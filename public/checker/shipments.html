@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Checker – Shipments</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <!-- 🔗 GLOBAL BADGES -->
+  <link rel="stylesheet" href="../styles/badges.css" />
+
+  <style>
+    body {
+      font-family: system-ui, -apple-system, Segoe UI, Roboto;
+      background: #f9fafb;
+      padding: 24px;
+    }
+
+    /* ================= HEADER ================= */
+    .header {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      margin-bottom: 24px;
+    }
+
+    .logo {
+      height: 36px;
+      width: auto;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 22px;
+      font-weight: 600;
+    }
+
+    /* ================= TABLE ================= */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: #ffffff;
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: 0 8px 20px rgba(0,0,0,.06);
+    }
+
+    th, td {
+      padding: 12px;
+      border-bottom: 1px solid #eee;
+      text-align: left;
+      font-size: 14px;
+    }
+
+    th {
+      background: #f1f5f9;
+      font-weight: 600;
+    }
+
+    button {
+      padding: 6px 12px;
+      border-radius: 6px;
+      font-size: 13px;
+      cursor: pointer;
+      background: #2563eb;
+      color: #fff;
+      border: none;
+    }
+
+    button:hover {
+      background: #1e40af;
+    }
+
+    button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+  </style>
+</head>
+
+<body>
+
+  <!-- ================= HEADER ================= -->
+  <div class="header">
+    <img src="../atlas-logo.png" alt="Atlas Logo" class="logo" />
+    <h1>Checker – Shipments</h1>
+  </div>
+
+  <!-- ================= TABLE ================= -->
+  <table>
+    <thead>
+      <tr>
+        <th>Tracking</th>
+        <th>Customer</th>
+        <th>Status</th>
+        <th>Action</th>
+      </tr>
+    </thead>
+
+    <tbody id="shipmentTable">
+      <!-- Filled by shipments.js -->
+    </tbody>
+  </table>
+
+  <!-- ================= SCRIPT ================= -->
+  <script type="module" src="./shipments.js"></script>
+
+</body>
+</html>

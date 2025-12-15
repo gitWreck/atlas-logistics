@@ -1,0 +1,13 @@
+# Firebase / Admin secrets
+serviceAccountKey.json
+
+# Node
+node_modules/
+
+# Env files
+.env
+.env.local
+
+# OS junk
+.DS_Store
+Thumbs.db

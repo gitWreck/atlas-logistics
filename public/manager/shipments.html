@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Manager – Shipments</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <!-- Badge styles -->
+  <link rel="stylesheet" href="../styles/badges.css" />
+
+  <style>
+    body {
+      font-family: system-ui, -apple-system, Segoe UI, Roboto;
+      background: #f9fafb;
+      padding: 24px;
+    }
+
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 24px;
+    }
+
+    .left {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .logo {
+      height: 36px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 22px;
+      font-weight: 600;
+    }
+
+    button {
+      padding: 6px 12px;
+      border-radius: 6px;
+      font-size: 13px;
+      cursor: pointer;
+      background: #2563eb;
+      color: #fff;
+      border: none;
+    }
+
+    button.secondary {
+      background: #475569;
+    }
+
+    button.sms {
+      background: #0ea5e9;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: #ffffff;
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: 0 8px 20px rgba(0,0,0,.06);
+    }
+
+    th, td {
+      padding: 12px;
+      border-bottom: 1px solid #eee;
+      font-size: 14px;
+      text-align: left;
+    }
+
+    th {
+      background: #f1f5f9;
+      font-weight: 600;
+    }
+
+    input, select, textarea {
+      padding: 6px 10px;
+      font-size: 13px;
+      border-radius: 6px;
+      border: 1px solid #cbd5e1;
+      width: 100%;
+    }
+
+    textarea {
+      resize: none;
+    }
+
+    .actions {
+      display: flex;
+      gap: 6px;
+    }
+
+    /* ================= MODALS ================= */
+    .modal {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,.4);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 50;
+    }
+
+    .modal.active {
+      display: flex;
+    }
+
+    .modal-content {
+      background: #fff;
+      padding: 20px;
+      border-radius: 12px;
+      width: 420px;
+      max-width: 92%;
+    }
+
+    .modal-content h2 {
+      margin-top: 0;
+      font-size: 18px;
+    }
+
+    .modal-content label {
+      font-size: 13px;
+      color: #475569;
+    }
+
+    .modal-content input,
+    .modal-content textarea {
+      margin-bottom: 10px;
+    }
+  </style>
+</head>
+
+<body>
+
+<!-- ================= HEADER ================= -->
+<div class="header">
+  <div class="left">
+    <img src="../atlas-logo.png" class="logo" />
+    <h1>Manager – Shipments</h1>
+  </div>
+  <button id="addShipmentBtn">➕ New Shipment</button>
+</div>
+
+<!-- ================= TABLE ================= -->
+<table>
+  <thead>
+    <tr>
+      <th>Tracking</th>
+      <th>Customer</th>
+      <th>Destination</th>
+      <th>Status</th>
+      <th>Actions</th>
+    </tr>
+  </thead>
+  <tbody id="shipmentTable"></tbody>
+</table>
+
+<!-- ================= CREATE / EDIT MODAL ================= -->
+<div class="modal" id="shipmentModal">
+  <div class="modal-content">
+    <h2 id="modalTitle">New Shipment</h2>
+
+    <label>Tracking ID</label>
+    <input id="trackingInput" />
+
+    <label>Customer Name</label>
+    <input id="customerInput" />
+
+    <label>Customer Phone</label>
+    <input id="customerPhone" placeholder="09XXXXXXXXX" />
+
+    <label>Destination</label>
+    <input id="destinationInput" />
+
+    <div class="actions">
+      <button id="saveShipmentBtn">Save</button>
+      <button class="secondary" id="cancelBtn">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- ================= SMS PREVIEW MODAL ================= -->
+<div class="modal" id="smsModal">
+  <div class="modal-content">
+    <h2>📩 SMS Preview</h2>
+
+    <p><strong>To:</strong> <span id="smsPhone"></span></p>
+    <p><strong>Tracking:</strong> <span id="smsTracking"></span></p>
+
+    <label>Message</label>
+    <textarea
+      id="smsMessage"
+      rows="6"
+      readonly
+    ></textarea>
+
+    <div class="actions">
+      <button id="sendSmsBtn">Send SMS</button>
+      <button class="secondary" id="closeSmsBtn">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- ================= SCRIPT ================= -->
+<script type="module" src="./shipments.js"></script>
+
+</body>
+</html>
