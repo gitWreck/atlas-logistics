@@ -1,140 +1,196 @@
-/*********************************************************
- * ATLAS TRACKING – CLOUD FUNCTIONS (PROD SAFE)
- * Node 18 – CommonJS – Firebase v2 + v1 Auth
- *********************************************************/
+"use strict";
 
-const functions = require("firebase-functions/v1");
-const { onCall, onRequest, HttpsError } = require("firebase-functions/v2/https");
+const { setGlobalOptions } = require("firebase-functions/v2/options");
+const { onDocumentUpdated } = require("firebase-functions/v2/firestore");
 const admin = require("firebase-admin");
 
-admin.initializeApp();
-const db = admin.firestore();
+// ✅ MUST be called once, before anything else
+setGlobalOptions({ region: "asia-southeast1" });
 
-/* ======================================================
-   🔐 ADMIN GUARD
-====================================================== */
-async function assertAdmin(request) {
-  if (!request.auth) {
-    throw new HttpsError("unauthenticated", "Login required");
-  }
-
-  const uid = request.auth.uid;
-  const snap = await db.collection("users").doc(uid).get();
-
-  if (!snap.exists || snap.data().role !== "admin") {
-    throw new HttpsError("permission-denied", "Admins only");
-  }
-
-  return uid;
+// ✅ Admin init (idempotent)
+if (!admin.apps.length) {
+  admin.initializeApp();
 }
 
-/* ======================================================
-   AUTH → USER PROFILE CREATION (v1 – SAFE)
-====================================================== */
-exports.createUserProfile = functions
-  .region("asia-southeast1")
-  .auth.user()
-  .onCreate(async (user) => {
-    const uid = user.uid;
 
-    await db.collection("users").doc(uid).set({
-      uid,
+/* ======================================================
+   PHASE 5 + 6 — PACKAGE → TRIP → TRACKING SYNC
+====================================================== */
+exports.syncTripProgressFromPackages = onDocumentUpdated(
+  "tracking_records/{trackingId}/truck_trips/{tripDocId}/trip_packages/{packageDocId}",
+  async (event) => {
+    const after = event.data.after?.data();
+    if (!after) return;
+
+    const tripRef = event.data.after.ref.parent.parent;
+    if (!tripRef) return;
+
+    const tripSnap = await tripRef.get();
+    if (!tripSnap.exists) return;
+
+    const trip = tripSnap.data();
+
+    // 🔄 Recalculate delivery progress
+    const packagesSnap = await tripRef
+      .collection("trip_packages")
+      .where("active", "==", true)
+      .get();
+
+    const total = packagesSnap.size;
+    const delivered = packagesSnap.docs.filter(
+      (d) => d.data().status === "DELIVERED"
+    ).length;
+
+    const progress = total === 0 ? 0 : delivered / total;
+
+    const tripUpdate = {
+      packageTotal: total,
+      packageDelivered: delivered,
+      deliveryProgress: progress,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    };
+
+    // ✅ Close trip if fully delivered
+    if (delivered === total && total > 0) {
+      tripUpdate.status = "DELIVERED";
+      tripUpdate.completedAt =
+        admin.firestore.FieldValue.serverTimestamp();
+      tripUpdate.active = false;
+    }
+
+    await tripRef.update(tripUpdate);
+
+    // 🔁 Phase 6 — auto-sync tracking_records
+    const trackingRef = tripRef.parent.parent;
+    if (trackingRef) {
+      const trackingUpdate = {
+        status: tripUpdate.status || trip.status,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      };
+
+      if (tripUpdate.status === "DELIVERED") {
+        trackingUpdate.deliveredAt =
+          admin.firestore.FieldValue.serverTimestamp();
+      }
+
+      await trackingRef.update(trackingUpdate);
+    }
+  }
+);
+
+// --------------------------------------------------
+// AUTH → USER PROFILE (v1 trigger)
+// --------------------------------------------------
+const { auth } = require("firebase-functions/v1");
+
+exports.createUserProfile = auth.user().onCreate(async (user) => {
+  if (!user?.uid) return;
+
+  await admin.firestore().collection("users").doc(user.uid).set(
+    {
+      uid: user.uid,
       email: user.email || "",
       name: user.displayName || "",
-      photoURL: user.photoURL || "",
       role: "user",
       active: true,
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
-    });
-  });
+    },
+    { merge: true }
+  );
+});
 
-/* ======================================================
-   ADMIN: SET USER ROLE (CALLABLE)
-====================================================== */
-exports.adminSetUserRole = onCall(
-  { region: "asia-southeast1" },
-  async (request) => {
-    const adminUid = await assertAdmin(request);
-    const { userId, role } = request.data;
+// ==================================================
+// 📦 CORE SHIPPING FUNCTIONS
+// ==================================================
+exports.createShipment = require("./createShipment").createShipment;
+exports.archiveShipment = require("./archiveShipment").archiveShipment;
+exports.updateTruckStatus = require("./updateTruckStatus").updateTruckStatus;
+exports.appendStatusEvent = require("./appendStatusEvent").appendStatusEvent;
+exports.syncShipmentItems = require("./syncShipmentItems").syncShipmentItems;
 
-    if (!userId || !["user", "admin"].includes(role)) {
-      throw new HttpsError("invalid-argument", "Invalid payload");
+
+// 🌍 PUBLIC (customer)
+exports.trackShipment = require("./trackShipment").trackShipment;
+
+// ==================================================
+// 📩 SMS – MANUAL & BULK (existing endpoints)
+// ==================================================
+exports.sendSMS = require("./sendSMS").sendSMS;
+exports.sendBulkSMS = require("./sendBulkSMS").sendBulkSMS;
+
+// ==================================================
+// 🤖 AUTO SMS (status-change driven)
+// ==================================================
+exports.autoSms = require("./autoSms").autoSms;
+
+// ==================================================
+// 🧠 SMS ADMIN / MANAGER CONTROLS (existing module)
+// ==================================================
+exports.smsAdmin = require("./smsAdmin").smsAdmin;
+
+// ==================================================
+// ✅ NEW: CALLABLES REQUIRED BY admin/shipments.js
+// ==================================================
+
+// Shipments
+exports.bulkCreateShipments = require("./bulkCreateShipments").bulkCreateShipments;
+
+// Truck trips
+exports.createTruckTrip = require("./createTruckTrip").createTruckTrip;
+exports.assignShipmentToTruckTrip = require("./assignShipmentToTruckTrip").assignShipmentToTruckTrip;
+exports.unassignShipmentFromTruckTrip = require("./unassignShipmentFromTruckTrip").unassignShipmentFromTruckTrip;
+
+// Truck controls
+exports.setTruckDelay = require("./setTruckDelay").setTruckDelay;
+exports.clearTruckDelay = require("./clearTruckDelay").clearTruckDelay;
+exports.setTruckAutoSmsSettings = require("./setTruckAutoSmsSettings").setTruckAutoSmsSettings;
+
+exports.assignDriverToTruckTrip = require("./assignDriverToTruckTrip").assignDriverToTruckTrip;
+exports.unassignDriverFromTruckTrip = require("./unassignDriverFromTruckTrip").unassignDriverFromTruckTrip;
+
+// SMS callable experience (UI preview/send + per-truck usage)
+exports.previewNextSms = require("./previewNextSms").previewNextSms;
+exports.previewManualSms = require("./previewManualSms").previewManualSms;
+exports.sendManualSms = require("./sendManualSms").sendManualSms;
+exports.getTruckSmsUsage = require("./getTruckSmsUsage").getTruckSmsUsage;
+
+// Partial delivery
+exports.recordPartialDelivery = require("./recordPartialDelivery").recordPartialDelivery;
+
+// ==================================================
+// 🔗 INVITATIONS
+// ==================================================
+const {
+  createInvite,
+  validateInvite,
+  acceptInvite,
+  revokeInvite,
+} = require("./invitations");
+
+exports.createInvite = createInvite;
+exports.validateInvite = validateInvite;
+exports.acceptInvite = acceptInvite;
+exports.revokeInvite = revokeInvite;
+
+exports.syncTripToTracking = onDocumentUpdated(
+  "tracking_records/{trackingId}/truck_trips/{tripId}",
+  async (event) => {
+    const after = event.data.after?.data();
+    if (!after) return;
+
+    const trackingRef = event.data.after.ref.parent.parent;
+    if (!trackingRef) return;
+
+    const update = {
+      status: after.status,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp()
+    };
+
+    if (after.status === "DELIVERED") {
+      update.deliveredAt =
+        admin.firestore.FieldValue.serverTimestamp();
     }
 
-    if (userId === adminUid) {
-      throw new HttpsError("failed-precondition", "Cannot change own role");
-    }
-
-    await db.collection("users").doc(userId).update({
-      role,
-      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-    });
-
-    await db.collection("admin_logs").add({
-      action: "SET_ROLE",
-      targetUser: userId,
-      role,
-      by: adminUid,
-      at: admin.firestore.FieldValue.serverTimestamp(),
-    });
-
-    return { success: true };
-  }
-);
-
-/* ======================================================
-   ADMIN: ACTIVATE / DEACTIVATE USER (CALLABLE)
-====================================================== */
-exports.adminSetUserActive = onCall(
-  { region: "asia-southeast1" },
-  async (request) => {
-    const adminUid = await assertAdmin(request);
-    const { userId, active } = request.data;
-
-    if (!userId || typeof active !== "boolean") {
-      throw new HttpsError("invalid-argument", "Invalid payload");
-    }
-
-    if (userId === adminUid) {
-      throw new HttpsError("failed-precondition", "Cannot modify own account");
-    }
-
-    await db.collection("users").doc(userId).update({
-      active,
-      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-    });
-
-    await db.collection("admin_logs").add({
-      action: active ? "ACTIVATE_USER" : "DEACTIVATE_USER",
-      targetUser: userId,
-      by: adminUid,
-      at: admin.firestore.FieldValue.serverTimestamp(),
-    });
-
-    return { success: true };
-  }
-);
-
-/* ======================================================
-   PUBLIC TRACKING API (HTTP – SAFE)
-====================================================== */
-exports.trackShipment = onRequest(
-  { cors: true, region: "asia-southeast1" },
-  async (req, res) => {
-    const tracking = String(req.query.tracking || "").trim();
-    if (!tracking) {
-      return res.status(400).json({ error: "Missing tracking number" });
-    }
-
-    const snap = await db
-      .collection("tracking_records")
-      .doc(tracking)
-      .get();
-
-    if (!snap.exists) {
-      return res.status(404).json({ error: "Not found" });
-    }
-
-    return res.json({ success: true, data: snap.data() });
+    await trackingRef.update(update);
   }
 );
