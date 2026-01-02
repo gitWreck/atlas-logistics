@@ -1,0 +1,27 @@
+# Node / Firebase
+node_modules/
+npm-debug.log*
+yarn-error.log*
+
+# Firebase
+.firebase/
+.firebaserc
+firebase-debug.log
+runtimeconfig.json
+
+# Environment secrets
+.env
+.env.local
+.env.production
+.env.development
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor files
+.vscode/
+.idea/
+
+# Logs
+*.log
