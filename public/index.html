@@ -1,3 +1,9 @@
+<!--
+ATLAS TRACKING UI
+MOBILE-FIRST CANONICAL v1.0
+❄️ DO NOT MODIFY CORE LOGIC ❄️
+-->
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -165,44 +171,52 @@ body {
 .steps {
   display: flex;
   justify-content: space-between;
+  position: relative;
 }
 
+/* BASE GREY LINE */
+.steps::before {
+  content: "";
+  position: absolute;
+  top: 18px;
+  left: 12.5%;
+  right: 12.5%;
+  height: 4px;
+  background: #e5e7eb;
+  border-radius: 999px;
+  z-index: 1;
+}
+
+/* BLUE PROGRESS LINE */
+.progress-line {
+  position: absolute;
+  top: 18px;
+  left: 12.5%;
+  height: 4px;
+  background: #2563eb;
+  border-radius: 999px;
+  z-index: 2;
+  width: 0%;
+  animation: fillLine .6s ease-out forwards;
+}
+
+/* STEP */
 .step {
   flex: 1;
   text-align: center;
   position: relative;
+  z-index: 3;
 }
 
+/* DOT WRAPPER */
 .dot-wrap {
   height: 36px;
   display: flex;
   align-items: center;
   justify-content: center;
-   position: relative;  /* ✅ required for z-index to apply */
-  z-index: 2;          /* ✅ above line */
 }
 
-/* optional but safe: force dot/pulse above everything */
-.dot, .pulse {
-  position: relative;
-  z-index: 3;
-}
-Z
-.step::before {
-  content: "";
-  position: absolute;
-  top: 18px;
-  left: 50%;
-  right: -50%;
-  height: 4px;
-  background: #e5e7eb;
-  z-index: 1;          /* ✅ behind dots */
-}
-
-.step:last-child::before {
-  display: none;
-}
-
+/* STATIC DOT */
 .dot {
   width: 18px;
   height: 18px;
@@ -214,6 +228,7 @@ Z
   background: #2563eb;
 }
 
+/* ACTIVE PULSE */
 .pulse {
   width: 36px;
   height: 36px;
@@ -238,18 +253,32 @@ Z
   border: 4px solid #fff;
 }
 
-@keyframes pulse {
-  0% { transform: scale(1); opacity: .6; }
-  70% { transform: scale(2.6); opacity: 0; }
-  100% { opacity: 0; }
-}
+.pulse.delayed::before { background: rgba(234,179,8,.45); }
+.pulse.delayed::after  { background: #eab308; }
 
 .step-label {
   font-size: 11px;
   font-weight: 600;
-  color: #374151;
   margin-top: 8px;
 }
+
+.delay-label {
+  font-size: 10px;
+  font-weight: 700;
+  color: #92400e;
+  margin-top: 6px;
+}
+
+@keyframes pulse {
+  0% { transform: scale(1); opacity:.6; }
+  70% { transform: scale(2.6); opacity:0; }
+  100% { opacity:0; }
+}
+
+@keyframes fillLine {
+  to { width: var(--progress); }
+}
+
 
 /* ===== TOTALS ===== */
 .totals {
@@ -276,6 +305,114 @@ Z
 .value {
   font-weight: 700;
 }
+
+/* 🌦 WEATHER FLOATING ICON */
+.pulse.weather::after {
+  content: "🌦";
+  position: absolute;
+  top: -26px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 14px;
+  animation: weatherFloat 2.6s ease-in-out infinite;
+}
+
+@keyframes weatherFloat {
+  0%   { transform: translate(-50%, 0); opacity:.7; }
+  50%  { transform: translate(-50%, -8px); opacity:1; }
+  100% { transform: translate(-50%, 0); opacity:.7; }
+}
+
+/* 🚢 RORO ROCKING ICON */
+.pulse.roro::after {
+  content: "🚢";
+  position: absolute;
+  top: -26px;
+  left: 50%;
+  transform-origin: center;
+  font-size: 15px;
+  animation: shipRock 2.4s ease-in-out infinite;
+}
+
+@keyframes shipRock {
+  0%   { transform: translateX(-50%) rotate(0deg); }
+  25%  { transform: translateX(-50%) rotate(4deg); }
+  50%  { transform: translateX(-50%) rotate(0deg); }
+  75%  { transform: translateX(-50%) rotate(-4deg); }
+  100% { transform: translateX(-50%) rotate(0deg); }
+}
+
+/* ✅ BACK ON TRACK BADGE */
+.resume-badge {
+  margin-top: 10px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: #eff6ff;
+  color: #1d4ed8;
+  font-size: 11px;
+  font-weight: 700;
+  text-align: center;
+  animation: fadeResume 4s forwards;
+}
+
+@keyframes fadeResume {
+  0%   { opacity: 0; transform: translateY(6px); }
+  15%  { opacity: 1; transform: translateY(0); }
+  80%  { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+/* ============================================
+   DESKTOP ENHANCEMENTS
+   (Overrides mobile-first canonical)
+============================================ */
+
+@media (min-width: 768px) {
+
+  .card {
+    max-width: 720px;
+    padding: 28px 32px;
+    border-radius: 20px;
+  }
+
+  .logo-wrap img {
+    height: 160px; /* desktop override */
+  }
+
+  .search-wrap input {
+    font-size: 17px;
+    height: 56px;
+    line-height: 56px;
+  }
+
+  .search-actions button {
+    font-size: 16px;
+    padding: 14px 34px;
+  }
+
+  .timeline {
+    margin: 28px 0;
+  }
+
+  .step-label {
+    font-size: 12px;
+  }
+
+  .result-scroll {
+    max-height: 420px;
+  }
+
+  .totals {
+    gap: 12px;
+    padding-top: 12px;
+  }
+
+  .totals div {
+    padding: 10px;
+  }
+}
+
+
 </style>
 </head>
 
@@ -325,23 +462,54 @@ function normalizeStatus(s) {
   return s === "Received at Warehouse" ? "Received" : s;
 }
 
-function renderTimeline(status) {
+/* ===== DELAY HELPERS ===== */
+function getDelayLabel(reason) {
+  return reason ? "⚠ " + reason.replace(/_/g," ") : "Delayed";
+}
+
+/* ✅ ADD THIS EXACTLY HERE */
+function renderResumeBadge() {
+  return `
+    <div class="resume-badge">
+      ✅ Back on track
+    </div>
+  `;
+}
+
+/* ===== TIMELINE ===== */
+function renderTimeline(status, delayReason, delayCleared) {
   const i = STATUS_STEPS.indexOf(normalizeStatus(status));
+  const progress = (i / (STATUS_STEPS.length - 1)) * 75;
+  const delayed = delayReason && delayCleared === false;
+
   return `
     <div class="timeline">
       <div class="steps">
-        ${STATUS_STEPS.map((s, x) => `
+        <div class="progress-line" style="--progress:${progress}%"></div>
+        ${STATUS_STEPS.map((s,x)=>`
           <div class="step">
-            <div class="dot-wrap">
-              ${x === i ? `<div class="pulse"></div>` :
-                `<div class="dot ${x < i ? "done" : ""}"></div>`}
-            </div>
-            <div class="step-label">${s}</div>
-          </div>
+  <div class="dot-wrap">
+    ${
+      x === i
+        ? `
+          <div class="pulse
+            ${delayed ? "delayed" : ""}
+            ${delayReason?.includes("WEATHER") ? "weather" : ""}
+            ${delayReason?.includes("RORO") ? "roro" : ""}
+          "></div>
+        `
+        : `<div class="dot ${x<i?"done":""}"></div>`
+    }
+  </div>
+  <div class="step-label">${s}</div>
+</div>
+
+
         `).join("")}
       </div>
     </div>`;
 }
+
 
 /* 🔢 COUNT-UP ANIMATION */
 function animateCount(el, target, duration = 600) {
@@ -363,12 +531,15 @@ async function track() {
   const btn = document.getElementById("trackBtn");
   const output = document.getElementById("output");
   const tracking = input.value.trim();
+
+  if (btn.disabled) return;   // ✅ CORRECT PLACE
   if (!tracking) return;
 
   btn.classList.add("loading");
   btn.disabled = true;
   btn.textContent = "Tracking";
   output.innerHTML = "";
+
 
   try {
     const res = await fetch(`${API_URL}?tracking=${encodeURIComponent(tracking)}`);
@@ -388,9 +559,13 @@ async function track() {
           Last updated: ${formatLastUpdated()}
         </div>
 
-        ${renderTimeline(d.status)}
+
+        ${renderTimeline(d.status, d.delayReason, d.delayCleared)}
+
+        ${d.delayCleared === true ? renderResumeBadge() : ""}
 
         <div class="label">Customer</div>
+
         <div class="value">${d.customerName}</div>
 
         <div class="label">Route</div>

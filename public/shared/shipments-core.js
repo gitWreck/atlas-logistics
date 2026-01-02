@@ -1,22 +1,41 @@
 import {
   collection,
-  getDocs,
-  query,
-  orderBy,
-  limit
+  getDocs
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
 import { STATUS_FLOW } from "./status-flow.js";
 import { getStatusBadgeClass } from "./badge-utils.js";
 import { updateShipmentStatus } from "../src/services/updateShipmentStatus.js";
 
+/* ======================================================
+   SAFE HTML ESCAPE (XSS HARDENING)
+====================================================== */
+function esc(v = "—") {
+  return String(v)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+
+/* ======================================================
+   EMPTY STATE RENDERER
+====================================================== */
+function renderState(tableEl, message, color = "#64748b") {
+  tableEl.innerHTML = `
+    <tr>
+      <td colspan="4" style="text-align:center;padding:24px;color:${color}">
+        ${esc(message)}
+      </td>
+    </tr>`;
+}
+
 /**
- * initShipmentsCore({
- *   db,
- *   tableEl,
- *   user,
- *   roleConfig
- * })
+ * Initialize shipment table
+ * - Delay-aware badge
+ * - Forward-only status progression
+ * - Role-guarded updates
  */
 export async function initShipmentsCore({
   db,
@@ -26,83 +45,107 @@ export async function initShipmentsCore({
 }) {
   tableEl.innerHTML = "";
 
-  const snap = await getDocs(collection(db, "tracking_records"));
-
-  if (snap.empty) {
-    tableEl.innerHTML = `
-      <tr>
-        <td colspan="4" style="text-align:center;padding:24px;color:#64748b">
-          No shipments found
-        </td>
-      </tr>`;
+  let snap;
+  try {
+    snap = await getDocs(collection(db, "tracking_records"));
+  } catch (err) {
+    console.error("Failed to load shipments:", err);
+    renderState(tableEl, "Failed to load shipments", "#dc2626");
     return;
   }
+
+  if (snap.empty) {
+    renderState(tableEl, "No shipments found");
+    return;
+  }
+
+  const rows = document.createDocumentFragment();
 
   for (const docSnap of snap.docs) {
     const record = docSnap.data();
 
-    // 🔑 latest status
-    const eventsRef = collection(
-      db,
-      "tracking_records",
-      docSnap.id,
-      "status_events"
-    );
+    const status = record.status || "Received";
+    const statusIndex = record.statusIndex ?? 0;
 
-    const eventsSnap = await getDocs(
-      query(eventsRef, orderBy("statusIndex", "desc"), limit(1))
-    );
+    /* ==================================================
+       🔴 DELAY-AWARE BADGE (CANONICAL)
+    ================================================== */
+    const hasActiveDelay =
+      record.delayReason && !record.delayCleared;
 
-    let status = record.status || "Received";
-    let statusIndex = record.statusIndex ?? 0;
+    const badgeClass = hasActiveDelay
+      ? "delayed"
+      : getStatusBadgeClass(status);
 
-    if (!eventsSnap.empty) {
-      const latest = eventsSnap.docs[0].data();
-      status = latest.status;
-      statusIndex = latest.statusIndex;
-    }
+    const badgeLabel = hasActiveDelay
+      ? "Delayed"
+      : status;
 
-    const badgeClass = getStatusBadgeClass(status);
-    const tr = document.createElement("tr");
-
-    // 🔒 forward-only
     const nextIndex = statusIndex + 1;
+
     const canAdvance =
       roleConfig.canUpdate &&
       nextIndex < STATUS_FLOW.length &&
       roleConfig.allowedNext(statusIndex, nextIndex);
 
+    const tr = document.createElement("tr");
+
     tr.innerHTML = `
-      <td>${docSnap.id}</td>
-      <td>${record.customerName ?? "—"}</td>
+      <td>${esc(docSnap.id)}</td>
+      <td>${esc(record.customerName)}</td>
       <td>
         <span class="badge ${badgeClass}">
-          ${status}
+          ${esc(badgeLabel)}
         </span>
       </td>
       <td>
         ${
-          roleConfig.canUpdate
-            ? `<button ${canAdvance ? "" : "disabled"}>
-                ${canAdvance ? "→ " + STATUS_FLOW[nextIndex] : "Completed"}
-               </button>`
-            : ""
+          canAdvance
+            ? `<button>→ ${esc(STATUS_FLOW[nextIndex])}</button>`
+            : `<span style="color:#94a3b8;font-size:12px;">No action</span>`
         }
       </td>
     `;
 
+    /* ==================================================
+       STATUS UPDATE HANDLER (SAFE)
+    ================================================== */
     if (canAdvance) {
-      tr.querySelector("button").onclick = async () => {
-        await updateShipmentStatus({
-          trackingId: docSnap.id,
-          nextStatus: STATUS_FLOW[nextIndex],
-          nextStatusIndex: nextIndex,
-          user
-        });
-        initShipmentsCore({ db, tableEl, user, roleConfig });
+      const btn = tr.querySelector("button");
+
+      btn.onclick = async () => {
+        if (btn.disabled) return;
+
+        btn.disabled = true;
+        btn.textContent = "Updating…";
+
+        try {
+          await updateShipmentStatus({
+            trackingId: docSnap.id,
+            nextStatus: STATUS_FLOW[nextIndex],
+            nextStatusIndex: nextIndex,
+            user
+          });
+
+          // Full refresh (single call)
+          await initShipmentsCore({
+            db,
+            tableEl,
+            user,
+            roleConfig
+          });
+        } catch (err) {
+          console.error("Status update failed:", err);
+          alert(err.message || "Failed to update status");
+
+          btn.disabled = false;
+          btn.textContent = "→ " + STATUS_FLOW[nextIndex];
+        }
       };
     }
 
-    tableEl.appendChild(tr);
+    rows.appendChild(tr);
   }
+
+  tableEl.appendChild(rows);
 }

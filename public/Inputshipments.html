@@ -1,0 +1,1122 @@
+<!-- public/admin/shipments.html
+     ATLAS OPS — Shipments + Trips (Admin/Manager)
+     ✅ Manifest Lock + Certificate + Safe Reopen
+     ✅ Trip Packages (trip_packages is the source of truth)
+     ✅ Assign/Unassign, Load/Unload, Partial Delivery (hooks)
+     ✅ Delay controls + Auto-SMS settings (hooks)
+     ✅ Role-gated (admin/manager) via guard.js + server enforcement
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Atlas OPS — Shipments</title>
+
+  <style>
+    :root{
+      --bg0:#05070f;
+      --bg1:#0b1020;
+      --card: rgba(255,255,255,.06);
+      --stroke: rgba(255,255,255,.12);
+      --stroke2: rgba(255,255,255,.18);
+      --text:#eaf0ff;
+      --muted: rgba(234,240,255,.7);
+      --blue:#2563eb;
+      --green:#16a34a;
+      --red:#dc2626;
+      --yellow:#f59e0b;
+      --ok:#5dffb1;
+      --err:#ff6b7a;
+      --shadow: 0 20px 50px rgba(0,0,0,.45);
+      --r:16px;
+    }
+
+    *{ box-sizing:border-box; }
+    body{
+      margin:0;
+      font-family: system-ui,-apple-system,Segoe UI,Roboto,Arial;
+      color:var(--text);
+      background: radial-gradient(circle at top, #0b1433, var(--bg0));
+      min-height:100vh;
+    }
+
+    .topbar{
+      position:sticky; top:0; z-index:30;
+      backdrop-filter: blur(10px);
+      background: rgba(5,7,15,.65);
+      border-bottom: 1px solid rgba(255,255,255,.08);
+    }
+    .topbar-inner{
+      max-width: 1320px; margin:0 auto;
+      padding: 14px 18px;
+      display:flex; align-items:center; gap:12px;
+    }
+    .brand{
+      display:flex; align-items:center; gap:10px;
+      font-weight:800; letter-spacing:.4px;
+    }
+    .brand img{ height:28px; width:auto; border-radius:8px; }
+    .chip{
+      display:inline-flex; align-items:center; gap:8px;
+      padding:6px 10px; border-radius:999px;
+      border:1px solid rgba(255,255,255,.14);
+      background: rgba(255,255,255,.06);
+      color: var(--muted);
+      font-size: 12px;
+      white-space: nowrap;
+    }
+    .spacer{ flex:1; }
+    .link{
+      color:#9fd3ff; text-decoration:none; font-weight:600;
+      font-size: 13px;
+    }
+    .link:hover{ text-decoration: underline; }
+
+    .wrap{ max-width: 1320px; margin: 0 auto; padding: 18px; }
+    .grid{
+      display:grid;
+      grid-template-columns: 420px 1fr;
+      gap:16px;
+    }
+    @media (max-width: 1100px){
+      .grid{ grid-template-columns: 1fr; }
+    }
+
+    .card{
+      background: var(--card);
+      border: 1px solid var(--stroke);
+      border-radius: var(--r);
+      box-shadow: var(--shadow);
+      overflow:hidden;
+    }
+    .card-h{
+      padding: 14px 14px;
+      border-bottom: 1px solid rgba(255,255,255,.08);
+      display:flex; align-items:center; justify-content:space-between; gap:12px;
+    }
+    .card-h h2{
+      margin:0; font-size: 14px;
+      letter-spacing:.4px;
+      text-transform: uppercase;
+      color: rgba(234,240,255,.85);
+    }
+    .card-b{ padding: 14px; }
+
+    .muted{ color: var(--muted); font-size: 13px; }
+    .small{ font-size: 12px; color: var(--muted); }
+
+    .row{ display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
+    .col{ display:flex; flex-direction:column; gap:8px; }
+
+    input, select, textarea{
+      width:100%;
+      padding: 10px 12px;
+      border-radius: 12px;
+      border: 1px solid var(--stroke2);
+      background: rgba(255,255,255,.06);
+      color: var(--text);
+      outline:none;
+    }
+    textarea{ min-height: 90px; resize: vertical; }
+
+    .btn{
+      padding: 10px 12px;
+      border-radius: 12px;
+      border: 1px solid rgba(255,255,255,.18);
+      background: rgba(255,255,255,.10);
+      color: var(--text);
+      cursor:pointer;
+      font-weight:700;
+      letter-spacing:.2px;
+      display:inline-flex; align-items:center; gap:8px;
+      user-select:none;
+      transition: transform .06s ease, background .12s ease, box-shadow .12s ease, opacity .12s ease;
+    }
+    .btn:hover{ background: rgba(255,255,255,.14); box-shadow: 0 10px 22px rgba(0,0,0,.25); }
+    .btn:active{ transform: translateY(1px); }
+    .btn.primary{ background: rgba(37,99,235,.85); border-color: rgba(37,99,235,.95); }
+    .btn.primary:hover{ background: rgba(37,99,235,.95); }
+    .btn.success{ background: rgba(22,163,74,.85); border-color: rgba(22,163,74,.95); }
+    .btn.success:hover{ background: rgba(22,163,74,.95); }
+    .btn.danger{ background: rgba(220,38,38,.85); border-color: rgba(220,38,38,.95); }
+    .btn.danger:hover{ background: rgba(220,38,38,.95); }
+    .btn.warn{ background: rgba(245,158,11,.85); border-color: rgba(245,158,11,.95); color:#0b1020; }
+    .btn.warn:hover{ background: rgba(245,158,11,.95); }
+    .btn.ghost{ background: rgba(255,255,255,.06); }
+    .btn[disabled]{ opacity:.45; cursor:not-allowed; transform:none; box-shadow:none; }
+
+    .list{
+      display:flex; flex-direction:column; gap:10px;
+    }
+    .item{
+      padding: 12px;
+      border-radius: 14px;
+      border:1px solid rgba(255,255,255,.12);
+      background: rgba(0,0,0,.18);
+      cursor:pointer;
+      transition: transform .06s ease, background .12s ease, border-color .12s ease;
+    }
+    .item:hover{ background: rgba(255,255,255,.07); }
+    .item.active{
+      border-color: rgba(159,211,255,.55);
+      background: rgba(159,211,255,.10);
+    }
+    .item .title{
+      font-weight:800;
+      display:flex; align-items:center; justify-content:space-between; gap:10px;
+    }
+    .item .meta{
+      margin-top:6px;
+      font-size: 12px;
+      color: var(--muted);
+      display:flex; gap:10px; flex-wrap:wrap;
+    }
+    .pill{
+      display:inline-flex; align-items:center; gap:6px;
+      padding: 3px 8px;
+      border-radius: 999px;
+      font-size: 12px;
+      border: 1px solid rgba(255,255,255,.14);
+      background: rgba(255,255,255,.07);
+      color: rgba(234,240,255,.85);
+      white-space:nowrap;
+    }
+    .pill.ok{ border-color: rgba(93,255,177,.35); background: rgba(93,255,177,.12); }
+    .pill.warn{ border-color: rgba(255,210,74,.35); background: rgba(255,210,74,.12); }
+    .pill.err{ border-color: rgba(255,107,122,.35); background: rgba(255,107,122,.12); }
+
+    table{ width:100%; border-collapse: collapse; }
+    th, td{
+      text-align:left;
+      padding: 10px 10px;
+      border-bottom: 1px solid rgba(255,255,255,.10);
+      font-size: 13px;
+      vertical-align: top;
+    }
+    th{ color: rgba(234,240,255,.72); font-weight: 700; font-size: 12px; letter-spacing:.3px; text-transform: uppercase; }
+
+    pre{
+      margin:0;
+      background: rgba(0,0,0,.35);
+      border: 1px solid rgba(255,255,255,.12);
+      border-radius: 14px;
+      padding: 12px;
+      overflow:auto;
+      max-height: 280px;
+      font-size: 12px;
+      color: rgba(234,240,255,.9);
+    }
+
+    /* Trip Control Bar (Atlas Standard) */
+    .trip-action-bar{
+      display:flex;
+      gap:12px;
+      align-items:center;
+      margin: 12px 0 0;
+      padding:10px 12px;
+      border-radius: 14px;
+      background: rgba(255,255,255,.04);
+      border: 1px solid rgba(255,255,255,.12);
+      flex-wrap: wrap;
+    }
+    .trip-seal{
+      margin-left:auto;
+      font-weight:800;
+      letter-spacing:.2px;
+      padding: 6px 10px;
+      border-radius: 999px;
+      border:1px solid rgba(255,255,255,.12);
+      background: rgba(255,255,255,.06);
+      color: rgba(234,240,255,.85);
+      display:inline-flex; align-items:center; gap:8px;
+    }
+    .trip-seal.muted{ color: rgba(234,240,255,.68); }
+    .trip-seal.locked{ border-color: rgba(255,210,74,.35); background: rgba(255,210,74,.12); }
+    .trip-seal.certified{ border-color: rgba(93,255,177,.35); background: rgba(93,255,177,.12); }
+
+    .section{
+      margin-top: 14px;
+      padding-top: 14px;
+      border-top: 1px solid rgba(255,255,255,.08);
+    }
+
+    .two{
+      display:grid;
+      grid-template-columns: 1fr 1fr;
+      gap:12px;
+    }
+    @media (max-width: 900px){
+      .two{ grid-template-columns: 1fr; }
+    }
+
+    .toast{
+      position: fixed;
+      bottom: 18px;
+      right: 18px;
+      z-index: 60;
+      min-width: 280px;
+      max-width: 420px;
+      padding: 12px 14px;
+      border-radius: 14px;
+      border:1px solid rgba(255,255,255,.14);
+      background: rgba(0,0,0,.55);
+      backdrop-filter: blur(8px);
+      box-shadow: var(--shadow);
+      display:none;
+    }
+    .toast.show{ display:block; }
+    .toast .t{ font-weight: 800; }
+    .toast .m{ margin-top:4px; color: var(--muted); font-size: 13px; }
+  </style>
+
+  <!-- Firebase SDKs (compat) -->
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-functions-compat.js"></script>
+
+  <!-- Your init + auth guard (already in your project) -->
+  <script src="/firebase.js"></script>
+  <script src="/auth.js"></script>
+  <script src="/guard.js"></script>
+</head>
+
+<body>
+  <div class="topbar">
+    <div class="topbar-inner">
+      <div class="brand">
+        <img src="/atlas-logo.png" alt="Atlas"/>
+        <div>ATLAS OPS</div>
+      </div>
+
+      <span class="chip" id="chipRole">Role: …</span>
+      <span class="chip" id="chipUser">User: …</span>
+
+      <div class="spacer"></div>
+
+      <a class="link" href="/dashboard.html">Manager Dashboard</a>
+      <a class="link" href="/dashboard.html">Manager Dashboard</a>
+      <a class="link" href="/manifest.html">Manifest Tool</a>
+      <button class="btn ghost" id="btnLogout">Logout</button>
+    </div>
+  </div>
+
+  <div class="wrap">
+    <div class="grid">
+
+      <!-- LEFT: Trips -->
+      <div class="card">
+        <div class="card-h">
+          <h2>Trips</h2>
+          <button class="btn primary" id="btnNewTrip">➕ Create Trip</button>
+        </div>
+        <div class="card-b">
+          <div class="row">
+            <input id="tripSearch" placeholder="Search Trip ID / driver / route…" />
+            <button class="btn" id="btnRefreshTrips">🔄 Refresh</button>
+          </div>
+
+          <div class="section">
+            <div class="muted">Select a trip to manage packages, manifest lock, and certificate.</div>
+            <div style="height:10px"></div>
+            <div class="list" id="tripList"></div>
+            <div class="muted" id="tripEmpty" style="display:none; margin-top:10px;">No trips found.</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- RIGHT: Trip Details -->
+      <div class="card">
+        <div class="card-h">
+          <h2>Trip Workspace</h2>
+          <div class="row">
+            <span class="pill" id="tripIdPill">No trip selected</span>
+            <button class="btn" id="btnOpenTripDoc" disabled>🧾 Open Doc</button>
+          </div>
+        </div>
+
+        <div class="card-b">
+          <div class="muted" id="tripSummary">Select a trip from the left panel.</div>
+
+          <!-- Atlas Standard Control Bar -->
+          <div class="trip-action-bar">
+            <button id="btnManifest" class="btn primary" disabled>🔒 Lock Manifest</button>
+            <button id="btnCertificate" class="btn success" disabled>📜 Generate Certificate</button>
+            <button id="btnReopen" class="btn danger" disabled>↩ Reopen Trip</button>
+
+            <span id="tripSealStatus" class="trip-seal muted">🧱 Open for loading</span>
+          </div>
+
+          <!-- PDF links -->
+          <div class="row" style="margin-top:10px;">
+            <span class="pill" id="pillManifest">Manifest: none</span>
+            <span class="pill" id="pillCertificate">Certificate: none</span>
+          </div>
+          <div class="row" style="margin-top:10px;">
+            <a class="link" id="lnkManifestPdf" href="#" target="_blank" rel="noopener" style="display:none;">Open Manifest PDF</a>
+            <a class="link" id="lnkCertPdf" href="#" target="_blank" rel="noopener" style="display:none;">Open Certificate PDF</a>
+          </div>
+
+          <!-- Packages table -->
+          <div class="section">
+            <div class="row" style="justify-content:space-between;">
+              <div class="row">
+                <b>Trip Packages</b>
+                <span class="pill" id="pkgCount">0</span>
+                <span class="pill" id="pkgPending">Pending: 0</span>
+              </div>
+              <div class="row">
+                <button class="btn" id="btnReloadPackages" disabled>🔄 Reload Packages</button>
+              </div>
+            </div>
+
+            <div style="height:10px"></div>
+
+            <div style="overflow:auto; border-radius: 14px; border:1px solid rgba(255,255,255,.10);">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Tracking</th>
+                    <th>Counts</th>
+                    <th>Status</th>
+                    <th>Route</th>
+                    <th>Updated</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="pkgRows">
+                  <tr><td colspan="6" class="muted">No trip selected.</td></tr>
+                </tbody>
+              </table>
+            </div>
+
+            <div class="muted" id="pkgHint" style="margin-top:10px;"></div>
+          </div>
+
+          <!-- Operations -->
+          <div class="section">
+            <div class="two">
+
+              <!-- Assign / Unassign -->
+              <div class="card" style="box-shadow:none;">
+                <div class="card-h"><h2>Assign / Unassign</h2></div>
+                <div class="card-b">
+                  <div class="muted">Use these if you still support assignShipmentToTruckTrip / unassignShipmentFromTruckTrip.</div>
+                  <div style="height:10px"></div>
+
+                  <div class="col">
+                    <input id="inpTrackingDocId" placeholder="trackingDocId (tracking_records doc id)" />
+                    <div class="row">
+                      <button class="btn" id="btnAssign" disabled>➕ Assign to Trip</button>
+                      <button class="btn danger" id="btnUnassign" disabled>➖ Unassign</button>
+                    </div>
+                    <div class="small">Tip: you can copy trackingDocId from shipment record.</div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Delay Controls -->
+              <div class="card" style="box-shadow:none;">
+                <div class="card-h"><h2>Delay Controls</h2></div>
+                <div class="card-b">
+                  <div class="row">
+                    <select id="selDelayReason" disabled>
+                      <option value="">Select delay reason…</option>
+                      <option value="WEATHER">WEATHER</option>
+                      <option value="RORO_FULL">RORO_FULL</option>
+                      <option value="PORT_CONGESTION">PORT_CONGESTION</option>
+                      <option value="MECHANICAL">MECHANICAL</option>
+                      <option value="OTHER">OTHER</option>
+                    </select>
+                  </div>
+                  <div style="height:10px"></div>
+                  <textarea id="txtDelayNote" placeholder="Optional delay note…" disabled></textarea>
+                  <div style="height:10px"></div>
+                  <div class="row">
+                    <button class="btn warn" id="btnSetDelay" disabled>⏸ Set Trip Delay</button>
+                    <button class="btn success" id="btnClearDelay" disabled>▶ Clear Delay</button>
+                  </div>
+                </div>
+              </div>
+
+            </div>
+          </div>
+
+          <!-- Debug / result -->
+          <div class="section">
+            <div class="row" style="justify-content:space-between;">
+              <b>Result</b>
+              <span class="muted" id="resultHint"></span>
+            </div>
+            <div style="height:10px"></div>
+            <pre id="result">{}</pre>
+          </div>
+
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="toast" id="toast">
+    <div class="t" id="toastTitle">…</div>
+    <div class="m" id="toastMsg">…</div>
+  </div>
+
+<script>
+  // ===========================
+  // Firebase handles
+  // ===========================
+  const db = firebase.firestore();
+  const functions = firebase.functions();
+
+  // ===========================
+  // Callables (must exist in functions/index.js exports)
+  // ===========================
+  const fnCreateTruckTrip = functions.httpsCallable("createTruckTrip");
+  const fnAssignShipment = functions.httpsCallable("assignShipmentToTruckTrip");
+  const fnUnassignShipment = functions.httpsCallable("unassignShipmentFromTruckTrip");
+
+  const fnSetDelay = functions.httpsCallable("setTruckDelay");
+  const fnClearDelay = functions.httpsCallable("clearTruckDelay");
+
+  const fnGenerateManifest = functions.httpsCallable("generateTripManifest");
+  const fnGenerateCertificate = functions.httpsCallable("generateTripCertificate");
+  const fnReopenTrip = functions.httpsCallable("reopenTrip");
+
+  // NOTE: if you have callable getTripPackages, we use it; else we read Firestore directly.
+  let fnGetTripPackages = null;
+  try { fnGetTripPackages = functions.httpsCallable("getTripPackages"); } catch(e){}
+
+  // ===========================
+  // UI elements
+  // ===========================
+  const chipRole = document.getElementById("chipRole");
+  const chipUser = document.getElementById("chipUser");
+  const btnLogout = document.getElementById("btnLogout");
+
+  const tripSearch = document.getElementById("tripSearch");
+  const btnRefreshTrips = document.getElementById("btnRefreshTrips");
+  const btnNewTrip = document.getElementById("btnNewTrip");
+  const tripList = document.getElementById("tripList");
+  const tripEmpty = document.getElementById("tripEmpty");
+
+  const tripIdPill = document.getElementById("tripIdPill");
+  const btnOpenTripDoc = document.getElementById("btnOpenTripDoc");
+  const tripSummary = document.getElementById("tripSummary");
+
+  const btnManifest = document.getElementById("btnManifest");
+  const btnCertificate = document.getElementById("btnCertificate");
+  const btnReopen = document.getElementById("btnReopen");
+  const tripSealStatus = document.getElementById("tripSealStatus");
+
+  const pillManifest = document.getElementById("pillManifest");
+  const pillCertificate = document.getElementById("pillCertificate");
+  const lnkManifestPdf = document.getElementById("lnkManifestPdf");
+  const lnkCertPdf = document.getElementById("lnkCertPdf");
+
+  const btnReloadPackages = document.getElementById("btnReloadPackages");
+  const pkgRows = document.getElementById("pkgRows");
+  const pkgCount = document.getElementById("pkgCount");
+  const pkgPending = document.getElementById("pkgPending");
+  const pkgHint = document.getElementById("pkgHint");
+
+  const inpTrackingDocId = document.getElementById("inpTrackingDocId");
+  const btnAssign = document.getElementById("btnAssign");
+  const btnUnassign = document.getElementById("btnUnassign");
+
+  const selDelayReason = document.getElementById("selDelayReason");
+  const txtDelayNote = document.getElementById("txtDelayNote");
+  const btnSetDelay = document.getElementById("btnSetDelay");
+  const btnClearDelay = document.getElementById("btnClearDelay");
+
+  const result = document.getElementById("result");
+  const resultHint = document.getElementById("resultHint");
+
+  const toast = document.getElementById("toast");
+  const toastTitle = document.getElementById("toastTitle");
+  const toastMsg = document.getElementById("toastMsg");
+
+  // ===========================
+  // State
+  // ===========================
+  let currentUser = null;
+  let currentRole = null;
+  let selectedTripId = null;
+  let selectedTrip = null;
+
+  // ===========================
+  // Helpers
+  // ===========================
+  function sleep(ms){ return new Promise(r => setTimeout(r, ms)); }
+
+  function showToast(title, msg, ms=2500){
+    toastTitle.textContent = title;
+    toastMsg.textContent = msg || "";
+    toast.classList.add("show");
+    setTimeout(()=>toast.classList.remove("show"), ms);
+  }
+
+  function setResult(obj, ok=true){
+    result.textContent = JSON.stringify(obj, null, 2);
+    resultHint.innerHTML = ok ? `<span style="color:var(--ok);font-weight:800;">OK</span>`
+                              : `<span style="color:var(--err);font-weight:800;">ERROR</span>`;
+  }
+
+  function fmtTs(ts){
+    try{
+      if(!ts) return "";
+      if(typeof ts.toDate === "function") return ts.toDate().toLocaleString();
+      return String(ts);
+    }catch(e){ return ""; }
+  }
+
+  function safeStr(v){
+    return (v === null || v === undefined) ? "" : String(v);
+  }
+
+  function clampInt(n){
+    const x = Number(n);
+    return Number.isFinite(x) ? x : 0;
+  }
+
+  // ===========================
+  // Guard + auth
+  // ===========================
+  async function boot(){
+    // your guard.js should block if not allowed; we also check role client-side for UX.
+    // Expected: guard.js sets window.__USER_ROLE__ or provides a function.
+    // If yours differs, this page still works because server callables enforce roles.
+
+    firebase.auth().onAuthStateChanged(async (u)=>{
+      if(!u){
+        location.href = "/login.html";
+        return;
+      }
+      currentUser = u;
+
+      chipUser.textContent = `User: ${u.email || u.uid}`;
+
+      // Optional: load role from /users/{uid}
+      try{
+        const snap = await db.collection("users").doc(u.uid).get();
+        const data = snap.exists ? (snap.data()||{}) : {};
+        currentRole = (data.role || "user").toLowerCase();
+      }catch(e){
+        currentRole = "user";
+      }
+
+      chipRole.textContent = `Role: ${currentRole}`;
+
+      // UI gate (admin/manager only)
+      if(currentRole !== "admin" && currentRole !== "manager"){
+        alert("Admin/Manager only.");
+        location.href = "/dashboard.html";
+        return;
+      }
+
+      await loadTrips();
+    });
+  }
+
+  btnLogout.addEventListener("click", async ()=>{
+    try{
+      await firebase.auth().signOut();
+    }catch(e){}
+    location.href = "/login.html";
+  });
+
+  // ===========================
+  // Trips list
+  // ===========================
+  async function loadTrips(){
+    tripList.innerHTML = "";
+    tripEmpty.style.display = "none";
+
+    const q = (tripSearch.value || "").trim().toLowerCase();
+
+    const snap = await db.collection("truck_trips")
+      .orderBy("createdAt", "desc")
+      .limit(50)
+      .get();
+
+    const rows = [];
+    snap.forEach(doc=>{
+      const t = doc.data() || {};
+      const id = doc.id;
+
+      const hay = [
+        id,
+        safeStr(t.tripId),
+        safeStr(t.driverName),
+        safeStr(t.driverId),
+        safeStr(t.route),
+        safeStr(t.origin),
+        safeStr(t.destination),
+        safeStr(t.status),
+      ].join(" ").toLowerCase();
+
+      if(q && !hay.includes(q)) return;
+
+      const locked = t.manifestLocked === true;
+      const certified = !!t.certificate;
+      const status = safeStr(t.status || "—");
+
+      rows.push({ id, t, locked, certified, status });
+    });
+
+    if(!rows.length){
+      tripEmpty.style.display = "block";
+      return;
+    }
+
+    rows.forEach(({id, t, locked, certified, status})=>{
+      const el = document.createElement("div");
+      el.className = "item" + (id === selectedTripId ? " active" : "");
+      el.innerHTML = `
+        <div class="title">
+          <span>${safeStr(t.tripId || id)}</span>
+          <span class="pill ${certified ? "ok" : locked ? "warn" : ""}">
+            ${certified ? "📜 Certified" : locked ? "🔒 Locked" : "🧱 Open"}
+          </span>
+        </div>
+        <div class="meta">
+          <span class="pill">Status: ${status}</span>
+          <span class="pill">Pkgs: ${clampInt(t.packageTotal || 0)}</span>
+          <span class="pill">Driver: ${safeStr(t.driverName || "—")}</span>
+          <span class="pill">Route: ${safeStr(t.route || "—")}</span>
+        </div>
+        <div class="meta">
+          <span>Created: ${fmtTs(t.createdAt)}</span>
+          <span>Updated: ${fmtTs(t.updatedAt || t.lastUpdatedAt)}</span>
+        </div>
+      `;
+      el.addEventListener("click", async ()=>{
+        selectedTripId = id;
+        selectedTrip = t;
+        await selectTrip(id, t);
+        await loadTrips();
+      });
+      tripList.appendChild(el);
+    });
+  }
+
+  btnRefreshTrips.addEventListener("click", async ()=>{
+    try{
+      await loadTrips();
+      showToast("Trips refreshed", "Loaded latest trips.");
+    }catch(e){
+      console.error(e);
+      alert(e.message || "Failed to load trips");
+    }
+  });
+
+  tripSearch.addEventListener("input", async ()=>{
+    await loadTrips();
+  });
+
+  // ===========================
+  // Select trip -> load details
+  // ===========================
+  async function selectTrip(tripId, trip){
+    tripIdPill.textContent = safeStr(trip.tripId || tripId);
+    btnOpenTripDoc.disabled = false;
+
+    btnReloadPackages.disabled = false;
+
+    // enable general actions
+    btnAssign.disabled = false;
+    btnUnassign.disabled = false;
+
+    selDelayReason.disabled = false;
+    txtDelayNote.disabled = false;
+    btnSetDelay.disabled = false;
+    btnClearDelay.disabled = false;
+
+    // Update control bar gating
+    updateTripButtons(trip);
+
+    // Render summary
+    tripSummary.innerHTML = `
+      <div class="row" style="gap:10px; flex-wrap:wrap;">
+        <span class="pill">TripDocId: <b>${tripId}</b></span>
+        <span class="pill">Status: <b>${safeStr(trip.status || "—")}</b></span>
+        <span class="pill">Driver: <b>${safeStr(trip.driverName || "—")}</b></span>
+        <span class="pill">Route: <b>${safeStr(trip.route || "—")}</b></span>
+      </div>
+      <div style="height:8px"></div>
+      <div class="muted">
+        Manifest is the cargo ledger. Certificate is legal proof of shipment.
+        Reopen voids certificate and unlocks cargo changes.
+      </div>
+    `;
+
+    // Pills + pdf links
+    renderSealPills(trip);
+
+    // Load packages
+    await loadTripPackages(tripId);
+
+    setResult({ selectedTripId: tripId }, true);
+  }
+
+  btnOpenTripDoc.addEventListener("click", ()=>{
+    if(!selectedTripId) return;
+    alert("TripDocId copied to clipboard: " + selectedTripId);
+    navigator.clipboard?.writeText(selectedTripId);
+  });
+
+  btnReloadPackages.addEventListener("click", async ()=>{
+    if(!selectedTripId) return;
+    await loadTripPackages(selectedTripId);
+  });
+
+  // ===========================
+  // Trip Control Bar logic
+  // ===========================
+  function updateTripButtons(trip){
+    const locked = trip.manifestLocked === true;
+    const certified = !!trip.certificate;
+
+    // Certificate requires locked and not already certified
+    btnManifest.disabled = locked || certified;
+    btnCertificate.disabled = !locked || certified;
+    btnReopen.disabled = !certified;
+
+    if(certified){
+      tripSealStatus.textContent = "📜 Certified & Sealed";
+      tripSealStatus.className = "trip-seal certified";
+    } else if(locked){
+      tripSealStatus.textContent = "🔒 Manifest Locked";
+      tripSealStatus.className = "trip-seal locked";
+    } else {
+      tripSealStatus.textContent = "🧱 Open for loading";
+      tripSealStatus.className = "trip-seal muted";
+    }
+  }
+
+  function renderSealPills(trip){
+    const locked = trip.manifestLocked === true;
+    const hasManifest = !!trip.manifest;
+    const hasCert = !!trip.certificate;
+
+    pillManifest.textContent = locked ? "Manifest: locked" : "Manifest: open";
+    pillManifest.className = "pill " + (locked ? "warn" : "");
+
+    pillCertificate.textContent = hasCert ? "Certificate: issued" : "Certificate: none";
+    pillCertificate.className = "pill " + (hasCert ? "ok" : "");
+
+    // Links
+    lnkManifestPdf.style.display = "none";
+    lnkCertPdf.style.display = "none";
+
+    if(trip.manifest?.pdfUrl){
+      lnkManifestPdf.style.display = "inline";
+      lnkManifestPdf.href = trip.manifest.pdfUrl;
+    }
+    if(trip.certificate?.pdfUrl){
+      lnkCertPdf.style.display = "inline";
+      lnkCertPdf.href = trip.certificate.pdfUrl;
+    }
+  }
+
+  async function reloadTrip(){
+    if(!selectedTripId) return;
+    const snap = await db.collection("truck_trips").doc(selectedTripId).get();
+    if(!snap.exists) return;
+    selectedTrip = snap.data() || {};
+    updateTripButtons(selectedTrip);
+    renderSealPills(selectedTrip);
+    await loadTripPackages(selectedTripId);
+    await loadTrips();
+  }
+
+  btnManifest.addEventListener("click", async ()=>{
+    if(!selectedTripId) return;
+
+    try{
+      if(!confirm("Lock manifest? This freezes cargo list and blocks future loading/unloading.")) return;
+
+      setResult({ action: "generateTripManifest", tripDocId: selectedTripId }, true);
+      const res = await fnGenerateManifest({ tripDocId: selectedTripId });
+
+      setResult(res.data, true);
+      showToast("Manifest locked", "Cargo ledger sealed.");
+      await reloadTrip();
+
+      // If function returns pdfUrl, open
+      if(res.data?.pdfUrl) window.open(res.data.pdfUrl, "_blank", "noopener");
+    }catch(e){
+      console.error(e);
+      setResult({ error: e.message, details: e.details || null }, false);
+      alert(e.message || "Manifest failed");
+    }
+  });
+
+  btnCertificate.addEventListener("click", async ()=>{
+    if(!selectedTripId) return;
+
+    try{
+      if(!confirm("Generate certificate? This is legal proof of shipment.")) return;
+
+      setResult({ action: "generateTripCertificate", tripDocId: selectedTripId }, true);
+      const res = await fnGenerateCertificate({ tripDocId: selectedTripId });
+
+      setResult(res.data, true);
+      showToast("Certificate issued", "Trip certified & sealed.");
+      await reloadTrip();
+
+      if(res.data?.pdfUrl) window.open(res.data.pdfUrl, "_blank", "noopener");
+    }catch(e){
+      console.error(e);
+      setResult({ error: e.message, details: e.details || null }, false);
+      alert(e.message || "Certificate failed");
+    }
+  });
+
+  btnReopen.addEventListener("click", async ()=>{
+    if(!selectedTripId) return;
+
+    try{
+      if(!confirm("Reopen trip? This VOIDs certificate and unlocks manifest.")) return;
+
+      setResult({ action: "reopenTrip", tripDocId: selectedTripId }, true);
+      const res = await fnReopenTrip({ tripDocId: selectedTripId });
+
+      setResult(res.data, true);
+      showToast("Trip reopened", "Manifest unlocked. Certificate voided.");
+      await reloadTrip();
+    }catch(e){
+      console.error(e);
+      setResult({ error: e.message, details: e.details || null }, false);
+      alert(e.message || "Reopen failed");
+    }
+  });
+
+  // ===========================
+  // Packages loading (trip_packages)
+  // ===========================
+  async function loadTripPackages(tripDocId){
+    pkgHint.textContent = "Loading packages…";
+    pkgRows.innerHTML = `<tr><td colspan="6" class="muted">Loading…</td></tr>`;
+    pkgCount.textContent = "0";
+    pkgPending.textContent = "Pending: 0";
+
+    let packages = [];
+
+    // Prefer callable if you implemented it (safer than direct Firestore)
+    if(fnGetTripPackages){
+      try{
+        const res = await fnGetTripPackages({ tripDocId });
+        packages = (res.data && res.data.packages) ? res.data.packages : [];
+      }catch(e){
+        // fallback to Firestore
+      }
+    }
+
+    if(!packages.length){
+      const snap = await db.collection("truck_trips").doc(tripDocId)
+        .collection("trip_packages")
+        .get();
+      snap.forEach(doc=>{
+        const p = doc.data() || {};
+        packages.push({
+          id: doc.id,
+          trackingDocId: doc.id,
+          trackingNumber: p.trackingNumber || doc.id,
+          packageCount: p.packageCount,
+          loadedCount: p.loadedCount,
+          deliveredCount: p.deliveredCount,
+          pendingCount: p.pendingCount,
+          status: p.status,
+          route: p.route,
+          lastUpdatedAt: p.lastUpdatedAt || p.updatedAt,
+        });
+      });
+    }
+
+    pkgCount.textContent = String(packages.length);
+
+    let pendingAny = 0;
+    const rows = packages.map(p=>{
+      const pending = (typeof p.pendingCount === "number") ? p.pendingCount : null;
+      if(pending && pending > 0) pendingAny++;
+
+      const countsLine = `
+        <div>pkg: <b>${p.packageCount ?? "-"}</b></div>
+        <div>loaded: <b>${p.loadedCount ?? "-"}</b></div>
+        <div>pending: <b>${p.pendingCount ?? "MISSING"}</b></div>
+      `;
+
+      const actions = `
+        <div class="row" style="gap:8px;">
+          <button class="btn ghost" data-act="copy" data-id="${p.trackingDocId}">📋</button>
+          <button class="btn danger" data-act="unassign" data-id="${p.trackingDocId}">➖</button>
+        </div>
+      `;
+
+      return `
+        <tr>
+          <td>
+            <div><b>${safeStr(p.trackingNumber)}</b></div>
+            <div class="small">${safeStr(p.trackingDocId || p.id)}</div>
+          </td>
+          <td>${countsLine}</td>
+          <td>${safeStr(p.status || "-")}</td>
+          <td>${safeStr(p.route || "-")}</td>
+          <td>${fmtTs(p.lastUpdatedAt)}</td>
+          <td>${actions}</td>
+        </tr>
+      `;
+    });
+
+    pkgRows.innerHTML = rows.length ? rows.join("") : `<tr><td colspan="6" class="muted">No trip_packages found.</td></tr>`;
+
+    pkgPending.textContent = `Pending: ${pendingAny}`;
+    pkgHint.textContent = pendingAny
+      ? `⚠ ${pendingAny} package(s) still have pendingCount > 0. Manifest/Certificate should be blocked by server rules.`
+      : `✅ All packages show pendingCount = 0 (ready for manifest/certificate).`;
+
+    // Row action handlers
+    pkgRows.querySelectorAll("button[data-act]").forEach(btn=>{
+      btn.addEventListener("click", async ()=>{
+        const act = btn.getAttribute("data-act");
+        const id = btn.getAttribute("data-id");
+        if(act === "copy"){
+          await navigator.clipboard?.writeText(id);
+          showToast("Copied", id);
+        }
+        if(act === "unassign"){
+          inpTrackingDocId.value = id;
+          if(confirm("Unassign this shipment from trip? (Blocked if loadedCount>0 or manifest locked.)")){
+            await unassignNow();
+          }
+        }
+      });
+    });
+
+    // After package load, refresh trip doc state (manifest/cert)
+    const tSnap = await db.collection("truck_trips").doc(tripDocId).get();
+    if(tSnap.exists){
+      selectedTrip = tSnap.data() || {};
+      updateTripButtons(selectedTrip);
+      renderSealPills(selectedTrip);
+    }
+  }
+
+  // ===========================
+  // Assign / Unassign
+  // ===========================
+  async function assignNow(){
+    if(!selectedTripId) return;
+    const trackingDocId = (inpTrackingDocId.value || "").trim();
+    if(!trackingDocId) return alert("Enter trackingDocId");
+
+    try{
+      setResult({ action: "assignShipmentToTruckTrip", trackingDocId, truckTripId: selectedTripId }, true);
+      const res = await fnAssignShipment({ trackingDocId, truckTripId: selectedTripId });
+      setResult(res.data, true);
+      showToast("Assigned", trackingDocId);
+      await reloadTrip();
+    }catch(e){
+      console.error(e);
+      setResult({ error: e.message, details: e.details || null }, false);
+      alert(e.message || "Assign failed");
+    }
+  }
+
+  async function unassignNow(){
+    if(!selectedTripId) return;
+    const trackingDocId = (inpTrackingDocId.value || "").trim();
+    if(!trackingDocId) return alert("Enter trackingDocId");
+
+    try{
+      setResult({ action: "unassignShipmentFromTruckTrip", trackingDocId, truckTripId: selectedTripId }, true);
+      const res = await fnUnassignShipment({ trackingDocId, truckTripId: selectedTripId });
+      setResult(res.data, true);
+      showToast("Unassigned", trackingDocId);
+      await reloadTrip();
+    }catch(e){
+      console.error(e);
+      setResult({ error: e.message, details: e.details || null }, false);
+      alert(e.message || "Unassign failed");
+    }
+  }
+
+  btnAssign.addEventListener("click", assignNow);
+  btnUnassign.addEventListener("click", unassignNow);
+
+  // ===========================
+  // Delay controls
+  // ===========================
+  btnSetDelay.addEventListener("click", async ()=>{
+    if(!selectedTripId) return;
+    const reason = (selDelayReason.value || "").trim();
+    if(!reason) return alert("Select a delay reason");
+
+    try{
+      const note = (txtDelayNote.value || "").trim();
+      setResult({ action: "setTruckDelay", tripDocId: selectedTripId, reason, note }, true);
+
+      const res = await fnSetDelay({ tripDocId: selectedTripId, reason, note });
+      setResult(res.data, true);
+
+      showToast("Delay set", reason);
+      await reloadTrip();
+    }catch(e){
+      console.error(e);
+      setResult({ error: e.message, details: e.details || null }, false);
+      alert(e.message || "Set delay failed");
+    }
+  });
+
+  btnClearDelay.addEventListener("click", async ()=>{
+    if(!selectedTripId) return;
+
+    try{
+      setResult({ action: "clearTruckDelay", tripDocId: selectedTripId }, true);
+      const res = await fnClearDelay({ tripDocId: selectedTripId });
+      setResult(res.data, true);
+
+      showToast("Delay cleared", "Trip back on track.");
+      await reloadTrip();
+    }catch(e){
+      console.error(e);
+      setResult({ error: e.message, details: e.details || null }, false);
+      alert(e.message || "Clear delay failed");
+    }
+  });
+
+  // ===========================
+  // Create Trip (simple prompt)
+  // ===========================
+  btnNewTrip.addEventListener("click", async ()=>{
+    try{
+      const tripId = prompt("Trip ID (example: TRIP-2025-12-25-01)") || "";
+      if(!tripId.trim()) return;
+
+      const driverName = prompt("Driver name (optional)") || "";
+      const route = prompt("Route (optional, e.g., DIVI→TABLAS)") || "";
+
+      setResult({ action: "createTruckTrip", tripId, driverName, route }, true);
+
+      const res = await fnCreateTruckTrip({ tripId: tripId.trim(), driverName: driverName.trim(), route: route.trim() });
+      setResult(res.data, true);
+
+      showToast("Trip created", tripId.trim());
+      await loadTrips();
+    }catch(e){
+      console.error(e);
+      setResult({ error: e.message, details: e.details || null }, false);
+      alert(e.message || "Create trip failed");
+    }
+  });
+
+  // ===========================
+  // Start
+  // ===========================
+  boot();
+</script>
+</body>
+</html>

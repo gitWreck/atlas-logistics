@@ -2,10 +2,18 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
-<title>Atlas Admin Dashboard</title>
+<title>Atlas – Admin Dashboard</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
+<!-- 🔐 SECURITY HARDENING -->
+<meta http-equiv="X-Frame-Options" content="DENY">
+
+   <script>
+    window.MY_ROLE = "admin";
+  </script>
+
 <style>
+
 /* ===============================
    BASE
 ================================ */
@@ -14,6 +22,12 @@ body {
   background: #f9fafb;
   margin: 0;
   padding: 40px;
+  color: #0f172a;
+}
+
+main {
+  max-width: 1200px;
+  margin: 0 auto;
 }
 
 h1 {
@@ -63,16 +77,12 @@ h2 {
   border-radius: 16px;
   padding: 20px;
   box-shadow: 0 8px 24px rgba(0,0,0,.05);
-  transition: 
-    box-shadow .2s ease,
-    transform .2s ease,
-    border-color .2s ease;
+  transition: box-shadow .2s ease, transform .2s ease;
 }
 
 .card:hover {
   box-shadow: 0 14px 40px rgba(0,0,0,.08);
   transform: translateY(-2px);
-  border-color: #d1d5db;
 }
 
 .card.analytics {
@@ -92,6 +102,11 @@ h2 {
 /* ===============================
    TABLES
 ================================ */
+.table-wrap {
+  border-radius: 12px;
+  overflow: hidden;
+}
+
 table {
   width: 100%;
   border-collapse: collapse;
@@ -100,42 +115,28 @@ table {
 th, td {
   padding: 12px;
   border-bottom: 1px solid #eee;
+  font-size: 14px;
   text-align: left;
 }
 
 th {
   background: #f8f9fc;
-}
-
-.card table {
-  border-radius: 12px;
-  overflow: hidden;
+  position: sticky;
+  top: 0;
+  z-index: 2;
 }
 
 /* ===============================
    UI ELEMENTS
 ================================ */
-select, button {
-  padding: 6px 10px;
-  border-radius: 8px;
-  border: 1px solid #ccc;
-}
-
 button {
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: none;
   background: #2563eb;
   color: white;
-  border: none;
   font-weight: 600;
   cursor: pointer;
-  transition: background .2s ease, transform .1s ease;
-}
-
-button:hover {
-  transform: translateY(-1px);
-}
-
-button:active {
-  transform: translateY(0);
 }
 
 button.secondary {
@@ -150,97 +151,166 @@ button.secondary {
   border-radius: 999px;
   font-size: 12px;
   font-weight: 600;
-  letter-spacing: .3px;
 }
 
 .badge.green { background: #dcfce7; color: #166534; }
 .badge.red   { background: #fee2e2; color: #991b1b; }
+
+/* ===============================
+   STATES
+================================ */
+.state {
+  text-align: center;
+  padding: 16px;
+  color: #64748b;
+  font-size: 14px;
+}
+
+/* ===============================
+   FOOTER
+================================ */
+.footer-actions {
+  margin-top: 30px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.admin-warning {
+  font-size: 12px;
+  color: #64748b;
+}
+
+/* ======================================================
+   📱 MOBILE OPTIMIZATION (PART 2 — REQUIRED)
+====================================================== */
+@media (max-width: 768px) {
+  body {
+    padding: 16px;
+  }
+
+  h1 {
+    font-size: 26px;
+  }
+
+  /* Enable swipe tables */
+  .table-wrap {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  table {
+    min-width: 720px;
+  }
+}
+
+@media (max-width: 640px) {
+  .footer-actions {
+    flex-direction: column;
+    gap: 12px;
+    align-items: stretch;
+  }
+
+  .footer-actions button {
+    width: 100%;
+  }
+}
 </style>
 </head>
 
 <body>
+<main>
 
-<!-- ================= LOGO ================= -->
+<!-- LOGO -->
 <div class="logo-wrap">
   <img src="../atlas-logo.png" alt="ATLAS Logo">
 </div>
 
-<!-- ================= HEADER ================= -->
+<!-- HEADER -->
 <h1>Admin Dashboard</h1>
 <div class="sub" id="adminInfo">Loading admin…</div>
 
-<!-- ================= CORE USER STATS ================= -->
+<!-- USER STATS -->
 <div class="grid">
   <div class="card">
     <div>👤 Users</div>
     <div class="stat" id="userCount">–</div>
   </div>
-
   <div class="card">
     <div>🟢 Active</div>
     <div class="stat" id="activeCount">–</div>
   </div>
-
   <div class="card">
     <div>🔴 Inactive</div>
     <div class="stat" id="inactiveCount">–</div>
   </div>
 </div>
 
-<!-- ================= ADMIN ANALYTICS ================= -->
+<!-- ANALYTICS -->
 <div class="grid">
   <div class="card analytics">
     <div>🧑‍⚖️ Admin Actions (24h)</div>
     <div class="stat" id="adminActions24h">–</div>
   </div>
-
   <div class="card analytics">
     <div>🔁 Total Admin Actions</div>
     <div class="stat" id="adminActionsTotal">–</div>
   </div>
 </div>
 
-<!-- ================= USERS TABLE ================= -->
+<!-- USERS TABLE -->
 <div class="card">
   <h2>Users</h2>
-  <table>
-    <thead>
-      <tr>
-        <th>Name</th>
-        <th>Role</th>
-        <th>Status</th>
-        <th>Action</th>
-      </tr>
-    </thead>
-    <tbody id="userTable"></tbody>
-  </table>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Role</th>
+          <th>Status</th>
+          <th>Action</th>
+        </tr>
+      </thead>
+      <tbody id="userTable">
+        <tr><td colspan="4" class="state">Loading users…</td></tr>
+      </tbody>
+    </table>
+  </div>
 </div>
 
-<!-- ================= ADMIN AUDIT LOG ================= -->
+<!-- AUDIT LOG -->
 <div class="card">
   <h2>🧾 Admin Audit Log</h2>
-  <table>
-    <thead>
-      <tr>
-        <th>Time</th>
-        <th>Action</th>
-        <th>Target User</th>
-        <th>Change</th>
-        <th>By</th>
-      </tr>
-    </thead>
-    <tbody id="auditTable">
-      <tr><td colspan="5">Loading logs…</td></tr>
-    </tbody>
-  </table>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Time</th>
+          <th>Action</th>
+          <th>Target</th>
+          <th>Change</th>
+          <th>By</th>
+        </tr>
+      </thead>
+      <tbody id="auditTable">
+        <tr><td colspan="5" class="state">Loading logs…</td></tr>
+      </tbody>
+    </table>
+  </div>
 </div>
 
-<br />
+<!-- FOOTER -->
+<div class="footer-actions">
+  <div class="admin-warning">
+    Admin actions are audited and irreversible.
+  </div>
+  <button id="logoutBtn" class="secondary">Logout</button>
+</div>
 
-<button id="logoutBtn">Logout</button>
+</main>
 
-<!-- ================= SCRIPTS ================= -->
-<script type="module" src="./firebase.js"></script>
+<!-- SCRIPTS -->
+<script type="module" src="../firebase.js"></script>
 <script type="module" src="./dashboard.js"></script>
 
 </body>

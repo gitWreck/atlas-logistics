@@ -1,0 +1,613 @@
+<!--
+ATLAS TRACKING UI
+MOBILE-FIRST CANONICAL v1.0
+❄️ DO NOT MODIFY CORE LOGIC ❄️
+-->
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Atlas Tracking</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+<style>
+/* ===== PAGE ===== */
+body {
+  font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  background: radial-gradient(circle at top, #f8fbff, #eef2f9);
+  margin: 0;
+  min-height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+/* ===== CARD ===== */
+.card {
+  display: flex;
+  flex-direction: column;
+  background: #fff;
+  max-width: 420px;
+  width: 100%;
+  padding: 20px;
+  border-radius: 16px;
+  box-shadow: 0 20px 40px rgba(0,0,0,.12);
+  max-height: calc(100vh - 32px);
+  overflow: hidden;
+}
+
+/* ===== LOGO ===== */
+.logo-wrap {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 24px;
+}
+
+.logo-wrap img {
+  height: 200px;
+  transition: height .4s ease;
+  max-width: 100%;
+  object-fit: contain;
+}
+
+/* ===== SEARCH ===== */
+.search-wrap {
+  width: 100%;
+  max-width: 420px;
+  margin: 0 auto;
+  background: #fff;
+  border-radius: 999px;
+  padding: 6px;
+  box-shadow:
+    0 0 0 2px #bfdbfe,
+    0 14px 32px rgba(59,130,246,.18);
+  transition: box-shadow .25s ease;
+}
+
+.search-wrap:hover {
+  box-shadow:
+    0 0 0 2px #e0f2fe,
+    0 18px 36px rgba(224,242,254,.9);
+}
+
+.search-wrap:focus-within {
+  box-shadow:
+    0 0 0 3px #bae6fd,
+    0 22px 48px rgba(186,230,253,1);
+}
+
+.search-wrap input {
+  width: 100%;
+  height: 52px;
+  line-height: 52px;
+  padding: 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  border-radius: 999px;
+  font-size: 16px;
+  text-align: center;
+}
+
+.search-wrap input::placeholder {
+  text-align: center;
+  color: #9ca3af;
+}
+
+/* ===== BUTTON ===== */
+.search-actions {
+  display: flex;
+  justify-content: center;
+  margin-top: 18px;
+}
+
+.search-actions button {
+  padding: 12px 28px;
+  border-radius: 999px;
+  min-width: 160px;
+  border: none;
+  background: #2563eb;
+  color: #fff;
+  font-size: 15px;
+  cursor: pointer;
+  transition: background .2s ease, box-shadow .2s ease;
+}
+
+.search-actions button:hover {
+  background: #1d4ed8;
+  box-shadow: 0 10px 24px rgba(37,99,235,.35);
+}
+
+/* LOADING STATE */
+.search-actions button.loading {
+  background: #93c5fd;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.search-actions button.loading::after {
+  content: "…";
+}
+
+/* ===== OUTPUT ===== */
+#output {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  margin-top: 12px;
+}
+
+.result-scroll {
+  flex: 1;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+/* ===== STATUS ===== */
+.status {
+  padding: 8px;
+  border-radius: 10px;
+  background: #e0f2fe;
+  color: #0369a1;
+  font-weight: 700;
+  text-align: center;
+  font-size: 15px;
+}
+
+/* ===== LAST UPDATED ===== */
+.last-updated {
+  text-align: center;
+  font-size: 11px;
+  color: #6b7280;
+  margin-top: 6px;
+}
+
+/* ===== TIMELINE ===== */
+.timeline {
+  margin: 18px 0;
+}
+
+.steps {
+  display: flex;
+  justify-content: space-between;
+  position: relative;
+}
+
+/* BASE GREY LINE */
+.steps::before {
+  content: "";
+  position: absolute;
+  top: 18px;
+  left: 12.5%;
+  right: 12.5%;
+  height: 4px;
+  background: #e5e7eb;
+  border-radius: 999px;
+  z-index: 1;
+}
+
+/* BLUE PROGRESS LINE */
+.progress-line {
+  position: absolute;
+  top: 18px;
+  left: 12.5%;
+  height: 4px;
+  background: #2563eb;
+  border-radius: 999px;
+  z-index: 2;
+  width: 0%;
+  animation: fillLine .6s ease-out forwards;
+}
+
+/* STEP */
+.step {
+  flex: 1;
+  text-align: center;
+  position: relative;
+  z-index: 3;
+}
+
+/* DOT WRAPPER */
+.dot-wrap {
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* STATIC DOT */
+.dot {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #cbd5e1;
+}
+
+.dot.done {
+  background: #2563eb;
+}
+
+/* ACTIVE PULSE */
+.pulse {
+  width: 36px;
+  height: 36px;
+  position: relative;
+}
+
+.pulse::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: rgba(37,99,235,.35);
+  animation: pulse 2.2s infinite ease-out;
+}
+
+.pulse::after {
+  content: "";
+  position: absolute;
+  inset: 6px;
+  border-radius: 50%;
+  background: #2563eb;
+  border: 4px solid #fff;
+}
+
+.pulse.delayed::before { background: rgba(234,179,8,.45); }
+.pulse.delayed::after  { background: #eab308; }
+
+.step-label {
+  font-size: 11px;
+  font-weight: 600;
+  margin-top: 8px;
+}
+
+.delay-label {
+  font-size: 10px;
+  font-weight: 700;
+  color: #92400e;
+  margin-top: 6px;
+}
+
+@keyframes pulse {
+  0% { transform: scale(1); opacity:.6; }
+  70% { transform: scale(2.6); opacity:0; }
+  100% { opacity:0; }
+}
+
+@keyframes fillLine {
+  to { width: var(--progress); }
+}
+
+
+/* ===== TOTALS ===== */
+.totals {
+  display: flex;
+  gap: 6px;
+  margin-top: auto;
+  padding-top: 8px;
+  border-top: 1px solid #e5e7eb;
+}
+
+.totals div {
+  flex: 1;
+  background: #f1f5f9;
+  border-radius: 10px;
+  padding: 6px;
+  text-align: center;
+}
+
+.label {
+  font-size: 12px;
+  color: #6b7280;
+}
+
+.value {
+  font-weight: 700;
+}
+
+/* 🌦 WEATHER FLOATING ICON */
+.pulse.weather::after {
+  content: "🌦";
+  position: absolute;
+  top: -26px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 14px;
+  animation: weatherFloat 2.6s ease-in-out infinite;
+}
+
+@keyframes weatherFloat {
+  0%   { transform: translate(-50%, 0); opacity:.7; }
+  50%  { transform: translate(-50%, -8px); opacity:1; }
+  100% { transform: translate(-50%, 0); opacity:.7; }
+}
+
+/* 🚢 RORO ROCKING ICON */
+.pulse.roro::after {
+  content: "🚢";
+  position: absolute;
+  top: -26px;
+  left: 50%;
+  transform-origin: center;
+  font-size: 15px;
+  animation: shipRock 2.4s ease-in-out infinite;
+}
+
+@keyframes shipRock {
+  0%   { transform: translateX(-50%) rotate(0deg); }
+  25%  { transform: translateX(-50%) rotate(4deg); }
+  50%  { transform: translateX(-50%) rotate(0deg); }
+  75%  { transform: translateX(-50%) rotate(-4deg); }
+  100% { transform: translateX(-50%) rotate(0deg); }
+}
+
+/* ✅ BACK ON TRACK BADGE */
+.resume-badge {
+  margin-top: 10px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: #eff6ff;
+  color: #1d4ed8;
+  font-size: 11px;
+  font-weight: 700;
+  text-align: center;
+  animation: fadeResume 4s forwards;
+}
+
+@keyframes fadeResume {
+  0%   { opacity: 0; transform: translateY(6px); }
+  15%  { opacity: 1; transform: translateY(0); }
+  80%  { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+
+/* ============================================
+   DESKTOP ENHANCEMENTS
+   (Overrides mobile-first canonical)
+============================================ */
+
+@media (min-width: 768px) {
+
+  .card {
+    max-width: 720px;
+    padding: 28px 32px;
+    border-radius: 20px;
+  }
+
+  .logo-wrap img {
+    height: 160px; /* desktop override */
+  }
+
+  .search-wrap input {
+    font-size: 17px;
+    height: 56px;
+    line-height: 56px;
+  }
+
+  .search-actions button {
+    font-size: 16px;
+    padding: 14px 34px;
+  }
+
+  .timeline {
+    margin: 28px 0;
+  }
+
+  .step-label {
+    font-size: 12px;
+  }
+
+  .result-scroll {
+    max-height: 420px;
+  }
+
+  .totals {
+    gap: 12px;
+    padding-top: 12px;
+  }
+
+  .totals div {
+    padding: 10px;
+  }
+}
+
+
+</style>
+</head>
+
+<body>
+<div class="card">
+
+  <div class="logo-wrap">
+    <img src="atlas-logo.png" alt="ATLAS Fast and Easy Shipping">
+  </div>
+
+  <div class="search-wrap">
+    <input id="trackingInput" placeholder="Enter Tracking Number">
+  </div>
+
+  <div class="search-actions">
+    <button id="trackBtn">Track</button>
+  </div>
+
+  <div id="output"></div>
+
+</div>
+
+
+
+<script>
+
+const STATUS_STEPS = ["Received","In Transit","Out for Delivery","Delivered"];
+
+/* ENTER-TO-TRACK */
+document.getElementById("trackingInput").addEventListener("keydown", e => {
+  if (e.key === "Enter") track();
+});
+
+document.getElementById("trackBtn").addEventListener("click", track);
+
+/* LAST UPDATED FORMAT */
+function formatLastUpdated() {
+  const now = new Date();
+  return now.toLocaleString(undefined, {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit"
+  });
+}
+
+function normalizeStatus(s) {
+  return s === "Received at Warehouse" ? "Received" : s;
+}
+
+/* ===== DELAY HELPERS ===== */
+function getDelayLabel(reason) {
+  return reason ? "⚠ " + reason.replace(/_/g," ") : "Delayed";
+}
+
+/* ✅ ADD THIS EXACTLY HERE */
+function renderResumeBadge() {
+  return `
+    <div class="resume-badge">
+      ✅ Back on track
+    </div>
+  `;
+}
+
+/* ===== TIMELINE ===== */
+function renderTimeline(status, delayReason, delayCleared) {
+  const i = STATUS_STEPS.indexOf(normalizeStatus(status));
+  const progress = (i / (STATUS_STEPS.length - 1)) * 75;
+  const delayed = delayReason && delayCleared === false;
+
+  return `
+    <div class="timeline">
+      <div class="steps">
+        <div class="progress-line" style="--progress:${progress}%"></div>
+        ${STATUS_STEPS.map((s,x)=>`
+          <div class="step">
+  <div class="dot-wrap">
+    ${
+      x === i
+        ? `
+          <div class="pulse
+            ${delayed ? "delayed" : ""}
+            ${delayReason?.includes("WEATHER") ? "weather" : ""}
+            ${delayReason?.includes("RORO") ? "roro" : ""}
+          "></div>
+        `
+        : `<div class="dot ${x<i?"done":""}"></div>`
+    }
+  </div>
+  <div class="step-label">${s}</div>
+</div>
+
+
+        `).join("")}
+      </div>
+    </div>`;
+}
+
+
+/* 🔢 COUNT-UP ANIMATION */
+function animateCount(el, target, duration = 600) {
+  const startTime = performance.now();
+
+  function update(now) {
+    const progress = Math.min((now - startTime) / duration, 1);
+    el.textContent = Math.floor(progress * target);
+    if (progress < 1) requestAnimationFrame(update);
+    else el.textContent = target;
+  }
+
+  requestAnimationFrame(update);
+}
+
+/* LOADING STATE + FETCH */
+async function track() {
+  const input = document.getElementById("trackingInput");
+  const btn = document.getElementById("trackBtn");
+  const output = document.getElementById("output");
+  const tracking = input.value.trim();
+
+  if (btn.disabled || !tracking) return;
+
+  btn.classList.add("loading");
+  btn.disabled = true;
+  btn.textContent = "Tracking";
+  output.innerHTML = "";
+
+  try {
+const res = await fetch(
+  `https://asia-southeast1-atlas-tracking.cloudfunctions.net/getPublicTracking?tracking=${encodeURIComponent(tracking)}`
+);
+
+
+
+    if (!res.ok) {
+      output.innerHTML = `<div class="status">Not found</div>`;
+      return;
+    }
+
+    const d = await res.json();
+
+    const total = d.totals?.received || 0;
+    const loaded = d.totals?.loaded || 0;
+    const pending = d.totals?.pending || (total - loaded);
+
+    output.innerHTML = `
+      <div class="result-scroll">
+        <div class="status">${d.status}</div>
+        <div class="last-updated">
+          Last updated: ${new Date(d.updatedAt.seconds * 1000).toLocaleString()}
+        </div>
+
+        ${renderTimeline(d.status, d.delayReason, d.delayCleared)}
+        ${d.delayCleared === true ? renderResumeBadge() : ""}
+
+        <div class="label">Customer</div>
+        <div class="value">${d.customerName}</div>
+
+        <div class="label">Route</div>
+        <div class="value">${d.origin} → ${d.destination}</div>
+      </div>
+
+      <div class="totals">
+        <div>
+          <div class="label">Received</div>
+          <div class="value" data-count="${total}">0</div>
+        </div>
+        <div>
+          <div class="label">Loaded</div>
+          <div class="value" data-count="${loaded}">0</div>
+        </div>
+        <div>
+          <div class="label">Pending</div>
+          <div class="value" data-count="${pending}">0</div>
+        </div>
+      </div>
+    `;
+
+    output.querySelectorAll(".value[data-count]").forEach(el => {
+      animateCount(el, Number(el.dataset.count));
+    });
+
+  } catch (e) {
+    console.error(e);
+    output.innerHTML = `<div class="status">Error loading tracking</div>`;
+  } finally {
+    btn.classList.remove("loading");
+    btn.disabled = false;
+    btn.textContent = "Track";
+  }
+}
+
+
+</script>
+</body>
+</html>

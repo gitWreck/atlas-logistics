@@ -1,62 +1,113 @@
 rules_version = '2';
-
 service cloud.firestore {
   match /databases/{database}/documents {
 
     /* ===============================
-       HELPER FUNCTIONS
+       AUTH HELPERS
     =============================== */
-    function isSignedIn() {
-      return request.auth != null;
+    function signedIn() { return request.auth != null; }
+
+    function userPath() {
+      return /databases/$(database)/documents/users/$(request.auth.uid);
     }
 
-    function isAdmin() {
-      return isSignedIn()
-        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
-        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "admin";
-    }
+    function hasUser() { return signedIn() && exists(userPath()); }
+    function user() { return hasUser() ? get(userPath()).data : null; }
+    function role() { return user() != null ? user().role : null; }
+    function active() { return hasUser() && user().active == true; }
 
-    function isSelf(userId) {
-      return isSignedIn() && request.auth.uid == userId;
+    function isStaff() {
+      return active() &&
+        (role() == "admin" ||
+         role() == "manager" ||
+         role() == "driver" ||
+         role() == "checker");
     }
 
     /* ===============================
-       USERS COLLECTION
+       USERS
     =============================== */
-    match /users/{userId} {
-
-      // ✅ Read rules
-      allow get: if isSelf(userId) || isAdmin();
-      allow list: if isAdmin();
-
-      // ❌ Block client-side creates (Cloud Function only)
-      allow create: if false;
-
-      // 🔐 User can update ONLY safe fields
-      allow update: if isSelf(userId)
-        && request.resource.data.diff(resource.data).changedKeys()
-          .hasOnly(["name", "photoURL"]);
-
-      // ❌ No deletes from client
-      allow delete: if false;
+    match /users/{uid} {
+      allow get: if signedIn() && (request.auth.uid == uid || role() == "admin");
+      allow list: if role() == "admin";
+      allow update: if request.auth.uid == uid;
+      allow create, delete: if false;
     }
 
     /* ===============================
-       ADMIN AUDIT LOGS
+       PUBLIC TRACKING RECORDS
     =============================== */
-    match /admin_logs/{logId} {
+match /tracking_records/{id} {
 
-      // ✅ Admins can read logs
-      allow get, list: if isAdmin();
+  // Public single doc
+  allow get: if resource.data.public == true || isStaff();
 
-      // ❌ No client writes EVER
-      allow create, update, delete: if false;
+  // Public tracking search
+  allow list: if
+    (
+      request.query.limit != null &&
+      request.query.where("public", "==", true)
+    ) || isStaff();
+
+  allow create, update, delete: if false;
+
+  match /status_events/{eid} {
+    allow get, list: if isStaff();
+  }
+
+  match /truck_trips/{tripId} {
+    allow get, list: if isStaff();
+
+    match /trip_packages/{pkgId} {
+      allow get, list: if isStaff();
+    }
+  }
+}
+
+    /* ===============================
+       CANONICAL TRUCK TRIPS (PUBLIC VIEW)
+    =============================== */
+    match /truck_trips/{tripId} {
+
+      // Public trip visibility
+      allow get: if resource.data.public == true || isStaff();
+      allow list: if isStaff();
+
+      match /trip_packages/{pkgId} {
+
+        // Public package visibility
+        allow get: if resource.data.public == true || isStaff();
+        allow list: if isStaff();
+
+        match /status_events/{eid} {
+
+          // Public status timeline
+          allow get, list: if
+            resource.data.public == true ||
+            isStaff();
+        }
+      }
     }
 
     /* ===============================
-       DEFAULT DENY (VERY IMPORTANT)
+       PRIVATE SYSTEM DATA
     =============================== */
-    match /{document=**} {
+    match /tracking_private/{id} {
+      allow read, write: if role() == "admin" || role() == "manager";
+    }
+
+    match /sms_logs/{id} {
+      allow read, write: if role() == "admin" || role() == "manager";
+    }
+
+    match /audit_logs/{id} {
+      allow read: if role() == "admin" || role() == "manager";
+    }
+
+    /* ===============================
+       DENY EVERYTHING ELSE
+    =============================== */
+    match /{doc=**} {
       allow read, write: if false;
     }
   }

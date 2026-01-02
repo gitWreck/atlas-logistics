@@ -2,8 +2,11 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Checker – Shipments</title>
+  <title>Atlas – Checker Shipments</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <!-- 🔐 SECURITY HARDENING -->
+  <meta http-equiv="X-Frame-Options" content="DENY">
 
   <!-- 🔗 GLOBAL BADGES -->
   <link rel="stylesheet" href="../styles/badges.css" />
@@ -13,6 +16,13 @@
       font-family: system-ui, -apple-system, Segoe UI, Roboto;
       background: #f9fafb;
       padding: 24px;
+      margin: 0;
+      color: #0f172a;
+    }
+
+    main {
+      max-width: 1200px;
+      margin: 0 auto;
     }
 
     /* ================= HEADER ================= */
@@ -20,7 +30,7 @@
       display: flex;
       align-items: center;
       gap: 14px;
-      margin-bottom: 24px;
+      margin-bottom: 20px;
     }
 
     .logo {
@@ -34,14 +44,27 @@
       font-weight: 600;
     }
 
+    .role-badge {
+      font-size: 11px;
+      padding: 4px 10px;
+      border-radius: 999px;
+      background: #fef3c7;
+      color: #92400e;
+      font-weight: 600;
+      letter-spacing: .3px;
+    }
+
     /* ================= TABLE ================= */
-    table {
-      width: 100%;
-      border-collapse: collapse;
+    .table-wrap {
       background: #ffffff;
       border-radius: 12px;
       overflow: hidden;
       box-shadow: 0 8px 20px rgba(0,0,0,.06);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
     }
 
     th, td {
@@ -49,11 +72,19 @@
       border-bottom: 1px solid #eee;
       text-align: left;
       font-size: 14px;
+      vertical-align: middle;
     }
 
     th {
       background: #f1f5f9;
       font-weight: 600;
+      position: sticky;
+      top: 0;
+      z-index: 2;
+    }
+
+    tr:last-child td {
+      border-bottom: none;
     }
 
     button {
@@ -66,7 +97,7 @@
       border: none;
     }
 
-    button:hover {
+    button:hover:not(:disabled) {
       background: #1e40af;
     }
 
@@ -74,35 +105,60 @@
       opacity: 0.5;
       cursor: not-allowed;
     }
+
+    .state {
+      text-align: center;
+      padding: 16px;
+      color: #64748b;
+      font-size: 14px;
+    }
+
+    .checker-note {
+      margin-top: 14px;
+      font-size: 12px;
+      color: #64748b;
+    }
   </style>
 </head>
 
 <body>
+<main>
 
   <!-- ================= HEADER ================= -->
   <div class="header">
-    <img src="../atlas-logo.png" alt="Atlas Logo" class="logo" />
+    <img src="/atlas-logo.png" alt="Atlas Logo" class="logo" />
     <h1>Checker – Shipments</h1>
+    <span class="role-badge">CHECKER</span>
   </div>
 
   <!-- ================= TABLE ================= -->
-  <table>
-    <thead>
-      <tr>
-        <th>Tracking</th>
-        <th>Customer</th>
-        <th>Status</th>
-        <th>Action</th>
-      </tr>
-    </thead>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Tracking</th>
+          <th>Customer</th>
+          <th>Status</th>
+          <th>Action</th>
+        </tr>
+      </thead>
 
-    <tbody id="shipmentTable">
-      <!-- Filled by shipments.js -->
-    </tbody>
-  </table>
+      <tbody id="shipmentTable">
+        <tr>
+          <td colspan="4" class="state">Loading shipments…</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p class="checker-note">
+    Checkers may only mark <strong>Out for Delivery → Delivered</strong>.  
+    Delays and status reversals are handled by Managers or Admins.
+  </p>
 
   <!-- ================= SCRIPT ================= -->
   <script type="module" src="./shipments.js"></script>
 
+</main>
 </body>
 </html>

@@ -1,10 +1,19 @@
 export function getStatusBadgeClass(status = "") {
-  const s = status.toLowerCase();
+  switch (status) {
+    case "Received":
+      return "received";
 
-  if (s.includes("received")) return "received";
-  if (s.includes("loaded") || s.includes("transit")) return "in-transit";
-  if (s.includes("delayed") || s.includes("weather")) return "delayed";
-  if (s.includes("delivered")) return "delivered";
+    case "Loaded":
+    case "In Transit":
+    case "Arrived at Port":
+    case "Boarded RORO Vessel":
+    case "Out for Delivery":
+      return "in-transit";
 
-  return "received";
+    case "Delivered":
+      return "delivered";
+
+    default:
+      return "received";
+  }
 }

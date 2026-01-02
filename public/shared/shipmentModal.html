@@ -1,0 +1,32 @@
+<!-- =====================================================
+     📦 SHARED SHIPMENT MODAL (ADMIN + MANAGER)
+===================================================== -->
+<div class="modal" id="shipmentModal">
+  <div class="modal-content">
+    <h2>➕ New Shipment</h2>
+
+    <label>Customer Name</label>
+    <input id="smCustomerName" placeholder="e.g. Rose" autocomplete="off" />
+
+    <label>Customer Phone</label>
+    <input id="smCustomerPhone" placeholder="09XXXXXXXXX" />
+
+    <label>Origin</label>
+    <input id="smOrigin" placeholder="Divisoria" />
+
+    <label>Destination</label>
+    <input id="smDestination" placeholder="Odiongan" />
+
+    <label>Number of Items / Packages</label>
+    <input id="smItems" type="number" min="1" value="1" />
+
+    <small style="color:#64748b;">
+      Tracking number is generated automatically.
+    </small>
+
+    <div class="actions">
+      <button id="smSaveBtn">Create Shipment</button>
+      <button class="secondary" id="smCancelBtn">Cancel</button>
+    </div>
+  </div>
+</div>

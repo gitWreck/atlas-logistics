@@ -1,181 +1,394 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <title>Manager – Shipments</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta charset="UTF-8" />
+<title>Atlas – Manager Shipments</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-  <!-- Badge styles -->
-  <link rel="stylesheet" href="../styles/badges.css" />
+<!-- 🔐 SECURITY -->
+<meta http-equiv="X-Frame-Options" content="DENY">
+<meta http-equiv="X-Content-Type-Options" content="nosniff">
+<link rel="stylesheet" href="/styles/badges.css">
 
-  <style>
-    body {
-      font-family: system-ui, -apple-system, Segoe UI, Roboto;
-      background: #f9fafb;
-      padding: 24px;
-    }
 
-    .header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      margin-bottom: 24px;
-    }
+<style>
+:root {
+  --blue:#2563eb;
+  --blue-soft:#eff6ff;
+  --yellow:#f59e0b;
+  --yellow-soft:#fef3c7;
+  --gray:#64748b;
+  --border:#e5e7eb;
+}
 
-    .left {
-      display: flex;
-      align-items: center;
-      gap: 14px;
-    }
+/* ===== BASE ===== */
+body {
+  font-family: system-ui,-apple-system,Segoe UI,Roboto;
+  background:#f9fafb;
+  margin:0;
+  padding:24px;
+  color:#0f172a;
+}
+main {
+  max-width:1200px;
+  margin:0 auto;
+}
 
-    .logo {
-      height: 36px;
-    }
+/* ===== HEADER ===== */
+.header {
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  margin-bottom:18px;
+}
+.left {
+  display:flex;
+  gap:14px;
+  align-items:center;
+}
+.logo { height:36px; }
+h1 { margin:0; font-size:22px; }
+.role-badge {
+  font-size:11px;
+  padding:4px 12px;
+  border-radius:999px;
+  background:#e0f2fe;
+  color:#075985;
+  font-weight:700;
+}
 
-    h1 {
-      margin: 0;
-      font-size: 22px;
-      font-weight: 600;
-    }
+/* ===== ANALYTICS ===== */
+.analytics {
+  display:flex;
+  gap:14px;
+  margin-bottom:16px;
+}
+.analytics .card {
+  flex:1;
+  background:#fff;
+  padding:14px 16px;
+  border-radius:14px;
+  box-shadow:0 6px 16px rgba(0,0,0,.06);
+}
+.analytics strong {
+  font-size:22px;
+  display:block;
+}
+.analytics span {
+  font-size:13px;
+  color:var(--gray);
+}
 
-    button {
-      padding: 6px 12px;
-      border-radius: 6px;
-      font-size: 13px;
-      cursor: pointer;
-      background: #2563eb;
-      color: #fff;
-      border: none;
-    }
+/* ===== INFO STRIP ===== */
+.info-strip {
+  background:#ffffff;
+  border:1px solid var(--border);
+  border-radius:12px;
+  padding:12px 16px;
+  font-size:13px;
+  color:var(--gray);
+  margin-bottom:16px;
+  line-height:1.5;
+}
+.info-strip strong { color:#0f172a; }
 
-    button.secondary {
-      background: #475569;
-    }
+/* ===== BULK BAR ===== */
+.bulk-bar {
+  display:flex;
+  gap:10px;
+  align-items:center;
+  margin-bottom:12px;
+}
+.bulk-bar select {
+  padding:8px 10px;
+  border-radius:8px;
+  border:1px solid var(--border);
+}
+.bulk-bar button {
+  background:var(--blue);
+  color:#fff;
+  border:none;
+  border-radius:8px;
+  padding:8px 14px;
+  cursor:pointer;
+}
 
-    button.sms {
-      background: #0ea5e9;
-    }
+/* ===== TABLE ===== */
+.table-wrap {
+  background:#fff;
+  border-radius:14px;
+  overflow:hidden;
+  box-shadow:0 10px 30px rgba(0,0,0,.06);
+}
+table {
+  width:100%;
+  border-collapse:collapse;
+}
+th,td {
+  padding:12px;
+  border-bottom:1px solid var(--border);
+  font-size:14px;
+}
+th {
+  background:#f1f5f9;
+  font-weight:600;
+}
+tr:last-child td { border-bottom:none; }
 
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      background: #ffffff;
-      border-radius: 12px;
-      overflow: hidden;
-      box-shadow: 0 8px 20px rgba(0,0,0,.06);
-    }
+/* ===== TRUCK ROW ===== */
+.truck-row td {
+  background:var(--blue-soft);
+  font-weight:600;
+  border-top:2px solid var(--border);
+}
+.truck-meta {
+  display:flex;
+  flex-wrap:wrap;
+  gap:10px;
+  align-items:center;
+  font-size:13px;
+}
+.truck-id {
+  font-family:ui-monospace,Menlo,monospace;
+  background:#fff;
+  padding:4px 8px;
+  border-radius:6px;
+  border:1px solid var(--border);
+}
 
-    th, td {
-      padding: 12px;
-      border-bottom: 1px solid #eee;
-      font-size: 14px;
-      text-align: left;
-    }
+/* ===== BADGES ===== */
+.badge {
+  font-size:11px;
+  padding:4px 10px;
+  border-radius:999px;
+  font-weight:700;
+}
+.badge.delayed {
+  background:var(--yellow-soft);
+  color:#92400e;
+}
+.badge.unassigned {
+  background:#fff7ed;
+  color:#9a3412;
+}
 
-    th {
-      background: #f1f5f9;
-      font-weight: 600;
-    }
+/* ===== SHIPMENT ROW ===== */
+.shipment-row td {
+  padding-left:28px;
+}
 
-    input, select, textarea {
-      padding: 6px 10px;
-      font-size: 13px;
-      border-radius: 6px;
-      border: 1px solid #cbd5e1;
-      width: 100%;
-    }
+/* ===== STATE ===== */
+.state {
+  text-align:center;
+  padding:18px;
+  color:var(--gray);
+}
 
-    textarea {
-      resize: none;
-    }
+/* ===== BUTTONS ===== */
+button {
+  background:var(--blue);
+  color:#fff;
+  border:none;
+  border-radius:8px;
+  padding:6px 12px;
+  font-size:13px;
+  cursor:pointer;
+}
+button.secondary {
+  background:#475569;
+}
+button.sms {
+  background:#0ea5e9;
+}
+button:disabled {
+  opacity:.5;
+  cursor:not-allowed;
+}
 
-    .actions {
-      display: flex;
-      gap: 6px;
-    }
+/* ===== MODALS ===== */
+.modal {
+  position:fixed;
+  inset:0;
+  background:rgba(15,23,42,.55);
+  display:none;
+  align-items:center;
+  justify-content:center;
+  z-index:50;
+  padding:18px;
+}
+.modal.active { display:flex; }
+.modal-content {
+  background:#fff;
+  border-radius:14px;
+  padding:18px;
+  width:420px;
+  box-shadow:0 20px 50px rgba(0,0,0,.25);
+}
+.modal-content h2 { margin:0 0 10px; }
+.modal-content label {
+  font-size:13px;
+  color:#475569;
+  margin-top:10px;
+  display:block;
+}
+input,textarea,select {
+  width:100%;
+  padding:8px 10px;
+  border-radius:8px;
+  border:1px solid #cbd5e1;
+}
+textarea { resize:none; }
+.actions {
+  display:flex;
+  justify-content:flex-end;
+  gap:8px;
+  margin-top:12px;
+}
 
-    /* ================= MODALS ================= */
-    .modal {
-      position: fixed;
-      inset: 0;
-      background: rgba(0,0,0,.4);
-      display: none;
-      align-items: center;
-      justify-content: center;
-      z-index: 50;
-    }
+.hint {
+  font-size: 12px;
+  color: #64748b;
+  margin-top: 2px;
+  display: block;
+}
 
-    .modal.active {
-      display: flex;
-    }
+.hint.warn {
+  color: #b45309;
+}
 
-    .modal-content {
-      background: #fff;
-      padding: 20px;
-      border-radius: 12px;
-      width: 420px;
-      max-width: 92%;
-    }
+.hint.ok {
+  color: #15803d;
+}
 
-    .modal-content h2 {
-      margin-top: 0;
-      font-size: 18px;
-    }
-
-    .modal-content label {
-      font-size: 13px;
-      color: #475569;
-    }
-
-    .modal-content input,
-    .modal-content textarea {
-      margin-bottom: 10px;
-    }
-  </style>
+</style>
 </head>
 
 <body>
+<main>
 
-<!-- ================= HEADER ================= -->
+<!-- HEADER -->
 <div class="header">
   <div class="left">
-    <img src="../atlas-logo.png" class="logo" />
+    <img src="/atlas-logo.png" class="logo" alt="Atlas Logo">
     <h1>Manager – Shipments</h1>
+    <span class="role-badge">MANAGER</span>
   </div>
   <button id="addShipmentBtn">➕ New Shipment</button>
 </div>
 
-<!-- ================= TABLE ================= -->
-<table>
-  <thead>
-    <tr>
-      <th>Tracking</th>
-      <th>Customer</th>
-      <th>Destination</th>
-      <th>Status</th>
-      <th>Actions</th>
-    </tr>
-  </thead>
-  <tbody id="shipmentTable"></tbody>
-</table>
+<!-- ANALYTICS -->
+<div class="analytics">
+  <div class="card"><strong id="cardDelayed">0</strong><span>Delayed</span></div>
+  <div class="card"><strong id="cardTransit">0</strong><span>In Transit</span></div>
+  <div class="card"><strong id="cardUnassigned">0</strong><span>Unassigned</span></div>
+</div>
 
-<!-- ================= CREATE / EDIT MODAL ================= -->
+<!-- INFO -->
+<div class="info-strip">
+  🚛 <strong>Truck-centric control:</strong> Delays are applied per truck.
+  Shipments inherit delay automatically.
+  <br>
+  ⚠️ <span class="badge unassigned">UNASSIGNED</span> shipments must be assigned before delay or status actions are available.
+</div>
+
+<!-- BULK ASSIGN -->
+<div class="bulk-bar">
+  <select id="bulkTruckSelect">
+    <option value="">Assign selected shipments to truck…</option>
+  </select>
+  <button id="bulkAssignBtn">Assign</button>
+</div>
+
+<!-- BULK UPLOAD (CSV) -->
+<div class="bulk-bar" style="flex-wrap:wrap; margin-bottom:12px;">
+  <input
+    type="file"
+    id="bulkFile"
+    accept=".csv"
+    style="max-width:260px;"
+  />
+
+  <button id="bulkUploadBtn">
+    📄 Bulk Upload CSV
+  </button>
+
+  <small style="color:#64748b;">
+    CSV headers:
+    customerName,
+    customerPhone,
+    originCode,
+    destinationCode,
+    originLabel,
+    destinationLabel
+  </small>
+</div>
+
+
+<!-- TABLE -->
+<div class="table-wrap">
+  <table>
+    <thead>
+      <tr>
+        <th>Select</th>
+        <th>Tracking</th>
+        <th>Customer</th>
+        <th>Destination</th>
+        <th>Status</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody id="shipmentTable">
+      <tr><td colspan="6" class="state">Loading shipments…</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- SMS MODAL -->
+<div class="modal" id="smsModal">
+  <div class="modal-content">
+    <h2>📩 SMS Preview</h2>
+    <p><strong>To:</strong> <span id="smsPhone"></span></p>
+    <p><strong>Tracking:</strong> <span id="smsTracking"></span></p>
+    <label>Message</label>
+    <textarea id="smsMessage" rows="6" readonly></textarea>
+    <div class="actions">
+      <button class="sms" id="sendSmsBtn">Send SMS</button>
+      <button class="secondary" id="closeSmsBtn">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- DELAY MODAL -->
+<div class="modal" id="delayModal">
+  <div class="modal-content">
+    <h2>Delay Reason</h2>
+    <select id="delayReasonSelect">
+      <option value="">Select reason…</option>
+      <option value="WEATHER">Weather</option>
+      <option value="RORO_FULL">RORO Full</option>
+      <option value="PORT_CONGESTION">Port Congestion</option>
+      <option value="MECHANICAL">Mechanical Issue</option>
+      <option value="ROAD_CLOSED">Road Closed</option>
+    </select>
+    <div class="actions">
+      <button id="confirmDelayBtn">Apply Delay</button>
+      <button class="secondary" id="cancelDelayBtn">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- SHIPMENT MODAL -->
 <div class="modal" id="shipmentModal">
   <div class="modal-content">
-    <h2 id="modalTitle">New Shipment</h2>
-
+    <h2>Shipment</h2>
     <label>Tracking ID</label>
-    <input id="trackingInput" />
-
+    <input id="trackingInput">
     <label>Customer Name</label>
-    <input id="customerInput" />
-
+    <input id="customerInput">
     <label>Customer Phone</label>
-    <input id="customerPhone" placeholder="09XXXXXXXXX" />
-
+    <input id="customerPhone">
     <label>Destination</label>
-    <input id="destinationInput" />
-
+    <input id="destinationInput">
     <div class="actions">
       <button id="saveShipmentBtn">Save</button>
       <button class="secondary" id="cancelBtn">Cancel</button>
@@ -183,30 +396,24 @@
   </div>
 </div>
 
-<!-- ================= SMS PREVIEW MODAL ================= -->
-<div class="modal" id="smsModal">
-  <div class="modal-content">
-    <h2>📩 SMS Preview</h2>
-
-    <p><strong>To:</strong> <span id="smsPhone"></span></p>
-    <p><strong>Tracking:</strong> <span id="smsTracking"></span></p>
-
-    <label>Message</label>
-    <textarea
-      id="smsMessage"
-      rows="6"
-      readonly
-    ></textarea>
-
-    <div class="actions">
-      <button id="sendSmsBtn">Send SMS</button>
-      <button class="secondary" id="closeSmsBtn">Cancel</button>
-    </div>
-  </div>
-</div>
-
-<!-- ================= SCRIPT ================= -->
+<!-- SCRIPT -->
 <script type="module" src="./shipments.js"></script>
 
+<button id="downloadCsvTemplate">⬇️ Download CSV Template</button>
+
+<script type="module">
+  fetch("/shared/shipmentModal.html")
+    .then(r => r.text())
+    .then(html =>
+      document.body.insertAdjacentHTML("beforeend", html)
+    );
+</script>
+
+<!-- SHARED SHIPMENT MODAL -->
+<script type="module" src="/shared/shipmentModal.js"></script>
+
+</main>
 </body>
 </html>
+
+
