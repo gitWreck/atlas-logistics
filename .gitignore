@@ -1,13 +1,28 @@
-# Firebase / Admin secrets
-serviceAccountKey.json
-
-# Node
+# Node / Firebase
 node_modules/
+npm-debug.log*
+yarn-error.log*
 
-# Env files
+# Firebase
+.firebase/
+.firebaserc
+firebase-debug.log
+runtimeconfig.json
+
+# Environment secrets
 .env
 .env.local
+.env.production
+.env.development
 
-# OS junk
+# OS files
 .DS_Store
 Thumbs.db
+
+# Editor files
+.vscode/
+.idea/
+
+# Logs
+*.log
+
