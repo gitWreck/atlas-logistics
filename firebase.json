@@ -18,5 +18,20 @@
         "*.local"
       ]
     }
-  ]
+  ],
+  "emulators": {
+    "auth": {
+      "port": 4001
+    },
+    "functions": {
+      "port": 5001
+    },
+    "firestore": {
+      "port": 6001
+    },
+    "ui": {
+      "enabled": true
+    },
+    "singleProjectMode": true
+  }
 }

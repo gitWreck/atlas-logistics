@@ -1,5 +1,6 @@
 "use client";
 import React, { useState, useEffect } from "react"; // Added useEffect
+import TripManager from "../../components/trips/TripManager";
 import ShipmentBoard from "../../components/shipments/ShipmentBoard";
 import AdminOverview from "../../components/admin/AdminOverview";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
@@ -7,10 +8,12 @@ import {
   faChartPie,
   faTruck,
   faSignOutAlt,
+  faMapSigns,
 } from "@fortawesome/free-solid-svg-icons";
 import { useRouter } from "next/navigation"; // For logout
-import { signOut } from "firebase/auth"; // For logout
-import { auth } from "@/lib/firebase"; // For logout
+import { signOut, onAuthStateChanged } from "firebase/auth"; // For logout
+import { auth, db } from "@/lib/firebase"; // For logout
+import { doc, getDoc } from "firebase/firestore";
 
 export default function AdminDashboardPage() {
   const router = useRouter();
@@ -23,20 +26,53 @@ export default function AdminDashboardPage() {
     role: "admin",
   });
 
-  // ✅ LOAD USER ON MOUNT
+  // ✅ 1. LISTEN TO FIREBASE AUTH STATE
   useEffect(() => {
-    const stored = localStorage.getItem("atlas_user");
-    console.log("Loaded user from storage:", stored);
-    if (stored) {
-      setCurrentUser(JSON.parse(stored));
-    }
+    // This listener runs automatically on mount AND whenever login/logout happens
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (user) {
+        console.log("User detected:", user.uid);
+
+        try {
+          // We have the basic Auth info (email, uid), now fetch the 'Role' from Firestore
+          const userDoc = await getDoc(doc(db, "users", user.uid));
+
+          if (userDoc.exists()) {
+            const userData = userDoc.data();
+
+            // Construct the session object exactly how you want it
+            const sessionUser = {
+              uid: user.uid,
+              name: userData.name || userData.displayName || "Atlas User",
+              email: user.email,
+              role: userData.role?.toUpperCase(),
+              photoURL: userData.photoURL || null,
+            };
+
+            setCurrentUser(sessionUser); // Update your app state
+          }
+        } catch (error) {
+          console.error("Error fetching user profile:", error);
+        }
+      } else {
+        // User is signed out
+        console.log("No user found");
+        setCurrentUser(null);
+      }
+    });
+
+    // Cleanup subscription on unmount
+    return () => unsubscribe();
   }, []);
 
-  // ✅ LOGOUT FUNCTION
+  // ✅ 2. SIMPLIFIED LOGOUT
   const handleLogout = async () => {
-    await signOut(auth);
-    localStorage.removeItem("atlas_user"); // Clear storage
-    router.push("/login");
+    try {
+      await signOut(auth); // The listener above will detect this and set currentUser to null automatically
+      router.push("/login");
+    } catch (error) {
+      console.error("Error signing out:", error);
+    }
   };
 
   return (
@@ -93,6 +129,12 @@ export default function AdminDashboardPage() {
               icon={faTruck}
               label="Shipment Operations"
             />
+            <TabButton
+              isActive={activeTab === "trips"}
+              onClick={() => setActiveTab("trips")}
+              icon={faMapSigns}
+              label="Trip Operations"
+            />
           </div>
         </div>
       </header>
@@ -101,6 +143,7 @@ export default function AdminDashboardPage() {
       <main className="max-w-7xl mx-auto p-6">
         {activeTab === "overview" && <AdminOverview />}
         {activeTab === "shipments" && <ShipmentBoard userRole="admin" />}
+        {activeTab === "trips" && <TripManager />}
       </main>
     </div>
   );

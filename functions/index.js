@@ -15,7 +15,11 @@
  */
 
 const { setGlobalOptions } = require("firebase-functions/v2/options");
-const { onCall, onRequest, HttpsError } = require("firebase-functions/v2/https");
+const {
+  onCall,
+  onRequest,
+  HttpsError,
+} = require("firebase-functions/v2/https");
 const { onDocumentUpdated } = require("firebase-functions/v2/firestore");
 const admin = require("firebase-admin");
 
@@ -46,24 +50,28 @@ if (!admin.apps.length) {
  * AUTH — USER CREATED
  * Automatically creates user profile in Firestore
  */
-exports.createUserProfile = functionsV1.auth.user().onCreate(async (user) => {
-  if (!user?.uid) return;
+// exports.createUserProfile = functionsV1.auth.user().onCreate(async (user) => {
+//   if (!user?.uid) return;
 
-  await admin.firestore().collection("users").doc(user.uid).set(
-    {
-      uid: user.uid,
-      email: user.email || "",
-      name: user.displayName || "",
-      role: "user",
-      active: true,
-      photoURL: user.photoURL || null,
-      provider: user.providerData?.[0]?.providerId || "password",
-      createdAt: admin.firestore.FieldValue.serverTimestamp(),
-      lastAuthAt: admin.firestore.FieldValue.serverTimestamp(),
-    },
-    { merge: true }
-  );
-});
+//   await admin.firestore().collection("users").doc(user.uid).set(
+//     {
+//       uid: user.uid,
+//       email: user.email || "",
+//       name: user.displayName || "",
+//       role: "user",
+//       active: true,
+//       photoURL: user.photoURL || null,
+//       provider: user.providerData?.[0]?.providerId || "password",
+//       createdAt: admin.firestore.FieldValue.serverTimestamp(),
+//       lastAuthAt: admin.firestore.FieldValue.serverTimestamp(),
+//     },
+//     { merge: true }
+//   );
+// });
+
+exports.createUserProfile = require("./src/createUserProfile"); // Your existing trigger
+
+exports.createUser = require("./src/createUser").createUser;
 
 /**
  * AUTH — USER DELETED
@@ -88,11 +96,12 @@ exports.cleanupUserProfile = functionsV1.auth.user().onDelete(async (user) => {
 // ------------------------------------------------------------
 
 const { createTruckTrip } = require("./src/createTruckTrip");
-const { createShipmentWithSequence } = require("./src/createShipmentWithSequence");
+const {
+  createShipmentWithSequence,
+} = require("./src/createShipmentWithSequence");
 const { loadItemsToTrip } = require("./src/loadItemsToTrip");
 const { unloadItemsFromTrip } = require("./src/unloadItemsFromTrip");
 const { completeTrip } = require("./src/completeTrip");
-
 
 exports.createTruckTrip = createTruckTrip;
 exports.createShipmentWithSequence = createShipmentWithSequence;
@@ -100,14 +109,15 @@ exports.loadItemsToTrip = loadItemsToTrip;
 exports.unloadItemsFromTrip = unloadItemsFromTrip;
 exports.completeTrip = completeTrip;
 
-
 // Partial (callable)
 exports.recordPartial = require("./src/recordPartial").recordPartial;
 
 /* MANIFEST & CERTIFICATES (CALLABLES) */
-exports.generateTripManifest = require("./generateTripManifest").generateTripManifest;
+exports.generateTripManifest =
+  require("./generateTripManifest").generateTripManifest;
 exports.getTripPackages = require("./getTripPackages").getTripPackages;
-exports.generateTripCertificate = require("./generateTripCertificate").generateTripCertificate;
+exports.generateTripCertificate =
+  require("./generateTripCertificate").generateTripCertificate;
 exports.reopenTrip = require("./reopenTrip").reopenTrip;
 
 /* CORE SHIPPING FUNCTIONS (existing endpoints) */
@@ -132,19 +142,25 @@ exports.smsAdmin = require("./smsAdmin").smsAdmin;
 /* ✅ CALLABLES REQUIRED BY admin/shipments.js */
 
 // Shipments
-exports.bulkCreateShipments = require("./bulkCreateShipments").bulkCreateShipments;
+exports.bulkCreateShipments =
+  require("./bulkCreateShipments").bulkCreateShipments;
 
 // Truck trips
-exports.assignShipmentToTruckTrip = require("./assignShipmentToTruckTrip").assignShipmentToTruckTrip;
-exports.unassignShipmentFromTruckTrip = require("./unassignShipmentFromTruckTrip").unassignShipmentFromTruckTrip;
+exports.assignShipmentToTruckTrip =
+  require("./assignShipmentToTruckTrip").assignShipmentToTruckTrip;
+exports.unassignShipmentFromTruckTrip =
+  require("./unassignShipmentFromTruckTrip").unassignShipmentFromTruckTrip;
 
 // Truck controls
 exports.setTruckDelay = require("./setTruckDelay").setTruckDelay;
 exports.clearTruckDelay = require("./clearTruckDelay").clearTruckDelay;
-exports.setTruckAutoSmsSettings = require("./setTruckAutoSmsSettings").setTruckAutoSmsSettings;
+exports.setTruckAutoSmsSettings =
+  require("./setTruckAutoSmsSettings").setTruckAutoSmsSettings;
 
-exports.assignDriverToTruckTrip = require("./assignDriverToTruckTrip").assignDriverToTruckTrip;
-exports.unassignDriverFromTruckTrip = require("./unassignDriverFromTruckTrip").unassignDriverFromTruckTrip;
+exports.assignDriverToTruckTrip =
+  require("./assignDriverToTruckTrip").assignDriverToTruckTrip;
+exports.unassignDriverFromTruckTrip =
+  require("./unassignDriverFromTruckTrip").unassignDriverFromTruckTrip;
 
 // SMS callable experience (UI preview/send + per-truck usage)
 exports.previewNextSms = require("./previewNextSms").previewNextSms;
@@ -153,7 +169,8 @@ exports.sendManualSms = require("./sendManualSms").sendManualSms;
 exports.getTruckSmsUsage = require("./getTruckSmsUsage").getTruckSmsUsage;
 
 // Partial delivery (separate implementation)
-exports.recordPartialDelivery = require("./recordPartialDelivery").recordPartialDelivery;
+exports.recordPartialDelivery =
+  require("./recordPartialDelivery").recordPartialDelivery;
 
 // 🔧 Repair tool — relink broken package → tracking
 exports.relinkPackageToTracking = onCall(async (request) => {
@@ -175,7 +192,12 @@ exports.relinkPackageToTracking = onCall(async (request) => {
 });
 
 /* 🔗 INVITATIONS */
-const { createInvite, validateInvite, acceptInvite, revokeInvite } = require("./invitations");
+const {
+  createInvite,
+  validateInvite,
+  acceptInvite,
+  revokeInvite,
+} = require("./invitations");
 exports.createInvite = createInvite;
 exports.validateInvite = validateInvite;
 exports.acceptInvite = acceptInvite;
@@ -199,11 +221,10 @@ exports.autoSetPublic = autoSetPublic;
 exports.autoRepairTrackingPublic =
   require("./autoRepairTrackingPublic").autoRepairTrackingPublic;
 
-
 const {
   syncTrackingPublic,
   syncTrackingPublicHttp,
-  getPublicTracking
+  getPublicTracking,
 } = require("./src/syncTrackingPublic");
 
 exports.syncTrackingPublic = syncTrackingPublic;
@@ -228,10 +249,6 @@ exports.autoSyncPublicOnTrackingChange = onDocumentWritten(
     await syncTrackingPublicCore();
   }
 );
-
-
-
-
 
 /**
  * PHASE 5 — PACKAGE → TRIP rollup (deliveryProgress)

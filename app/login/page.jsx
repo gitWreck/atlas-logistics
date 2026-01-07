@@ -55,7 +55,7 @@ export default function LoginPage() {
         photoURL: userData.photoURL || null,
       };
 
-      localStorage.setItem("atlas_user", JSON.stringify(sessionUser));
+      // localStorage.setItem("atlas_user", JSON.stringify(sessionUser));
       // ---------------------------------------------------------
 
       // 4. Route to Dashboard
@@ -94,8 +94,13 @@ export default function LoginPage() {
       <div className="w-full max-w-md bg-white rounded-2xl shadow-2xl overflow-hidden">
         {/* Header Section */}
         <div className="bg-slate-900 p-8 text-center border-b border-slate-800">
-          <div className="w-16 h-16 mx-auto bg-gradient-to-br from-blue-600 to-indigo-700 rounded-xl flex items-center justify-center shadow-lg shadow-blue-500/20 mb-4">
-            <span className="text-2xl font-bold text-white">A</span>
+          <div className="w-20 h-20 mx-auto bg-gradient-to-br from-blue-600 to-indigo-700 rounded-xl flex items-center justify-center shadow-lg shadow-blue-500/20 mb-4">
+            {/* <span className="text-2xl font-bold text-white">A</span> */}
+            <img
+              src="/atlas-logo1.png"
+              alt="Atlas Logo"
+              className="w-full h-full object-cover rounded-xl"
+            />
           </div>
           <h1 className="text-2xl font-bold text-white tracking-wide">
             ATLAS LOGIN
