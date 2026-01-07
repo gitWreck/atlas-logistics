@@ -1,0 +1,98 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    /* ===============================
+       1. AUTH HELPERS (Yours are great, kept them)
+    =============================== */
+    function signedIn() { return request.auth != null; }
+
+    function userPath() {
+      return /databases/$(database)/documents/users/$(request.auth.uid);
+    }
+    
+    // Check if the user is logged in
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+		// Check if the user has the 'ADMIN' role (accepts both cases)
+    function isAdmin() {
+      return isAuthenticated() && 
+        (
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'ADMIN'
+        );
+    }
+    
+    // Note: This costs 1 Read per request. Acceptable for admin tools.
+    function hasUser() { return signedIn() && exists(userPath()); }
+    function user() { return hasUser() ? get(userPath()).data : null; }
+    function role() { return user() != null ? user().role : null; }
+    
+    function isStaff() {
+      // Assuming 'active' boolean exists on user profile
+      return hasUser() && user().active == true &&
+        (role() == "admin" || role() == "manager" || role() == "driver" || role() == "checker");
+    }
+
+    function isDriverForTrip() {
+      return role() == "driver" && resource.data.driverId == request.auth.uid;
+    }
+
+    /* ===============================
+       2. USERS COLLECTION
+    =============================== */
+    match /users/{uid} {
+      allow get: if signedIn() && (request.auth.uid == uid || role() == "admin");
+      allow read: if isAdmin() || role() == "manager";
+      
+      // Allow user to write their own simple fields, but critical roles must be set by Admin SDK
+      allow update: if request.auth.uid == uid; 
+      allow write: if isAdmin();
+    }
+
+    /* ===============================
+       3. TRUTH MODEL (Strictly Private)
+       MANDATE: "Public users must never see private collections"
+    =============================== */
+    match /tracking_records/{id} {
+      // STAFF ONLY. Public is strictly blocked.
+      allow read: if isStaff();
+      
+      // WRITE: DENY ALL. 
+      // All logic (assigning trips, status changes) happens in Cloud Functions.
+      allow write: if false; 
+    }
+
+    match /truck_trips/{tripId} {
+      // Managers see all. Drivers see ONLY their own trips.
+      allow read: if isStaff() && (role() != "driver" || isDriverForTrip());
+      
+      // WRITE: DENY ALL.
+      // Manifest locking and trip creation happens in Cloud Functions.
+      allow write: if false; 
+    }
+
+    /* ===============================
+       4. PUBLIC PROJECTION (The Safe Zone)
+       MANDATE: "This is a read-only projection"
+    =============================== */
+    match /tracking_public/{id} {
+      // OPEN TO THE WORLD
+      allow read: if true;
+      
+      // SYSTEM ONLY
+      // Even Admins cannot write here manually; the Cloud Function does it.
+      allow write: if false;
+    }
+
+    /* ===============================
+       5. LOGS & SYSTEM
+    =============================== */
+    match /audit_logs/{id} {
+      allow read: if role() == "admin";
+      allow write: if false; 
+    }
+  }
+}

@@ -61,7 +61,15 @@ export default function ShipmentDrawer({ isOpen, onClose, data }) {
               </div>
               <div className="p-4 rounded-lg bg-slate-800/50 border border-slate-700/50">
                 <div className="text-xs text-slate-500 uppercase tracking-wider mb-1">
-                  Driver/Owner
+                  Driver
+                </div>
+                <div className="text-slate-200 font-medium truncate">
+                  {data.owner}
+                </div>
+              </div>
+              <div className="p-4 rounded-lg bg-slate-800/50 border border-slate-700/50">
+                <div className="text-xs text-slate-500 uppercase tracking-wider mb-1">
+                  Owner
                 </div>
                 <div className="text-slate-200 font-medium truncate">
                   {data.owner}
