@@ -2,113 +2,71 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    /* ===============================
-       AUTH HELPERS
-    =============================== */
-    function signedIn() { return request.auth != null; }
-
-    function userPath() {
-      return /databases/$(database)/documents/users/$(request.auth.uid);
+    // --- HELPER FUNCTIONS ---
+    
+    // Check if user is authenticated
+    function isSignedIn() {
+      return request.auth != null;
+    }
+    
+    // Check user role from custom claims or a 'users' collection
+    // (Assuming you store roles in a 'users' collection for this phase)
+    function hasRole(role) {
+      return isSignedIn() && 
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == role;
     }
 
-    function hasUser() { return signedIn() && exists(userPath()); }
-    function user() { return hasUser() ? get(userPath()).data : null; }
-    function role() { return user() != null ? user().role : null; }
-    function active() { return hasUser() && user().active == true; }
-
-    function isStaff() {
-      return active() &&
-        (role() == "admin" ||
-         role() == "manager" ||
-         role() == "driver" ||
-         role() == "checker");
+    // Check if the user is the specific driver assigned to the trip
+    function isAssignedDriver() {
+      return resource.data.driverId == request.auth.uid;
     }
 
-    /* ===============================
-       USERS
-    =============================== */
-    match /users/{uid} {
-      allow get: if signedIn() && (request.auth.uid == uid || role() == "admin");
-      allow list: if role() == "admin";
-      allow update: if request.auth.uid == uid;
-      allow create, delete: if false;
+    // --- COLLECTIONS ---
+
+    // 1. USER PROFILES
+    match /users/{userId} {
+      allow read: if isSignedIn(); // Users can read profiles (or restrict to own/admin)
+      allow write: if request.auth.uid == userId || hasRole('admin');
     }
 
-    /* ===============================
-       PUBLIC TRACKING RECORDS
-    =============================== */
-match /tracking_records/{id} {
-
-  // Public single doc
-  allow get: if resource.data.public == true || isStaff();
-
-  // Public tracking search
-  allow list: if
-    (
-      request.query.limit != null &&
-      request.query.where("public", "==", true)
-    ) || isStaff();
-
-  allow create, update, delete: if false;
-
-  match /status_events/{eid} {
-    allow get, list: if isStaff();
-  }
-
-  match /truck_trips/{tripId} {
-    allow get, list: if isStaff();
-
-    match /trip_packages/{pkgId} {
-      allow get, list: if isStaff();
+    // 2. INTERNAL TRUTH: TRACKING RECORDS
+    // Contains sensitive customer data. STRICTLY INTERNAL.
+    match /tracking_records/{trackingNumber} {
+      // READ: Admins, Managers, and Checkers can see details. 
+      // Drivers might need to see packages on their manifest.
+      allow read: if hasRole('admin') || hasRole('manager') || hasRole('checker') || hasRole('driver');
+      
+      // WRITE: DENY ALL. 
+      // Mandate: "All critical actions must go through Cloud Functions"
+      // This forces your Next.js app to use Server Actions/Cloud Functions to modify data.
+      allow write: if false; 
     }
-  }
-}
 
-    /* ===============================
-       CANONICAL TRUCK TRIPS (PUBLIC VIEW)
-    =============================== */
+    // 3. TRIPS (Physical Truck Runs)
     match /truck_trips/{tripId} {
-
-      // Public trip visibility
-      allow get: if resource.data.public == true || isStaff();
-      allow list: if isStaff();
-
-      match /trip_packages/{pkgId} {
-
-        // Public package visibility
-        allow get: if resource.data.public == true || isStaff();
-        allow list: if isStaff();
-
-        match /status_events/{eid} {
-
-          // Public status timeline
-          allow get, list: if
-            resource.data.public == true ||
-            isStaff();
-        }
-      }
+      // READ: Managers and the assigned Driver.
+      allow read: if hasRole('admin') || hasRole('manager') || (hasRole('driver') && isAssignedDriver());
+      
+      // WRITE: DENY ALL. 
+      // Trip creation, locking, and status updates go through Cloud Functions.
+      allow write: if false;
     }
 
-    /* ===============================
-       PRIVATE SYSTEM DATA
-    =============================== */
-    match /tracking_private/{id} {
-      allow read, write: if role() == "admin" || role() == "manager";
+    // 4. PUBLIC PROJECTION
+    // The ONLY place the public can look.
+    match /tracking_public/{trackingNumber} {
+      // READ: Open to the world (or restrict to those with the tracking # if you prefer)
+      allow read: if true;
+      
+      // WRITE: DENY ALL. 
+      // Only the "Projection" Cloud Function can write here.
+      allow write: if false;
     }
-
-    match /sms_logs/{id} {
-      allow read, write: if role() == "admin" || role() == "manager";
-    }
-
-    match /audit_logs/{id} {
-      allow read: if role() == "admin" || role() == "manager";
-    }
-
-    /* ===============================
-       DENY EVERYTHING ELSE
-    =============================== */
-    match /{doc=**} {
-      allow read, write: if false;
+    
+    // 5. LOGS (Audit Trail)
+    match /audit_logs/{logId} {
+      allow read: if hasRole('admin');
+      allow write: if false; // Only written by backend
     }
   }
 }

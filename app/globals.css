@@ -1,0 +1,78 @@
+@import "tailwindcss";
+
+/* 🎨 Light Mode & Brand Colors */
+:root {
+  /* Layout Colors */
+  --background: #f9fafb; 
+  --foreground: #111827; 
+  --card-bg: #ffffff;
+  --muted: #4b5563;
+
+  /* YOUR BRAND COLORS defined here */
+  --brand-blue: #1D4ED8;   /* Main Primary */
+  --brand-navy: #0F172A;   /* Headings */
+  --brand-cyan: #06B6D4;   /* Accents */
+  --brand-lime: #A3E635;   /* Highlights */
+  --brand-yellow: #FACC15; /* Pops */
+}
+
+/* 🌙 Dark Mode Colors */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0a0a0a;
+    --foreground: #ededed;
+    --card-bg: #171717;
+    --muted: #9ca3af;
+    
+    /* Optional: Adjust brand colors for dark mode if needed */
+    /* For now, they will stay the same as light mode */
+  }
+}
+
+/* Tailwind Theme Setup */
+@theme inline {
+  /* 1. Map Layout Colors */
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card-bg);
+  --color-muted: var(--muted);
+
+  /* 2. Map YOUR Brand Colors so 'bg-brand-blue' works */
+  --color-brand-blue: var(--brand-blue);
+  --color-brand-navy: var(--brand-navy);
+  --color-brand-cyan: var(--brand-cyan);
+  --color-brand-lime: var(--brand-lime);
+  --color-brand-yellow: var(--brand-yellow);
+
+  /* 3. Map Semantic names (Optional: makes 'bg-primary' use your blue) */
+  --color-primary: var(--brand-blue);
+  --color-accent: var(--brand-cyan);
+
+  /* Fonts */
+  --font-sans: var(--font-geist-sans, "Inter", "system-ui", sans-serif);
+  --font-mono: var(--font-geist-mono, monospace);
+}
+
+/* Base Body Styles */
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+  transition: background 0.3s ease, color 0.3s ease;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+
+/* ------------------------------------ */
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.animate-fadeIn {
+  animation: fadeIn 0.2s ease-out forwards;
+}
