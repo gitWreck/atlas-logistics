@@ -197,7 +197,6 @@ export default function AdminOverview() {
       <AddUserModal
         isOpen={isUserModalOpen}
         onClose={() => setUserModalOpen(false)}
-        // No explicit refresh needed because onSnapshot handles it!
       />
     </div>
   );

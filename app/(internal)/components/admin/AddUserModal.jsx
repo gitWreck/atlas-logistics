@@ -16,10 +16,10 @@ import {
   signOut,
 } from "firebase/auth";
 import { doc, setDoc, serverTimestamp } from "firebase/firestore";
-import { db, app as mainApp } from "@/lib/firebase"; // Import main app config
+import { db, app as mainApp } from "@/lib/firebase";
 
 export default function AddUserModal({ isOpen, onClose, onSuccess }) {
-  const [step, setStep] = useState("FORM"); // FORM | CONFIRM | LOADING | SUCCESS
+  const [step, setStep] = useState("FORM");
   const [error, setError] = useState("");
 
   const [formData, setFormData] = useState({
@@ -53,7 +53,6 @@ export default function AddUserModal({ isOpen, onClose, onSuccess }) {
 
     try {
       // 1. TRICK: Initialize a second Firebase App to avoid logging out the Admin
-      // We use the options (API keys) from your main app
       secondaryApp = initializeApp(mainApp.options, "SecondaryApp");
       const secondaryAuth = getAuth(secondaryApp);
 
@@ -71,16 +70,13 @@ export default function AddUserModal({ isOpen, onClose, onSuccess }) {
       });
 
       // 4. Force Write the Role to Firestore
-      // Your existing trigger will run in the background and set role="user".
-      // We write THIS document immediately to ensure it gets the correct role (e.g. DRIVER).
-      // We use 'merge: true' so we don't wipe out what the trigger creates.
       await setDoc(
         doc(db, "users", newUser.uid),
         {
           uid: newUser.uid,
           email: formData.email,
           name: formData.displayName,
-          role: formData.role, // "DRIVER", "CHECKER", etc.
+          role: formData.role,
           active: true,
           createdAt: serverTimestamp(),
         },
@@ -117,7 +113,6 @@ export default function AddUserModal({ isOpen, onClose, onSuccess }) {
     onClose();
   };
 
-  // --- UI RENDER (Identical to previous, just wrapped logic above) ---
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div

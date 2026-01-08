@@ -309,9 +309,6 @@ export default function TripDetail({ tripId }) {
                 <input
                   className="flex-1 bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white placeholder:text-slate-600 focus:outline-none focus:border-blue-500"
                   placeholder="Type custom delay reason..."
-                  // We use a separate state or just grab the value on click.
-                  // For simplicity, let's use a ref or just reuse assignInput logic if you want,
-                  // but best to add a small state: const [customDelay, setCustomDelay] = useState("");
                   id="customDelayInput"
                 />
                 <button
@@ -319,7 +316,6 @@ export default function TripDetail({ tripId }) {
                     const customVal =
                       document.getElementById("customDelayInput").value;
                     if (customVal) {
-                      // Override the reason sent to backend
                       callFn("setTruckDelay", {
                         tripDocId: tripId,
                         reason: customVal,
