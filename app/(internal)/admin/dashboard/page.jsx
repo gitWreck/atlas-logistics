@@ -10,9 +10,9 @@ import {
   faSignOutAlt,
   faMapSigns,
 } from "@fortawesome/free-solid-svg-icons";
-import { useRouter } from "next/navigation"; // For logout
-import { signOut, onAuthStateChanged } from "firebase/auth"; // For logout
-import { auth, db } from "@/lib/firebase"; // For logout
+import { useRouter } from "next/navigation";
+import { signOut, onAuthStateChanged } from "firebase/auth";
+import { auth, db } from "@/lib/firebase";
 import { doc, getDoc } from "firebase/firestore";
 
 export default function AdminDashboardPage() {
@@ -28,19 +28,16 @@ export default function AdminDashboardPage() {
 
   // ✅ 1. LISTEN TO FIREBASE AUTH STATE
   useEffect(() => {
-    // This listener runs automatically on mount AND whenever login/logout happens
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (user) {
         console.log("User detected:", user.uid);
 
         try {
-          // We have the basic Auth info (email, uid), now fetch the 'Role' from Firestore
           const userDoc = await getDoc(doc(db, "users", user.uid));
 
           if (userDoc.exists()) {
             const userData = userDoc.data();
 
-            // Construct the session object exactly how you want it
             const sessionUser = {
               uid: user.uid,
               name: userData.name || userData.displayName || "Atlas User",
@@ -49,26 +46,24 @@ export default function AdminDashboardPage() {
               photoURL: userData.photoURL || null,
             };
 
-            setCurrentUser(sessionUser); // Update your app state
+            setCurrentUser(sessionUser);
           }
         } catch (error) {
           console.error("Error fetching user profile:", error);
         }
       } else {
-        // User is signed out
         console.log("No user found");
         setCurrentUser(null);
       }
     });
 
-    // Cleanup subscription on unmount
     return () => unsubscribe();
   }, []);
 
   // ✅ 2. SIMPLIFIED LOGOUT
   const handleLogout = async () => {
     try {
-      await signOut(auth); // The listener above will detect this and set currentUser to null automatically
+      await signOut(auth);
       router.push("/login");
     } catch (error) {
       console.error("Error signing out:", error);
@@ -149,7 +144,6 @@ export default function AdminDashboardPage() {
   );
 }
 
-// ... TabButton component stays the same ...
 function TabButton({ isActive, onClick, icon, label }) {
   return (
     <button

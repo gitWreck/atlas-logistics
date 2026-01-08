@@ -48,7 +48,6 @@ export default function TrackingPage() {
   const handleSearch = (e) => {
     e.preventDefault();
     if (!inputVal.trim()) return;
-    // Update URL to match search (good for sharing)
     router.push(`/track/${encodeURIComponent(inputVal.trim())}`);
   };
 
@@ -58,7 +57,6 @@ export default function TrackingPage() {
     setData(null);
 
     try {
-      // Direct Firestore Read (Faster than Cloud Function API)
       const docRef = doc(db, "tracking_public", trackingId);
       const snap = await getDoc(docRef);
 

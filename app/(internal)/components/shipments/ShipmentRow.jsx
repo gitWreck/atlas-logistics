@@ -6,25 +6,35 @@ import {
   faEllipsisV,
 } from "@fortawesome/free-solid-svg-icons";
 import StatusBadge from "../ui/StatusBadge";
+import formatFirestoreDate from "../utility/FormatFirestoreDate";
 
 export default function ShipmentRow({ s, onClick }) {
   const isDelayed = !!s.delayReason && !s.delayCleared;
+  console.log("Rendering shipment row for:", s);
 
   return (
-    <div
-      onClick={() => onClick(s.id)}
-      className="grid grid-cols-12 gap-4 px-6 py-4 items-center hover:bg-slate-800/30 transition-colors cursor-pointer group border-b border-slate-800/50 last:border-0"
-    >
+    <div className="grid grid-cols-12 gap-4 px-6 py-4 items-center hover:bg-slate-800/30 transition-colors cursor-pointer group border-b border-slate-800/50 last:border-0">
       {/* Col 1: ID & Pulse */}
       <div className="col-span-4 flex items-center gap-4">
         <StatusDot status={s.status} isDelayed={isDelayed} />
         <div>
+          <div className="flex items-center gap-2 mt-1">
+            <span className="font-mono text-sm font-medium text-slate-200 group-hover:text-blue-400 transition-colors">
+              {s.tripId}
+            </span>
+            <span className="text-xs text-slate-500">
+              {formatFirestoreDate(s.startedAt)}
+            </span>
+          </div>
           <div className="font-mono text-sm font-medium text-slate-200 group-hover:text-blue-400 transition-colors">
             {s.tracking}
           </div>
-          <div className="flex items-center gap-2 mt-1">
+          <div className="flex items-center gap-3 mt-1">
             <StatusBadge status={s.status} />
-            <span className="text-xs text-slate-500">{s.owner}</span>
+            <span className="text-xs text-slate-500">
+              Total Loaded: {s.totals["loaded"]}
+            </span>
+            <span className="text-xs text-slate-500">Driver: {s.driver}</span>
           </div>
         </div>
       </div>
@@ -76,7 +86,10 @@ export default function ShipmentRow({ s, onClick }) {
 
       {/* Col 5: Actions */}
       <div className="col-span-1 text-right">
-        <button className="text-slate-500 hover:text-white p-2">
+        <button
+          onClick={() => onClick(s.id)}
+          className="text-slate-500 hover:text-white p-2"
+        >
           <FontAwesomeIcon icon={faEllipsisV} />
         </button>
       </div>

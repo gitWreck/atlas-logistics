@@ -1,80 +1,19 @@
 "use client";
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
+import { collection, query, onSnapshot } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faSearch,
   faPlus,
   faFileCsv,
   faCommentSms,
+  faSync,
 } from "@fortawesome/free-solid-svg-icons";
 import ShipmentRow from "./ShipmentRow";
 import ShipmentDrawer from "./ShipmentDrawer";
-
-// Mock Data (Move to a separate data file later if you want)
-const SHIPMENTS = [
-  {
-    id: "m1",
-    tracking: "AT-20251212-DIVI-CAL-0001",
-    route: "DIVI → CAL",
-    routeCode: "DIVI-CAL",
-    status: "IN_TRANSIT",
-    delayReason: "WEATHER",
-    delayCleared: false,
-    trip: "T-18",
-    owner: "Checker: Lean",
-    lastUpdate: "20m ago",
-    progress: 45,
-  },
-  {
-    id: "m2",
-    tracking: "AT-20251213-DIVI-TAB-0002",
-    route: "DIVI → TAB",
-    routeCode: "DIVI-TAB",
-    status: "IN_TRANSIT",
-    delayReason: null,
-    trip: null,
-    owner: "Manager: Rose",
-    lastUpdate: "1h ago",
-    progress: 30,
-  },
-  {
-    id: "m3",
-    tracking: "AT-20251214-DIVI-CAL-0004",
-    route: "DIVI → CAL",
-    routeCode: "DIVI-CAL",
-    status: "ARRIVED_PORT",
-    delayReason: "RORO",
-    delayCleared: false,
-    trip: "T-12",
-    owner: "Checker: Rose",
-    lastUpdate: "5m ago",
-    progress: 60,
-  },
-  {
-    id: "m4",
-    tracking: "AT-20251215-DIVI-ODI-0011",
-    route: "DIVI → ODI",
-    routeCode: "DIVI-ODI",
-    status: "OUT_FOR_DELIVERY",
-    delayReason: null,
-    trip: "T-07",
-    owner: "Driver: Joven",
-    lastUpdate: "Just now",
-    progress: 90,
-  },
-  {
-    id: "m5",
-    tracking: "AT-20251210-DIVI-CAL-0009",
-    route: "DIVI → CAL",
-    routeCode: "DIVI-CAL",
-    status: "DELIVERED",
-    delayReason: null,
-    trip: "T-03",
-    owner: "Checker: Lean",
-    lastUpdate: "1d ago",
-    progress: 100,
-  },
-];
+import ShipmentNewModal from "./ShipmentNewModal";
+import formatFirestoreDate from "../utility/FormatFirestoreDate";
 
 const FILTERS = [
   { key: "ALL", label: "All View" },
@@ -84,23 +23,165 @@ const FILTERS = [
 ];
 
 export default function ShipmentBoard({ userRole = "ADMIN" }) {
+  const [shipments, setShipments] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+
   const [activeFilter, setActiveFilter] = useState("ALL");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedId, setSelectedId] = useState(null);
 
+  const handleSaveShipment = (newShipmentData) => {
+    console.log("Saving data to DB:", newShipmentData);
+  };
+
+  // --- 1. REAL-TIME LISTENER ---
+  useEffect(() => {
+    setLoading(true);
+
+    // 1. Prepare references
+    // Replace "shipment_details" with the actual name of your second collection
+    const detailsRef = collection(db, "tracking_public");
+    const trackingRef = collection(db, "tracking_records");
+
+    // We need to store the data from both collections temporarily
+    let detailsMap = {};
+    let trackingDocs = [];
+
+    // Helper function to merge and update state
+    const mergeAndSetShipments = () => {
+      if (trackingDocs.length === 0) return;
+
+      const combinedData = trackingDocs.map((doc) => {
+        const t = doc.data(); // Data from tracking_records
+
+        // Find matching data in the second collection using Tracking Number
+        // (Adjust 'trackingNumber' if the field name is different in your DB)
+        const detail = detailsMap[t.trackingNumber] || {};
+
+        // PRIORITY: detail (new data) overwrites t (tracking_record) if fields exist
+        const merged = { ...t, ...detail };
+
+        return {
+          id: doc.id,
+          // --- CORE IDENTIFIERS ---
+          tracking: merged.trackingNumber || doc.id,
+          tripId: merged.tripId || "Unassigned",
+
+          // --- ROUTE INFO ---
+          origin: merged.origin || "Unknown",
+          destination: merged.destination || "Unknown",
+          route: `${merged.origin || "?"} → ${merged.destination || "?"}`,
+
+          // --- STATUS & DELAYS ---
+          status: merged.status || "UNKNOWN",
+          delayReason: merged.delayReason || null,
+          delayCleared: merged.delayCleared || false,
+
+          // --- PEOPLE ---
+          driver: merged.driverName || "Unassigned",
+          customer: merged.customerName || "Unknown",
+
+          lastUpdate:
+            formatFirestoreDate(merged.updatedAt) ||
+            formatFirestoreDate(merged.delayStartedAt) ||
+            "No Data",
+
+          startedAt: formatFirestoreDate(merged.startedAt),
+
+          totals: merged.totals || { loaded: 0, pending: 0, received: 0 },
+          progress: calculateProgress(merged.status), // Ensure this function exists
+
+          ...merged,
+        };
+      });
+
+      setShipments(combinedData);
+      setLoading(false);
+    };
+
+    // 2. LISTEN TO COLLECTION B (The Detailed Data)
+    const unsubscribeDetails = onSnapshot(detailsRef, (snapshot) => {
+      detailsMap = {};
+      snapshot.docs.forEach((doc) => {
+        const data = doc.data();
+        if (data.trackingNumber) {
+          detailsMap[data.trackingNumber] = data;
+        }
+      });
+      mergeAndSetShipments();
+    });
+
+    // 3. LISTEN TO COLLECTION A (The Main Tracking Records)
+    const unsubscribeTracking = onSnapshot(trackingRef, (snapshot) => {
+      trackingDocs = snapshot.docs;
+      mergeAndSetShipments();
+    });
+
+    return () => {
+      unsubscribeDetails();
+      unsubscribeTracking();
+    };
+  }, []);
+
+  // useEffect(() => {
+  //   setLoading(true);
+
+  //   const q = collection(db, "tracking_records");
+
+  //   const unsubscribe = onSnapshot(q, (snapshot) => {
+  //     const liveData = snapshot.docs.map((doc) => {
+  //       const d = doc.data();
+
+  //       // MAPPING: Matching exact Firestore fields
+  //       return {
+  //         id: doc.id,
+  //         tracking: d.trackingNumber || doc.id,
+
+  //         route: d.route || `${d.origin} → ${d.destination}`,
+  //         routeCode: `${d.origin}-${d.destination}`,
+
+  //         status: d.status || "UNKNOWN",
+
+  //         delayReason: d.delayReason || null,
+  //         delayCleared: d.delayCleared || false,
+
+  //         trip: d.driverName || "Unassigned",
+  //         owner: d.customerName || "Unknown",
+
+  //         lastUpdate: d.delayStartedAt?.seconds
+  //           ? new Date(d.delayStartedAt.seconds * 1000).toLocaleDateString()
+  //           : "No Date",
+
+  //         progress: calculateProgress(d.status),
+  //         ...d,
+  //       };
+  //     });
+
+  //     setShipments(liveData);
+  //     setLoading(false);
+  //   });
+
+  //   return () => unsubscribe();
+  // }, []);
+
+  // --- 2. FILTER LOGIC ---
   const filteredShipments = useMemo(() => {
-    return SHIPMENTS.filter((s) => {
+    console.log("Filtering shipments with:", shipments);
+    return shipments.filter((s) => {
       const searchContent = (s.tracking + s.route + s.owner).toLowerCase();
       if (!searchContent.includes(searchQuery.toLowerCase())) return false;
+
       if (activeFilter === "ALL") return true;
       if (activeFilter === "ACTIVE") return s.status !== "DELIVERED";
       if (activeFilter === "DELAYED") return s.delayReason && !s.delayCleared;
       if (activeFilter === "DELIVERED") return s.status === "DELIVERED";
+
       return true;
     });
-  }, [searchQuery, activeFilter]);
+  }, [searchQuery, activeFilter, shipments]);
 
-  const selectedShipment = SHIPMENTS.find((s) => s.id === selectedId);
+  const selectedShipment = shipments.find((s) => s.id === selectedId);
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-200 font-sans">
@@ -111,6 +192,13 @@ export default function ShipmentBoard({ userRole = "ADMIN" }) {
             <h1 className="font-bold text-white tracking-wide text-lg">
               Shipments
             </h1>
+            {loading && (
+              <FontAwesomeIcon
+                icon={faSync}
+                spin
+                className="text-slate-500 text-xs"
+              />
+            )}
           </div>
 
           <div className="flex flex-1 w-full md:w-auto gap-3 justify-end">
@@ -126,7 +214,6 @@ export default function ShipmentBoard({ userRole = "ADMIN" }) {
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
             </div>
-            {/* Only Admins see CSV/SMS buttons */}
             {userRole === "ADMIN" && (
               <>
                 <button className="h-9 px-3 rounded-lg border border-slate-800 bg-slate-900 text-slate-400 hover:text-white">
@@ -137,9 +224,20 @@ export default function ShipmentBoard({ userRole = "ADMIN" }) {
                 </button>
               </>
             )}
-            <button className="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2">
-              <FontAwesomeIcon icon={faPlus} /> <span>New</span>
+            <button
+              onClick={() => setIsModalOpen(true)}
+              className="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2"
+            >
+              <FontAwesomeIcon icon={faPlus} />
+              <span>New</span>
             </button>
+
+            {/* THE MODAL COMPONENT */}
+            <ShipmentNewModal
+              isOpen={isModalOpen}
+              onClose={() => setIsModalOpen(false)}
+              onSave={handleSaveShipment}
+            />
           </div>
         </div>
 
@@ -172,9 +270,19 @@ export default function ShipmentBoard({ userRole = "ADMIN" }) {
             <div className="col-span-1 text-right">Action</div>
           </div>
           <div>
-            {filteredShipments.map((s) => (
-              <ShipmentRow key={s.id} s={s} onClick={setSelectedId} />
-            ))}
+            {loading ? (
+              <div className="p-10 text-center text-slate-500">
+                Loading shipments...
+              </div>
+            ) : filteredShipments.length === 0 ? (
+              <div className="p-10 text-center text-slate-500">
+                No shipments found.
+              </div>
+            ) : (
+              filteredShipments.map((s) => (
+                <ShipmentRow key={s.id} s={s} onClick={setSelectedId} />
+              ))
+            )}
           </div>
         </div>
       </main>
@@ -186,4 +294,25 @@ export default function ShipmentBoard({ userRole = "ADMIN" }) {
       />
     </div>
   );
+}
+
+function calculateProgress(status) {
+  switch (status) {
+    case "CREATED":
+      return 10;
+    case "RECEIVED":
+      return 25;
+    case "LOADED":
+      return 40;
+    case "IN_TRANSIT":
+      return 60;
+    case "ARRIVED_PORT":
+      return 75;
+    case "OUT_FOR_DELIVERY":
+      return 90;
+    case "DELIVERED":
+      return 100;
+    default:
+      return 0;
+  }
 }

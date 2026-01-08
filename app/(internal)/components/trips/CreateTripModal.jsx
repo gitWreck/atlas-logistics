@@ -10,24 +10,21 @@ import {
   faArrowRight,
 } from "@fortawesome/free-solid-svg-icons";
 import { getFunctions, httpsCallable } from "firebase/functions";
-// import { app } from "@/lib/firebase";
 import { functions } from "@/lib/firebase";
 
 export default function CreateTripModal({ isOpen, onClose, onSuccess }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  // Fields required by your Cloud Function
   const [formData, setFormData] = useState({
-    originCode: "", // e.g. "MNL"
-    destCode: "", // e.g. "CEB"
-    driverName: "", // Optional
-    driverId: "", // Optional
-    truckPlateNumber: "", // Optional
-    truckInternalCode: "", // Optional
+    originCode: "",
+    destCode: "",
+    driverName: "",
+    driverId: "",
+    truckPlateNumber: "",
+    truckInternalCode: "",
   });
 
-  // Reset form when opening
   useEffect(() => {
     if (isOpen) {
       setFormData({
@@ -57,25 +54,21 @@ export default function CreateTripModal({ isOpen, onClose, onSuccess }) {
     setLoading(true);
 
     try {
-      // const functions = getFunctions(app);
       const createFn = httpsCallable(functions, "createTruckTrip");
 
-      // Your function supports 'idempotencyKey' to prevent duplicates on double-click
       const payload = {
         ...formData,
-        idempotencyKey: Date.now().toString(), // Simple unique key for this attempt
+        idempotencyKey: Date.now().toString(),
       };
 
       const result = await createFn(payload);
 
-      // Function returns { success: true, tripId: "..." }
       console.log("Trip Created:", result.data);
 
-      onSuccess(); // Refresh parent list
-      onClose(); // Close modal
+      onSuccess();
+      onClose();
     } catch (err) {
       console.error(err);
-      // Handle Firebase HttpsError structure
       setError(err.message || "Failed to create trip. Check permissions.");
     } finally {
       setLoading(false);

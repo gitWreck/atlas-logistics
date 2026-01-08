@@ -55,9 +55,6 @@ export default function LoginPage() {
         photoURL: userData.photoURL || null,
       };
 
-      // localStorage.setItem("atlas_user", JSON.stringify(sessionUser));
-      // ---------------------------------------------------------
-
       // 4. Route to Dashboard
       switch (role) {
         case "ADMIN":
