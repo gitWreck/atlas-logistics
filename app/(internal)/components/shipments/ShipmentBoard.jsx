@@ -231,13 +231,6 @@ export default function ShipmentBoard({ userRole = "ADMIN" }) {
               <FontAwesomeIcon icon={faPlus} />
               <span>New</span>
             </button>
-
-            {/* THE MODAL COMPONENT */}
-            <ShipmentNewModal
-              isOpen={isModalOpen}
-              onClose={() => setIsModalOpen(false)}
-              onSave={handleSaveShipment}
-            />
           </div>
         </div>
 
@@ -291,6 +284,12 @@ export default function ShipmentBoard({ userRole = "ADMIN" }) {
         isOpen={!!selectedId}
         onClose={() => setSelectedId(null)}
         data={selectedShipment}
+      />
+      {/* THE MODAL COMPONENT */}
+      <ShipmentNewModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        onSave={handleSaveShipment}
       />
     </div>
   );

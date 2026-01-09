@@ -11,35 +11,63 @@ import {
 } from "@fortawesome/free-solid-svg-icons";
 import { collection, onSnapshot, query, orderBy } from "firebase/firestore";
 import { db } from "@/lib/firebase"; // Ensure this path is correct
+import DisableUserModal from "./DisableUserModal";
 import AddUserModal from "./AddUserModal";
+
+// test emulator connection
+import {
+  getFunctions,
+  httpsCallable,
+  connectFunctionsEmulator,
+} from "firebase/functions";
+import { app as mainApp } from "@/lib/firebase";
+
+const functions = getFunctions(mainApp, "asia-southeast1");
+// connectFunctionsEmulator(functions, "localhost", 5001);
+console.log("process.env.NODE_ENV:", process.env.NODE_ENV);
+if (process.env.NODE_ENV === "development") {
+  connectFunctionsEmulator(functions, "127.0.0.1", 5001);
+}
 
 export default function AdminOverview() {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
+
   const [isUserModalOpen, setUserModalOpen] = useState(false);
+  const [isDisableModalOpen, setDisableModalOpen] = useState(false);
+  const [selectedUser, setSelectedUser] = useState(null);
 
-  // --- 1. REAL-TIME DATA LISTENER ---
-  useEffect(() => {
-    // Query users collection, sorted by creation time (newest first)
-    const q = query(collection(db, "users"), orderBy("createdAt", "desc"));
+  const listUsers = httpsCallable(functions, "listUsers");
+  const fetchUsers = async () => {
+    try {
+      setLoading(true); // Ensure loading starts
+      const res = await listUsers();
 
-    const unsubscribe = onSnapshot(
-      q,
-      (snapshot) => {
-        const userList = snapshot.docs.map((doc) => ({
-          id: doc.id,
-          ...doc.data(),
+      // console.log("Users fetched:", res.data);
+
+      // ✅ FIX 1: Save the data to state
+      // ensure res.data is an array before setting it
+      if (Array.isArray(res.data)) {
+        const formattedUsers = res.data.map((user) => ({
+          ...user,
+          id: user.uid, // Create 'id' from the Firebase 'uid'
         }));
-        setUsers(userList);
-        setLoading(false);
-      },
-      (error) => {
-        console.error("Error fetching users:", error);
-        setLoading(false);
-      }
-    );
 
-    return () => unsubscribe();
+        console.log("Formatted Users:", formattedUsers);
+        setUsers(formattedUsers);
+      } else {
+        console.warn("Expected array but got:", res.data);
+        setUsers([]);
+      }
+    } catch (err) {
+      console.error("Failed to fetch users:", err);
+    } finally {
+      // ✅ FIX 2: Stop loading whether it succeeds OR fails
+      setLoading(false);
+    }
+  };
+  useEffect(() => {
+    fetchUsers();
   }, []);
 
   // --- 2. CALCULATE LIVE STATS ---
@@ -53,6 +81,11 @@ export default function AdminOverview() {
       actionsTotal: 154,
     };
   }, [users]);
+
+  const initiateDisable = (user) => {
+    setSelectedUser(user);
+    setDisableModalOpen(true);
+  };
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
@@ -181,7 +214,10 @@ export default function AdminOverview() {
                       </span>
                     </td>
                     <td className="px-6 py-4 text-right">
-                      <button className="text-slate-500 hover:text-red-400 transition-colors">
+                      <button
+                        onClick={() => initiateDisable(u)}
+                        className="text-slate-500 hover:text-red-400 transition-colors"
+                      >
                         <FontAwesomeIcon icon={faTrash} />
                       </button>
                     </td>
@@ -197,6 +233,15 @@ export default function AdminOverview() {
       <AddUserModal
         isOpen={isUserModalOpen}
         onClose={() => setUserModalOpen(false)}
+      />
+      <DisableUserModal
+        isOpen={isDisableModalOpen}
+        user={selectedUser}
+        onClose={() => {
+          setDisableModalOpen(false);
+          setSelectedUser(null);
+        }}
+        refreshUsers={fetchUsers} // <-- NEW
       />
     </div>
   );
@@ -219,3 +264,23 @@ function StatCard({ title, value, icon, color, bg }) {
     </div>
   );
 }
+
+// Query users collection, sorted by creation time (newest first)
+// const q = query(collection(db, "users"), orderBy("createdAt", "desc"));
+
+// const unsubscribe = onSnapshot(
+//   q,
+//   (snapshot) => {
+//     const userList = snapshot.docs.map((doc) => ({
+//       id: doc.id,
+//       ...doc.data(),
+//     }));
+//     setUsers(userList);
+//     setLoading(false);
+//   },
+//   (error) => {
+//     console.error("Error fetching users:", error);
+//     setLoading(false);
+//   }
+// );
+// return () => unsubscribe();
