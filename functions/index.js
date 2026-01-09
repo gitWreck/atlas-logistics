@@ -46,62 +46,24 @@ if (!admin.apps.length) {
 // 2) AUTH TRIGGERS (V1 ONLY)
 // ------------------------------------------------------------
 
-/**
- * AUTH — USER CREATED
- * Automatically creates user profile in Firestore
- */
-// exports.createUserProfile = functionsV1.auth.user().onCreate(async (user) => {
-//   if (!user?.uid) return;
-
-//   await admin.firestore().collection("users").doc(user.uid).set(
-//     {
-//       uid: user.uid,
-//       email: user.email || "",
-//       name: user.displayName || "",
-//       role: "user",
-//       active: true,
-//       photoURL: user.photoURL || null,
-//       provider: user.providerData?.[0]?.providerId || "password",
-//       createdAt: admin.firestore.FieldValue.serverTimestamp(),
-//       lastAuthAt: admin.firestore.FieldValue.serverTimestamp(),
-//     },
-//     { merge: true }
-//   );
-// });
-
-exports.createUserProfile = require("./src/createUserProfile"); // Your existing trigger
-
-exports.createUser = require("./src/createUser").createUser;
-
-/**
- * AUTH — USER DELETED
- * Marks user profile deleted in Firestore
- */
-exports.cleanupUserProfile = functionsV1.auth.user().onDelete(async (user) => {
-  if (!user?.uid) return;
-
-  await admin.firestore().collection("users").doc(user.uid).set(
-    {
-      deleted: true,
-      deletedAt: admin.firestore.FieldValue.serverTimestamp(),
-    },
-    { merge: true }
-  );
-
-  console.log("User marked deleted:", user.uid);
-});
+// exports.createUser = require("./src/createUser").createUser; // test
+exports.createUserProfile = require("./src/users/createUserProfile");
+exports.toggleUserAccount = require("./src/users/toggleUserAccount");
+// src/index.js
+const { listUsers } = require("./src/users/listUsers"); // Destructure if you used exports.listUsers
+exports.listUsers = listUsers;
 
 // ------------------------------------------------------------
 // 3) CALLABLE / HTTPS FUNCTIONS
 // ------------------------------------------------------------
 
-const { createTruckTrip } = require("./src/createTruckTrip");
+const { createTruckTrip } = require("./src/trips/createTruckTrip");
 const {
   createShipmentWithSequence,
-} = require("./src/createShipmentWithSequence");
-const { loadItemsToTrip } = require("./src/loadItemsToTrip");
-const { unloadItemsFromTrip } = require("./src/unloadItemsFromTrip");
-const { completeTrip } = require("./src/completeTrip");
+} = require("./src/shipments/createShipmentWithSequence");
+const { loadItemsToTrip } = require("./src/trips/loadItemsToTrip");
+const { unloadItemsFromTrip } = require("./src/trips/unloadItemsFromTrip");
+const { completeTrip } = require("./src/trips/completeTrip");
 
 exports.createTruckTrip = createTruckTrip;
 exports.createShipmentWithSequence = createShipmentWithSequence;
@@ -110,67 +72,75 @@ exports.unloadItemsFromTrip = unloadItemsFromTrip;
 exports.completeTrip = completeTrip;
 
 // Partial (callable)
-exports.recordPartial = require("./src/recordPartial").recordPartial;
+exports.recordPartial = require("./src/shipments/recordPartial").recordPartial;
 
 /* MANIFEST & CERTIFICATES (CALLABLES) */
 exports.generateTripManifest =
-  require("./generateTripManifest").generateTripManifest;
-exports.getTripPackages = require("./getTripPackages").getTripPackages;
+  require("./src/trips/generateTripManifest").generateTripManifest;
+exports.getTripPackages =
+  require("./src/trips/getTripPackages").getTripPackages;
 exports.generateTripCertificate =
-  require("./generateTripCertificate").generateTripCertificate;
-exports.reopenTrip = require("./reopenTrip").reopenTrip;
+  require("./src/trips/generateTripCertificate").generateTripCertificate;
+exports.reopenTrip = require("./src/trips/reopenTrip").reopenTrip;
 
 /* CORE SHIPPING FUNCTIONS (existing endpoints) */
-exports.archiveShipment = require("./archiveShipment").archiveShipment;
-exports.updateTruckStatus = require("./updateTruckStatus").updateTruckStatus;
-exports.appendStatusEvent = require("./appendStatusEvent").appendStatusEvent;
-exports.syncShipmentItems = require("./syncShipmentItems").syncShipmentItems;
+exports.archiveShipment =
+  require("./src/shipments/archiveShipment").archiveShipment;
+exports.updateTruckStatus =
+  require("./src/trips/updateTruckStatus").updateTruckStatus;
+exports.appendStatusEvent =
+  require("./src/shipments/appendStatusEvent").appendStatusEvent;
+exports.syncShipmentItems =
+  require("./src/shipments/syncShipmentItems").syncShipmentItems;
 
 // 🌍 PUBLIC (customer)
-exports.trackShipment = require("./trackShipment").trackShipment;
+exports.trackShipment = require("./src/shipments/trackShipment").trackShipment;
 
 /* SMS – MANUAL & BULK (existing endpoints) */
-exports.sendSMS = require("./sendSMS").sendSMS;
-exports.sendBulkSMS = require("./sendBulkSMS").sendBulkSMS;
+exports.sendSMS = require("./src/messaging/sendSMS").sendSMS;
+exports.sendBulkSMS = require("./src/messaging/sendBulkSMS").sendBulkSMS;
 
-/* 🤖 AUTO SMS (status-change driven) */
-exports.autoSms = require("./autoSms").autoSms;
-
-/* 🧠 SMS ADMIN / MANAGER CONTROLS */
-exports.smsAdmin = require("./smsAdmin").smsAdmin;
+exports.autoSms =
+  require("./src/messaging/autoSms").autoSms; /* 🤖 AUTO SMS (status-change driven) */
+exports.smsAdmin =
+  require("./src/messaging/smsAdmin").smsAdmin; /* 🧠 SMS ADMIN / MANAGER CONTROLS */
 
 /* ✅ CALLABLES REQUIRED BY admin/shipments.js */
 
 // Shipments
 exports.bulkCreateShipments =
-  require("./bulkCreateShipments").bulkCreateShipments;
+  require("./src/shipments/bulkCreateShipments").bulkCreateShipments;
 
 // Truck trips
 exports.assignShipmentToTruckTrip =
-  require("./assignShipmentToTruckTrip").assignShipmentToTruckTrip;
+  require("./src/trips/assignShipmentToTruckTrip").assignShipmentToTruckTrip;
 exports.unassignShipmentFromTruckTrip =
-  require("./unassignShipmentFromTruckTrip").unassignShipmentFromTruckTrip;
+  require("./src/trips/unassignShipmentFromTruckTrip").unassignShipmentFromTruckTrip;
 
 // Truck controls
-exports.setTruckDelay = require("./setTruckDelay").setTruckDelay;
-exports.clearTruckDelay = require("./clearTruckDelay").clearTruckDelay;
+exports.setTruckDelay = require("./src/trips/setTruckDelay").setTruckDelay;
+exports.clearTruckDelay =
+  require("./src/trips/clearTruckDelay").clearTruckDelay;
 exports.setTruckAutoSmsSettings =
-  require("./setTruckAutoSmsSettings").setTruckAutoSmsSettings;
+  require("./src/trips/setTruckAutoSmsSettings").setTruckAutoSmsSettings;
 
 exports.assignDriverToTruckTrip =
-  require("./assignDriverToTruckTrip").assignDriverToTruckTrip;
+  require("./src/trips/assignDriverToTruckTrip").assignDriverToTruckTrip;
 exports.unassignDriverFromTruckTrip =
-  require("./unassignDriverFromTruckTrip").unassignDriverFromTruckTrip;
+  require("./src/trips/unassignDriverFromTruckTrip").unassignDriverFromTruckTrip;
 
 // SMS callable experience (UI preview/send + per-truck usage)
-exports.previewNextSms = require("./previewNextSms").previewNextSms;
-exports.previewManualSms = require("./previewManualSms").previewManualSms;
-exports.sendManualSms = require("./sendManualSms").sendManualSms;
-exports.getTruckSmsUsage = require("./getTruckSmsUsage").getTruckSmsUsage;
+exports.previewNextSms =
+  require("./src/messaging/previewNextSms").previewNextSms;
+exports.previewManualSms =
+  require("./src/messaging/previewManualSms").previewManualSms;
+exports.sendManualSms = require("./src/messaging/sendManualSms").sendManualSms;
+exports.getTruckSmsUsage =
+  require("./src/messaging/getTruckSmsUsage").getTruckSmsUsage;
 
 // Partial delivery (separate implementation)
 exports.recordPartialDelivery =
-  require("./recordPartialDelivery").recordPartialDelivery;
+  require("./src/shipments/recordPartialDelivery").recordPartialDelivery;
 
 // 🔧 Repair tool — relink broken package → tracking
 exports.relinkPackageToTracking = onCall(async (request) => {
@@ -197,42 +167,42 @@ const {
   validateInvite,
   acceptInvite,
   revokeInvite,
-} = require("./invitations");
+} = require("./src/system/invitations");
 exports.createInvite = createInvite;
 exports.validateInvite = validateInvite;
 exports.acceptInvite = acceptInvite;
 exports.revokeInvite = revokeInvite;
 
 /* 🔁 DATA MIGRATION TOOLS (ADMIN ONLY) */
-const migrateTripsToTopLevel = require("./migrateTripsToTopLevel");
+const migrateTripsToTopLevel = require("./src/system/migrateTripsToTopLevel");
 exports.migrateTripsToTopLevel = onRequest(migrateTripsToTopLevel);
 
 // ------------------------------------------------------------
 // 4) FIRESTORE TRIGGERS
 // ------------------------------------------------------------
 
-const { autoStatusSMS } = require("./src/autoStatusSMS");
+const { autoStatusSMS } = require("./src/messaging/autoStatusSMS");
 exports.autoStatusSMS = autoStatusSMS;
 
 // 🌍 AUTO PUBLIC TRACKING
-const { autoSetPublic } = require("./src/autoSetPublic");
+const { autoSetPublic } = require("./src/tracking/autoSetPublic");
 exports.autoSetPublic = autoSetPublic;
 
 exports.autoRepairTrackingPublic =
-  require("./autoRepairTrackingPublic").autoRepairTrackingPublic;
+  require("./src/tracking/autoRepairTrackingPublic").autoRepairTrackingPublic;
 
 const {
   syncTrackingPublic,
   syncTrackingPublicHttp,
   getPublicTracking,
-} = require("./src/syncTrackingPublic");
+} = require("./src/tracking/syncTrackingPublic");
 
 exports.syncTrackingPublic = syncTrackingPublic;
 exports.syncTrackingPublicHttp = syncTrackingPublicHttp;
 exports.getPublicTracking = getPublicTracking;
 
 const { onDocumentWritten } = require("firebase-functions/v2/firestore");
-const { syncTrackingPublicCore } = require("./src/syncTrackingPublic");
+const { syncTrackingPublicCore } = require("./src/tracking/syncTrackingPublic");
 
 exports.autoSyncPublicOnPackageChange = onDocumentWritten(
   "truck_trips/{tripId}/trip_packages/{pkgId}",
@@ -319,3 +289,44 @@ exports.syncTripToTracking = onDocumentUpdated(
     await trackingRef.set(update, { merge: true });
   }
 );
+
+/**
+ * AUTH — USER CREATED
+ * Automatically creates user profile in Firestore
+ */
+// exports.createUserProfile = functionsV1.auth.user().onCreate(async (user) => {
+//   if (!user?.uid) return;
+
+//   await admin.firestore().collection("users").doc(user.uid).set(
+//     {
+//       uid: user.uid,
+//       email: user.email || "",
+//       name: user.displayName || "",
+//       role: "user",
+//       active: true,
+//       photoURL: user.photoURL || null,
+//       provider: user.providerData?.[0]?.providerId || "password",
+//       createdAt: admin.firestore.FieldValue.serverTimestamp(),
+//       lastAuthAt: admin.firestore.FieldValue.serverTimestamp(),
+//     },
+//     { merge: true }
+//   );
+// });
+
+/**
+ * AUTH — USER DELETED
+ * Marks user profile deleted in Firestore
+ */
+// exports.cleanupUserProfile = functionsV1.auth.user().onDelete(async (user) => {
+//   if (!user?.uid) return;
+
+//   await admin.firestore().collection("users").doc(user.uid).set(
+//     {
+//       deleted: true,
+//       deletedAt: admin.firestore.FieldValue.serverTimestamp(),
+//     },
+//     { merge: true }
+//   );
+
+//   console.log("User marked deleted:", user.uid);
+// });

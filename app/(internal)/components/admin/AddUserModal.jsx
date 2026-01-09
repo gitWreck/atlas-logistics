@@ -8,15 +8,16 @@ import {
   faCircleNotch,
   faCheckCircle,
 } from "@fortawesome/free-solid-svg-icons";
-import { initializeApp, getApp, deleteApp } from "firebase/app";
+import { app as mainApp } from "@/lib/firebase";
 import {
-  getAuth,
-  createUserWithEmailAndPassword,
-  updateProfile,
-  signOut,
-} from "firebase/auth";
-import { doc, setDoc, serverTimestamp } from "firebase/firestore";
-import { db, app as mainApp } from "@/lib/firebase";
+  getFunctions,
+  httpsCallable,
+  connectFunctionsEmulator,
+} from "firebase/functions";
+
+const functions = getFunctions(mainApp);
+connectFunctionsEmulator(functions, "localhost", 5001);
+const createUserProfile = httpsCallable(functions, "createUserProfile");
 
 export default function AddUserModal({ isOpen, onClose, onSuccess }) {
   const [step, setStep] = useState("FORM");
@@ -47,62 +48,22 @@ export default function AddUserModal({ isOpen, onClose, onSuccess }) {
 
   const handleSubmit = async () => {
     setStep("LOADING");
-    setError("");
-
-    let secondaryApp = null;
 
     try {
-      // 1. TRICK: Initialize a second Firebase App to avoid logging out the Admin
-      secondaryApp = initializeApp(mainApp.options, "SecondaryApp");
-      const secondaryAuth = getAuth(secondaryApp);
-
-      // 2. Create the User (on the secondary app instance)
-      const userCredential = await createUserWithEmailAndPassword(
-        secondaryAuth,
-        formData.email,
-        formData.password
-      );
-      const newUser = userCredential.user;
-
-      // 3. Set the Display Name
-      await updateProfile(newUser, {
+      await createUserProfile({
+        email: formData.email,
+        password: formData.password,
         displayName: formData.displayName,
+        role: formData.role,
       });
 
-      // 4. Force Write the Role to Firestore
-      await setDoc(
-        doc(db, "users", newUser.uid),
-        {
-          uid: newUser.uid,
-          email: formData.email,
-          name: formData.displayName,
-          role: formData.role,
-          active: true,
-          createdAt: serverTimestamp(),
-        },
-        { merge: true }
-      );
-
-      // 5. Cleanup: Sign out the new user from the secondary app (just in case)
-      await signOut(secondaryAuth);
-
       setStep("SUCCESS");
-      if (onSuccess) onSuccess();
+      onSuccess?.();
     } catch (err) {
-      console.error("Creation Error:", err);
-      let msg = "Failed to create user.";
-      if (err.code === "auth/email-already-in-use")
-        msg = "That email is already registered.";
-      if (err.code === "auth/weak-password")
-        msg = "Password must be at least 6 characters.";
+      console.error(err);
 
-      setError(msg);
+      setError(err.message || "Failed to create user.");
       setStep("FORM");
-    } finally {
-      // 6. Delete the secondary app to free resources
-      if (secondaryApp) {
-        await deleteApp(secondaryApp);
-      }
     }
   };
 
@@ -275,3 +236,64 @@ export default function AddUserModal({ isOpen, onClose, onSuccess }) {
     </div>
   );
 }
+
+// const handleSubmit = async () => {
+//   setStep("LOADING");
+//   setError("");
+
+//   let secondaryApp = null;
+
+//   try {
+//     // 1. TRICK: Initialize a second Firebase App to avoid logging out the Admin
+//     secondaryApp = initializeApp(mainApp.options, "SecondaryApp");
+//     const secondaryAuth = getAuth(secondaryApp);
+
+//     // 2. Create the User (on the secondary app instance)
+//     const userCredential = await createUserWithEmailAndPassword(
+//       secondaryAuth,
+//       formData.email,
+//       formData.password
+//     );
+//     const newUser = userCredential.user;
+
+//     // 3. Set the Display Name
+//     await updateProfile(newUser, {
+//       displayName: formData.displayName,
+//     });
+
+//     // 4. Force Write the Role to Firestore
+//     // await setDoc(
+//     //   doc(db, "users", newUser.uid),
+//     //   {
+//     //     uid: newUser.uid,
+//     //     email: formData.email,
+//     //     name: formData.displayName,
+//     //     role: formData.role,
+//     //     active: true,
+//     //     createdAt: serverTimestamp(),
+//     //   },
+//     //   { merge: true }
+//     // );
+
+//     // 5. Cleanup: Sign out the new user from the secondary app (just in case)
+//     await signOut(secondaryAuth);
+
+//     setStep("SUCCESS");
+//     if (onSuccess) onSuccess();
+//   } catch (err) {
+//     console.error("Creation Error:", err);
+//     let msg = "Failed to create user.";
+//     if (err.code === "auth/email-already-in-use")
+//       msg = "That email is already registered.";
+//     if (err.code === "auth/weak-password")
+//       msg = "Password must be at least 6 characters.";
+
+//     setError(msg);
+//     setStep("FORM");
+//   } finally {
+//     // 6. Delete the secondary app to free resources
+//     if (secondaryApp) {
+//       await deleteApp(secondaryApp);
+//     }
+//   }
+// };
