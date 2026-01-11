@@ -6,11 +6,12 @@ import {
   faEllipsisV,
 } from "@fortawesome/free-solid-svg-icons";
 import StatusBadge from "../ui/StatusBadge";
-import formatFirestoreDate from "../utility/FormatFirestoreDate";
+import formatFirestoreDate from "../../../utility/FormatFirestoreDate";
 
 export default function ShipmentRow({ s, onClick }) {
   const isDelayed = !!s.delayReason && !s.delayCleared;
   console.log("Rendering shipment row for:", s);
+  const GRID_COLS = "grid-cols-[320px_160px_260px_200px_160px_80px]";
 
   return (
     <div className="grid grid-cols-12 gap-4 px-6 py-4 items-center hover:bg-slate-800/30 transition-colors cursor-pointer group border-b border-slate-800/50 last:border-0">
@@ -20,21 +21,24 @@ export default function ShipmentRow({ s, onClick }) {
         <div>
           <div className="flex items-center gap-2 mt-1">
             <span className="font-mono text-sm font-medium text-slate-200 group-hover:text-blue-400 transition-colors">
-              {s.tripId}
+              TRIP ID: {s.tripId || "Unassigned"}
             </span>
             <span className="text-xs text-slate-500">
               {formatFirestoreDate(s.startedAt)}
             </span>
           </div>
           <div className="font-mono text-sm font-medium text-slate-200 group-hover:text-blue-400 transition-colors">
-            {s.tracking}
+            {s.trackingNumber}
           </div>
           <div className="flex items-center gap-3 mt-1">
             <StatusBadge status={s.status} />
             <span className="text-xs text-slate-500">
-              Total Loaded: {s.totals["loaded"]}
+              Total Loaded: {s.totals["loadedCount"] || 0}
+              {/* Total Loaded: {s.loadedCount || 0} */}
             </span>
-            <span className="text-xs text-slate-500">Driver: {s.driver}</span>
+            <span className="text-xs text-slate-500">
+              Driver: {s.driver || "Unassigned"}
+            </span>
           </div>
         </div>
       </div>
@@ -66,22 +70,28 @@ export default function ShipmentRow({ s, onClick }) {
       </div>
 
       {/* Col 4: Delay/Time */}
-      <div className="col-span-2">
-        {isDelayed ? (
-          <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-amber-500/10 border border-amber-500/20 text-amber-400 text-xs">
-            <FontAwesomeIcon
-              icon={
-                s.delayReason === "WEATHER" ? faExclamationTriangle : faShip
-              }
-            />
-            {s.delayReason}
-          </div>
-        ) : (
+      <div className="col-span-2 flex-col items-center gap-3">
+        <div className="text-xs text-slate-500">
+          <span className="block text-slate-400">Updated</span>
+          {s.updatedAt ? formatFirestoreDate(s.updatedAt) : "N/A"}
+        </div>
+        <div className="mt-2">
           <div className="text-xs text-slate-500">
-            <span className="block text-slate-400">Updated</span>
-            {s.lastUpdate}
+            <span className="block text-slate-400">Delay Info: </span>
+            {isDelayed ? (
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-amber-500/10 border border-amber-500/20 text-amber-400 text-xs">
+                <FontAwesomeIcon
+                  icon={
+                    s.delayReason === "WEATHER" ? faExclamationTriangle : faShip
+                  }
+                />
+                {s.delayReason}
+              </div>
+            ) : (
+              <div className="text-xs text-slate-500">-</div>
+            )}
           </div>
-        )}
+        </div>
       </div>
 
       {/* Col 5: Actions */}

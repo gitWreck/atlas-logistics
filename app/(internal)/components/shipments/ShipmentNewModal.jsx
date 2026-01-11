@@ -41,6 +41,8 @@ const ShipmentNewModal = ({ isOpen, onClose, onSave }) => {
     setLoading(true);
     try {
       await onSave({
+        customerName: formData.customerName,
+        customerPhoneNumber: formData.customerPhoneNumber,
         origin: formData.origin,
         destination: formData.destination,
         totalItems: Number(formData.totalItems),
@@ -94,13 +96,39 @@ const ShipmentNewModal = ({ isOpen, onClose, onSave }) => {
           <form onSubmit={handleNext} className="p-6 space-y-4">
             <div>
               <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">
+                Customer Name
+              </label>
+              <input
+                name="customerName"
+                type="text"
+                placeholder="Customer Name"
+                className="w-full bg-slate-950 border border-slate-700 rounded-lg px-4 py-2.5 text-white focus:border-red-500 focus:outline-none"
+                value={formData.customerName}
+                onChange={handleChange}
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">
+                Customer Phone Number
+              </label>
+              <input
+                name="customerPhoneNumber"
+                type="number"
+                placeholder="Customer Phone Number"
+                className="w-full bg-slate-950 border border-slate-700 rounded-lg px-4 py-2.5 text-white focus:border-red-500 focus:outline-none"
+                value={formData.customerPhoneNumber}
+                onChange={handleChange}
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">
                 Origin
               </label>
               <input
                 name="origin"
                 type="text"
                 placeholder="City / Location"
-                className="w-full bg-slate-950 border border-slate-700 rounded-lg px-4 py-2.5 text-white focus:border-red-500 focus:outline-none"
+                className="uppercase w-full bg-slate-950 border border-slate-700 rounded-lg px-4 py-2.5 text-white focus:border-red-500 focus:outline-none"
                 value={formData.origin}
                 onChange={handleChange}
               />
@@ -113,7 +141,7 @@ const ShipmentNewModal = ({ isOpen, onClose, onSave }) => {
                 name="destination"
                 type="text"
                 placeholder="City / Location"
-                className="w-full bg-slate-950 border border-slate-700 rounded-lg px-4 py-2.5 text-white focus:border-red-500 focus:outline-none"
+                className="uppercase w-full bg-slate-950 border border-slate-700 rounded-lg px-4 py-2.5 text-white focus:border-red-500 focus:outline-none"
                 value={formData.destination}
                 onChange={handleChange}
               />

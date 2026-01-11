@@ -10,7 +10,7 @@ import {
   faArrowRight,
 } from "@fortawesome/free-solid-svg-icons";
 import { getFunctions, httpsCallable } from "firebase/functions";
-import { functions } from "@/lib/firebase";
+// import { functions } from "@/lib/firebase";
 
 export default function CreateTripModal({ isOpen, onClose, onSuccess }) {
   const [loading, setLoading] = useState(false);
@@ -53,26 +53,26 @@ export default function CreateTripModal({ isOpen, onClose, onSuccess }) {
 
     setLoading(true);
 
-    try {
-      const createFn = httpsCallable(functions, "createTruckTrip");
+    // try {
+    //   const createFn = httpsCallable(functions, "createTruckTrip");
 
-      const payload = {
-        ...formData,
-        idempotencyKey: Date.now().toString(),
-      };
+    //   const payload = {
+    //     ...formData,
+    //     idempotencyKey: Date.now().toString(),
+    //   };
 
-      const result = await createFn(payload);
+    //   const result = await createFn(payload);
 
-      console.log("Trip Created:", result.data);
+    //   console.log("Trip Created:", result.data);
 
-      onSuccess();
-      onClose();
-    } catch (err) {
-      console.error(err);
-      setError(err.message || "Failed to create trip. Check permissions.");
-    } finally {
-      setLoading(false);
-    }
+    //   onSuccess();
+    //   onClose();
+    // } catch (err) {
+    //   console.error(err);
+    //   setError(err.message || "Failed to create trip. Check permissions.");
+    // } finally {
+    //   setLoading(false);
+    // }
   };
 
   const handleChange = (e) => {

@@ -1,6 +1,7 @@
 "use strict";
 
 const { onDocumentWritten } = require("firebase-functions/v2/firestore");
+const { FieldValue } = require("firebase-admin/firestore");
 const admin = require("firebase-admin");
 
 if (!admin.apps.length) admin.initializeApp();
@@ -12,7 +13,7 @@ const db = admin.firestore();
 exports.autoRepairTrackingPublic = onDocumentWritten(
   {
     document: "tracking_records/{trackingNumber}",
-    region: "asia-southeast1"
+    region: "asia-southeast1",
   },
   async (event) => {
     const trackingNumber = event.params.trackingNumber;
@@ -76,7 +77,7 @@ async function rebuildPublic(trackingNumber, tr) {
     .orderBy("at", "asc")
     .get();
 
-  const timeline = eventsSnap.docs.map(d => d.data());
+  const timeline = eventsSnap.docs.map((d) => d.data());
 
   const pub = {
     trackingNumber,
@@ -92,7 +93,7 @@ async function rebuildPublic(trackingNumber, tr) {
     totals: tr.totals || { received: 0, loaded: 0, pending: 0 },
     stepsDone: tr.stepsDone || [],
     timeline,
-    updatedAt: admin.firestore.FieldValue.serverTimestamp()
+    updatedAt: FieldValue.serverTimestamp(),
   };
 
   await db

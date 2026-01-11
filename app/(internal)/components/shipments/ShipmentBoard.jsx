@@ -1,7 +1,5 @@
 "use client";
 import React, { useState, useMemo, useEffect } from "react";
-import { collection, query, onSnapshot } from "firebase/firestore";
-import { db } from "@/lib/firebase";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faSearch,
@@ -13,7 +11,11 @@ import {
 import ShipmentRow from "./ShipmentRow";
 import ShipmentDrawer from "./ShipmentDrawer";
 import ShipmentNewModal from "./ShipmentNewModal";
-import formatFirestoreDate from "../utility/FormatFirestoreDate";
+import {
+  createShipmentWithSequence,
+  getListShipments,
+} from "@/app/utility/FirebaseFunctionsLocal";
+import formatFirestoreDate from "@/app/utility/FormatFirestoreDate";
 
 const FILTERS = [
   { key: "ALL", label: "All View" },
@@ -31,145 +33,55 @@ export default function ShipmentBoard({ userRole = "ADMIN" }) {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedId, setSelectedId] = useState(null);
 
-  const handleSaveShipment = (newShipmentData) => {
+  const handleSaveShipment = async (newShipmentData) => {
     console.log("Saving data to DB:", newShipmentData);
+    try {
+      const results = await createShipmentWithSequence(newShipmentData);
+      console.log("Function results:", results);
+    } catch (error) {
+      console.error("Error creating shipment:", error);
+    }
+  };
+
+  const fetchShipments = async () => {
+    try {
+      setLoading(true);
+
+      const res = await getListShipments();
+      const data = res.data.records;
+
+      const formatted = data.map((s) => ({
+        ...s,
+        route: s.route || `${s.origin} → ${s.destination}`,
+        startedAt: formatFirestoreDate(s.startedAt),
+        lastUpdate:
+          formatFirestoreDate(s.updatedAt) ||
+          formatFirestoreDate(s.delayStartedAt) ||
+          "No Data",
+        progress: calculateProgress(s.status),
+      }));
+
+      setShipments(formatted);
+    } catch (err) {
+      console.error("Failed to fetch shipments:", err);
+    } finally {
+      setLoading(false);
+    }
   };
 
   // --- 1. REAL-TIME LISTENER ---
   useEffect(() => {
-    setLoading(true);
-
-    // 1. Prepare references
-    // Replace "shipment_details" with the actual name of your second collection
-    const detailsRef = collection(db, "tracking_public");
-    const trackingRef = collection(db, "tracking_records");
-
-    // We need to store the data from both collections temporarily
-    let detailsMap = {};
-    let trackingDocs = [];
-
-    // Helper function to merge and update state
-    const mergeAndSetShipments = () => {
-      if (trackingDocs.length === 0) return;
-
-      const combinedData = trackingDocs.map((doc) => {
-        const t = doc.data(); // Data from tracking_records
-
-        // Find matching data in the second collection using Tracking Number
-        // (Adjust 'trackingNumber' if the field name is different in your DB)
-        const detail = detailsMap[t.trackingNumber] || {};
-
-        // PRIORITY: detail (new data) overwrites t (tracking_record) if fields exist
-        const merged = { ...t, ...detail };
-
-        return {
-          id: doc.id,
-          // --- CORE IDENTIFIERS ---
-          tracking: merged.trackingNumber || doc.id,
-          tripId: merged.tripId || "Unassigned",
-
-          // --- ROUTE INFO ---
-          origin: merged.origin || "Unknown",
-          destination: merged.destination || "Unknown",
-          route: `${merged.origin || "?"} → ${merged.destination || "?"}`,
-
-          // --- STATUS & DELAYS ---
-          status: merged.status || "UNKNOWN",
-          delayReason: merged.delayReason || null,
-          delayCleared: merged.delayCleared || false,
-
-          // --- PEOPLE ---
-          driver: merged.driverName || "Unassigned",
-          customer: merged.customerName || "Unknown",
-
-          lastUpdate:
-            formatFirestoreDate(merged.updatedAt) ||
-            formatFirestoreDate(merged.delayStartedAt) ||
-            "No Data",
-
-          startedAt: formatFirestoreDate(merged.startedAt),
-
-          totals: merged.totals || { loaded: 0, pending: 0, received: 0 },
-          progress: calculateProgress(merged.status), // Ensure this function exists
-
-          ...merged,
-        };
-      });
-
-      setShipments(combinedData);
-      setLoading(false);
-    };
-
-    // 2. LISTEN TO COLLECTION B (The Detailed Data)
-    const unsubscribeDetails = onSnapshot(detailsRef, (snapshot) => {
-      detailsMap = {};
-      snapshot.docs.forEach((doc) => {
-        const data = doc.data();
-        if (data.trackingNumber) {
-          detailsMap[data.trackingNumber] = data;
-        }
-      });
-      mergeAndSetShipments();
-    });
-
-    // 3. LISTEN TO COLLECTION A (The Main Tracking Records)
-    const unsubscribeTracking = onSnapshot(trackingRef, (snapshot) => {
-      trackingDocs = snapshot.docs;
-      mergeAndSetShipments();
-    });
-
-    return () => {
-      unsubscribeDetails();
-      unsubscribeTracking();
-    };
+    fetchShipments();
   }, []);
-
-  // useEffect(() => {
-  //   setLoading(true);
-
-  //   const q = collection(db, "tracking_records");
-
-  //   const unsubscribe = onSnapshot(q, (snapshot) => {
-  //     const liveData = snapshot.docs.map((doc) => {
-  //       const d = doc.data();
-
-  //       // MAPPING: Matching exact Firestore fields
-  //       return {
-  //         id: doc.id,
-  //         tracking: d.trackingNumber || doc.id,
-
-  //         route: d.route || `${d.origin} → ${d.destination}`,
-  //         routeCode: `${d.origin}-${d.destination}`,
-
-  //         status: d.status || "UNKNOWN",
-
-  //         delayReason: d.delayReason || null,
-  //         delayCleared: d.delayCleared || false,
-
-  //         trip: d.driverName || "Unassigned",
-  //         owner: d.customerName || "Unknown",
-
-  //         lastUpdate: d.delayStartedAt?.seconds
-  //           ? new Date(d.delayStartedAt.seconds * 1000).toLocaleDateString()
-  //           : "No Date",
-
-  //         progress: calculateProgress(d.status),
-  //         ...d,
-  //       };
-  //     });
-
-  //     setShipments(liveData);
-  //     setLoading(false);
-  //   });
-
-  //   return () => unsubscribe();
-  // }, []);
 
   // --- 2. FILTER LOGIC ---
   const filteredShipments = useMemo(() => {
     console.log("Filtering shipments with:", shipments);
-    return shipments.filter((s) => {
-      const searchContent = (s.tracking + s.route + s.owner).toLowerCase();
+    return shipments?.filter((s) => {
+      const searchContent = [s.tracking, s.route, s.owner]
+        .filter(Boolean) // remove null / undefined
+        .join(" ") // safe string
+        .toLowerCase();
       if (!searchContent.includes(searchQuery.toLowerCase())) return false;
 
       if (activeFilter === "ALL") return true;
@@ -182,6 +94,8 @@ export default function ShipmentBoard({ userRole = "ADMIN" }) {
   }, [searchQuery, activeFilter, shipments]);
 
   const selectedShipment = shipments.find((s) => s.id === selectedId);
+
+  const GRID_COLS = "grid-cols-[320px_160px_260px_200px_160px_80px]";
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-200 font-sans">
@@ -253,13 +167,14 @@ export default function ShipmentBoard({ userRole = "ADMIN" }) {
       </div>
 
       {/* List */}
+
       <main className="max-w-7xl mx-auto p-6">
         <div className="bg-slate-900/50 border border-slate-800 rounded-xl overflow-hidden backdrop-blur-sm">
           <div className="grid grid-cols-12 gap-4 px-6 py-3 border-b border-slate-800 bg-slate-900/80 text-xs font-semibold text-slate-500 uppercase tracking-wider">
             <div className="col-span-4">Tracking / Signal</div>
             <div className="col-span-2">Route</div>
             <div className="col-span-3">Status Flow</div>
-            <div className="col-span-2">Delay Info</div>
+            <div className="col-span-2">Last Updated</div>
             <div className="col-span-1 text-right">Action</div>
           </div>
           <div>

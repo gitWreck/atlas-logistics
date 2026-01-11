@@ -3,17 +3,17 @@
 /* 🎨 Light Mode & Brand Colors */
 :root {
   /* Layout Colors */
-  --background: #f9fafb; 
-  --foreground: #111827; 
+  --background: #f9fafb;
+  --foreground: #111827;
   --card-bg: #ffffff;
   --muted: #4b5563;
 
   /* YOUR BRAND COLORS defined here */
-  --brand-blue: #1D4ED8;   /* Main Primary */
-  --brand-navy: #0F172A;   /* Headings */
-  --brand-cyan: #06B6D4;   /* Accents */
-  --brand-lime: #A3E635;   /* Highlights */
-  --brand-yellow: #FACC15; /* Pops */
+  --brand-blue: #1d4ed8; /* Main Primary */
+  --brand-navy: #0f172a; /* Headings */
+  --brand-cyan: #06b6d4; /* Accents */
+  --brand-lime: #a3e635; /* Highlights */
+  --brand-yellow: #facc15; /* Pops */
 }
 
 /* 🌙 Dark Mode Colors */
@@ -23,7 +23,7 @@
     --foreground: #ededed;
     --card-bg: #171717;
     --muted: #9ca3af;
-    
+
     /* Optional: Adjust brand colors for dark mode if needed */
     /* For now, they will stay the same as light mode */
   }
@@ -65,14 +65,29 @@ html {
   scroll-behavior: smooth;
 }
 
-
 /* ------------------------------------ */
 
 @keyframes fadeIn {
-  from { opacity: 0; transform: scale(0.95); }
-  to { opacity: 1; transform: scale(1); }
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
 }
 
 .animate-fadeIn {
   animation: fadeIn 0.2s ease-out forwards;
+}
+
+/* ---------------------------------------*/
+.no-scrollbar {
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE 10+ */
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none; /* Chrome, Safari */
 }

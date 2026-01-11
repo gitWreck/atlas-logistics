@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useEffect } from "react"; // Added useEffect
+import React, { useState } from "react"; // Added useEffect
 import TripManager from "../../components/trips/TripManager";
 import ShipmentBoard from "../../components/shipments/ShipmentBoard";
 import AdminOverview from "../../components/admin/AdminOverview";
@@ -11,62 +11,34 @@ import {
   faMapSigns,
 } from "@fortawesome/free-solid-svg-icons";
 import { useRouter } from "next/navigation";
-import { signOut, onAuthStateChanged } from "firebase/auth";
-import { auth, db } from "@/lib/firebase";
-import { doc, getDoc } from "firebase/firestore";
+import { signOut } from "firebase/auth";
+import { auth } from "@/lib/firebase";
+import { useAuth } from "@/app/context/AuthContext";
 
 export default function AdminDashboardPage() {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState("overview");
 
-  // ✅ STATE FOR USER INFO
-  const [currentUser, setCurrentUser] = useState({
-    name: "Loading...",
-    email: "...",
-    role: "admin",
-  });
+  // 👇 THIS IS HOW YOU ACCESS THE INFO NOW
+  const { user, profile, loading } = useAuth();
 
-  // ✅ 1. LISTEN TO FIREBASE AUTH STATE
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      if (user) {
-        console.log("User detected:", user.uid);
+  // Optional: Prevent errors while loading
+  if (loading) return <div>Loading...</div>;
 
-        try {
-          const userDoc = await getDoc(doc(db, "users", user.uid));
+  // Optional: Security Check
+  // if (!profile || profile.role !== "admin") {
+  //   // router.push("/login"); // Uncomment to auto-redirect
+  //   return <div>Access Denied: You are not an admin.</div>;
+  // }
 
-          if (userDoc.exists()) {
-            const userData = userDoc.data();
-
-            const sessionUser = {
-              uid: user.uid,
-              name: userData.name || userData.displayName || "Atlas User",
-              email: user.email,
-              role: userData.role?.toUpperCase(),
-              photoURL: userData.photoURL || null,
-            };
-
-            setCurrentUser(sessionUser);
-          }
-        } catch (error) {
-          console.error("Error fetching user profile:", error);
-        }
-      } else {
-        console.log("No user found");
-        setCurrentUser(null);
-      }
-    });
-
-    return () => unsubscribe();
-  }, []);
-
-  // ✅ 2. SIMPLIFIED LOGOUT
   const handleLogout = async () => {
     try {
       await signOut(auth);
-      router.push("/login");
     } catch (error) {
-      console.error("Error signing out:", error);
+      console.warn("Logout error (likely emulator stale token):", error);
+    } finally {
+      // localStorage.removeItem("atlas_user");
+      router.push("/login");
     }
   };
 
@@ -92,10 +64,10 @@ export default function AdminDashboardPage() {
             <div className="flex items-center gap-4">
               <div className="text-right hidden sm:block">
                 <div className="text-sm font-medium text-white">
-                  {currentUser.name}
+                  {profile?.name || "test"}
                 </div>
                 <div className="text-xs text-slate-500 uppercase">
-                  {currentUser.role}
+                  {profile?.role || "admin"}
                 </div>
               </div>
 

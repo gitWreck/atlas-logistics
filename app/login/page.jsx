@@ -44,17 +44,6 @@ export default function LoginPage() {
       const userData = userDoc.data();
       const role = userData.role?.toUpperCase();
 
-      // ---------------------------------------------------------
-      // 3. ✅ NEW: Save User Details to Local Storage
-      // ---------------------------------------------------------
-      const sessionUser = {
-        uid: uid,
-        name: userData.name || userData.displayName || "Atlas User",
-        email: userData.email,
-        role: role,
-        photoURL: userData.photoURL || null,
-      };
-
       // 4. Route to Dashboard
       switch (role) {
         case "ADMIN":

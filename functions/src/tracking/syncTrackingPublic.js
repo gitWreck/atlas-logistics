@@ -10,6 +10,7 @@
 
 const { onRequest } = require("firebase-functions/v2/https");
 const { onDocumentWritten } = require("firebase-functions/v2/firestore");
+const { Timestamp, FieldValue } = require("firebase-admin/firestore");
 const admin = require("firebase-admin");
 
 if (!admin.apps.length) {
@@ -36,12 +37,12 @@ async function syncOneTracking(tr) {
 
   const timeline = [];
   if (eventsSnap) {
-    eventsSnap.docs.forEach(d => {
+    eventsSnap.docs.forEach((d) => {
       const e = d.data();
       timeline.push({
         status: e.status,
         at: e.at || null,
-        note: e.note || ""
+        note: e.note || "",
       });
     });
   }
@@ -58,7 +59,7 @@ async function syncOneTracking(tr) {
   let pending = 0;
 
   if (pkgSnap) {
-    pkgSnap.docs.forEach(d => {
+    pkgSnap.docs.forEach((d) => {
       const p = d.data();
       if (p.status === "RECEIVED") received++;
       else if (p.status === "LOADED") loaded++;
@@ -89,10 +90,10 @@ async function syncOneTracking(tr) {
     totals: {
       received,
       loaded,
-      pending
+      pending,
     },
 
-    updatedAt: admin.firestore.FieldValue.serverTimestamp()
+    updatedAt: FieldValue.serverTimestamp(),
   };
 
   await db
@@ -109,7 +110,7 @@ async function syncOneTracking(tr) {
 exports.autoSyncPublicOnTrackingChange = onDocumentWritten(
   {
     document: "tracking_records/{docId}",
-    region: "asia-southeast1"
+    region: "asia-southeast1",
   },
   async (event) => {
     const after = event.data.after?.data();
