@@ -8,16 +8,8 @@ import {
   faCircleNotch,
   faCheckCircle,
 } from "@fortawesome/free-solid-svg-icons";
-import { app as mainApp } from "@/lib/firebase";
-import {
-  getFunctions,
-  httpsCallable,
-  connectFunctionsEmulator,
-} from "firebase/functions";
-
-const functions = getFunctions(mainApp);
-connectFunctionsEmulator(functions, "localhost", 5001);
-const createUserProfile = httpsCallable(functions, "createUserProfile");
+import { createUserProfileCallable } from "../../../utility/FirebaseFunctions";
+import { createUserProfile } from "../../../utility/FirebaseFunctionsLocal";
 
 export default function AddUserModal({ isOpen, onClose, onSuccess }) {
   const [step, setStep] = useState("FORM");
@@ -27,7 +19,7 @@ export default function AddUserModal({ isOpen, onClose, onSuccess }) {
     email: "",
     password: "",
     displayName: "",
-    role: "DRIVER",
+    role: "driver",
   });
 
   if (!isOpen) return null;
@@ -236,6 +228,8 @@ export default function AddUserModal({ isOpen, onClose, onSuccess }) {
     </div>
   );
 }
+
+// --------------------------------
 
 // const handleSubmit = async () => {
 //   setStep("LOADING");

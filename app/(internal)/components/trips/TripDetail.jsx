@@ -9,7 +9,7 @@ import {
   getDoc,
 } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
-import { db, functions } from "@/lib/firebase";
+import { db } from "@/lib/firebase";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faLock,
@@ -64,16 +64,16 @@ export default function TripDetail({ tripId }) {
 
   const callFn = async (name, payload) => {
     setActionLoading(true);
-    try {
-      const fn = httpsCallable(functions, name);
-      const res = await fn(payload);
-      return { success: true, data: res.data };
-    } catch (err) {
-      alert(`Error: ${err.message}`);
-      return { success: false };
-    } finally {
-      setActionLoading(false);
-    }
+    // try {
+    //   const fn = httpsCallable(functions, name);
+    //   const res = await fn(payload);
+    //   return { success: true, data: res.data };
+    // } catch (err) {
+    //   alert(`Error: ${err.message}`);
+    //   return { success: false };
+    // } finally {
+    //   setActionLoading(false);
+    // }
   };
 
   // STEP 1: VERIFY SHIPMENT (Reads "Truth" Record)

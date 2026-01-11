@@ -9,27 +9,20 @@ import {
   faHistory,
   faTrash,
 } from "@fortawesome/free-solid-svg-icons";
-import { collection, onSnapshot, query, orderBy } from "firebase/firestore";
-import { db } from "@/lib/firebase"; // Ensure this path is correct
 import DisableUserModal from "./DisableUserModal";
 import AddUserModal from "./AddUserModal";
-
-// test emulator connection
-import {
-  getFunctions,
-  httpsCallable,
-  connectFunctionsEmulator,
-} from "firebase/functions";
-import { app as mainApp } from "@/lib/firebase";
-
-const functions = getFunctions(mainApp, "asia-southeast1");
-// connectFunctionsEmulator(functions, "localhost", 5001);
-console.log("process.env.NODE_ENV:", process.env.NODE_ENV);
-if (process.env.NODE_ENV === "development") {
-  connectFunctionsEmulator(functions, "127.0.0.1", 5001);
-}
+import { listUsersCallable } from "../../../utility/FirebaseFunctions";
+import { useAuth } from "@/app/context/AuthContext";
+import { getAuth } from "firebase/auth";
+import { listUsers } from "@/app/utility/FirebaseFunctionsLocal";
 
 export default function AdminOverview() {
+  const { user } = useAuth();
+
+  if (user?.customClaims?.admin) {
+    console.log("This user is definitely an admin.");
+  }
+
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -37,32 +30,44 @@ export default function AdminOverview() {
   const [isDisableModalOpen, setDisableModalOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState(null);
 
-  const listUsers = httpsCallable(functions, "listUsers");
+  // const listUsers = httpsCallable(functions, "listUsers");
   const fetchUsers = async () => {
+    setLoading(true);
+
     try {
-      setLoading(true); // Ensure loading starts
-      const res = await listUsers();
+      const auth = getAuth();
 
-      // console.log("Users fetched:", res.data);
+      console.log("Current User:", auth.currentUser);
 
-      // ✅ FIX 1: Save the data to state
-      // ensure res.data is an array before setting it
-      if (Array.isArray(res.data)) {
-        const formattedUsers = res.data.map((user) => ({
-          ...user,
-          id: user.uid, // Create 'id' from the Firebase 'uid'
-        }));
-
-        console.log("Formatted Users:", formattedUsers);
-        setUsers(formattedUsers);
-      } else {
-        console.warn("Expected array but got:", res.data);
-        setUsers([]);
+      if (!auth.currentUser) {
+        throw new Error("User is not logged in");
       }
+
+      // Call your callable function / API
+      const result = await listUsers();
+
+      // Adjust this depending on your function's return shape
+      const users = result.data;
+
+      console.log("Users fetched:", users);
+
+      if (!Array.isArray(users)) {
+        console.warn("Expected array but got:", users);
+        setUsers([]);
+        return;
+      }
+
+      const formattedUsers = users.map((user) => ({
+        ...user,
+        id: user.uid, // for table/grid components
+      }));
+
+      console.log("Formatted Users:", formattedUsers);
+      setUsers(formattedUsers);
     } catch (err) {
       console.error("Failed to fetch users:", err);
+      setUsers([]);
     } finally {
-      // ✅ FIX 2: Stop loading whether it succeeds OR fails
       setLoading(false);
     }
   };
@@ -264,6 +269,23 @@ function StatCard({ title, value, icon, color, bg }) {
     </div>
   );
 }
+
+// test emulator connection
+// import {
+//   getFunctions,
+//   httpsCallable,
+//   connectFunctionsEmulator,
+// } from "firebase/functions";
+// import { app as mainApp } from "@/lib/firebase";
+
+// const functions = getFunctions(mainApp, "asia-southeast1");
+// // connectFunctionsEmulator(functions, "localhost", 5001);
+// console.log("process.env.NODE_ENV:", process.env.NODE_ENV);
+// if (process.env.NODE_ENV === "development") {
+//   connectFunctionsEmulator(functions, "127.0.0.1", 5001);
+// }
+
+// -----------------------------
 
 // Query users collection, sorted by creation time (newest first)
 // const q = query(collection(db, "users"), orderBy("createdAt", "desc"));

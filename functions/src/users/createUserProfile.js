@@ -5,12 +5,12 @@ const { FieldValue } = require("firebase-admin/firestore");
 const createUserProfile = functions
   .region("us-central1")
   .https.onCall(async (data, context) => {
-    // if (!context.auth?.token?.admin) {
-    //   throw new functions.https.HttpsError(
-    //     "permission-denied",
-    //     "Only admins can create users."
-    //   );
-    // }
+    if (!context.auth?.token?.admin) {
+      throw new functions.https.HttpsError(
+        "permission-denied",
+        "Only admins can create users."
+      );
+    }
 
     const { email, password, displayName, role } = data;
 

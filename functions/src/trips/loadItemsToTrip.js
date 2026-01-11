@@ -50,7 +50,7 @@ async function assertAdminOrManager(tx, uid) {
 let transitionInternal;
 try {
   transitionInternal =
-    require("./transitionPackageStatus").transitionPackageStatusInternal;
+    require("./../shipments/transitionPackageStatus").transitionPackageStatusInternal;
 } catch (e) {
   transitionInternal = null;
 }

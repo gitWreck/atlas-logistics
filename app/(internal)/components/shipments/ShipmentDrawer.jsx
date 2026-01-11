@@ -31,7 +31,7 @@ export default function ShipmentDrawer({ isOpen, onClose, data }) {
           <div className="p-6 border-b border-slate-800 flex justify-between items-start">
             <div>
               <h2 className="text-xl font-mono text-white font-bold">
-                {data.tracking}
+                {data.trackingNumber}
               </h2>
               <div className="flex gap-2 mt-2">
                 <StatusBadge status={data.status} />
@@ -56,7 +56,7 @@ export default function ShipmentDrawer({ isOpen, onClose, data }) {
                   Trip ID
                 </div>
                 <div className="text-slate-200 font-mono font-medium">
-                  {data.trip || "—"}
+                  {data.tripId || "—"}
                 </div>
               </div>
               <div className="p-4 rounded-lg bg-slate-800/50 border border-slate-700/50">
@@ -64,15 +64,15 @@ export default function ShipmentDrawer({ isOpen, onClose, data }) {
                   Driver
                 </div>
                 <div className="text-slate-200 font-medium truncate">
-                  {data.owner}
+                  {data.driver || "Unassigned"}
                 </div>
               </div>
               <div className="p-4 rounded-lg bg-slate-800/50 border border-slate-700/50">
                 <div className="text-xs text-slate-500 uppercase tracking-wider mb-1">
-                  Owner
+                  Customer Name
                 </div>
                 <div className="text-slate-200 font-medium truncate">
-                  {data.owner}
+                  {data.customerName || "—"}
                 </div>
               </div>
             </div>
@@ -81,15 +81,17 @@ export default function ShipmentDrawer({ isOpen, onClose, data }) {
             <div>
               <h3 className="text-sm font-bold text-white mb-4 flex items-center gap-2">
                 <FontAwesomeIcon icon={faTruck} className="text-blue-500" />
-                Shipment Progress
+                Status Flow
               </h3>
               <div className="space-y-6 relative pl-2">
                 <div className="absolute left-[11px] top-2 bottom-2 w-0.5 bg-slate-800"></div>
                 {[
+                  "CREATED",
                   "RECEIVED",
                   "LOADED",
                   "IN_TRANSIT",
                   "ARRIVED_PORT",
+                  "OUT_FOR_DELIVERY",
                   "DELIVERED",
                 ].map((step, idx) => {
                   const isDone = idx * 25 <= data.progress;
@@ -125,10 +127,37 @@ export default function ShipmentDrawer({ isOpen, onClose, data }) {
           </div>
 
           {/* Footer Actions */}
-          <div className="p-6 border-t border-slate-800 bg-slate-900/50 flex flex-col gap-3">
+          {/* <div className="p-6 border-t border-slate-800 bg-slate-900/50 flex flex-col gap-3">
             <button className="w-full py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-lg font-medium shadow-lg shadow-blue-900/20 transition-all">
               Send Manual SMS
             </button>
+          </div> */}
+          <div className="p-6 border-t border-slate-800 bg-slate-900/50 flex flex-col gap-4">
+            {/* MAIN ACTION */}
+            <button className="w-full py-3.5 bg-slate-800 hover:bg-slate-700 text-slate-100 rounded-xl font-semibold border border-slate-700 transition-all">
+              Preview Next SMS
+            </button>
+
+            {/* SECONDARY ACTIONS */}
+            <div className="grid grid-cols-2 gap-3">
+              {/* Row 1 */}
+              <button className="py-3 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg font-medium border border-slate-700 transition-all">
+                Send Manual SMS
+              </button>
+
+              <button className="py-3 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg font-medium border border-slate-700 transition-all">
+                Assign / Unassign
+              </button>
+
+              {/* Row 2 */}
+              <button className="py-3 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg font-medium border border-slate-700 transition-all">
+                Record Partial Delivery
+              </button>
+
+              <button className="py-3 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg font-medium border border-slate-700 transition-all">
+                Marked Delivered
+              </button>
+            </div>
           </div>
         </div>
       </aside>
