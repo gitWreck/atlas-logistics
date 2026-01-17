@@ -4,6 +4,40 @@ import { app as mainApp } from "@/lib/firebase";
 // ⚠️ Make sure this matches your deployed region!
 const functions = getFunctions(mainApp, "asia-southeast1");
 
+// PACKAGES
+
+export const createPackage = httpsCallable(functions, "createPackage");
+export const createShipmentWithPackages = httpsCallable(
+  functions,
+  "createShipmentWithPackages"
+);
+
+// TRIPS
+
+export const createTruckTrip = httpsCallable(functions, "createTruckTrip");
+export const assignShipmentToTruckTrip = httpsCallable(
+  functions,
+  "assignShipmentToTruckTrip"
+);
+export const unassignShipmentFromTruckTrip = httpsCallable(
+  functions,
+  "unassignShipmentFromTruckTrip"
+);
+export const disableTruckTrip = httpsCallable(functions, "disableTruckTrip");
+export const setTruckDelay = httpsCallable(functions, "setTruckDelay");
+export const clearTruckDelay = httpsCallable(functions, "clearTruckDelay");
+
+// DRIVERS
+
+export const assignDriverToTruckTrip = httpsCallable(
+  functions,
+  "assignDriverToTruckTrip"
+);
+export const unassignDriverFromTruckTrip = httpsCallable(
+  functions,
+  "unassignDriverFromTruckTrip"
+);
+
 // SHIPMENTS
 
 export const sendBulkSMSCallable = httpsCallable(functions, "sendBulkSMS");
@@ -33,10 +67,10 @@ export const unloadItemsFromTripCallable = httpsCallable(
   "unloadItemsFromTrip"
 );
 export const recordPartialCallable = httpsCallable(functions, "recordPartial");
-export const assignShipmentToTruckTripCallable = httpsCallable(
-  functions,
-  "assignShipmentToTruckTrip"
-);
+// export const assignShipmentToTruckTripCallable = httpsCallable(
+//   functions,
+//   "assignShipmentToTruckTrip"
+// );
 export const completeTripCallable = httpsCallable(functions, "completeTrip");
 export const createShipmentWithSequenceCallable = httpsCallable(
   functions,
@@ -45,8 +79,5 @@ export const createShipmentWithSequenceCallable = httpsCallable(
 
 // ADMIN
 
-export const listUsersCallable = httpsCallable(functions, "listUsers");
-export const createUserProfileCallable = httpsCallable(
-  getFunctions(mainApp, "us-central1"),
-  "createUserProfile"
-);
+export const createUserProfile = httpsCallable(functions, "createUserProfile");
+export const toggleUserStatus = httpsCallable(functions, "toggleUserStatus");

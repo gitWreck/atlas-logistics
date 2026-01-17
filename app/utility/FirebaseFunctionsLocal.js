@@ -3,7 +3,7 @@ import { connectFunctionsEmulator, httpsCallable } from "firebase/functions";
 import { app as mainApp } from "@/lib/firebase";
 
 const functions = getFunctions(mainApp, "asia-southeast1");
-connectFunctionsEmulator(functions, "localhost", 5001);
+// connectFunctionsEmulator(functions, "localhost", 5001);
 
 // shipments
 

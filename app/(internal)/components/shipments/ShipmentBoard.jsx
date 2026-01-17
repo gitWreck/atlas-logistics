@@ -4,229 +4,262 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faSearch,
   faPlus,
-  faFileCsv,
-  faCommentSms,
   faSync,
+  faFilter,
+  faTruckFast,
+  faFileCsv,
 } from "@fortawesome/free-solid-svg-icons";
 import ShipmentRow from "./ShipmentRow";
 import ShipmentDrawer from "./ShipmentDrawer";
-import ShipmentNewModal from "./ShipmentNewModal";
-import {
-  createShipmentWithSequence,
-  getListShipments,
-} from "@/app/utility/FirebaseFunctionsLocal";
-import formatFirestoreDate from "@/app/utility/FormatFirestoreDate";
+import ReceivePackageForm from "./ReceivePackageForm"; // This replaces ShipmentNewModal
 
-const FILTERS = [
-  { key: "ALL", label: "All View" },
-  { key: "ACTIVE", label: "Active" },
-  { key: "DELAYED", label: "Delayed" },
-  { key: "DELIVERED", label: "Delivered" },
-];
+import { auth } from "@/lib/firebase";
+import { calculateProgress } from "@/app/utility/utilities";
 
-export default function ShipmentBoard({ userRole = "ADMIN" }) {
+export default function ShipmentBoard({ userRole }) {
   const [shipments, setShipments] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [isModalOpen, setIsModalOpen] = useState(false);
 
+  // Modal & Drawer State
+  const [isNewOrderModalOpen, setIsNewOrderModalOpen] = useState(false);
+  const [selectedShipmentId, setSelectedShipmentId] = useState(null);
+
+  // Search & Filter State
   const [activeFilter, setActiveFilter] = useState("ALL");
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedId, setSelectedId] = useState(null);
-
-  const handleSaveShipment = async (newShipmentData) => {
-    console.log("Saving data to DB:", newShipmentData);
-    try {
-      const results = await createShipmentWithSequence(newShipmentData);
-      console.log("Function results:", results);
-    } catch (error) {
-      console.error("Error creating shipment:", error);
-    }
-  };
 
   const fetchShipments = async () => {
     try {
       setLoading(true);
+      const user = auth.currentUser;
+      if (!user) {
+        console.error("User is not logged in yet.");
+        setLoading(false);
+        return;
+      }
+      const token = await user.getIdToken();
 
-      const res = await getListShipments();
-      const data = res.data.records;
+      // 1. Call your new Next.js API
+      const res = await fetch("/api/shipments", {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`, // <--- THIS WAS MISSING
+        },
+        cache: "no-store", // Ensure we always get fresh data
+      });
 
-      const formatted = data.map((s) => ({
+      if (!res.ok) {
+        const errorData = await res.json(); // Read the JSON response
+        console.error("SERVER ERROR DETAILS:", errorData); // Log object to console
+        throw new Error(errorData.details || errorData.error || "Server Error");
+      }
+
+      const data = await res.json();
+      console.log("data: ", data);
+
+      // 2. Final UI Formatting
+      const formatted = data.shipments.map((s) => ({
         ...s,
-        route: s.route || `${s.origin} → ${s.destination}`,
-        startedAt: formatFirestoreDate(s.startedAt),
-        lastUpdate:
-          formatFirestoreDate(s.updatedAt) ||
-          formatFirestoreDate(s.delayStartedAt) ||
-          "No Data",
         progress: calculateProgress(s.status),
       }));
 
       setShipments(formatted);
     } catch (err) {
-      console.error("Failed to fetch shipments:", err);
+      console.error("FULL ERROR:", err); // Now this prints the real reason
+      alert(`Error: ${err.message}`); // Optional: Show user
     } finally {
       setLoading(false);
     }
   };
 
-  // --- 1. REAL-TIME LISTENER ---
   useEffect(() => {
     fetchShipments();
   }, []);
 
-  // --- 2. FILTER LOGIC ---
+  // --- 2. LOGIC ---
   const filteredShipments = useMemo(() => {
-    console.log("Filtering shipments with:", shipments);
-    return shipments?.filter((s) => {
-      const searchContent = [s.tracking, s.route, s.owner]
-        .filter(Boolean) // remove null / undefined
-        .join(" ") // safe string
+    return shipments.filter((s) => {
+      // Search Logic: Tracking, Sender Name, Recipient Name
+      const searchContent = [
+        s.trackingNumber,
+        s.sender?.name,
+        s.recipient?.name,
+      ]
+        .filter(Boolean)
+        .join(" ")
         .toLowerCase();
+
       if (!searchContent.includes(searchQuery.toLowerCase())) return false;
 
+      // Filter Logic
       if (activeFilter === "ALL") return true;
       if (activeFilter === "ACTIVE") return s.status !== "DELIVERED";
-      if (activeFilter === "DELAYED") return s.delayReason && !s.delayCleared;
+      if (activeFilter === "DELAYED") return s.status === "DELAYED"; // Or check delay flags
       if (activeFilter === "DELIVERED") return s.status === "DELIVERED";
 
       return true;
     });
   }, [searchQuery, activeFilter, shipments]);
 
-  const selectedShipment = shipments.find((s) => s.id === selectedId);
+  const selectedShipment = shipments.find((s) => s.id === selectedShipmentId);
 
-  const GRID_COLS = "grid-cols-[320px_160px_260px_200px_160px_80px]";
+  // --- 3. ACTIONS ---
+  const handleMessageCustomer = (shipment) => {
+    const phone = shipment.sender?.phone || shipment.recipient?.phone;
+    alert(`Logic to SMS ${phone} for Order ${shipment.trackingNumber}`);
+  };
+
+  const handleSuccess = () => {
+    fetchShipments();
+  };
+
+  console.log("selected shipments: ", selectedShipment);
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-200 font-sans">
-      {/* Header */}
+      {/* --- PAGE HEADER --- */}
       <div className="sticky top-0 z-30 bg-slate-950/80 backdrop-blur-md border-b border-slate-800 px-6 py-4">
-        <div className="max-w-7xl mx-auto flex flex-col md:flex-row gap-4 justify-between items-center">
-          <div className="flex items-center gap-3 w-full md:w-auto">
-            <h1 className="font-bold text-white tracking-wide text-lg">
-              Shipments
-            </h1>
-            {loading && (
-              <FontAwesomeIcon
-                icon={faSync}
-                spin
-                className="text-slate-500 text-xs"
-              />
-            )}
+        <div className="max-w-7xl mx-auto flex justify-between items-center">
+          <div className="flex items-center gap-3">
+            <div className="flex gap-3">
+              <div className="h-10 w-10 bg-blue-600/20 rounded-xl flex items-center justify-center text-blue-500">
+                <FontAwesomeIcon icon={faTruckFast} size="lg" />
+              </div>
+              <div>
+                <h1 className="flex text-xl font-bold text-white tracking-tight gap-2">
+                  Shipments / Orders
+                  <button
+                    onClick={fetchShipments}
+                    disabled={loading}
+                    className="text-slate-500 hover:text-white transition-colors"
+                  >
+                    <FontAwesomeIcon
+                      icon={faSync}
+                      spin={loading}
+                      className="text-xs"
+                    />
+                  </button>
+                </h1>
+                <p className="text-xs text-slate-500">
+                  Manage shipments and orders.
+                </p>
+              </div>
+            </div>
           </div>
 
-          <div className="flex flex-1 w-full md:w-auto gap-3 justify-end">
-            <div className="relative flex-1 md:max-w-md">
-              <span className="absolute left-3 top-2.5 text-slate-500">
-                <FontAwesomeIcon icon={faSearch} />
-              </span>
-              <input
-                type="text"
-                placeholder="Search..."
-                className="w-full bg-slate-900 border border-slate-800 rounded-lg pl-10 pr-4 py-2 text-sm focus:border-blue-500 focus:outline-none"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-              />
-            </div>
-            {userRole === "ADMIN" && (
-              <>
-                <button className="h-9 px-3 rounded-lg border border-slate-800 bg-slate-900 text-slate-400 hover:text-white">
-                  <FontAwesomeIcon icon={faFileCsv} />
-                </button>
-                <button className="h-9 px-3 rounded-lg border border-slate-800 bg-slate-900 text-slate-400 hover:text-white">
-                  <FontAwesomeIcon icon={faCommentSms} />
-                </button>
-              </>
+          <div className="flex gap-3">
+            {/* Admin Actions */}
+            {userRole === "admin" && (
+              <button className="h-9 px-3 rounded-lg border border-slate-800 bg-slate-900 text-slate-400 hover:text-white">
+                <FontAwesomeIcon icon={faFileCsv} />
+              </button>
             )}
+
+            {/* NEW ORDER BUTTON */}
             <button
-              onClick={() => setIsModalOpen(true)}
-              className="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2"
+              onClick={() => setIsNewOrderModalOpen(true)}
+              className="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 shadow-lg shadow-blue-500/20 transition-all"
             >
               <FontAwesomeIcon icon={faPlus} />
-              <span>New</span>
+              <span>New Order</span>
             </button>
           </div>
-        </div>
-
-        {/* Filter Tabs */}
-        <div className="max-w-7xl mx-auto mt-6 flex gap-2 overflow-x-auto pb-1">
-          {FILTERS.map((f) => (
-            <button
-              key={f.key}
-              onClick={() => setActiveFilter(f.key)}
-              className={`px-4 py-1.5 rounded-full text-xs font-medium border transition-all whitespace-nowrap ${
-                activeFilter === f.key
-                  ? "bg-blue-500/10 border-blue-500/50 text-blue-400"
-                  : "bg-slate-900 border-slate-800 text-slate-400"
-              }`}
-            >
-              {f.label}
-            </button>
-          ))}
         </div>
       </div>
 
-      {/* List */}
-
+      {/* --- MAIN CONTENT --- */}
       <main className="max-w-7xl mx-auto p-6">
-        <div className="bg-slate-900/50 border border-slate-800 rounded-xl overflow-hidden backdrop-blur-sm">
-          <div className="grid grid-cols-12 gap-4 px-6 py-3 border-b border-slate-800 bg-slate-900/80 text-xs font-semibold text-slate-500 uppercase tracking-wider">
-            <div className="col-span-4">Tracking / Signal</div>
+        {/* TABLE CARD */}
+        <div className="border border-slate-800 rounded-xl bg-slate-900/50 overflow-hidden shadow-xl backdrop-blur-sm">
+          {/* CARD HEADER: Search & Filters (Aligned like PackageTable) */}
+          <div className="px-6 py-4 border-b border-slate-800 flex flex-col md:flex-row justify-between items-center gap-4 bg-slate-950/30">
+            <h3 className="font-bold text-white whitespace-nowrap hidden md:block">
+              Recent Orders
+            </h3>
+
+            <div className="flex gap-2 w-full md:w-auto">
+              {/* Search */}
+              <div className="relative flex-1 md:w-64">
+                <FontAwesomeIcon
+                  icon={faSearch}
+                  className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-sm"
+                />
+                <input
+                  type="text"
+                  placeholder="Search Tracking, Name..."
+                  className="w-full bg-slate-900 border border-slate-700 rounded-lg pl-9 pr-4 py-2 text-sm text-white focus:border-blue-500 focus:outline-none"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                />
+              </div>
+
+              {/* Filter Dropdown */}
+              <div className="relative w-40">
+                <FontAwesomeIcon
+                  icon={faFilter}
+                  className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-sm"
+                />
+                <select
+                  className="w-full bg-slate-900 border border-slate-700 rounded-lg pl-9 pr-4 py-2 text-sm text-white focus:border-blue-500 focus:outline-none appearance-none"
+                  value={activeFilter}
+                  onChange={(e) => setActiveFilter(e.target.value)}
+                >
+                  <option value="ALL">All View</option>
+                  <option value="ACTIVE">Active</option>
+                  <option value="DELAYED">Delayed</option>
+                  <option value="DELIVERED">Delivered</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          {/* TABLE HEADER */}
+          <div className="grid grid-cols-12 gap-4 px-6 py-3 border-b border-slate-800 bg-slate-950 text-xs font-semibold text-slate-500 uppercase tracking-wider">
+            <div className="col-span-4">Tracking / Customer</div>
             <div className="col-span-2">Route</div>
-            <div className="col-span-3">Status Flow</div>
-            <div className="col-span-2">Last Updated</div>
+            <div className="col-span-3">Progress</div>
+            <div className="col-span-2">Last Update</div>
             <div className="col-span-1 text-right">Action</div>
           </div>
+
+          {/* TABLE BODY */}
           <div>
             {loading ? (
-              <div className="p-10 text-center text-slate-500">
-                Loading shipments...
+              <div className="p-10 text-center text-slate-500 animate-pulse">
+                Loading orders...
               </div>
             ) : filteredShipments.length === 0 ? (
               <div className="p-10 text-center text-slate-500">
-                No shipments found.
+                No orders found.
               </div>
             ) : (
               filteredShipments.map((s) => (
-                <ShipmentRow key={s.id} s={s} onClick={setSelectedId} />
+                <ShipmentRow
+                  key={s.id}
+                  s={s}
+                  onClick={setSelectedShipmentId}
+                  onMessage={() => handleMessageCustomer(s)}
+                />
               ))
             )}
           </div>
         </div>
       </main>
 
+      {/* --- DRAWER --- */}
       <ShipmentDrawer
-        isOpen={!!selectedId}
-        onClose={() => setSelectedId(null)}
+        isOpen={!!selectedShipmentId}
+        onClose={() => setSelectedShipmentId(null)}
         data={selectedShipment}
       />
-      {/* THE MODAL COMPONENT */}
-      <ShipmentNewModal
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        onSave={handleSaveShipment}
+
+      {/* --- NEW ORDER MODAL (Reusing ReceiveForm) --- */}
+      <ReceivePackageForm
+        isOpen={isNewOrderModalOpen}
+        onClose={setIsNewOrderModalOpen}
+        onSuccess={handleSuccess}
       />
     </div>
   );
-}
-
-function calculateProgress(status) {
-  switch (status) {
-    case "CREATED":
-      return 10;
-    case "RECEIVED":
-      return 25;
-    case "LOADED":
-      return 40;
-    case "IN_TRANSIT":
-      return 60;
-    case "ARRIVED_PORT":
-      return 75;
-    case "OUT_FOR_DELIVERY":
-      return 90;
-    case "DELIVERED":
-      return 100;
-    default:
-      return 0;
-  }
 }

@@ -2,7 +2,7 @@
 
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const admin = require("firebase-admin");
-const { requireRole } = require("./../../_shared");
+const { requireRole } = require("./../utilities/helpers");
 
 if (!admin.apps.length) admin.initializeApp();
 const db = admin.firestore();
@@ -11,9 +11,9 @@ const db = admin.firestore();
    ASSIGN SHIPMENT TO TRUCK TRIP (OPTION B — CANONICAL)
 ====================================================== */
 exports.assignShipmentToTruckTrip = onCall(
-  { region: "asia-southeast1" },
+  { region: "asia-southeast1", maxInstances: 10 },
   async (req) => {
-    await requireRole(req, ["admin", "manager"]);
+    await requireRole(db, req, ["admin", "manager"]);
 
     const { trackingDocId, truckTripId } = req.data || {};
     if (!trackingDocId || typeof trackingDocId !== "string") {
@@ -31,23 +31,20 @@ exports.assignShipmentToTruckTrip = onCall(
     }
     const role = userSnap.data().role;
 
-    const trackingRef = db.collection("tracking_records").doc(trackingDocId);
+    const trackingRef = db.collection("shipments").doc(trackingDocId);
     const tripRef = db.collection("truck_trips").doc(truckTripId);
-    const pkgRef = tripRef.collection("trip_packages").doc(trackingDocId);
+    const shipRef = tripRef.collection("trip_shipments").doc(trackingDocId);
 
     await db.runTransaction(async (tx) => {
-      const [trackingSnap, tripSnap, pkgSnap] = await Promise.all([
+      const [trackingSnap, tripSnap, shipSnap] = await Promise.all([
         tx.get(trackingRef),
         tx.get(tripRef),
-        tx.get(pkgRef),
+        tx.get(shipRef),
       ]);
 
-      if (!trackingSnap.exists) {
-        throw new HttpsError("not-found", "Tracking record not found");
-      }
-      if (!tripSnap.exists) {
-        throw new HttpsError("not-found", "Truck trip not found");
-      }
+      if (!trackingSnap.exists)
+        throw new HttpsError("not-found", "Shipment not found");
+      if (!tripSnap.exists) throw new HttpsError("not-found", "Trip not found");
 
       const tracking = trackingSnap.data();
       const trip = tripSnap.data();
@@ -56,7 +53,15 @@ exports.assignShipmentToTruckTrip = onCall(
       if (trip.active === false || trip.status === "COMPLETED") {
         throw new HttpsError(
           "failed-precondition",
-          "Cannot assign shipment to completed trip"
+          "Cannot assign shipment to completed trip",
+        );
+      }
+
+      // ❌ NEW CHECK: Do not allow changes if Manifest is Locked
+      if (trip.manifestLocked === true) {
+        throw new HttpsError(
+          "failed-precondition",
+          "Trip Manifest is LOCKED. Unlock it first.",
         );
       }
 
@@ -65,44 +70,72 @@ exports.assignShipmentToTruckTrip = onCall(
         return;
       }
 
+      // 🛑 CRITICAL FIX: PREVENT DOUBLE ASSIGNMENT
+      // If this shipment is already assigned to a DIFFERENT truck, stop!
+      // The manager must explicitly "Unassign" it from the old truck first.
+      if (
+        tracking.currentTruckTripId &&
+        tracking.currentTruckTripId !== truckTripId
+      ) {
+        throw new HttpsError(
+          "failed-precondition",
+          `Shipment is already assigned to another trip (${tracking.currentTruckTripId}). Please unassign it there first.`,
+        );
+      }
+
       const now = admin.firestore.FieldValue.serverTimestamp();
 
       // 📦 Ensure trip_package exists (NO loading yet)
-      if (!pkgSnap.exists) {
-        tx.set(pkgRef, {
+      if (!shipSnap.exists) {
+        tx.set(shipRef, {
           trackingDocId,
           trackingNumber: tracking.trackingNumber || null,
-          route: tracking.route || null,
-          totalItems:
-            Number(tracking.totalItems || tracking.itemCount || 0) || null,
+          route:
+            tracking.originCode + " -> " + tracking.destinationCode || null,
 
+          totalItems: Number(tracking.totals["totalItems"] || 0) || null,
           loadedCount: 0,
           pendingCount: Number(tracking.pendingCount || 0),
 
           createdAt: now,
           createdBy: uid,
-          createdRole: role,
-          lastUpdatedAt: now,
+
+          updatedAt: now,
+          updatedBy: uid,
+          updatedRole: role,
+
+          status: "ASSIGNED",
         });
       }
 
       // 🔗 Update tracking record
       tx.update(trackingRef, {
         currentTruckTripId: truckTripId,
-        assignedToTripAt: now,
-        lastUpdatedAt: now,
-        lastUpdatedBy: uid,
+        assignedToTruckTripAt: now,
+
+        updatedAt: now,
+        updatedBy: uid,
+
+        status: "ASSIGNED",
+        statusHistory: [
+          ...(tracking.statusHistory ?? []),
+          {
+            status: "ASSIGNED",
+            at: admin.firestore.Timestamp.now(),
+          },
+        ],
+
         lastUpdatedRole: role,
       });
 
       // 🧾 Status event (timeline-visible)
       tx.set(trackingRef.collection("status_events").doc(), {
         type: "ASSIGN_TO_TRIP",
-        message: `Assigned to truck trip`,
+        message: "Assigned to truck trip",
         truckTripId,
         createdAt: now,
         createdBy: uid,
-        createdRole: role,
+        // createdRole: role,
       });
 
       // 🧾 Admin audit log
@@ -112,7 +145,7 @@ exports.assignShipmentToTruckTrip = onCall(
         truckTripId,
         actorId: uid,
         actorRole: role,
-        createdAt: now,
+        // createdAt: now,
       });
     });
 
@@ -121,5 +154,5 @@ exports.assignShipmentToTruckTrip = onCall(
       trackingDocId,
       truckTripId,
     };
-  }
+  },
 );

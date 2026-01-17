@@ -4,17 +4,7 @@ import {
   faExclamationTriangle,
   faBan,
 } from "@fortawesome/free-solid-svg-icons";
-import { doc, updateDoc } from "firebase/firestore"; // Import Firestore functions
-import { db, app as mainApp } from "@/lib/firebase"; // Import your DB instance
-import {
-  getFunctions,
-  httpsCallable,
-  connectFunctionsEmulator,
-} from "firebase/functions";
-
-const functions = getFunctions(mainApp);
-connectFunctionsEmulator(functions, "localhost", 5001);
-const toggleUserAccount = httpsCallable(functions, "toggleUserAccount");
+import { toggleUserStatus } from "@/app/utility/FirebaseFunctions";
 
 export default function DisableUserModal({
   isOpen,
@@ -24,23 +14,25 @@ export default function DisableUserModal({
 }) {
   const [loading, setLoading] = useState(false);
 
-  if (!isOpen) return null;
-  const isActive = user?.active !== false; // if `active` is false → disabled
+  if (!isOpen || !user) return null;
+  const isActive = user.status === "active";
 
-  const handleToggle = async (activeStatus) => {
-    if (!user) return;
+  const handleToggle = async () => {
     setLoading(true);
 
     try {
-      await toggleUserAccount({ uid: user.id, active: activeStatus });
+      const shouldDisable = isActive;
+      await toggleUserStatus({
+        uid: user.id || user.uid,
+        shouldDisable,
+      });
 
-      // ✅ Refresh the user list
       if (refreshUsers) refreshUsers();
 
       onClose();
     } catch (error) {
-      console.error("Error updating user:", error);
-      alert("Failed to update user");
+      console.error("Failed to toggle user:", error);
+      alert(error.message);
     } finally {
       setLoading(false);
     }
@@ -54,40 +46,59 @@ export default function DisableUserModal({
       />
       <div className="relative bg-slate-900 border border-red-500/30 w-full max-w-md rounded-2xl shadow-2xl overflow-hidden">
         <div className="p-6 text-center">
-          <div className="w-16 h-16 bg-red-500/10 rounded-full flex items-center justify-center mx-auto mb-4 text-red-500">
+          {/* Icon */}
+          <div
+            className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 ${
+              isActive
+                ? "bg-red-500/10 text-red-500"
+                : "bg-emerald-500/10 text-emerald-500"
+            }`}
+          >
             <FontAwesomeIcon
               icon={faExclamationTriangle}
               className="text-3xl"
             />
           </div>
 
+          {/* Title */}
           <h3 className="text-xl font-bold text-white mb-2">
             {isActive ? "Disable Account?" : "Activate Account?"}
           </h3>
+
+          {/* Body Text */}
           <p className="text-slate-400 text-sm mb-6">
             Are you sure you want to {isActive ? "disable" : "activate"}{" "}
-            <span className="text-white font-semibold">{user?.email}</span>?
+            <span className="text-white font-semibold">{user.email}</span>?
+            {isActive && (
+              <span className="block mt-2 text-xs text-red-400/80">
+                {/* * They will be logged out immediately and cannot access the app. */}
+              </span>
+            )}
           </p>
 
           <div className="flex gap-3 justify-center">
             <button
               onClick={onClose}
               disabled={loading}
-              className="px-5 py-2.5 rounded-lg text-slate-300 hover:bg-slate-800 disabled:opacity-50"
+              className="flex-1 px-5 py-2.5 rounded-lg border border-slate-700 text-slate-300 hover:bg-slate-800 disabled:opacity-50 transition-colors"
             >
               Cancel
             </button>
             <button
-              onClick={() => handleToggle(!isActive)}
+              onClick={handleToggle}
               disabled={loading}
-              className={`px-5 py-2.5 rounded-lg ${
+              className={`flex-1 px-5 py-2.5 rounded-lg text-white shadow-lg flex items-center justify-center gap-2 disabled:opacity-50 transition-all ${
                 isActive
-                  ? "bg-red-600 hover:bg-red-500"
-                  : "bg-green-600 hover:bg-green-500"
-              } text-white shadow-lg shadow-red-500/20 flex items-center gap-2 disabled:opacity-50`}
+                  ? "bg-red-600 hover:bg-red-500 shadow-red-500/20"
+                  : "bg-emerald-600 hover:bg-emerald-500 shadow-emerald-500/20"
+              }`}
             >
               {loading ? (
-                "Processing..."
+                <>
+                  {/* Simple Spinner */}
+                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  Processing...
+                </>
               ) : isActive ? (
                 <>
                   <FontAwesomeIcon icon={faBan} /> Disable User
@@ -102,26 +113,3 @@ export default function DisableUserModal({
     </div>
   );
 }
-
-// const handleDisable = async () => {
-//   if (!user) return;
-//   setLoading(true);
-
-//   try {
-//     const userRef = doc(db, "users", user.id);
-
-//     // Perform the update directly inside the modal
-//     await updateDoc(userRef, {
-//       active: false,
-//       disabledAt: new Date().toISOString(),
-//     });
-
-//     // Close modal after success
-//     onClose();
-//   } catch (error) {
-//     console.error("Error disabling user:", error);
-//     alert("Failed to disable user");
-//   } finally {
-//     setLoading(false);
-//   }
-// };

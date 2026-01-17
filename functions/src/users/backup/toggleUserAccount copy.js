@@ -6,7 +6,7 @@ const { FieldValue } = require("firebase-admin/firestore");
 if (!admin.apps.length) admin.initializeApp();
 
 const toggleUserAccount = functions
-  .region("us-central1")
+  .region("asia-southeast1")
   .https.onCall(async (data, context) => {
     // ✅ Only admins allowed
     // if (!context.auth?.token?.admin) {

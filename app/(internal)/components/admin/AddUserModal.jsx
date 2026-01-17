@@ -8,18 +8,19 @@ import {
   faCircleNotch,
   faCheckCircle,
 } from "@fortawesome/free-solid-svg-icons";
-import { createUserProfileCallable } from "../../../utility/FirebaseFunctions";
-import { createUserProfile } from "../../../utility/FirebaseFunctionsLocal";
+import { createUserProfile } from "../../../utility/FirebaseFunctions";
 
 export default function AddUserModal({ isOpen, onClose, onSuccess }) {
   const [step, setStep] = useState("FORM");
   const [error, setError] = useState("");
 
   const [formData, setFormData] = useState({
+    displayName: "",
     email: "",
     password: "",
-    displayName: "",
     role: "driver",
+    phoneNumber: "",
+    warehouseId: "",
   });
 
   if (!isOpen) return null;
@@ -40,14 +41,12 @@ export default function AddUserModal({ isOpen, onClose, onSuccess }) {
 
   const handleSubmit = async () => {
     setStep("LOADING");
+    setError("");
+
+    console.log("formData: ", formData);
 
     try {
-      await createUserProfile({
-        email: formData.email,
-        password: formData.password,
-        displayName: formData.displayName,
-        role: formData.role,
-      });
+      await createUserProfile(formData);
 
       setStep("SUCCESS");
       onSuccess?.();
@@ -61,11 +60,16 @@ export default function AddUserModal({ isOpen, onClose, onSuccess }) {
 
   const handleClose = () => {
     setStep("FORM");
-    setFormData({ email: "", password: "", displayName: "", role: "driver" });
-    setError("");
+    setFormData({
+      displayName: "",
+      email: "",
+      password: "",
+      role: "driver",
+      phoneNumber: "",
+      warehouseId: "",
+    });
     onClose();
   };
-
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div
@@ -129,6 +133,23 @@ export default function AddUserModal({ isOpen, onClose, onSuccess }) {
                 onChange={handleChange}
               />
             </div>
+            {/* NEW: Phone Number */}
+            <div>
+              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">
+                Phone Number{" "}
+                <span className="text-slate-600 font-normal normal-case">
+                  (Required for Drivers)
+                </span>
+              </label>
+              <input
+                name="phoneNumber"
+                type="tel"
+                placeholder="+63 917 123 4567"
+                className="w-full bg-slate-950 border border-slate-700 rounded-lg px-4 py-2.5 text-white focus:border-blue-500 focus:outline-none"
+                value={formData.phoneNumber}
+                onChange={handleChange}
+              />
+            </div>
             <div>
               <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">
                 Role
@@ -145,11 +166,32 @@ export default function AddUserModal({ isOpen, onClose, onSuccess }) {
                 <option value="admin">Admin</option>
               </select>
             </div>
+            {/* NEW: Warehouse Select (Hidden for Admins) */}
+            {formData.role !== "admin" && (
+              <div className="animate-in fade-in slide-in-from-top-2 duration-300">
+                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">
+                  Assign Warehouse Base
+                </label>
+                <select
+                  name="warehouseId"
+                  className="w-full bg-slate-950 border border-slate-700 rounded-lg px-4 py-2.5 text-white focus:border-blue-500 focus:outline-none appearance-none"
+                  value={formData.warehouseId}
+                  onChange={handleChange}
+                >
+                  <option value="">Select Warehouse...</option>
+                  {/* Ideally, fetch these from Firestore too */}
+                  <option value="hub-mnl">Manila Hub</option>
+                  <option value="hub-ceb">Cebu Hub</option>
+                </select>
+              </div>
+            )}
+
             {error && (
               <p className="text-red-400 text-sm bg-red-500/10 p-2 rounded border border-red-500/20">
                 {error}
               </p>
             )}
+
             <div className="pt-2">
               <button
                 type="submit"
@@ -173,6 +215,15 @@ export default function AddUserModal({ isOpen, onClose, onSuccess }) {
               account for <br />
               <strong className="text-white">{formData.displayName}</strong> (
               {formData.email}).
+            </p>
+            <p className="text-slate-400 text-sm mb-6">
+              Role:{" "}
+              <strong className="text-white uppercase">{formData.role}</strong>
+              <br />
+              Warehouse:{" "}
+              <strong className="text-white">
+                {formData.warehouseId || "None"}
+              </strong>
             </p>
             <div className="flex gap-3">
               <button

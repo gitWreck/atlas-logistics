@@ -11,19 +11,21 @@ import {
 } from "@fortawesome/free-solid-svg-icons";
 import DisableUserModal from "./DisableUserModal";
 import AddUserModal from "./AddUserModal";
-import { listUsersCallable } from "../../../utility/FirebaseFunctions";
+import StatusCard from "../ui/StatusCard";
 import { useAuth } from "@/app/context/AuthContext";
-import { getAuth } from "firebase/auth";
-import { listUsers } from "@/app/utility/FirebaseFunctionsLocal";
 
 export default function AdminOverview() {
   const { user } = useAuth();
-
   if (user?.customClaims?.admin) {
     console.log("This user is definitely an admin.");
   }
 
   const [users, setUsers] = useState([]);
+  const [stats, setStats] = useState({
+    total: 0,
+    active: 0,
+    inactive: 0,
+  });
   const [loading, setLoading] = useState(true);
 
   const [isUserModalOpen, setUserModalOpen] = useState(false);
@@ -33,40 +35,14 @@ export default function AdminOverview() {
   // const listUsers = httpsCallable(functions, "listUsers");
   const fetchUsers = async () => {
     setLoading(true);
-
     try {
-      const auth = getAuth();
+      const res = await fetch("/api/admin/dashboard");
+      const data = await res.json();
 
-      console.log("Current User:", auth.currentUser);
-
-      if (!auth.currentUser) {
-        throw new Error("User is not logged in");
-      }
-
-      // Call your callable function / API
-      const result = await listUsers();
-
-      // Adjust this depending on your function's return shape
-      const users = result.data;
-
-      console.log("Users fetched:", users);
-
-      if (!Array.isArray(users)) {
-        console.warn("Expected array but got:", users);
-        setUsers([]);
-        return;
-      }
-
-      const formattedUsers = users.map((user) => ({
-        ...user,
-        id: user.uid, // for table/grid components
-      }));
-
-      console.log("Formatted Users:", formattedUsers);
-      setUsers(formattedUsers);
+      if (data.users) setUsers(data.users);
+      if (data.stats) setStats(data.stats);
     } catch (err) {
-      console.error("Failed to fetch users:", err);
-      setUsers([]);
+      console.error("Failed to load dashboard", err);
     } finally {
       setLoading(false);
     }
@@ -74,18 +50,6 @@ export default function AdminOverview() {
   useEffect(() => {
     fetchUsers();
   }, []);
-
-  // --- 2. CALCULATE LIVE STATS ---
-  const stats = useMemo(() => {
-    return {
-      total: users.length,
-      active: users.filter((u) => u.active).length,
-      inactive: users.filter((u) => !u.active).length,
-      // Mock logs for now, replace with real logs later
-      actions24h: 12,
-      actionsTotal: 154,
-    };
-  }, [users]);
 
   const initiateDisable = (user) => {
     setSelectedUser(user);
@@ -96,21 +60,21 @@ export default function AdminOverview() {
     <div className="space-y-6 animate-in fade-in duration-500">
       {/* 1. STATS GRID (DYNAMIC) */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <StatCard
+        <StatusCard
           title="Total Users"
           value={stats.total}
           icon={faUsers}
           color="text-blue-400"
           bg="bg-blue-500/10"
         />
-        <StatCard
+        <StatusCard
           title="Active Accounts"
           value={stats.active}
           icon={faUserCheck}
           color="text-emerald-400"
           bg="bg-emerald-500/10"
         />
-        <StatCard
+        <StatusCard
           title="Inactive / Banned"
           value={stats.inactive}
           icon={faUserTimes}
@@ -210,12 +174,12 @@ export default function AdminOverview() {
                     <td className="px-6 py-4">
                       <span
                         className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${
-                          u.active
+                          u.status === "active"
                             ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
                             : "bg-red-500/10 text-red-400 border border-red-500/20"
                         }`}
                       >
-                        {u.active ? "Active" : "Inactive"}
+                        {u.status === "active" ? "Active" : "Inactive"}
                       </span>
                     </td>
                     <td className="px-6 py-4 text-right">
@@ -251,58 +215,3 @@ export default function AdminOverview() {
     </div>
   );
 }
-
-function StatCard({ title, value, icon, color, bg }) {
-  return (
-    <div className="p-5 rounded-xl border border-slate-800 bg-slate-900/50 backdrop-blur-sm flex items-start justify-between hover:border-slate-700 transition-colors">
-      <div>
-        <p className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-1">
-          {title}
-        </p>
-        <h4 className="text-3xl font-bold text-slate-200">{value}</h4>
-      </div>
-      <div
-        className={`w-10 h-10 rounded-lg flex items-center justify-center ${bg} ${color}`}
-      >
-        <FontAwesomeIcon icon={icon} />
-      </div>
-    </div>
-  );
-}
-
-// test emulator connection
-// import {
-//   getFunctions,
-//   httpsCallable,
-//   connectFunctionsEmulator,
-// } from "firebase/functions";
-// import { app as mainApp } from "@/lib/firebase";
-
-// const functions = getFunctions(mainApp, "asia-southeast1");
-// // connectFunctionsEmulator(functions, "localhost", 5001);
-// console.log("process.env.NODE_ENV:", process.env.NODE_ENV);
-// if (process.env.NODE_ENV === "development") {
-//   connectFunctionsEmulator(functions, "127.0.0.1", 5001);
-// }
-
-// -----------------------------
-
-// Query users collection, sorted by creation time (newest first)
-// const q = query(collection(db, "users"), orderBy("createdAt", "desc"));
-
-// const unsubscribe = onSnapshot(
-//   q,
-//   (snapshot) => {
-//     const userList = snapshot.docs.map((doc) => ({
-//       id: doc.id,
-//       ...doc.data(),
-//     }));
-//     setUsers(userList);
-//     setLoading(false);
-//   },
-//   (error) => {
-//     console.error("Error fetching users:", error);
-//     setLoading(false);
-//   }
-// );
-// return () => unsubscribe();

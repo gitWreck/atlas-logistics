@@ -2,7 +2,7 @@
 
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const admin = require("firebase-admin");
-const { requireRole } = require("./../../_shared");
+const { requireRole } = require("./../utilities/helpers");
 
 if (!admin.apps.length) admin.initializeApp();
 const db = admin.firestore();
@@ -11,9 +11,9 @@ const db = admin.firestore();
    UNASSIGN SHIPMENT FROM TRUCK TRIP (OPTION B — CANONICAL)
 ====================================================== */
 exports.unassignShipmentFromTruckTrip = onCall(
-  { region: "asia-southeast1" },
+  { region: "asia-southeast1", maxInstances: 10 },
   async (req) => {
-    await requireRole(req, ["admin", "manager"]);
+    await requireRole(db, req, ["admin", "manager"]);
 
     const { trackingDocId, truckTripId } = req.data || {};
     if (!trackingDocId || typeof trackingDocId !== "string") {
@@ -31,15 +31,15 @@ exports.unassignShipmentFromTruckTrip = onCall(
     }
     const role = userSnap.data().role;
 
-    const trackingRef = db.collection("tracking_records").doc(trackingDocId);
+    const trackingRef = db.collection("shipments").doc(trackingDocId);
     const tripRef = db.collection("truck_trips").doc(truckTripId);
-    const pkgRef = tripRef.collection("trip_packages").doc(trackingDocId);
+    const shipRef = tripRef.collection("trip_shipments").doc(trackingDocId);
 
     await db.runTransaction(async (tx) => {
-      const [trackingSnap, tripSnap, pkgSnap] = await Promise.all([
+      const [trackingSnap, tripSnap, shipSnap] = await Promise.all([
         tx.get(trackingRef),
         tx.get(tripRef),
-        tx.get(pkgRef),
+        tx.get(shipRef),
       ]);
 
       if (!trackingSnap.exists) {
@@ -56,7 +56,7 @@ exports.unassignShipmentFromTruckTrip = onCall(
       if (trip.active === false || trip.status === "COMPLETED") {
         throw new HttpsError(
           "failed-precondition",
-          "Cannot unassign from completed trip"
+          "Cannot unassign from completed trip",
         );
       }
 
@@ -65,31 +65,49 @@ exports.unassignShipmentFromTruckTrip = onCall(
         return;
       }
 
+      // ❌ MISSING CHECK: MANIFEST LOCK
+      if (trip.manifestLocked === true) {
+        throw new HttpsError(
+          "failed-precondition",
+          "Trip Manifest is LOCKED. Unlock it first to remove items.",
+        );
+      }
+
       // 🚫 Cannot unassign if any items are loaded
-      if (pkgSnap.exists) {
-        const pkg = pkgSnap.data();
+      if (shipSnap.exists) {
+        const pkg = shipSnap.data();
         if (Number(pkg.loadedCount || 0) > 0) {
           throw new HttpsError(
             "failed-precondition",
-            "Unload all items before unassigning shipment from trip"
+            "Unload all items before unassigning shipment from trip",
           );
         }
       }
 
       const now = admin.firestore.FieldValue.serverTimestamp();
 
-      // 🧹 Remove trip_package (safe: no loaded items)
-      if (pkgSnap.exists) {
-        tx.delete(pkgRef);
+      // 🧹 Remove trip_shipments (safe: no loaded items)
+      if (shipSnap.exists) {
+        tx.delete(shipRef);
       }
 
       // 🔗 Update tracking record
       tx.update(trackingRef, {
         currentTruckTripId: null,
-        unassignedFromTripAt: now,
-        lastUpdatedAt: now,
-        lastUpdatedBy: uid,
-        lastUpdatedRole: role,
+        // unassignedFromTripAt: now,
+
+        updatedAt: now,
+        updatedBy: uid,
+        updatedRole: role,
+
+        status: "RECEIVED",
+        statusHistory: [
+          ...(tracking.statusHistory ?? []),
+          {
+            status: "RECEIVED",
+            at: admin.firestore.Timestamp.now(),
+          },
+        ],
       });
 
       // 🧾 Status event (timeline-visible)
@@ -99,7 +117,7 @@ exports.unassignShipmentFromTruckTrip = onCall(
         truckTripId,
         createdAt: now,
         createdBy: uid,
-        createdRole: role,
+        updatedRole: role,
       });
 
       // 📜 Admin audit log
@@ -118,5 +136,5 @@ exports.unassignShipmentFromTruckTrip = onCall(
       trackingDocId,
       truckTripId,
     };
-  }
+  },
 );
