@@ -2,7 +2,7 @@
 
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const admin = require("firebase-admin");
-const { requireRole } = require("./../../_shared");
+const { requireRole } = require("./..//utilities/helpers");
 
 if (!admin.apps.length) admin.initializeApp();
 const db = admin.firestore();
@@ -11,9 +11,9 @@ const db = admin.firestore();
    UNASSIGN DRIVER FROM TRUCK TRIP (OPTION B — CANONICAL)
 ====================================================== */
 exports.unassignDriverFromTruckTrip = onCall(
-  { region: "asia-southeast1" },
+  { region: "asia-southeast1", maxInstances: 10 },
   async (req) => {
-    await requireRole(req, ["admin", "manager"]);
+    await requireRole(db, req, ["admin", "manager"]);
 
     const { truckTripId } = req.data || {};
     if (!truckTripId || typeof truckTripId !== "string") {
@@ -34,6 +34,13 @@ exports.unassignDriverFromTruckTrip = onCall(
 
       const trip = tripSnap.data();
 
+      if (trip.manifestLocked) {
+        throw new HttpsError(
+          "failed-precondition",
+          "Manifest is locked. Unlock it before changing drivers."
+        );
+      }
+
       // 🔒 Hard stop: completed trip
       if (trip.active === false || trip.status === "COMPLETED") {
         throw new HttpsError(
@@ -52,10 +59,13 @@ exports.unassignDriverFromTruckTrip = onCall(
       // 🚚 Update trip
       tx.update(tripRef, {
         driverId: null,
-        driverUnassignedAt: now,
-        lastUpdatedAt: now,
-        lastUpdatedBy: uid,
-        lastUpdatedRole: role,
+        driverName: null, // <--- ADD THIS to clear the name
+        truckPlateNumber: null, // <--- OPTIONAL: Do you want to remove the truck too? Usually yes.
+
+        // driverUnassignedAt: now,
+        updatedAt: now,
+        updatedBy: uid,
+        updatedRole: role,
       });
 
       // 🧾 Trip status event

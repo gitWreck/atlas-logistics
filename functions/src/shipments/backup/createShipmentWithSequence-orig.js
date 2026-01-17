@@ -112,11 +112,11 @@ exports.createShipmentWithSequence = onCall(
           CREATE SHIPMENT (SERVER-ONLY)
        ====================================================== */
       tx.set(shipmentRef, {
-        trackingNumber,
+        trackingNumber, //
         route,
 
-        origin,
-        destination,
+        origin, //
+        destination, //
 
         customerName,
         customerPhoneNumber,
@@ -125,22 +125,22 @@ exports.createShipmentWithSequence = onCall(
         loadedCount: 0,
         pendingCount: totalItems,
 
-        status: "CREATED",
+        status: "CREATED", //
         statusIndex: 0,
 
-        public: false,
-        archived: false,
+        public: false, //
+        archived: false, //
 
-        currentTruckTripId: null,
+        currentTruckTripId: null, //
 
-        remarks,
+        remarks, //
 
-        createdAt: FieldValue.serverTimestamp(),
-        createdBy: uid,
+        createdAt: FieldValue.serverTimestamp(), //
+        createdBy: uid, //
         createdRole: role,
 
-        lastUpdatedAt: FieldValue.serverTimestamp(),
-        lastUpdatedBy: uid,
+        lastUpdatedAt: FieldValue.serverTimestamp(), //
+        lastUpdatedBy: uid, //
         lastUpdatedRole: role,
       });
 

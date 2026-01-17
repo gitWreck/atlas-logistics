@@ -2,7 +2,7 @@
 
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const admin = require("firebase-admin");
-const { requireRole } = require("./../../_shared");
+const { requireRole } = require("./../utilities/helpers");
 
 if (!admin.apps.length) admin.initializeApp();
 const db = admin.firestore();
@@ -11,30 +11,43 @@ const db = admin.firestore();
    ASSIGN DRIVER TO TRUCK TRIP (OPTION B — CANONICAL)
 ====================================================== */
 exports.assignDriverToTruckTrip = onCall(
-  { region: "asia-southeast1" },
+  { region: "asia-southeast1", maxInstances: 10 },
   async (req) => {
-    await requireRole(req, ["admin", "manager"]);
+    await requireRole(db, req, ["admin", "manager"]);
 
-    const { truckTripId, driverId } = req.data || {};
+    const { truckTripId, driverId, truckPlateNumber } = req.data || {};
     if (!truckTripId || typeof truckTripId !== "string") {
       throw new HttpsError("invalid-argument", "truckTripId required");
     }
-    if (!driverId || typeof driverId !== "string") {
-      throw new HttpsError("invalid-argument", "driverId required");
-    }
+    // if (!driverId || typeof driverId !== "string") {
+    //   throw new HttpsError("invalid-argument", "driverId required");
+    // }
 
     const uid = req.auth.uid;
     const role = req.auth.token?.role || "unknown";
 
     const tripRef = db.collection("truck_trips").doc(truckTripId);
+    const driverRef = db.collection("users").doc(driverId);
 
     await db.runTransaction(async (tx) => {
-      const snap = await tx.get(tripRef);
-      if (!snap.exists) {
+      const [tripSnap, driverSnap] = await Promise.all([
+        tx.get(tripRef),
+        tx.get(driverRef),
+      ]);
+
+      if (!tripSnap.exists) {
         throw new HttpsError("not-found", "Truck trip not found");
       }
+      if (!driverSnap.exists) {
+        throw new HttpsError("not-found", "Driver profile not found");
+      }
 
-      const trip = snap.data();
+      const trip = tripSnap.data();
+      const driver = driverSnap.data();
+
+      if (driver.role !== "driver") {
+        throw new HttpsError("failed-precondition", "User is not a driver");
+      }
 
       // 🔒 Hard stop: completed trip
       if (trip.active === false || trip.status === "COMPLETED") {
@@ -45,7 +58,10 @@ exports.assignDriverToTruckTrip = onCall(
       }
 
       // 🔁 Idempotent: already assigned
-      if (trip.driverId === driverId) {
+      if (
+        trip.driverId === driverId &&
+        trip.truckPlateNumber === truckPlateNumber
+      ) {
         return;
       }
 
@@ -54,10 +70,13 @@ exports.assignDriverToTruckTrip = onCall(
       // ✅ Update trip
       tx.update(tripRef, {
         driverId,
+        driverName: driver.name || "Unknown Driver", // <--- CRITICAL FIX
+        truckPlateNumber: truckPlateNumber || trip.truckPlateNumber || null,
         driverAssignedAt: now,
-        lastUpdatedAt: now,
-        lastUpdatedBy: uid,
-        lastUpdatedRole: role,
+
+        updatedAt: now,
+        updatedBy: uid,
+        updatedRole: role,
       });
 
       // 🧾 Audit log

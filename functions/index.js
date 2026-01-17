@@ -11,11 +11,7 @@ const {
   onDocumentWritten,
 } = require("firebase-functions/v2/firestore");
 const admin = require("firebase-admin");
-const functionsV1 = require("firebase-functions");
 
-// ------------------------------------------------------------
-// 1) GLOBAL OPTIONS + ADMIN INIT
-// ------------------------------------------------------------
 setGlobalOptions({
   region: "asia-southeast1",
   cors: [
@@ -29,46 +25,50 @@ if (!admin.apps.length) {
   admin.initializeApp();
 }
 
-// ------------------------------------------------------------
-// 2) AUTH TRIGGERS (v1 only)
-// ------------------------------------------------------------
-exports.createUserProfile = require("./src/users/createUserProfile");
-exports.toggleUserAccount = require("./src/users/toggleUserAccount");
+// admin actions
+exports.createUserProfile =
+  require("./src/users/createUserProfile").createUserProfile;
+exports.toggleUserStatus = require("./src/users/toggleUserStatus");
 
-// ------------------------------------------------------------
-// 3) HTTPS / CALLABLE FUNCTIONS
-// ------------------------------------------------------------
+// packages
+exports.createPackage = require("./src/packages/createPackage").createPackage;
+exports.createShipmentWithPackages =
+  require("./src/shipments/createShipmentWithPackages").createShipmentWithPackages;
 
-// Users
-exports.listUsers = require("./src/users/listUsers").listUsers;
-
+// ------------------------------------------
 // Trips
 exports.createTruckTrip =
   require("./src/trips/createTruckTrip").createTruckTrip;
-exports.loadItemsToTrip =
-  require("./src/trips/loadItemsToTrip").loadItemsToTrip;
-exports.unloadItemsFromTrip =
-  require("./src/trips/unloadItemsFromTrip").unloadItemsFromTrip;
-exports.completeTrip = require("./src/trips/completeTrip").completeTrip;
 exports.assignShipmentToTruckTrip =
   require("./src/trips/assignShipmentToTruckTrip").assignShipmentToTruckTrip;
 exports.unassignShipmentFromTruckTrip =
   require("./src/trips/unassignShipmentFromTruckTrip").unassignShipmentFromTruckTrip;
+
+exports.loadItemsToTrip =
+  require("./src/trips/loadItemsToTrip").loadItemsToTrip;
+exports.unloadItemsFromTrip =
+  require("./src/trips/unloadItemsFromTrip").unloadItemsFromTrip;
+
 exports.setTruckDelay = require("./src/trips/setTruckDelay").setTruckDelay;
 exports.clearTruckDelay =
   require("./src/trips/clearTruckDelay").clearTruckDelay;
-exports.setTruckAutoSmsSettings =
-  require("./src/trips/setTruckAutoSmsSettings").setTruckAutoSmsSettings;
+
 exports.assignDriverToTruckTrip =
   require("./src/trips/assignDriverToTruckTrip").assignDriverToTruckTrip;
 exports.unassignDriverFromTruckTrip =
   require("./src/trips/unassignDriverFromTruckTrip").unassignDriverFromTruckTrip;
+exports.setTruckAutoSmsSettings =
+  require("./src/trips/setTruckAutoSmsSettings").setTruckAutoSmsSettings;
+
+exports.disableTruckTrip =
+  require("./src/trips/disableTruckTrip").disableTruckTrip;
+exports.completeTrip = require("./src/trips/completeTrip").completeTrip;
 
 // Shipments
 exports.getListShipments =
   require("./src/shipments/getListShipments").getListShipments;
 exports.createShipmentWithSequence =
-  require("./src/shipments/createShipmentWithSequence").createShipmentWithSequence;
+  require("./src/shipments/backup/createShipmentWithSequence-orig").createShipmentWithSequence;
 exports.archiveShipment =
   require("./src/shipments/archiveShipment").archiveShipment;
 exports.appendStatusEvent =

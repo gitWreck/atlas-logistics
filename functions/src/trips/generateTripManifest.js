@@ -18,56 +18,25 @@
 
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const admin = require("firebase-admin");
-const crypto = require("crypto");
-const { requireRole } = require("./../../_shared");
+const {
+  requireRole,
+  requireString,
+  stableStringify,
+  sha256Hex,
+} = require("./../utilities/helpers");
 
 if (!admin.apps.length) admin.initializeApp();
 const db = admin.firestore();
-
-/* ===============================
-   Helpers
-================================ */
-
-function requireString(v, field) {
-  if (typeof v !== "string" || !v.trim()) {
-    throw new HttpsError("invalid-argument", `${field} required`);
-  }
-  return v.trim();
-}
-
-/**
- * Stable stringify (sorted keys) to create deterministic hash
- */
-function stableStringify(obj) {
-  const seen = new WeakSet();
-  const sorter = (value) => {
-    if (value === null || typeof value !== "object") return value;
-    if (seen.has(value)) return "[Circular]";
-    seen.add(value);
-
-    if (Array.isArray(value)) return value.map(sorter);
-
-    const keys = Object.keys(value).sort();
-    const out = {};
-    for (const k of keys) out[k] = sorter(value[k]);
-    return out;
-  };
-  return JSON.stringify(sorter(obj));
-}
-
-function sha256Hex(s) {
-  return crypto.createHash("sha256").update(s, "utf8").digest("hex");
-}
 
 /* ===============================
    Main callable
 ================================ */
 
 exports.generateTripManifest = onCall(
-  { region: "asia-southeast1" },
+  { region: "asia-southeast1", maxInstances: 10 },
   async (req) => {
     // 🔐 Role guard
-    await requireRole(req, ["admin", "manager"]);
+    await requireRole(db, req, ["admin", "manager"]);
 
     const tripDocId = requireString(req.data?.tripDocId, "tripDocId");
 
@@ -81,7 +50,7 @@ exports.generateTripManifest = onCall(
       null;
 
     const tripRef = db.collection("truck_trips").doc(tripDocId);
-    const pkgsRef = tripRef.collection("trip_packages");
+    const pkgsRef = tripRef.collection("trip_shipments");
 
     return db.runTransaction(async (tx) => {
       const tripSnap = await tx.get(tripRef);
@@ -114,7 +83,7 @@ exports.generateTripManifest = onCall(
       if (pkgsSnap.empty) {
         throw new HttpsError(
           "failed-precondition",
-          "Trip has no packages. Nothing to manifest."
+          "Trip has no packages. Nothing to manifest.",
         );
       }
 
@@ -210,7 +179,7 @@ exports.generateTripManifest = onCall(
             reason: "MANIFEST_BLOCKED",
             tripDocId,
             blockers,
-          }
+          },
         );
       }
 
@@ -272,8 +241,9 @@ exports.generateTripManifest = onCall(
         manifestHash: hash,
         manifestGeneratedAt: admin.firestore.FieldValue.serverTimestamp(),
         manifestGeneratedBy: uid,
-        lastUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
-        lastUpdatedBy: uid,
+
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        updatedBy: uid,
       });
 
       // Manifest events (trip-scoped)
@@ -309,5 +279,5 @@ exports.generateTripManifest = onCall(
         hash,
       };
     });
-  }
+  },
 );

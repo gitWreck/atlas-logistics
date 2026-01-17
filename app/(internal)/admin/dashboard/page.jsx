@@ -9,11 +9,15 @@ import {
   faTruck,
   faSignOutAlt,
   faMapSigns,
+  faTruckLoading,
 } from "@fortawesome/free-solid-svg-icons";
 import { useRouter } from "next/navigation";
-import { signOut } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 import { useAuth } from "@/app/context/AuthContext";
+import { handleLogout } from "@/app/utility/utilities";
+import PackageManager from "../../components/packages/PackageManager";
+import ManifestPage from "../../components/manifests/ManifestBoard";
+import TabButton from "../../components/ui/TabButton";
 
 export default function AdminDashboardPage() {
   const router = useRouter();
@@ -22,25 +26,13 @@ export default function AdminDashboardPage() {
   // 👇 THIS IS HOW YOU ACCESS THE INFO NOW
   const { user, profile, loading } = useAuth();
 
-  // Optional: Prevent errors while loading
   if (loading) return <div>Loading...</div>;
 
   // Optional: Security Check
   // if (!profile || profile.role !== "admin") {
-  //   // router.push("/login"); // Uncomment to auto-redirect
+  //   router.push("/login"); // Uncomment to auto-redirect
   //   return <div>Access Denied: You are not an admin.</div>;
   // }
-
-  const handleLogout = async () => {
-    try {
-      await signOut(auth);
-    } catch (error) {
-      console.warn("Logout error (likely emulator stale token):", error);
-    } finally {
-      // localStorage.removeItem("atlas_user");
-      router.push("/login");
-    }
-  };
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-200 font-sans">
@@ -73,7 +65,9 @@ export default function AdminDashboardPage() {
 
               {/* Logout Button */}
               <button
-                onClick={handleLogout}
+                onClick={() => {
+                  handleLogout(auth, router);
+                }}
                 className="h-9 w-9 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-slate-400 hover:text-white hover:bg-red-900/50 hover:border-red-800 transition-colors"
                 title="Sign Out"
               >
@@ -97,11 +91,23 @@ export default function AdminDashboardPage() {
               label="Shipment Operations"
             />
             <TabButton
+              isActive={activeTab === "manifests"}
+              onClick={() => setActiveTab("manifests")}
+              icon={faTruckLoading}
+              label="Manifest & Trips"
+            />
+            {/* <TabButton
+              isActive={activeTab === "manager"}
+              onClick={() => setActiveTab("manager")}
+              icon={faMapSigns}
+              label="Package Manager"
+            /> */}
+            {/* <TabButton
               isActive={activeTab === "trips"}
               onClick={() => setActiveTab("trips")}
               icon={faMapSigns}
               label="Trip Operations"
-            />
+            /> */}
           </div>
         </div>
       </header>
@@ -110,27 +116,10 @@ export default function AdminDashboardPage() {
       <main className="max-w-7xl mx-auto p-6">
         {activeTab === "overview" && <AdminOverview />}
         {activeTab === "shipments" && <ShipmentBoard userRole="admin" />}
-        {activeTab === "trips" && <TripManager />}
+        {activeTab === "manifests" && <ManifestPage />}
+        {/* {activeTab === "manager" && <PackageManager />} */}
+        {/* {activeTab === "trips" && <TripManager />} */}
       </main>
     </div>
-  );
-}
-
-function TabButton({ isActive, onClick, icon, label }) {
-  return (
-    <button
-      onClick={onClick}
-      className={`
-        pb-3 flex items-center gap-2 text-sm font-medium border-b-2 transition-colors
-        ${
-          isActive
-            ? "border-blue-500 text-blue-400"
-            : "border-transparent text-slate-500 hover:text-slate-300 hover:border-slate-800"
-        }
-      `}
-    >
-      <FontAwesomeIcon icon={icon} />
-      {label}
-    </button>
   );
 }

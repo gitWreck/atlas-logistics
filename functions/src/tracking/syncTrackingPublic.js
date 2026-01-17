@@ -28,7 +28,7 @@ async function syncOneTracking(tr) {
 
   // Load timeline
   const eventsSnap = await db
-    .collection("tracking_records")
+    .collection("shipments")
     .doc(trackingNumber)
     .collection("events")
     .orderBy("at", "asc")
@@ -109,12 +109,15 @@ async function syncOneTracking(tr) {
 =============================== */
 exports.autoSyncPublicOnTrackingChange = onDocumentWritten(
   {
-    document: "tracking_records/{docId}",
+    document: "shipments/{docId}",
     region: "asia-southeast1",
   },
   async (event) => {
+    if (!event.data.after.exists) {
+      await db.collection("tracking_public").doc(event.params.docId).delete();
+      return;
+    }
     const after = event.data.after?.data();
-    if (!after) return;
 
     try {
       await syncOneTracking(after);
@@ -130,7 +133,7 @@ exports.autoSyncPublicOnTrackingChange = onDocumentWritten(
 exports.syncTrackingPublicHttp = onRequest(
   { region: "asia-southeast1" },
   async (req, res) => {
-    const snap = await db.collection("tracking_records").get();
+    const snap = await db.collection("shipments").get();
 
     let scanned = 0;
     let written = 0;

@@ -84,7 +84,9 @@ function normStatus(s) {
 }
 
 function upper(s) {
-  return String(s || "").trim().toUpperCase();
+  return String(s || "")
+    .trim()
+    .toUpperCase();
 }
 
 function asPosInt(v, fallback = 0) {
@@ -173,8 +175,10 @@ function isTerminal(status) {
 
 function isDelayToggle(fromStatus, toStatus) {
   return (
-    (normStatus(fromStatus) === "In Transit" && normStatus(toStatus) === "Delayed") ||
-    (normStatus(fromStatus) === "Delayed" && normStatus(toStatus) === "In Transit")
+    (normStatus(fromStatus) === "In Transit" &&
+      normStatus(toStatus) === "Delayed") ||
+    (normStatus(fromStatus) === "Delayed" &&
+      normStatus(toStatus) === "In Transit")
   );
 }
 
@@ -188,10 +192,14 @@ exports.transitionPackageStatus = onCall(
 
     // ---- Inputs
     const tripDocId = requireString(req.data?.tripDocId, "tripDocId");
-    const tripPackageId = requireString(req.data?.tripPackageId, "tripPackageId"); // doc id under trip_packages
+    const tripPackageId = requireString(
+      req.data?.tripPackageId,
+      "tripPackageId",
+    ); // doc id under trip_packages
     const toStatus = requireString(req.data?.toStatus, "toStatus");
     const remarks = optionalString(req.data?.remarks);
-    const delayReason = req.data?.delayReason != null ? upper(req.data.delayReason) : null;
+    const delayReason =
+      req.data?.delayReason != null ? upper(req.data.delayReason) : null;
 
     // ---- Refs
     const tripRef = db.collection("truck_trips").doc(tripDocId);
@@ -203,20 +211,29 @@ exports.transitionPackageStatus = onCall(
       const { role, name } = await loadActiveUser(tx, uid);
 
       // ---- Load trip + package
-      const [tripSnap, pkgSnap] = await Promise.all([tx.get(tripRef), tx.get(pkgRef)]);
+      const [tripSnap, pkgSnap] = await Promise.all([
+        tx.get(tripRef),
+        tx.get(pkgRef),
+      ]);
 
       if (!tripSnap.exists) {
         structuredError("not-found", "Trip not found", { tripDocId });
       }
       if (!pkgSnap.exists) {
-        structuredError("not-found", "Trip package not found", { tripDocId, tripPackageId });
+        structuredError("not-found", "Trip package not found", {
+          tripDocId,
+          tripPackageId,
+        });
       }
 
       const trip = tripSnap.data() || {};
       const pkg = pkgSnap.data() || {};
 
       // ---- Trip must be active
-      if (trip.active === false || String(trip.status || "").toUpperCase() === "COMPLETED") {
+      if (
+        trip.active === false ||
+        String(trip.status || "").toUpperCase() === "COMPLETED"
+      ) {
         structuredError("failed-precondition", "Trip already closed", {
           reason: "TRIP_CLOSED",
           tripDocId,
@@ -239,20 +256,28 @@ exports.transitionPackageStatus = onCall(
       }
 
       if (fromIdx === -1) {
-        structuredError("failed-precondition", "Package has invalid current status", {
-          fromStatus,
-          allowed: STATUS_FLOW,
-        });
+        structuredError(
+          "failed-precondition",
+          "Package has invalid current status",
+          {
+            fromStatus,
+            allowed: STATUS_FLOW,
+          },
+        );
       }
 
       // ---- Terminal lock
       if (isTerminal(fromStatus)) {
-        structuredError("failed-precondition", "Delivered packages are immutable", {
-          reason: "TERMINAL_LOCK",
-          fromStatus,
-          tripDocId,
-          tripPackageId,
-        });
+        structuredError(
+          "failed-precondition",
+          "Delivered packages are immutable",
+          {
+            reason: "TERMINAL_LOCK",
+            fromStatus,
+            tripDocId,
+            tripPackageId,
+          },
+        );
       }
 
       // ---- Idempotency (no-op)
@@ -285,7 +310,9 @@ exports.transitionPackageStatus = onCall(
       }
 
       // Other forward statuses: Admin/Manager
-      if (["Created", "Loaded", "In Transit", "Out for Delivery"].includes(to)) {
+      if (
+        ["Created", "Loaded", "In Transit", "Out for Delivery"].includes(to)
+      ) {
         // Created is usually system-set; but allow admin/manager to fix.
         assertRoleAllowed(role, ["admin", "manager", "checker"]); // keep tolerant
       }
@@ -295,10 +322,14 @@ exports.transitionPackageStatus = onCall(
       // ==================================================
       if (to === "Delayed") {
         if (!delayReason || !DELAY_REASONS.includes(delayReason)) {
-          structuredError("invalid-argument", "delayReason must be WEATHER or RORO", {
-            delayReason,
-            allowed: DELAY_REASONS,
-          });
+          structuredError(
+            "invalid-argument",
+            "delayReason must be WEATHER or RORO",
+            {
+              delayReason,
+              allowed: DELAY_REASONS,
+            },
+          );
         }
       }
 
@@ -322,13 +353,17 @@ exports.transitionPackageStatus = onCall(
 
       if (!delayToggle) {
         if (toIdx !== fromIdx + 1) {
-          structuredError("failed-precondition", `Illegal transition ${fromStatus} → ${to}`, {
-            reason: "ILLEGAL_TRANSITION",
-            fromStatus,
-            toStatus: to,
-            tripDocId,
-            tripPackageId,
-          });
+          structuredError(
+            "failed-precondition",
+            `Illegal transition ${fromStatus} → ${to}`,
+            {
+              reason: "ILLEGAL_TRANSITION",
+              fromStatus,
+              toStatus: to,
+              tripDocId,
+              tripPackageId,
+            },
+          );
         }
       }
 
@@ -344,23 +379,31 @@ exports.transitionPackageStatus = onCall(
       // Special-case: delay status is allowed even if truck is "In Transit"
       // BUT not allowed if truck hasn't reached "In Transit" yet.
       if (to === "Delayed" && maxPkgIdx < idxOfStatus("In Transit")) {
-        structuredError("failed-precondition", "Cannot set delay before trip is In Transit", {
-          reason: "TRIP_NOT_READY_FOR_DELAY",
-          tripStatus,
-          tripDocId,
-        });
+        structuredError(
+          "failed-precondition",
+          "Cannot set delay before trip is In Transit",
+          {
+            reason: "TRIP_NOT_READY_FOR_DELAY",
+            tripStatus,
+            tripDocId,
+          },
+        );
       }
 
       // For non-delay statuses, enforce max index
       if (to !== "Delayed" && toIdx > maxPkgIdx) {
-        structuredError("failed-precondition", "Package cannot outrun truck trip status", {
-          reason: "TRIP_AHEAD_BLOCK",
-          tripStatus,
-          maxAllowedPackageStatus: STATUS_FLOW[maxPkgIdx] || null,
-          attempted: to,
-          tripDocId,
-          tripPackageId,
-        });
+        structuredError(
+          "failed-precondition",
+          "Package cannot outrun truck trip status",
+          {
+            reason: "TRIP_AHEAD_BLOCK",
+            tripStatus,
+            maxAllowedPackageStatus: STATUS_FLOW[maxPkgIdx] || null,
+            attempted: to,
+            tripDocId,
+            tripPackageId,
+          },
+        );
       }
 
       // Also: if truck itself is currently delayed, block moving package forward (unless clearing delay)
@@ -371,13 +414,17 @@ exports.transitionPackageStatus = onCall(
       if (tripIsDelayed) {
         // Allow only: setting package to Delayed OR no-op
         if (to !== "Delayed") {
-          structuredError("failed-precondition", "Trip is delayed — package progression blocked", {
-            reason: "TRIP_DELAY_BLOCK",
-            tripStatus,
-            tripDelayReason,
-            tripDocId,
-            tripPackageId,
-          });
+          structuredError(
+            "failed-precondition",
+            "Trip is delayed — package progression blocked",
+            {
+              reason: "TRIP_DELAY_BLOCK",
+              tripStatus,
+              tripDelayReason,
+              tripDocId,
+              tripPackageId,
+            },
+          );
         }
       }
 
@@ -385,42 +432,45 @@ exports.transitionPackageStatus = onCall(
       // COUNTS + PROGRESS (idempotent delivery)
       // ==================================================
       const packageCount = asPosInt(pkg.packageCount, 0); // expected >= 1
-      const prevDeliveredCount = Number.isFinite(pkg.deliveredCount) ? Number(pkg.deliveredCount) : 0;
+      const prevDeliveredCount = Number.isFinite(pkg.deliveredCount)
+        ? Number(pkg.deliveredCount)
+        : 0;
 
       // Delivery idempotency lock
       if (to === "Delivered") {
         // If already deliveredAt exists, block (prevents double click)
 
-      // ✅ VERIFIED DELIVERY LOCK (Black Box rule)
-      // Delivered is ONLY allowed when all items are accounted for:
-      // pendingCount must be 0 (everything loaded must either be delivered or reconciled via partial/unload).
-      const pendingCount =
-        Number.isFinite(pkg.pendingCount) ? Number(pkg.pendingCount) : null;
+        // ✅ VERIFIED DELIVERY LOCK (Black Box rule)
+        // Delivered is ONLY allowed when all items are accounted for:
+        // pendingCount must be 0 (everything loaded must either be delivered or reconciled via partial/unload).
+        const pendingCount = Number.isFinite(pkg.pendingCount)
+          ? Number(pkg.pendingCount)
+          : null;
 
-      if (pendingCount === null) {
-        structuredError(
-          "failed-precondition",
-          "Cannot mark Delivered — pendingCount missing (enable item accounting)",
-          {
-            reason: "MISSING_PENDINGCOUNT",
-            tripDocId,
-            tripPackageId,
-          }
-        );
-      }
+        if (pendingCount === null) {
+          structuredError(
+            "failed-precondition",
+            "Cannot mark Delivered — pendingCount missing (enable item accounting)",
+            {
+              reason: "MISSING_PENDINGCOUNT",
+              tripDocId,
+              tripPackageId,
+            },
+          );
+        }
 
-      if (pendingCount > 0) {
-        structuredError(
-          "failed-precondition",
-          `Cannot mark Delivered — ${pendingCount} item(s) not accounted for`,
-          {
-            reason: "PENDING_ITEMS_BLOCK",
-            tripDocId,
-            tripPackageId,
-            pendingCount,
-          }
-        );
-      }
+        if (pendingCount > 0) {
+          structuredError(
+            "failed-precondition",
+            `Cannot mark Delivered — ${pendingCount} item(s) not accounted for`,
+            {
+              reason: "PENDING_ITEMS_BLOCK",
+              tripDocId,
+              tripPackageId,
+              pendingCount,
+            },
+          );
+        }
 
         if (pkg.deliveredAt) {
           structuredError("failed-precondition", "Already delivered", {
@@ -432,11 +482,15 @@ exports.transitionPackageStatus = onCall(
         }
 
         if (packageCount <= 0) {
-          structuredError("failed-precondition", "packageCount missing — cannot compute delivery progress", {
-            reason: "MISSING_PACKAGECOUNT",
-            tripDocId,
-            tripPackageId,
-          });
+          structuredError(
+            "failed-precondition",
+            "packageCount missing — cannot compute delivery progress",
+            {
+              reason: "MISSING_PACKAGECOUNT",
+              tripDocId,
+              tripPackageId,
+            },
+          );
         }
       }
 
@@ -470,13 +524,21 @@ exports.transitionPackageStatus = onCall(
 
       // Delivery fields + counts/progress
       let deliveredCountAfter = prevDeliveredCount;
-      let deliveryProgressAfter = Number.isFinite(pkg.deliveryProgress) ? Number(pkg.deliveryProgress) : 0;
+      let deliveryProgressAfter = Number.isFinite(pkg.deliveryProgress)
+        ? Number(pkg.deliveryProgress)
+        : 0;
 
       if (to === "Delivered") {
-        deliveredCountAfter = Math.min(packageCount, prevDeliveredCount + packageCount); // typically package-level = whole package
+        deliveredCountAfter = Math.min(
+          packageCount,
+          prevDeliveredCount + packageCount,
+        ); // typically package-level = whole package
         // In your screenshots, deliveredCount was 0; packageCount was 8.
         // If your deliveredCount means "items delivered inside this package set", you might want +packageCount:
-        deliveredCountAfter = Math.min(packageCount, prevDeliveredCount + packageCount);
+        deliveredCountAfter = Math.min(
+          packageCount,
+          prevDeliveredCount + packageCount,
+        );
 
         deliveryProgressAfter = clamp01(deliveredCountAfter / packageCount);
 
@@ -489,7 +551,11 @@ exports.transitionPackageStatus = onCall(
       }
 
       // If you want progress to update on other transitions (optional)
-      if (to !== "Delivered" && packageCount > 0 && Number.isFinite(prevDeliveredCount)) {
+      if (
+        to !== "Delivered" &&
+        packageCount > 0 &&
+        Number.isFinite(prevDeliveredCount)
+      ) {
         update.deliveryProgress = clamp01(prevDeliveredCount / packageCount);
       }
 
@@ -512,7 +578,12 @@ exports.transitionPackageStatus = onCall(
         actorName: name || null,
 
         // delay
-        delayReason: to === "Delayed" ? delayReason : (pkg.delayReason ? upper(pkg.delayReason) : null),
+        delayReason:
+          to === "Delayed"
+            ? delayReason
+            : pkg.delayReason
+              ? upper(pkg.delayReason)
+              : null,
 
         // remarks
         remarks: remarks || "",
@@ -536,9 +607,12 @@ exports.transitionPackageStatus = onCall(
         // delivery numbers (if relevant)
         packageCount: packageCount || null,
         deliveredCountBefore: prevDeliveredCount,
-        deliveredCountAfter: to === "Delivered" ? deliveredCountAfter : prevDeliveredCount,
+        deliveredCountAfter:
+          to === "Delivered" ? deliveredCountAfter : prevDeliveredCount,
         deliveryProgressAfter:
-          to === "Delivered" ? deliveryProgressAfter : (update.deliveryProgress ?? null),
+          to === "Delivered"
+            ? deliveryProgressAfter
+            : (update.deliveryProgress ?? null),
 
         remarks: remarks || null,
 
@@ -557,10 +631,13 @@ exports.transitionPackageStatus = onCall(
         toStatus: to,
         statusIndex: toIdx,
         delayReason: to === "Delayed" ? delayReason : null,
-        deliveredCount: to === "Delivered" ? deliveredCountAfter : prevDeliveredCount,
+        deliveredCount:
+          to === "Delivered" ? deliveredCountAfter : prevDeliveredCount,
         deliveryProgress:
-          to === "Delivered" ? deliveryProgressAfter : (update.deliveryProgress ?? pkg.deliveryProgress ?? 0),
+          to === "Delivered"
+            ? deliveryProgressAfter
+            : (update.deliveryProgress ?? pkg.deliveryProgress ?? 0),
       };
     });
-  }
+  },
 );
