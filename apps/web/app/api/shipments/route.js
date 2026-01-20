@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
-import { adminDb, adminAuth } from "@/apps/web/lib/firebase-admin";
+import { adminDb, adminAuth } from "@/lib/firebase-admin";
 import { headers } from "next/headers";
-import { formatFirestoreDate } from "@/apps/web/app/utility/utilities";
+import { formatFirestoreDate } from "@/app/utility/utilities";
 
 export const dynamic = "force-dynamic";
 

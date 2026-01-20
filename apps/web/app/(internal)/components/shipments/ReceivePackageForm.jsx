@@ -8,7 +8,7 @@ import {
   faPaperPlane,
   faTimes, // Added for the close button visual
 } from "@fortawesome/free-solid-svg-icons";
-import { createShipmentWithPackages } from "@/apps/web/app/utility/FirebaseFunctions";
+import { createShipmentWithPackages } from "@/app/utility/FirebaseFunctions";
 
 export default function ReceivePackageForm({ isOpen, onClose, onSuccess }) {
   const [loading, setLoading] = useState(false);

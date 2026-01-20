@@ -4,7 +4,7 @@ import {
   faExclamationTriangle,
   faBan,
 } from "@fortawesome/free-solid-svg-icons";
-import { toggleUserStatus } from "@/apps/web/app/utility/FirebaseFunctions";
+import { toggleUserStatus } from "@/app/utility/FirebaseFunctions";
 
 export default function DisableUserModal({
   isOpen,

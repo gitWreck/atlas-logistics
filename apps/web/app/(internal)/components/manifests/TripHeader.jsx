@@ -10,8 +10,8 @@ import {
 } from "@fortawesome/free-solid-svg-icons";
 import { ActionButton } from "../ui/ActionButton";
 import StatusBadge from "../ui/StatusBadge";
-import { generateTripManifest } from "@/apps/web/app/utility/FirebaseFunctions";
-import { runAction } from "@/apps/web/app/utility/utilities";
+import { generateTripManifest } from "@/app/utility/FirebaseFunctions";
+import { runAction } from "@/app/utility/utilities";
 import StatusButton from "../ui/StatusButton";
 
 export default function TripHeader({

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { adminAuth, adminDb } from "@/apps/web/lib/firebase-admin"; // Use your existing lib
+import { adminAuth, adminDb } from "@/lib/firebase-admin"; // Use your existing lib
 
 export async function POST(request) {
   try {

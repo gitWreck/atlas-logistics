@@ -5,7 +5,7 @@ import {
   faTimes,
   faExclamationTriangle,
 } from "@fortawesome/free-solid-svg-icons";
-import { disableTruckTrip } from "@/apps/web/app/utility/FirebaseFunctions";
+import { disableTruckTrip } from "@/app/utility/FirebaseFunctions";
 
 export default function DisableTripModal({ isOpen, onClose, trip, onSuccess }) {
   const [reason, setReason] = useState("");

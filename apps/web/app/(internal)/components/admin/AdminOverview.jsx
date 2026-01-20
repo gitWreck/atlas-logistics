@@ -12,7 +12,7 @@ import {
 import DisableUserModal from "./DisableUserModal";
 import AddUserModal from "./AddUserModal";
 import StatusCard from "../ui/StatusCard";
-import { useAuth } from "@/apps/web/app/context/AuthContext";
+import { useAuth } from "@/app/context/AuthContext";
 
 export default function AdminOverview() {
   const { user } = useAuth();

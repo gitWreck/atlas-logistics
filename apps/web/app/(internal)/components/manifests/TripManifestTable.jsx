@@ -1,7 +1,7 @@
 import React from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faCut, faMinus } from "@fortawesome/free-solid-svg-icons";
-import { formatFirestoreDate } from "@/apps/web/app/utility/utilities";
+import { formatFirestoreDate } from "@/app/utility/utilities";
 import StatusBadge from "../ui/StatusBadge";
 
 export default function TripManifestTable({

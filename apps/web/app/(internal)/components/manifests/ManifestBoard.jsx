@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faTruckLoading } from "@fortawesome/free-solid-svg-icons";
-import { auth } from "@/apps/web/lib/firebase";
+import { auth } from "@/lib/firebase";
 import CreateTripModal from "./modals/CreateTripModal";
 import TripWorkspace from "./TripWorkspace";
 // import TripWorkspace from "./backup/TripWorkspace-orig";

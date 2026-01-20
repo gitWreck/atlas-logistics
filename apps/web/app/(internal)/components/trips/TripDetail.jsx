@@ -9,7 +9,7 @@ import {
   getDoc,
 } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
-import { db } from "@/apps/web/lib/firebase";
+import { db } from "@/lib/firebase";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faLock,

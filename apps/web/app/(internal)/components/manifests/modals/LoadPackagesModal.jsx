@@ -7,7 +7,7 @@ import {
   faTimes,
 } from "@fortawesome/free-solid-svg-icons";
 import { httpsCallable } from "firebase/functions";
-import { functions } from "@/apps/web/lib/firebase";
+import { functions } from "@/lib/firebase";
 
 export default function LoadPackagesModal({
   isOpen,

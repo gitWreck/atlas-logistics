@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { adminDb } from "@/apps/web/lib/firebase-admin"; // Ensure you use Admin SDK
+import { adminDb } from "@/lib/firebase-admin"; // Ensure you use Admin SDK
 
 export async function GET() {
   try {
