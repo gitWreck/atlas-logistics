@@ -1,28 +1,15 @@
 {
   "name": "atlas-trucking-platform",
-  "version": "0.1.0",
   "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start"
-  },
-  "dependencies": {
-    "@fortawesome/fontawesome-svg-core": "^7.1.0",
-    "@fortawesome/free-solid-svg-icons": "^7.1.0",
-    "@fortawesome/react-fontawesome": "^3.1.1",
-    "eslint-config-next": "^16.1.1",
-    "firebase": "^12.7.0",
-    "firebase-admin": "^13.6.0",
-    "next": "^16.1.1",
-    "pg": "^8.16.3",
-    "react": "^19.2.3",
-    "react-dom": "^19.2.3",
-    "react-qr-code": "^2.0.18",
-    "server-only": "^0.0.1"
+    "dev": "turbo run dev",
+    "build": "turbo run build"
   },
   "devDependencies": {
-    "@tailwindcss/postcss": "^4",
-    "tailwindcss": "^4"
+    "turbo": "latest"
   }
 }
