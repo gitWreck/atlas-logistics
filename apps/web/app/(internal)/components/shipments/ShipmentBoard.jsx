@@ -13,8 +13,8 @@ import ShipmentRow from "./ShipmentRow";
 import ShipmentDrawer from "./ShipmentDrawer";
 import ReceivePackageForm from "./ReceivePackageForm"; // This replaces ShipmentNewModal
 
-import { auth } from "@/apps/web/lib/firebase";
-import { calculateProgress } from "@/apps/web/app/utility/utilities";
+import { auth } from "@/lib/firebase";
+import { calculateProgress } from "@/app/utility/utilities";
 
 export default function ShipmentBoard({ userRole }) {
   const [shipments, setShipments] = useState([]);

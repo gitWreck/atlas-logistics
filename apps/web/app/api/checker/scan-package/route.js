@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { db } from "@/lib/firebaseAdmin"; // Use the ADMIN db
+import { adminDb } from "@/lib/firebase-admin"; // Use the ADMIN db
 
 export async function POST(request) {
   try {
@@ -7,7 +7,7 @@ export async function POST(request) {
 
     // 1. Find the Shipment containing this Barcode
     // Note: We search the 'packages' array for an object with this barcode
-    const snapshot = await db
+    const snapshot = await adminDb
       .collection("shipments")
       .where("packageBarcodes", "array-contains", barcode) // Helper field for fast search
       .limit(1)

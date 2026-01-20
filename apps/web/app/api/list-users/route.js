@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 // We import from your lib folder.
 // If your '@' alias isn't set up for root, use the relative path: "../../../lib/firebase-admin"
-import { adminAuth } from "@/apps/web/lib/firebase-admin";
+import { adminAuth } from "@/lib/firebase-admin";
 
 export async function GET() {
   try {

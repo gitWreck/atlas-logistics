@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { httpsCallable } from "firebase/functions";
-import { functions } from "@/apps/web/lib/firebase";
+import { functions } from "@/lib/firebase";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faCut,

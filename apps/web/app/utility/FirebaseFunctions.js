@@ -1,5 +1,5 @@
 import { getFunctions, httpsCallable } from "firebase/functions";
-import { app as mainApp } from "@/apps/web/lib/firebase";
+import { app as mainApp } from "@/lib/firebase";
 
 // ⚠️ Make sure this matches your deployed region!
 const functions = getFunctions(mainApp, "asia-southeast1");

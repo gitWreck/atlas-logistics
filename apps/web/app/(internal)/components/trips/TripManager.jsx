@@ -7,7 +7,7 @@ import {
   onSnapshot,
   limit,
 } from "firebase/firestore";
-import { db } from "@/apps/web/lib/firebase";
+import { db } from "@/lib/firebase";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faSearch, faPlus, faSync } from "@fortawesome/free-solid-svg-icons";
 import CreateTripModal from "./CreateTripModal";

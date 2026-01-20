@@ -4,9 +4,9 @@ import {
   assignShipmentToTruckTrip,
   clearTruckDelay,
   setTruckDelay,
-} from "@/apps/web/app/utility/FirebaseFunctions";
+} from "@/app/utility/FirebaseFunctions";
 import StatusButton from "../ui/StatusButton";
-import { runAction } from "@/apps/web/app/utility/utilities";
+import { runAction } from "@/app/utility/utilities";
 
 export default function TripOperations({ tripId, isLocked, onSuccess }) {
   // --- INTERNAL STATE (Parent doesn't need to know this) ---

@@ -10,7 +10,7 @@ import {
 import {
   assignDriverToTruckTrip,
   unassignDriverFromTruckTrip,
-} from "@/apps/web/app/utility/FirebaseFunctions";
+} from "@/app/utility/FirebaseFunctions";
 import DriverSelectInput from "../DriverSelectInput";
 
 export default function AssignDriverModal({

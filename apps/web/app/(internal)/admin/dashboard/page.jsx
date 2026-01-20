@@ -12,9 +12,9 @@ import {
   faTruckLoading,
 } from "@fortawesome/free-solid-svg-icons";
 import { useRouter } from "next/navigation";
-import { auth } from "@/apps/web/lib/firebase";
-import { useAuth } from "@/apps/web/app/context/AuthContext";
-import { handleLogout } from "@/apps/web/app/utility/utilities";
+import { auth } from "@/lib/firebase";
+import { useAuth } from "@/app/context/AuthContext";
+import { handleLogout } from "@/app/utility/utilities";
 import PackageManager from "../../components/packages/PackageManager";
 import ManifestPage from "../../components/manifests/ManifestBoard";
 import TabButton from "../../components/ui/TabButton";

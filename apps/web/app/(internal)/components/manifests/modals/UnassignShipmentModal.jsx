@@ -5,7 +5,7 @@ import {
   faTimes,
   faMinusCircle,
 } from "@fortawesome/free-solid-svg-icons";
-import { unassignShipmentFromTruckTrip } from "@/apps/web/app/utility/FirebaseFunctions";
+import { unassignShipmentFromTruckTrip } from "@/app/utility/FirebaseFunctions";
 
 export default function UnassignShipmentModal({
   isOpen,

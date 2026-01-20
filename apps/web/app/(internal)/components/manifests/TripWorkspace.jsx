@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { auth } from "@/apps/web/lib/firebase";
+import { auth } from "@/lib/firebase";
 
 // Components
 import TripHeader from "./TripHeader";

@@ -7,7 +7,7 @@ import {
   faRoute,
   faUser,
 } from "@fortawesome/free-solid-svg-icons";
-import { createTruckTrip } from "@/apps/web/app/utility/FirebaseFunctions";
+import { createTruckTrip } from "@/app/utility/FirebaseFunctions";
 import DriverSelectInput from "../DriverSelectInput";
 
 export default function CreateTripModal({ isOpen, onClose, onSuccess }) {
