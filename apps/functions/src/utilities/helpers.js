@@ -105,7 +105,7 @@ async function assertAdminOrManager(db, tx, uid) {
   return { role, name: u.name || null };
 }
 
-async function requireAuth(context) {
+function requireAuth(context) {
   if (!context.auth?.uid) {
     throw new HttpsError("unauthenticated", "Authentication required");
   }
@@ -169,4 +169,5 @@ module.exports = {
   toLocal,
   stableStringify,
   sha256Hex,
+  requireAuth,
 };

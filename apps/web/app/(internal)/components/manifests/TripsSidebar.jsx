@@ -120,7 +120,7 @@ export default function TripsSidebar({
                 <div className="flex justify-between items-center text-[10px] text-slate-500">
                   <span>{t.route || "No Route"}</span>
                   <span className="bg-slate-950 px-1.5 py-0.5 rounded border border-slate-800 text-slate-400">
-                    {t.packageTotal || 0} Pkgs
+                    {t.totalItems || 0} Pkgs
                   </span>
                 </div>
 

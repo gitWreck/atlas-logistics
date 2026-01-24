@@ -1,14 +1,10 @@
 // app/admin/manifest/CreateTripModal.jsx
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import {
-  faTimes,
-  faTruck,
-  faRoute,
-  faUser,
-} from "@fortawesome/free-solid-svg-icons";
+import { faTimes, faTruck, faRoute } from "@fortawesome/free-solid-svg-icons";
 import { createTruckTrip } from "@/app/utility/FirebaseFunctions";
 import DriverSelectInput from "../DriverSelectInput";
+import { PROVINCES, getCities } from "@/app/utility/PhilippinesData";
 
 export default function CreateTripModal({ isOpen, onClose, onSuccess }) {
   const [loading, setLoading] = useState(false);
@@ -16,14 +12,57 @@ export default function CreateTripModal({ isOpen, onClose, onSuccess }) {
 
   // Form State
   const [formData, setFormData] = useState({
-    origin: "Manila", // Default example
-    destination: "Cebu", // Default example
+    originProvince: "",
+    originCity: "",
+    originCode: "", // Will be auto-filled
+
+    destinationProvince: "",
+    destinationCity: "",
+    destinationCode: "",
+
     driverName: "", // For display
     driverId: null, // For backend logic (Optional)
     truckPlateNumber: "",
   });
 
+  useEffect(() => {
+    if (isOpen) {
+      setFormData({
+        originProvince: "",
+        originCity: "",
+        originCode: "",
+        destinationProvince: "",
+        destinationCity: "",
+        destinationCode: "",
+        driverName: "",
+        driverId: null,
+        truckPlateNumber: "",
+      });
+    }
+  }, [isOpen]);
+
   if (!isOpen) return null;
+
+  // Helper to handle City selection and Code lookup
+  const handleCityChange = (type, cityName, provinceName) => {
+    const cityList = getCities(provinceName);
+    const selected = cityList.find((c) => c.name === cityName);
+    const code = selected ? selected.code : "GEN";
+
+    if (type === "origin") {
+      setFormData((prev) => ({
+        ...prev,
+        originCity: cityName,
+        originCode: code,
+      }));
+    } else {
+      setFormData((prev) => ({
+        ...prev,
+        destinationCity: cityName,
+        destinationCode: code,
+      }));
+    }
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -33,8 +72,10 @@ export default function CreateTripModal({ isOpen, onClose, onSuccess }) {
     try {
       // Call the backend function you provided
       const results = await createTruckTrip({
-        origin: formData.origin.toUpperCase(),
-        destination: formData.destination.toUpperCase(),
+        originCity: formData.originCity.toUpperCase(),
+        destinationCity: formData.destinationCity.toUpperCase(),
+        originCode: formData.originCode.toUpperCase(),
+        destinationCode: formData.destinationCode.toUpperCase(),
         truckPlateNumber: formData.truckPlateNumber,
         driverName: formData.driverName,
         driverId: formData.driverId,
@@ -70,48 +111,121 @@ export default function CreateTripModal({ isOpen, onClose, onSuccess }) {
 
         {/* Form */}
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
-          {/* Route Section */}
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1">
-              <label className="text-xs font-bold text-slate-400 uppercase">
-                Origin
-              </label>
-              <div className="relative">
-                <FontAwesomeIcon
-                  icon={faRoute}
-                  className="absolute left-3 top-3 text-slate-600 text-xs"
-                />
-                <input
-                  required
-                  // maxLength={3}
-                  className="w-full bg-slate-950 border border-slate-700 rounded-lg py-2 pl-8 pr-3 text-white focus:border-blue-500 outline-none uppercase font-mono"
-                  placeholder="MNL"
-                  value={formData.origin}
+          {/* --- ROUTE SECTION (UPDATED) --- */}
+          <div className="space-y-4">
+            {/* ORIGIN */}
+            <div className="bg-slate-950/50 p-3 rounded-lg border border-slate-800">
+              <div className="flex justify-between items-center mb-2">
+                <label className="text-[10px] font-bold text-blue-400 uppercase flex items-center gap-2">
+                  <FontAwesomeIcon icon={faRoute} /> Origin
+                </label>
+                {formData.originCode && (
+                  <span className="text-[10px] font-mono bg-blue-500/20 text-blue-400 px-1.5 rounded">
+                    {formData.originCode}
+                  </span>
+                )}
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                {/* Province Dropdown */}
+                <select
+                  className="bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-white outline-none focus:border-blue-500"
+                  value={formData.originProvince}
                   onChange={(e) =>
-                    setFormData({ ...formData, origin: e.target.value })
+                    setFormData((p) => ({
+                      ...p,
+                      originProvince: e.target.value,
+                      originCity: "",
+                      originCode: "",
+                    }))
                   }
-                />
+                  required
+                >
+                  <option value="">Select Province</option>
+                  {PROVINCES.map((p) => (
+                    <option key={p} value={p}>
+                      {p}
+                    </option>
+                  ))}
+                </select>
+
+                {/* City Dropdown */}
+                <select
+                  className="bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-white outline-none focus:border-blue-500 disabled:opacity-50"
+                  value={formData.originCity}
+                  onChange={(e) =>
+                    handleCityChange(
+                      "origin",
+                      e.target.value,
+                      formData.originProvince,
+                    )
+                  }
+                  disabled={!formData.originProvince}
+                  required
+                >
+                  <option value="">Select City</option>
+                  {getCities(formData.originProvince).map((c) => (
+                    <option key={c.name} value={c.name}>
+                      {c.name}
+                    </option>
+                  ))}
+                </select>
               </div>
             </div>
-            <div className="space-y-1">
-              <label className="text-xs font-bold text-slate-400 uppercase">
-                Destination
-              </label>
-              <div className="relative">
-                <FontAwesomeIcon
-                  icon={faRoute}
-                  className="absolute left-3 top-3 text-slate-600 text-xs"
-                />
-                <input
-                  required
-                  // maxLength={3}
-                  className="w-full bg-slate-950 border border-slate-700 rounded-lg py-2 pl-8 pr-3 text-white focus:border-blue-500 outline-none uppercase font-mono"
-                  placeholder="CEB"
-                  value={formData.destination}
+
+            {/* DESTINATION */}
+            <div className="bg-slate-950/50 p-3 rounded-lg border border-slate-800">
+              <div className="flex justify-between items-center mb-2">
+                <label className="text-[10px] font-bold text-emerald-400 uppercase flex items-center gap-2">
+                  <FontAwesomeIcon icon={faRoute} /> Destination
+                </label>
+                {formData.destCode && (
+                  <span className="text-[10px] font-mono bg-emerald-500/20 text-emerald-400 px-1.5 rounded">
+                    {formData.destCode}
+                  </span>
+                )}
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <select
+                  className="bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-white outline-none focus:border-emerald-500"
+                  value={formData.destinationProvince}
                   onChange={(e) =>
-                    setFormData({ ...formData, destCode: e.target.value })
+                    setFormData((p) => ({
+                      ...p,
+                      destinationProvince: e.target.value,
+                      destinationCity: "",
+                      destinationCode: "",
+                    }))
                   }
-                />
+                  required
+                >
+                  <option value="">Select Province</option>
+                  {PROVINCES.map((p) => (
+                    <option key={p} value={p}>
+                      {p}
+                    </option>
+                  ))}
+                </select>
+
+                <select
+                  className="bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-white outline-none focus:border-emerald-500 disabled:opacity-50"
+                  value={formData.destCity}
+                  onChange={(e) =>
+                    handleCityChange(
+                      "destination",
+                      e.target.value,
+                      formData.destinationProvince,
+                    )
+                  }
+                  disabled={!formData.destinationProvince}
+                  required
+                >
+                  <option value="">Select City</option>
+                  {getCities(formData.destinationProvince).map((c) => (
+                    <option key={c.name} value={c.name}>
+                      {c.name}
+                    </option>
+                  ))}
+                </select>
               </div>
             </div>
           </div>

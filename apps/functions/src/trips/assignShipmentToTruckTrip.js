@@ -71,8 +71,6 @@ exports.assignShipmentToTruckTrip = onCall(
       }
 
       // 🛑 CRITICAL FIX: PREVENT DOUBLE ASSIGNMENT
-      // If this shipment is already assigned to a DIFFERENT truck, stop!
-      // The manager must explicitly "Unassign" it from the old truck first.
       if (
         tracking.currentTruckTripId &&
         tracking.currentTruckTripId !== truckTripId
@@ -85,6 +83,9 @@ exports.assignShipmentToTruckTrip = onCall(
 
       const now = admin.firestore.FieldValue.serverTimestamp();
 
+      // Calculate Items to Add (Safely handle missing totals)
+      const itemsToAdd = Number(tracking.totals?.totalItems || 0);
+
       // 📦 Ensure trip_package exists (NO loading yet)
       if (!shipSnap.exists) {
         tx.set(shipRef, {
@@ -93,9 +94,10 @@ exports.assignShipmentToTruckTrip = onCall(
           route:
             tracking.originCode + " -> " + tracking.destinationCode || null,
 
-          totalItems: Number(tracking.totals["totalItems"] || 0) || null,
+          totalItems: itemsToAdd || null,
+          pendingCount: itemsToAdd, // Initially, all items are pending
           loadedCount: 0,
-          pendingCount: Number(tracking.pendingCount || 0),
+          deliveredCount: 0,
 
           createdAt: now,
           createdBy: uid,
@@ -125,7 +127,22 @@ exports.assignShipmentToTruckTrip = onCall(
           },
         ],
 
-        lastUpdatedRole: role,
+        updatedRole: role,
+      });
+
+      // --------------------------------------------------------
+      // 🆕 NEW: Update Trip Counters (itemPending)
+      // --------------------------------------------------------
+      tx.update(tripRef, {
+        // Also update totalItems (optional, but good practice to track capacity)
+        totalItems: admin.firestore.FieldValue.increment(itemsToAdd),
+        itemPending: admin.firestore.FieldValue.increment(itemsToAdd),
+
+        totalLoaded: 0,
+        totalDelivered: 0,
+
+        updatedAt: now,
+        updatedBy: uid,
       });
 
       // 🧾 Status event (timeline-visible)

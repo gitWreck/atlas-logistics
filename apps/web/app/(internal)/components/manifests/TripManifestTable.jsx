@@ -1,6 +1,6 @@
 import React from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faCut, faMinus } from "@fortawesome/free-solid-svg-icons";
+import { faCut, faMinus, faPlus } from "@fortawesome/free-solid-svg-icons";
 import { formatFirestoreDate } from "@/app/utility/utilities";
 import StatusBadge from "../ui/StatusBadge";
 
@@ -10,6 +10,7 @@ export default function TripManifestTable({
   isLocked,
   onSplit,
   onUnassign,
+  onBulkAssign,
 }) {
   const totalItems =
     shipments?.reduce((sum, p) => sum + (p.totalItems || 0), 0) || 0;
@@ -20,9 +21,21 @@ export default function TripManifestTable({
         <h3 className="font-bold text-slate-400 text-sm uppercase">
           Cargo Manifest
         </h3>
-        <span className="bg-slate-800 text-slate-300 px-2 py-1 rounded text-xs font-mono">
-          Shipments Count: {totalItems}
-        </span>
+        <div className="flex items-center gap-3">
+          <span className="bg-slate-800 text-slate-300 px-2 py-1 rounded text-xs font-mono">
+            Count: {totalItems}
+          </span>
+
+          {/* THE NEW BUTTON */}
+          <button
+            onClick={onBulkAssign}
+            disabled={isLocked}
+            className="bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold px-3 py-1.5 rounded flex items-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-blue-900/20"
+          >
+            <FontAwesomeIcon icon={faPlus} />
+            Add Shipments
+          </button>
+        </div>
       </div>
 
       <div className="overflow-x-auto">
@@ -69,7 +82,7 @@ export default function TripManifestTable({
                   </td>
                   <td className="p-3">
                     <div>
-                      Load: {p.loadedCount}/{p.totalItems}
+                      Loaded: {p.loadedCount}/{p.totalItems}
                     </div>
                     {p.pendingCount > 0 && (
                       <div className="text-red-400 font-bold">

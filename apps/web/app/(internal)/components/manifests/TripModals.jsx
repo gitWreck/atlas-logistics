@@ -4,6 +4,7 @@ import SplitShipmentModal from "./modals/SplitShipmentModal";
 import AssignDriverModal from "./modals/AssignDriverModal";
 import UnassignShipmentModal from "./modals/UnassignShipmentModal";
 import OutcomeModal from "./modals/OutcomeModal";
+import BulkAssignmentModal from "./modals/BulkAssignmentModal";
 
 export default function TripModals({
   state, // Pass the whole state object or destructure
@@ -52,6 +53,15 @@ export default function TripModals({
         type={state.outcome?.type}
         title={state.outcome?.title}
         message={state.outcome?.message}
+      />
+      <BulkAssignmentModal
+        isOpen={state.isBulkModalOpen}
+        trip={trip}
+        onClose={() => actions.setBulkModalOpen(false)}
+        onSuccess={() => {
+          actions.setBulkModalOpen(false);
+          actions.handleRefresh(); // This refreshes the table & sidebar
+        }}
       />
     </>
   );

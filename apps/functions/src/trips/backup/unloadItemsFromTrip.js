@@ -2,7 +2,7 @@
 
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const admin = require("firebase-admin");
-const { writeAuditLog } = require("../../_shared");
+const { writeAuditLog } = require("../../../_shared");
 
 if (!admin.apps.length) admin.initializeApp();
 const db = admin.firestore();
@@ -29,7 +29,7 @@ function requirePosInt(v, field) {
   if (!Number.isInteger(n) || n <= 0) {
     throw new HttpsError(
       "invalid-argument",
-      `${field} must be a positive integer`
+      `${field} must be a positive integer`,
     );
   }
   return n;
@@ -67,7 +67,7 @@ async function transition(tx, args) {
   if (!transitionInternal) {
     throw new HttpsError(
       "failed-precondition",
-      "transitionPackageStatusInternal not exported"
+      "transitionPackageStatusInternal not exported",
     );
   }
   return transitionInternal(tx, args);
@@ -99,7 +99,7 @@ exports.unloadItemsFromTrip = onCall(
       if (role === "manager" && !reason) {
         throw new HttpsError(
           "invalid-argument",
-          "Unload reason required for managers"
+          "Unload reason required for managers",
         );
       }
 
@@ -127,7 +127,7 @@ exports.unloadItemsFromTrip = onCall(
       if (loaded <= 0) {
         throw new HttpsError(
           "failed-precondition",
-          "No loaded items available to unload"
+          "No loaded items available to unload",
         );
       }
 
@@ -199,5 +199,5 @@ exports.unloadItemsFromTrip = onCall(
         pendingAfter: newPending,
       };
     });
-  }
+  },
 );

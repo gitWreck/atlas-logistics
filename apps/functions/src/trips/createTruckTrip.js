@@ -37,12 +37,8 @@ exports.createTruckTrip = onCall(
     }
 
     // Required route
-    const originCode = shortCode(
-      cleanCode(requireString(req.data?.origin, "origin"))
-    );
-    const destinationCode = shortCode(
-      cleanCode(requireString(req.data?.destination, "destination"))
-    );
+    const originCode = req.data?.originCode;
+    const destinationCode = req.data?.destinationCode;
 
     // Optional fields
     const truckPlateNumber = optionalString(req.data?.truckPlateNumber);
@@ -68,7 +64,7 @@ exports.createTruckTrip = onCall(
 
       // Human ID you can show in UI
       const tripId = `TRIP-${today}-${originCode}-${destinationCode}-${pad4(
-        next
+        next,
       )}`;
 
       // 3. NEW LOCATION: Set the Document ID to match tripId
@@ -83,7 +79,9 @@ exports.createTruckTrip = onCall(
       const tripData = {
         // identity
         tripId,
+        origin: req.data?.originCity,
         originCode,
+        destination: req.data?.destinationCity,
         destinationCode,
         route: originCode + " -> " + destinationCode || null,
 
@@ -99,11 +97,11 @@ exports.createTruckTrip = onCall(
         active: true,
 
         // counters used by your load/unload pipeline
-        lastSequence: 0, // used by createShipmentWithSequence
+        // lastSequence: 0, // used by createShipmentWithSequence
         totalLoaded: 0, // aggregate across packages (optional)
         totalPackages: 0, // optional (you can maintain in functions)
-        totalItemsPlanned: 0, // optional
-        totalItemsLoaded: 0, // optional
+        totalItems: 0, // optional
+        // totalItemsLoaded: 0, // optional
 
         // delay system (optional)
         delayReason: null,
@@ -117,9 +115,9 @@ exports.createTruckTrip = onCall(
         createdRole: role,
 
         // last update (mutable but server-set)
-        lastUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
-        lastUpdatedBy: req.auth.uid,
-        lastUpdatedRole: role,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        updatedBy: req.auth.uid,
+        updatedRole: role,
       };
 
       tx.set(tripRef, tripData);
@@ -132,7 +130,7 @@ exports.createTruckTrip = onCall(
           updatedAt: admin.firestore.FieldValue.serverTimestamp(),
           updatedBy: req.auth.uid,
         },
-        { merge: true }
+        { merge: true },
       );
 
       // Admin audit log (append-only collection; rules allow read admin only)
@@ -163,5 +161,5 @@ exports.createTruckTrip = onCall(
         sequence: next,
       };
     });
-  }
+  },
 );

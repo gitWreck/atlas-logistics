@@ -23,12 +23,14 @@ export default function TripWorkspace({
   const [isDriverModalOpen, setDriverModalOpen] = useState(false);
   const [isDisableModalOpen, setDisableModalOpen] = useState(false);
   const [shipmentToUnassign, setShipmentToUnassign] = useState(null);
+  const [isBulkModalOpen, setBulkModalOpen] = useState(false);
 
   useEffect(() => {
     setTrip(initialTripData);
     if (tripId) fetchShipments();
   }, [tripId, initialTripData]);
 
+  console.log("manifest shipment: ", shipments);
   // --- DATA FETCHING ---
   const fetchShipments = async () => {
     if (!tripId) return;
@@ -45,6 +47,9 @@ export default function TripWorkspace({
       });
       const data = await res.json();
       setShipments(data.shipments || []);
+
+      // console.log("Total Loaded:", data.stats.totalLoaded);
+      // console.log("Total Pending:", data.stats.totalPending);
     } catch (e) {
       console.error(e);
     } finally {
@@ -85,6 +90,7 @@ export default function TripWorkspace({
           setSplitModalOpen(true);
         }}
         onUnassign={(s) => setShipmentToUnassign(s)}
+        onBulkAssign={() => setBulkModalOpen(true)}
       />
 
       {/* 3. Operations (COMPLETELY SELF-CONTAINED NOW) */}
@@ -103,12 +109,14 @@ export default function TripWorkspace({
           isDriverModalOpen,
           isDisableModalOpen,
           shipmentToUnassign,
+          isBulkModalOpen,
         }}
         actions={{
           setSplitModalOpen,
           setDriverModalOpen,
           setDisableModalOpen,
           setShipmentToUnassign,
+          setBulkModalOpen,
           handleRefresh,
           fetchShipments,
           onRefreshTrips,

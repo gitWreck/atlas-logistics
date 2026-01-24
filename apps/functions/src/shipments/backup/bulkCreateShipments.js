@@ -15,7 +15,7 @@
 const admin = require("firebase-admin");
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const crypto = require("crypto");
-const { assertAdminOrManager, nowTs } = require("../../_shared");
+const { assertAdminOrManager, nowTs } = require("../../../_shared");
 
 if (!admin.apps.length) admin.initializeApp();
 const db = admin.firestore();
