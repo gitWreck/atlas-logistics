@@ -127,6 +127,7 @@ export default function ScannerScreen() {
       </TouchableOpacity>
 
       {/* 3. THE MANUAL INPUT POPUP (Modal) */}
+      {/* 3. THE MANUAL INPUT POPUP (Modal) */}
       <Modal
         animationType="slide"
         transparent={true}
@@ -146,26 +147,33 @@ export default function ScannerScreen() {
             <TextInput
               style={styles.input}
               placeholder="AT-2026..."
+              placeholderTextColor="#94a3b8"
               value={manualCode}
               onChangeText={setManualCode}
               autoCapitalize="characters"
               autoCorrect={false}
             />
 
+            {/* ACTION BUTTONS: Row Layout */}
             <View style={styles.modalActions}>
-              <AtlasButton
-                title="CANCEL"
-                style={{ backgroundColor: "#ef4444", flex: 1, marginRight: 10 }}
+              {/* Cancel Button */}
+              <TouchableOpacity
+                style={[styles.actionBtn, styles.cancelBtn]}
                 onPress={() => setShowManual(false)}
-              />
-              <AtlasButton
-                title="SUBMIT"
-                style={{ flex: 1 }}
+              >
+                <Text style={styles.cancelText}>CANCEL</Text>
+              </TouchableOpacity>
+
+              {/* Submit Button */}
+              <TouchableOpacity
+                style={[styles.actionBtn, styles.submitBtn]}
                 onPress={() => {
-                  setShowManual(false); // Close modal
-                  processPackage(manualCode); // 🚀 Call the same logic!
+                  setShowManual(false);
+                  processPackage(manualCode);
                 }}
-              />
+              >
+                <Text style={styles.submitText}>SUBMIT</Text>
+              </TouchableOpacity>
             </View>
           </View>
         </KeyboardAvoidingView>
@@ -226,32 +234,74 @@ const styles = StyleSheet.create({
     marginLeft: 10,
   },
   modalOverlay: {
-    flex: 1,
-    justifyContent: "flex-end", // Aligns to bottom like a sheet
+    flex: 1, // Takes up full screen height
+    justifyContent: "flex-end", // 👈 Pushes everything to the BOTTOM
     backgroundColor: "rgba(0,0,0,0.5)",
   },
+
   modalContent: {
     backgroundColor: "white",
     padding: 24,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
+    width: "100%",
+
+    // Optional: Add safe area padding for iPhone Home Indicator
+    paddingBottom: 40,
   },
   modalTitle: {
     fontSize: 20,
-    fontWeight: "bold",
-    marginBottom: 8,
+    fontWeight: "800",
+    color: "#0f172a",
+    marginBottom: 4,
+    textAlign: "center",
+  },
+  modalSubtitle: {
+    color: "#64748b",
+    fontSize: 14,
+    textAlign: "center",
+    marginBottom: 20,
   },
   input: {
+    backgroundColor: "#f1f5f9",
     borderWidth: 1,
     borderColor: "#e2e8f0",
     borderRadius: 12,
     padding: 16,
     fontSize: 18,
-    marginVertical: 20,
-    backgroundColor: "#f8fafc",
+    fontWeight: "600",
+    color: "#0f172a",
+    textAlign: "center",
+    marginBottom: 24,
   },
+
+  // 🛠️ KEY LAYOUT FIXES START HERE
   modalActions: {
-    flexDirection: "row",
-    justifyContent: "space-between",
+    flexDirection: "row", // Put them side by side
+    gap: 12, // Space between them
+    width: "100%",
+  },
+  actionBtn: {
+    flex: 1, // 👈 This makes them stretch to fill the row
+    height: 50,
+    borderRadius: 12,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  cancelBtn: {
+    backgroundColor: "#fff",
+    borderWidth: 1,
+    borderColor: "#cbd5e1",
+  },
+  submitBtn: {
+    backgroundColor: "#3b82f6", // Atlas Blue
+  },
+  cancelText: {
+    fontWeight: "700",
+    color: "#64748b",
+  },
+  submitText: {
+    fontWeight: "700",
+    color: "#fff",
   },
 });

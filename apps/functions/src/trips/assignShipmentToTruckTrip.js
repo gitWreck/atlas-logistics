@@ -124,6 +124,7 @@ exports.assignShipmentToTruckTrip = onCall(
           {
             status: "ASSIGNED",
             at: admin.firestore.Timestamp.now(),
+            note: `Assigned to trip ${truckTripId}`,
           },
         ],
 

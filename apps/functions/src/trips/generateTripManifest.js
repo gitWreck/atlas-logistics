@@ -50,7 +50,7 @@ exports.generateTripManifest = onCall(
       null;
 
     const tripRef = db.collection("truck_trips").doc(tripDocId);
-    const pkgsRef = tripRef.collection("trip_shipments");
+    const shipRef = tripRef.collection("trip_shipments");
 
     return db.runTransaction(async (tx) => {
       const tripSnap = await tx.get(tripRef);
@@ -79,8 +79,8 @@ exports.generateTripManifest = onCall(
       }
 
       // Read all trip packages
-      const pkgsSnap = await tx.get(pkgsRef);
-      if (pkgsSnap.empty) {
+      const shipSnap = await tx.get(shipRef);
+      if (shipSnap.empty) {
         throw new HttpsError(
           "failed-precondition",
           "Trip has no packages. Nothing to manifest.",
@@ -94,7 +94,7 @@ exports.generateTripManifest = onCall(
       let totalPackages = 0;
       let totalItems = 0;
 
-      pkgsSnap.forEach((doc) => {
+      shipSnap.forEach((doc) => {
         const p = doc.data() || {};
         totalPackages += 1;
 
@@ -106,6 +106,9 @@ exports.generateTripManifest = onCall(
 
         const hasPending = typeof p.pendingCount === "number";
         const pendingCount = hasPending ? Number(p.pendingCount || 0) : null;
+
+        const status = p.status || "ASSIGNED"; // e.g. "LOADED"
+        const deliveredCount = Number(p.deliveredCount || 0);
 
         // Black-box requirement: pendingCount must exist
         if (!hasPending) {
@@ -147,6 +150,15 @@ exports.generateTripManifest = onCall(
           totalItems += Math.max(0, loadedCount);
         }
 
+        if (loadedCount >= packageCount && status !== "LOADED") {
+          // Log a warning or block it, depending on how strict you want to be.
+          blockers.push({
+            reason: "STATUS_MISMATCH",
+            expected: "LOADED",
+            actual: status,
+          });
+        }
+
         items.push({
           trackingDocId,
           trackingNumber,
@@ -161,13 +173,16 @@ exports.generateTripManifest = onCall(
           loadedCount,
           pendingCount,
 
+          deliveredCount, // Should be 0, but good for schema consistency
+          status, // "LOADED" - Proof that the system marked it ready
+
           // optional metadata if present
           packageType: p.packageType || null,
           weightKg: typeof p.weightKg === "number" ? p.weightKg : null,
 
-          loadedAt: p.lastUpdatedAt || null,
-          loadedBy: p.lastUpdatedBy || null,
-          loadedRole: p.lastUpdatedRole || null,
+          loadedAt: p.updatedAt || null,
+          loadedBy: p.updatedBy || null,
+          loadedRole: p.updatedRole || null,
         });
       });
 
@@ -211,6 +226,7 @@ exports.generateTripManifest = onCall(
         totals: {
           totalPackages,
           totalItems,
+          totalLoaded: totalItems,
         },
 
         items, // ledger list
@@ -220,7 +236,7 @@ exports.generateTripManifest = onCall(
 
       // Firestore write targets
       const manifestRef = db.collection("manifests").doc(manifestId);
-      const manifestEventRef = pkgsRef.parent
+      const manifestEventRef = shipRef.parent
         .collection("manifest_events")
         .doc(); // truck_trips/{trip}/manifest_events
       const adminLogRef = db.collection("admin_logs").doc();
