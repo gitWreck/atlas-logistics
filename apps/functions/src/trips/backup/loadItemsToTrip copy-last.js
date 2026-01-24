@@ -2,7 +2,7 @@
 
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const admin = require("firebase-admin");
-const { writeAuditLog } = require("../../_shared");
+const { writeAuditLog } = require("../../../_shared");
 
 if (!admin.apps.length) admin.initializeApp();
 const db = admin.firestore();
@@ -50,7 +50,7 @@ async function assertAdminOrManager(tx, uid) {
 let transitionInternal;
 try {
   transitionInternal =
-    require("../shipments/transitionPackageStatus").transitionPackageStatusInternal;
+    require("../../shipments/transitionPackageStatus").transitionPackageStatusInternal;
 } catch (e) {
   transitionInternal = null;
 }

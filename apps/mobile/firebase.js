@@ -40,4 +40,4 @@ try {
 // 3. Initialize Firestore
 const db = getFirestore(app);
 
-export { auth, db };
+export { auth, db, app };

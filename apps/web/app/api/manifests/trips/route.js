@@ -49,9 +49,9 @@ export async function GET(request) {
         updatedAt: data.updatedAt?.toDate
           ? data.updatedAt.toDate().toISOString()
           : null,
-        lastUpdatedAt: data.lastUpdatedAt?.toDate
-          ? data.lastUpdatedAt.toDate().toISOString()
-          : null,
+        // lastUpdatedAt: data.lastUpdatedAt?.toDate
+        //   ? data.lastUpdatedAt.toDate().toISOString()
+        //   : null,
 
         // Ensure numbers are safe (optional)
         packageTotal: data.packageTotal || 0,

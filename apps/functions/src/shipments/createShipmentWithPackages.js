@@ -15,17 +15,22 @@ exports.createShipmentWithPackages = onCall(
       throw new HttpsError("unauthenticated", "Login required.");
     }
 
-    const { sender, recipient, origin, destination, items, remarks } =
-      request.data;
+    const {
+      sender,
+      recipient,
+      origin,
+      destination,
+      originCode, // NEW
+      destinationCode, // NEW
+      items,
+      remarks,
+    } = request.data;
 
     // --- VALIDATION ---
-    if (!origin || typeof origin !== "string") {
-      throw new HttpsError("invalid-argument", "Missing or invalid 'origin'.");
-    }
-    if (!destination || typeof destination !== "string") {
+    if (!origin || !destination) {
       throw new HttpsError(
         "invalid-argument",
-        "Missing or invalid 'destination'.",
+        "Missing origin or destination.",
       );
     }
     if (!items || !Array.isArray(items) || items.length === 0) {
@@ -34,6 +39,21 @@ exports.createShipmentWithPackages = onCall(
         "Items array is empty or invalid.",
       );
     }
+
+    const originSummary = `${sender.details.city}, ${sender.details.province}`;
+    const destinationSummary = `${recipient.details.city}, ${recipient.details.province}`;
+
+    // Fallback: If frontend didn't send codes (legacy calls), default to 'GEN' (General)
+    const finalOriginCode = originCode || "GEN";
+    const finalDestCode = destinationCode || "GEN";
+
+    if (!items || !Array.isArray(items) || items.length === 0) {
+      throw new HttpsError(
+        "invalid-argument",
+        "Items array is empty or invalid.",
+      );
+    }
+
     // Safety Limit: Arrays work great up to ~500-1000 items.
     // 200 is extremely safe (document size will be small).
     if (items.length > 200) {
@@ -49,8 +69,6 @@ exports.createShipmentWithPackages = onCall(
     // 2. Generate IDs
     const timestamp = new Date();
     const dateStr = timestamp.toISOString().slice(0, 10).replace(/-/g, "");
-    const originCode = shortCode(origin.toUpperCase());
-    const destinationCode = shortCode(destination.toUpperCase());
 
     // Example: AT-20231027-MNL-CEB-123456
     const shipmentId = `AT-${dateStr}-${originCode}-${destinationCode}-${Date.now().toString().slice(-6)}`;
@@ -71,13 +89,26 @@ exports.createShipmentWithPackages = onCall(
       const pkgObj = {
         trackingNumber: pkgId, // The Barcode
         sequence: index + 1,
+
+        // Physical Props
+        description: item.description || "Standard Package",
         weight: Number(item.weight) || 0,
-        description: item.description || "Standard Box",
+        packagingType: item.packagingType || "Box", // NEW
+
+        // Dimensions (Optional, save if present)
+        length: item.length || "",
+        width: item.width || "",
+        height: item.height || "",
+
+        // Liability & Handling (NEW)
+        declaredValue: Number(item.declaredValue) || 0,
+        isFragile: Boolean(item.isFragile),
+        isPerishable: Boolean(item.isPerishable),
 
         status: "RECEIVED", // Initial Status
 
         // Tracking location
-        currentLocation: origin,
+        currentLocation: originSummary,
         loadedOnTrip: null, // Will be filled when scanned onto truck
         loadedAt: null,
 
@@ -94,12 +125,40 @@ exports.createShipmentWithPackages = onCall(
       trackingNumber: shipmentId,
       currentTruckTripId: null,
 
-      sender,
-      recipient,
-      origin,
-      originCode,
-      destination,
-      destinationCode,
+      sender: {
+        name: sender.name,
+        phone: sender.phone,
+        // Explicit Address Details (Map)
+        address: {
+          unit: sender.details.unit || "",
+          street: sender.details.street || "",
+          barangay: sender.details.barangay || "",
+          city: sender.details.city,
+          province: sender.details.province,
+        },
+        // Helper string for printing labels easily
+        formattedAddress: `${sender.details.unit} ${sender.details.street}, ${sender.details.barangay}, ${sender.details.city}, ${sender.details.province}`,
+      },
+
+      recipient: {
+        name: recipient.name,
+        phone: recipient.phone,
+        // Explicit Address Details (Map)
+        address: {
+          unit: recipient.details.unit || "",
+          street: recipient.details.street || "",
+          barangay: recipient.details.barangay || "",
+          city: recipient.details.city,
+          province: recipient.details.province,
+        },
+        formattedAddress: `${recipient.details.unit} ${recipient.details.street}, ${recipient.details.barangay}, ${recipient.details.city}, ${recipient.details.province}`,
+      },
+
+      origin: sender.details.city,
+      originCode: finalOriginCode, // Save the code explicitly
+
+      destination: recipient.details.city,
+      destinationCode: finalDestCode,
 
       createdAt: nowAt,
       createdBy: request.auth.uid,
@@ -116,11 +175,11 @@ exports.createShipmentWithPackages = onCall(
 
       // AGGREGATES
       totals: {
-        totalItems: items.length,
-        delivered: 0,
-        loaded: 0, // Starts at 0
+        // totalItems: items.length,
         received: items.length, // Starts fully received
         pending: items.length, // All items pending loading
+        loaded: 0, // Starts at 0
+        delivered: 0,
       },
 
       remarks: remarks || null,
@@ -137,8 +196,8 @@ exports.createShipmentWithPackages = onCall(
       trackingDocId: shipmentRef.id,
       trackingNumber: shipmentId,
       totalItems: items.length,
-      origin,
-      destination,
+      originCode: finalOriginCode,
+      destinationCode: finalDestCode,
       actorId: request.auth.uid,
       createdAt: nowAt,
     });

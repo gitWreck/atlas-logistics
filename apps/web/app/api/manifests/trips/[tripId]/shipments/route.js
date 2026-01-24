@@ -54,8 +54,8 @@ export async function GET(request, { params }) {
         createdAt: data.createdAt?.toDate
           ? data.createdAt.toDate().toISOString()
           : null,
-        lastUpdatedAt: data.lastUpdatedAt?.toDate
-          ? data.lastUpdatedAt.toDate().toISOString()
+        updatedAt: data.updatedAt?.toDate
+          ? data.updatedAt.toDate().toISOString()
           : null,
       };
     });

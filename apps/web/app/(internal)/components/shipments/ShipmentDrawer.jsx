@@ -9,6 +9,7 @@ import {
   faPaperPlane,
   faPrint,
   faCheckCircle,
+  faQrcode,
 } from "@fortawesome/free-solid-svg-icons";
 import StatusBadge from "../ui/StatusBadge";
 
@@ -30,27 +31,11 @@ export default function ShipmentDrawer({ isOpen, onClose, data }) {
       setMessageBody(
         `Hello ${data?.recipient?.name || "Customer"}, regarding order ${
           data?.trackingNumber
-        }...`
+        }...`,
       );
-      fetchPackages();
     }
+    console.log("shipment data: ", data);
   }, [isOpen, data]);
-
-  const fetchPackages = async () => {
-    if (!data?.trackingNumber) return;
-    setLoadingPackages(true);
-    try {
-      const res = await fetch(
-        `/api/shipments/packages?shipmentId=${data.trackingNumber}`
-      );
-      const result = await res.json();
-      setPackages(result.packages || []);
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setLoadingPackages(false);
-    }
-  };
 
   const handleSendMessage = () => {
     // Integration logic here
@@ -58,6 +43,69 @@ export default function ShipmentDrawer({ isOpen, onClose, data }) {
   };
 
   if (!data) return null;
+
+  function PackageRow({ pkg, idx }) {
+    const [showQR, setShowQR] = useState(false);
+
+    return (
+      <div className="bg-slate-800/40 border border-slate-700 p-3 rounded-lg flex flex-col gap-3">
+        {/* TOP ROW: INFO */}
+        <div className="flex justify-between items-center">
+          <div className="flex gap-3 items-center">
+            {/* SEQUENCE BADGE */}
+            <div className="h-8 w-8 bg-slate-900 rounded flex items-center justify-center text-xs font-mono font-bold text-slate-500 border border-slate-700">
+              {pkg.sequence || idx + 1}
+            </div>
+
+            {/* TEXT DETAILS */}
+            <div>
+              <div className="text-slate-200 text-sm font-medium">
+                {pkg.description}
+              </div>
+              <div className="text-xs text-slate-500 font-mono">
+                {pkg.trackingNumber}
+              </div>
+            </div>
+          </div>
+
+          {/* ACTIONS & STATUS */}
+          <div className="flex items-center gap-3">
+            {/* QR TOGGLE BUTTON */}
+            <button
+              onClick={() => setShowQR(!showQR)}
+              className={`h-8 w-8 rounded flex items-center justify-center transition-all ${
+                showQR
+                  ? "bg-white text-black"
+                  : "bg-slate-700 text-slate-400 hover:bg-slate-600 hover:text-white"
+              }`}
+              title="Show QR Code"
+            >
+              <FontAwesomeIcon icon={faQrcode} />
+            </button>
+
+            <StatusBadge status={pkg.status} size="xs" />
+          </div>
+        </div>
+
+        {/* QR CODE REVEAL (CONDITIONAL) */}
+        {showQR && (
+          <div className="p-4 bg-white rounded-lg flex flex-col items-center justify-center animate-in zoom-in duration-200">
+            <QRCode
+              value={pkg.trackingNumber} // <--- THE PAYLOAD
+              size={128}
+              level="M"
+            />
+            <div className="mt-2 text-[10px] font-mono font-bold text-black tracking-widest">
+              {pkg.trackingNumber}
+            </div>
+            <div className="text-[9px] text-gray-500 uppercase mt-1">
+              Scan to Load Package
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
 
   return (
     <>
@@ -110,7 +158,7 @@ export default function ShipmentDrawer({ isOpen, onClose, data }) {
             isActive={activeTab === "ITEMS"}
             onClick={() => setActiveTab("ITEMS")}
             icon={faBoxOpen}
-            label={`Items (${packages.length})`}
+            label={`Items (${data.packages.length})`}
           />
           <TabButton
             isActive={activeTab === "TOOLS"}
@@ -137,7 +185,7 @@ export default function ShipmentDrawer({ isOpen, onClose, data }) {
                 {/* Timeline Visual */}
                 <div>
                   <h3 className="text-xs font-bold text-slate-500 uppercase mb-4 pl-1">
-                    Progress
+                    Status Flow
                   </h3>
                   <div className="space-y-0 relative pl-4 border-l-2 border-slate-800 ml-2">
                     {[
@@ -210,29 +258,17 @@ export default function ShipmentDrawer({ isOpen, onClose, data }) {
           {/* --- TAB 2: ITEMS --- */}
           {activeTab === "ITEMS" && (
             <div className="space-y-3 animate-in fade-in slide-in-from-right-4 duration-300">
-              {packages.map((pkg, idx) => (
-                <div
-                  key={idx}
-                  className="bg-slate-800/40 border border-slate-700 p-3 rounded-lg flex justify-between items-center"
-                >
-                  <div className="flex gap-3 items-center">
-                    <div className="h-8 w-8 bg-slate-900 rounded flex items-center justify-center text-xs font-mono font-bold text-slate-500 border border-slate-700">
-                      {pkg.sequence || idx + 1}
-                    </div>
-                    <div>
-                      {/* <div className="text-slate-200 text-sm font-medium">
-                        {pkg.description}
-                      </div> */}
-                      <div className="text-slate-200 text-sm font-medium">
-                        {pkg.description}
-                      </div>
-                      <div className="text-xs text-slate-500 font-mono">
-                        {pkg.trackingNumber}
-                      </div>
-                    </div>
-                  </div>
-                  <StatusBadge status={pkg.status} size="xs" />
-                </div>
+              <button
+                onClick={() =>
+                  window.open(`../print/labels?id=${data.id}`, "_blank")
+                }
+                className="flex items-center gap-2 bg-slate-700 hover:bg-slate-600 text-white px-4 py-2 rounded-lg transition-colors text-sm font-bold"
+              >
+                <FontAwesomeIcon icon={faPrint} />
+                <span>Print {data.packages?.length} Labels</span>
+              </button>
+              {data.packages.map((pkg, idx) => (
+                <PackageRow key={idx} pkg={pkg} idx={idx} />
               ))}
             </div>
           )}
@@ -240,29 +276,6 @@ export default function ShipmentDrawer({ isOpen, onClose, data }) {
           {/* --- TAB 3: TOOLS (EMBEDDED QR & MESSAGE) --- */}
           {activeTab === "TOOLS" && (
             <div className="space-y-8 animate-in zoom-in-95 duration-200">
-              {/* SECTION A: MASTER QR CODE */}
-              <div className="bg-slate-800/40 border border-slate-700 rounded-xl p-5 text-center">
-                <h3 className="text-sm font-bold text-slate-300 mb-4 flex items-center justify-center gap-2">
-                  <FontAwesomeIcon icon={faPrint} className="text-blue-500" />
-                  Master Label (Shipment)
-                </h3>
-
-                {/* The Embedded QR */}
-                <div className="bg-white p-4 rounded-lg inline-block shadow-lg mx-auto">
-                  <QRCode
-                    value={data.trackingNumber}
-                    size={150}
-                    fgColor="#0f172a"
-                  />
-                </div>
-
-                <div className="mt-4 flex justify-center">
-                  <button className="text-xs font-bold text-blue-400 hover:text-blue-300 border border-blue-500/30 bg-blue-500/10 px-4 py-2 rounded-full transition-colors">
-                    Print this Label
-                  </button>
-                </div>
-              </div>
-
               {/* SECTION B: MESSAGING */}
               <div className="bg-slate-800/40 border border-slate-700 rounded-xl p-5">
                 <h3 className="text-sm font-bold text-slate-300 mb-3 flex items-center gap-2">

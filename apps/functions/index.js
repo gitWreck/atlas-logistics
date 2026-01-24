@@ -34,6 +34,7 @@ exports.toggleUserStatus = require("./src/users/toggleUserStatus");
 exports.createPackage = require("./src/packages/createPackage").createPackage;
 exports.createShipmentWithPackages =
   require("./src/shipments/createShipmentWithPackages").createShipmentWithPackages;
+exports.scanPackages = require("./src/packages/scanPackages").scanPackages;
 
 // ------------------------------------------
 // Trips
@@ -44,29 +45,34 @@ exports.assignShipmentToTruckTrip =
 exports.unassignShipmentFromTruckTrip =
   require("./src/trips/unassignShipmentFromTruckTrip").unassignShipmentFromTruckTrip;
 
-exports.loadItemsToTrip =
-  require("./src/trips/loadItemsToTrip").loadItemsToTrip;
-exports.unloadItemsFromTrip =
-  require("./src/trips/unloadItemsFromTrip").unloadItemsFromTrip;
+// exports.loadItemsToTrip =
+//   require("./src/trips/loadItemsToTrip").loadItemsToTrip;
+// exports.unloadItemsFromTrip =
+//   require("./src/trips/unloadItemsFromTrip").unloadItemsFromTrip;
 
 exports.setTruckDelay = require("./src/trips/setTruckDelay").setTruckDelay;
 exports.clearTruckDelay =
   require("./src/trips/clearTruckDelay").clearTruckDelay;
-
 exports.assignDriverToTruckTrip =
   require("./src/trips/assignDriverToTruckTrip").assignDriverToTruckTrip;
 exports.unassignDriverFromTruckTrip =
   require("./src/trips/unassignDriverFromTruckTrip").unassignDriverFromTruckTrip;
 exports.setTruckAutoSmsSettings =
-  require("./src/trips/setTruckAutoSmsSettings").setTruckAutoSmsSettings;
+  require("./src/messaging/setTruckAutoSmsSettings").setTruckAutoSmsSettings;
 
 exports.disableTruckTrip =
   require("./src/trips/disableTruckTrip").disableTruckTrip;
 exports.completeTrip = require("./src/trips/completeTrip").completeTrip;
 
 // Shipments
-exports.getListShipments =
-  require("./src/shipments/getListShipments").getListShipments;
+exports.bulkAssignShipments =
+  require("./src/shipments/bulkAssignShipments").bulkAssignShipments;
+
+// -------------------------------
+
+// Shipments
+// exports.getListShipments =
+//   require("./src/shipments/getListShipments").getListShipments;
 exports.createShipmentWithSequence =
   require("./src/shipments/backup/createShipmentWithSequence-orig").createShipmentWithSequence;
 exports.archiveShipment =
@@ -75,8 +81,8 @@ exports.appendStatusEvent =
   require("./src/shipments/appendStatusEvent").appendStatusEvent;
 exports.syncShipmentItems =
   require("./src/shipments/syncShipmentItems").syncShipmentItems;
-exports.bulkCreateShipments =
-  require("./src/shipments/bulkCreateShipments").bulkCreateShipments;
+// exports.bulkCreateShipments =
+//   require("./src/shipments/bulkCreateShipments").bulkCreateShipments;
 exports.recordPartial = require("./src/shipments/recordPartial").recordPartial;
 exports.recordPartialDelivery =
   require("./src/shipments/recordPartialDelivery").recordPartialDelivery;
@@ -128,7 +134,7 @@ exports.revokeInvite = require("./src/system/invitations").revokeInvite;
 
 // Migration
 exports.migrateTripsToTopLevel = onRequest(
-  require("./src/system/migrateTripsToTopLevel")
+  require("./src/system/migrateTripsToTopLevel"),
 );
 
 // ------------------------------------------------------------
@@ -155,7 +161,7 @@ exports.autoSyncPublicOnPackageChange = onDocumentWritten(
   async () => {
     console.log("📡 Package changed — syncing public tracking");
     // await syncTrackingPublicCore();
-  }
+  },
 );
 
 exports.autoSyncPublicOnTrackingChange = onDocumentWritten(
@@ -163,7 +169,7 @@ exports.autoSyncPublicOnTrackingChange = onDocumentWritten(
   async () => {
     console.log("📡 Tracking changed — syncing public tracking");
     // await syncTrackingPublicCore();
-  }
+  },
 );
 
 exports.syncTripProgressFromPackages = onDocumentUpdated(
@@ -185,7 +191,7 @@ exports.syncTripProgressFromPackages = onDocumentUpdated(
     const total = packagesSnap.size;
     const delivered = packagesSnap.docs.reduce(
       (acc, d) => acc + (d.data()?.status === "DELIVERED" ? 1 : 0),
-      0
+      0,
     );
     const progress = total === 0 ? 0 : delivered / total;
 
@@ -196,9 +202,9 @@ exports.syncTripProgressFromPackages = onDocumentUpdated(
         deliveryProgress: progress,
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       },
-      { merge: true }
+      { merge: true },
     );
-  }
+  },
 );
 
 exports.syncTripToTracking = onDocumentUpdated(
@@ -220,5 +226,5 @@ exports.syncTripToTracking = onDocumentUpdated(
     }
 
     await trackingRef.set(update, { merge: true });
-  }
+  },
 );

@@ -11,18 +11,19 @@
   },
   "dependencies": {
     "@atlas/shared": "*",
+    "@expo/vector-icons": "^14.0.0",
+    "@react-native-async-storage/async-storage": "1.23.1",
     "expo": "~52.0.0",
-    "expo-router": "~4.0.0",
+    "expo-camera": "~16.0.18",
     "expo-constants": "~17.0.3",
     "expo-linking": "~7.0.0",
+    "expo-router": "~4.0.0",
     "expo-status-bar": "~2.0.0",
+    "firebase": "^12.7.0",
     "react": "18.3.1",
     "react-native": "0.76.6",
     "react-native-safe-area-context": "4.12.0",
-    "react-native-screens": "~4.4.0",
-    "@expo/vector-icons": "^14.0.0",
-    "@react-native-async-storage/async-storage": "1.23.1",
-    "firebase": "^12.7.0"
+    "react-native-screens": "~4.4.0"
   },
   "private": true
 }

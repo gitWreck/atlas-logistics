@@ -21,10 +21,22 @@ export function calculateProgress(status) {
   }
 }
 
-export function formatFirestoreDate(timestamp) {
-  if (!timestamp?._seconds) return "";
+export function formatFirestoreDate(value) {
+  if (!value) return "";
 
-  return new Date(timestamp._seconds * 1000).toLocaleString("en-US", {
+  let date;
+
+  // Firestore Timestamp
+  if (value._seconds) {
+    date = new Date(value._seconds * 1000);
+  }
+  // ISO string or Date
+  else {
+    date = new Date(value);
+    if (isNaN(date.getTime())) return "";
+  }
+
+  return date.toLocaleString("en-US", {
     month: "short",
     day: "numeric",
     hour: "2-digit",

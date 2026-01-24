@@ -44,6 +44,10 @@ export const generateTripManifest = httpsCallable(
   functions,
   "generateTripManifest",
 );
+export const bulkAssignShipments = httpsCallable(
+  functions,
+  "bulkAssignShipments",
+);
 
 // ----------------------------
 

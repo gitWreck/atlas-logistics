@@ -118,7 +118,8 @@ export default function TripHeader({
                 generateTripManifest({
                   tripDocId: trip?.tripId, // Ensure correct ID field
                 }),
-              () => onRefresh && onRefresh(), // Refresh parent on success
+              // () => onRefresh && onRefresh(), // Refresh parent on success
+              () => onAction && onAction(), // Refresh parent on success
             )
           }
         />
