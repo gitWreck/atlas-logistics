@@ -4,3 +4,4 @@ import { app } from "../../firebase";
 const functions = getFunctions(app, "asia-southeast1");
 
 export const scanPackages = httpsCallable(functions, "scanPackages");
+export const reportTripDelay = httpsCallable(functions, "reportTripDelay");

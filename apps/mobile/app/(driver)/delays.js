@@ -13,16 +13,9 @@ import {
 } from "react-native";
 import { useRouter } from "expo-router";
 import { FontAwesome5 } from "@expo/vector-icons";
-import {
-  collection,
-  addDoc,
-  query,
-  where,
-  getDocs,
-  limit,
-  serverTimestamp,
-} from "firebase/firestore";
+import { collection, query, where, getDocs, limit } from "firebase/firestore";
 import { db, auth } from "../../firebase";
+import { reportTripDelay } from "../../components/utilities/FirebaseFunctions";
 
 const DELAY_TYPES = [
   {
@@ -62,7 +55,7 @@ export default function ReportDelayScreen() {
         const q = query(
           collection(db, "truck_trips"),
           where("status", "in", ["LOADED", "IN_TRANSIT"]),
-          // where("driverId", "==", auth.currentUser.uid), // Uncomment in production
+          where("driverId", "==", auth.currentUser.uid), // Uncomment in production
           limit(1),
         );
         const snapshot = await getDocs(q);
@@ -92,25 +85,23 @@ export default function ReportDelayScreen() {
     setSubmitting(true);
 
     try {
-      // 2. Save to 'trip_delays' sub-collection (or a global 'alerts' collection)
-      await addDoc(collection(db, "truck_trips", tripId, "delays"), {
+      // 🚀 Call the Function
+      await reportTripDelay({
+        tripId: tripId,
         type: selectedType,
         notes: notes,
-        reportedAt: serverTimestamp(),
-        status: "PENDING_APPROVAL", // Per your rule: Manager must approve
-        driverId: auth.currentUser?.uid || "unknown",
       });
 
-      Alert.alert("Reported", "Delay has been reported to the dashboard.", [
+      Alert.alert("Reported", "Dispatch has been notified immediately.", [
         { text: "OK", onPress: () => router.back() },
       ]);
     } catch (error) {
-      Alert.alert("Error", "Failed to submit report. Please try again.");
+      console.error("Delay Report Error:", error);
+      Alert.alert("Error", error.message || "Failed to submit report.");
     } finally {
       setSubmitting(false);
     }
   };
-
   if (fetching) {
     return (
       <View style={styles.center}>

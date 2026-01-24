@@ -106,8 +106,9 @@ exports.bulkAssignShipments = onCall(
             (data.originCode || "?") + " -> " + (data.destinationCode || "?"),
 
           totalItems: itemsToAdd,
-          loadedCount: 0,
           pendingCount: itemsToAdd, // Initially all pending
+          loadedCount: 0,
+          deliveredCount: 0,
 
           // Copy barcodes for the Checker API (Important for scanning!)
           packageBarcodes: data.packageBarcodes || [],
@@ -164,8 +165,12 @@ exports.bulkAssignShipments = onCall(
       // --- E. Update Trip Aggregates (Once per batch) ---
       if (batchHasUpdates) {
         batch.update(tripRef, {
-          itemPending: admin.firestore.FieldValue.increment(batchTotalItems),
           totalItems: admin.firestore.FieldValue.increment(batchTotalItems),
+          itemPending: admin.firestore.FieldValue.increment(batchTotalItems),
+
+          totalLoaded: 0,
+          totalDelivered: 0,
+
           updatedAt: admin.firestore.FieldValue.serverTimestamp(),
           updatedBy: uid,
         });

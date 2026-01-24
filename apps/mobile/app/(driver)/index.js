@@ -12,46 +12,86 @@ import {
 import { useRouter } from "expo-router";
 import { FontAwesome5, Ionicons } from "@expo/vector-icons";
 import { getFunctions, httpsCallable } from "firebase/functions";
-import { collection, query, where, getDocs, limit } from "firebase/firestore";
+import {
+  collection,
+  query,
+  where,
+  getDocs,
+  limit,
+  doc,
+  getDoc,
+} from "firebase/firestore";
 import { signOut } from "firebase/auth";
 import { db, auth } from "../../firebase"; // Ensure auth is imported to get current user
 
 export default function DriverDashboard() {
   const router = useRouter();
+  const uid = auth.currentUser?.uid;
+
   const [currentTrip, setCurrentTrip] = useState(null);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
 
-  // 1. FETCH ASSIGNED TRIP
-  useEffect(() => {
-    // In a real app, you'd filter by 'driverId == auth.currentUser.uid'
-    // For now, we fetch the first active trip for demo purposes
-    const fetchTrip = async () => {
-      try {
-        const q = query(
-          collection(db, "truck_trips"),
-          where("status", "in", ["CREATED", "LOADED", "IN_TRANSIT"]),
-          // where("driverId", "==", auth.currentUser.uid), // Uncomment when ready
-          limit(1),
+  const [driverName, setDriverName] = useState("Driver"); // Default placeholder
+  const [refreshing, setRefreshing] = useState(false);
+
+  const fetchData = async () => {
+    if (!uid) return;
+
+    try {
+      // 1. PREPARE QUERIES
+      // A. Profile Query (Get name)
+      const userRef = doc(db, "users", uid);
+
+      // B. Trip Query (Get active job)
+      const tripQuery = query(
+        collection(db, "truck_trips"),
+        where("status", "in", ["CREATED", "LOADED", "IN_TRANSIT"]),
+        where("driverId", "==", uid),
+        limit(1),
+      );
+
+      // 2. EXECUTE IN PARALLEL (Faster)
+      const [userSnap, tripSnap] = await Promise.all([
+        getDoc(userRef),
+        getDocs(tripQuery),
+      ]);
+
+      // 3. HANDLE PROFILE
+      if (userSnap.exists()) {
+        const data = userSnap.data();
+        // Use full name, or fall back to displayName, or just "Driver"
+        setDriverName(
+          data.name ||
+            data.fullName ||
+            auth.currentUser.displayName ||
+            "Driver",
         );
-        const snapshot = await getDocs(q);
-
-        if (!snapshot.empty) {
-          const doc = snapshot.docs[0];
-          setCurrentTrip({ id: doc.id, ...doc.data() });
-        } else {
-          setCurrentTrip(null);
-        }
-      } catch (error) {
-        console.error("Error fetching trip:", error);
-      } finally {
-        setLoading(false);
       }
-    };
 
-    fetchTrip();
+      // 4. HANDLE TRIP
+      if (!tripSnap.empty) {
+        const docData = tripSnap.docs[0];
+        setCurrentTrip({ id: docData.id, ...docData.data() });
+      } else {
+        setCurrentTrip(null);
+      }
+    } catch (error) {
+      console.error("Error fetching driver data:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchData();
   }, []);
 
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await fetchData();
+    setRefreshing(false);
+  };
   const handleLogout = () => {
     Alert.alert("Sign Out", "Are you sure you want to log out?", [
       { text: "Cancel", style: "cancel" },
@@ -117,7 +157,7 @@ export default function DriverDashboard() {
           </View>
           <View>
             <Text style={styles.greeting}>Welcome back,</Text>
-            <Text style={styles.username}>Driver</Text>
+            <Text style={styles.driverName}>{driverName}</Text>
           </View>
         </View>
         {/* LOGOUT BUTTON */}
@@ -251,10 +291,20 @@ const styles = StyleSheet.create({
     backgroundColor: "#0f172a",
   },
   header: {
-    padding: 20,
+    padding: 24,
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
+  },
+  greeting: {
+    fontSize: 14,
+    color: "#94a3b8",
+    marginBottom: 4,
+  },
+  driverName: {
+    fontSize: 20,
+    fontWeight: "700",
+    color: "#f8fafc",
   },
   // 👇 NEW STYLE: Groups Avatar + Text horizontally
   profileInfo: {

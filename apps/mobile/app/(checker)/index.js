@@ -1,42 +1,40 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   View,
   Text,
-  StyleSheet,
   TouchableOpacity,
-  SafeAreaView,
   ScrollView,
+  SafeAreaView,
+  StyleSheet,
+  RefreshControl,
+  StatusBar,
   Alert,
 } from "react-native";
 import { useRouter } from "expo-router";
-import { FontAwesome5, Ionicons } from "@expo/vector-icons";
-import { signOut } from "firebase/auth";
-import { auth } from "../../firebase";
+import { FontAwesome5 } from "@expo/vector-icons";
+import {
+  getFirestore,
+  collection,
+  query,
+  where,
+  getCountFromServer,
+  Timestamp,
+} from "firebase/firestore";
+import { getAuth, signOut } from "firebase/auth";
+import { startOfDay, subDays } from "date-fns";
 
-export default function CheckerDashboard() {
+export default function CheckerIndex() {
   const router = useRouter();
+  const auth = getAuth();
+  const db = getFirestore();
 
-  // Mock Stats (You can connect this to Firestore later)
-  const [stats] = useState({
-    received: 120,
-    loaded: 45,
-    pending: 75,
-  });
+  // STATE
+  const [filter, setFilter] = useState("TODAY"); // 'TODAY' | 'WEEK'
+  const [stats, setStats] = useState({ received: 0, loaded: 0, pending: 0 });
+  const [refreshing, setRefreshing] = useState(false);
+  const [userName, setUserName] = useState("Checker");
 
-  const handleLogout = () => {
-    Alert.alert("Sign Out", "Are you sure?", [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Sign Out",
-        style: "destructive",
-        onPress: () => {
-          signOut(auth).then(() => router.replace("/"));
-        },
-      },
-    ]);
-  };
-
-  // Helper for Navigation
+  // 1. NAVIGATION HANDLER
   const goToScan = (mode, title) => {
     router.push({
       pathname: "/(checker)/scan",
@@ -44,9 +42,81 @@ export default function CheckerDashboard() {
     });
   };
 
+  const handleLogout = async () => {
+    try {
+      await signOut(auth);
+      router.replace("/");
+    } catch (error) {
+      Alert.alert("Error", error.message);
+    }
+  };
+
+  // 2. FETCH STATS (Facility View)
+  const fetchStats = useCallback(async () => {
+    try {
+      // Get User Profile Name (Optional)
+      if (auth.currentUser?.displayName) {
+        setUserName(auth.currentUser.displayName);
+      }
+
+      const shipmentsRef = collection(db, "shipments");
+      const now = new Date();
+
+      // A. Date Range for Activity
+      const startDate =
+        filter === "WEEK" ? subDays(startOfDay(now), 7) : startOfDay(now);
+      const firestoreDate = Timestamp.fromDate(startDate);
+
+      // B. Queries
+      // Pending: Always real-time backlog (No date filter)
+      const pendingQ = query(shipmentsRef, where("status", "==", "RECEIVED"));
+
+      // Inbound: What arrived in this period
+      const receivedQ = query(
+        shipmentsRef,
+        where("createdAt", ">=", firestoreDate),
+      );
+
+      // Outbound: What left in this period
+      const loadedQ = query(
+        shipmentsRef,
+        where("status", "in", ["IN_TRANSIT", "COMPLETED"]),
+        where("updatedAt", ">=", firestoreDate),
+      );
+
+      // C. Execute
+      const [pSnap, rSnap, lSnap] = await Promise.all([
+        getCountFromServer(pendingQ),
+        getCountFromServer(receivedQ),
+        getCountFromServer(loadedQ),
+      ]);
+
+      setStats({
+        pending: pSnap.data().count,
+        received: rSnap.data().count,
+        loaded: lSnap.data().count,
+      });
+    } catch (err) {
+      console.error("Stats Error:", err);
+    }
+  }, [filter]);
+
+  // Initial Load
+  useEffect(() => {
+    fetchStats();
+  }, [fetchStats]);
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await fetchStats();
+    setRefreshing(false);
+  };
+
   return (
     <SafeAreaView style={styles.container}>
-      {/* 1. HEADER (Profile + Logout) */}
+      <StatusBar barStyle="light-content" backgroundColor="#0f172a" />
+
+      {/* 1. HEADER */}
       <View style={styles.header}>
         <View style={styles.profileInfo}>
           <View style={styles.avatar}>
@@ -54,7 +124,7 @@ export default function CheckerDashboard() {
           </View>
           <View>
             <Text style={styles.greeting}>Hello,</Text>
-            <Text style={styles.username}>Checker</Text>
+            <Text style={styles.username}>{userName}</Text>
           </View>
         </View>
         <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
@@ -62,33 +132,93 @@ export default function CheckerDashboard() {
         </TouchableOpacity>
       </View>
 
-      <ScrollView contentContainerStyle={styles.content}>
-        {/* 2. STATS BOARD (New Addition) */}
+      <ScrollView
+        contentContainerStyle={styles.content}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor="#fff"
+            colors={["#3b82f6"]}
+          />
+        }
+      >
+        {/* 2. DASHBOARD CONTROLS (Filter) */}
+        <View style={styles.controlsRow}>
+          <Text style={styles.sectionTitle}>Facility Overview</Text>
+          <View style={styles.filterContainer}>
+            <TouchableOpacity
+              style={[
+                styles.filterTab,
+                filter === "TODAY" && styles.activeFilter,
+              ]}
+              onPress={() => setFilter("TODAY")}
+            >
+              <Text
+                style={[
+                  styles.filterText,
+                  filter === "TODAY" && styles.activeFilterText,
+                ]}
+              >
+                Today
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[
+                styles.filterTab,
+                filter === "WEEK" && styles.activeFilter,
+              ]}
+              onPress={() => setFilter("WEEK")}
+            >
+              <Text
+                style={[
+                  styles.filterText,
+                  filter === "WEEK" && styles.activeFilterText,
+                ]}
+              >
+                Week
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* 3. STATS BOARD */}
         <View style={styles.statsRow}>
+          {/* INBOUND */}
           <View style={styles.statCard}>
             <Text style={styles.statVal}>{stats.received}</Text>
-            <Text style={styles.statLabel}>Received</Text>
+            <Text style={styles.statLabel}>Inbound</Text>
+            <Text style={styles.statSub}>
+              {filter === "TODAY" ? "Today" : "7 Days"}
+            </Text>
             <View style={[styles.statBar, { backgroundColor: "#3b82f6" }]} />
           </View>
+
+          {/* OUTBOUND */}
           <View style={styles.statCard}>
             <Text style={styles.statVal}>{stats.loaded}</Text>
-            <Text style={styles.statLabel}>Loaded</Text>
+            <Text style={styles.statLabel}>Outbound</Text>
+            <Text style={styles.statSub}>
+              {filter === "TODAY" ? "Today" : "7 Days"}
+            </Text>
             <View style={[styles.statBar, { backgroundColor: "#10b981" }]} />
           </View>
+
+          {/* BACKLOG */}
           <View style={styles.statCard}>
             <Text style={styles.statVal}>{stats.pending}</Text>
-            <Text style={styles.statLabel}>Pending</Text>
+            <Text style={styles.statLabel}>On Floor</Text>
+            <Text style={[styles.statSub, { color: "#f59e0b" }]}>Active</Text>
             <View style={[styles.statBar, { backgroundColor: "#f59e0b" }]} />
           </View>
         </View>
 
-        {/* 3. GRID BUTTONS (Preserving your layout) */}
-        <Text style={styles.sectionTitle}>Operations</Text>
+        {/* 4. OPERATIONS GRID */}
+        <Text style={[styles.sectionTitle, { marginTop: 24 }]}>Operations</Text>
 
         <View style={styles.gridContainer}>
-          {/* ROW 1 */}
           <View style={styles.row}>
-            {/* Load Truck */}
+            {/* A. LOAD TRUCK */}
             <TouchableOpacity
               style={[styles.gridBtn, { backgroundColor: "#3b82f6" }]}
               onPress={() => goToScan("loading", "Load Truck")}
@@ -100,7 +230,7 @@ export default function CheckerDashboard() {
               <Text style={styles.btnSub}>Scan to vehicle</Text>
             </TouchableOpacity>
 
-            {/* Unload / Receive */}
+            {/* B. OFFLOAD (Updated Mode!) */}
             <TouchableOpacity
               style={[
                 styles.gridBtn,
@@ -110,9 +240,7 @@ export default function CheckerDashboard() {
                   borderColor: "#334155",
                 },
               ]}
-              // ⚠️ CRITICAL CHANGE HERE:
-              // 1. Mode must be "delivering" (matches Cloud Function)
-              // 2. Title changed to "Offload" (matches Trip Stats)
+              // ⚠️ Corrected mode to "delivering"
               onPress={() => goToScan("delivering", "Offload Items")}
             >
               <View style={[styles.iconCircle, { backgroundColor: "#334155" }]}>
@@ -123,28 +251,8 @@ export default function CheckerDashboard() {
             </TouchableOpacity>
           </View>
 
-          {/* ROW 2 */}
+          {/* C. Placeholder / Check */}
           <View style={styles.row}>
-            {/* Single Check */}
-            {/* <TouchableOpacity
-              style={[
-                styles.gridBtn,
-                {
-                  backgroundColor: "#1e293b",
-                  borderWidth: 1,
-                  borderColor: "#334155",
-                },
-              ]}
-              onPress={() => goToScan("manual", "Single Check")}
-            >
-              <View style={[styles.iconCircle, { backgroundColor: "#334155" }]}>
-                <FontAwesome5 name="search" size={24} color="#94a3b8" />
-              </View>
-              <Text style={[styles.btnTitle, { color: "#94a3b8" }]}>CHECK</Text>
-              <Text style={styles.btnSub}>Details lookup</Text>
-            </TouchableOpacity> */}
-
-            {/* Placeholder */}
             <View style={styles.cardPlaceholder}>
               <FontAwesome5 name="plus" size={24} color="#334155" />
             </View>
@@ -156,83 +264,145 @@ export default function CheckerDashboard() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#0f172a" }, // Dark Background
-
-  // Header
-  header: {
+  container: {
+    flex: 1,
+    backgroundColor: "#0f172a", // Slate 900
+  },
+  content: {
     padding: 20,
+    paddingBottom: 40,
+  },
+
+  // HEADER
+  header: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: "#1e293b",
   },
-  profileInfo: { flexDirection: "row", alignItems: "center", gap: 12 },
+  profileInfo: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
   avatar: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: "#1e293b",
+    backgroundColor: "rgba(59,130,246,0.1)",
     alignItems: "center",
     justifyContent: "center",
+  },
+  greeting: {
+    color: "#94a3b8",
+    fontSize: 12,
+  },
+  username: {
+    color: "#f8fafc",
+    fontWeight: "700",
+    fontSize: 16,
+  },
+  logoutBtn: {
+    padding: 8,
+    borderRadius: 8,
+    backgroundColor: "rgba(239,68,68,0.1)",
+  },
+
+  // SECTIONS
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: "#f8fafc",
+    marginBottom: 10,
+  },
+
+  // CONTROLS & FILTER
+  controlsRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 12,
+    marginTop: 10,
+  },
+  filterContainer: {
+    flexDirection: "row",
+    backgroundColor: "#1e293b",
+    borderRadius: 8,
+    padding: 2,
     borderWidth: 1,
     borderColor: "#334155",
   },
-  greeting: { color: "#94a3b8", fontSize: 12 },
-  username: { color: "#fff", fontSize: 18, fontWeight: "bold" },
-  logoutBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: "rgba(239, 68, 68, 0.1)",
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 1,
-    borderColor: "rgba(239, 68, 68, 0.3)",
+  filterTab: {
+    paddingVertical: 4,
+    paddingHorizontal: 12,
+    borderRadius: 6,
+  },
+  activeFilter: {
+    backgroundColor: "#3b82f6",
+  },
+  filterText: {
+    color: "#94a3b8",
+    fontSize: 12,
+    fontWeight: "600",
+  },
+  activeFilterText: {
+    color: "#fff",
   },
 
-  content: { padding: 20 },
-
-  // Stats Row
+  // STATS
   statsRow: {
     flexDirection: "row",
-    justifyContent: "space-between",
-    marginBottom: 30,
     gap: 12,
+    marginBottom: 20,
   },
   statCard: {
     flex: 1,
     backgroundColor: "#1e293b",
     padding: 16,
     borderRadius: 16,
-    alignItems: "center",
     borderWidth: 1,
     borderColor: "#334155",
   },
-  statVal: { color: "#fff", fontSize: 22, fontWeight: "bold", marginBottom: 4 },
+  statVal: {
+    fontSize: 24,
+    fontWeight: "800",
+    color: "#f8fafc",
+    marginBottom: 4,
+  },
   statLabel: {
     color: "#94a3b8",
+    fontSize: 12,
+    fontWeight: "600",
+  },
+  statSub: {
     fontSize: 10,
-    fontWeight: "700",
-    textTransform: "uppercase",
+    color: "#64748b",
+    marginBottom: 8,
+    marginTop: 2,
   },
-  statBar: { width: 20, height: 4, borderRadius: 2, marginTop: 10 },
-
-  // Grid Section
-  sectionTitle: {
-    color: "#fff",
-    fontSize: 18,
-    fontWeight: "bold",
-    marginBottom: 15,
+  statBar: {
+    height: 4,
+    borderRadius: 2,
+    width: "40%",
   },
-  gridContainer: { gap: 16 },
-  row: { flexDirection: "row", gap: 16 },
 
-  // The Big Buttons
+  // GRID BUTTONS
+  gridContainer: {
+    gap: 16,
+  },
+  row: {
+    flexDirection: "row",
+    gap: 16,
+  },
   gridBtn: {
     flex: 1,
-    aspectRatio: 1, // Makes it a square
-    borderRadius: 24,
     padding: 20,
-    justifyContent: "space-between",
+    borderRadius: 20,
+    minHeight: 140,
+    justifyContent: "center",
   },
   iconCircle: {
     width: 48,
@@ -241,20 +411,26 @@ const styles = StyleSheet.create({
     backgroundColor: "#fff",
     alignItems: "center",
     justifyContent: "center",
+    marginBottom: 16,
   },
-  btnTitle: { color: "#fff", fontSize: 16, fontWeight: "800", marginTop: 10 },
-  btnSub: { color: "rgba(255,255,255,0.6)", fontSize: 12 },
-
-  // Placeholder
+  btnTitle: {
+    fontSize: 16,
+    fontWeight: "800",
+    color: "#fff",
+    marginBottom: 4,
+  },
+  btnSub: {
+    color: "rgba(255,255,255,0.7)",
+    fontSize: 12,
+  },
   cardPlaceholder: {
     flex: 1,
-    aspectRatio: 1,
-    borderRadius: 24,
     borderWidth: 2,
     borderColor: "#1e293b",
     borderStyle: "dashed",
+    borderRadius: 20,
+    minHeight: 140,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "transparent",
   },
 });
