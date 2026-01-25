@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
-import ReceivePackageForm from "./components/packages/ReceivePackageForm";
-import PackagesTable from "./components/packages/PackagesTable";
+import ReceivePackageForm from "../components/shipments/ReceivePackageForm";
+import PackagesTable from "../components/packages/PackagesTable";
 
 export default function ManagerDashboard() {
   const [refreshKey, setRefreshKey] = useState(0);

@@ -9,9 +9,9 @@ import {
   faSignOutAlt,
 } from "@fortawesome/free-solid-svg-icons";
 import { useRouter } from "next/navigation";
-import { auth } from "@/apps/web/lib/firebase";
-import { useAuth } from "@/apps/web/app/context/AuthContext";
-import { handleLogout } from "@/apps/web/app/utility/utilities";
+import { auth } from "@/lib/firebase";
+import { useAuth } from "@/app/context/AuthContext";
+import { handleLogout } from "@/app/utility/utilities";
 import TabButton from "../../components/ui/TabButton";
 import CheckerBoard from "../../components/checker/CheckerBoard";
 

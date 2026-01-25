@@ -259,9 +259,9 @@ export default function ShipmentDrawer({ isOpen, onClose, data }) {
           {activeTab === "ITEMS" && (
             <div className="space-y-3 animate-in fade-in slide-in-from-right-4 duration-300">
               <button
-                onClick={() =>
-                  window.open(`../print/labels?id=${data.id}`, "_blank")
-                }
+                // onClick={() =>
+                //   window.open(`../print/labels?id=${data.id}`, "_blank")
+                // }
                 className="flex items-center gap-2 bg-slate-700 hover:bg-slate-600 text-white px-4 py-2 rounded-lg transition-colors text-sm font-bold"
               >
                 <FontAwesomeIcon icon={faPrint} />
