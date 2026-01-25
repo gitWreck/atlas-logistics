@@ -3,6 +3,7 @@
     "name": "mobile",
     "slug": "atlas-tracking",
     "version": "1.0.0",
+    "main": "index.js",
     "scheme": "atlastrucking",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -36,8 +37,6 @@
       }
     },
     "owner": "esplanadrey",
-    "plugins": [
-      "expo-router"
-    ]
+    "plugins": ["expo-router"]
   }
 }
