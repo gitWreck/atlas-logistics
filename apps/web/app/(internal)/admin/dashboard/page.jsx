@@ -18,7 +18,7 @@ import { handleLogout } from "@/app/utility/utilities";
 import PackageManager from "../../components/packages/PackageManager";
 import ManifestPage from "../../components/manifests/ManifestBoard";
 import TabButton from "../../components/ui/TabButton";
-import NotificationBell from "../../components/notifications/NotificationBell";
+// import NotificationBell from "../../../../../../NotificationBell";
 
 export default function AdminDashboardPage() {
   const router = useRouter();
@@ -56,7 +56,7 @@ export default function AdminDashboardPage() {
             {/* ✅ DYNAMIC USER INFO */}
             <div className="flex items-center gap-4">
               {/* 1. INSERT BELL HERE */}
-              <NotificationBell />
+              {/* <NotificationBell /> */}
 
               {/* Divider (Optional visual separator) */}
               <div className="h-8 w-px bg-slate-800 hidden sm:block"></div>
