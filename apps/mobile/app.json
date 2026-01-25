@@ -29,7 +29,10 @@
     },
     "extra": {
       "eas": {
-        "projectId": "ee02fa18-b8b2-4753-a0ea-8bfe2f6c7cc2"
+        "projectId": "3e20619e-8203-4ad6-9dfa-861f20553b29"
+      },
+      "router": {
+        "origin": false
       }
     },
     "owner": "esplanadrey",
