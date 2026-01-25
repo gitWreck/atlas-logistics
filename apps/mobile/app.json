@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "mobile",
-    "slug": "mobile",
+    "slug": "atlas-tracking",
     "version": "1.0.0",
     "scheme": "atlastrucking",
     "orientation": "portrait",
@@ -21,10 +21,20 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "edgeToEdgeEnabled": true
+      "edgeToEdgeEnabled": true,
+      "package": "com.atlas.atlastracking"
     },
     "web": {
       "favicon": "./assets/favicon.png"
-    }
+    },
+    "extra": {
+      "eas": {
+        "projectId": "ee02fa18-b8b2-4753-a0ea-8bfe2f6c7cc2"
+      }
+    },
+    "owner": "esplanadrey",
+    "plugins": [
+      "expo-router"
+    ]
   }
 }

@@ -1,0 +1,12 @@
+{
+  "expo": {
+    "extra": {
+      "eas": {
+        "projectId": "7376afea-cc67-4dfc-aea0-d0257291e7f3"
+      }
+    },
+    "android": {
+      "package": "com.esplanadrey.atlastruckingplatform"
+    }
+  }
+}
