@@ -50,3 +50,5 @@ Thumbs.db
 
 # TurboRepo (If you use it later)
 .turbo/
+.vercel
+.env*.local
