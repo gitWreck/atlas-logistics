@@ -14,8 +14,11 @@ import {
 import { useRouter } from "expo-router";
 import { FontAwesome5 } from "@expo/vector-icons";
 import { collection, query, where, getDocs, limit } from "firebase/firestore";
+import { getFunctions, httpsCallable } from "firebase/functions";
 import { db, auth } from "../../firebase";
-import { reportTripDelay } from "../../components/utilities/FirebaseFunctions";
+
+// 🎨 IMPORT SHARED THEME
+import { COLORS, GLOBAL_STYLES } from "../../components/constants/theme";
 
 const DELAY_TYPES = [
   {
@@ -48,17 +51,18 @@ export default function ReportDelayScreen() {
   const [submitting, setSubmitting] = useState(false);
   const [fetching, setFetching] = useState(true);
 
-  // 1. Auto-fetch the active trip (so the driver doesn't have to select it)
+  // 1. Auto-fetch active trip
   useEffect(() => {
     const fetchActiveTrip = async () => {
       try {
         const q = query(
           collection(db, "truck_trips"),
           where("status", "in", ["LOADED", "IN_TRANSIT"]),
-          where("driverId", "==", auth.currentUser.uid), // Uncomment in production
+          where("driverId", "==", auth.currentUser?.uid),
           limit(1),
         );
         const snapshot = await getDocs(q);
+
         if (!snapshot.empty) {
           setTripId(snapshot.docs[0].id);
         } else {
@@ -70,6 +74,7 @@ export default function ReportDelayScreen() {
         }
       } catch (error) {
         console.error(error);
+        Alert.alert("Error", "Could not fetch active trip.");
       } finally {
         setFetching(false);
       }
@@ -85,8 +90,11 @@ export default function ReportDelayScreen() {
     setSubmitting(true);
 
     try {
-      // 🚀 Call the Function
-      await reportTripDelay({
+      // 🚀 CALL CLOUD FUNCTION
+      const functions = getFunctions(undefined, "asia-southeast1");
+      const reportDelayFn = httpsCallable(functions, "reportTripDelay");
+
+      await reportDelayFn({
         tripId: tripId,
         type: selectedType,
         notes: notes,
@@ -102,10 +110,11 @@ export default function ReportDelayScreen() {
       setSubmitting(false);
     }
   };
+
   if (fetching) {
     return (
-      <View style={styles.center}>
-        <ActivityIndicator size="large" color="#fbbf24" />
+      <View style={GLOBAL_STYLES.center}>
+        <ActivityIndicator size="large" color={COLORS.primary} />
       </View>
     );
   }
@@ -113,10 +122,10 @@ export default function ReportDelayScreen() {
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === "ios" ? "padding" : "height"}
-      style={styles.container}
+      style={GLOBAL_STYLES.container}
     >
       <ScrollView contentContainerStyle={styles.content}>
-        <Text style={styles.title}>Report Delay</Text>
+        <Text style={GLOBAL_STYLES.sectionTitle}>Report Delay</Text>
         <Text style={styles.subtitle}>Select the reason for the delay</Text>
 
         <View style={styles.grid}>
@@ -127,7 +136,7 @@ export default function ReportDelayScreen() {
                 styles.card,
                 selectedType === type.id && {
                   borderColor: type.color,
-                  backgroundColor: `${type.color}20`,
+                  backgroundColor: `${type.color}20`, // 20% opacity
                 },
               ]}
               onPress={() => setSelectedType(type.id)}
@@ -144,7 +153,7 @@ export default function ReportDelayScreen() {
         <TextInput
           style={styles.input}
           placeholder="e.g., Flat tire at KM 45..."
-          placeholderTextColor="#64748b"
+          placeholderTextColor={COLORS.textSecondary}
           multiline
           numberOfLines={3}
           value={notes}
@@ -157,7 +166,7 @@ export default function ReportDelayScreen() {
           disabled={submitting}
         >
           {submitting ? (
-            <ActivityIndicator color="#fff" />
+            <ActivityIndicator color="#000" />
           ) : (
             <Text style={styles.btnText}>SUBMIT REPORT</Text>
           )}
@@ -168,17 +177,14 @@ export default function ReportDelayScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#0f172a" },
-  center: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: "#0f172a",
-  },
   content: { padding: 24, paddingBottom: 50 },
 
-  title: { fontSize: 28, fontWeight: "bold", color: "#fff", marginBottom: 8 },
-  subtitle: { fontSize: 16, color: "#94a3b8", marginBottom: 32 },
+  subtitle: {
+    fontSize: 16,
+    color: COLORS.textSecondary,
+    marginBottom: 24,
+    marginTop: -8,
+  },
 
   grid: {
     flexDirection: "row",
@@ -188,7 +194,7 @@ const styles = StyleSheet.create({
   },
   card: {
     width: "48%",
-    backgroundColor: "#1e293b",
+    backgroundColor: COLORS.card,
     padding: 16,
     borderRadius: 16,
     marginBottom: 16,
@@ -205,28 +211,39 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   cardLabel: {
-    color: "#fff",
+    color: COLORS.textPrimary,
     fontWeight: "600",
     fontSize: 14,
     textAlign: "center",
   },
 
-  label: { color: "#cbd5e1", marginBottom: 8, fontWeight: "600" },
+  label: {
+    color: COLORS.textSecondary,
+    marginBottom: 8,
+    fontWeight: "600",
+  },
   input: {
-    backgroundColor: "#1e293b",
-    color: "#fff",
+    backgroundColor: COLORS.card,
+    color: COLORS.textPrimary,
     borderRadius: 12,
     padding: 16,
     fontSize: 16,
     textAlignVertical: "top",
     marginBottom: 32,
+    borderWidth: 1,
+    borderColor: COLORS.slate,
   },
 
   submitBtn: {
-    backgroundColor: "#fbbf24",
+    backgroundColor: COLORS.primary,
     padding: 18,
     borderRadius: 12,
     alignItems: "center",
   },
-  btnText: { color: "#000", fontWeight: "bold", fontSize: 16 },
+  btnText: {
+    color: "#000",
+    fontWeight: "bold",
+    fontSize: 16,
+    letterSpacing: 0.5,
+  },
 });
