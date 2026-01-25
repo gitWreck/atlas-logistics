@@ -30,13 +30,15 @@
     },
     "extra": {
       "eas": {
-        "projectId": "3e20619e-8203-4ad6-9dfa-861f20553b29"
+        "projectId": "f9739e4f-031c-4794-8d49-e1910831b6c5"
       },
       "router": {
         "origin": false
       }
     },
     "owner": "esplanadrey",
-    "plugins": ["expo-router"]
+    "plugins": [
+      "expo-router"
+    ]
   }
 }
