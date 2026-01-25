@@ -10,14 +10,6 @@ import {
   faPen,
   faExclamationTriangle,
 } from "@fortawesome/free-solid-svg-icons";
-import { db } from "@/apps/web/lib/firebase"; // Ensure client config is imported
-import {
-  collection,
-  query,
-  where,
-  getDocs,
-  onSnapshot,
-} from "firebase/firestore";
 import LoadPackagesModal from "../manifests/modals/LoadPackagesModal";
 
 export default function CheckerBoard() {
