@@ -29,9 +29,9 @@ config.resolver.blockList = [
   new RegExp(
     `^${escape(path.resolve(workspaceRoot, "node_modules/react-native"))}/.*$`,
   ),
-  new RegExp(
-    `^${escape(path.resolve(workspaceRoot, "node_modules/expo-router"))}/.*$`,
-  ),
+  // new RegExp(
+  //   `^${escape(path.resolve(workspaceRoot, "node_modules/expo-router"))}/.*$`,
+  // ),
 ];
 
 // 4. Force alias to the local versions
