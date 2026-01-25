@@ -1,7 +1,12 @@
 // app/admin/manifest/CreateTripModal.jsx
 import React, { useEffect, useState } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faTimes, faTruck, faRoute } from "@fortawesome/free-solid-svg-icons";
+import {
+  faTimes,
+  faTruck,
+  faRoute,
+  faCalendarDays,
+} from "@fortawesome/free-solid-svg-icons";
 import { createTruckTrip } from "@/app/utility/FirebaseFunctions";
 import DriverSelectInput from "../DriverSelectInput";
 import { PROVINCES, getCities } from "@/app/utility/PhilippinesData";
@@ -20,6 +25,11 @@ export default function CreateTripModal({ isOpen, onClose, onSuccess }) {
     destinationCity: "",
     destinationCode: "",
 
+    // 2. Add Schedule State
+    scheduledDeparture: "",
+    estimatedArrival: "",
+    helperName: "",
+
     driverName: "", // For display
     driverId: null, // For backend logic (Optional)
     truckPlateNumber: "",
@@ -28,12 +38,17 @@ export default function CreateTripModal({ isOpen, onClose, onSuccess }) {
   useEffect(() => {
     if (isOpen) {
       setFormData({
-        originProvince: "",
         originCity: "",
         originCode: "",
-        destinationProvince: "",
+        originProvince: "",
         destinationCity: "",
         destinationCode: "",
+        destinationProvince: "",
+
+        scheduledDeparture: "",
+        estimatedArrival: "",
+        helperName: "",
+
         driverName: "",
         driverId: null,
         truckPlateNumber: "",
@@ -76,6 +91,11 @@ export default function CreateTripModal({ isOpen, onClose, onSuccess }) {
         destinationCity: formData.destinationCity.toUpperCase(),
         originCode: formData.originCode.toUpperCase(),
         destinationCode: formData.destinationCode.toUpperCase(),
+
+        scheduledDeparture: formData.scheduledDeparture,
+        estimatedArrival: formData.estimatedArrival,
+        helperName: formData.helperName,
+
         truckPlateNumber: formData.truckPlateNumber,
         driverName: formData.driverName,
         driverId: formData.driverId,
@@ -230,6 +250,48 @@ export default function CreateTripModal({ isOpen, onClose, onSuccess }) {
             </div>
           </div>
 
+          {/* --- 4. NEW SCHEDULE SECTION --- */}
+          <div className="bg-slate-950/50 p-3 rounded-lg border border-slate-800 grid grid-cols-2 gap-4">
+            {/* Departure (Existing) */}
+            <div>
+              <label className="text-[10px] font-bold text-slate-400 uppercase flex items-center gap-2 mb-2">
+                <FontAwesomeIcon icon={faCalendarDays} /> Departure
+              </label>
+              <input
+                type="datetime-local"
+                required
+                className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-sm text-white outline-none focus:border-blue-500 [color-scheme:dark]"
+                value={formData.scheduledDeparture}
+                onChange={(e) =>
+                  setFormData((p) => ({
+                    ...p,
+                    scheduledDeparture: e.target.value,
+                  }))
+                }
+              />
+            </div>
+
+            {/* 4. NEW: ARRIVAL (ETA) */}
+            <div>
+              <label className="text-[10px] font-bold text-slate-400 uppercase flex items-center gap-2 mb-2">
+                <FontAwesomeIcon icon={faCalendarDays} /> Est. Arrival
+              </label>
+              <input
+                type="datetime-local"
+                required
+                className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-sm text-white outline-none focus:border-emerald-500 [color-scheme:dark]"
+                value={formData.estimatedArrival}
+                min={formData.scheduledDeparture} // Prevent ETA before Departure
+                onChange={(e) =>
+                  setFormData((p) => ({
+                    ...p,
+                    estimatedArrival: e.target.value,
+                  }))
+                }
+              />
+            </div>
+          </div>
+
           {/* Details Section */}
           <div className="space-y-4 pt-2 border-t border-slate-800">
             <DriverSelectInput
@@ -241,6 +303,20 @@ export default function CreateTripModal({ isOpen, onClose, onSuccess }) {
                 setFormData((prev) => ({ ...prev, driverId: id }))
               }
             />
+
+            <div className="space-y-1">
+              <label className="text-xs font-bold text-slate-400 uppercase">
+                Truck Helper / Pahinante
+              </label>
+              <input
+                className="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-white outline-none"
+                placeholder="Optional Name"
+                value={formData.helperName}
+                onChange={(e) =>
+                  setFormData({ ...formData, helperName: e.target.value })
+                }
+              />
+            </div>
 
             <div className="space-y-1">
               <label className="text-xs font-bold text-slate-400 uppercase">

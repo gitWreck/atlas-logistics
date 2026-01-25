@@ -205,6 +205,12 @@ exports.scanPackages = onCall(
         itemPending: increment(-1),
         totalLoaded: increment(1),
       };
+      if (
+        tripSnap.data().status === "ASSIGNED" ||
+        tripSnap.data().status === "CREATED"
+      ) {
+        tripUpdate.status = "LOADING";
+      }
     } else if (mode === "delivering") {
       tripUpdate = {
         totalLoaded: increment(-1),
