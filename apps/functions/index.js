@@ -45,11 +45,6 @@ exports.assignShipmentToTruckTrip =
 exports.unassignShipmentFromTruckTrip =
   require("./src/trips/unassignShipmentFromTruckTrip").unassignShipmentFromTruckTrip;
 
-// exports.loadItemsToTrip =
-//   require("./src/trips/loadItemsToTrip").loadItemsToTrip;
-// exports.unloadItemsFromTrip =
-//   require("./src/trips/unloadItemsFromTrip").unloadItemsFromTrip;
-
 exports.reportTripDelay =
   require("./src/trips/reportTripDelay").reportTripDelay;
 exports.setTruckDelay = require("./src/trips/setTruckDelay").setTruckDelay;
@@ -145,90 +140,13 @@ exports.migrateTripsToTopLevel = onRequest(
 // 4) FIRESTORE TRIGGERS
 // ------------------------------------------------------------
 exports.autoStatusSMS = require("./src/messaging/autoStatusSMS").autoStatusSMS;
-exports.autoSetPublic = require("./src/tracking/autoSetPublic").autoSetPublic;
-exports.autoRepairTrackingPublic =
-  require("./src/tracking/autoRepairTrackingPublic").autoRepairTrackingPublic;
 
 const {
-  syncTrackingPublic,
+  mirrorShipmentToPublic,
   syncTrackingPublicHttp,
-  getPublicTracking,
-  syncTrackingPublicCore,
+  propagateTripUpdates,
 } = require("./src/tracking/syncTrackingPublic");
 
-exports.syncTrackingPublic = syncTrackingPublic;
+exports.mirrorShipmentToPublic = mirrorShipmentToPublic;
 exports.syncTrackingPublicHttp = syncTrackingPublicHttp;
-exports.getPublicTracking = getPublicTracking;
-
-exports.autoSyncPublicOnPackageChange = onDocumentWritten(
-  "truck_trips/{tripId}/trip_packages/{pkgId}",
-  async () => {
-    console.log("📡 Package changed — syncing public tracking");
-    // await syncTrackingPublicCore();
-  },
-);
-
-exports.autoSyncPublicOnTrackingChange = onDocumentWritten(
-  "tracking_records/{trackingId}",
-  async () => {
-    console.log("📡 Tracking changed — syncing public tracking");
-    // await syncTrackingPublicCore();
-  },
-);
-
-exports.syncTripProgressFromPackages = onDocumentUpdated(
-  "tracking_records/{trackingId}/truck_trips/{tripDocId}/trip_packages/{packageDocId}",
-  async (event) => {
-    const after = event.data?.after?.data();
-    if (!after) return;
-
-    const tripRef = event.data.after.ref.parent.parent;
-    if (!tripRef) return;
-
-    const tripSnap = await tripRef.get();
-    if (!tripSnap.exists) return;
-
-    const packagesSnap = await tripRef
-      .collection("trip_packages")
-      .where("active", "==", true)
-      .get();
-    const total = packagesSnap.size;
-    const delivered = packagesSnap.docs.reduce(
-      (acc, d) => acc + (d.data()?.status === "DELIVERED" ? 1 : 0),
-      0,
-    );
-    const progress = total === 0 ? 0 : delivered / total;
-
-    await tripRef.set(
-      {
-        packageTotal: total,
-        packageDelivered: delivered,
-        deliveryProgress: progress,
-        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-      },
-      { merge: true },
-    );
-  },
-);
-
-exports.syncTripToTracking = onDocumentUpdated(
-  "tracking_records/{trackingId}/truck_trips/{tripId}",
-  async (event) => {
-    const after = event.data?.after?.data();
-    if (!after) return;
-
-    const trackingRef = event.data.after.ref.parent.parent;
-    if (!trackingRef) return;
-
-    const update = {
-      status: after.status,
-      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-    };
-
-    if (after.status === "DELIVERED") {
-      update.deliveredAt = admin.firestore.FieldValue.serverTimestamp();
-    }
-
-    await trackingRef.set(update, { merge: true });
-  },
-);
+exports.propagateTripUpdates = propagateTripUpdates;

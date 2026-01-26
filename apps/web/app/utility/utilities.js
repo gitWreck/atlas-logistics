@@ -21,6 +21,21 @@ export function calculateProgress(status) {
   }
 }
 
+export function getVisualProgress(status) {
+  switch (status) {
+    case "RECEIVED":
+      return 0;
+    case "IN_TRANSIT":
+      return 33;
+    case "OUT_FOR_DELIVERY":
+      return 66;
+    case "DELIVERED":
+      return 100;
+    default:
+      return 0;
+  }
+}
+
 export function formatFirestoreDate(value) {
   if (!value) return "";
 

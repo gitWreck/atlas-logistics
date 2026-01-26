@@ -17,7 +17,7 @@ import {
   faTruck,
 } from "@fortawesome/free-solid-svg-icons";
 
-import StatusBadge from "../components/ui/StatusBadge";
+import StatusBadge from "../../components/ui/StatusBadge";
 
 const STATUS_STEPS = [
   "Received",

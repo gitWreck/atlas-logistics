@@ -15,12 +15,43 @@ function optionalString(v) {
   return typeof v === "string" && v.trim() ? v.trim() : null;
 }
 
-function cleanCode(code) {
-  return String(code || "")
-    .trim()
-    .toUpperCase()
-    .replace(/[^A-Z0-9]/g, "");
-}
+// -------------------------------------
+
+// 1. Map Internal Statuses to Public 4
+const formatStatus = (internalStatus) => {
+  if (!internalStatus) return "RECEIVED";
+
+  const s = internalStatus.toUpperCase();
+
+  // GROUP 1: DELIVERED
+  if (s === "DELIVERED" || s === "COMPLETED" || s === "DONE") {
+    return "DELIVERED";
+  }
+
+  // GROUP 2: OUT FOR DELIVERY
+  // Matches the "delivering" mode you added to the Checker App
+  if (s === "DELIVERING" || s === "OUT_FOR_DELIVERY") {
+    return "OUT FOR DELIVERY";
+  }
+
+  // GROUP 3: IN TRANSIT
+  // strictly when the truck is moving
+  if (s === "IN_TRANSIT" || s === "ON_THE_WAY") {
+    return "IN TRANSIT";
+  }
+
+  // GROUP 4: RECEIVED (The Catch-All)
+  // Covers: CREATED, ASSIGNED, LOADING, LOADED
+  return "RECEIVED";
+};
+
+const sanitizeDriverName = (fullName) => {
+  if (!fullName) return "Unassigned";
+  // Returns "Juan" from "Juan Dela Cruz"
+  return fullName.split(" ")[0] + " (Driver)";
+};
+
+// ---------------------------
 
 function yyyymmddFromDate(d) {
   return (
@@ -28,6 +59,25 @@ function yyyymmddFromDate(d) {
     String(d.getMonth() + 1).padStart(2, "0") +
     String(d.getDate()).padStart(2, "0")
   );
+}
+
+const formatTimeline = (history) => {
+  if (!history || !Array.isArray(history)) return [];
+  return history
+    .sort((a, b) => (b.at?.toMillis() || 0) - (a.at?.toMillis() || 0))
+    .map((h) => ({
+      status: formatStatus(h.status),
+      date: h.at?.toDate().toISOString() || new Date().toISOString(),
+      note: h.note || "",
+      location: h.location || "",
+    }));
+};
+
+function cleanCode(code) {
+  return String(code || "")
+    .trim()
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, "");
 }
 
 function pad4(n) {
@@ -159,15 +209,22 @@ function toLocal(e164Number) {
 module.exports = {
   requireString,
   optionalString,
-  cleanCode,
+  formatStatus,
+  sanitizeDriverName,
+
+  formatTimeline,
   yyyymmddFromDate,
+
+  cleanCode,
   pad4,
   shortCode,
-  assertAdminOrManager,
-  requireRole,
   toE164,
   toLocal,
+
   stableStringify,
   sha256Hex,
+
+  assertAdminOrManager,
+  requireRole,
   requireAuth,
 };
