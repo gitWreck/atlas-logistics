@@ -123,6 +123,11 @@ export default function TrackingResult({ data }) {
             <span className="text-slate-600 mx-1">&rarr;</span>{" "}
             {data.destinationCode || "DST"}
           </div>
+          <div className="text-xs text-slate-600 font-mono mt-0.5">
+            {data.origin}
+            <span className="text-slate-600 mx-1">&rarr;</span>
+            {data.destination || "—"}
+          </div>
         </div>
       </div>
 
