@@ -65,7 +65,7 @@ export default function TrackingPage() {
             <img
               src="/atlas-logo1.png"
               alt="Logo"
-              className="w-full h-full object-contain"
+              className="w-full h-full object-cover rounded-xl"
             />
           </div>
           <h1 className="text-xl font-bold text-white tracking-wide uppercase">
