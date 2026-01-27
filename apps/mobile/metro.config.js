@@ -23,23 +23,23 @@ config.resolver.nodeModulesPaths = [
 // 3. Block the Root React/React Native to prevent conflicts
 //    We use the escape() function to ensure this works on Windows
 config.resolver.blockList = [
-  // new RegExp(
-  //   `^${escape(path.resolve(workspaceRoot, "node_modules/react"))}/.*$`,
-  // ),
-  // new RegExp(
-  //   `^${escape(path.resolve(workspaceRoot, "node_modules/react-native"))}/.*$`,
-  // ),
-  // new RegExp(
-  //   `^${escape(path.resolve(workspaceRoot, "node_modules/expo-router"))}/.*$`,
-  // ),
+  new RegExp(
+    `^${escape(path.resolve(workspaceRoot, "node_modules/react"))}/.*$`,
+  ),
+  new RegExp(
+    `^${escape(path.resolve(workspaceRoot, "node_modules/react-native"))}/.*$`,
+  ),
+  new RegExp(
+    `^${escape(path.resolve(workspaceRoot, "node_modules/expo-router"))}/.*$`,
+  ),
 ];
 
 // 4. Force alias to the local versions
 config.resolver.extraNodeModules = {
   ...config.resolver.extraNodeModules,
-  // react: path.resolve(projectRoot, "node_modules/react"),
-  // "react-native": path.resolve(projectRoot, "node_modules/react-native"),
-  // "expo-router": path.resolve(projectRoot, "node_modules/expo-router"),
+  react: path.resolve(projectRoot, "node_modules/react"),
+  "react-native": path.resolve(projectRoot, "node_modules/react-native"),
+  "expo-router": path.resolve(projectRoot, "node_modules/expo-router"),
 };
 
 module.exports = config;

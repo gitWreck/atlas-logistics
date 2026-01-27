@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "mobile",
-    "slug": "atlas-tracking",
+    "slug": "atlas-transport",
     "version": "1.0.0",
     "main": "index.js",
     "scheme": "atlastrucking",
@@ -30,13 +30,13 @@
     },
     "extra": {
       "eas": {
-        "projectId": "f9739e4f-031c-4794-8d49-e1910831b6c5"
+        "projectId": "3ec04372-8f0b-4964-b303-cd522153e2ae"
       },
       "router": {
         "origin": false
       }
     },
-    "owner": "esplanadrey",
+    "owner": "atlas-transport",
     "plugins": [
       "expo-router"
     ]
