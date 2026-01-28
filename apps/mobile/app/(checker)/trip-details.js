@@ -13,7 +13,13 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { FontAwesome5, Ionicons, MaterialIcons } from "@expo/vector-icons";
 import { getFunctions, httpsCallable } from "firebase/functions";
 // 1. IMPORT FIREBASE
-import { collection, onSnapshot, query, orderBy } from "firebase/firestore";
+import {
+  collection,
+  onSnapshot,
+  query,
+  orderBy,
+  doc,
+} from "firebase/firestore";
 import { db } from "../../firebase";
 
 export default function TripDetailsScreen() {
@@ -24,6 +30,7 @@ export default function TripDetailsScreen() {
   const [shipments, setShipments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false); // Separate loading state for actions
+  const [trip, setTrip] = useState(null); // <--- ADD THIS
 
   // 2. FETCH REAL SHIPMENTS (Sub-collection Listener)
   useEffect(() => {
@@ -62,6 +69,19 @@ export default function TripDetailsScreen() {
       },
     );
 
+    return () => unsubscribe();
+  }, [tripId]);
+
+  useEffect(() => {
+    if (!tripId) return;
+    const tripRef = doc(db, "truck_trips", tripId);
+
+    // Listen to the Trip Document
+    const unsubscribe = onSnapshot(tripRef, (docSnap) => {
+      if (docSnap.exists()) {
+        setTrip({ id: docSnap.id, ...docSnap.data() });
+      }
+    });
     return () => unsubscribe();
   }, [tripId]);
 
@@ -134,6 +154,47 @@ export default function TripDetailsScreen() {
         { text: "Confirm", onPress: () => updateStatus(ids, newStatus) },
       ],
     );
+  };
+
+  // 4. NEW: HANDLE FINISH LOADING
+  const handleFinishLoading = () => {
+    if (!trip) return;
+
+    // Safety: Prevent empty trucks
+    if ((trip.loadedCount || 0) === 0) {
+      Alert.alert("Empty Truck", "You must scan at least one package.");
+      return;
+    }
+
+    const total = trip.totalItems || 0;
+    const loaded = trip.loadedCount || 0;
+
+    const isFull = loaded >= total;
+    const message = isFull
+      ? "All items loaded. Release to driver?"
+      : `Only ${loaded}/${total} items loaded. Release anyway?`;
+
+    Alert.alert("Confirm Seal", message, [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "SEAL TRUCK",
+        onPress: async () => {
+          setUpdating(true); // Reuse your existing loader state
+          try {
+            const functions = getFunctions(undefined, "asia-southeast1");
+            const finishFn = httpsCallable(functions, "finishLoading");
+            await finishFn({ tripId: tripId });
+
+            Alert.alert("Success", "Truck marked as LOADED. Driver notified.");
+            router.back();
+          } catch (err) {
+            Alert.alert("Error", err.message);
+          } finally {
+            setUpdating(false);
+          }
+        },
+      },
+    ]);
   };
 
   return (
@@ -261,6 +322,43 @@ export default function TripDetailsScreen() {
           )}
         />
       )}
+
+      {/* 5. NEW: FOOTER BUTTON */}
+      {/* Only show if trip exists and is NOT yet loaded/shipped */}
+      {trip && (trip.status === "ASSIGNED" || trip.status === "LOADING") && (
+        <View style={styles.footer}>
+          <View style={styles.progressRow}>
+            <Text style={styles.progressText}>
+              {trip.loadedCount || 0} / {trip.totalItems || 0} Loaded
+            </Text>
+            {/* Visual Bar Background */}
+            <View style={styles.progressBarBg}>
+              {/* Visual Bar Fill */}
+              <View
+                style={[
+                  styles.progressBarFill,
+                  {
+                    width: `${Math.min(((trip.loadedCount || 0) / (trip.totalItems || 1)) * 100, 100)}%`,
+                  },
+                ]}
+              />
+            </View>
+          </View>
+
+          <TouchableOpacity
+            style={[
+              styles.finishBtn,
+              (trip.loadedCount || 0) > 0
+                ? styles.btnActive
+                : styles.btnDisabled,
+            ]}
+            onPress={handleFinishLoading}
+            disabled={(trip.loadedCount || 0) === 0}
+          >
+            <Text style={styles.finishText}>FINISH & RELEASE</Text>
+          </TouchableOpacity>
+        </View>
+      )}
     </View>
   );
 }
@@ -351,5 +449,51 @@ const styles = StyleSheet.create({
     borderLeftColor: "#334155", // Dark Border
     height: "100%",
     justifyContent: "center",
+  },
+
+  // FOOTER STYLES
+  footer: {
+    padding: 20,
+    borderTopWidth: 1,
+    borderTopColor: "#334155",
+    backgroundColor: "#1e293b", // Match card color
+  },
+  progressRow: {
+    marginBottom: 15,
+  },
+  progressText: {
+    color: "#94a3b8",
+    marginBottom: 8,
+    fontSize: 12,
+    fontWeight: "bold",
+    textAlign: "right",
+  },
+  progressBarBg: {
+    height: 6,
+    backgroundColor: "#334155",
+    borderRadius: 3,
+    overflow: "hidden",
+  },
+  progressBarFill: {
+    height: "100%",
+    backgroundColor: "#10b981", // Green progress
+  },
+  finishBtn: {
+    padding: 18,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  btnActive: {
+    backgroundColor: "#3b82f6", // Bright Blue
+  },
+  btnDisabled: {
+    backgroundColor: "#475569", // Slate 600
+  },
+  finishText: {
+    color: "#fff",
+    fontWeight: "bold",
+    fontSize: 16,
+    letterSpacing: 1,
   },
 });
