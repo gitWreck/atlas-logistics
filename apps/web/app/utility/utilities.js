@@ -41,15 +41,25 @@ export function formatFirestoreDate(value) {
 
   let date;
 
-  // Firestore Timestamp
-  if (value._seconds) {
+  // 1. Handle actual Firestore Timestamp object (Best Practice)
+  if (typeof value.toDate === "function") {
+    date = value.toDate();
+  }
+  // 2. Handle object with 'seconds' (Web SDK / Client side)
+  else if (value.seconds) {
+    date = new Date(value.seconds * 1000);
+  }
+  // 3. Handle object with '_seconds' (Node.js / Admin SDK)
+  else if (value._seconds) {
     date = new Date(value._seconds * 1000);
   }
-  // ISO string or Date
+  // 4. Handle String, Number, or Date Object
   else {
     date = new Date(value);
-    if (isNaN(date.getTime())) return "";
   }
+
+  // Final validation
+  if (isNaN(date.getTime())) return "";
 
   return date.toLocaleString("en-US", {
     month: "short",

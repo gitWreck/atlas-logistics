@@ -1,11 +1,11 @@
 import React from "react";
 import QRCode from "react-qr-code";
 
-export default function ShipmentLabel({ shipment }) {
+export default function ShipmentLabel({ shipment, packages }) {
   if (!shipment) return null;
 
   return (
-    <div className="w-[4in] h-[6in] bg-white text-black p-4 flex flex-col font-sans border border-gray-300 mx-auto">
+    <div className="w-[3.5in] h-[6in] bg-white text-black p-4 flex flex-col font-sans border border-gray-300 mx-auto">
       {/* HEADER */}
       <div className="flex justify-between items-start border-b-2 border-black pb-2 mb-2">
         <div className="font-bold text-2xl uppercase tracking-tighter">
@@ -13,9 +13,7 @@ export default function ShipmentLabel({ shipment }) {
         </div>
         <div className="text-right">
           <div className="text-xs font-bold text-gray-500">WEIGHT</div>
-          <div className="text-xl font-bold">
-            {shipment.weightKg || "0.5"} KG
-          </div>
+          <div className="text-xl font-bold">{packages.weight || "0.5"} KG</div>
         </div>
       </div>
 
@@ -25,25 +23,25 @@ export default function ShipmentLabel({ shipment }) {
           <span className="font-bold text-gray-500 block text-[10px]">
             FROM:
           </span>
-          <div className="font-bold">{shipment.senderName}</div>
-          <div>{shipment.originWarehouse || "Manila Hub"}</div>
+          <div className="font-bold">{shipment.sender.name}</div>
+          <div>{shipment.origin || "Manila Hub"}</div>
         </div>
         <div>
           <span className="font-bold text-gray-500 block text-[10px]">TO:</span>
-          <div className="font-bold text-lg">{shipment.receiverName}</div>
-          <div className="leading-tight">{shipment.destinationAddress}</div>
+          <div className="font-bold text-lg">{shipment.recipient.name}</div>
+          <div className="leading-tight">{shipment.destination}</div>
         </div>
       </div>
 
       {/* QR CODE (THE CORE) */}
       <div className="flex-1 flex flex-col items-center justify-center border-2 border-black rounded-lg py-4 mb-2">
         <QRCode
-          value={shipment.id} // This is what the scanner reads
+          value={packages.trackingNumber} // This is what the scanner reads
           size={128}
           level="M"
         />
         <div className="mt-2 font-mono font-bold text-sm tracking-widest">
-          {shipment.trackingNumber}
+          {packages.trackingNumber}
         </div>
       </div>
 
@@ -51,7 +49,11 @@ export default function ShipmentLabel({ shipment }) {
       <div className="grid grid-cols-3 text-center text-[10px] font-bold border-t border-black pt-2">
         <div>
           <div className="text-gray-500">ROUTE</div>
-          <div className="text-lg">{shipment.route || "N/A"}</div>
+          <div className="text-lg">
+            {shipment.originCode || "N/A"}
+            {" -> "}
+            {shipment.destinationCode || "N/A"}
+          </div>
         </div>
         <div>
           <div className="text-gray-500">PCS</div>
@@ -59,7 +61,7 @@ export default function ShipmentLabel({ shipment }) {
         </div>
         <div>
           <div className="text-gray-500">DATE</div>
-          <div>{new Date().toLocaleDateString()}</div>
+          <div className="text-lg">{new Date().toLocaleDateString()}</div>
         </div>
       </div>
     </div>
