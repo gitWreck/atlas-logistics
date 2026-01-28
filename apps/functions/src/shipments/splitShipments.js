@@ -12,7 +12,7 @@ exports.splitShipment = onCall(
   { region: "asia-southeast1", maxInstances: 10 },
   async (req) => {
     // 1. Auth & Role Check
-    await requireRole(req, ["admin", "manager"]);
+    await requireRole(db, req, ["admin", "manager"]);
 
     const { originalShipmentId, itemsToSplit } = req.data;
     // itemsToSplit:
@@ -26,6 +26,8 @@ exports.splitShipment = onCall(
 
     const uid = req.auth.uid;
     const originRef = db.collection("shipments").doc(originalShipmentId);
+
+    let newShipmentId = null;
 
     await db.runTransaction(async (tx) => {
       // 2. Get Original Shipment
@@ -90,7 +92,7 @@ exports.splitShipment = onCall(
 
       // Generate New Shipment ID
       const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, "");
-      const newShipmentId = `${originalShipmentId}-SP-${Date.now().toString().slice(-4)}`;
+      newShipmentId = `${originalShipmentId}-SP-${Date.now().toString().slice(-4)}`;
       const newShipmentRef = db.collection("shipments").doc(newShipmentId);
 
       // 5. Create New Shipment Doc
@@ -103,7 +105,7 @@ exports.splitShipment = onCall(
         statusHistory: [
           {
             status: "RECEIVED",
-            at: admin.firestore.FieldValue.serverTimestamp(),
+            at: admin.firestore.Timestamp.now(),
             note: `Split from ${originalShipmentId}`,
           },
         ],

@@ -1,37 +1,47 @@
 import React, { useState, useEffect } from "react";
-import { httpsCallable } from "firebase/functions";
-import { functions } from "@/lib/firebase";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faCut,
   faTimes,
   faArrowRight,
   faBoxOpen,
+  faTruckLoading,
 } from "@fortawesome/free-solid-svg-icons";
+// 1. IMPORT THE EXTRA FUNCTIONS
+import {
+  splitShipments,
+  unassignShipmentFromTruckTrip,
+  assignShipmentToTruckTrip,
+} from "@/app/utility/FirebaseFunctions";
 
 export default function SplitShipmentModal({
   isOpen,
   onClose,
   shipment,
+  tripId,
   onSuccess,
 }) {
   const [splitCount, setSplitCount] = useState(1);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [step, setStep] = useState(""); // To show progress text
 
-  // Reset state when modal opens
   useEffect(() => {
     if (isOpen) {
       setSplitCount(1);
       setError("");
+      setStep("");
     }
   }, [isOpen]);
 
   if (!isOpen || !shipment) return null;
 
   const totalItems = shipment.totalItems || 0;
-  // Maximum items you can move (must leave at least 1 behind)
   const maxMove = totalItems > 1 ? totalItems - 1 : 0;
+
+  // Check if this is an "Active" split (on a truck)
+  const activeTripId = shipment?.currentTruckTripId || tripId;
+  const isOnTrip = !!activeTripId;
 
   const handleSplit = async (e) => {
     e.preventDefault();
@@ -39,20 +49,48 @@ export default function SplitShipmentModal({
     setError("");
 
     try {
-      const fn = httpsCallable(functions, "splitShipment");
+      // SCENARIO A: PARTIAL OFFLOAD (On Truck)
+      if (isOnTrip) {
+        const tripId = activeTripId;
 
-      await fn({
-        originalShipmentId: shipment.id,
-        itemsToSplit: Number(splitCount),
-      });
+        // 1. Unassign (Pull off truck)
+        setStep("Offloading shipment...");
+        await unassignShipmentFromTruckTrip({
+          trackingDocId: shipment.id,
+          truckTripId: tripId,
+        });
 
-      onSuccess(); // Refresh parent list
-      onClose(); // Close modal
+        // 2. Split (Divide items)
+        setStep("Splitting items...");
+        await splitShipments({
+          originalShipmentId: shipment.id,
+          itemsToSplit: Number(splitCount),
+        });
+
+        // 3. Re-assign Original (Put remaining items back on truck)
+        setStep("Loading remaining items back...");
+        await assignShipmentToTruckTrip({
+          trackingDocId: shipment.id,
+          truckTripId: tripId,
+        });
+      }
+      // SCENARIO B: WAREHOUSE SPLIT (Not on truck)
+      else {
+        setStep("Processing split...");
+        await splitShipments({
+          originalShipmentId: shipment.id,
+          itemsToSplit: Number(splitCount),
+        });
+      }
+
+      onSuccess();
+      onClose();
     } catch (err) {
       console.error(err);
       setError(err.message || "Failed to split shipment.");
     } finally {
       setLoading(false);
+      setStep("");
     }
   };
 
@@ -62,8 +100,11 @@ export default function SplitShipmentModal({
         {/* Header */}
         <div className="p-4 border-b border-slate-800 flex justify-between items-center bg-slate-950">
           <h3 className="font-bold text-white flex items-center gap-2">
-            <FontAwesomeIcon icon={faCut} className="text-amber-500" />
-            Split Shipment
+            <FontAwesomeIcon
+              icon={isOnTrip ? faTruckLoading : faCut}
+              className={isOnTrip ? "text-blue-500" : "text-amber-500"}
+            />
+            {isOnTrip ? "Partial Offload" : "Split Shipment"}
           </h3>
           <button
             onClick={onClose}
@@ -76,19 +117,35 @@ export default function SplitShipmentModal({
         {/* Content */}
         <form onSubmit={handleSplit} className="p-6 space-y-6">
           <div className="text-sm text-slate-400">
-            Splitting{" "}
-            <span className="font-mono text-white font-bold">
-              {shipment.trackingNumber}
-            </span>
-            . The items you select will be moved to a <b>new</b> shipment ID.
+            {isOnTrip ? (
+              <>
+                Removing items from <b>Trip</b>. <br />
+                <span className="text-white font-bold">
+                  {totalItems - splitCount} items
+                </span>{" "}
+                will stay on the truck. <br />
+                <span className="text-amber-500 font-bold">
+                  {splitCount} items
+                </span>{" "}
+                will be offloaded & unassigned.
+              </>
+            ) : (
+              <>
+                Splitting{" "}
+                <span className="font-mono text-white font-bold">
+                  {shipment.trackingNumber}
+                </span>
+                . Selected items move to a <b>new</b> ID.
+              </>
+            )}
           </div>
 
           {/* Visual Splitter */}
           <div className="bg-slate-950 rounded-lg p-4 border border-slate-800 flex items-center justify-between gap-2">
-            {/* Left: Original (Remaining) */}
+            {/* Left: Original */}
             <div className="text-center w-1/3">
               <div className="text-[10px] uppercase font-bold text-slate-500 mb-1">
-                Stays on Truck
+                {isOnTrip ? "Stays on Trip" : "Original ID"}
               </div>
               <div className="text-2xl font-bold text-white">
                 {totalItems - splitCount}
@@ -98,10 +155,10 @@ export default function SplitShipmentModal({
 
             <FontAwesomeIcon icon={faArrowRight} className="text-slate-600" />
 
-            {/* Right: New (Moved) */}
+            {/* Right: New */}
             <div className="text-center w-1/3">
               <div className="text-[10px] uppercase font-bold text-amber-500 mb-1">
-                Moves to New ID
+                {isOnTrip ? "Offloads" : "New ID"}
               </div>
               <div className="text-3xl font-bold text-amber-400">
                 {splitCount}
@@ -110,10 +167,10 @@ export default function SplitShipmentModal({
             </div>
           </div>
 
-          {/* Slider / Input */}
+          {/* Input Section */}
           <div className="space-y-2">
             <label className="text-xs font-bold text-slate-400 uppercase flex justify-between">
-              <span>Items to separate</span>
+              <span>Items to {isOnTrip ? "Offload" : "Split"}</span>
               <span>Max: {maxMove}</span>
             </label>
             <input
@@ -143,9 +200,10 @@ export default function SplitShipmentModal({
             </div>
           </div>
 
+          {/* Status/Error Messages */}
           {maxMove === 0 && (
             <div className="text-red-400 text-xs text-center bg-red-500/10 p-2 rounded">
-              Cannot split: Shipment has only 1 item. Unassign it instead.
+              Cannot split: Shipment has only 1 item. Use "Unassign" instead.
             </div>
           )}
 
@@ -167,9 +225,15 @@ export default function SplitShipmentModal({
             <button
               type="submit"
               disabled={loading || maxMove === 0}
-              className="flex-1 py-2.5 rounded-lg bg-amber-600 hover:bg-amber-500 text-white font-bold text-sm shadow-lg shadow-amber-500/20 disabled:opacity-50 disabled:grayscale"
+              className="flex-1 py-2.5 rounded-lg bg-amber-600 hover:bg-amber-500 text-white font-bold text-sm shadow-lg shadow-amber-500/20 disabled:opacity-50 flex justify-center items-center gap-2"
             >
-              {loading ? "Splitting..." : "Confirm Split"}
+              {loading ? (
+                <span className="animate-pulse">{step || "Processing..."}</span>
+              ) : isOnTrip ? (
+                "Confirm Offload"
+              ) : (
+                "Confirm Split"
+              )}
             </button>
           </div>
         </form>

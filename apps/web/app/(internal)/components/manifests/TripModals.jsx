@@ -17,6 +17,7 @@ export default function TripModals({
         isOpen={state.splitModalOpen}
         shipment={state.selectedShipment}
         onClose={() => actions.setSplitModalOpen(false)}
+        tripId={trip?.tripId}
         onSuccess={() => {
           actions.fetchShipments();
           actions.setSplitModalOpen(false);

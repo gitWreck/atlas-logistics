@@ -48,6 +48,7 @@ export const bulkAssignShipments = httpsCallable(
   functions,
   "bulkAssignShipments",
 );
+export const splitShipments = httpsCallable(functions, "splitShipments");
 
 // ----------------------------
 

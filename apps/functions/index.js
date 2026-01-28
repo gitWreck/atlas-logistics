@@ -66,6 +66,8 @@ exports.bulkAssignShipments =
   require("./src/shipments/bulkAssignShipments").bulkAssignShipments;
 exports.bulkUpdateShipmentStatus =
   require("./src/shipments/bulkUpdateShipmentStatus").bulkUpdateShipmentStatus;
+exports.splitShipments =
+  require("./src/shipments/splitShipments").splitShipment;
 
 // -------------------------------
 
