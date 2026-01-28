@@ -12,6 +12,8 @@ import {
   faQrcode,
 } from "@fortawesome/free-solid-svg-icons";
 import StatusBadge from "../ui/StatusBadge";
+import ShipmentBoard from "./ShipmentBoard";
+import ShipmentLabel from "./ShipmentLabel";
 
 function calculateCurrentStep(status) {
   // You can reuse your logic here to determine which step is "Active"
@@ -88,21 +90,7 @@ export default function ShipmentDrawer({ isOpen, onClose, data }) {
         </div>
 
         {/* QR CODE REVEAL (CONDITIONAL) */}
-        {showQR && (
-          <div className="p-4 bg-white rounded-lg flex flex-col items-center justify-center animate-in zoom-in duration-200">
-            <QRCode
-              value={pkg.trackingNumber} // <--- THE PAYLOAD
-              size={128}
-              level="M"
-            />
-            <div className="mt-2 text-[10px] font-mono font-bold text-black tracking-widest">
-              {pkg.trackingNumber}
-            </div>
-            <div className="text-[9px] text-gray-500 uppercase mt-1">
-              Scan to Load Package
-            </div>
-          </div>
-        )}
+        {showQR && <ShipmentLabel shipment={data} packages={pkg} />}
       </div>
     );
   }
@@ -259,9 +247,13 @@ export default function ShipmentDrawer({ isOpen, onClose, data }) {
           {activeTab === "ITEMS" && (
             <div className="space-y-3 animate-in fade-in slide-in-from-right-4 duration-300">
               <button
-                // onClick={() =>
-                //   window.open(`../print/labels?id=${data.id}`, "_blank")
-                // }
+                onClick={() =>
+                  // window.open(`../print/labels?id=${data.id}`, "_blank")
+                  window.open(
+                    `/components/print/labels?id=${encodeURIComponent(data.id)}`,
+                    "_blank",
+                  )
+                }
                 className="flex items-center gap-2 bg-slate-700 hover:bg-slate-600 text-white px-4 py-2 rounded-lg transition-colors text-sm font-bold"
               >
                 <FontAwesomeIcon icon={faPrint} />
