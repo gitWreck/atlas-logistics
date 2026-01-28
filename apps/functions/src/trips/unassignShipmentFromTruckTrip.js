@@ -111,11 +111,13 @@ exports.unassignShipmentFromTruckTrip = onCall(
             return {
               ...pkg,
               status: "RECEIVED", // Reset to warehouse inventory
+
               loadedAt: null,
               loadedBy: null,
               loadedOnTrip: null,
-              receivedAt: null, // Clear delivery data if it existed
-              receivedBy: null,
+
+              deliveredAt: null,
+              deliveredBy: null,
             };
           }
           return pkg;

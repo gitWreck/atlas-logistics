@@ -139,8 +139,8 @@ exports.assignShipmentToTruckTrip = onCall(
         totalItems: admin.firestore.FieldValue.increment(itemsToAdd),
         itemPending: admin.firestore.FieldValue.increment(itemsToAdd),
 
-        totalLoaded: 0,
-        totalDelivered: 0,
+        // totalLoaded: 0,
+        // totalDelivered: 0,
 
         updatedAt: now,
         updatedBy: uid,
