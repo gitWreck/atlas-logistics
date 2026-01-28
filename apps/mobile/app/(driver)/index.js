@@ -85,7 +85,7 @@ export default function DriverDashboard() {
         style: "destructive",
         onPress: () => {
           signOut(auth);
-          router.replace("/");
+          router.replace("/(auth)/login");
         },
       },
     ]);
