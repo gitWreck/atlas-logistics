@@ -175,7 +175,7 @@ exports.createShipmentWithPackages = onCall(
 
       // AGGREGATES
       totals: {
-        // totalItems: items.length,
+        totalItems: items.length,
         received: items.length, // Starts fully received
         pending: items.length, // All items pending loading
         loaded: 0, // Starts at 0
