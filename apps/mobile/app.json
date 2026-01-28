@@ -3,7 +3,6 @@
     "name": "mobile",
     "slug": "atlas-transport",
     "version": "1.0.0",
-    "main": "index.js",
     "scheme": "atlastrucking",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -22,7 +21,6 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "edgeToEdgeEnabled": true,
       "package": "com.atlas.atlastracking"
     },
     "web": {
@@ -38,7 +36,8 @@
     },
     "owner": "atlas-transport",
     "plugins": [
-      "expo-router"
+      "expo-router",
+      "expo-font"
     ]
   }
 }
