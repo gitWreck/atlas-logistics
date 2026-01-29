@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { View, Text, TextInput, StyleSheet } from "react-native";
+import { View, Text, TextInput, StyleSheet, TouchableOpacity } from "react-native";
 import { FontAwesome } from "@expo/vector-icons";
 
 export default function AtlasInput({
@@ -12,6 +12,10 @@ export default function AtlasInput({
   iconName,
 }) {
   const [isFocused, setIsFocused] = useState(false);
+  const [isPasswordVisible, setIsPasswordVisible] = useState(false);
+
+  const isPasswordField = !!secureTextEntry;
+  const effectiveSecureEntry = isPasswordField && !isPasswordVisible;
 
   return (
     <View style={styles.container}>
@@ -42,12 +46,27 @@ export default function AtlasInput({
           placeholderTextColor="#94a3b8"
           autoCapitalize="none"
           keyboardType={keyboardType}
-          secureTextEntry={secureTextEntry}
+          secureTextEntry={effectiveSecureEntry}
           value={value}
           onChangeText={onChangeText}
           onFocus={() => setIsFocused(true)}
           onBlur={() => setIsFocused(false)}
         />
+
+        {/* Password visibility toggle (eye icon) */}
+        {isPasswordField && (
+          <TouchableOpacity
+            onPress={() => setIsPasswordVisible((prev) => !prev)}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          >
+            <FontAwesome
+              name={isPasswordVisible ? "eye-slash" : "eye"}
+              size={18}
+              color={isFocused ? "#2563eb" : "#94a3b8"}
+              style={styles.toggleIcon}
+            />
+          </TouchableOpacity>
+        )}
       </View>
     </View>
   );
@@ -82,6 +101,9 @@ const styles = StyleSheet.create({
   },
   icon: {
     marginRight: 12,
+  },
+  toggleIcon: {
+    marginLeft: 12,
   },
   input: {
     flex: 1,

@@ -1,19 +1,10 @@
-import React from "react";
 import { View, Text, StyleSheet } from "react-native";
-import { FontAwesome } from "@expo/vector-icons";
+import { Image } from "expo-image";
 
 export default function LoginHeader({ title, subtitle }) {
   return (
     <View style={styles.header}>
-      <View style={styles.logoContainer}>
-        {/* If you have a local image, put it in apps/mobile/assets/ 
-           and use: require('../../assets/atlas-logo.png')
-           For now, we will use a simple placeholder view or icon.
-        */}
-        {/* <Text style={{ fontSize: 40 }}>🚚</Text> */}
-        <FontAwesome name="truck" size={40} color="white" />
-      </View>
-      <Text style={styles.title}>{title}</Text>
+      <Image source={require("../../assets/atlas-login.svg")} style={{ width: 200, height: 200 }} />
       <Text style={styles.subtitle}>{subtitle}</Text>
     </View>
   );
@@ -40,7 +31,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 24,
     fontWeight: "bold",
-    color: "white",
+    color: "#0650A0",
     letterSpacing: 1.5,
   },
   subtitle: {
