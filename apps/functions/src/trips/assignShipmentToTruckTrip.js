@@ -99,6 +99,9 @@ exports.assignShipmentToTruckTrip = onCall(
           loadedCount: 0,
           deliveredCount: 0,
 
+          sender: tracking.sender,
+          receiver: tracking.recipient,
+
           createdAt: now,
           createdBy: uid,
 
