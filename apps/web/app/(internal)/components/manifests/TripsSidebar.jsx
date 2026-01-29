@@ -134,8 +134,9 @@ export default function TripsSidebar({
               className="bg-slate-900 border border-slate-700 text-slate-300 text-xs rounded-lg p-2 outline-none focus:border-blue-500"
             >
               <option value="ALL">All Status</option>
-              <option value="PLANNED">Planned</option>
-              <option value="ACTIVE">Active</option>
+              <option value="CREATED">Created</option>
+              <option value="LOADED">Loaded</option>
+              <option value="IN_TRANSIT">In Transit</option>
               <option value="COMPLETED">Completed</option>
             </select>
             <div className="relative">
@@ -201,7 +202,7 @@ export default function TripsSidebar({
                 <div className="flex justify-between items-center text-[10px] text-slate-500">
                   <span>{t.route || "No Route"}</span>
                   <span className="bg-slate-950 px-1.5 py-0.5 rounded border border-slate-800 text-slate-400">
-                    {t.totalItems || 0} Pkgs
+                    {t.totalItems || 0} Package/s
                   </span>
                 </div>
 

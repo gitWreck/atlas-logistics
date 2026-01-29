@@ -60,7 +60,7 @@ export default function TripManifestTable({
           </h3>
           <div className="flex items-center gap-3">
             <span className="bg-slate-800 text-slate-300 px-2 py-1 rounded text-xs font-mono hidden sm:inline-block">
-              Total Pkgs: {totalItems}
+              Total Package/s: {totalItems}
             </span>
             <button
               onClick={onBulkAssign}
