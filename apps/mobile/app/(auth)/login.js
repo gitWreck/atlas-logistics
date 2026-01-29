@@ -19,9 +19,31 @@ import LoginHeader from "../../components/auth/LoginHeader"; // (Assume you made
 
 export default function LoginScreen() {
   const router = useRouter();
+  const [disabled, setDisabled] = useState(true);
   const [loading, setLoading] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+
+  const validateEmail = (value) => /\S+@\S+\.\S+/.test(value);
+
+  const updateDisabled = (emailValue, passwordValue) => {
+    const isEmailValid = validateEmail(emailValue);
+    if (!emailValue || !passwordValue || !isEmailValid) {
+      setDisabled(true);
+    } else {
+      setDisabled(false);
+    }
+  };
+
+  const handleEmailChange = (value) => {
+    setEmail(value);
+    updateDisabled(value, password);
+  };
+
+  const handlePasswordChange = (value) => {
+    setPassword(value);
+    updateDisabled(email, value);
+  };
 
   const handleLogin = async () => {
     // 1. Basic Validation
@@ -89,6 +111,7 @@ export default function LoginScreen() {
       Alert.alert("Login Failed", errorMessage);
     } finally {
       setLoading(false);
+      updateDisabled(email, password);
     }
   };
 
@@ -98,51 +121,39 @@ export default function LoginScreen() {
       style={styles.container}
     >
       <ScrollView contentContainerStyle={styles.scrollContainer}>
-        {/* Reusable Header Component */}
         <LoginHeader
           title="ATLAS LOGIN"
           subtitle="Secure Gateway for Operations"
         />
 
-        <View style={styles.formContainer}>
-          {/* Reusable Input Components */}
-          <AtlasInput
-            label="Email Address"
-            placeholder="user@atlas.com"
-            value={email}
-            onChangeText={setEmail}
-            keyboardType="email-address"
-          />
+        <AtlasInput
+          label="Email Address"
+          placeholder="user@atlas.com"
+          value={email}
+          onChangeText={handleEmailChange}
+          keyboardType="email-address"
+        />
 
-          <AtlasInput
-            label="Password"
-            placeholder="••••••••"
-            value={password}
-            onChangeText={setPassword}
-            secureTextEntry={true}
-          />
+        <AtlasInput
+          label="Password"
+          placeholder="••••••••"
+          value={password}
+          onChangeText={handlePasswordChange}
+          secureTextEntry={true}
+        />
 
-          {/* Reusable Button Component */}
-          <AtlasButton
-            title="Sign In"
-            onPress={handleLogin}
-            loading={loading}
-            disabled={loading}
-            iconName="lock"
+        <AtlasButton
+          title="Sign In"
+          onPress={handleLogin}
+          loading={loading}
+          disabled={disabled}
           />
-        </View>
       </ScrollView>
     </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#020617" },
+  container: { flex: 1, backgroundColor: "#FFFFFF" },
   scrollContainer: { flexGrow: 1, justifyContent: "center", padding: 20 },
-  formContainer: {
-    backgroundColor: "white",
-    borderRadius: 20,
-    padding: 24,
-    elevation: 8,
-  },
 });
