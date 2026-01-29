@@ -281,7 +281,9 @@ export default function ShipmentBoard({ userRole }) {
                   }}
                 >
                   <option value="ALL">All View</option>
-                  <option value="ACTIVE">Active</option>
+                  <option value="CREATED">Created</option>
+                  <option value="ASSIGNED">Assigned</option>
+                  <option value="IN_TRANSIT">In Transit</option>
                   <option value="DELAYED">Delayed</option>
                   <option value="DELIVERED">Delivered</option>
                 </select>
