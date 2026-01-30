@@ -16,6 +16,7 @@ import {
   faCheck,
 } from "@fortawesome/free-solid-svg-icons";
 import { formatDistanceToNow } from "date-fns"; // Recommended for "5 mins ago"
+import StatusBadge from "../ui/StatusBadge";
 
 export default function NotificationBell() {
   const [alerts, setAlerts] = useState([]);
@@ -126,13 +127,27 @@ export default function NotificationBell() {
                   {/* Content */}
                   <div className="flex-1">
                     <p className="text-sm font-bold text-slate-200 leading-tight mb-1">
-                      {alert.message || "New System Alert"}
+                      {/* ✅ FIX: Construct message since 'message' field is missing in data */}
+                      {alert.details.driverName
+                        ? `${alert.details.driverName}: `
+                        : ""}
+                      {alert.details.reason ? (
+                        <StatusBadge
+                          status={"delayed"}
+                          reason={alert.details.reason}
+                        />
+                      ) : (
+                        "New System Alert"
+                      )}
                     </p>
                     <div className="flex justify-between items-center mt-2">
                       <span className="text-[10px] text-slate-500 font-mono">
-                        {formatDistanceToNow(alert.createdAt.toDate(), {
-                          addSuffix: true,
-                        })}
+                        {/* ✅ FIX: Safe check for toDate() in case data is incomplete */}
+                        {alert.createdAt?.toDate
+                          ? formatDistanceToNow(alert.createdAt.toDate(), {
+                              addSuffix: true,
+                            })
+                          : "Just now"}
                       </span>
 
                       {/* Mark Read Button (Visible on Hover) */}
