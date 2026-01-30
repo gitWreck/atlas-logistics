@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import {
   View,
+  Text,
   StyleSheet,
   Alert,
   KeyboardAvoidingView,
@@ -10,10 +11,11 @@ import {
 import { useRouter } from "expo-router";
 import { signInWithEmailAndPassword, signOut } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
+import { Image } from "expo-image";
 
 import { auth, db } from "../../firebase";
 import AtlasInput from "../../components/ui/AtlasInput";
-import AtlasButton from "../../components/ui/AtlasButton";
+import GradientButton from "../../components/ui/GradientButton";
 import LoginHeader from "../../components/auth/LoginHeader";
 
 export default function LoginScreen() {
@@ -140,12 +142,23 @@ export default function LoginScreen() {
           secureTextEntry={true}
         />
 
-        <AtlasButton
+        <GradientButton
           title="Sign In"
           onPress={handleLogin}
           loading={loading}
           disabled={disabled}
           />
+
+          <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", marginTop: 20 }}>
+            <Image
+              source={require("../../assets/icons/shield.svg")}
+              style={{ width: 18, height: 18, marginRight: 8, alignSelf: 'center' }}
+            />
+            <Text style={[styles.note, { marginTop: 0 }]}>
+              All login attempts are monitored and audited.
+            </Text>
+          </View>
+
       </ScrollView>
     </KeyboardAvoidingView>
   );
@@ -154,4 +167,10 @@ export default function LoginScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#FFFFFF" },
   scrollContainer: { flexGrow: 1, justifyContent: "center", padding: 20 },
+  note: {
+    textAlign: "center",
+    color: "#94a3b8",
+    fontSize: 13,
+    marginTop: 20,
+  }
 });

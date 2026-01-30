@@ -7,7 +7,6 @@ import {
   StyleSheet,
 } from "react-native";
 import { FontAwesome } from "@expo/vector-icons";
-import { LinearGradient } from "expo-linear-gradient";
 
 export default function AtlasButton({
   onPress,
@@ -16,62 +15,42 @@ export default function AtlasButton({
   iconName,
   disabled,
 }) {
-  const gradientColors = disabled
-    ? ["#94a3b8", "#94a3b8"] // gray when disabled
-    : ["#042C83", "#07B9F4"];
-
   return (
     <TouchableOpacity
+      style={[styles.button, disabled && styles.buttonDisabled]}
       onPress={onPress}
-      disabled={disabled || loading}
-      activeOpacity={0.8}
-      style={{ width: "100%" }}
+      disabled={disabled}
     >
-      <LinearGradient
-        colors={gradientColors}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 0 }}
-        style={styles.button}
-      >
-        {loading ? (
-          <ActivityIndicator color="#fff" />
-        ) : (
-          <View style={styles.buttonContent}>
-            {iconName && (
-              <FontAwesome
-                name={iconName}
-                size={18}
-                color="#fff"
-                style={{ marginRight: 8 }}
-              />
-            )}
-            <Text style={styles.buttonText}>{title}</Text>
-          </View>
-        )}
-      </LinearGradient>
+      {loading ? (
+        <ActivityIndicator color="#fff" />
+      ) : (
+        <View style={styles.buttonContent}>
+          {iconName && (
+            <FontAwesome
+              name={iconName}
+              size={20}
+              color="white"
+              style={{ marginRight: 10 }}
+            />
+          )}
+          <Text style={styles.buttonText}>{title}</Text>
+        </View>
+      )}
     </TouchableOpacity>
   );
 }
 
 const styles = StyleSheet.create({
   button: {
-    height: 52,
-    borderRadius: 26,
+    backgroundColor: "#2563eb",
+    paddingVertical: 16,
+    borderRadius: 12,
     alignItems: "center",
     justifyContent: "center",
-    shadowColor: "#07B9F4",
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.35,
-    shadowRadius: 12,
-    elevation: 6,
+    marginTop: 10,
+    elevation: 4,
   },
-  buttonContent: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  buttonText: {
-    color: "#fff",
-    fontWeight: "600",
-    fontSize: 16,
-  },
+  buttonDisabled: { backgroundColor: "#94a3b8" },
+  buttonContent: { flexDirection: "row", alignItems: "center" },
+  buttonText: { color: "white", fontWeight: "bold", fontSize: 16 },
 });
