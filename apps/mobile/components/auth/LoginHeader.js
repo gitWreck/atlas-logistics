@@ -3,8 +3,9 @@ import { Image } from "expo-image";
 
 export default function LoginHeader({ title, subtitle }) {
   return (
-    <View style={styles.header}>
+    <View style={styles.header}>a
       <Image source={require("../../assets/atlas-login.svg")} style={{ width: 200, height: 200 }} />
+      <Text style={styles.title}>{title}</Text>
       <Text style={styles.subtitle}>{subtitle}</Text>
     </View>
   );

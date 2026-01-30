@@ -15,7 +15,6 @@ import {
 import { CameraView, useCameraPermissions } from "expo-camera";
 import { useLocalSearchParams } from "expo-router";
 import { FontAwesome } from "@expo/vector-icons";
-import AtlasButton from "../../components/ui/AtlasButton";
 import { scanPackages } from "../../components/utilities/FirebaseFunctions";
 
 export default function ScannerScreen() {
