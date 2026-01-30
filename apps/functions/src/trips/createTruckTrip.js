@@ -87,7 +87,7 @@ exports.createTruckTrip = onCall(
 
         // assignment (optional)
         truckPlateNumber: truckPlateNumber || null,
-        truckInternalCode: truckInternalCode || null,
+        // truckInternalCode: truckInternalCode || null,
         driverName: driverName || null,
         driverId: driverId || null,
 
@@ -99,13 +99,13 @@ exports.createTruckTrip = onCall(
         // counters used by your load/unload pipeline
         // lastSequence: 0, // used by createShipmentWithSequence
         totalLoaded: 0, // aggregate across packages (optional)
-        totalPackages: 0, // optional (you can maintain in functions)
+        // totalPackages: 0, // optional (you can maintain in functions)
         totalItems: 0, // optional
         // totalItemsLoaded: 0, // optional
 
         // delay system (optional)
         delayReason: null,
-        delayCleared: false,
+        // delayCleared: false,
         delayStartedAt: null,
         delayClearedAt: null,
 

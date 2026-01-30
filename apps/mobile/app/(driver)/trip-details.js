@@ -20,6 +20,7 @@ import TripSummaryCard from "../../components/driver/trip/TripSummaryCard";
 import TripProgressStepper from "../../components/driver/trip/TripProgressStepper";
 import TripStatusRow from "../../components/driver/trip/TripStatusRow";
 import TripActionButtons from "../../components/driver/trip/TripActionButtons";
+import { startTrip } from "../../components/utilities/FirebaseFunctions";
 
 export default function TripDetailsScreen() {
   const { tripId } = useLocalSearchParams();
@@ -86,9 +87,7 @@ export default function TripDetailsScreen() {
               */
 
               // Using Cloud Function (Recommended for the automation)
-              const functions = getFunctions(undefined, "asia-southeast1");
-              const startFn = httpsCallable(functions, "startTrip"); // We'll assume you have/make this
-              await startFn({ tripId: trip.id });
+              await startTrip({ tripId: trip.id });
 
               Alert.alert("Success", "Trip Started! Drive Safely.");
             } catch (error) {

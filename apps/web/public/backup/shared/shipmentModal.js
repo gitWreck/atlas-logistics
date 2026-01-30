@@ -1,11 +1,11 @@
 import {
   getFunctions,
-  httpsCallable
+  httpsCallable,
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-functions.js";
 
 import {
   collection,
-  getDocs
+  getDocs,
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
 import { db } from "../firebase.js";
@@ -28,7 +28,11 @@ const hint = document.getElementById("sm_customerHint");
    HELPERS
 ====================================================== */
 const toCode = (s = "") =>
-  s.trim().toUpperCase().replace(/[^A-Z]/g, "").slice(0, 4);
+  s
+    .trim()
+    .toUpperCase()
+    .replace(/[^A-Z]/g, "")
+    .slice(0, 4);
 
 function openModal() {
   modal.classList.add("active");
@@ -60,12 +64,12 @@ async function loadCustomers() {
   const snap = await getDocs(collection(db, "tracking_records"));
   const map = new Map();
 
-  snap.forEach(d => {
+  snap.forEach((d) => {
     const r = d.data();
     if (r.customerName && r.customerPhone) {
       map.set(r.customerName.toLowerCase(), {
         name: r.customerName,
-        phone: r.customerPhone
+        phone: r.customerPhone,
       });
     }
   });
@@ -75,9 +79,7 @@ async function loadCustomers() {
 
 nameInput.addEventListener("input", () => {
   const v = nameInput.value.toLowerCase();
-  const match = cachedCustomers.find(c =>
-    c.name.toLowerCase().startsWith(v)
-  );
+  const match = cachedCustomers.find((c) => c.name.toLowerCase().startsWith(v));
 
   if (match) {
     hint.textContent = `↳ ${match.phone}`;
@@ -93,8 +95,7 @@ nameInput.addEventListener("input", () => {
 ====================================================== */
 export function initShipmentModal({ onCreated }) {
   const functions = getFunctions(undefined, "asia-southeast1");
-  const createShipment =
-    httpsCallable(functions, "createShipment");
+  const createShipment = httpsCallable(functions, "createShipment");
 
   loadCustomers().catch(console.warn);
 
@@ -139,8 +140,8 @@ export function initShipmentModal({ onCreated }) {
           itemCount,
           receivedCount: itemCount,
           loadedCount: 0,
-          pendingCount: itemCount
-        }
+          pendingCount: itemCount,
+        },
       });
 
       closeModal();
@@ -158,7 +159,7 @@ export function initShipmentModal({ onCreated }) {
   };
 
   // ESC to close
-  document.addEventListener("keydown", e => {
+  document.addEventListener("keydown", (e) => {
     if (e.key === "Escape") closeModal();
   });
 }

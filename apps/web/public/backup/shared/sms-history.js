@@ -5,7 +5,7 @@ import {
   where,
   orderBy,
   limit,
-  getDocs
+  getDocs,
 } from "firebase/firestore";
 
 /**
@@ -19,17 +19,17 @@ export async function loadSMSHistory(trackingId, max = 5) {
       collection(db, "sms_logs"),
       where("trackingId", "==", trackingId),
       orderBy("at", "desc"),
-      limit(max)
+      limit(max),
     );
 
     const snap = await getDocs(q);
 
-    return snap.docs.map(d => {
+    return snap.docs.map((d) => {
       const data = d.data();
       return {
         id: d.id,
         ...data,
-        at: data.at || null // normalize timestamp
+        at: data.at || null, // normalize timestamp
       };
     });
   } catch (err) {

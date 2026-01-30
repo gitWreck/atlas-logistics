@@ -20,12 +20,12 @@ import {
   collection,
   query,
   where,
-  getCountFromServer
+  getCountFromServer,
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
 import {
   getFunctions,
-  httpsCallable
+  httpsCallable,
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-functions.js";
 
 import { db } from "../firebase.js";
@@ -45,7 +45,7 @@ export function initTruckTripItemEditor({
   inputEl,
   saveBtn,
   currUser,
-  onSuccess
+  onSuccess,
 }) {
   if (!trackingId || !truckTripId) return;
   if (!inputEl || !saveBtn) return;
@@ -56,7 +56,7 @@ export function initTruckTripItemEditor({
     "tracking_records",
     trackingId,
     "truck_trips",
-    truckTripId
+    truckTripId,
   );
 
   /* ======================================================
@@ -75,10 +75,14 @@ export function initTruckTripItemEditor({
         loadedItems: newValue,
         updatedAt: serverTimestamp(),
         updatedBy: currUser.uid,
-        updatedRole: currUser.role
+        updatedRole: currUser.role,
       });
 
-      await syncShipmentItems({ trackingId, truckTripId, loadedItems: newValue });
+      await syncShipmentItems({
+        trackingId,
+        truckTripId,
+        loadedItems: newValue,
+      });
       onSuccess?.();
     } finally {
       saveBtn.disabled = false;
@@ -148,7 +152,7 @@ export function initTruckTripItemEditor({
       ...update,
       autoSmsUpdatedBy: currUser.uid,
       autoSmsUpdatedRole: currUser.role,
-      autoSmsUpdatedAt: serverTimestamp()
+      autoSmsUpdatedAt: serverTimestamp(),
     });
   }
 
@@ -167,7 +171,9 @@ export function initTruckTripItemEditor({
   pauseWeatherToggle.onchange = async () => {
     pauseWeatherToggle.disabled = true;
     try {
-      await saveToggle({ pauseAutoSmsDuringWeather: pauseWeatherToggle.checked });
+      await saveToggle({
+        pauseAutoSmsDuringWeather: pauseWeatherToggle.checked,
+      });
     } finally {
       pauseWeatherToggle.disabled = false;
     }
@@ -195,13 +201,13 @@ export function initTruckTripItemEditor({
     const autoQ = query(
       base,
       where("truckTripId", "==", truckTripId),
-      where("source", "==", "auto")
+      where("source", "==", "auto"),
     );
 
     const manualQ = query(
       base,
       where("truckTripId", "==", truckTripId),
-      where("source", "==", "manual")
+      where("source", "==", "manual"),
     );
 
     const autoCount = (await getCountFromServer(autoQ)).data().count;

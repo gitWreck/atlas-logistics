@@ -84,7 +84,7 @@ exports.reportTripDelay = onCall(
     // Sets a flag so the trip turns "Red" or shows an icon in the trip list
     const tripRef = db.collection("truck_trips").doc(tripId);
     batch.update(tripRef, {
-      hasActiveDelay: true,
+      delayCleared: false,
       lastDelayReason: type,
       updatedAt: timestamp,
     });

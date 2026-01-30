@@ -14,6 +14,7 @@ import AddUserModal from "./AddUserModal";
 import StatusCard from "../ui/StatusCard";
 import { useAuth } from "@/app/context/AuthContext";
 import UserManagementTable from "./UserManagementTable";
+import DelayApprovalWidget from "../delay/DelayApprovalWIdget";
 
 export default function AdminOverview() {
   const { user } = useAuth();
@@ -59,6 +60,8 @@ export default function AdminOverview() {
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
+      <DelayApprovalWidget />
+
       {/* 1. STATS GRID (DYNAMIC) */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <StatusCard
