@@ -1,16 +1,17 @@
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { COLORS } from "../../components/constants/theme"; // Adjust path if needed
+import { COLORS } from "../../components/constants/theme";
+import AuthGuard from "../../components/auth/AuthGuard";
 
 export default function DriverLayout() {
   return (
-    <>
-      <StatusBar style="light" backgroundColor={COLORS.background} />
+    <AuthGuard role="driver">
+      <StatusBar style="light" backgroundColor={COLORS.bg} />
 
       <Stack
         screenOptions={{
           headerShown: false, // We use custom headers in our screens
-          contentStyle: { backgroundColor: COLORS.background }, // Dark background
+          contentStyle: { backgroundColor: COLORS.bg }, // Dark background
           animation: "slide_from_right", // Smooth transitions
         }}
       >
@@ -43,6 +44,6 @@ export default function DriverLayout() {
           }}
         />
       </Stack>
-    </>
+    </AuthGuard>
   );
 }
