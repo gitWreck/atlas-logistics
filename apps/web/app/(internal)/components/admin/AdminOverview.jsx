@@ -13,6 +13,7 @@ import DisableUserModal from "./DisableUserModal";
 import AddUserModal from "./AddUserModal";
 import StatusCard from "../ui/StatusCard";
 import { useAuth } from "@/app/context/AuthContext";
+import UserManagementTable from "./UserManagementTable";
 
 export default function AdminOverview() {
   const { user } = useAuth();
@@ -114,89 +115,12 @@ export default function AdminOverview() {
       </div>
 
       {/* 3. USERS TABLE (REAL DATA) */}
-      <div className="border border-slate-800 rounded-xl bg-slate-900/50 overflow-hidden">
-        <div className="px-6 py-4 border-b border-slate-800 flex justify-between items-center">
-          <h2 className="font-bold text-white">User Management</h2>
-          <button
-            onClick={() => setUserModalOpen(true)}
-            className="text-xs bg-blue-600 hover:bg-blue-500 text-white px-3 py-1.5 rounded-lg transition-colors flex items-center gap-2"
-          >
-            + Add User
-          </button>
-        </div>
-
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm text-slate-400">
-            <thead className="bg-slate-950 text-slate-500 uppercase font-semibold text-xs">
-              <tr>
-                <th className="px-6 py-3">Name / Email</th>
-                <th className="px-6 py-3">Role</th>
-                <th className="px-6 py-3">Status</th>
-                <th className="px-6 py-3 text-right">Action</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-800">
-              {loading ? (
-                <tr>
-                  <td
-                    colSpan="4"
-                    className="px-6 py-8 text-center text-slate-600"
-                  >
-                    Loading users...
-                  </td>
-                </tr>
-              ) : users.length === 0 ? (
-                <tr>
-                  <td
-                    colSpan="4"
-                    className="px-6 py-8 text-center text-slate-600"
-                  >
-                    No users found.
-                  </td>
-                </tr>
-              ) : (
-                users.map((u) => (
-                  <tr
-                    key={u.id}
-                    className="hover:bg-slate-800/30 transition-colors"
-                  >
-                    <td className="px-6 py-4">
-                      <div className="font-medium text-slate-200">
-                        {u.name || "—"}
-                      </div>
-                      <div className="text-xs text-slate-500">{u.email}</div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className="bg-slate-800 px-2 py-1 rounded text-xs border border-slate-700 font-mono">
-                        {u.role || "USER"}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span
-                        className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${
-                          u.status === "active"
-                            ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
-                            : "bg-red-500/10 text-red-400 border border-red-500/20"
-                        }`}
-                      >
-                        {u.status === "active" ? "Active" : "Inactive"}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 text-right">
-                      <button
-                        onClick={() => initiateDisable(u)}
-                        className="text-slate-500 hover:text-red-400 transition-colors"
-                      >
-                        <FontAwesomeIcon icon={faTrash} />
-                      </button>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
+      <UserManagementTable
+        users={users}
+        loading={loading}
+        onDeleteUser={initiateDisable}
+        onAddUser={() => setUserModalOpen(true)}
+      />
 
       {/* 4. MODAL */}
       <AddUserModal

@@ -1,6 +1,12 @@
-import React from "react";
+import React, { useState, useMemo } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faCut, faMinus, faPlus } from "@fortawesome/free-solid-svg-icons";
+import {
+  faCut,
+  faMinus,
+  faPlus,
+  faSearch,
+  faFilter,
+} from "@fortawesome/free-solid-svg-icons";
 import { formatFirestoreDate } from "@/app/utility/utilities";
 import StatusBadge from "../ui/StatusBadge";
 
@@ -12,33 +18,99 @@ export default function TripManifestTable({
   onUnassign,
   onBulkAssign,
 }) {
+  // --- 1. NEW STATE ---
+  const [search, setSearch] = useState("");
+  const [filter, setFilter] = useState("ALL"); // 'ALL', 'PENDING', 'LOADED'
+
+  // --- 2. FILTER LOGIC ---
+  const filteredShipments = useMemo(() => {
+    if (!shipments) return [];
+
+    return shipments.filter((p) => {
+      // Search Logic (Tracking or Route)
+      const matchesSearch =
+        p.trackingNumber.toLowerCase().includes(search.toLowerCase()) ||
+        p.route?.toLowerCase().includes(search.toLowerCase());
+
+      if (!matchesSearch) return false;
+
+      // Filter Logic
+      if (filter === "PENDING") return (p.pendingCount || 0) > 0;
+      if (filter === "LOADED") return (p.pendingCount || 0) === 0;
+
+      return true;
+    });
+  }, [shipments, search, filter]);
+
+  // Recalculate totals based on VIEW (optional, or keep generic)
   const totalItems =
     shipments?.reduce((sum, p) => sum + (p.totalItems || 0), 0) || 0;
 
   return (
-    <div className="bg-slate-900/50 border border-slate-800 rounded-xl overflow-hidden shadow-xl min-h-[300px]">
-      <div className="p-4 bg-slate-950/50 border-b border-slate-800 flex justify-between items-center">
-        <h3 className="font-bold text-slate-400 text-sm uppercase">
-          Cargo Manifest
-        </h3>
-        <div className="flex items-center gap-3">
-          <span className="bg-slate-800 text-slate-300 px-2 py-1 rounded text-xs font-mono">
-            Count: {totalItems}
-          </span>
+    <div className="bg-slate-900/50 border border-slate-800 rounded-xl overflow-hidden shadow-xl min-h-[300px] flex flex-col">
+      {/* --- HEADER SECTION --- */}
+      <div className="p-4 bg-slate-950/50 border-b border-slate-800 space-y-3">
+        {/* Top Row: Title & Actions */}
+        <div className="flex justify-between items-center">
+          <h3 className="font-bold text-slate-400 text-sm uppercase">
+            Cargo Manifest{" "}
+            <span className="text-slate-600 ml-1">
+              ({filteredShipments.length})
+            </span>
+          </h3>
+          <div className="flex items-center gap-3">
+            <span className="bg-slate-800 text-slate-300 px-2 py-1 rounded text-xs font-mono hidden sm:inline-block">
+              Total Package/s: {totalItems}
+            </span>
+            <button
+              onClick={onBulkAssign}
+              disabled={isLocked}
+              className="bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold px-3 py-1.5 rounded flex items-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-blue-900/20"
+            >
+              <FontAwesomeIcon icon={faPlus} />
+              <span className="hidden sm:inline">Add Shipments</span>
+            </button>
+          </div>
+        </div>
 
-          {/* THE NEW BUTTON */}
-          <button
-            onClick={onBulkAssign}
-            disabled={isLocked}
-            className="bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold px-3 py-1.5 rounded flex items-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-blue-900/20"
-          >
-            <FontAwesomeIcon icon={faPlus} />
-            Add Shipments
-          </button>
+        {/* --- NEW: FILTERS ROW --- */}
+        <div className="flex gap-2">
+          {/* Search Input */}
+          <div className="relative flex-1">
+            <FontAwesomeIcon
+              icon={faSearch}
+              className="absolute left-3 top-2.5 text-slate-500 text-xs"
+            />
+            <input
+              type="text"
+              placeholder="Search Tracking ID or Route..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-full bg-slate-900 border border-slate-700 rounded-lg pl-8 pr-3 py-1.5 text-xs text-slate-200 focus:border-blue-500 outline-none"
+            />
+          </div>
+
+          {/* Status Filter */}
+          <div className="relative">
+            <FontAwesomeIcon
+              icon={faFilter}
+              className="absolute left-3 top-2.5 text-slate-500 text-xs"
+            />
+            <select
+              value={filter}
+              onChange={(e) => setFilter(e.target.value)}
+              className="bg-slate-900 border border-slate-700 rounded-lg pl-8 pr-8 py-1.5 text-xs text-slate-200 focus:border-blue-500 outline-none appearance-none cursor-pointer hover:bg-slate-800 transition-colors"
+            >
+              <option value="ALL">Show All</option>
+              <option value="PENDING">Pending Only</option>
+              <option value="LOADED">Fully Loaded</option>
+            </select>
+          </div>
         </div>
       </div>
 
-      <div className="overflow-x-auto">
+      {/* --- TABLE SECTION --- */}
+      <div className="overflow-x-auto flex-1">
         <table className="w-full text-left text-xs">
           <thead className="bg-slate-900 text-slate-500 font-bold uppercase border-b border-slate-800">
             <tr>
@@ -57,17 +129,20 @@ export default function TripManifestTable({
                   Loading Cargo...
                 </td>
               </tr>
-            ) : shipments?.length === 0 ? (
+            ) : filteredShipments.length === 0 ? (
               <tr>
                 <td
                   colSpan="6"
                   className="p-6 text-center text-slate-500 italic"
                 >
-                  Truck is empty.
+                  {shipments?.length === 0
+                    ? "Truck is empty."
+                    : "No matching shipments found."}
                 </td>
               </tr>
             ) : (
-              shipments?.map((p) => (
+              // --- 3. USE FILTERED SHIPMENTS HERE ---
+              filteredShipments.map((p) => (
                 <tr
                   key={p.id}
                   className="hover:bg-slate-800/30 transition-colors"

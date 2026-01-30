@@ -45,6 +45,8 @@ exports.assignShipmentToTruckTrip =
 exports.unassignShipmentFromTruckTrip =
   require("./src/trips/unassignShipmentFromTruckTrip").unassignShipmentFromTruckTrip;
 
+exports.startTrip = require("./src/trips/startTrip").startTrip;
+
 exports.reportTripDelay =
   require("./src/trips/reportTripDelay").reportTripDelay;
 exports.setTruckDelay = require("./src/trips/setTruckDelay").setTruckDelay;
@@ -68,6 +70,8 @@ exports.bulkUpdateShipmentStatus =
   require("./src/shipments/bulkUpdateShipmentStatus").bulkUpdateShipmentStatus;
 exports.splitShipments =
   require("./src/shipments/splitShipments").splitShipment;
+exports.updateShipmentStatus =
+  require("./src/shipments/updateShipmentStatus").updateShipmentStatus;
 
 // -------------------------------
 
