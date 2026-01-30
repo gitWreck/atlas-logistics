@@ -1,22 +1,24 @@
 import { Tabs } from "expo-router";
-import { FontAwesome5 } from "@expo/vector-icons"; // Removed MaterialIcons
+import { FontAwesome5 } from "@expo/vector-icons";
+import AuthGuard from "../../components/auth/AuthGuard";
 
 export default function CheckerLayout() {
   return (
-    <Tabs
-      screenOptions={{
-        headerShown: false,
-        tabBarStyle: {
-          backgroundColor: "#0f172a", // Dark Background
-          borderTopColor: "#334155", // Subtle Border
-          height: 60,
-          paddingBottom: 8,
-          paddingTop: 8,
-        },
-        tabBarActiveTintColor: "#3b82f6", // Blue for Checkers
-        tabBarInactiveTintColor: "#64748b",
-      }}
-    >
+    <AuthGuard role="checker" loaderColor="#3b82f6">
+      <Tabs
+        screenOptions={{
+          headerShown: false,
+          tabBarStyle: {
+            backgroundColor: "#0f172a", // Dark Background
+            borderTopColor: "#334155", // Subtle Border
+            height: 60,
+            paddingBottom: 8,
+            paddingTop: 8,
+          },
+          tabBarActiveTintColor: "#3b82f6", // Blue for Checkers
+          tabBarInactiveTintColor: "#64748b",
+        }}
+      >
       <Tabs.Screen
         name="index"
         options={{
@@ -55,5 +57,6 @@ export default function CheckerLayout() {
         options={{ href: null, tabBarStyle: { display: "none" } }}
       />
     </Tabs>
+    </AuthGuard>
   );
 }

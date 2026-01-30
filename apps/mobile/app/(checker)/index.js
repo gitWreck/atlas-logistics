@@ -45,7 +45,7 @@ export default function CheckerIndex() {
   const handleLogout = async () => {
     try {
       await signOut(auth);
-      router.replace("/");
+      router.replace("/(auth)/login");
     } catch (error) {
       Alert.alert("Error", error.message);
     }
