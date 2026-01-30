@@ -11,11 +11,10 @@ import { useRouter } from "expo-router";
 import { signInWithEmailAndPassword, signOut } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
 
-// 1. IMPORT YOUR COMPONENTS
-import { auth, db } from "../../firebase"; // Adjust path if needed
+import { auth, db } from "../../firebase";
 import AtlasInput from "../../components/ui/AtlasInput";
 import AtlasButton from "../../components/ui/AtlasButton";
-import LoginHeader from "../../components/auth/LoginHeader"; // (Assume you made this too)
+import LoginHeader from "../../components/auth/LoginHeader";
 
 export default function LoginScreen() {
   const router = useRouter();
@@ -72,12 +71,11 @@ export default function LoginScreen() {
 
       if (userDoc.exists()) {
         const userData = userDoc.data();
-        const role = userData.role; // e.g., 'driver', 'checker', 'admin'
+        const role = (userData.role ?? "").toString().toLowerCase();
 
         console.log("User Role:", role);
 
-        // 4. Route based on Role
-        // We use 'replace' so they can't swipe back to the login screen
+        // 4. Route based on Role (checker, driver only)
         if (role === "driver") {
           router.replace("/(driver)/");
         } else if (role === "checker") {
