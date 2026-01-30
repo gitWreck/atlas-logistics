@@ -4,34 +4,32 @@ import {
   Text,
   StyleSheet,
   FlatList,
-  TextInput,
-  TouchableOpacity,
   Alert,
   ActivityIndicator,
+  SafeAreaView,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { Ionicons, FontAwesome5 } from "@expo/vector-icons";
 import { getFunctions, httpsCallable } from "firebase/functions";
-// 1. IMPORT FIREBASE
 import { doc, onSnapshot } from "firebase/firestore";
 import { db } from "../../firebase";
-import StatusBadge from "../../components/ui/StatusBadge";
+
+// ✅ IMPORT NEW COMPONENTS
+import ShipmentHeader from "../../components/checker/shipment-details/ShipmentHeader";
+import ShipmentSearch from "../../components/checker/shipment-details/ShipmentSearch";
+import PackageListItem from "../../components/checker/shipment-details/PackageListItem";
 
 export default function ShipmentDetailsScreen() {
-  // Get params passed from previous screen
   const { shipmentId, parentTripId, parentPlate } = useLocalSearchParams();
   const router = useRouter();
 
   const [search, setSearch] = useState("");
-  const [packages, setPackages] = useState([]); // Real data
+  const [packages, setPackages] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [actionLoading, setActionLoading] = useState(false); // For button presses
+  const [actionLoading, setActionLoading] = useState(false);
 
-  // 2. FETCH REAL PACKAGES (Document Listener)
+  // 1. FETCH PACKAGES
   useEffect(() => {
     if (!shipmentId) return;
-
-    // Listen to the specific Shipment Document
     const shipmentRef = doc(db, "shipments", shipmentId);
 
     const unsubscribe = onSnapshot(
@@ -39,9 +37,7 @@ export default function ShipmentDetailsScreen() {
       (docSnap) => {
         if (docSnap.exists()) {
           const data = docSnap.data();
-          // Packages are an array inside the document
-          const pkgList = data.packages || [];
-          setPackages(pkgList);
+          setPackages(data.packages || []);
         } else {
           Alert.alert("Error", "Shipment not found!");
           router.back();
@@ -53,32 +49,25 @@ export default function ShipmentDetailsScreen() {
         setLoading(false);
       },
     );
-
     return () => unsubscribe();
   }, [shipmentId]);
 
-  // Filter Logic
+  // 2. FILTER
   const filtered = packages.filter((p) =>
     (p.trackingNumber || "").toLowerCase().includes(search.toLowerCase()),
   );
 
-  // --- ACTIONS ---
-
+  // 3. ACTIONS
   const updateStatus = async (pkg, newMode) => {
     setActionLoading(true);
     try {
       const functions = getFunctions(undefined, "asia-southeast1");
       const scanPackages = httpsCallable(functions, "scanPackages");
 
-      // Reuse the existing Scan function
       const result = await scanPackages({
         barcode: pkg.trackingNumber,
-        mode: newMode, // "out_for_delivery" or "delivered"
+        mode: newMode,
       });
-
-      // NOTE: We do NOT need to manually update state here.
-      // The 'onSnapshot' listener above will see the change in DB
-      // and update the UI automatically.
 
       Alert.alert("Success", result.data.message);
     } catch (error) {
@@ -107,49 +96,32 @@ export default function ShipmentDetailsScreen() {
     );
   };
 
-  // Safe Back Navigation
+  // ✅ REPLACE WITH THIS SIMPLE VERSION
   const handleBack = () => {
-    if (parentTripId) {
-      router.push({
-        pathname: "/(checker)/trip-details",
-        params: { tripId: parentTripId, plate: parentPlate },
-      });
+    if (router.canGoBack()) {
+      router.back(); // Slides back to previous screen nicely
     } else {
-      router.back();
+      // Fallback: If opened via notification/deep link, go to Dashboard
+      router.replace("/(checker)/(tabs)/trips");
     }
   };
 
   return (
-    <View style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={handleBack} style={styles.backBtn}>
-          <Ionicons name="arrow-back" size={24} color="#f8fafc" />
-        </TouchableOpacity>
-        <View>
-          <Text style={styles.title}>Shipment Contents</Text>
-          <Text style={styles.subtitle}>ID: {shipmentId}</Text>
-        </View>
-      </View>
+    <SafeAreaView style={styles.container}>
+      {/* 1. HEADER */}
+      <ShipmentHeader shipmentId={shipmentId} onBack={handleBack} />
 
-      {/* Loading Overlay (For Actions) */}
+      {/* 2. LOADING OVERLAY */}
       {actionLoading && (
         <View style={styles.loaderOverlay}>
           <ActivityIndicator size="large" color="#3b82f6" />
         </View>
       )}
 
-      {/* Search */}
-      <View style={styles.controls}>
-        <TextInput
-          style={styles.searchInput}
-          placeholder="Search Tracking Number..."
-          value={search}
-          onChangeText={setSearch}
-        />
-      </View>
+      {/* 3. SEARCH */}
+      <ShipmentSearch value={search} onChange={setSearch} />
 
-      {/* Main Content */}
+      {/* 4. LIST */}
       {loading ? (
         <View style={{ flex: 1, justifyContent: "center" }}>
           <ActivityIndicator size="large" color="#3b82f6" />
@@ -157,131 +129,32 @@ export default function ShipmentDetailsScreen() {
       ) : (
         <FlatList
           data={filtered}
-          keyExtractor={(item) => item.trackingNumber} // Use unique tracking number
+          keyExtractor={(item) => item.trackingNumber}
           contentContainerStyle={{ paddingBottom: 100 }}
+          renderItem={({ item }) => (
+            <PackageListItem item={item} onPress={handlePackagePress} />
+          )}
           ListEmptyComponent={
             <Text style={styles.emptyText}>No packages in this shipment.</Text>
           }
-          renderItem={({ item }) => (
-            <TouchableOpacity
-              style={[
-                styles.listItem,
-                item.status === "DELIVERED" && { borderColor: "#bbf7d0" }, // Green border if done
-              ]}
-              onPress={() => handlePackagePress(item)}
-            >
-              {/* Icon */}
-              <View
-                style={[
-                  styles.iconCircle,
-                  item.status === "DELIVERED" && { backgroundColor: "#dcfce7" },
-                ]}
-              >
-                <FontAwesome5
-                  name={item.status === "DELIVERED" ? "check" : "box-open"}
-                  size={16}
-                  color={item.status === "DELIVERED" ? "#166534" : "#64748b"}
-                />
-              </View>
-
-              {/* Text Info */}
-              <View style={{ flex: 1 }}>
-                <Text style={styles.itemTitle}>{item.trackingNumber}</Text>
-                <Text style={styles.itemSub}>Tap to update</Text>
-              </View>
-
-              {/* Status Badge */}
-              <StatusBadge status={item.status} />
-            </TouchableOpacity>
-          )}
         />
       )}
-    </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  // 1. MAIN BACKGROUND (Slate 900)
   container: { flex: 1, backgroundColor: "#0f172a" },
-
-  header: {
-    padding: 20,
-    paddingTop: 50,
-    backgroundColor: "#0f172a", // Matches container
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 15,
-    borderBottomWidth: 1,
-    borderColor: "#334155", // Dark Border
-  },
-  backBtn: { padding: 8 },
-
-  // 2. TEXT COLORS
-  title: { fontSize: 18, fontWeight: "800", color: "#f8fafc" }, // White
-  subtitle: { color: "#94a3b8", fontSize: 12 }, // Light Gray
-
-  // 3. LOADER OVERLAY (Dark Fade)
   loaderOverlay: {
     position: "absolute",
     top: 0,
     bottom: 0,
     left: 0,
     right: 0,
-    backgroundColor: "rgba(15, 23, 42, 0.9)", // Dark fade
+    backgroundColor: "rgba(15, 23, 42, 0.9)",
     zIndex: 20,
     justifyContent: "center",
     alignItems: "center",
   },
-
-  controls: { padding: 16 },
-
-  // 4. SEARCH INPUT (Slate 800)
-  searchInput: {
-    backgroundColor: "#1e293b",
-    padding: 12,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: "#334155", // Subtle dark border
-    color: "#f8fafc", // Text color inside input
-  },
-
   emptyText: { textAlign: "center", color: "#64748b", marginTop: 40 },
-
-  // 5. LIST ITEM CARDS (Slate 800)
-  listItem: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    padding: 16,
-    backgroundColor: "#1e293b", // Dark Card
-    marginHorizontal: 16,
-    marginBottom: 8,
-    borderRadius: 12,
-    alignItems: "center",
-    gap: 12,
-    borderWidth: 1,
-    borderColor: "#334155", // Dark Border
-  },
-
-  iconCircle: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: "#334155", // Dark Circle
-    alignItems: "center",
-    justifyContent: "center",
-  },
-
-  itemTitle: { fontWeight: "700", color: "#f8fafc" }, // White Title
-  itemSub: { color: "#94a3b8", fontSize: 10 }, // Gray Subtitle
-
-  // 6. STATUS BADGE
-  statusBadge: {
-    backgroundColor: "#334155", // Dark background for badge
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 6,
-    borderWidth: 1,
-    borderColor: "#475569",
-  },
-  statusText: { fontSize: 10, fontWeight: "700", color: "#cbd5e1" }, // Light text
 });

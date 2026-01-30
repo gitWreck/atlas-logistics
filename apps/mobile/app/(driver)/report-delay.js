@@ -19,6 +19,7 @@ import { db, auth } from "../../firebase";
 
 // 🎨 IMPORT SHARED THEME
 import { COLORS, GLOBAL_STYLES } from "../../components/constants/theme";
+import { reportTripDelay } from "../../components/utilities/FirebaseFunctions";
 
 const DELAY_TYPES = [
   {
@@ -91,10 +92,8 @@ export default function ReportDelayScreen() {
 
     try {
       // 🚀 CALL CLOUD FUNCTION
-      const functions = getFunctions(undefined, "asia-southeast1");
-      const reportDelayFn = httpsCallable(functions, "reportTripDelay");
 
-      await reportDelayFn({
+      await reportTripDelay({
         tripId: tripId,
         type: selectedType,
         notes: notes,
@@ -177,6 +176,12 @@ export default function ReportDelayScreen() {
 }
 
 const styles = StyleSheet.create({
+  header: {
+    padding: 20,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
   content: { padding: 24, paddingBottom: 50 },
 
   subtitle: {

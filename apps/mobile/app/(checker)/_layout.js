@@ -1,62 +1,35 @@
-import { Tabs } from "expo-router";
-import { FontAwesome5 } from "@expo/vector-icons";
-import AuthGuard from "../../components/auth/AuthGuard";
+import { Stack } from "expo-router";
+import { StatusBar } from "expo-status-bar";
+import AuthGuard from "../../components/auth/AuthGuard"; // Adjust path
 
-export default function CheckerLayout() {
+export default function CheckerStackLayout() {
   return (
     <AuthGuard role="checker" loaderColor="#3b82f6">
-      <Tabs
+      <StatusBar style="light" backgroundColor="#0f172a" />
+
+      <Stack
         screenOptions={{
           headerShown: false,
-          tabBarStyle: {
-            backgroundColor: "#0f172a", // Dark Background
-            borderTopColor: "#334155", // Subtle Border
-            height: 60,
-            paddingBottom: 8,
-            paddingTop: 8,
-          },
-          tabBarActiveTintColor: "#3b82f6", // Blue for Checkers
-          tabBarInactiveTintColor: "#64748b",
+          contentStyle: { backgroundColor: "#0f172a" },
+          animation: "slide_from_right",
         }}
       >
-      <Tabs.Screen
-        name="index"
-        options={{
-          title: "Dashboard",
-          tabBarIcon: ({ color }) => (
-            // Changed "dashboard" (Material) to "th-large" (FontAwesome5)
-            <FontAwesome5 name="th-large" size={20} color={color} />
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="trips"
-        options={{
-          title: "Trips",
-          tabBarIcon: ({ color }) => (
-            <FontAwesome5 name="truck" size={20} color={color} />
-          ),
-        }}
-      />
+        {/* 1. The Tabs (Dashboard & Trips) */}
+        {/* This points to app/(checker)/(tabs)/_layout.js */}
+        <Stack.Screen name="(tabs)" />
 
-      {/* Hide internal screens */}
-      <Tabs.Screen
-        name="scan"
-        options={{ href: null, tabBarStyle: { display: "none" } }}
-      />
-      <Tabs.Screen
-        name="scan-result"
-        options={{ href: null, tabBarStyle: { display: "none" } }}
-      />
-      <Tabs.Screen
-        name="trip-details"
-        options={{ href: null, tabBarStyle: { display: "none" } }}
-      />
-      <Tabs.Screen
-        name="shipment-details"
-        options={{ href: null, tabBarStyle: { display: "none" } }}
-      />
-    </Tabs>
+        {/* 2. Full Screen Pages (These cover the tabs) */}
+        <Stack.Screen name="trip-details" />
+        <Stack.Screen name="shipment-details" />
+
+        <Stack.Screen
+          name="scan"
+          options={{
+            presentation: "fullScreenModal",
+            animation: "fade_from_bottom",
+          }}
+        />
+      </Stack>
     </AuthGuard>
   );
 }

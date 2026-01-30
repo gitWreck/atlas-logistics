@@ -23,17 +23,17 @@ import {
   onSnapshot,
   where,
   Timestamp,
-  getCountFromServer
+  getCountFromServer,
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
 import {
   onAuthStateChanged,
-  signOut
+  signOut,
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
 import {
   getFunctions,
-  httpsCallable
+  httpsCallable,
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-functions.js";
 
 import { auth, db, app } from "../firebase.js";
@@ -46,7 +46,7 @@ const ROLE_LABEL = {
   admin: "Admin",
   manager: "Manager",
   driver: "Driver",
-  checker: "Checker"
+  checker: "Checker",
 };
 
 const REGION = "asia-southeast1";
@@ -54,7 +54,13 @@ const REGION = "asia-southeast1";
 // audit action inference (works with mixed schemas)
 const ACTION_KEYS = {
   SET_ROLE: ["set_role", "role_change", "adminSetUserRole", "SET_ROLE"],
-  SET_ACTIVE: ["set_active", "set_status", "activation", "adminSetUserActive", "SET_ACTIVE"]
+  SET_ACTIVE: [
+    "set_active",
+    "set_status",
+    "activation",
+    "adminSetUserActive",
+    "SET_ACTIVE",
+  ],
 };
 
 const MAX_USERS = 500;
@@ -92,18 +98,18 @@ let unsubUsers = null;
 let unsubAudit = null;
 let unsubSelf = null;
 
-const usersById = new Map();  // uid -> user doc
-const logsCache = [];         // latest logs in memory
+const usersById = new Map(); // uid -> user doc
+const logsCache = []; // latest logs in memory
 
 // filters (Users)
 let userSearch = "";
-let userRoleFilter = "all";   // all | admin | manager | driver | checker
+let userRoleFilter = "all"; // all | admin | manager | driver | checker
 let userActiveFilter = "all"; // all | active | inactive
 
 // filters (Audit)
 let auditSearch = "";
 let auditActionFilter = "all"; // all | role | active
-let auditWindow = "50";        // "50" fixed to table size; kept for future
+let auditWindow = "50"; // "50" fixed to table size; kept for future
 
 // op locks
 let opBusy = false;
@@ -121,7 +127,7 @@ function setAdminText(msg) {
 
 function setStat(el, value) {
   if (!el) return;
-  el.textContent = (value === null || value === undefined) ? "—" : String(value);
+  el.textContent = value === null || value === undefined ? "—" : String(value);
 }
 
 function setUsersLoading() {
@@ -145,9 +151,15 @@ function setAuditError(msg) {
 }
 
 function cleanupListeners() {
-  try { unsubUsers?.(); } catch (_) {}
-  try { unsubAudit?.(); } catch (_) {}
-  try { unsubSelf?.(); } catch (_) {}
+  try {
+    unsubUsers?.();
+  } catch (_) {}
+  try {
+    unsubAudit?.();
+  } catch (_) {}
+  try {
+    unsubSelf?.();
+  } catch (_) {}
   unsubUsers = null;
   unsubAudit = null;
   unsubSelf = null;
@@ -187,7 +199,7 @@ function injectUserControls() {
     />
     <select style="padding:10px 12px; border-radius:10px; border:1px solid #e5e7eb;" aria-label="Filter role" data-u-role>
       <option value="all">All roles</option>
-      ${ROLES.map(r => `<option value="${r}">${ROLE_LABEL[r] || r}</option>`).join("")}
+      ${ROLES.map((r) => `<option value="${r}">${ROLE_LABEL[r] || r}</option>`).join("")}
     </select>
     <select style="padding:10px 12px; border-radius:10px; border:1px solid #e5e7eb;" aria-label="Filter status" data-u-active>
       <option value="all">All status</option>
@@ -315,7 +327,7 @@ function injectAnalyticsBreakdown() {
 /* =========================================================
    AUTH + ADMIN GUARD (LIVE REVOCATION)
 ========================================================= */
-onAuthStateChanged(auth, async user => {
+onAuthStateChanged(auth, async (user) => {
   cleanupListeners();
   usersById.clear();
   logsCache.length = 0;
@@ -350,7 +362,9 @@ onAuthStateChanged(auth, async user => {
     const data = snap.exists() ? snap.data() : null;
 
     if (!data || data.role !== "admin" || data.active !== true) {
-      try { await signOut(auth); } catch (_) {}
+      try {
+        await signOut(auth);
+      } catch (_) {}
       hardRedirectToLogin();
       return;
     }
@@ -371,10 +385,11 @@ onAuthStateChanged(auth, async user => {
 
     // counts
     refreshAdminActionCounts().catch(() => {});
-
   } catch (err) {
     console.error("Admin guard failed:", err);
-    try { await signOut(auth); } catch (_) {}
+    try {
+      await signOut(auth);
+    } catch (_) {}
     hardRedirectToLogin();
   }
 });
@@ -388,7 +403,7 @@ function startUsersListener() {
   const qUsers = query(
     collection(db, "users"),
     orderBy("role"),
-    limit(MAX_USERS)
+    limit(MAX_USERS),
   );
 
   setUsersLoading();
@@ -406,7 +421,9 @@ function startUsersListener() {
         return;
       }
 
-      snap.forEach(docSnap => usersById.set(docSnap.id, docSnap.data() || {}));
+      snap.forEach((docSnap) =>
+        usersById.set(docSnap.id, docSnap.data() || {}),
+      );
 
       renderUsersTable();
       refreshUserStats();
@@ -417,16 +434,18 @@ function startUsersListener() {
       setStat(userCountEl, "—");
       setStat(activeCountEl, "—");
       setStat(inactiveCountEl, "—");
-    }
+    },
   );
 }
 
 function refreshUserStats() {
-  let total = 0, active = 0, inactive = 0;
+  let total = 0,
+    active = 0,
+    inactive = 0;
 
   for (const [, u] of usersById.entries()) {
     total++;
-    (u.active === true) ? active++ : inactive++;
+    u.active === true ? active++ : inactive++;
   }
 
   setStat(userCountEl, total);
@@ -444,8 +463,8 @@ function getActiveAdminCount() {
 
 function passesUserFilters(uid, u) {
   const name = (u?.name || "").toString().toLowerCase();
-  const role = (ROLES.includes(u?.role) ? u.role : "unknown");
-  const isActive = (u?.active === true);
+  const role = ROLES.includes(u?.role) ? u.role : "unknown";
+  const isActive = u?.active === true;
 
   if (userSearch && !name.includes(userSearch)) return false;
 
@@ -481,11 +500,11 @@ function renderUsersTable() {
   for (const [uid, u] of rows) {
     const isSelf = currentAdmin && uid === currentAdmin.uid;
 
-    const safeName = (u.name || "—");
+    const safeName = u.name || "—";
     const safeRole = ROLES.includes(u.role) ? u.role : "unknown";
-    const active = (u.active === true);
+    const active = u.active === true;
 
-    const malformed = (!ROLES.includes(u.role) || typeof u.active !== "boolean");
+    const malformed = !ROLES.includes(u.role) || typeof u.active !== "boolean";
 
     const tr = document.createElement("tr");
 
@@ -498,11 +517,13 @@ function renderUsersTable() {
 
       <td>
         <select ${isSelf ? "disabled" : ""} aria-label="Role">
-          ${ROLES.map(r => `
+          ${ROLES.map(
+            (r) => `
             <option value="${r}" ${safeRole === r ? "selected" : ""}>
               ${ROLE_LABEL[r] || r}
             </option>
-          `).join("")}
+          `,
+          ).join("")}
         </select>
       </td>
 
@@ -542,7 +563,7 @@ function renderUsersTable() {
       }
 
       // Last-admin protection: cannot demote last active admin
-      if (prevRole === "admin" && nextRole !== "admin" && (u.active === true)) {
+      if (prevRole === "admin" && nextRole !== "admin" && u.active === true) {
         const activeAdminCount = getActiveAdminCount();
         if (activeAdminCount <= 1) {
           toast("Blocked: you cannot demote the last active admin.");
@@ -566,7 +587,7 @@ function renderUsersTable() {
         confirmAuditSoon({
           kind: "role",
           target: uid,
-          expected: nextRole
+          expected: nextRole,
         }).catch(() => {});
       } catch (err) {
         console.error(err);
@@ -601,10 +622,15 @@ function renderUsersTable() {
 
       // Operator warning (Patch 6 style): if disabling a manager/driver/checker, warn
       // (We don’t query shipments here to avoid indexes; this is awareness only.)
-      if (nextActive === false && (safeRole === "manager" || safeRole === "driver" || safeRole === "checker")) {
+      if (
+        nextActive === false &&
+        (safeRole === "manager" ||
+          safeRole === "driver" ||
+          safeRole === "checker")
+      ) {
         const okWarn = confirm(
           `Heads up:\n\nYou are disabling a ${ROLE_LABEL[safeRole]}.\n` +
-          `If they are currently responsible for active/delayed shipments, operations may be impacted.\n\nContinue?`
+            `If they are currently responsible for active/delayed shipments, operations may be impacted.\n\nContinue?`,
         );
         if (!okWarn) return;
       } else {
@@ -620,7 +646,7 @@ function renderUsersTable() {
         confirmAuditSoon({
           kind: "active",
           target: uid,
-          expected: nextActive
+          expected: nextActive,
         }).catch(() => {});
       } catch (err) {
         console.error(err);
@@ -641,7 +667,7 @@ function startAuditListener() {
   const qLogs = query(
     collection(db, "admin_logs"),
     orderBy("at", "desc"),
-    limit(MAX_LOGS)
+    limit(MAX_LOGS),
   );
 
   setAuditLoading();
@@ -656,7 +682,7 @@ function startAuditListener() {
         return;
       }
 
-      snap.forEach(docSnap => logsCache.push(docSnap.data() || {}));
+      snap.forEach((docSnap) => logsCache.push(docSnap.data() || {}));
       renderAuditTable();
 
       // also refresh analytics breakdown from real logs
@@ -664,16 +690,22 @@ function startAuditListener() {
     },
     (err) => {
       console.error("Audit listener error:", err);
-      setAuditError("Failed to load audit logs (check Firestore rules / network).");
-    }
+      setAuditError(
+        "Failed to load audit logs (check Firestore rules / network).",
+      );
+    },
   );
 }
 
 function inferActionKind(log) {
   const raw = String(log?.action ?? log?.type ?? "").toLowerCase();
 
-  const isRole = ACTION_KEYS.SET_ROLE.some(k => raw.includes(String(k).toLowerCase()));
-  const isActive = ACTION_KEYS.SET_ACTIVE.some(k => raw.includes(String(k).toLowerCase()));
+  const isRole = ACTION_KEYS.SET_ROLE.some((k) =>
+    raw.includes(String(k).toLowerCase()),
+  );
+  const isActive = ACTION_KEYS.SET_ACTIVE.some((k) =>
+    raw.includes(String(k).toLowerCase()),
+  );
 
   if (isRole) return "role";
   if (isActive) return "active";
@@ -696,8 +728,11 @@ function passesAuditFilters(log) {
     log.byEmail,
     log.change,
     log.role,
-    (log.active === true ? "active" : log.active === false ? "inactive" : "")
-  ].filter(Boolean).join(" ").toLowerCase();
+    log.active === true ? "active" : log.active === false ? "inactive" : "",
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
 
   return hay.includes(auditSearch);
 }
@@ -725,9 +760,13 @@ function renderAuditTable() {
     const action = log.action ?? log.type ?? "—";
     const target = log.targetUser ?? log.target ?? "—";
     const change =
-      (log.change ?? log.role ??
-        (log.active === true ? "Active" :
-          log.active === false ? "Inactive" : "—"));
+      log.change ??
+      log.role ??
+      (log.active === true
+        ? "Active"
+        : log.active === false
+          ? "Inactive"
+          : "—");
     const by = log.by ?? log.byEmail ?? "—";
 
     const tr = document.createElement("tr");
@@ -754,21 +793,23 @@ function exportAuditCsv() {
 
   for (const log of rows) {
     const time = log.at?.toDate ? log.at.toDate().toISOString() : "";
-    const action = (log.action ?? log.type ?? "");
-    const target = (log.targetUser ?? log.target ?? "");
+    const action = log.action ?? log.type ?? "";
+    const target = log.targetUser ?? log.target ?? "";
     const change =
-      (log.change ?? log.role ??
-        (log.active === true ? "Active" :
-          log.active === false ? "Inactive" : ""));
-    const by = (log.by ?? log.byEmail ?? "");
+      log.change ??
+      log.role ??
+      (log.active === true ? "Active" : log.active === false ? "Inactive" : "");
+    const by = log.by ?? log.byEmail ?? "";
 
-    lines.push([
-      csvCell(time),
-      csvCell(action),
-      csvCell(target),
-      csvCell(change),
-      csvCell(by)
-    ].join(","));
+    lines.push(
+      [
+        csvCell(time),
+        csvCell(action),
+        csvCell(target),
+        csvCell(change),
+        csvCell(by),
+      ].join(","),
+    );
   }
 
   const blob = new Blob([lines.join("\n")], { type: "text/csv;charset=utf-8" });
@@ -817,27 +858,44 @@ async function refreshAdminActionCounts() {
 
 // uses live cache for breakdown (zero extra reads)
 function refreshAnalyticsBreakdownFromCache() {
-  const a24 = adminActions24hEl?.parentElement?.querySelector("[data-breakdown='24h']");
-  const aTot = adminActionsTotalEl?.parentElement?.querySelector("[data-breakdown='total']");
+  const a24 = adminActions24hEl?.parentElement?.querySelector(
+    "[data-breakdown='24h']",
+  );
+  const aTot = adminActionsTotalEl?.parentElement?.querySelector(
+    "[data-breakdown='total']",
+  );
   if (!a24 && !aTot) return;
 
   const sinceMs = Date.now() - 24 * 60 * 60 * 1000;
 
-  let role24 = 0, active24 = 0, other24 = 0;
-  let roleTot = 0, activeTot = 0, otherTot = 0;
+  let role24 = 0,
+    active24 = 0,
+    other24 = 0;
+  let roleTot = 0,
+    activeTot = 0,
+    otherTot = 0;
 
   for (const log of logsCache) {
     const kind = inferActionKind(log);
     const atMs = log.at?.toDate ? log.at.toDate().getTime() : 0;
     const in24 = atMs && atMs >= sinceMs;
 
-    if (kind === "role") { roleTot++; if (in24) role24++; }
-    else if (kind === "active") { activeTot++; if (in24) active24++; }
-    else { otherTot++; if (in24) other24++; }
+    if (kind === "role") {
+      roleTot++;
+      if (in24) role24++;
+    } else if (kind === "active") {
+      activeTot++;
+      if (in24) active24++;
+    } else {
+      otherTot++;
+      if (in24) other24++;
+    }
   }
 
-  if (a24) a24.textContent = `24h breakdown: Role ${role24} • Active ${active24} • Other ${other24}`;
-  if (aTot) aTot.textContent = `Shown breakdown: Role ${roleTot} • Active ${activeTot} • Other ${otherTot}`;
+  if (a24)
+    a24.textContent = `24h breakdown: Role ${role24} • Active ${active24} • Other ${other24}`;
+  if (aTot)
+    aTot.textContent = `Shown breakdown: Role ${roleTot} • Active ${activeTot} • Other ${otherTot}`;
 }
 
 /* =========================================================
@@ -852,7 +910,7 @@ async function confirmAuditSoon({ kind, target, expected }) {
   // simple polling against in-memory cache
   // (we already have onSnapshot feeding logsCache)
   while (Date.now() - start < timeoutMs) {
-    const found = logsCache.some(l => {
+    const found = logsCache.some((l) => {
       const k = inferActionKind(l);
       const tgt = String(l.targetUser ?? l.target ?? "");
       if (k !== kind) return false;
@@ -865,10 +923,12 @@ async function confirmAuditSoon({ kind, target, expected }) {
 
       if (kind === "active") {
         const act =
-          (typeof l.active === "boolean")
+          typeof l.active === "boolean"
             ? l.active
-            : (String(l.change ?? "").toLowerCase().includes("active"));
-        return (expected === undefined) ? true : act === expected;
+            : String(l.change ?? "")
+                .toLowerCase()
+                .includes("active");
+        return expected === undefined ? true : act === expected;
       }
 
       return true;
@@ -887,14 +947,16 @@ async function confirmAuditSoon({ kind, target, expected }) {
 }
 
 function sleep(ms) {
-  return new Promise(r => setTimeout(r, ms));
+  return new Promise((r) => setTimeout(r, ms));
 }
 
 /* =========================================================
    LOGOUT
 ========================================================= */
 logoutBtn?.addEventListener("click", async () => {
-  try { await signOut(auth); } catch (_) {}
+  try {
+    await signOut(auth);
+  } catch (_) {}
   hardRedirectToLogin();
 });
 

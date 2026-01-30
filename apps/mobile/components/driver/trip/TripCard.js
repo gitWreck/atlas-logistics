@@ -49,7 +49,7 @@ const TripCard = ({ trip, onPress, actionLabel = "View Trip" }) => {
             style={{ width: 24 }}
           />
           <Text style={styles.subText}>
-            {trip.plateNumber || "No Truck Assigned"}
+            {trip.truckPlateNumber || "No Truck Assigned"}
           </Text>
         </View>
       </View>
