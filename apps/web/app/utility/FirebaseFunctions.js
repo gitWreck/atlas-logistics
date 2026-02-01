@@ -26,6 +26,7 @@ export const unassignShipmentFromTruckTrip = httpsCallable(
 export const disableTruckTrip = httpsCallable(functions, "disableTruckTrip");
 export const setTruckDelay = httpsCallable(functions, "setTruckDelay");
 export const clearTruckDelay = httpsCallable(functions, "clearTruckDelay");
+export const updateTripStatus = httpsCallable(functions, "updateTripStatus");
 
 // DRIVERS
 
@@ -44,6 +45,12 @@ export const generateTripManifest = httpsCallable(
   functions,
   "generateTripManifest",
 );
+export const generateTripCertificate = httpsCallable(
+  functions,
+  "generateTripCertificate",
+);
+export const reopenTrip = httpsCallable(functions, "reopentrip");
+
 export const bulkAssignShipments = httpsCallable(
   functions,
   "bulkAssignShipments",

@@ -110,14 +110,19 @@ exports.bulkAssignShipments = onCall(
           loadedCount: 0,
           deliveredCount: 0,
 
+          sender: data.sender,
+          receiver: data.recipient,
+
           // Copy barcodes for the Checker API (Important for scanning!)
           packageBarcodes: data.packageBarcodes || [],
 
           createdAt: now,
           createdBy: uid,
+
           updatedAt: now,
           updatedBy: uid,
           updatedRole: userRole,
+
           status: "ASSIGNED",
         });
 
