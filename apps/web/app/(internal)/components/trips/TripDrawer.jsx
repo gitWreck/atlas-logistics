@@ -21,16 +21,23 @@ import {
   generateTripCertificate,
   reopenTrip,
 } from "@/app/utility/FirebaseFunctions"; // Import your backend calls
-import { runAction } from "@/app/utility/utilities";
+import { formatFirestoreDate, runAction } from "@/app/utility/utilities";
 import { auth } from "@/lib/firebase";
 
 function calculateCurrentStep(status) {
   return status;
 }
 
-export default function TripDrawer({ isOpen, onClose, data, onAddShipment }) {
+export default function TripDrawer({
+  isOpen,
+  onClose,
+  data,
+  onAddShipment,
+  onRefreshTrips,
+}) {
   const [activeTab, setActiveTab] = useState("TIMELINE");
   const [messageBody, setMessageBody] = useState("");
+  const [trip, setTrip] = useState(null);
   const [shipments, setShipments] = useState([]);
   const [loadingShips, setLoadingShips] = useState(false);
 
@@ -49,9 +56,9 @@ export default function TripDrawer({ isOpen, onClose, data, onAddShipment }) {
   }, [isOpen, data]);
 
   useEffect(() => {
-    setTrip(data.shipments);
-    if (data.tripId) fetchShipments();
-  }, [data.tripId, data.shipments]);
+    setTrip(data?.shipments);
+    if (data?.tripId) fetchShipments();
+  }, [data?.tripId, data?.shipments]);
 
   const fetchShipments = async () => {
     if (!data.tripId) return;
@@ -66,8 +73,11 @@ export default function TripDrawer({ isOpen, onClose, data, onAddShipment }) {
         },
         cache: "no-store",
       });
-      const data = await res.json();
-      setShipments(data.shipments || []);
+
+      const dataRes = await res.json();
+      console.log("res data: ", dataRes);
+
+      setShipments(dataRes.shipments || []);
 
       // console.log("Total Loaded:", data.stats.totalLoaded);
       // console.log("Total Pending:", data.stats.totalPending);
@@ -76,6 +86,11 @@ export default function TripDrawer({ isOpen, onClose, data, onAddShipment }) {
     } finally {
       setLoadingShips(false);
     }
+  };
+
+  const handleRefresh = () => {
+    // onRefreshTrips?.(); // Refresh Sidebar/Parent
+    fetchShipments(); // Refresh Table
   };
 
   const handleSendMessage = () => {
@@ -101,7 +116,7 @@ export default function TripDrawer({ isOpen, onClose, data, onAddShipment }) {
 
   if (!data) return null;
 
-  console.log("shipments: ", data);
+  // console.log("shipments: ", data);
 
   return (
     <>
@@ -114,7 +129,7 @@ export default function TripDrawer({ isOpen, onClose, data, onAddShipment }) {
 
       <aside
         className={`
-          fixed top-0 right-0 h-full w-full max-w-md bg-slate-900 border-l border-slate-800 z-50 shadow-2xl transform transition-transform duration-300 flex flex-col
+          fixed top-0 right-0 h-full w-full max-w-xl bg-slate-900 border-l border-slate-800 z-50 shadow-2xl transform transition-transform duration-300 flex flex-col
           ${isOpen ? "translate-x-0" : "translate-x-full"}
         `}
       >
@@ -233,7 +248,8 @@ export default function TripDrawer({ isOpen, onClose, data, onAddShipment }) {
                           </p>
                           {isCurrent && (
                             <p className="text-[10px] text-emerald-400 mt-0.5">
-                              Current Status • Updated {data.updatedAt}
+                              Current Status • Updated{" "}
+                              {formatFirestoreDate(data.updatedAt)}
                             </p>
                           )}
                         </div>
@@ -255,7 +271,7 @@ export default function TripDrawer({ isOpen, onClose, data, onAddShipment }) {
                     Total Cargo
                   </span>
                   <div className="text-sm font-bold text-white">
-                    {data.totalPackages || 0} Packages
+                    {data.totalItems || 0} Packages
                   </div>
                 </div>
 
@@ -266,7 +282,7 @@ export default function TripDrawer({ isOpen, onClose, data, onAddShipment }) {
                   className="bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold px-3 py-1.5 rounded flex items-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-blue-900/20"
                 >
                   <FontAwesomeIcon icon={faPlus} />
-                  <span className="hidden sm:inline">Add Shipments</span>
+                  <span className="hidden sm:inline">Shipments</span>
                 </button>
               </div>
 
@@ -281,6 +297,7 @@ export default function TripDrawer({ isOpen, onClose, data, onAddShipment }) {
                     key={shipment.id || idx}
                     shipment={shipment}
                     idx={idx}
+                    data={data}
                   />
                 ))
               )}
@@ -388,8 +405,7 @@ export default function TripDrawer({ isOpen, onClose, data, onAddShipment }) {
 
 // --- HELPER COMPONENTS ---
 
-// --- INLINE COMPONENT FOR SHIPMENT ROW ---
-function ShipmentManifestRow({ shipment, idx }) {
+function ShipmentManifestRow({ shipment, idx, data }) {
   return (
     <div className="bg-slate-800/40 border border-slate-700 p-3 rounded-lg flex justify-between items-center hover:bg-slate-800/60 transition-colors">
       <div className="flex gap-3 items-center">
@@ -402,10 +418,14 @@ function ShipmentManifestRow({ shipment, idx }) {
           </div>
           <div className="text-xs text-slate-500 flex items-center gap-1">
             <span className="text-slate-400">
-              {shipment.recipient?.name || "Customer"}
+              {shipment.receiver?.name || "Customer"}
             </span>
             <span>•</span>
-            <span>{shipment.destinationCity || "Unknown City"}</span>
+            <span>{shipment.receiver?.address.province || "Unknown City"}</span>
+            <span>•</span>
+            <span>
+              {shipment.loadedCount}/{data.totalItems}
+            </span>
           </div>
         </div>
       </div>
