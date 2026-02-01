@@ -307,6 +307,7 @@ export default function TripBoard({ userRole }) {
         onClose={() => setSelectedTripId(null)}
         data={selectedTrip}
         onAddShipment={() => setBulkModalOpen(true)}
+        onRefreshTrips={fetchTrips}
       />
       <CreateTripModal
         isOpen={isNewTripModalOpen}
@@ -320,6 +321,7 @@ export default function TripBoard({ userRole }) {
         onSuccess={() => {
           setBulkModalOpen(false);
           // handleRefresh(); // This refreshes the table & sidebar
+          fetchTrips();
         }}
       />
     </div>
