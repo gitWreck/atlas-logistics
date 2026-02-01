@@ -12,8 +12,8 @@ import {
   faQrcode,
 } from "@fortawesome/free-solid-svg-icons";
 import StatusBadge from "../ui/StatusBadge";
-import ShipmentBoard from "./ShipmentBoard";
 import ShipmentLabel from "./ShipmentLabel";
+// import ShipmentBoard from "./ShipmentBoard";
 
 function calculateCurrentStep(status) {
   // You can reuse your logic here to determine which step is "Active"
@@ -22,9 +22,9 @@ function calculateCurrentStep(status) {
 
 export default function ShipmentDrawer({ isOpen, onClose, data }) {
   const [activeTab, setActiveTab] = useState("TIMELINE");
-  const [packages, setPackages] = useState([]);
   const [messageBody, setMessageBody] = useState(""); // State for the message input
-  const [loadingPackages, setLoadingPackages] = useState(false);
+  // const [packages, setPackages] = useState([]);
+  // const [loadingPackages, setLoadingPackages] = useState(false);
 
   // Reset when opening
   useEffect(() => {

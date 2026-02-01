@@ -6,10 +6,11 @@ import {
   faTruck,
   faRoute,
   faCalendarDays,
+  faWarehouse, // Added icon
 } from "@fortawesome/free-solid-svg-icons";
 import { createTruckTrip } from "@/app/utility/FirebaseFunctions";
 import DriverSelectInput from "../DriverSelectInput";
-import { PROVINCES, getCities } from "@/app/utility/PhilippinesData";
+import { WAREHOUSES } from "@/app/utility/WarehouseData"; // <--- IMPORT THIS
 
 export default function CreateTripModal({ isOpen, onClose, onSuccess }) {
   const [loading, setLoading] = useState(false);
@@ -17,38 +18,32 @@ export default function CreateTripModal({ isOpen, onClose, onSuccess }) {
 
   // Form State
   const [formData, setFormData] = useState({
-    originProvince: "",
-    originCity: "",
-    originCode: "", // Will be auto-filled
+    origin: "",
+    originCode: "",
 
-    destinationProvince: "",
-    destinationCity: "",
+    destination: "",
     destinationCode: "",
 
-    // 2. Add Schedule State
     scheduledDeparture: "",
     estimatedArrival: "",
     helperName: "",
 
-    driverName: "", // For display
-    driverId: null, // For backend logic (Optional)
+    driverName: "",
+    driverId: null,
     truckPlateNumber: "",
   });
 
   useEffect(() => {
     if (isOpen) {
+      // Reset form on open
       setFormData({
-        originCity: "",
+        origin: "",
         originCode: "",
-        originProvince: "",
-        destinationCity: "",
+        destination: "",
         destinationCode: "",
-        destinationProvince: "",
-
         scheduledDeparture: "",
         estimatedArrival: "",
         helperName: "",
-
         driverName: "",
         driverId: null,
         truckPlateNumber: "",
@@ -58,22 +53,22 @@ export default function CreateTripModal({ isOpen, onClose, onSuccess }) {
 
   if (!isOpen) return null;
 
-  // Helper to handle City selection and Code lookup
-  const handleCityChange = (type, cityName, provinceName) => {
-    const cityList = getCities(provinceName);
-    const selected = cityList.find((c) => c.name === cityName);
-    const code = selected ? selected.code : "GEN";
+  // --- NEW HANDLER FOR WAREHOUSES ---
+  const handleWarehouseChange = (type, value) => {
+    // 1. Find the selected warehouse object to get the code
+    const selected = WAREHOUSES.find((w) => w.name === value);
+    const code = selected ? selected.code : "";
 
     if (type === "origin") {
       setFormData((prev) => ({
         ...prev,
-        originCity: cityName,
+        origin: value,
         originCode: code,
       }));
     } else {
       setFormData((prev) => ({
         ...prev,
-        destinationCity: cityName,
+        destination: value,
         destinationCode: code,
       }));
     }
@@ -85,25 +80,32 @@ export default function CreateTripModal({ isOpen, onClose, onSuccess }) {
     setError("");
 
     try {
-      // Call the backend function you provided
+      // Check logic to prevent same origin/destination
+      if (formData.originCode === formData.destinationCode) {
+        throw new Error("Origin and Destination cannot be the same.");
+      }
+
       const results = await createTruckTrip({
-        originCity: formData.originCity.toUpperCase(),
-        destinationCity: formData.destinationCity.toUpperCase(),
-        originCode: formData.originCode.toUpperCase(),
-        destinationCode: formData.destinationCode.toUpperCase(),
+        // Simplified Payload
+        origin: formData.origin,
+        destination: formData.destination,
+        originCode: formData.originCode,
+        destinationCode: formData.destinationCode,
+
+        // Pass "City" fields for backward compatibility if your backend needs them
+        originCity: formData.origin,
+        destinationCity: formData.destination,
 
         scheduledDeparture: formData.scheduledDeparture,
         estimatedArrival: formData.estimatedArrival,
         helperName: formData.helperName,
-
-        truckPlateNumber: formData.truckPlateNumber,
+        truckPlateNumber: formData.truckPlateNumber.toUpperCase(),
         driverName: formData.driverName,
         driverId: formData.driverId,
       });
 
-      onSuccess(); // Trigger refresh in parent
-      onClose(); // Close modal
-      console.log("results: ", results);
+      onSuccess();
+      onClose();
     } catch (err) {
       console.error(err);
       setError(err.message || "Failed to create trip.");
@@ -131,13 +133,13 @@ export default function CreateTripModal({ isOpen, onClose, onSuccess }) {
 
         {/* Form */}
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
-          {/* --- ROUTE SECTION (UPDATED) --- */}
+          {/* --- ROUTE SECTION (SIMPLIFIED) --- */}
           <div className="space-y-4">
-            {/* ORIGIN */}
+            {/* ORIGIN SELECTOR */}
             <div className="bg-slate-950/50 p-3 rounded-lg border border-slate-800">
               <div className="flex justify-between items-center mb-2">
                 <label className="text-[10px] font-bold text-blue-400 uppercase flex items-center gap-2">
-                  <FontAwesomeIcon icon={faRoute} /> Origin
+                  <FontAwesomeIcon icon={faWarehouse} /> Origin Warehouse
                 </label>
                 {formData.originCode && (
                   <span className="text-[10px] font-mono bg-blue-500/20 text-blue-400 px-1.5 rounded">
@@ -145,114 +147,58 @@ export default function CreateTripModal({ isOpen, onClose, onSuccess }) {
                   </span>
                 )}
               </div>
-              <div className="grid grid-cols-2 gap-2">
-                {/* Province Dropdown */}
-                <select
-                  className="bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-white outline-none focus:border-blue-500"
-                  value={formData.originProvince}
-                  onChange={(e) =>
-                    setFormData((p) => ({
-                      ...p,
-                      originProvince: e.target.value,
-                      originCity: "",
-                      originCode: "",
-                    }))
-                  }
-                  required
-                >
-                  <option value="">Select Province</option>
-                  {PROVINCES.map((p) => (
-                    <option key={p} value={p}>
-                      {p}
-                    </option>
-                  ))}
-                </select>
-
-                {/* City Dropdown */}
-                <select
-                  className="bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-white outline-none focus:border-blue-500 disabled:opacity-50"
-                  value={formData.originCity}
-                  onChange={(e) =>
-                    handleCityChange(
-                      "origin",
-                      e.target.value,
-                      formData.originProvince,
-                    )
-                  }
-                  disabled={!formData.originProvince}
-                  required
-                >
-                  <option value="">Select City</option>
-                  {getCities(formData.originProvince).map((c) => (
-                    <option key={c.name} value={c.name}>
-                      {c.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              <select
+                className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-white outline-none focus:border-blue-500 appearance-none cursor-pointer"
+                value={formData.origin}
+                onChange={(e) =>
+                  handleWarehouseChange("origin", e.target.value)
+                }
+                required
+              >
+                <option value="">Select Origin...</option>
+                {WAREHOUSES.map((w) => (
+                  <option key={w.code} value={w.name}>
+                    {w.name}
+                  </option>
+                ))}
+              </select>
             </div>
 
-            {/* DESTINATION */}
+            {/* DESTINATION SELECTOR */}
             <div className="bg-slate-950/50 p-3 rounded-lg border border-slate-800">
               <div className="flex justify-between items-center mb-2">
                 <label className="text-[10px] font-bold text-emerald-400 uppercase flex items-center gap-2">
-                  <FontAwesomeIcon icon={faRoute} /> Destination
+                  <FontAwesomeIcon icon={faRoute} /> Destination Warehouse
                 </label>
-                {formData.destCode && (
+                {formData.destinationCode && (
                   <span className="text-[10px] font-mono bg-emerald-500/20 text-emerald-400 px-1.5 rounded">
-                    {formData.destCode}
+                    {formData.destinationCode}
                   </span>
                 )}
               </div>
-              <div className="grid grid-cols-2 gap-2">
-                <select
-                  className="bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-white outline-none focus:border-emerald-500"
-                  value={formData.destinationProvince}
-                  onChange={(e) =>
-                    setFormData((p) => ({
-                      ...p,
-                      destinationProvince: e.target.value,
-                      destinationCity: "",
-                      destinationCode: "",
-                    }))
-                  }
-                  required
-                >
-                  <option value="">Select Province</option>
-                  {PROVINCES.map((p) => (
-                    <option key={p} value={p}>
-                      {p}
+              <select
+                className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-white outline-none focus:border-emerald-500 appearance-none cursor-pointer"
+                value={formData.destination}
+                onChange={(e) =>
+                  handleWarehouseChange("destination", e.target.value)
+                }
+                required
+              >
+                <option value="">Select Destination...</option>
+                {/* Filter out selected origin so you can't ship to same place */}
+                {WAREHOUSES.filter((w) => w.code !== formData.originCode).map(
+                  (w) => (
+                    <option key={w.code} value={w.name}>
+                      {w.name}
                     </option>
-                  ))}
-                </select>
-
-                <select
-                  className="bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-white outline-none focus:border-emerald-500 disabled:opacity-50"
-                  value={formData.destCity}
-                  onChange={(e) =>
-                    handleCityChange(
-                      "destination",
-                      e.target.value,
-                      formData.destinationProvince,
-                    )
-                  }
-                  disabled={!formData.destinationProvince}
-                  required
-                >
-                  <option value="">Select City</option>
-                  {getCities(formData.destinationProvince).map((c) => (
-                    <option key={c.name} value={c.name}>
-                      {c.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
+                  ),
+                )}
+              </select>
             </div>
           </div>
 
-          {/* --- 4. NEW SCHEDULE SECTION --- */}
+          {/* --- SCHEDULE SECTION (UNCHANGED) --- */}
           <div className="bg-slate-950/50 p-3 rounded-lg border border-slate-800 grid grid-cols-2 gap-4">
-            {/* Departure (Existing) */}
             <div>
               <label className="text-[10px] font-bold text-slate-400 uppercase flex items-center gap-2 mb-2">
                 <FontAwesomeIcon icon={faCalendarDays} /> Departure
@@ -270,8 +216,6 @@ export default function CreateTripModal({ isOpen, onClose, onSuccess }) {
                 }
               />
             </div>
-
-            {/* 4. NEW: ARRIVAL (ETA) */}
             <div>
               <label className="text-[10px] font-bold text-slate-400 uppercase flex items-center gap-2 mb-2">
                 <FontAwesomeIcon icon={faCalendarDays} /> Est. Arrival
@@ -281,7 +225,7 @@ export default function CreateTripModal({ isOpen, onClose, onSuccess }) {
                 required
                 className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-sm text-white outline-none focus:border-emerald-500 [color-scheme:dark]"
                 value={formData.estimatedArrival}
-                min={formData.scheduledDeparture} // Prevent ETA before Departure
+                min={formData.scheduledDeparture}
                 onChange={(e) =>
                   setFormData((p) => ({
                     ...p,
@@ -292,7 +236,7 @@ export default function CreateTripModal({ isOpen, onClose, onSuccess }) {
             </div>
           </div>
 
-          {/* Details Section */}
+          {/* --- DETAILS SECTION (UNCHANGED) --- */}
           <div className="space-y-4 pt-2 border-t border-slate-800">
             <DriverSelectInput
               value={formData.driverName}

@@ -8,9 +8,12 @@ import {
   faPaperPlane,
   faWineGlass,
   faSnowflake,
+  faWarehouse, // Added
+  faRoute, // Added
 } from "@fortawesome/free-solid-svg-icons";
 import { createShipmentWithPackages } from "@/app/utility/FirebaseFunctions";
 import AddressInputGroup from "./AddressInputGroup";
+import { WAREHOUSES } from "@/app/utility/WarehouseData"; // <--- IMPORT THIS
 
 const INITIAL_CONTACT = {
   name: "",
@@ -20,7 +23,7 @@ const INITIAL_CONTACT = {
   barangay: "",
   city: "",
   province: "",
-  code: "", // This is the crucial Origin/Dest code
+  // Code removed from here, now handled by Warehouse Selector
 };
 
 const PACKAGING_TYPES = ["Box", "Sack", "Crate", "Bundle", "Roll", "Envelope"];
@@ -28,25 +31,25 @@ const PACKAGING_TYPES = ["Box", "Sack", "Crate", "Bundle", "Roll", "Envelope"];
 export default function ReceivePackageForm({ isOpen, onClose, onSuccess }) {
   const [loading, setLoading] = useState(false);
 
-  // Updated State Structure
+  // --- 1. NEW STATE FOR ROUTE/WAREHOUSE ---
+  const [routeInfo, setRouteInfo] = useState({
+    origin: "",
+    originCode: "",
+    destination: "",
+    destinationCode: "",
+  });
+
   const [sender, setSender] = useState({ ...INITIAL_CONTACT });
   const [recipient, setRecipient] = useState({ ...INITIAL_CONTACT });
 
-  // const [items, setItems] = useState([{ weight: "", description: "" }]);
-
   const [items, setItems] = useState([
     {
-      // quantity: 1, // Default 1
       description: "",
       weight: "",
-
-      // New Fields
       declaredValue: "",
       packagingType: "Box",
       isFragile: false,
       isPerishable: false,
-
-      // Hidden Fields (Ready for logic, hidden from display)
       length: "",
       width: "",
       height: "",
@@ -56,19 +59,33 @@ export default function ReceivePackageForm({ isOpen, onClose, onSuccess }) {
 
   if (!isOpen) return null;
 
+  // --- 2. WAREHOUSE HANDLER ---
+  const handleWarehouseChange = (type, value) => {
+    const selected = WAREHOUSES.find((w) => w.name === value);
+    const code = selected ? selected.code : "";
+
+    if (type === "origin") {
+      setRouteInfo((prev) => ({ ...prev, origin: value, originCode: code }));
+    } else {
+      setRouteInfo((prev) => ({
+        ...prev,
+        destination: value,
+        destinationCode: code,
+      }));
+    }
+  };
+
+  // --- Item Handlers (Unchanged) ---
   const toggleItemTag = (index, tag) => {
     const newItems = [...items];
     newItems[index][tag] = !newItems[index][tag];
     setItems(newItems);
   };
-
   const handleAddItem = () =>
     setItems([...items, { weight: "", description: "" }]);
-
   const handleRemoveItem = (index) => {
     setItems(items.filter((_, i) => i !== index));
   };
-
   const handleItemChange = (index, field, value) => {
     const newItems = [...items];
     newItems[index][field] = value;
@@ -78,21 +95,22 @@ export default function ReceivePackageForm({ isOpen, onClose, onSuccess }) {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    // Validation: Ensure Codes are present
-    if (!sender.code || !recipient.code) {
-      alert(
-        "Please select a valid City/Province to generate the Location Code.",
-      );
+    // Validation: Ensure Warehouses are selected
+    if (!routeInfo.originCode || !routeInfo.destinationCode) {
+      alert("Please select Origin and Destination Warehouses.");
+      return;
+    }
+
+    if (routeInfo.originCode === routeInfo.destinationCode) {
+      alert("Origin and Destination cannot be the same.");
       return;
     }
 
     setLoading(true);
 
     try {
-      // 2. EXPLODE ITEMS (Handle Quantity Multiplier)
-      // If user enters Qty: 3, we create 3 identical objects in the array
+      // Explode Items logic (Unchanged)
       const finalItems = [];
-
       items.forEach((item) => {
         const qty = parseInt(item.quantity) || 1;
         for (let i = 0; i < qty; i++) {
@@ -100,13 +118,9 @@ export default function ReceivePackageForm({ isOpen, onClose, onSuccess }) {
             description: item.description,
             weight: item.weight,
             packagingType: item.packagingType,
-
-            // New Fields
             declaredValue: item.declaredValue,
             isFragile: item.isFragile,
             isPerishable: item.isPerishable,
-
-            // Dimensions (Hidden but present)
             length: item.length,
             width: item.width,
             height: item.height,
@@ -114,17 +128,16 @@ export default function ReceivePackageForm({ isOpen, onClose, onSuccess }) {
         }
       });
 
-      // 3. Construct Payload with "details" object
+      // Construct Payload
       const payload = {
         sender: {
           name: sender.name,
           phone: sender.phone,
-          // PASS GRANULAR DETAILS SO BACKEND CAN QUERY THEM
           details: {
             unit: sender.unit,
             street: sender.street,
             barangay: sender.barangay,
-            city: sender.city,
+            city: sender.city, // Optional: Keep manual city entry for door-to-door info
             province: sender.province,
           },
         },
@@ -140,17 +153,16 @@ export default function ReceivePackageForm({ isOpen, onClose, onSuccess }) {
           },
         },
 
-        // Codes (Root Level)
-        origin: sender.city,
-        originCode: sender.code,
-        destination: recipient.city,
-        destinationCode: recipient.code,
+        // --- 3. UPDATED: USE ROUTE INFO FOR CODES ---
+        origin: routeInfo.origin, // e.g. "Divisoria"
+        originCode: routeInfo.originCode, // e.g. "DIV"
+        destination: routeInfo.destination, // e.g. "Odiongan"
+        destinationCode: routeInfo.destinationCode, // e.g. "ODI"
 
-        // Pass the exploded array
         items: finalItems,
         remarks,
       };
-      // Call Backend
+
       const result = await createShipmentWithPackages(payload);
       const { shipmentId } = result.data;
 
@@ -168,6 +180,12 @@ export default function ReceivePackageForm({ isOpen, onClose, onSuccess }) {
     setSender({ ...INITIAL_CONTACT });
     setRecipient({ ...INITIAL_CONTACT });
     setItems([{ weight: "", description: "" }]);
+    setRouteInfo({
+      origin: "",
+      originCode: "",
+      destination: "",
+      destinationCode: "",
+    });
     onClose();
   };
 
@@ -198,23 +216,103 @@ export default function ReceivePackageForm({ isOpen, onClose, onSuccess }) {
         {/* CONTENT */}
         <div className="flex-1 overflow-y-auto p-6 custom-scrollbar">
           <form id="receive-form" onSubmit={handleSubmit} className="space-y-8">
-            {/* ROW 1: ADDRESSES (Now Clean & Reusable) */}
+            {/* --- 4. NEW: ROUTE / WAREHOUSE SELECTION (ON TOP) --- */}
+            <div className="bg-slate-950/50 p-4 rounded-xl border border-slate-800">
+              <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-4 flex items-center gap-2">
+                <FontAwesomeIcon icon={faRoute} /> Shipment Route
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* ORIGIN WAREHOUSE */}
+                <div className="space-y-1">
+                  <div className="flex justify-between">
+                    <label className="text-xs font-bold text-blue-400 uppercase">
+                      Origin Warehouse
+                    </label>
+                    {routeInfo.originCode && (
+                      <span className="text-[10px] font-mono bg-blue-500/20 text-blue-400 px-1.5 rounded">
+                        {routeInfo.originCode}
+                      </span>
+                    )}
+                  </div>
+                  <div className="relative">
+                    <FontAwesomeIcon
+                      icon={faWarehouse}
+                      className="absolute left-3 top-2.5 text-slate-500 text-xs"
+                    />
+                    <select
+                      className="w-full bg-slate-900 border border-slate-700 rounded-lg pl-8 pr-3 py-2 text-sm text-white focus:border-blue-500 outline-none appearance-none cursor-pointer"
+                      value={routeInfo.origin}
+                      onChange={(e) =>
+                        handleWarehouseChange("origin", e.target.value)
+                      }
+                      required
+                    >
+                      <option value="">Select Origin...</option>
+                      {WAREHOUSES.map((w) => (
+                        <option key={w.code} value={w.name}>
+                          {w.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                {/* DESTINATION WAREHOUSE */}
+                <div className="space-y-1">
+                  <div className="flex justify-between">
+                    <label className="text-xs font-bold text-emerald-400 uppercase">
+                      Destination Warehouse
+                    </label>
+                    {routeInfo.destinationCode && (
+                      <span className="text-[10px] font-mono bg-emerald-500/20 text-emerald-400 px-1.5 rounded">
+                        {routeInfo.destinationCode}
+                      </span>
+                    )}
+                  </div>
+                  <div className="relative">
+                    <FontAwesomeIcon
+                      icon={faWarehouse}
+                      className="absolute left-3 top-2.5 text-slate-500 text-xs"
+                    />
+                    <select
+                      className="w-full bg-slate-900 border border-slate-700 rounded-lg pl-8 pr-3 py-2 text-sm text-white focus:border-emerald-500 outline-none appearance-none cursor-pointer"
+                      value={routeInfo.destination}
+                      onChange={(e) =>
+                        handleWarehouseChange("destination", e.target.value)
+                      }
+                      required
+                    >
+                      <option value="">Select Destination...</option>
+                      {WAREHOUSES.filter(
+                        (w) => w.code !== routeInfo.originCode,
+                      ).map((w) => (
+                        <option key={w.code} value={w.name}>
+                          {w.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* ROW 2: ADDRESSES (Contact Info) */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
               <AddressInputGroup
-                label="Sender"
+                label="Sender Contact"
                 values={sender}
                 onChange={setSender}
                 color="blue"
               />
               <AddressInputGroup
-                label="Recipient"
+                label="Recipient Contact"
                 values={recipient}
                 onChange={setRecipient}
                 color="emerald"
               />
             </div>
 
-            {/* ROW 2: ITEMS LIST */}
+            {/* ROW 3: ITEMS LIST (Unchanged) */}
             <div className="pt-2">
               <div className="flex justify-between items-center mb-4">
                 <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider">
@@ -235,7 +333,7 @@ export default function ReceivePackageForm({ isOpen, onClose, onSuccess }) {
                     key={idx}
                     className="bg-slate-950 rounded-xl border border-slate-800 p-4 animate-in slide-in-from-left-2 duration-300 shadow-sm"
                   >
-                    {/* --- TOP ROW: PHYSICAL DETAILS --- */}
+                    {/* TOP ROW: PHYSICAL DETAILS */}
                     <div className="flex gap-4 items-start">
                       {/* Index Badge */}
                       <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-slate-900 text-slate-500 font-mono text-xs border border-slate-800 mt-6">
@@ -321,7 +419,7 @@ export default function ReceivePackageForm({ isOpen, onClose, onSuccess }) {
                       )}
                     </div>
 
-                    {/* --- BOTTOM ROW: HANDLING & VALUE --- */}
+                    {/* BOTTOM ROW: HANDLING & VALUE */}
                     <div className="flex gap-4 mt-3 pl-12 items-end">
                       {/* Declared Value */}
                       <div className="w-40 relative">
@@ -375,28 +473,6 @@ export default function ReceivePackageForm({ isOpen, onClose, onSuccess }) {
                           <FontAwesomeIcon icon={faSnowflake} />
                           Perishable
                         </button>
-                      </div>
-
-                      {/* HIDDEN DIMENSIONS (Logic remains, but inputs are invisible) */}
-                      <div className="hidden">
-                        <input
-                          value={item.length}
-                          onChange={(e) =>
-                            handleItemChange(idx, "length", e.target.value)
-                          }
-                        />
-                        <input
-                          value={item.width}
-                          onChange={(e) =>
-                            handleItemChange(idx, "width", e.target.value)
-                          }
-                        />
-                        <input
-                          value={item.height}
-                          onChange={(e) =>
-                            handleItemChange(idx, "height", e.target.value)
-                          }
-                        />
                       </div>
                     </div>
                   </div>

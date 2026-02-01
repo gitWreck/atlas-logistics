@@ -86,7 +86,7 @@ exports.assignShipmentToTruckTrip = onCall(
       // Calculate Items to Add (Safely handle missing totals)
       const itemsToAdd = Number(tracking.totals?.totalItems || 0);
 
-      // 📦 Ensure trip_package exists (NO loading yet)
+      // 📦 Ensure trip_shipments exists (NO loading yet)
       if (!shipSnap.exists) {
         tx.set(shipRef, {
           trackingDocId,
@@ -94,7 +94,7 @@ exports.assignShipmentToTruckTrip = onCall(
           route:
             tracking.originCode + " -> " + tracking.destinationCode || null,
 
-          totalItems: itemsToAdd || null,
+          totalItems: itemsToAdd || 0,
           pendingCount: itemsToAdd, // Initially, all items are pending
           loadedCount: 0,
           deliveredCount: 0,
