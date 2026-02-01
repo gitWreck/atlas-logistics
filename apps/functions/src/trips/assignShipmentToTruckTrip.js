@@ -102,6 +102,9 @@ exports.assignShipmentToTruckTrip = onCall(
           sender: tracking.sender,
           receiver: tracking.recipient,
 
+          // Copy barcodes for the Checker API (Important for scanning!)
+          packageBarcodes: tracking.packageBarcodes || [],
+
           createdAt: now,
           createdBy: uid,
 

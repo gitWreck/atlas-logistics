@@ -15,7 +15,7 @@ function StatusDot({ status, isDelayed }) {
   let animate = false;
 
   if (status === "COMPLETED") color = "bg-emerald-500";
-  if (status === "PLANNED") color = "bg-slate-600";
+  if (status === "CREATED") color = "bg-slate-600";
   if (status === "IN_TRANSIT") {
     color = "bg-blue-500";
     animate = true;
@@ -153,7 +153,7 @@ export default function TripRow({ trip, onClick }) {
               }`}
           >
             {isDelayed
-              ? trip.lastDelayReason?.replace("_", " ") || "DELAYED"
+              ? trip.delayReason?.replace("_", " ") || "DELAYED"
               : trip.status.replace("_", " ")}
           </span>
         </div>

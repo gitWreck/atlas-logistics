@@ -93,22 +93,22 @@ export default function AdminDashboardPage() {
               label="Overview & Users"
             />
             <TabButton
+              isActive={activeTab === "trips"}
+              onClick={() => setActiveTab("trips")}
+              icon={faMapSigns}
+              label="Trip Operations"
+            />
+            <TabButton
               isActive={activeTab === "shipments"}
               onClick={() => setActiveTab("shipments")}
               icon={faTruck}
-              label="Shipment Operations"
+              label="Shipment and Packages"
             />
             <TabButton
               isActive={activeTab === "manifests"}
               onClick={() => setActiveTab("manifests")}
               icon={faTruckLoading}
               label="Manifest & Trips"
-            />
-            <TabButton
-              isActive={activeTab === "trips"}
-              onClick={() => setActiveTab("trips")}
-              icon={faMapSigns}
-              label="Trip Operations"
             />
             {/* <TabButton
               isActive={activeTab === "manager"}
