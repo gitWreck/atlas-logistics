@@ -50,7 +50,6 @@ export default TabSelector;
 const styles = StyleSheet.create({
   tabContainer: {
     flexDirection: "row",
-    paddingHorizontal: 8,
     marginBottom: 16,
     marginHorizontal: 16,
     marginTop: 25,
@@ -65,13 +64,13 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   tabButton: {
-    paddingVertical: 12,
+    paddingVertical: 10,
     alignItems: "center",
     justifyContent: "center",
     borderRadius: 9999, // fully circular / pill-shaped
   },
   tabButtonInactive: {
-    paddingVertical: 12,
+    paddingVertical: 10,
     alignItems: "center",
     justifyContent: "center",
     borderRadius: 9999, // fully circular / pill-shaped

@@ -201,7 +201,7 @@ const styles = StyleSheet.create({
   },
   header: {
     paddingHorizontal: 20,
-    paddingTop: 35,
+    paddingTop: 60,
     paddingBottom: 15,
     flexDirection: "row",
     justifyContent: "space-between",
@@ -218,7 +218,7 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     marginLeft: 12,
   },
-  listContent: { paddingHorizontal: 20, paddingBottom: 50 },
+  listContent: { paddingHorizontal: 20, paddingBottom: 50, paddingTop: 10 },
   emptyContainer: { alignItems: "center", marginTop: 50, gap: 10 },
   emptyText: { color: "#64748b" },
 });
