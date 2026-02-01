@@ -1,11 +1,6 @@
 import React from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import {
-  faExclamationTriangle,
-  faShip,
-  faEllipsisV,
-  faTruck,
-} from "@fortawesome/free-solid-svg-icons";
+import { faEllipsisV, faTruck } from "@fortawesome/free-solid-svg-icons";
 import StatusBadge from "../ui/StatusBadge";
 
 // Keeping your visual component
@@ -110,8 +105,8 @@ export default function ShipmentRow({ s, onClick }) {
               s.status === "DELIVERED"
                 ? "bg-emerald-500"
                 : s.truckDetails?.delayReason // <--- CHECK FOR DELAY HERE
-                ? "bg-amber-500"
-                : "bg-blue-500"
+                  ? "bg-amber-500"
+                  : "bg-blue-500"
             }`}
             style={{ width: `${s.progress || 0}%` }}
           />
@@ -122,8 +117,8 @@ export default function ShipmentRow({ s, onClick }) {
               isDelayed
                 ? "text-amber-500" // <--- MATCH TEXT COLOR
                 : s.status === "DELIVERED"
-                ? "text-emerald-400"
-                : "text-blue-400"
+                  ? "text-emerald-400"
+                  : "text-blue-400"
             }`}
           >
             {/* If delayed, show specific reason, otherwise standard status */}
