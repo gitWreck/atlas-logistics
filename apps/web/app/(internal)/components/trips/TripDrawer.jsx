@@ -11,6 +11,7 @@ import {
   faLock,
   faScroll,
   faUnlock,
+  faPlus,
 } from "@fortawesome/free-solid-svg-icons";
 import StatusBadge from "../ui/StatusBadge"; // Ensure this path is correct
 // import TripManifestRow from "./TripManifestRow"; // We will create a simple inline version below
@@ -21,14 +22,17 @@ import {
   reopenTrip,
 } from "@/app/utility/FirebaseFunctions"; // Import your backend calls
 import { runAction } from "@/app/utility/utilities";
+import { auth } from "@/lib/firebase";
 
 function calculateCurrentStep(status) {
   return status;
 }
 
-export default function TripDrawer({ isOpen, onClose, data }) {
+export default function TripDrawer({ isOpen, onClose, data, onAddShipment }) {
   const [activeTab, setActiveTab] = useState("TIMELINE");
   const [messageBody, setMessageBody] = useState("");
+  const [shipments, setShipments] = useState([]);
+  const [loadingShips, setLoadingShips] = useState(false);
 
   const [lockStatus, setLockStatus] = useState("IDLE");
   const isLocked = data?.manifestLocked;
@@ -43,6 +47,36 @@ export default function TripDrawer({ isOpen, onClose, data }) {
       );
     }
   }, [isOpen, data]);
+
+  useEffect(() => {
+    setTrip(data.shipments);
+    if (data.tripId) fetchShipments();
+  }, [data.tripId, data.shipments]);
+
+  const fetchShipments = async () => {
+    if (!data.tripId) return;
+    setLoadingShips(true);
+    try {
+      const token = await auth.currentUser?.getIdToken();
+      const res = await fetch(`/api/manifests/trips/${data.tripId}/shipments`, {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        cache: "no-store",
+      });
+      const data = await res.json();
+      setShipments(data.shipments || []);
+
+      // console.log("Total Loaded:", data.stats.totalLoaded);
+      // console.log("Total Pending:", data.stats.totalPending);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoadingShips(false);
+    }
+  };
 
   const handleSendMessage = () => {
     // Integration logic here (e.g., Push Notification or SMS to Driver)
@@ -66,37 +100,6 @@ export default function TripDrawer({ isOpen, onClose, data }) {
   };
 
   if (!data) return null;
-
-  // --- INLINE COMPONENT FOR SHIPMENT ROW ---
-  function ShipmentManifestRow({ shipment, idx }) {
-    return (
-      <div className="bg-slate-800/40 border border-slate-700 p-3 rounded-lg flex justify-between items-center hover:bg-slate-800/60 transition-colors">
-        <div className="flex gap-3 items-center">
-          {/* Sequence / Index */}
-          <div className="h-8 w-8 bg-slate-900 rounded flex items-center justify-center text-xs font-mono font-bold text-slate-500 border border-slate-700">
-            {idx + 1}
-          </div>
-
-          {/* Details */}
-          <div>
-            <div className="text-slate-200 text-sm font-bold">
-              {shipment.trackingNumber}
-            </div>
-            <div className="text-xs text-slate-500 flex items-center gap-1">
-              <span className="text-slate-400">
-                {shipment.recipient?.name || "Customer"}
-              </span>
-              <span>•</span>
-              <span>{shipment.destinationCity || "Unknown City"}</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Status */}
-        <StatusBadge status={shipment.status} size="xs" />
-      </div>
-    );
-  }
 
   console.log("shipments: ", data);
 
@@ -190,7 +193,7 @@ export default function TripDrawer({ isOpen, onClose, data }) {
                     // Logic to determine if step is done (Adjust based on your real status enum)
                     const isDone =
                       data.status === step ||
-                      step === "PLANNED" ||
+                      step === "CREATED" ||
                       data.status === "COMPLETED";
                     // Note: You might need a proper helper like 'getTripStepIndex' for accurate progress bars
 
@@ -242,27 +245,38 @@ export default function TripDrawer({ isOpen, onClose, data }) {
             </div>
           )}
 
-          {/* --- TAB 2: MANIFEST (List of Shipments) --- */}
+          {/* --- TAB 2: MANIFEST (With Add Button) --- */}
           {activeTab === "MANIFEST" && (
             <div className="space-y-3 animate-in fade-in slide-in-from-right-4 duration-300">
-              {/* Summary Header */}
+              {/* HEADER WITH BUTTON */}
               <div className="bg-slate-800/20 border border-slate-800 p-3 rounded-lg flex justify-between items-center mb-2">
-                <span className="text-xs font-bold text-slate-400 uppercase">
-                  Total Cargo
-                </span>
-                <span className="text-sm font-bold text-white">
-                  {data.totalItems || 0} Packages
-                </span>
+                <div>
+                  <span className="text-xs font-bold text-slate-400 uppercase">
+                    Total Cargo
+                  </span>
+                  <div className="text-sm font-bold text-white">
+                    {data.totalPackages || 0} Packages
+                  </div>
+                </div>
+
+                {/* --- ADD SHIPMENTS BUTTON (Moved Here) --- */}
+                <button
+                  onClick={onAddShipment}
+                  disabled={isLocked}
+                  className="bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold px-3 py-1.5 rounded flex items-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-blue-900/20"
+                >
+                  <FontAwesomeIcon icon={faPlus} />
+                  <span className="hidden sm:inline">Add Shipments</span>
+                </button>
               </div>
 
-              {/* If you have the list of shipments in 'data.shipments', map them. 
-                  Otherwise, you might need to fetch them. Assuming data.shipments exists for now. */}
-              {(data.shipments || []).length === 0 ? (
-                <div className="text-center p-8 text-slate-500 italic text-sm">
+              {/* LIST */}
+              {(shipments || []).length === 0 ? (
+                <div className="text-center p-8 text-slate-500 italic text-sm border border-dashed border-slate-800 rounded-xl">
                   No shipments assigned to this trip yet.
                 </div>
               ) : (
-                data.shipments.map((shipment, idx) => (
+                shipments.map((shipment, idx) => (
                   <ShipmentManifestRow
                     key={shipment.id || idx}
                     shipment={shipment}
@@ -373,6 +387,32 @@ export default function TripDrawer({ isOpen, onClose, data }) {
 }
 
 // --- HELPER COMPONENTS ---
+
+// --- INLINE COMPONENT FOR SHIPMENT ROW ---
+function ShipmentManifestRow({ shipment, idx }) {
+  return (
+    <div className="bg-slate-800/40 border border-slate-700 p-3 rounded-lg flex justify-between items-center hover:bg-slate-800/60 transition-colors">
+      <div className="flex gap-3 items-center">
+        <div className="h-8 w-8 bg-slate-900 rounded flex items-center justify-center text-xs font-mono font-bold text-slate-500 border border-slate-700">
+          {idx + 1}
+        </div>
+        <div>
+          <div className="text-slate-200 text-sm font-bold">
+            {shipment.trackingNumber}
+          </div>
+          <div className="text-xs text-slate-500 flex items-center gap-1">
+            <span className="text-slate-400">
+              {shipment.recipient?.name || "Customer"}
+            </span>
+            <span>•</span>
+            <span>{shipment.destinationCity || "Unknown City"}</span>
+          </div>
+        </div>
+      </div>
+      <StatusBadge status={shipment.status} size="xs" />
+    </div>
+  );
+}
 
 function TabButton({ isActive, onClick, icon, label }) {
   return (

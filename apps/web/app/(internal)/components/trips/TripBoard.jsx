@@ -18,6 +18,7 @@ import { auth } from "@/lib/firebase";
 import TripDrawer from "./TripDrawer";
 import CreateTripModal from "../manifests/modals/CreateTripModal";
 import { calculateProgress } from "@/app/utility/utilities";
+import BulkAssignmentModal from "../manifests/modals/BulkAssignmentModal";
 
 export default function TripBoard({ userRole }) {
   const [trips, setTrips] = useState([]);
@@ -26,6 +27,7 @@ export default function TripBoard({ userRole }) {
   // Modal & Drawer State
   const [isNewTripModalOpen, setIsNewTripModalOpen] = useState(false);
   const [selectedTripId, setSelectedTripId] = useState(null);
+  const [isBulkModalOpen, setBulkModalOpen] = useState(false);
 
   // Search & Filter State
   const [activeFilter, setActiveFilter] = useState("ALL");
@@ -304,11 +306,21 @@ export default function TripBoard({ userRole }) {
         isOpen={!!selectedTripId}
         onClose={() => setSelectedTripId(null)}
         data={selectedTrip}
+        onAddShipment={() => setBulkModalOpen(true)}
       />
       <CreateTripModal
         isOpen={isNewTripModalOpen}
         onClose={() => setIsNewTripModalOpen(false)}
         onSuccess={fetchTrips}
+      />
+      <BulkAssignmentModal
+        isOpen={isBulkModalOpen}
+        trip={selectedTrip}
+        onClose={() => setBulkModalOpen(false)}
+        onSuccess={() => {
+          setBulkModalOpen(false);
+          // handleRefresh(); // This refreshes the table & sidebar
+        }}
       />
     </div>
   );
