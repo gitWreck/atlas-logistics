@@ -1,7 +1,8 @@
 "use client";
 import React, { useState } from "react"; // Added useEffect
-import TripManager from "../../components/trips/TripManager";
+// import TripManager from "../../components/trips/TripManager";
 import ShipmentBoard from "../../components/shipments/ShipmentBoard";
+import TripBoard from "../../components/trips/TripBoard";
 import AdminOverview from "../../components/admin/AdminOverview";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
@@ -103,17 +104,17 @@ export default function AdminDashboardPage() {
               icon={faTruckLoading}
               label="Manifest & Trips"
             />
+            <TabButton
+              isActive={activeTab === "trips"}
+              onClick={() => setActiveTab("trips")}
+              icon={faMapSigns}
+              label="Trip Operations"
+            />
             {/* <TabButton
               isActive={activeTab === "manager"}
               onClick={() => setActiveTab("manager")}
               icon={faMapSigns}
               label="Package Manager"
-            /> */}
-            {/* <TabButton
-              isActive={activeTab === "trips"}
-              onClick={() => setActiveTab("trips")}
-              icon={faMapSigns}
-              label="Trip Operations"
             /> */}
           </div>
         </div>
@@ -122,10 +123,10 @@ export default function AdminDashboardPage() {
       {/* --- CONTENT AREA --- */}
       <main className="max-w-7xl mx-auto p-6">
         {activeTab === "overview" && <AdminOverview />}
+        {activeTab === "trips" && <TripBoard />}
         {activeTab === "shipments" && <ShipmentBoard userRole="admin" />}
         {activeTab === "manifests" && <ManifestPage />}
         {/* {activeTab === "manager" && <PackageManager />} */}
-        {/* {activeTab === "trips" && <TripManager />} */}
       </main>
     </div>
   );
