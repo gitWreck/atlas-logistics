@@ -46,7 +46,7 @@ export default function ShipmentRow({ s, onClick }) {
 
         <div>
           {/* TRIP INFO (The Latest One) */}
-          <div className="flex items-center gap-2 mt-1">
+          {/* <div className="flex items-center gap-2 mt-1">
             <span
               className={`font-mono text-sm font-medium transition-colors ${
                 tripId !== "—" ? "text-blue-400" : "text-slate-600"
@@ -60,7 +60,7 @@ export default function ShipmentRow({ s, onClick }) {
             <span className="text-xs text-slate-500">
               {s.startedAt ? s.startedAt : ""}
             </span>
-          </div>
+          </div> */}
 
           {/* TRACKING NUMBER */}
           <div className="font-mono text-sm font-medium text-slate-200 group-hover:text-blue-400 transition-colors">

@@ -418,10 +418,12 @@ function ShipmentManifestRow({ shipment, idx, data }) {
           </div>
           <div className="text-xs text-slate-500 flex items-center gap-1">
             <span className="text-slate-400">
-              {shipment.receiver?.name || "Customer"}
+              {shipment.recipient?.name || "Customer"}
             </span>
             <span>•</span>
-            <span>{shipment.receiver?.address.province || "Unknown City"}</span>
+            <span>
+              {shipment.recipient?.address.province || "Unknown City"}
+            </span>
             <span>•</span>
             <span>
               {shipment.loadedCount}/{data.totalItems}
