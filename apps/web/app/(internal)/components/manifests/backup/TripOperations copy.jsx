@@ -5,7 +5,7 @@ import {
   clearTruckDelay,
   setTruckDelay,
 } from "@/app/utility/FirebaseFunctions";
-import StatusButton from "../ui/StatusButton";
+import StatusButton from "../../ui/StatusButton";
 import { runAction } from "@/app/utility/utilities";
 
 export default function TripOperations({ tripId, isLocked, onSuccess }) {
