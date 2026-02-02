@@ -1,45 +1,89 @@
 import React from "react";
-import { View, Text, StyleSheet } from "react-native";
+import { View, Text, StyleSheet, Platform } from "react-native";
 import { FontAwesome5 } from "@expo/vector-icons";
-import { COLORS } from "../../constants/theme";
-import StatusBadge from "../../ui/StatusBadge"; // Adjust path
+import { Image } from "expo-image";
+
+const CARD_BG = "#ffffff";
+const LABEL_GREY = "#6b7280";
+const VALUE_DARK = "#111827";
+const SEPARATOR = "#e5e7eb";
 
 const TripSummaryCard = ({ trip }) => {
   if (!trip) return null;
 
+  const tripDisplayId = trip.tripId?.startsWith("TRIP")
+    ? trip.tripId
+    : `TRIP - ${trip.tripId || "—"}`;
+  const truckDisplay = trip.truckPlateNumber?.startsWith("TRK")
+    ? trip.truckPlateNumber
+    : trip.truckPlateNumber
+      ? `TRK - ${trip.truckPlateNumber}`
+      : "—";
+
   return (
-    <View style={styles.summaryCard}>
-      <View style={styles.cardHeader}>
-        <View style={styles.plateBox}>
-          <Text style={styles.plateText}>{trip.tripId}</Text>
+    <View style={styles.card}>
+      <Text style={styles.sectionTitle}>Trip Summary</Text>
+
+      <View style={styles.separator} />
+
+      {/* Row 1: Trip Number */}
+      <View style={styles.twoColRow}>
+        <View style={styles.half}>
+          <Text style={styles.label}>Trip Number</Text>
+          <Text style={styles.value}>{tripDisplayId}</Text>
         </View>
-        <StatusBadge status={trip.status} />
       </View>
 
-      {/* Route Big Text */}
-      <View style={styles.routeSection}>
-        <View style={styles.row}>
-          <FontAwesome5
-            name="map-signs"
-            size={20}
-            color={COLORS.primary}
-            style={{ marginRight: 10 }}
-          />
-          <Text style={styles.routeTitle}>{trip.route || "NO ROUTE"}</Text>
+      <View style={styles.separator} />
+
+      {/* From */}
+      <View style={styles.locationBlock}>
+        <View style={styles.locationRow1}>
+          <View style={styles.iconColumn}>
+            <Image
+              source={require("../../../assets/icons/location.svg")}
+              style={[styles.locationIcon, { width: 16, height: 16, tintColor: LABEL_GREY }]}
+            />
+          </View>
+          <Text style={[styles.label, styles.labelInRow]}>From</Text>
         </View>
-        <Text style={styles.routeSub}>
-          {trip.origin || "Origin"}{" "}
-          <FontAwesome5 name="arrow-right" size={10} color="#64748b" />{" "}
-          {trip.destination || "Destination"}
-        </Text>
+        <View style={styles.locationRow2}>
+          <Text style={styles.locationValue} numberOfLines={1}>
+            {trip.origin || "—"}
+          </Text>
+        </View>
       </View>
 
-      {/* Truck & Driver */}
-      <View style={styles.infoRow}>
-        <FontAwesome5 name="truck" size={14} color="#94a3b8" />
-        <Text style={styles.infoText}>
-          {trip.plateNumber || "No Plate"} • {trip.driverName || "You"}
-        </Text>
+      {/* To */}
+      <View style={[{...styles.locationBlock, marginTop: 15}]}>
+        <View style={styles.locationRow1}>
+          <View style={styles.iconColumn}>
+            <Image
+              source={require("../../../assets/icons/location.svg")}
+              style={[styles.locationIcon, { width: 16, height: 16, tintColor: LABEL_GREY }]}
+            />
+          </View>
+          <Text style={[styles.label, styles.labelInRow]}>To</Text>
+        </View>
+        <View style={styles.locationRow2}>
+          <Text style={styles.locationValue} numberOfLines={1}>
+            {trip.destination || "—"}
+          </Text>
+        </View>
+      </View>
+
+      <View style={styles.separator} />
+
+      {/* Row: Driver | Vehicle */}
+      <View style={styles.twoColRow}>
+        <View style={styles.half}>
+          <Text style={styles.label}>Driver</Text>
+          <Text style={styles.value}>{trip.driverName || "—"}</Text>
+        </View>
+        <View style={styles.half}>
+          <Text style={styles.label}>Vehicle</Text>
+          <Text style={styles.value}>{truckDisplay}</Text>
+        </View>
       </View>
     </View>
   );
@@ -48,40 +92,67 @@ const TripSummaryCard = ({ trip }) => {
 export default TripSummaryCard;
 
 const styles = StyleSheet.create({
-  summaryCard: {
-    backgroundColor: COLORS.card,
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 24,
-    borderWidth: 1,
-    borderColor: "#334155",
-  },
-  cardHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginBottom: 20,
-  },
-  plateBox: {
-    backgroundColor: "#334155",
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 6,
-  },
-  plateText: { color: "#fff", fontWeight: "bold" },
-  routeSection: {
+  card: {
+    backgroundColor: CARD_BG,
+    borderRadius: 15,
+    padding: 16,
     marginBottom: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: "#334155",
-    paddingBottom: 16,
+    ...Platform.select({
+      ios: {
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.08,
+        shadowRadius: 8,
+      },
+      android: { elevation: 3 },
+    }),
   },
-  row: { flexDirection: "row", alignItems: "center" },
-  routeTitle: {
-    fontSize: 28,
-    fontWeight: "800",
-    color: "#fff",
-    letterSpacing: 1,
+  sectionTitle: {
+    fontSize: 15,
+    color: VALUE_DARK,
   },
-  routeSub: { color: "#94a3b8", marginTop: 4, marginLeft: 34 },
-  infoRow: { flexDirection: "row", gap: 10, alignItems: "center" },
-  infoText: { color: "#94a3b8", fontSize: 14 },
+  twoColRow: {
+    flexDirection: "row",
+  },
+  half: { flex: 1 },
+  label: {
+    fontSize: 12,
+    color: LABEL_GREY,
+    marginBottom: 2,
+  },
+  value: {
+    fontSize: 14,
+    color: VALUE_DARK,
+  },
+  locationBlock: {
+    marginBottom: 0,
+  },
+  locationRow1: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 2,
+  },
+  locationRow2: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  iconColumn: {
+    width: 20,
+    alignItems: "center",
+    marginRight: 4,
+  },
+  locationIcon: { width: 16, textAlign: "center" },
+  locationValue: {
+    flex: 1,
+    fontSize: 14,
+    marginLeft: 5,
+    marginTop: 6,
+    color: VALUE_DARK,
+  },
+  labelInRow: { marginBottom: 0 },
+  separator: {
+    height: 1,
+    backgroundColor: SEPARATOR,
+    marginVertical: 14,
+  },
 });
