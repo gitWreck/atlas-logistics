@@ -5,6 +5,7 @@ import {
   faPlus,
   faBoxOpen,
   faPrint,
+  faMinus,
 } from "@fortawesome/free-solid-svg-icons";
 
 export default function TripManifestTab({
@@ -13,9 +14,12 @@ export default function TripManifestTab({
   isLocked,
   onAddShipment,
   onViewPackages, // <--- New Prop to open your future modal
+  onUnassign,
 }) {
   const [search, setSearch] = useState("");
   const [filterStatus, setFilterStatus] = useState("ALL");
+
+  console.log("TripManifestTab shipments:", shipments);
 
   // --- FILTER LOGIC ---
   const filteredData = useMemo(() => {
@@ -134,18 +138,26 @@ export default function TripManifestTab({
                     </div>
                   </td>
                   <td className="px-4 py-3 text-xs">
-                    {s.destinationCode || "—"}
+                    {s.recipient?.address.city || "—"}
                   </td>
                   <td className="px-4 py-3 text-center text-xs text-slate-300">
-                    {s.totalPackages || 1}
+                    {s.totalItems || 1}
                   </td>
-                  <td className="px-4 py-3 text-right">
+                  <td className="px-4 py-3 text-right gap-2 flex justify-end ">
                     <button
                       onClick={() => onViewPackages && onViewPackages(s)} // <--- Trigger Modal Here
                       className="text-xs bg-slate-800 hover:bg-slate-700 text-blue-400 border border-slate-700 px-3 py-1.5 rounded transition-all flex items-center gap-1 ml-auto"
                     >
                       <FontAwesomeIcon icon={faBoxOpen} />
-                      Items
+                    </button>
+
+                    <button
+                      // onClick={() => onViewPackages && onViewPackages(s)} // <--- Trigger Modal Here
+                      onClick={() => onUnassign(s)}
+                      className="text-slate-500 hover:text-red-400 p-2"
+                      disabled={isLocked}
+                    >
+                      <FontAwesomeIcon icon={faMinus} />
                     </button>
                   </td>
                 </tr>

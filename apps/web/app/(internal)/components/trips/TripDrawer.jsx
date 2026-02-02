@@ -15,6 +15,7 @@ import TripToolsTab from "./TripToolsTab";
 import TripDrawerFooter from "./TripDrawerFooter";
 import StatusBadge from "../ui/StatusBadge";
 import ViewPackagesModal from "../manifests/modals/ViewPackagesModal";
+import UnassignShipmentModal from "../manifests/modals/UnassignShipmentModal";
 
 export default function TripDrawer({
   isOpen,
@@ -26,6 +27,7 @@ export default function TripDrawer({
   const [activeTab, setActiveTab] = useState("TIMELINE");
   const [shipments, setShipments] = useState([]);
   const [loadingShips, setLoadingShips] = useState(false);
+  const [shipmentToUnassign, setShipmentToUnassign] = useState(null);
   const [selectedShipmentForModal, setSelectedShipmentForModal] =
     useState(null);
 
@@ -134,10 +136,19 @@ export default function TripDrawer({
               onViewPackages={(shipment) =>
                 setSelectedShipmentForModal(shipment)
               }
+              onUnassign={(shipment) => setShipmentToUnassign(shipment)}
             />
           )}
 
-          {activeTab === "TOOLS" && <TripToolsTab data={data} />}
+          {activeTab === "TOOLS" && (
+            <TripToolsTab
+              data={data}
+              onRefresh={() => {
+                fetchShipments();
+                onRefreshTrips();
+              }}
+            />
+          )}
         </div>
 
         {/* FOOTER */}
@@ -149,6 +160,18 @@ export default function TripDrawer({
         isOpen={!!selectedShipmentForModal}
         shipment={selectedShipmentForModal}
         onClose={() => setSelectedShipmentForModal(null)}
+      />
+
+      <UnassignShipmentModal
+        isOpen={!!shipmentToUnassign}
+        shipment={shipmentToUnassign}
+        tripId={data?.tripId}
+        onClose={() => setShipmentToUnassign(null)}
+        onSuccess={() => {
+          fetchShipments();
+          setShipmentToUnassign(null);
+          onRefreshTrips();
+        }}
       />
     </>
   );

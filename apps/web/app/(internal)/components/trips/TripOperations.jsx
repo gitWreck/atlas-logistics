@@ -41,7 +41,7 @@ export default function TripOperations({ tripId, isLocked, onSuccess }) {
         <div className="flex gap-2 mt-auto">
           <input
             value={assignId}
-            onChange={(e) => setAssignId(e.target.value)}
+            onChange={(e) => setAssignId(e.target.value.trim())}
             placeholder="Shipment ID..."
             className="flex-1 bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white outline-none focus:border-blue-500 transition-colors"
             disabled={isLocked}
