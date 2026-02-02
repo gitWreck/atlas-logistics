@@ -35,6 +35,8 @@ exports.createPackage = require("./src/packages/createPackage").createPackage;
 exports.createShipmentWithPackages =
   require("./src/shipments/createShipmentWithPackages").createShipmentWithPackages;
 exports.scanPackages = require("./src/packages/scanPackages").scanPackages;
+exports.updateShipmentPackages =
+  require("./src/packages/updateShipmentPackages").updateShipmentPackages;
 
 // ------------------------------------------
 // Trips

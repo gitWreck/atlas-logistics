@@ -11,6 +11,10 @@ export const createShipmentWithPackages = httpsCallable(
   functions,
   "createShipmentWithPackages",
 );
+export const updateShipmentPackages = httpsCallable(
+  functions,
+  "updateShipmentPackages",
+);
 
 // TRIPS
 

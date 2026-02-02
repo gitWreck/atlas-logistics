@@ -15,9 +15,9 @@ import TripRow from "./TripRow"; // <--- We will create this next
 // import TripDrawer from "./TripDrawer"; // <--- You can create this later
 // import CreateTripModal from "./CreateTripModal"; // <--- You can create this later
 import { auth } from "@/lib/firebase";
+import { calculateProgress } from "@/app/utility/utilities";
 import TripDrawer from "./TripDrawer";
 import CreateTripModal from "../manifests/modals/CreateTripModal";
-import { calculateProgress } from "@/app/utility/utilities";
 import BulkAssignmentModal from "../manifests/modals/BulkAssignmentModal";
 
 export default function TripBoard({ userRole }) {
