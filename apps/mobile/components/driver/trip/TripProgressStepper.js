@@ -1,25 +1,23 @@
 import React from "react";
 import { View, Text, StyleSheet } from "react-native";
-import { FontAwesome5 } from "@expo/vector-icons";
-import { COLORS } from "../../constants/theme";
+import { Image } from "expo-image";
+
+const BLUE = "#155DFC";
+const GREY = "#94a3b8";
+const GREY_LINE = "#e2e8f0";
+const SEPARATOR = "#e5e7eb";
+
+const steps = [
+  { key: "RECEIVED", label: "Received", source: require("../../../assets/icons/picked-requested.svg") },
+  { key: "LOADED", label: "Loaded", source: require("../../../assets/icons/picked-up.svg") },
+  { key: "IN_TRANSIT", label: "In Transit", source: require("../../../assets/icons/in-transit.svg") },
+  { key: "OUT_FOR_DELIVERY", label: "Out for Delivery", source: require("../../../assets/icons/out-for-delivery.svg") },
+  { key: "DELIVERED", label: "Delivered", source: require("../../../assets/icons/delivered.png") },
+];
 
 const TripProgressStepper = ({ currentStatus }) => {
-  const steps = [
-    { key: "RECEIVED", label: "Received", icon: "box" },
-    { key: "LOADED", label: "Loaded", icon: "dolly" },
-    { key: "IN_TRANSIT", label: "In Transit", icon: "shipping-fast" },
-    {
-      key: "OUT_FOR_DELIVERY",
-      label: "Out for Delivery",
-      icon: "truck-loading",
-    },
-    { key: "DELIVERED", label: "Delivered", icon: "check-circle" },
-  ];
-
-  // Logic to determine active step index
-  let activeIndex = 0;
   const s = (currentStatus || "").toUpperCase();
-
+  let activeIndex = 0;
   if (s === "COMPLETED" || s === "DELIVERED") activeIndex = 4;
   else if (s === "DELIVERING" || s === "OUT_FOR_DELIVERY") activeIndex = 3;
   else if (s === "IN_TRANSIT") activeIndex = 2;
@@ -27,51 +25,54 @@ const TripProgressStepper = ({ currentStatus }) => {
   else activeIndex = 0;
 
   return (
-    <View style={styles.progressContainer}>
-      <View style={styles.stepIconsRow}>
+    <View style={styles.card}>
+      <Text style={styles.sectionTitle}>Trip Progress</Text>
+
+      <View style={styles.separator} />
+
+      <View style={styles.verticalTimeline}>
         {steps.map((step, index) => {
-          const isActive = index <= activeIndex;
+          const isCompletedOrCurrent = index <= activeIndex;
           const isLast = index === steps.length - 1;
+          const lineActive = index < activeIndex;
 
           return (
-            <React.Fragment key={step.key}>
-              <View style={{ alignItems: "center", width: 60 }}>
+            <View key={step.key} style={styles.stepRow}>
+              <View style={styles.leftColumn}>
                 <View
                   style={[
-                    styles.stepCircle,
-                    isActive ? styles.stepActive : styles.stepInactive,
+                    styles.circle,
+                    isCompletedOrCurrent ? styles.circleActive : styles.circleInactive,
                   ]}
                 >
-                  <FontAwesome5
-                    name={step.icon}
-                    size={14}
-                    color={isActive ? "#fff" : COLORS.textSecondary}
+                  <Image
+                    source={step.source}
+                    style={[
+                      styles.stepIcon,
+                      { tintColor: isCompletedOrCurrent ? "#fff" : GREY },
+                    ]}
                   />
                 </View>
+                {!isLast && (
+                  <View
+                    style={[
+                      styles.connector,
+                      lineActive ? styles.connectorActive : styles.connectorInactive,
+                    ]}
+                  />
+                )}
+              </View>
+              <View style={styles.labelWrapper}>
                 <Text
                   style={[
                     styles.stepLabel,
-                    isActive
-                      ? { color: COLORS.primary }
-                      : { color: COLORS.textSecondary },
+                    isCompletedOrCurrent ? styles.stepLabelActive : styles.stepLabelInactive,
                   ]}
                 >
                   {step.label}
                 </Text>
               </View>
-
-              {/* Connector Line */}
-              {!isLast && (
-                <View
-                  style={[
-                    styles.connector,
-                    index < activeIndex
-                      ? styles.connectorActive
-                      : styles.connectorInactive,
-                  ]}
-                />
-              )}
-            </React.Fragment>
+            </View>
           );
         })}
       </View>
@@ -82,30 +83,72 @@ const TripProgressStepper = ({ currentStatus }) => {
 export default TripProgressStepper;
 
 const styles = StyleSheet.create({
-  progressContainer: { marginBottom: 24 },
-  stepIconsRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
+  card: {
+    backgroundColor: "#ffffff",
+    borderRadius: 15,
+    padding: 16,
+    marginBottom: 16,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 3,
   },
-  stepCircle: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+  sectionTitle: {
+    fontSize: 15,
+    color: "#111827",
+  },
+  verticalTimeline: {},
+  stepRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    marginBottom: 0,
+  },
+  labelWrapper: {
+    height: 24,
+    justifyContent: "center",
+    flex: 1,
+  },
+  leftColumn: {
+    width: 28,
+    alignItems: "center",
+    marginRight: 12,
+  },
+  circle: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
     justifyContent: "center",
     alignItems: "center",
-    marginBottom: 8,
     borderWidth: 2,
   },
-  stepActive: { backgroundColor: COLORS.primary, borderColor: COLORS.primary },
-  stepInactive: { backgroundColor: "transparent", borderColor: "#475569" },
-  stepLabel: {
-    fontSize: 10,
-    textAlign: "center",
-    width: 60,
-    fontWeight: "600",
+  circleActive: {
+    backgroundColor: BLUE,
+    borderColor: BLUE,
   },
-  connector: { flex: 1, height: 2, marginTop: 16 },
-  connectorActive: { backgroundColor: COLORS.primary },
-  connectorInactive: { backgroundColor: "#475569" },
+  circleInactive: {
+    backgroundColor: "#fff",
+    borderColor: GREY_LINE,
+  },
+  stepIcon: {
+    width: 13,
+    height: 13,
+  },
+  connector: {
+    width: 2,
+    height: 58,
+    marginVertical: 8,
+  },
+  connectorActive: { backgroundColor: BLUE },
+  connectorInactive: { backgroundColor: GREY_LINE },
+  stepLabel: {
+    fontSize: 14,
+  },
+  stepLabelActive: { color: "#111827" },
+  stepLabelInactive: { color: GREY },
+  separator: {
+    height: 1,
+    backgroundColor: SEPARATOR,
+    marginVertical: 14,
+  },
 });
