@@ -58,7 +58,7 @@ export default function TripRow({ trip, onClick }) {
 
   return (
     <div
-      onClick={() => onClick(trip.id)}
+      // onClick={() => onClick(trip.id)}
       className={`grid grid-cols-12 gap-4 px-6 py-4 items-center transition-colors cursor-pointer group border-b border-slate-800/50 last:border-0
         ${isDelayed ? "bg-amber-500/5 hover:bg-amber-500/10" : "hover:bg-slate-800/30"}
       `}
