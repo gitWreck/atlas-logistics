@@ -1,5 +1,6 @@
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const admin = require("firebase-admin");
+const { FieldValue } = admin.firestore;
 
 if (!admin.apps.length) admin.initializeApp();
 const db = admin.firestore();

@@ -70,8 +70,9 @@ export default function TripDrawer({
       />
 
       <aside
+        style={{ width: "min(100%, 780px)" }}
         className={`
-          fixed top-0 right-0 h-full w-full max-w-xl /* Fixed manageable width on desktop */
+          fixed top-0 right-0 h-full  /* Fixed manageable width on desktop */
           bg-slate-900 border-l border-slate-800 z-50 shadow-2xl 
           transform transition-transform duration-300 flex flex-col
           ${isOpen ? "translate-x-0" : "translate-x-full"}
@@ -137,6 +138,11 @@ export default function TripDrawer({
                 setSelectedShipmentForModal(shipment)
               }
               onUnassign={(shipment) => setShipmentToUnassign(shipment)}
+              tripId={data?.tripId}
+              onRefresh={() => {
+                fetchShipments();
+                onRefreshTrips();
+              }}
             />
           )}
 

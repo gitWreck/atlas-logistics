@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faBoxOpen,
@@ -12,17 +12,21 @@ import {
   faPen,
   faSave,
   faBan,
-  faWineGlass, // <--- Added
-  faSnowflake, // <--- Added
+  faWineGlass,
+  faSnowflake,
+  faCheckSquare,
+  faSquare,
+  faTruckLoading,
+  faDolly,
 } from "@fortawesome/free-solid-svg-icons";
-import { auth } from "@/lib/firebase";
-import { updateShipmentPackages } from "@/app/utility/FirebaseFunctions";
+import { auth, functions } from "@/lib/firebase";
+import { httpsCallable } from "firebase/functions";
 
 // --- CONSTANTS ---
 const PACKAGING_TYPES = ["Box", "Sack", "Crate", "Bundle", "Roll", "Envelope"];
 
 const isPackageLocked = (status) => {
-  return ["LOADED", "IN_TRANSIT", "DELIVERED"].includes(status);
+  return ["IN_TRANSIT", "DELIVERED"].includes(status); // Allow unloading if just LOADED
 };
 
 export default function ViewPackagesModal({ isOpen, onClose, shipment }) {
@@ -30,23 +34,24 @@ export default function ViewPackagesModal({ isOpen, onClose, shipment }) {
   const [loading, setLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
-  // Editing State
+  // Selection State
+  const [selectedIndices, setSelectedIndices] = useState(new Set());
+
+  // Editing/Adding State
   const [editingId, setEditingId] = useState(null);
   const [editForm, setEditForm] = useState({});
-
-  // Adding State
   const [isAdding, setIsAdding] = useState(false);
   const [newPackage, setNewPackage] = useState({
     description: "",
     weight: "",
     declaredValue: "",
-    packagingType: "Box", // Default
-    isFragile: false, // Default
-    isPerishable: false, // Default
+    packagingType: "Box",
+    isFragile: false,
+    isPerishable: false,
     status: "RECEIVED",
   });
 
-  // --- FETCH LOGIC ---
+  // --- 1. FETCH LOGIC ---
   useEffect(() => {
     if (isOpen && shipment?.id) {
       fetchFullShipmentDetails(shipment.id);
@@ -54,6 +59,7 @@ export default function ViewPackagesModal({ isOpen, onClose, shipment }) {
       setPackages([]);
       setEditingId(null);
       setIsAdding(false);
+      setSelectedIndices(new Set());
     }
   }, [isOpen, shipment]);
 
@@ -74,21 +80,40 @@ export default function ViewPackagesModal({ isOpen, onClose, shipment }) {
     }
   };
 
-  // --- ACTIONS ---
+  // --- 2. SELECTION HANDLERS ---
+  const handleSelectAll = () => {
+    if (selectedIndices.size === packages.length) {
+      setSelectedIndices(new Set());
+    } else {
+      // Create a set of all indices (0 to n-1)
+      setSelectedIndices(new Set(packages.map((_, i) => i)));
+    }
+  };
+
+  const handleSelectOne = (index) => {
+    const newSet = new Set(selectedIndices);
+    if (newSet.has(index)) newSet.delete(index);
+    else newSet.add(index);
+    setSelectedIndices(newSet);
+  };
+
+  // --- 3. ACTIONS ---
   const saveUpdates = async (updatedPackages) => {
     try {
       setIsSaving(true);
+      const updateFn = httpsCallable(functions, "updateShipmentPackages");
 
-      // Call it (No need to manually handle headers/tokens!)
-      await updateShipmentPackages({
+      await updateFn({
         shipmentId: shipment.id,
         packages: updatedPackages,
       });
 
-      // Success Handling (Local State Update)
       setPackages(updatedPackages);
       setEditingId(null);
       setIsAdding(false);
+      setSelectedIndices(new Set()); // Clear selection after save
+
+      // Reset Form
       setNewPackage({
         description: "",
         weight: "",
@@ -104,6 +129,22 @@ export default function ViewPackagesModal({ isOpen, onClose, shipment }) {
     } finally {
       setIsSaving(false);
     }
+  };
+
+  // NEW: Bulk Load/Unload
+  const handleBulkStatusChange = (newStatus) => {
+    if (selectedIndices.size === 0) return;
+
+    const updatedPackages = packages.map((pkg, idx) => {
+      if (selectedIndices.has(idx)) {
+        // Prevent changing if locked (e.g. Delivered)
+        if (pkg.status === "DELIVERED") return pkg;
+        return { ...pkg, status: newStatus };
+      }
+      return pkg;
+    });
+
+    saveUpdates(updatedPackages);
   };
 
   const handleRemove = (idx) => {
@@ -141,7 +182,7 @@ export default function ViewPackagesModal({ isOpen, onClose, shipment }) {
         onClick={onClose}
       />
 
-      <div className="relative bg-slate-900 border border-slate-700 w-full max-w-xl rounded-xl shadow-2xl flex flex-col max-h-[85vh] animate-in zoom-in-95 duration-200">
+      <div className="relative bg-slate-900 border border-slate-700 w-full max-w-[650px] rounded-xl shadow-2xl flex flex-col max-h-[85vh] animate-in zoom-in-95 duration-200">
         {/* HEADER */}
         <div className="flex items-center justify-between p-6 border-b border-slate-800 bg-slate-950/50 rounded-t-xl">
           <div>
@@ -160,6 +201,31 @@ export default function ViewPackagesModal({ isOpen, onClose, shipment }) {
             <FontAwesomeIcon icon={faTimes} size="lg" />
           </button>
         </div>
+
+        {/* BULK ACTION BAR (Only visible when items selected) */}
+        {selectedIndices.size > 0 && (
+          <div className="bg-blue-900/20 border-b border-blue-500/20 px-6 py-3 flex items-center justify-between animate-in slide-in-from-top-2">
+            <div className="text-xs font-bold text-blue-300">
+              {selectedIndices.size} Items Selected
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={() => handleBulkStatusChange("RECEIVED")}
+                disabled={isSaving}
+                className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 border border-slate-600 text-slate-300 text-xs font-bold rounded flex items-center gap-2 transition-colors"
+              >
+                <FontAwesomeIcon icon={faDolly} /> Unload
+              </button>
+              <button
+                onClick={() => handleBulkStatusChange("LOADED")}
+                disabled={isSaving}
+                className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded flex items-center gap-2 transition-colors shadow-lg shadow-emerald-900/20"
+              >
+                <FontAwesomeIcon icon={faTruckLoading} /> Load Selected
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* BODY */}
         <div className="flex-1 overflow-y-auto p-6 custom-scrollbar">
@@ -201,6 +267,31 @@ export default function ViewPackagesModal({ isOpen, onClose, shipment }) {
 
           {/* LIST */}
           <div className="space-y-4">
+            {/* Header Row with Checkbox */}
+            <div className="flex items-center gap-4 px-4 pb-2 border-b border-slate-800 mb-2">
+              <button
+                onClick={handleSelectAll}
+                className="hover:text-white transition-colors"
+              >
+                <FontAwesomeIcon
+                  icon={
+                    selectedIndices.size > 0 &&
+                    selectedIndices.size === packages.length
+                      ? faCheckSquare
+                      : faSquare
+                  }
+                  className={
+                    selectedIndices.size > 0
+                      ? "text-blue-500"
+                      : "text-slate-700"
+                  }
+                />
+              </button>
+              <span className="text-[10px] uppercase font-bold text-slate-500">
+                Select All Packages
+              </span>
+            </div>
+
             {loading ? (
               <div className="text-center py-10 text-slate-500 flex flex-col items-center gap-2">
                 <FontAwesomeIcon icon={faSpinner} spin size="2x" />
@@ -212,20 +303,42 @@ export default function ViewPackagesModal({ isOpen, onClose, shipment }) {
                 {packages.map((pkg, idx) => {
                   const isLocked = isPackageLocked(pkg.status);
                   const isEditingThis = editingId === idx;
+                  const isSelected = selectedIndices.has(idx);
 
                   return (
                     <div
                       key={idx}
-                      className={`bg-slate-950 border rounded-xl p-4 transition-all ${isEditingThis ? "border-blue-500 ring-1 ring-blue-500/20" : "border-slate-800 hover:border-slate-600"}`}
+                      className={`bg-slate-950 border rounded-xl p-4 transition-all group ${
+                        isEditingThis
+                          ? "border-blue-500 ring-1 ring-blue-500/20"
+                          : isSelected
+                            ? "border-blue-500/50 bg-blue-900/5"
+                            : "border-slate-800 hover:border-slate-600"
+                      }`}
                     >
                       <div className="flex justify-between items-start gap-4">
+                        {/* SELECTION CHECKBOX */}
+                        <div className="pt-3">
+                          <button onClick={() => handleSelectOne(idx)}>
+                            <FontAwesomeIcon
+                              icon={isSelected ? faCheckSquare : faSquare}
+                              className={
+                                isSelected
+                                  ? "text-blue-500"
+                                  : "text-slate-700 group-hover:text-slate-500"
+                              }
+                            />
+                          </button>
+                        </div>
+
+                        {/* SEQUENCE */}
                         <div className="h-10 w-10 bg-slate-900 border border-slate-800 rounded-lg flex flex-shrink-0 items-center justify-center text-sm font-mono text-slate-500 font-bold">
                           {pkg.sequence || idx + 1}
                         </div>
 
                         <div className="flex-1 space-y-2">
                           {isEditingThis ? (
-                            // --- EDIT MODE ---
+                            /* --- EDIT MODE --- */
                             <div className="grid grid-cols-2 gap-3">
                               <div className="col-span-2">
                                 <label className="text-[10px] uppercase text-slate-500 font-bold">
@@ -279,7 +392,6 @@ export default function ViewPackagesModal({ isOpen, onClose, shipment }) {
                                   }
                                 />
                               </div>
-                              {/* Edit Toggles */}
                               <div className="col-span-2 flex gap-2 pt-1">
                                 <button
                                   onClick={() =>
@@ -307,7 +419,7 @@ export default function ViewPackagesModal({ isOpen, onClose, shipment }) {
                               </div>
                             </div>
                           ) : (
-                            // --- VIEW MODE ---
+                            /* --- VIEW MODE --- */
                             <>
                               <div className="text-base font-bold text-slate-200">
                                 {pkg.description || "Item"}
@@ -349,12 +461,15 @@ export default function ViewPackagesModal({ isOpen, onClose, shipment }) {
                           <span
                             className={`text-[10px] font-bold px-2 py-1 rounded uppercase border ${
                               pkg.status === "LOADED"
-                                ? "bg-blue-900/30 text-blue-400 border-blue-500/30"
-                                : "bg-slate-800 text-slate-400 border-slate-700"
+                                ? "bg-emerald-900/30 text-emerald-400 border-emerald-500/30"
+                                : pkg.status === "RECEIVED"
+                                  ? "bg-slate-800 text-slate-400 border-slate-700"
+                                  : "bg-blue-900/30 text-blue-400 border-blue-500/30"
                             }`}
                           >
                             {pkg.status}
                           </span>
+
                           <div className="flex gap-1 mt-1">
                             {isEditingThis ? (
                               <>
@@ -405,13 +520,13 @@ export default function ViewPackagesModal({ isOpen, onClose, shipment }) {
                 })}
 
                 {/* --- ADD NEW ITEM ROW --- */}
+                {/* ... (Add form remains the same as previous) ... */}
+                {/* I excluded the full Add Form HTML here for brevity, keep your existing logic */}
                 {isAdding ? (
                   <div className="bg-slate-800/30 border border-blue-500/50 rounded-xl p-4 animate-in fade-in slide-in-from-top-2">
                     <div className="text-xs font-bold text-blue-400 uppercase mb-3">
                       New Package Details
                     </div>
-
-                    {/* Row 1: Description */}
                     <div className="mb-3">
                       <input
                         placeholder="Description (e.g. Large Box)"
@@ -426,8 +541,6 @@ export default function ViewPackagesModal({ isOpen, onClose, shipment }) {
                         autoFocus
                       />
                     </div>
-
-                    {/* Row 2: Type & Weight */}
                     <div className="grid grid-cols-2 gap-3 mb-3">
                       <select
                         className="bg-slate-900 border border-slate-700 rounded-lg px-4 py-3 text-sm text-white focus:border-blue-500 outline-none transition-colors"
@@ -458,8 +571,6 @@ export default function ViewPackagesModal({ isOpen, onClose, shipment }) {
                         }
                       />
                     </div>
-
-                    {/* Row 3: Value & Toggles */}
                     <div className="grid grid-cols-2 gap-3 mb-4">
                       <input
                         type="number"
@@ -498,7 +609,6 @@ export default function ViewPackagesModal({ isOpen, onClose, shipment }) {
                         </button>
                       </div>
                     </div>
-
                     <div className="flex justify-end gap-2">
                       <button
                         onClick={() => setIsAdding(false)}
