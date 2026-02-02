@@ -69,18 +69,13 @@ export default function TripRow({ trip, onClick }) {
 
         <div>
           {/* TRIP ID */}
-          <div className="flex items-center gap-2 mt-1">
+          <div className="flex-col items-center gap-2 mt-1">
             <span
               className={`font-mono text-sm font-bold transition-colors flex items-center gap-2 ${isDelayed ? "text-amber-400" : "text-blue-400"}`}
             >
               <FontAwesomeIcon icon={faTruck} className="text-[10px]" />
               {trip.tripId}
             </span>
-            {isDelayed && (
-              <span className="text-[10px] bg-amber-600 text-white px-1.5 rounded animate-pulse font-bold">
-                DELAYED
-              </span>
-            )}
           </div>
 
           {/* DRIVER INFO */}
@@ -141,7 +136,12 @@ export default function TripRow({ trip, onClick }) {
         </div>
 
         {/* Status Text */}
-        <div className="mt-1.5">
+        <div className="mt-1.5 gap-2 flex">
+          {isDelayed && (
+            <span className="text-[10px] bg-amber-600 text-white px-1.5 rounded animate-pulse font-bold">
+              DELAYED
+            </span>
+          )}
           <span
             className={`text-[10px] font-bold uppercase tracking-wide
               ${

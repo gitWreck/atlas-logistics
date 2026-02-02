@@ -8,7 +8,7 @@ import {
 } from "@fortawesome/free-solid-svg-icons";
 import TripOperations from "./TripOperations"; // Your existing operations component
 
-export default function TripToolsTab({ data }) {
+export default function TripToolsTab({ data, onRefresh }) {
   const [messageBody, setMessageBody] = useState("");
 
   const handleSendMessage = () => {
@@ -26,6 +26,7 @@ export default function TripToolsTab({ data }) {
         tripId={data.tripId}
         isLocked={data.manifestLocked}
         onSuccess={() => {
+          onRefresh();
           // Optional: Trigger a parent refresh if needed
           console.log("Operation successful");
         }}
@@ -34,7 +35,7 @@ export default function TripToolsTab({ data }) {
       <hr className="border-slate-800" />
 
       {/* 2. COMMUNICATION CARD */}
-      <div className="bg-slate-800/40 border border-slate-700 rounded-xl p-5 shadow-lg">
+      {/* <div className="bg-slate-800/40 border border-slate-700 rounded-xl p-5 shadow-lg">
         <h3 className="text-sm font-bold text-slate-300 mb-3 flex items-center gap-2">
           <FontAwesomeIcon icon={faPaperPlane} className="text-emerald-500" />
           Message Driver
@@ -66,7 +67,7 @@ export default function TripToolsTab({ data }) {
         >
           Send Message
         </button>
-      </div>
+      </div> */}
 
       {/* 3. QUICK ACTIONS GRID */}
       {/* <div className="grid grid-cols-2 gap-3">
