@@ -9,6 +9,7 @@ import {
   FlatList,
   SafeAreaView,
 } from "react-native";
+import { StatusBar } from "expo-status-bar";
 import { useRouter } from "expo-router";
 import { FontAwesome5 } from "@expo/vector-icons";
 import {
@@ -23,6 +24,7 @@ import {
 import { signOut } from "firebase/auth";
 import { db, auth } from "../../../firebase";
 import { COLORS, GLOBAL_STYLES } from "../../../components/constants/theme";
+import { Image } from "expo-image";
 
 // ✅ IMPORT THE NEW COMPONENTS
 // (Adjust path depending on where you saved them)
@@ -138,27 +140,26 @@ export default function DriverDashboard() {
 
   if (loading) {
     return (
-      <View style={GLOBAL_STYLES.center}>
-        <ActivityIndicator size="large" color={COLORS.primary} />
+      <View style={[GLOBAL_STYLES.center, { backgroundColor: "#f1f5f9" }]}>
+        <ActivityIndicator size="large" color="#042C83" />
       </View>
     );
   }
 
   return (
-    <SafeAreaView style={GLOBAL_STYLES.container}>
-      {/* HEADER */}
+    <SafeAreaView style={styles.container}>
+      <StatusBar style="dark" />
+      {/* HEADER: My Trips (light theme - matches Figma) */}
       <View style={styles.header}>
-        <View style={styles.profileInfo}>
-          <View style={styles.avatar}>
-            <FontAwesome5 name="user-alt" size={18} color={COLORS.primary} />
-          </View>
-          <View>
-            <Text style={styles.greeting}>Welcome back,</Text>
-            <Text style={styles.driverName}>{driverName}</Text>
-          </View>
+        <View style={styles.titleRow}>
+          <Image
+            source={require("../../../assets/icons/driver-icon.svg")}
+            style={{ width: 45, height: 45 }}
+          />
+          <Text style={styles.headerTitle}>My Trips</Text>
         </View>
         <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
-          <FontAwesome5 name="sign-out-alt" size={20} color={COLORS.danger} />
+          <FontAwesome5 name="sign-out-alt" size={20} color={COLORS.logout} />
         </TouchableOpacity>
       </View>
 
@@ -181,7 +182,7 @@ export default function DriverDashboard() {
         )}
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
-            <FontAwesome5 name="clipboard-list" size={40} color="#334155" />
+            <FontAwesome5 name="clipboard-list" size={40} color="#94a3b8" />
             <Text style={styles.emptyText}>
               No {activeTab.toLowerCase()} trips.
             </Text>
@@ -192,28 +193,32 @@ export default function DriverDashboard() {
   );
 }
 
-// Only Keep Styles needed for the Layout Container
+// Light theme - matches Figma design
 const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: "#f1f5f9",
+  },
   header: {
-    padding: 24,
+    paddingHorizontal: 20,
+    paddingTop: 60,
+    paddingBottom: 15,
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
+    backgroundColor: "#ffffff",
+    borderBottomWidth: 1,
+    borderBottomColor: "#e2e8f0",
   },
-  profileInfo: { flexDirection: "row", gap: 12, alignItems: "center" },
-  avatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: COLORS.card,
-    justifyContent: "center",
-    alignItems: "center",
-    borderWidth: 1,
-    borderColor: "#334155",
+  titleRow: { flexDirection: "row", alignItems: "center" },
+  headerIcon: { marginRight: 12 },
+  headerTitle: {
+    color: "#0f172a",
+    fontSize: 16,
+    fontWeight: "600",
+    marginLeft: 12,
   },
-  greeting: { color: COLORS.textSecondary, fontSize: 12 },
-  driverName: { color: COLORS.textPrimary, fontSize: 18, fontWeight: "bold" },
-  listContent: { paddingHorizontal: 20, paddingBottom: 50 },
+  listContent: { paddingHorizontal: 20, paddingBottom: 50, paddingTop: 10 },
   emptyContainer: { alignItems: "center", marginTop: 50, gap: 10 },
-  emptyText: { color: COLORS.textSecondary },
+  emptyText: { color: "#64748b" },
 });
