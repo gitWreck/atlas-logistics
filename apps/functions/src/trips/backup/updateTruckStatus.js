@@ -3,7 +3,7 @@
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const admin = require("firebase-admin");
 const crypto = require("crypto");
-const { assertAdminOrManager } = require("../system/authGuards");
+const { assertAdminOrManager } = require("../../system/authGuards");
 
 if (!admin.apps.length) admin.initializeApp();
 const db = admin.firestore();

@@ -31,7 +31,7 @@ exports.createUserProfile =
 exports.toggleUserStatus = require("./src/users/toggleUserStatus");
 
 // packages
-exports.createPackage = require("./src/packages/createPackage").createPackage;
+// exports.createPackage = require("./src/packages/createPackage").createPackage;
 exports.createShipmentWithPackages =
   require("./src/shipments/createShipmentWithPackages").createShipmentWithPackages;
 exports.scanPackages = require("./src/packages/scanPackages").scanPackages;
@@ -67,6 +67,10 @@ exports.setTruckAutoSmsSettings =
 exports.disableTruckTrip =
   require("./src/trips/disableTruckTrip").disableTruckTrip;
 exports.completeTrip = require("./src/trips/completeTrip").completeTrip;
+exports.unlockTripManifest =
+  require("./src/trips/unlockTripManiefest").unlockTripManifest;
+exports.updateTripStatus =
+  require("./src/trips/updateTripStatus").updateTripStatus;
 
 // Shipments
 exports.bulkAssignShipments =

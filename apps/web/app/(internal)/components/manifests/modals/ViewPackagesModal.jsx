@@ -6,7 +6,6 @@ import {
   faSpinner,
   faCube,
   faWeightHanging,
-  faBarcode,
   faPlus,
   faTrash,
   faPen,
@@ -18,6 +17,7 @@ import {
   faSquare,
   faTruckLoading,
   faDolly,
+  faArrowsSplitUpAndLeft,
 } from "@fortawesome/free-solid-svg-icons";
 import { auth, functions } from "@/lib/firebase";
 import { httpsCallable } from "firebase/functions";
@@ -29,7 +29,22 @@ const isPackageLocked = (status) => {
   return ["IN_TRANSIT", "DELIVERED"].includes(status); // Allow unloading if just LOADED
 };
 
-export default function ViewPackagesModal({ isOpen, onClose, shipment }) {
+const INITIAL_PACKAGE_STATE = {
+  description: "",
+  weight: "",
+  declaredValue: "",
+  packagingType: "Box",
+  isFragile: false,
+  isPerishable: false,
+  status: "RECEIVED",
+};
+
+export default function ViewPackagesModal({
+  isOpen,
+  onClose,
+  shipment,
+  isLocked,
+}) {
   const [packages, setPackages] = useState([]);
   const [loading, setLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -41,15 +56,7 @@ export default function ViewPackagesModal({ isOpen, onClose, shipment }) {
   const [editingId, setEditingId] = useState(null);
   const [editForm, setEditForm] = useState({});
   const [isAdding, setIsAdding] = useState(false);
-  const [newPackage, setNewPackage] = useState({
-    description: "",
-    weight: "",
-    declaredValue: "",
-    packagingType: "Box",
-    isFragile: false,
-    isPerishable: false,
-    status: "RECEIVED",
-  });
+  const [newPackage, setNewPackage] = useState(INITIAL_PACKAGE_STATE);
 
   // --- 1. FETCH LOGIC ---
   useEffect(() => {
@@ -114,15 +121,7 @@ export default function ViewPackagesModal({ isOpen, onClose, shipment }) {
       setSelectedIndices(new Set()); // Clear selection after save
 
       // Reset Form
-      setNewPackage({
-        description: "",
-        weight: "",
-        declaredValue: "",
-        packagingType: "Box",
-        isFragile: false,
-        isPerishable: false,
-        status: "RECEIVED",
-      });
+      setNewPackage(INITIAL_PACKAGE_STATE);
     } catch (err) {
       console.error(err);
       alert("Error saving: " + err.message);
@@ -166,11 +165,87 @@ export default function ViewPackagesModal({ isOpen, onClose, shipment }) {
 
   const handleAddSave = () => {
     if (!newPackage.description) return alert("Description required");
-    const updated = [
-      ...packages,
-      { ...newPackage, sequence: packages.length + 1 },
-    ];
+
+    // 1. Calculate Sequence
+    const nextSequence = packages.length + 1;
+
+    // 2. Generate Tracking Number
+    const generatedTracking = `${shipment.trackingNumber}-${String(nextSequence).padStart(2, "0")}`;
+
+    // 3. Create the Complete Object (Matching your Firestore Schema)
+    const packageToAdd = {
+      // -- Fields from Form --
+      description: newPackage.description,
+      weight: Number(newPackage.weight) || 0, // Ensure Number
+      declaredValue: Number(newPackage.declaredValue) || 0, // Ensure Number
+      packagingType: newPackage.packagingType,
+      isFragile: newPackage.isFragile,
+      isPerishable: newPackage.isPerishable,
+      status: "RECEIVED", // Default status
+
+      // -- Generated Fields --
+      sequence: nextSequence,
+      trackingNumber: generatedTracking,
+
+      // -- Default/Empty Fields (To match your schema) --
+      currentLocation: "", // or shipment.originCode if you prefer
+      isDelayed: false,
+      loadedAt: null,
+      loadedOnTrip: null,
+
+      // Dimensions (Initialize as empty strings to match your example)
+      height: "",
+      length: "",
+      width: "",
+    };
+
+    // 4. Update & Save
+    const updated = [...packages, packageToAdd];
     saveUpdates(updated);
+  };
+
+  const canSplit = useMemo(() => {
+    if (selectedIndices.size === 0) return false;
+    // Check if ALL selected items are "RECEIVED" (not loaded/delivered)
+    return Array.from(selectedIndices).every((idx) => {
+      const pkg = packages[idx];
+      return pkg.status === "RECEIVED";
+    });
+  }, [selectedIndices, packages]);
+
+  const handleSplitShipment = async () => {
+    if (
+      !confirm(
+        `Create a new shipment with these ${selectedIndices.size} items?`,
+      )
+    )
+      return;
+
+    try {
+      setIsSaving(true);
+
+      // Get the actual barcodes/IDs of the selected items
+      const barcodesToSplit = Array.from(selectedIndices).map(
+        (idx) => packages[idx].trackingNumber,
+      );
+
+      const splitFn = httpsCallable(functions, "splitShipment");
+      const result = await splitFn({
+        originalShipmentId: shipment.id,
+        itemsToSplit: barcodesToSplit, // Pass the array of barcodes
+      });
+
+      alert(
+        "Shipment Split Successfully! New Tracking: " +
+          result.data.newShipmentId,
+      );
+
+      onClose(); // Close modal (data will refresh when parent reloads)
+    } catch (error) {
+      alert("Split Failed: " + error.message);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   if (!isOpen || !shipment) return null;
@@ -182,7 +257,7 @@ export default function ViewPackagesModal({ isOpen, onClose, shipment }) {
         onClick={onClose}
       />
 
-      <div className="relative bg-slate-900 border border-slate-700 w-full max-w-[650px] rounded-xl shadow-2xl flex flex-col max-h-[85vh] animate-in zoom-in-95 duration-200">
+      <div className="relative bg-slate-900 border border-slate-700 w-full max-w-xl rounded-xl shadow-2xl flex flex-col max-h-[85vh] animate-in zoom-in-95 duration-200">
         {/* HEADER */}
         <div className="flex items-center justify-between p-6 border-b border-slate-800 bg-slate-950/50 rounded-t-xl">
           <div>
@@ -209,19 +284,30 @@ export default function ViewPackagesModal({ isOpen, onClose, shipment }) {
               {selectedIndices.size} Items Selected
             </div>
             <div className="flex gap-2">
+              {canSplit && (
+                <button
+                  onClick={handleSplitShipment}
+                  disabled={isLocked || isSaving}
+                  className="px-3 py-1.5 bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold rounded flex items-center gap-2 transition-colors mr-auto disabled:opacity-50"
+                  title="Create new shipment from selected items"
+                >
+                  <FontAwesomeIcon icon={faArrowsSplitUpAndLeft} /> Split
+                </button>
+              )}
+
               <button
                 onClick={() => handleBulkStatusChange("RECEIVED")}
-                disabled={isSaving}
-                className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 border border-slate-600 text-slate-300 text-xs font-bold rounded flex items-center gap-2 transition-colors"
+                disabled={isLocked || isSaving}
+                className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 border border-slate-600 text-slate-300 text-xs font-bold rounded flex items-center gap-2 transition-colors disabled:opacity-50"
               >
                 <FontAwesomeIcon icon={faDolly} /> Unload
               </button>
               <button
                 onClick={() => handleBulkStatusChange("LOADED")}
-                disabled={isSaving}
-                className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded flex items-center gap-2 transition-colors shadow-lg shadow-emerald-900/20"
+                disabled={isLocked || isSaving}
+                className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded flex items-center gap-2 transition-colors shadow-lg shadow-emerald-900/20 disabled:opacity-50"
               >
-                <FontAwesomeIcon icon={faTruckLoading} /> Load Selected
+                <FontAwesomeIcon icon={faTruckLoading} /> Load
               </button>
             </div>
           </div>

@@ -79,6 +79,8 @@ export default function TripManifestTab({
     }
   };
 
+  console.log("Rendered TripManifestTab with shipments:", shipments);
+
   return (
     <div className="space-y-4 animate-in fade-in slide-in-from-right-4 duration-300">
       {/* HEADER: STATS + CONTROLS */}
@@ -88,7 +90,7 @@ export default function TripManifestTab({
             Total Cargo
           </div>
           <div className="text-xl font-bold text-white">
-            {shipments.length}{" "}
+            {shipments.length + " "}
             <span className="text-sm font-normal text-slate-500">
               shipments
             </span>
@@ -114,10 +116,17 @@ export default function TripManifestTab({
 
           <div className="flex gap-2">
             <button
+              onClick={() =>
+                window.open(
+                  `/components/print/labels?tripId=${tripId}`,
+                  "_blank",
+                )
+              }
               className="bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-xs font-bold px-3 py-1.5 rounded flex items-center gap-2 transition-colors"
               title="Print All Labels"
             >
               <FontAwesomeIcon icon={faPrint} />
+              {/* Hidden on small screens, visible on XL */}
               <span className="hidden xl:inline">Labels</span>
             </button>
 
@@ -209,7 +218,7 @@ export default function TripManifestTab({
               <th className="px-4 py-3 w-10 text-center">#</th>
               <th className="px-4 py-3">Tracking / Customer</th>
               <th className="px-4 py-3">Destination</th>
-              <th className="px-4 py-3 text-center">Status</th>{" "}
+              <th className="px-4 py-3 text-center">Status</th>
               {/* Added Status Col */}
               <th className="px-4 py-3 text-right">Action</th>
             </tr>
@@ -273,7 +282,7 @@ export default function TripManifestTab({
                       </div>
                     </td>
                     <td className="px-4 py-3 text-xs">
-                      {s.destinationCode || "—"}
+                      {s.recipient?.address.city || "—"}
                     </td>
 
                     {/* STATUS COL */}
