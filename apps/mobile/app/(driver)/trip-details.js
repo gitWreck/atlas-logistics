@@ -13,21 +13,21 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { FontAwesome5 } from "@expo/vector-icons";
 import { doc, onSnapshot } from "firebase/firestore";
 import { db } from "../../firebase";
-import { COLORS, GLOBAL_STYLES } from "../../components/constants/theme";
+import { StatusBar } from "expo-status-bar";
 
-// ✅ IMPORT THE NEW COMPONENTS
 import TripSummaryCard from "../../components/driver/trip/TripSummaryCard";
 import TripProgressStepper from "../../components/driver/trip/TripProgressStepper";
 import TripStatusRow from "../../components/driver/trip/TripStatusRow";
-import TripActionButtons from "../../components/driver/trip/TripActionButtons";
+import GradientButton from "../../components/ui/figma/GradientButton";
 import { startTrip } from "../../components/utilities/FirebaseFunctions";
+import { Image } from "expo-image";
 
 export default function TripDetailsScreen() {
   const { tripId } = useLocalSearchParams();
   const router = useRouter();
   const [trip, setTrip] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [actionLoading, setActionLoading] = useState(false); // Add this state
+  const [actionLoading, setActionLoading] = useState(false);
 
   useEffect(() => {
     if (!tripId) return;
@@ -45,13 +45,12 @@ export default function TripDetailsScreen() {
 
   if (loading) {
     return (
-      <View style={GLOBAL_STYLES.center}>
-        <ActivityIndicator size="large" color={COLORS.primary} />
+      <View style={[styles.center, { backgroundColor: "#f1f5f9" }]}>
+        <ActivityIndicator size="large" color="#042C83" />
       </View>
     );
   }
 
-  // Handlers
   const handleViewShipments = () => {
     router.push({
       pathname: "/(driver)/shipments",
@@ -77,18 +76,7 @@ export default function TripDetailsScreen() {
           onPress: async () => {
             setActionLoading(true);
             try {
-              // Call the Cloud Function or Update Doc directly
-              // If you have a specific function for 'startTrip', use it.
-              // Otherwise, update the doc:
-              /* await updateDoc(doc(db, "truck_trips", tripId), {
-                    status: "IN_TRANSIT",
-                    startedAt: serverTimestamp()
-                 });
-              */
-
-              // Using Cloud Function (Recommended for the automation)
               await startTrip({ tripId: trip.id });
-
               Alert.alert("Success", "Trip Started! Drive Safely.");
             } catch (error) {
               Alert.alert("Error", error.message);
@@ -97,56 +85,120 @@ export default function TripDetailsScreen() {
             }
           },
         },
-      ],
+      ]
     );
   };
 
+  const isReadyToStart = trip?.status === "LOADED" || trip?.status === "ASSIGNED";
+  const isDriving = trip?.status === "IN_TRANSIT";
+
   return (
-    <SafeAreaView style={GLOBAL_STYLES.container}>
-      {/* HEADER */}
+    <SafeAreaView style={styles.container}>
+      <StatusBar style="dark" />
+      {/* Header: light theme like index.js */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-          <FontAwesome5 name="arrow-left" size={20} color="#fff" />
+          <Image
+            source={require("../../assets/icons/back.svg")}
+            style={{ width: 14, height: 14 }}
+          />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Trip Details</Text>
-        <View style={{ width: 20 }} />
       </View>
 
-      {/* CONTENT */}
       <ScrollView contentContainerStyle={styles.scrollContent}>
-        {/* 1. Summary Card */}
         <TripSummaryCard trip={trip} />
-
-        {/* 2. Timeline */}
-        <Text style={GLOBAL_STYLES.sectionTitle}>Status Timeline</Text>
         <TripProgressStepper currentStatus={trip.status} />
-
-        {/* 3. Stats */}
         <TripStatusRow
-          totalShipments={trip.loadedCount || 0}
-          totalPackages={trip.totalItems || 0}
+          totalShipments={trip.loadedCount ?? 0}
+          totalPackages={trip.totalItems ?? 0}
         />
       </ScrollView>
 
-      <TripActionButtons
-        status={trip?.status}
-        loading={actionLoading}
-        onStartTrip={handleStartTrip} // The function we wrote earlier
-        onViewShipments={handleViewShipments}
-        onReportDelay={handleReportDelay}
-      />
+      {/* Bottom CTA: GradientButton - View Shipments or Start Trip */}
+      <View style={styles.bottomActions}>
+        {isReadyToStart ? (
+          <GradientButton
+            title="Start Trip"
+            onPress={handleStartTrip}
+            loading={actionLoading}
+            disabled={actionLoading}
+          />
+        ) : (
+          <GradientButton
+            title="View Shipments"
+            onPress={handleViewShipments}
+          />
+        )}
+        {isDriving && (
+          <TouchableOpacity
+            style={styles.reportDelayLink}
+            onPress={handleReportDelay}
+            activeOpacity={0.7}
+          >
+            <FontAwesome5 name="exclamation-triangle" size={14} color="#ef4444" style={{ marginRight: 6 }} />
+            <Text style={styles.reportDelayText}>Report Delay</Text>
+          </TouchableOpacity>
+        )}
+      </View>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  header: {
-    padding: 20,
-    flexDirection: "row",
-    justifyContent: "space-between",
+  container: {
+    flex: 1,
+    backgroundColor: "#f1f5f9",
+  },
+  center: {
+    flex: 1,
+    justifyContent: "center",
     alignItems: "center",
   },
-  headerTitle: { color: "#fff", fontSize: 18, fontWeight: "bold" },
-  backBtn: { padding: 8 },
-  scrollContent: { paddingHorizontal: 20, paddingBottom: 150 }, // Added padding for bottom buttons
+  header: {
+    paddingHorizontal: 20,
+    paddingTop: 50,
+    paddingBottom: 15,
+    flexDirection: "column",
+    alignItems: "flex-start",
+    backgroundColor: "#ffffff",
+    borderBottomWidth: 1,
+    borderBottomColor: "#e2e8f0",
+  },
+  backBtn: { 
+    padding: 0, 
+    marginBottom: 10,
+  },
+  headerTitle: {
+    color: "#0f172a",
+    fontSize: 16,
+  },
+  scrollContent: {
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    paddingBottom: 120,
+  },
+  bottomActions: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: "#ffffff",
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    paddingBottom: 34,
+    borderTopWidth: 1,
+    borderTopColor: "#e2e8f0",
+  },
+  reportDelayLink: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 12,
+  },
+  reportDelayText: {
+    fontSize: 14,
+    color: "#ef4444",
+    fontWeight: "500",
+  },
 });
