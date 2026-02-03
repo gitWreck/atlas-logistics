@@ -1,184 +1,198 @@
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const admin = require("firebase-admin");
-const { requireRole } = require("../utilities/helpers");
+const { FieldValue } = admin.firestore;
 
+// Initialize Admin if not already done
 if (!admin.apps.length) admin.initializeApp();
 const db = admin.firestore();
 
+// --- HELPER: Recalculate Totals based on Package Status ---
+const recalculateTotals = (packages) => {
+  return packages.reduce(
+    (acc, pkg) => {
+      acc.totalItems += 1;
+
+      const status = (pkg.status || "RECEIVED").toUpperCase();
+
+      if (status === "RECEIVED") acc.pending += 1;
+      else if (["LOADED", "IN_TRANSIT", "OUT_FOR_DELIVERY"].includes(status))
+        acc.loaded += 1;
+      else if (status === "DELIVERED") acc.delivered += 1;
+
+      // "received" usually tracks total intake at warehouse
+      acc.received += 1;
+
+      return acc;
+    },
+    { totalItems: 0, pending: 0, loaded: 0, delivered: 0, received: 0 },
+  );
+};
+
 /* ======================================================
-   SPLIT SHIPMENT (Array Version)
+   SPLIT SHIPMENT (Full Implementation)
 ====================================================== */
 exports.splitShipment = onCall(
   { region: "asia-southeast1", maxInstances: 10 },
-  async (req) => {
-    // 1. Auth & Role Check
-    await requireRole(db, req, ["admin", "manager"]);
+  async (request) => {
+    // 1. Auth Check
+    if (!request.auth) {
+      throw new HttpsError("unauthenticated", "Authentication required.");
+    }
 
-    const { originalShipmentId, itemsToSplit } = req.data;
-    // itemsToSplit:
-    //   - number (e.g., 5 => move the last 5 items)
-    //   - array of strings (e.g., ["TRK-001-05", "TRK-001-06"] => move specific barcodes)
+    const { originalShipmentId, itemsToSplit } = request.data;
+    // itemsToSplit: Array of barcode strings ["TRK-123-01", "TRK-123-02"]
 
-    if (!originalShipmentId)
-      throw new HttpsError("invalid-argument", "Missing shipment ID");
-    if (!itemsToSplit)
-      throw new HttpsError("invalid-argument", "Missing items to split");
+    // 2. Input Validation
+    if (!originalShipmentId) {
+      throw new HttpsError("invalid-argument", "Missing original shipment ID.");
+    }
+    if (
+      !itemsToSplit ||
+      !Array.isArray(itemsToSplit) ||
+      itemsToSplit.length === 0
+    ) {
+      throw new HttpsError("invalid-argument", "Missing items to split.");
+    }
 
-    const uid = req.auth.uid;
+    const uid = request.auth.uid;
     const originRef = db.collection("shipments").doc(originalShipmentId);
 
+    // We will return the new ID to the client
     let newShipmentId = null;
 
+    // 3. Start Transaction
     await db.runTransaction(async (tx) => {
-      // 2. Get Original Shipment
-      const originSnap = await tx.get(originRef);
-      if (!originSnap.exists)
-        throw new HttpsError("not-found", "Shipment not found");
+      // A. Read Original Shipment
+      const originDoc = await tx.get(originRef);
+      if (!originDoc.exists) {
+        throw new HttpsError("not-found", "Original shipment not found.");
+      }
 
-      const originData = originSnap.data();
+      const originData = originDoc.data();
       const allPackages = originData.packages || [];
 
-      // Guard: Cannot split if currently assigned to a trip
-      if (originData.currentTruckTripId) {
-        throw new HttpsError(
-          "failed-precondition",
-          "Shipment is currently assigned to a trip. Unassign it before splitting.",
-        );
-      }
+      // B. Separate Packages (Keep vs Move)
+      const splitSet = new Set(itemsToSplit);
+      const keepPackages = [];
+      const movePackages = [];
 
-      // 3. Identify Packages to Move (Filter the Array)
-      let movePackages = [];
-      let keepPackages = [];
-
-      if (typeof itemsToSplit === "number") {
-        // Option A: Split by Count (Take the last N items)
-        if (itemsToSplit >= allPackages.length) {
-          throw new HttpsError(
-            "invalid-argument",
-            "Cannot split all items (rename instead).",
-          );
+      allPackages.forEach((pkg) => {
+        // We check trackingNumber first, fallback to checking if the whole object matches (rare)
+        if (pkg.trackingNumber && splitSet.has(pkg.trackingNumber)) {
+          movePackages.push(pkg);
+        } else {
+          keepPackages.push(pkg);
         }
-        const splitIndex = allPackages.length - itemsToSplit;
-        keepPackages = allPackages.slice(0, splitIndex);
-        movePackages = allPackages.slice(splitIndex);
-      } else if (Array.isArray(itemsToSplit)) {
-        // Option B: Split by Specific Barcodes
-        const targets = new Set(itemsToSplit);
+      });
 
-        keepPackages = allPackages.filter(
-          (p) => !targets.has(p.trackingNumber),
-        );
-        movePackages = allPackages.filter((p) => targets.has(p.trackingNumber));
-      }
-
+      // C. Logic Validation
       if (movePackages.length === 0) {
         throw new HttpsError(
-          "invalid-argument",
+          "failed-precondition",
           "No matching packages found to split.",
         );
       }
       if (keepPackages.length === 0) {
         throw new HttpsError(
-          "invalid-argument",
-          "Result would leave original shipment empty.",
+          "failed-precondition",
+          "Cannot split ALL items. Use rename or edit instead.",
         );
       }
 
-      // 4. Prepare Data for New Shipment
-      // Note: We do NOT change the package barcode.
-      // This ensures physical labels on boxes still work.
-      const moveBarcodes = movePackages.map((p) => p.trackingNumber);
-      const keepBarcodes = keepPackages.map((p) => p.trackingNumber);
-
-      // Generate New Shipment ID
-      const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, "");
-      newShipmentId = `${originalShipmentId}-SP-${Date.now().toString().slice(-4)}`;
+      // D. Prepare New Shipment Data
+      // Generate ID: {Original}-SP-{Timestamp}
+      const timeSuffix = Date.now().toString().slice(-5);
+      newShipmentId = `${originalShipmentId}-SP-${timeSuffix}`;
       const newShipmentRef = db.collection("shipments").doc(newShipmentId);
 
-      // 5. Create New Shipment Doc
+      // Recalculate totals for the NEW shipment
+      const newTotals = recalculateTotals(movePackages);
+
+      // Construct New Object
       const newShipmentData = {
-        ...originData, // Copy sender, receiver, route, etc.
+        ...originData, // Copy sender, recipient, route, etc.
+
+        // Overwrites
+        id: newShipmentId, // Ensure internal ID matches doc ID
         trackingNumber: newShipmentId,
+        packages: movePackages,
+        packageBarcodes: movePackages.map((p) => p.trackingNumber),
+        totals: newTotals,
 
-        // Reset Status
+        // Reset Status / Trip Info (New shipment is fresh)
         status: "RECEIVED",
-        statusHistory: [
-          {
-            status: "RECEIVED",
-            at: admin.firestore.Timestamp.now(),
-            note: `Split from ${originalShipmentId}`,
-          },
-        ],
-
-        // Clear Trip Info
         currentTruckTripId: null,
         assignedToTruckTripAt: null,
 
-        // Update Totals
-        totals: {
-          ...originData.totals,
-          totalItems: movePackages.length,
-          received: movePackages.length,
-          loaded: 0,
-          pending: movePackages.length, // Assume they need to be re-processed
-        },
-
-        // Linkage
+        // Linkage Metadata
         parentShipmentId: originalShipmentId,
-        splitFromAt: admin.firestore.FieldValue.serverTimestamp(),
-        createdAt: admin.firestore.FieldValue.serverTimestamp(),
-        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        splitFromAt: FieldValue.serverTimestamp(),
+        createdAt: FieldValue.serverTimestamp(),
+        updatedAt: FieldValue.serverTimestamp(),
+        updatedBy: uid,
 
-        // THE NEW ARRAYS
-        packages: movePackages,
-        packageBarcodes: moveBarcodes,
+        // Clean History (Start fresh log)
+        statusHistory: [
+          {
+            status: "RECEIVED",
+            at: new Date().toISOString(), // Use ISO string for array storage
+            note: `Created via split from ${originalShipmentId}`,
+            by: uid,
+          },
+        ],
+
+        audit_log: [
+          {
+            action: "CREATED_FROM_SPLIT",
+            at: new Date().toISOString(),
+            by: uid,
+            note: `Split ${movePackages.length} items from ${originalShipmentId}`,
+          },
+        ],
       };
 
-      // Remove ID field if copied from originData (firestore doesn't store doc ID in data usually, but just in case)
-      delete newShipmentData.id;
+      // E. Prepare Original Shipment Updates
+      const originTotals = recalculateTotals(keepPackages);
 
+      // F. WRITE OPERATIONS
+
+      // 1. Create New Shipment
       tx.set(newShipmentRef, newShipmentData);
 
-      // 6. Update Original Shipment Doc
+      // 2. Update Original Shipment
       tx.update(originRef, {
         packages: keepPackages,
-        packageBarcodes: keepBarcodes,
-
-        "totals.totalItems": keepPackages.length,
-        "totals.received": keepPackages.length, // Logic assumption: origin is purely warehouse side if unassigned
-        "totals.pending": keepPackages.length, // Reset pending calculation if needed, or recalculate based on status
-
-        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        packageBarcodes: keepPackages.map((p) => p.trackingNumber),
+        totals: originTotals, // Update totals with accurate recount
+        updatedAt: FieldValue.serverTimestamp(),
+        updatedBy: uid,
+        audit_log: FieldValue.arrayUnion({
+          action: "SPLIT_OUT",
+          at: new Date().toISOString(),
+          by: uid,
+          note: `Moved ${movePackages.length} items to ${newShipmentId}`,
+          details: { newShipmentId, count: movePackages.length },
+        }),
       });
 
-      // 7. Audit Logs
-      const now = admin.firestore.FieldValue.serverTimestamp();
-
-      // Log on Origin
-      tx.set(originRef.collection("status_events").doc(), {
-        type: "SPLIT_ORDER_OUT",
-        message: `Split ${movePackages.length} items to ${newShipmentId}`,
-        createdAt: now,
-        createdBy: uid,
-      });
-
-      // Log on New
-      // Note: We use the batch/transaction to create the subcollection doc
-      // technically we can't 'set' a subcollection doc on a ref that doesn't exist yet in the DB context
-      // but 'set' works fine for new document paths.
-      // Alternatively, stick to the statusHistory array we created above.
-
-      // Admin Log
-      tx.set(db.collection("admin_logs").doc(), {
+      // 3. Global Audit Log
+      const globalLogRef = db.collection("audit_log").doc();
+      tx.set(globalLogRef, {
         action: "SPLIT_SHIPMENT",
-        originalShipmentId,
-        newShipmentId,
-        itemCount: movePackages.length,
-        actorId: uid,
-        createdAt: now,
+        targetId: originalShipmentId, // Main target is the origin
+        targetCollection: "shipments",
+        secondaryId: newShipmentId,
+        at: FieldValue.serverTimestamp(),
+        by: uid,
+        note: `Split shipment. Moved ${movePackages.length} items. Kept ${keepPackages.length}.`,
+        details: {
+          movedCount: movePackages.length,
+          movedBarcodes: movePackages.map((p) => p.trackingNumber),
+        },
       });
     });
 
+    // 4. Return result to client
     return { success: true, newShipmentId };
   },
 );

@@ -100,6 +100,24 @@ export default function TripDrawer({
           >
             <FontAwesomeIcon icon={faTimes} size="lg" />
           </button>
+          {/* // Inside TripDrawer or ManifestTab */}
+          {data?.isLocked && (
+            <button
+              onClick={async () => {
+                const reason = prompt(
+                  "Why are you unlocking this manifest? (Required for audit)",
+                );
+                if (!reason) return;
+
+                const unlockFn = httpsCallable(functions, "unlockTripManifest");
+                await unlockFn({ tripDocId: trip.id, reason });
+                // Refresh logic...
+              }}
+              className="bg-amber-500 text-white px-4 py-2 rounded shadow hover:bg-amber-600"
+            >
+              <FontAwesomeIcon icon={faUnlock} /> Unlock Manifest
+            </button>
+          )}
         </div>
 
         {/* TABS */}
@@ -166,6 +184,7 @@ export default function TripDrawer({
         isOpen={!!selectedShipmentForModal}
         shipment={selectedShipmentForModal}
         onClose={() => setSelectedShipmentForModal(null)}
+        isLocked={data.manifestLocked}
       />
 
       <UnassignShipmentModal

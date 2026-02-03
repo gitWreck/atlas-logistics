@@ -91,10 +91,11 @@ export default function TripOperations({ tripId, isLocked, onSuccess }) {
             onChange={(e) => setStatusSelect(e.target.value)}
           >
             <option value="">Select...</option>
-            <option value="PLANNED">Planned</option>
+            <option value="CREATED">Created</option>
             <option value="LOADED">Loaded</option>
             <option value="IN_TRANSIT">In Transit</option>
             <option value="COMPLETED">Completed</option>
+            <option value="CANCELLED">Cancelled</option>
           </select>
           <div className="w-20">
             <StatusButton

@@ -9,20 +9,19 @@ const db = admin.firestore();
 exports.bulkShipmentAction = onCall(
   { region: "asia-southeast1", maxInstances: 10 },
   async (request) => {
-    await requireRole(db, request, ["admin", "manager"]); // Uncomment if using role helper
+    await requireRole(db, request, ["admin", "manager"]);
 
     if (!request.auth) throw new HttpsError("unauthenticated", "Auth required");
 
     const { tripId, shipmentIds, action } = request.data;
-    // action = "LOAD", "UNLOAD", "OUT_FOR_DELIVERY", "DELIVERED"
+    const userId = request.auth.uid;
 
     // 1. Determine Target Status
     let targetStatus = "RECEIVED";
     if (action === "LOAD") targetStatus = "LOADED";
     if (action === "OUT_FOR_DELIVERY") targetStatus = "OUT_FOR_DELIVERY";
     if (action === "DELIVERED") targetStatus = "DELIVERED";
-
-    const userId = request.auth.uid;
+    else if (action === "UNLOAD") targetStatus = "RECEIVED";
 
     if (!tripId || !shipmentIds || shipmentIds.length === 0) {
       throw new HttpsError("invalid-argument", "Missing parameters");
@@ -30,81 +29,95 @@ exports.bulkShipmentAction = onCall(
 
     try {
       await db.runTransaction(async (t) => {
-        // 2. Get the Trip Ref
+        // --- PHASE 1: READS (Must come first) ---
+
         const tripRef = db.collection("truck_trips").doc(tripId);
+
+        // Prepare arrays to hold refs so we can fetch them all
+        const shipmentRefs = [];
+        const tripShipmentRefs = [];
+
+        shipmentIds.forEach((id) => {
+          const sRef = db.collection("shipments").doc(id);
+          const tsRef = tripRef.collection("trip_shipments").doc(id);
+          shipmentRefs.push(sRef);
+          tripShipmentRefs.push(tsRef);
+        });
+
+        // Execute all Reads
+        // We use t.getAll (if available in your SDK version) or parallel t.get promises
+        // Standard Admin SDK supports t.getAll(...refs) which is cleaner,
+        // but simple Promise.all with t.get works reliably everywhere.
+
+        const shipmentDocsPromise = Promise.all(
+          shipmentRefs.map((ref) => t.get(ref)),
+        );
+        const tripShipmentDocsPromise = Promise.all(
+          tripShipmentRefs.map((ref) => t.get(ref)),
+        );
+
+        const [shipmentDocs, tripShipmentDocs] = await Promise.all([
+          shipmentDocsPromise,
+          tripShipmentDocsPromise,
+        ]);
+
+        // --- PHASE 2: WRITES (Logic & Updates) ---
 
         // Variables to track TOTAL changes for the Trip Document
         let tripDeltaLoaded = 0;
         let tripDeltaPending = 0;
-        let tripDeltaDelivered = 0; // <--- NEW
+        let tripDeltaDelivered = 0;
 
-        // 3. Iterate through every selected shipment
-        for (const shipId of shipmentIds) {
-          const shipRef = db.collection("shipments").doc(shipId);
-          const tripShipRef = tripRef.collection("trip_shipments").doc(shipId);
-
-          const shipDoc = await t.get(shipRef);
-          const tripShipDoc = await t.get(tripShipRef);
+        // Iterate using index to match docs with refs
+        for (let i = 0; i < shipmentIds.length; i++) {
+          const shipDoc = shipmentDocs[i];
+          const tripShipDoc = tripShipmentDocs[i];
+          const shipRef = shipmentRefs[i];
+          const tripShipRef = tripShipmentRefs[i];
 
           if (!shipDoc.exists) continue;
 
           const shipData = shipDoc.data();
           const packages = shipData.packages || [];
 
-          // 4. Update Packages & Calculate Local Deltas
+          // Calculate Local Deltas
           let localLoadedChange = 0;
           let localPendingChange = 0;
-          let localDeliveredChange = 0; // <--- NEW
+          let localDeliveredChange = 0;
 
           const updatedPackages = packages.map((pkg) => {
-            // If status is already correct, do nothing
             if (pkg.status === targetStatus) return pkg;
-
             const currentStatus = pkg.status;
 
-            // --- LOGIC MATRIX ---
-
-            // A. LOADING (Received -> Loaded)
+            // Logic Matrix
             if (action === "LOAD" && currentStatus === "RECEIVED") {
               localPendingChange--;
               localLoadedChange++;
-            }
-            // B. UNLOADING (Loaded -> Received)
-            else if (action === "UNLOAD" && currentStatus === "LOADED") {
+            } else if (action === "UNLOAD" && currentStatus === "LOADED") {
               localLoadedChange--;
               localPendingChange++;
-            }
-            // C. OUT FOR DELIVERY (Loaded -> Out)
-            else if (
-              action === "OUT_FOR_DELIVERY" &&
-              currentStatus === "LOADED"
-            ) {
-              // No count change: It is still technically "on the truck" (loaded) until delivered
-              // Unless you have a specific 'Out' counter, we usually keep it as Loaded count.
-            }
-            // D. DELIVERED (Loaded/Out -> Delivered)
-            else if (
+            } else if (
               action === "DELIVERED" &&
               ["LOADED", "OUT_FOR_DELIVERY"].includes(currentStatus)
             ) {
-              localLoadedChange--; // Removes from the truck
-              localDeliveredChange++; // Adds to delivered
+              localLoadedChange--;
+              localDeliveredChange++;
             }
 
             return { ...pkg, status: targetStatus };
           });
 
-          // Add local changes to the Global Trip Delta
+          // Update Global Deltas
           tripDeltaLoaded += localLoadedChange;
           tripDeltaPending += localPendingChange;
           tripDeltaDelivered += localDeliveredChange;
 
-          // 5. Update Shipment Doc
+          // Update Shipment Doc
           t.update(shipRef, {
             packages: updatedPackages,
             "totals.loaded": FieldValue.increment(localLoadedChange),
             "totals.pending": FieldValue.increment(localPendingChange),
-            "totals.delivered": FieldValue.increment(localDeliveredChange), // <--- NEW
+            "totals.delivered": FieldValue.increment(localDeliveredChange),
             status:
               action === "LOAD"
                 ? "LOADED"
@@ -115,29 +128,27 @@ exports.bulkShipmentAction = onCall(
             updatedBy: userId,
           });
 
-          // 6. Update Trip Shipment Sub-Doc
+          // Update Sub-Doc
           if (tripShipDoc.exists) {
             t.update(tripShipRef, {
               loadedCount: FieldValue.increment(localLoadedChange),
               pendingCount: FieldValue.increment(localPendingChange),
-              deliveredCount: FieldValue.increment(localDeliveredChange), // <--- NEW
+              deliveredCount: FieldValue.increment(localDeliveredChange),
               updatedAt: FieldValue.serverTimestamp(),
             });
           }
         }
 
-        // 7. Update Main Trip Doc (Atomic Increment)
+        // Final Trip Update
         t.update(tripRef, {
           totalLoaded: FieldValue.increment(tripDeltaLoaded),
           itemPending: FieldValue.increment(tripDeltaPending),
-          totalDelivered: FieldValue.increment(tripDeltaDelivered), // <--- NEW
+          totalDelivered: FieldValue.increment(tripDeltaDelivered),
           updatedAt: FieldValue.serverTimestamp(),
         });
 
-        // 8. Audit Log
+        // Audit Log
         const logRef = db.collection("audit_log").doc();
-
-        // Helper to format action string
         let logAction = "BULK_UPDATE";
         if (action === "LOAD") logAction = "BULK_LOAD";
         else if (action === "UNLOAD") logAction = "BULK_UNLOAD";
