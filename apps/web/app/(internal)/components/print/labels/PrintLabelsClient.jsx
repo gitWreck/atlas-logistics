@@ -176,7 +176,7 @@ export default function PrintLabelsClient() {
 function StandardLabel({ shipment, pkg, index, total }) {
   const recipient = shipment.recipient || {};
   const address = recipient.address || {};
-  const qrValue = pkg.trackingNumber || shipment.trackingNumber || "NO_ID";
+  const qrValue = pkg.trackingNumber || "NO_ID";
 
   console.log("Rendering label for package:", pkg);
 

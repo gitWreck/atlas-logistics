@@ -17,6 +17,8 @@ export function calculateProgress(status) {
     case "OUT_FOR_DELIVERY":
       return 90;
     case "DELIVERED":
+      return 99;
+    case "COMPLETED":
       return 100;
     default:
       return 0;
