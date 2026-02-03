@@ -1,17 +1,16 @@
 import React from "react";
 import { View, Text, StyleSheet } from "react-native";
-import { COLORS } from "../../constants/theme";
 
 const TripStatusRow = ({ totalShipments, totalPackages }) => {
   return (
     <View style={styles.statsRow}>
       <View style={styles.statBox}>
-        <Text style={styles.statNumber}>{totalShipments}</Text>
         <Text style={styles.statLabel}>Total Shipments</Text>
+        <Text style={styles.statNumber}>{totalShipments}</Text>
       </View>
       <View style={styles.statBox}>
+        <Text style={styles.statLabel}>Total Items</Text>
         <Text style={styles.statNumber}>{totalPackages}</Text>
-        <Text style={styles.statLabel}>Total Packages</Text>
       </View>
     </View>
   );
@@ -20,21 +19,26 @@ const TripStatusRow = ({ totalShipments, totalPackages }) => {
 export default TripStatusRow;
 
 const styles = StyleSheet.create({
-  statsRow: { flexDirection: "row", gap: 16, marginBottom: 24 },
+  statsRow: {
+    flexDirection: "row",
+    gap: 12,
+    marginBottom: 24,
+  },
   statBox: {
     flex: 1,
-    backgroundColor: "#1e293b",
-    padding: 16,
-    borderRadius: 12,
-    alignItems: "center",
+    backgroundColor: "#ffffff",
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 10,
     borderWidth: 1,
-    borderColor: "#334155",
+    borderColor: "#e5e7eb",
   },
-  statNumber: {
-    fontSize: 24,
-    fontWeight: "bold",
-    color: "#fff",
+  statLabel: {
+    fontSize: 12,
     marginBottom: 4,
   },
-  statLabel: { color: "#94a3b8", fontSize: 12 },
+  statNumber: {
+    fontSize: 18,
+    color: "#111827",
+  },
 });

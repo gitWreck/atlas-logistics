@@ -15,7 +15,7 @@ import { Image } from "expo-image";
 
 import { auth, db } from "../../firebase";
 import AtlasInput from "../../components/ui/AtlasInput";
-import GradientButton from "../../components/ui/GradientButton";
+import GradientButton from "../../components/ui/figma/GradientButton";
 import LoginHeader from "../../components/auth/LoginHeader";
 
 export default function LoginScreen() {

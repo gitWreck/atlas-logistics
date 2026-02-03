@@ -11,7 +11,7 @@ export default function DriverLayout() {
       <Stack
         screenOptions={{
           headerShown: false, // We use custom headers in our screens
-          contentStyle: { backgroundColor: COLORS.bg }, // Dark background
+          contentStyle: { backgroundColor: "#f1f5f9" }, // Light background (Figma)
           animation: "slide_from_right", // Smooth transitions
         }}
       >
