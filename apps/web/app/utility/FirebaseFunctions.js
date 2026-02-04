@@ -63,6 +63,10 @@ export const bulkShipmentAction = httpsCallable(
   functions,
   "bulkShipmentAction",
 );
+export const verifyTripManifest = httpsCallable(
+  functions,
+  "verifyTripManifest",
+);
 
 // ----------------------------
 

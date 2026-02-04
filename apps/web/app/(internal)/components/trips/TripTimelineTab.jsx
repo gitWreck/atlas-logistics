@@ -1,7 +1,8 @@
-import React from "react";
+import React, { useState } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faCheckCircle } from "@fortawesome/free-solid-svg-icons";
+import { faCheckCircle, faPen } from "@fortawesome/free-solid-svg-icons";
 import { formatFirestoreDate } from "@/app/utility/utilities";
+import AssignDriverModal from "../manifests/modals/AssignDriverModal";
 
 // Internal Helper for Info Cards
 function InfoCard({ label, value }) {
@@ -23,12 +24,28 @@ function calculateCurrentStep(status) {
   return status;
 }
 
-export default function TripTimelineTab({ data }) {
+export default function TripTimelineTab({ data, onRefresh }) {
   // Define the ordered steps of a Trip Lifecycle
+  const [isDriverModalOpen, setIsDriverModalOpen] = useState(false);
+
   const STEPS = ["CREATED", "LOADING", "LOADED", "IN_TRANSIT", "COMPLETED"];
 
   return (
     <div className="animate-in fade-in slide-in-from-left-4 duration-300">
+      {/* HEADER WITH EDIT BUTTON */}
+      <div className="flex justify-between items-end mb-2">
+        <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+          Vehicle & Driver
+        </h4>
+        <button
+          onClick={() => setIsDriverModalOpen(true)}
+          className="text-xs bg-slate-800 hover:bg-slate-700 text-blue-400 px-2 py-1 rounded transition-colors flex items-center gap-1 border border-slate-700"
+        >
+          <FontAwesomeIcon icon={faPen} size="sm" />
+          <span>Edit</span>
+        </button>
+      </div>
+
       {/* 1. KEY INFO GRID */}
       <div className="grid grid-cols-2 gap-3 mb-8">
         <InfoCard label="Driver" value={data.driverName} />
@@ -101,6 +118,17 @@ export default function TripTimelineTab({ data }) {
           })}
         </div>
       </div>
+
+      {/* 4. RENDER THE MODAL */}
+      <AssignDriverModal
+        isOpen={isDriverModalOpen}
+        onClose={() => setIsDriverModalOpen(false)}
+        trip={data}
+        onSuccess={() => {
+          // If you have a refresh function passed from the parent, call it here
+          if (onRefresh) onRefresh();
+        }}
+      />
     </div>
   );
 }

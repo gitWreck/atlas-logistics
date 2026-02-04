@@ -14,8 +14,9 @@ import {
   reopenTrip,
 } from "@/app/utility/FirebaseFunctions";
 import { runAction } from "@/app/utility/utilities";
+import ExportTripButton from "../exports/ExportTripManifest";
 
-export default function TripDrawerFooter({ data, onClose }) {
+export default function TripDrawerFooter({ data, onClose, shipments }) {
   const [lockStatus, setLockStatus] = useState("IDLE");
 
   // Safety Check
@@ -93,15 +94,22 @@ export default function TripDrawerFooter({ data, onClose }) {
       {/* ROW 2: REPORTING & PRINTING */}
       <div className="flex gap-3">
         <button
-          onClick={() => window.print()} // Simple print trigger
+          onClick={() => {
+            // Opens the manifest page in a new tab
+            window.open(
+              `/components/print/manifest?tripId=${data.tripId}`,
+              "_blank",
+            );
+          }}
           className="flex-1 py-3 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg font-medium text-sm transition-colors flex items-center justify-center gap-2"
         >
           <FontAwesomeIcon icon={faPrint} /> Print Manifest
         </button>
 
-        <button className="flex-1 py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-lg font-bold text-sm transition-colors shadow-lg shadow-blue-500/20 flex items-center justify-center gap-2">
+        {/* <button className="flex-1 py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-lg font-bold text-sm transition-colors shadow-lg shadow-blue-500/20 flex items-center justify-center gap-2">
           <FontAwesomeIcon icon={faFilePdf} /> Trip Report
-        </button>
+        </button> */}
+        <ExportTripButton trip={data} shipments={shipments} />
       </div>
     </div>
   );

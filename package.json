@@ -15,5 +15,8 @@
   },
   "devDependencies": {
     "turbo": "latest"
+  },
+  "dependencies": {
+    "xlsx": "^0.18.5"
   }
 }
