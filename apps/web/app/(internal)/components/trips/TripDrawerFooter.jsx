@@ -96,10 +96,7 @@ export default function TripDrawerFooter({ data, onClose, shipments }) {
         <button
           onClick={() => {
             // Opens the manifest page in a new tab
-            window.open(
-              `/components/print/manifest?tripId=${data.tripId}`,
-              "_blank",
-            );
+            window.open(`/print/manifest?tripId=${data.tripId}`, "_blank");
           }}
           className="flex-1 py-3 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg font-medium text-sm transition-colors flex items-center justify-center gap-2"
         >
