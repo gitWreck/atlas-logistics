@@ -144,7 +144,15 @@ export default function TripDrawer({
 
         {/* CONTENT AREA */}
         <div className="flex-1 overflow-y-auto p-6 bg-slate-900">
-          {activeTab === "TIMELINE" && <TripTimelineTab data={data} />}
+          {activeTab === "TIMELINE" && (
+            <TripTimelineTab
+              data={data}
+              onRefresh={() => {
+                // fetchShipments();
+                onRefreshTrips();
+              }}
+            />
+          )}
 
           {activeTab === "MANIFEST" && (
             <TripManifestTab
@@ -176,7 +184,7 @@ export default function TripDrawer({
         </div>
 
         {/* FOOTER */}
-        <TripDrawerFooter data={data} onClose={onClose} />
+        <TripDrawerFooter data={data} onClose={onClose} shipments={shipments} />
       </aside>
 
       {/* --- RENDER THE NEW MODAL OUTSIDE THE ASIDE --- */}
