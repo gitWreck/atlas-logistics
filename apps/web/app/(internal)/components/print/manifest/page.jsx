@@ -334,7 +334,8 @@ function ManifestContent() {
               </div>
               <div>
                 <h1 className="text-lg font-black leading-tight uppercase">
-                  Official Sealed Bill of Lading <br /> & Cargo Declaration
+                  ATLAS OFFICIAL SEALED BILL OF LADING <br /> & CARGO
+                  DECLARATION
                 </h1>
                 <p className="text-[10px] text-slate-500 mt-1 leading-snug max-w-sm">
                   Atlas Logistics Platform — digitally sealed cargo ledger for
