@@ -13,6 +13,7 @@ import {
 } from "@fortawesome/free-solid-svg-icons";
 import StatusBadge from "../ui/StatusBadge";
 import ShipmentLabel from "./ShipmentLabel";
+import CustomerMessageWidget from "../messaging/CustomerMessageWidget";
 // import ShipmentBoard from "./ShipmentBoard";
 
 function calculateCurrentStep(status) {
@@ -271,7 +272,7 @@ export default function ShipmentDrawer({ isOpen, onClose, data }) {
           {activeTab === "TOOLS" && (
             <div className="space-y-8 animate-in zoom-in-95 duration-200">
               {/* SECTION B: MESSAGING */}
-              <div className="bg-slate-800/40 border border-slate-700 rounded-xl p-5">
+              {/* <div className="bg-slate-800/40 border border-slate-700 rounded-xl p-5">
                 <h3 className="text-sm font-bold text-slate-300 mb-3 flex items-center gap-2">
                   <FontAwesomeIcon
                     icon={faPaperPlane}
@@ -298,7 +299,8 @@ export default function ShipmentDrawer({ isOpen, onClose, data }) {
                 >
                   Send Message
                 </button>
-              </div>
+              </div> */}
+              <CustomerMessageWidget shipment={data} />
             </div>
           )}
         </div>

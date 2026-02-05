@@ -108,13 +108,15 @@ exports.recordPartialDelivery =
 // Manifests & Certificates
 exports.generateTripManifest =
   require("./src/trips/generateTripManifest").generateTripManifest;
-exports.getTripPackages =
-  require("./src/trips/getTripPackages").getTripPackages;
+// exports.getTripPackages =
+//   require("./src/trips/backup/getTripPackages").getTripPackages;
 exports.generateTripCertificate =
   require("./src/trips/generateTripCertificate").generateTripCertificate;
 exports.reopenTrip = require("./src/trips/reopenTrip").reopenTrip;
 
 // Messaging
+exports.sendManualSms = require("./src/messaging/sendManualSms").sendManualSms;
+
 exports.sendSMS = require("./src/messaging/sendSMS").sendSMS;
 exports.sendBulkSMS = require("./src/messaging/sendBulkSMS").sendBulkSMS;
 exports.autoSms = require("./src/messaging/autoSms").autoSms;
@@ -123,7 +125,6 @@ exports.previewNextSms =
   require("./src/messaging/previewNextSms").previewNextSms;
 exports.previewManualSms =
   require("./src/messaging/previewManualSms").previewManualSms;
-exports.sendManualSms = require("./src/messaging/sendManualSms").sendManualSms;
 exports.getTruckSmsUsage =
   require("./src/messaging/getTruckSmsUsage").getTruckSmsUsage;
 

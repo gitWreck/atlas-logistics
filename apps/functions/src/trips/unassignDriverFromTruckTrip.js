@@ -61,6 +61,7 @@ exports.unassignDriverFromTruckTrip = onCall(
         driverId: null,
         driverName: null, // <--- ADD THIS to clear the name
         truckPlateNumber: null, // <--- OPTIONAL: Do you want to remove the truck too? Usually yes.
+        driverPhone: null, // <--- ADD THIS to clear the phone
 
         // driverUnassignedAt: now,
         updatedAt: now,

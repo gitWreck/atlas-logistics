@@ -76,10 +76,10 @@ exports.sendManualSms = onCall(
     const role = actor.role;
 
     const {
-      phone,
+      phone = request.data?.phoneNumber,
       message,
-      trackingId = null,
-      tripDocId = null,
+      trackingId = request.data?.shipmentId || null,
+      tripDocId = request.data?.tripId || null,
       reason = "manual_override",
       suppressSame = true,
       force = false,
