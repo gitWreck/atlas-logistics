@@ -73,6 +73,7 @@ exports.assignDriverToTruckTrip = onCall(
         driverName: driver.name || "Unknown Driver", // <--- CRITICAL FIX
         truckPlateNumber: truckPlateNumber || trip.truckPlateNumber || null,
         driverAssignedAt: now,
+        driverPhone: driver.phone || null, // <--- CRITICAL FIX
 
         updatedAt: now,
         updatedBy: uid,

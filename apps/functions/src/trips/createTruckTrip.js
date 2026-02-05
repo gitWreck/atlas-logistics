@@ -5,11 +5,8 @@ const admin = require("firebase-admin");
 
 // 1. IMPORT YOUR HELPERS
 const {
-  requireString,
   optionalString,
-  cleanCode,
   yyyymmddFromDate,
-  shortCode,
   pad4,
   assertAdminOrManager,
 } = require("../utilities/helpers");
@@ -45,6 +42,9 @@ exports.createTruckTrip = onCall(
     const truckInternalCode = optionalString(req.data?.truckInternalCode);
     const driverName = optionalString(req.data?.driverName);
     const driverId = optionalString(req.data?.driverId);
+
+    const snap = await db.collection("users").doc(driverId).get();
+    const driver = snap.data();
 
     // We store a trip counter per day+route to generate a nice tripId
     const today = yyyymmddFromDate(new Date());
@@ -90,6 +90,7 @@ exports.createTruckTrip = onCall(
         // truckInternalCode: truckInternalCode || null,
         driverName: driverName || null,
         driverId: driverId || null,
+        driverPhone: driver.phoneNumber || null, // set when assigned
 
         // operational state
         status: "CREATED",
@@ -149,6 +150,7 @@ exports.createTruckTrip = onCall(
           truckInternalCode: truckInternalCode || null,
           driverName: driverName || null,
           driverId: driverId || null,
+          driverPhone: driver.phoneNumber || null, // set when assigned
         },
       });
 

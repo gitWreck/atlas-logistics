@@ -7,17 +7,18 @@ import {
   faFileContract,
 } from "@fortawesome/free-solid-svg-icons";
 import TripOperations from "./TripOperations"; // Your existing operations component
+import DriverMessageWidget from "../messaging/DriverMessageWidget";
 
 export default function TripToolsTab({ data, onRefresh }) {
   const [messageBody, setMessageBody] = useState("");
 
-  const handleSendMessage = () => {
-    // Replace with your actual SMS/Push Notification logic
-    alert(
-      `Sending Message to Driver (${data.driverName}):\n\n"${messageBody}"`,
-    );
-    setMessageBody(""); // Clear after sending
-  };
+  // const handleSendMessage = () => {
+  //   // Replace with your actual SMS/Push Notification logic
+  //   alert(
+  //     `Sending Message to Driver (${data.driverName}):\n\n"${messageBody}"`,
+  //   );
+  //   setMessageBody(""); // Clear after sending
+  // };
 
   return (
     <div className="animate-in zoom-in-95 duration-200 space-y-6">
@@ -35,6 +36,7 @@ export default function TripToolsTab({ data, onRefresh }) {
       <hr className="border-slate-800" />
 
       {/* 2. COMMUNICATION CARD */}
+      <DriverMessageWidget trip={data} />
       {/* <div className="bg-slate-800/40 border border-slate-700 rounded-xl p-5 shadow-lg">
         <h3 className="text-sm font-bold text-slate-300 mb-3 flex items-center gap-2">
           <FontAwesomeIcon icon={faPaperPlane} className="text-emerald-500" />

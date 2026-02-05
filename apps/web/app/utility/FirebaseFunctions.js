@@ -68,6 +68,10 @@ export const verifyTripManifest = httpsCallable(
   "verifyTripManifest",
 );
 
+// SMS & COMMUNICATION
+
+export const sendManualSms = httpsCallable(functions, "sendManualSms");
+
 // ----------------------------
 
 export const sendBulkSMSCallable = httpsCallable(functions, "sendBulkSMS");
