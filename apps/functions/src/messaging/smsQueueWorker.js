@@ -108,29 +108,42 @@ exports.smsQueueWorker = onSchedule(
             error: "Invalid phone/message/idempotencyKey",
             failedAt: FieldValue.serverTimestamp(),
           },
-          { merge: true }
+          { merge: true },
         );
         continue;
       }
 
       // Idempotency state: (trackingNumber optional)
-      const stateId = trackingNumber ? `${trackingNumber}__${phone}` : `GEN__${phone}`;
+      const stateId = trackingNumber
+        ? `${trackingNumber}__${phone}`
+        : `GEN__${phone}`;
       const stateRef = db.collection("sms_state").doc(stateId);
 
       const stateSnap = await stateRef.get();
-      const lastKey = stateSnap.exists ? String(stateSnap.data()?.lastIdempotencyKey || "") : "";
+      const lastKey = stateSnap.exists
+        ? String(stateSnap.data()?.lastIdempotencyKey || "")
+        : "";
       if (lastKey && lastKey === idempotencyKey) {
         // Already sent — mark done
         await queueRef.set(
-          { status: "DONE", suppressed: true, doneAt: FieldValue.serverTimestamp() },
-          { merge: true }
+          {
+            status: "DONE",
+            suppressed: true,
+            doneAt: FieldValue.serverTimestamp(),
+          },
+          { merge: true },
         );
         continue;
       }
 
       // Attempt send
       try {
-        const result = await sendViaSemaphore({ phone, message, apiKey, sender });
+        const result = await sendViaSemaphore({
+          phone,
+          message,
+          apiKey,
+          sender,
+        });
 
         const logRef = await db.collection("sms_logs").add({
           provider: "semaphore",
@@ -154,16 +167,22 @@ exports.smsQueueWorker = onSchedule(
             lastSentAt: FieldValue.serverTimestamp(),
             lastSmsLogId: logRef.id,
           },
-          { merge: true }
+          { merge: true },
         );
 
         await queueRef.set(
-          { status: "DONE", tries: (q.tries || 0) + 1, doneAt: FieldValue.serverTimestamp() },
-          { merge: true }
+          {
+            status: "DONE",
+            tries: (q.tries || 0) + 1,
+            doneAt: FieldValue.serverTimestamp(),
+          },
+          { merge: true },
         );
       } catch (err) {
         const tries = (q.tries || 0) + 1;
-        const next = admin.firestore.Timestamp.fromMillis(Date.now() + backoffSeconds(tries) * 1000);
+        const next = admin.firestore.Timestamp.fromMillis(
+          Date.now() + backoffSeconds(tries) * 1000,
+        );
 
         await db.collection("sms_logs").add({
           provider: "semaphore",
@@ -181,16 +200,26 @@ exports.smsQueueWorker = onSchedule(
 
         if (tries >= MAX_TRIES) {
           await queueRef.set(
-            { status: "FAILED", tries, error: String(err?.message || err), failedAt: FieldValue.serverTimestamp() },
-            { merge: true }
+            {
+              status: "FAILED",
+              tries,
+              error: String(err?.message || err),
+              failedAt: FieldValue.serverTimestamp(),
+            },
+            { merge: true },
           );
         } else {
           await queueRef.set(
-            { status: "QUEUED", tries, error: String(err?.message || err), nextAttemptAt: next },
-            { merge: true }
+            {
+              status: "QUEUED",
+              tries,
+              error: String(err?.message || err),
+              nextAttemptAt: next,
+            },
+            { merge: true },
           );
         }
       }
     }
-  }
+  },
 );
