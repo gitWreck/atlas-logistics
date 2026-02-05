@@ -1,7 +1,8 @@
 import { useState, useEffect } from "react";
 import { PROVINCES, getCities } from "@/app/utility/PhilippinesData";
+import { normalizePhoneNumber } from "@/app/utility/utilities";
 
-export default function AddressInputGroup({
+export default function InputGroup({
   label,
   values,
   onChange,
@@ -69,7 +70,17 @@ export default function AddressInputGroup({
           placeholder="Phone Number"
           className={`w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm ${ringColor} ${borderColor} focus:ring-1`}
           value={values.phone}
+          // onChange={(e) => handleChange("phone", e.target.value)}
+          // 1. ALLOW TYPING: Let them type dashes/spaces if they want
           onChange={(e) => handleChange("phone", e.target.value)}
+          // 2. FORMAT ON LEAVE: When they click away, auto-fix the format
+          onBlur={(e) => {
+            const formatted = normalizePhoneNumber(e.target.value);
+            // Only update if it changed
+            if (formatted !== values.phone) {
+              handleChange("phone", formatted);
+            }
+          }}
         />
       </div>
 

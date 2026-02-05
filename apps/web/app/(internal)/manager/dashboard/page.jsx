@@ -17,6 +17,7 @@ import TabButton from "../../components/ui/TabButton";
 import ManagerOverview from "../../components/manager/ManagerOverview"; // We will create this below
 import ShipmentBoard from "../../components/shipments/ShipmentBoard";
 import ManifestPage from "../../components/manifests/ManifestBoard";
+import TripBoard from "../../components/trips/TripBoard";
 
 export default function ManagerDashboardPage() {
   const router = useRouter();
@@ -78,16 +79,22 @@ export default function ManagerDashboardPage() {
               label="Overview"
             />
             <TabButton
+              isActive={activeTab === "trips"}
+              onClick={() => setActiveTab("trips")}
+              icon={faTruckLoading}
+              label="Trip Operations"
+            />
+            <TabButton
               isActive={activeTab === "shipments"}
               onClick={() => setActiveTab("shipments")}
               icon={faTruck}
-              label="Shipments"
+              label="Shipment and Packages"
             />
             <TabButton
               isActive={activeTab === "manifests"}
               onClick={() => setActiveTab("manifests")}
               icon={faTruckLoading}
-              label="Manifests"
+              label="Manifest & Trips"
             />
           </div>
         </div>
@@ -102,6 +109,7 @@ export default function ManagerDashboardPage() {
         )}
         {activeTab === "shipments" && <ShipmentBoard userRole="manager" />}
         {activeTab === "manifests" && <ManifestPage />}
+        {activeTab === "trips" && <TripBoard />}
       </main>
     </div>
   );
