@@ -111,7 +111,7 @@ exports.bulkAssignShipments = onCall(
           deliveredCount: 0,
 
           sender: data.sender,
-          receiver: data.recipient,
+          recipient: data.recipient,
 
           // Copy barcodes for the Checker API (Important for scanning!)
           packageBarcodes: data.packageBarcodes || [],

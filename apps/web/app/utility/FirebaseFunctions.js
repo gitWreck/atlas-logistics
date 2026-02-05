@@ -11,6 +11,10 @@ export const createShipmentWithPackages = httpsCallable(
   functions,
   "createShipmentWithPackages",
 );
+export const updateShipmentPackages = httpsCallable(
+  functions,
+  "updateShipmentPackages",
+);
 
 // TRIPS
 
@@ -50,12 +54,19 @@ export const generateTripCertificate = httpsCallable(
   "generateTripCertificate",
 );
 export const reopenTrip = httpsCallable(functions, "reopentrip");
-
 export const bulkAssignShipments = httpsCallable(
   functions,
   "bulkAssignShipments",
 );
 export const splitShipments = httpsCallable(functions, "splitShipments");
+export const bulkShipmentAction = httpsCallable(
+  functions,
+  "bulkShipmentAction",
+);
+export const verifyTripManifest = httpsCallable(
+  functions,
+  "verifyTripManifest",
+);
 
 // ----------------------------
 

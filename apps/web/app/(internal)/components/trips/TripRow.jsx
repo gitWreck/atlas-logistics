@@ -15,7 +15,7 @@ function StatusDot({ status, isDelayed }) {
   let animate = false;
 
   if (status === "COMPLETED") color = "bg-emerald-500";
-  if (status === "PLANNED") color = "bg-slate-600";
+  if (status === "CREATED") color = "bg-slate-600";
   if (status === "IN_TRANSIT") {
     color = "bg-blue-500";
     animate = true;
@@ -58,7 +58,7 @@ export default function TripRow({ trip, onClick }) {
 
   return (
     <div
-      onClick={() => onClick(trip.id)}
+      // onClick={() => onClick(trip.id)}
       className={`grid grid-cols-12 gap-4 px-6 py-4 items-center transition-colors cursor-pointer group border-b border-slate-800/50 last:border-0
         ${isDelayed ? "bg-amber-500/5 hover:bg-amber-500/10" : "hover:bg-slate-800/30"}
       `}
@@ -69,18 +69,13 @@ export default function TripRow({ trip, onClick }) {
 
         <div>
           {/* TRIP ID */}
-          <div className="flex items-center gap-2 mt-1">
+          <div className="flex-col items-center gap-2 mt-1">
             <span
               className={`font-mono text-sm font-bold transition-colors flex items-center gap-2 ${isDelayed ? "text-amber-400" : "text-blue-400"}`}
             >
               <FontAwesomeIcon icon={faTruck} className="text-[10px]" />
               {trip.tripId}
             </span>
-            {isDelayed && (
-              <span className="text-[10px] bg-amber-600 text-white px-1.5 rounded animate-pulse font-bold">
-                DELAYED
-              </span>
-            )}
           </div>
 
           {/* DRIVER INFO */}
@@ -141,7 +136,12 @@ export default function TripRow({ trip, onClick }) {
         </div>
 
         {/* Status Text */}
-        <div className="mt-1.5">
+        <div className="mt-1.5 gap-2 flex">
+          {isDelayed && (
+            <span className="text-[10px] bg-amber-600 text-white px-1.5 rounded animate-pulse font-bold">
+              DELAYED
+            </span>
+          )}
           <span
             className={`text-[10px] font-bold uppercase tracking-wide
               ${
@@ -153,7 +153,7 @@ export default function TripRow({ trip, onClick }) {
               }`}
           >
             {isDelayed
-              ? trip.lastDelayReason?.replace("_", " ") || "DELAYED"
+              ? trip.delayReason?.replace("_", " ") || "DELAYED"
               : trip.status.replace("_", " ")}
           </span>
         </div>

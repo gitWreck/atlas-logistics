@@ -1,134 +1,124 @@
 "use strict";
 
-/**
- * verifyTripManifest.js
- *
- * Verifies manifest integrity (anti-tamper):
- * - Loads manifests/{manifestId}
- * - Recomputes SHA-256 from snapshot (trip + packages)
- * - Compares to stored manifestHash
- * - Optionally compares snapshot packages vs live trip_packages to detect drift
- */
-
 const { onRequest } = require("firebase-functions/v2/https");
 const admin = require("firebase-admin");
 const crypto = require("crypto");
+// Import the SAME helpers used in generation to ensure Hash matches
+const { stableStringify, sha256Hex } = require("../utilities/helpers");
 
 if (!admin.apps.length) admin.initializeApp();
 const db = admin.firestore();
 
-function stableStringify(obj) {
-  const allKeys = [];
-  JSON.stringify(obj, (k, v) => (allKeys.push(k), v));
-  allKeys.sort();
-  return JSON.stringify(obj, allKeys);
-}
-
-function sha256Hex(str) {
-  return crypto.createHash("sha256").update(str, "utf8").digest("hex");
-}
-
-function safeNum(n) {
-  const x = Number(n);
-  return Number.isFinite(x) ? x : 0;
-}
-
 exports.verifyTripManifest = onRequest(async (req, res) => {
+  // Allow CORS if being called from client-side JS
+  res.set("Access-Control-Allow-Origin", "*");
+
   try {
-    const manifestId = String(req.query.manifestId || req.body?.manifestId || "").trim();
+    const manifestId = String(
+      req.query.manifestId || req.body?.manifestId || "",
+    ).trim();
+
     if (!manifestId) {
-      res.status(400).json({ ok: false, error: "manifestId is required" });
+      res.status(400).json({ ok: false, error: "Manifest ID is required" });
       return;
     }
 
-    const mref = db.collection("manifests").doc(manifestId);
-    const msnap = await mref.get();
-    if (!msnap.exists) {
+    // 1. Load the Manifest Snapshot
+    const mRef = db.collection("manifests").doc(manifestId);
+    const mSnap = await mRef.get();
+
+    if (!mSnap.exists) {
       res.status(404).json({ ok: false, error: "Manifest not found" });
       return;
     }
 
-    const m = msnap.data() || {};
-    const snapTrip = m.snapshot?.trip || null;
-    const snapPkgs = m.snapshot?.packages || [];
+    const data = mSnap.data();
 
-    if (!snapTrip) {
-      res.status(500).json({ ok: false, error: "Manifest snapshot missing" });
-      return;
-    }
+    // 2. Reconstruct the Payload exactly as it was in 'generateTripManifest'
+    // We must manually pick the fields that were hashed.
+    // If we hash the whole doc, it fails because the doc has 'hash' and 'createdAt' which weren't in the input.
 
-    // Recompute hash from snapshot (the ONLY correct way)
-    const hashInput = stableStringify({
-      trip: snapTrip,
-      packages: (snapPkgs || []).slice().sort((a, b) =>
-        String(a.trackingNumber || "").localeCompare(String(b.trackingNumber || ""))
-      ),
-    });
+    const payloadToHash = {
+      manifestId: data.manifestId,
+      tripDocId: data.tripDocId,
+      // Status is NOT part of the hash usually, but if you included it in generation, include it here.
+      // Based on previous code, we hashed the 'payload' object BEFORE adding 'hash' or 'createdAt'.
 
-    const recomputedHash = sha256Hex(hashInput);
-    const storedHash = String(m.manifestHash || "");
-    const hashMatches = recomputedHash === storedHash;
+      // We need to match the structure from generateTripManifest Step 6:
+      status: "LOCKED", // This was hardcoded in the payload in generation script
 
-    // Optional: compare snapshot vs live trip_packages to detect drift
-    let drift = null;
-    try {
-      const tripDocId = m.tripDocId || snapTrip.tripDocId;
-      if (tripDocId) {
-        const liveSnap = await db
-          .collection("truck_trips")
-          .doc(tripDocId)
-          .collection("trip_packages")
-          .get();
+      trip: {
+        tripCode: data.trip?.tripCode || null,
+        truckPlate: data.trip?.truckPlate || null,
+        driverName: data.trip?.driverName || null,
+        driverUid: data.trip?.driverUid || null, // Ensure this exists in data or handle undefined
+        origin: data.trip?.origin || null,
+        destination: data.trip?.destination || null,
+        route: data.trip?.route || null,
+      },
 
-        const live = liveSnap.docs
-          .map((d) => {
-            const p = d.data() || {};
-            return {
-              trackingNumber: p.trackingNumber || "",
-              loadedCount: safeNum(p.loadedCount ?? p.itemsLoaded ?? p.loadedItems),
-              pendingCount: safeNum(p.pendingCount ?? p.itemsPending ?? p.pendingItems),
-              receivedCount: safeNum(p.receivedCount ?? p.itemsReceived ?? p.receivedItems),
-              totalCount: safeNum(p.packageCount ?? p.totalCount ?? p.itemsTotal ?? p.totalItems),
-              status: p.status || "",
-            };
-          })
-          .sort((a, b) => String(a.trackingNumber).localeCompare(String(b.trackingNumber)));
+      meta: {
+        generatedAt: data.meta?.generatedAt,
+        generatedBy: data.meta?.generatedBy,
+        generatedByName: data.meta?.generatedByName,
+      },
 
-        const snapshotComparable = (snapPkgs || [])
-          .map((p) => ({
-            trackingNumber: p.trackingNumber || "",
-            loadedCount: safeNum(p.loadedCount),
-            pendingCount: safeNum(p.pendingCount),
-            receivedCount: safeNum(p.receivedCount),
-            totalCount: safeNum(p.totalCount),
-            status: p.status || "",
-          }))
-          .sort((a, b) => String(a.trackingNumber).localeCompare(String(b.trackingNumber)));
+      totals: {
+        totalShipments: data.totals?.totalShipments,
+        totalItems: data.totals?.totalItems,
+      },
 
-        const liveStr = stableStringify(live);
-        const snapStr = stableStringify(snapshotComparable);
+      shipments: data.shipments, // This is the detailed array
+    };
 
-        drift = {
-          liveCount: live.length,
-          snapshotCount: snapshotComparable.length,
-          matchesSnapshot: liveStr === snapStr,
-        };
-      }
-    } catch (e) {
-      drift = { error: String(e?.message || e) };
+    // 3. Recompute Hash
+    const recomputedHash = sha256Hex(stableStringify(payloadToHash));
+    const storedHash = data.hash; // The hash stored in the doc
+
+    const isIntegrityValid = recomputedHash === storedHash;
+
+    // 4. (Optional) Drift Detection
+    // Check if the LIVE trip data still matches the SNAPSHOT
+    let drift = { hasDrift: false, details: [] };
+
+    if (data.tripDocId) {
+      const tripRef = db.collection("truck_trips").doc(data.tripDocId);
+      const tripShipRef = tripRef.collection("trip_shipments");
+      const currentSnaps = await tripShipRef.get();
+
+      const currentIds = new Set(currentSnaps.docs.map((d) => d.id));
+      const manifestIds = new Set(data.shipments.map((s) => s.trackingDocId));
+
+      // Check for Removed Items
+      manifestIds.forEach((id) => {
+        if (!currentIds.has(id))
+          drift.details.push(
+            `Shipment ${id} was removed from trip after manifest.`,
+          );
+      });
+
+      // Check for Added Items
+      currentIds.forEach((id) => {
+        if (!manifestIds.has(id))
+          drift.details.push(
+            `Shipment ${id} was added to trip after manifest.`,
+          );
+      });
+
+      if (drift.details.length > 0) drift.hasDrift = true;
     }
 
     res.json({
       ok: true,
+      status: isIntegrityValid ? "VALID" : "TAMPERED",
       manifestId,
-      tripDocId: m.tripDocId || snapTrip.tripDocId || null,
       storedHash,
-      recomputedHash,
-      hashMatches,
+      recomputedHash, // Useful for debugging why it failed
+      timestamp: new Date().toISOString(),
       drift,
-      verifiedAt: new Date().toISOString(),
     });
   } catch (err) {
-    res.status(500).json({ ok: false, error: String(err?.message || err) });
+    console.error(err);
+    res.status(500).json({ ok: false, error: err.message });
   }
 });

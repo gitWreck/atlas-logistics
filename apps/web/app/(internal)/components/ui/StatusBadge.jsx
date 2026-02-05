@@ -30,7 +30,7 @@ export default function StatusBadge({ status, reason }) {
   }
 
   const styles = {
-    CREATED: "bg-stone-400/10 text-slate-300 border-slate-500/20",
+    CREATED: "bg-stone-200/10 text-slate-300 border-slate-500/20",
     RECEIVED: "bg-cyan-500/10 text-cyan-400 border-cyan-500/20",
     ASSIGNED: "bg-yellow-500/10 text-yellow-400 border-yellow-500/20",
     LOADED: "bg-orange-500/10 text-orange-400 border-orange-500/20",
@@ -42,6 +42,7 @@ export default function StatusBadge({ status, reason }) {
     // DELAYED is amber
     DELAYED: "bg-amber-500/10 text-amber-400 border-amber-500/20",
     DELIVERED: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
+    COMPLETED: "bg-emerald-500/30 text-emerald-400 border-emerald-500/20",
 
     UNASSIGNED: "bg-amber-500/10 text-amber-400 border-amber-500/20",
     CANCELLED: "bg-red-500/10 text-red-400 border-red-500/20",

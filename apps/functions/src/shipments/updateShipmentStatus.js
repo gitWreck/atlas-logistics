@@ -11,7 +11,7 @@ if (!admin.apps.length) admin.initializeApp();
 const db = admin.firestore();
 
 exports.updateShipmentStatus = onCall(
-  { region: "asia-southeast1" },
+  { region: "asia-southeast1", maxInstances: 10 },
   async (req) => {
     // 1. AUTHENTICATION
     if (!req.auth) {
