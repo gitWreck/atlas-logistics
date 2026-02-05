@@ -68,6 +68,7 @@ export default function StatusButton({
       onClick={onClick}
       disabled={disabled || status === "LOADING" || status === "SUCCESS"}
       className={`
+        w-full
         flex-1 py-2 rounded text-xs font-bold transition-all duration-300 
         flex items-center justify-center gap-2 border 
         disabled:opacity-50 disabled:cursor-not-allowed

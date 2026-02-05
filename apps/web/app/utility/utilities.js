@@ -8,6 +8,8 @@ export function calculateProgress(status) {
       return 25;
     case "ASSIGNED":
       return 40;
+    case "LOADING":
+      return 50;
     case "LOADED":
       return 60;
     case "IN_TRANSIT":
@@ -15,6 +17,8 @@ export function calculateProgress(status) {
     case "OUT_FOR_DELIVERY":
       return 90;
     case "DELIVERED":
+      return 99;
+    case "COMPLETED":
       return 100;
     default:
       return 0;

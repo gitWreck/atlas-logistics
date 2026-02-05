@@ -90,7 +90,7 @@ export default function ShipmentDrawer({ isOpen, onClose, data }) {
         </div>
 
         {/* QR CODE REVEAL (CONDITIONAL) */}
-        {showQR && <ShipmentLabel shipment={data} packages={pkg} />}
+        {showQR && <ShipmentLabel shipment={data} packages={pkg} index={idx} />}
       </div>
     );
   }
@@ -105,8 +105,10 @@ export default function ShipmentDrawer({ isOpen, onClose, data }) {
       />
 
       <aside
+        style={{ width: "min(100%, 600px)" }}
         className={`
-          fixed top-0 right-0 h-full w-full max-w-md bg-slate-900 border-l border-slate-800 z-50 shadow-2xl transform transition-transform duration-300 flex flex-col
+          fixed top-0 right-0 h-full 
+          bg-slate-900 border-l border-slate-800 z-50 shadow-2xl transform transition-transform duration-300 flex flex-col
           ${isOpen ? "translate-x-0" : "translate-x-full"}
         `}
       >
@@ -250,7 +252,7 @@ export default function ShipmentDrawer({ isOpen, onClose, data }) {
                 onClick={() =>
                   // window.open(`../print/labels?id=${data.id}`, "_blank")
                   window.open(
-                    `/components/print/labels?id=${encodeURIComponent(data.id)}`,
+                    `/print/labels?id=${encodeURIComponent(data.id)}`,
                     "_blank",
                   )
                 }
@@ -302,14 +304,14 @@ export default function ShipmentDrawer({ isOpen, onClose, data }) {
         </div>
 
         {/* FOOTER ACTIONS */}
-        <div className="p-4 border-t border-slate-800 bg-slate-950 flex gap-3">
+        {/* <div className="p-4 border-t border-slate-800 bg-slate-950 flex gap-3">
           <button className="flex-1 py-3 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg font-medium text-sm transition-colors">
             Download Manifest
           </button>
           <button className="flex-1 py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-lg font-bold text-sm transition-colors shadow-lg shadow-blue-500/20">
             Generate Report
           </button>
-        </div>
+        </div> */}
       </aside>
     </>
   );
