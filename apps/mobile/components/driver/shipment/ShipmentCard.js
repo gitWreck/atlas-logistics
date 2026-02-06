@@ -29,26 +29,26 @@ const ShipmentCard = ({ shipment, onPress }) => {
           </View>
           <View style={{ flex: 1 }}>
             <Text style={styles.destinationText} numberOfLines={2}>
-              {shipment.receiver.address.street +
+              {shipment.recipient.address.street +
                 ", " +
-                shipment.receiver.address.barangay ||
+                shipment.recipient.address.barangay ||
                 shipment.destination ||
                 "No Address"}
             </Text>
             <Text style={styles.cityText}>
-              {shipment.receiver.address.city +
+              {shipment.recipient.address.city +
                 ", " +
-                shipment.receiver.address.province || "City, Province"}
+                shipment.recipient.address.province || "City, Province"}
             </Text>
           </View>
         </View>
 
-        {/* Receiver & Package Count */}
+        {/* recipient & Package Count */}
         <View style={styles.metaRow}>
           <View style={styles.metaItem}>
             <FontAwesome5 name="user" size={12} color="#94a3b8" />
             <Text style={styles.metaText}>
-              {shipment.receiver.name || "Receiver"}
+              {shipment.recipient.name || "recipient"}
             </Text>
           </View>
           <View style={styles.separator} />
