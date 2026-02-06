@@ -10,15 +10,16 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
+  SafeAreaView,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { FontAwesome5 } from "@expo/vector-icons";
 import { collection, query, where, getDocs, limit } from "firebase/firestore";
 import { getFunctions, httpsCallable } from "firebase/functions";
 import { db, auth } from "../../firebase";
-
-// 🎨 IMPORT SHARED THEME
-import { COLORS, GLOBAL_STYLES } from "../../components/constants/theme";
+import { StatusBar } from "expo-status-bar";
+import { Image } from "expo-image";
+import GradientButton from "../../components/ui/figma/GradientButton";
 import { reportTripDelay } from "../../components/utilities/FirebaseFunctions";
 
 const DELAY_TYPES = [
@@ -112,19 +113,32 @@ export default function ReportDelayScreen() {
 
   if (fetching) {
     return (
-      <View style={GLOBAL_STYLES.center}>
-        <ActivityIndicator size="large" color={COLORS.primary} />
+      <View style={[styles.center, { backgroundColor: "#f1f5f9" }]}>
+        <ActivityIndicator size="large" color="#042C83" />
       </View>
     );
   }
 
   return (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === "ios" ? "padding" : "height"}
-      style={GLOBAL_STYLES.container}
-    >
-      <ScrollView contentContainerStyle={styles.content}>
-        <Text style={GLOBAL_STYLES.sectionTitle}>Report Delay</Text>
+    <SafeAreaView style={styles.container}>
+      <StatusBar style="dark" />
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        style={{ flex: 1 }}
+      >
+        {/* Header: back | title - aligned with Trip Details */}
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
+            <Image
+              source={require("../../assets/icons/back.svg")}
+              style={{ width: 20, height: 20 }}
+            />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Report Delay</Text>
+        </View>
+
+        <ScrollView contentContainerStyle={styles.scrollContent}>
+          <Text style={styles.sectionTitle}>Report Delay</Text>
         <Text style={styles.subtitle}>Select the reason for the delay</Text>
 
         <View style={styles.grid}>
@@ -148,47 +162,69 @@ export default function ReportDelayScreen() {
           ))}
         </View>
 
-        <Text style={styles.label}>Additional Notes (Optional)</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="e.g., Flat tire at KM 45..."
-          placeholderTextColor={COLORS.textSecondary}
-          multiline
-          numberOfLines={3}
-          value={notes}
-          onChangeText={setNotes}
-        />
+          <Text style={styles.label}>Additional Notes (Optional)</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="e.g., Flat tire at KM 45..."
+            placeholderTextColor="#94a3b8"
+            multiline
+            numberOfLines={3}
+            value={notes}
+            onChangeText={setNotes}
+          />
+        </ScrollView>
+      </KeyboardAvoidingView>
 
-        <TouchableOpacity
-          style={[styles.submitBtn, submitting && { opacity: 0.7 }]}
+      {/* Bottom CTA: GradientButton */}
+      <View style={styles.footer}>
+        <GradientButton
+          title={submitting ? "Submitting..." : "Submit Report"}
           onPress={handleSubmit}
+          loading={submitting}
           disabled={submitting}
-        >
-          {submitting ? (
-            <ActivityIndicator color="#000" />
-          ) : (
-            <Text style={styles.btnText}>SUBMIT REPORT</Text>
-          )}
-        </TouchableOpacity>
-      </ScrollView>
-    </KeyboardAvoidingView>
+        />
+      </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  header: {
-    padding: 20,
-    flexDirection: "row",
-    justifyContent: "space-between",
+  container: {
+    flex: 1,
+    backgroundColor: "#f1f5f9",
+  },
+  center: {
+    flex: 1,
+    justifyContent: "center",
     alignItems: "center",
   },
-  content: { padding: 24, paddingBottom: 50 },
+  header: {
+    paddingHorizontal: 20,
+    paddingTop: 50,
+    paddingBottom: 15,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    backgroundColor: "#ffffff",
+    borderBottomWidth: 1,
+    borderBottomColor: "#e2e8f0",
+  },
+  backBtn: {
+    padding: 0,
+  },
+  headerTitle: {
+    color: "#0f172a",
+    fontSize: 16,
+    fontWeight: "bold",
+    flex: 1,
+    marginLeft: 12,
+  },
+  scrollContent: { paddingHorizontal: 24, paddingTop: 16, paddingBottom: 120 },
 
   subtitle: {
     fontSize: 16,
-    color: COLORS.textSecondary,
+    color: "#64748b",
     marginBottom: 24,
-    marginTop: -8,
   },
 
   grid: {
@@ -199,7 +235,7 @@ const styles = StyleSheet.create({
   },
   card: {
     width: "48%",
-    backgroundColor: COLORS.card,
+    backgroundColor: "#ffffff",
     padding: 16,
     borderRadius: 16,
     marginBottom: 16,
@@ -216,39 +252,38 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   cardLabel: {
-    color: COLORS.textPrimary,
+    color: "#0f172a",
     fontWeight: "600",
     fontSize: 14,
     textAlign: "center",
   },
 
   label: {
-    color: COLORS.textSecondary,
+    color: "#64748b",
     marginBottom: 8,
     fontWeight: "600",
   },
   input: {
-    backgroundColor: COLORS.card,
-    color: COLORS.textPrimary,
+    backgroundColor: "#ffffff",
+    color: "#0f172a",
     borderRadius: 12,
     padding: 16,
     fontSize: 16,
     textAlignVertical: "top",
     marginBottom: 32,
     borderWidth: 1,
-    borderColor: COLORS.slate,
+    borderColor: "#e2e8f0",
   },
-
-  submitBtn: {
-    backgroundColor: COLORS.primary,
-    padding: 18,
-    borderRadius: 12,
-    alignItems: "center",
-  },
-  btnText: {
-    color: "#000",
-    fontWeight: "bold",
-    fontSize: 16,
-    letterSpacing: 0.5,
+  footer: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: "#ffffff",
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    paddingBottom: 34,
+    borderTopWidth: 1,
+    borderTopColor: "#e2e8f0",
   },
 });
