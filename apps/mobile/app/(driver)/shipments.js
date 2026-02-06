@@ -11,11 +11,11 @@ import {
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { FontAwesome5 } from "@expo/vector-icons";
+import { StatusBar } from "expo-status-bar";
 import { collection, query, onSnapshot, orderBy } from "firebase/firestore";
 import { db } from "../../firebase";
-import { COLORS, GLOBAL_STYLES } from "../../components/constants/theme";
-
-// Import your new component
+import { COLORS } from "../../components/constants/theme";
+import { Image } from "expo-image";
 import ShipmentCard from "../../components/driver/shipment/ShipmentCard";
 
 export default function ShipmentsListScreen() {
@@ -71,26 +71,27 @@ export default function ShipmentsListScreen() {
   };
 
   return (
-    <SafeAreaView style={GLOBAL_STYLES.container}>
-      {/* Header */}
+    <SafeAreaView style={styles.container}>
+      <StatusBar style="dark" />
+      {/* Header: back | title | count (right) */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-          <FontAwesome5 name="arrow-left" size={20} color="#fff" />
+          <Image
+            source={require("../../assets/icons/back.svg")}
+            style={{ width: 20, height: 20 }}
+          />
         </TouchableOpacity>
-        <View>
-          <Text style={styles.title}>Shipments</Text>
-          <Text style={styles.subtitle}>{shipments.length} Stops</Text>
-        </View>
-        <View style={{ width: 40 }} />
+        <Text style={styles.headerTitle}>Shipments</Text>
+        <Text style={styles.headerCount}>{shipments.length} Items</Text>
       </View>
 
-      {/* Search Bar */}
+      {/* Search Bar - light mode */}
       <View style={styles.searchContainer}>
         <FontAwesome5 name="search" size={16} color="#94a3b8" />
         <TextInput
           style={styles.searchInput}
           placeholder="Search address, ID, or name..."
-          placeholderTextColor="#64748b"
+          placeholderTextColor="#94a3b8"
           value={searchText}
           onChangeText={setSearchText}
         />
@@ -98,8 +99,8 @@ export default function ShipmentsListScreen() {
 
       {/* List */}
       {loading ? (
-        <View style={GLOBAL_STYLES.center}>
-          <ActivityIndicator size="large" color={COLORS.primary} />
+        <View style={styles.center}>
+          <ActivityIndicator size="large" color="#042C83" />
         </View>
       ) : (
         <FlatList
@@ -111,7 +112,7 @@ export default function ShipmentsListScreen() {
           )}
           ListEmptyComponent={
             <View style={styles.emptyBox}>
-              <FontAwesome5 name="box-open" size={40} color="#334155" />
+              <FontAwesome5 name="box-open" size={40} color="#94a3b8" />
               <Text style={styles.emptyText}>No shipments found.</Text>
             </View>
           }
@@ -122,37 +123,61 @@ export default function ShipmentsListScreen() {
 }
 
 const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: "#f1f5f9",
+  },
+  center: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#f1f5f9",
+  },
   header: {
-    padding: 20,
+    paddingHorizontal: 20,
+    paddingTop: 50,
+    paddingBottom: 15,
     flexDirection: "row",
     alignItems: "center",
-    gap: 16,
+    justifyContent: "space-between",
+    backgroundColor: "#ffffff",
+    borderBottomWidth: 1,
+    borderBottomColor: "#e2e8f0",
   },
-  backBtn: { padding: 8 },
-  title: { color: "#fff", fontSize: 20, fontWeight: "bold" },
-  subtitle: { color: "#94a3b8", fontSize: 12 },
-
+  backBtn: {
+    padding: 0,
+  },
+  headerTitle: {
+    color: "#0f172a",
+    fontSize: 16,
+    fontWeight: "bold",
+    flex: 1,
+    marginLeft: 12,
+  },
+  headerCount: {
+    color: "#0f172a",
+    fontSize: 14,
+  },
   searchContainer: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#1e293b",
+    backgroundColor: "#ffffff",
     marginHorizontal: 20,
+    marginTop: 16,
     paddingHorizontal: 16,
     borderRadius: 12,
     height: 50,
     marginBottom: 16,
     borderWidth: 1,
-    borderColor: "#334155",
+    borderColor: "#e2e8f0",
   },
   searchInput: {
     flex: 1,
-    color: "#fff",
+    color: "#0f172a",
     marginLeft: 12,
     fontSize: 16,
   },
-
   listContent: { paddingHorizontal: 20, paddingBottom: 40 },
-
   emptyBox: { alignItems: "center", marginTop: 60, gap: 12 },
   emptyText: { color: "#64748b", fontSize: 14 },
 });

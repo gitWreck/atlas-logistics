@@ -1,73 +1,79 @@
 import React from "react";
-import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
+import { View, Text, TouchableOpacity, StyleSheet, Platform } from "react-native";
 import { FontAwesome5 } from "@expo/vector-icons";
-import { COLORS } from "../../constants/theme";
-import StatusBadge from "../../ui/StatusBadge"; // Reuse your existing badge
+import StatusBadge from "../../ui/StatusBadge";
+
+const LABEL_GREY = "#6b7280";
+const VALUE_DARK = "#111827";
+const SEPARATOR_COLOR = "#e5e7eb";
+const LINK_BLUE = "#2563eb";
 
 const ShipmentCard = ({ shipment, onPress }) => {
-  console.log("shipment details: ", shipment);
+  const tripId = shipment.id || shipment.trackingNumber || "—";
+  const address = shipment.recipient?.address;
+  const destination =
+    (address?.street && address?.barangay
+      ? `${address.street}, ${address.barangay}`
+      : null) ||
+    (address?.city && address?.province
+      ? `${address.city}, ${address.province}`
+      : null) ||
+    shipment.destination ||
+    "No Address";
+  const itemLabel =
+    shipment.itemDescription ||
+    shipment.description ||
+    shipment.recipient?.name ||
+    "Shipment";
+  const quantity = shipment.totalItems ?? shipment.loadedCount ?? 0;
+
   return (
     <View style={styles.card}>
-      {/* HEADER: ID + Status */}
+      {/* HEADER: Trip Number (icon + label/value) | Status */}
       <View style={styles.cardHeader}>
-        <Text style={styles.idText}>
-          {shipment.id || shipment.trackingNumber}
-        </Text>
+        <View style={styles.headerLeft}>
+          <View style={styles.iconBox}>
+            <FontAwesome5 name="box" size={14} color={LABEL_GREY} />
+          </View>
+          <View>
+            <Text style={styles.label}>Trip Number</Text>
+            <Text style={styles.value} numberOfLines={1}>
+              {tripId}
+            </Text>
+          </View>
+        </View>
         <StatusBadge status={shipment.status} />
       </View>
 
-      {/* BODY: Destination is King */}
+      {/* CONTENT: Item, Destination */}
       <View style={styles.body}>
-        {/* Destination Icon & Text */}
-        <View style={styles.locationRow}>
-          <View style={styles.iconBox}>
-            <FontAwesome5
-              name="map-marker-alt"
-              size={16}
-              color={COLORS.danger}
-            />
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.destinationText} numberOfLines={2}>
-              {shipment.recipient.address.street +
-                ", " +
-                shipment.recipient.address.barangay ||
-                shipment.destination ||
-                "No Address"}
-            </Text>
-            <Text style={styles.cityText}>
-              {shipment.recipient.address.city +
-                ", " +
-                shipment.recipient.address.province || "City, Province"}
-            </Text>
-          </View>
+        <View style={styles.contentRow}>
+          <Text style={styles.label}>Item</Text>
+          <Text style={styles.value} numberOfLines={1}>
+            {itemLabel}
+          </Text>
         </View>
-
-        {/* recipient & Package Count */}
-        <View style={styles.metaRow}>
-          <View style={styles.metaItem}>
-            <FontAwesome5 name="user" size={12} color="#94a3b8" />
-            <Text style={styles.metaText}>
-              {shipment.recipient.name || "recipient"}
-            </Text>
-          </View>
-          <View style={styles.separator} />
-          <View style={styles.metaItem}>
-            <FontAwesome5 name="box" size={12} color="#94a3b8" />
-            <Text style={styles.metaText}>
-              {shipment.loadedCount || 0}/{shipment.totalItems || 0} Items
-            </Text>
-          </View>
+        <View style={[styles.contentRow, styles.contentRowLast]}>
+          <Text style={styles.label}>Destination</Text>
+          <Text style={styles.value} numberOfLines={2}>
+            {destination}
+          </Text>
         </View>
       </View>
 
-      {/* FOOTER: Action Button */}
+      <View style={styles.separatorLine} />
+
+      {/* FOOTER: Quantity | View Details */}
       <TouchableOpacity
-        style={styles.actionBtn}
+        style={styles.footer}
         onPress={() => onPress(shipment)}
+        activeOpacity={0.7}
       >
-        <Text style={styles.actionText}>VIEW DETAILS</Text>
-        <FontAwesome5 name="chevron-right" size={12} color="#fff" />
+        <Text style={styles.quantityText}>Quantity: {quantity}</Text>
+        <View style={styles.viewDetailsRow}>
+          <Text style={styles.viewDetailsText}>View Details</Text>
+          <FontAwesome5 name="chevron-right" size={12} color={LINK_BLUE} />
+        </View>
       </TouchableOpacity>
     </View>
   );
@@ -77,71 +83,86 @@ export default ShipmentCard;
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: COLORS.card,
+    backgroundColor: "#ffffff",
     borderRadius: 12,
     marginBottom: 12,
     borderWidth: 1,
-    borderColor: "#334155",
+    borderColor: "#e2e8f0",
     overflow: "hidden",
+    ...Platform.select({
+      ios: {
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.08,
+        shadowRadius: 8,
+      },
+      android: { elevation: 3 },
+    }),
   },
   cardHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
-    alignItems: "center",
-    padding: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: "#334155",
-    backgroundColor: "rgba(255,255,255,0.02)",
+    alignItems: "flex-start",
+    padding: 16,
   },
-  idText: { color: "#94a3b8", fontWeight: "bold", fontSize: 12 },
-
-  body: { padding: 16 },
-  locationRow: { flexDirection: "row", gap: 12, marginBottom: 12 },
-  iconBox: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: "rgba(239, 68, 68, 0.1)", // Red tint
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  destinationText: {
-    color: "#fff",
-    fontSize: 16,
-    fontWeight: "bold",
-    lineHeight: 22,
-  },
-  cityText: { color: "#94a3b8", fontSize: 13, marginTop: 2 },
-
-  metaRow: {
+  headerLeft: {
     flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#0f172a",
-    padding: 8,
-    borderRadius: 8,
-  },
-  metaItem: {
-    flexDirection: "row",
-    gap: 6,
     alignItems: "center",
     flex: 1,
-    justifyContent: "center",
+    gap: 10,
   },
-  metaText: { color: "#cbd5e1", fontSize: 12, fontWeight: "500" },
-  separator: { width: 1, height: 16, backgroundColor: "#334155" },
-
-  actionBtn: {
-    flexDirection: "row",
+  iconBox: {
+    width: 36,
+    height: 36,
+    borderRadius: 8,
+    backgroundColor: "#f3f4f6",
     justifyContent: "center",
     alignItems: "center",
-    padding: 12,
-    backgroundColor: "#334155",
-    gap: 8,
   },
-  actionText: {
-    color: "#fff",
+  label: {
     fontSize: 12,
-    fontWeight: "bold",
-    letterSpacing: 1,
+    color: LABEL_GREY,
+    marginBottom: 2,
+  },
+  value: {
+    fontSize: 14,
+    color: VALUE_DARK,
+  },
+  body: {
+    paddingHorizontal: 16,
+    paddingBottom: 12,
+  },
+  contentRow: {
+    marginBottom: 10,
+  },
+  contentRowLast: {
+    marginBottom: 0,
+  },
+  separatorLine: {
+    height: 1,
+    backgroundColor: SEPARATOR_COLOR,
+    marginHorizontal: 16,
+  },
+  footer: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+  },
+  quantityText: {
+    fontSize: 14,
+    color: VALUE_DARK,
+    fontWeight: "500",
+  },
+  viewDetailsRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+  viewDetailsText: {
+    fontSize: 14,
+    color: LINK_BLUE,
+    fontWeight: "500",
   },
 });
