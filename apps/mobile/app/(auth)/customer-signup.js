@@ -117,11 +117,18 @@ export default function CustomerSignupScreen() {
       // Create a corresponding user profile in Firestore with role "customer"
       const userDocRef = doc(db, "users", user.uid);
       await setDoc(userDocRef, {
-        fullName,
+        // Align fields with web "Add New User" user document shape
+        uid: user.uid,
         email,
-        phoneNumber,
+        name: fullName,
         role: "customer",
+        phoneNumber: phoneNumber || null,
+        warehouseId: null,
+        active: true,
+        status: "active",
+        provider: "password",
         createdAt: serverTimestamp(),
+        lastAuthAt: null,
       });
 
       Alert.alert(
