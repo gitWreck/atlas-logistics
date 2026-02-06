@@ -77,11 +77,13 @@ export default function LoginScreen() {
 
         console.log("User Role:", role);
 
-        // 4. Route based on Role (checker, driver only)
+        // 4. Route based on Role
         if (role === "driver") {
           router.replace("/(driver)/");
         } else if (role === "checker") {
           router.replace("/(checker)");
+        } else if (role === "customer") {
+          router.replace("/(customer)/");
         } else {
           Alert.alert(
             "Access Denied",
