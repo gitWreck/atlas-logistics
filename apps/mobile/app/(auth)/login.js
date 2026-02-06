@@ -147,17 +147,20 @@ export default function LoginScreen() {
           onPress={handleLogin}
           loading={loading}
           disabled={disabled}
-          />
+        />
 
-          <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", marginTop: 20 }}>
-            <Image
-              source={require("../../assets/icons/shield.svg")}
-              style={{ width: 18, height: 18, marginRight: 8, alignSelf: 'center' }}
-            />
-            <Text style={[styles.note, { marginTop: 0 }]}>
-              All login attempts are monitored and audited.
+        {/* Customer CTA with only "Create your account" tappable */}
+        <View style={styles.customerCtaContainer}>
+          <Text style={styles.customerCtaText}>
+            Are you a customer?{" "}
+            <Text
+              style={styles.customerCtaLink}
+              onPress={() => router.push("/customer-signup")}
+            >
+              Create your account
             </Text>
-          </View>
+          </Text>
+        </View>
 
       </ScrollView>
     </KeyboardAvoidingView>
@@ -172,5 +175,20 @@ const styles = StyleSheet.create({
     color: "#94a3b8",
     fontSize: 13,
     marginTop: 20,
-  }
+  },
+  customerCtaContainer: {
+    marginTop: 16,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  customerCtaText: {
+    fontSize: 13,
+    color: "#64748b",
+  },
+  customerCtaLink: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: "#2563eb",
+    textDecorationLine: "underline",
+  },
 });
