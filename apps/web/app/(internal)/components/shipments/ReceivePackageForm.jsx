@@ -12,8 +12,8 @@ import {
   faRoute, // Added
 } from "@fortawesome/free-solid-svg-icons";
 import { createShipmentWithPackages } from "@/app/utility/FirebaseFunctions";
-import AddressInputGroup from "./AddressInputGroup";
 import { WAREHOUSES } from "@/app/utility/WarehouseData"; // <--- IMPORT THIS
+import InputGroup from "./InputGroup";
 
 const INITIAL_CONTACT = {
   name: "",
@@ -298,13 +298,13 @@ export default function ReceivePackageForm({ isOpen, onClose, onSuccess }) {
 
             {/* ROW 2: ADDRESSES (Contact Info) */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-              <AddressInputGroup
+              <InputGroup
                 label="Sender Contact"
                 values={sender}
                 onChange={setSender}
                 color="blue"
               />
-              <AddressInputGroup
+              <InputGroup
                 label="Recipient Contact"
                 values={recipient}
                 onChange={setRecipient}

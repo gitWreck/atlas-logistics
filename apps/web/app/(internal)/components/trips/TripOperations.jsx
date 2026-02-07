@@ -14,6 +14,7 @@ import {
 } from "@/app/utility/FirebaseFunctions";
 import StatusButton from "../ui/StatusButton";
 import { runAction } from "@/app/utility/utilities";
+import NotifyToggle from "../messaging/NotifyToggle";
 
 export default function TripOperations({ tripId, isLocked, onSuccess }) {
   // --- INTERNAL STATE ---
@@ -28,11 +29,12 @@ export default function TripOperations({ tripId, isLocked, onSuccess }) {
   const [clearStatus, setClearStatus] = useState("IDLE");
   const [statusChangeStatus, setStatusChangeStatus] = useState("IDLE");
 
+  const [notifySms, setNotifySms] = useState(true);
+  const [notifyDelay, setNotifyDelay] = useState(true);
+
   return (
     <div className="space-y-4">
       {/* --- TOP ROW: ASSIGNMENT & STATUS --- */}
-      {/* <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-      </div> */}
       {/* 1. MANUAL ASSIGNMENT CARD */}
       <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-4 flex flex-col gap-3 shadow-lg h-full">
         <h4 className="text-xs font-bold text-slate-500 uppercase flex items-center gap-2">
@@ -81,22 +83,37 @@ export default function TripOperations({ tripId, isLocked, onSuccess }) {
 
       {/* 2. FORCE STATUS CHANGE CARD */}
       <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-4 flex flex-col gap-3 shadow-lg h-full">
-        <h4 className="text-xs font-bold text-slate-500 uppercase flex items-center gap-2">
-          <FontAwesomeIcon icon={faTruckFast} /> Force Status
+        <h4 className="text-xs font-bold text-slate-500 uppercase flex items-center justify-between gap-2">
+          <span className="flex items-center gap-2">
+            <FontAwesomeIcon icon={faTruckFast} /> Force Status
+          </span>
+
+          {/* 2. THE NEW CHECKBOX */}
+          <NotifyToggle
+            checked={notifySms}
+            onChange={setNotifySms}
+            color="emerald"
+            labelOff="Silent Update"
+          />
         </h4>
         <div className="flex gap-2 mt-auto">
-          <select
-            className="flex-1 bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white focus:border-blue-500 outline-none"
-            value={statusSelect}
-            onChange={(e) => setStatusSelect(e.target.value)}
-          >
-            <option value="">Select...</option>
-            <option value="CREATED">Created</option>
-            <option value="LOADED">Loaded</option>
-            <option value="IN_TRANSIT">In Transit</option>
-            <option value="COMPLETED">Completed</option>
-            <option value="CANCELLED">Cancelled</option>
-          </select>
+          <div className="flex-1 flex flex-col gap-2">
+            {/* The Select Box */}
+            <select
+              className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white focus:border-blue-500 outline-none"
+              value={statusSelect}
+              onChange={(e) => setStatusSelect(e.target.value)}
+            >
+              <option value="">Select Status...</option>
+              <option value="CREATED">Created</option>
+              <option value="LOADING">Loading</option>
+              <option value="LOADED">Loaded</option>
+              <option value="IN_TRANSIT">In Transit</option>
+              <option value="ARRIVED">Arrived</option>
+              <option value="COMPLETED">Completed</option>
+              <option value="CANCELLED">Cancelled</option>
+            </select>
+          </div>
           <div className="w-20">
             <StatusButton
               status={statusChangeStatus}
@@ -120,8 +137,18 @@ export default function TripOperations({ tripId, isLocked, onSuccess }) {
 
       {/* --- BOTTOM ROW: DELAY CONTROLS --- */}
       <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-4 flex flex-col gap-3 shadow-lg">
-        <h4 className="text-xs font-bold text-slate-500 uppercase flex items-center gap-2">
-          <FontAwesomeIcon icon={faPause} /> Delay Controls
+        <h4 className="text-xs font-bold text-slate-500 uppercase flex items-center justify-between gap-2">
+          <span className="flex items-center gap-2">
+            <FontAwesomeIcon icon={faPause} /> Delay Controls
+          </span>
+
+          {/* 2. THE CHECKBOX (Top Right for visibility) */}
+          <NotifyToggle
+            checked={notifyDelay}
+            onChange={setNotifyDelay}
+            color="amber"
+            labelOff="Silent Log"
+          />
         </h4>
 
         {/* Row: Dropdown + Buttons */}
@@ -151,16 +178,20 @@ export default function TripOperations({ tripId, isLocked, onSuccess }) {
                   const finalReason =
                     delaySelect === "OTHER" ? customReason : delaySelect;
                   if (!finalReason) return;
+
                   runAction(
                     setDelayStatus,
+                    // 3. PASS THE NOTIFY FLAG
                     () =>
                       setTruckDelay({
                         truckTripId: tripId,
                         reason: finalReason,
+                        notify: notifyDelay, // <--- Send this to backend
                       }),
                     () => {
                       setDelaySelect("");
                       setCustomReason("");
+                      setNotifyDelay(true); // Reset to default
                       if (onSuccess) onSuccess();
                     },
                   );
@@ -175,28 +206,34 @@ export default function TripOperations({ tripId, isLocked, onSuccess }) {
             <div className="w-24">
               <StatusButton
                 status={clearStatus}
-                onClick={() =>
-                  runAction(
-                    setClearStatus,
-                    () => clearTruckDelay({ truckTripId: tripId }),
-                    () => {
-                      setDelaySelect("");
-                      setCustomReason("");
-                      if (onSuccess) onSuccess();
-                    },
-                  )
-                }
                 icon={faPlay}
                 label="Clear"
                 loadingLabel="..."
                 successLabel="OK"
                 idleColor="bg-emerald-600/20 hover:bg-emerald-600/40 text-emerald-400 border border-emerald-500/30"
+                onClick={() =>
+                  runAction(
+                    setClearStatus,
+                    // 3. PASS THE NOTIFY FLAG HERE TOO
+                    () =>
+                      clearTruckDelay({
+                        truckTripId: tripId,
+                        notify: notifyDelay,
+                      }),
+                    () => {
+                      setDelaySelect("");
+                      setCustomReason("");
+                      setNotifyDelay(true);
+                      if (onSuccess) onSuccess();
+                    },
+                  )
+                }
               />
             </div>
           </div>
         </div>
 
-        {/* Conditional Custom Reason Input (Appears below if needed) */}
+        {/* Conditional Custom Reason Input */}
         {delaySelect === "OTHER" && (
           <div className="animate-in fade-in slide-in-from-top-1 duration-200">
             <input
