@@ -157,6 +157,14 @@ exports.generateTripManifest = onCall(
         });
       });
 
+      // Guard: Prevent empty manifest (0 loaded items)
+      if (totalItems === 0) {
+        throw new HttpsError(
+          "failed-precondition",
+          "Cannot lock manifest: No items are loaded on the truck.",
+        );
+      }
+
       if (blockers.length) {
         throw new HttpsError("failed-precondition", "Manifest Blocked", {
           reason: "VALIDATION_FAILED",
@@ -204,7 +212,7 @@ exports.generateTripManifest = onCall(
       // 7. Write Operations
       const manifestRef = db.collection("manifests").doc(manifestId);
       const manifestEventRef = tripRef.collection("manifest_events").doc();
-      const adminLogRef = db.collection("audit_log").doc(); // Using your audit_log collection
+      const adminLogRef = db.collection("audit_logs").doc(); // Using your audit_log collection
 
       // A. Write Manifest
       tx.set(manifestRef, {

@@ -10,7 +10,7 @@ import {
   faSnowflake,
 } from "@fortawesome/free-solid-svg-icons";
 import { createShipmentWithPackages } from "@/app/utility/FirebaseFunctions";
-import AddressInputGroup from "../AddressInputGroup";
+import AddressInputGroup from "../InputGroup";
 
 const INITIAL_CONTACT = {
   name: "",

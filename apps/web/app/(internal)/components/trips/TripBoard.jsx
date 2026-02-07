@@ -27,7 +27,6 @@ export default function TripBoard({ userRole }) {
   // Modal & Drawer State
   const [isNewTripModalOpen, setIsNewTripModalOpen] = useState(false);
   const [selectedTripId, setSelectedTripId] = useState(null);
-  const [isBulkModalOpen, setBulkModalOpen] = useState(false);
 
   // Search & Filter State
   const [activeFilter, setActiveFilter] = useState("ALL");
@@ -306,23 +305,13 @@ export default function TripBoard({ userRole }) {
         isOpen={!!selectedTripId}
         onClose={() => setSelectedTripId(null)}
         data={selectedTrip}
-        onAddShipment={() => setBulkModalOpen(true)}
+        // onAddShipment={() => setBulkModalOpen(true)}
         onRefreshTrips={fetchTrips}
       />
       <CreateTripModal
         isOpen={isNewTripModalOpen}
         onClose={() => setIsNewTripModalOpen(false)}
         onSuccess={fetchTrips}
-      />
-      <BulkAssignmentModal
-        isOpen={isBulkModalOpen}
-        trip={selectedTrip}
-        onClose={() => setBulkModalOpen(false)}
-        onSuccess={() => {
-          setBulkModalOpen(false);
-          // handleRefresh(); // This refreshes the table & sidebar
-          fetchTrips();
-        }}
       />
     </div>
   );

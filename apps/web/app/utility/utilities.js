@@ -104,3 +104,39 @@ export const runAction = async (setStatus, apiPromise, onSuccess) => {
     setTimeout(() => setStatus("IDLE"), 2000);
   }
 };
+
+// src/utils/formatters.js
+export const normalizePhoneNumber = (input) => {
+  if (!input) return "";
+
+  // 1. Remove all non-numeric characters (spaces, dashes, parentheses)
+  //    Example: "(0917) 123-4567" -> "09171234567"
+  let cleaned = input.replace(/\D/g, "");
+
+  // 2. Handle Philippines specific cases
+  // Case A: Starts with "09" (Standard local) -> Replace "0" with "63"
+  if (cleaned.startsWith("09") && cleaned.length === 11) {
+    cleaned = "63" + cleaned.substring(1);
+  }
+  // Case B: Starts with "9" (Short local) -> Add "63"
+  else if (cleaned.startsWith("9") && cleaned.length === 10) {
+    cleaned = "63" + cleaned;
+  }
+
+  // 3. Check for valid length (PH numbers are 12 digits including country code 63)
+  if (cleaned.length !== 12 || !cleaned.startsWith("63")) {
+    // Return original or null if you want strict validation failure
+    return input;
+  }
+
+  // 4. Return E.164 Standard (with +)
+  return `+${cleaned}`;
+};
+
+// Optional: A display formatter for reading (User friendly)
+export const displayPhoneNumber = (e164Number) => {
+  if (!e164Number) return "";
+  // Turns +639171234567 -> 0917 123 4567
+  const cleaned = e164Number.replace("+63", "0");
+  return cleaned.replace(/(\d{4})(\d{3})(\d{4})/, "$1 $2 $3");
+};
