@@ -3,11 +3,10 @@
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const admin = require("firebase-admin");
 const { FieldValue } = require("firebase-admin/firestore");
+const { requireRole } = require("../utilities/helpers");
 
-if (!admin.apps.length) {
-  admin.initializeApp();
-}
-
+if (!admin.apps.length) admin.initializeApp();
+const db = admin.firestore();
 /**
  * Customer helper: add a tracked shipment for the current user.
  *
@@ -15,14 +14,17 @@ if (!admin.apps.length) {
  */
 exports.addTrackedShipment = onCall(
   { region: "asia-southeast1", maxInstances: 10 },
-  async (request) => {
-    const uid = request.auth?.uid;
+  async (req) => {
+    await requireRole(db, req, ["customer"]);
 
-    if (!uid) {
-      throw new HttpsError("unauthenticated", "Login required.");
+    // 1. AUTH CHECK
+    if (!req.auth) {
+      throw new HttpsError("unauthenticated", "User must be logged in.");
     }
 
-    const { trackingNumber, label } = request.data || {};
+    const uid = req.auth.uid;
+
+    const { trackingNumber, label } = req.data || {};
     const normalizedTracking = String(trackingNumber || "")
       .trim()
       .toUpperCase();
@@ -33,9 +35,6 @@ exports.addTrackedShipment = onCall(
         "A valid tracking number is required.",
       );
     }
-
-    const db = admin.firestore();
-
     // Basic account guard: ensure the profile exists and is active
     const userSnap = await db.collection("users").doc(uid).get();
     if (!userSnap.exists || userSnap.data().active === false) {
