@@ -148,7 +148,7 @@ exports.bulkShipmentAction = onCall(
         });
 
         // Audit Log
-        const logRef = db.collection("audit_log").doc();
+        const logRef = db.collection("audit_logs").doc();
         let logAction = "BULK_UPDATE";
         if (action === "LOAD") logAction = "BULK_LOAD";
         else if (action === "UNLOAD") logAction = "BULK_UNLOAD";
