@@ -29,6 +29,8 @@ if (!admin.apps.length) {
 exports.createUserProfile =
   require("./src/users/createUserProfile").createUserProfile;
 exports.toggleUserStatus = require("./src/users/toggleUserStatus");
+exports.addTrackedShipment =
+  require("./src/users/addTrackedShipment").addTrackedShipment;
 
 // packages
 // exports.createPackage = require("./src/packages/createPackage").createPackage;

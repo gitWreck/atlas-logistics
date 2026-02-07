@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   SafeAreaView,
   View,
@@ -15,17 +15,20 @@ import { useRouter } from "expo-router";
 import { FontAwesome5 } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { signOut } from "firebase/auth";
+import { collection, onSnapshot, orderBy, query } from "firebase/firestore";
 
-import { auth } from "../../firebase";
+import { auth, db } from "../../firebase";
 import { COLORS } from "../../components/constants/theme";
 import AtlasInput from "../../components/ui/AtlasInput";
 import GradientButton from "../../components/ui/figma/GradientButton";
+import { addTrackedShipment } from "../../components/utilities/FirebaseFunctions";
 
 export default function CustomerDashboard() {
   const router = useRouter();
   const [trackingNumber, setTrackingNumber] = useState("");
   const [addModalVisible, setAddModalVisible] = useState(false);
   const [trackedShipments, setTrackedShipments] = useState([]);
+  const [adding, setAdding] = useState(false);
 
   const handleLogout = () => {
     Alert.alert("Sign Out", "Are you sure?", [
@@ -50,23 +53,78 @@ export default function CustomerDashboard() {
     setAddModalVisible(false);
   };
 
-  const handleAddTracking = () => {
-    if (!trackingNumber) {
+  // Subscribe to this customer's tracked shipments in Firestore
+  useEffect(() => {
+    const user = auth.currentUser;
+    if (!user) return;
+
+    const ref = collection(db, "users", user.uid, "trackedShipments");
+    const q = query(ref, orderBy("createdAt", "desc"));
+
+    const unsubscribe = onSnapshot(
+      q,
+      (snapshot) => {
+        const items = snapshot.docs.map((docSnap) => ({
+          id: docSnap.id,
+          ...(docSnap.data() || {}),
+        }));
+        setTrackedShipments(items);
+      },
+      (error) => {
+        console.error("Failed to subscribe to tracked shipments:", error);
+      },
+    );
+
+    return unsubscribe;
+  }, []);
+
+  const handleAddTracking = async () => {
+    const normalizedTracking = trackingNumber.trim().toUpperCase();
+    if (!normalizedTracking) {
       return;
     }
 
-    // For now, just add to local list to visualize.
-    setTrackedShipments((prev) => [
-      ...prev,
-      {
-        id: `${Date.now()}-${trackingNumber}`,
-        trackingNumber: trackingNumber.trim(),
-      },
-    ]);
+    try {
+      setAdding(true);
 
-    setAddModalVisible(false);
-    setTrackingNumber("");
-    // Backend validation + Firestore linking will be wired here later.
+      // Delegate validation + write to Cloud Function
+      await addTrackedShipment({ trackingNumber: normalizedTracking });
+
+      setAddModalVisible(false);
+      setTrackingNumber("");
+    } catch (error) {
+      console.error("Failed to add tracked shipment:", error);
+      const code = error?.code || "";
+
+      if (code.endsWith("already-exists")) {
+        Alert.alert(
+          "Already added",
+          "This shipment is already in your tracked list.",
+        );
+      } else if (code.endsWith("not-found")) {
+        Alert.alert(
+          "Shipment not found",
+          "We couldn't find a shipment with that tracking number. Please double-check and try again.",
+        );
+      } else if (code.endsWith("permission-denied")) {
+        Alert.alert(
+          "Not authorized",
+          "You can only track shipments where your name and phone number match the sender or receiver.",
+        );
+      } else if (code.endsWith("invalid-argument")) {
+        Alert.alert(
+          "Invalid tracking number",
+          "Please enter a valid tracking number and try again.",
+        );
+      } else {
+        Alert.alert(
+          "Something went wrong",
+          "We couldn't add this tracking number right now. Please try again later.",
+        );
+      }
+    } finally {
+      setAdding(false);
+    }
   };
 
   return (
@@ -104,13 +162,25 @@ export default function CustomerDashboard() {
         ) : (
           <ScrollView contentContainerStyle={styles.listContent}>
             {trackedShipments.map((item) => (
-              <View key={item.id} style={styles.shipmentCard}>
+              <TouchableOpacity
+                key={item.id}
+                style={styles.shipmentCard}
+                activeOpacity={0.85}
+                onPress={() =>
+                  router.push({
+                    pathname: "/(customer)/tracking/[trackingId]",
+                    params: { trackingId: item.trackingNumber || item.id },
+                  })
+                }
+              >
                 <Text style={styles.trackingLabel}>Tracking number</Text>
-                <Text style={styles.trackingValue}>{item.trackingNumber}</Text>
-                <Text style={styles.trackingHint}>
-                  Details and status will be shown here later.
+                <Text style={styles.trackingValue}>
+                  {item.trackingNumber || item.id}
                 </Text>
-              </View>
+                <Text style={styles.trackingHint}>
+                  Tap to view live status and details.
+                </Text>
+              </TouchableOpacity>
             ))}
           </ScrollView>
         )}
@@ -162,7 +232,7 @@ export default function CustomerDashboard() {
                 <GradientButton
                   title="Add"
                   onPress={handleAddTracking}
-                  disabled={!trackingNumber}
+                  disabled={!trackingNumber || adding}
                 />
               </View>
             </View>
