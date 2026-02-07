@@ -13,20 +13,24 @@
  */
 
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
-const { defineSecret } = require("firebase-functions/params");
+// const { defineSecret } = require("firebase-functions/params");
 const admin = require("firebase-admin");
 
 const { calculateSmsCost } = require("../../shared/sms-cost");
 const { buildSmsSignature } = require("../../shared/sms-suppression");
 const { writeAuditEvent } = require("../../shared/audit");
 const { assertAdminOrManager } = require("../system/authGuards");
+const {
+  SEMAPHORE_API_KEY,
+  SEMAPHORE_SENDER_NAME,
+} = require("../../shared/sms-service");
 
 if (!admin.apps.length) admin.initializeApp();
 const db = admin.firestore();
 const FieldValue = admin.firestore.FieldValue;
 
-const SEMAPHORE_API_KEY = defineSecret("SEMAPHORE_API_KEY");
-const SEMAPHORE_SENDER_NAME = defineSecret("SEMAPHORE_SENDER_NAME");
+// const SEMAPHORE_API_KEY = defineSecret("SEMAPHORE_API_KEY");
+// const SEMAPHORE_SENDER_NAME = defineSecret("SEMAPHORE_SENDER_NAME");
 
 const MAX_SMS_CREDITS = 5;
 
@@ -41,25 +45,25 @@ function normalizePhonePH(phone) {
   return null;
 }
 
-async function sendViaSemaphore({ phone, message, apiKey, sender }) {
-  const res = await fetch("https://api.semaphore.co/api/v4/messages", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      apikey: apiKey,
-      number: phone,
-      message,
-      sendername: sender || undefined,
-    }),
-  });
+// async function sendViaSemaphore({ phone, message, apiKey, sender }) {
+//   const res = await fetch("https://api.semaphore.co/api/v4/messages", {
+//     method: "POST",
+//     headers: { "Content-Type": "application/json" },
+//     body: JSON.stringify({
+//       apikey: apiKey,
+//       number: phone,
+//       message,
+//       sendername: sender || undefined,
+//     }),
+//   });
 
-  if (!res.ok) {
-    const txt = await res.text().catch(() => "");
-    throw new Error(`Semaphore ${res.status}: ${txt}`);
-  }
+//   if (!res.ok) {
+//     const txt = await res.text().catch(() => "");
+//     throw new Error(`Semaphore ${res.status}: ${txt}`);
+//   }
 
-  return await res.json().catch(() => ({}));
-}
+//   return await res.json().catch(() => ({}));
+// }
 
 /* ======================================================
    FUNCTION

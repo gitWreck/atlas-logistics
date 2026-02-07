@@ -86,6 +86,26 @@ exports.updateShipmentStatus =
 exports.finishLoadingTruck =
   require("./src/trips/finishLoadingTruck").finishLoadingTruck;
 
+// Manifests & Certificates
+exports.generateTripManifest =
+  require("./src/trips/generateTripManifest").generateTripManifest;
+
+// Messaging
+exports.sendManualSms = require("./src/messaging/sendManualSms").sendManualSms;
+exports.broadcastTripMessage =
+  require("./src/messaging/broadcastTripMessage").broadcastTripMessage;
+
+// Firestore Triggers
+const {
+  mirrorShipmentToPublic,
+  syncTrackingPublicHttp,
+  propagateTripUpdates,
+} = require("./src/tracking/syncTrackingPublic");
+
+exports.mirrorShipmentToPublic = mirrorShipmentToPublic;
+exports.syncTrackingPublicHttp = syncTrackingPublicHttp;
+exports.propagateTripUpdates = propagateTripUpdates;
+
 // -------------------------------
 
 // Shipments
@@ -105,17 +125,11 @@ exports.recordPartial = require("./src/shipments/recordPartial").recordPartial;
 exports.recordPartialDelivery =
   require("./src/shipments/recordPartialDelivery").recordPartialDelivery;
 
-// Manifests & Certificates
-exports.generateTripManifest =
-  require("./src/trips/generateTripManifest").generateTripManifest;
 // exports.getTripPackages =
 //   require("./src/trips/backup/getTripPackages").getTripPackages;
 exports.generateTripCertificate =
   require("./src/trips/generateTripCertificate").generateTripCertificate;
 exports.reopenTrip = require("./src/trips/reopenTrip").reopenTrip;
-
-// Messaging
-exports.sendManualSms = require("./src/messaging/sendManualSms").sendManualSms;
 
 exports.sendSMS = require("./src/messaging/sendSMS").sendSMS;
 exports.sendBulkSMS = require("./src/messaging/sendBulkSMS").sendBulkSMS;
@@ -160,13 +174,3 @@ exports.migrateTripsToTopLevel = onRequest(
 // 4) FIRESTORE TRIGGERS
 // ------------------------------------------------------------
 exports.autoStatusSMS = require("./src/messaging/autoStatusSMS").autoStatusSMS;
-
-const {
-  mirrorShipmentToPublic,
-  syncTrackingPublicHttp,
-  propagateTripUpdates,
-} = require("./src/tracking/syncTrackingPublic");
-
-exports.mirrorShipmentToPublic = mirrorShipmentToPublic;
-exports.syncTrackingPublicHttp = syncTrackingPublicHttp;
-exports.propagateTripUpdates = propagateTripUpdates;

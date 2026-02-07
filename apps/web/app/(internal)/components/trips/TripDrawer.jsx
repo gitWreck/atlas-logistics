@@ -16,6 +16,7 @@ import TripDrawerFooter from "./TripDrawerFooter";
 import StatusBadge from "../ui/StatusBadge";
 import ViewPackagesModal from "../manifests/modals/ViewPackagesModal";
 import UnassignShipmentModal from "../manifests/modals/UnassignShipmentModal";
+import BulkAssignmentModal from "../manifests/modals/BulkAssignmentModal";
 
 export default function TripDrawer({
   isOpen,
@@ -30,6 +31,8 @@ export default function TripDrawer({
   const [shipmentToUnassign, setShipmentToUnassign] = useState(null);
   const [selectedShipmentForModal, setSelectedShipmentForModal] =
     useState(null);
+
+  const [isBulkModalOpen, setBulkModalOpen] = useState(false);
 
   // --- 1. DATA FETCHING ---
   const fetchShipments = async () => {
@@ -159,7 +162,8 @@ export default function TripDrawer({
               shipments={shipments}
               loading={loadingShips}
               isLocked={data.manifestLocked}
-              onAddShipment={onAddShipment}
+              // onAddShipment={onAddShipment}
+              onAddShipment={() => setBulkModalOpen(true)}
               onViewPackages={(shipment) =>
                 setSelectedShipmentForModal(shipment)
               }
@@ -194,7 +198,6 @@ export default function TripDrawer({
         onClose={() => setSelectedShipmentForModal(null)}
         isLocked={data.manifestLocked}
       />
-
       <UnassignShipmentModal
         isOpen={!!shipmentToUnassign}
         shipment={shipmentToUnassign}
@@ -204,6 +207,19 @@ export default function TripDrawer({
           fetchShipments();
           setShipmentToUnassign(null);
           onRefreshTrips();
+        }}
+      />
+      <BulkAssignmentModal
+        isOpen={isBulkModalOpen}
+        // trip={selectedTrip}
+        trip={data}
+        onClose={() => setBulkModalOpen(false)}
+        onSuccess={() => {
+          setBulkModalOpen(false);
+          fetchShipments();
+          onRefreshTrips();
+          // handleRefresh(); // This refreshes the table & sidebar
+          // fetchTrips();
         }}
       />
     </>

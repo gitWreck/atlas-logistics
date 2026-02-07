@@ -3,6 +3,7 @@
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const admin = require("firebase-admin");
 const { requireRole, requireString } = require("../utilities/helpers");
+const { broadcastTripLogic } = require("../messaging/broadcastTripMessage"); // Import if you want to call it directly
 
 if (!admin.apps.length) admin.initializeApp();
 const db = admin.firestore();
@@ -15,7 +16,7 @@ const db = admin.firestore();
    ✅ Logs the action securely
 ====================================================== */
 exports.updateTripStatus = onCall(
-  { region: "asia-southeast1" },
+  { region: "asia-southeast1", maxInstances: 10 },
   async (req) => {
     // 1. Auth & Role Check
     await requireRole(db, req, ["admin", "manager"]);
@@ -23,12 +24,15 @@ exports.updateTripStatus = onCall(
 
     const tripId = requireString(req.data?.tripId, "tripId");
     const newStatus = requireString(req.data?.status, "status").toUpperCase();
+    const notify = !!req.data?.notify; // Optional: whether to send SMS notifications for this status change
 
     // Validate Status Enum
     const VALID_STATUSES = [
       "CREATED",
+      "LOADING",
       "LOADED",
       "IN_TRANSIT",
+      "ARRIVED",
       "COMPLETED",
       "CANCELLED",
     ];
@@ -111,6 +115,50 @@ exports.updateTripStatus = onCall(
         at: admin.firestore.FieldValue.serverTimestamp(),
       });
     });
+
+    // If user checked the box, trigger the notification
+    // --- 4. OPTIONAL: AUTOMATED SMS NOTIFICATION ---
+    if (notify === true) {
+      // 1. Define Standard Messages
+      const STATUS_MESSAGES = {
+        LOADING:
+          "Atlas Logistics: Your package is currently being loaded onto the delivery truck.",
+        LOADED:
+          "Atlas Logistics: Your package has been loaded and is ready for departure.",
+        IN_TRANSIT:
+          "Atlas Logistics: The truck has departed the warehouse and is on its way to your area.",
+        ARRIVED:
+          "Atlas Logistics: The truck has arrived at the local distribution center/hub.",
+        COMPLETED:
+          "Atlas Logistics: Delivery successful! Thank you for choosing Atlas.",
+        CANCELLED:
+          "Atlas Logistics: This trip has been cancelled. Please contact support for details.",
+      };
+
+      const messageText = STATUS_MESSAGES[newStatus];
+
+      if (messageText) {
+        console.log(
+          `[Notify] Sending broadcast for trip ${tripId} with status ${newStatus}`,
+        );
+
+        // 2. Reuse your broadcast logic (Internal Call)
+        // We import the logic from your existing broadcast function or just invoke it here.
+        // Since this is "server-side to server-side", we can just call the logic directly.
+
+        try {
+          broadcastTripLogic({
+            tripId: tripId,
+            message: STATUS_MESSAGES[newStatus],
+            actorUid: request.auth.uid || "SYSTEM",
+          }).catch((err) => console.error("Broadcast failed:", err));
+        } catch (err) {
+          console.error("[Notify] Failed to queue SMS:", err);
+          // Don't throw error here, or you will roll back the Status Update!
+          // We want the status to change even if SMS fails.
+        }
+      }
+    }
 
     return { success: true, oldStatus: "FETCHED_INSIDE", newStatus };
   },
