@@ -21,7 +21,7 @@ import {
 } from "firebase/firestore";
 import { FontAwesome5 } from "@expo/vector-icons";
 import { Image } from "expo-image";
-// import MapView, { Marker, PROVIDER_DEFAULT } from "react-native-maps";
+import MapView, { Marker, PROVIDER_DEFAULT } from "react-native-maps";
 
 import { db } from "../../../firebase";
 
@@ -221,7 +221,7 @@ export default function CustomerTrackingDetailsScreen() {
         <View style={styles.mapSectionCard}>
           <Text style={styles.sectionTitle}>Package Location</Text>
           <View style={styles.mapContainer}>
-            {/* <MapView
+            <MapView
               style={styles.map}
               initialRegion={PACKAGE_LOCATION}
               showsUserLocation={false}
@@ -237,7 +237,7 @@ export default function CustomerTrackingDetailsScreen() {
                 title="Your package"
                 description="Current package location"
               />
-            </MapView> */}
+            </MapView>
           </View>
         </View>
 

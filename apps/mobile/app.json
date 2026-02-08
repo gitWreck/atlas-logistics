@@ -50,14 +50,7 @@
     "owner": "atlas-transport",
     "plugins": [
       "expo-router",
-      "expo-font",
-      [
-        "expo-maps",
-        {
-          "requestLocationPermission": "true",
-          "locationPermission": "Allow $(PRODUCT_NAME) to use your location"
-        }
-      ]
+      "expo-font"
     ],
     "runtimeVersion": {
       "policy": "appVersion"
