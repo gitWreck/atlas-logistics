@@ -75,17 +75,17 @@ export default function CustomerTrackingDetailsScreen() {
         setData(payload);
 
         // 2) Optional photos from tracking_photos
-        const photosQuery = query(
-          collection(db, "tracking_photos"),
-          where("trackingNumber", "==", normalizedTracking),
-          limit(4),
-        );
-        const photosSnap = await getDocs(photosQuery);
-        const photoItems = photosSnap.docs.map((docSnap) => ({
-          id: docSnap.id,
-          ...(docSnap.data() || {}),
-        }));
-        setPhotos(photoItems);
+        // const photosQuery = query(
+        //   collection(db, "tracking_photos"),
+        //   where("trackingNumber", "==", normalizedTracking),
+        //   limit(4),
+        // );
+        // const photosSnap = await getDocs(photosQuery);
+        // const photoItems = photosSnap.docs.map((docSnap) => ({
+        //   id: docSnap.id,
+        //   ...(docSnap.data() || {}),
+        // }));
+        // setPhotos(photoItems);
       } catch (err) {
         console.error("Failed to load tracking details:", err);
         setError("System offline. Please try again later.");
