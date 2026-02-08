@@ -20,8 +20,15 @@ exports.createUserProfile = onCall(
       );
     }
 
-    const { email, password, displayName, role, phoneNumber, warehouseId } =
-      request.data;
+    const {
+      email,
+      password,
+      displayName,
+      role,
+      phoneNumber,
+      warehouseCode,
+      warehouseName,
+    } = request.data;
 
     // 2. Validation
     if (!email || !password || !displayName) {
@@ -38,9 +45,9 @@ exports.createUserProfile = onCall(
       };
 
       // Only add phoneNumber property if it actually exists
-      if (phoneNumber) {
-        userProps.phoneNumber = toE164(phoneNumber);
-      }
+      // if (phoneNumber) {
+      //   userProps.phoneNumber = toE164(phoneNumber);
+      // }
 
       const userRecord = await admin.auth().createUser(userProps);
 
@@ -58,7 +65,8 @@ exports.createUserProfile = onCall(
           name: displayName,
           role,
           phoneNumber: phoneNumber ? toE164(phoneNumber) : null, // Allowed in Firestore
-          warehouseId: warehouseId || null,
+          warehouseName: warehouseName || null,
+          warehouseCode: warehouseCode || null,
           active: true,
           status: "active",
           provider: "password",

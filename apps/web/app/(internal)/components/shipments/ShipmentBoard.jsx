@@ -16,13 +16,10 @@ import {
 import ShipmentRow from "./ShipmentRow";
 import ShipmentDrawer from "./ShipmentDrawer";
 import ReceivePackageForm from "./ReceivePackageForm";
-import { auth } from "@/lib/firebase";
-import {
-  calculateProgress,
-  formatFirestoreDate,
-} from "@/app/utility/utilities";
+// import { auth } from "@/lib/firebase";
+import { calculateProgress } from "@/app/utility/utilities";
 
-export default function ShipmentBoard({ userRole }) {
+export default function ShipmentBoard({ user, userRole, profile }) {
   const [shipments, setShipments] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -44,7 +41,8 @@ export default function ShipmentBoard({ userRole }) {
   const fetchShipments = async () => {
     try {
       setLoading(true);
-      const user = auth.currentUser;
+      // const user = auth.currentUser;
+
       if (!user) {
         console.error("User is not logged in yet.");
         setLoading(false);
@@ -202,11 +200,11 @@ export default function ShipmentBoard({ userRole }) {
           </div>
 
           <div className="flex gap-3">
-            {userRole === "admin" && (
+            {/* {userRole === "admin" && (
               <button className="h-9 px-3 rounded-lg border border-slate-800 bg-slate-900 text-slate-400 hover:text-white">
                 <FontAwesomeIcon icon={faFileCsv} />
               </button>
-            )}
+            )} */}
 
             <button
               onClick={() => setIsNewOrderModalOpen(true)}
@@ -392,6 +390,7 @@ export default function ShipmentBoard({ userRole }) {
       />
 
       <ReceivePackageForm
+        profile={profile}
         isOpen={isNewOrderModalOpen}
         onClose={setIsNewOrderModalOpen}
         onSuccess={handleSuccess}

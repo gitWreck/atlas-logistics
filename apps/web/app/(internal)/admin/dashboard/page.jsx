@@ -124,7 +124,9 @@ export default function AdminDashboardPage() {
       <main className="max-w-7xl mx-auto p-6">
         {activeTab === "overview" && <AdminOverview />}
         {activeTab === "trips" && <TripBoard />}
-        {activeTab === "shipments" && <ShipmentBoard userRole="admin" />}
+        {activeTab === "shipments" && (
+          <ShipmentBoard user={user} userRole="admin" profile={profile} />
+        )}
         {activeTab === "manifests" && <ManifestPage />}
         {/* {activeTab === "manager" && <PackageManager />} */}
       </main>

@@ -14,6 +14,8 @@ export function calculateProgress(status) {
       return 60;
     case "IN_TRANSIT":
       return 75;
+    case "ARRIVED":
+      return 80;
     case "OUT_FOR_DELIVERY":
       return 90;
     case "DELIVERED":
@@ -130,7 +132,7 @@ export const normalizePhoneNumber = (input) => {
   }
 
   // 4. Return E.164 Standard (with +)
-  return `+${cleaned}`;
+  return `${cleaned}`;
 };
 
 // Optional: A display formatter for reading (User friendly)

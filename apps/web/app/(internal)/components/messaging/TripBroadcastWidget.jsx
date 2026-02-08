@@ -5,14 +5,12 @@ import {
   faPaperPlane,
   faSpinner,
   faExclamationTriangle,
-  // NEW ICONS IMPORTED HERE:
   faTruckFast,
   faCloudShowersHeavy,
   faShip,
   faCheckCircle,
 } from "@fortawesome/free-solid-svg-icons";
-import { httpsCallable } from "firebase/functions";
-import { functions } from "@/lib/firebase";
+import { broadcastTripMessage } from "@/app/utility/FirebaseFunctions";
 
 // UPDATED TEMPLATES WITH ICONS
 const TEMPLATES = [
@@ -63,8 +61,8 @@ export default function TripBroadcastWidget({ trip }) {
     setResult(null);
 
     try {
-      const fn = httpsCallable(functions, "broadcastTripMessage");
-      const resp = await fn({
+      // const fn = httpsCallable(functions, "broadcastTripMessage");
+      const resp = await broadcastTripMessage({
         tripId: trip.id,
         message: messageBody,
       });

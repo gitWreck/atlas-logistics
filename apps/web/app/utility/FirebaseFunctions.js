@@ -71,6 +71,15 @@ export const verifyTripManifest = httpsCallable(
 // SMS & COMMUNICATION
 
 export const sendManualSms = httpsCallable(functions, "sendManualSms");
+export const broadcastTripMessage = httpsCallable(
+  functions,
+  "broadcastTripMessage",
+);
+
+// ADMIN
+
+export const createUserProfile = httpsCallable(functions, "createUserProfile");
+export const toggleUserStatus = httpsCallable(functions, "toggleUserStatus");
 
 // ----------------------------
 
@@ -102,8 +111,3 @@ export const unloadItemsFromTripCallable = httpsCallable(
 );
 export const recordPartialCallable = httpsCallable(functions, "recordPartial");
 export const completeTripCallable = httpsCallable(functions, "completeTrip");
-
-// ADMIN
-
-export const createUserProfile = httpsCallable(functions, "createUserProfile");
-export const toggleUserStatus = httpsCallable(functions, "toggleUserStatus");
