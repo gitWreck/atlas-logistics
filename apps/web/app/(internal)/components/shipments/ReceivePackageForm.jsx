@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faBoxOpen,
@@ -28,8 +28,14 @@ const INITIAL_CONTACT = {
 
 const PACKAGING_TYPES = ["Box", "Sack", "Crate", "Bundle", "Roll", "Envelope"];
 
-export default function ReceivePackageForm({ isOpen, onClose, onSuccess }) {
+export default function ReceivePackageForm({
+  profile,
+  isOpen,
+  onClose,
+  onSuccess,
+}) {
   const [loading, setLoading] = useState(false);
+  console.log("ReceivePackageForm profile:", profile); // Debugging line
 
   // --- 1. NEW STATE FOR ROUTE/WAREHOUSE ---
   const [routeInfo, setRouteInfo] = useState({
@@ -57,8 +63,6 @@ export default function ReceivePackageForm({ isOpen, onClose, onSuccess }) {
   ]);
   const [remarks, setRemarks] = useState("");
 
-  if (!isOpen) return null;
-
   // --- 2. WAREHOUSE HANDLER ---
   const handleWarehouseChange = (type, value) => {
     const selected = WAREHOUSES.find((w) => w.name === value);
@@ -74,6 +78,14 @@ export default function ReceivePackageForm({ isOpen, onClose, onSuccess }) {
       }));
     }
   };
+
+  useEffect(() => {
+    // If we have a profile, and the origin is currently empty, auto-fill it
+    if (profile?.warehouseName && !routeInfo.origin) {
+      // Reuse your existing handler or set state directly
+      handleWarehouseChange("origin", profile.warehouseName);
+    }
+  }, [profile, routeInfo.origin]);
 
   // --- Item Handlers (Unchanged) ---
   const toggleItemTag = (index, tag) => {
@@ -189,6 +201,8 @@ export default function ReceivePackageForm({ isOpen, onClose, onSuccess }) {
     onClose();
   };
 
+  if (!isOpen) return null;
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div
@@ -242,6 +256,7 @@ export default function ReceivePackageForm({ isOpen, onClose, onSuccess }) {
                     <select
                       className="w-full bg-slate-900 border border-slate-700 rounded-lg pl-8 pr-3 py-2 text-sm text-white focus:border-blue-500 outline-none appearance-none cursor-pointer"
                       value={routeInfo.origin}
+                      // defaultValue={profile?.warehouseName || ""} // Default to user's warehouse if available
                       onChange={(e) =>
                         handleWarehouseChange("origin", e.target.value)
                       }

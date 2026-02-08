@@ -22,7 +22,7 @@ import TripBoard from "../../components/trips/TripBoard";
 export default function ManagerDashboardPage() {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState("overview");
-  const { profile, loading } = useAuth();
+  const { user, profile, loading } = useAuth();
 
   if (loading)
     return (
@@ -107,7 +107,9 @@ export default function ManagerDashboardPage() {
             onNavigateToShipments={() => setActiveTab("shipments")}
           />
         )}
-        {activeTab === "shipments" && <ShipmentBoard userRole="manager" />}
+        {activeTab === "shipments" && (
+          <ShipmentBoard user={user} userRole="manager" profile={profile} />
+        )}
         {activeTab === "manifests" && <ManifestPage />}
         {activeTab === "trips" && <TripBoard />}
       </main>

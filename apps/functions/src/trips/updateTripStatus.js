@@ -1,9 +1,19 @@
 "use strict";
 
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
+// const { defineSecret } = require("firebase-functions/params"); // 1. Import this
 const admin = require("firebase-admin");
 const { requireRole, requireString } = require("../utilities/helpers");
+
+// 2. Define/Import the secrets SAME as you did in the broadcast file
+// const SEMAPHORE_API_KEY = defineSecret("SEMAPHORE_API_KEY");
+// const SEMAPHORE_SENDER_NAME = defineSecret("SEMAPHORE_SENDER_NAME");
+const {
+  SEMAPHORE_API_KEY,
+  SEMAPHORE_SENDER_NAME,
+} = require("../../shared/sms-service");
 const { broadcastTripLogic } = require("../messaging/broadcastTripMessage"); // Import if you want to call it directly
+const { STATUS_MESSAGES } = require("../utilities/dataDetails");
 
 if (!admin.apps.length) admin.initializeApp();
 const db = admin.firestore();
@@ -16,7 +26,11 @@ const db = admin.firestore();
    ✅ Logs the action securely
 ====================================================== */
 exports.updateTripStatus = onCall(
-  { region: "asia-southeast1", maxInstances: 10 },
+  {
+    region: "asia-southeast1",
+    secrets: [SEMAPHORE_API_KEY, SEMAPHORE_SENDER_NAME],
+    maxInstances: 10,
+  },
   async (req) => {
     // 1. Auth & Role Check
     await requireRole(db, req, ["admin", "manager"]);
@@ -120,20 +134,6 @@ exports.updateTripStatus = onCall(
     // --- 4. OPTIONAL: AUTOMATED SMS NOTIFICATION ---
     if (notify === true) {
       // 1. Define Standard Messages
-      const STATUS_MESSAGES = {
-        LOADING:
-          "Atlas Logistics: Your package is currently being loaded onto the delivery truck.",
-        LOADED:
-          "Atlas Logistics: Your package has been loaded and is ready for departure.",
-        IN_TRANSIT:
-          "Atlas Logistics: The truck has departed the warehouse and is on its way to your area.",
-        ARRIVED:
-          "Atlas Logistics: The truck has arrived at the local distribution center/hub.",
-        COMPLETED:
-          "Atlas Logistics: Delivery successful! Thank you for choosing Atlas.",
-        CANCELLED:
-          "Atlas Logistics: This trip has been cancelled. Please contact support for details.",
-      };
 
       const messageText = STATUS_MESSAGES[newStatus];
 
@@ -149,8 +149,8 @@ exports.updateTripStatus = onCall(
         try {
           broadcastTripLogic({
             tripId: tripId,
-            message: STATUS_MESSAGES[newStatus],
-            actorUid: request.auth.uid || "SYSTEM",
+            message: messageText,
+            actorUid: uid || "SYSTEM",
           }).catch((err) => console.error("Broadcast failed:", err));
         } catch (err) {
           console.error("[Notify] Failed to queue SMS:", err);

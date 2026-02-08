@@ -28,7 +28,8 @@ if (!admin.apps.length) {
 // admin actions
 exports.createUserProfile =
   require("./src/users/createUserProfile").createUserProfile;
-exports.toggleUserStatus = require("./src/users/toggleUserStatus");
+exports.toggleUserStatus =
+  require("./src/users/toggleUserStatus").toggleUserStatus;
 
 // packages
 // exports.createPackage = require("./src/packages/createPackage").createPackage;
@@ -68,7 +69,7 @@ exports.disableTruckTrip =
   require("./src/trips/disableTruckTrip").disableTruckTrip;
 exports.completeTrip = require("./src/trips/completeTrip").completeTrip;
 exports.unlockTripManifest =
-  require("./src/trips/unlockTripManiefest").unlockTripManifest;
+  require("./src/trips/unlockTripManifest").unlockTripManifest;
 exports.updateTripStatus =
   require("./src/trips/updateTripStatus").updateTripStatus;
 
@@ -131,7 +132,7 @@ exports.generateTripCertificate =
   require("./src/trips/generateTripCertificate").generateTripCertificate;
 exports.reopenTrip = require("./src/trips/reopenTrip").reopenTrip;
 
-exports.sendSMS = require("./src/messaging/sendSMS").sendSMS;
+// exports.sendSMS = require("./src/messaging/sendSMS").sendSMS;
 exports.sendBulkSMS = require("./src/messaging/sendBulkSMS").sendBulkSMS;
 exports.autoSms = require("./src/messaging/autoSms").autoSms;
 exports.smsAdmin = require("./src/messaging/smsAdmin").smsAdmin;
