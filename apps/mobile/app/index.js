@@ -4,7 +4,8 @@ import { useAuth } from "../contexts/AuthContext";
 import { COLORS, GLOBAL_STYLES } from "../components/constants/theme";
 
 export default function Index() {
-  const { user, loading, isReady, isAllowedRole, isChecker, isDriver, signOut } = useAuth();
+  const { user, loading, isReady, isAllowedRole, isChecker, isDriver, isCustomer, signOut } =
+    useAuth();
 
   if (!isReady || loading) {
     return (
@@ -24,6 +25,10 @@ export default function Index() {
 
   if (isDriver) {
     return <Redirect href="/(driver)/" />;
+  }
+
+  if (isCustomer) {
+    return <Redirect href="/(customer)/" />;
   }
 
   if (!isAllowedRole) {

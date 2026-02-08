@@ -42,30 +42,33 @@ const PackageItemCard = ({ pkg, index }) => {
 
 export default PackageItemCard;
 
+const LABEL_GREY = "#6b7280";
+const VALUE_DARK = "#111827";
+
 const styles = StyleSheet.create({
   container: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#1e293b",
+    backgroundColor: "#ffffff",
     padding: 12,
     borderRadius: 12,
     marginBottom: 8,
     borderWidth: 1,
-    borderColor: "#334155",
+    borderColor: "#e2e8f0",
   },
   iconBox: {
     width: 36,
     height: 36,
     borderRadius: 8,
-    backgroundColor: "#334155",
+    backgroundColor: "#f3f4f6",
     justifyContent: "center",
     alignItems: "center",
     marginRight: 12,
   },
-  indexText: { color: "#fff", fontWeight: "bold" },
+  indexText: { color: LABEL_GREY, fontWeight: "bold" },
   details: { flex: 1 },
-  desc: { color: "#fff", fontWeight: "600", fontSize: 14 },
-  specs: { color: "#94a3b8", fontSize: 12, marginTop: 2 },
+  desc: { color: VALUE_DARK, fontWeight: "600", fontSize: 14 },
+  specs: { color: LABEL_GREY, fontSize: 12, marginTop: 2 },
   tags: { flexDirection: "row", gap: 6 },
   tag: { padding: 6, borderRadius: 6 },
 });

@@ -1,5 +1,5 @@
 import React from "react";
-import { View, Text, StyleSheet } from "react-native";
+import { View, Text, StyleSheet, Platform } from "react-native";
 import { FontAwesome5 } from "@expo/vector-icons";
 import { COLORS } from "../../constants/theme"; // Adjust path
 import StatusBadge from "../../ui/StatusBadge"; // Reuse your badge
@@ -65,40 +65,57 @@ const ShipmentHeaderCard = ({ shipment }) => {
 
 export default ShipmentHeaderCard;
 
+const LABEL_GREY = "#6b7280";
+const VALUE_DARK = "#111827";
+const SEPARATOR = "#e5e7eb";
+
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: COLORS.card,
-    borderRadius: 16,
+    backgroundColor: "#ffffff",
+    borderRadius: 15,
     padding: 16,
     marginBottom: 16,
     borderWidth: 1,
-    borderColor: "#334155",
+    borderColor: "#e2e8f0",
+    ...Platform.select({
+      ios: {
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.08,
+        shadowRadius: 8,
+      },
+      android: { elevation: 3 },
+    }),
   },
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: "#334155",
+    marginBottom: 12,
     paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: SEPARATOR,
   },
-  idText: { color: "#94a3b8", fontWeight: "bold", fontSize: 14 },
+  idText: {
+    color: LABEL_GREY,
+    fontWeight: "bold",
+    fontSize: 14,
+  },
   section: {
     marginBottom: 12,
     borderBottomWidth: 1,
-    borderBottomColor: "rgba(51, 65, 85, 0.5)",
+    borderBottomColor: SEPARATOR,
     paddingBottom: 12,
   },
   row: { flexDirection: "row", alignItems: "flex-start" },
   addressText: {
-    color: "#fff",
-    fontSize: 18,
-    fontWeight: "bold",
-    lineHeight: 24,
+    color: VALUE_DARK,
+    fontSize: 16,
+    fontWeight: "600",
+    lineHeight: 22,
   },
-  subText: { color: "#94a3b8", marginTop: 4 },
-  label: { color: "#64748b", fontSize: 12, marginBottom: 2 },
-  valueText: { color: "#fff", fontSize: 16, fontWeight: "600" },
+  subText: { color: LABEL_GREY, marginTop: 4 },
+  label: { color: LABEL_GREY, fontSize: 12, marginBottom: 2 },
+  valueText: { color: VALUE_DARK, fontSize: 16, fontWeight: "600" },
   phoneText: { color: COLORS.primary, fontSize: 14, marginTop: 2 },
 });
