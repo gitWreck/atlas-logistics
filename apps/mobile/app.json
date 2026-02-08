@@ -21,11 +21,20 @@
       }
     },
     "android": {
+      "package": "com.atlas.atlastracking",
+      "permissions": [
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION"
+      ],
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "package": "com.atlas.atlastracking"
+      "config": {
+        "googleMaps": {
+          "apiKey": "AIzaSyD2-cgUlA9g4PyV9Zwrx17L5EFyQoTDkQo"
+        }
+      }
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -41,7 +50,14 @@
     "owner": "atlas-transport",
     "plugins": [
       "expo-router",
-      "expo-font"
+      "expo-font",
+      [
+        "expo-maps",
+        {
+          "requestLocationPermission": "true",
+          "locationPermission": "Allow $(PRODUCT_NAME) to use your location"
+        }
+      ]
     ],
     "runtimeVersion": {
       "policy": "appVersion"

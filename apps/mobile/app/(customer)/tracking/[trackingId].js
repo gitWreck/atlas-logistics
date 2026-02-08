@@ -21,8 +21,18 @@ import {
 } from "firebase/firestore";
 import { FontAwesome5 } from "@expo/vector-icons";
 import { Image } from "expo-image";
+// import MapView, { Marker, PROVIDER_DEFAULT } from "react-native-maps";
 
 import { db } from "../../../firebase";
+
+// Hardcoded package location for Divisoria (updated coordinates)
+const PACKAGE_LOCATION = {
+  latitude: 14.605683302722035,
+  longitude: 120.96347820295834,
+  latitudeDelta: 0.02,
+  longitudeDelta: 0.02,
+};
+
 
 const BLUE = "#155DFC";
 const GREY = "#94a3b8";
@@ -204,6 +214,30 @@ export default function CustomerTrackingDetailsScreen() {
                 </Text>
               </View>
             </View>
+          </View>
+        </View>
+
+        {/* Package location map */}
+        <View style={styles.mapSectionCard}>
+          <Text style={styles.sectionTitle}>Package Location</Text>
+          <View style={styles.mapContainer}>
+            {/* <MapView
+              style={styles.map}
+              initialRegion={PACKAGE_LOCATION}
+              showsUserLocation={false}
+              scrollEnabled={true}
+              zoomEnabled={true}
+              provider={PROVIDER_DEFAULT}
+            >
+              <Marker
+                coordinate={{
+                  latitude: PACKAGE_LOCATION.latitude,
+                  longitude: PACKAGE_LOCATION.longitude,
+                }}
+                title="Your package"
+                description="Current package location"
+              />
+            </MapView> */}
           </View>
         </View>
 
@@ -412,14 +446,14 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   timelineStep: {
+    width: 56,
     flex: 0,
     alignItems: "center",
-    minWidth: 56,
   },
   timelineIconCircle: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     borderWidth: 2,
     justifyContent: "center",
     alignItems: "center",
@@ -433,14 +467,13 @@ const styles = StyleSheet.create({
     borderColor: GREY_LINE,
   },
   timelineStepIcon: {
-    width: 13,
-    height: 13,
+    width: 22,
+    height: 22,
   },
   timelineConnector: {
     flex: 1,
-    height: 2,
-    marginTop: 11,
-    marginHorizontal: 4,
+    height: 5,
+    marginTop: 17,
   },
   timelineConnectorActive: {
     backgroundColor: BLUE,
@@ -453,10 +486,31 @@ const styles = StyleSheet.create({
     color: GREY,
     fontSize: 9,
     textAlign: "center",
+    width: "100%",
   },
   timelineLabelActive: {
     color: "#111827",
     fontWeight: "600",
+  },
+  mapSectionCard: {
+    backgroundColor: "#ffffff",
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: "#e2e8f0",
+    padding: 16,
+    marginBottom: 20,
+  },
+  mapContainer: {
+    height: 200,
+    borderRadius: 12,
+    overflow: "hidden",
+    marginTop: 10,
+    borderWidth: 1,
+    borderColor: "#e2e8f0",
+  },
+  map: {
+    width: "100%",
+    height: "100%",
   },
   sectionCard: {
     backgroundColor: "#ffffff",

@@ -15,7 +15,7 @@ import { useRouter } from "expo-router";
 import { FontAwesome5 } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { signOut } from "firebase/auth";
-import { collection, onSnapshot, orderBy, query } from "firebase/firestore";
+import { collection, doc, getDoc, onSnapshot, orderBy, query } from "firebase/firestore";
 
 import { auth, db } from "../../firebase";
 import { COLORS } from "../../components/constants/theme";
@@ -29,6 +29,7 @@ export default function CustomerDashboard() {
   const [addModalVisible, setAddModalVisible] = useState(false);
   const [trackedShipments, setTrackedShipments] = useState([]);
   const [adding, setAdding] = useState(false);
+  const [firstName, setFirstName] = useState("");
 
   const handleLogout = () => {
     Alert.alert("Sign Out", "Are you sure?", [
@@ -52,6 +53,22 @@ export default function CustomerDashboard() {
   const closeAddModal = () => {
     setAddModalVisible(false);
   };
+
+  // Load customer first name from Firestore user profile
+  useEffect(() => {
+    const user = auth.currentUser;
+    if (!user) return;
+
+    getDoc(doc(db, "users", user.uid))
+      .then((snap) => {
+        if (snap.exists()) {
+          const name = (snap.data().name || "").trim();
+          const first = name.split(/\s+/)[0] || "";
+          setFirstName(first);
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   // Subscribe to this customer's tracked shipments in Firestore
   useEffect(() => {
@@ -133,7 +150,9 @@ export default function CustomerDashboard() {
 
       <View style={styles.header}>
         <View style={styles.headerTextWrapper}>
-          <Text style={styles.headerTitle}>Customer Dashboard</Text>
+          <Text style={styles.headerTitle}>
+            {firstName ? `Hi ${firstName}!` : "Hi!"}
+          </Text>
           <Text style={styles.headerSubtitle}>
             Your shipments and activity will appear here.
           </Text>

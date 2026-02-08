@@ -9,7 +9,7 @@ export const COLORS = {
   slate: "#334155", // Slate 700 (Secondary Buttons)
   logout: "#0690D3", // Blue 600 (Logout/Error)
 
-  bg: "#0f172a", // Slate 900 (Main Background)
+  bg: "#FFFFFF", // Slate 900 (Main Background)
   card: "#1e293b", // Slate 800 (Card Background)
 
   textPrimary: "#f8fafc", // Whiteish
