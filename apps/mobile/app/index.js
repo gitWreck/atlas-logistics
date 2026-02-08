@@ -1,44 +1,12 @@
-import { Redirect } from "expo-router";
-import { View, ActivityIndicator, StyleSheet } from "react-native";
-import { useAuth } from "../contexts/AuthContext";
-import { COLORS, GLOBAL_STYLES } from "../components/constants/theme";
+import { AppleMaps, GoogleMaps } from 'expo-maps';
+import { Platform, Text } from 'react-native';
 
-export default function Index() {
-  const { user, loading, isReady, isAllowedRole, isChecker, isDriver, isCustomer, signOut } =
-    useAuth();
-
-  if (!isReady || loading) {
-    return (
-      <View style={GLOBAL_STYLES.center}>
-        <ActivityIndicator size="large" color={COLORS.primary} />
-      </View>
-    );
+export default function App() {
+  if (Platform.OS === 'ios') {
+    return <AppleMaps.View style={{ flex: 1 }} />;
+  } else if (Platform.OS === 'android') {
+    return <GoogleMaps.View style={{ flex: 1 }} />;
+  } else {
+    return <Text>Maps are only available on Android and iOS</Text>;
   }
-
-  if (!user) {
-    return <Redirect href="/(auth)/login" />;
-  }
-
-  if (isChecker) {
-    return <Redirect href="/(checker)" />;
-  }
-
-  if (isDriver) {
-    return <Redirect href="/(driver)/" />;
-  }
-
-  if (isCustomer) {
-    return <Redirect href="/(customer)/" />;
-  }
-
-  if (!isAllowedRole) {
-    signOut();
-    return <Redirect href="/(auth)/login" />;
-  }
-
-  return (
-    <View style={GLOBAL_STYLES.center}>
-      <ActivityIndicator size="large" color={COLORS.primary} />
-    </View>
-  );
 }
