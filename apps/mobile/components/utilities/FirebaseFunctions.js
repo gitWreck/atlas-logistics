@@ -11,3 +11,9 @@ export const finishLoadingTruck = httpsCallable(
 
 export const startTrip = httpsCallable(functions, "startTrip");
 export const reportTripDelay = httpsCallable(functions, "reportTripDelay");
+
+// Customer helpers
+export const addTrackedShipment = httpsCallable(
+  functions,
+  "addTrackedShipment",
+);

@@ -3,7 +3,7 @@ import { onAuthStateChanged, signOut as firebaseSignOut } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
 import { auth, db } from "../firebase";
 
-const ALLOWED_ROLES = ["checker", "driver"];
+const ALLOWED_ROLES = ["checker", "driver", "customer"];
 
 const AuthContext = createContext(null);
 
@@ -55,6 +55,7 @@ export function AuthProvider({ children }) {
   const isAllowedRole = ALLOWED_ROLES.includes(role);
   const isChecker = role === "checker";
   const isDriver = role === "driver";
+  const isCustomer = role === "customer";
 
   const value = {
     user,
@@ -64,6 +65,7 @@ export function AuthProvider({ children }) {
     isAllowedRole,
     isChecker,
     isDriver,
+    isCustomer,
     signOut,
   };
 

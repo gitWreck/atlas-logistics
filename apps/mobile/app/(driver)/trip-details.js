@@ -95,12 +95,12 @@ export default function TripDetailsScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar style="dark" />
-      {/* Header: light theme like index.js */}
+      {/* Header: back | title | count (right) - same as shipments */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
           <Image
             source={require("../../assets/icons/back.svg")}
-            style={{ width: 14, height: 14 }}
+            style={{ width: 20, height: 20 }}
           />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Trip Details</Text>
@@ -159,19 +159,26 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 50,
     paddingBottom: 15,
-    flexDirection: "column",
-    alignItems: "flex-start",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     backgroundColor: "#ffffff",
     borderBottomWidth: 1,
     borderBottomColor: "#e2e8f0",
   },
-  backBtn: { 
-    padding: 0, 
-    marginBottom: 10,
+  backBtn: {
+    padding: 0,
   },
   headerTitle: {
     color: "#0f172a",
     fontSize: 16,
+    fontWeight: "bold",
+    flex: 1,
+    marginLeft: 12,
+  },
+  headerCount: {
+    color: "#0f172a",
+    fontSize: 14,
   },
   scrollContent: {
     paddingHorizontal: 20,

@@ -28,8 +28,14 @@ if (!admin.apps.length) {
 // admin actions
 exports.createUserProfile =
   require("./src/users/createUserProfile").createUserProfile;
+<<<<<<< HEAD
 exports.toggleUserStatus =
   require("./src/users/toggleUserStatus").toggleUserStatus;
+=======
+exports.toggleUserStatus = require("./src/users/toggleUserStatus");
+exports.addTrackedShipment =
+  require("./src/users/addTrackedShipment").addTrackedShipment;
+>>>>>>> 3c04bad7002bac9aae41a5f2619e079332dd0150
 
 // packages
 // exports.createPackage = require("./src/packages/createPackage").createPackage;

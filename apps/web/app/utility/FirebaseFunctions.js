@@ -111,3 +111,11 @@ export const unloadItemsFromTripCallable = httpsCallable(
 );
 export const recordPartialCallable = httpsCallable(functions, "recordPartial");
 export const completeTripCallable = httpsCallable(functions, "completeTrip");
+<<<<<<< HEAD
+=======
+
+// ADMIN
+
+export const createUserProfile = httpsCallable(functions, "createUserProfile");
+export const toggleUserStatus = httpsCallable(functions, "toggleUserStatus");
+>>>>>>> 3c04bad7002bac9aae41a5f2619e079332dd0150

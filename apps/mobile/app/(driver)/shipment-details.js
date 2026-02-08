@@ -7,17 +7,18 @@ import {
   ScrollView,
   ActivityIndicator,
   Alert,
+  TouchableOpacity,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { FontAwesome5 } from "@expo/vector-icons";
 import { doc, getDoc, updateDoc, serverTimestamp } from "firebase/firestore";
 import { db } from "../../firebase";
-import { COLORS, GLOBAL_STYLES } from "../../components/constants/theme";
+import { StatusBar } from "expo-status-bar";
+import { Image } from "expo-image";
 
 // ✅ IMPORT YOUR NEW COMPONENTS
 import ShipmentHeaderCard from "../../components/driver/shipment/ShipmentHeaderCard";
 import PackageItemCard from "../../components/driver/shipment/PackageItemCard";
-import DeliveryActionButton from "../../components/driver/shipment/DeliveryActionButton";
+import GradientButton from "../../components/ui/figma/GradientButton";
 
 export default function ShipmentDetailsScreen() {
   const { shipmentId, tripId } = useLocalSearchParams();
@@ -98,8 +99,8 @@ export default function ShipmentDetailsScreen() {
 
   if (loading) {
     return (
-      <View style={GLOBAL_STYLES.center}>
-        <ActivityIndicator size="large" color={COLORS.primary} />
+      <View style={[styles.center, { backgroundColor: "#f1f5f9" }]}>
+        <ActivityIndicator size="large" color="#042C83" />
       </View>
     );
   }
@@ -107,27 +108,25 @@ export default function ShipmentDetailsScreen() {
   const packages = shipment?.packages || []; // Assume packages array exists in doc
 
   return (
-    <SafeAreaView style={GLOBAL_STYLES.container}>
-      {/* Header Bar */}
-      <View style={styles.navBar}>
-        <FontAwesome5
-          name="arrow-left"
-          size={20}
-          color="#fff"
-          onPress={() => router.back()}
-        />
-        <Text style={styles.navTitle}>Shipment Details</Text>
-        <View style={{ width: 20 }} />
+    <SafeAreaView style={styles.container}>
+      <StatusBar style="dark" />
+      {/* Header: back | title - aligned with Trip Details */}
+      <View style={styles.header}>
+        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
+          <Image
+            source={require("../../assets/icons/back.svg")}
+            style={{ width: 20, height: 20 }}
+          />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>Shipment Details</Text>
       </View>
 
-      <ScrollView contentContainerStyle={styles.content}>
+      <ScrollView contentContainerStyle={styles.scrollContent}>
         {/* 1. Main Info Card */}
         <ShipmentHeaderCard shipment={shipment} />
 
         {/* 2. Package List */}
-        <Text style={GLOBAL_STYLES.sectionTitle}>
-          Packages ({packages.length})
-        </Text>
+        <Text style={styles.sectionTitle}>Packages ({packages.length})</Text>
 
         {packages.length > 0 ? (
           packages.map((pkg, i) => (
@@ -140,10 +139,15 @@ export default function ShipmentDetailsScreen() {
 
       {/* 3. Bottom Action Button */}
       <View style={styles.footer}>
-        <DeliveryActionButton
-          status={shipment.status}
+        <GradientButton
+          title={
+            shipment.status === "OUT_FOR_DELIVERY"
+              ? "Complete Delivery"
+              : "Mark Out for Delivery"
+          }
           onPress={handleAction}
           loading={actionLoading}
+          disabled={actionLoading}
         />
       </View>
     </SafeAreaView>
@@ -151,14 +155,48 @@ export default function ShipmentDetailsScreen() {
 }
 
 const styles = StyleSheet.create({
-  navBar: {
-    padding: 20,
-    flexDirection: "row",
-    justifyContent: "space-between",
+  container: {
+    flex: 1,
+    backgroundColor: "#f1f5f9",
+  },
+  center: {
+    flex: 1,
+    justifyContent: "center",
     alignItems: "center",
   },
-  navTitle: { color: "#fff", fontSize: 18, fontWeight: "bold" },
-  content: { paddingHorizontal: 20, paddingBottom: 100 },
+  header: {
+    paddingHorizontal: 20,
+    paddingTop: 50,
+    paddingBottom: 15,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    backgroundColor: "#ffffff",
+    borderBottomWidth: 1,
+    borderBottomColor: "#e2e8f0",
+  },
+  backBtn: {
+    padding: 0,
+  },
+  headerTitle: {
+    color: "#0f172a",
+    fontSize: 16,
+    fontWeight: "bold",
+    flex: 1,
+    marginLeft: 12,
+  },
+  scrollContent: {
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    paddingBottom: 120,
+  },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#0f172a",
+    marginTop: 24,
+    marginBottom: 8,
+  },
   emptyText: { color: "#64748b", fontStyle: "italic", marginTop: 10 },
 
   footer: {
@@ -166,9 +204,11 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    padding: 20,
-    backgroundColor: COLORS.background,
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    paddingBottom: 34,
+    backgroundColor: "#ffffff",
     borderTopWidth: 1,
-    borderTopColor: "#334155",
+    borderTopColor: "#e2e8f0",
   },
 });
