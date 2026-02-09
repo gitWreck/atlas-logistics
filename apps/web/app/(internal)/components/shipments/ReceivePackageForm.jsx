@@ -13,7 +13,7 @@ import {
 } from "@fortawesome/free-solid-svg-icons";
 import { createShipmentWithPackages } from "@/app/utility/FirebaseFunctions";
 import { WAREHOUSES } from "@/app/utility/WarehouseData"; // <--- IMPORT THIS
-import InputGroup from "./InputGroup";
+import InputGroup from "./ReceivePackageForm/InputGroup";
 
 const INITIAL_CONTACT = {
   name: "",

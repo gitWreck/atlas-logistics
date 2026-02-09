@@ -54,14 +54,27 @@ exports.unassignDriverFromTruckTrip = onCall(
         return;
       }
 
+      const assignedTruckId = trip.truckId;
       const now = admin.firestore.FieldValue.serverTimestamp();
+
+      if (assignedTruckId) {
+        const truckRef = db.collection("trucks").doc(assignedTruckId);
+
+        tx.update(truckRef, {
+          status: "IDLE", // Set it back to available
+          currentTripId: null, // Remove the link to this trip
+          updatedAt: now,
+          updatedBy: uid,
+        });
+      }
 
       // 🚚 Update trip
       tx.update(tripRef, {
         driverId: null,
         driverName: null, // <--- ADD THIS to clear the name
-        truckPlateNumber: null, // <--- OPTIONAL: Do you want to remove the truck too? Usually yes.
         driverPhone: null, // <--- ADD THIS to clear the phone
+        truckPlateNumber: null, // <--- OPTIONAL: Do you want to remove the truck too? Usually yes.
+        truckId: null,
 
         // driverUnassignedAt: now,
         updatedAt: now,

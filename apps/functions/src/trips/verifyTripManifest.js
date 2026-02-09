@@ -51,24 +51,40 @@ exports.verifyTripManifest = onRequest(async (req, res) => {
         tripCode: data.trip?.tripCode || null,
         truckPlate: data.trip?.truckPlate || null,
         driverName: data.trip?.driverName || null,
-        driverUid: data.trip?.driverUid || null, // Ensure this exists in data or handle undefined
+        // driverUid: data.trip?.driverUid || null, // Ensure this exists in data or handle undefined
         origin: data.trip?.origin || null,
         destination: data.trip?.destination || null,
-        route: data.trip?.route || null,
+        // route: data.trip?.route || null,
       },
 
       meta: {
-        generatedAt: data.meta?.generatedAt,
-        generatedBy: data.meta?.generatedBy,
-        generatedByName: data.meta?.generatedByName,
+        generatedAtMs: data.meta.generatedAtMs,
+        generatedBy: data.meta.generatedBy,
+        generatedByName: data.meta.generatedByName,
       },
 
       totals: {
-        totalShipments: data.totals?.totalShipments,
-        totalItems: data.totals?.totalItems,
+        totalShipments: data.totals.totalShipments,
+        totalItems: data.totals.totalItems,
       },
 
-      shipments: data.shipments, // This is the detailed array
+      // shipments: data.shipments, // This is the detailed array
+      shipments: data.shipments.map((s) => ({
+        trackingDocId: s.trackingDocId,
+        trackingNumber: s.trackingNumber,
+        route: s.route ?? null,
+        senderName: s.senderName ?? null,
+        receiverName: s.receiverName ?? null,
+        totalCount: s.totalCount,
+        loadedCount: s.loadedCount,
+        contents: (s.contents || []).map((c) => ({
+          desc: c.desc,
+          weight: c.weight,
+          type: c.type,
+          value: c.value,
+          isFragile: c.isFragile,
+        })),
+      })),
     };
 
     // 3. Recompute Hash

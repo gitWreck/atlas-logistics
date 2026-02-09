@@ -18,6 +18,7 @@ import ShipmentDrawer from "./ShipmentDrawer";
 import ReceivePackageForm from "./ReceivePackageForm";
 // import { auth } from "@/lib/firebase";
 import { calculateProgress } from "@/app/utility/utilities";
+import UnifiedShipmentModal from "./UnifiedShipmentModal";
 
 export default function ShipmentBoard({ user, userRole, profile }) {
   const [shipments, setShipments] = useState([]);
@@ -389,11 +390,18 @@ export default function ShipmentBoard({ user, userRole, profile }) {
         data={selectedShipment}
       />
 
-      <ReceivePackageForm
+      {/* <ReceivePackageForm
         profile={profile}
         isOpen={isNewOrderModalOpen}
         onClose={setIsNewOrderModalOpen}
         onSuccess={handleSuccess}
+      /> */}
+
+      <UnifiedShipmentModal
+        profile={profile}
+        isOpen={isNewOrderModalOpen}
+        onClose={() => setIsNewOrderModalOpen(false)}
+        // onSuccess={handleSuccess}
       />
     </div>
   );

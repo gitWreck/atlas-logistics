@@ -12,6 +12,7 @@ import {
   unassignDriverFromTruckTrip,
 } from "@/app/utility/FirebaseFunctions";
 import DriverSelectInput from "../DriverSelectInput";
+import TruckSelectInput from "../TruckSelectInput";
 
 export default function AssignDriverModal({
   isOpen,
@@ -33,6 +34,7 @@ export default function AssignDriverModal({
         driverName: trip.driverName || "",
         truckPlateNumber: trip.truckPlateNumber || "",
         driverId: trip.driverId || "",
+        truckId: trip.truckId || "",
       });
     }
   }, [isOpen, trip]);
@@ -48,6 +50,7 @@ export default function AssignDriverModal({
         truckTripId: trip.id,
         driverId: isUnassign ? null : formData.driverId,
         truckPlateNumber: isUnassign ? null : formData.truckPlateNumber,
+        truckId: isUnassign ? null : formData.truckId,
       });
       onSuccess();
       onClose();
@@ -104,7 +107,17 @@ export default function AssignDriverModal({
             />
           </div>
 
-          <div className="space-y-1">
+          <TruckSelectInput
+            value={formData.truckPlateNumber}
+            onChange={(val) =>
+              setFormData((prev) => ({ ...prev, truckPlateNumber: val }))
+            }
+            onSelectId={(id) =>
+              setFormData((prev) => ({ ...prev, truckId: id }))
+            }
+          />
+
+          {/* <div className="space-y-1">
             <label className="text-xs font-bold text-slate-400 uppercase">
               Truck Plate #
             </label>
@@ -123,7 +136,7 @@ export default function AssignDriverModal({
                 }
               />
             </div>
-          </div>
+          </div> */}
 
           <div className="pt-2 flex gap-2">
             {/* UNASSIGN BUTTON */}

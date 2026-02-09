@@ -46,6 +46,14 @@ export default function StatusBadge({ status, reason }) {
 
     UNASSIGNED: "bg-amber-500/10 text-amber-400 border-amber-500/20",
     CANCELLED: "bg-red-500/10 text-red-400 border-red-500/20",
+
+    // --- NEW TRUCK ASSET STATUSES ---
+    ACTIVE: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
+    IDLE: "bg-slate-500/10 text-slate-400 border-slate-500/20",
+    MAINTENANCE: "bg-amber-500/10 text-amber-500 border-amber-500/20",
+    REPAIR: "bg-orange-500/10 text-orange-400 border-orange-500/20",
+    DISABLED: "bg-rose-500/10 text-rose-400 border-rose-500/20",
+    OUT_OF_SERVICE: "bg-red-500/10 text-red-400 border-red-500/20",
   };
 
   const defaultStyle = "bg-slate-800 text-slate-400 border-slate-700";
