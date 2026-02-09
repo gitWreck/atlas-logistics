@@ -1,6 +1,6 @@
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const admin = require("firebase-admin");
-const { shortCode } = require("../utilities/helpers");
+// const { shortCode } = require("../utilities/helpers");
 const { Timestamp } = admin.firestore;
 
 if (!admin.apps.length) {
@@ -24,6 +24,7 @@ exports.createShipmentWithPackages = onCall(
       destinationCode, // NEW
       items,
       remarks,
+      routeInfo,
     } = request.data;
 
     // --- VALIDATION ---

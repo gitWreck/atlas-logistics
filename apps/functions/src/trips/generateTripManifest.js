@@ -176,6 +176,7 @@ exports.generateTripManifest = onCall(
       const nowTs = admin.firestore.FieldValue.serverTimestamp();
       // We generate a discrete timestamp string for the hash input
       const generatedAtISO = new Date().toISOString();
+      const generatedAtMs = Date.now();
 
       const manifestId = `MANIFEST-${tripDocId}-${Date.now()}`;
 
@@ -193,7 +194,7 @@ exports.generateTripManifest = onCall(
         },
 
         meta: {
-          generatedAt: generatedAtISO,
+          generatedAtMs,
           generatedBy: uid,
           generatedByName,
         },
