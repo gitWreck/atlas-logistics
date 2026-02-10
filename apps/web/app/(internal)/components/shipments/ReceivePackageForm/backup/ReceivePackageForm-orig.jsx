@@ -4,9 +4,9 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faBoxOpen, faPaperPlane } from "@fortawesome/free-solid-svg-icons";
 import { createShipmentWithPackages } from "@/app/utility/FirebaseFunctions";
 import { WAREHOUSES } from "@/app/utility/WarehouseData";
-import InputGroup from "./InputGroup";
-import RouteSection from "./RouteSection";
-import ItemSection from "./ItemSection";
+import InputGroup from "../InputGroup";
+import RouteSection from "../RouteSection";
+import ItemSection from "../ItemSection";
 
 const INITIAL_CONTACT = {
   name: "",

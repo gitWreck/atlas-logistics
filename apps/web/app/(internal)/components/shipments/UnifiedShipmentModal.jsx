@@ -4,7 +4,8 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faCheckCircle,
   faCircleNotch,
-  faBoxOpen, // Icon for 'Pending' state
+  faBoxOpen,
+  faCommentSms, // New icon for SMS
 } from "@fortawesome/free-solid-svg-icons";
 import ReceivePackageForm from "./ReceivePackageForm/ReceivePackageForm";
 import TripStep from "../manifests/CreateTripModal/TripStep";
@@ -18,38 +19,52 @@ export default function UnifiedShipmentModal({ profile, isOpen, onClose }) {
   const [loading, setLoading] = useState(false);
   const [shipmentDraft, setShipmentDraft] = useState(null);
   const [finalTripId, setFinalTripId] = useState(null);
-  const [createdShipmentId, setCreatedShipmentId] = useState(null); // Track ID for printing
+  const [createdShipmentId, setCreatedShipmentId] = useState(null);
+
+  // NEW: SMS State
+  const [sendSms, setSendSms] = useState(true);
 
   const handleMasterSubmit = async (tripDecision) => {
+    // NEW: Confirmation Logic for Trip Assignment
+    if (tripDecision && tripDecision.tripId) {
+      const confirmAssign = window.confirm(
+        `Confirm assignment to Trip: ${tripDecision.tripId}?\nThis will generate labels for this trip immediately.`,
+      );
+      if (!confirmAssign) return;
+    }
+
     setLoading(true);
     try {
-      // 1. Always create the shipment first
-      const shipmentRes = await createShipmentWithPackages({
-        ...shipmentDraft,
+      const payload = {
+        // ... previous payload structure remains same
+        sender: shipmentDraft.sender,
+        recipient: shipmentDraft.recipient,
         origin: shipmentDraft.routeInfo.origin,
         originCode: shipmentDraft.routeInfo.originCode,
         destination: shipmentDraft.routeInfo.destination,
         destinationCode: shipmentDraft.routeInfo.destinationCode,
-      });
+        items: shipmentDraft.items,
+        remarks: shipmentDraft.remarks,
+        notifySms: sendSms, // NEW: Pass notification preference to backend
+      };
 
+      const shipmentRes = await createShipmentWithPackages(payload);
       const newShipmentId = shipmentRes.data.shipmentId;
       setCreatedShipmentId(newShipmentId);
 
-      // 2. Check if the user selected a trip or clicked "Skip"
       if (tripDecision && tripDecision.tripId) {
         const targetTripId = tripDecision.tripId;
-
-        // Assign to the trip
         await assignShipmentToTruckTrip({
           trackingDocId: newShipmentId,
           truckTripId: targetTripId,
         });
 
         setFinalTripId(targetTripId);
-        // Only auto-open print labels if assigned to a trip (optional preference)
-        window.open(`/admin/print-labels?tripId=${targetTripId}`, "_blank");
+        window.open(
+          `/components/print/labels?tripId=${targetTripId}`,
+          "_blank",
+        );
       } else {
-        // Skip assignment logic
         setFinalTripId(null);
       }
 
@@ -65,10 +80,12 @@ export default function UnifiedShipmentModal({ profile, isOpen, onClose }) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      {/* Backdrop */}
       <div
         className="fixed inset-0 bg-slate-950/90 backdrop-blur-md"
         onClick={loading ? null : onClose}
       />
+
       <div className="relative bg-slate-900 border border-slate-700 w-full max-w-4xl rounded-xl shadow-xl overflow-hidden flex flex-col min-h-[600px] max-h-[90vh]">
         {/* Loading Overlay */}
         {loading && (
@@ -83,7 +100,6 @@ export default function UnifiedShipmentModal({ profile, isOpen, onClose }) {
         )}
 
         <div className="flex-1 flex flex-col overflow-hidden">
-          {/* STEP 1: DETAILS */}
           {step === 1 && (
             <div className="flex flex-col h-full overflow-hidden">
               <div className="p-6 border-b border-slate-800 flex justify-between">
@@ -108,14 +124,33 @@ export default function UnifiedShipmentModal({ profile, isOpen, onClose }) {
             </div>
           )}
 
-          {/* STEP 2: TRIP SELECTION (With Skip Option) */}
           {step === 2 && (
             <div className="flex flex-col h-full overflow-hidden">
               <div className="p-6 border-b border-slate-800 flex justify-between items-center">
                 <h2 className="text-xl font-bold text-white">2. Select Trip</h2>
 
-                <div className="flex items-center gap-4">
-                  {/* NEW: Skip Button */}
+                <div className="flex items-center gap-6">
+                  {/* NEW: SMS Notification Toggle */}
+                  <label className="flex items-center gap-2 cursor-pointer group">
+                    <input
+                      type="checkbox"
+                      className="w-4 h-4 rounded border-slate-700 bg-slate-800 text-blue-600 focus:ring-blue-500 focus:ring-offset-slate-900"
+                      checked={sendSms}
+                      onChange={(e) => setSendSms(e.target.checked)}
+                    />
+                    <div className="flex items-center gap-1.5">
+                      <FontAwesomeIcon
+                        icon={faCommentSms}
+                        className={`text-sm ${sendSms ? "text-blue-400" : "text-slate-500"}`}
+                      />
+                      <span
+                        className={`text-xs font-bold uppercase tracking-tight ${sendSms ? "text-slate-200" : "text-slate-500"}`}
+                      >
+                        Notify SMS
+                      </span>
+                    </div>
+                  </label>
+
                   <button
                     onClick={() => handleMasterSubmit(null)}
                     className="text-sm font-bold text-amber-500 hover:text-amber-400 border border-amber-500/30 bg-amber-500/10 px-3 py-1.5 rounded-lg transition-colors"
@@ -140,60 +175,46 @@ export default function UnifiedShipmentModal({ profile, isOpen, onClose }) {
             </div>
           )}
 
-          {/* STEP 3: SUCCESS (Dynamic based on assignment) */}
+          {/* Step 3 remains similar, icons already handle dynamic logic */}
           {step === 3 && (
             <div className="p-12 text-center space-y-6 flex-1 flex flex-col justify-center items-center">
               <FontAwesomeIcon
                 icon={finalTripId ? faCheckCircle : faBoxOpen}
                 className={`text-6xl ${finalTripId ? "text-emerald-500" : "text-amber-500"}`}
               />
-
+              {/* ... Success Message and Buttons ... */}
               <div>
                 <h2 className="text-2xl font-bold text-white">
                   {finalTripId
-                    ? `Shipment Linked to ${finalTripId}`
-                    : "Shipment Created Successfully"}
+                    ? `Shipment Assigned to ${finalTripId}`
+                    : "Shipment Created as Pending"}
                 </h2>
-                {!finalTripId && (
-                  <p className="text-slate-400 mt-2">
-                    This shipment is saved in the warehouse (Pending) and can be
-                    assigned to a trip later.
+                {sendSms && (
+                  <p className="text-emerald-400 text-xs font-bold mt-2 uppercase tracking-widest">
+                    <FontAwesomeIcon icon={faCommentSms} className="mr-2" />
+                    SMS Notifications Queued
                   </p>
                 )}
               </div>
-
-              {/* Action Buttons */}
               <div className="w-full max-w-xs space-y-3">
-                {/* Only show "Print Trip Labels" if assigned, otherwise show "Print Waybill" */}
-                {finalTripId ? (
-                  <button
-                    onClick={() =>
-                      window.open(
-                        `/admin/print-labels?tripId=${finalTripId}`,
-                        "_blank",
-                      )
-                    }
-                    className="w-full py-4 bg-slate-800 text-white rounded-xl font-bold border border-slate-700 hover:bg-slate-700 transition-colors"
-                  >
-                    Print Trip Labels
-                  </button>
-                ) : (
-                  <button
-                    onClick={() =>
-                      window.open(
-                        `/admin/print-waybill?id=${createdShipmentId}`, // Assuming you have a single waybill print page
-                        "_blank",
-                      )
-                    }
-                    className="w-full py-4 bg-slate-800 text-white rounded-xl font-bold border border-slate-700 hover:bg-slate-700 transition-colors"
-                  >
-                    Print Individual Waybill
-                  </button>
-                )}
-
+                <button
+                  onClick={() =>
+                    window.open(
+                      finalTripId
+                        ? `/admin/print-labels?tripId=${finalTripId}`
+                        : `/admin/print-waybill?id=${createdShipmentId}`,
+                      "_blank",
+                    )
+                  }
+                  className="w-full py-4 bg-slate-800 text-white rounded-xl font-bold border border-slate-700 hover:bg-slate-700 transition-colors"
+                >
+                  {finalTripId
+                    ? "Print Trip Labels"
+                    : "Print Individual Waybill"}
+                </button>
                 <button
                   onClick={onClose}
-                  className="w-full py-4 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-bold transition-colors"
+                  className="w-full py-4 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-bold"
                 >
                   Return to Dashboard
                 </button>

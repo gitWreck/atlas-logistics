@@ -73,6 +73,22 @@ export default function ItemSection({
               </div>
               <div className="w-24 relative">
                 <label className="text-[10px] text-slate-500 uppercase font-bold mb-1 block pl-1">
+                  Quantity {/* Changed from "Weight" */}
+                </label>
+                <input
+                  type="number"
+                  step="1"
+                  min="1"
+                  className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm text-right focus:border-blue-500 outline-none placeholder:text-slate-600"
+                  value={item.quantity}
+                  onChange={(e) => onChange(idx, "quantity", e.target.value)}
+                  required
+                  placeholder="e.g. 1"
+                />
+              </div>
+
+              {/* <div className="w-24 relative">
+                <label className="text-[10px] text-slate-500 uppercase font-bold mb-1 block pl-1">
                   Weight
                 </label>
                 <input
@@ -86,7 +102,7 @@ export default function ItemSection({
                 <span className="absolute right-3 top-[29px] text-slate-500 text-xs font-bold pointer-events-none">
                   KG
                 </span>
-              </div>
+              </div> */}
               {items.length > 1 && (
                 <div className="mt-6">
                   <button
