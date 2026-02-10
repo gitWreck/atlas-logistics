@@ -36,16 +36,39 @@ export default function UnifiedShipmentModal({ profile, isOpen, onClose }) {
     setLoading(true);
     try {
       const payload = {
-        // ... previous payload structure remains same
-        sender: shipmentDraft.sender,
-        recipient: shipmentDraft.recipient,
+        sender: {
+          name: shipmentDraft.sender.name,
+          phone: shipmentDraft.sender.phone,
+          details: {
+            unit: shipmentDraft.sender.unit,
+            street: shipmentDraft.sender.street,
+            barangay: shipmentDraft.sender.barangay,
+            city: shipmentDraft.sender.city, // Optional: Keep manual city entry for door-to-door info
+            province: shipmentDraft.sender.province,
+          },
+        },
+
+        recipient: {
+          name: shipmentDraft.recipient.name,
+          phone: shipmentDraft.recipient.phone,
+          details: {
+            unit: shipmentDraft.recipient.unit,
+            street: shipmentDraft.recipient.street,
+            barangay: shipmentDraft.recipient.barangay,
+            city: shipmentDraft.recipient.city,
+            province: shipmentDraft.recipient.province,
+          },
+        },
+
+        // --- 3. UPDATED: USE ROUTE INFO FOR CODES ---
+
         origin: shipmentDraft.routeInfo.origin,
         originCode: shipmentDraft.routeInfo.originCode,
         destination: shipmentDraft.routeInfo.destination,
         destinationCode: shipmentDraft.routeInfo.destinationCode,
         items: shipmentDraft.items,
         remarks: shipmentDraft.remarks,
-        notifySms: sendSms, // NEW: Pass notification preference to backend
+        notifySms: sendSms,
       };
 
       const shipmentRes = await createShipmentWithPackages(payload);

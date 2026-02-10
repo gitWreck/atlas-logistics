@@ -1,5 +1,12 @@
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const admin = require("firebase-admin");
+const {
+  sendShipmentCreatedSmsLogic,
+} = require("../messaging/sendShipmentCreatedSmsLogic");
+const {
+  SEMAPHORE_API_KEY,
+  SEMAPHORE_SENDER_NAME,
+} = require("../../shared/sms-service");
 // const { shortCode } = require("../utilities/helpers");
 const { Timestamp } = admin.firestore;
 
@@ -8,7 +15,11 @@ if (!admin.apps.length) {
 }
 
 exports.createShipmentWithPackages = onCall(
-  { region: "asia-southeast1", maxInstances: 10 },
+  {
+    region: "asia-southeast1",
+    secrets: [SEMAPHORE_API_KEY, SEMAPHORE_SENDER_NAME],
+    maxInstances: 10,
+  },
   async (request) => {
     // 1. Auth Check
     if (!request.auth) {
@@ -24,7 +35,7 @@ exports.createShipmentWithPackages = onCall(
       destinationCode, // NEW
       items,
       remarks,
-      routeInfo,
+      notifySms,
     } = request.data;
 
     // --- VALIDATION ---
@@ -204,12 +215,43 @@ exports.createShipmentWithPackages = onCall(
     // 6. Commit
     try {
       await batch.commit();
-      return {
-        success: true,
-        shipmentId,
-        // Return barcodes so UI can print labels immediately
-        packageBarcodes,
-      };
+
+      // --- 6. Commit ---
+      try {
+        await batch.commit();
+
+        // NEW: TRIGGER SMS NOTIFICATION
+        if (notifySms === true) {
+          // We don't 'await' this if we want to return to the UI faster,
+          // but we catch errors to prevent crashing the response.
+          sendShipmentCreatedSmsLogic({
+            shipmentId,
+            senderPhone: sender.phone,
+            recipientPhone: recipient.phone,
+            origin: origin,
+            destination: destination,
+            actorUid: request.auth.uid,
+          }).catch((err) =>
+            console.error("[SMS_ERROR] Initial notification failed:", err),
+          );
+        }
+
+        return {
+          success: true,
+          shipmentId,
+          packageBarcodes,
+        };
+      } catch (error) {
+        console.error("[Notify] Failed to queue SMS:", err);
+        // ... existing error handling
+      }
+
+      // return {
+      //   success: true,
+      //   shipmentId,
+      //   // Return barcodes so UI can print labels immediately
+      //   packageBarcodes,
+      // };
     } catch (error) {
       console.error("Transaction failure:", error);
       throw new HttpsError("internal", "Failed to create shipment records.");
