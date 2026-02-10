@@ -12,7 +12,7 @@ exports.startTrip = onCall({ region: "asia-southeast1" }, async (req) => {
   }
   const uid = req.auth.uid;
 
-  const { tripId } = req.data;
+  const { tripId, location } = req.data || {};
   if (!tripId) throw new HttpsError("invalid-argument", "Missing tripId");
 
   // 2. GET TRIP
@@ -54,17 +54,28 @@ exports.startTrip = onCall({ region: "asia-southeast1" }, async (req) => {
 
     // 2. Update the REAL shipment record (shipments)
     const realShipmentRef = db.collection("shipments").doc(doc.id);
-    batch.update(realShipmentRef, {
+
+    const historyEntry = {
+      status: "OUT_FOR_DELIVERY",
+      at: new Date(), // Firestore converts JS Date to Timestamp in arrayUnion
+      note: `Trip ${trip.tripId || tripId} Started`,
+      by: uid,
+      location: location || null, // { lat, lng }
+    };
+
+    const shipmentUpdate = {
       status: "OUT_FOR_DELIVERY",
       updatedAt: FieldValue.serverTimestamp(),
       // 3. Add to History Timeline
-      statusHistory: FieldValue.arrayUnion({
-        status: "OUT_FOR_DELIVERY",
-        at: new Date(), // Firestore converts JS Date to Timestamp in arrayUnion
-        note: `Trip ${trip.tripId || tripId} Started`,
-        by: uid,
-      }),
-    });
+      statusHistory: FieldValue.arrayUnion(historyEntry),
+    };
+
+    // Persist latest known location for this shipment if provided
+    if (location) {
+      shipmentUpdate.lastLocation = location;
+    }
+
+    batch.update(realShipmentRef, shipmentUpdate);
   });
 
   // C. AUDIT LOG (The New Part)

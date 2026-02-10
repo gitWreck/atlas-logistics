@@ -14,6 +14,7 @@ import { FontAwesome5 } from "@expo/vector-icons";
 import { doc, onSnapshot } from "firebase/firestore";
 import { db } from "../../firebase";
 import { StatusBar } from "expo-status-bar";
+import GetLocation from "react-native-get-location";
 
 import TripSummaryCard from "../../components/driver/trip/TripSummaryCard";
 import TripProgressStepper from "../../components/driver/trip/TripProgressStepper";
@@ -28,6 +29,24 @@ export default function TripDetailsScreen() {
   const [trip, setTrip] = useState(null);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
+
+  const getCurrentLocationSafe = async () => {
+    try {
+      const loc = await GetLocation.getCurrentPosition({
+        enableHighAccuracy: true,
+        timeout: 15000,
+      });
+
+      if (!loc) return null;
+      return {
+        lat: loc.latitude,
+        lng: loc.longitude,
+      };
+    } catch (error) {
+      console.log("Location error (startTrip):", error);
+      return null;
+    }
+  };
 
   useEffect(() => {
     if (!tripId) return;
@@ -76,7 +95,11 @@ export default function TripDetailsScreen() {
           onPress: async () => {
             setActionLoading(true);
             try {
-              await startTrip({ tripId: trip.id });
+              const location = await getCurrentLocationSafe();
+              await startTrip({
+                tripId: trip.id,
+                ...(location ? { location } : {}),
+              });
               Alert.alert("Success", "Trip Started! Drive Safely.");
             } catch (error) {
               Alert.alert("Error", error.message);

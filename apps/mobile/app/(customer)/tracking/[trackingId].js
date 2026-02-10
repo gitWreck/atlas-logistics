@@ -38,11 +38,46 @@ const BLUE = "#155DFC";
 const GREY = "#94a3b8";
 const GREY_LINE = "#e2e8f0";
 
+// Customer-facing shipment journey:
+// - Warehouse A ➜ Warehouse B
+// - Warehouse B ➜ Customer house
+// Codes align with backend status values; labels clarify each leg.
 const STATUS_STEPS = [
-  { code: "RECEIVED", label: "RECEIVED", source: require("../../../assets/icons/picked-requested.svg") },
-  { code: "IN_TRANSIT", label: "IN TRANSIT", source: require("../../../assets/icons/in-transit.svg") },
-  { code: "OUT_FOR_DELIVERY", label: "OUT FOR DELIVERY", source: require("../../../assets/icons/out-for-delivery.svg") },
-  { code: "DELIVERED", label: "DELIVERED", source: require("../../../assets/icons/delivered.png") },
+  {
+    code: "RECEIVED",
+    label: "RECEIVED",
+    source: require("../../../assets/icons/picked-requested.svg"),
+  },
+  {
+    code: "ASSIGNED",
+    label: "ASSIGNED TO A TRIP",
+    source: require("../../../assets/icons/picked-requested.svg"),
+  },
+  {
+    code: "LOADED",
+    label: "LOADED ON TRUCK",
+    source: require("../../../assets/icons/picked-requested.svg"),
+  },
+  {
+    code: ["IN_TRANSIT", "OUT_FOR_DELIVERY"],
+    label: "IN TRANSIT",
+    source: require("../../../assets/icons/in-transit.svg"),
+  },
+  {
+    code: "COMPLETED",
+    label: "FOR DELIVERY TO CUSTOMER",
+    source: require("../../../assets/icons/picked-requested.svg"),
+  },
+  {
+    code: "OUT_FOR_DELIVERY_CUSTOMER",
+    label: "OUT FOR DELIVERY",
+    source: require("../../../assets/icons/out-for-delivery.svg"),
+  },
+  {
+    code: "DELIVERED",
+    label: "DELIVERED TO YOUR ADDRESS",
+    source: require("../../../assets/icons/delivered.png"),
+  },
 ];
 
 export default function CustomerTrackingDetailsScreen() {
@@ -71,8 +106,8 @@ export default function CustomerTrackingDetailsScreen() {
         setLoading(true);
         setError("");
 
-        // 1) Core tracking data from tracking_public
-        const publicRef = doc(db, "tracking_public", normalizedTracking);
+        // 1) Core tracking data from shipments
+        const publicRef = doc(db, "shipments", normalizedTracking);
         const snap = await getDoc(publicRef);
 
         if (!snap.exists()) {
@@ -108,12 +143,16 @@ export default function CustomerTrackingDetailsScreen() {
   }, [normalizedTracking]);
 
   const activeStepIndex = useMemo(() => {
-    if (!data?.statusCode) return 0;
-    const idx = STATUS_STEPS.findIndex(
-      (s) => s.code === String(data.statusCode).toUpperCase(),
-    );
+    if (!data?.status) return 0;
+    const current = String(data.status).toUpperCase();
+    const idx = STATUS_STEPS.findIndex((s) => {
+      if (Array.isArray(s.code)) {
+        return s.code.includes(current);
+      }
+      return s.code === current;
+    });
     return idx === -1 ? 0 : idx;
-  }, [data?.statusCode]);
+  }, [data?.status]);
 
   const totalItems = data?.totalPackages ?? 0;
   const loaded = data?.itemsDelivered ?? 0;
@@ -241,18 +280,21 @@ export default function CustomerTrackingDetailsScreen() {
           </View>
         </View>
 
-        {/* Timeline steps - design matches TripProgressStepper */}
+        {/* Timeline steps - now vertical, matching TripProgressStepper */}
         <View style={styles.timelineWrapper}>
           {STATUS_STEPS.map((step, index) => {
             const isActive = index <= activeStepIndex;
             const isLineActive = index < activeStepIndex;
+            const isLast = index === STATUS_STEPS.length - 1;
             return (
-              <React.Fragment key={step.code}>
-                <View style={styles.timelineStep}>
+              <View key={step.code} style={styles.timelineStepRow}>
+                <View style={styles.timelineLeftColumn}>
                   <View
                     style={[
                       styles.timelineIconCircle,
-                      isActive ? styles.timelineIconCircleActive : styles.timelineIconCircleInactive,
+                      isActive
+                        ? styles.timelineIconCircleActive
+                        : styles.timelineIconCircleInactive,
                     ]}
                   >
                     <Image
@@ -263,6 +305,18 @@ export default function CustomerTrackingDetailsScreen() {
                       ]}
                     />
                   </View>
+                  {!isLast && (
+                    <View
+                      style={[
+                        styles.timelineConnector,
+                        isLineActive
+                          ? styles.timelineConnectorActive
+                          : styles.timelineConnectorInactive,
+                      ]}
+                    />
+                  )}
+                </View>
+                <View style={styles.timelineLabelWrapper}>
                   <Text
                     style={[
                       styles.timelineLabel,
@@ -272,15 +326,7 @@ export default function CustomerTrackingDetailsScreen() {
                     {step.label}
                   </Text>
                 </View>
-                {index < STATUS_STEPS.length - 1 && (
-                  <View
-                    style={[
-                      styles.timelineConnector,
-                      isLineActive ? styles.timelineConnectorActive : styles.timelineConnectorInactive,
-                    ]}
-                  />
-                )}
-              </React.Fragment>
+              </View>
             );
           })}
         </View>
@@ -439,21 +485,23 @@ const styles = StyleSheet.create({
     fontSize: 11,
   },
   timelineWrapper: {
-    flexDirection: "row",
-    alignItems: "flex-start",
     paddingVertical: 16,
     paddingHorizontal: 4,
     marginBottom: 20,
   },
-  timelineStep: {
-    width: 56,
-    flex: 0,
+  timelineStepRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+  },
+  timelineLeftColumn: {
+    width: 32,
     alignItems: "center",
+    marginRight: 12,
   },
   timelineIconCircle: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
     borderWidth: 2,
     justifyContent: "center",
     alignItems: "center",
@@ -467,13 +515,13 @@ const styles = StyleSheet.create({
     borderColor: GREY_LINE,
   },
   timelineStepIcon: {
-    width: 22,
-    height: 22,
+    width: 16,
+    height: 16,
   },
   timelineConnector: {
-    flex: 1,
-    height: 5,
-    marginTop: 17,
+    width: 2,
+    height: 46,
+    marginVertical: 6,
   },
   timelineConnectorActive: {
     backgroundColor: BLUE,
@@ -482,15 +530,16 @@ const styles = StyleSheet.create({
     backgroundColor: GREY_LINE,
   },
   timelineLabel: {
-    marginTop: 6,
     color: GREY,
-    fontSize: 9,
-    textAlign: "center",
-    width: "100%",
+    fontSize: 12,
   },
   timelineLabelActive: {
     color: "#111827",
     fontWeight: "600",
+  },
+  timelineLabelWrapper: {
+    justifyContent: "center",
+    paddingTop: 4,
   },
   mapSectionCard: {
     backgroundColor: "#ffffff",

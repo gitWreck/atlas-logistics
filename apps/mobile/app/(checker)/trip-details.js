@@ -17,6 +17,7 @@ import {
   doc,
 } from "firebase/firestore";
 import { db } from "../../firebase";
+import GetLocation from "react-native-get-location";
 
 // ✅ IMPORT NEW COMPONENTS
 import TripDetailsHeader from "../../components/checker/trip-details/TripDetailsHeader";
@@ -34,6 +35,24 @@ export default function TripDetailsScreen() {
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
   const [trip, setTrip] = useState(null);
+
+  const getCurrentLocationSafe = async () => {
+    try {
+      const loc = await GetLocation.getCurrentPosition({
+        enableHighAccuracy: true,
+        timeout: 15000,
+      });
+
+      if (!loc) return null;
+      return {
+        lat: loc.latitude,
+        lng: loc.longitude,
+      };
+    } catch (error) {
+      console.log("Location error (checker trip-details):", error);
+      return null;
+    }
+  };
 
   // 1. FETCH SHIPMENTS
   useEffect(() => {
@@ -92,10 +111,12 @@ export default function TripDetailsScreen() {
       const functions = getFunctions(undefined, "asia-southeast1");
       const bulkUpdateFn = httpsCallable(functions, "bulkUpdateShipmentStatus");
 
+      const location = await getCurrentLocationSafe();
       await bulkUpdateFn({
         tripId: tripId,
         shipmentIds: ids,
         newStatus: newStatus,
+        ...(location ? { location } : {}),
       });
 
       Alert.alert(

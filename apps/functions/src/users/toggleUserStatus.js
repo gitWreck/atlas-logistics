@@ -1,25 +1,28 @@
-const functions = require("firebase-functions/v1");
+const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const admin = require("firebase-admin");
 const { FieldValue } = require("firebase-admin/firestore");
 
 // Ensure Admin SDK is initialized
 if (!admin.apps.length) admin.initializeApp();
 
-const toggleUserStatus = functions
-  .region("asia-southeast1")
-  .https.onCall(async (data, context) => {
-    if (!context.auth?.token?.admin) {
-      throw new functions.https.HttpsError(
+// Export as a Gen 2 callable so it works with global options (CPU, region, etc.)
+module.exports = onCall(
+  { region: "asia-southeast1", maxInstances: 10 },
+  async (req) => {
+    const auth = req.auth;
+
+    if (!auth?.token?.admin) {
+      throw new HttpsError(
         "permission-denied",
-        "Only admins can manage user status."
+        "Only admins can manage user status.",
       );
     }
 
-    const { uid, shouldDisable } = data; // Expecting { uid: "...", shouldDisable: true/false }
+    const { uid, shouldDisable } = req.data || {}; // Expecting { uid: "...", shouldDisable: true/false }
     if (typeof uid !== "string" || typeof shouldDisable !== "boolean") {
-      throw new functions.https.HttpsError(
+      throw new HttpsError(
         "invalid-argument",
-        "Must provide uid (string) and shouldDisable (boolean)."
+        "Must provide uid (string) and shouldDisable (boolean).",
       );
     }
 
@@ -45,7 +48,7 @@ const toggleUserStatus = functions
         .collection("audit_logs")
         .add({
           action: shouldDisable ? "USER_DISABLED" : "USER_ACTIVATED",
-          actorId: context.auth.uid,
+          actorId: auth.uid,
           targetUserId: uid,
           timestamp: FieldValue.serverTimestamp(),
         });
@@ -53,11 +56,10 @@ const toggleUserStatus = functions
       return { success: true };
     } catch (err) {
       console.error(err);
-      throw new functions.https.HttpsError(
+      throw new HttpsError(
         "internal",
-        "Failed to update user status."
+        "Failed to update user status.",
       );
     }
-  });
-
-module.exports = toggleUserStatus;
+  },
+);
