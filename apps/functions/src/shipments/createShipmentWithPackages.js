@@ -82,43 +82,36 @@ exports.createShipmentWithPackages = onCall(
     const packagesArray = [];
     const packageBarcodes = []; // Helper for fast scanning
 
-    items.forEach((item, index) => {
-      const seqNum = (index + 1).toString().padStart(2, "0");
-      const pkgId = `${shipmentId}-${seqNum}`; // e.g., AT-...-01
+    // 3. Construct the Packages Array (In Memory)
+    let globalSeq = 1; // Track total package count
 
-      // The Package Object
-      const pkgObj = {
-        trackingNumber: pkgId, // The Barcode
-        sequence: index + 1,
+    items.forEach((item) => {
+      const qty = Number(item.quantity) || 1; // Use quantity instead of weight
 
-        // Physical Props
-        description: item.description || "Standard Package",
-        weight: Number(item.weight) || 0,
-        packagingType: item.packagingType || "Box", // NEW
+      for (let i = 0; i < qty; i++) {
+        const seqNum = globalSeq.toString().padStart(2, "0");
+        const pkgId = `${shipmentId}-${seqNum}`; // unique barcode per unit
 
-        // Dimensions (Optional, save if present)
-        length: item.length || "",
-        width: item.width || "",
-        height: item.height || "",
+        const pkgObj = {
+          trackingNumber: pkgId,
+          sequence: globalSeq,
+          description: item.description || "Standard Package",
+          quantity: 1, // Each individual package represents 1 unit
+          packagingType: item.packagingType || "Box",
+          declaredValue: (Number(item.declaredValue) || 0) / qty, // Optional: split value per box
+          isFragile: Boolean(item.isFragile),
+          isPerishable: Boolean(item.isPerishable),
+          status: "RECEIVED",
+          currentLocation: originSummary,
+          loadedOnTrip: null,
+          loadedAt: null,
+          isDelayed: false,
+        };
 
-        // Liability & Handling (NEW)
-        declaredValue: Number(item.declaredValue) || 0,
-        isFragile: Boolean(item.isFragile),
-        isPerishable: Boolean(item.isPerishable),
-
-        status: "RECEIVED", // Initial Status
-
-        // Tracking location
-        currentLocation: originSummary,
-        loadedOnTrip: null, // Will be filled when scanned onto truck
-        loadedAt: null,
-
-        // Denormalized info (Optional, can rely on parent, but good for reporting if extracted)
-        isDelayed: false,
-      };
-
-      packagesArray.push(pkgObj);
-      packageBarcodes.push(pkgId);
+        packagesArray.push(pkgObj);
+        packageBarcodes.push(pkgId);
+        globalSeq++; // Increment for the next package
+      }
     });
 
     // 4. Create Shipment (Parent Document)
@@ -176,9 +169,13 @@ exports.createShipmentWithPackages = onCall(
 
       // AGGREGATES
       totals: {
-        totalItems: items.length,
-        received: items.length, // Starts fully received
-        pending: items.length, // All items pending loading
+        // totalItems: items.length,
+        // received: items.length, // Starts fully received
+        // pending: items.length, // All items pending loading
+        totalItems: packagesArray.length, // Total physical boxes
+        received: packagesArray.length,
+        pending: packagesArray.length,
+
         loaded: 0, // Starts at 0
         delivered: 0,
       },
@@ -196,7 +193,8 @@ exports.createShipmentWithPackages = onCall(
       action: "CREATE_SHIPMENT",
       trackingDocId: shipmentRef.id,
       trackingNumber: shipmentId,
-      totalItems: items.length,
+      // totalItems: items.length,
+      totalItems: packagesArray.length, // Log the actual box count
       originCode: finalOriginCode,
       destinationCode: finalDestCode,
       actorId: request.auth.uid,

@@ -49,25 +49,37 @@ export default function ReceivePackageForm({ profile, onNext, initialData }) {
   // --- Logic Helpers ---
   useEffect(() => {
     if (profile?.warehouseName && !routeInfo.origin) {
-      const selected = require("@/app/utility/WarehouseData").WAREHOUSES.find(
-        (w) => w.name === profile.warehouseName,
-      );
-      setRouteInfo((prev) => ({
-        ...prev,
-        origin: profile.warehouseName,
-        originCode: selected?.code || "",
-      }));
+      handleWarehouseChange("origin", profile.warehouseName);
     }
   }, [profile, routeInfo.origin]);
 
   const handleWarehouseChange = (type, value) => {
     const { WAREHOUSES } = require("@/app/utility/WarehouseData");
     const selected = WAREHOUSES.find((w) => w.name === value);
+
+    // 1. Update Route Info (Standard)
     setRouteInfo((prev) => ({
       ...prev,
       [type]: value,
       [`${type}Code`]: selected?.code || "",
     }));
+
+    // 2. Auto-fill Contact Address if warehouse has data
+    if (selected?.city && selected?.province) {
+      if (type === "origin") {
+        setSender((prev) => ({
+          ...prev,
+          city: selected.city,
+          province: selected.province,
+        }));
+      } else if (type === "destination") {
+        setRecipient((prev) => ({
+          ...prev,
+          city: selected.city,
+          province: selected.province,
+        }));
+      }
+    }
   };
 
   const handleNext = (e) => {
@@ -78,7 +90,7 @@ export default function ReceivePackageForm({ profile, onNext, initialData }) {
       return alert("Select Warehouses.");
     if (routeInfo.originCode === routeInfo.destinationCode)
       return alert("Origin and Destination cannot be the same.");
-    if (items.some((it) => !it.description || !it.weight))
+    if (items.some((it) => !it.description || !it.quantity))
       return alert("Please fill in all item details.");
 
     // "Emit" the data to the Unified Modal state
