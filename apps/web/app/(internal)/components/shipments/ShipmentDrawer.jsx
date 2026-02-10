@@ -253,7 +253,7 @@ export default function ShipmentDrawer({ isOpen, onClose, data }) {
                 onClick={() =>
                   // window.open(`../print/labels?id=${data.id}`, "_blank")
                   window.open(
-                    `/print/labels?id=${encodeURIComponent(data.id)}`,
+                    `/components/print/labels?id=${encodeURIComponent(data.id)}`,
                     "_blank",
                   )
                 }
