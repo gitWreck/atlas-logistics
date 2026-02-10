@@ -17,7 +17,8 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.atlas.atlastracking",
       "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSLocationWhenInUseUsageDescription": "Atlas uses your location to update package tracking and trip progress while you are on the road."
       }
     },
     "android": {

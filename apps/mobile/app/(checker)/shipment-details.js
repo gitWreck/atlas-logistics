@@ -12,6 +12,7 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { getFunctions, httpsCallable } from "firebase/functions";
 import { doc, onSnapshot } from "firebase/firestore";
 import { db } from "../../firebase";
+import GetLocation from "react-native-get-location";
 
 // ✅ IMPORT NEW COMPONENTS
 import ShipmentHeader from "../../components/checker/shipment-details/ShipmentHeader";
@@ -26,6 +27,24 @@ export default function ShipmentDetailsScreen() {
   const [packages, setPackages] = useState([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
+
+  const getCurrentLocationSafe = async () => {
+    try {
+      const loc = await GetLocation.getCurrentPosition({
+        enableHighAccuracy: true,
+        timeout: 15000,
+      });
+
+      if (!loc) return null;
+      return {
+        lat: loc.latitude,
+        lng: loc.longitude,
+      };
+    } catch (error) {
+      console.log("Location error (checker shipment-details):", error);
+      return null;
+    }
+  };
 
   // 1. FETCH PACKAGES
   useEffect(() => {
@@ -64,9 +83,11 @@ export default function ShipmentDetailsScreen() {
       const functions = getFunctions(undefined, "asia-southeast1");
       const scanPackages = httpsCallable(functions, "scanPackages");
 
+      const location = await getCurrentLocationSafe();
       const result = await scanPackages({
         barcode: pkg.trackingNumber,
         mode: newMode,
+        ...(location ? { location } : {}),
       });
 
       Alert.alert("Success", result.data.message);

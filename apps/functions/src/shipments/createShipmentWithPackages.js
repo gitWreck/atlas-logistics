@@ -24,7 +24,8 @@ exports.createShipmentWithPackages = onCall(
       destinationCode, // NEW
       items,
       remarks,
-    } = request.data;
+      location, // Optional { lat, lng } for initial status location
+    } = request.data || {};
 
     // --- VALIDATION ---
     if (!origin || !destination) {
@@ -167,8 +168,16 @@ exports.createShipmentWithPackages = onCall(
 
       status: "RECEIVED",
       statusHistory: [
-        { status: "RECEIVED", at: now, note: "Shipment Created" },
+        {
+          status: "RECEIVED",
+          at: now,
+          note: "Shipment Created",
+          location: location || null,
+        },
       ],
+
+      // Latest known geo location for this shipment (if provided)
+      ...(location ? { lastLocation: location } : {}),
 
       public: false,
       archived: false,

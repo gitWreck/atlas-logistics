@@ -12,7 +12,7 @@ exports.bulkUpdateShipmentStatus = onCall(
   async (req) => {
     // 1. AUTHENTICATION
     const uid = await requireAuth(req);
-    const { tripId, shipmentIds, newStatus } = req.data;
+    const { tripId, shipmentIds, newStatus, location } = req.data || {};
 
     // 2. VALIDATION
     if (!tripId || !shipmentIds || !Array.isArray(shipmentIds) || !newStatus) {
@@ -99,6 +99,14 @@ exports.bulkUpdateShipmentStatus = onCall(
         }));
 
         // 4. Update Shipment Doc
+        const historyEntry = {
+          status: "COMPLETED",
+          at: new Date(),
+          by: uid,
+          note: "Bulk status update to COMPLETED",
+          location: location || null,
+        };
+
         batch.update(shipmentRef, {
           status: "COMPLETED",
           "totals.pending": 0,
@@ -108,6 +116,8 @@ exports.bulkUpdateShipmentStatus = onCall(
           packages: updatedPackages,
           updatedAt: timestamp,
           updatedBy: uid,
+          statusHistory: admin.firestore.FieldValue.arrayUnion(historyEntry),
+          ...(location ? { lastLocation: location } : {}),
         });
 
         // 5. Update Trip Manifest Doc
@@ -124,10 +134,20 @@ exports.bulkUpdateShipmentStatus = onCall(
       // ====================================================
       else {
         // Just update the status text. Do not touch the counters.
+        const historyEntry = {
+          status: newStatus,
+          at: new Date(),
+          by: uid,
+          note: `Bulk status update to ${newStatus}`,
+          location: location || null,
+        };
+
         batch.update(shipmentRef, {
           status: newStatus,
           updatedAt: timestamp,
           updatedBy: uid,
+          statusHistory: admin.firestore.FieldValue.arrayUnion(historyEntry),
+          ...(location ? { lastLocation: location } : {}),
         });
 
         // Map status for manifest (Optional logic)

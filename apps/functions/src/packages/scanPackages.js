@@ -48,6 +48,7 @@ exports.scanPackages = onCall(
     const rawBarcode = req.data.barcode;
     const barcode = (rawBarcode || "").trim();
     const mode = req.data.mode; // "loading" or "delivering"
+    const location = req.data.location || null; // Optional { lat, lng }
 
     logger.info("🔍 SCAN START", { barcode, mode, user: uid, role: userRole });
 
@@ -150,6 +151,7 @@ exports.scanPackages = onCall(
       by: uid,
       at: isoDate,
       tripId: tripId,
+      location: location || null,
     };
 
     const updatedPackages = shipmentData.packages.map((pkg) => {
@@ -177,6 +179,7 @@ exports.scanPackages = onCall(
       updatedAt: timestamp,
       updatedBy: uid,
       ...totalUpdates,
+      ...(location ? { lastLocation: location } : {}),
     });
 
     // B. Update Trip Shipment (Manifest Logic)
@@ -253,10 +256,36 @@ exports.scanPackages = onCall(
       shipmentData.status !== "IN_TRANSIT"
     ) {
       // 🚛 Start moving
-      batch.update(shipmentDoc.ref, { status: "IN_TRANSIT" });
+      const historyEntry = {
+        status: "IN_TRANSIT",
+        at: new Date(),
+        by: uid,
+        note: "Auto-marked IN_TRANSIT via scan",
+        location: location || null,
+      };
+
+      batch.update(shipmentDoc.ref, {
+        status: "IN_TRANSIT",
+        updatedAt: timestamp,
+        statusHistory: admin.firestore.FieldValue.arrayUnion(historyEntry),
+        ...(location ? { lastLocation: location } : {}),
+      });
     } else if (mode === "delivering" && currentDelivered >= totalItems) {
       // ✅ Finished
-      batch.update(shipmentDoc.ref, { status: "COMPLETED" });
+      const historyEntry = {
+        status: "COMPLETED",
+        at: new Date(),
+        by: uid,
+        note: "Auto-marked COMPLETED via scan",
+        location: location || null,
+      };
+
+      batch.update(shipmentDoc.ref, {
+        status: "COMPLETED",
+        updatedAt: timestamp,
+        statusHistory: admin.firestore.FieldValue.arrayUnion(historyEntry),
+        ...(location ? { lastLocation: location } : {}),
+      });
     }
 
     // 2. TRIP SHIPMENT STATUS (Manifest)
