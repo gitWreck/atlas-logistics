@@ -7,15 +7,25 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
+  TouchableOpacity,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { createUserWithEmailAndPassword } from "firebase/auth";
-import { doc, setDoc, serverTimestamp } from "firebase/firestore";
+import {
+  doc,
+  setDoc,
+  serverTimestamp,
+  collection,
+  query,
+  where,
+  getDocs,
+} from "firebase/firestore";
 
 import { auth, db } from "../../firebase";
 import AtlasInput from "../../components/ui/AtlasInput";
 import GradientButton from "../../components/ui/figma/GradientButton";
 import LoginHeader from "../../components/auth/LoginHeader";
+import { Image } from "expo-image";
 
 export default function CustomerSignupScreen() {
   const router = useRouter();
@@ -29,7 +39,7 @@ export default function CustomerSignupScreen() {
   const [disabled, setDisabled] = useState(true);
   const [loading, setLoading] = useState(false);
 
-  const validateEmail = (value) => /\S+@\S+\.\S+/.test(value);
+  const validateEmail = (value) => /\S+@\S+\.\S+/.test(value.trim());
 
   const updateDisabled = (
     fullNameValue,
@@ -38,20 +48,14 @@ export default function CustomerSignupScreen() {
     confirmPasswordValue,
     phoneValue,
   ) => {
-    const isEmailValid = validateEmail(emailValue);
     const hasAllFields =
       !!fullNameValue &&
       !!emailValue &&
       !!passwordValue &&
       !!confirmPasswordValue &&
       !!phoneValue;
-    const passwordsMatch = passwordValue === confirmPasswordValue;
 
-    if (!hasAllFields || !isEmailValid || !passwordsMatch) {
-      setDisabled(true);
-    } else {
-      setDisabled(false);
-    }
+    setDisabled(!hasAllFields);
   };
 
   const handleFullNameChange = (value) => {
@@ -79,9 +83,37 @@ export default function CustomerSignupScreen() {
     updateDisabled(fullName, email, password, confirmPassword, value);
   };
 
+  const normalizePhilippinesMobile = (raw) => {
+    if (!raw) return "";
+    // Strip all non-digits
+    let digits = raw.replace(/[^\d]/g, "");
+
+    // Handle leading country code 63 or +63
+    if (digits.startsWith("63")) {
+      digits = "0" + digits.slice(2);
+    }
+
+    // If user typed 9xxxxxxxxx, prefix with 0
+    if (digits.length === 10 && digits.startsWith("9")) {
+      digits = "0" + digits;
+    }
+
+    return digits;
+  };
+
   const handleSignup = async () => {
     if (!fullName || !email || !password || !confirmPassword || !phoneNumber) {
       Alert.alert("Missing Fields", "Please fill out all fields.");
+      return;
+    }
+
+    const normalizedPhone = normalizePhilippinesMobile(phoneNumber);
+
+    if (!normalizedPhone.startsWith("09") || normalizedPhone.length !== 11) {
+      Alert.alert(
+        "Invalid Phone Number",
+        "Please enter a valid PH mobile number in 09XXXXXXXXX format.",
+      );
       return;
     }
 
@@ -103,12 +135,41 @@ export default function CustomerSignupScreen() {
       return;
     }
 
-    setLoading(true);
-
     try {
+      // Check for duplicates in Firestore first
+      const usersRef = collection(db, "users");
+      const [emailSnap, identitySnap] = await Promise.all([
+        getDocs(query(usersRef, where("email", "==", email.trim()))),
+        getDocs(
+          query(
+            usersRef,
+            where("name", "==", fullName.trim()),
+            where("phoneNumber", "==", normalizedPhone),
+          ),
+        ),
+      ]);
+
+      if (!emailSnap.empty) {
+        Alert.alert(
+          "Duplicate Email",
+          "An account with this email already exists. Please sign in instead.",
+        );
+        return;
+      }
+
+      if (!identitySnap.empty) {
+        Alert.alert(
+          "Duplicate Customer",
+          "A customer with the same name and phone number already exists.",
+        );
+        return;
+      }
+
+      setLoading(true);
+
       const userCredential = await createUserWithEmailAndPassword(
         auth,
-        email,
+        email.trim(),
         password,
       );
 
@@ -119,10 +180,10 @@ export default function CustomerSignupScreen() {
       await setDoc(userDocRef, {
         // Align fields with web "Add New User" user document shape
         uid: user.uid,
-        email,
-        name: fullName,
+        email: email.trim(),
+        name: fullName.trim(),
         role: "customer",
-        phoneNumber: phoneNumber || null,
+        phoneNumber: normalizedPhone || null,
         warehouseId: null,
         active: true,
         status: "active",
@@ -168,6 +229,19 @@ export default function CustomerSignupScreen() {
       style={styles.container}
     >
       <ScrollView contentContainerStyle={styles.scrollContainer}>
+        <View style={styles.headerRow}>
+          <TouchableOpacity
+            style={styles.backBtn}
+            onPress={() => router.back()}
+            activeOpacity={0.7}
+          >
+            <Image
+              source={require("../../assets/icons/back.svg")}
+              style={{ width: 20, height: 20 }}
+            />
+          </TouchableOpacity>
+        </View>
+
         <LoginHeader
           title="CUSTOMER SIGNUP"
           subtitle="Create your ATLAS account"
@@ -206,7 +280,7 @@ export default function CustomerSignupScreen() {
 
         <AtlasInput
           label="Phone Number"
-          placeholder="+63 900 000 0000"
+          placeholder="09XX XXX XXXX"
           value={phoneNumber}
           onChangeText={handlePhoneChange}
           keyboardType="phone-pad"
@@ -238,6 +312,17 @@ export default function CustomerSignupScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#FFFFFF" },
   scrollContainer: { flexGrow: 1, justifyContent: "center", padding: 20 },
+  headerRow: {
+    width: "100%",
+    flexDirection: "row",
+    justifyContent: "flex-start",
+    marginBottom: 8,
+  },
+  backBtn: {
+    padding: 8,
+    borderRadius: 9999,
+    backgroundColor: "#e5f2ff",
+  },
   footerTextContainer: {
     marginTop: 24,
     alignItems: "center",
