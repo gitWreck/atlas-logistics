@@ -38,19 +38,19 @@ const styles = StyleSheet.create({
   statsRow: { flexDirection: "row", gap: 12, marginBottom: 20 },
   statCard: {
     flex: 1,
-    backgroundColor: "#1e293b",
+    backgroundColor: "#ffffff",
     padding: 16,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: "#334155",
+    borderColor: "#cbd5e1",
   },
   statVal: {
     fontSize: 24,
     fontWeight: "800",
-    color: "#f8fafc",
+    color: "#0f172a",
     marginBottom: 4,
   },
-  statLabel: { color: "#94a3b8", fontSize: 12, fontWeight: "600" },
+  statLabel: { color: "#475569", fontSize: 12, fontWeight: "600" },
   statSub: { fontSize: 10, color: "#64748b", marginBottom: 8, marginTop: 2 },
   statBar: { height: 4, borderRadius: 2, width: "40%" },
 });

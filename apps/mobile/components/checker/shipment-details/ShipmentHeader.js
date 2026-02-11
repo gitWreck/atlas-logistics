@@ -1,15 +1,16 @@
 import React from "react";
-import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
+import { View, Text, TouchableOpacity, StyleSheet, Platform, StatusBar } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 
 export default function ShipmentHeader({ shipmentId, onBack }) {
   return (
     <View style={styles.header}>
       <TouchableOpacity onPress={onBack} style={styles.backBtn}>
-        <Ionicons name="arrow-back" size={24} color="#f8fafc" />
+        <Ionicons name="arrow-back" size={22} color="#0f172a" />
       </TouchableOpacity>
-      <View>
-        <Text style={styles.title}>Shipment Contents</Text>
+      <View style={styles.textBlock}>
+        <Text style={styles.label}>Shipment</Text>
+        <Text style={styles.title}>Contents</Text>
         <Text style={styles.subtitle}>ID: {shipmentId}</Text>
       </View>
     </View>
@@ -18,16 +19,27 @@ export default function ShipmentHeader({ shipmentId, onBack }) {
 
 const styles = StyleSheet.create({
   header: {
-    padding: 20,
-    paddingTop: 50,
-    backgroundColor: "#0f172a",
+    paddingHorizontal: 20,
+    paddingTop:
+      Platform.OS === "android"
+        ? (StatusBar.currentHeight || 0) + 12
+        : 24,
+    paddingBottom: 16,
+    backgroundColor: "#ffffff",
     flexDirection: "row",
     alignItems: "center",
-    gap: 15,
     borderBottomWidth: 1,
-    borderColor: "#334155",
+    borderColor: "#cbd5e1",
   },
-  backBtn: { padding: 8 },
-  title: { fontSize: 18, fontWeight: "800", color: "#f8fafc" },
-  subtitle: { color: "#94a3b8", fontSize: 12 },
+  backBtn: { padding: 8, marginRight: 8 },
+  textBlock: { flex: 1 },
+  label: {
+    fontSize: 11,
+    fontWeight: "600",
+    color: "#64748b",
+    textTransform: "uppercase",
+    marginBottom: 2,
+  },
+  title: { fontSize: 16, fontWeight: "700", color: "#0f172a" },
+  subtitle: { color: "#475569", fontSize: 12, marginTop: 2 },
 });
