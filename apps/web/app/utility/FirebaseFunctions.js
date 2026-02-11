@@ -5,7 +5,6 @@ import { app as mainApp } from "@/lib/firebase";
 const functions = getFunctions(mainApp, "asia-southeast1");
 
 // PACKAGES
-
 export const createPackage = httpsCallable(functions, "createPackage");
 export const createShipmentWithPackages = httpsCallable(
   functions,
@@ -17,7 +16,6 @@ export const updateShipmentPackages = httpsCallable(
 );
 
 // TRIPS
-
 export const createTruckTrip = httpsCallable(functions, "createTruckTrip");
 export const assignShipmentToTruckTrip = httpsCallable(
   functions,
@@ -33,7 +31,6 @@ export const clearTruckDelay = httpsCallable(functions, "clearTruckDelay");
 export const updateTripStatus = httpsCallable(functions, "updateTripStatus");
 
 // DRIVERS
-
 export const assignDriverToTruckTrip = httpsCallable(
   functions,
   "assignDriverToTruckTrip",
@@ -44,7 +41,6 @@ export const unassignDriverFromTruckTrip = httpsCallable(
 );
 
 // SHIPMENTS
-
 export const generateTripManifest = httpsCallable(
   functions,
   "generateTripManifest",
@@ -69,21 +65,32 @@ export const verifyTripManifest = httpsCallable(
 );
 
 // SMS & COMMUNICATION
-
 export const sendManualSms = httpsCallable(functions, "sendManualSms");
+export const broadcastTripMessage = httpsCallable(
+  functions,
+  "broadcastTripMessage",
+);
+
+// ADMIN
+export const createUserProfile = httpsCallable(functions, "createUserProfile");
+export const toggleUserStatus = httpsCallable(functions, "toggleUserStatus");
+
+// TRUCKS
+export const upsertTruck = httpsCallable(functions, "upsertTruck");
+export const updateTruckStatus = httpsCallable(functions, "updateTruckStatus");
 
 // ----------------------------
 
 export const sendBulkSMSCallable = httpsCallable(functions, "sendBulkSMS");
-export const syncShipmentItemsCallable = httpsCallable(
-  functions,
-  "syncShipmentItems",
-);
-export const setTruckDelayCallable = httpsCallable(functions, "setTruckDelay");
-export const clearTruckDelayCallable = httpsCallable(
-  functions,
-  "clearTruckDelay",
-);
+// export const syncShipmentItemsCallable = httpsCallable(
+//   functions,
+//   "syncShipmentItems",
+// );
+// export const setTruckDelayCallable = httpsCallable(functions, "setTruckDelay");
+// export const clearTruckDelayCallable = httpsCallable(
+//   functions,
+//   "clearTruckDelay",
+// );
 export const setTruckAutoSmsSettingsCallable = httpsCallable(
   functions,
   "setTruckAutoSmsSettings",
@@ -105,5 +112,5 @@ export const completeTripCallable = httpsCallable(functions, "completeTrip");
 
 // ADMIN
 
-export const createUserProfile = httpsCallable(functions, "createUserProfile");
-export const toggleUserStatus = httpsCallable(functions, "toggleUserStatus");
+// export const createUserProfile = httpsCallable(functions, "createUserProfile");
+// export const toggleUserStatus = httpsCallable(functions, "toggleUserStatus");

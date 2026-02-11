@@ -123,9 +123,15 @@ export default function TripOperations({ tripId, isLocked, onSuccess }) {
               onClick={() =>
                 runAction(
                   setStatusChangeStatus,
-                  () => updateTripStatus({ tripId, status: statusSelect }),
+                  () =>
+                    updateTripStatus({
+                      tripId,
+                      status: statusSelect,
+                      notify: notifySms,
+                    }),
                   () => {
                     setStatusSelect("");
+                    setNotifySms(true); // Reset to default
                     if (onSuccess) onSuccess();
                   },
                 )

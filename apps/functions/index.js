@@ -70,7 +70,7 @@ exports.disableTruckTrip =
   require("./src/trips/disableTruckTrip").disableTruckTrip;
 exports.completeTrip = require("./src/trips/completeTrip").completeTrip;
 exports.unlockTripManifest =
-  require("./src/trips/unlockTripManiefest").unlockTripManifest;
+  require("./src/trips/unlockTripManifest").unlockTripManifest;
 exports.updateTripStatus =
   require("./src/trips/updateTripStatus").updateTripStatus;
 
@@ -108,6 +108,11 @@ exports.mirrorShipmentToPublic = mirrorShipmentToPublic;
 exports.syncTrackingPublicHttp = syncTrackingPublicHttp;
 exports.propagateTripUpdates = propagateTripUpdates;
 
+// Trucks
+exports.upsertTruck = require("./src/trucks/handleTruck").upsertTruck;
+exports.updateTruckStatus =
+  require("./src/trucks/handleTruck").updateTruckStatus;
+
 // -------------------------------
 
 // Shipments
@@ -133,7 +138,7 @@ exports.generateTripCertificate =
   require("./src/trips/generateTripCertificate").generateTripCertificate;
 exports.reopenTrip = require("./src/trips/reopenTrip").reopenTrip;
 
-exports.sendSMS = require("./src/messaging/sendSMS").sendSMS;
+// exports.sendSMS = require("./src/messaging/sendSMS").sendSMS;
 exports.sendBulkSMS = require("./src/messaging/sendBulkSMS").sendBulkSMS;
 exports.autoSms = require("./src/messaging/autoSms").autoSms;
 exports.smsAdmin = require("./src/messaging/smsAdmin").smsAdmin;

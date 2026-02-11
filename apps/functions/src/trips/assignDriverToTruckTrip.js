@@ -15,7 +15,7 @@ exports.assignDriverToTruckTrip = onCall(
   async (req) => {
     await requireRole(db, req, ["admin", "manager"]);
 
-    const { truckTripId, driverId, truckPlateNumber } = req.data || {};
+    const { truckTripId, driverId, truckPlateNumber, truckId } = req.data || {};
     if (!truckTripId || typeof truckTripId !== "string") {
       throw new HttpsError("invalid-argument", "truckTripId required");
     }
@@ -79,6 +79,29 @@ exports.assignDriverToTruckTrip = onCall(
         updatedBy: uid,
         updatedRole: role,
       });
+
+      // --- Inside the transaction block ---
+      // 1. If a new truck is being assigned, update its status
+      if (truckId) {
+        const truckRef = db.collection("trucks").doc(truckId);
+
+        tx.update(truckRef, {
+          status: "ASSIGNED",
+          currentTripId: truckTripId,
+          updatedAt: now,
+        });
+      }
+
+      // 2. (Optional but Pro) If the trip already HAD a truck and you are REPLACING it,
+      // you should set the OLD truck back to "IDLE"
+      if (trip.truckId && trip.truckId !== truckId) {
+        const oldTruckRef = db.collection("trucks").doc(trip.truckId);
+        tx.update(oldTruckRef, {
+          status: "IDLE",
+          currentTripId: null,
+          updatedAt: now,
+        });
+      }
 
       // 🧾 Audit log
       tx.set(db.collection("admin_logs").doc(), {

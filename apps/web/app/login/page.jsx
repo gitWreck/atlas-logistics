@@ -10,7 +10,6 @@ import {
   faExclamationCircle,
   faEye,
   faEyeSlash,
-  faLock,
 } from "@fortawesome/free-solid-svg-icons";
 
 export default function LoginPage() {
@@ -89,7 +88,10 @@ export default function LoginPage() {
             alt="Atlas Logo"
             className="w-28 h-28 sm:w-40 sm:h-40 md:w-[200px] md:h-[200px] mx-auto object-contain"
           />
-          <h1 className="text-xl sm:text-2xl font-bold mt-3 sm:mt-4" style={{ color: "#0650A0" }}>
+          <h1
+            className="text-xl sm:text-2xl font-bold mt-3 sm:mt-4"
+            style={{ color: "#0650A0" }}
+          >
             Atlas Login
           </h1>
           <p className="text-xs sm:text-sm mt-1.5 sm:mt-2 text-slate-500 px-2">
@@ -135,7 +137,10 @@ export default function LoginPage() {
                   className="absolute right-3 top-1/2 -translate-y-1/2 p-1.5 text-slate-400 hover:text-slate-600 focus:outline-none focus:text-blue-600"
                   aria-label={showPassword ? "Hide password" : "Show password"}
                 >
-                  <FontAwesomeIcon icon={showPassword ? faEyeSlash : faEye} className="text-lg" />
+                  <FontAwesomeIcon
+                    icon={showPassword ? faEyeSlash : faEye}
+                    className="text-lg"
+                  />
                 </button>
               </div>
             </div>
@@ -170,17 +175,23 @@ export default function LoginPage() {
                   <FontAwesomeIcon icon={faCircleNotch} spin /> Verifying...
                 </>
               ) : (
-                <>
-                  Sign In
-                </>
+                <>Sign In</>
               )}
             </button>
           </form>
 
           {/* Footer – shield.svg + single line; wraps on narrow screens */}
           <div className="flex flex-wrap items-center justify-center gap-x-2 gap-y-1 mt-4 sm:mt-6">
-            <img src="/shield.svg" alt="" className="w-4 h-4 sm:w-[18px] sm:h-[18px] shrink-0" aria-hidden />
-            <p className="text-center text-xs sm:text-[13px]" style={{ color: "#94a3b8" }}>
+            <img
+              src="/shield.svg"
+              alt=""
+              className="w-4 h-4 sm:w-[18px] sm:h-[18px] shrink-0"
+              aria-hidden
+            />
+            <p
+              className="text-center text-xs sm:text-[13px]"
+              style={{ color: "#94a3b8" }}
+            >
               All login attempts are monitored and audited.
             </p>
           </div>
