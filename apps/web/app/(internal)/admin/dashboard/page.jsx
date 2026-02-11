@@ -20,6 +20,7 @@ import PackageManager from "../../components/packages/PackageManager";
 import ManifestPage from "../../components/manifests/ManifestBoard";
 import TabButton from "../../components/ui/TabButton";
 import NotificationBell from "../../components/notifications/NotificationBell";
+import TruckBoard from "../../components/trucks/TruckBoard";
 
 export default function AdminDashboardPage() {
   const router = useRouter();
@@ -105,6 +106,12 @@ export default function AdminDashboardPage() {
               label="Shipment and Packages"
             />
             <TabButton
+              isActive={activeTab === "trucks"}
+              onClick={() => setActiveTab("trucks")}
+              icon={faTruckLoading}
+              label="Truck Management"
+            />
+            <TabButton
               isActive={activeTab === "manifests"}
               onClick={() => setActiveTab("manifests")}
               icon={faTruckLoading}
@@ -123,8 +130,15 @@ export default function AdminDashboardPage() {
       {/* --- CONTENT AREA --- */}
       <main className="max-w-7xl mx-auto p-6">
         {activeTab === "overview" && <AdminOverview />}
-        {activeTab === "trips" && <TripBoard />}
-        {activeTab === "shipments" && <ShipmentBoard userRole="admin" />}
+        {activeTab === "trips" && (
+          <TripBoard user={user} userRole="admin" profile={profile} />
+        )}
+        {activeTab === "shipments" && (
+          <ShipmentBoard user={user} userRole="admin" profile={profile} />
+        )}
+        {activeTab === "trucks" && (
+          <TruckBoard user={user} userRole="admin" profile={profile} />
+        )}
         {activeTab === "manifests" && <ManifestPage />}
         {/* {activeTab === "manager" && <PackageManager />} */}
       </main>

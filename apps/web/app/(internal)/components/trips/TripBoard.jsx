@@ -18,9 +18,8 @@ import { auth } from "@/lib/firebase";
 import { calculateProgress } from "@/app/utility/utilities";
 import TripDrawer from "./TripDrawer";
 import CreateTripModal from "../manifests/modals/CreateTripModal";
-import BulkAssignmentModal from "../manifests/modals/BulkAssignmentModal";
 
-export default function TripBoard({ userRole }) {
+export default function TripBoard({ user, userRole, profile }) {
   const [trips, setTrips] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -41,7 +40,7 @@ export default function TripBoard({ userRole }) {
   const fetchTrips = async () => {
     try {
       setLoading(true);
-      const user = auth.currentUser;
+      // const user = auth.currentUser;
       if (!user) return;
       const token = await user.getIdToken();
 

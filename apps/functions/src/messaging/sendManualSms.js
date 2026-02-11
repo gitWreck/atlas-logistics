@@ -21,6 +21,7 @@ const { buildSmsSignature } = require("../../shared/sms-suppression");
 const { writeAuditEvent } = require("../../shared/audit");
 const { assertAdminOrManager } = require("../system/authGuards");
 const {
+  sendSmsViaProvider,
   SEMAPHORE_API_KEY,
   SEMAPHORE_SENDER_NAME,
 } = require("../../shared/sms-service");
@@ -28,9 +29,6 @@ const {
 if (!admin.apps.length) admin.initializeApp();
 const db = admin.firestore();
 const FieldValue = admin.firestore.FieldValue;
-
-// const SEMAPHORE_API_KEY = defineSecret("SEMAPHORE_API_KEY");
-// const SEMAPHORE_SENDER_NAME = defineSecret("SEMAPHORE_SENDER_NAME");
 
 const MAX_SMS_CREDITS = 5;
 
@@ -44,26 +42,6 @@ function normalizePhonePH(phone) {
   if (p.startsWith("63") && p.length === 12) return p;
   return null;
 }
-
-// async function sendViaSemaphore({ phone, message, apiKey, sender }) {
-//   const res = await fetch("https://api.semaphore.co/api/v4/messages", {
-//     method: "POST",
-//     headers: { "Content-Type": "application/json" },
-//     body: JSON.stringify({
-//       apikey: apiKey,
-//       number: phone,
-//       message,
-//       sendername: sender || undefined,
-//     }),
-//   });
-
-//   if (!res.ok) {
-//     const txt = await res.text().catch(() => "");
-//     throw new Error(`Semaphore ${res.status}: ${txt}`);
-//   }
-
-//   return await res.json().catch(() => ({}));
-// }
 
 /* ======================================================
    FUNCTION
@@ -110,12 +88,12 @@ exports.sendManualSms = onCall(
       );
     }
 
-    const apiKey = SEMAPHORE_API_KEY.value();
-    const sender = SEMAPHORE_SENDER_NAME.value();
+    // const apiKey = SEMAPHORE_API_KEY.value();
+    // const sender = SEMAPHORE_SENDER_NAME.value();
 
-    if (!apiKey || !sender) {
-      throw new HttpsError("failed-precondition", "Semaphore secrets missing");
-    }
+    // if (!apiKey || !sender) {
+    //   throw new HttpsError("failed-precondition", "Semaphore secrets missing");
+    // }
 
     // 🔁 Suppression
     const signature = buildSmsSignature({
@@ -145,11 +123,15 @@ exports.sendManualSms = onCall(
     // 📤 Send
     let providerResult;
     try {
-      providerResult = await sendViaSemaphore({
+      // providerResult = await sendViaSemaphore({
+      //   phone: normalizedPhone,
+      //   message,
+      //   apiKey,
+      //   sender,
+      // });
+      providerResult = await sendSmsViaProvider({
         phone: normalizedPhone,
         message,
-        apiKey,
-        sender,
       });
     } catch (err) {
       await db.collection("sms_logs").add({

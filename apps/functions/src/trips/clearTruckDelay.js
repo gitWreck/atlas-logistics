@@ -1,8 +1,15 @@
 "use strict";
 
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
+const { defineSecret } = require("firebase-functions/params");
+
 const admin = require("firebase-admin");
 const { requireRole } = require("../utilities/helpers");
+const { broadcastTripLogic } = require("../messaging/broadcastTripMessage"); // Import if you want to call it directly
+const { STATUS_MESSAGES } = require("../utilities/dataDetails");
+
+const SEMAPHORE_API_KEY = defineSecret("SEMAPHORE_API_KEY");
+const SEMAPHORE_SENDER_NAME = defineSecret("SEMAPHORE_SENDER_NAME");
 
 if (!admin.apps.length) admin.initializeApp();
 const db = admin.firestore();
@@ -11,7 +18,11 @@ const db = admin.firestore();
    CLEAR TRUCK DELAY (OPTION B — CANONICAL)
 ====================================================== */
 exports.clearTruckDelay = onCall(
-  { region: "asia-southeast1", maxInstances: 10 },
+  {
+    region: "asia-southeast1",
+    maxInstances: 10,
+    secrets: [SEMAPHORE_API_KEY, SEMAPHORE_SENDER_NAME],
+  },
   async (req) => {
     await requireRole(db, req, ["admin", "manager"]);
 
@@ -66,6 +77,34 @@ exports.clearTruckDelay = onCall(
         createdAt: now,
       });
     });
+
+    if (notify === true) {
+      // 1. Define Standard Messages
+
+      const messageText = STATUS_MESSAGES[newStatus];
+
+      if (messageText) {
+        console.log(
+          `[Notify] Sending broadcast for trip ${tripId} with status ${newStatus}`,
+        );
+
+        // 2. Reuse your broadcast logic (Internal Call)
+        // We import the logic from your existing broadcast function or just invoke it here.
+        // Since this is "server-side to server-side", we can just call the logic directly.
+
+        try {
+          broadcastTripLogic({
+            tripId: tripId,
+            message: messageText,
+            actorUid: request.auth.uid || "SYSTEM",
+          }).catch((err) => console.error("Broadcast failed:", err));
+        } catch (err) {
+          console.error("[Notify] Failed to queue SMS:", err);
+          // Don't throw error here, or you will roll back the Status Update!
+          // We want the status to change even if SMS fails.
+        }
+      }
+    }
 
     return {
       success: true,

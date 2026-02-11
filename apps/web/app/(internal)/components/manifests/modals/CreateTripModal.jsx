@@ -11,6 +11,7 @@ import {
 import { createTruckTrip } from "@/app/utility/FirebaseFunctions";
 import DriverSelectInput from "../DriverSelectInput";
 import { WAREHOUSES } from "@/app/utility/WarehouseData"; // <--- IMPORT THIS
+import TruckSelectInput from "../TruckSelectInput";
 
 export default function CreateTripModal({ isOpen, onClose, onSuccess }) {
   const [loading, setLoading] = useState(false);
@@ -31,6 +32,7 @@ export default function CreateTripModal({ isOpen, onClose, onSuccess }) {
     driverName: "",
     driverId: null,
     truckPlateNumber: "",
+    truckId: null,
   });
 
   useEffect(() => {
@@ -98,10 +100,13 @@ export default function CreateTripModal({ isOpen, onClose, onSuccess }) {
 
         scheduledDeparture: formData.scheduledDeparture,
         estimatedArrival: formData.estimatedArrival,
-        helperName: formData.helperName,
-        truckPlateNumber: formData.truckPlateNumber.toUpperCase(),
+
         driverName: formData.driverName,
         driverId: formData.driverId,
+
+        helperName: formData.helperName,
+        truckPlateNumber: formData.truckPlateNumber.toUpperCase(),
+        truckId: formData.truckId,
       });
 
       onSuccess();
@@ -248,6 +253,16 @@ export default function CreateTripModal({ isOpen, onClose, onSuccess }) {
               }
             />
 
+            <TruckSelectInput
+              value={formData.truckPlateNumber}
+              onChange={(val) =>
+                setFormData((prev) => ({ ...prev, truckPlateNumber: val }))
+              }
+              onSelectId={(id) =>
+                setFormData((prev) => ({ ...prev, truckId: id }))
+              }
+            />
+
             <div className="space-y-1">
               <label className="text-xs font-bold text-slate-400 uppercase">
                 Truck Helper / Pahinante
@@ -262,7 +277,7 @@ export default function CreateTripModal({ isOpen, onClose, onSuccess }) {
               />
             </div>
 
-            <div className="space-y-1">
+            {/* <div className="space-y-1">
               <label className="text-xs font-bold text-slate-400 uppercase">
                 Truck Plate #
               </label>
@@ -274,7 +289,7 @@ export default function CreateTripModal({ isOpen, onClose, onSuccess }) {
                   setFormData({ ...formData, truckPlateNumber: e.target.value })
                 }
               />
-            </div>
+            </div> */}
           </div>
 
           {/* Error Message */}

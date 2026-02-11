@@ -19,11 +19,11 @@ const { onDocumentCreated } = require("firebase-functions/v2/firestore");
 const { defineSecret } = require("firebase-functions/params");
 const admin = require("firebase-admin");
 
-const { buildStatusSMS } = require("./buildStatusSMS");
-const { calculateSmsCost } = require("../../shared/sms-cost");
-const { buildSmsSignature } = require("../../shared/sms-suppression");
-const { writeAuditEvent } = require("../../shared/audit");
-const { assertAdminOrManager } = require("../system/authGuards");
+const { buildStatusSMS } = require("../buildStatusSMS");
+const { calculateSmsCost } = require("../../../shared/sms-cost");
+const { buildSmsSignature } = require("../../../shared/sms-suppression");
+const { writeAuditEvent } = require("../../../shared/audit");
+const { assertAdminOrManager } = require("../../system/authGuards");
 
 if (!admin.apps.length) admin.initializeApp();
 const db = admin.firestore();

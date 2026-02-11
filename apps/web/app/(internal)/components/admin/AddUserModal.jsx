@@ -9,6 +9,8 @@ import {
   faCheckCircle,
 } from "@fortawesome/free-solid-svg-icons";
 import { createUserProfile } from "../../../utility/FirebaseFunctions";
+import { WAREHOUSES } from "@/app/utility/WarehouseData";
+import { normalizePhoneNumber } from "@/app/utility/utilities";
 
 export default function AddUserModal({ isOpen, onClose, onSuccess }) {
   const [step, setStep] = useState("FORM");
@@ -20,13 +22,51 @@ export default function AddUserModal({ isOpen, onClose, onSuccess }) {
     password: "",
     role: "driver",
     phoneNumber: "",
-    warehouseId: "",
+    warehouseCode: "",
+    warehouseName: "",
   });
 
   if (!isOpen) return null;
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
+  };
+
+  const handleWarehouseChange = (e) => {
+    const selectedCode = e.target.value;
+
+    // Find the full warehouse object that matches the selected code
+    const selectedWarehouse = WAREHOUSES.find((w) => w.code === selectedCode);
+
+    setFormData({
+      ...formData,
+      warehouseCode: selectedCode,
+      // If found, save the name; otherwise clear it (e.g. if they selected the placeholder)
+      warehouseName: selectedWarehouse ? selectedWarehouse.name : "",
+    });
+  };
+
+  const handlePhoneChange = (e) => {
+    const rawValue = e.target.value;
+
+    // Update state immediately so the user sees what they type
+    setFormData((prev) => ({
+      ...prev,
+      phoneNumber: rawValue,
+    }));
+  };
+
+  const handlePhoneBlur = (e) => {
+    const rawValue = e.target.value;
+    const formatted = normalizePhoneNumber(rawValue);
+
+    // Only update if the formatting actually changed something
+    if (formatted !== formData.phoneNumber) {
+      setFormData((prev) => ({
+        ...prev,
+        phoneNumber: formatted,
+      }));
+    }
   };
 
   const handleNext = (e) => {
@@ -147,7 +187,8 @@ export default function AddUserModal({ isOpen, onClose, onSuccess }) {
                 placeholder="+63 917 123 4567"
                 className="w-full bg-slate-950 border border-slate-700 rounded-lg px-4 py-2.5 text-white focus:border-blue-500 focus:outline-none"
                 value={formData.phoneNumber}
-                onChange={handleChange}
+                onChange={handlePhoneChange}
+                onBlur={handlePhoneBlur}
               />
             </div>
             <div>
@@ -173,15 +214,21 @@ export default function AddUserModal({ isOpen, onClose, onSuccess }) {
                   Assign Warehouse Base
                 </label>
                 <select
-                  name="warehouseId"
+                  name="warehouseCode"
                   className="w-full bg-slate-950 border border-slate-700 rounded-lg px-4 py-2.5 text-white focus:border-blue-500 focus:outline-none appearance-none"
-                  value={formData.warehouseId}
-                  onChange={handleChange}
+                  value={formData.warehouseCode}
+                  // onChange={handleChange}
+                  onChange={handleWarehouseChange}
                 >
                   <option value="">Select Warehouse...</option>
                   {/* Ideally, fetch these from Firestore too */}
-                  <option value="hub-mnl">Manila Hub</option>
-                  <option value="hub-ceb">Cebu Hub</option>
+                  {/* <option value="hub-mnl">Manila Hub</option>
+                  <option value="hub-ceb">Cebu Hub</option> */}
+                  {WAREHOUSES.map((w, i) => (
+                    <option key={i} value={w.code}>
+                      {w.name}
+                    </option>
+                  ))}
                 </select>
               </div>
             )}
@@ -222,7 +269,7 @@ export default function AddUserModal({ isOpen, onClose, onSuccess }) {
               <br />
               Warehouse:{" "}
               <strong className="text-white">
-                {formData.warehouseId || "None"}
+                {formData.warehouseName || "None"}
               </strong>
             </p>
             <div className="flex gap-3">

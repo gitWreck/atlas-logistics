@@ -3,6 +3,9 @@
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const admin = require("firebase-admin");
 const { assertAdminOrManager } = require("../system/authGuards");
+
+// 1. IMPORT EVERYTHING FROM SHARED SERVICE
+// We get the function AND the Secret definitions from one place.
 const {
   sendSmsViaProvider,
   SEMAPHORE_API_KEY,
@@ -16,9 +19,6 @@ const db = admin.firestore();
  * ==================================================================
  * CORE LOGIC: broadcastTripLogic
  * Purpose: Reusable function to blast SMS to all customers on a trip.
- * Can be called by:
- * 1. The 'broadcastTripMessage' Cloud Function (Manual Button)
- * 2. The 'updateTripStatus' Cloud Function (Automated Status Changes)
  * ==================================================================
  */
 async function broadcastTripLogic({
@@ -43,14 +43,12 @@ async function broadcastTripLogic({
   }
 
   // 2. Extract Unique Phone Numbers (Deduplication)
-  const recipients = new Map(); // Map ensures unique keys (phones)
+  const recipients = new Map();
 
   shipmentsSnap.forEach((doc) => {
     const data = doc.data();
-    // We assume 'recipient.phone' is the field. Adjust if needed.
     const phone = data.recipient?.phone;
 
-    // Simple validity check (length > 10)
     if (phone && typeof phone === "string" && phone.length >= 10) {
       recipients.set(phone, {
         phone,
@@ -73,12 +71,12 @@ async function broadcastTripLogic({
     `[Broadcast] Starting ${type} for Trip ${tripId} to ${totalRecipients} unique numbers.`,
   );
 
-  // 3. Send Messages (Parallel Execution)
-  // Promise.allSettled ensures one failure doesn't stop the others
+  // 3. Send Messages
   const results = await Promise.allSettled(
     uniqueList.map(async (recipient) => {
       try {
-        await sendSmsViaProvider(recipient.phone, message);
+        // This calls the shared function which uses .value() internally
+        await sendSmsViaProvider({ phone: recipient.phone, message });
         return { status: "fulfilled", phone: recipient.phone };
       } catch (err) {
         console.error(
@@ -98,10 +96,10 @@ async function broadcastTripLogic({
   const successCount = results.filter((r) => r.status === "fulfilled").length;
   const failCount = totalRecipients - successCount;
 
-  // 5. Audit / Logging (Write to DB)
+  // 5. Audit / Logging
   try {
     await db.collection("sms_logs").add({
-      type: type, // "BROADCAST" or "AUTO_STATUS"
+      type: type,
       tripId,
       message,
       requestedBy: actorUid || "SYSTEM",
@@ -113,7 +111,6 @@ async function broadcastTripLogic({
     });
   } catch (logErr) {
     console.error("Failed to write sms_log:", logErr);
-    // Don't throw error here, the SMS was already sent.
   }
 
   return {
@@ -133,18 +130,16 @@ async function broadcastTripLogic({
 exports.broadcastTripMessage = onCall(
   {
     region: "asia-southeast1",
+    // 2. PASS THE IMPORTED SECRETS HERE
+    // This allows this function to access the keys needed by sendSmsViaProvider
     secrets: [SEMAPHORE_API_KEY, SEMAPHORE_SENDER_NAME],
-    timeoutSeconds: 300, // 5 minutes max for large batches
+    timeoutSeconds: 300,
     memory: "256MiB",
   },
   async (request) => {
-    // 1. Auth Guard (Admin/Manager Only)
     const actor = await assertAdminOrManager(request);
-
-    // 2. Unpack Data
     const { tripId, message } = request.data;
 
-    // 3. Execute Shared Logic
     try {
       const result = await broadcastTripLogic({
         tripId,
@@ -160,3 +155,6 @@ exports.broadcastTripMessage = onCall(
     }
   },
 );
+
+// 3. EXPORT THE LOGIC so updateTripStatus.js can use it
+exports.broadcastTripLogic = broadcastTripLogic;

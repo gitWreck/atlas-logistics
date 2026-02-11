@@ -43,6 +43,12 @@ exports.createTruckTrip = onCall(
     const driverName = optionalString(req.data?.driverName);
     const driverId = optionalString(req.data?.driverId);
 
+    // Add this near tripRef definition
+    const truckDocId = req.data?.truckId; // Ensure you pass 'truckId' from the frontend
+    const truckRef = truckDocId
+      ? db.collection("trucks").doc(truckDocId)
+      : null;
+
     const snap = await db.collection("users").doc(driverId).get();
     const driver = snap.data();
 
@@ -79,9 +85,9 @@ exports.createTruckTrip = onCall(
       const tripData = {
         // identity
         tripId,
-        origin: req.data?.originCity,
+        origin: req.data?.origin,
         originCode,
-        destination: req.data?.destinationCity,
+        destination: req.data?.destination,
         destinationCode,
         route: originCode + " -> " + destinationCode || null,
 
@@ -120,6 +126,25 @@ exports.createTruckTrip = onCall(
         updatedBy: req.auth.uid,
         updatedRole: role,
       };
+
+      // --- TRUCK STATUS UPDATE ---
+      if (truckRef) {
+        const truckSnap = await tx.get(truckRef);
+        if (!truckSnap.exists) {
+          throw new HttpsError(
+            "not-found",
+            "The selected truck was not found.",
+          );
+        }
+
+        // Logic: Change status from IDLE to ASSIGNED
+        tx.update(truckRef, {
+          status: "ASSIGNED",
+          currentTripId: tripId,
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          updatedBy: req.auth.uid,
+        });
+      }
 
       tx.set(tripRef, tripData);
 

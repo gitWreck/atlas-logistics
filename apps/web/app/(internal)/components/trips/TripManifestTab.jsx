@@ -117,7 +117,10 @@ export default function TripManifestTab({
           <div className="flex gap-2">
             <button
               onClick={() =>
-                window.open(`/print/labels?tripId=${tripId}`, "_blank")
+                window.open(
+                  `/components/print/labels?tripId=${tripId}`,
+                  "_blank",
+                )
               }
               className="bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-xs font-bold px-3 py-1.5 rounded flex items-center gap-2 transition-colors"
               title="Print All Labels"
