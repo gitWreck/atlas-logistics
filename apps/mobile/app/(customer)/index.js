@@ -236,7 +236,7 @@ export default function CustomerDashboard() {
             <View style={styles.modalInputWrapper}>
               <AtlasInput
                 label="Tracking Number"
-                placeholder="e.g. ATLAS-123456"
+                placeholder="e.g. AT-20260203-MNL-CEB-123456"
                 value={trackingNumber}
                 onChangeText={setTrackingNumber}
               />

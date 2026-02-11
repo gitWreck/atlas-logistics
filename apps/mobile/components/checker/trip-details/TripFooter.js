@@ -1,5 +1,6 @@
 import React from "react";
 import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
+import GradientButton from "../../ui/figma/GradientButton";
 
 export default function TripFooter({ trip, onFinish }) {
   if (!trip || (trip.status !== "ASSIGNED" && trip.status !== "LOADING")) {
@@ -23,38 +24,41 @@ export default function TripFooter({ trip, onFinish }) {
         </View>
       </View>
 
-      <TouchableOpacity
-        style={[
-          styles.finishBtn,
-          loaded > 0 ? styles.btnActive : styles.btnDisabled,
-        ]}
+      <GradientButton
+        title="Finish & Release"
         onPress={onFinish}
         disabled={loaded === 0}
-      >
-        <Text style={styles.finishText}>FINISH & RELEASE</Text>
-      </TouchableOpacity>
+      />
+
+      {loaded === 0 && (
+        <Text style={styles.helperText}>
+          Scan at least one package before releasing this trip.
+        </Text>
+      )}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   footer: {
-    padding: 20,
+    paddingHorizontal: 20,
+    paddingTop: 12,
+    paddingBottom: 20,
     borderTopWidth: 1,
-    borderTopColor: "#334155",
-    backgroundColor: "#1e293b",
+    borderTopColor: "#cbd5e1",
+    backgroundColor: "#ffffff",
   },
-  progressRow: { marginBottom: 15 },
+  progressRow: { marginBottom: 12 },
   progressText: {
-    color: "#94a3b8",
+    color: "#475569",
     marginBottom: 8,
     fontSize: 12,
-    fontWeight: "bold",
+    fontWeight: "600",
     textAlign: "right",
   },
   progressBarBg: {
     height: 6,
-    backgroundColor: "#334155",
+    backgroundColor: "#e5e7eb",
     borderRadius: 3,
     overflow: "hidden",
   },
@@ -62,18 +66,10 @@ const styles = StyleSheet.create({
     height: "100%",
     backgroundColor: "#10b981",
   },
-  finishBtn: {
-    padding: 18,
-    borderRadius: 12,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  btnActive: { backgroundColor: "#3b82f6" },
-  btnDisabled: { backgroundColor: "#475569" },
-  finishText: {
-    color: "#fff",
-    fontWeight: "bold",
-    fontSize: 16,
-    letterSpacing: 1,
+  helperText: {
+    marginTop: 8,
+    fontSize: 11,
+    color: "#64748b",
+    textAlign: "center",
   },
 });

@@ -19,7 +19,7 @@ export default function ShipmentControls({
       <TextInput
         style={styles.searchInput}
         placeholder="Search shipment ID or route..."
-        placeholderTextColor="#64748b"
+        placeholderTextColor="#94a3b8"
         value={search}
         onChangeText={onSearchChange}
       />
@@ -45,16 +45,22 @@ export default function ShipmentControls({
 }
 
 const styles = StyleSheet.create({
-  controls: { padding: 16, gap: 10 },
+  controls: {
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 10,
+    gap: 10,
+    backgroundColor: "#f1f5f9",
+  },
   searchInput: {
-    backgroundColor: "#1e293b",
+    backgroundColor: "#ffffff",
     padding: 12,
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: "#334155",
-    color: "#f8fafc",
+    borderColor: "#cbd5e1",
+    color: "#0f172a",
   },
   actionRow: { flexDirection: "row", gap: 10 },
-  smallBtn: { flex: 1, padding: 10, borderRadius: 8, alignItems: "center" },
-  btnText: { color: "#fff", fontWeight: "700", fontSize: 12 },
+  smallBtn: { flex: 1, padding: 10, borderRadius: 9999, alignItems: "center" },
+  btnText: { color: "#fff", fontWeight: "600", fontSize: 12 },
 });

@@ -135,7 +135,7 @@ export default function ShipmentDetailsScreen() {
       {/* 2. LOADING OVERLAY */}
       {actionLoading && (
         <View style={styles.loaderOverlay}>
-          <ActivityIndicator size="large" color="#3b82f6" />
+          <ActivityIndicator size="large" color="#042C83" />
         </View>
       )}
 
@@ -144,14 +144,14 @@ export default function ShipmentDetailsScreen() {
 
       {/* 4. LIST */}
       {loading ? (
-        <View style={{ flex: 1, justifyContent: "center" }}>
-          <ActivityIndicator size="large" color="#3b82f6" />
+        <View style={styles.loadingWrapper}>
+          <ActivityIndicator size="large" color="#042C83" />
         </View>
       ) : (
         <FlatList
           data={filtered}
           keyExtractor={(item) => item.trackingNumber}
-          contentContainerStyle={{ paddingBottom: 100 }}
+          contentContainerStyle={styles.listContent}
           renderItem={({ item }) => (
             <PackageListItem item={item} onPress={handlePackagePress} />
           )}
@@ -165,17 +165,25 @@ export default function ShipmentDetailsScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#0f172a" },
+  container: { flex: 1, backgroundColor: "#f1f5f9" },
   loaderOverlay: {
     position: "absolute",
     top: 0,
     bottom: 0,
     left: 0,
     right: 0,
-    backgroundColor: "rgba(15, 23, 42, 0.9)",
+    backgroundColor: "rgba(15, 23, 42, 0.15)",
     zIndex: 20,
     justifyContent: "center",
     alignItems: "center",
   },
-  emptyText: { textAlign: "center", color: "#64748b", marginTop: 40 },
+  loadingWrapper: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  listContent: {
+    paddingBottom: 120,
+  },
+  emptyText: { textAlign: "center", color: "#475569", marginTop: 40 },
 });

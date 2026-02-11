@@ -1,5 +1,5 @@
 import React from "react";
-import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
+import { View, Text, TouchableOpacity, StyleSheet, Platform } from "react-native";
 import { FontAwesome5 } from "@expo/vector-icons";
 import { COLORS } from "../../components/constants/theme"; // Adjust path
 import StatusBadge from "../../components/ui/StatusBadge"; // Adjust path
@@ -56,9 +56,13 @@ const CheckerTripCard = ({ trip, onPress }) => {
       </View>
 
       {/* FOOTER: Action */}
-      <TouchableOpacity style={styles.actionBtn} onPress={() => onPress(trip)}>
-        <Text style={styles.actionText}>MANAGE LOAD</Text>
-        <FontAwesome5 name="arrow-right" size={12} color="#fff" />
+      <TouchableOpacity
+        style={styles.actionRow}
+        onPress={() => onPress(trip)}
+        activeOpacity={0.7}
+      >
+        <Text style={styles.actionText}>Manage Load</Text>
+        <FontAwesome5 name="arrow-right" size={12} color="#067FC6" />
       </TouchableOpacity>
     </View>
   );
@@ -68,12 +72,23 @@ export default CheckerTripCard;
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: COLORS.card,
-    borderRadius: 16,
+    backgroundColor: "#ffffff",
+    borderRadius: 12,
     padding: 16,
     marginBottom: 16,
     borderWidth: 1,
-    borderColor: "#334155",
+    borderColor: "#cbd5e1",
+    ...Platform.select({
+      ios: {
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.06,
+        shadowRadius: 6,
+      },
+      android: {
+        elevation: 2,
+      },
+    }),
   },
   cardHeader: {
     flexDirection: "row",
@@ -85,21 +100,21 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 4,
-    backgroundColor: "#1e293b",
+    backgroundColor: "#e5f2ff",
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 6,
   },
-  idText: { color: "#94a3b8", fontWeight: "bold", fontSize: 12 },
+  idText: { color: "#0f172a", fontWeight: "600", fontSize: 12 },
 
   body: { marginBottom: 16 },
   plateText: {
-    color: "#fff",
-    fontSize: 20,
-    fontWeight: "800",
+    color: "#0f172a",
+    fontSize: 18,
+    fontWeight: "700",
     letterSpacing: 1,
   },
-  routeText: { color: "#94a3b8", fontSize: 12, marginTop: 2 },
+  routeText: { color: "#475569", fontSize: 12, marginTop: 2 },
 
   progressContainer: { marginBottom: 16 },
   progressRow: {
@@ -113,26 +128,24 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     textTransform: "uppercase",
   },
-  progressValue: { color: "#fff", fontSize: 12, fontWeight: "bold" },
+  progressValue: { color: "#0f172a", fontSize: 12, fontWeight: "600" },
 
   progressBarBg: {
     height: 8,
-    backgroundColor: "#0f172a",
+    backgroundColor: "#e5e7eb",
     borderRadius: 4,
     overflow: "hidden",
     borderWidth: 1,
-    borderColor: "#334155",
+    borderColor: "#cbd5e1",
   },
   progressBarFill: { height: "100%", borderRadius: 4 },
 
-  actionBtn: {
+  actionRow: {
     flexDirection: "row",
     justifyContent: "center",
     alignItems: "center",
-    paddingVertical: 12,
-    backgroundColor: "#334155",
-    borderRadius: 8,
-    gap: 8,
+    marginTop: 4,
+    gap: 6,
   },
-  actionText: { color: "#fff", fontWeight: "700", fontSize: 12 },
+  actionText: { color: "#067FC6", fontWeight: "600", fontSize: 13 },
 });
