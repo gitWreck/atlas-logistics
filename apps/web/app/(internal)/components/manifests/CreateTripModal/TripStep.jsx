@@ -21,12 +21,16 @@ import { db } from "@/lib/firebase";
 import { createTruckTrip } from "@/app/utility/FirebaseFunctions";
 import ScheduleSection from "./ScheduleSection";
 import VehicleDetails from "./VehicleDetails";
+import { useAlert } from "@/app/context/AlertContext";
 
 export default function TripStep({ shipmentDraft, onBack, onComplete }) {
+  const { showAlert, showConfirm } = useAlert();
+
   const [view, setView] = useState("selection");
   const [trips, setTrips] = useState([]);
   const [loading, setLoading] = useState(false);
   const destinationCode = shipmentDraft?.routeInfo?.destinationCode;
+  const destination = shipmentDraft?.routeInfo?.destination;
 
   const [newTripData, setNewTripData] = useState({
     origin: shipmentDraft?.routeInfo?.origin || "",
@@ -71,7 +75,7 @@ export default function TripStep({ shipmentDraft, onBack, onComplete }) {
       setView("selection"); // Go back to list
       fetchTrips(); // Refresh list to show new trip on top
     } catch (err) {
-      alert("Failed to create trip: " + err.message);
+      showAlert("error", "Failed to create trip", err.message);
     } finally {
       setLoading(false);
     }
@@ -86,9 +90,7 @@ export default function TripStep({ shipmentDraft, onBack, onComplete }) {
               <h3 className="text-lg font-bold text-white">Assign to Trip</h3>
               <p className="text-xs text-slate-400">
                 Destination:{" "}
-                <span className="text-blue-400 font-bold">
-                  {destinationCode}
-                </span>
+                <span className="text-blue-400 font-bold">{destination}</span>
               </p>
             </div>
 
