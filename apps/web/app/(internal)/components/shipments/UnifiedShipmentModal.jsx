@@ -13,8 +13,11 @@ import {
   createShipmentWithPackages,
   assignShipmentToTruckTrip,
 } from "@/app/utility/FirebaseFunctions";
+import { useAlert } from "@/app/context/AlertContext";
 
 export default function UnifiedShipmentModal({ profile, isOpen, onClose }) {
+  const { showAlert, showConfirm } = useAlert();
+
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [shipmentDraft, setShipmentDraft] = useState(null);
@@ -25,77 +28,83 @@ export default function UnifiedShipmentModal({ profile, isOpen, onClose }) {
   const [sendSms, setSendSms] = useState(true);
 
   const handleMasterSubmit = async (tripDecision) => {
-    // NEW: Confirmation Logic for Trip Assignment
-    if (tripDecision && tripDecision.tripId) {
-      const confirmAssign = window.confirm(
-        `Confirm assignment to Trip: ${tripDecision.tripId}?\nThis will generate labels for this trip immediately.`,
-      );
-      if (!confirmAssign) return;
-    }
-
-    setLoading(true);
-    try {
-      const payload = {
-        sender: {
-          name: shipmentDraft.sender.name,
-          phone: shipmentDraft.sender.phone,
-          details: {
-            unit: shipmentDraft.sender.unit,
-            street: shipmentDraft.sender.street,
-            barangay: shipmentDraft.sender.barangay,
-            city: shipmentDraft.sender.city, // Optional: Keep manual city entry for door-to-door info
-            province: shipmentDraft.sender.province,
+    const executeSubmission = async () => {
+      setLoading(true);
+      try {
+        const payload = {
+          sender: {
+            name: shipmentDraft.sender.name,
+            phone: shipmentDraft.sender.phone,
+            details: {
+              unit: shipmentDraft.sender.unit,
+              street: shipmentDraft.sender.street,
+              barangay: shipmentDraft.sender.barangay,
+              city: shipmentDraft.sender.city, // Optional: Keep manual city entry for door-to-door info
+              province: shipmentDraft.sender.province,
+            },
           },
-        },
 
-        recipient: {
-          name: shipmentDraft.recipient.name,
-          phone: shipmentDraft.recipient.phone,
-          details: {
-            unit: shipmentDraft.recipient.unit,
-            street: shipmentDraft.recipient.street,
-            barangay: shipmentDraft.recipient.barangay,
-            city: shipmentDraft.recipient.city,
-            province: shipmentDraft.recipient.province,
+          recipient: {
+            name: shipmentDraft.recipient.name,
+            phone: shipmentDraft.recipient.phone,
+            details: {
+              unit: shipmentDraft.recipient.unit,
+              street: shipmentDraft.recipient.street,
+              barangay: shipmentDraft.recipient.barangay,
+              city: shipmentDraft.recipient.city,
+              province: shipmentDraft.recipient.province,
+            },
           },
-        },
 
-        // --- 3. UPDATED: USE ROUTE INFO FOR CODES ---
+          // --- 3. UPDATED: USE ROUTE INFO FOR CODES ---
 
-        origin: shipmentDraft.routeInfo.origin,
-        originCode: shipmentDraft.routeInfo.originCode,
-        destination: shipmentDraft.routeInfo.destination,
-        destinationCode: shipmentDraft.routeInfo.destinationCode,
-        items: shipmentDraft.items,
-        remarks: shipmentDraft.remarks,
-        notifySms: sendSms,
-      };
+          origin: shipmentDraft.routeInfo.origin,
+          originCode: shipmentDraft.routeInfo.originCode,
+          destination: shipmentDraft.routeInfo.destination,
+          destinationCode: shipmentDraft.routeInfo.destinationCode,
+          items: shipmentDraft.items,
+          remarks: shipmentDraft.remarks,
+          notifySms: sendSms,
+        };
 
-      const shipmentRes = await createShipmentWithPackages(payload);
-      const newShipmentId = shipmentRes.data.shipmentId;
-      setCreatedShipmentId(newShipmentId);
+        const shipmentRes = await createShipmentWithPackages(payload);
+        const newShipmentId = shipmentRes.data.shipmentId;
+        setCreatedShipmentId(newShipmentId);
 
-      if (tripDecision && tripDecision.tripId) {
-        const targetTripId = tripDecision.tripId;
-        await assignShipmentToTruckTrip({
-          trackingDocId: newShipmentId,
-          truckTripId: targetTripId,
-        });
+        if (tripDecision && tripDecision.tripId) {
+          const targetTripId = tripDecision.tripId;
+          await assignShipmentToTruckTrip({
+            trackingDocId: newShipmentId,
+            truckTripId: targetTripId,
+          });
 
-        setFinalTripId(targetTripId);
-        window.open(
-          `/components/print/labels?tripId=${targetTripId}`,
-          "_blank",
-        );
-      } else {
-        setFinalTripId(null);
+          setFinalTripId(targetTripId);
+          window.open(
+            `/components/print/labels?tripId=${targetTripId}`,
+            "_blank",
+          );
+        } else {
+          setFinalTripId(null);
+        }
+
+        setStep(3);
+      } catch (err) {
+        showAlert("error", "Error", err.message);
+      } finally {
+        setLoading(false);
       }
+    };
 
-      setStep(3);
-    } catch (err) {
-      alert("Error: " + err.message);
-    } finally {
-      setLoading(false);
+    if (tripDecision && tripDecision.tripId) {
+      // Case A: Trip Selected -> Ask Permission -> Then Run
+      showConfirm(
+        "Confirm Assignment",
+        `Confirm assignment to Trip: ${tripDecision.tripId}?\nThis will generate labels for this trip immediately.`,
+        executeSubmission, // <--- PASS THE FUNCTION, DON'T CALL IT
+      );
+    } else {
+      // Case B: No Trip -> Run Immediately
+      executeSubmission();
     }
   };
 
@@ -162,10 +171,10 @@ export default function UnifiedShipmentModal({ profile, isOpen, onClose }) {
                       onChange={(e) => setSendSms(e.target.checked)}
                     />
                     <div className="flex items-center gap-1.5">
-                      <FontAwesomeIcon
+                      {/* <FontAwesomeIcon 
                         icon={faCommentSms}
                         className={`text-sm ${sendSms ? "text-blue-400" : "text-slate-500"}`}
-                      />
+                      /> */}
                       <span
                         className={`text-xs font-bold uppercase tracking-tight ${sendSms ? "text-slate-200" : "text-slate-500"}`}
                       >

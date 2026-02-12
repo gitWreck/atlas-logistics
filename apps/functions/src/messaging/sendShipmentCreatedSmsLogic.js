@@ -30,7 +30,7 @@ async function sendShipmentCreatedSmsLogic({
   if (phones.size === 0) return { success: false, reason: "No valid phones" };
 
   const message = `ATLAS: Shipment ${shipmentId} from ${origin} to ${destination} has been RECEIVED. 
-  Tracking link: https://atlas-trucking-platform.vercel.app/track/search/${shipmentId}`;
+  Tracking link: https://atlas-trucking-platform.vercel.app/track/${shipmentId}`;
 
   const { credits } = calculateSmsCost(message);
 

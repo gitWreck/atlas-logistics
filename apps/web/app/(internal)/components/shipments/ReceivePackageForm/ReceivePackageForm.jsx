@@ -5,6 +5,7 @@ import { faBoxOpen, faArrowRight } from "@fortawesome/free-solid-svg-icons";
 import RouteSection from "./RouteSection";
 import ItemSection from "./ItemSection";
 import InputGroup from "./InputGroup";
+import { useAlert } from "@/app/context/AlertContext";
 
 const INITIAL_CONTACT = {
   name: "",
@@ -17,6 +18,8 @@ const INITIAL_CONTACT = {
 };
 
 export default function ReceivePackageForm({ profile, onNext, initialData }) {
+  const { showAlert, showConfirm } = useAlert();
+
   // Use initialData if the user clicked "Back" from Step 2
   const [routeInfo, setRouteInfo] = useState(
     initialData?.routeInfo || {
@@ -87,11 +90,19 @@ export default function ReceivePackageForm({ profile, onNext, initialData }) {
 
     // Validation Logic
     if (!routeInfo.originCode || !routeInfo.destinationCode)
-      return alert("Select Warehouses.");
+      return showAlert("error", "Route Error", "Select Warehouses.");
     if (routeInfo.originCode === routeInfo.destinationCode)
-      return alert("Origin and Destination cannot be the same.");
+      return showAlert(
+        "error",
+        "Route Error",
+        "Origin and Destination cannot be the same.",
+      );
     if (items.some((it) => !it.description || !it.quantity))
-      return alert("Please fill in all item details.");
+      return showAlert(
+        "error",
+        "Item Error",
+        "Please fill in all item details.",
+      );
 
     // "Emit" the data to the Unified Modal state
     onNext({
