@@ -1,13 +1,5 @@
 import React, { useEffect, useState } from "react";
-import {
-  collection,
-  query,
-  where,
-  onSnapshot,
-  doc,
-  writeBatch,
-  serverTimestamp,
-} from "firebase/firestore";
+import { collection, query, where, onSnapshot } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
@@ -16,7 +8,6 @@ import {
   faXmark,
   faClock,
 } from "@fortawesome/free-solid-svg-icons";
-import { formatDistanceToNow } from "date-fns";
 import { formatFirestoreDate } from "@/app/utility/utilities";
 import StatusBadge from "../ui/StatusBadge";
 

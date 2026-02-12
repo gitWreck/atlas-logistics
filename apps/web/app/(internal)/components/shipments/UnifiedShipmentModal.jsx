@@ -224,8 +224,8 @@ export default function UnifiedShipmentModal({ profile, isOpen, onClose }) {
                   onClick={() =>
                     window.open(
                       finalTripId
-                        ? `/admin/print-labels?tripId=${finalTripId}`
-                        : `/admin/print-waybill?id=${createdShipmentId}`,
+                        ? `/components/print/labels?tripId=${finalTripId}`
+                        : `/components/print/labels?id=${createdShipmentId}`,
                       "_blank",
                     )
                   }
