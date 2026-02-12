@@ -18,12 +18,12 @@ const { STATUS_MESSAGES } = require("../utilities/dataDetails");
 if (!admin.apps.length) admin.initializeApp();
 const db = admin.firestore();
 
-/* ======================================================
-   updateTripStatus (Force Status Change)
-   ======================================================
-   ✅ Admin/Manager tool to manually override trip status
-   ✅ Handles side-effects for COMPLETED/CANCELLED
-   ✅ Logs the action securely
+/* ====================================================== 
+   updateTripStatus (Force Status Change) 
+   ====================================================== 
+   ✅ Admin/Manager tool to manually override trip status 
+   ✅ Handles side-effects for COMPLETED/CANCELLED 
+   ✅ Logs the action securely 
 ====================================================== */
 exports.updateTripStatus = onCall(
   {

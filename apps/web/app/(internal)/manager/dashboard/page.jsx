@@ -107,11 +107,13 @@ export default function ManagerDashboardPage() {
             onNavigateToShipments={() => setActiveTab("shipments")}
           />
         )}
+        {activeTab === "trips" && (
+          <TripBoard user={user} userRole="manager" profile={profile} />
+        )}
         {activeTab === "shipments" && (
           <ShipmentBoard user={user} userRole="manager" profile={profile} />
         )}
         {activeTab === "manifests" && <ManifestPage />}
-        {activeTab === "trips" && <TripBoard />}
       </main>
     </div>
   );
