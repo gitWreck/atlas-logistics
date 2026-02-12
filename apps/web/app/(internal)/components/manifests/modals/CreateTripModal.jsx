@@ -31,6 +31,7 @@ export default function CreateTripModal({ isOpen, onClose, onSuccess }) {
 
     driverName: "",
     driverId: null,
+
     truckPlateNumber: "",
     truckId: null,
   });
