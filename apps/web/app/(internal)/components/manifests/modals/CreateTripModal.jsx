@@ -13,68 +13,41 @@ import DriverSelectInput from "../DriverSelectInput";
 import { WAREHOUSES } from "@/app/utility/WarehouseData"; // <--- IMPORT THIS
 import TruckSelectInput from "../TruckSelectInput";
 
+const INITIAL_FORM_STATE = {
+  origin: "",
+  originCode: "",
+  destination: "",
+  destinationCode: "",
+  scheduledDeparture: "",
+  estimatedArrival: "",
+  helperName: "",
+  driverName: "",
+  driverId: null,
+  truckPlateNumber: "",
+};
+
 export default function CreateTripModal({ isOpen, onClose, onSuccess }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
   // Form State
-  const [formData, setFormData] = useState({
-    origin: "",
-    originCode: "",
-
-    destination: "",
-    destinationCode: "",
-
-    scheduledDeparture: "",
-    estimatedArrival: "",
-    helperName: "",
-
-    driverName: "",
-    driverId: null,
-
-    truckPlateNumber: "",
-    truckId: null,
-  });
+  const [formData, setFormData] = useState(INITIAL_FORM_STATE);
 
   useEffect(() => {
-    if (isOpen) {
-      // Reset form on open
-      setFormData({
-        origin: "",
-        originCode: "",
-        destination: "",
-        destinationCode: "",
-        scheduledDeparture: "",
-        estimatedArrival: "",
-        helperName: "",
-        driverName: "",
-        driverId: null,
-        truckPlateNumber: "",
-      });
-    }
+    if (isOpen) setFormData(INITIAL_FORM_STATE);
   }, [isOpen]);
 
   if (!isOpen) return null;
 
   // --- NEW HANDLER FOR WAREHOUSES ---
   const handleWarehouseChange = (type, value) => {
-    // 1. Find the selected warehouse object to get the code
     const selected = WAREHOUSES.find((w) => w.name === value);
     const code = selected ? selected.code : "";
-
-    if (type === "origin") {
-      setFormData((prev) => ({
-        ...prev,
-        origin: value,
-        originCode: code,
-      }));
-    } else {
-      setFormData((prev) => ({
-        ...prev,
-        destination: value,
-        destinationCode: code,
-      }));
-    }
+    setFormData((prev) => ({
+      ...prev,
+      [type]: value,
+      [`${type}Code`]: code,
+    }));
   };
 
   const handleSubmit = async (e) => {
@@ -88,26 +61,11 @@ export default function CreateTripModal({ isOpen, onClose, onSuccess }) {
         throw new Error("Origin and Destination cannot be the same.");
       }
 
-      const results = await createTruckTrip({
-        // Simplified Payload
-        origin: formData.origin,
-        destination: formData.destination,
-        originCode: formData.originCode,
-        destinationCode: formData.destinationCode,
-
-        // Pass "City" fields for backward compatibility if your backend needs them
+      await createTruckTrip({
+        ...formData,
+        truckPlateNumber: formData.truckPlateNumber.toUpperCase(),
         originCity: formData.origin,
         destinationCity: formData.destination,
-
-        scheduledDeparture: formData.scheduledDeparture,
-        estimatedArrival: formData.estimatedArrival,
-
-        driverName: formData.driverName,
-        driverId: formData.driverId,
-
-        helperName: formData.helperName,
-        truckPlateNumber: formData.truckPlateNumber.toUpperCase(),
-        truckId: formData.truckId,
       });
 
       onSuccess();
