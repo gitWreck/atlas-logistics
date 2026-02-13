@@ -7,17 +7,15 @@ import {
   faUserTimes,
   faShieldAlt,
   faHistory,
-  faTrash,
 } from "@fortawesome/free-solid-svg-icons";
 import DisableUserModal from "./DisableUserModal";
 import AddUserModal from "./AddUserModal";
 import StatusCard from "../ui/StatusCard";
-import { useAuth } from "@/app/context/AuthContext";
+// import { useAuth } from "@/app/context/AuthContext";
 import UserManagementTable from "./UserManagementTable";
-import DelayApprovalWidget from "../delay/DelayApprovalWIdget";
+import DelayApprovalWidget from "../delay/DelayApprovalWidget";
 
-export default function AdminOverview() {
-  const { user } = useAuth();
+export default function AdminOverview({ user }) {
   if (user?.customClaims?.admin) {
     console.log("This user is definitely an admin.");
   }
@@ -28,6 +26,7 @@ export default function AdminOverview() {
     active: 0,
     inactive: 0,
   });
+
   const [loading, setLoading] = useState(true);
 
   const [isUserModalOpen, setUserModalOpen] = useState(false);
@@ -117,7 +116,7 @@ export default function AdminOverview() {
         </div>
       </div>
 
-      {/* 3. USERS TABLE (REAL DATA) */}
+      {/* 3. USER MANAGEMENT TABLE */}
       <UserManagementTable
         users={users}
         loading={loading}
@@ -125,7 +124,7 @@ export default function AdminOverview() {
         onAddUser={() => setUserModalOpen(true)}
       />
 
-      {/* 4. MODAL */}
+      {/* MODALS */}
       <AddUserModal
         isOpen={isUserModalOpen}
         onClose={() => setUserModalOpen(false)}
@@ -137,7 +136,7 @@ export default function AdminOverview() {
           setDisableModalOpen(false);
           setSelectedUser(null);
         }}
-        refreshUsers={fetchUsers} // <-- NEW
+        refreshUsers={fetchUsers}
       />
     </div>
   );
