@@ -16,6 +16,7 @@ import { CameraView, useCameraPermissions } from "expo-camera";
 import { useLocalSearchParams } from "expo-router";
 import { FontAwesome } from "@expo/vector-icons";
 import { scanPackages } from "../../components/utilities/FirebaseFunctions";
+import GetLocation from "react-native-get-location";
 
 export default function ScannerScreen() {
   const [permission, requestPermission] = useCameraPermissions();
@@ -40,6 +41,24 @@ export default function ScannerScreen() {
   }
 
   // Rename 'handleBarCodeScanned' to this:
+  const getCurrentLocationSafe = async () => {
+    try {
+      const loc = await GetLocation.getCurrentPosition({
+        enableHighAccuracy: true,
+        timeout: 15000,
+      });
+
+      if (!loc) return null;
+      return {
+        lat: loc.latitude,
+        lng: loc.longitude,
+      };
+    } catch (error) {
+      console.log("Location error (checker scan):", error);
+      return null;
+    }
+  };
+
   const processPackage = async (barcode) => {
     if (processing) return; // Prevent double taps
     setProcessing(true);
@@ -49,9 +68,11 @@ export default function ScannerScreen() {
     Vibration.vibrate();
 
     try {
+      const location = await getCurrentLocationSafe();
       const result = await scanPackages({
         barcode: barcode, // ✅ Accepts string from Camera OR Text Input
         mode: mode,
+        ...(location ? { location } : {}),
       });
 
       console.log("results: ", result);

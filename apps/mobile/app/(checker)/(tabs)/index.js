@@ -115,7 +115,7 @@ export default function CheckerIndex() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#0f172a" />
+      <StatusBar barStyle="dark-content" backgroundColor="#f1f5f9" />
 
       {/* 1. HEADER */}
       <CheckerHeader userName={userName} onLogout={handleLogout} />
@@ -126,8 +126,8 @@ export default function CheckerIndex() {
           <RefreshControl
             refreshing={refreshing}
             onRefresh={onRefresh}
-            tintColor="#fff"
-            colors={["#3b82f6"]}
+            tintColor="#0f172a"
+            colors={["#0f172a"]}
           />
         }
       >
@@ -150,7 +150,7 @@ export default function CheckerIndex() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#0f172a", // Slate 900
+    backgroundColor: "#f1f5f9",
     paddingTop: Platform.OS === "android" ? StatusBar.currentHeight : 0,
   },
   content: {

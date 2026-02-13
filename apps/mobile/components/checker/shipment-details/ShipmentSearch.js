@@ -7,7 +7,7 @@ export default function ShipmentSearch({ value, onChange }) {
       <TextInput
         style={styles.searchInput}
         placeholder="Search Tracking Number..."
-        placeholderTextColor="#64748b"
+        placeholderTextColor="#94a3b8"
         value={value}
         onChangeText={onChange}
       />
@@ -16,13 +16,18 @@ export default function ShipmentSearch({ value, onChange }) {
 }
 
 const styles = StyleSheet.create({
-  controls: { padding: 16 },
+  controls: {
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 10,
+    backgroundColor: "#f1f5f9",
+  },
   searchInput: {
-    backgroundColor: "#1e293b",
+    backgroundColor: "#ffffff",
     padding: 12,
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: "#334155",
-    color: "#f8fafc",
+    borderColor: "#cbd5e1",
+    color: "#0f172a",
   },
 });

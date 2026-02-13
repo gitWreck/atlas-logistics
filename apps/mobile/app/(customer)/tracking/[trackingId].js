@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   SafeAreaView,
@@ -21,18 +21,63 @@ import {
 } from "firebase/firestore";
 import { FontAwesome5 } from "@expo/vector-icons";
 import { Image } from "expo-image";
+import MapView, { Marker, PROVIDER_DEFAULT } from "react-native-maps";
 
 import { db } from "../../../firebase";
+
+// Hardcoded package location for Divisoria (updated coordinates)
+const PACKAGE_LOCATION = {
+  latitude: 14.605683302722035,
+  longitude: 120.96347820295834,
+  latitudeDelta: 0.02,
+  longitudeDelta: 0.02,
+};
+
 
 const BLUE = "#155DFC";
 const GREY = "#94a3b8";
 const GREY_LINE = "#e2e8f0";
 
+// Customer-facing shipment journey:
+// - Warehouse A ➜ Warehouse B
+// - Warehouse B ➜ Customer house
+// Codes align with backend status values; labels clarify each leg.
 const STATUS_STEPS = [
-  { code: "RECEIVED", label: "RECEIVED", source: require("../../../assets/icons/picked-requested.svg") },
-  { code: "IN_TRANSIT", label: "IN TRANSIT", source: require("../../../assets/icons/in-transit.svg") },
-  { code: "OUT_FOR_DELIVERY", label: "OUT FOR DELIVERY", source: require("../../../assets/icons/out-for-delivery.svg") },
-  { code: "DELIVERED", label: "DELIVERED", source: require("../../../assets/icons/delivered.png") },
+  {
+    code: "RECEIVED",
+    label: "RECEIVED",
+    source: require("../../../assets/icons/picked-requested.svg"),
+  },
+  {
+    code: "ASSIGNED",
+    label: "ASSIGNED TO A TRIP",
+    source: require("../../../assets/icons/picked-requested.svg"),
+  },
+  {
+    code: ["LOADED", "IN_TRANSIT"],
+    label: "LOADED ON TRUCK",
+    source: require("../../../assets/icons/picked-requested.svg"),
+  },
+  {
+    code: ["OUT_FOR_DELIVERY"],
+    label: "IN TRANSIT",
+    source: require("../../../assets/icons/in-transit.svg"),
+  },
+  {
+    code: "COMPLETED",
+    label: "FOR DELIVERY TO CUSTOMER",
+    source: require("../../../assets/icons/picked-requested.svg"),
+  },
+  {
+    code: "OUT_FOR_DELIVERY_CUSTOMER",
+    label: "OUT FOR DELIVERY",
+    source: require("../../../assets/icons/out-for-delivery.svg"),
+  },
+  {
+    code: "DELIVERED",
+    label: "DELIVERED TO YOUR ADDRESS",
+    source: require("../../../assets/icons/delivered.png"),
+  },
 ];
 
 export default function CustomerTrackingDetailsScreen() {
@@ -43,6 +88,8 @@ export default function CustomerTrackingDetailsScreen() {
   const [error, setError] = useState("");
   const [data, setData] = useState(null);
   const [photos, setPhotos] = useState([]);
+  const [selectedStepIndex, setSelectedStepIndex] = useState(null);
+  const mapRef = useRef(null);
 
   const normalizedTracking = useMemo(
     () => String(trackingId || "").trim().toUpperCase(),
@@ -61,8 +108,8 @@ export default function CustomerTrackingDetailsScreen() {
         setLoading(true);
         setError("");
 
-        // 1) Core tracking data from tracking_public
-        const publicRef = doc(db, "tracking_public", normalizedTracking);
+        // 1) Core tracking data from shipments
+        const publicRef = doc(db, "shipments", normalizedTracking);
         const snap = await getDoc(publicRef);
 
         if (!snap.exists()) {
@@ -75,17 +122,17 @@ export default function CustomerTrackingDetailsScreen() {
         setData(payload);
 
         // 2) Optional photos from tracking_photos
-        const photosQuery = query(
-          collection(db, "tracking_photos"),
-          where("trackingNumber", "==", normalizedTracking),
-          limit(4),
-        );
-        const photosSnap = await getDocs(photosQuery);
-        const photoItems = photosSnap.docs.map((docSnap) => ({
-          id: docSnap.id,
-          ...(docSnap.data() || {}),
-        }));
-        setPhotos(photoItems);
+        // const photosQuery = query(
+        //   collection(db, "tracking_photos"),
+        //   where("trackingNumber", "==", normalizedTracking),
+        //   limit(4),
+        // );
+        // const photosSnap = await getDocs(photosQuery);
+        // const photoItems = photosSnap.docs.map((docSnap) => ({
+        //   id: docSnap.id,
+        //   ...(docSnap.data() || {}),
+        // }));
+        // setPhotos(photoItems);
       } catch (err) {
         console.error("Failed to load tracking details:", err);
         setError("System offline. Please try again later.");
@@ -98,16 +145,169 @@ export default function CustomerTrackingDetailsScreen() {
   }, [normalizedTracking]);
 
   const activeStepIndex = useMemo(() => {
-    if (!data?.statusCode) return 0;
-    const idx = STATUS_STEPS.findIndex(
-      (s) => s.code === String(data.statusCode).toUpperCase(),
-    );
+    if (!data?.status) return 0;
+    const current = String(data.status).toUpperCase();
+    const idx = STATUS_STEPS.findIndex((s) => {
+      if (Array.isArray(s.code)) {
+        return s.code.includes(current);
+      }
+      return s.code === current;
+    });
     return idx === -1 ? 0 : idx;
-  }, [data?.statusCode]);
+  }, [data?.status]);
 
   const totalItems = data?.totalPackages ?? 0;
   const loaded = data?.itemsDelivered ?? 0;
   const pending = Math.max(totalItems - loaded, 0);
+
+  const statusHistoryLocations = useMemo(() => {
+    if (!data?.statusHistory || !Array.isArray(data.statusHistory)) {
+      return [];
+    }
+
+    return data.statusHistory
+      .map((entry) => {
+        const rawStatus =
+          entry?.status ||
+          entry?.code ||
+          entry?.newStatus ||
+          entry?.oldStatus ||
+          "";
+        const status = String(rawStatus).toUpperCase().trim();
+
+        // Only include history entries that correspond to one of the
+        // STATUS_STEPS codes (i.e. the same statuses shown in the stepper).
+        const stepIndex = STATUS_STEPS.findIndex((step) => {
+          const codes = Array.isArray(step.code) ? step.code : [step.code];
+          return codes.some((c) => String(c).toUpperCase() === status);
+        });
+
+        if (stepIndex === -1) {
+          return null;
+        }
+
+        const lat =
+          entry?.location?.lat ??
+          entry?.location?.latitude ??
+          entry?.location?.Latitude;
+        const lng =
+          entry?.location?.lng ??
+          entry?.location?.lon ??
+          entry?.location?.longitude ??
+          entry?.location?.Longitude;
+
+        if (typeof lat !== "number" || typeof lng !== "number") {
+          return null;
+        }
+
+        return {
+          latitude: lat,
+          longitude: lng,
+        };
+      })
+      .filter(Boolean);
+  }, [data?.statusHistory]);
+
+  const statusLocationsPerStep = useMemo(() => {
+    // For each step in STATUS_STEPS, collect any history entries that match that status.
+    const buckets = STATUS_STEPS.map(() => []);
+
+    if (!data?.statusHistory || !Array.isArray(data.statusHistory)) {
+      return buckets;
+    }
+
+    data.statusHistory.forEach((entry) => {
+      const rawStatus =
+        entry?.status ||
+        entry?.code ||
+        entry?.newStatus ||
+        entry?.oldStatus ||
+        "";
+      const status = String(rawStatus).toUpperCase().trim();
+
+      const lat =
+        entry?.location?.lat ??
+        entry?.location?.latitude ??
+        entry?.location?.Latitude;
+      const lng =
+        entry?.location?.lng ??
+        entry?.location?.lon ??
+        entry?.location?.longitude ??
+        entry?.location?.Longitude;
+
+      if (typeof lat !== "number" || typeof lng !== "number") {
+        return;
+      }
+
+      const coordinate = { latitude: lat, longitude: lng };
+
+      const stepIndex = STATUS_STEPS.findIndex((step) => {
+        const codes = Array.isArray(step.code) ? step.code : [step.code];
+        return codes.some((c) => String(c).toUpperCase() === status);
+      });
+
+      if (stepIndex >= 0) {
+        buckets[stepIndex].push({ coordinate, raw: entry });
+      }
+    });
+
+    return buckets;
+  }, [data?.statusHistory]);
+
+  const latestLocation =
+    statusHistoryLocations.length > 0
+      ? statusHistoryLocations[statusHistoryLocations.length - 1]
+      : null;
+
+  const initialRegion = useMemo(() => {
+    if (latestLocation) {
+      return {
+        latitude: latestLocation.latitude,
+        longitude: latestLocation.longitude,
+        latitudeDelta: 0.02,
+        longitudeDelta: 0.02,
+      };
+    }
+
+    return PACKAGE_LOCATION;
+  }, [latestLocation]);
+
+  const selectedLocation = useMemo(() => {
+    if (
+      selectedStepIndex == null ||
+      selectedStepIndex < 0 ||
+      selectedStepIndex >= statusLocationsPerStep.length
+    ) {
+      return latestLocation;
+    }
+
+    const bucket = statusLocationsPerStep[selectedStepIndex];
+    if (!bucket || bucket.length === 0) {
+      return latestLocation;
+    }
+
+    // Use the last known coordinate for that status.
+    return bucket[bucket.length - 1].coordinate;
+  }, [latestLocation, selectedStepIndex, statusLocationsPerStep]);
+
+  useEffect(() => {
+    if (!mapRef.current) return;
+    if (!selectedLocation) return;
+
+    try {
+      mapRef.current.animateToRegion(
+        {
+          latitude: selectedLocation.latitude,
+          longitude: selectedLocation.longitude,
+          latitudeDelta: 0.02,
+          longitudeDelta: 0.02,
+        },
+        350,
+      );
+    } catch (e) {
+      console.warn("Unable to move map to selected status location", e);
+    }
+  }, [selectedLocation]);
 
   if (loading) {
     return (
@@ -207,18 +407,84 @@ export default function CustomerTrackingDetailsScreen() {
           </View>
         </View>
 
-        {/* Timeline steps - design matches TripProgressStepper */}
+        {/* Package location map */}
+        <View style={styles.mapSectionCard}>
+          <Text style={styles.sectionTitle}>Package Location</Text>
+          <View style={styles.mapContainer}>
+            <MapView
+              ref={mapRef}
+              style={styles.map}
+              initialRegion={initialRegion}
+              showsUserLocation={false}
+              scrollEnabled={true}
+              zoomEnabled={true}
+              provider={PROVIDER_DEFAULT}
+            >
+              {statusHistoryLocations.length > 0 ? (
+                statusHistoryLocations.map((coord, index) => {
+                  const isLatest =
+                    index === statusHistoryLocations.length - 1;
+                  return (
+                    <Marker
+                      key={`history-${index}`}
+                      coordinate={coord}
+                      pinColor={isLatest ? BLUE : GREY}
+                      title={
+                        isLatest ? "Latest package location" : "Previous stop"
+                      }
+                      description={
+                        isLatest
+                          ? "Most recent scan location"
+                          : "Earlier scan on the route"
+                      }
+                    />
+                  );
+                })
+              ) : (
+                <Marker
+                  coordinate={{
+                    latitude: PACKAGE_LOCATION.latitude,
+                    longitude: PACKAGE_LOCATION.longitude,
+                  }}
+                  title="Your package"
+                  description="Current package location"
+                />
+              )}
+            </MapView>
+          </View>
+        </View>
+
+        {/* Timeline steps - now vertical, matching TripProgressStepper */}
         <View style={styles.timelineWrapper}>
           {STATUS_STEPS.map((step, index) => {
             const isActive = index <= activeStepIndex;
             const isLineActive = index < activeStepIndex;
+            const isLast = index === STATUS_STEPS.length - 1;
+            const hasLocation =
+              statusLocationsPerStep[index] &&
+              statusLocationsPerStep[index].length > 0;
+            const isSelected = selectedStepIndex === index;
+
             return (
-              <React.Fragment key={step.code}>
-                <View style={styles.timelineStep}>
+              <TouchableOpacity
+                key={step.code}
+                style={styles.timelineStepRow}
+                activeOpacity={hasLocation ? 0.7 : 1}
+                onPress={() => {
+                  if (!hasLocation) return;
+                  setSelectedStepIndex((prev) =>
+                    prev === index ? null : index,
+                  );
+                }}
+              >
+                <View style={styles.timelineLeftColumn}>
                   <View
                     style={[
                       styles.timelineIconCircle,
-                      isActive ? styles.timelineIconCircleActive : styles.timelineIconCircleInactive,
+                      isActive
+                        ? styles.timelineIconCircleActive
+                        : styles.timelineIconCircleInactive,
+                      isSelected && styles.timelineIconCircleSelected,
                     ]}
                   >
                     <Image
@@ -229,6 +495,18 @@ export default function CustomerTrackingDetailsScreen() {
                       ]}
                     />
                   </View>
+                  {!isLast && (
+                    <View
+                      style={[
+                        styles.timelineConnector,
+                        isLineActive
+                          ? styles.timelineConnectorActive
+                          : styles.timelineConnectorInactive,
+                      ]}
+                    />
+                  )}
+                </View>
+                <View style={styles.timelineLabelWrapper}>
                   <Text
                     style={[
                       styles.timelineLabel,
@@ -237,16 +515,13 @@ export default function CustomerTrackingDetailsScreen() {
                   >
                     {step.label}
                   </Text>
+                  {hasLocation && (
+                    <Text style={styles.timelineLocationHint}>
+                      {isSelected ? "Showing this stop on map" : "Tap to view on map"}
+                    </Text>
+                  )}
                 </View>
-                {index < STATUS_STEPS.length - 1 && (
-                  <View
-                    style={[
-                      styles.timelineConnector,
-                      isLineActive ? styles.timelineConnectorActive : styles.timelineConnectorInactive,
-                    ]}
-                  />
-                )}
-              </React.Fragment>
+              </TouchableOpacity>
             );
           })}
         </View>
@@ -405,21 +680,23 @@ const styles = StyleSheet.create({
     fontSize: 11,
   },
   timelineWrapper: {
-    flexDirection: "row",
-    alignItems: "flex-start",
     paddingVertical: 16,
     paddingHorizontal: 4,
     marginBottom: 20,
   },
-  timelineStep: {
-    flex: 0,
+  timelineStepRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+  },
+  timelineLeftColumn: {
+    width: 32,
     alignItems: "center",
-    minWidth: 56,
+    marginRight: 12,
   },
   timelineIconCircle: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
     borderWidth: 2,
     justifyContent: "center",
     alignItems: "center",
@@ -432,15 +709,18 @@ const styles = StyleSheet.create({
     backgroundColor: "#fff",
     borderColor: GREY_LINE,
   },
+  timelineIconCircleSelected: {
+    borderColor: "#f97316",
+    borderWidth: 2.5,
+  },
   timelineStepIcon: {
-    width: 13,
-    height: 13,
+    width: 16,
+    height: 16,
   },
   timelineConnector: {
-    flex: 1,
-    height: 2,
-    marginTop: 11,
-    marginHorizontal: 4,
+    width: 2,
+    height: 28,
+    marginVertical: 4,
   },
   timelineConnectorActive: {
     backgroundColor: BLUE,
@@ -449,14 +729,41 @@ const styles = StyleSheet.create({
     backgroundColor: GREY_LINE,
   },
   timelineLabel: {
-    marginTop: 6,
     color: GREY,
-    fontSize: 9,
-    textAlign: "center",
+    fontSize: 12,
   },
   timelineLabelActive: {
     color: "#111827",
     fontWeight: "600",
+  },
+  timelineLabelWrapper: {
+    justifyContent: "center",
+    paddingTop: 4,
+  },
+  timelineLocationHint: {
+    marginTop: 2,
+    fontSize: 10,
+    color: "#64748b",
+  },
+  mapSectionCard: {
+    backgroundColor: "#ffffff",
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: "#e2e8f0",
+    padding: 16,
+    marginBottom: 20,
+  },
+  mapContainer: {
+    height: 200,
+    borderRadius: 12,
+    overflow: "hidden",
+    marginTop: 10,
+    borderWidth: 1,
+    borderColor: "#e2e8f0",
+  },
+  map: {
+    width: "100%",
+    height: "100%",
   },
   sectionCard: {
     backgroundColor: "#ffffff",

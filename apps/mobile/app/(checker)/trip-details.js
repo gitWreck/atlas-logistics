@@ -6,6 +6,7 @@ import {
   Alert,
   ActivityIndicator,
   Text,
+  SafeAreaView,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { getFunctions, httpsCallable } from "firebase/functions";
@@ -17,6 +18,7 @@ import {
   doc,
 } from "firebase/firestore";
 import { db } from "../../firebase";
+import GetLocation from "react-native-get-location";
 
 // ✅ IMPORT NEW COMPONENTS
 import TripDetailsHeader from "../../components/checker/trip-details/TripDetailsHeader";
@@ -34,6 +36,24 @@ export default function TripDetailsScreen() {
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
   const [trip, setTrip] = useState(null);
+
+  const getCurrentLocationSafe = async () => {
+    try {
+      const loc = await GetLocation.getCurrentPosition({
+        enableHighAccuracy: true,
+        timeout: 15000,
+      });
+
+      if (!loc) return null;
+      return {
+        lat: loc.latitude,
+        lng: loc.longitude,
+      };
+    } catch (error) {
+      console.log("Location error (checker trip-details):", error);
+      return null;
+    }
+  };
 
   // 1. FETCH SHIPMENTS
   useEffect(() => {
@@ -92,10 +112,12 @@ export default function TripDetailsScreen() {
       const functions = getFunctions(undefined, "asia-southeast1");
       const bulkUpdateFn = httpsCallable(functions, "bulkUpdateShipmentStatus");
 
+      const location = await getCurrentLocationSafe();
       await bulkUpdateFn({
         tripId: tripId,
         shipmentIds: ids,
         newStatus: newStatus,
+        ...(location ? { location } : {}),
       });
 
       Alert.alert(
@@ -185,7 +207,7 @@ export default function TripDetailsScreen() {
   };
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container}>
       {/* 1. HEADER */}
       <TripDetailsHeader
         tripId={tripId}
@@ -196,7 +218,7 @@ export default function TripDetailsScreen() {
       {/* 2. LOADING OVERLAY */}
       {updating && (
         <View style={styles.loaderOverlay}>
-          <ActivityIndicator size="large" color="#3b82f6" />
+          <ActivityIndicator size="large" color="#042C83" />
           <Text style={styles.loaderText}>Updating...</Text>
         </View>
       )}
@@ -211,14 +233,14 @@ export default function TripDetailsScreen() {
 
       {/* 4. LIST */}
       {loading ? (
-        <View style={{ flex: 1, justifyContent: "center" }}>
-          <ActivityIndicator size="large" color="#3b82f6" />
+        <View style={styles.loadingWrapper}>
+          <ActivityIndicator size="large" color="#042C83" />
         </View>
       ) : (
         <FlatList
           data={filteredData}
           keyExtractor={(item) => item.id}
-          contentContainerStyle={{ paddingBottom: 100 }}
+          contentContainerStyle={styles.listContent}
           renderItem={({ item }) => (
             <ShipmentListItem
               item={item}
@@ -234,23 +256,31 @@ export default function TripDetailsScreen() {
 
       {/* 5. FOOTER */}
       <TripFooter trip={trip} onFinish={handleFinishLoading} />
-    </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#0f172a" },
+  container: { flex: 1, backgroundColor: "#f1f5f9" },
   loaderOverlay: {
     position: "absolute",
     top: 0,
     bottom: 0,
     left: 0,
     right: 0,
-    backgroundColor: "rgba(15, 23, 42, 0.9)",
+    backgroundColor: "rgba(15, 23, 42, 0.15)",
     zIndex: 20,
     justifyContent: "center",
     alignItems: "center",
   },
-  loaderText: { marginTop: 10, fontWeight: "bold", color: "#60a5fa" },
-  emptyText: { textAlign: "center", color: "#64748b", marginTop: 40 },
+  loaderText: { marginTop: 10, fontWeight: "bold", color: "#042C83" },
+  loadingWrapper: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  listContent: {
+    paddingBottom: 120,
+  },
+  emptyText: { textAlign: "center", color: "#475569", marginTop: 40 },
 });

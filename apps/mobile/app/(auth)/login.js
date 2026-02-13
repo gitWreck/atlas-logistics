@@ -25,15 +25,9 @@ export default function LoginScreen() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
-  const validateEmail = (value) => /\S+@\S+\.\S+/.test(value);
-
   const updateDisabled = (emailValue, passwordValue) => {
-    const isEmailValid = validateEmail(emailValue);
-    if (!emailValue || !passwordValue || !isEmailValid) {
-      setDisabled(true);
-    } else {
-      setDisabled(false);
-    }
+    const hasValues = !!emailValue && !!passwordValue;
+    setDisabled(!hasValues);
   };
 
   const handleEmailChange = (value) => {

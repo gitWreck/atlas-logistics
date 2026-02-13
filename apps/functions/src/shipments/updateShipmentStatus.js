@@ -69,12 +69,19 @@ exports.updateShipmentStatus = onCall(
       };
 
       // B. Update Main Shipment
-      tx.update(shipmentRef, {
+      const updateData = {
         status: newStatus,
         updatedAt: FieldValue.serverTimestamp(),
         updatedBy: uid,
         statusHistory: FieldValue.arrayUnion(historyEntry),
-      });
+      };
+
+      // Persist latest known geo location for this shipment if provided
+      if (location) {
+        updateData.lastLocation = location;
+      }
+
+      tx.update(shipmentRef, updateData);
 
       // C. Update Trip Link (If exists)
       if (tripShipmentRef) {
