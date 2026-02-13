@@ -17,15 +17,25 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.atlas.atlastracking",
       "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSLocationWhenInUseUsageDescription": "Atlas uses your location to update package tracking and trip progress while you are on the road."
       }
     },
     "android": {
+      "package": "com.atlas.atlastracking",
+      "permissions": [
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION"
+      ],
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "package": "com.atlas.atlastracking"
+      "config": {
+        "googleMaps": {
+          "apiKey": "AIzaSyD2-cgUlA9g4PyV9Zwrx17L5EFyQoTDkQo"
+        }
+      }
     },
     "web": {
       "favicon": "./assets/favicon.png"

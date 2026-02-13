@@ -7,14 +7,14 @@ export default function CheckerTabsLayout() {
       screenOptions={{
         headerShown: false,
         tabBarStyle: {
-          backgroundColor: "#0f172a", // Dark Background
-          borderTopColor: "#334155", // Subtle Border
+          backgroundColor: "#ffffff",
+          borderTopColor: "#cbd5e1",
           height: 60,
           paddingBottom: 8,
           paddingTop: 8,
         },
-        tabBarActiveTintColor: "#3b82f6", // Blue for Checkers
-        tabBarInactiveTintColor: "#64748b",
+        tabBarActiveTintColor: "#07B9F4",
+        tabBarInactiveTintColor: "#475569",
         tabBarLabelStyle: {
           fontSize: 10,
           fontWeight: "600",

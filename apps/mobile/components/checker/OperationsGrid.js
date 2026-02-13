@@ -2,6 +2,9 @@
 import React from "react";
 import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
 import { FontAwesome5 } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
+
+const GRADIENT_COLORS = ["#042C83", "#07B9F4"];
 
 export default function OperationsGrid({ onScanLoad, onScanOffload }) {
   return (
@@ -12,14 +15,22 @@ export default function OperationsGrid({ onScanLoad, onScanOffload }) {
         <View style={styles.row}>
           {/* A. LOAD TRUCK */}
           <TouchableOpacity
-            style={[styles.gridBtn, { backgroundColor: "#3b82f6" }]}
+            style={styles.gridBtnTouchable}
             onPress={onScanLoad}
+            activeOpacity={0.9}
           >
-            <View style={styles.iconCircle}>
-              <FontAwesome5 name="truck" size={24} color="#3b82f6" />
-            </View>
-            <Text style={styles.btnTitle}>LOAD TRUCK</Text>
-            <Text style={styles.btnSub}>Scan to vehicle</Text>
+            <LinearGradient
+              colors={GRADIENT_COLORS}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={styles.gridBtn}
+            >
+              <View style={styles.iconCircle}>
+                <FontAwesome5 name="truck" size={24} color="#3b82f6" />
+              </View>
+              <Text style={styles.btnTitle}>LOAD TRUCK</Text>
+              <Text style={styles.btnSub}>Scan to vehicle</Text>
+            </LinearGradient>
           </TouchableOpacity>
 
           {/* B. OFFLOAD */}
@@ -27,18 +38,22 @@ export default function OperationsGrid({ onScanLoad, onScanOffload }) {
             style={[
               styles.gridBtn,
               {
-                backgroundColor: "#1e293b",
+                backgroundColor: "#ffffff",
                 borderWidth: 1,
-                borderColor: "#334155",
+                borderColor: "#cbd5e1",
               },
             ]}
             onPress={onScanOffload}
           >
-            <View style={[styles.iconCircle, { backgroundColor: "#334155" }]}>
+            <View style={[styles.iconCircle, { backgroundColor: "#d1d5db" }]}>
               <FontAwesome5 name="dolly" size={24} color="#fff" />
             </View>
-            <Text style={styles.btnTitle}>OFFLOAD</Text>
-            <Text style={styles.btnSub}>Inbound scan</Text>
+            <Text style={[styles.btnTitle, styles.btnTitleSecondary]}>
+              OFFLOAD
+            </Text>
+            <Text style={[styles.btnSub, styles.btnSubSecondary]}>
+              Inbound scan
+            </Text>
           </TouchableOpacity>
         </View>
 
@@ -58,11 +73,14 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 18,
     fontWeight: "700",
-    color: "#f8fafc",
+    color: "#0f172a",
     marginBottom: 10,
   },
   gridContainer: { gap: 16 },
   row: { flexDirection: "row", gap: 16 },
+  gridBtnTouchable: {
+    flex: 1,
+  },
   gridBtn: {
     flex: 1,
     padding: 20,
@@ -81,10 +99,12 @@ const styles = StyleSheet.create({
   },
   btnTitle: { fontSize: 16, fontWeight: "800", color: "#fff", marginBottom: 4 },
   btnSub: { color: "rgba(255,255,255,0.7)", fontSize: 12 },
+  btnTitleSecondary: { color: "#0f172a" },
+  btnSubSecondary: { color: "#475569" },
   cardPlaceholder: {
     flex: 1,
     borderWidth: 2,
-    borderColor: "#1e293b",
+    borderColor: "#cbd5e1",
     borderStyle: "dashed",
     borderRadius: 20,
     minHeight: 140,

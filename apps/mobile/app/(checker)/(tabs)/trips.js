@@ -75,7 +75,7 @@ export default function TripsScreen() {
   };
 
   return (
-    <SafeAreaView style={GLOBAL_STYLES.container}>
+    <SafeAreaView style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
         <Text style={styles.title}>Active Loads</Text>
@@ -107,14 +107,23 @@ export default function TripsScreen() {
 }
 
 const styles = StyleSheet.create({
-  header: {
-    padding: 24,
-    borderBottomWidth: 1,
-    borderBottomColor: "#1e293b",
-    paddingTop: Platform.OS === "android" ? StatusBar.currentHeight : 0,
+  container: {
+    flex: 1,
+    backgroundColor: "#f1f5f9",
   },
-  title: { fontSize: 24, fontWeight: "800", color: "#fff" },
-  subtitle: { color: "#94a3b8", fontSize: 14, marginTop: 4 },
+  header: {
+    paddingHorizontal: 20,
+    paddingTop:
+      Platform.OS === "android"
+        ? (StatusBar.currentHeight || 0) + 12
+        : 24,
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: "#cbd5e1",
+    backgroundColor: "#ffffff",
+  },
+  title: { fontSize: 20, fontWeight: "700", color: "#0f172a" },
+  subtitle: { color: "#475569", fontSize: 13, marginTop: 4 },
 
   listContent: { padding: 20, paddingBottom: 50 },
 

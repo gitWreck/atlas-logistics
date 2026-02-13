@@ -17,7 +17,7 @@ exports.loadItemsToTrip = onCall({ region: "asia-southeast1" }, async (req) => {
 
   // Allow Admins AND Checkers (if you want checkers to have bulk tools)
   // For now, let's keep it robust.
-  const { tripId, trackingNumber, loadCount } = req.data;
+  const { tripId, trackingNumber, loadCount, location } = req.data || {};
 
   if (!tripId || !trackingNumber) {
     throw new HttpsError(
@@ -75,6 +75,7 @@ exports.loadItemsToTrip = onCall({ region: "asia-southeast1" }, async (req) => {
       updatedAt: FieldValue.serverTimestamp(),
       // Link the trip if not linked yet
       currentTruckTripId: tripId,
+      ...(location ? { lastLocation: location } : {}),
     };
 
     // If fully loaded, update status
@@ -86,6 +87,7 @@ exports.loadItemsToTrip = onCall({ region: "asia-southeast1" }, async (req) => {
         at: new Date(),
         note: `Bulk loaded ${actualLoad} items via Admin Console`,
         by: req.auth.uid,
+        location: location || null,
       });
     }
 
