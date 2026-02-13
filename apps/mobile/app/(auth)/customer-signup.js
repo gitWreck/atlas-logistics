@@ -83,22 +83,16 @@ export default function CustomerSignupScreen() {
     updateDisabled(fullName, email, password, confirmPassword, value);
   };
 
+  // Same as backend: +63, 63, 09... all normalize to 639xxxxxxxxx for matching
   const normalizePhilippinesMobile = (raw) => {
     if (!raw) return "";
-    // Strip all non-digits
-    let digits = raw.replace(/[^\d]/g, "");
-
-    // Handle leading country code 63 or +63
-    if (digits.startsWith("63")) {
-      digits = "0" + digits.slice(2);
+    let d = String(raw).replace(/[^\d]/g, "");
+    if (d.length === 11 && d.startsWith("0")) {
+      d = "63" + d.slice(1); // 09xxxxxxxxx → 639xxxxxxxxx
+    } else if (d.length === 10 && d.startsWith("9")) {
+      d = "63" + d; // 9xxxxxxxxx → 639xxxxxxxxx
     }
-
-    // If user typed 9xxxxxxxxx, prefix with 0
-    if (digits.length === 10 && digits.startsWith("9")) {
-      digits = "0" + digits;
-    }
-
-    return digits;
+    return d;
   };
 
   const handleSignup = async () => {
@@ -109,10 +103,13 @@ export default function CustomerSignupScreen() {
 
     const normalizedPhone = normalizePhilippinesMobile(phoneNumber);
 
-    if (!normalizedPhone.startsWith("09") || normalizedPhone.length !== 11) {
+    if (
+      normalizedPhone.length !== 12 ||
+      !normalizedPhone.startsWith("639")
+    ) {
       Alert.alert(
         "Invalid Phone Number",
-        "Please enter a valid PH mobile number in 09XXXXXXXXX format.",
+        "Please enter a valid PH mobile number (09XXXXXXXXX, +63..., or 63...).",
       );
       return;
     }
