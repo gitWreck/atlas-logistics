@@ -72,8 +72,17 @@ exports.addTrackedShipment = onCall(
 
     const normalizeName = (value) =>
       String(value || "").trim().toLowerCase();
-    const normalizePhone = (value) =>
-      String(value || "").replace(/[^\d+]/g, "");
+
+    // Normalize so +63, 63, 09... all match (Philippine numbers)
+    const normalizePhone = (value) => {
+      let d = String(value || "").replace(/[^\d]/g, "");
+      if (d.length === 11 && d.startsWith("0")) {
+        d = "63" + d.slice(1); // 09xxxxxxxxx → 639xxxxxxxxx
+      } else if (d.length === 10 && d.startsWith("9")) {
+        d = "63" + d; // 9xxxxxxxxx → 639xxxxxxxxx
+      }
+      return d;
+    };
 
     const userNameNorm = normalizeName(userName);
     const userPhoneNorm = normalizePhone(userPhone);
