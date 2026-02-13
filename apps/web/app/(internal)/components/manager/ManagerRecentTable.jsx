@@ -32,7 +32,7 @@ export default function ManagerRecentTable({
     );
   });
 
-  console.log("recent shipment: ", filteredShipments);
+  // console.log("recent shipment: ", filteredShipments);
 
   return (
     <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-xl">

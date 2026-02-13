@@ -1,5 +1,5 @@
 "use client";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
@@ -14,7 +14,7 @@ import { handleLogout } from "@/app/utility/utilities";
 
 // Components
 import TabButton from "../../components/ui/TabButton";
-import ManagerOverview from "../../components/manager/ManagerOverview"; // We will create this below
+import ManagerOverview from "../../components/manager/ManagerOverview";
 import ShipmentBoard from "../../components/shipments/ShipmentBoard";
 import ManifestPage from "../../components/manifests/ManifestBoard";
 import TripBoard from "../../components/trips/TripBoard";
@@ -24,10 +24,35 @@ export default function ManagerDashboardPage() {
   const [activeTab, setActiveTab] = useState("overview");
   const { user, profile, loading } = useAuth();
 
+  console.log("Manager Dashboard - User:", user);
+  console.log("Manager Dashboard - Profile:", profile);
+
+  useEffect(() => {
+    // 1. Do nothing while loading
+    if (loading) return;
+
+    // 2. Check if user is not logged in
+    if (!user) {
+      router.push("/login");
+      return;
+    }
+
+    // 3. Check if user is logged in but NOT a manager
+    if (profile?.role !== "manager") {
+      // Option A: Kick them out (Strict)
+      handleLogout(auth, router);
+
+      // Option B: Redirect to home (Friendlier)
+      console.warn("Unauthorized access attempt by:", user.email);
+      router.push("/login");
+    }
+  }, [user, profile, loading, router]);
+
   if (loading)
     return (
       <div className="p-10 text-slate-400">Loading Manager Console...</div>
     );
+  if (!user || profile?.role !== "manager") return null;
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-200 font-sans">
@@ -104,6 +129,9 @@ export default function ManagerDashboardPage() {
       <main className="max-w-7xl mx-auto p-6">
         {activeTab === "overview" && (
           <ManagerOverview
+            user={user}
+            userRole="manager"
+            profile={profile}
             onNavigateToShipments={() => setActiveTab("shipments")}
           />
         )}

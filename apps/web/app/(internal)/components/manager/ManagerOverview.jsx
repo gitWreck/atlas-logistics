@@ -1,22 +1,14 @@
 import React, { useState, useEffect } from "react";
 // Firebase
-import { db } from "@/lib/firebase"; // Ensure path is correct
-import {
-  collection,
-  query,
-  where,
-  orderBy,
-  limit,
-  getDocs,
-  getCountFromServer,
-  Timestamp,
-} from "firebase/firestore";
-
-import ManagerStats from "./ManagerStatistics";
 import ManagerRecentTable from "./ManagerRecentTable";
+import ManagerStatistics from "./ManagerStatistics";
 
-export default function ManagerOverview({ onNavigateToShipments }) {
-  // --- STATE ---
+export default function ManagerOverview({
+  user,
+  userRole,
+  profile,
+  onNavigateToShipments,
+}) {
   const [dateRange, setDateRange] = useState("today");
   const [viewLimit, setViewLimit] = useState(5); // Default to 5 recent items
 
@@ -24,80 +16,42 @@ export default function ManagerOverview({ onNavigateToShipments }) {
   const [recentShipments, setRecentShipments] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // --- HELPER: GET DATE OBJECT ---
-  const getStartDate = (range) => {
-    const now = new Date();
-    if (range === "today") {
-      now.setHours(0, 0, 0, 0); // Start of today
-    } else if (range === "7days") {
-      now.setDate(now.getDate() - 7);
-    } else if (range === "30days") {
-      now.setDate(now.getDate() - 30);
+  const fetchDashboardData = async () => {
+    setLoading(true);
+    try {
+      const token = await user.getIdToken();
+
+      // 3. Make the Fetch Call with Headers
+      const res = await fetch(
+        `/api/manager/dashboard?range=${dateRange}&limit=${viewLimit}`,
+        {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`, // <--- Pass token here
+          },
+          cache: "no-store", // Ensure we don't get stale data
+        },
+      );
+
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.details || errorData.error || "Server Error");
+      }
+
+      const data = await res.json();
+      setStats(data.stats);
+      setRecentShipments(data.recentShipments);
+    } catch (error) {
+      console.error("Fetch error:", error);
+    } finally {
+      setLoading(false);
     }
-    return Timestamp.fromDate(now);
   };
 
-  // --- FETCH DATA ---
   useEffect(() => {
-    const fetchDashboardData = async () => {
-      setLoading(true);
-      try {
-        const shipmentsRef = collection(db, "shipments");
-        const startDate = getStartDate(dateRange);
-
-        // 1. PREPARE STATS QUERIES (Parallel)
-        // Note: 'updatedAt' is better for "Activity" dashboard than 'createdAt'
-        const qTotal = query(shipmentsRef, where("updatedAt", ">=", startDate));
-        const qDelayed = query(
-          shipmentsRef,
-          where("updatedAt", ">=", startDate),
-          where("status", "==", "DELAYED"), // Requires Index: updatedAt + status
-        );
-        const qInTransit = query(
-          shipmentsRef,
-          where("updatedAt", ">=", startDate),
-          where("status", "==", "IN_TRANSIT"), // Requires Index: updatedAt + status
-        );
-
-        // 2. PREPARE TABLE QUERY (Recent Activity)
-        // This is separate from Date Range stats. Recent is always "Latest N items".
-        const qRecent = query(
-          shipmentsRef,
-          orderBy("updatedAt", "desc"),
-          limit(viewLimit),
-        );
-
-        // 3. EXECUTE ALL
-        const [snapTotal, snapDelayed, snapTransit, snapRecent] =
-          await Promise.all([
-            getCountFromServer(qTotal),
-            getCountFromServer(qDelayed),
-            getCountFromServer(qInTransit),
-            getDocs(qRecent),
-          ]);
-
-        // 4. SET STATE
-        setStats({
-          total: snapTotal.data().count,
-          delayed: snapDelayed.data().count,
-          inTransit: snapTransit.data().count,
-        });
-
-        const shipmentsData = snapRecent.docs.map((doc) => ({
-          id: doc.id,
-          ...doc.data(),
-        }));
-        setRecentShipments(shipmentsData);
-      } catch (error) {
-        console.error("Error fetching dashboard data:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
     fetchDashboardData();
-  }, [dateRange, viewLimit]); // Re-run when range OR limit changes
-
+  }, [dateRange, viewLimit]);
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
       {/* --- A. CONTROLS HEADER --- */}
@@ -135,7 +89,7 @@ export default function ManagerOverview({ onNavigateToShipments }) {
       </div>
 
       {/* --- B. STATS --- */}
-      <ManagerStats stats={stats} loading={loading} />
+      <ManagerStatistics stats={stats} loading={loading} />
 
       {/* --- C. RECENT TABLE (With View Limit Prop) --- */}
       <ManagerRecentTable

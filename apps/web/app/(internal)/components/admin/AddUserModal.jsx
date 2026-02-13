@@ -12,19 +12,21 @@ import { createUserProfile } from "../../../utility/FirebaseFunctions";
 import { WAREHOUSES } from "@/app/utility/WarehouseData";
 import { normalizePhoneNumber } from "@/app/utility/utilities";
 
+const INITIAL_FORM_STATE = {
+  displayName: "",
+  email: "",
+  password: "",
+  role: "driver",
+  phoneNumber: "",
+  warehouseCode: "",
+  warehouseName: "",
+};
+
 export default function AddUserModal({ isOpen, onClose, onSuccess }) {
   const [step, setStep] = useState("FORM");
   const [error, setError] = useState("");
 
-  const [formData, setFormData] = useState({
-    displayName: "",
-    email: "",
-    password: "",
-    role: "driver",
-    phoneNumber: "",
-    warehouseCode: "",
-    warehouseName: "",
-  });
+  const [formData, setFormData] = useState(INITIAL_FORM_STATE);
 
   if (!isOpen) return null;
 
@@ -100,16 +102,10 @@ export default function AddUserModal({ isOpen, onClose, onSuccess }) {
 
   const handleClose = () => {
     setStep("FORM");
-    setFormData({
-      displayName: "",
-      email: "",
-      password: "",
-      role: "driver",
-      phoneNumber: "",
-      warehouseId: "",
-    });
+    setFormData(INITIAL_FORM_STATE);
     onClose();
   };
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div
@@ -207,7 +203,7 @@ export default function AddUserModal({ isOpen, onClose, onSuccess }) {
                 <option value="admin">Admin</option>
               </select>
             </div>
-            {/* NEW: Warehouse Select (Hidden for Admins) */}
+
             {formData.role !== "admin" && (
               <div className="animate-in fade-in slide-in-from-top-2 duration-300">
                 <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">
@@ -222,8 +218,6 @@ export default function AddUserModal({ isOpen, onClose, onSuccess }) {
                 >
                   <option value="">Select Warehouse...</option>
                   {/* Ideally, fetch these from Firestore too */}
-                  {/* <option value="hub-mnl">Manila Hub</option>
-                  <option value="hub-ceb">Cebu Hub</option> */}
                   {WAREHOUSES.map((w, i) => (
                     <option key={i} value={w.code}>
                       {w.name}
@@ -326,66 +320,3 @@ export default function AddUserModal({ isOpen, onClose, onSuccess }) {
     </div>
   );
 }
-
-// --------------------------------
-
-// const handleSubmit = async () => {
-//   setStep("LOADING");
-//   setError("");
-
-//   let secondaryApp = null;
-
-//   try {
-//     // 1. TRICK: Initialize a second Firebase App to avoid logging out the Admin
-//     secondaryApp = initializeApp(mainApp.options, "SecondaryApp");
-//     const secondaryAuth = getAuth(secondaryApp);
-
-//     // 2. Create the User (on the secondary app instance)
-//     const userCredential = await createUserWithEmailAndPassword(
-//       secondaryAuth,
-//       formData.email,
-//       formData.password
-//     );
-//     const newUser = userCredential.user;
-
-//     // 3. Set the Display Name
-//     await updateProfile(newUser, {
-//       displayName: formData.displayName,
-//     });
-
-//     // 4. Force Write the Role to Firestore
-//     // await setDoc(
-//     //   doc(db, "users", newUser.uid),
-//     //   {
-//     //     uid: newUser.uid,
-//     //     email: formData.email,
-//     //     name: formData.displayName,
-//     //     role: formData.role,
-//     //     active: true,
-//     //     createdAt: serverTimestamp(),
-//     //   },
-//     //   { merge: true }
-//     // );
-
-//     // 5. Cleanup: Sign out the new user from the secondary app (just in case)
-//     await signOut(secondaryAuth);
-
-//     setStep("SUCCESS");
-//     if (onSuccess) onSuccess();
-//   } catch (err) {
-//     console.error("Creation Error:", err);
-//     let msg = "Failed to create user.";
-//     if (err.code === "auth/email-already-in-use")
-//       msg = "That email is already registered.";
-//     if (err.code === "auth/weak-password")
-//       msg = "Password must be at least 6 characters.";
-
-//     setError(msg);
-//     setStep("FORM");
-//   } finally {
-//     // 6. Delete the secondary app to free resources
-//     if (secondaryApp) {
-//       await deleteApp(secondaryApp);
-//     }
-//   }
-// };

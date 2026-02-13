@@ -16,7 +16,6 @@ import { useRouter } from "next/navigation";
 import { auth } from "@/lib/firebase";
 import { useAuth } from "@/app/context/AuthContext";
 import { handleLogout } from "@/app/utility/utilities";
-import PackageManager from "../../components/packages/PackageManager";
 import ManifestPage from "../../components/manifests/ManifestBoard";
 import TabButton from "../../components/ui/TabButton";
 import NotificationBell from "../../components/notifications/NotificationBell";
@@ -25,17 +24,31 @@ import TruckBoard from "../../components/trucks/TruckBoard";
 export default function AdminDashboardPage() {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState("overview");
-
-  // 👇 THIS IS HOW YOU ACCESS THE INFO NOW
   const { user, profile, loading } = useAuth();
 
-  if (loading) return <div>Loading...</div>;
+  useEffect(() => {
+    // 1. Do nothing while loading
+    if (loading) return;
 
-  // Optional: Security Check
-  // if (!profile || profile.role !== "admin") {
-  //   router.push("/login"); // Uncomment to auto-redirect
-  //   return <div>Access Denied: You are not an admin.</div>;
-  // }
+    // 2. Check if user is not logged in
+    if (!user) {
+      router.push("/login");
+      return;
+    }
+
+    // 3. Check if user is logged in but NOT a admin
+    if (profile?.role !== "admin") {
+      // Option A: Kick them out (Strict)
+      handleLogout(auth, router);
+
+      // Option B: Redirect to home (Friendlier)
+      console.warn("Unauthorized access attempt by:", user.email);
+      router.push("/login");
+    }
+  }, [user, profile, loading, router]);
+
+  if (loading) return <div>Loading...</div>;
+  if (!user || profile?.role !== "admin") return null;
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-200 font-sans">
@@ -117,19 +130,15 @@ export default function AdminDashboardPage() {
               icon={faTruckLoading}
               label="Manifest & Trips"
             />
-            {/* <TabButton
-              isActive={activeTab === "manager"}
-              onClick={() => setActiveTab("manager")}
-              icon={faMapSigns}
-              label="Package Manager"
-            /> */}
           </div>
         </div>
       </header>
 
       {/* --- CONTENT AREA --- */}
       <main className="max-w-7xl mx-auto p-6">
-        {activeTab === "overview" && <AdminOverview />}
+        {activeTab === "overview" && (
+          <AdminOverview user={user} userRole="admin" profile={profile} />
+        )}
         {activeTab === "trips" && (
           <TripBoard user={user} userRole="admin" profile={profile} />
         )}
@@ -140,7 +149,6 @@ export default function AdminDashboardPage() {
           <TruckBoard user={user} userRole="admin" profile={profile} />
         )}
         {activeTab === "manifests" && <ManifestPage />}
-        {/* {activeTab === "manager" && <PackageManager />} */}
       </main>
     </div>
   );

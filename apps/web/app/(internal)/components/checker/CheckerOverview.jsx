@@ -113,7 +113,7 @@ export default function CheckerOverview() {
         />
         <StatusCard
           title="Pending / Floor"
-          value={stats.pending} // Calculated as Received - Loaded usually
+          value={stats.pending}
           icon={faClipboardCheck}
           color="text-amber-400"
           bg="bg-amber-500/10"

@@ -92,7 +92,7 @@ export default function TripManifestTab({
           <div className="text-xl font-bold text-white">
             {shipments.length + " "}
             <span className="text-sm font-normal text-slate-500">
-              shipments
+              shipment{shipments.length > 1 ? "s" : ""}
             </span>
           </div>
         </div>

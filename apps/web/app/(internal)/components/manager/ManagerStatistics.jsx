@@ -9,7 +9,7 @@ import {
 export default function ManagerStatistics({ stats, loading }) {
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-      <StatCard
+      <StatusCard
         title="Total Shipments"
         value={stats.total}
         icon={faBoxOpen}
@@ -18,7 +18,7 @@ export default function ManagerStatistics({ stats, loading }) {
         border="border-blue-500/20"
         loading={loading}
       />
-      <StatCard
+      <StatusCard
         title="Delayed"
         value={stats.delayed}
         icon={faExclamationTriangle}
@@ -27,7 +27,7 @@ export default function ManagerStatistics({ stats, loading }) {
         border="border-amber-500/20"
         loading={loading}
       />
-      <StatCard
+      <StatusCard
         title="In Transit"
         value={stats.inTransit}
         icon={faTruckFast}
@@ -41,7 +41,7 @@ export default function ManagerStatistics({ stats, loading }) {
 }
 
 // Internal Helper for Cards
-function StatCard({ title, value, icon, color, bg, border, loading }) {
+function StatusCard({ title, value, icon, color, bg, border, loading }) {
   return (
     <div
       className={`p-6 rounded-xl border ${bg} ${border} flex items-center justify-between relative overflow-hidden group`}

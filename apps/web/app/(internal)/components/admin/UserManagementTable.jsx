@@ -14,15 +14,12 @@ export default function UserManagementTable({
   onDeleteUser,
   onAddUser,
 }) {
-  // --- STATE ---
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState("ALL");
   const [page, setPage] = useState(1);
   const itemsPerPage = 5;
 
-  // --- LOGIC ---
   const filteredUsers = useMemo(() => {
-    // Reset to page 1 if filters change
     if (page !== 1 && (search || roleFilter !== "ALL")) setPage(1);
 
     return users.filter((u) => {
