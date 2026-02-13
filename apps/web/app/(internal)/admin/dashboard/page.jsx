@@ -1,5 +1,5 @@
 "use client";
-import React, { useState } from "react"; // Added useEffect
+import React, { useEffect, useState } from "react"; // Added useEffect
 // import TripManager from "../../components/trips/TripManager";
 import ShipmentBoard from "../../components/shipments/ShipmentBoard";
 import TripBoard from "../../components/trips/TripBoard";
