@@ -2,8 +2,6 @@
 
 import React, { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
-import { httpsCallable } from "firebase/functions";
-import { functions, db } from "@/lib/firebase"; // Ensure db is imported
 import { doc, getDoc } from "firebase/firestore";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
@@ -13,7 +11,8 @@ import {
   faSpinner,
   faExclamationTriangle,
 } from "@fortawesome/free-solid-svg-icons";
-import { verifyTripManifest } from "@/app/utility/FirebaseFunctions";
+import { db } from "@/lib/firebase";
+// import { verifyTripManifest } from "@/app/utility/FirebaseFunctions";
 
 export default function VerifyPage() {
   const { id: tripId } = useParams(); // Get ID from URL
@@ -21,49 +20,68 @@ export default function VerifyPage() {
   const [data, setData] = useState(null);
   const [drift, setDrift] = useState(null);
 
+  const performVerification = async () => {
+    try {
+      // 1. Get the Trip Doc first to find the Manifest ID
+      // (Because the QR code links to the Trip ID, but verification needs Manifest ID)
+      const tripRef = doc(db, "truck_trips", tripId);
+      const tripSnap = await getDoc(tripRef);
+
+      if (!tripSnap.exists()) {
+        throw new Error("Trip ID not found in system.");
+      }
+
+      const tripData = tripSnap.data();
+      const manifestId = tripData.manifestId;
+
+      if (!manifestId) {
+        setStatus("ERROR");
+        setData({ error: "Trip exists but has no locked manifest." });
+        return;
+      }
+
+      // 2. Call the Cloud Function
+      // This is the backend logic you already wrote!
+      // const result = await verifyTripManifest({ manifestId });
+      const FUNCTION_URL =
+        "https://asia-southeast1-atlas-tracking.cloudfunctions.net/verifyTripManifest";
+
+      const response = await fetch(FUNCTION_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ manifestId }), // Send raw JSON, no "data" wrapper
+      });
+
+      if (!response.ok) {
+        // Parse error message from server if possible
+        const errData = await response.json().catch(() => ({}));
+        throw new Error(errData.error || `Server Error: ${response?.status}`);
+      }
+
+      const verifyData = await response.json();
+
+      console.log("verified hash: ", response.json());
+      console.log("verified hash: ", response);
+
+      if (verifyData?.status === "VALID") {
+        setStatus("VALID");
+      } else {
+        setStatus("TAMPERED");
+      }
+
+      setData(verifyData);
+      setDrift(verifyData?.drift);
+    } catch (err) {
+      console.error(err);
+      setStatus("ERROR");
+      setData({ error: err.message });
+    }
+  };
+
   useEffect(() => {
     if (!tripId) return;
-
-    const performVerification = async () => {
-      try {
-        // 1. Get the Trip Doc first to find the Manifest ID
-        // (Because the QR code links to the Trip ID, but verification needs Manifest ID)
-        const tripRef = doc(db, "truck_trips", tripId);
-        const tripSnap = await getDoc(tripRef);
-
-        if (!tripSnap.exists()) {
-          throw new Error("Trip ID not found in system.");
-        }
-
-        const tripData = tripSnap.data();
-        const manifestId = tripData.manifestId;
-
-        if (!manifestId) {
-          setStatus("ERROR");
-          setData({ error: "Trip exists but has no locked manifest." });
-          return;
-        }
-
-        // 2. Call the Cloud Function
-        // This is the backend logic you already wrote!
-        const result = await verifyTripManifest({ manifestId });
-
-        const verifyData = result.data;
-
-        if (verifyData.status === "VALID") {
-          setStatus("VALID");
-        } else {
-          setStatus("TAMPERED");
-        }
-
-        setData(verifyData);
-        setDrift(verifyData.drift);
-      } catch (err) {
-        console.error(err);
-        setStatus("ERROR");
-        setData({ error: err.message });
-      }
-    };
 
     performVerification();
   }, [tripId]);

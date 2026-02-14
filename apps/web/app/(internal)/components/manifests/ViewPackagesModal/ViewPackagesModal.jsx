@@ -8,12 +8,14 @@ import { auth, functions } from "@/lib/firebase";
 import { httpsCallable } from "firebase/functions";
 import {
   faBoxOpen,
+  faCheckSquare,
   faChevronLeft,
   faChevronRight,
   faCube,
   faPlus,
   faSearch,
   faSnowflake,
+  faSquare,
   faTimes,
   faWeightHanging,
   faWineGlass,
@@ -448,19 +450,46 @@ export default function ViewPackagesModal({
                 onSplit={handleSplitShipment}
                 onStatusChange={handleBulkStatusChange}
               />
-              <div className="p-4 relative">
-                <FontAwesomeIcon
-                  icon={faSearch}
-                  style={{ left: "30px" }}
-                  className="absolute top-1/2 -translate-y-1/2 text-slate-500 text-sm"
-                />
-                <input
-                  type="text"
-                  placeholder="Search by description or barcode..."
-                  className="w-full bg-slate-950 border border-slate-800 rounded-lg pl-10 pr-4 py-2.5 text-sm text-white focus:border-blue-500 outline-none"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                />
+              <div className="flex justify-between items-center border-t border-slate-800 px-4 py-3">
+                {/* LEFT SIDE */}
+                <div className="flex items-center gap-4">
+                  <button
+                    onClick={handleSelectAll}
+                    className="hover:text-white transition-colors"
+                  >
+                    <FontAwesomeIcon
+                      icon={
+                        selectedIndices.size > 0 &&
+                        selectedIndices.size === packages.length
+                          ? faCheckSquare
+                          : faSquare
+                      }
+                      className={
+                        selectedIndices.size > 0
+                          ? "text-blue-500"
+                          : "text-slate-700"
+                      }
+                    />
+                  </button>
+                  <span className="text-[10px] uppercase font-bold text-slate-500">
+                    Select All Packages
+                  </span>
+                </div>
+
+                {/* RIGHT SIDE */}
+                <div className="relative w-80">
+                  <FontAwesomeIcon
+                    icon={faSearch}
+                    className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-sm"
+                  />
+                  <input
+                    type="text"
+                    placeholder="Search by description or barcode..."
+                    className="w-full bg-slate-950 border border-slate-800 rounded-lg pl-10 pr-4 py-2.5 text-sm text-white focus:border-blue-500 outline-none"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                  />
+                </div>
               </div>
             </div>
 

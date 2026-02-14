@@ -10,7 +10,7 @@ import {
 import StatusButton from "../ui/StatusButton";
 import {
   generateTripManifest,
-  generateTripCertificate,
+  // generateTripCertificate,
   reopenTrip,
 } from "@/app/utility/FirebaseFunctions";
 import { runAction } from "@/app/utility/utilities";
@@ -28,9 +28,10 @@ export default function TripDrawerFooter({ data, onClose, shipments }) {
 
   // Helper for non-StatusButton actions (simple async wrapper)
   const handleAction = async (actionType) => {
+    console.log(`Action Triggered: ${actionType} for Trip ID: ${data.tripId}`);
     try {
       if (actionType === "generateTripCertificate") {
-        await generateTripCertificate({ tripDocId: data.tripId }); // Use tripId or id depending on your DB
+        // await generateTripCertificate({ tripDocId: data.tripId }); // Use tripId or id depending on your DB
         alert("Certificate generated successfully!");
       }
       if (actionType === "reopenTrip") {
