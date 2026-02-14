@@ -38,9 +38,7 @@ exports.generateTripManifest = onCall(
     // Get User Name for logs
     const userSnap = await db.collection("users").doc(uid).get();
     const user = userSnap.exists ? userSnap.data() : {};
-    const generatedByName =
-      String(user.name || user.fullName || user.displayName || "").trim() ||
-      "Unknown User";
+    const generatedByName = String(user.name || "").trim() || "Unknown User";
 
     const tripRef = db.collection("truck_trips").doc(tripDocId);
     const tripShipmentsRef = tripRef.collection("trip_shipments");
@@ -134,25 +132,28 @@ exports.generateTripManifest = onCall(
         const manifestedPackages = packages.filter((p) =>
           ["LOADED", "OUT_FOR_DELIVERY", "DELIVERED"].includes(p.status),
         );
+        const actualLoadedCount = manifestedPackages.length;
+        totalItems += actualLoadedCount;
 
         items.push({
           trackingDocId,
           trackingNumber,
-          route: summary.route || fullData.destinationCode || null,
+          route: summary.route || null,
           senderName: fullData.sender?.name || null,
           receiverName: fullData.recipient?.name || null,
 
           // Stats for this shipment
           totalCount: shipmentTotalItems,
-          loadedCount: loadedCount,
+          // loadedCount: loadedCount,
+          loadedCount: actualLoadedCount,
 
           // The actual list of items on the truck
           contents: manifestedPackages.map((p) => ({
-            desc: p.description,
-            weight: p.weight,
-            type: p.packagingType,
-            value: p.declaredValue,
-            isFragile: p.isFragile,
+            desc: p.description || "N/A",
+            // weight: p.weight,
+            type: p.packagingType || "Custom",
+            value: p.declaredValue ?? 0,
+            isFragile: p.isFragile ?? false,
           })),
         });
       });

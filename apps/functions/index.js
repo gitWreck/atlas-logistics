@@ -18,6 +18,7 @@ setGlobalOptions({
     "http://localhost:3000",
     "https://atlas-tracking.web.app",
     "https://atlas-tracking.firebaseapp.com",
+    "https://atlas-trucking-platform.vercel.app",
   ],
 });
 
@@ -91,6 +92,8 @@ exports.finishLoadingTruck =
 // Manifests & Certificates
 exports.generateTripManifest =
   require("./src/trips/generateTripManifest").generateTripManifest;
+exports.verifyTripManifest =
+  require("./src/trips/verifyTripManifest").verifyTripManifest;
 
 // Messaging
 exports.sendManualSms = require("./src/messaging/sendManualSms").sendManualSms;
@@ -134,8 +137,8 @@ exports.recordPartialDelivery =
 
 // exports.getTripPackages =
 //   require("./src/trips/backup/getTripPackages").getTripPackages;
-exports.generateTripCertificate =
-  require("./src/trips/generateTripCertificate").generateTripCertificate;
+// exports.generateTripCertificate =
+//   require("./src/trips/generateTripCertificate").generateTripCertificate;
 exports.reopenTrip = require("./src/trips/reopenTrip").reopenTrip;
 
 // exports.sendSMS = require("./src/messaging/sendSMS").sendSMS;

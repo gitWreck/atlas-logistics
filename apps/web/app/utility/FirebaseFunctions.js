@@ -45,10 +45,11 @@ export const generateTripManifest = httpsCallable(
   functions,
   "generateTripManifest",
 );
-export const generateTripCertificate = httpsCallable(
+export const verifyTripManifest = httpsCallable(
   functions,
-  "generateTripCertificate",
+  "verifyTripManifest",
 );
+
 export const reopenTrip = httpsCallable(functions, "reopentrip");
 export const bulkAssignShipments = httpsCallable(
   functions,
@@ -58,10 +59,6 @@ export const splitShipments = httpsCallable(functions, "splitShipments");
 export const bulkShipmentAction = httpsCallable(
   functions,
   "bulkShipmentAction",
-);
-export const verifyTripManifest = httpsCallable(
-  functions,
-  "verifyTripManifest",
 );
 
 // SMS & COMMUNICATION
