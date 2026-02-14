@@ -13,7 +13,7 @@ import AddUserModal from "./AddUserModal";
 import StatusCard from "../ui/StatusCard";
 // import { useAuth } from "@/app/context/AuthContext";
 import UserManagementTable from "./UserManagementTable";
-import DelayApprovalWidget from "../delay/DelayApprovalWidget";
+import DelayApprovalWidget from "../delay/DelayWidget";
 
 export default function AdminOverview({ user }) {
   if (user?.customClaims?.admin) {
