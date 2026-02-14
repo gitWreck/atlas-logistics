@@ -1,11 +1,6 @@
 import React from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import {
-  faExclamationTriangle,
-  faEllipsisV,
-  faTruck,
-  faCalendarAlt,
-} from "@fortawesome/free-solid-svg-icons";
+import { faEllipsisV, faTruck } from "@fortawesome/free-solid-svg-icons";
 import StatusBadge from "../ui/StatusBadge";
 import { formatFirestoreDate } from "@/app/utility/utilities"; // Ensure you have this
 
@@ -38,12 +33,12 @@ function StatusDot({ status, isDelayed }) {
 }
 
 // Helper: Calculate Trip Progress %
-function getTripProgress(status) {
-  if (status === "COMPLETED") return 100;
-  if (status === "IN_TRANSIT") return 60;
-  if (status === "LOADED") return 30;
-  return 10; // Planned/Created
-}
+// function getTripProgress(status) {
+//   if (status === "COMPLETED") return 100;
+//   if (status === "IN_TRANSIT") return 60;
+//   if (status === "LOADED") return 30;
+//   return 10; // Planned/Created
+// }
 
 export default function TripRow({ trip, onClick }) {
   // 1. Logic: Active Issue if delayCleared is explicitly false

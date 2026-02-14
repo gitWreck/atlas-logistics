@@ -14,9 +14,10 @@ import TripManifestTab from "./TripManifestTab";
 import TripToolsTab from "./TripToolsTab";
 import TripDrawerFooter from "./TripDrawerFooter";
 import StatusBadge from "../ui/StatusBadge";
-import ViewPackagesModal from "../manifests/modals/ViewPackagesModal";
+// import ViewPackagesModal from "../manifests/modals/ViewPackagesModal";
 import UnassignShipmentModal from "../manifests/modals/UnassignShipmentModal";
 import BulkAssignmentModal from "../manifests/modals/BulkAssignmentModal";
+import ViewPackagesModal from "../manifests/ViewPackagesModal/ViewPackagesModal";
 
 export default function TripDrawer({
   isOpen,

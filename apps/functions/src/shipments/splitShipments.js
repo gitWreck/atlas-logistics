@@ -141,14 +141,14 @@ exports.splitShipment = onCall(
           },
         ],
 
-        audit_log: [
-          {
-            action: "CREATED_FROM_SPLIT",
-            at: new Date().toISOString(),
-            by: uid,
-            note: `Split ${movePackages.length} items from ${originalShipmentId}`,
-          },
-        ],
+        // audit_log: [
+        //   {
+        //     action: "CREATED_FROM_SPLIT",
+        //     at: new Date().toISOString(),
+        //     by: uid,
+        //     note: `Split ${movePackages.length} items from ${originalShipmentId}`,
+        //   },
+        // ],
       };
 
       // E. Prepare Original Shipment Updates
