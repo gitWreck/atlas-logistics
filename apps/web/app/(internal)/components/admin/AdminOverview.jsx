@@ -13,7 +13,7 @@ import AddUserModal from "./AddUserModal";
 import StatusCard from "../ui/StatusCard";
 // import { useAuth } from "@/app/context/AuthContext";
 import UserManagementTable from "./UserManagementTable";
-import DelayApprovalWidget from "../delay/DelayApprovalWidget";
+// import DelayApprovalWidget from "../delay/DelayApprovalWidget";
 
 export default function AdminOverview({ user }) {
   if (user?.customClaims?.admin) {
@@ -59,7 +59,7 @@ export default function AdminOverview({ user }) {
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
-      <DelayApprovalWidget />
+      {/* <DelayApprovalWidget /> */}
 
       {/* 1. STATS GRID (DYNAMIC) */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
