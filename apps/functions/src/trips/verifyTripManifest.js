@@ -29,13 +29,34 @@ exports.verifyTripManifest = onRequest(
 
     return cors(req, res, async () => {
       try {
-        const manifestId = String(
-          req.query.manifestId || req.body?.manifestId || "",
-        ).trim();
+        let manifestId = req.body.manifestId || req.query.manifestId;
+        const tripId = req.body.tripId || req.query.tripId;
 
-        if (!manifestId) {
-          res.status(400).json({ ok: false, error: "Manifest ID is required" });
+        if (!manifestId && !tripId) {
+          res
+            .status(400)
+            .json({ ok: false, error: "Manifest ID or Trip ID required" });
           return;
+        }
+
+        // 2. If we only have tripId, LOOK UP the manifestId (Admin Bypass)
+        if (!manifestId && tripId) {
+          const tripRef = db.collection("truck_trips").doc(tripId);
+          const tripSnap = await tripRef.get();
+
+          if (!tripSnap.exists) {
+            res.status(404).json({ ok: false, error: "Trip not found" });
+            return;
+          }
+
+          manifestId = tripSnap.data().manifestId;
+
+          if (!manifestId) {
+            res
+              .status(400)
+              .json({ ok: false, error: "Trip has no locked manifest" });
+            return;
+          }
         }
 
         // 1. Load the Manifest Snapshot

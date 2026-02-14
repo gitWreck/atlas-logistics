@@ -15,43 +15,50 @@ import { db } from "@/lib/firebase";
 // import { verifyTripManifest } from "@/app/utility/FirebaseFunctions";
 
 export default function VerifyPage() {
-  const { id: tripId } = useParams(); // Get ID from URL
+  const params = useParams();
+  const tripId = params.id; // Get ID from URL
+
   const [status, setStatus] = useState("LOADING"); // LOADING, VALID, TAMPERED, ERROR
   const [data, setData] = useState(null);
   const [drift, setDrift] = useState(null);
 
-  const performVerification = async () => {
+  const performVerification = async (tripId) => {
     try {
       // 1. Get the Trip Doc first to find the Manifest ID
       // (Because the QR code links to the Trip ID, but verification needs Manifest ID)
-      const tripRef = doc(db, "truck_trips", tripId);
-      const tripSnap = await getDoc(tripRef);
+      // const tripRef = doc(db, "truck_trips", tripId);
+      // const tripSnap = await getDoc(tripRef);
 
-      if (!tripSnap.exists()) {
-        throw new Error("Trip ID not found in system.");
-      }
+      // if (!tripSnap.exists()) {
+      //   throw new Error("Trip ID not found in system.");
+      // }
 
-      const tripData = tripSnap.data();
-      const manifestId = tripData.manifestId;
+      // const tripData = tripSnap.data();
+      // const manifestId = tripData.manifestId;
 
-      if (!manifestId) {
-        setStatus("ERROR");
-        setData({ error: "Trip exists but has no locked manifest." });
-        return;
-      }
+      // if (!manifestId) {
+      //   setStatus("ERROR");
+      //   setData({ error: "Trip exists but has no locked manifest." });
+      //   return;
+      // }
 
       // 2. Call the Cloud Function
       // This is the backend logic you already wrote!
       // const result = await verifyTripManifest({ manifestId });
       const FUNCTION_URL =
         "https://asia-southeast1-atlas-tracking.cloudfunctions.net/verifyTripManifest";
+      const uniqueUrl = `${FUNCTION_URL}?t=${new Date().getTime()}`;
 
-      const response = await fetch(FUNCTION_URL, {
+      const response = await fetch(uniqueUrl, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          "Cache-Control": "no-cache, no-store, must-revalidate", // 1. Tell Server
+          Pragma: "no-cache",
+          Expires: "0",
         },
-        body: JSON.stringify({ manifestId }), // Send raw JSON, no "data" wrapper
+        body: JSON.stringify({ tripId }), // Send raw JSON, no "data" wrapper
+        cache: "no-store", // 2. Tell Browser
       });
 
       if (!response.ok) {
@@ -62,8 +69,8 @@ export default function VerifyPage() {
 
       const verifyData = await response.json();
 
-      console.log("verified hash: ", response.json());
-      console.log("verified hash: ", response);
+      console.log("verified hash: ", verifyData);
+      // console.log("verified hash: ", response);
 
       if (verifyData?.status === "VALID") {
         setStatus("VALID");
@@ -83,7 +90,7 @@ export default function VerifyPage() {
   useEffect(() => {
     if (!tripId) return;
 
-    performVerification();
+    performVerification(tripId);
   }, [tripId]);
 
   // --- RENDER STATES ---
@@ -113,18 +120,24 @@ export default function VerifyPage() {
         ATLAS <span className="text-blue-600">VERIFY</span>
       </div>
 
-      <div className="w-full max-w-md bg-white rounded-2xl shadow-xl overflow-hidden border border-slate-200">
+      {/* ✅ ADDED: 'text-slate-900' here forces dark text inside the card 
+         This prevents Mobile Dark Mode from making text white on a white card.
+      */}
+      <div className="w-full max-w-md bg-white rounded-2xl shadow-xl overflow-hidden border border-slate-200 text-slate-900">
         {/* STATUS BANNER */}
         <div
           className={`p-8 flex flex-col items-center text-center ${
-            status === "VALID" ? "bg-emerald-50" : "bg-red-50"
+            status === "VALID"
+              ? "bg-emerald-100 text-emerald-900"
+              : "bg-red-100 text-red-900"
           }`}
         >
+          {/* ICON CIRCLE */}
           <div
             className={`w-20 h-20 rounded-full flex items-center justify-center text-4xl mb-4 ${
               status === "VALID"
-                ? "bg-emerald-100 text-emerald-600"
-                : "bg-red-100 text-red-600"
+                ? "bg-emerald-200 text-emerald-600"
+                : "bg-red-200 text-red-600"
             }`}
           >
             <FontAwesomeIcon
@@ -132,17 +145,19 @@ export default function VerifyPage() {
             />
           </div>
 
+          {/* MAIN HEADING */}
           <h1
             className={`text-2xl font-black uppercase ${
-              status === "VALID" ? "text-emerald-900" : "text-red-900"
+              status === "VALID" ? "text-emerald-600" : "text-red-600"
             }`}
           >
             {status === "VALID" ? "Official Record" : "Integrity Failed"}
           </h1>
 
+          {/* SUBTEXT */}
           <p
             className={`font-bold mt-1 ${
-              status === "VALID" ? "text-emerald-600" : "text-red-600"
+              status === "VALID" ? "text-emerald-700" : "text-red-700"
             }`}
           >
             {status === "VALID"
@@ -175,12 +190,15 @@ export default function VerifyPage() {
 
           {/* Hash Display */}
           {data?.recomputedHash && (
-            <div className="bg-slate-50 p-3 rounded-lg border border-slate-200">
+            <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 w-full">
               <div className="text-[10px] font-bold text-slate-400 uppercase mb-1 flex items-center gap-1">
                 <FontAwesomeIcon icon={faShieldAlt} /> Digital Fingerprint
                 (SHA-256)
               </div>
-              <div className="font-mono text-[10px] break-all text-slate-600 leading-tight">
+              {/* ✅ ADDED: 'whitespace-normal' and 'break-all' 
+                  This forces the long hash to wrap to the next line 
+              */}
+              <div className="font-mono text-[10px] text-slate-600 leading-tight whitespace-normal break-all w-full">
                 {data.recomputedHash}
               </div>
             </div>
