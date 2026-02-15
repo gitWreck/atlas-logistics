@@ -85,22 +85,26 @@ exports.setTruckDelay = onCall(
       });
     });
 
+    const delayStatus = reason.toUpperCase();
+
     if (notify === true) {
       // 1. Define Standard Messages
-      const messageText = STATUS_MESSAGES[newStatus];
+      const messageText = STATUS_MESSAGES[delayStatus];
+
+      if (!messageText || delayStatus === "CUSTOM") {
+        // Use the 'notes' provided, or a generic fallback
+        const customReason = `We are experiencing an unexpected delay. ${delayStatus}`;
+        messageText = `Atlas Logistics: ${customReason}`;
+      }
 
       if (messageText) {
         console.log(
-          `[Notify] Sending broadcast for trip ${tripId} with status ${newStatus}`,
+          `[Notify] Sending broadcast for trip ${truckTripId} with status ${delayStatus}`,
         );
-
-        // 2. Reuse your broadcast logic (Internal Call)
-        // We import the logic from your existing broadcast function or just invoke it here.
-        // Since this is "server-side to server-side", we can just call the logic directly.
 
         try {
           broadcastTripLogic({
-            tripId: tripId,
+            tripId: truckTripId,
             message: messageText,
             actorUid: request.auth.uid || "SYSTEM",
           }).catch((err) => console.error("Broadcast failed:", err));

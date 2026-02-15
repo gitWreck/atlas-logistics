@@ -34,6 +34,7 @@ exports.clearTruckDelay = onCall(
     const uid = req.auth.uid;
     const role = req.auth.token?.role || "unknown";
     const tripRef = db.collection("truck_trips").doc(truckTripId);
+    const notify = !!req.data?.notify; // Optional: whether to send SMS notifications for this status change
 
     await db.runTransaction(async (tx) => {
       const snap = await tx.get(tripRef);
@@ -80,21 +81,16 @@ exports.clearTruckDelay = onCall(
 
     if (notify === true) {
       // 1. Define Standard Messages
-
-      const messageText = STATUS_MESSAGES[newStatus];
+      const messageText = STATUS_MESSAGES["DELAY_CLEARED"];
 
       if (messageText) {
         console.log(
-          `[Notify] Sending broadcast for trip ${tripId} with status ${newStatus}`,
+          `[Notify] Sending broadcast for trip ${truckTripId} with delay is cleared`,
         );
-
-        // 2. Reuse your broadcast logic (Internal Call)
-        // We import the logic from your existing broadcast function or just invoke it here.
-        // Since this is "server-side to server-side", we can just call the logic directly.
 
         try {
           broadcastTripLogic({
-            tripId: tripId,
+            tripId: truckTripId,
             message: messageText,
             actorUid: request.auth.uid || "SYSTEM",
           }).catch((err) => console.error("Broadcast failed:", err));

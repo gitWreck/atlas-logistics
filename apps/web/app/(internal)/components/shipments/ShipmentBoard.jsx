@@ -349,8 +349,9 @@ export default function ShipmentBoard({ user, userRole, profile }) {
               <span className="text-xs text-slate-500">
                 Showing{" "}
                 <span className="text-white font-bold">
-                  {indexOfFirstItem + 1}-
-                  {Math.min(indexOfLastItem, filteredShipments.length)}
+                  {indexOfFirstItem + 1}
+                  {/* - */}
+                  {/* {Math.min(indexOfLastItem, filteredShipments.length)} */}
                 </span>{" "}
                 of {filteredShipments.length}
               </span>

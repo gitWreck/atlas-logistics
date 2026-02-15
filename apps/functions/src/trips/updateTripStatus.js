@@ -50,6 +50,7 @@ exports.updateTripStatus = onCall(
       "COMPLETED",
       "CANCELLED",
     ];
+
     if (!VALID_STATUSES.includes(newStatus)) {
       throw new HttpsError(
         "invalid-argument",
@@ -58,8 +59,6 @@ exports.updateTripStatus = onCall(
     }
 
     const tripRef = db.collection("truck_trips").doc(tripId);
-
-    // Get actor name for logs
     const userSnap = await db.collection("users").doc(uid).get();
     const actorName = userSnap.data()?.name || "Unknown Admin";
 
@@ -129,6 +128,52 @@ exports.updateTripStatus = onCall(
         at: admin.firestore.FieldValue.serverTimestamp(),
       });
     });
+
+    try {
+      const batch = db.batch();
+      let operationCount = 0;
+
+      // A. Get all shipments on this trip
+      const shipmentsSnap = await db
+        .collection("shipments")
+        .where("currentTruckTripId", "==", tripId)
+        .get();
+
+      // B. Get all truck_shipments (if using a separate collection)
+      const truckShipmentsSnap = await db
+        .collection("truck_shipments")
+        .where("truckTripId", "==", tripId)
+        .get();
+
+      // Helper to add updates to batch safely
+      const addToBatch = (docRef, status) => {
+        // If Trip is CANCELLED, we might want to unassign the shipment?
+        // For now, we will just sync the status.
+        const updateData = {
+          status: status,
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        };
+
+        // Edge Case: If Trip is COMPLETED, mark shipment as COMPLETED/DELIVERED
+        // If Trip is CANCELLED, maybe revert to RECEIVED?
+        // (You can customize this logic)
+
+        batch.update(docRef, updateData);
+        operationCount++;
+      };
+
+      shipmentsSnap.forEach((doc) => addToBatch(doc.ref, newStatus));
+      truckShipmentsSnap.forEach((doc) => addToBatch(doc.ref, newStatus));
+
+      if (operationCount > 0) {
+        await batch.commit();
+        console.log(`[Cascade] Updated ${operationCount} related shipments.`);
+      }
+    } catch (err) {
+      console.error("Failed to cascade status update:", err);
+      // We don't throw here because the main Trip Update succeeded.
+      // We just log the error so you can debug.
+    }
 
     // If user checked the box, trigger the notification
     // --- 4. OPTIONAL: AUTOMATED SMS NOTIFICATION ---
