@@ -10,7 +10,7 @@
   },
   "dependencies": {
     "@sendgrid/mail": "^8.1.6",
-    "cors": "^2.8.5",
+    "cors": "^2.8.6",
     "express": "^5.2.1",
     "firebase-admin": "^11.11.1",
     "firebase-functions": "^7.0.3",

@@ -29,8 +29,8 @@ export default function ExportTripButton({ trip, shipments }) {
     }
   };
 
-  console.log("ExportTripButton received trip:", trip);
-  console.log("ExportTripButton received shipments:", shipments);
+  // console.log("ExportTripButton received trip:", trip);
+  // console.log("ExportTripButton received shipments:", shipments);
 
   const handleExport = () => {
     if (!trip || !shipments || shipments.length === 0) {
