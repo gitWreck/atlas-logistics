@@ -133,6 +133,15 @@ export default function CustomerSignupScreen() {
     }
 
     try {
+      // Match both stored forms: 639... (canonical) or 09... (legacy)
+      const phoneVariants =
+        normalizedPhone.length === 12 && normalizedPhone.startsWith("639")
+          ? [
+              normalizedPhone,
+              "0" + normalizedPhone.slice(2), // 639xxxxxxxxx → 09xxxxxxxxx
+            ]
+          : [normalizedPhone];
+
       // Check for duplicates in Firestore first
       const usersRef = collection(db, "users");
       const [emailSnap, identitySnap] = await Promise.all([
@@ -141,7 +150,7 @@ export default function CustomerSignupScreen() {
           query(
             usersRef,
             where("name", "==", fullName.trim()),
-            where("phoneNumber", "==", normalizedPhone),
+            where("phoneNumber", "in", phoneVariants),
           ),
         ),
       ]);
