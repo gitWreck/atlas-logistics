@@ -3,6 +3,8 @@ import React, { useState, useEffect } from "react";
 import ManagerRecentTable from "./ManagerRecentTable";
 import ManagerStatistics from "./ManagerStatistics";
 import DelayApprovalWidget from "../delay/DelayWidget";
+import RecentAlertsLogs from "../logs/RecentAlertsLogs";
+import RecentSmsLogs from "../logs/RecentSmsLogs";
 
 export default function ManagerOverview({
   user,
@@ -110,6 +112,14 @@ export default function ManagerOverview({
         setViewLimit={setViewLimit}
         onViewAll={onNavigateToShipments} // <--- Pass it here
       />
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 h-[500px] mb-8">
+        {/* LEFT: INCOMING ALERTS */}
+        <RecentAlertsLogs />
+
+        {/* RIGHT: OUTGOING LOGS */}
+        <RecentSmsLogs />
+      </div>
     </div>
   );
 }
