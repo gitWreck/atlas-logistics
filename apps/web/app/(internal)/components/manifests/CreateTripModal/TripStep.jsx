@@ -82,8 +82,13 @@ export default function TripStep({ shipmentDraft, onBack, onComplete }) {
   };
 
   return (
-    <div className="flex flex-col h-full animate-in slide-in-from-right duration-300">
-      <div className="flex-1 overflow-y-auto p-6 custom-scrollbar">
+    // <div className="flex flex-col h-full animate-in slide-in-from-right duration-300 overflow-hidden">
+    // <div className="flex flex-col h-full animate-in slide-in-from-right duration-300 overflow-hidden">
+    <div className="flex flex-col h-full w-full">
+      {/* Scrollable Content */}
+      {/* <div className="flex-1 overflow-y-auto p-4 sm:p-6 custom-scrollbar pb-20 sm:pb-0"> */}
+      {/* <div className="flex-1 overflow-y-auto min-h-0 p-4 sm:p-6 custom-scrollbar"> */}
+      <div className="flex-1 overflow-y-auto p-4 sm:p-6 custom-scrollbar">
         {view === "selection" ? (
           <div className="space-y-6">
             <div className="text-center">
@@ -108,17 +113,17 @@ export default function TripStep({ shipmentDraft, onBack, onComplete }) {
                       }
                       className="w-full p-4 bg-slate-950 border border-slate-800 rounded-xl hover:border-blue-500 transition-all flex items-center justify-between"
                     >
-                      <div className="flex items-center gap-4">
-                        <div className="p-3 bg-slate-900 rounded-lg text-slate-500 group-hover:text-blue-500 transition-colors">
+                      <div className="flex items-center gap-3 sm:gap-4">
+                        <div className="p-3 bg-slate-900 rounded-lg text-slate-500 group-hover:text-blue-500 transition-colors shrink-0">
                           <FontAwesomeIcon icon={faTruck} />
                         </div>
                         <div className="text-left">
-                          <div className="flex items-center gap-2">
-                            <p className="font-bold text-slate-200">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <p className="font-bold text-slate-200 text-sm sm:text-base">
                               {trip.truckPlateNumber}
                             </p>
                             {/* TRUCK/TRIP ID BADGE */}
-                            <span className="text-[12px] font-mono bg-slate-800 text-slate-400 px-1.5 py-0.5 rounded border border-slate-700">
+                            <span className="text-[10px] sm:text-[12px] font-mono bg-slate-800 text-slate-400 px-1.5 py-0.5 rounded border border-slate-700">
                               {trip.tripId}
                             </span>
                           </div>
@@ -142,7 +147,7 @@ export default function TripStep({ shipmentDraft, onBack, onComplete }) {
 
             <button
               onClick={() => setView("create")}
-              className="w-full p-4 rounded-xl border-2 border-dashed border-blue-500/30 bg-blue-500/5 hover:bg-blue-500/10 text-blue-400 font-bold flex items-center justify-center gap-3"
+              className="w-full p-4 rounded-xl border-2 border-dashed border-blue-500/30 bg-blue-500/5 hover:bg-blue-500/10 text-blue-400 font-bold flex items-center justify-center gap-3 text-sm sm:text-base"
             >
               <FontAwesomeIcon icon={faPlus} /> Create a New Trip
             </button>
@@ -153,7 +158,7 @@ export default function TripStep({ shipmentDraft, onBack, onComplete }) {
               onClick={() => setView("selection")}
               className="text-xs text-blue-400 flex items-center gap-2"
             >
-              <FontAwesomeIcon icon={faArrowLeft} /> Cancel
+              <FontAwesomeIcon icon={faArrowLeft} /> Cancel Creation
             </button>
             <div className="bg-blue-500/5 border border-blue-500/20 p-4 rounded-xl flex items-center justify-between">
               <p className="text-sm font-bold text-white uppercase">
@@ -172,10 +177,12 @@ export default function TripStep({ shipmentDraft, onBack, onComplete }) {
         )}
       </div>
 
-      <div className="p-6 border-t border-slate-800 bg-slate-900/50 flex gap-3">
+      {/* 3. FOOTER: shrink-0 keeps it fixed size, mt-auto pushes it down */}
+      {/* <div className="shrink-0 p-4 sm:p-6 border-t border-slate-800 bg-slate-950 flex gap-3 z-10"> */}
+      <div className="shrink-0 mt-auto p-4 sm:p-6 border-t border-slate-800 bg-slate-950 flex gap-3 z-10">
         <button
           onClick={onBack}
-          className="px-8 py-3.5 rounded-xl border border-slate-700 text-slate-400 font-bold"
+          className="px-5 py-3 sm:py-2 rounded-xl border border-slate-700 text-slate-400 font-bold hover:bg-slate-800 transition-colors"
         >
           Back
         </button>
@@ -183,7 +190,7 @@ export default function TripStep({ shipmentDraft, onBack, onComplete }) {
           <button
             onClick={handleCreateTrip}
             disabled={loading}
-            className="flex-1 bg-blue-600 text-white font-bold py-3.5 rounded-xl"
+            className="flex-1 bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 sm:py-2 rounded-xl shadow-lg transition-all"
           >
             {loading ? "Creating Trip..." : "Confirm & Add to List"}
           </button>

@@ -173,14 +173,18 @@ export default function ReceivePackageForm({ profile, onNext, initialData }) {
   return (
     <div className="flex flex-col h-full animate-in slide-in-from-left duration-300 overflow-hidden">
       {/* Scrollable Form Area */}
-      <div className="flex-1 overflow-y-auto p-6 custom-scrollbar">
-        <form id="step1-form" onSubmit={handleNext} className="space-y-8">
+      <div className="flex-1 overflow-y-auto p-4 sm:p-6 custom-scrollbar">
+        <form
+          id="step1-form"
+          onSubmit={handleNext}
+          className="space-y-6 sm:space-y-8 pb-20 sm:pb-0"
+        >
           <RouteSection
             routeInfo={routeInfo}
             onWarehouseChange={handleWarehouseChange}
           />
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-8">
             <InputGroup
               label="Sender Contact"
               values={sender}
@@ -216,7 +220,7 @@ export default function ReceivePackageForm({ profile, onNext, initialData }) {
             }}
           />
 
-          {/* --- 4. NEW: IMAGE UPLOAD SECTION --- */}
+          {/* --- IMAGE UPLOAD SECTION --- */}
           <div className="bg-slate-950/50 p-4 rounded-xl border border-slate-800/50 space-y-3">
             <div className="flex justify-between items-center">
               <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">
@@ -227,12 +231,14 @@ export default function ReceivePackageForm({ profile, onNext, initialData }) {
               </span>
             </div>
 
-            <div className="flex gap-4 items-start">
+            <div className="flex gap-4 items-start overflow-x-auto pb-2 sm:pb-0">
               {/* Upload Button */}
               {imageFiles.length < 3 && (
-                <label className="w-24 h-24 flex flex-col items-center justify-center bg-slate-900 border-2 border-dashed border-slate-700 rounded-xl cursor-pointer hover:border-blue-500 hover:text-blue-500 transition-colors text-slate-500">
+                <label className="shrink-0 w-20 h-20 sm:w-24 sm:h-24 flex flex-col items-center justify-center bg-slate-900 border-2 border-dashed border-slate-700 rounded-xl cursor-pointer hover:border-blue-500 hover:text-blue-500 transition-colors text-slate-500">
                   <FontAwesomeIcon icon={faCamera} className="text-xl mb-1" />
-                  <span className="text-[10px] font-bold">Add Photo</span>
+                  <span className="text-[9px] sm:text-[10px] font-bold">
+                    Add Photo
+                  </span>
                   <input
                     type="file"
                     accept="image/*"
@@ -247,7 +253,7 @@ export default function ReceivePackageForm({ profile, onNext, initialData }) {
               {previews.map((src, idx) => (
                 <div
                   key={idx}
-                  className="relative w-24 h-24 rounded-xl overflow-hidden border border-slate-700 group"
+                  className="relative shrink-0 w-20 h-20 sm:w-24 sm:h-24 rounded-xl overflow-hidden border border-slate-700 group"
                 >
                   <img
                     src={src}
@@ -257,7 +263,7 @@ export default function ReceivePackageForm({ profile, onNext, initialData }) {
                   <button
                     type="button"
                     onClick={() => removeImage(idx)}
-                    className="absolute top-1 right-1 bg-red-600/80 text-white w-6 h-6 rounded-full flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition-opacity"
+                    className="absolute top-1 right-1 bg-red-600/80 text-white w-6 h-6 rounded-full flex items-center justify-center text-xs opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"
                   >
                     <FontAwesomeIcon icon={faTrash} />
                   </button>
@@ -279,12 +285,12 @@ export default function ReceivePackageForm({ profile, onNext, initialData }) {
         </form>
       </div>
 
-      {/* Footer Navigation */}
-      <div className="p-6 border-t border-slate-800 bg-slate-900/50 rounded-b-2xl">
+      {/* Footer Navigation (Fixed at bottom) */}
+      <div className="p-4 sm:p-6 border-t border-slate-800 bg-slate-950 shrink-0">
         <button
           type="submit"
           form="step1-form"
-          className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-3.5 rounded-xl shadow-lg transition-all flex justify-center items-center gap-2"
+          className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-3.5 rounded-xl shadow-lg transition-all flex justify-center items-center gap-2 text-sm sm:text-base"
         >
           <span>Continue to Trip Selection</span>
           <FontAwesomeIcon icon={faArrowRight} />

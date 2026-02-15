@@ -10,7 +10,7 @@ import { AlertProvider } from "./context/AlertContext";
 export default function RootLayout({ children }) {
   return (
     <html lang="en">
-      <body>
+      <body suppressHydrationWarning={true}>
         <AlertProvider>
           <AuthProvider>{children}</AuthProvider>
         </AlertProvider>

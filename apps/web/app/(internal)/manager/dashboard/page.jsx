@@ -7,6 +7,7 @@ import {
   faTruck,
   faSignOutAlt,
   faTruckLoading,
+  faMapSigns,
 } from "@fortawesome/free-solid-svg-icons";
 import { auth } from "@/lib/firebase";
 import { useAuth } from "@/app/context/AuthContext";
@@ -19,6 +20,7 @@ import ShipmentBoard from "../../components/shipments/ShipmentBoard";
 import ManifestPage from "../../components/manifests/ManifestBoard";
 import TripBoard from "../../components/trips/TripBoard";
 import NotificationBell from "../../components/notifications/NotificationBell";
+import TruckBoard from "../../components/trucks/TruckBoard";
 
 export default function ManagerDashboardPage() {
   const router = useRouter();
@@ -122,32 +124,6 @@ export default function ManagerDashboardPage() {
               </div>
             ))}
           </div>
-          {/* <div className="flex gap-6">
-            <TabButton
-              isActive={activeTab === "overview"}
-              onClick={() => setActiveTab("overview")}
-              icon={faChartPie}
-              label="Overview"
-            />
-            <TabButton
-              isActive={activeTab === "trips"}
-              onClick={() => setActiveTab("trips")}
-              icon={faTruckLoading}
-              label="Trip Operations"
-            />
-            <TabButton
-              isActive={activeTab === "shipments"}
-              onClick={() => setActiveTab("shipments")}
-              icon={faTruck}
-              label="Shipment and Packages"
-            />
-            <TabButton
-              isActive={activeTab === "manifests"}
-              onClick={() => setActiveTab("manifests")}
-              icon={faTruckLoading}
-              label="Manifest & Trips"
-            />
-          </div> */}
         </div>
       </header>
 
@@ -166,6 +142,9 @@ export default function ManagerDashboardPage() {
         )}
         {activeTab === "shipments" && (
           <ShipmentBoard user={user} userRole="manager" profile={profile} />
+        )}
+        {activeTab === "trucks" && (
+          <TruckBoard user={user} userRole="admin" profile={profile} />
         )}
         {/* {activeTab === "manifests" && <ManifestPage />} */}
       </main>

@@ -45,7 +45,7 @@ export default function ManagerRecentTable({
         </h3>
 
         {/* ACTIONS: Search + Limit Selector */}
-        <div className="flex items-center gap-3 w-full sm:w-auto">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full sm:w-auto">
           {/* SEARCH BOX */}
           <div className="relative flex-1 sm:flex-none">
             <FontAwesomeIcon
@@ -61,93 +61,131 @@ export default function ManagerRecentTable({
             />
           </div>
 
-          {/* VIEW LIMIT SELECTOR */}
-          <div className="flex items-center gap-2 bg-slate-900 border border-slate-700 rounded-lg px-2 py-1">
-            <span className="text-[10px] uppercase font-bold text-slate-500">
-              Rows:
-            </span>
-            <select
-              value={viewLimit}
-              onChange={(e) => setViewLimit(Number(e.target.value))}
-              className="bg-transparent text-xs font-bold text-white outline-none cursor-pointer"
-            >
-              <option value={5}>5</option>
-              <option value={10}>10</option>
-              <option value={20}>20</option>
-            </select>
-          </div>
+          <div className="flex items-center justify-between sm:justify-start gap-2">
+            {/* VIEW LIMIT SELECTOR */}
+            <div className="flex items-center gap-2 bg-slate-900 border border-slate-700 rounded-lg px-2 py-1 flex-1 sm:flex-none">
+              <span className="text-[10px] uppercase font-bold text-slate-500">
+                Rows:
+              </span>
+              <select
+                value={viewLimit}
+                onChange={(e) => setViewLimit(Number(e.target.value))}
+                className="bg-transparent text-xs font-bold text-white outline-none cursor-pointer w-full"
+              >
+                <option value={5}>5</option>
+                <option value={10}>10</option>
+                <option value={20}>20</option>
+              </select>
+            </div>
 
-          <button
-            onClick={onViewAll}
-            className="text-xs text-blue-400 hover:text-blue-300 font-bold flex items-center gap-1 ml-2"
-          >
-            All <FontAwesomeIcon icon={faArrowRight} />
-          </button>
+            <button
+              onClick={onViewAll}
+              className="text-xs text-blue-400 hover:text-blue-300 font-bold flex items-center gap-1 px-2 py-1"
+            >
+              All <FontAwesomeIcon icon={faArrowRight} />
+            </button>
+          </div>
         </div>
       </div>
 
-      {/* TABLE */}
-      <div className="overflow-x-auto">
-        <table className="w-full text-left text-xs">
-          <thead className="bg-slate-950 text-slate-500 font-bold uppercase border-b border-slate-800">
-            <tr>
-              <th className="p-4">Tracking Number</th>
-              <th className="p-4">Route</th>
-              <th className="p-4">Status</th>
-              <th className="p-4 text-right">Last Update</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-800 text-slate-300">
-            {loading ? (
-              <tr>
-                <td colSpan="4" className="p-8 text-center text-slate-500">
-                  <div className="flex justify-center items-center gap-2 animate-pulse">
-                    <div className="w-2 h-2 bg-slate-600 rounded-full"></div>
-                    <span>Loading...</span>
-                  </div>
-                </td>
-              </tr>
-            ) : filteredShipments.length === 0 ? (
-              <tr>
-                <td
-                  colSpan="4"
-                  className="p-8 text-center text-slate-500 italic"
-                >
-                  {searchTerm
-                    ? `No results for "${searchTerm}"`
-                    : "No recent activity found."}
-                </td>
-              </tr>
-            ) : (
-              filteredShipments.map((shipment) => (
-                <tr
-                  key={shipment.id}
-                  className="hover:bg-slate-800/30 transition-colors group cursor-pointer"
-                >
-                  <td className="p-4 font-mono font-bold text-white">
-                    {shipment.trackingNumber || shipment.id}
-                  </td>
-                  <td className="p-4">
-                    <span className="bg-slate-800 px-2 py-1 rounded text-[10px] font-bold text-slate-400">
-                      {shipment.originCode || "N/A"}
-                      {" -> "}
-                      {shipment.destinationCode || "N/A"}
-                    </span>
-                  </td>
-                  <td className="p-4">
-                    <StatusBadge
-                      status={shipment.status}
-                      reason={shipment.delayReason}
-                    />
-                  </td>
-                  <td className="p-4 text-right text-slate-500">
-                    {formatFirestoreDate(shipment.updatedAt)}
-                  </td>
+      {/* CONTENT AREA */}
+      <div className="border-t border-slate-800/50">
+        {/* LOADING STATE */}
+        {loading && (
+          <div className="p-8 text-center text-slate-500">
+            <div className="flex justify-center items-center gap-2 animate-pulse">
+              <div className="w-2 h-2 bg-slate-600 rounded-full"></div>
+              <span>Loading...</span>
+            </div>
+          </div>
+        )}
+
+        {/* EMPTY STATE */}
+        {!loading && filteredShipments.length === 0 && (
+          <div className="p-8 text-center text-slate-500 italic">
+            {searchTerm
+              ? `No results for "${searchTerm}"`
+              : "No recent activity found."}
+          </div>
+        )}
+
+        {/* DESKTOP TABLE VIEW */}
+        {!loading && filteredShipments.length > 0 && (
+          <div className="hidden sm:block overflow-x-auto">
+            <table className="w-full text-left text-xs">
+              <thead className="bg-slate-950 text-slate-500 font-bold uppercase border-b border-slate-800">
+                <tr>
+                  <th className="p-4">Tracking Number</th>
+                  <th className="p-4">Route</th>
+                  <th className="p-4">Status</th>
+                  <th className="p-4 text-right">Last Update</th>
                 </tr>
-              ))
-            )}
-          </tbody>
-        </table>
+              </thead>
+              <tbody className="divide-y divide-slate-800 text-slate-300">
+                {filteredShipments.map((shipment) => (
+                  <tr
+                    key={shipment.id}
+                    className="hover:bg-slate-800/30 transition-colors group cursor-pointer"
+                  >
+                    <td className="p-4 font-mono font-bold text-white">
+                      {shipment.trackingNumber || shipment.id}
+                    </td>
+                    <td className="p-4">
+                      <span className="bg-slate-800 px-2 py-1 rounded text-[10px] font-bold text-slate-400">
+                        {shipment.originCode || "N/A"}
+                        {" -> "}
+                        {shipment.destinationCode || "N/A"}
+                      </span>
+                    </td>
+                    <td className="p-4">
+                      <StatusBadge
+                        status={shipment.status}
+                        reason={shipment.delayReason}
+                      />
+                    </td>
+                    <td className="p-4 text-right text-slate-500">
+                      {formatFirestoreDate(shipment.updatedAt)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {/* MOBILE CARD VIEW */}
+        {!loading && filteredShipments.length > 0 && (
+          <div className="sm:hidden divide-y divide-slate-800">
+            {filteredShipments.map((shipment) => (
+              <div
+                key={shipment.id}
+                className="p-4 hover:bg-slate-800/30 transition-colors cursor-pointer space-y-2"
+              >
+                <div className="flex justify-between items-start">
+                  <span className="font-mono font-bold text-white text-sm">
+                    {shipment.trackingNumber || shipment.id}
+                  </span>
+                  <span className="text-[10px] text-slate-500">
+                    {formatFirestoreDate(shipment.updatedAt)}
+                  </span>
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <span className="bg-slate-800 px-2 py-1 rounded text-[10px] font-bold text-slate-400">
+                    {shipment.originCode || "N/A"}
+                    {" -> "}
+                    {shipment.destinationCode || "N/A"}
+                  </span>
+                  <StatusBadge
+                    status={shipment.status}
+                    reason={shipment.delayReason}
+                    size="xs"
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Footer Info */}
