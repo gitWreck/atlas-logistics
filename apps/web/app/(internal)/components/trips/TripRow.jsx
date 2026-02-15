@@ -41,30 +41,51 @@ function StatusDot({ status, isDelayed }) {
 // }
 
 export default function TripRow({ trip, onClick }) {
-  // 1. Logic: Active Issue if delayCleared is explicitly false
   const isDelayed = !!trip.delayReason && !trip.delayCleared;
-
-  // 2. Data
-  const loadedCount = trip.totalLoaded || 0; // Or trip.totalLoaded if you have it
+  const loadedCount = trip.totalLoaded || 0;
   const totalCount = trip.totalItems || 0;
-
   const driverName = trip.driverName || "Unassigned";
-  //   const progress = getTripProgress(trip.status);
 
   return (
     <div
-      // onClick={() => onClick(trip.id)}
-      className={`grid grid-cols-12 gap-4 px-6 py-4 items-center transition-colors cursor-pointer group border-b border-slate-800/50 last:border-0
+      onClick={() => onClick(trip.id)}
+      className={`
+        relative flex flex-col gap-3 p-4 border-b border-slate-800/50 cursor-pointer transition-colors group
+        md:grid md:grid-cols-12 md:gap-4 md:px-6 md:items-center
         ${isDelayed ? "bg-amber-500/5 hover:bg-amber-500/10" : "hover:bg-slate-800/30"}
       `}
     >
-      {/* Col 1: ID & Status Pulse */}
-      <div className="col-span-3 flex items-center gap-4">
-        <StatusDot status={trip.status} isDelayed={isDelayed} />
+      {/* --- MOBILE ONLY HEADER (Top Row) --- */}
+      <div className="flex md:hidden justify-between items-start mb-2">
+        <div className="flex items-center gap-3">
+          <StatusDot status={trip.status} isDelayed={isDelayed} />
+          <div>
+            <span
+              className={`font-mono text-sm font-bold flex items-center gap-2 ${isDelayed ? "text-amber-400" : "text-blue-400"}`}
+            >
+              {trip.tripId}
+            </span>
+            <div className="text-[10px] text-slate-500">
+              {formatFirestoreDate(trip.updatedAt)}
+            </div>
+          </div>
+        </div>
+        {/* Mobile Action Button */}
+        <button className="text-slate-500 p-2 -mr-2">
+          <FontAwesomeIcon icon={faEllipsisV} />
+        </button>
+      </div>
 
-        <div>
-          {/* TRIP ID */}
-          <div className="flex-col items-center gap-2 mt-1">
+      {/* --- DESKTOP COL 1 (ID & Driver) / MOBILE CONTENT --- */}
+      <div className="md:col-span-3 flex items-center gap-4">
+        {/* Hide StatusDot on mobile since we moved it to header */}
+        <div className="hidden md:block">
+          <StatusDot status={trip.status} isDelayed={isDelayed} />
+        </div>
+
+        <div className="w-full">
+          {/* Desktop ID (Hidden on mobile) */}
+          <div className="hidden md:flex flex-col items-start gap-2 mt-1">
             <span
               className={`font-mono text-sm font-bold transition-colors flex items-center gap-2 ${isDelayed ? "text-amber-400" : "text-blue-400"}`}
             >
@@ -73,79 +94,74 @@ export default function TripRow({ trip, onClick }) {
             </span>
           </div>
 
-          {/* DRIVER INFO */}
-          <div className="text-xs text-slate-400 mt-1 flex items-center gap-2">
-            <StatusBadge
-              status={trip.status}
-              // reason={s.truckDetails?.delayReason}
-              size="xs"
-            />
-            <span className="font-medium text-slate-300">{driverName}</span>
-            <span className="text-slate-600">•</span>
-            <span className="font-mono text-slate-500">
-              {trip.truckPlateNumber || "No Plate"}
+          {/* Driver Info (Visible on both) */}
+          <div className="text-xs text-slate-400 md:mt-1 flex items-center justify-between md:justify-start gap-2 w-full">
+            <div className="flex items-center gap-2">
+              <span className="font-medium text-slate-300">{driverName}</span>
+              <span className="text-slate-600">•</span>
+              <span className="font-mono text-slate-500">
+                {trip.truckPlateNumber || "No Plate"}
+              </span>
+            </div>
+            {/* Mobile Loaded Count (Moved here for space) */}
+            <span className="md:hidden text-slate-500 font-mono text-[10px]">
+              {loadedCount}/{totalCount} Items
             </span>
           </div>
         </div>
       </div>
 
-      {/* Col 2: Route */}
-      <div className="col-span-2">
-        <div className="text-sm font-medium text-slate-300">
-          {trip.originCode} <span className="text-slate-600 px-1">→</span>{" "}
+      {/* --- COL 2: Route --- */}
+      <div className="md:col-span-2 flex justify-between md:block items-center border-t border-slate-800/50 md:border-0 pt-2 md:pt-0">
+        <div className="text-sm font-medium text-slate-300 flex items-center gap-2">
+          {trip.originCode} <span className="text-slate-600">→</span>{" "}
           {trip.destinationCode}
         </div>
         <div
-          className="text-[10px] text-slate-500 font-mono mt-0.5 truncate max-w-[120px]"
+          className="text-[10px] text-slate-500 font-mono md:mt-0.5 truncate max-w-[150px] md:max-w-[120px]"
           title={trip.route}
         >
           {trip.origin} → {trip.destination}
         </div>
       </div>
 
-      <div className="col-span-1 pr-4">
+      {/* --- COL 3: Stats (Desktop Only - Mobile Moved to Driver Row) --- */}
+      <div className="hidden md:block col-span-1 pr-4">
         <span className="text text-slate-500 font-mono border-l border-slate-700 pl-2">
           {loadedCount}/{totalCount} Loaded
         </span>
       </div>
 
-      {/* Col 3: Progress Bar (Load & Status) */}
-      <div className="col-span-3 pr-4">
-        {/* Load Stats */}
-        <div className="flex justify-between text-[10px] text-slate-500 mb-1">
+      {/* --- COL 4: Progress Bar --- */}
+      <div className="md:col-span-3 md:pr-4 w-full">
+        {/* Load Stats (Desktop Only) */}
+        <div className="hidden md:flex justify-between text-[10px] text-slate-500 mb-1">
           <span>{trip.progress}%</span>
         </div>
 
         {/* Bar */}
-        <div className="h-1.5 w-full bg-slate-800 rounded-full overflow-hidden">
+        <div className="h-1.5 w-full bg-slate-800 rounded-full overflow-hidden mt-1 md:mt-0">
           <div
             className={`h-full rounded-full transition-all duration-500 ${
               trip.status === "COMPLETED"
                 ? "bg-emerald-500"
                 : isDelayed
-                  ? "bg-amber-500" // Red bar for delay
+                  ? "bg-amber-500"
                   : "bg-blue-500"
             }`}
             style={{ width: `${trip.progress}%` }}
           />
         </div>
 
-        {/* Status Text */}
-        <div className="mt-1.5 gap-2 flex">
+        {/* Status Text (Desktop Only) */}
+        <div className="mt-1.5 gap-2 hidden md:flex">
           {isDelayed && (
             <span className="text-[10px] bg-amber-600 text-white px-1.5 rounded animate-pulse font-bold">
               DELAYED
             </span>
           )}
           <span
-            className={`text-[10px] font-bold uppercase tracking-wide
-              ${
-                isDelayed
-                  ? "text-amber-400"
-                  : trip.status === "COMPLETED"
-                    ? "text-emerald-400"
-                    : "text-blue-400"
-              }`}
+            className={`text-[10px] font-bold uppercase tracking-wide ${isDelayed ? "text-amber-400" : trip.status === "COMPLETED" ? "text-emerald-400" : "text-blue-400"}`}
           >
             {isDelayed
               ? trip.delayReason?.replace("_", " ") || "DELAYED"
@@ -154,14 +170,11 @@ export default function TripRow({ trip, onClick }) {
         </div>
       </div>
 
-      {/* Col 4: Time / Last Update */}
-      <div className="col-span-2 flex flex-col gap-1">
+      {/* --- COL 5: Time (Desktop Only) --- */}
+      <div className="hidden md:flex col-span-2 flex-col gap-1">
         <div className="text-xs text-slate-500 flex items-center gap-1.5">
-          {/* <FontAwesomeIcon icon={faCalendarAlt} className="text-slate-700" /> */}
           {formatFirestoreDate(trip.updatedAt)}
         </div>
-
-        {/* Show Scheduled Time if not completed */}
         {trip.status !== "COMPLETED" && trip.estimatedArrival && (
           <div className="text-xs text-slate-600">
             ETA: {new Date(trip.estimatedArrival).toLocaleDateString()}
@@ -169,8 +182,8 @@ export default function TripRow({ trip, onClick }) {
         )}
       </div>
 
-      {/* Col 5: Actions */}
-      <div className="col-span-1 text-right">
+      {/* --- COL 6: Action (Desktop Only) --- */}
+      <div className="hidden md:block col-span-1 text-right">
         <button
           className="text-slate-500 hover:text-white p-2 hover:bg-slate-800 rounded-full transition-colors"
           onClick={(e) => {

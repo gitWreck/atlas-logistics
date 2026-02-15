@@ -18,6 +18,7 @@ import ManagerOverview from "../../components/manager/ManagerOverview";
 import ShipmentBoard from "../../components/shipments/ShipmentBoard";
 import ManifestPage from "../../components/manifests/ManifestBoard";
 import TripBoard from "../../components/trips/TripBoard";
+import NotificationBell from "../../components/notifications/NotificationBell";
 
 export default function ManagerDashboardPage() {
   const router = useRouter();
@@ -74,8 +75,11 @@ export default function ManagerDashboardPage() {
             </div>
 
             {/* User Profile & Actions */}
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-3 sm:gap-4 shrink-0">
+              <NotificationBell />
+
               <div className="h-8 w-px bg-slate-800 hidden sm:block"></div>
+
               <div className="text-right hidden sm:block">
                 <div className="text-sm font-medium text-white">
                   {profile?.name || "Manager"}
@@ -96,7 +100,29 @@ export default function ManagerDashboardPage() {
           </div>
 
           {/* --- TABS --- */}
-          <div className="flex gap-6">
+          <div className="flex gap-4 sm:gap-6 overflow-x-auto pb-0 -mx-4 px-4 sm:mx-0 sm:px-0 no-scrollbar">
+            {[
+              { id: "overview", icon: faChartPie, label: "Overview" },
+              { id: "trips", icon: faMapSigns, label: "Trip Operations" },
+              { id: "shipments", icon: faTruck, label: "Shipments" },
+              { id: "trucks", icon: faTruckLoading, label: "Trucks" },
+              { id: "manifests", icon: faTruckLoading, label: "Manifests" },
+            ].map((tab) => (
+              <div key={tab.id} className="shrink-0 pb-3">
+                {" "}
+                {/* shrink-0 prevents squishing */}
+                <TabButton
+                  isActive={activeTab === tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  icon={tab.icon}
+                  label={tab.label}
+                  // Ensure TabButton accepts className to prevent text wrapping
+                  className="whitespace-nowrap"
+                />
+              </div>
+            ))}
+          </div>
+          {/* <div className="flex gap-6">
             <TabButton
               isActive={activeTab === "overview"}
               onClick={() => setActiveTab("overview")}
@@ -121,7 +147,7 @@ export default function ManagerDashboardPage() {
               icon={faTruckLoading}
               label="Manifest & Trips"
             />
-          </div>
+          </div> */}
         </div>
       </header>
 
