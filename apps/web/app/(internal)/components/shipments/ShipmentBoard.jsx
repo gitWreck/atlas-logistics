@@ -214,7 +214,7 @@ export default function ShipmentBoard({ user, userRole, profile }) {
               className="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 shadow-lg shadow-blue-500/20 transition-all"
             >
               <FontAwesomeIcon icon={faPlus} />
-              <span>New Shipment</span>
+              <span>Shipment</span>
             </button>
           </div>
         </div>
