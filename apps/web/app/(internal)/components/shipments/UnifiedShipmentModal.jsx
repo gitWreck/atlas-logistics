@@ -14,6 +14,8 @@ import {
   assignShipmentToTruckTrip,
 } from "@/app/utility/FirebaseFunctions";
 import { useAlert } from "@/app/context/AlertContext";
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { storage } from "@/lib/firebase";
 
 export default function UnifiedShipmentModal({ profile, isOpen, onClose }) {
   const { showAlert, showConfirm } = useAlert();
@@ -27,10 +29,40 @@ export default function UnifiedShipmentModal({ profile, isOpen, onClose }) {
   // NEW: SMS State
   const [sendSms, setSendSms] = useState(true);
 
+  const generateShipmentId = (originCode, destCode) => {
+    const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, "");
+    const random = Date.now().toString().slice(-6);
+    return `AT-${dateStr}-${originCode || "GEN"}-${destCode || "GEN"}-${random}`;
+  };
+
   const handleMasterSubmit = async (tripDecision) => {
     const executeSubmission = async () => {
       setLoading(true);
       try {
+        // 1. GENERATE ID HERE (Client Side)
+        const originCode = shipmentDraft.routeInfo.originCode || "GEN";
+        const destCode = shipmentDraft.routeInfo.destinationCode || "GEN";
+        const manualShipmentId = generateShipmentId(originCode, destCode);
+
+        let uploadedUrls = [];
+        if (shipmentDraft.imageFiles && shipmentDraft.imageFiles.length > 0) {
+          const uploadPromises = shipmentDraft.imageFiles.map(
+            async (file, index) => {
+              // Filename: AT-2026...-123456_1.jpg
+              const ext = file.name.split(".").pop();
+              const fileName = `${newShipmentId}_${index + 1}.${ext}`;
+              const storageRef = ref(
+                storage,
+                `shipments/${newShipmentId}/${fileName}`,
+              );
+
+              const snapshot = await uploadBytes(storageRef, file);
+              return await getDownloadURL(snapshot.ref);
+            },
+          );
+          uploadedUrls = await Promise.all(uploadPromises);
+        }
+
         const payload = {
           sender: {
             name: shipmentDraft.sender.name,
@@ -65,6 +97,9 @@ export default function UnifiedShipmentModal({ profile, isOpen, onClose }) {
           items: shipmentDraft.items,
           remarks: shipmentDraft.remarks,
           notifySms: sendSms,
+
+          manualShipmentId: manualShipmentId,
+          imageUrls: uploadedUrls,
         };
 
         const shipmentRes = await createShipmentWithPackages(payload);

@@ -14,6 +14,7 @@ import {
 import StatusBadge from "../ui/StatusBadge";
 import ShipmentLabel from "./ShipmentLabel";
 import CustomerMessageWidget from "../messaging/CustomerMessageWidget";
+import PackagesTable from "./Packages/PackagesTable";
 // import ShipmentBoard from "./ShipmentBoard";
 
 function calculateCurrentStep(status) {
@@ -248,72 +249,35 @@ export default function ShipmentDrawer({ isOpen, onClose, data }) {
 
           {/* --- TAB 2: ITEMS --- */}
           {activeTab === "ITEMS" && (
-            <div className="space-y-3 animate-in fade-in slide-in-from-right-4 duration-300">
-              <button
-                onClick={() =>
-                  // window.open(`../print/labels?id=${data.id}`, "_blank")
-                  window.open(
-                    `/components/print/labels?id=${encodeURIComponent(data.id)}`,
-                    "_blank",
-                  )
-                }
-                className="flex items-center gap-2 bg-slate-700 hover:bg-slate-600 text-white px-4 py-2 rounded-lg transition-colors text-sm font-bold"
-              >
-                <FontAwesomeIcon icon={faPrint} />
-                <span>Print {data.packages?.length} Labels</span>
-              </button>
-              {data.packages.map((pkg, idx) => (
-                <PackageRow key={idx} pkg={pkg} idx={idx} />
-              ))}
-            </div>
+            <PackagesTable data={data} />
+            // <div className="space-y-3 animate-in fade-in slide-in-from-right-4 duration-300">
+            //   <button
+            //     onClick={() =>
+            //       // window.open(`../print/labels?id=${data.id}`, "_blank")
+            //       window.open(
+            //         `/components/print/labels?id=${encodeURIComponent(data.id)}`,
+            //         "_blank",
+            //       )
+            //     }
+            //     className="flex items-center gap-2 bg-slate-700 hover:bg-slate-600 text-white px-4 py-2 rounded-lg transition-colors text-sm font-bold"
+            //   >
+            //     <FontAwesomeIcon icon={faPrint} />
+            //     <span>Print {data.packages?.length} Labels</span>
+            //   </button>
+            //   {data.packages.map((pkg, idx) => (
+            //     <PackageRow key={idx} pkg={pkg} idx={idx} />
+            //   ))}
+            // </div>
           )}
 
           {/* --- TAB 3: TOOLS (EMBEDDED QR & MESSAGE) --- */}
           {activeTab === "TOOLS" && (
             <div className="space-y-8 animate-in zoom-in-95 duration-200">
               {/* SECTION B: MESSAGING */}
-              {/* <div className="bg-slate-800/40 border border-slate-700 rounded-xl p-5">
-                <h3 className="text-sm font-bold text-slate-300 mb-3 flex items-center gap-2">
-                  <FontAwesomeIcon
-                    icon={faPaperPlane}
-                    className="text-emerald-500"
-                  />
-                  Message Customer
-                </h3>
-
-                <div className="text-xs text-slate-500 mb-2">
-                  To:{" "}
-                  <span className="text-slate-300">{data.recipient?.name}</span>{" "}
-                  ({data.recipient?.phone})
-                </div>
-
-                <textarea
-                  className="w-full bg-slate-950 border border-slate-700 rounded-lg p-3 text-sm text-slate-200 focus:border-emerald-500 focus:outline-none mb-3 h-24 resize-none"
-                  value={messageBody}
-                  onChange={(e) => setMessageBody(e.target.value)}
-                />
-
-                <button
-                  onClick={handleSendMessage}
-                  className="w-full bg-emerald-600 hover:bg-emerald-500 text-white py-2 rounded-lg font-bold text-sm transition-colors shadow-lg shadow-emerald-500/20"
-                >
-                  Send Message
-                </button>
-              </div> */}
               <CustomerMessageWidget shipment={data} />
             </div>
           )}
         </div>
-
-        {/* FOOTER ACTIONS */}
-        {/* <div className="p-4 border-t border-slate-800 bg-slate-950 flex gap-3">
-          <button className="flex-1 py-3 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg font-medium text-sm transition-colors">
-            Download Manifest
-          </button>
-          <button className="flex-1 py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-lg font-bold text-sm transition-colors shadow-lg shadow-blue-500/20">
-            Generate Report
-          </button>
-        </div> */}
       </aside>
     </>
   );
