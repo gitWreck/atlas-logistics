@@ -32,15 +32,8 @@ function StatusDot({ status, isDelayed }) {
   );
 }
 
-// Helper: Calculate Trip Progress %
-// function getTripProgress(status) {
-//   if (status === "COMPLETED") return 100;
-//   if (status === "IN_TRANSIT") return 60;
-//   if (status === "LOADED") return 30;
-//   return 10; // Planned/Created
-// }
-
 export default function TripRow({ trip, onClick }) {
+  console.log("trip data: ", trip);
   const isDelayed = !!trip.delayReason && !trip.delayCleared;
   const loadedCount = trip.totalLoaded || 0;
   const totalCount = trip.totalItems || 0;

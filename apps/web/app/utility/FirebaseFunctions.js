@@ -80,15 +80,7 @@ export const updateTruckStatus = httpsCallable(functions, "updateTruckStatus");
 // ----------------------------
 
 export const sendBulkSMSCallable = httpsCallable(functions, "sendBulkSMS");
-// export const syncShipmentItemsCallable = httpsCallable(
-//   functions,
-//   "syncShipmentItems",
-// );
-// export const setTruckDelayCallable = httpsCallable(functions, "setTruckDelay");
-// export const clearTruckDelayCallable = httpsCallable(
-//   functions,
-//   "clearTruckDelay",
-// );
+
 export const setTruckAutoSmsSettingsCallable = httpsCallable(
   functions,
   "setTruckAutoSmsSettings",
@@ -107,8 +99,3 @@ export const unloadItemsFromTripCallable = httpsCallable(
 );
 export const recordPartialCallable = httpsCallable(functions, "recordPartial");
 export const completeTripCallable = httpsCallable(functions, "completeTrip");
-
-// ADMIN
-
-// export const createUserProfile = httpsCallable(functions, "createUserProfile");
-// export const toggleUserStatus = httpsCallable(functions, "toggleUserStatus");
