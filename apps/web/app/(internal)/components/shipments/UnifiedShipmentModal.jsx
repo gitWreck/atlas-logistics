@@ -146,14 +146,9 @@ export default function UnifiedShipmentModal({ profile, isOpen, onClose }) {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      {/* Backdrop */}
-      <div
-        className="fixed inset-0 bg-slate-950/90 backdrop-blur-md"
-        onClick={loading ? null : onClose}
-      />
-
-      <div className="relative bg-slate-900 border border-slate-700 w-full max-w-4xl rounded-xl shadow-xl overflow-hidden flex flex-col min-h-[600px] max-h-[90vh]">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/90 backdrop-blur-md sm:p-4">
+      {/* Modal Container: Full screen on mobile, Rounded card on desktop */}
+      <div className="relative bg-slate-900 border-x border-y border-slate-700 w-full max-w-4xl sm:rounded-xl shadow-xl overflow-hidden flex flex-col h-full sm:h-auto sm:min-h-[600px] sm:max-h-[90vh]">
         {/* Loading Overlay */}
         {loading && (
           <div className="absolute inset-0 z-[100] bg-slate-900/80 backdrop-blur-sm flex flex-col items-center justify-center">
@@ -167,15 +162,16 @@ export default function UnifiedShipmentModal({ profile, isOpen, onClose }) {
         )}
 
         <div className="flex-1 flex flex-col overflow-hidden">
+          {/* --- STEP 1: DETAILS --- */}
           {step === 1 && (
             <div className="flex flex-col h-full overflow-hidden">
-              <div className="p-6 border-b border-slate-800 flex justify-between">
-                <h2 className="text-xl font-bold text-white">
+              <div className="p-4 sm:p-6 border-b border-slate-800 flex justify-between items-center shrink-0 bg-slate-950">
+                <h2 className="text-lg sm:text-xl font-bold text-white">
                   1. Shipment Details
                 </h2>
                 <button
                   onClick={onClose}
-                  className="text-slate-500 hover:text-white"
+                  className="text-slate-500 hover:text-white p-2"
                 >
                   ✕
                 </button>
@@ -191,14 +187,26 @@ export default function UnifiedShipmentModal({ profile, isOpen, onClose }) {
             </div>
           )}
 
+          {/* --- STEP 2: TRIP SELECTION --- */}
           {step === 2 && (
             <div className="flex flex-col h-full overflow-hidden">
-              <div className="p-6 border-b border-slate-800 flex justify-between items-center">
-                <h2 className="text-xl font-bold text-white">2. Select Trip</h2>
+              <div className="p-4 sm:p-6 border-b border-slate-800 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 shrink-0 bg-slate-950">
+                <div className="flex justify-between items-center w-full sm:w-auto">
+                  <h2 className="text-lg sm:text-xl font-bold text-white">
+                    2. Select Trip
+                  </h2>
+                  {/* Mobile Close Button (Visible only on small screens) */}
+                  <button
+                    onClick={onClose}
+                    className="sm:hidden text-slate-500 p-2"
+                  >
+                    ✕
+                  </button>
+                </div>
 
-                <div className="flex items-center gap-6">
-                  {/* NEW: SMS Notification Toggle */}
-                  <label className="flex items-center gap-2 cursor-pointer group">
+                <div className="flex flex-wrap items-center gap-3 sm:gap-6 w-full sm:w-auto">
+                  {/* SMS Toggle */}
+                  <label className="flex items-center gap-2 cursor-pointer group bg-slate-900 sm:bg-transparent p-2 sm:p-0 rounded-lg border sm:border-0 border-slate-800">
                     <input
                       type="checkbox"
                       className="w-4 h-4 rounded border-slate-700 bg-slate-800 text-blue-600 focus:ring-blue-500 focus:ring-offset-slate-900"
@@ -206,10 +214,6 @@ export default function UnifiedShipmentModal({ profile, isOpen, onClose }) {
                       onChange={(e) => setSendSms(e.target.checked)}
                     />
                     <div className="flex items-center gap-1.5">
-                      {/* <FontAwesomeIcon 
-                        icon={faCommentSms}
-                        className={`text-sm ${sendSms ? "text-blue-400" : "text-slate-500"}`}
-                      /> */}
                       <span
                         className={`text-xs font-bold uppercase tracking-tight ${sendSms ? "text-slate-200" : "text-slate-500"}`}
                       >
@@ -220,38 +224,40 @@ export default function UnifiedShipmentModal({ profile, isOpen, onClose }) {
 
                   <button
                     onClick={() => handleMasterSubmit(null)}
-                    className="text-sm font-bold text-amber-500 hover:text-amber-400 border border-amber-500/30 bg-amber-500/10 px-3 py-1.5 rounded-lg transition-colors"
+                    className="flex-1 sm:flex-none text-xs sm:text-sm font-bold text-amber-500 hover:text-amber-400 border border-amber-500/30 bg-amber-500/10 px-3 py-2 sm:py-1.5 rounded-lg transition-colors whitespace-nowrap"
                   >
-                    Skip & Save as Pending
+                    Skip trip assignment & Save
                   </button>
 
+                  {/* Desktop Close Button */}
                   <button
                     onClick={onClose}
-                    className="text-slate-500 hover:text-white"
+                    className="hidden sm:block text-slate-500 hover:text-white"
                   >
                     ✕
                   </button>
                 </div>
               </div>
 
-              <TripStep
-                shipmentDraft={shipmentDraft}
-                onBack={() => setStep(1)}
-                onComplete={handleMasterSubmit}
-              />
+              <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
+                <TripStep
+                  shipmentDraft={shipmentDraft}
+                  onBack={() => setStep(1)}
+                  onComplete={handleMasterSubmit}
+                />
+              </div>
             </div>
           )}
 
-          {/* Step 3 remains similar, icons already handle dynamic logic */}
+          {/* --- STEP 3: SUCCESS --- */}
           {step === 3 && (
-            <div className="p-12 text-center space-y-6 flex-1 flex flex-col justify-center items-center">
+            <div className="p-6 sm:p-12 text-center space-y-6 flex-1 flex flex-col justify-center items-center h-full overflow-y-auto">
               <FontAwesomeIcon
                 icon={finalTripId ? faCheckCircle : faBoxOpen}
-                className={`text-6xl ${finalTripId ? "text-emerald-500" : "text-amber-500"}`}
+                className={`text-5xl sm:text-6xl ${finalTripId ? "text-emerald-500" : "text-amber-500"}`}
               />
-              {/* ... Success Message and Buttons ... */}
               <div>
-                <h2 className="text-2xl font-bold text-white">
+                <h2 className="text-xl sm:text-2xl font-bold text-white">
                   {finalTripId
                     ? `Shipment Assigned to ${finalTripId}`
                     : "Shipment Created as Pending"}
@@ -273,7 +279,7 @@ export default function UnifiedShipmentModal({ profile, isOpen, onClose }) {
                       "_blank",
                     )
                   }
-                  className="w-full py-4 bg-slate-800 text-white rounded-xl font-bold border border-slate-700 hover:bg-slate-700 transition-colors"
+                  className="w-full py-3 sm:py-4 bg-slate-800 text-white rounded-xl font-bold border border-slate-700 hover:bg-slate-700 transition-colors text-sm sm:text-base"
                 >
                   {finalTripId
                     ? "Print Trip Labels"
@@ -281,7 +287,7 @@ export default function UnifiedShipmentModal({ profile, isOpen, onClose }) {
                 </button>
                 <button
                   onClick={onClose}
-                  className="w-full py-4 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-bold"
+                  className="w-full py-3 sm:py-4 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-bold text-sm sm:text-base"
                 >
                   Return to Dashboard
                 </button>
