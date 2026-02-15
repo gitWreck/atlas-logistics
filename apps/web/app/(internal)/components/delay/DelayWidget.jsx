@@ -10,6 +10,7 @@ import {
 } from "@fortawesome/free-solid-svg-icons";
 import { formatFirestoreDate } from "@/app/utility/utilities";
 import StatusBadge from "../ui/StatusBadge";
+import { resolveDelay } from "@/app/utility/FirebaseFunctions";
 
 export default function DelayApprovalWidget() {
   const [requests, setRequests] = useState([]);
@@ -42,7 +43,7 @@ export default function DelayApprovalWidget() {
     try {
       setProcessingId(req.id); // Disable buttons while processing
 
-      const resolveDelay = httpsCallable(functions, "resolveDelayReport");
+      // const resolveDelay = httpsCallable(functions, "resolveDelayReport");
 
       await resolveDelay({
         alertId: req.id,

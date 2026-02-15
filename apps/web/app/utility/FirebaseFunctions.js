@@ -29,6 +29,7 @@ export const disableTruckTrip = httpsCallable(functions, "disableTruckTrip");
 export const setTruckDelay = httpsCallable(functions, "setTruckDelay");
 export const clearTruckDelay = httpsCallable(functions, "clearTruckDelay");
 export const updateTripStatus = httpsCallable(functions, "updateTripStatus");
+export const resolveDelay = httpsCallable(functions, "resolveDelayReport");
 
 // DRIVERS
 export const assignDriverToTruckTrip = httpsCallable(
