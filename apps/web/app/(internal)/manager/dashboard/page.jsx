@@ -106,7 +106,7 @@ export default function ManagerDashboardPage() {
               { id: "trips", icon: faMapSigns, label: "Trip Operations" },
               { id: "shipments", icon: faTruck, label: "Shipments" },
               { id: "trucks", icon: faTruckLoading, label: "Trucks" },
-              { id: "manifests", icon: faTruckLoading, label: "Manifests" },
+              // { id: "manifests", icon: faTruckLoading, label: "Manifests" },
             ].map((tab) => (
               <div key={tab.id} className="shrink-0 pb-3">
                 {" "}
@@ -167,7 +167,7 @@ export default function ManagerDashboardPage() {
         {activeTab === "shipments" && (
           <ShipmentBoard user={user} userRole="manager" profile={profile} />
         )}
-        {activeTab === "manifests" && <ManifestPage />}
+        {/* {activeTab === "manifests" && <ManifestPage />} */}
       </main>
     </div>
   );

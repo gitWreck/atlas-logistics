@@ -107,7 +107,11 @@ export const AlertProvider = ({ children }) => {
       {mounted &&
         alertState.isOpen &&
         createPortal(
-          <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
+          // <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
+          <div
+            className="fixed inset-0 flex items-center justify-center p-4"
+            style={{ zIndex: 99999 }} // <--- FORCE THIS TO BE HIGHEST
+          >
             <div
               className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm transition-opacity"
               onClick={alertState.type === "confirm" ? null : closeAlert}
