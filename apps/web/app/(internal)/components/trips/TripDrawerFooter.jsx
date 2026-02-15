@@ -73,14 +73,14 @@ export default function TripDrawerFooter({ data, onClose, shipments }) {
         />
 
         {/* 2. GENERATE CERTIFICATE */}
-        <button
+        {/* <button
           disabled={!isLocked || isCertified}
           onClick={() => handleAction("generateTripCertificate")}
           className="flex-1 py-2 rounded-lg border border-emerald-500/30 text-emerald-400 hover:bg-emerald-600/20 text-xs font-bold disabled:opacity-30 disabled:cursor-not-allowed transition-colors flex justify-center items-center gap-2"
         >
           <FontAwesomeIcon icon={faScroll} />
           {isCertified ? "Certified" : "Certificate"}
-        </button>
+        </button> */}
 
         {/* 3. REOPEN TRIP */}
         <button

@@ -37,6 +37,8 @@ exports.createShipmentWithPackages = onCall(
       remarks,
       location, // Optional { lat, lng } for initial status location
       notifySms,
+      manualShipmentId,
+      imageUrls = [],
     } = request.data || {};
 
     // --- VALIDATION ---
@@ -81,10 +83,25 @@ exports.createShipmentWithPackages = onCall(
 
     // 2. Generate IDs
     const timestamp = new Date();
-    const dateStr = timestamp.toISOString().slice(0, 10).replace(/-/g, "");
+    let shipmentId = manualShipmentId;
 
     // Example: AT-20231027-MNL-CEB-123456
-    const shipmentId = `AT-${dateStr}-${originCode}-${destinationCode}-${Date.now().toString().slice(-6)}`;
+    if (!shipmentId) {
+      // ... your old ID generation logic as backup ...
+      //  const dateStr = ...
+      //  shipmentId = `AT-...`;
+      const dateStr = timestamp.toISOString().slice(0, 10).replace(/-/g, "");
+      shipmentId = `AT-${dateStr}-${originCode}-${destinationCode}-${Date.now().toString().slice(-6)}`;
+    }
+
+    const doc = await db.collection("shipments").doc(shipmentId).get();
+    if (doc.exists) {
+      throw new HttpsError(
+        "already-exists",
+        "Shipment ID collision. Try again.",
+      );
+    }
+
     const shipmentRef = db.collection("shipments").doc(shipmentId);
 
     const now = Timestamp.now();
@@ -201,6 +218,7 @@ exports.createShipmentWithPackages = onCall(
       },
 
       remarks: remarks || null,
+      imageUrls: imageUrls,
 
       // *** THE CRITICAL CHANGE ***
       // We store the data here instead of subcollections
@@ -223,7 +241,7 @@ exports.createShipmentWithPackages = onCall(
 
     // 6. Commit
     try {
-      await batch.commit();
+      // await batch.commit();
 
       // --- 6. Commit ---
       try {
