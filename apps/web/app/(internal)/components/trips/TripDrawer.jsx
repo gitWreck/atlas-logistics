@@ -14,18 +14,11 @@ import TripManifestTab from "./TripManifestTab";
 import TripToolsTab from "./TripToolsTab";
 import TripDrawerFooter from "./TripDrawerFooter";
 import StatusBadge from "../ui/StatusBadge";
-// import ViewPackagesModal from "../manifests/modals/ViewPackagesModal";
 import UnassignShipmentModal from "../manifests/modals/UnassignShipmentModal";
 import BulkAssignmentModal from "../manifests/modals/BulkAssignmentModal";
 import ViewPackagesModal from "../manifests/ViewPackagesModal/ViewPackagesModal";
 
-export default function TripDrawer({
-  isOpen,
-  onClose,
-  data,
-  onAddShipment,
-  onRefreshTrips,
-}) {
+export default function TripDrawer({ isOpen, onClose, data, onRefreshTrips }) {
   const [activeTab, setActiveTab] = useState("TIMELINE");
   const [shipments, setShipments] = useState([]);
   const [loadingShips, setLoadingShips] = useState(false);
@@ -219,8 +212,6 @@ export default function TripDrawer({
           setBulkModalOpen(false);
           fetchShipments();
           onRefreshTrips();
-          // handleRefresh(); // This refreshes the table & sidebar
-          // fetchTrips();
         }}
       />
     </>

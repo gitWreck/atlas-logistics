@@ -1,16 +1,9 @@
 import React, { useState } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import {
-  faLock,
-  faScroll,
-  faUnlock,
-  faPrint,
-  faFilePdf,
-} from "@fortawesome/free-solid-svg-icons";
+import { faLock, faUnlock, faPrint } from "@fortawesome/free-solid-svg-icons";
 import StatusButton from "../ui/StatusButton";
 import {
   generateTripManifest,
-  // generateTripCertificate,
   reopenTrip,
 } from "@/app/utility/FirebaseFunctions";
 import { runAction } from "@/app/utility/utilities";
@@ -30,10 +23,6 @@ export default function TripDrawerFooter({ data, onClose, shipments }) {
   const handleAction = async (actionType) => {
     console.log(`Action Triggered: ${actionType} for Trip ID: ${data.tripId}`);
     try {
-      if (actionType === "generateTripCertificate") {
-        // await generateTripCertificate({ tripDocId: data.tripId }); // Use tripId or id depending on your DB
-        alert("Certificate generated successfully!");
-      }
       if (actionType === "reopenTrip") {
         if (
           !confirm(
@@ -71,16 +60,6 @@ export default function TripDrawerFooter({ data, onClose, shipments }) {
             )
           }
         />
-
-        {/* 2. GENERATE CERTIFICATE */}
-        {/* <button
-          disabled={!isLocked || isCertified}
-          onClick={() => handleAction("generateTripCertificate")}
-          className="flex-1 py-2 rounded-lg border border-emerald-500/30 text-emerald-400 hover:bg-emerald-600/20 text-xs font-bold disabled:opacity-30 disabled:cursor-not-allowed transition-colors flex justify-center items-center gap-2"
-        >
-          <FontAwesomeIcon icon={faScroll} />
-          {isCertified ? "Certified" : "Certificate"}
-        </button> */}
 
         {/* 3. REOPEN TRIP */}
         <button
