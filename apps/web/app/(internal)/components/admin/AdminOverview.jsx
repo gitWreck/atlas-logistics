@@ -13,6 +13,8 @@ import AddUserModal from "./AddUserModal";
 import StatusCard from "../ui/StatusCard";
 import UserManagementTable from "./UserManagementTable";
 import DelayApprovalWidget from "../delay/DelayWidget";
+import RecentAlertsLogs from "../logs/RecentAlertsLogs";
+import RecentSmsLogs from "../logs/RecentSmsLogs";
 
 export default function AdminOverview({ user }) {
   if (user?.customClaims?.admin) {
@@ -122,6 +124,14 @@ export default function AdminOverview({ user }) {
         onDeleteUser={initiateDisable}
         onAddUser={() => setUserModalOpen(true)}
       />
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 h-[500px] mb-8">
+        {/* LEFT: INCOMING ALERTS */}
+        <RecentAlertsLogs />
+
+        {/* RIGHT: OUTGOING LOGS */}
+        <RecentSmsLogs />
+      </div>
 
       {/* MODALS */}
       <AddUserModal
