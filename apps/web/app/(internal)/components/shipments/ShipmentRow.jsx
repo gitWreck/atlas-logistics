@@ -30,81 +30,90 @@ export default function ShipmentRow({ s, onClick }) {
   const totalCount = s.totals?.totalItems || 0;
 
   // 2. Extract "Latest Trip" Data
-  const tripId = s.truckDetails?.tripId || "—";
   const driverName = s.truckDetails?.driverName || "Unassigned";
-  console.log("s: ", s.truckDetails);
 
   return (
     <div
-      // onClick={() => onClick(s.id)}
-      className="grid grid-cols-12 gap-4 px-6 py-4 items-center hover:bg-slate-800/30 transition-colors cursor-pointer group border-b border-slate-800/50 last:border-0"
+      onClick={() => onClick(s.id)}
+      className={`
+        relative flex flex-col gap-3 p-4 border-b border-slate-800/50 cursor-pointer transition-colors group
+        md:grid md:grid-cols-12 md:gap-4 md:px-6 md:items-center hover:bg-slate-800/30
+      `}
     >
-      {/* Col 1: ID & Status Pulse */}
-      <div className="col-span-4 flex items-center gap-4">
-        <StatusDot status={s.status} isDelayed={isDelayed} />
-        {/* <StatusBadge status={s.status} reason={s.truckDetails?.delayReason} /> */}
+      {/* --- MOBILE HEADER (Top Row) --- */}
+      <div className="flex md:hidden justify-between items-start mb-1">
+        <div className="flex items-center gap-3">
+          {/* Status Dot */}
+          <StatusDot status={s.status} isDelayed={isDelayed} />
+          <div>
+            {/* Tracking Number */}
+            <div className="font-mono text-sm font-bold text-blue-400">
+              {s.trackingNumber}
+            </div>
+            <div className="text-[10px] text-slate-500">
+              {s.updatedAt || "Just now"}
+            </div>
+          </div>
+        </div>
+        {/* Mobile Action Button */}
+        <button className="text-slate-500 p-2 -mr-2">
+          <FontAwesomeIcon icon={faEllipsisV} />
+        </button>
+      </div>
 
-        <div>
-          {/* TRIP INFO (The Latest One) */}
-          {/* <div className="flex items-center gap-2 mt-1">
-            <span
-              className={`font-mono text-sm font-medium transition-colors ${
-                tripId !== "—" ? "text-blue-400" : "text-slate-600"
-              }`}
-            >
-              {tripId !== "—" && (
-                <FontAwesomeIcon icon={faTruck} className="mr-1 text-[10px]" />
-              )}
-              {tripId}
-            </span>
-            <span className="text-xs text-slate-500">
-              {s.startedAt ? s.startedAt : ""}
-            </span>
-          </div> */}
+      {/* --- COL 1: Tracking/Driver --- */}
+      <div className="md:col-span-4 flex items-center gap-4">
+        {/* Desktop Status (Hidden on Mobile) */}
+        <div className="hidden md:block">
+          <StatusDot status={s.status} isDelayed={isDelayed} />
+        </div>
 
-          {/* TRACKING NUMBER */}
-          <div className="font-mono text-sm font-medium text-slate-200 group-hover:text-blue-400 transition-colors">
+        <div className="w-full">
+          {/* Desktop Tracking (Hidden on Mobile) */}
+          <div className="hidden md:block font-mono text-sm font-medium text-slate-200 group-hover:text-blue-400 transition-colors">
             {s.trackingNumber}
           </div>
 
-          {/* DRIVER & LOAD COUNTS */}
-          <div className="flex items-center gap-3 mt-1">
-            <StatusBadge
-              status={s.status}
-              // reason={s.truckDetails?.delayReason}
-              size="xs"
-            />
+          {/* DRIVER & LOAD COUNTS (Visible on both) */}
+          <div className="flex flex-wrap md:flex-nowrap items-center gap-3 mt-1">
+            <StatusBadge status={s.status} size="xs" />
+            {/* Mobile Loaded Info */}
             <span className="text-xs text-slate-500 font-mono border-l border-slate-700 pl-2">
               {loadedCount}/{totalCount} Loaded
             </span>
+            {/* Desktop Driver Info */}
             <span
-              className="text-xs text-slate-500 border-l border-slate-700 pl-2 truncate max-w-[120px]"
+              className="hidden md:block text-xs text-slate-500 border-l border-slate-700 pl-2 truncate max-w-[120px]"
               title={driverName}
             >
               Driver: {driverName}
             </span>
           </div>
+          {/* Mobile Driver Info (New Row) */}
+          <div className="md:hidden text-xs text-slate-500 mt-1">
+            Driver: {driverName}
+          </div>
         </div>
       </div>
 
-      {/* Col 2: Route */}
-      <div className="col-span-2">
+      {/* --- COL 2: Route --- */}
+      <div className="md:col-span-2 flex justify-between md:block items-center border-t border-slate-800/50 md:border-0 pt-2 md:pt-0">
         <div className="text-sm font-medium text-slate-300">
-          {s.originCode + "->" + s.destinationCode || "STD-ROUTE"}
+          {s.originCode + " -> " + s.destinationCode || "STD-ROUTE"}
         </div>
         <div className="text-xs text-slate-600 font-mono mt-0.5">
-          {s.origin + "->" + s.destination || "—"}
+          {s.origin + " -> " + s.destination || "—"}
         </div>
       </div>
 
-      {/* Col 3: Progress Bar */}
-      <div className="col-span-3 pr-4">
+      {/* --- COL 3: Progress Bar --- */}
+      <div className="md:col-span-3 md:pr-4 w-full mt-2 md:mt-0">
         <div className="h-1.5 w-full bg-slate-800 rounded-full overflow-hidden">
           <div
             className={`h-full rounded-full transition-all duration-500 ${
               s.status === "DELIVERED"
                 ? "bg-emerald-500"
-                : s.truckDetails?.delayReason // <--- CHECK FOR DELAY HERE
+                : s.truckDetails?.delayReason
                   ? "bg-amber-500"
                   : "bg-blue-500"
             }`}
@@ -115,52 +124,41 @@ export default function ShipmentRow({ s, onClick }) {
           <span
             className={`text-[10px] font-medium uppercase ${
               isDelayed
-                ? "text-amber-500" // <--- MATCH TEXT COLOR
+                ? "text-amber-500"
                 : s.status === "DELIVERED"
                   ? "text-emerald-400"
                   : "text-blue-400"
             }`}
           >
-            {/* If delayed, show specific reason, otherwise standard status */}
-            {/* {isDelayed
-              ? s.truckDetails?.delayReason
-              : s.status?.replace("_", " ")} */}
             {s.status?.replace("_", " ")}
           </span>
           <span className="text-[10px] text-slate-600">{s.progress || 0}%</span>
         </div>
       </div>
 
-      {/* Col 4: Delay/Time */}
-      <div className="col-span-2 flex flex-col gap-2">
+      {/* --- COL 4: Delay/Time (Desktop Only) --- */}
+      <div className="hidden md:flex col-span-2 flex-col gap-2">
         <div className="text-xs text-slate-500">
-          {/* <span className="block text-slate-600 text-[10px] uppercase font-bold mb-0.5">
-            Last Update
-          </span> */}
           {s.updatedAt || "Just now"}
         </div>
-
-        {/* Conditional Delay UI */}
         {isDelayed && (
           <div className="w-fit">
             <StatusBadge
               status={s.truckDetails?.status}
               reason={s.truckDetails?.delayReason}
             />
-            {/* // Renders: [ AMBER BADGE: ⛈ WEATHER ] */}
           </div>
         )}
       </div>
 
-      {/* Col 5: Actions */}
-      <div className="col-span-1 text-right">
+      {/* --- COL 5: Actions (Desktop Only) --- */}
+      <div className="hidden md:block col-span-1 text-right">
         <button
           className="text-slate-500 hover:text-white p-2 hover:bg-slate-800 rounded-full transition-colors"
-          // onClick={(e) => {
-          //   e.stopPropagation();
-          //   // Add custom menu logic here if needed
-          // }}
-          onClick={() => onClick(s.id)}
+          onClick={(e) => {
+            e.stopPropagation();
+            onClick(s.id);
+          }}
         >
           <FontAwesomeIcon icon={faEllipsisV} />
         </button>

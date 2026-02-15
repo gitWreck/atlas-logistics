@@ -7,6 +7,7 @@ import {
   faQrcode,
   faChevronLeft,
   faChevronRight,
+  faBoxOpen,
 } from "@fortawesome/free-solid-svg-icons";
 import StatusBadge from "../../ui/StatusBadge";
 import ShipmentLabel from "../ShipmentLabel";
@@ -48,11 +49,11 @@ export default function PackagesTable({ data }) {
   return (
     <div className="space-y-4 animate-in fade-in slide-in-from-right-4 duration-300">
       {/* --- CONTROLS BAR --- */}
-      <div className="flex flex-col md:flex-row gap-3 justify-between items-end md:items-center bg-slate-800/40 p-3 rounded-xl border border-slate-700/50">
+      <div className="flex flex-col md:flex-row gap-3 justify-between items-stretch md:items-center bg-slate-800/40 p-3 rounded-xl border border-slate-700/50">
         {/* Search & Filter Group */}
-        <div className="flex flex-1 gap-2 w-full md:w-auto">
+        <div className="flex flex-col sm:flex-row flex-1 gap-2 w-full md:w-auto">
           {/* Search */}
-          <div className="relative flex-1 max-w-xs">
+          <div className="relative flex-1">
             <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none">
               <FontAwesomeIcon icon={faSearch} className="text-slate-500" />
             </div>
@@ -79,7 +80,7 @@ export default function PackagesTable({ data }) {
                 setFilter(e.target.value);
                 setCurrentPage(1);
               }}
-              className="bg-slate-900 border border-slate-700 rounded-lg pl-9 pr-8 py-2 text-sm text-white focus:ring-1 focus:ring-blue-500 outline-none appearance-none cursor-pointer"
+              className="w-full sm:w-auto bg-slate-900 border border-slate-700 rounded-lg pl-9 pr-8 py-2 text-sm text-white focus:ring-1 focus:ring-blue-500 outline-none appearance-none cursor-pointer"
             >
               {uniqueStatuses.map((status) => (
                 <option key={status} value={status}>
@@ -98,47 +99,68 @@ export default function PackagesTable({ data }) {
               "_blank",
             )
           }
-          className="flex items-center gap-2 bg-slate-700 hover:bg-slate-600 text-white px-4 py-2 rounded-lg transition-colors text-xs font-bold whitespace-nowrap"
+          className="flex justify-center items-center gap-2 bg-slate-700 hover:bg-slate-600 text-white px-4 py-2 rounded-lg transition-colors text-xs font-bold whitespace-nowrap"
         >
           <FontAwesomeIcon icon={faPrint} />
           <span>Print {filteredPackages.length} Labels</span>
         </button>
       </div>
 
-      {/* --- TABLE --- */}
+      {/* --- CONTENT AREA (Responsive Switch) --- */}
       <div className="border border-slate-700 rounded-xl overflow-hidden bg-slate-900/50">
-        <table className="w-full text-left border-collapse">
-          <thead>
-            <tr className="bg-slate-900 border-b border-slate-700 text-xs uppercase tracking-wider text-slate-400">
-              <th className="p-4 w-16 text-center">#</th>
-              <th className="p-4">Item Details</th>
-              <th className="p-4">Tracking No.</th>
-              <th className="p-4">Status</th>
-              <th className="p-4 text-right">Actions</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-800">
-            {currentPackages.length > 0 ? (
-              currentPackages.map((pkg, idx) => (
-                <PackageTableRow
-                  key={pkg.trackingNumber || idx}
-                  pkg={pkg}
-                  idx={startIndex + idx} // correct global index
-                  shipmentData={data}
-                />
-              ))
-            ) : (
-              <tr>
-                <td
-                  colSpan="5"
-                  className="p-8 text-center text-slate-500 italic"
-                >
-                  No packages found matching your criteria.
-                </td>
+        {/* DESKTOP: TABLE VIEW */}
+        <div className="hidden md:block">
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr className="bg-slate-900 border-b border-slate-700 text-xs uppercase tracking-wider text-slate-400">
+                <th className="p-4 w-16 text-center">#</th>
+                <th className="p-4">Item Details</th>
+                <th className="p-4">Tracking No.</th>
+                <th className="p-4">Status</th>
+                <th className="p-4 text-right">Actions</th>
               </tr>
-            )}
-          </tbody>
-        </table>
+            </thead>
+            <tbody className="divide-y divide-slate-800">
+              {currentPackages.length > 0 ? (
+                currentPackages.map((pkg, idx) => (
+                  <PackageTableRow
+                    key={pkg.trackingNumber || idx}
+                    pkg={pkg}
+                    idx={startIndex + idx}
+                    shipmentData={data}
+                  />
+                ))
+              ) : (
+                <tr>
+                  <td
+                    colSpan="5"
+                    className="p-8 text-center text-slate-500 italic"
+                  >
+                    No packages found matching your criteria.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        {/* MOBILE: CARD LIST VIEW */}
+        <div className="md:hidden divide-y divide-slate-800">
+          {currentPackages.length > 0 ? (
+            currentPackages.map((pkg, idx) => (
+              <PackageMobileCard
+                key={pkg.trackingNumber || idx}
+                pkg={pkg}
+                idx={startIndex + idx}
+                shipmentData={data}
+              />
+            ))
+          ) : (
+            <div className="p-8 text-center text-slate-500 italic">
+              No packages found.
+            </div>
+          )}
+        </div>
       </div>
 
       {/* --- PAGINATION --- */}
@@ -177,7 +199,7 @@ export default function PackagesTable({ data }) {
   );
 }
 
-// --- SUB-COMPONENT: TABLE ROW ---
+// --- SUB-COMPONENT: DESKTOP TABLE ROW ---
 function PackageTableRow({ pkg, idx, shipmentData }) {
   const [showQR, setShowQR] = useState(false);
 
@@ -211,7 +233,6 @@ function PackageTableRow({ pkg, idx, shipmentData }) {
 
         {/* Status */}
         <td className="p-4">
-          {/* Assuming StatusBadge is available globally */}
           <StatusBadge status={pkg.status} size="xs" />
         </td>
 
@@ -236,24 +257,74 @@ function PackageTableRow({ pkg, idx, shipmentData }) {
         <tr className="bg-slate-900/50 animate-in fade-in zoom-in-95 duration-200">
           <td colSpan="5" className="p-4">
             <div className="flex items-center gap-6 bg-slate-950 border border-slate-800 rounded-xl p-4 max-w-lg mx-auto shadow-inner">
-              {/* Pass data to your label component */}
               <ShipmentLabel
                 shipment={shipmentData}
                 packages={pkg}
                 index={idx}
               />
-
-              {/* <div className="text-sm text-slate-400">
-                <p className="font-bold text-white mb-1">Print Label</p>
-                <p>
-                  This QR code can be scanned by drivers to update the status of
-                  this specific package.
-                </p>
-              </div> */}
             </div>
           </td>
         </tr>
       )}
     </>
+  );
+}
+
+// --- SUB-COMPONENT: MOBILE CARD ROW ---
+function PackageMobileCard({ pkg, idx, shipmentData }) {
+  const [showQR, setShowQR] = useState(false);
+
+  return (
+    <div className="p-4 space-y-3 bg-slate-900/50 hover:bg-slate-800/30 transition-colors">
+      {/* Header: Sequence + Tracking + Action */}
+      <div className="flex justify-between items-start">
+        <div className="flex gap-3 items-center">
+          <span className="inline-flex items-center justify-center w-8 h-8 rounded bg-slate-800 border border-slate-700 text-slate-400 text-xs font-mono font-bold">
+            {pkg.sequence || idx + 1}
+          </span>
+          <div className="font-mono text-xs text-amber-500 bg-amber-500/10 px-2 py-1 rounded w-fit border border-amber-500/20">
+            {pkg.trackingNumber}
+          </div>
+        </div>
+
+        <button
+          onClick={() => setShowQR(!showQR)}
+          className={`w-8 h-8 rounded inline-flex items-center justify-center transition-all ${
+            showQR
+              ? "bg-blue-600 text-white shadow-lg shadow-blue-900/50"
+              : "bg-slate-800 text-slate-400 border border-slate-700"
+          }`}
+        >
+          <FontAwesomeIcon icon={faQrcode} />
+        </button>
+      </div>
+
+      {/* Body: Description + Details */}
+      <div className="pl-11">
+        <div className="text-slate-200 font-medium text-sm">
+          {pkg.description || "No Description"}
+        </div>
+        <div className="text-xs text-slate-500 mt-1 flex gap-2 items-center">
+          <FontAwesomeIcon icon={faBoxOpen} className="text-slate-600" />
+          {pkg.packagingType || "Package"}
+          <span className="text-slate-700">|</span>
+          {pkg.weight ? `${pkg.weight}kg` : "N/A"}
+        </div>
+
+        <div className="mt-3">
+          <StatusBadge status={pkg.status} size="xs" />
+        </div>
+      </div>
+
+      {/* Expandable QR (Mobile Optimized) */}
+      {showQR && (
+        <div className="mt-4 pt-4 border-t border-slate-800 animate-in fade-in zoom-in-95 duration-200">
+          <div className="bg-slate-950 border border-slate-800 rounded-xl p-4 flex justify-center shadow-inner">
+            {/* Scale down label slightly on mobile if needed via CSS in ShipmentLabel */}
+            <ShipmentLabel shipment={shipmentData} packages={pkg} index={idx} />
+          </div>
+        </div>
+      )}
+    </div>
   );
 }

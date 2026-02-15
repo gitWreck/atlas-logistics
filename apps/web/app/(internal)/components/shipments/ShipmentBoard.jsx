@@ -171,42 +171,44 @@ export default function ShipmentBoard({ user, userRole, profile }) {
   return (
     <div className="min-h-screen bg-slate-950 text-slate-200 font-sans">
       {/* --- PAGE HEADER --- */}
-      <div className="sticky top-0 z-30 bg-slate-950/80 backdrop-blur-md border-b border-slate-800 px-6 py-4">
-        <div className="max-w-7xl mx-auto flex justify-between items-center">
-          <div className="flex items-center gap-3">
-            <div className="flex gap-3">
-              <div className="h-10 w-10 bg-blue-600/20 rounded-xl flex items-center justify-center text-blue-500">
-                <FontAwesomeIcon icon={faTruckFast} size="lg" />
-              </div>
-              <div>
-                <h1 className="flex text-xl font-bold text-white tracking-tight gap-2">
-                  Shipments / Orders
-                  <button
-                    onClick={fetchShipments}
-                    disabled={loading}
-                    className="text-slate-500 hover:text-white transition-colors"
-                  >
-                    <FontAwesomeIcon
-                      icon={faSync}
-                      spin={loading}
-                      className="text-xs"
-                    />
-                  </button>
-                </h1>
-                <p className="text-xs text-slate-500">
-                  Manage shipments and orders.
-                </p>
-              </div>
+      <div className="sticky top-0 z-30 bg-slate-950/80 backdrop-blur-md border-b border-slate-800 px-4 sm:px-6 py-4">
+        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+          {/* Title Section */}
+          <div className="flex items-center gap-3 w-full sm:w-auto">
+            <div className="h-10 w-10 bg-blue-600/20 rounded-xl flex items-center justify-center text-blue-500 shrink-0">
+              <FontAwesomeIcon icon={faTruckFast} size="lg" />
             </div>
+            <div className="flex-1">
+              <h1 className="flex text-xl font-bold text-white tracking-tight gap-2 items-center">
+                Shipments
+                <button
+                  onClick={fetchShipments}
+                  disabled={loading}
+                  className="text-slate-500 hover:text-white transition-colors p-1"
+                >
+                  <FontAwesomeIcon
+                    icon={faSync}
+                    spin={loading}
+                    className="text-xs"
+                  />
+                </button>
+              </h1>
+              <p className="text-xs text-slate-500 line-clamp-1">
+                Manage shipments and orders.
+              </p>
+            </div>
+
+            {/* Mobile Create Button */}
+            <button
+              onClick={() => setIsNewOrderModalOpen(true)}
+              className="sm:hidden bg-blue-600 text-white h-10 w-10 rounded-lg flex items-center justify-center shadow-lg shadow-blue-500/20"
+            >
+              <FontAwesomeIcon icon={faPlus} />
+            </button>
           </div>
 
-          <div className="flex gap-3">
-            {/* {userRole === "admin" && (
-              <button className="h-9 px-3 rounded-lg border border-slate-800 bg-slate-900 text-slate-400 hover:text-white">
-                <FontAwesomeIcon icon={faFileCsv} />
-              </button>
-            )} */}
-
+          {/* Desktop Create Button */}
+          <div className="hidden sm:flex gap-3">
             <button
               onClick={() => setIsNewOrderModalOpen(true)}
               className="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 shadow-lg shadow-blue-500/20 transition-all"
@@ -219,16 +221,16 @@ export default function ShipmentBoard({ user, userRole, profile }) {
       </div>
 
       {/* --- MAIN CONTENT --- */}
-      <main className="max-w-7xl mx-auto p-6">
+      <main className="max-w-7xl mx-auto p-4 sm:p-6">
         <div className="border border-slate-800 rounded-xl bg-slate-900/50 overflow-hidden shadow-xl backdrop-blur-sm">
           {/* CARD HEADER: Search & Filters */}
-          <div className="px-6 py-4 border-b border-slate-800 flex flex-col xl:flex-row justify-between items-center gap-4 bg-slate-950/30">
+          <div className="px-4 sm:px-6 py-4 border-b border-slate-800 flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4 bg-slate-950/30">
             <h3 className="font-bold text-white whitespace-nowrap hidden xl:block">
               Recent Orders
             </h3>
 
             {/* CONTROL GROUP */}
-            <div className="flex flex-wrap items-center gap-2 w-full xl:w-auto">
+            <div className="flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center gap-2 w-full xl:w-auto">
               {/* 1. SEARCH */}
               <div className="relative flex-1 min-w-[200px]">
                 <FontAwesomeIcon
@@ -237,60 +239,58 @@ export default function ShipmentBoard({ user, userRole, profile }) {
                 />
                 <input
                   type="text"
-                  placeholder="Search Tracking, Name..."
+                  placeholder="Search Tracking..."
                   className="w-full bg-slate-900 border border-slate-700 rounded-lg pl-9 pr-4 py-2 text-sm text-white focus:border-blue-500 focus:outline-none"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                 />
               </div>
 
-              {/* 2. DATE FILTERS */}
-              <div className="flex items-center gap-2 bg-slate-900 border border-slate-700 rounded-lg px-2 py-1">
-                <FontAwesomeIcon
-                  icon={faCalendarAlt}
-                  className="text-slate-500 text-xs ml-1"
-                />
-                <input
-                  type="date"
-                  className="bg-transparent text-xs text-white outline-none w-24 [color-scheme:dark]"
-                  value={startDate}
-                  onChange={(e) => setStartDate(e.target.value)}
-                />
-                <span className="text-slate-600">-</span>
-                <input
-                  type="date"
-                  className="bg-transparent text-xs text-white outline-none w-24 [color-scheme:dark]"
-                  value={endDate}
-                  onChange={(e) => setEndDate(e.target.value)}
-                />
-              </div>
+              <div className="flex gap-2 w-full sm:w-auto">
+                {/* 2. DATE FILTERS */}
+                <div className="flex items-center gap-2 bg-slate-900 border border-slate-700 rounded-lg px-2 py-1 flex-1 sm:flex-none justify-center">
+                  <input
+                    type="date"
+                    className="bg-transparent text-xs text-white outline-none w-24 [color-scheme:dark]"
+                    value={startDate}
+                    onChange={(e) => setStartDate(e.target.value)}
+                  />
+                  <span className="text-slate-600">-</span>
+                  <input
+                    type="date"
+                    className="bg-transparent text-xs text-white outline-none w-24 [color-scheme:dark]"
+                    value={endDate}
+                    onChange={(e) => setEndDate(e.target.value)}
+                  />
+                </div>
 
-              {/* 3. MAIN FILTER */}
-              <div className="relative w-36">
-                <FontAwesomeIcon
-                  icon={faFilter}
-                  className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-sm"
-                />
-                <select
-                  className="w-full bg-slate-900 border border-slate-700 rounded-lg pl-9 pr-4 py-2 text-sm text-white focus:border-blue-500 focus:outline-none appearance-none cursor-pointer"
-                  value={activeFilter}
-                  onChange={(e) => {
-                    setActiveFilter(e.target.value);
-                    setDelayType("ALL"); // Reset specific delay type if main filter changes
-                  }}
-                >
-                  <option value="ALL">All View</option>
-                  <option value="CREATED">Created</option>
-                  <option value="ASSIGNED">Assigned</option>
-                  <option value="IN_TRANSIT">In Transit</option>
-                  <option value="DELAYED">Delayed</option>
-                  <option value="DELIVERED">Delivered</option>
-                </select>
+                {/* 3. MAIN FILTER */}
+                <div className="relative w-full sm:w-36">
+                  <FontAwesomeIcon
+                    icon={faFilter}
+                    className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-sm"
+                  />
+                  <select
+                    className="w-full bg-slate-900 border border-slate-700 rounded-lg pl-9 pr-4 py-2 text-sm text-white focus:border-blue-500 focus:outline-none appearance-none cursor-pointer"
+                    value={activeFilter}
+                    onChange={(e) => {
+                      setActiveFilter(e.target.value);
+                      setDelayType("ALL");
+                    }}
+                  >
+                    <option value="ALL">All View</option>
+                    <option value="CREATED">Created</option>
+                    <option value="ASSIGNED">Assigned</option>
+                    <option value="IN_TRANSIT">In Transit</option>
+                    <option value="DELAYED">Delayed</option>
+                    <option value="DELIVERED">Delivered</option>
+                  </select>
+                </div>
               </div>
 
               {/* 4. CONDITIONAL: DELAY TYPE FILTER */}
               {activeFilter === "DELAYED" && (
-                <div className="relative w-40 animate-in fade-in slide-in-from-right-2 duration-300">
+                <div className="relative w-full sm:w-40 animate-in fade-in slide-in-from-right-2 duration-300">
                   <FontAwesomeIcon
                     icon={faExclamationCircle}
                     className="absolute left-3 top-1/2 -translate-y-1/2 text-amber-500 text-sm"
@@ -312,8 +312,8 @@ export default function ShipmentBoard({ user, userRole, profile }) {
             </div>
           </div>
 
-          {/* TABLE HEADER */}
-          <div className="grid grid-cols-12 gap-4 px-6 py-3 border-b border-slate-800 bg-slate-950 text-xs font-semibold text-slate-500 uppercase tracking-wider">
+          {/* TABLE HEADER (Hidden on mobile) */}
+          <div className="hidden md:grid grid-cols-12 gap-4 px-6 py-3 border-b border-slate-800 bg-slate-950 text-xs font-semibold text-slate-500 uppercase tracking-wider">
             <div className="col-span-4">Tracking / Customer</div>
             <div className="col-span-2">Route</div>
             <div className="col-span-3">Progress</div>
@@ -321,7 +321,7 @@ export default function ShipmentBoard({ user, userRole, profile }) {
             <div className="col-span-1 text-right">Action</div>
           </div>
 
-          {/* TABLE BODY (Uses currentItems slice) */}
+          {/* TABLE BODY */}
           <div className="min-h-[300px]">
             {loading ? (
               <div className="p-10 text-center text-slate-500 animate-pulse">
@@ -345,14 +345,11 @@ export default function ShipmentBoard({ user, userRole, profile }) {
 
           {/* 5. PAGINATION FOOTER */}
           {filteredShipments.length > 0 && (
-            <div className="px-6 py-4 border-t border-slate-800 bg-slate-950/30 flex justify-between items-center">
+            <div className="px-4 sm:px-6 py-4 border-t border-slate-800 bg-slate-950/30 flex justify-between items-center">
               <span className="text-xs text-slate-500">
                 Showing{" "}
                 <span className="text-white font-bold">
-                  {indexOfFirstItem + 1}
-                </span>{" "}
-                to{" "}
-                <span className="text-white font-bold">
+                  {indexOfFirstItem + 1}-
                   {Math.min(indexOfLastItem, filteredShipments.length)}
                 </span>{" "}
                 of {filteredShipments.length}
@@ -364,19 +361,18 @@ export default function ShipmentBoard({ user, userRole, profile }) {
                     setCurrentPage((prev) => Math.max(prev - 1, 1))
                   }
                   disabled={currentPage === 1}
-                  className="px-3 py-1.5 rounded-lg border border-slate-700 bg-slate-900 text-slate-400 text-xs hover:text-white hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="px-3 py-1.5 rounded-lg border border-slate-700 bg-slate-900 text-slate-400 text-xs hover:text-white hover:bg-slate-800 disabled:opacity-50"
                 >
-                  <FontAwesomeIcon icon={faChevronLeft} className="mr-1" /> Prev
+                  <FontAwesomeIcon icon={faChevronLeft} />
                 </button>
                 <button
                   onClick={() =>
                     setCurrentPage((prev) => Math.min(prev + 1, totalPages))
                   }
                   disabled={currentPage === totalPages}
-                  className="px-3 py-1.5 rounded-lg border border-slate-700 bg-slate-900 text-slate-400 text-xs hover:text-white hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="px-3 py-1.5 rounded-lg border border-slate-700 bg-slate-900 text-slate-400 text-xs hover:text-white hover:bg-slate-800 disabled:opacity-50"
                 >
-                  Next{" "}
-                  <FontAwesomeIcon icon={faChevronRight} className="ml-1" />
+                  <FontAwesomeIcon icon={faChevronRight} />
                 </button>
               </div>
             </div>
@@ -390,18 +386,10 @@ export default function ShipmentBoard({ user, userRole, profile }) {
         data={selectedShipment}
       />
 
-      {/* <ReceivePackageForm
-        profile={profile}
-        isOpen={isNewOrderModalOpen}
-        onClose={setIsNewOrderModalOpen}
-        onSuccess={handleSuccess}
-      /> */}
-
       <UnifiedShipmentModal
         profile={profile}
         isOpen={isNewOrderModalOpen}
         onClose={() => setIsNewOrderModalOpen(false)}
-        // onSuccess={handleSuccess}
       />
     </div>
   );

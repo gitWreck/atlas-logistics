@@ -84,17 +84,26 @@ export default function TripManifestTab({
   return (
     <div className="space-y-4 animate-in fade-in slide-in-from-right-4 duration-300">
       {/* HEADER: STATS + CONTROLS */}
-      <div className="flex flex-col md:flex-row justify-between items-end md:items-center gap-4 bg-slate-800/20 p-3 rounded-lg border border-slate-800">
-        <div>
-          <div className="text-xs font-bold text-slate-400 uppercase">
-            Total Cargo
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-slate-800/20 p-3 rounded-lg border border-slate-800">
+        {/* Stats Section */}
+        <div className="w-full md:w-auto flex justify-between md:block items-center">
+          <div>
+            <div className="text-xs font-bold text-slate-400 uppercase">
+              Total Cargo
+            </div>
+            <div className="text-xl font-bold text-white">
+              {shipments.length + " "}
+              <span className="text-sm font-normal text-slate-500">
+                shipment{shipments.length > 1 ? "s" : ""}
+              </span>
+            </div>
           </div>
-          <div className="text-xl font-bold text-white">
-            {shipments.length + " "}
-            <span className="text-sm font-normal text-slate-500">
-              shipment{shipments.length > 1 ? "s" : ""}
-            </span>
-          </div>
+          {/* Mobile Only: Show Selection Count here to save space */}
+          {selectedIds.size > 0 && (
+            <div className="md:hidden text-xs font-bold text-blue-400 bg-blue-900/20 px-2 py-1 rounded border border-blue-500/30">
+              {selectedIds.size} Selected
+            </div>
+          )}
         </div>
 
         {/* CONTROLS ROW */}
@@ -122,18 +131,18 @@ export default function TripManifestTab({
                   "_blank",
                 )
               }
-              className="bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-xs font-bold px-3 py-1.5 rounded flex items-center gap-2 transition-colors"
+              className="bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-xs font-bold px-3 py-1.5 rounded flex items-center justify-center gap-2 transition-colors flex-1 sm:flex-none"
               title="Print All Labels"
             >
               <FontAwesomeIcon icon={faPrint} />
-              {/* Hidden on small screens, visible on XL */}
-              <span className="hidden xl:inline">Labels</span>
+              {/* Label text hidden on small mobile, visible on SM+ */}
+              <span className="inline sm:hidden xl:inline">Labels</span>
             </button>
 
             <button
               onClick={onAddShipment}
               disabled={isLocked}
-              className="bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold px-3 py-1.5 rounded flex items-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-blue-900/20 whitespace-nowrap"
+              className="bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold px-3 py-1.5 rounded flex items-center justify-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-blue-900/20 whitespace-nowrap flex-1 sm:flex-none"
             >
               <FontAwesomeIcon icon={faPlus} />
               <span>Shipments</span>
@@ -142,24 +151,26 @@ export default function TripManifestTab({
         </div>
       </div>
 
-      {/* --- BULK ACTION BAR (Visible when items selected) --- */}
+      {/* --- BULK ACTION BAR (Scrollable on mobile) --- */}
       {selectedIds.size > 0 && (
-        <div className="bg-blue-900/20 border border-blue-500/30 p-2 rounded-lg flex items-center justify-between animate-in slide-in-from-top-2">
-          <div className="text-xs font-bold text-blue-400 px-2">
+        <div className="bg-blue-900/20 border border-blue-500/30 p-2 rounded-lg flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 animate-in slide-in-from-top-2">
+          <div className="hidden md:block text-xs font-bold text-blue-400 px-2 whitespace-nowrap">
             {selectedIds.size} Selected
           </div>
-          <div className="flex gap-2">
+
+          {/* Actions Container - Horizontal Scroll on Mobile */}
+          <div className="flex gap-2 w-full overflow-x-auto pb-1 sm:pb-0 no-scrollbar">
             <button
               onClick={() => handleBulkAction("UNLOAD")}
               disabled={isBulkProcessing || isLocked}
-              className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 border border-slate-600 text-slate-300 text-xs font-bold rounded flex items-center gap-2 transition-colors disabled:opacity-50"
+              className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 border border-slate-600 text-slate-300 text-xs font-bold rounded flex items-center gap-2 transition-colors disabled:opacity-50 whitespace-nowrap"
             >
               <FontAwesomeIcon icon={faDolly} /> Unload
             </button>
             <button
               onClick={() => handleBulkAction("LOAD")}
               disabled={isBulkProcessing || isLocked}
-              className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded flex items-center gap-2 transition-colors disabled:opacity-50"
+              className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded flex items-center gap-2 transition-colors disabled:opacity-50 whitespace-nowrap"
             >
               {isBulkProcessing ? (
                 "Processing..."
@@ -169,20 +180,17 @@ export default function TripManifestTab({
                 </>
               )}
             </button>
-            {/* --- NEW: OUT FOR DELIVERY --- */}
             <button
               onClick={() => handleBulkAction("OUT_FOR_DELIVERY")}
               disabled={isBulkProcessing || isLocked}
-              className="px-3 py-1.5 bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold rounded flex items-center gap-2 transition-colors disabled:opacity-50"
+              className="px-3 py-1.5 bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold rounded flex items-center gap-2 transition-colors disabled:opacity-50 whitespace-nowrap"
             >
               <FontAwesomeIcon icon={faTruckFast} /> Out
             </button>
-
-            {/* --- NEW: DELIVERED --- */}
             <button
               onClick={() => handleBulkAction("DELIVERED")}
               disabled={isBulkProcessing || isLocked}
-              className="px-3 py-1.5 bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold rounded flex items-center gap-2 transition-colors disabled:opacity-50"
+              className="px-3 py-1.5 bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold rounded flex items-center gap-2 transition-colors disabled:opacity-50 whitespace-nowrap"
             >
               <FontAwesomeIcon icon={faCheckDouble} /> Delivered
             </button>
@@ -190,139 +198,151 @@ export default function TripManifestTab({
         </div>
       )}
 
-      {/* TABLE */}
-      <div className="border border-slate-800 rounded-lg overflow-hidden">
-        <table className="w-full text-left text-sm text-slate-400">
-          <thead className="bg-slate-950 text-slate-500 uppercase font-bold text-[10px] tracking-wider">
-            <tr>
-              {/* CHECKBOX HEADER */}
-              <th className="px-4 py-3 w-10 text-center">
-                <button
-                  onClick={handleSelectAll}
-                  disabled={filteredData.length === 0}
-                  className="hover:text-white transition-colors"
-                >
-                  <FontAwesomeIcon
-                    icon={
-                      selectedIds.size > 0 &&
-                      selectedIds.size === filteredData.length
-                        ? faCheckSquare
-                        : faSquare
-                    }
-                    className={
-                      selectedIds.size > 0 ? "text-blue-500" : "text-slate-700"
-                    }
-                  />
-                </button>
-              </th>
-              <th className="px-4 py-3 w-10 text-center">#</th>
-              <th className="px-4 py-3">Tracking / Customer</th>
-              <th className="px-4 py-3">Destination</th>
-              <th className="px-4 py-3 text-center">Status</th>
-              {/* Added Status Col */}
-              <th className="px-4 py-3 text-right">Action</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-800 bg-slate-900/50">
-            {loading ? (
+      {/* TABLE CONTAINER (Horizontal Scroll wrapper) */}
+      <div className="border border-slate-800 rounded-lg overflow-hidden bg-slate-900/50">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-sm text-slate-400 min-w-[600px] md:min-w-0">
+            <thead className="bg-slate-950 text-slate-500 uppercase font-bold text-[10px] tracking-wider">
               <tr>
-                <td
-                  colSpan="6"
-                  className="px-4 py-8 text-center text-slate-500 animate-pulse"
-                >
-                  Loading manifest...
-                </td>
-              </tr>
-            ) : filteredData.length === 0 ? (
-              <tr>
-                <td
-                  colSpan="6"
-                  className="px-4 py-8 text-center text-slate-500 italic"
-                >
-                  No shipments found.
-                </td>
-              </tr>
-            ) : (
-              filteredData.map((s, idx) => {
-                const isSelected = selectedIds.has(s.id);
-                // Calculate mini-status based on loadedCount vs total
-                const isFullyLoaded =
-                  (s.loadedCount || 0) >= (s.totalItems || 1);
-
-                return (
-                  <tr
-                    key={s.id || idx}
-                    className={`transition-colors ${isSelected ? "bg-blue-900/10" : "hover:bg-slate-800/50"}`}
-                    onClick={() => handleSelectOne(s.id)} // Click row to select
+                {/* CHECKBOX HEADER */}
+                <th className="px-4 py-3 w-10 text-center sticky left-0 bg-slate-950 z-10">
+                  <button
+                    onClick={handleSelectAll}
+                    disabled={filteredData.length === 0}
+                    className="hover:text-white transition-colors"
                   >
-                    {/* CHECKBOX ROW */}
-                    <td
-                      className="px-4 py-3 text-center"
-                      onClick={(e) => e.stopPropagation()}
+                    <FontAwesomeIcon
+                      icon={
+                        selectedIds.size > 0 &&
+                        selectedIds.size === filteredData.length
+                          ? faCheckSquare
+                          : faSquare
+                      }
+                      className={
+                        selectedIds.size > 0
+                          ? "text-blue-500"
+                          : "text-slate-700"
+                      }
+                    />
+                  </button>
+                </th>
+                <th className="px-4 py-3 w-10 text-center">#</th>
+                <th className="px-4 py-3">Tracking / Customer</th>
+                {/* Destination: Hidden on small screens */}
+                <th className="hidden sm:table-cell px-4 py-3">Destination</th>
+                <th className="px-4 py-3 text-center">Status</th>
+                <th className="px-4 py-3 text-right sticky right-0 bg-slate-950 z-10">
+                  Action
+                </th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-800">
+              {loading ? (
+                <tr>
+                  <td
+                    colSpan="6"
+                    className="px-4 py-8 text-center text-slate-500 animate-pulse"
+                  >
+                    Loading manifest...
+                  </td>
+                </tr>
+              ) : filteredData.length === 0 ? (
+                <tr>
+                  <td
+                    colSpan="6"
+                    className="px-4 py-8 text-center text-slate-500 italic"
+                  >
+                    No shipments found.
+                  </td>
+                </tr>
+              ) : (
+                filteredData.map((s, idx) => {
+                  const isSelected = selectedIds.has(s.id);
+                  const isFullyLoaded =
+                    (s.loadedCount || 0) >= (s.totalItems || 1);
+
+                  return (
+                    <tr
+                      key={s.id || idx}
+                      className={`transition-colors ${isSelected ? "bg-blue-900/10" : "hover:bg-slate-800/50"}`}
+                      onClick={() => handleSelectOne(s.id)}
                     >
-                      <button onClick={() => handleSelectOne(s.id)}>
-                        <FontAwesomeIcon
-                          icon={isSelected ? faCheckSquare : faSquare}
-                          className={
-                            isSelected ? "text-blue-500" : "text-slate-700"
-                          }
-                        />
-                      </button>
-                    </td>
-
-                    <td className="px-4 py-3 text-center font-mono text-xs text-slate-600">
-                      {idx + 1}
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="font-bold text-white text-xs font-mono">
-                        {s.trackingNumber}
-                      </div>
-                      <div className="text-[11px] text-slate-500 truncate max-w-[150px]">
-                        {s.recipient?.name || "Unknown"}
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 text-xs">
-                      {s.recipient?.address.city || "—"}
-                    </td>
-
-                    {/* STATUS COL */}
-                    <td className="px-4 py-3 text-center">
-                      <span
-                        className={`text-[10px] font-bold px-2 py-0.5 rounded border ${
-                          isFullyLoaded
-                            ? "bg-emerald-900/30 text-emerald-400 border-emerald-500/30"
-                            : "bg-slate-800 text-slate-500 border-slate-700"
-                        }`}
+                      {/* CHECKBOX ROW */}
+                      <td
+                        className={`px-4 py-3 text-center sticky left-0 z-10 ${isSelected ? "bg-blue-900/10" : "bg-slate-900/50"}`}
+                        onClick={(e) => e.stopPropagation()}
                       >
-                        {s.loadedCount || 0} / {s.totalItems || 0}
-                      </span>
-                    </td>
+                        <button onClick={() => handleSelectOne(s.id)}>
+                          <FontAwesomeIcon
+                            icon={isSelected ? faCheckSquare : faSquare}
+                            className={
+                              isSelected ? "text-blue-500" : "text-slate-700"
+                            }
+                          />
+                        </button>
+                      </td>
 
-                    <td
-                      className="px-4 py-3 text-right gap-2 flex justify-end "
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <button
-                        onClick={() => onViewPackages && onViewPackages(s)}
-                        className="text-xs bg-slate-800 hover:bg-slate-700 text-blue-400 border border-slate-700 px-3 py-1.5 rounded transition-all flex items-center gap-1 ml-auto"
+                      <td className="px-4 py-3 text-center font-mono text-xs text-slate-600">
+                        {idx + 1}
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="font-bold text-white text-xs font-mono">
+                          {s.trackingNumber}
+                        </div>
+                        <div className="text-[11px] text-slate-500 truncate max-w-[150px]">
+                          {s.recipient?.name || "Unknown"}
+                        </div>
+                        {/* Mobile Only: Show City here since column is hidden */}
+                        <div className="sm:hidden text-[10px] text-slate-600 italic">
+                          {s.recipient?.address.city || "—"}
+                        </div>
+                      </td>
+
+                      {/* Destination: Hidden on small screens */}
+                      <td className="hidden sm:table-cell px-4 py-3 text-xs">
+                        {s.recipient?.address.city || "—"}
+                      </td>
+
+                      {/* STATUS COL */}
+                      <td className="px-4 py-3 text-center">
+                        <span
+                          className={`text-[10px] font-bold px-2 py-0.5 rounded border ${
+                            isFullyLoaded
+                              ? "bg-emerald-900/30 text-emerald-400 border-emerald-500/30"
+                              : "bg-slate-800 text-slate-500 border-slate-700"
+                          }`}
+                        >
+                          {s.loadedCount || 0} / {s.totalItems || 0}
+                        </span>
+                      </td>
+
+                      <td
+                        className={`px-4 py-3 text-right sticky right-0 z-10 ${isSelected ? "bg-blue-900/10" : "bg-slate-900/50"}`}
+                        onClick={(e) => e.stopPropagation()}
                       >
-                        <FontAwesomeIcon icon={faBoxOpen} />
-                      </button>
-                      <button
-                        // onClick={() => onViewPackages && onViewPackages(s)} // <--- Trigger Modal Here
-                        onClick={() => onUnassign(s)}
-                        className="text-slate-500 hover:text-red-400 p-2"
-                        disabled={isLocked}
-                      >
-                        <FontAwesomeIcon icon={faMinus} />
-                      </button>
-                    </td>
-                  </tr>
-                );
-              })
-            )}
-          </tbody>
-        </table>
+                        <div className="flex justify-end gap-2">
+                          <button
+                            onClick={() => onViewPackages && onViewPackages(s)}
+                            className="text-xs bg-slate-800 hover:bg-slate-700 text-blue-400 border border-slate-700 px-3 py-1.5 rounded transition-all flex items-center gap-1"
+                          >
+                            <FontAwesomeIcon icon={faBoxOpen} />
+                          </button>
+                          <button
+                            onClick={() => onUnassign(s)}
+                            className="text-slate-500 hover:text-red-400 p-2"
+                            disabled={isLocked}
+                          >
+                            <FontAwesomeIcon icon={faMinus} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );
