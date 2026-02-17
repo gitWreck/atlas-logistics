@@ -22,13 +22,40 @@ const INITIAL_FORM_STATE = {
   warehouseName: "",
 };
 
-export default function AddUserModal({ isOpen, onClose, onSuccess }) {
+export default function AddUserModal({ isOpen, onClose, onSuccess, isDark = false }) {
   const [step, setStep] = useState("FORM");
   const [error, setError] = useState("");
 
   const [formData, setFormData] = useState(INITIAL_FORM_STATE);
 
   if (!isOpen) return null;
+
+  const overlayClasses = isDark ? "bg-slate-950/70" : "bg-slate-900/50";
+  const modalClasses = isDark
+    ? "bg-slate-900 border-slate-700"
+    : "bg-white border-slate-200 shadow-xl";
+  const headerClasses = isDark
+    ? "border-slate-800 bg-slate-950/50"
+    : "border-slate-200 bg-slate-50";
+  const titleClasses = isDark ? "text-white" : "text-slate-900";
+  const closeBtnClasses = isDark
+    ? "text-slate-500 hover:text-white"
+    : "text-slate-500 hover:text-slate-900";
+  const labelClasses = isDark ? "text-slate-500" : "text-slate-600";
+  const inputClasses = isDark
+    ? "bg-slate-950 border-slate-700 text-white placeholder:text-slate-500"
+    : "bg-white border-slate-200 text-slate-900 placeholder:text-slate-400";
+  const hintClasses = isDark ? "text-slate-600" : "text-slate-500";
+  const confirmTitleClasses = isDark ? "text-white" : "text-slate-900";
+  const confirmTextClasses = isDark ? "text-slate-400" : "text-slate-600";
+  const confirmStrongClasses = isDark ? "text-white" : "text-slate-900";
+  const backBtnClasses = isDark
+    ? "border-slate-700 text-slate-300 hover:bg-slate-800"
+    : "border-slate-300 text-slate-700 hover:bg-slate-100";
+  const loadingTitleClasses = isDark ? "text-white" : "text-slate-900";
+  const loadingTextClasses = isDark ? "text-slate-500" : "text-slate-500";
+  const successTitleClasses = isDark ? "text-white" : "text-slate-900";
+  const successTextClasses = isDark ? "text-slate-400" : "text-slate-600";
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -109,19 +136,23 @@ export default function AddUserModal({ isOpen, onClose, onSuccess }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div
-        className="absolute inset-0 bg-slate-950/70 backdrop-blur-sm transition-opacity"
+        className={`absolute inset-0 backdrop-blur-sm transition-opacity ${overlayClasses}`}
         onClick={handleClose}
       />
-      <div className="relative bg-slate-900 border border-slate-700 w-full max-w-md rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+      <div
+        className={`relative border w-full max-w-md rounded-2xl overflow-hidden animate-in zoom-in-95 duration-200 ${modalClasses}`}
+      >
         {/* Header */}
-        <div className="px-6 py-4 border-b border-slate-800 flex justify-between items-center bg-slate-950/50">
-          <h3 className="text-white font-bold flex items-center gap-2">
+        <div
+          className={`px-6 py-4 border-b flex justify-between items-center ${headerClasses}`}
+        >
+          <h3 className={`${titleClasses} font-bold flex items-center gap-2`}>
             <FontAwesomeIcon icon={faUserPlus} className="text-blue-500" />
             Add New User
           </h3>
           <button
             onClick={handleClose}
-            className="text-slate-500 hover:text-white transition-colors"
+            className={`transition-colors ${closeBtnClasses}`}
           >
             <FontAwesomeIcon icon={faTimes} />
           </button>
@@ -131,49 +162,49 @@ export default function AddUserModal({ isOpen, onClose, onSuccess }) {
         {step === "FORM" && (
           <form onSubmit={handleNext} className="p-6 space-y-4">
             <div>
-              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">
+              <label className={`block text-xs font-bold uppercase tracking-wider mb-1 ${labelClasses}`}>
                 Full Name
               </label>
               <input
                 name="displayName"
                 type="text"
                 placeholder="e.g. Juan Dela Cruz"
-                className="w-full bg-slate-950 border border-slate-700 rounded-lg px-4 py-2.5 text-white focus:border-blue-500 focus:outline-none"
+                className={`w-full border rounded-lg px-4 py-2.5 focus:border-blue-500 focus:outline-none ${inputClasses}`}
                 value={formData.displayName}
                 onChange={handleChange}
               />
             </div>
             <div>
-              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">
+              <label className={`block text-xs font-bold uppercase tracking-wider mb-1 ${labelClasses}`}>
                 Email
               </label>
               <input
                 name="email"
                 type="email"
                 placeholder="user@atlas.com"
-                className="w-full bg-slate-950 border border-slate-700 rounded-lg px-4 py-2.5 text-white focus:border-blue-500 focus:outline-none"
+                className={`w-full border rounded-lg px-4 py-2.5 focus:border-blue-500 focus:outline-none ${inputClasses}`}
                 value={formData.email}
                 onChange={handleChange}
               />
             </div>
             <div>
-              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">
+              <label className={`block text-xs font-bold uppercase tracking-wider mb-1 ${labelClasses}`}>
                 Temporary Password
               </label>
               <input
                 name="password"
                 type="password"
                 placeholder="••••••••"
-                className="w-full bg-slate-950 border border-slate-700 rounded-lg px-4 py-2.5 text-white focus:border-blue-500 focus:outline-none"
+                className={`w-full border rounded-lg px-4 py-2.5 focus:border-blue-500 focus:outline-none ${inputClasses}`}
                 value={formData.password}
                 onChange={handleChange}
               />
             </div>
             {/* NEW: Phone Number */}
             <div>
-              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">
+              <label className={`block text-xs font-bold uppercase tracking-wider mb-1 ${labelClasses}`}>
                 Phone Number{" "}
-                <span className="text-slate-600 font-normal normal-case">
+                <span className={`font-normal normal-case ${hintClasses}`}>
                   (Required for Drivers)
                 </span>
               </label>
@@ -181,19 +212,19 @@ export default function AddUserModal({ isOpen, onClose, onSuccess }) {
                 name="phoneNumber"
                 type="tel"
                 placeholder="+63 917 123 4567"
-                className="w-full bg-slate-950 border border-slate-700 rounded-lg px-4 py-2.5 text-white focus:border-blue-500 focus:outline-none"
+                className={`w-full border rounded-lg px-4 py-2.5 focus:border-blue-500 focus:outline-none ${inputClasses}`}
                 value={formData.phoneNumber}
                 onChange={handlePhoneChange}
                 onBlur={handlePhoneBlur}
               />
             </div>
             <div>
-              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">
+              <label className={`block text-xs font-bold uppercase tracking-wider mb-1 ${labelClasses}`}>
                 Role
               </label>
               <select
                 name="role"
-                className="w-full bg-slate-950 border border-slate-700 rounded-lg px-4 py-2.5 text-white focus:border-blue-500 focus:outline-none appearance-none"
+                className={`w-full border rounded-lg px-4 py-2.5 focus:border-blue-500 focus:outline-none appearance-none ${inputClasses}`}
                 value={formData.role}
                 onChange={handleChange}
               >
@@ -206,18 +237,16 @@ export default function AddUserModal({ isOpen, onClose, onSuccess }) {
 
             {formData.role !== "admin" && (
               <div className="animate-in fade-in slide-in-from-top-2 duration-300">
-                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">
+                <label className={`block text-xs font-bold uppercase tracking-wider mb-1 ${labelClasses}`}>
                   Assign Warehouse Base
                 </label>
                 <select
                   name="warehouseCode"
-                  className="w-full bg-slate-950 border border-slate-700 rounded-lg px-4 py-2.5 text-white focus:border-blue-500 focus:outline-none appearance-none"
+                  className={`w-full border rounded-lg px-4 py-2.5 focus:border-blue-500 focus:outline-none appearance-none ${inputClasses}`}
                   value={formData.warehouseCode}
-                  // onChange={handleChange}
                   onChange={handleWarehouseChange}
                 >
                   <option value="">Select Warehouse...</option>
-                  {/* Ideally, fetch these from Firestore too */}
                   {WAREHOUSES.map((w, i) => (
                     <option key={i} value={w.code}>
                       {w.name}
@@ -247,29 +276,37 @@ export default function AddUserModal({ isOpen, onClose, onSuccess }) {
         {/* Step 2: Confirm */}
         {step === "CONFIRM" && (
           <div className="p-6 text-center">
-            <div className="w-16 h-16 bg-amber-500/10 text-amber-500 rounded-full flex items-center justify-center mx-auto mb-4 border border-amber-500/20">
+            <div
+              className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 border ${
+                isDark
+                  ? "bg-amber-500/10 text-amber-500 border-amber-500/20"
+                  : "bg-amber-100 text-amber-600 border-amber-200"
+              }`}
+            >
               <FontAwesomeIcon icon={faExclamationTriangle} size="lg" />
             </div>
-            <h4 className="text-xl font-bold text-white mb-2">Are you sure?</h4>
-            <p className="text-slate-400 text-sm mb-6">
+            <h4 className={`text-xl font-bold mb-2 ${confirmTitleClasses}`}>
+              Are you sure?
+            </h4>
+            <p className={`text-sm mb-6 ${confirmTextClasses}`}>
               You are about to create a new <strong>{formData.role}</strong>{" "}
               account for <br />
-              <strong className="text-white">{formData.displayName}</strong> (
+              <strong className={confirmStrongClasses}>{formData.displayName}</strong> (
               {formData.email}).
             </p>
-            <p className="text-slate-400 text-sm mb-6">
+            <p className={`text-sm mb-6 ${confirmTextClasses}`}>
               Role:{" "}
-              <strong className="text-white uppercase">{formData.role}</strong>
+              <strong className={`uppercase ${confirmStrongClasses}`}>{formData.role}</strong>
               <br />
               Warehouse:{" "}
-              <strong className="text-white">
+              <strong className={confirmStrongClasses}>
                 {formData.warehouseName || "None"}
               </strong>
             </p>
             <div className="flex gap-3">
               <button
                 onClick={() => setStep("FORM")}
-                className="flex-1 py-3 rounded-xl border border-slate-700 text-slate-300 hover:bg-slate-800 font-medium transition-colors"
+                className={`flex-1 py-3 rounded-xl border font-medium transition-colors ${backBtnClasses}`}
               >
                 Go Back
               </button>
@@ -291,8 +328,10 @@ export default function AddUserModal({ isOpen, onClose, onSuccess }) {
               spin
               className="text-4xl text-blue-500 mb-4"
             />
-            <h4 className="text-lg font-bold text-white">Creating User...</h4>
-            <p className="text-slate-500 text-sm mt-2">
+            <h4 className={`text-lg font-bold ${loadingTitleClasses}`}>
+              Creating User...
+            </h4>
+            <p className={`text-sm mt-2 ${loadingTextClasses}`}>
               Connecting to Authentication...
             </p>
           </div>
@@ -301,11 +340,19 @@ export default function AddUserModal({ isOpen, onClose, onSuccess }) {
         {/* Step 4: Success */}
         {step === "SUCCESS" && (
           <div className="p-8 text-center">
-            <div className="w-16 h-16 bg-emerald-500/10 text-emerald-500 rounded-full flex items-center justify-center mx-auto mb-4 border border-emerald-500/20">
+            <div
+              className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 border ${
+                isDark
+                  ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/20"
+                  : "bg-emerald-100 text-emerald-600 border-emerald-200"
+              }`}
+            >
               <FontAwesomeIcon icon={faCheckCircle} size="2x" />
             </div>
-            <h4 className="text-xl font-bold text-white mb-2">Success!</h4>
-            <p className="text-slate-400 text-sm mb-6">
+            <h4 className={`text-xl font-bold mb-2 ${successTitleClasses}`}>
+              Success!
+            </h4>
+            <p className={`text-sm mb-6 ${successTextClasses}`}>
               The user has been successfully created.
             </p>
             <button
