@@ -124,7 +124,8 @@ export default function UnifiedShipmentModal({ profile, isOpen, onClose }) {
 
         setStep(3);
       } catch (err) {
-        showAlert("error", "Error", err.message);
+        // showAlert("error", "Error", err.message);
+        alert("error: ", err.message);
       } finally {
         setLoading(false);
       }
@@ -132,11 +133,12 @@ export default function UnifiedShipmentModal({ profile, isOpen, onClose }) {
 
     if (tripDecision && tripDecision.tripId) {
       // Case A: Trip Selected -> Ask Permission -> Then Run
-      showConfirm(
-        "Confirm Assignment",
-        `Confirm assignment to Trip: ${tripDecision.tripId}?\nThis will generate labels for this trip immediately.`,
-        executeSubmission, // <--- PASS THE FUNCTION, DON'T CALL IT
-      );
+      // showConfirm(
+      //   "Confirm Assignment",
+      //   `Confirm assignment to Trip: ${tripDecision.tripId}?\nThis will generate labels for this trip immediately.`,
+      //   executeSubmission, // <--- PASS THE FUNCTION, DON'T CALL IT
+      // );
+      alert("Confirm");
     } else {
       // Case B: No Trip -> Run Immediately
       executeSubmission();
