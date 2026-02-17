@@ -63,6 +63,11 @@ export default function UnifiedShipmentModal({ profile, isOpen, onClose }) {
           uploadedUrls = await Promise.all(uploadPromises);
         }
 
+        if (uploadedUrls.length === 0) {
+          alert("Add Images before proceeding");
+          return;
+        }
+
         const payload = {
           sender: {
             name: shipmentDraft.sender.name,
