@@ -7,6 +7,7 @@ import {
   Alert,
   ActivityIndicator,
   SafeAreaView,
+  TouchableOpacity,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { getFunctions, httpsCallable } from "firebase/functions";
@@ -19,6 +20,9 @@ import ShipmentHeader from "../../components/checker/shipment-details/ShipmentHe
 import ShipmentSearch from "../../components/checker/shipment-details/ShipmentSearch";
 import PackageListItem from "../../components/checker/shipment-details/PackageListItem";
 
+import PackageActionModal from "../../components/checker/shipment-details/PackageActionModal";
+import { updateShipmentPackages } from "../../components/utilities/FirebaseFunctions";
+
 export default function ShipmentDetailsScreen() {
   const { shipmentId, parentTripId, parentPlate } = useLocalSearchParams();
   const router = useRouter();
@@ -27,6 +31,11 @@ export default function ShipmentDetailsScreen() {
   const [packages, setPackages] = useState([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
+
+  // ✅ NEW STATE FOR SELECTION & MODAL
+  const [selectedIds, setSelectedIds] = useState(new Set());
+  const [modalVisible, setModalVisible] = useState(false);
+  const [targetPackage, setTargetPackage] = useState(null); // null if bulk action
 
   const getCurrentLocationSafe = async () => {
     try {
@@ -76,45 +85,93 @@ export default function ShipmentDetailsScreen() {
     (p.trackingNumber || "").toLowerCase().includes(search.toLowerCase()),
   );
 
-  // 3. ACTIONS
-  const updateStatus = async (pkg, newMode) => {
-    setActionLoading(true);
-    try {
-      const functions = getFunctions(undefined, "asia-southeast1");
-      const scanPackages = httpsCallable(functions, "scanPackages");
+  // ✅ SELECTION HELPERS
+  const handleSelectAll = () => {
+    if (selectedIds.size === filtered.length) {
+      setSelectedIds(new Set()); // Deselect All
+    } else {
+      const allIds = new Set(filtered.map((p) => p.trackingNumber));
+      setSelectedIds(allIds);
+    }
+  };
 
-      const location = await getCurrentLocationSafe();
-      const result = await scanPackages({
-        barcode: pkg.trackingNumber,
-        mode: newMode,
-        ...(location ? { location } : {}),
+  const toggleSelection = (id) => {
+    const newSet = new Set(selectedIds);
+    if (newSet.has(id)) newSet.delete(id);
+    else newSet.add(id);
+    setSelectedIds(newSet);
+  };
+
+  // ✅ UPDATED ACTION HANDLER (Handles Single & Bulk)
+  const executeAction = async (newMode) => {
+    setActionLoading(true);
+
+    // STEP 1: Decide WHO to update
+    // If 'targetPackage' exists (Menu Press), we create a Set with JUST that one ID.
+    // If 'targetPackage' is null (Bulk Button), we use the 'selectedIds' Set.
+    const idsToUpdate = targetPackage
+      ? new Set([targetPackage.trackingNumber])
+      : selectedIds;
+
+    // STEP 2: Create the NEW full list
+    // We loop through the CURRENT full list of packages.
+    const updatedPackages = packages.map((pkg) => {
+      // If this package's ID is in our "idsToUpdate" set...
+      if (idsToUpdate.has(pkg.trackingNumber)) {
+        // ...we clone it and change its status.
+        return { ...pkg, status: newMode };
+      }
+      // Otherwise, keep it exactly as it is.
+      return pkg;
+    });
+
+    try {
+      console.log("updated packages: ", updatedPackages.trim());
+      console.log("shipment id: ", shipmentId.trim());
+
+      // const functions = getFunctions(undefined, "asia-southeast1");
+      // const updateFn = httpsCallable(functions, "updateShipmentPackages");
+
+      // STEP 3: Send the ENTIRE list (with the changes) to the server
+      await updateShipmentPackages({
+        shipmentId: shipmentId.trim(),
+        packages: updatedPackages, // This contains 99 unchanged items + 1 updated item
       });
 
-      Alert.alert("Success", result.data.message);
+      Alert.alert("Success", `Updated status to ${newMode}`);
+
+      // Cleanup
+      setSelectedIds(new Set());
+      setTargetPackage(null);
+      setModalVisible(false); // Don't forget to close the modal!
     } catch (error) {
-      console.error(error);
-      Alert.alert("Error", error.message);
+      console.error("Update Error:", error);
+      Alert.alert("Update Failed", error.message);
     } finally {
       setActionLoading(false);
     }
   };
 
-  const handlePackagePress = (pkg) => {
-    Alert.alert(
-      "Update Package",
-      `ID: ${pkg.trackingNumber}\nStatus: ${pkg.status}`,
-      [
-        {
-          text: "Mark Out for Delivery",
-          onPress: () => updateStatus(pkg, "out_for_delivery"),
-        },
-        {
-          text: "Mark Delivered",
-          onPress: () => updateStatus(pkg, "delivered"),
-        },
-        { text: "Cancel", style: "cancel" },
-      ],
-    );
+  // ✅ UPDATED PRESS HANDLERS
+  const handleMenuPress = (pkg) => {
+    // If we are in "Selection Mode", tap acts like selection
+    if (selectedIds.size > 0) {
+      toggleSelection(pkg.trackingNumber);
+      return;
+    }
+
+    // Otherwise, open the Single Action Modal
+    setTargetPackage(pkg);
+    setModalVisible(true);
+  };
+
+  const handleLongPress = (pkg) => {
+    toggleSelection(pkg.trackingNumber);
+    // Optional: Provide haptic feedback here
+  };
+  const handleBulkButtonPress = () => {
+    setTargetPackage(null); // Indicates bulk mode
+    setModalVisible(true);
   };
 
   // ✅ REPLACE WITH THIS SIMPLE VERSION
@@ -139,6 +196,18 @@ export default function ShipmentDetailsScreen() {
         </View>
       )}
 
+      {/* ✅ SELECT ALL BAR */}
+      <View style={styles.selectionBar}>
+        <TouchableOpacity onPress={handleSelectAll}>
+          <Text style={styles.selectText}>
+            {selectedIds.size === filtered.length && filtered.length > 0
+              ? "Deselect All"
+              : "Select All"}
+          </Text>
+        </TouchableOpacity>
+        <Text style={styles.countText}>{selectedIds.size} selected</Text>
+      </View>
+
       {/* 3. SEARCH */}
       <ShipmentSearch value={search} onChange={setSearch} />
 
@@ -152,14 +221,54 @@ export default function ShipmentDetailsScreen() {
           data={filtered}
           keyExtractor={(item) => item.trackingNumber}
           contentContainerStyle={styles.listContent}
-          renderItem={({ item }) => (
-            <PackageListItem item={item} onPress={handlePackagePress} />
-          )}
+          renderItem={({ item }) => {
+            const isSelected = selectedIds.has(item.trackingNumber);
+            return (
+              <View
+                style={[
+                  styles.itemWrapper,
+                  isSelected && styles.selectedWrapper,
+                ]}
+              >
+                <PackageListItem
+                  item={item}
+                  onMenuPress={handleMenuPress} // Tap the dots -> Open Modal
+                  onLongPress={handleLongPress} // Hold -> Select
+                  selected={selectedIds.has(item.trackingNumber)}
+                />
+                {/* Visual Indicator Overlay if PackageListItem can't be modified */}
+                {isSelected && (
+                  <View style={styles.selectionOverlay} pointerEvents="none" />
+                )}
+              </View>
+            );
+          }}
           ListEmptyComponent={
             <Text style={styles.emptyText}>No packages in this shipment.</Text>
           }
         />
       )}
+      {/* ✅ BULK ACTION BUTTON (Floating) */}
+      {selectedIds.size > 0 && (
+        <View style={styles.floatingBar}>
+          <TouchableOpacity
+            style={styles.bulkBtn}
+            onPress={handleBulkButtonPress}
+          >
+            <Text style={styles.bulkBtnText}>
+              Update {selectedIds.size} Selected
+            </Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
+      {/* ✅ ACTION MODAL */}
+      <PackageActionModal
+        visible={modalVisible}
+        onClose={() => setModalVisible(false)}
+        count={targetPackage ? 1 : selectedIds.size}
+        onAction={executeAction}
+      />
     </SafeAreaView>
   );
 }
@@ -177,13 +286,53 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-  loadingWrapper: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  listContent: {
-    paddingBottom: 120,
-  },
+  loadingWrapper: { flex: 1, justifyContent: "center", alignItems: "center" },
+  listContent: { paddingBottom: 120 },
   emptyText: { textAlign: "center", color: "#475569", marginTop: 40 },
+
+  // New Styles
+  selectionBar: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: "#e2e8f0",
+    backgroundColor: "#fff",
+  },
+  selectText: { color: "#3b82f6", fontWeight: "600" },
+  countText: { color: "#64748b" },
+  itemWrapper: {
+    borderRadius: 12,
+    marginHorizontal: 20,
+    marginVertical: 6,
+    overflow: "hidden",
+  },
+  selectedWrapper: {
+    borderWidth: 2,
+    borderColor: "#3b82f6",
+    backgroundColor: "#eff6ff",
+  },
+  selectionOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(59, 130, 246, 0.1)",
+  },
+
+  floatingBar: {
+    position: "absolute",
+    bottom: 20,
+    left: 20,
+    right: 20,
+    zIndex: 10,
+  },
+  bulkBtn: {
+    backgroundColor: "#042C83",
+    padding: 16,
+    borderRadius: 16,
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOpacity: 0.2,
+    shadowOffset: { width: 0, height: 4 },
+  },
+  bulkBtnText: { color: "#fff", fontWeight: "bold", fontSize: 16 },
 });

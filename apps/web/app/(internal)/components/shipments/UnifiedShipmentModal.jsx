@@ -36,6 +36,8 @@ export default function UnifiedShipmentModal({ profile, isOpen, onClose }) {
   };
 
   const handleMasterSubmit = async (tripDecision) => {
+    console.log("shipdata to be uploaded: ", shipmentDraft);
+
     const executeSubmission = async () => {
       setLoading(true);
       try {
@@ -50,10 +52,10 @@ export default function UnifiedShipmentModal({ profile, isOpen, onClose }) {
             async (file, index) => {
               // Filename: AT-2026...-123456_1.jpg
               const ext = file.name.split(".").pop();
-              const fileName = `${newShipmentId}_${index + 1}.${ext}`;
+              const fileName = `proof_of_receipt_${manualShipmentId}_${index + 1}.${ext}`;
               const storageRef = ref(
                 storage,
-                `shipments/${newShipmentId}/${fileName}`,
+                `shipments/${manualShipmentId}/${fileName}`,
               );
 
               const snapshot = await uploadBytes(storageRef, file);
@@ -61,6 +63,11 @@ export default function UnifiedShipmentModal({ profile, isOpen, onClose }) {
             },
           );
           uploadedUrls = await Promise.all(uploadPromises);
+        }
+
+        if (uploadedUrls.length === 0) {
+          alert("Add Images before proceeding");
+          return;
         }
 
         const payload = {
@@ -99,11 +106,16 @@ export default function UnifiedShipmentModal({ profile, isOpen, onClose }) {
           notifySms: sendSms,
 
           manualShipmentId: manualShipmentId,
-          imageUrls: uploadedUrls,
+          proofOfReceipt: uploadedUrls,
         };
 
+        console.log("payload: ", payload);
+
         const shipmentRes = await createShipmentWithPackages(payload);
-        const newShipmentId = shipmentRes.data.shipmentId;
+        let newShipmentId = manualShipmentId;
+        if (!newShipmentId) {
+          newShipmentId = shipmentRes.data.shipmentId;
+        }
         setCreatedShipmentId(newShipmentId);
 
         if (tripDecision && tripDecision.tripId) {
@@ -124,7 +136,9 @@ export default function UnifiedShipmentModal({ profile, isOpen, onClose }) {
 
         setStep(3);
       } catch (err) {
-        showAlert("error", "Error", err.message);
+        // showAlert("error", "Error", err.message);
+        console.log(err);
+        alert("error: ", err.message);
       } finally {
         setLoading(false);
       }
@@ -132,11 +146,12 @@ export default function UnifiedShipmentModal({ profile, isOpen, onClose }) {
 
     if (tripDecision && tripDecision.tripId) {
       // Case A: Trip Selected -> Ask Permission -> Then Run
-      showConfirm(
-        "Confirm Assignment",
-        `Confirm assignment to Trip: ${tripDecision.tripId}?\nThis will generate labels for this trip immediately.`,
-        executeSubmission, // <--- PASS THE FUNCTION, DON'T CALL IT
-      );
+      // showConfirm(
+      //   "Confirm Assignment",
+      //   `Confirm assignment to Trip: ${tripDecision.tripId}?\nThis will generate labels for this trip immediately.`,
+      //   executeSubmission, // <--- PASS THE FUNCTION, DON'T CALL IT
+      // );
+      alert("Confirm");
     } else {
       // Case B: No Trip -> Run Immediately
       executeSubmission();
@@ -286,7 +301,10 @@ export default function UnifiedShipmentModal({ profile, isOpen, onClose }) {
                     : "Print Individual Waybill"}
                 </button>
                 <button
-                  onClick={onClose}
+                  onClick={() => {
+                    onClose();
+                    setStep(1);
+                  }}
                   className="w-full py-3 sm:py-4 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-bold text-sm sm:text-base"
                 >
                   Return to Dashboard

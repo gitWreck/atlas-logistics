@@ -34,7 +34,7 @@ export default function TripsScreen() {
     // but you can add it back if checkers need to review departed trucks.
     const q = query(
       collection(db, "truck_trips"),
-      where("status", "in", ["CREATED", "ASSIGNED", "LOADING"]),
+      where("status", "in", ["CREATED", "ASSIGNED", "LOADING", "LOADED"]),
       orderBy("createdAt", "desc"),
     );
 
@@ -47,7 +47,7 @@ export default function TripsScreen() {
           console.log("CHECKER TRIPS: ", data);
           return {
             id: doc.id,
-            plate: data.plateNumber || "No Plate",
+            plate: data.truckPlateNumber || "No Plate",
             status: data.status || "UNKNOWN",
             route: data.route || "No Route",
             loaded: data.totalLoaded || 0, // Using unified field names
@@ -114,9 +114,7 @@ const styles = StyleSheet.create({
   header: {
     paddingHorizontal: 20,
     paddingTop:
-      Platform.OS === "android"
-        ? (StatusBar.currentHeight || 0) + 12
-        : 24,
+      Platform.OS === "android" ? (StatusBar.currentHeight || 0) + 12 : 24,
     paddingBottom: 16,
     borderBottomWidth: 1,
     borderBottomColor: "#cbd5e1",

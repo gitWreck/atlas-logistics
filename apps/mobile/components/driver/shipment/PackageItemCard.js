@@ -15,7 +15,8 @@ const PackageItemCard = ({ pkg, index }) => {
       <View style={styles.details}>
         <Text style={styles.desc}>{pkg.description || "Package Item"}</Text>
         <Text style={styles.specs}>
-          {pkg.weight}kg • {pkg.dimensions || "Standard"}
+          {/* {pkg.weight}kg •  */}
+          {pkg.dimensions || "Standard"}
         </Text>
       </View>
 

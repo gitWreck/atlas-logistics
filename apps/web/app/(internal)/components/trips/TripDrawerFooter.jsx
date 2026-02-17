@@ -5,12 +5,14 @@ import StatusButton from "../ui/StatusButton";
 import {
   generateTripManifest,
   reopenTrip,
+  unlockTripManifest,
 } from "@/app/utility/FirebaseFunctions";
 import { runAction } from "@/app/utility/utilities";
 import ExportTripButton from "../exports/ExportTripManifest";
 
 export default function TripDrawerFooter({ data, onClose, shipments }) {
   const [lockStatus, setLockStatus] = useState("IDLE");
+  const [unlockStatus, setUnlockStatus] = useState("IDLE");
 
   // Safety Check
   if (!data) return null;
@@ -54,6 +56,23 @@ export default function TripDrawerFooter({ data, onClose, shipments }) {
             runAction(
               setLockStatus,
               () => generateTripManifest({ tripDocId: data.tripId }),
+              () => {
+                /* Optional Success Callback */
+              },
+            )
+          }
+        />
+
+        <StatusButton
+          status={unlockStatus}
+          label="Unlock Manifest"
+          icon={faUnlock}
+          idleColor="bg-amber-600/20 hover:bg-amber-600/40 text-amber-400 border border-amber-500/30"
+          disabled={!isLocked}
+          onClick={() =>
+            runAction(
+              setUnlockStatus,
+              () => unlockTripManifest({ tripDocId: data.tripId, reason: "" }),
               () => {
                 /* Optional Success Callback */
               },

@@ -1,0 +1,110 @@
+import React from "react";
+import {
+  View,
+  Text,
+  ScrollView,
+  TouchableOpacity,
+  StyleSheet,
+} from "react-native";
+
+export default function TrackedShipmentList({ shipments, onShipmentPress }) {
+  // Empty State
+  if (!shipments || shipments.length === 0) {
+    return (
+      <View style={styles.emptyState}>
+        <Text style={styles.emptyText}>
+          You haven’t added any tracking numbers yet.
+        </Text>
+        <Text style={styles.emptyTextMuted}>
+          Use “Add tracking” to link a shipment to your dashboard.
+        </Text>
+      </View>
+    );
+  }
+
+  // List State
+  return (
+    <ScrollView contentContainerStyle={styles.listContent}>
+      <View style={styles.sectionHeaderRow}>
+        <Text style={styles.sectionTitle}>My tracked shipments</Text>
+      </View>
+
+      {shipments.map((item) => (
+        <TouchableOpacity
+          key={item.id}
+          style={styles.shipmentCard}
+          activeOpacity={0.85}
+          onPress={() => onShipmentPress(item)}
+        >
+          <Text style={styles.trackingLabel}>Tracking number</Text>
+          <Text style={styles.trackingValue}>
+            {item.trackingNumber || item.id}
+          </Text>
+          <Text style={styles.trackingHint}>
+            Tap to view live status and details.
+          </Text>
+        </TouchableOpacity>
+      ))}
+    </ScrollView>
+  );
+}
+
+const styles = StyleSheet.create({
+  sectionHeaderRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 12,
+  },
+  sectionTitle: {
+    fontSize: 15,
+    fontWeight: "600",
+    color: "#0f172a",
+    marginBottom: 8,
+  },
+  emptyState: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 12,
+  },
+  emptyText: {
+    color: "#64748b",
+    fontSize: 14,
+    textAlign: "center",
+    marginBottom: 4,
+  },
+  emptyTextMuted: {
+    color: "#94a3b8",
+    fontSize: 13,
+    textAlign: "center",
+  },
+  listContent: {
+    paddingBottom: 24,
+  },
+  shipmentCard: {
+    backgroundColor: "#ffffff",
+    borderRadius: 12,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: "#e2e8f0",
+    marginBottom: 12,
+  },
+  trackingLabel: {
+    fontSize: 11,
+    color: "#94a3b8",
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+    marginBottom: 4,
+  },
+  trackingValue: {
+    fontSize: 15,
+    fontWeight: "600",
+    color: "#0f172a",
+    marginBottom: 4,
+  },
+  trackingHint: {
+    fontSize: 12,
+    color: "#64748b",
+  },
+});

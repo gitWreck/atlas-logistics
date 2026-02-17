@@ -11,7 +11,6 @@ import {
 import { useRouter } from "expo-router";
 import { signInWithEmailAndPassword, signOut } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
-import { Image } from "expo-image";
 
 import { auth, db } from "../../firebase";
 import AtlasInput from "../../components/ui/AtlasInput";
@@ -151,13 +150,12 @@ export default function LoginScreen() {
             Are you a customer?{" "}
             <Text
               style={styles.customerCtaLink}
-              onPress={() => router.push("/customer-signup")}
+              onPress={() => router.push("/signup/")}
             >
               Create your account
             </Text>
           </Text>
         </View>
-
       </ScrollView>
     </KeyboardAvoidingView>
   );
