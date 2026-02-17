@@ -112,7 +112,7 @@ export default function UnifiedShipmentModal({ profile, isOpen, onClose }) {
         console.log("payload: ", payload);
 
         const shipmentRes = await createShipmentWithPackages(payload);
-        const newShipmentId = manualShipmentId;
+        let newShipmentId = manualShipmentId;
         if (!newShipmentId) {
           newShipmentId = shipmentRes.data.shipmentId;
         }
