@@ -201,7 +201,7 @@ exports.createShipmentWithPackages = onCall(
       // Latest known geo location for this shipment (if provided)
       ...(location ? { lastLocation: location } : {}),
 
-      public: false,
+      public: true,
       archived: false,
 
       // AGGREGATES
