@@ -9,16 +9,17 @@ const db = admin.firestore();
 exports.bulkShipmentAction = onCall(
   { region: "asia-southeast1", maxInstances: 10 },
   async (request) => {
-    await requireRole(db, request, ["admin", "manager"]);
+    await requireRole(db, request, ["admin", "manager", "checker"]);
 
     if (!request.auth) throw new HttpsError("unauthenticated", "Auth required");
 
-    const { tripId, shipmentIds, action } = request.data;
+    const { tripId, shipmentIds, action, location } = request.data;
     const userId = request.auth.uid;
 
     // 1. Determine Target Status
     let targetStatus = "RECEIVED";
     if (action === "LOAD") targetStatus = "LOADED";
+    if (action === "OFFLOAD") targetStatus = "ARRIVED"; // [New] For destination scan
     if (action === "OUT_FOR_DELIVERY") targetStatus = "OUT_FOR_DELIVERY";
     if (action === "DELIVERED") targetStatus = "DELIVERED";
     else if (action === "UNLOAD") targetStatus = "RECEIVED";
@@ -67,6 +68,7 @@ exports.bulkShipmentAction = onCall(
         let tripDeltaLoaded = 0;
         let tripDeltaPending = 0;
         let tripDeltaDelivered = 0;
+        let tripDeltaArrived = 0;
 
         // Iterate using index to match docs with refs
         for (let i = 0; i < shipmentIds.length; i++) {
@@ -84,6 +86,7 @@ exports.bulkShipmentAction = onCall(
           let localLoadedChange = 0;
           let localPendingChange = 0;
           let localDeliveredChange = 0;
+          let localArrivedChange = 0;
 
           const updatedPackages = packages.map((pkg) => {
             if (pkg.status === targetStatus) return pkg;
@@ -96,11 +99,24 @@ exports.bulkShipmentAction = onCall(
             } else if (action === "UNLOAD" && currentStatus === "LOADED") {
               localLoadedChange--;
               localPendingChange++;
-            } else if (
-              action === "DELIVERED" &&
-              ["LOADED", "OUT_FOR_DELIVERY"].includes(currentStatus)
+            } // [NEW BLOCK] Handle Offload at Destination
+            else if (
+              (action === "OFFLOAD" || action === "ARRIVED") &&
+              currentStatus === "LOADED"
             ) {
               localLoadedChange--;
+              localArrivedChange++;
+              // We don't increment pending or delivered here typically,
+              // unless you track "Arrived at Hub" as a separate counter.
+              // If you don't have a specific counter for 'arrived',
+              // you might just decrement loaded.
+            } else if (
+              action === "DELIVERED" &&
+              ["LOADED", "OUT_FOR_DELIVERY", "ARRIVED"].includes(currentStatus) // Add ARRIVED
+            ) {
+              // If it was loaded, decrement loaded. If it was already offloaded/arrived, don't.
+              if (currentStatus === "LOADED") localLoadedChange--;
+              if (currentStatus === "ARRIVED") localArrivedChange--; // Handle from Arrived too
               localDeliveredChange++;
             }
 
@@ -111,6 +127,7 @@ exports.bulkShipmentAction = onCall(
           tripDeltaLoaded += localLoadedChange;
           tripDeltaPending += localPendingChange;
           tripDeltaDelivered += localDeliveredChange;
+          tripDeltaArrived += localArrivedChange;
 
           // Update Shipment Doc
           t.update(shipRef, {
@@ -118,22 +135,46 @@ exports.bulkShipmentAction = onCall(
             "totals.loaded": FieldValue.increment(localLoadedChange),
             "totals.pending": FieldValue.increment(localPendingChange),
             "totals.delivered": FieldValue.increment(localDeliveredChange),
+            "totals.arrived": FieldValue.increment(localArrivedChange),
             status:
               action === "LOAD"
                 ? "LOADED"
                 : action === "UNLOAD"
-                  ? "ASSIGNED"
-                  : targetStatus,
+                  ? "RECEIVED" // Back to start
+                  : action === "OFFLOAD" || action === "ARRIVED"
+                    ? "ARRIVED" // Destination scan
+                    : targetStatus,
             updatedAt: FieldValue.serverTimestamp(),
             updatedBy: userId,
+
+            // ✅ ADD THIS BLOCK:
+            statusHistory: FieldValue.arrayUnion({
+              status: targetStatus,
+              at: new Date(), // Use JS Date for array elements to avoid serialization issues
+              by: userId,
+              note: `Bulk Action: ${action}`,
+              location: location || null, // Saves geo-coords if provided
+            }),
+
+            // ✅ AND THIS: Update the latest known location on the doc root
+            ...(location ? { lastLocation: location } : {}),
           });
 
           // Update Sub-Doc
           if (tripShipDoc.exists) {
             t.update(tripShipRef, {
+              status:
+                action === "LOAD"
+                  ? "LOADED"
+                  : action === "UNLOAD"
+                    ? "RECEIVED" // Back to start
+                    : action === "OFFLOAD" || action === "ARRIVED"
+                      ? "ARRIVED" // Destination scan
+                      : targetStatus,
               loadedCount: FieldValue.increment(localLoadedChange),
               pendingCount: FieldValue.increment(localPendingChange),
               deliveredCount: FieldValue.increment(localDeliveredChange),
+              arrivedCount: FieldValue.increment(localArrivedChange),
               updatedAt: FieldValue.serverTimestamp(),
             });
           }
@@ -144,6 +185,7 @@ exports.bulkShipmentAction = onCall(
           totalLoaded: FieldValue.increment(tripDeltaLoaded),
           itemPending: FieldValue.increment(tripDeltaPending),
           totalDelivered: FieldValue.increment(tripDeltaDelivered),
+          totalArrived: FieldValue.increment(tripDeltaArrived),
           updatedAt: FieldValue.serverTimestamp(),
         });
 
@@ -168,6 +210,7 @@ exports.bulkShipmentAction = onCall(
             deltaLoaded: tripDeltaLoaded,
             deltaPending: tripDeltaPending,
             deltaDelivered: tripDeltaDelivered,
+            deltaArrived: tripDeltaArrived,
           },
         });
       });

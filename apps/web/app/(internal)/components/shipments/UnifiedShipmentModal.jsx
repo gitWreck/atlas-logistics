@@ -50,7 +50,7 @@ export default function UnifiedShipmentModal({ profile, isOpen, onClose }) {
             async (file, index) => {
               // Filename: AT-2026...-123456_1.jpg
               const ext = file.name.split(".").pop();
-              const fileName = `${newShipmentId}_${index + 1}.${ext}`;
+              const fileName = `proof_of_receipt_${newShipmentId}_${index + 1}.${ext}`;
               const storageRef = ref(
                 storage,
                 `shipments/${newShipmentId}/${fileName}`,
@@ -99,7 +99,7 @@ export default function UnifiedShipmentModal({ profile, isOpen, onClose }) {
           notifySms: sendSms,
 
           manualShipmentId: manualShipmentId,
-          imageUrls: uploadedUrls,
+          proofOfReceipt: uploadedUrls,
         };
 
         const shipmentRes = await createShipmentWithPackages(payload);

@@ -1,13 +1,13 @@
 import React from "react";
-import { View, Text, StyleSheet } from "react-native";
+import { View, Text, StyleSheet, Platform } from "react-native";
 
 const TripStatusRow = ({ totalShipments, totalPackages }) => {
   return (
     <View style={styles.statsRow}>
-      <View style={styles.statBox}>
+      {/* <View style={styles.statBox}>
         <Text style={styles.statLabel}>Total Shipments</Text>
         <Text style={styles.statNumber}>{totalShipments}</Text>
-      </View>
+      </View> */}
       <View style={styles.statBox}>
         <Text style={styles.statLabel}>Total Items</Text>
         <Text style={styles.statNumber}>{totalPackages}</Text>
@@ -32,6 +32,15 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     borderWidth: 1,
     borderColor: "#e5e7eb",
+    ...Platform.select({
+      ios: {
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.08,
+        shadowRadius: 8,
+      },
+      android: { elevation: 3 },
+    }),
   },
   statLabel: {
     fontSize: 12,

@@ -1,105 +1,154 @@
 import React, { useState } from "react";
-import {
-  Text,
-  View,
-  StyleSheet,
-  Alert,
-  ActivityIndicator,
-  TouchableOpacity,
-  Modal,
-  KeyboardAvoidingView,
-  Platform,
-  TextInput,
-  Vibration,
-} from "react-native";
+import { View, Alert, Vibration, StyleSheet } from "react-native";
 import { CameraView, useCameraPermissions } from "expo-camera";
-import { useLocalSearchParams } from "expo-router";
-import { FontAwesome } from "@expo/vector-icons";
-import { scanPackages } from "../../components/utilities/FirebaseFunctions";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import GetLocation from "react-native-get-location";
+import {
+  doc,
+  getDoc,
+  collection,
+  query,
+  where,
+  getDocs,
+} from "firebase/firestore";
+import { db } from "../../firebase";
+
+// Import Custom Components
+import { scanPackages } from "../../components/utilities/FirebaseFunctions";
+import PermissionRequest from "../../components/scanner/PermissionRequest";
+import ScannerOverlay from "../../components/scanner/ScannerOverlay";
+import ManualEntryModal from "../../components/scanner/ManualEntryModal";
 
 export default function ScannerScreen() {
+  const router = useRouter();
   const [permission, requestPermission] = useCameraPermissions();
   const [scanned, setScanned] = useState(false);
   const [processing, setProcessing] = useState(false);
   const [showManual, setShowManual] = useState(false);
-  const [manualCode, setManualCode] = useState("");
 
   const { mode } = useLocalSearchParams();
 
-  // 1. Permission Check
+  // --- PERMISSION CHECK ---
   if (!permission) return <View />;
   if (!permission.granted) {
-    return (
-      <View style={styles.center}>
-        <Text>Camera permission is required.</Text>
-        <Text onPress={requestPermission} style={styles.link}>
-          Grant Permission
-        </Text>
-      </View>
-    );
+    return <PermissionRequest onRequest={requestPermission} />;
   }
 
-  // Rename 'handleBarCodeScanned' to this:
+  // --- HELPERS ---
   const getCurrentLocationSafe = async () => {
     try {
       const loc = await GetLocation.getCurrentPosition({
         enableHighAccuracy: true,
         timeout: 15000,
       });
-
-      if (!loc) return null;
-      return {
-        lat: loc.latitude,
-        lng: loc.longitude,
-      };
+      return loc ? { lat: loc.latitude, lng: loc.longitude } : null;
     } catch (error) {
-      console.log("Location error (checker scan):", error);
+      console.log("Location error:", error);
       return null;
     }
   };
 
-  const processPackage = async (barcode) => {
-    if (processing) return; // Prevent double taps
+  const handleProcessPackage = async (barcode) => {
+    if (processing) return;
     setProcessing(true);
-
-    // (Optional) If coming from manual input, maybe don't vibrate?
-    // Or keep it for consistent feedback.
     Vibration.vibrate();
 
     try {
+      // ------------------------------------------
+      // MODE: INFO (Read Directly from Phone)
+      // ------------------------------------------
+      if (mode === "info") {
+        let shipmentData = null;
+        let shipmentId = barcode;
+
+        // STEP 1: Try finding the document directly (Shipment Level Scan)
+        const shipmentRef = doc(db, "shipments", barcode);
+        const docSnap = await getDoc(shipmentRef);
+
+        if (docSnap.exists()) {
+          shipmentData = docSnap.data();
+        } else {
+          // STEP 2: If not found, search inside packages (Package Level Scan)
+          // "Find the shipment where packageBarcodes array contains this barcode"
+          const q = query(
+            collection(db, "shipments"),
+            where("packageBarcodes", "array-contains", barcode),
+          );
+          const querySnap = await getDocs(q);
+
+          if (!querySnap.empty) {
+            // Found the parent shipment!
+            const parentDoc = querySnap.docs[0];
+            shipmentData = parentDoc.data();
+            shipmentId = parentDoc.id;
+          }
+        }
+
+        // STEP 3: Display Results
+        if (shipmentData) {
+          const infoText = `
+          Shipment: ${shipmentData.trackingNumber}
+          Status: ${shipmentData.status || "N/A"}
+          Origin: ${shipmentData.originCode} ➔ ${shipmentData.destinationCode}
+          Sender: ${shipmentData.sender?.name || "N/A"}
+          Receiver: ${shipmentData.recipient?.name || "N/A"}
+          Packages: ${shipmentData.packageBarcodes?.length || 0} items
+        `.trim();
+
+          Alert.alert("Shipment Found", infoText, [
+            { text: "OK", onPress: resetScanner },
+          ]);
+        } else {
+          Alert.alert(
+            "Not Found",
+            "No shipment or package found with this ID.",
+            [{ text: "Scan Again", onPress: resetScanner }],
+          );
+        }
+        return;
+      }
+
+      // ------------------------------------------
+      // MODE: LOAD/OFFLOAD (Cloud Function)
+      // ------------------------------------------
+      // The Cloud Function should already handle this logic internally,
+      // but if it doesn't, you might need to update it too.
+      // For now, we assume your 'scanPackages' function handles the lookup.
+
       const location = await getCurrentLocationSafe();
+
       const result = await scanPackages({
-        barcode: barcode, // ✅ Accepts string from Camera OR Text Input
+        barcode: barcode,
         mode: mode,
         ...(location ? { location } : {}),
       });
 
-      console.log("results: ", result);
-
       Alert.alert("Success", result.data.message, [
-        {
-          text: "Next",
-          onPress: () => {
-            setScanned(false);
-            setProcessing(false);
-            setManualCode(""); // Clear text field if used
-          },
-        },
+        { text: "Next", onPress: resetScanner },
       ]);
     } catch (error) {
-      Alert.alert("Error", error.message);
-      setScanned(false);
-      setProcessing(false);
+      console.error(error);
+      Alert.alert("Error", error.message || "Scan failed", [
+        { text: "Retry", onPress: resetScanner },
+      ]);
     }
+  };
+
+  const resetScanner = () => {
+    setScanned(false);
+    setProcessing(false);
   };
 
   const onCameraScan = ({ data }) => {
     if (!scanned && !processing) {
-      console.log("barcode", data);
       setScanned(true);
-      processPackage(data);
+      handleProcessPackage(data);
     }
+  };
+
+  const onManualSubmit = (code) => {
+    setShowManual(false);
+    handleProcessPackage(code);
   };
 
   return (
@@ -111,217 +160,32 @@ export default function ScannerScreen() {
         barcodeScannerSettings={{
           barcodeTypes: [
             "qr",
-            "ean13", // Standard retail products
-            "ean8", // Smaller retail products
-            "upc_e", // US products
-            "code128", // 📦 Very common for logistics/shipping labels
-            "code39", // Older logistics standard
-            "pdf417", // Complex labels (like on IDs or shipping manifests)
+            "ean13",
+            "ean8",
+            "upc_e",
+            "code128",
+            "code39",
+            "pdf417",
           ],
         }}
       >
-        <View style={styles.overlay}>
-          {processing && (
-            <ActivityIndicator
-              size="large"
-              color="#fff"
-              style={{ marginBottom: 20 }}
-            />
-          )}
-          <Text style={styles.overlayText}>Mode: {mode?.toUpperCase()}</Text>
-          <View
-            style={[styles.square, processing && { borderColor: "yellow" }]}
-          />
-          <Text style={styles.instruction}>
-            Scan individual package barcode
-          </Text>
-        </View>
+        <ScannerOverlay
+          processing={processing}
+          mode={mode}
+          onManualPress={() => setShowManual(true)}
+        />
       </CameraView>
 
-      <TouchableOpacity
-        style={styles.manualButton}
-        onPress={() => setShowManual(true)}
-      >
-        <FontAwesome name="keyboard-o" size={24} color="white" />
-        <Text style={styles.manualButtonText}>Enter ID Manually</Text>
-      </TouchableOpacity>
-
-      {/* 3. THE MANUAL INPUT POPUP (Modal) */}
-      {/* 3. THE MANUAL INPUT POPUP (Modal) */}
-      <Modal
-        animationType="slide"
-        transparent={true}
+      <ManualEntryModal
         visible={showManual}
-        onRequestClose={() => setShowManual(false)}
-      >
-        <KeyboardAvoidingView
-          behavior={Platform.OS === "ios" ? "padding" : "height"}
-          style={styles.modalOverlay}
-        >
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Manual Entry</Text>
-            <Text style={styles.modalSubtitle}>
-              Type the tracking number exactly
-            </Text>
-
-            <TextInput
-              style={styles.input}
-              placeholder="AT-2026..."
-              placeholderTextColor="#94a3b8"
-              value={manualCode}
-              onChangeText={setManualCode}
-              autoCapitalize="characters"
-              autoCorrect={false}
-            />
-
-            {/* ACTION BUTTONS: Row Layout */}
-            <View style={styles.modalActions}>
-              {/* Cancel Button */}
-              <TouchableOpacity
-                style={[styles.actionBtn, styles.cancelBtn]}
-                onPress={() => setShowManual(false)}
-              >
-                <Text style={styles.cancelText}>CANCEL</Text>
-              </TouchableOpacity>
-
-              {/* Submit Button */}
-              <TouchableOpacity
-                style={[styles.actionBtn, styles.submitBtn]}
-                onPress={() => {
-                  setShowManual(false);
-                  processPackage(manualCode);
-                }}
-              >
-                <Text style={styles.submitText}>SUBMIT</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </KeyboardAvoidingView>
-      </Modal>
+        onClose={() => setShowManual(false)}
+        onSubmit={onManualSubmit}
+      />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  center: { flex: 1, justifyContent: "center", alignItems: "center" },
   camera: { flex: 1 },
-  overlay: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.6)",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  overlayText: {
-    color: "white",
-    fontSize: 24,
-    fontWeight: "900",
-    marginBottom: 40,
-    top: -50,
-    textShadowColor: "black",
-    textShadowRadius: 10,
-  },
-  instruction: {
-    color: "#e2e8f0",
-    marginTop: 20,
-    fontSize: 14,
-  },
-  square: {
-    width: 260,
-    height: 260,
-    borderWidth: 4,
-    borderColor: "#2563eb",
-    borderRadius: 20,
-    backgroundColor: "transparent",
-  },
-  link: { color: "blue", marginTop: 10, fontWeight: "bold" },
-  manualButton: {
-    position: "absolute",
-    bottom: 50,
-    alignSelf: "center",
-    backgroundColor: "rgba(0,0,0,0.8)",
-    flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    borderRadius: 30,
-    borderWidth: 1,
-    borderColor: "white",
-  },
-  manualButtonText: {
-    color: "white",
-    fontWeight: "bold",
-    marginLeft: 10,
-  },
-  modalOverlay: {
-    flex: 1, // Takes up full screen height
-    justifyContent: "flex-end", // 👈 Pushes everything to the BOTTOM
-    backgroundColor: "rgba(0,0,0,0.5)",
-  },
-
-  modalContent: {
-    backgroundColor: "white",
-    padding: 24,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    width: "100%",
-
-    // Optional: Add safe area padding for iPhone Home Indicator
-    paddingBottom: 40,
-  },
-  modalTitle: {
-    fontSize: 20,
-    fontWeight: "800",
-    color: "#0f172a",
-    marginBottom: 4,
-    textAlign: "center",
-  },
-  modalSubtitle: {
-    color: "#64748b",
-    fontSize: 14,
-    textAlign: "center",
-    marginBottom: 20,
-  },
-  input: {
-    backgroundColor: "#f1f5f9",
-    borderWidth: 1,
-    borderColor: "#e2e8f0",
-    borderRadius: 12,
-    padding: 16,
-    fontSize: 18,
-    fontWeight: "600",
-    color: "#0f172a",
-    textAlign: "center",
-    marginBottom: 24,
-  },
-
-  // 🛠️ KEY LAYOUT FIXES START HERE
-  modalActions: {
-    flexDirection: "row", // Put them side by side
-    gap: 12, // Space between them
-    width: "100%",
-  },
-  actionBtn: {
-    flex: 1, // 👈 This makes them stretch to fill the row
-    height: 50,
-    borderRadius: 12,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  cancelBtn: {
-    backgroundColor: "#fff",
-    borderWidth: 1,
-    borderColor: "#cbd5e1",
-  },
-  submitBtn: {
-    backgroundColor: "#3b82f6", // Atlas Blue
-  },
-  cancelText: {
-    fontWeight: "700",
-    color: "#64748b",
-  },
-  submitText: {
-    fontWeight: "700",
-    color: "#fff",
-  },
 });

@@ -141,6 +141,7 @@ export default function CheckerIndex() {
         <OperationsGrid
           onScanLoad={() => goToScan("loading", "Load Truck")}
           onScanOffload={() => goToScan("delivering", "Offload Items")}
+          onScanInfo={() => goToScan("info", "Information")}
         />
       </ScrollView>
     </SafeAreaView>

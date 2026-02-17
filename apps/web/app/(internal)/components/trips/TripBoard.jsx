@@ -177,7 +177,7 @@ export default function TripBoard({ user, userRole, profile }) {
             className="hidden sm:flex bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-lg text-sm font-medium items-center gap-2 shadow-lg shadow-emerald-500/20 transition-all"
           >
             <FontAwesomeIcon icon={faPlus} />
-            <span>Create Trip</span>
+            <span>Trip</span>
           </button>
         </div>
       </div>
