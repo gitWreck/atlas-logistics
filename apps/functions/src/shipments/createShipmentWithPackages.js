@@ -38,7 +38,7 @@ exports.createShipmentWithPackages = onCall(
       location, // Optional { lat, lng } for initial status location
       notifySms,
       manualShipmentId,
-      imageUrls = [],
+      proofOfReceipt = [],
     } = request.data || {};
 
     // --- VALIDATION ---
@@ -218,7 +218,7 @@ exports.createShipmentWithPackages = onCall(
       },
 
       remarks: remarks || null,
-      imageUrls: imageUrls,
+      proofOfReceipt: proofOfReceipt,
 
       // *** THE CRITICAL CHANGE ***
       // We store the data here instead of subcollections

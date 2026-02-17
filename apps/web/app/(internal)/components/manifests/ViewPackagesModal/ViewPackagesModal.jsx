@@ -134,7 +134,7 @@ export default function ViewPackagesModal({
       setIsSaving(true);
       const updateFn = httpsCallable(functions, "updateShipmentPackages");
 
-      await updateFn({
+      await updateShipmentPackages({
         shipmentId: shipment.id,
         packages: updatedPackages,
       });

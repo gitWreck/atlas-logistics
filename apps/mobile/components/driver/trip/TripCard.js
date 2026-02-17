@@ -1,5 +1,11 @@
 import React from "react";
-import { View, Text, TouchableOpacity, StyleSheet, Platform } from "react-native";
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  StyleSheet,
+  Platform,
+} from "react-native";
 import { FontAwesome5 } from "@expo/vector-icons";
 import StatusBadge from "../../ui/figma/StatusBadge";
 import { Image } from "expo-image";
@@ -31,46 +37,46 @@ const TripCard = ({ trip, onPress, actionLabel = "View Trip" }) => {
         <StatusBadge status={trip.status} />
       </View>
 
-      {/* From: row1 = icon + label (fixed gap); row2 = spacer + value (aligned with icon) */}
-      <View style={styles.locationBlock}>
-        
-        <View style={styles.locationRow1}>
-          <View style={styles.iconColumn}>
-            <FontAwesome5
-              name="map-marker-alt"
-              size={14}
-              color={LABEL_GREY}
-              style={styles.locationIcon}
-            />
+      <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+        {/* From: row1 = icon + label (fixed gap); row2 = spacer + value (aligned with icon) */}
+        <View style={[styles.locationBlock, { flex: 1 }]}>
+          <View style={styles.locationRow1}>
+            <View style={styles.iconColumn}>
+              <FontAwesome5
+                name="map-marker-alt"
+                size={14}
+                color={LABEL_GREY}
+                style={styles.locationIcon}
+              />
+            </View>
+            <Text style={[styles.label, styles.labelInRow]}>From</Text>
           </View>
-          <Text style={[styles.label, styles.labelInRow]}>From</Text>
-        </View>
 
-        <View style={styles.locationRow2}>
-          <Text style={styles.locationValue} numberOfLines={1}>
-            {trip.origin || "—"}
-          </Text>
-        </View>
-
-      </View>
-
-      {/* To: same layout */}
-      <View style={styles.locationBlock}>
-        <View style={styles.locationRow1}>
-          <View style={styles.iconColumn}>
-            <FontAwesome5
-              name="map-marker-alt"
-              size={14}
-              color={LABEL_GREY}
-              style={styles.locationIcon}
-            />
+          <View style={styles.locationRow2}>
+            <Text style={styles.locationValue} numberOfLines={1}>
+              {trip.origin || "—"}
+            </Text>
           </View>
-          <Text style={[styles.label, styles.labelInRow]}>To</Text>
         </View>
-        <View style={styles.locationRow2}>
-          <Text style={styles.locationValue} numberOfLines={1}>
-            {trip.destination || "—"}
-          </Text>
+
+        {/* To: same layout */}
+        <View style={[styles.locationBlock, { flex: 1 }]}>
+          <View style={styles.locationRow1}>
+            <View style={styles.iconColumn}>
+              <FontAwesome5
+                name="map-marker-alt"
+                size={14}
+                color={LABEL_GREY}
+                style={styles.locationIcon}
+              />
+            </View>
+            <Text style={[styles.label, styles.labelInRow]}>To</Text>
+          </View>
+          <View style={styles.locationRow2}>
+            <Text style={styles.locationValue} numberOfLines={1}>
+              {trip.destination || "—"}
+            </Text>
+          </View>
         </View>
       </View>
 

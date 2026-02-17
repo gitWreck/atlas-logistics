@@ -36,39 +36,50 @@ const TripSummaryCard = ({ trip }) => {
 
       <View style={styles.separator} />
 
-      {/* From */}
-      <View style={styles.locationBlock}>
-        <View style={styles.locationRow1}>
-          <View style={styles.iconColumn}>
-            <Image
-              source={require("../../../assets/icons/location.svg")}
-              style={[styles.locationIcon, { width: 16, height: 16, tintColor: LABEL_GREY }]}
-            />
+      <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+        {/* From */}
+        <View
+          style={[styles.locationBlock, { flex: 1 }]}
+          // style={styles.locationBlock}
+        >
+          <View style={styles.locationRow1}>
+            <View style={styles.iconColumn}>
+              <Image
+                source={require("../../../assets/icons/location.svg")}
+                style={[
+                  styles.locationIcon,
+                  { width: 16, height: 16, tintColor: LABEL_GREY },
+                ]}
+              />
+            </View>
+            <Text style={[styles.label, styles.labelInRow]}>From</Text>
           </View>
-          <Text style={[styles.label, styles.labelInRow]}>From</Text>
+          <View style={styles.locationRow2}>
+            <Text style={styles.locationValue} numberOfLines={1}>
+              {trip.origin || "—"}
+            </Text>
+          </View>
         </View>
-        <View style={styles.locationRow2}>
-          <Text style={styles.locationValue} numberOfLines={1}>
-            {trip.origin || "—"}
-          </Text>
-        </View>
-      </View>
 
-      {/* To */}
-      <View style={[{...styles.locationBlock, marginTop: 15}]}>
-        <View style={styles.locationRow1}>
-          <View style={styles.iconColumn}>
-            <Image
-              source={require("../../../assets/icons/location.svg")}
-              style={[styles.locationIcon, { width: 16, height: 16, tintColor: LABEL_GREY }]}
-            />
+        {/* To */}
+        <View style={[styles.locationBlock, { flex: 1 }]}>
+          <View style={styles.locationRow1}>
+            <View style={styles.iconColumn}>
+              <Image
+                source={require("../../../assets/icons/location.svg")}
+                style={[
+                  styles.locationIcon,
+                  { width: 16, height: 16, tintColor: LABEL_GREY },
+                ]}
+              />
+            </View>
+            <Text style={[styles.label, styles.labelInRow]}>To</Text>
           </View>
-          <Text style={[styles.label, styles.labelInRow]}>To</Text>
-        </View>
-        <View style={styles.locationRow2}>
-          <Text style={styles.locationValue} numberOfLines={1}>
-            {trip.destination || "—"}
-          </Text>
+          <View style={styles.locationRow2}>
+            <Text style={styles.locationValue} numberOfLines={1}>
+              {trip.destination || "—"}
+            </Text>
+          </View>
         </View>
       </View>
 

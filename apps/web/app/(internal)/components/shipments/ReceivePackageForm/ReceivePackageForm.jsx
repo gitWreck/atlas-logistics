@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faBoxOpen,
@@ -59,6 +59,9 @@ export default function ReceivePackageForm({ profile, onNext, initialData }) {
   // We use initialData.imageFiles if coming back from Step 2, else empty
   const [imageFiles, setImageFiles] = useState(initialData?.imageFiles || []);
   const [previews, setPreviews] = useState(initialData?.previews || []);
+  const [isCameraOpen, setIsCameraOpen] = useState(false);
+  const videoRef = useRef(null);
+  const canvasRef = useRef(null);
 
   // --- Logic Helpers ---
   useEffect(() => {
@@ -109,6 +112,88 @@ export default function ReceivePackageForm({ profile, onNext, initialData }) {
     setImageFiles((prev) => prev.filter((_, i) => i !== index));
     setPreviews((prev) => prev.filter((_, i) => i !== index));
   };
+
+  // 1. Safer Stop Function
+  const stopCamera = () => {
+    if (videoRef.current && videoRef.current.srcObject) {
+      const tracks = videoRef.current.srcObject.getTracks();
+      tracks.forEach((track) => track.stop());
+      videoRef.current.srcObject = null;
+    }
+    setIsCameraOpen(false);
+  };
+
+  // 2. Safer Start Function
+  const startCamera = async () => {
+    // Force stop any existing streams first
+    stopCamera();
+    setIsCameraOpen(true);
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: "environment" }, // Prefers back camera
+      });
+
+      // Delay slightly to ensure the modal DOM exists
+      setTimeout(() => {
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+        }
+      }, 100);
+    } catch (err) {
+      console.error("Camera error:", err);
+      setIsCameraOpen(false);
+
+      // Specific error handling
+      if (err.name === "NotReadableError") {
+        alert(
+          "Camera is currently in use by another application. Please close other apps/tabs and try again.",
+        );
+      } else if (err.name === "NotAllowedError") {
+        alert(
+          "Camera permission denied. Please allow camera access in your browser settings.",
+        );
+      } else {
+        alert(`Error starting camera: ${err.message}`);
+      }
+    }
+  };
+
+  const capturePhoto = () => {
+    if (videoRef.current && canvasRef.current) {
+      const video = videoRef.current;
+      const canvas = canvasRef.current;
+
+      // Match dimensions
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+
+      // Draw
+      const context = canvas.getContext("2d");
+      context.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+      // Convert to File
+      canvas.toBlob((blob) => {
+        if (!blob) return;
+        const file = new File([blob], `capture_${Date.now()}.jpg`, {
+          type: "image/jpeg",
+        });
+
+        // Reuse existing handler by mocking an event
+        const pseudoEvent = { target: { files: [file] } };
+        handleImageSelect(pseudoEvent);
+
+        stopCamera();
+      }, "image/jpeg");
+    }
+  };
+
+  useEffect(() => {
+    // This runs when the component unmounts or modal closes
+    return () => {
+      stopCamera();
+    };
+  }, []);
 
   const handleWarehouseChange = (type, value) => {
     const { WAREHOUSES } = require("@/app/utility/WarehouseData");
@@ -231,22 +316,37 @@ export default function ReceivePackageForm({ profile, onNext, initialData }) {
               </span>
             </div>
 
-            <div className="flex gap-4 items-start overflow-x-auto pb-2 sm:pb-0">
-              {/* Upload Button */}
+            <div className="flex gap-4 items-start overflow-x-auto pb-2 sm:pb-0 custom-scrollbar">
+              {/* BUTTON GROUP: Show if less than 3 images */}
               {imageFiles.length < 3 && (
-                <label className="shrink-0 w-20 h-20 sm:w-24 sm:h-24 flex flex-col items-center justify-center bg-slate-900 border-2 border-dashed border-slate-700 rounded-xl cursor-pointer hover:border-blue-500 hover:text-blue-500 transition-colors text-slate-500">
-                  <FontAwesomeIcon icon={faCamera} className="text-xl mb-1" />
-                  <span className="text-[9px] sm:text-[10px] font-bold">
-                    Add Photo
-                  </span>
-                  <input
-                    type="file"
-                    accept="image/*"
-                    multiple
-                    className="hidden"
-                    onChange={handleImageSelect}
-                  />
-                </label>
+                <div className="flex gap-3 shrink-0">
+                  {/* 1. UPLOAD FILE BUTTON */}
+                  <label className="w-20 h-20 sm:w-24 sm:h-24 flex flex-col items-center justify-center bg-slate-900 border-2 border-dashed border-slate-700 rounded-xl cursor-pointer hover:border-blue-500 hover:text-blue-500 transition-colors text-slate-500">
+                    <FontAwesomeIcon icon={faImage} className="text-xl mb-1" />
+                    <span className="text-[9px] sm:text-[10px] font-bold">
+                      Upload
+                    </span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      multiple
+                      className="hidden"
+                      onChange={handleImageSelect}
+                    />
+                  </label>
+
+                  {/* 2. CAMERA BUTTON */}
+                  <button
+                    type="button"
+                    onClick={startCamera}
+                    className="w-20 h-20 sm:w-24 sm:h-24 flex flex-col items-center justify-center bg-slate-900 border-2 border-dashed border-slate-700 rounded-xl cursor-pointer hover:border-emerald-500 hover:text-emerald-500 transition-colors text-slate-500"
+                  >
+                    <FontAwesomeIcon icon={faCamera} className="text-xl mb-1" />
+                    <span className="text-[9px] sm:text-[10px] font-bold">
+                      Camera
+                    </span>
+                  </button>
+                </div>
               )}
 
               {/* Previews */}
@@ -296,6 +396,43 @@ export default function ReceivePackageForm({ profile, onNext, initialData }) {
           <FontAwesomeIcon icon={faArrowRight} />
         </button>
       </div>
+
+      {/* --- CAMERA OVERLAY MODAL --- */}
+      {isCameraOpen && (
+        <div className="fixed inset-0 z-[60] bg-black flex flex-col animate-in fade-in duration-200">
+          {/* Header */}
+          <div className="absolute top-0 left-0 right-0 p-4 flex justify-between items-center bg-gradient-to-b from-black/80 to-transparent z-10">
+            <span className="text-white font-bold text-sm">Take Photo</span>
+            <button
+              onClick={stopCamera}
+              className="text-white bg-white/20 hover:bg-white/30 rounded-full w-8 h-8 flex items-center justify-center backdrop-blur-md"
+            >
+              ✕
+            </button>
+          </div>
+
+          {/* Video Stream */}
+          <div className="flex-1 flex items-center justify-center bg-black overflow-hidden relative">
+            <video
+              ref={videoRef}
+              autoPlay
+              playsInline
+              className="w-full h-full object-cover"
+            />
+            {/* Hidden Canvas for capture */}
+            <canvas ref={canvasRef} className="hidden" />
+          </div>
+
+          {/* Capture Footer */}
+          <div className="p-8 bg-black flex justify-center items-center pb-12">
+            <button
+              type="button"
+              onClick={capturePhoto}
+              className="w-16 h-16 rounded-full bg-white border-4 border-slate-300 shadow-lg hover:scale-105 active:scale-95 transition-transform"
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

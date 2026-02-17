@@ -3,39 +3,65 @@ import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
 import { FontAwesome5 } from "@expo/vector-icons";
 import StatusBadge from "../../ui/StatusBadge"; // Adjust path
 
-export default function PackageListItem({ item, onPress }) {
+export default function PackageListItem({
+  item,
+  onMenuPress,
+  onLongPress,
+  selected,
+}) {
   const isDelivered = item.status === "DELIVERED";
 
   return (
     <TouchableOpacity
       style={[
         styles.listItem,
-        isDelivered && { borderColor: "#bbf7d0" }, // Green border if done
+        isDelivered && styles.deliveredBorder,
+        selected && styles.selectedBorder,
       ]}
-      onPress={() => onPress(item)}
+      onLongPress={() => onLongPress(item)} // ✅ Hold to Select
+      onPress={() => selected && onLongPress(item)} // Tap toggles if already in selection mode
+      activeOpacity={0.7}
+      delayLongPress={300} // Sensitivity for "Hold"
     >
-      {/* Icon */}
+      {/* Left: Icon */}
       <View
         style={[
           styles.iconCircle,
-          isDelivered && { backgroundColor: "#dcfce7" },
+          isDelivered && styles.deliveredIconBg,
+          selected && styles.selectedIconBg,
         ]}
       >
         <FontAwesome5
-          name={isDelivered ? "check" : "box-open"}
+          name={selected ? "check" : "box-open"}
           size={16}
-          color={isDelivered ? "#166534" : "#64748b"}
+          color={selected ? "#ffffff" : isDelivered ? "#166534" : "#64748b"}
         />
       </View>
 
-      {/* Text Info */}
+      {/* Center: Text Info */}
       <View style={{ flex: 1 }}>
-        <Text style={styles.itemTitle}>{item.trackingNumber}</Text>
-        <Text style={styles.itemSub}>Tap to update</Text>
+        <Text style={[styles.itemTitle, selected && styles.selectedText]}>
+          {item.trackingNumber}
+        </Text>
+        <Text style={styles.itemSub}>
+          {selected ? "Selected" : item.status}
+        </Text>
       </View>
 
-      {/* Status Badge */}
-      <StatusBadge status={item.status} />
+      {/* Right: Actions */}
+      <View style={styles.rightActionRow}>
+        {/* Status Badge (Hide if selected to reduce clutter) */}
+        {!selected && <StatusBadge status={item.status} />}
+
+        {/* ✅ Three Dot Menu Button */}
+        <TouchableOpacity
+          style={styles.menuBtn}
+          onPress={() => onMenuPress(item)}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }} // Easier to tap
+        >
+          <FontAwesome5 name="ellipsis-v" size={16} color="#94a3b8" />
+        </TouchableOpacity>
+      </View>
     </TouchableOpacity>
   );
 }
@@ -43,25 +69,58 @@ export default function PackageListItem({ item, onPress }) {
 const styles = StyleSheet.create({
   listItem: {
     flexDirection: "row",
-    justifyContent: "space-between",
-    padding: 16,
-    backgroundColor: "#ffffff",
-    marginHorizontal: 16,
-    marginBottom: 8,
-    borderRadius: 12,
     alignItems: "center",
+    padding: 12, // Reduced padding slightly to fit menu
+    backgroundColor: "#ffffff",
+    // marginHorizontal: 16,
+    // marginBottom: 8,
+    borderRadius: 12,
     gap: 12,
-    borderWidth: 1,
-    borderColor: "#cbd5e1",
+    borderWidth: 2, // Consistent border width
+    borderColor: "#e2e8f0", // Default gray
+  },
+  deliveredBorder: {
+    borderColor: "#bbf7d0", // Green border
+  },
+  selectedBorder: {
+    // borderColor: "#3b82f6", // Blue border
+    backgroundColor: "#eff6ff", // Light blue bg
   },
   iconCircle: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: "#e5f2ff",
+    backgroundColor: "#f1f5f9",
     alignItems: "center",
     justifyContent: "center",
   },
-  itemTitle: { fontWeight: "700", color: "#0f172a" },
-  itemSub: { color: "#64748b", fontSize: 10 },
+  deliveredIconBg: {
+    backgroundColor: "#dcfce7",
+  },
+  selectedIconBg: {
+    backgroundColor: "#3b82f6",
+  },
+  selectedText: {
+    color: "#1e3a8a",
+    fontWeight: "bold",
+  },
+  itemTitle: {
+    fontWeight: "700",
+    color: "#0f172a",
+    fontSize: 14,
+  },
+  itemSub: {
+    color: "#64748b",
+    fontSize: 11,
+    marginTop: 2,
+  },
+  rightActionRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  menuBtn: {
+    padding: 8,
+    paddingRight: 0, // Align right
+  },
 });

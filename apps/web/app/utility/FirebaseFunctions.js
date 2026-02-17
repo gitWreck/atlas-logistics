@@ -51,6 +51,10 @@ export const verifyTripManifest = httpsCallable(
   "verifyTripManifest",
 );
 export const reopenTrip = httpsCallable(functions, "reopentrip");
+export const unlockTripManifest = httpsCallable(
+  functions,
+  "unlockTripManifest",
+);
 
 export const bulkAssignShipments = httpsCallable(
   functions,

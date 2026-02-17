@@ -82,6 +82,8 @@ async function syncOneShipmentToPublic(shipmentId, shipmentData) {
     // Progress Data (From Shipment Totals)
     totalPackages: shipmentData.totals?.totalPackages || 0,
     itemsDelivered: shipmentData.totals?.delivered || 0,
+    proofOfReceipt: shipmentData.proofOfReceipt,
+    proofOfDelivery: shipmentData.proofOfDelivery,
 
     // Trip Context (Merged from above)
     ...tripContext,

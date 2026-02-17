@@ -96,9 +96,9 @@ export default function TrackingPage() {
             data={{
               ...data,
               // 1. DUMMY IMAGES FOR TESTING
-              images: [
-                "https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?q=80&w=2070&auto=format&fit=crop",
-              ],
+              // images: [
+              //   "https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?q=80&w=2070&auto=format&fit=crop",
+              // ],
               // 2. DUMMY STATS (If real data is missing)
               // totals: data.totals || {
               //   totalItems: 15,

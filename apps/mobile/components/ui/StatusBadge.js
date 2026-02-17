@@ -19,6 +19,11 @@ const COLORS = {
     text: "#cbd5e1",
     border: "#94a3b8",
   },
+  ARRIVED: {
+    bg: "rgba(97, 40, 231, 0.91)", // Slate
+    text: "#f0f0f0ff",
+    border: "rgba(138, 111, 202, 0.91)",
+  },
 
   // Existing Package Statuses
   DELIVERED: {

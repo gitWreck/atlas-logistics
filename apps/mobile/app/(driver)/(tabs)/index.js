@@ -48,7 +48,13 @@ export default function DriverDashboard() {
       const activeQuery = query(
         collection(db, "truck_trips"),
         where("driverId", "==", uid),
-        where("status", "in", ["CREATED", "ASSIGNED", "LOADED", "IN_TRANSIT"]),
+        where("status", "in", [
+          // "CREATED",
+          "ASSIGNED",
+          "LOADED",
+          "IN_TRANSIT",
+          "ARRIVED",
+        ]),
       );
 
       const completedQuery = query(
@@ -93,7 +99,11 @@ export default function DriverDashboard() {
   const filteredTrips = useMemo(() => {
     return allTrips.filter((trip) => {
       if (activeTab === "Active") {
-        return trip.status === "IN_TRANSIT" || trip.status === "LOADED";
+        return (
+          trip.status === "IN_TRANSIT" ||
+          trip.status === "LOADED" ||
+          trip.status === "ARRIVED"
+        );
       }
       if (activeTab === "Upcoming") {
         return trip.status === "ASSIGNED" || trip.status === "CREATED";
@@ -108,9 +118,10 @@ export default function DriverDashboard() {
   const handleViewTrip = (trip) => {
     console.log("TRIP DETAILS: ", trip);
     if (
-      trip.status === "IN_TRANSIT" ||
+      trip.status === "ASSIGNED" ||
       trip.status === "LOADED" ||
-      trip.status === "CREATED"
+      trip.status === "IN_TRANSIT" ||
+      trip.status === "ARRIVED"
     ) {
       router.push({
         pathname: "/(driver)/trip-details",
