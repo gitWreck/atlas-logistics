@@ -98,7 +98,28 @@ const DestinationCard = ({ group }) => {
                 )}
               </td>
               <td className="px-4 py-2 text-right font-bold text-slate-900">
-                {item.packageCount}
+                {/* {item.packageCount} */}
+                {item.descriptionBreakdown &&
+                item.descriptionBreakdown.length > 0 ? (
+                  <div className="flex flex-col items-end gap-0.5">
+                    {item.descriptionBreakdown.map((line, idx) => (
+                      <div key={idx} className="text-[10px] whitespace-nowrap">
+                        <span className="text-slate-500 font-medium">
+                          {line.desc}:{" "}
+                        </span>
+                        <span className="text-slate-900">{line.count}</span>
+                      </div>
+                    ))}
+                    {/* Optional: Show Total line if multiple types exist */}
+                    {item.descriptionBreakdown.length > 1 && (
+                      <div className="border-t border-slate-200 mt-1 pt-1 text-[10px]">
+                        Total: {item.packageCount}
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  item.packageCount
+                )}
               </td>
             </tr>
           ))}
@@ -167,6 +188,26 @@ function ManifestContent() {
           ship.packages?.length || ship.totals?.totalItems || 0;
         totalPackages += itemsCount;
 
+        // --- NEW: Calculate Description Breakdown ---
+        const descCounts = {};
+        if (ship.packages && Array.isArray(ship.packages)) {
+          ship.packages.forEach((p) => {
+            // Use description or fallback to "Standard Pkg"
+            const d = p.description ? p.description.trim() : "Standard Pkg";
+            descCounts[d] = (descCounts[d] || 0) + 1;
+          });
+        }
+
+        // Convert object to array for easier rendering: [{desc: "Box", count: 2}, ...]
+        const descriptionBreakdown = Object.entries(descCounts).map(
+          ([k, v]) => ({
+            desc: k,
+            count: v,
+          }),
+        );
+
+        // ----------------------
+
         if (!groupedDestinations[destCode]) {
           groupedDestinations[destCode] = {
             destination: ship.destinationCity || destCode,
@@ -179,6 +220,8 @@ function ManifestContent() {
           trackingNumber: ship.trackingNumber,
           packageCount: itemsCount,
           note: ship.packages?.some((p) => p.isFragile) ? "Fragile" : "",
+
+          descriptionBreakdown: descriptionBreakdown, // <--- Add this new field
         });
       });
 
