@@ -23,7 +23,7 @@ import { FontAwesome5 } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import MapView, { Marker, PROVIDER_DEFAULT } from "react-native-maps";
 
-import { db } from "../../../firebase";
+import { db } from "../../firebase";
 
 // Hardcoded package location for Divisoria (updated coordinates)
 const PACKAGE_LOCATION = {
@@ -32,7 +32,6 @@ const PACKAGE_LOCATION = {
   latitudeDelta: 0.02,
   longitudeDelta: 0.02,
 };
-
 
 const BLUE = "#155DFC";
 const GREY = "#94a3b8";
@@ -92,7 +91,10 @@ export default function CustomerTrackingDetailsScreen() {
   const mapRef = useRef(null);
 
   const normalizedTracking = useMemo(
-    () => String(trackingId || "").trim().toUpperCase(),
+    () =>
+      String(trackingId || "")
+        .trim()
+        .toUpperCase(),
     [trackingId],
   );
 
@@ -323,7 +325,10 @@ export default function CustomerTrackingDetailsScreen() {
       <SafeAreaView style={styles.container}>
         <StatusBar style="dark" />
         <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
+          <TouchableOpacity
+            onPress={() => router.back()}
+            style={styles.backBtn}
+          >
             <Image
               source={require("../../../assets/icons/back.svg")}
               style={{ width: 20, height: 20 }}
@@ -422,8 +427,7 @@ export default function CustomerTrackingDetailsScreen() {
             >
               {statusHistoryLocations.length > 0 ? (
                 statusHistoryLocations.map((coord, index) => {
-                  const isLatest =
-                    index === statusHistoryLocations.length - 1;
+                  const isLatest = index === statusHistoryLocations.length - 1;
                   return (
                     <Marker
                       key={`history-${index}`}
@@ -517,7 +521,9 @@ export default function CustomerTrackingDetailsScreen() {
                   </Text>
                   {hasLocation && (
                     <Text style={styles.timelineLocationHint}>
-                      {isSelected ? "Showing this stop on map" : "Tap to view on map"}
+                      {isSelected
+                        ? "Showing this stop on map"
+                        : "Tap to view on map"}
                     </Text>
                   )}
                 </View>
@@ -864,4 +870,3 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
 });
-

@@ -1,5 +1,11 @@
 import React from "react";
-import { View, Text, TouchableOpacity, StyleSheet, Platform } from "react-native";
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  StyleSheet,
+  Platform,
+} from "react-native";
 import { FontAwesome5 } from "@expo/vector-icons";
 import { COLORS } from "../../components/constants/theme"; // Adjust path
 import StatusBadge from "../../components/ui/StatusBadge"; // Adjust path
@@ -36,7 +42,7 @@ const CheckerTripCard = ({ trip, onPress }) => {
       {/* PROGRESS SECTION */}
       <View style={styles.progressContainer}>
         <View style={styles.progressRow}>
-          <Text style={styles.progressLabel}>Loading Status</Text>
+          <Text style={styles.progressLabel}>Status</Text>
           <Text style={styles.progressValue}>
             {loaded} / {total} Items
           </Text>

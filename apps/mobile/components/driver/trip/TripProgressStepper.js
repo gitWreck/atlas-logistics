@@ -1,26 +1,21 @@
 import React from "react";
 import { View, Text, StyleSheet } from "react-native";
 import { Image } from "expo-image";
+import { FontAwesome5 } from "@expo/vector-icons";
+import { DRIVER_STEPS } from "../../constants/tracking-constants";
 
 const BLUE = "#155DFC";
 const GREY = "#94a3b8";
 const GREY_LINE = "#e2e8f0";
 const SEPARATOR = "#e5e7eb";
 
-const steps = [
-  { key: "RECEIVED", label: "Received", source: require("../../../assets/icons/picked-requested.svg") },
-  { key: "LOADED", label: "Loaded", source: require("../../../assets/icons/picked-up.svg") },
-  { key: "IN_TRANSIT", label: "In Transit", source: require("../../../assets/icons/in-transit.svg") },
-  { key: "OUT_FOR_DELIVERY", label: "Out for Delivery", source: require("../../../assets/icons/out-for-delivery.svg") },
-  { key: "DELIVERED", label: "Delivered", source: require("../../../assets/icons/delivered.png") },
-];
-
 const TripProgressStepper = ({ currentStatus }) => {
   const s = (currentStatus || "").toUpperCase();
   let activeIndex = 0;
-  if (s === "COMPLETED" || s === "DELIVERED") activeIndex = 4;
-  else if (s === "DELIVERING" || s === "OUT_FOR_DELIVERY") activeIndex = 3;
-  else if (s === "IN_TRANSIT") activeIndex = 2;
+  if (s === "COMPLETED" || s === "DELIVERED") activeIndex = 5;
+  else if (s === "DELIVERING" || s === "OUT_FOR_DELIVERY") activeIndex = 4;
+  else if (s === "IN_TRANSIT") activeIndex = 3;
+  else if (s === "ARRIVED") activeIndex = 2;
   else if (s === "LOADED") activeIndex = 1;
   else activeIndex = 0;
 
@@ -31,9 +26,9 @@ const TripProgressStepper = ({ currentStatus }) => {
       <View style={styles.separator} />
 
       <View style={styles.verticalTimeline}>
-        {steps.map((step, index) => {
+        {DRIVER_STEPS.map((step, index) => {
           const isCompletedOrCurrent = index <= activeIndex;
-          const isLast = index === steps.length - 1;
+          const isLast = index === DRIVER_STEPS.length - 1;
           const lineActive = index < activeIndex;
 
           return (
@@ -42,22 +37,35 @@ const TripProgressStepper = ({ currentStatus }) => {
                 <View
                   style={[
                     styles.circle,
-                    isCompletedOrCurrent ? styles.circleActive : styles.circleInactive,
+                    isCompletedOrCurrent
+                      ? styles.circleActive
+                      : styles.circleInactive,
                   ]}
                 >
-                  <Image
+                  {/* <Image
                     source={step.source}
                     style={[
                       styles.stepIcon,
                       { tintColor: isCompletedOrCurrent ? "#fff" : GREY },
                     ]}
+                  /> */}
+                  <FontAwesome5
+                    name={step.icon}
+                    size={12}
+                    style={[
+                      styles.stepIcon,
+                      { tintColor: isCompletedOrCurrent ? "#fff" : GREY },
+                    ]}
+                    color={currentStatus === step.key ? "#3b82f6" : "#cbd5e1"}
                   />
                 </View>
                 {!isLast && (
                   <View
                     style={[
                       styles.connector,
-                      lineActive ? styles.connectorActive : styles.connectorInactive,
+                      lineActive
+                        ? styles.connectorActive
+                        : styles.connectorInactive,
                     ]}
                   />
                 )}
@@ -66,7 +74,9 @@ const TripProgressStepper = ({ currentStatus }) => {
                 <Text
                   style={[
                     styles.stepLabel,
-                    isCompletedOrCurrent ? styles.stepLabelActive : styles.stepLabelInactive,
+                    isCompletedOrCurrent
+                      ? styles.stepLabelActive
+                      : styles.stepLabelInactive,
                   ]}
                 >
                   {step.label}
@@ -133,10 +143,11 @@ const styles = StyleSheet.create({
   stepIcon: {
     width: 13,
     height: 13,
+    size: 8,
   },
   connector: {
     width: 2,
-    height: 58,
+    height: 18,
     marginVertical: 8,
   },
   connectorActive: { backgroundColor: BLUE },

@@ -6,12 +6,17 @@ import { LinearGradient } from "expo-linear-gradient";
 
 const GRADIENT_COLORS = ["#042C83", "#07B9F4"];
 
-export default function OperationsGrid({ onScanLoad, onScanOffload }) {
+export default function OperationsGrid({
+  onScanLoad,
+  onScanOffload,
+  onScanInfo, // <--- New Prop
+}) {
   return (
     <View style={styles.container}>
       <Text style={styles.sectionTitle}>Operations</Text>
 
       <View style={styles.gridContainer}>
+        {/* ROW 1: Load & Offload */}
         <View style={styles.row}>
           {/* A. LOAD TRUCK */}
           <TouchableOpacity
@@ -45,8 +50,8 @@ export default function OperationsGrid({ onScanLoad, onScanOffload }) {
             ]}
             onPress={onScanOffload}
           >
-            <View style={[styles.iconCircle, { backgroundColor: "#d1d5db" }]}>
-              <FontAwesome5 name="dolly" size={24} color="#fff" />
+            <View style={[styles.iconCircle, { backgroundColor: "#f1f5f9" }]}>
+              <FontAwesome5 name="dolly" size={24} color="#64748b" />
             </View>
             <Text style={[styles.btnTitle, styles.btnTitleSecondary]}>
               OFFLOAD
@@ -57,11 +62,31 @@ export default function OperationsGrid({ onScanLoad, onScanOffload }) {
           </TouchableOpacity>
         </View>
 
-        {/* C. Placeholder (for future expansion) */}
+        {/* ROW 2: Scan Info */}
         <View style={styles.row}>
-          <View style={styles.cardPlaceholder}>
-            <FontAwesome5 name="plus" size={24} color="#334155" />
-          </View>
+          {/* C. SCAN INFO (New Button) */}
+          <TouchableOpacity
+            style={[
+              styles.gridBtn,
+              {
+                backgroundColor: "#ffffff",
+                borderWidth: 1,
+                borderColor: "#cbd5e1",
+              },
+            ]}
+            onPress={onScanInfo}
+            activeOpacity={0.7}
+          >
+            <View style={[styles.iconCircle, { backgroundColor: "#f3e8ff" }]}>
+              <FontAwesome5 name="qrcode" size={24} color="#9333ea" />
+            </View>
+            <Text style={[styles.btnTitle, styles.btnTitleSecondary]}>
+              SCAN INFO
+            </Text>
+            <Text style={[styles.btnSub, styles.btnSubSecondary]}>
+              Check shipment, trip, or package details
+            </Text>
+          </TouchableOpacity>
         </View>
       </View>
     </View>
@@ -97,18 +122,13 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     marginBottom: 16,
   },
-  btnTitle: { fontSize: 16, fontWeight: "800", color: "#fff", marginBottom: 4 },
-  btnSub: { color: "rgba(255,255,255,0.7)", fontSize: 12 },
-  btnTitleSecondary: { color: "#0f172a" },
-  btnSubSecondary: { color: "#475569" },
-  cardPlaceholder: {
-    flex: 1,
-    borderWidth: 2,
-    borderColor: "#cbd5e1",
-    borderStyle: "dashed",
-    borderRadius: 20,
-    minHeight: 140,
-    alignItems: "center",
-    justifyContent: "center",
+  btnTitle: {
+    fontSize: 16,
+    fontWeight: "800",
+    color: "#fff",
+    marginBottom: 4,
   },
+  btnSub: { color: "rgba(255,255,255,0.8)", fontSize: 12 },
+  btnTitleSecondary: { color: "#0f172a" },
+  btnSubSecondary: { color: "#64748b" },
 });

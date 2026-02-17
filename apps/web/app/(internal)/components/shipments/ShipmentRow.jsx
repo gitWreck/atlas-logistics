@@ -34,7 +34,7 @@ export default function ShipmentRow({ s, onClick }) {
 
   return (
     <div
-      onClick={() => onClick(s.id)}
+      // onClick={() => onClick(s.id)}
       className={`
         relative flex flex-col gap-3 p-4 border-b border-slate-800/50 cursor-pointer transition-colors group
         md:grid md:grid-cols-12 md:gap-4 md:px-6 md:items-center hover:bg-slate-800/30

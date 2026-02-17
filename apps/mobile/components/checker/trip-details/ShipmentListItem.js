@@ -22,8 +22,8 @@ export default function ShipmentListItem({ item, onPress, onMenuPress }) {
             <Text
               style={[
                 styles.statusText,
-                item.status === "DELIVERED" && { color: "#10b981" },
-                item.status === "OUT_FOR_DELIVERY" && { color: "#8b5cf6" },
+                item.status === "DELIVERED" && { color: "#8E24AA" },
+                item.status === "OUT_FOR_DELIVERY" && { color: "#FFB300" },
               ]}
             >
               {item.status.replace(/_/g, " ")}
@@ -52,7 +52,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     backgroundColor: "#ffffff",
     marginHorizontal: 16,
-    marginBottom: 8,
+    // marginBottom: 8,
     borderRadius: 12,
     alignItems: "center",
     borderWidth: 1,
@@ -84,7 +84,7 @@ const styles = StyleSheet.create({
   statusText: { fontSize: 10, fontWeight: "700", color: "#2563eb" },
   countText: { fontSize: 10, color: "#64748b" },
   menuBtn: {
-    padding: 16,
+    padding: 10,
     borderLeftWidth: 1,
     borderLeftColor: "#e5e7eb",
     height: "100%",

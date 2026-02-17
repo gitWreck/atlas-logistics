@@ -10,7 +10,7 @@ const db = admin.firestore();
 /**
  * Customer helper: add a tracked shipment for the current user.
  *
- * Path: users/{uid}/trackedShipments/{trackingNumber}
+ * Path: users/{uid}/tracked_shipments/{trackingNumber}
  */
 exports.addTrackedShipment = onCall(
   { region: "asia-southeast1", maxInstances: 10 },
@@ -44,7 +44,10 @@ exports.addTrackedShipment = onCall(
       );
     }
 
-    const shipmentSnap = await db.collection("shipments").doc(normalizedTracking).get();
+    const shipmentSnap = await db
+      .collection("shipments")
+      .doc(normalizedTracking)
+      .get();
 
     if (!shipmentSnap.exists) {
       throw new HttpsError(
@@ -59,8 +62,8 @@ exports.addTrackedShipment = onCall(
     const recipient = shipment.recipient || {};
     const sender = shipment.sender || {};
 
-    const userName = String(user.name || "").trim();
-    const userPhone = String(user.phoneNumber || user.phone || "").trim();
+    // const userName = String(user.name || "").trim();
+    // const userPhone = String(user.phoneNumber || user.phone || "").trim();
 
     // Require shipment to have complete contact details
     if (!recipient.phone || !sender.phone) {
@@ -71,7 +74,9 @@ exports.addTrackedShipment = onCall(
     }
 
     const normalizeName = (value) =>
-      String(value || "").trim().toLowerCase();
+      String(value || "")
+        .trim()
+        .toLowerCase();
 
     // Normalize so +63, 63, 09... all match (Philippine numbers)
     const normalizePhone = (value) => {
@@ -84,25 +89,25 @@ exports.addTrackedShipment = onCall(
       return d;
     };
 
-    const userNameNorm = normalizeName(userName);
-    const userPhoneNorm = normalizePhone(userPhone);
+    const userPhone = normalizePhone(user.phoneNumber || user.phone);
+    const senderPhone = normalizePhone(shipment.sender?.phone);
+    const recipientPhone = normalizePhone(shipment.recipient?.phone);
 
-    const senderNameNorm = normalizeName(sender.name);
-    const senderPhoneNorm = normalizePhone(sender.phone);
+    // If user has no phone in profile, they can't track anything strictly.
+    if (!userPhone) {
+      throw new HttpsError(
+        "failed-precondition",
+        "Please update your profile with a valid phone number to track shipments.",
+      );
+    }
 
-    const recipientNameNorm = normalizeName(recipient.name);
-    const recipientPhoneNorm = normalizePhone(recipient.phone);
-
-    const isSender =
-      userNameNorm === senderNameNorm && userPhoneNorm === senderPhoneNorm;
-    const isRecipient =
-      userNameNorm === recipientNameNorm &&
-      userPhoneNorm === recipientPhoneNorm;
+    const isSender = userPhone === senderPhone;
+    const isRecipient = userPhone === recipientPhone;
 
     if (!isSender && !isRecipient) {
       throw new HttpsError(
         "permission-denied",
-        "You are not authorized to track this shipment. Please check your tracking number.",
+        "You are not authorized to track this shipment. Your phone number must match the sender or receiver.",
       );
     }
 
@@ -122,7 +127,7 @@ exports.addTrackedShipment = onCall(
     const trackedRef = db
       .collection("users")
       .doc(uid)
-      .collection("trackedShipments")
+      .collection("tracked_shipments")
       .doc(normalizedTracking);
 
     // Prevent duplicates: do not allow the same trackingNumber to be added twice
@@ -151,4 +156,3 @@ exports.addTrackedShipment = onCall(
     };
   },
 );
-
