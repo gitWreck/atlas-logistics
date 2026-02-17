@@ -199,12 +199,12 @@ function StandardLabel({ shipment, pkg, index, total }) {
           </div>
 
           {/* WEIGHT */}
-          <div className="text-right">
+          {/* <div className="text-right">
             <div className="text-[10px] font-bold text-gray-500 uppercase">
               Weight
             </div>
             <div className="text-xl font-bold">{pkg.weight} KG</div>
-          </div>
+          </div> */}
         </div>
 
         {/* DESTINATION */}
@@ -224,7 +224,7 @@ function StandardLabel({ shipment, pkg, index, total }) {
           </div>
           <div className="text-sm font-mono mt-0.5">{recipient.phone}</div>
 
-          <div className="text-sm leading-tight mt-2 font-medium uppercase text-gray-800">
+          <div className="text-[10px] leading-tight mt-2 font-medium uppercase text-gray-800">
             {address.unit ? `${address.unit}, ` : ""}
             {address.street}
             <br />
@@ -234,7 +234,7 @@ function StandardLabel({ shipment, pkg, index, total }) {
           </div>
 
           {/* PACKAGE INFO */}
-          <div className="mt-3 border-t pt-2 text-xs">
+          <div className="mt-3 border-t pt-2 text-[10px]">
             <div className="font-bold uppercase text-gray-500">
               Package Details
             </div>
