@@ -301,7 +301,10 @@ export default function UnifiedShipmentModal({ profile, isOpen, onClose }) {
                     : "Print Individual Waybill"}
                 </button>
                 <button
-                  onClick={onClose}
+                  onClick={() => {
+                    onClose();
+                    setStep(1);
+                  }}
                   className="w-full py-3 sm:py-4 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-bold text-sm sm:text-base"
                 >
                   Return to Dashboard

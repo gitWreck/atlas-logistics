@@ -22,7 +22,11 @@ async function syncOneShipmentToPublic(shipmentId, shipmentData) {
 
   // 1. CHECK "KILL SWITCH" & DELETION
   // If shipment was deleted OR admin marked it as hidden
-  if (!shipmentData || shipmentData.isPubliclyVisible === false) {
+  if (
+    !shipmentData ||
+    shipmentData.isPubliclyVisible === false ||
+    shipmentData.public === false
+  ) {
     await publicRef.delete();
     return { action: "DELETED", id: shipmentId };
   }
@@ -82,8 +86,9 @@ async function syncOneShipmentToPublic(shipmentId, shipmentData) {
     // Progress Data (From Shipment Totals)
     totalPackages: shipmentData.totals?.totalPackages || 0,
     itemsDelivered: shipmentData.totals?.delivered || 0,
-    proofOfReceipt: shipmentData.proofOfReceipt,
-    proofOfDelivery: shipmentData.proofOfDelivery,
+
+    proofOfReceipt: shipmentData.proofOfReceipt || null,
+    proofOfDelivery: shipmentData.proofOfDelivery || null,
 
     // Trip Context (Merged from above)
     ...tripContext,
