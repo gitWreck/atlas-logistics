@@ -103,10 +103,7 @@ export default function CustomerSignupScreen() {
 
     const normalizedPhone = normalizePhilippinesMobile(phoneNumber);
 
-    if (
-      normalizedPhone.length !== 12 ||
-      !normalizedPhone.startsWith("639")
-    ) {
+    if (normalizedPhone.length !== 12 || !normalizedPhone.startsWith("639")) {
       Alert.alert(
         "Invalid Phone Number",
         "Please enter a valid PH mobile number (09XXXXXXXXX, +63..., or 63...).",
@@ -345,4 +342,3 @@ const styles = StyleSheet.create({
     textDecorationLine: "underline",
   },
 });
-

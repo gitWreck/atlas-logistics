@@ -23,10 +23,7 @@
     },
     "android": {
       "package": "com.atlas.atlastracking",
-      "permissions": [
-        "ACCESS_FINE_LOCATION",
-        "ACCESS_COARSE_LOCATION"
-      ],
+      "permissions": ["ACCESS_FINE_LOCATION", "ACCESS_COARSE_LOCATION"],
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
@@ -41,23 +38,15 @@
       "favicon": "./assets/favicon.png"
     },
     "extra": {
-      "eas": {
-        "projectId": "3ec04372-8f0b-4964-b303-cd522153e2ae"
-      },
       "router": {
         "origin": false
       }
     },
     "owner": "atlas-transport",
-    "plugins": [
-      "expo-router",
-      "expo-font"
-    ],
+    "plugins": ["expo-router", "expo-font"],
     "runtimeVersion": {
       "policy": "appVersion"
     },
-    "updates": {
-      "url": "https://u.expo.dev/3ec04372-8f0b-4964-b303-cd522153e2ae"
-    }
+    "updates": {}
   }
 }
