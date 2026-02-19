@@ -138,7 +138,12 @@ export default function ManagerDashboardPage() {
           />
         )}
         {activeTab === "trips" && (
-          <TripBoard user={user} userRole="manager" profile={profile} />
+          <TripBoard
+            user={user}
+            userRole="manager"
+            profile={profile}
+            isDark={false}
+          />
         )}
         {activeTab === "shipments" && (
           <ShipmentBoard user={user} userRole="manager" profile={profile} />

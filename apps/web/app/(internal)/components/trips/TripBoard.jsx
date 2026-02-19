@@ -15,7 +15,7 @@ import { calculateProgress } from "@/app/utility/utilities";
 import TripDrawer from "./TripDrawer";
 import CreateTripModal from "../manifests/modals/CreateTripModal";
 
-export default function TripBoard({ user, userRole, profile }) {
+export default function TripBoard({ user, userRole, profile, isDark = false }) {
   const [trips, setTrips] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -133,22 +133,46 @@ export default function TripBoard({ user, userRole, profile }) {
   const selectedTrip = trips.find((t) => t.id === selectedTripId);
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-200 font-sans">
+    <div
+      className={`min-h-screen font-sans ${
+        isDark ? "bg-slate-950 text-slate-200" : "bg-slate-50 text-slate-900"
+      }`}
+    >
       {/* --- HEADER --- */}
-      <div className="sticky top-0 z-30 bg-slate-950/80 backdrop-blur-md border-b border-slate-800 px-4 sm:px-6 py-4">
+      <div
+        className={`sticky top-0 z-30 backdrop-blur-md border-b px-4 sm:px-6 py-4 ${
+          isDark
+            ? "bg-slate-950/80 border-slate-800"
+            : "bg-white/80 border-slate-200"
+        }`}
+      >
         <div className="max-w-7xl mx-auto flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           {/* Title Section */}
           <div className="flex gap-3 w-full sm:w-auto">
-            <div className="h-10 w-10 bg-emerald-600/20 rounded-xl flex items-center justify-center text-emerald-500 shrink-0">
+            <div
+              className={`h-10 w-10 rounded-xl flex items-center justify-center shrink-0 ${
+                isDark
+                  ? "bg-emerald-600/20 text-emerald-500"
+                  : "bg-emerald-100 text-emerald-600"
+              }`}
+            >
               <FontAwesomeIcon icon={faRoute} size="lg" />
             </div>
             <div className="flex-1">
-              <h1 className="flex text-xl font-bold text-white tracking-tight gap-2 items-center">
+              <h1
+                className={`flex text-xl font-bold tracking-tight gap-2 items-center ${
+                  isDark ? "text-white" : "text-slate-900"
+                }`}
+              >
                 Trip Board
                 <button
                   onClick={fetchTrips}
                   disabled={loading}
-                  className="text-slate-500 hover:text-white transition-colors p-1"
+                  className={`transition-colors p-1 ${
+                    isDark
+                      ? "text-slate-500 hover:text-white"
+                      : "text-slate-400 hover:text-slate-700"
+                  }`}
                 >
                   <FontAwesomeIcon
                     icon={faSync}
@@ -157,7 +181,11 @@ export default function TripBoard({ user, userRole, profile }) {
                   />
                 </button>
               </h1>
-              <p className="text-xs text-slate-500 line-clamp-1">
+              <p
+                className={`text-xs line-clamp-1 ${
+                  isDark ? "text-slate-500" : "text-slate-600"
+                }`}
+              >
                 Manage truck assignments and routes.
               </p>
             </div>
@@ -184,10 +212,24 @@ export default function TripBoard({ user, userRole, profile }) {
 
       {/* --- CONTENT --- */}
       <main className="max-w-7xl mx-auto p-4 sm:p-6">
-        <div className="border border-slate-800 rounded-xl bg-slate-900/50 overflow-hidden shadow-xl backdrop-blur-sm">
+        <div
+          className={`rounded-xl overflow-hidden shadow-xl backdrop-blur-sm border ${
+            isDark ? "border-slate-800 bg-slate-900/50" : "border-slate-200 bg-white"
+          }`}
+        >
           {/* CONTROLS */}
-          <div className="px-4 sm:px-6 py-4 border-b border-slate-800 flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4 bg-slate-950/30">
-            <h3 className="font-bold text-white whitespace-nowrap hidden xl:block">
+          <div
+            className={`px-4 sm:px-6 py-4 border-b flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4 ${
+              isDark
+                ? "border-slate-800 bg-slate-950/30"
+                : "border-slate-200 bg-slate-50"
+            }`}
+          >
+            <h3
+              className={`font-bold whitespace-nowrap hidden xl:block ${
+                isDark ? "text-white" : "text-slate-900"
+              }`}
+            >
               Active Manifests
             </h3>
 
@@ -197,12 +239,16 @@ export default function TripBoard({ user, userRole, profile }) {
               <div className="relative flex-1 min-w-[200px]">
                 <FontAwesomeIcon
                   icon={faSearch}
-                  className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-sm"
+                  className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm"
                 />
                 <input
                   type="text"
                   placeholder="Search Trip ID..."
-                  className="w-full bg-slate-900 border border-slate-700 rounded-lg pl-9 pr-4 py-2 text-sm text-white focus:border-emerald-500 focus:outline-none"
+                  className={`w-full rounded-lg pl-9 pr-4 py-2 text-sm focus:border-emerald-500 focus:outline-none border ${
+                    isDark
+                      ? "bg-slate-900 border-slate-700 text-white"
+                      : "bg-white border-slate-300 text-slate-900"
+                  }`}
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                 />
@@ -210,17 +256,31 @@ export default function TripBoard({ user, userRole, profile }) {
 
               <div className="flex gap-2 w-full sm:w-auto">
                 {/* Date Picker (Scrollable on very small screens) */}
-                <div className="flex items-center gap-2 bg-slate-900 border border-slate-700 rounded-lg px-2 py-1 flex-1 sm:flex-none justify-center">
+                <div
+                  className={`flex items-center gap-2 rounded-lg px-2 py-1 flex-1 sm:flex-none justify-center border ${
+                    isDark
+                      ? "bg-slate-900 border-slate-700"
+                      : "bg-white border-slate-300"
+                  }`}
+                >
                   <input
                     type="date"
-                    className="bg-transparent text-xs text-white outline-none w-24 [color-scheme:dark]"
+                    className={`bg-transparent text-xs outline-none w-24 ${
+                      isDark
+                        ? "text-white [color-scheme:dark]"
+                        : "text-slate-900 [color-scheme:light]"
+                    }`}
                     value={startDate}
                     onChange={(e) => setStartDate(e.target.value)}
                   />
-                  <span className="text-slate-600">-</span>
+                  <span className="text-slate-400">-</span>
                   <input
                     type="date"
-                    className="bg-transparent text-xs text-white outline-none w-24 [color-scheme:dark]"
+                    className={`bg-transparent text-xs outline-none w-24 ${
+                      isDark
+                        ? "text-white [color-scheme:dark]"
+                        : "text-slate-900 [color-scheme:light]"
+                    }`}
                     value={endDate}
                     onChange={(e) => setEndDate(e.target.value)}
                   />
@@ -230,10 +290,14 @@ export default function TripBoard({ user, userRole, profile }) {
                 <div className="relative w-full sm:w-40">
                   <FontAwesomeIcon
                     icon={faFilter}
-                    className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-sm"
+                    className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm"
                   />
                   <select
-                    className="w-full bg-slate-900 border border-slate-700 rounded-lg pl-9 pr-4 py-2 text-sm text-white focus:border-emerald-500 focus:outline-none appearance-none cursor-pointer"
+                    className={`w-full rounded-lg pl-9 pr-4 py-2 text-sm focus:border-emerald-500 focus:outline-none appearance-none cursor-pointer border ${
+                      isDark
+                        ? "bg-slate-900 border-slate-700 text-white"
+                        : "bg-white border-slate-300 text-slate-900"
+                    }`}
                     value={activeFilter}
                     onChange={(e) => setActiveFilter(e.target.value)}
                   >
@@ -248,7 +312,13 @@ export default function TripBoard({ user, userRole, profile }) {
           </div>
 
           {/* TABLE HEADER (Hidden on Mobile) */}
-          <div className="hidden md:grid grid-cols-12 gap-4 px-6 py-3 border-b border-slate-800 bg-slate-950 text-xs font-semibold text-slate-500 uppercase tracking-wider">
+          <div
+            className={`hidden md:grid grid-cols-12 gap-4 px-6 py-3 border-b text-xs font-semibold uppercase tracking-wider ${
+              isDark
+                ? "border-slate-800 bg-slate-950 text-slate-500"
+                : "border-slate-200 bg-slate-50 text-slate-700"
+            }`}
+          >
             <div className="col-span-3">Trip Info / Driver</div>
             <div className="col-span-2">Route</div>
             <div className="col-span-1">Stats</div>
@@ -260,11 +330,11 @@ export default function TripBoard({ user, userRole, profile }) {
           {/* TABLE BODY */}
           <div className="min-h-[300px]">
             {loading ? (
-              <div className="p-10 text-center text-slate-500 animate-pulse">
+              <div className="p-10 text-center text-slate-600 animate-pulse">
                 Loading trips...
               </div>
             ) : currentItems.length === 0 ? (
-              <div className="p-10 text-center text-slate-500">
+              <div className="p-10 text-center text-slate-600">
                 No trips found.
               </div>
             ) : (
@@ -277,16 +347,33 @@ export default function TripBoard({ user, userRole, profile }) {
           {/* PAGINATION */}
           {/* ... (Your pagination code remains mostly the same, just ensure flex-wrap if needed) ... */}
           {filteredTrips.length > 0 && (
-            <div className="px-4 sm:px-6 py-4 border-t border-slate-800 bg-slate-950/30 flex justify-between items-center">
-              <span className="text-xs text-slate-500">
-                Page <span className="text-white font-bold">{currentPage}</span>{" "}
+            <div
+              className={`px-4 sm:px-6 py-4 border-t flex justify-between items-center ${
+                isDark
+                  ? "border-slate-800 bg-slate-950/30"
+                  : "border-slate-200 bg-slate-50"
+              }`}
+            >
+              <span className="text-xs text-slate-600">
+                Page{" "}
+                <span
+                  className={`font-bold ${
+                    isDark ? "text-white" : "text-slate-900"
+                  }`}
+                >
+                  {currentPage}
+                </span>{" "}
                 of {totalPages}
               </span>
               <div className="flex gap-2">
                 <button
                   onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
                   disabled={currentPage === 1}
-                  className="px-3 py-1.5 rounded-lg border border-slate-700 bg-slate-900 text-slate-400 text-xs hover:text-white disabled:opacity-50"
+                  className={`px-3 py-1.5 rounded-lg border text-xs disabled:opacity-50 ${
+                    isDark
+                      ? "border-slate-700 bg-slate-900 text-slate-400 hover:text-white"
+                      : "border-slate-300 bg-white text-slate-700 hover:text-slate-900"
+                  }`}
                 >
                   <FontAwesomeIcon icon={faChevronLeft} />
                 </button>
@@ -295,7 +382,11 @@ export default function TripBoard({ user, userRole, profile }) {
                     setCurrentPage((p) => Math.min(totalPages, p + 1))
                   }
                   disabled={currentPage === totalPages}
-                  className="px-3 py-1.5 rounded-lg border border-slate-700 bg-slate-900 text-slate-400 text-xs hover:text-white disabled:opacity-50"
+                  className={`px-3 py-1.5 rounded-lg border text-xs disabled:opacity-50 ${
+                    isDark
+                      ? "border-slate-700 bg-slate-900 text-slate-400 hover:text-white"
+                      : "border-slate-300 bg-white text-slate-700 hover:text-slate-900"
+                  }`}
                 >
                   <FontAwesomeIcon icon={faChevronRight} />
                 </button>
