@@ -87,11 +87,11 @@ export default function AdminDashboardPage() {
 
   return (
     <div
-      className={`min-h-screen flex font-sans overflow-x-hidden ${rootBackgroundClasses}`}
+      className={`h-screen flex font-sans overflow-hidden ${rootBackgroundClasses}`}
     >
-      {/* Sidebar */}
+      {/* Sidebar - fixed height, does not scroll */}
       <aside
-        className={`hidden md:flex flex-col w-64 border-r px-6 py-6 ${sidebarClasses}`}
+        className={`hidden md:flex flex-col w-64 shrink-0 border-r px-6 py-6 overflow-y-auto ${sidebarClasses}`}
       >
         {/* Logo / Brand */}
         <div className="flex items-center gap-3">
@@ -199,8 +199,8 @@ export default function AdminDashboardPage() {
         </div>
       </aside>
 
-      {/* Main content area */}
-      <section className="flex-1 flex flex-col">
+      {/* Main content area - min-h-0 lets main scroll inside flex */}
+      <section className="flex-1 flex flex-col min-h-0">
         {/* Topbar */}
         <header
           className={`flex items-center justify-between gap-4 border-b px-4 sm:px-6 py-4 ${topbarClasses}`}
