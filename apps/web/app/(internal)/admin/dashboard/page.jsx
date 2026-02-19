@@ -17,6 +17,8 @@ import {
   faQuestionCircle,
   faSun,
   faMoon,
+  faChevronLeft,
+  faChevronRight,
 } from "@fortawesome/free-solid-svg-icons";
 import { useRouter } from "next/navigation";
 import { auth } from "@/lib/firebase";
@@ -43,6 +45,7 @@ export default function AdminDashboardPage() {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState("overview");
   const [isDark, setIsDark] = useState(false);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const { user, profile, loading } = useAuth();
 
   useEffect(() => {
@@ -85,44 +88,58 @@ export default function AdminDashboardPage() {
     ? "bg-slate-900 border-slate-800"
     : "bg-white border-slate-200";
 
+  const sidebarToggleClasses = isDark
+    ? "bg-slate-800 border-slate-700 text-slate-200 hover:bg-slate-700 hover:text-slate-50"
+    : "bg-slate-50 border-slate-200 text-slate-500 hover:bg-slate-100 hover:text-slate-900";
+
   return (
     <div
       className={`h-screen flex font-sans overflow-hidden ${rootBackgroundClasses}`}
     >
       {/* Sidebar - fixed height, does not scroll */}
       <aside
-        className={`hidden md:flex flex-col w-64 shrink-0 border-r px-6 py-6 overflow-y-auto ${sidebarClasses}`}
+        className={`hidden md:flex flex-col ${
+          isSidebarCollapsed ? "w-20" : "w-64"
+        } shrink-0 border-r px-4 py-6 overflow-y-auto ${sidebarClasses}`}
       >
         {/* Logo / Brand */}
-        <div className="flex items-center gap-3">
+        <div
+          className={`flex items-center ${
+            isSidebarCollapsed ? "justify-center" : "gap-3"
+          }`}
+        >
           <img
             src="/atlas-logo.png"
             alt="Atlas"
             className="w-10 h-10 rounded-2xl object-contain shrink-0"
           />
-          <div>
-            <div
-              className={`text-xs font-semibold tracking-[0.2em] uppercase ${
-                isDark ? "text-slate-400" : "text-slate-600"
-              }`}
-            >
-              Atlas
+          {!isSidebarCollapsed && (
+            <div className="ml-3">
+              <div
+                className={`text-xs font-semibold tracking-[0.2em] uppercase ${
+                  isDark ? "text-slate-400" : "text-slate-600"
+                }`}
+              >
+                Atlas
+              </div>
+              <div
+                className={`text-sm font-semibold ${
+                  isDark ? "text-white" : "text-slate-900"
+                }`}
+              >
+                Fast &amp; Easy Shipping
+              </div>
             </div>
-            <div
-              className={`text-sm font-semibold ${
-                isDark ? "text-white" : "text-slate-900"
-              }`}
-            >
-              Fast &amp; Easy Shipping
-            </div>
-          </div>
+          )}
         </div>
 
         {/* Main Navigation */}
         <div className="mt-8">
-          <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
-            Main
-          </div>
+          {!isSidebarCollapsed && (
+            <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+              Main
+            </div>
+          )}
           <div className="mt-3 space-y-1">
             {mainNavItems.map((item) => {
               const isActive = activeTab === item.id;
@@ -135,7 +152,9 @@ export default function AdminDashboardPage() {
                   key={item.id}
                   type="button"
                   onClick={() => setActiveTab(item.id)}
-                  className={`w-full flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium transition-colors ${
+                  className={`w-full flex items-center ${
+                    isSidebarCollapsed ? "justify-center" : "gap-3"
+                  } rounded-xl px-3 py-2 text-sm font-medium transition-colors ${
                     isActive
                       ? "bg-gradient-to-br from-indigo-600 to-purple-600 text-white shadow-md shadow-indigo-500/25"
                       : idleClasses
@@ -152,7 +171,7 @@ export default function AdminDashboardPage() {
                   >
                     <FontAwesomeIcon icon={item.icon} size="sm" />
                   </span>
-                  <span>{item.label}</span>
+                  {!isSidebarCollapsed && <span>{item.label}</span>}
                 </button>
               );
             })}
@@ -161,19 +180,23 @@ export default function AdminDashboardPage() {
 
         {/* Secondary Navigation */}
         <div className="mt-8 space-y-1">
-          <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
-            Tools
-          </div>
+          {!isSidebarCollapsed && (
+            <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+              Tools
+            </div>
+          )}
           <div className="mt-3 space-y-1">
             {secondaryNavItems.map((item) => (
               <div
                 key={item.id}
-                className="w-full flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium text-slate-400/80 cursor-default"
+                className={`w-full flex items-center ${
+                  isSidebarCollapsed ? "justify-center" : "gap-3"
+                } rounded-xl px-3 py-2 text-sm font-medium text-slate-400/80 cursor-default`}
               >
                 <span className="inline-flex h-8 w-8 items-center justify-center rounded-xl bg-slate-900/5 text-slate-500">
                   <FontAwesomeIcon icon={item.icon} size="sm" />
                 </span>
-                <span>{item.label}</span>
+                {!isSidebarCollapsed && <span>{item.label}</span>}
               </div>
             ))}
           </div>
@@ -193,7 +216,7 @@ export default function AdminDashboardPage() {
               <span className="inline-flex h-8 w-8 items-center justify-center rounded-xl bg-red-50 text-red-600 dark:bg-red-950/50 dark:text-red-400">
                 <FontAwesomeIcon icon={faSignOutAlt} size="sm" />
               </span>
-              <span>Logout</span>
+              {!isSidebarCollapsed && <span>Logout</span>}
             </span>
           </button>
         </div>
@@ -201,56 +224,25 @@ export default function AdminDashboardPage() {
 
       {/* Main content area - min-h-0 lets main scroll inside flex */}
       <section className="flex-1 flex flex-col min-h-0">
-        {/* Topbar */}
+        {/* Topbar - collapse button + actions */}
         <header
-          className={`flex items-center justify-between gap-4 border-b px-4 sm:px-6 py-4 ${topbarClasses}`}
+          className={`flex items-center justify-between gap-4 border-b pl-0 pr-4 sm:pl-0 sm:pr-6 py-4 ${topbarClasses}`}
         >
-          {/* Title */}
-          <div className="space-y-1">
-            <h1 className="text-lg sm:text-xl font-semibold leading-tight">
-              Dashboard
-            </h1>
-            <p className="text-xs sm:text-sm text-slate-500">
-              Logistics visibility across all routes
-            </p>
-          </div>
-
-          {/* Search */}
-          <div className="hidden md:flex flex-1 max-w-md mx-4">
-            <div
-              className={`flex items-center w-full rounded-full border px-3 py-1.5 text-sm shadow-sm ${
-                isDark
-                  ? "border-slate-700 bg-slate-800 text-slate-300"
-                  : "border-slate-200 bg-slate-50 text-slate-500"
-              }`}
-            >
-              <span className="mr-2 text-slate-400">
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  className="h-4 w-4"
-                >
-                  <circle cx="11" cy="11" r="6" />
-                  <line x1="16" y1="16" x2="21" y2="21" />
-                </svg>
-              </span>
-              <input
-                type="text"
-                placeholder="Search trips, drivers, locations..."
-                className={`flex-1 bg-transparent outline-none text-xs sm:text-sm ${
-                  isDark
-                    ? "placeholder:text-slate-500 text-slate-200"
-                    : "placeholder:text-slate-400 text-slate-900"
-                }`}
-              />
-            </div>
-          </div>
+          {/* Sidebar collapse toggle - between sidebar and header */}
+          <button
+            type="button"
+            onClick={() => setIsSidebarCollapsed((prev) => !prev)}
+            className={`hidden md:flex h-7 w-7 shrink-0 items-center justify-center rounded-full -translate-x-1/2 -ml-px shadow-sm ${sidebarToggleClasses}`}
+            title={isSidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+          >
+            <FontAwesomeIcon
+              icon={isSidebarCollapsed ? faChevronRight : faChevronLeft}
+              size="sm"
+            />
+          </button>
 
           {/* Actions */}
-          <div className="flex items-center gap-3 sm:gap-4">
+          <div className="flex items-center gap-3 sm:gap-4 ml-auto">
             {/* Theme toggle */}
             <button
               type="button"
