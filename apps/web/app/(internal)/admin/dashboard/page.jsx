@@ -84,10 +84,6 @@ export default function AdminDashboardPage() {
     ? "bg-slate-900 border-slate-800"
     : "bg-white border-slate-200";
 
-  const contentCardClasses = isDark
-    ? "bg-slate-900 border-slate-800"
-    : "bg-white border-slate-200";
-
   const sidebarToggleClasses = isDark
     ? "bg-slate-800 border-slate-700 text-slate-200 hover:bg-slate-700 hover:text-slate-50"
     : "bg-slate-50 border-slate-200 text-slate-500 hover:bg-slate-100 hover:text-slate-900";
@@ -178,35 +174,11 @@ export default function AdminDashboardPage() {
           </div>
         </div>
 
-        {/* Secondary Navigation */}
-        <div className="mt-8 space-y-1">
-          {!isSidebarCollapsed && (
-            <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
-              Tools
-            </div>
-          )}
-          <div className="mt-3 space-y-1">
-            {secondaryNavItems.map((item) => (
-              <div
-                key={item.id}
-                className={`w-full flex items-center ${
-                  isSidebarCollapsed ? "justify-center" : "gap-3"
-                } rounded-xl px-3 py-2 text-sm font-medium text-slate-400/80 cursor-default`}
-              >
-                <span className="inline-flex h-8 w-8 items-center justify-center rounded-xl bg-slate-900/5 text-slate-500">
-                  <FontAwesomeIcon icon={item.icon} size="sm" />
-                </span>
-                {!isSidebarCollapsed && <span>{item.label}</span>}
-              </div>
-            ))}
-          </div>
-        </div>
-
         {/* Spacer */}
         <div className="flex-1" />
 
         {/* Logout */}
-        <div className="pt-4 border-t border-slate-200/70 dark:border-slate-800">
+        <div className="pt-4">
           <button
             type="button"
             onClick={() => handleLogout(auth, router)}
@@ -276,126 +248,125 @@ export default function AdminDashboardPage() {
         {/* Scrollable content area */}
         <main className="flex-1 overflow-y-auto">
           <div className="max-w-7xl mx-auto w-full px-4 sm:px-6 py-6 space-y-6">
-            {/* Summary cards row */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-              <div
-                className={`rounded-2xl border px-4 py-3 ${
-                  isDark
-                    ? "bg-indigo-950/40 border-indigo-800 text-indigo-200"
-                    : "bg-indigo-50 border-indigo-100"
-                }`}
-              >
+            {/* Summary cards row - only show on Overview tab */}
+            {activeTab === "overview" && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
                 <div
-                  className={`text-xs font-medium uppercase tracking-wide ${
-                    isDark ? "text-indigo-300" : "text-indigo-700"
+                  className={`rounded-2xl border px-4 py-3 ${
+                    isDark
+                      ? "bg-indigo-950/40 border-indigo-800 text-indigo-200"
+                      : "bg-indigo-50 border-indigo-100"
                   }`}
                 >
-                  Active Trips
+                  <div
+                    className={`text-xs font-medium uppercase tracking-wide ${
+                      isDark ? "text-indigo-300" : "text-indigo-700"
+                    }`}
+                  >
+                    Active Trips
+                  </div>
+                  <div
+                    className={`mt-2 text-2xl font-semibold ${
+                      isDark ? "text-indigo-100" : "text-indigo-900"
+                    }`}
+                  >
+                    2
+                  </div>
+                  <div
+                    className={`mt-1 text-xs ${isDark ? "text-indigo-400" : "text-indigo-600"}`}
+                  >
+                    Trips currently in progress
+                  </div>
                 </div>
-                <div
-                  className={`mt-2 text-2xl font-semibold ${
-                    isDark ? "text-indigo-100" : "text-indigo-900"
-                  }`}
-                >
-                  2
-                </div>
-                <div
-                  className={`mt-1 text-xs ${isDark ? "text-indigo-400" : "text-indigo-600"}`}
-                >
-                  Trips currently in progress
-                </div>
-              </div>
 
-              <div
-                className={`rounded-2xl border px-4 py-3 ${
-                  isDark
-                    ? "bg-amber-950/40 border-amber-800 text-amber-200"
-                    : "bg-amber-50 border-amber-100"
-                }`}
-              >
                 <div
-                  className={`text-xs font-medium uppercase tracking-wide ${
-                    isDark ? "text-amber-300" : "text-amber-700"
+                  className={`rounded-2xl border px-4 py-3 ${
+                    isDark
+                      ? "bg-amber-950/40 border-amber-800 text-amber-200"
+                      : "bg-amber-50 border-amber-100"
                   }`}
                 >
-                  Delayed Trips
+                  <div
+                    className={`text-xs font-medium uppercase tracking-wide ${
+                      isDark ? "text-amber-300" : "text-amber-700"
+                    }`}
+                  >
+                    Delayed Trips
+                  </div>
+                  <div
+                    className={`mt-2 text-2xl font-semibold ${
+                      isDark ? "text-amber-100" : "text-amber-900"
+                    }`}
+                  >
+                    2
+                  </div>
+                  <div
+                    className={`mt-1 text-xs ${isDark ? "text-amber-400" : "text-amber-600"}`}
+                  >
+                    Trips requiring attention
+                  </div>
                 </div>
-                <div
-                  className={`mt-2 text-2xl font-semibold ${
-                    isDark ? "text-amber-100" : "text-amber-900"
-                  }`}
-                >
-                  2
-                </div>
-                <div
-                  className={`mt-1 text-xs ${isDark ? "text-amber-400" : "text-amber-600"}`}
-                >
-                  Trips requiring attention
-                </div>
-              </div>
 
-              <div
-                className={`rounded-2xl border px-4 py-3 ${
-                  isDark
-                    ? "bg-sky-950/40 border-sky-800 text-sky-200"
-                    : "bg-sky-50 border-sky-100"
-                }`}
-              >
                 <div
-                  className={`text-xs font-medium uppercase tracking-wide ${
-                    isDark ? "text-sky-300" : "text-sky-700"
+                  className={`rounded-2xl border px-4 py-3 ${
+                    isDark
+                      ? "bg-sky-950/40 border-sky-800 text-sky-200"
+                      : "bg-sky-50 border-sky-100"
                   }`}
                 >
-                  Pickup Requests
+                  <div
+                    className={`text-xs font-medium uppercase tracking-wide ${
+                      isDark ? "text-sky-300" : "text-sky-700"
+                    }`}
+                  >
+                    Pickup Requests
+                  </div>
+                  <div
+                    className={`mt-2 text-2xl font-semibold ${
+                      isDark ? "text-sky-100" : "text-sky-900"
+                    }`}
+                  >
+                    3
+                  </div>
+                  <div
+                    className={`mt-1 text-xs ${isDark ? "text-sky-400" : "text-sky-600"}`}
+                  >
+                    Pending driver assignments
+                  </div>
                 </div>
-                <div
-                  className={`mt-2 text-2xl font-semibold ${
-                    isDark ? "text-sky-100" : "text-sky-900"
-                  }`}
-                >
-                  3
-                </div>
-                <div
-                  className={`mt-1 text-xs ${isDark ? "text-sky-400" : "text-sky-600"}`}
-                >
-                  Pending driver assignments
-                </div>
-              </div>
 
-              <div
-                className={`rounded-2xl border px-4 py-3 ${
-                  isDark
-                    ? "bg-emerald-950/40 border-emerald-800 text-emerald-200"
-                    : "bg-emerald-50 border-emerald-100"
-                }`}
-              >
                 <div
-                  className={`text-xs font-medium uppercase tracking-wide ${
-                    isDark ? "text-emerald-300" : "text-emerald-700"
+                  className={`rounded-2xl border px-4 py-3 ${
+                    isDark
+                      ? "bg-emerald-950/40 border-emerald-800 text-emerald-200"
+                      : "bg-emerald-50 border-emerald-100"
                   }`}
                 >
-                  Delivered Trips
-                </div>
-                <div
-                  className={`mt-2 text-2xl font-semibold ${
-                    isDark ? "text-emerald-100" : "text-emerald-900"
-                  }`}
-                >
-                  4
-                </div>
-                <div
-                  className={`mt-1 text-xs ${isDark ? "text-emerald-400" : "text-emerald-600"}`}
-                >
-                  Completed within SLA
+                  <div
+                    className={`text-xs font-medium uppercase tracking-wide ${
+                      isDark ? "text-emerald-300" : "text-emerald-700"
+                    }`}
+                  >
+                    Delivered Trips
+                  </div>
+                  <div
+                    className={`mt-2 text-2xl font-semibold ${
+                      isDark ? "text-emerald-100" : "text-emerald-900"
+                    }`}
+                  >
+                    4
+                  </div>
+                  <div
+                    className={`mt-1 text-xs ${isDark ? "text-emerald-400" : "text-emerald-600"}`}
+                  >
+                    Completed within SLA
+                  </div>
                 </div>
               </div>
-            </div>
+            )}
 
             {/* Active tab content */}
-            <div
-              className={`mt-4 rounded-2xl border shadow-sm ${contentCardClasses}`}
-            >
-              <div className="p-4 sm:p-6">
+            <div>
                 {activeTab === "overview" && (
                   <AdminOverview
                     user={user}
@@ -425,7 +396,6 @@ export default function AdminDashboardPage() {
                     profile={profile}
                   />
                 )}
-              </div>
             </div>
           </div>
         </main>
