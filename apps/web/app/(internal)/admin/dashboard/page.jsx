@@ -380,6 +380,7 @@ export default function AdminDashboardPage() {
                     user={user}
                     userRole="admin"
                     profile={profile}
+                    isDark={isDark}
                   />
                 )}
                 {activeTab === "shipments" && (
