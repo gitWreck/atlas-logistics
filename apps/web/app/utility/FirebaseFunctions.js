@@ -84,7 +84,6 @@ export const updateTruckStatus = httpsCallable(functions, "updateTruckStatus");
 // ----------------------------
 
 export const sendBulkSMSCallable = httpsCallable(functions, "sendBulkSMS");
-
 export const setTruckAutoSmsSettingsCallable = httpsCallable(
   functions,
   "setTruckAutoSmsSettings",

@@ -31,12 +31,27 @@ function StatusDot({ status }) {
 export default function TruckRow({ truck: t, onEdit }) {
   // PMS Logic
   const serviceInterval = 5000;
-  // const currentOdo = Number(t.lastPmsOdometer) || 0;
+  const currentOdo = Number(t.lastPmsOdometer) || 0;
   const pmsProgress = Math.min(
     Math.max(((serviceInterval - (t.nextPMS || 0)) / serviceInterval) * 100, 0),
     100,
   );
   const isCritical = (t.nextPMS || 0) <= 500;
+  // --- NEW: COMPLIANCE & MAINTENANCE LOGIC ---
+  const ltoExpiry = t.registrationExpiry
+    ? new Date(t.registrationExpiry)
+    : null;
+  // Due if expiry is within 30 days
+  const isLtoDue = ltoExpiry
+    ? (ltoExpiry.getTime() - Date.now()) / (1000 * 3600 * 24) <= 30
+    : false;
+
+  // Oil due if driven 10,000 KM since last change
+  const isOilDue =
+    t.lastOilChange && currentOdo - Number(t.lastOilChange) >= 10000;
+  // Tires due if driven 50,000 KM since last change
+  const isTireDue =
+    t.lastTireChange && currentOdo - Number(t.lastTireChange) >= 50000;
 
   return (
     <div
@@ -144,17 +159,39 @@ export default function TruckRow({ truck: t, onEdit }) {
         </div>
       </div>
 
-      {/* --- COL 4: Payload & Expiry --- */}
-      <div className="md:col-span-2 flex flex-row md:flex-col justify-between md:justify-start gap-1 md:gap-1 mt-2 md:mt-0 border-t border-slate-800/50 md:border-0 pt-2 md:pt-0">
-        <div className="text-xs text-slate-300 flex items-center gap-2">
-          <FontAwesomeIcon
-            icon={faWeightHanging}
-            className="text-[10px] text-slate-500"
-          />
-          {t.payloadCapacity || t.payload} KG
+      {/* --- COL 4: Compliance & Alerts --- */}
+      <div className="md:col-span-2 flex flex-col justify-center gap-1.5 mt-2 md:mt-0 border-t border-slate-800/50 md:border-0 pt-2 md:pt-0">
+        {/* Dynamic Alert Badges */}
+        <div className="flex flex-wrap gap-1.5">
+          {isLtoDue && (
+            <span className="text-[9px] font-bold bg-amber-500/20 text-amber-400 px-1.5 py-0.5 rounded border border-amber-500/30">
+              LTO RENEWAL
+            </span>
+          )}
+          {isOilDue && (
+            <span className="text-[9px] font-bold bg-rose-500/20 text-rose-400 px-1.5 py-0.5 rounded border border-rose-500/30">
+              OIL CHANGE
+            </span>
+          )}
+          {isTireDue && (
+            <span className="text-[9px] font-bold bg-rose-500/20 text-rose-400 px-1.5 py-0.5 rounded border border-rose-500/30">
+              TIRES DUE
+            </span>
+          )}
+          {!isLtoDue && !isOilDue && !isTireDue && (
+            <span className="text-[10px] text-emerald-500 font-bold uppercase tracking-wider">
+              Fully Compliant
+            </span>
+          )}
         </div>
-        <div className="text-[10px] text-slate-600 uppercase font-bold">
-          Reg: {t.registrationExpiry || "—"}
+
+        <div className="text-[10px] text-slate-500 flex items-center gap-2">
+          <span>
+            LTO:{" "}
+            <span className="text-slate-300 font-mono">
+              {t.registrationExpiry || "—"}
+            </span>
+          </span>
         </div>
       </div>
 

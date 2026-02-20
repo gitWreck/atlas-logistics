@@ -180,6 +180,95 @@ export default function ShipmentDrawer({ isOpen, onClose, data }) {
                     Status Flow
                   </h3>
                   <div className="space-y-0 relative pl-4 border-l-2 border-slate-800 ml-2">
+                    {(() => {
+                      // 1. Determine if this started as a Home Pickup
+                      const isPickupOrder =
+                        data.status === "PENDING_PICKUP" ||
+                        data.status === "PICKED_UP" ||
+                        (data.statusHistory || []).some((h) =>
+                          h.status.includes("PICKUP"),
+                        );
+
+                      // 2. Build the continuous timeline dynamically
+                      const STEPS = isPickupOrder
+                        ? [
+                            "PENDING_PICKUP",
+                            "PICKED_UP",
+                            "RECEIVED", // Merges into standard flow here (at Origin Hub)
+                            "ASSIGNED",
+                            "LOADED",
+                            "IN_TRANSIT",
+                            "OUT_FOR_DELIVERY",
+                            "DELIVERED",
+                          ]
+                        : [
+                            "CREATED", // Standard Drop-off
+                            "RECEIVED",
+                            "ASSIGNED",
+                            "LOADED",
+                            "IN_TRANSIT",
+                            "OUT_FOR_DELIVERY",
+                            "DELIVERED",
+                          ];
+
+                      const currentStepIndex = STEPS.indexOf(data.status);
+
+                      return STEPS.map((step, idx) => {
+                        // 3. Check progress based on array index, not strict percentage
+                        const isDone = currentStepIndex >= idx;
+                        const isCurrent = data.status === step;
+
+                        return (
+                          <div key={step} className="relative pb-8 last:pb-0">
+                            {/* Dot */}
+                            <div
+                              className={`
+                                absolute -left-[21px] top-0 w-4 h-4 rounded-full border-2 flex items-center justify-center transition-all duration-300
+                                ${
+                                  isDone
+                                    ? "bg-blue-600 border-blue-600"
+                                    : "bg-slate-900 border-slate-700"
+                                }
+                                ${isCurrent ? "ring-4 ring-blue-500/20 scale-110" : ""}
+                              `}
+                            >
+                              {isDone && (
+                                <FontAwesomeIcon
+                                  icon={faCheckCircle}
+                                  className="text-white text-[8px]"
+                                />
+                              )}
+                            </div>
+
+                            {/* Text */}
+                            <div
+                              className={`-mt-1.5 ml-2 transition-opacity duration-300 ${
+                                isDone || isCurrent
+                                  ? "opacity-100"
+                                  : "opacity-40"
+                              }`}
+                            >
+                              <p
+                                className={`text-sm font-bold ${
+                                  isDone || isCurrent
+                                    ? "text-white"
+                                    : "text-slate-400"
+                                }`}
+                              >
+                                {step.replace(/_/g, " ")}
+                              </p>
+                              {isCurrent && (
+                                <p className="text-[10px] text-blue-400 mt-0.5 animate-pulse">
+                                  Current Stage • {data.updatedAt}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      });
+                    })()}
+                  </div>
+                  {/* <div className="space-y-0 relative pl-4 border-l-2 border-slate-800 ml-2">
                     {[
                       "CREATED",
                       "RECEIVED",
@@ -195,21 +284,20 @@ export default function ShipmentDrawer({ isOpen, onClose, data }) {
 
                       return (
                         <div key={step} className="relative pb-8 last:pb-0">
-                          {/* Dot */}
                           <div
                             className={`
-                                            absolute -left-[21px] top-0 w-4 h-4 rounded-full border-2 flex items-center justify-center
-                                            ${
-                                              isDone
-                                                ? "bg-blue-600 border-blue-600"
-                                                : "bg-slate-900 border-slate-700"
-                                            }
-                                            ${
-                                              isCurrent
-                                                ? "ring-4 ring-blue-500/20"
-                                                : ""
-                                            }
-                                          `}
+                                        absolute -left-[21px] top-0 w-4 h-4 rounded-full border-2 flex items-center justify-center
+                                        ${
+                                          isDone
+                                            ? "bg-blue-600 border-blue-600"
+                                            : "bg-slate-900 border-slate-700"
+                                        }
+                                        ${
+                                          isCurrent
+                                            ? "ring-4 ring-blue-500/20"
+                                            : ""
+                                        }
+                                      `}
                           >
                             {isDone && (
                               <FontAwesomeIcon
@@ -219,7 +307,6 @@ export default function ShipmentDrawer({ isOpen, onClose, data }) {
                             )}
                           </div>
 
-                          {/* Text */}
                           <div
                             className={`-mt-1.5 ml-2 ${
                               isDone ? "opacity-100" : "opacity-40"
@@ -241,34 +328,14 @@ export default function ShipmentDrawer({ isOpen, onClose, data }) {
                         </div>
                       );
                     })}
-                  </div>
+                  </div> */}
                 </div>
               </div>
             </div>
           )}
 
           {/* --- TAB 2: ITEMS --- */}
-          {activeTab === "ITEMS" && (
-            <PackagesTable data={data} />
-            // <div className="space-y-3 animate-in fade-in slide-in-from-right-4 duration-300">
-            //   <button
-            //     onClick={() =>
-            //       // window.open(`../print/labels?id=${data.id}`, "_blank")
-            //       window.open(
-            //         `/components/print/labels?id=${encodeURIComponent(data.id)}`,
-            //         "_blank",
-            //       )
-            //     }
-            //     className="flex items-center gap-2 bg-slate-700 hover:bg-slate-600 text-white px-4 py-2 rounded-lg transition-colors text-sm font-bold"
-            //   >
-            //     <FontAwesomeIcon icon={faPrint} />
-            //     <span>Print {data.packages?.length} Labels</span>
-            //   </button>
-            //   {data.packages.map((pkg, idx) => (
-            //     <PackageRow key={idx} pkg={pkg} idx={idx} />
-            //   ))}
-            // </div>
-          )}
+          {activeTab === "ITEMS" && <PackagesTable data={data} />}
 
           {/* --- TAB 3: TOOLS (EMBEDDED QR & MESSAGE) --- */}
           {activeTab === "TOOLS" && (

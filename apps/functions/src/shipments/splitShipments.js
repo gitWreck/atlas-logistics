@@ -31,7 +31,7 @@ const recalculateTotals = (packages) => {
 /* ======================================================
    SPLIT SHIPMENT (Full Implementation)
 ====================================================== */
-exports.splitShipment = onCall(
+exports.splitShipments = onCall(
   { region: "asia-southeast1", maxInstances: 10 },
   async (request) => {
     // 1. Auth Check
@@ -140,19 +140,29 @@ exports.splitShipment = onCall(
             by: uid,
           },
         ],
-
-        // audit_log: [
-        //   {
-        //     action: "CREATED_FROM_SPLIT",
-        //     at: new Date().toISOString(),
-        //     by: uid,
-        //     note: `Split ${movePackages.length} items from ${originalShipmentId}`,
-        //   },
-        // ],
       };
 
       // E. Prepare Original Shipment Updates
       const originTotals = recalculateTotals(keepPackages);
+
+      // --- NEW: TRUCK TRIP SYNC LOGIC ---
+      let tripRef = null;
+      let tripDoc = null;
+      let tripShipmentRef = null;
+
+      if (originData.currentTruckTripId) {
+        tripRef = db
+          .collection("truck_trips")
+          .doc(originData.currentTruckTripId);
+        tripDoc = await tx.get(tripRef);
+
+        if (tripDoc.exists) {
+          // Reference to the subcollection document linking this shipment to the trip
+          tripShipmentRef = tripRef
+            .collection("trip_shipments")
+            .doc(originalShipmentId);
+        }
+      }
 
       // F. WRITE OPERATIONS
 
@@ -174,6 +184,35 @@ exports.splitShipment = onCall(
           details: { newShipmentId, count: movePackages.length },
         }),
       });
+
+      // --- 2.5: Update Truck Trip (If Applicable) ---
+      if (tripDoc && tripDoc.exists) {
+        const tripData = tripDoc.data();
+
+        // 1. Update the Master Truck Trip Document
+        // Subtract the moved packages from the master trip counters
+        tx.update(tripRef, {
+          totalItems: Math.max(
+            0,
+            (tripData.totalItems || 0) - movePackages.length,
+          ),
+          itemPending: Math.max(
+            0,
+            (tripData.itemPending || 0) - movePackages.length,
+          ),
+          updatedAt: FieldValue.serverTimestamp(),
+        });
+
+        // 2. Update the Trip Shipment Subcollection Document
+        // Use the newly calculated 'originTotals' to set exact values
+        if (tripShipmentRef) {
+          tx.update(tripShipmentRef, {
+            totalItems: originTotals.totalItems,
+            pendingCount: originTotals.pending,
+            updatedAt: FieldValue.serverTimestamp(),
+          });
+        }
+      }
 
       // 3. Global Audit Log
       const globalLogRef = db.collection("audit_log").doc();

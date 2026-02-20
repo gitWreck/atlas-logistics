@@ -83,7 +83,7 @@ exports.bulkUpdateShipmentStatus =
 exports.bulkShipmentAction =
   require("./src/shipments/bulkShipmentAction").bulkShipmentAction;
 exports.splitShipments =
-  require("./src/shipments/splitShipments").splitShipment;
+  require("./src/shipments/splitShipments").splitShipments;
 exports.updateShipmentStatus =
   require("./src/shipments/updateShipmentStatus").updateShipmentStatus;
 exports.finishLoadingTruck =
