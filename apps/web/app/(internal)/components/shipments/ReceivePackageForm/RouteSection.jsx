@@ -2,7 +2,11 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faRoute, faWarehouse } from "@fortawesome/free-solid-svg-icons";
 import { WAREHOUSES } from "@/app/utility/WarehouseData";
 
-export default function RouteSection({ routeInfo, onWarehouseChange }) {
+export default function RouteSection({
+  routeInfo,
+  onWarehouseChange,
+  isPickupMode,
+}) {
   return (
     <div className="bg-slate-950/50 p-4 rounded-xl border border-slate-800">
       <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-4 flex items-center gap-2">
@@ -27,7 +31,11 @@ export default function RouteSection({ routeInfo, onWarehouseChange }) {
               className="absolute left-3 top-2.5 text-slate-500 text-xs"
             />
             <select
-              className="w-full bg-slate-900 border border-slate-700 rounded-lg pl-8 pr-3 py-2 text-sm text-white focus:border-blue-500 outline-none appearance-none cursor-pointer"
+              className={`w-full bg-slate-900 border rounded-lg pl-8 pr-3 py-2 text-sm text-white outline-none appearance-none ${
+                isPickupMode
+                  ? "border-amber-700/50 focus:border-amber-500 cursor-pointer"
+                  : "border-slate-700 focus:border-blue-500 cursor-pointer"
+              }`}
               value={routeInfo.origin}
               onChange={(e) => onWarehouseChange("origin", e.target.value)}
               required
@@ -63,7 +71,7 @@ export default function RouteSection({ routeInfo, onWarehouseChange }) {
               className="w-full bg-slate-900 border border-slate-700 rounded-lg pl-8 pr-3 py-2 text-sm text-white focus:border-emerald-500 outline-none appearance-none cursor-pointer"
               value={routeInfo.destination}
               onChange={(e) => onWarehouseChange("destination", e.target.value)}
-              required
+              required={!isPickupMode}
             >
               <option value="">Select Destination...</option>
               {WAREHOUSES.filter((w) => w.code !== routeInfo.originCode).map(

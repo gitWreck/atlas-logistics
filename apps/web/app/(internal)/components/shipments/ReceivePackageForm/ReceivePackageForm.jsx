@@ -22,8 +22,12 @@ const INITIAL_CONTACT = {
   city: "",
   province: "",
 };
-
-export default function ReceivePackageForm({ profile, onNext, initialData }) {
+export default function ReceivePackageForm({
+  profile,
+  onNext,
+  initialData,
+  isPickupMode,
+}) {
   const { showAlert, showConfirm } = useAlert();
 
   // Use initialData if the user clicked "Back" from Step 2
@@ -227,21 +231,36 @@ export default function ReceivePackageForm({ profile, onNext, initialData }) {
   const handleNext = (e) => {
     e.preventDefault();
 
-    // Validation Logic
-    if (!routeInfo.originCode || !routeInfo.destinationCode)
-      return showAlert("error", "Route Error", "Select Warehouses.");
-    if (routeInfo.originCode === routeInfo.destinationCode)
+    // 1. Origin is always required
+    if (!routeInfo.originCode) {
+      return showAlert("error", "Route Error", "Origin Hub is required.");
+    }
+
+    // 2. Destination is required ONLY if it's NOT a pickup
+    if (!isPickupMode && !routeInfo.destinationCode) {
+      return showAlert("error", "Route Error", "Select Destination Warehouse.");
+    }
+
+    // 3. If they DO select a destination, it can't be the same as origin
+    if (
+      routeInfo.destinationCode &&
+      routeInfo.originCode === routeInfo.destinationCode
+    ) {
       return showAlert(
         "error",
         "Route Error",
         "Origin and Destination cannot be the same.",
       );
-    if (items.some((it) => !it.description || !it.quantity))
+    }
+
+    // 4. Validate Items
+    if (items.some((it) => !it.description || !it.quantity)) {
       return showAlert(
         "error",
         "Item Error",
         "Please fill in all item details.",
       );
+    }
 
     // "Emit" the data to the Unified Modal state
     onNext({
@@ -267,6 +286,7 @@ export default function ReceivePackageForm({ profile, onNext, initialData }) {
           <RouteSection
             routeInfo={routeInfo}
             onWarehouseChange={handleWarehouseChange}
+            isPickupMode={isPickupMode} // <-- Add this
           />
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-8">
@@ -383,18 +403,6 @@ export default function ReceivePackageForm({ profile, onNext, initialData }) {
             rows={3}
           />
         </form>
-      </div>
-
-      {/* Footer Navigation (Fixed at bottom) */}
-      <div className="p-4 sm:p-6 border-t border-slate-800 bg-slate-950 shrink-0">
-        <button
-          type="submit"
-          form="step1-form"
-          className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-3.5 rounded-xl shadow-lg transition-all flex justify-center items-center gap-2 text-sm sm:text-base"
-        >
-          <span>Continue to Trip Selection</span>
-          <FontAwesomeIcon icon={faArrowRight} />
-        </button>
       </div>
 
       {/* --- CAMERA OVERLAY MODAL --- */}

@@ -39,6 +39,9 @@ exports.createShipmentWithPackages = onCall(
       notifySms,
       manualShipmentId,
       proofOfReceipt = [],
+
+      status = "RECEIVED", // <-- NEW
+      currentLocation = null,
     } = request.data || {};
 
     // --- VALIDATION ---
@@ -48,6 +51,7 @@ exports.createShipmentWithPackages = onCall(
         "Missing origin or destination.",
       );
     }
+
     if (!items || !Array.isArray(items) || items.length === 0) {
       throw new HttpsError(
         "invalid-argument",
@@ -59,6 +63,8 @@ exports.createShipmentWithPackages = onCall(
     const destinationSummary = `${recipient.details.city}, ${recipient.details.province}`;
 
     // Fallback: If frontend didn't send codes (legacy calls), default to 'GEN' (General)
+    // Provide a fallback for destination if it's a pickup
+    const finalDest = destination || "TBD";
     const finalOriginCode = originCode || "GEN";
     const finalDestCode = destinationCode || "GEN";
 
@@ -130,8 +136,11 @@ exports.createShipmentWithPackages = onCall(
           declaredValue: (Number(item.declaredValue) || 0) / qty, // Optional: split value per box
           isFragile: Boolean(item.isFragile),
           isPerishable: Boolean(item.isPerishable),
-          status: "RECEIVED",
-          currentLocation: originSummary,
+
+          // --- CHANGED FIELDS ---
+          status: status,
+          currentLocation: currentLocation || originSummary,
+
           loadedOnTrip: null,
           loadedAt: null,
           isDelayed: false,

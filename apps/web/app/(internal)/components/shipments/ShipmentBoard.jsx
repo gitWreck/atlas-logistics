@@ -31,6 +31,7 @@ export default function ShipmentBoard({ user, userRole, profile }) {
   // Search & Filter State
   const [activeFilter, setActiveFilter] = useState("ALL");
   const [searchQuery, setSearchQuery] = useState("");
+  const [modeFilter, setModeFilter] = useState("ALL");
 
   // --- NEW STATES ---
   const [startDate, setStartDate] = useState("");
@@ -131,6 +132,20 @@ export default function ShipmentBoard({ user, userRole, profile }) {
         }
         if (activeFilter === "DELIVERED" && s.status !== "DELIVERED")
           return false;
+      }
+
+      // D. NEW: Shipment Mode Logic
+      if (modeFilter !== "ALL") {
+        // We know it's a home pickup if the initial status or current status includes 'PICKUP'
+        // Or if the originCode equals the destinationCode (Local Collection)
+        const isPickup =
+          s.status === "PENDING_PICKUP" ||
+          s.status === "PICKED_UP" ||
+          (s.statusHistory &&
+            s.statusHistory.some((h) => h.status.includes("PICKUP")));
+
+        if (modeFilter === "PICKUP" && !isPickup) return false;
+        if (modeFilter === "DROP_OFF" && isPickup) return false;
       }
 
       return true;
@@ -262,6 +277,26 @@ export default function ShipmentBoard({ user, userRole, profile }) {
                     value={endDate}
                     onChange={(e) => setEndDate(e.target.value)}
                   />
+                </div>
+
+                {/* NEW: Mode Filter */}
+                <div className="relative w-full sm:w-36">
+                  <FontAwesomeIcon
+                    icon={faTruckFast} // Or faStore / faTruckPickup
+                    className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-sm"
+                  />
+                  <select
+                    className="w-full bg-slate-900 border border-slate-700 rounded-lg pl-9 pr-4 py-2 text-sm text-white focus:border-blue-500 focus:outline-none appearance-none cursor-pointer"
+                    value={modeFilter}
+                    onChange={(e) => {
+                      setModeFilter(e.target.value);
+                      setCurrentPage(1);
+                    }}
+                  >
+                    <option value="ALL">All Modes</option>
+                    <option value="DROP_OFF">Hub Drop-offs</option>
+                    <option value="PICKUP">Home Pickups</option>
+                  </select>
                 </div>
 
                 {/* 3. MAIN FILTER */}

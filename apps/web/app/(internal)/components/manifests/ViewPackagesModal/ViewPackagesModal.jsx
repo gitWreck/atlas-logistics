@@ -20,6 +20,7 @@ import {
   faWeightHanging,
   faWineGlass,
 } from "@fortawesome/free-solid-svg-icons";
+import { splitShipments } from "@/app/utility/FirebaseFunctions";
 
 // --- CONSTANTS ---
 const PACKAGING_TYPES = ["Box", "Sack", "Crate", "Bundle", "Roll", "Envelope"];
@@ -43,6 +44,7 @@ export default function ViewPackagesModal({
   onClose,
   shipment,
   isLocked: parentLocked,
+  onRefresh,
 }) {
   const [packages, setPackages] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -253,8 +255,8 @@ export default function ViewPackagesModal({
         (idx) => packages[idx].trackingNumber,
       );
 
-      const splitFn = httpsCallable(functions, "splitShipment");
-      const result = await splitFn({
+      // const splitFn = httpsCallable(functions, "splitShipment");
+      const result = await splitShipments({
         originalShipmentId: shipment.id,
         itemsToSplit: barcodesToSplit, // Pass the array of barcodes
       });
@@ -269,13 +271,14 @@ export default function ViewPackagesModal({
       alert("Split Failed: " + error.message);
     } finally {
       setIsSaving(false);
+      onRefresh();
     }
   };
 
   if (!isOpen || !shipment) return null;
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-[60] flex items-center justify-center sm:p-4">
       {/* Backdrop */}
       <div
         className="absolute inset-0 bg-black/70 backdrop-blur-sm"
@@ -283,33 +286,34 @@ export default function ViewPackagesModal({
       />
 
       <div
-        style={{ width: "min(95vw, 1200px)", height: "85vh" }}
-        className="relative bg-slate-900 border border-slate-700 rounded-xl shadow-2xl flex flex-col overflow-hidden"
+        className="relative bg-slate-900 border-0 sm:border border-slate-700 sm:rounded-xl shadow-2xl flex flex-col overflow-hidden w-full h-full sm:h-[85vh]"
+        style={{ maxWidth: "1200px" }} // Replaced the inline min() style for better Tailwind compatibility
       >
         {/* 1. HEADER */}
-        <div className="flex items-center justify-between p-6 border-b border-slate-800 bg-slate-950/50 rounded-t-xl shrink-0">
+        <div className="flex items-center justify-between p-4 sm:p-6 border-b border-slate-800 bg-slate-950/50 sm:rounded-t-xl shrink-0">
           <div>
-            <div className="text-xs font-bold text-blue-400 uppercase tracking-wider mb-1">
+            <div className="text-[10px] sm:text-xs font-bold text-blue-400 uppercase tracking-wider mb-1">
               Shipment Contents
             </div>
-            <h2 className="text-xl font-bold text-white flex items-center gap-3">
+            <h2 className="text-lg sm:text-xl font-bold text-white flex items-center gap-2 sm:gap-3">
               <FontAwesomeIcon icon={faBoxOpen} className="text-slate-500" />
               {shipment.trackingNumber}
             </h2>
           </div>
           <button
             onClick={onClose}
-            className="text-slate-500 hover:text-white transition-colors p-2 hover:bg-slate-800 rounded-lg"
+            className="text-slate-500 hover:text-white transition-colors p-2 hover:bg-slate-800 rounded-lg -mr-2 sm:mr-0"
           >
             <FontAwesomeIcon icon={faTimes} size="lg" />
           </button>
         </div>
 
-        {/* 2. THE BODY: Using Flex instead of Grid for better reliability */}
-        <div className="flex-1 flex flex-row overflow-hidden">
-          {/* LEFT COLUMN: Sidebar (Fixed Width) */}
-          <div className="w-[300px] shrink-0 border-r border-slate-800 bg-slate-950/20 p-6 flex flex-col gap-6 overflow-y-auto custom-scrollbar">
-            <div className="space-y-3">
+        {/* 2. THE BODY: Stacks on mobile, Row on desktop */}
+        <div className="flex-1 flex flex-col md:flex-row overflow-hidden min-h-0">
+          {/* LEFT COLUMN / TOP ROW (Sidebar) */}
+          <div className="w-full md:w-[300px] shrink-0 border-b md:border-b-0 md:border-r border-slate-800 bg-slate-950/20 p-4 sm:p-6 flex flex-col gap-4 sm:gap-6 overflow-y-auto md:overflow-y-auto max-h-[40vh] md:max-h-none custom-scrollbar">
+            {/* Stats - Grid on mobile, Stack on Desktop */}
+            <div className="grid grid-cols-2 md:grid-cols-1 gap-3">
               <PackageStatusCard
                 icon={faCube}
                 label="Count"
@@ -322,16 +326,16 @@ export default function ViewPackagesModal({
               />
             </div>
 
-            <div className="pt-6 border-t border-slate-800">
+            <div className="pt-2 md:pt-6 border-t border-slate-800/50 md:border-slate-800">
               {isAdding ? (
-                <div className="bg-blue-500/5 border border-blue-500/30 p-4 rounded-xl space-y-4 animate-in fade-in zoom-in-95">
-                  <div className="text-xs font-bold text-blue-400 uppercase mb-3">
+                <div className="bg-blue-500/5 border border-blue-500/30 p-3 sm:p-4 rounded-xl space-y-3 sm:space-y-4 animate-in fade-in zoom-in-95">
+                  <div className="text-xs font-bold text-blue-400 uppercase mb-2 sm:mb-3">
                     New Package Details
                   </div>
-                  <div className="mb-3">
+                  <div>
                     <input
                       placeholder="Description (e.g. Large Box)"
-                      className="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-3 text-sm text-white focus:border-blue-500 outline-none transition-colors"
+                      className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 sm:px-4 py-2 sm:py-3 text-sm text-white focus:border-blue-500 outline-none transition-colors"
                       value={newPackage.description}
                       onChange={(e) =>
                         setNewPackage({
@@ -342,9 +346,9 @@ export default function ViewPackagesModal({
                       autoFocus
                     />
                   </div>
-                  <div className="grid grid-cols-2 gap-3 mb-3">
+                  <div className="grid grid-cols-2 gap-2 sm:gap-3">
                     <select
-                      className="bg-slate-900 border border-slate-700 rounded-lg px-4 py-3 text-sm text-white focus:border-blue-500 outline-none transition-colors"
+                      className="bg-slate-900 border border-slate-700 rounded-lg px-2 sm:px-4 py-2 sm:py-3 text-sm text-white focus:border-blue-500 outline-none transition-colors"
                       value={newPackage.packagingType}
                       onChange={(e) =>
                         setNewPackage({
@@ -362,7 +366,7 @@ export default function ViewPackagesModal({
                     <input
                       type="number"
                       placeholder="Weight (kg)"
-                      className="bg-slate-900 border border-slate-700 rounded-lg px-4 py-3 text-sm text-white focus:border-blue-500 outline-none transition-colors"
+                      className="bg-slate-900 border border-slate-700 rounded-lg px-3 sm:px-4 py-2 sm:py-3 text-sm text-white focus:border-blue-500 outline-none transition-colors"
                       value={newPackage.weight}
                       onChange={(e) =>
                         setNewPackage({
@@ -372,11 +376,11 @@ export default function ViewPackagesModal({
                       }
                     />
                   </div>
-                  <div className="grid grid-cols-2 gap-3 mb-4">
+                  <div className="grid grid-cols-2 gap-2 sm:gap-3">
                     <input
                       type="number"
                       placeholder="Value (PHP)"
-                      className="bg-slate-900 border border-slate-700 rounded-lg px-4 py-3 text-sm text-white focus:border-blue-500 outline-none transition-colors"
+                      className="bg-slate-900 border border-slate-700 rounded-lg px-3 sm:px-4 py-2 sm:py-3 text-sm text-white focus:border-blue-500 outline-none transition-colors"
                       value={newPackage.declaredValue}
                       onChange={(e) =>
                         setNewPackage({
@@ -385,7 +389,7 @@ export default function ViewPackagesModal({
                         })
                       }
                     />
-                    <div className="flex gap-2 items-center">
+                    <div className="flex gap-1 sm:gap-2 items-center">
                       <button
                         onClick={() =>
                           setNewPackage((p) => ({
@@ -393,9 +397,10 @@ export default function ViewPackagesModal({
                             isFragile: !p.isFragile,
                           }))
                         }
-                        className={`flex-1 h-full rounded-lg border text-xs font-bold flex items-center justify-center gap-2 transition-all ${newPackage.isFragile ? "bg-amber-500/10 border-amber-500 text-amber-500" : "bg-slate-900 border-slate-700 text-slate-500 hover:border-slate-500"}`}
+                        className={`flex-1 h-full rounded-lg border text-[10px] sm:text-xs font-bold flex items-center justify-center gap-1 sm:gap-2 transition-all ${newPackage.isFragile ? "bg-amber-500/10 border-amber-500 text-amber-500" : "bg-slate-900 border-slate-700 text-slate-500 hover:border-slate-500"}`}
                       >
-                        <FontAwesomeIcon icon={faWineGlass} /> Fragile
+                        <FontAwesomeIcon icon={faWineGlass} />{" "}
+                        <span className="hidden sm:inline">Fragile</span>
                       </button>
                       <button
                         onClick={() =>
@@ -404,23 +409,24 @@ export default function ViewPackagesModal({
                             isPerishable: !p.isPerishable,
                           }))
                         }
-                        className={`flex-1 h-full rounded-lg border text-xs font-bold flex items-center justify-center gap-2 transition-all ${newPackage.isPerishable ? "bg-cyan-500/10 border-cyan-500 text-cyan-500" : "bg-slate-900 border-slate-700 text-slate-500 hover:border-slate-500"}`}
+                        className={`flex-1 h-full rounded-lg border text-[10px] sm:text-xs font-bold flex items-center justify-center gap-1 sm:gap-2 transition-all ${newPackage.isPerishable ? "bg-cyan-500/10 border-cyan-500 text-cyan-500" : "bg-slate-900 border-slate-700 text-slate-500 hover:border-slate-500"}`}
                       >
-                        <FontAwesomeIcon icon={faSnowflake} /> Perishable
+                        <FontAwesomeIcon icon={faSnowflake} />{" "}
+                        <span className="hidden sm:inline">Perish</span>
                       </button>
                     </div>
                   </div>
-                  <div className="flex justify-end gap-2">
+                  <div className="flex justify-end gap-2 pt-2">
                     <button
                       onClick={() => setIsAdding(false)}
-                      className="px-4 py-2 rounded-lg text-sm font-bold text-slate-400 hover:text-white transition-colors"
+                      className="px-3 sm:px-4 py-2 rounded-lg text-sm font-bold text-slate-400 hover:text-white transition-colors"
                     >
                       Cancel
                     </button>
                     <button
                       onClick={handleAddSave}
                       disabled={isSaving}
-                      className="px-6 py-2 rounded-lg text-sm font-bold bg-blue-600 hover:bg-blue-500 text-white shadow-lg shadow-blue-500/20 transition-colors"
+                      className="px-4 sm:px-6 py-2 rounded-lg text-sm font-bold bg-blue-600 hover:bg-blue-500 text-white shadow-lg shadow-blue-500/20 transition-colors"
                     >
                       {isSaving ? "Saving..." : "Save Package"}
                     </button>
@@ -429,7 +435,7 @@ export default function ViewPackagesModal({
               ) : (
                 <button
                   onClick={() => setIsAdding(true)}
-                  className="w-full py-10 border-2 border-dashed border-slate-800 rounded-xl text-slate-500 hover:text-blue-400 hover:border-blue-500/30 transition-all font-bold text-xs uppercase flex flex-col items-center gap-2"
+                  className="w-full py-6 md:py-10 border-2 border-dashed border-slate-800 rounded-xl text-slate-500 hover:text-blue-400 hover:border-blue-500/30 transition-all font-bold text-xs uppercase flex flex-col md:flex-row items-center justify-center gap-2"
                 >
                   <FontAwesomeIcon icon={faPlus} />
                   Add Item
@@ -438,9 +444,9 @@ export default function ViewPackagesModal({
             </div>
           </div>
 
-          {/* RIGHT COLUMN: List & Actions (Takes remaining space) */}
-          <div className="flex-1 flex flex-col bg-slate-900 overflow-hidden">
-            {/* Bulk Actions & Search (Sticky Top of right side) */}
+          {/* RIGHT COLUMN / BOTTOM ROW: List & Actions */}
+          <div className="flex-1 flex flex-col bg-slate-900 overflow-hidden min-h-0">
+            {/* Bulk Actions & Search */}
             <div className="bg-slate-950/40 border-b border-slate-800 shrink-0">
               <PackageBulkActions
                 selectedCount={selectedIndices.size}
@@ -450,12 +456,12 @@ export default function ViewPackagesModal({
                 onSplit={handleSplitShipment}
                 onStatusChange={handleBulkStatusChange}
               />
-              <div className="flex justify-between items-center border-t border-slate-800 px-4 py-3">
-                {/* LEFT SIDE */}
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center border-t border-slate-800 px-4 py-3 gap-3">
+                {/* LEFT SIDE (Select All) */}
                 <div className="flex items-center gap-4">
                   <button
                     onClick={handleSelectAll}
-                    className="hover:text-white transition-colors"
+                    className="hover:text-white transition-colors p-1 -ml-1"
                   >
                     <FontAwesomeIcon
                       icon={
@@ -466,8 +472,8 @@ export default function ViewPackagesModal({
                       }
                       className={
                         selectedIndices.size > 0
-                          ? "text-blue-500"
-                          : "text-slate-700"
+                          ? "text-blue-500 text-lg"
+                          : "text-slate-700 text-lg"
                       }
                     />
                   </button>
@@ -476,16 +482,16 @@ export default function ViewPackagesModal({
                   </span>
                 </div>
 
-                {/* RIGHT SIDE */}
-                <div className="relative w-80">
+                {/* RIGHT SIDE (Search) */}
+                <div className="relative w-full sm:w-80">
                   <FontAwesomeIcon
                     icon={faSearch}
                     className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-sm"
                   />
                   <input
                     type="text"
-                    placeholder="Search by description or barcode..."
-                    className="w-full bg-slate-950 border border-slate-800 rounded-lg pl-10 pr-4 py-2.5 text-sm text-white focus:border-blue-500 outline-none"
+                    placeholder="Search description or barcode..."
+                    className="w-full bg-slate-950 border border-slate-800 rounded-lg pl-10 pr-4 py-2 sm:py-2.5 text-sm text-white focus:border-blue-500 outline-none"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                   />
@@ -494,9 +500,8 @@ export default function ViewPackagesModal({
             </div>
 
             {/* Scrollable Package List */}
-            <div className="flex-1 overflow-y-auto p-6 custom-scrollbar space-y-3">
+            <div className="flex-1 overflow-y-auto p-4 sm:p-6 custom-scrollbar space-y-3 min-h-0">
               {filteredAndPaginatedPackages.paginated.map((pkg, idx) => {
-                // Find original index for editing/selection logic
                 const originalIdx = packages.findIndex(
                   (p) => p.trackingNumber === pkg.trackingNumber,
                 );
@@ -568,10 +573,10 @@ export default function ViewPackagesModal({
         </div>
 
         {/* 3. FOOTER */}
-        <div className="p-4 border-t border-slate-800 bg-slate-950/50 rounded-b-xl flex justify-end shrink-0">
+        <div className="p-4 border-t border-slate-800 bg-slate-950/50 sm:rounded-b-xl flex justify-end shrink-0">
           <button
             onClick={onClose}
-            className="px-6 py-2.5 bg-slate-800 hover:bg-slate-700 text-white text-sm font-bold rounded-lg border border-slate-700 transition-colors"
+            className="w-full sm:w-auto px-6 py-3 sm:py-2.5 bg-slate-800 hover:bg-slate-700 text-white text-sm font-bold rounded-lg border border-slate-700 transition-colors"
           >
             Close
           </button>

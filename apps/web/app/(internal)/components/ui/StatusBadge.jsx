@@ -31,6 +31,12 @@ export default function StatusBadge({ status, reason }) {
 
   const styles = {
     CREATED: "bg-stone-200/10 text-slate-300 border-slate-500/20",
+
+    // --- NEW PICKUP STATUSES ---
+    PENDING_PICKUP: "bg-sky-500/10 text-sky-400 border-sky-500/20",
+    DISPATCHED: "bg-indigo-500/10 text-indigo-400 border-indigo-500/20", // For local trips
+    PICKED_UP: "bg-teal-500/10 text-teal-400 border-teal-500/20",
+
     RECEIVED: "bg-cyan-500/10 text-cyan-400 border-cyan-500/20",
     ASSIGNED: "bg-yellow-500/10 text-yellow-400 border-yellow-500/20",
     LOADED: "bg-orange-500/10 text-orange-400 border-orange-500/20",

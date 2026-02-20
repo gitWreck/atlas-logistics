@@ -1,6 +1,10 @@
 import React from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faEllipsisV, faTruck } from "@fortawesome/free-solid-svg-icons";
+import {
+  faEllipsisV,
+  faTruck,
+  faTruckPickup,
+} from "@fortawesome/free-solid-svg-icons";
 import StatusBadge from "../ui/StatusBadge";
 import { formatFirestoreDate } from "@/app/utility/utilities"; // Ensure you have this
 
@@ -33,11 +37,13 @@ function StatusDot({ status, isDelayed }) {
 }
 
 export default function TripRow({ trip, onClick }) {
-  console.log("trip data: ", trip);
   const isDelayed = !!trip.delayReason && !trip.delayCleared;
   const loadedCount = trip.totalLoaded || 0;
   const totalCount = trip.totalItems || 0;
   const driverName = trip.driverName || "Unassigned";
+
+  // NEW: Determine trip type
+  const isLocal = trip.tripType === "LOCAL";
 
   return (
     <div
@@ -50,17 +56,36 @@ export default function TripRow({ trip, onClick }) {
     >
       {/* --- MOBILE ONLY HEADER (Top Row) --- */}
       <div className="flex md:hidden justify-between items-start mb-2">
-        <div className="flex items-center gap-3">
-          <StatusDot status={trip.status} isDelayed={isDelayed} />
-          <div>
+        <div className="flex items-start gap-3">
+          {/* Added mt-1 to the dot so it aligns nicely with the taller text stack */}
+          <div className="mt-1">
+            <StatusDot status={trip.status} isDelayed={isDelayed} />
+          </div>
+
+          {/* Desktop ID (Hidden on mobile) */}
+          <div className="hidden md:flex flex-col items-start gap-0.5 mt-1">
+            {/* NEW: Desktop Trip Type Badge (Moved Above) */}
             <span
-              className={`font-mono text-sm font-bold flex items-center gap-2 ${isDelayed ? "text-amber-400" : "text-blue-400"}`}
+              className={`text-[8px] tracking-wider font-bold px-1.5 py-[1px] rounded border w-max ${
+                isLocal
+                  ? "bg-amber-500/10 text-amber-500 border-amber-500/20"
+                  : "bg-blue-500/10 text-blue-500 border-blue-500/20"
+              }`}
             >
+              {isLocal ? "LOCAL PICKUP" : "TRANSFER"}
+            </span>
+
+            <span
+              className={`font-mono text-sm font-bold transition-colors flex items-center gap-2 ${
+                isDelayed ? "text-amber-400" : "text-blue-400"
+              }`}
+            >
+              <FontAwesomeIcon
+                icon={isLocal ? faTruckPickup : faTruck}
+                className="text-[10px]"
+              />
               {trip.tripId}
             </span>
-            <div className="text-[10px] text-slate-500">
-              {formatFirestoreDate(trip.updatedAt)}
-            </div>
           </div>
         </div>
         {/* Mobile Action Button */}
@@ -79,12 +104,23 @@ export default function TripRow({ trip, onClick }) {
         <div className="w-full">
           {/* Desktop ID (Hidden on mobile) */}
           <div className="hidden md:flex flex-col items-start gap-2 mt-1">
-            <span
-              className={`font-mono text-sm font-bold transition-colors flex items-center gap-2 ${isDelayed ? "text-amber-400" : "text-blue-400"}`}
-            >
-              <FontAwesomeIcon icon={faTruck} className="text-[10px]" />
-              {trip.tripId}
-            </span>
+            <div className="flex items-center gap-2">
+              <span
+                className={`font-mono text-sm font-bold transition-colors flex items-center gap-2 ${isDelayed ? "text-amber-400" : "text-blue-400"}`}
+              >
+                <FontAwesomeIcon
+                  icon={isLocal ? faTruckPickup : faTruck}
+                  className="text-[10px]"
+                />
+                {trip.tripId}
+              </span>
+              {/* NEW: Desktop Trip Type Badge */}
+              <span
+                className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${isLocal ? "bg-amber-500/10 text-amber-500 border-amber-500/20" : "bg-blue-500/10 text-blue-500 border-blue-500/20"}`}
+              >
+                {isLocal ? "LOCAL" : "TRANSFER"}
+              </span>
+            </div>
           </div>
 
           {/* Driver Info (Visible on both) */}
@@ -107,21 +143,27 @@ export default function TripRow({ trip, onClick }) {
       {/* --- COL 2: Route --- */}
       <div className="md:col-span-2 flex justify-between md:block items-center border-t border-slate-800/50 md:border-0 pt-2 md:pt-0">
         <div className="text-sm font-medium text-slate-300 flex items-center gap-2">
-          {trip.originCode} <span className="text-slate-600">→</span>{" "}
-          {trip.destinationCode}
+          {trip.originCode}
+          <span className="text-slate-600">{isLocal ? "↻" : "→"}</span>
+          {/* If it's local, the destination code might be the same, so we format it slightly differently */}
+          {isLocal && trip.originCode === trip.destinationCode
+            ? "HUB ROUTE"
+            : trip.destinationCode}
         </div>
         <div
           className="text-[10px] text-slate-500 font-mono md:mt-0.5 truncate max-w-[150px] md:max-w-[120px]"
           title={trip.route}
         >
-          {trip.origin} → {trip.destination}
+          {isLocal
+            ? "Local Collection"
+            : `${trip.origin} → ${trip.destination}`}
         </div>
       </div>
 
       {/* --- COL 3: Stats (Desktop Only - Mobile Moved to Driver Row) --- */}
       <div className="hidden md:block col-span-1 pr-4">
-        <span className="text text-slate-500 font-mono border-l border-slate-700 pl-2">
-          {loadedCount}/{totalCount} Loaded
+        <span className="text-xs text-slate-500 font-mono border-l border-slate-700 pl-2">
+          {loadedCount}/{totalCount}
         </span>
       </div>
 

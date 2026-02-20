@@ -3,8 +3,11 @@ import { signOut } from "firebase/auth";
 export function calculateProgress(status) {
   switch (status) {
     case "CREATED":
+    case "PENDING_PICKUP": // 1. Initial State (Walk-in or Home Request)
       return 10;
-    case "RECEIVED":
+    case "PICKED_UP": // 2. Driver collected it, heading to Hub
+      return 15;
+    case "RECEIVED": // 3. Arrived at the Origin Hub
       return 25;
     case "ASSIGNED":
       return 40;
@@ -22,6 +25,11 @@ export function calculateProgress(status) {
       return 99;
     case "COMPLETED":
       return 100;
+    case "CANCELLED":
+    case "DELAYED":
+      // Optional: You can handle delayed/cancelled here if you want the bar to freeze
+      // where it was, but normally your UI handles the color change based on the status string.
+      return 0;
     default:
       return 0;
   }
