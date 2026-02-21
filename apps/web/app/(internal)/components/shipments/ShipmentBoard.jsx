@@ -1,26 +1,24 @@
 "use client";
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo, useEffect, forwardRef, useImperativeHandle } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faSearch,
-  faPlus,
   faSync,
   faFilter,
   faTruckFast,
   faFileCsv,
-  faCalendarAlt, // Added
-  faChevronLeft, // Added
-  faChevronRight, // Added
-  faExclamationCircle, // Added
+  faCalendarAlt,
+  faChevronLeft,
+  faChevronRight,
+  faExclamationCircle,
 } from "@fortawesome/free-solid-svg-icons";
 import ShipmentRow from "./ShipmentRow";
 import ShipmentDrawer from "./ShipmentDrawer";
 import ReceivePackageForm from "./ReceivePackageForm";
-// import { auth } from "@/lib/firebase";
 import { calculateProgress } from "@/app/utility/utilities";
 import UnifiedShipmentModal from "./UnifiedShipmentModal";
 
-export default function ShipmentBoard({ user, userRole, profile }) {
+const ShipmentBoard = forwardRef(function ShipmentBoard({ user, userRole, profile }, ref) {
   const [shipments, setShipments] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -168,65 +166,27 @@ export default function ShipmentBoard({ user, userRole, profile }) {
     fetchShipments();
   };
 
+  useImperativeHandle(ref, () => ({
+    openCreateModal: () => setIsNewOrderModalOpen(true),
+  }), []);
+
   return (
     <div className="min-h-screen bg-slate-950 text-slate-200 font-sans">
-      {/* --- PAGE HEADER --- */}
-      <div className="sticky top-0 z-30 bg-slate-950/80 backdrop-blur-md border-b border-slate-800 px-4 sm:px-6 py-4">
-        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-          {/* Title Section */}
-          <div className="flex items-center gap-3 w-full sm:w-auto">
-            <div className="h-10 w-10 bg-blue-600/20 rounded-xl flex items-center justify-center text-blue-500 shrink-0">
-              <FontAwesomeIcon icon={faTruckFast} size="lg" />
-            </div>
-            <div className="flex-1">
-              <h1 className="flex text-xl font-bold text-white tracking-tight gap-2 items-center">
-                Shipments
-                <button
-                  onClick={fetchShipments}
-                  disabled={loading}
-                  className="text-slate-500 hover:text-white transition-colors p-1"
-                >
-                  <FontAwesomeIcon
-                    icon={faSync}
-                    spin={loading}
-                    className="text-xs"
-                  />
-                </button>
-              </h1>
-              <p className="text-xs text-slate-500 line-clamp-1">
-                Manage shipments and orders.
-              </p>
-            </div>
-
-            {/* Mobile Create Button */}
-            <button
-              onClick={() => setIsNewOrderModalOpen(true)}
-              className="sm:hidden bg-blue-600 text-white h-10 w-10 rounded-lg flex items-center justify-center shadow-lg shadow-blue-500/20"
-            >
-              <FontAwesomeIcon icon={faPlus} />
-            </button>
-          </div>
-
-          {/* Desktop Create Button */}
-          <div className="hidden sm:flex gap-3">
-            <button
-              onClick={() => setIsNewOrderModalOpen(true)}
-              className="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 shadow-lg shadow-blue-500/20 transition-all"
-            >
-              <FontAwesomeIcon icon={faPlus} />
-              <span>Shipment</span>
-            </button>
-          </div>
-        </div>
-      </div>
-
       {/* --- MAIN CONTENT --- */}
       <main className="max-w-7xl mx-auto p-4 sm:p-6">
         <div className="border border-slate-800 rounded-xl bg-slate-900/50 overflow-hidden shadow-xl backdrop-blur-sm">
           {/* CARD HEADER: Search & Filters */}
           <div className="px-4 sm:px-6 py-4 border-b border-slate-800 flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4 bg-slate-950/30">
-            <h3 className="font-bold text-white whitespace-nowrap hidden xl:block">
+            <h3 className="font-bold text-white whitespace-nowrap hidden xl:flex items-center gap-2">
               Recent Orders
+              <button
+                onClick={fetchShipments}
+                disabled={loading}
+                className="text-slate-500 hover:text-white transition-colors p-1 rounded hover:bg-slate-800"
+                title="Refresh"
+              >
+                <FontAwesomeIcon icon={faSync} spin={loading} className="text-xs" />
+              </button>
             </h3>
 
             {/* CONTROL GROUP */}
@@ -394,4 +354,6 @@ export default function ShipmentBoard({ user, userRole, profile }) {
       />
     </div>
   );
-}
+});
+
+export default ShipmentBoard;

@@ -32,7 +32,7 @@ function StatusDot({ status, isDelayed }) {
   );
 }
 
-export default function TripRow({ trip, onClick }) {
+export default function TripRow({ trip, onClick, isDark = false }) {
   console.log("trip data: ", trip);
   const isDelayed = !!trip.delayReason && !trip.delayCleared;
   const loadedCount = trip.totalLoaded || 0;
@@ -43,9 +43,10 @@ export default function TripRow({ trip, onClick }) {
     <div
       onClick={() => onClick(trip.id)}
       className={`
-        relative flex flex-col gap-3 p-4 border-b border-slate-800/50 cursor-pointer transition-colors group
+        relative flex flex-col gap-3 p-4 border-b cursor-pointer transition-colors group
         md:grid md:grid-cols-12 md:gap-4 md:px-6 md:items-center
-        ${isDelayed ? "bg-amber-500/5 hover:bg-amber-500/10" : "hover:bg-slate-800/30"}
+        ${isDark ? "border-slate-800/50" : "border-slate-200"}
+        ${isDelayed ? (isDark ? "bg-amber-500/5 hover:bg-amber-500/10" : "bg-amber-50 hover:bg-amber-50/80") : (isDark ? "hover:bg-slate-800/30" : "hover:bg-slate-50")}
       `}
     >
       {/* --- MOBILE ONLY HEADER (Top Row) --- */}
@@ -54,17 +55,17 @@ export default function TripRow({ trip, onClick }) {
           <StatusDot status={trip.status} isDelayed={isDelayed} />
           <div>
             <span
-              className={`font-mono text-sm font-bold flex items-center gap-2 ${isDelayed ? "text-amber-400" : "text-blue-400"}`}
+              className={`font-mono text-sm font-bold flex items-center gap-2 ${isDelayed ? (isDark ? "text-amber-400" : "text-amber-700") : (isDark ? "text-blue-400" : "text-blue-600")}`}
             >
               {trip.tripId}
             </span>
-            <div className="text-[10px] text-slate-500">
+            <div className={`text-[10px] ${isDark ? "text-slate-500" : "text-slate-600"}`}>
               {formatFirestoreDate(trip.updatedAt)}
             </div>
           </div>
         </div>
         {/* Mobile Action Button */}
-        <button className="text-slate-500 p-2 -mr-2">
+        <button className={`p-2 -mr-2 ${isDark ? "text-slate-500" : "text-slate-600"}`}>
           <FontAwesomeIcon icon={faEllipsisV} />
         </button>
       </div>
@@ -80,7 +81,7 @@ export default function TripRow({ trip, onClick }) {
           {/* Desktop ID (Hidden on mobile) */}
           <div className="hidden md:flex flex-col items-start gap-2 mt-1">
             <span
-              className={`font-mono text-sm font-bold transition-colors flex items-center gap-2 ${isDelayed ? "text-amber-400" : "text-blue-400"}`}
+              className={`font-mono text-sm font-bold transition-colors flex items-center gap-2 ${isDelayed ? (isDark ? "text-amber-400" : "text-amber-700") : (isDark ? "text-blue-400" : "text-blue-600")}`}
             >
               <FontAwesomeIcon icon={faTruck} className="text-[10px]" />
               {trip.tripId}
@@ -88,16 +89,16 @@ export default function TripRow({ trip, onClick }) {
           </div>
 
           {/* Driver Info (Visible on both) */}
-          <div className="text-xs text-slate-400 md:mt-1 flex items-center justify-between md:justify-start gap-2 w-full">
+          <div className={`text-xs md:mt-1 flex items-center justify-between md:justify-start gap-2 w-full ${isDark ? "text-slate-400" : "text-slate-600"}`}>
             <div className="flex items-center gap-2">
-              <span className="font-medium text-slate-300">{driverName}</span>
-              <span className="text-slate-600">•</span>
-              <span className="font-mono text-slate-500">
+              <span className={`font-medium ${isDark ? "text-slate-300" : "text-slate-700"}`}>{driverName}</span>
+              <span className={isDark ? "text-slate-600" : "text-slate-400"}>•</span>
+              <span className={`font-mono ${isDark ? "text-slate-500" : "text-slate-600"}`}>
                 {trip.truckPlateNumber || "No Plate"}
               </span>
             </div>
             {/* Mobile Loaded Count (Moved here for space) */}
-            <span className="md:hidden text-slate-500 font-mono text-[10px]">
+            <span className={`md:hidden font-mono text-[10px] ${isDark ? "text-slate-500" : "text-slate-600"}`}>
               {loadedCount}/{totalCount} Items
             </span>
           </div>
@@ -105,13 +106,13 @@ export default function TripRow({ trip, onClick }) {
       </div>
 
       {/* --- COL 2: Route --- */}
-      <div className="md:col-span-2 flex justify-between md:block items-center border-t border-slate-800/50 md:border-0 pt-2 md:pt-0">
-        <div className="text-sm font-medium text-slate-300 flex items-center gap-2">
-          {trip.originCode} <span className="text-slate-600">→</span>{" "}
+      <div className={`md:col-span-2 flex justify-between md:block items-center border-t md:border-0 pt-2 md:pt-0 ${isDark ? "border-slate-800/50" : "border-slate-200"}`}>
+        <div className={`text-sm font-medium flex items-center gap-2 ${isDark ? "text-slate-300" : "text-slate-700"}`}>
+          {trip.originCode} <span className={isDark ? "text-slate-600" : "text-slate-500"}>→</span>{" "}
           {trip.destinationCode}
         </div>
         <div
-          className="text-[10px] text-slate-500 font-mono md:mt-0.5 truncate max-w-[150px] md:max-w-[120px]"
+          className={`text-[10px] font-mono md:mt-0.5 truncate max-w-[150px] md:max-w-[120px] ${isDark ? "text-slate-500" : "text-slate-600"}`}
           title={trip.route}
         >
           {trip.origin} → {trip.destination}
@@ -120,7 +121,7 @@ export default function TripRow({ trip, onClick }) {
 
       {/* --- COL 3: Stats (Desktop Only - Mobile Moved to Driver Row) --- */}
       <div className="hidden md:block col-span-1 pr-4">
-        <span className="text text-slate-500 font-mono border-l border-slate-700 pl-2">
+        <span className={`text font-mono border-l pl-2 ${isDark ? "text-slate-500 border-slate-700" : "text-slate-600 border-slate-300"}`}>
           {loadedCount}/{totalCount} Loaded
         </span>
       </div>
@@ -128,12 +129,12 @@ export default function TripRow({ trip, onClick }) {
       {/* --- COL 4: Progress Bar --- */}
       <div className="md:col-span-3 md:pr-4 w-full">
         {/* Load Stats (Desktop Only) */}
-        <div className="hidden md:flex justify-between text-[10px] text-slate-500 mb-1">
+        <div className={`hidden md:flex justify-between text-[10px] mb-1 ${isDark ? "text-slate-500" : "text-slate-600"}`}>
           <span>{trip.progress}%</span>
         </div>
 
         {/* Bar */}
-        <div className="h-1.5 w-full bg-slate-800 rounded-full overflow-hidden mt-1 md:mt-0">
+        <div className={`h-1.5 w-full rounded-full overflow-hidden mt-1 md:mt-0 ${isDark ? "bg-slate-800" : "bg-slate-200"}`}>
           <div
             className={`h-full rounded-full transition-all duration-500 ${
               trip.status === "COMPLETED"
@@ -149,12 +150,18 @@ export default function TripRow({ trip, onClick }) {
         {/* Status Text (Desktop Only) */}
         <div className="mt-1.5 gap-2 hidden md:flex">
           {isDelayed && (
-            <span className="text-[10px] bg-amber-600 text-white px-1.5 rounded animate-pulse font-bold">
+            <span className={`text-[10px] px-1.5 rounded animate-pulse font-bold ${isDark ? "bg-amber-600 text-white" : "bg-amber-100 text-amber-800"}`}>
               DELAYED
             </span>
           )}
           <span
-            className={`text-[10px] font-bold uppercase tracking-wide ${isDelayed ? "text-amber-400" : trip.status === "COMPLETED" ? "text-emerald-400" : "text-blue-400"}`}
+            className={`text-[10px] font-bold uppercase tracking-wide ${
+              isDelayed
+                ? isDark ? "text-amber-400" : "text-amber-700"
+                : trip.status === "COMPLETED"
+                  ? isDark ? "text-emerald-400" : "text-emerald-600"
+                  : isDark ? "text-blue-400" : "text-blue-600"
+            }`}
           >
             {isDelayed
               ? trip.delayReason?.replace("_", " ") || "DELAYED"
@@ -165,11 +172,11 @@ export default function TripRow({ trip, onClick }) {
 
       {/* --- COL 5: Time (Desktop Only) --- */}
       <div className="hidden md:flex col-span-2 flex-col gap-1">
-        <div className="text-xs text-slate-500 flex items-center gap-1.5">
+        <div className={`text-xs flex items-center gap-1.5 ${isDark ? "text-slate-500" : "text-slate-600"}`}>
           {formatFirestoreDate(trip.updatedAt)}
         </div>
         {trip.status !== "COMPLETED" && trip.estimatedArrival && (
-          <div className="text-xs text-slate-600">
+          <div className={`text-xs ${isDark ? "text-slate-600" : "text-slate-500"}`}>
             ETA: {new Date(trip.estimatedArrival).toLocaleDateString()}
           </div>
         )}
@@ -178,7 +185,7 @@ export default function TripRow({ trip, onClick }) {
       {/* --- COL 6: Action (Desktop Only) --- */}
       <div className="hidden md:block col-span-1 text-right">
         <button
-          className="text-slate-500 hover:text-white p-2 hover:bg-slate-800 rounded-full transition-colors"
+          className={`p-2 rounded-full transition-colors ${isDark ? "text-slate-500 hover:text-white hover:bg-slate-800" : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"}`}
           onClick={(e) => {
             e.stopPropagation();
             onClick(trip.id);
