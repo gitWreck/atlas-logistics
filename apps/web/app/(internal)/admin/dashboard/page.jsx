@@ -50,8 +50,13 @@ export default function AdminDashboardPage() {
   const tripBoardRef = useRef(null);
   const shipmentBoardRef = useRef(null);
   const truckBoardRef = useRef(null);
+  const mainScrollRef = useRef(null);
 
   const currentTabConfig = useMemo(() => mainNavItems.find((t) => t.id === activeTab) || mainNavItems[0], [activeTab]);
+
+  useEffect(() => {
+    mainScrollRef.current?.scrollTo(0, 0);
+  }, [activeTab]);
 
   const headerButton = useMemo(() => {
     if (activeTab === "trips") return { label: "Trip", icon: faPlus, accent: "emerald", onClick: () => tripBoardRef.current?.openCreateTripModal?.() };
@@ -293,7 +298,7 @@ export default function AdminDashboardPage() {
         </header>
 
         {/* Scrollable content area */}
-        <main className="flex-1 overflow-y-auto">
+        <main ref={mainScrollRef} className="flex-1 overflow-y-auto">
           <div className="max-w-7xl mx-auto w-full px-4 sm:px-6 py-6 space-y-6">
             {/* Summary cards row - only show on Overview tab */}
             {activeTab === "overview" && (
