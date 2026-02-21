@@ -1,6 +1,5 @@
 "use client";
-import React, { useEffect, useState } from "react"; // Added useEffect
-// import TripManager from "../../components/trips/TripManager";
+import React, { useEffect, useState, useRef, useMemo } from "react";
 import ShipmentBoard from "../../components/shipments/ShipmentBoard";
 import TripBoard from "../../components/trips/TripBoard";
 import AdminOverview from "../../components/admin/AdminOverview";
@@ -19,6 +18,7 @@ import {
   faMoon,
   faChevronLeft,
   faChevronRight,
+  faPlus,
 } from "@fortawesome/free-solid-svg-icons";
 import { useRouter } from "next/navigation";
 import { auth } from "@/lib/firebase";
@@ -28,10 +28,10 @@ import NotificationBell from "../../components/notifications/NotificationBell";
 import TruckBoard from "../../components/trucks/TruckBoard";
 
 const mainNavItems = [
-  { id: "overview", label: "Dashboard", icon: faChartPie },
-  { id: "trips", label: "Trips", icon: faMapSigns },
-  { id: "shipments", label: "Shipments", icon: faTruck },
-  { id: "trucks", label: "Trucks", icon: faTruckLoading },
+  { id: "overview", label: "Dashboard", icon: faChartPie, title: "Overview", description: "Operations dashboard" },
+  { id: "trips", label: "Trips", icon: faMapSigns, title: "Trip Board", description: "Manage truck assignments and routes." },
+  { id: "shipments", label: "Shipments", icon: faTruck, title: "Shipments", description: "Manage shipments and orders." },
+  { id: "trucks", label: "Trucks", icon: faTruckLoading, title: "Truck Board", description: "Manage fleet health and availability." },
 ];
 
 const secondaryNavItems = [
@@ -47,6 +47,18 @@ export default function AdminDashboardPage() {
   const [isDark, setIsDark] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const { user, profile, loading } = useAuth();
+  const tripBoardRef = useRef(null);
+  const shipmentBoardRef = useRef(null);
+  const truckBoardRef = useRef(null);
+
+  const currentTabConfig = useMemo(() => mainNavItems.find((t) => t.id === activeTab) || mainNavItems[0], [activeTab]);
+
+  const headerButton = useMemo(() => {
+    if (activeTab === "trips") return { label: "Trip", icon: faPlus, accent: "emerald", onClick: () => tripBoardRef.current?.openCreateTripModal?.() };
+    if (activeTab === "shipments") return { label: "Shipment", icon: faPlus, accent: "blue", onClick: () => shipmentBoardRef.current?.openCreateModal?.() };
+    if (activeTab === "trucks") return { label: "Register Truck", icon: faPlus, accent: "blue", onClick: () => truckBoardRef.current?.openRegisterModal?.() };
+    return null;
+  }, [activeTab]);
 
   useEffect(() => {
     // 1. Do nothing while loading
@@ -196,15 +208,15 @@ export default function AdminDashboardPage() {
 
       {/* Main content area - min-h-0 lets main scroll inside flex */}
       <section className="flex-1 flex flex-col min-h-0">
-        {/* Topbar - collapse button + actions */}
+        {/* Topbar - collapse button + title + actions */}
         <header
-          className={`flex items-center justify-between gap-4 border-b pl-0 pr-4 sm:pl-0 sm:pr-6 py-4 ${topbarClasses}`}
+          className={`flex items-center justify-between gap-4 border-b pl-4 pr-4 sm:pl-6 sm:pr-6 py-4 min-h-[72px] ${topbarClasses}`}
         >
-          {/* Sidebar collapse toggle - between sidebar and header */}
+          {/* Sidebar collapse toggle */}
           <button
             type="button"
             onClick={() => setIsSidebarCollapsed((prev) => !prev)}
-            className={`hidden md:flex h-7 w-7 shrink-0 items-center justify-center rounded-full -translate-x-1/2 -ml-px shadow-sm ${sidebarToggleClasses}`}
+            className={`hidden md:flex h-7 w-7 shrink-0 items-center justify-center rounded-full shadow-sm ${sidebarToggleClasses}`}
             title={isSidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
           >
             <FontAwesomeIcon
@@ -213,8 +225,43 @@ export default function AdminDashboardPage() {
             />
           </button>
 
-          {/* Actions */}
-          <div className="flex items-center gap-3 sm:gap-4 ml-auto">
+          {/* Tab title & description */}
+          <div className={`flex-1 min-w-0 px-2 ${isDark ? "text-white" : "text-slate-900"}`}>
+            <h1 className="font-bold tracking-wide text-lg uppercase leading-tight">
+              {currentTabConfig?.title ?? "Dashboard"}
+            </h1>
+            <p className={`text-xs mt-0.5 leading-tight ${isDark ? "text-slate-400" : "text-slate-600"}`}>
+              {currentTabConfig?.description ?? "Operations dashboard"}
+            </p>
+          </div>
+
+          {/* Actions + optional header button */}
+          <div className="flex items-center gap-3 sm:gap-4 shrink-0">
+            {headerButton && (
+              <>
+                <button
+                  onClick={headerButton.onClick}
+                  className={`hidden sm:flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-white transition-all ${
+                    headerButton.accent === "emerald"
+                      ? "bg-emerald-600 hover:bg-emerald-500 shadow-lg shadow-emerald-500/20"
+                      : "bg-blue-600 hover:bg-blue-500 shadow-lg shadow-blue-500/20"
+                  }`}
+                >
+                  <FontAwesomeIcon icon={headerButton.icon} />
+                  <span>{headerButton.label}</span>
+                </button>
+                <button
+                  onClick={headerButton.onClick}
+                  className={`sm:hidden h-10 w-10 rounded-lg flex items-center justify-center text-white ${
+                    headerButton.accent === "emerald"
+                      ? "bg-emerald-600 shadow-lg shadow-emerald-500/20"
+                      : "bg-blue-600 shadow-lg shadow-blue-500/20"
+                  }`}
+                >
+                  <FontAwesomeIcon icon={headerButton.icon} />
+                </button>
+              </>
+            )}
             {/* Theme toggle */}
             <button
               type="button"
@@ -377,6 +424,7 @@ export default function AdminDashboardPage() {
                 )}
                 {activeTab === "trips" && (
                   <TripBoard
+                    ref={tripBoardRef}
                     user={user}
                     userRole="admin"
                     profile={profile}
@@ -385,6 +433,7 @@ export default function AdminDashboardPage() {
                 )}
                 {activeTab === "shipments" && (
                   <ShipmentBoard
+                    ref={shipmentBoardRef}
                     user={user}
                     userRole="admin"
                     profile={profile}
@@ -392,6 +441,7 @@ export default function AdminDashboardPage() {
                 )}
                 {activeTab === "trucks" && (
                   <TruckBoard
+                    ref={truckBoardRef}
                     user={user}
                     userRole="admin"
                     profile={profile}

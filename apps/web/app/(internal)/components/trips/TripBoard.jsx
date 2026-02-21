@@ -1,21 +1,19 @@
 "use client";
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo, useEffect, forwardRef, useImperativeHandle } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faSearch,
-  faPlus,
   faSync,
   faFilter,
-  faRoute,
   faChevronLeft,
   faChevronRight,
 } from "@fortawesome/free-solid-svg-icons";
-import TripRow from "./TripRow"; // <--- We will create this next
+import TripRow from "./TripRow";
 import { calculateProgress } from "@/app/utility/utilities";
 import TripDrawer from "./TripDrawer";
 import CreateTripModal from "../manifests/modals/CreateTripModal";
 
-export default function TripBoard({ user, userRole, profile, isDark = false }) {
+const TripBoard = forwardRef(function TripBoard({ user, userRole, profile, isDark = false }, ref) {
   const [trips, setTrips] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -132,84 +130,16 @@ export default function TripBoard({ user, userRole, profile, isDark = false }) {
 
   const selectedTrip = trips.find((t) => t.id === selectedTripId);
 
+  useImperativeHandle(ref, () => ({
+    openCreateTripModal: () => setIsNewTripModalOpen(true),
+  }), []);
+
   return (
     <div
       className={`min-h-screen font-sans ${
         isDark ? "bg-slate-950 text-slate-200" : "bg-slate-50 text-slate-900"
       }`}
     >
-      {/* --- HEADER --- */}
-      <div
-        className={`sticky top-0 z-30 backdrop-blur-md border-b px-4 sm:px-6 py-4 ${
-          isDark
-            ? "bg-slate-950/80 border-slate-800"
-            : "bg-white/80 border-slate-200"
-        }`}
-      >
-        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-          {/* Title Section */}
-          <div className="flex gap-3 w-full sm:w-auto">
-            <div
-              className={`h-10 w-10 rounded-xl flex items-center justify-center shrink-0 ${
-                isDark
-                  ? "bg-emerald-600/20 text-emerald-500"
-                  : "bg-emerald-100 text-emerald-600"
-              }`}
-            >
-              <FontAwesomeIcon icon={faRoute} size="lg" />
-            </div>
-            <div className="flex-1">
-              <h1
-                className={`flex text-xl font-bold tracking-tight gap-2 items-center ${
-                  isDark ? "text-white" : "text-slate-900"
-                }`}
-              >
-                Trip Board
-                <button
-                  onClick={fetchTrips}
-                  disabled={loading}
-                  className={`transition-colors p-1 ${
-                    isDark
-                      ? "text-slate-500 hover:text-white"
-                      : "text-slate-400 hover:text-slate-700"
-                  }`}
-                >
-                  <FontAwesomeIcon
-                    icon={faSync}
-                    spin={loading}
-                    className="text-xs"
-                  />
-                </button>
-              </h1>
-              <p
-                className={`text-xs line-clamp-1 ${
-                  isDark ? "text-slate-500" : "text-slate-600"
-                }`}
-              >
-                Manage truck assignments and routes.
-              </p>
-            </div>
-
-            {/* Mobile Create Button (Visible only on small screens) */}
-            <button
-              onClick={() => setIsNewTripModalOpen(true)}
-              className="sm:hidden bg-emerald-600 text-white h-10 w-10 rounded-lg flex items-center justify-center shadow-lg shadow-emerald-500/20"
-            >
-              <FontAwesomeIcon icon={faPlus} />
-            </button>
-          </div>
-
-          {/* Desktop Create Button (Hidden on mobile) */}
-          <button
-            onClick={() => setIsNewTripModalOpen(true)}
-            className="hidden sm:flex bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-lg text-sm font-medium items-center gap-2 shadow-lg shadow-emerald-500/20 transition-all"
-          >
-            <FontAwesomeIcon icon={faPlus} />
-            <span>Trip</span>
-          </button>
-        </div>
-      </div>
-
       {/* --- CONTENT --- */}
       <main className="max-w-7xl mx-auto p-4 sm:p-6">
         <div
@@ -226,11 +156,23 @@ export default function TripBoard({ user, userRole, profile, isDark = false }) {
             }`}
           >
             <h3
-              className={`font-bold whitespace-nowrap hidden xl:block ${
+              className={`font-bold whitespace-nowrap hidden xl:flex items-center gap-2 ${
                 isDark ? "text-white" : "text-slate-900"
               }`}
             >
               Active Manifests
+              <button
+                onClick={fetchTrips}
+                disabled={loading}
+                className={`transition-colors p-1 rounded ${
+                  isDark
+                    ? "text-slate-500 hover:text-white hover:bg-slate-800"
+                    : "text-slate-400 hover:text-slate-700 hover:bg-slate-200"
+                }`}
+                title="Refresh"
+              >
+                <FontAwesomeIcon icon={faSync} spin={loading} className="text-xs" />
+              </button>
             </h3>
 
             {/* Filter Container - Stack on mobile, Row on Desktop */}
@@ -339,7 +281,7 @@ export default function TripBoard({ user, userRole, profile, isDark = false }) {
               </div>
             ) : (
               currentItems.map((t) => (
-                <TripRow key={t.id} trip={t} onClick={setSelectedTripId} />
+                <TripRow key={t.id} trip={t} onClick={setSelectedTripId} isDark={isDark} />
               ))
             )}
           </div>
@@ -411,4 +353,6 @@ export default function TripBoard({ user, userRole, profile, isDark = false }) {
       />
     </div>
   );
-}
+});
+
+export default TripBoard;
