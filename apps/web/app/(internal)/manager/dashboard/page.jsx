@@ -71,6 +71,10 @@ export default function ManagerDashboardPage() {
     }
   }, [user, profile, loading, router]);
 
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [activeTab]);
+
   if (loading)
     return (
       <div className="p-10 text-slate-400">Loading Manager Console...</div>
