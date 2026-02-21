@@ -350,6 +350,7 @@ const TripBoard = forwardRef(function TripBoard({ user, userRole, profile, isDar
         isOpen={isNewTripModalOpen}
         onClose={() => setIsNewTripModalOpen(false)}
         onSuccess={fetchTrips}
+        isDark={isDark}
       />
     </div>
   );
