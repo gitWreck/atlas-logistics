@@ -8,7 +8,7 @@ import {
 } from "@fortawesome/free-solid-svg-icons";
 import { auth } from "@/lib/firebase";
 
-export default function TruckSelectInput({ value, onChange, onSelectId }) {
+export default function TruckSelectInput({ value, onChange, onSelectId, isDark = true }) {
   const [trucks, setTrucks] = useState([]);
   const [suggestions, setSuggestions] = useState([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -60,11 +60,13 @@ export default function TruckSelectInput({ value, onChange, onSelectId }) {
   return (
     <div className="space-y-1 relative">
       <div className="flex justify-between items-center">
-        <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+        <label className={`text-xs font-bold uppercase tracking-wider ${isDark ? "text-slate-400" : "text-slate-600"}`}>
           Truck Plate #
         </label>
         {verified && (
-          <span className="text-[10px] font-bold bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded-full flex items-center gap-1 border border-emerald-500/10">
+          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 ${
+            isDark ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/10" : "bg-emerald-100 text-emerald-700 border border-emerald-200"
+          }`}>
             <FontAwesomeIcon icon={faCheckCircle} /> Ready for Trip
           </span>
         )}
@@ -73,11 +75,10 @@ export default function TruckSelectInput({ value, onChange, onSelectId }) {
       <input
         required
         autoComplete="off"
-        // className={`w-full bg-slate-950 border rounded-lg p-2.5 text-sm text-white outline-none transition-all ${
-        className={`w-full bg-slate-950 border rounded-lg p-2 text-white outline-none transition-colors ${
-          verified
-            ? "border-emerald-500/50 ring-1 ring-emerald-500/10"
-            : "border-slate-700 focus:border-blue-500"
+        className={`w-full border rounded-lg p-2 outline-none transition-colors ${
+          isDark
+            ? `bg-slate-950 text-white ${verified ? "border-emerald-500/50 ring-1 ring-emerald-500/10" : "border-slate-700 focus:border-blue-500"}`
+            : `bg-white text-slate-900 ${verified ? "border-emerald-500/50 ring-1 ring-emerald-500/10" : "border-slate-300 focus:border-blue-500"}`
         }`}
         placeholder="Search plate or model..."
         value={value}
@@ -99,9 +100,11 @@ export default function TruckSelectInput({ value, onChange, onSelectId }) {
 
       {/* DROPDOWN */}
       {showSuggestions && (
-        <div className="absolute top-full left-0 right-0 mt-1 bg-slate-900 border border-slate-700 rounded-lg shadow-2xl z-[60] max-h-48 overflow-y-auto custom-scrollbar">
+        <div className={`absolute top-full left-0 right-0 mt-1 border rounded-lg shadow-2xl z-[60] max-h-48 overflow-y-auto custom-scrollbar ${
+          isDark ? "bg-slate-900 border-slate-700" : "bg-white border-slate-200"
+        }`}>
           {loading ? (
-            <div className="p-4 text-center text-slate-500 text-xs">
+            <div className={`p-4 text-center text-xs ${isDark ? "text-slate-500" : "text-slate-600"}`}>
               <FontAwesomeIcon icon={faSpinner} spin />
             </div>
           ) : suggestions.length > 0 ? (
@@ -109,23 +112,29 @@ export default function TruckSelectInput({ value, onChange, onSelectId }) {
               <div
                 key={t.id}
                 onMouseDown={() => handleSelect(t)}
-                className="p-3 hover:bg-slate-800 cursor-pointer border-b border-slate-800/50 last:border-0 flex items-center justify-between group"
+                className={`p-3 cursor-pointer border-b last:border-0 flex items-center justify-between group ${
+                  isDark ? "hover:bg-slate-800 border-slate-800/50" : "hover:bg-slate-100 border-slate-200"
+                }`}
               >
                 <div>
-                  <div className="text-sm font-mono font-bold text-slate-200 group-hover:text-blue-400 uppercase">
+                  <div className={`text-sm font-mono font-bold uppercase group-hover:text-blue-500 ${
+                    isDark ? "text-slate-200" : "text-slate-900"
+                  }`}>
                     {t.plateNumber}
                   </div>
-                  <div className="text-[10px] text-slate-500 font-medium">
+                  <div className={`text-[10px] font-medium ${isDark ? "text-slate-500" : "text-slate-600"}`}>
                     {t.model} • {t.type}
                   </div>
                 </div>
-                <div className="text-[9px] font-bold bg-slate-950 px-1.5 py-0.5 rounded text-slate-600 border border-slate-800">
+                <div className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${
+                  isDark ? "bg-slate-950 text-slate-600 border border-slate-800" : "bg-slate-100 text-slate-700 border border-slate-200"
+                }`}>
                   {t.payloadCapacity || t.payload} KG
                 </div>
               </div>
             ))
           ) : (
-            <div className="p-4 text-center text-slate-500 text-xs italic">
+            <div className={`p-4 text-center text-xs italic ${isDark ? "text-slate-500" : "text-slate-600"}`}>
               No available trucks found
             </div>
           )}
