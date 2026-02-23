@@ -282,7 +282,7 @@ function ManifestContent() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-900 pb-10 print:bg-white print:pb-0 flex flex-col items-center">
+    <div className="min-h-screen bg-slate-100 pb-10 print:bg-white print:pb-0 flex flex-col items-center">
       <style jsx global>{`
         @media print {
           @page {
@@ -296,7 +296,7 @@ function ManifestContent() {
       `}</style>
 
       {/* TOOLBAR */}
-      <div className="sticky top-0 z-50 bg-slate-900/80 backdrop-blur-md border-b border-slate-800 p-4 print:hidden shadow-lg mb-8 w-full">
+      <div className="sticky top-0 z-50 bg-white/95 backdrop-blur-md border-b border-slate-200 p-4 print:hidden shadow-lg mb-8 w-full">
         <div className="max-w-5xl mx-auto flex flex-col md:flex-row gap-4 items-center justify-between">
           <div className="flex gap-2 w-full md:w-auto">
             <div className="relative flex-1 md:w-96">
@@ -305,17 +305,17 @@ function ManifestContent() {
                 onChange={(e) => setSearchQuery(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && handleManualLoad()}
                 placeholder="Enter Manifest Hash or Trip ID..."
-                className="w-full bg-slate-950 border border-slate-700 text-white rounded-lg pl-10 pr-4 py-2.5 focus:border-blue-500 focus:outline-none text-sm font-mono"
+                className="w-full border border-slate-300 bg-white text-slate-900 rounded-lg pl-10 pr-4 py-2.5 focus:border-blue-500 focus:outline-none text-sm font-mono"
               />
               <FontAwesomeIcon
                 icon={faSearch}
-                className="absolute left-3.5 top-3 text-slate-500 text-sm"
+                className="absolute left-3.5 top-3 text-sm text-slate-400"
               />
             </div>
             <button
               onClick={handleManualLoad}
               disabled={loading}
-              className="bg-slate-800 hover:bg-slate-700 text-white px-4 py-2.5 rounded-lg border border-slate-700 font-medium text-sm transition-colors"
+              className="px-4 py-2.5 rounded-lg border bg-slate-200 hover:bg-slate-300 text-slate-800 border-slate-300 font-medium text-sm transition-colors"
             >
               Load
             </button>
@@ -328,7 +328,7 @@ function ManifestContent() {
                   ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
                   : status === "BAD"
                     ? "bg-red-500/10 text-red-400 border-red-500/20"
-                    : "bg-slate-800 text-slate-400 border-slate-700"
+                    : "bg-slate-200 text-slate-600 border-slate-300"
               }`}
             >
               {status === "OK" && <FontAwesomeIcon icon={faCheckCircle} />}
@@ -683,7 +683,7 @@ function ManifestContent() {
           <div className="animate-spin text-blue-500 text-3xl mb-4">
             <FontAwesomeIcon icon={faQrcode} />
           </div>
-          <p className="text-slate-400">Verifying Cryptographic Seal...</p>
+          <p className="text-slate-600">Verifying Cryptographic Seal...</p>
         </div>
       )}
     </div>
@@ -696,8 +696,8 @@ export default function ManifestPrintPage() {
   return (
     <Suspense
       fallback={
-        <div className="text-center p-10 text-white">
-          Loading Manifest System...
+        <div className="min-h-screen flex items-center justify-center bg-slate-100 text-slate-800">
+          <div className="text-center p-10">Loading Manifest System...</div>
         </div>
       }
     >

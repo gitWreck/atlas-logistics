@@ -192,7 +192,7 @@ export default function ManagerDashboardPage() {
           />
         )}
         {activeTab === "shipments" && (
-          <ShipmentBoard ref={shipmentBoardRef} user={user} userRole="manager" profile={profile} />
+          <ShipmentBoard ref={shipmentBoardRef} user={user} userRole="manager" profile={profile} isDark={false} />
         )}
         {activeTab === "trucks" && (
           <TruckBoard ref={truckBoardRef} user={user} userRole="admin" profile={profile} />
