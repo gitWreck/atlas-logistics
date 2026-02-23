@@ -195,7 +195,13 @@ export default function ManagerDashboardPage() {
           <ShipmentBoard ref={shipmentBoardRef} user={user} userRole="manager" profile={profile} isDark={false} />
         )}
         {activeTab === "trucks" && (
-          <TruckBoard ref={truckBoardRef} user={user} userRole="admin" profile={profile} />
+          <TruckBoard
+            ref={truckBoardRef}
+            user={user}
+            userRole="admin"
+            profile={profile}
+            isDark={false}
+          />
         )}
         {/* {activeTab === "manifests" && <ManifestPage />} */}
       </main>
