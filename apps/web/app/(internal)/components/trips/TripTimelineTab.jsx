@@ -9,20 +9,26 @@ import { formatFirestoreDate } from "@/app/utility/utilities";
 import AssignDriverModal from "../manifests/modals/AssignDriverModal";
 
 // Internal Helper for Info Cards
-function InfoCard({ label, value }) {
+function InfoCard({ label, value, isDark }) {
   return (
-    <div className="p-3 rounded-lg bg-slate-800/30 border border-slate-800">
-      <div className="text-[10px] text-slate-500 uppercase font-bold mb-1">
+    <div className={`p-3 rounded-lg border ${
+      isDark ? "bg-slate-800/30 border-slate-800" : "bg-slate-50 border-slate-200"
+    }`}>
+      <div className={`text-[10px] uppercase font-bold mb-1 ${
+        isDark ? "text-slate-500" : "text-slate-600"
+      }`}>
         {label}
       </div>
-      <div className="text-slate-300 text-sm font-medium truncate">
+      <div className={`text-sm font-medium truncate ${
+        isDark ? "text-slate-300" : "text-slate-700"
+      }`}>
         {value || "—"}
       </div>
     </div>
   );
 }
 
-export default function TripTimelineTab({ data, onRefresh }) {
+export default function TripTimelineTab({ data, onRefresh, isDark = false }) {
   // Define the ordered steps of a Trip Lifecycle
   const STEPS = [
     "CREATED",
@@ -42,12 +48,16 @@ export default function TripTimelineTab({ data, onRefresh }) {
     <div className="animate-in fade-in slide-in-from-left-4 duration-300">
       {/* HEADER WITH EDIT BUTTON */}
       <div className="flex justify-between items-end mb-2">
-        <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+        <h4 className={`text-xs font-bold uppercase tracking-wider ${
+          isDark ? "text-slate-500" : "text-slate-600"
+        }`}>
           Vehicle & Driver
         </h4>
         <button
           onClick={() => setIsDriverModalOpen(true)}
-          className="text-xs bg-slate-800 hover:bg-slate-700 text-blue-400 px-2 py-1 rounded transition-colors flex items-center gap-1 border border-slate-700"
+          className={`text-xs px-2 py-1 rounded transition-colors flex items-center gap-1 ${
+            isDark ? "bg-slate-800 hover:bg-slate-700 text-blue-400 border border-slate-700" : "bg-slate-100 hover:bg-slate-200 text-blue-600 border border-slate-300"
+          }`}
         >
           <FontAwesomeIcon icon={faPen} size="sm" />
           <span>Edit</span>
@@ -56,19 +66,23 @@ export default function TripTimelineTab({ data, onRefresh }) {
 
       {/* 1. KEY INFO GRID */}
       <div className="grid grid-cols-2 gap-3 mb-8">
-        <InfoCard label="Driver" value={data.driverName} />
-        <InfoCard label="Plate Number" value={data.truckPlateNumber} />
-        <InfoCard label="Origin" value={data.origin} />
-        <InfoCard label="Destination" value={data.destination} />
+        <InfoCard label="Driver" value={data.driverName} isDark={isDark} />
+        <InfoCard label="Plate Number" value={data.truckPlateNumber} isDark={isDark} />
+        <InfoCard label="Origin" value={data.origin} isDark={isDark} />
+        <InfoCard label="Destination" value={data.destination} isDark={isDark} />
       </div>
 
       {/* 2. TIMELINE VISUAL */}
-      <div className="text-slate-500">
-        <h3 className="text-xs font-bold text-slate-500 uppercase mb-4 pl-1">
+      <div className={isDark ? "text-slate-500" : "text-slate-600"}>
+        <h3 className={`text-xs font-bold uppercase mb-4 pl-1 ${
+          isDark ? "text-slate-500" : "text-slate-600"
+        }`}>
           Trip Progress
         </h3>
 
-        <div className="space-y-0 relative pl-4 border-l-2 border-slate-800 ml-2">
+        <div className={`space-y-0 relative pl-4 border-l-2 ml-2 ${
+          isDark ? "border-slate-800" : "border-slate-300"
+        }`}>
           {/* 1. SPECIAL 'CANCELLED' INDICATOR (Only shows if cancelled) */}
           {isCancelled && (
             <div className="relative pb-8">
@@ -104,7 +118,7 @@ export default function TripTimelineTab({ data, onRefresh }) {
               ${
                 isDone
                   ? "bg-emerald-600 border-emerald-600"
-                  : "bg-slate-900 border-slate-700"
+                  : isDark ? "bg-slate-900 border-slate-700" : "bg-slate-300 border-slate-400"
               }
               ${isCurrent ? "ring-4 ring-emerald-500/20 scale-110" : ""}
             `}
@@ -125,7 +139,9 @@ export default function TripTimelineTab({ data, onRefresh }) {
                 >
                   <p
                     className={`text-sm font-bold ${
-                      isDone || isCurrent ? "text-white" : "text-slate-400"
+                      isDone || isCurrent
+                        ? isDark ? "text-white" : "text-slate-900"
+                        : isDark ? "text-slate-400" : "text-slate-500"
                     }`}
                   >
                     {step.replace(/_/g, " ")}
@@ -150,10 +166,8 @@ export default function TripTimelineTab({ data, onRefresh }) {
         isOpen={isDriverModalOpen}
         onClose={() => setIsDriverModalOpen(false)}
         trip={data}
-        onSuccess={() => {
-          // If you have a refresh function passed from the parent, call it here
-          if (onRefresh) onRefresh();
-        }}
+        onSuccess={() => onRefresh?.()}
+        isDark={isDark}
       />
     </div>
   );

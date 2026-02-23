@@ -18,7 +18,7 @@ import UnassignShipmentModal from "../manifests/modals/UnassignShipmentModal";
 import BulkAssignmentModal from "../manifests/modals/BulkAssignmentModal";
 import ViewPackagesModal from "../manifests/ViewPackagesModal/ViewPackagesModal";
 
-export default function TripDrawer({ isOpen, onClose, data, onRefreshTrips }) {
+export default function TripDrawer({ isOpen, onClose, data, onRefreshTrips, isDark = false }) {
   const [activeTab, setActiveTab] = useState("TIMELINE");
   const [shipments, setShipments] = useState([]);
   const [loadingShips, setLoadingShips] = useState(false);
@@ -69,31 +69,41 @@ export default function TripDrawer({ isOpen, onClose, data, onRefreshTrips }) {
       <aside
         style={{ width: "min(100%, 780px)" }}
         className={`
-          fixed top-0 right-0 h-full  /* Fixed manageable width on desktop */
-          bg-slate-900 border-l border-slate-800 z-50 shadow-2xl 
-          transform transition-transform duration-300 flex flex-col
+          fixed top-0 right-0 h-full
+          z-50 shadow-2xl transform transition-transform duration-300 flex flex-col
+          ${isDark ? "bg-slate-900 border-l border-slate-800" : "bg-white border-l border-slate-200"}
           ${isOpen ? "translate-x-0" : "translate-x-full"}
         `}
       >
         {/* HEADER */}
-        <div className="p-6 border-b border-slate-800 flex justify-between items-start bg-slate-950">
+        <div className={`p-6 border-b flex justify-between items-start ${
+          isDark ? "border-slate-800 bg-slate-950" : "border-slate-200 bg-slate-50"
+        }`}>
           <div>
-            <div className="text-[10px] uppercase text-emerald-500 font-bold tracking-wider mb-1">
+            <div className={`text-[10px] uppercase font-bold tracking-wider mb-1 ${
+              isDark ? "text-emerald-500" : "text-emerald-600"
+            }`}>
               Active Trip Details
             </div>
-            <h2 className="text-xl font-mono text-white font-bold tracking-tight">
+            <h2 className={`text-xl font-mono font-bold tracking-tight ${
+              isDark ? "text-white" : "text-slate-900"
+            }`}>
               {data.tripId}
             </h2>
             <div className="flex gap-2 mt-2 items-center">
               <StatusBadge status={data.status} />
-              <span className="text-xs text-slate-400 border-l border-slate-700 pl-2 ml-1">
+              <span className={`text-xs border-l pl-2 ml-1 ${
+                isDark ? "text-slate-400 border-slate-700" : "text-slate-600 border-slate-300"
+              }`}>
                 {data.route}
               </span>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="text-slate-500 hover:text-white p-2 hover:bg-slate-800 rounded-lg"
+            className={`p-2 rounded-lg transition-colors ${
+              isDark ? "text-slate-500 hover:text-white hover:bg-slate-800" : "text-slate-500 hover:text-slate-900 hover:bg-slate-100"
+            }`}
           >
             <FontAwesomeIcon icon={faTimes} size="lg" />
           </button>
@@ -118,36 +128,19 @@ export default function TripDrawer({ isOpen, onClose, data, onRefreshTrips }) {
         </div>
 
         {/* TABS */}
-        <div className="flex border-b border-slate-800 bg-slate-900">
-          <TabButton
-            isActive={activeTab === "TIMELINE"}
-            onClick={() => setActiveTab("TIMELINE")}
-            icon={faTruck}
-            label="Status"
-          />
-          <TabButton
-            isActive={activeTab === "MANIFEST"}
-            onClick={() => setActiveTab("MANIFEST")}
-            icon={faClipboardList}
-            label={`Manifest (${shipments.length})`}
-          />
-          <TabButton
-            isActive={activeTab === "TOOLS"}
-            onClick={() => setActiveTab("TOOLS")}
-            icon={faWrench}
-            label="Actions"
-          />
+        <div className={`flex border-b ${isDark ? "border-slate-800 bg-slate-900" : "border-slate-200 bg-slate-50"}`}>
+          <TabButton isDark={isDark} isActive={activeTab === "TIMELINE"} onClick={() => setActiveTab("TIMELINE")} icon={faTruck} label="Status" />
+          <TabButton isDark={isDark} isActive={activeTab === "MANIFEST"} onClick={() => setActiveTab("MANIFEST")} icon={faClipboardList} label={`Manifest (${shipments.length})`} />
+          <TabButton isDark={isDark} isActive={activeTab === "TOOLS"} onClick={() => setActiveTab("TOOLS")} icon={faWrench} label="Actions" />
         </div>
 
         {/* CONTENT AREA */}
-        <div className="flex-1 overflow-y-auto p-6 bg-slate-900">
+        <div className={`flex-1 overflow-y-auto p-6 ${isDark ? "bg-slate-900" : "bg-white"}`}>
           {activeTab === "TIMELINE" && (
             <TripTimelineTab
               data={data}
-              onRefresh={() => {
-                // fetchShipments();
-                onRefreshTrips();
-              }}
+              onRefresh={() => onRefreshTrips()}
+              isDark={isDark}
             />
           )}
 
@@ -167,6 +160,7 @@ export default function TripDrawer({ isOpen, onClose, data, onRefreshTrips }) {
                 fetchShipments();
                 onRefreshTrips();
               }}
+              isDark={isDark}
             />
           )}
 
@@ -177,12 +171,13 @@ export default function TripDrawer({ isOpen, onClose, data, onRefreshTrips }) {
                 fetchShipments();
                 onRefreshTrips();
               }}
+              isDark={isDark}
             />
           )}
         </div>
 
         {/* FOOTER */}
-        <TripDrawerFooter data={data} onClose={onClose} shipments={shipments} />
+        <TripDrawerFooter data={data} onClose={onClose} shipments={shipments} isDark={isDark} />
       </aside>
 
       {/* --- RENDER THE NEW MODAL OUTSIDE THE ASIDE --- */}
@@ -191,6 +186,7 @@ export default function TripDrawer({ isOpen, onClose, data, onRefreshTrips }) {
         shipment={selectedShipmentForModal}
         onClose={() => setSelectedShipmentForModal(null)}
         isLocked={data.manifestLocked}
+        isDark={isDark}
       />
       <UnassignShipmentModal
         isOpen={!!shipmentToUnassign}
@@ -205,7 +201,6 @@ export default function TripDrawer({ isOpen, onClose, data, onRefreshTrips }) {
       />
       <BulkAssignmentModal
         isOpen={isBulkModalOpen}
-        // trip={selectedTrip}
         trip={data}
         onClose={() => setBulkModalOpen(false)}
         onSuccess={() => {
@@ -213,20 +208,25 @@ export default function TripDrawer({ isOpen, onClose, data, onRefreshTrips }) {
           fetchShipments();
           onRefreshTrips();
         }}
+        isDark={isDark}
       />
     </>
   );
 }
 
 // Simple internal helper for tabs
-function TabButton({ isActive, onClick, icon, label }) {
+function TabButton({ isActive, onClick, icon, label, isDark = false }) {
   return (
     <button
       onClick={onClick}
       className={`flex-1 py-3 text-xs font-bold border-b-2 transition-colors flex items-center justify-center gap-2 uppercase tracking-wide ${
         isActive
-          ? "border-emerald-500 text-emerald-400 bg-emerald-500/5"
-          : "border-transparent text-slate-500 hover:text-slate-300 hover:bg-slate-800/50"
+          ? isDark
+            ? "border-emerald-500 text-emerald-400 bg-emerald-500/5"
+            : "border-emerald-500 text-emerald-600 bg-emerald-50"
+          : isDark
+            ? "border-transparent text-slate-500 hover:text-slate-300 hover:bg-slate-800/50"
+            : "border-transparent text-slate-600 hover:text-slate-800 hover:bg-slate-100"
       }`}
     >
       <FontAwesomeIcon icon={icon} /> {label}

@@ -10,7 +10,7 @@ import {
 import { runAction } from "@/app/utility/utilities";
 import ExportTripButton from "../exports/ExportTripManifest";
 
-export default function TripDrawerFooter({ data, onClose, shipments }) {
+export default function TripDrawerFooter({ data, onClose, shipments, isDark = false }) {
   const [lockStatus, setLockStatus] = useState("IDLE");
   const [unlockStatus, setUnlockStatus] = useState("IDLE");
 
@@ -42,7 +42,9 @@ export default function TripDrawerFooter({ data, onClose, shipments }) {
   };
 
   return (
-    <div className="p-4 border-t border-slate-800 bg-slate-950 flex flex-col gap-3">
+    <div className={`p-4 border-t flex flex-col gap-3 ${
+      isDark ? "border-slate-800 bg-slate-950" : "border-slate-200 bg-slate-50"
+    }`}>
       {/* ROW 1: LIFE CYCLE ACTIONS (Lock -> Certify -> Reopen) */}
       <div className="flex gap-3">
         {/* 1. LOCK MANIFEST */}
@@ -100,7 +102,9 @@ export default function TripDrawerFooter({ data, onClose, shipments }) {
               "_blank",
             );
           }}
-          className="flex-1 py-3 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg font-medium text-sm transition-colors flex items-center justify-center gap-2"
+          className={`flex-1 py-3 rounded-lg font-medium text-sm transition-colors flex items-center justify-center gap-2 ${
+          isDark ? "bg-slate-800 hover:bg-slate-700 text-slate-200" : "bg-slate-200 hover:bg-slate-300 text-slate-800"
+        }`}
         >
           <FontAwesomeIcon icon={faPrint} /> Print Manifest
         </button>
