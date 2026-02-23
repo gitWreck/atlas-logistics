@@ -1,17 +1,29 @@
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faCalendarDays } from "@fortawesome/free-solid-svg-icons";
 
-export default function ScheduleSection({ formData, setFormData }) {
+export default function ScheduleSection({ formData, setFormData, isDark = false }) {
   return (
-    <div className="bg-slate-950/50 p-3 rounded-lg border border-slate-800 grid grid-cols-2 gap-4">
+    <div
+      className={`p-3 rounded-lg border grid grid-cols-2 gap-4 ${
+        isDark ? "bg-slate-950/50 border-slate-800" : "bg-slate-50 border-slate-200"
+      }`}
+    >
       <div>
-        <label className="text-[10px] font-bold text-slate-400 uppercase flex items-center gap-2 mb-2">
+        <label
+          className={`text-[10px] font-bold uppercase flex items-center gap-2 mb-2 ${
+            isDark ? "text-slate-400" : "text-slate-600"
+          }`}
+        >
           <FontAwesomeIcon icon={faCalendarDays} /> Departure
         </label>
         <input
           type="datetime-local"
           required
-          className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-sm text-white outline-none focus:border-blue-500 [color-scheme:dark]"
+          className={`w-full border rounded-lg p-2 text-sm outline-none focus:border-blue-500 ${
+            isDark
+              ? "bg-slate-900 border-slate-700 text-white [color-scheme:dark]"
+              : "bg-white border-slate-300 text-slate-900 [color-scheme:light]"
+          }`}
           value={formData.scheduledDeparture}
           onChange={(e) =>
             setFormData((p) => ({ ...p, scheduledDeparture: e.target.value }))
@@ -19,13 +31,21 @@ export default function ScheduleSection({ formData, setFormData }) {
         />
       </div>
       <div>
-        <label className="text-[10px] font-bold text-slate-400 uppercase flex items-center gap-2 mb-2">
+        <label
+          className={`text-[10px] font-bold uppercase flex items-center gap-2 mb-2 ${
+            isDark ? "text-slate-400" : "text-slate-600"
+          }`}
+        >
           <FontAwesomeIcon icon={faCalendarDays} /> Est. Arrival
         </label>
         <input
           type="datetime-local"
           required
-          className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-sm text-white outline-none focus:border-emerald-500 [color-scheme:dark]"
+          className={`w-full border rounded-lg p-2 text-sm outline-none focus:border-emerald-500 ${
+            isDark
+              ? "bg-slate-900 border-slate-700 text-white [color-scheme:dark]"
+              : "bg-white border-slate-300 text-slate-900 [color-scheme:light]"
+          }`}
           value={formData.estimatedArrival}
           min={formData.scheduledDeparture}
           onChange={(e) =>

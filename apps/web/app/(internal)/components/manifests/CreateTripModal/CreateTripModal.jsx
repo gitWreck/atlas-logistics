@@ -93,8 +93,8 @@ export default function CreateTripModal({ isOpen, onClose, onSuccess }) {
             formData={formData}
             onWarehouseChange={handleWarehouseChange}
           />
-          <ScheduleSection formData={formData} setFormData={setFormData} />
-          <VehicleDetails formData={formData} setFormData={setFormData} />
+          <ScheduleSection formData={formData} setFormData={setFormData} isDark />
+          <VehicleDetails formData={formData} setFormData={setFormData} isDark />
 
           {error && (
             <div className="bg-red-500/10 border border-red-500/20 text-red-400 text-xs p-3 rounded-lg">

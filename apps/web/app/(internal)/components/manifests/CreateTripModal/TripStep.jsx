@@ -23,7 +23,12 @@ import ScheduleSection from "./ScheduleSection";
 import VehicleDetails from "./VehicleDetails";
 import { useAlert } from "@/app/context/AlertContext";
 
-export default function TripStep({ shipmentDraft, onBack, onComplete }) {
+export default function TripStep({
+  shipmentDraft,
+  onBack,
+  onComplete,
+  isDark = false,
+}) {
   const { showAlert, showConfirm } = useAlert();
 
   const [view, setView] = useState("selection");
@@ -84,24 +89,42 @@ export default function TripStep({ shipmentDraft, onBack, onComplete }) {
   return (
     // <div className="flex flex-col h-full animate-in slide-in-from-right duration-300 overflow-hidden">
     // <div className="flex flex-col h-full animate-in slide-in-from-right duration-300 overflow-hidden">
-    <div className="flex flex-col h-full w-full">
-      {/* Scrollable Content */}
-      {/* <div className="flex-1 overflow-y-auto p-4 sm:p-6 custom-scrollbar pb-20 sm:pb-0"> */}
-      {/* <div className="flex-1 overflow-y-auto min-h-0 p-4 sm:p-6 custom-scrollbar"> */}
-      <div className="flex-1 overflow-y-auto p-4 sm:p-6 custom-scrollbar">
+    <div className="flex flex-col h-full w-full min-h-0">
+      {/* Scrollable Content: fills space so footer stays pinned to bottom */}
+      <div className="flex-1 min-h-0 overflow-y-auto p-4 sm:p-6 custom-scrollbar">
         {view === "selection" ? (
           <div className="space-y-6">
             <div className="text-center">
-              <h3 className="text-lg font-bold text-white">Assign to Trip</h3>
-              <p className="text-xs text-slate-400">
+              <h3
+                className={`text-lg font-bold ${
+                  isDark ? "text-white" : "text-slate-900"
+                }`}
+              >
+                Assign to Trip
+              </h3>
+              <p
+                className={`text-xs ${
+                  isDark ? "text-slate-400" : "text-slate-600"
+                }`}
+              >
                 Destination:{" "}
-                <span className="text-blue-400 font-bold">{destination}</span>
+                <span
+                  className={`font-bold ${
+                    isDark ? "text-blue-400" : "text-blue-600"
+                  }`}
+                >
+                  {destination}
+                </span>
               </p>
             </div>
 
             <div className="space-y-3">
               {loading ? (
-                <div className="p-10 text-center text-slate-500 animate-pulse">
+                <div
+                  className={`p-10 text-center animate-pulse ${
+                    isDark ? "text-slate-500" : "text-slate-600"
+                  }`}
+                >
                   Updating trips...
                 </div>
               ) : (
@@ -111,23 +134,47 @@ export default function TripStep({ shipmentDraft, onBack, onComplete }) {
                       onClick={() =>
                         onComplete({ mode: "existing", tripId: trip.id })
                       }
-                      className="w-full p-4 bg-slate-950 border border-slate-800 rounded-xl hover:border-blue-500 transition-all flex items-center justify-between"
+                      className={`w-full p-4 rounded-xl transition-all flex items-center justify-between border ${
+                        isDark
+                          ? "bg-slate-950 border-slate-800 hover:border-blue-500"
+                          : "bg-slate-50 border-slate-200 hover:border-blue-500/60"
+                      }`}
                     >
                       <div className="flex items-center gap-3 sm:gap-4">
-                        <div className="p-3 bg-slate-900 rounded-lg text-slate-500 group-hover:text-blue-500 transition-colors shrink-0">
+                        <div
+                          className={`p-3 rounded-lg transition-colors shrink-0 ${
+                            isDark
+                              ? "bg-slate-900 text-slate-500 group-hover:text-blue-500"
+                              : "bg-slate-100 text-slate-500 group-hover:text-blue-600"
+                          }`}
+                        >
                           <FontAwesomeIcon icon={faTruck} />
                         </div>
                         <div className="text-left">
                           <div className="flex flex-wrap items-center gap-2">
-                            <p className="font-bold text-slate-200 text-sm sm:text-base">
+                            <p
+                              className={`font-bold text-sm sm:text-base ${
+                                isDark ? "text-slate-200" : "text-slate-900"
+                              }`}
+                            >
                               {trip.truckPlateNumber}
                             </p>
                             {/* TRUCK/TRIP ID BADGE */}
-                            <span className="text-[10px] sm:text-[12px] font-mono bg-slate-800 text-slate-400 px-1.5 py-0.5 rounded border border-slate-700">
+                            <span
+                              className={`text-[10px] sm:text-[12px] font-mono px-1.5 py-0.5 rounded border ${
+                                isDark
+                                  ? "bg-slate-800 text-slate-400 border-slate-700"
+                                  : "bg-slate-100 text-slate-600 border-slate-300"
+                              }`}
+                            >
                               {trip.tripId}
                             </span>
                           </div>
-                          <p className="text-[10px] text-slate-500 uppercase tracking-wide mt-0.5">
+                          <p
+                            className={`text-[10px] uppercase tracking-wide mt-0.5 ${
+                              isDark ? "text-slate-500" : "text-slate-500"
+                            }`}
+                          >
                             {trip.driverName}
                           </p>
                         </div>
@@ -136,7 +183,11 @@ export default function TripStep({ shipmentDraft, onBack, onComplete }) {
                       <div className="flex items-center gap-3">
                         <FontAwesomeIcon
                           icon={faCheckCircle}
-                          className="text-slate-800 group-hover:text-blue-500 transition-colors text-lg"
+                          className={`transition-colors text-lg ${
+                            isDark
+                              ? "text-slate-800 group-hover:text-blue-500"
+                              : "text-slate-300 group-hover:text-blue-600"
+                          }`}
                         />
                       </div>
                     </button>
@@ -147,7 +198,11 @@ export default function TripStep({ shipmentDraft, onBack, onComplete }) {
 
             <button
               onClick={() => setView("create")}
-              className="w-full p-4 rounded-xl border-2 border-dashed border-blue-500/30 bg-blue-500/5 hover:bg-blue-500/10 text-blue-400 font-bold flex items-center justify-center gap-3 text-sm sm:text-base"
+              className={`w-full p-4 rounded-xl border-2 border-dashed font-bold flex items-center justify-center gap-3 text-sm sm:text-base ${
+                isDark
+                  ? "border-blue-500/30 bg-blue-500/5 hover:bg-blue-500/10 text-blue-400"
+                  : "border-blue-500/40 bg-blue-50 hover:bg-blue-100 text-blue-700"
+              }`}
             >
               <FontAwesomeIcon icon={faPlus} /> Create a New Trip
             </button>
@@ -156,33 +211,54 @@ export default function TripStep({ shipmentDraft, onBack, onComplete }) {
           <div className="space-y-6">
             <button
               onClick={() => setView("selection")}
-              className="text-xs text-blue-400 flex items-center gap-2"
+              className="text-xs text-blue-500 flex items-center gap-2"
             >
               <FontAwesomeIcon icon={faArrowLeft} /> Cancel Creation
             </button>
-            <div className="bg-blue-500/5 border border-blue-500/20 p-4 rounded-xl flex items-center justify-between">
-              <p className="text-sm font-bold text-white uppercase">
+            <div
+              className={`p-4 rounded-xl flex items-center justify-between border ${
+                isDark
+                  ? "bg-blue-500/5 border-blue-500/20"
+                  : "bg-blue-50 border-blue-200"
+              }`}
+            >
+              <p
+                className={`text-sm font-bold uppercase ${
+                  isDark ? "text-white" : "text-slate-900"
+                }`}
+              >
                 {newTripData.origin} → {newTripData.destination}
               </p>
             </div>
             <ScheduleSection
               formData={newTripData}
               setFormData={setNewTripData}
+              isDark={isDark}
             />
             <VehicleDetails
               formData={newTripData}
               setFormData={setNewTripData}
+              isDark={isDark}
             />
           </div>
         )}
       </div>
 
-      {/* 3. FOOTER: shrink-0 keeps it fixed size, mt-auto pushes it down */}
-      {/* <div className="shrink-0 p-4 sm:p-6 border-t border-slate-800 bg-slate-950 flex gap-3 z-10"> */}
-      <div className="shrink-0 mt-auto p-4 sm:p-6 border-t border-slate-800 bg-slate-950 flex gap-3 z-10">
+      {/* Footer: sits directly under content, no extra space below */}
+      <div
+        className={`shrink-0 p-3 sm:p-4 border-t flex items-center gap-3 z-10 ${
+          isDark
+            ? "border-slate-800 bg-slate-950"
+            : "border-slate-200 bg-slate-50"
+        }`}
+      >
         <button
           onClick={onBack}
-          className="px-5 py-3 sm:py-2 rounded-xl border border-slate-700 text-slate-400 font-bold hover:bg-slate-800 transition-colors"
+          className={`px-5 py-3 sm:py-2 rounded-xl border font-bold transition-colors ${
+            isDark
+              ? "border-slate-700 text-slate-400 hover:bg-slate-800"
+              : "border-slate-300 text-slate-700 hover:bg-slate-100"
+          }`}
         >
           Back
         </button>
@@ -190,7 +266,7 @@ export default function TripStep({ shipmentDraft, onBack, onComplete }) {
           <button
             onClick={handleCreateTrip}
             disabled={loading}
-            className="flex-1 bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 sm:py-2 rounded-xl shadow-lg transition-all"
+            className="flex-1 bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 sm:py-2 rounded-xl shadow-lg transition-all disabled:opacity-60"
           >
             {loading ? "Creating Trip..." : "Confirm & Add to List"}
           </button>

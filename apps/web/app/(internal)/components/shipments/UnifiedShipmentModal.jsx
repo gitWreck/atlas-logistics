@@ -164,7 +164,7 @@ export default function UnifiedShipmentModal({ profile, isOpen, onClose, isDark 
     <div className={`fixed inset-0 z-50 flex items-center justify-center backdrop-blur-md sm:p-4 ${
       isDark ? "bg-slate-950/90" : "bg-black/40"
     }`}>
-      <div className={`relative w-full max-w-4xl sm:rounded-xl shadow-xl overflow-hidden flex flex-col h-full sm:h-auto sm:min-h-[600px] sm:max-h-[90vh] border ${
+      <div className={`relative w-full max-w-4xl sm:rounded-xl shadow-xl overflow-hidden flex flex-col h-full sm:h-auto sm:max-h-[90vh] border ${
         isDark ? "bg-slate-900 border-slate-700" : "bg-white border-slate-200"
       }`}>
         {loading && (
@@ -268,6 +268,7 @@ export default function UnifiedShipmentModal({ profile, isOpen, onClose, isDark 
                   shipmentDraft={shipmentDraft}
                   onBack={() => setStep(1)}
                   onComplete={handleMasterSubmit}
+                  isDark={isDark}
                 />
               </div>
             </div>
