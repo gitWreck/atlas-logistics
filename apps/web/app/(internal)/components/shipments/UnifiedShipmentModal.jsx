@@ -17,7 +17,7 @@ import { useAlert } from "@/app/context/AlertContext";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { storage } from "@/lib/firebase";
 
-export default function UnifiedShipmentModal({ profile, isOpen, onClose }) {
+export default function UnifiedShipmentModal({ profile, isOpen, onClose, isDark = false }) {
   const { showAlert, showConfirm } = useAlert();
 
   const [step, setStep] = useState(1);
@@ -161,32 +161,37 @@ export default function UnifiedShipmentModal({ profile, isOpen, onClose }) {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/90 backdrop-blur-md sm:p-4">
-      {/* Modal Container: Full screen on mobile, Rounded card on desktop */}
-      <div className="relative bg-slate-900 border-x border-y border-slate-700 w-full max-w-4xl sm:rounded-xl shadow-xl overflow-hidden flex flex-col h-full sm:h-auto sm:min-h-[600px] sm:max-h-[90vh]">
-        {/* Loading Overlay */}
+    <div className={`fixed inset-0 z-50 flex items-center justify-center backdrop-blur-md sm:p-4 ${
+      isDark ? "bg-slate-950/90" : "bg-black/40"
+    }`}>
+      <div className={`relative w-full max-w-4xl sm:rounded-xl shadow-xl overflow-hidden flex flex-col h-full sm:h-auto sm:min-h-[600px] sm:max-h-[90vh] border ${
+        isDark ? "bg-slate-900 border-slate-700" : "bg-white border-slate-200"
+      }`}>
         {loading && (
-          <div className="absolute inset-0 z-[100] bg-slate-900/80 backdrop-blur-sm flex flex-col items-center justify-center">
+          <div className={`absolute inset-0 z-[100] backdrop-blur-sm flex flex-col items-center justify-center ${
+            isDark ? "bg-slate-900/80" : "bg-white/90"
+          }`}>
             <FontAwesomeIcon
               icon={faCircleNotch}
               spin
               className="text-4xl text-blue-500 mb-4"
             />
-            <p className="text-white font-bold">Processing Shipment...</p>
+            <p className={`font-bold ${isDark ? "text-white" : "text-slate-900"}`}>Processing Shipment...</p>
           </div>
         )}
 
         <div className="flex-1 flex flex-col overflow-hidden">
-          {/* --- STEP 1: DETAILS --- */}
           {step === 1 && (
             <div className="flex flex-col h-full overflow-hidden">
-              <div className="p-4 sm:p-6 border-b border-slate-800 flex justify-between items-center shrink-0 bg-slate-950">
-                <h2 className="text-lg sm:text-xl font-bold text-white">
+              <div className={`p-4 sm:p-6 border-b flex justify-between items-center shrink-0 ${
+                isDark ? "border-slate-800 bg-slate-950" : "border-slate-200 bg-slate-50"
+              }`}>
+                <h2 className={`text-lg sm:text-xl font-bold ${isDark ? "text-white" : "text-slate-900"}`}>
                   1. Shipment Details
                 </h2>
                 <button
                   onClick={onClose}
-                  className="text-slate-500 hover:text-white p-2"
+                  className={`p-2 transition-colors ${isDark ? "text-slate-500 hover:text-white" : "text-slate-500 hover:text-slate-900"}`}
                 >
                   ✕
                 </button>
@@ -198,6 +203,7 @@ export default function UnifiedShipmentModal({ profile, isOpen, onClose }) {
                   setStep(2);
                 }}
                 initialData={shipmentDraft}
+                isDark={isDark}
               />
             </div>
           )}
@@ -205,33 +211,37 @@ export default function UnifiedShipmentModal({ profile, isOpen, onClose }) {
           {/* --- STEP 2: TRIP SELECTION --- */}
           {step === 2 && (
             <div className="flex flex-col h-full overflow-hidden">
-              <div className="p-4 sm:p-6 border-b border-slate-800 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 shrink-0 bg-slate-950">
+              <div className={`p-4 sm:p-6 border-b flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 shrink-0 ${
+                isDark ? "border-slate-800 bg-slate-950" : "border-slate-200 bg-slate-50"
+              }`}>
                 <div className="flex justify-between items-center w-full sm:w-auto">
-                  <h2 className="text-lg sm:text-xl font-bold text-white">
+                  <h2 className={`text-lg sm:text-xl font-bold ${isDark ? "text-white" : "text-slate-900"}`}>
                     2. Select Trip
                   </h2>
-                  {/* Mobile Close Button (Visible only on small screens) */}
                   <button
                     onClick={onClose}
-                    className="sm:hidden text-slate-500 p-2"
+                    className={`sm:hidden p-2 ${isDark ? "text-slate-500" : "text-slate-600"}`}
                   >
                     ✕
                   </button>
                 </div>
 
                 <div className="flex flex-wrap items-center gap-3 sm:gap-6 w-full sm:w-auto">
-                  {/* SMS Toggle */}
-                  <label className="flex items-center gap-2 cursor-pointer group bg-slate-900 sm:bg-transparent p-2 sm:p-0 rounded-lg border sm:border-0 border-slate-800">
+                  <label className={`flex items-center gap-2 cursor-pointer group p-2 sm:p-0 rounded-lg sm:border-0 ${
+                    isDark ? "bg-slate-900 border border-slate-800" : "bg-slate-100 border border-slate-200 sm:bg-transparent"
+                  }`}>
                     <input
                       type="checkbox"
-                      className="w-4 h-4 rounded border-slate-700 bg-slate-800 text-blue-600 focus:ring-blue-500 focus:ring-offset-slate-900"
+                      className={`w-4 h-4 rounded text-blue-600 focus:ring-blue-500 ${
+                        isDark ? "border-slate-700 bg-slate-800 focus:ring-offset-slate-900" : "border-slate-300 bg-white focus:ring-offset-white"
+                      }`}
                       checked={sendSms}
                       onChange={(e) => setSendSms(e.target.checked)}
                     />
                     <div className="flex items-center gap-1.5">
-                      <span
-                        className={`text-xs font-bold uppercase tracking-tight ${sendSms ? "text-slate-200" : "text-slate-500"}`}
-                      >
+                      <span className={`text-xs font-bold uppercase tracking-tight ${
+                        sendSms ? (isDark ? "text-slate-200" : "text-slate-800") : (isDark ? "text-slate-500" : "text-slate-500")
+                      }`}>
                         Notify SMS
                       </span>
                     </div>
@@ -244,10 +254,9 @@ export default function UnifiedShipmentModal({ profile, isOpen, onClose }) {
                     Skip trip assignment & Save
                   </button>
 
-                  {/* Desktop Close Button */}
                   <button
                     onClick={onClose}
-                    className="hidden sm:block text-slate-500 hover:text-white"
+                    className={`hidden sm:block transition-colors ${isDark ? "text-slate-500 hover:text-white" : "text-slate-500 hover:text-slate-900"}`}
                   >
                     ✕
                   </button>
@@ -272,13 +281,13 @@ export default function UnifiedShipmentModal({ profile, isOpen, onClose }) {
                 className={`text-5xl sm:text-6xl ${finalTripId ? "text-emerald-500" : "text-amber-500"}`}
               />
               <div>
-                <h2 className="text-xl sm:text-2xl font-bold text-white">
+                <h2 className={`text-xl sm:text-2xl font-bold ${isDark ? "text-white" : "text-slate-900"}`}>
                   {finalTripId
                     ? `Shipment Assigned to ${finalTripId}`
                     : "Shipment Created as Pending"}
                 </h2>
                 {sendSms && (
-                  <p className="text-emerald-400 text-xs font-bold mt-2 uppercase tracking-widest">
+                  <p className="text-emerald-600 text-xs font-bold mt-2 uppercase tracking-widest">
                     <FontAwesomeIcon icon={faCommentSms} className="mr-2" />
                     SMS Notifications Queued
                   </p>
@@ -294,7 +303,9 @@ export default function UnifiedShipmentModal({ profile, isOpen, onClose }) {
                       "_blank",
                     )
                   }
-                  className="w-full py-3 sm:py-4 bg-slate-800 text-white rounded-xl font-bold border border-slate-700 hover:bg-slate-700 transition-colors text-sm sm:text-base"
+                  className={`w-full py-3 sm:py-4 rounded-xl font-bold border transition-colors text-sm sm:text-base ${
+                    isDark ? "bg-slate-800 text-white border-slate-700 hover:bg-slate-700" : "bg-slate-200 text-slate-800 border-slate-300 hover:bg-slate-300"
+                  }`}
                 >
                   {finalTripId
                     ? "Print Trip Labels"

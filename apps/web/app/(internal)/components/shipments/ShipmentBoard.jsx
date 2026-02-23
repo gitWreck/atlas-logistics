@@ -18,7 +18,7 @@ import ReceivePackageForm from "./ReceivePackageForm";
 import { calculateProgress } from "@/app/utility/utilities";
 import UnifiedShipmentModal from "./UnifiedShipmentModal";
 
-const ShipmentBoard = forwardRef(function ShipmentBoard({ user, userRole, profile }, ref) {
+const ShipmentBoard = forwardRef(function ShipmentBoard({ user, userRole, profile, isDark = false }, ref) {
   const [shipments, setShipments] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -171,18 +171,22 @@ const ShipmentBoard = forwardRef(function ShipmentBoard({ user, userRole, profil
   }), []);
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-200 font-sans">
+    <div className={`min-h-screen font-sans ${isDark ? "bg-slate-950 text-slate-200" : "bg-slate-50 text-slate-900"}`}>
       {/* --- MAIN CONTENT --- */}
       <main className="max-w-7xl mx-auto p-4 sm:p-6">
-        <div className="border border-slate-800 rounded-xl bg-slate-900/50 overflow-hidden shadow-xl backdrop-blur-sm">
+        <div className={`border rounded-xl overflow-hidden shadow-xl backdrop-blur-sm ${
+          isDark ? "border-slate-800 bg-slate-900/50" : "border-slate-200 bg-white"
+        }`}>
           {/* CARD HEADER: Search & Filters */}
-          <div className="px-4 sm:px-6 py-4 border-b border-slate-800 flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4 bg-slate-950/30">
-            <h3 className="font-bold text-white whitespace-nowrap hidden xl:flex items-center gap-2">
+          <div className={`px-4 sm:px-6 py-4 border-b flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4 ${
+            isDark ? "border-slate-800 bg-slate-950/30" : "border-slate-200 bg-slate-50"
+          }`}>
+            <h3 className={`font-bold whitespace-nowrap hidden xl:flex items-center gap-2 ${isDark ? "text-white" : "text-slate-900"}`}>
               Recent Orders
               <button
                 onClick={fetchShipments}
                 disabled={loading}
-                className="text-slate-500 hover:text-white transition-colors p-1 rounded hover:bg-slate-800"
+                className={`transition-colors p-1 rounded ${isDark ? "text-slate-500 hover:text-white hover:bg-slate-800" : "text-slate-500 hover:text-slate-900 hover:bg-slate-200"}`}
                 title="Refresh"
               >
                 <FontAwesomeIcon icon={faSync} spin={loading} className="text-xs" />
@@ -195,12 +199,14 @@ const ShipmentBoard = forwardRef(function ShipmentBoard({ user, userRole, profil
               <div className="relative flex-1 min-w-[200px]">
                 <FontAwesomeIcon
                   icon={faSearch}
-                  className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-sm"
+                  className={`absolute left-3 top-1/2 -translate-y-1/2 text-sm ${isDark ? "text-slate-500" : "text-slate-400"}`}
                 />
                 <input
                   type="text"
                   placeholder="Search Tracking..."
-                  className="w-full bg-slate-900 border border-slate-700 rounded-lg pl-9 pr-4 py-2 text-sm text-white focus:border-blue-500 focus:outline-none"
+                  className={`w-full border rounded-lg pl-9 pr-4 py-2 text-sm focus:border-blue-500 focus:outline-none ${
+                    isDark ? "bg-slate-900 border-slate-700 text-white" : "bg-white border-slate-300 text-slate-900"
+                  }`}
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                 />
@@ -208,17 +214,19 @@ const ShipmentBoard = forwardRef(function ShipmentBoard({ user, userRole, profil
 
               <div className="flex gap-2 w-full sm:w-auto">
                 {/* 2. DATE FILTERS */}
-                <div className="flex items-center gap-2 bg-slate-900 border border-slate-700 rounded-lg px-2 py-1 flex-1 sm:flex-none justify-center">
+                <div className={`flex items-center gap-2 border rounded-lg px-2 py-1 flex-1 sm:flex-none justify-center ${
+                  isDark ? "bg-slate-900 border-slate-700" : "bg-white border-slate-300"
+                }`}>
                   <input
                     type="date"
-                    className="bg-transparent text-xs text-white outline-none w-24 [color-scheme:dark]"
+                    className={`bg-transparent text-xs outline-none w-24 ${isDark ? "text-white [color-scheme:dark]" : "text-slate-900 [color-scheme:light]"}`}
                     value={startDate}
                     onChange={(e) => setStartDate(e.target.value)}
                   />
-                  <span className="text-slate-600">-</span>
+                  <span className={isDark ? "text-slate-600" : "text-slate-400"}>-</span>
                   <input
                     type="date"
-                    className="bg-transparent text-xs text-white outline-none w-24 [color-scheme:dark]"
+                    className={`bg-transparent text-xs outline-none w-24 ${isDark ? "text-white [color-scheme:dark]" : "text-slate-900 [color-scheme:light]"}`}
                     value={endDate}
                     onChange={(e) => setEndDate(e.target.value)}
                   />
@@ -228,10 +236,12 @@ const ShipmentBoard = forwardRef(function ShipmentBoard({ user, userRole, profil
                 <div className="relative w-full sm:w-36">
                   <FontAwesomeIcon
                     icon={faFilter}
-                    className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-sm"
+                    className={`absolute left-3 top-1/2 -translate-y-1/2 text-sm ${isDark ? "text-slate-500" : "text-slate-400"}`}
                   />
                   <select
-                    className="w-full bg-slate-900 border border-slate-700 rounded-lg pl-9 pr-4 py-2 text-sm text-white focus:border-blue-500 focus:outline-none appearance-none cursor-pointer"
+                    className={`w-full border rounded-lg pl-9 pr-4 py-2 text-sm focus:border-blue-500 focus:outline-none appearance-none cursor-pointer ${
+                      isDark ? "bg-slate-900 border-slate-700 text-white" : "bg-white border-slate-300 text-slate-900"
+                    }`}
                     value={activeFilter}
                     onChange={(e) => {
                       setActiveFilter(e.target.value);
@@ -256,7 +266,9 @@ const ShipmentBoard = forwardRef(function ShipmentBoard({ user, userRole, profil
                     className="absolute left-3 top-1/2 -translate-y-1/2 text-amber-500 text-sm"
                   />
                   <select
-                    className="w-full bg-slate-900 border border-amber-500/50 rounded-lg pl-9 pr-4 py-2 text-sm text-amber-100 focus:border-amber-500 focus:outline-none appearance-none cursor-pointer"
+                    className={`w-full border border-amber-500/50 rounded-lg pl-9 pr-4 py-2 text-sm focus:border-amber-500 focus:outline-none appearance-none cursor-pointer ${
+                      isDark ? "bg-slate-900 text-amber-100" : "bg-amber-50 text-amber-900"
+                    }`}
                     value={delayType}
                     onChange={(e) => setDelayType(e.target.value)}
                   >
@@ -273,7 +285,9 @@ const ShipmentBoard = forwardRef(function ShipmentBoard({ user, userRole, profil
           </div>
 
           {/* TABLE HEADER (Hidden on mobile) */}
-          <div className="hidden md:grid grid-cols-12 gap-4 px-6 py-3 border-b border-slate-800 bg-slate-950 text-xs font-semibold text-slate-500 uppercase tracking-wider">
+          <div className={`hidden md:grid grid-cols-12 gap-4 px-6 py-3 border-b text-xs font-semibold uppercase tracking-wider ${
+            isDark ? "border-slate-800 bg-slate-950 text-slate-500" : "border-slate-200 bg-slate-50 text-slate-600"
+          }`}>
             <div className="col-span-4">Tracking / Customer</div>
             <div className="col-span-2">Route</div>
             <div className="col-span-3">Progress</div>
@@ -284,11 +298,11 @@ const ShipmentBoard = forwardRef(function ShipmentBoard({ user, userRole, profil
           {/* TABLE BODY */}
           <div className="min-h-[300px]">
             {loading ? (
-              <div className="p-10 text-center text-slate-500 animate-pulse">
+              <div className={`p-10 text-center animate-pulse ${isDark ? "text-slate-500" : "text-slate-600"}`}>
                 Loading orders...
               </div>
             ) : filteredShipments.length === 0 ? (
-              <div className="p-10 text-center text-slate-500">
+              <div className={`p-10 text-center ${isDark ? "text-slate-500" : "text-slate-600"}`}>
                 No orders found matching filters.
               </div>
             ) : (
@@ -298,6 +312,7 @@ const ShipmentBoard = forwardRef(function ShipmentBoard({ user, userRole, profil
                   s={s}
                   onClick={setSelectedShipmentId}
                   onMessage={() => handleMessageCustomer(s)}
+                  isDark={isDark}
                 />
               ))
             )}
@@ -305,13 +320,13 @@ const ShipmentBoard = forwardRef(function ShipmentBoard({ user, userRole, profil
 
           {/* 5. PAGINATION FOOTER */}
           {filteredShipments.length > 0 && (
-            <div className="px-4 sm:px-6 py-4 border-t border-slate-800 bg-slate-950/30 flex justify-between items-center">
-              <span className="text-xs text-slate-500">
+            <div className={`px-4 sm:px-6 py-4 border-t flex justify-between items-center ${
+              isDark ? "border-slate-800 bg-slate-950/30" : "border-slate-200 bg-slate-50"
+            }`}>
+              <span className={`text-xs ${isDark ? "text-slate-500" : "text-slate-600"}`}>
                 Showing{" "}
-                <span className="text-white font-bold">
+                <span className={`font-bold ${isDark ? "text-white" : "text-slate-900"}`}>
                   {indexOfFirstItem + 1}
-                  {/* - */}
-                  {/* {Math.min(indexOfLastItem, filteredShipments.length)} */}
                 </span>{" "}
                 of {filteredShipments.length}
               </span>
@@ -322,7 +337,9 @@ const ShipmentBoard = forwardRef(function ShipmentBoard({ user, userRole, profil
                     setCurrentPage((prev) => Math.max(prev - 1, 1))
                   }
                   disabled={currentPage === 1}
-                  className="px-3 py-1.5 rounded-lg border border-slate-700 bg-slate-900 text-slate-400 text-xs hover:text-white hover:bg-slate-800 disabled:opacity-50"
+                  className={`px-3 py-1.5 rounded-lg border text-xs disabled:opacity-50 ${
+                    isDark ? "border-slate-700 bg-slate-900 text-slate-400 hover:text-white hover:bg-slate-800" : "border-slate-300 bg-white text-slate-600 hover:text-slate-900 hover:bg-slate-100"
+                  }`}
                 >
                   <FontAwesomeIcon icon={faChevronLeft} />
                 </button>
@@ -331,7 +348,9 @@ const ShipmentBoard = forwardRef(function ShipmentBoard({ user, userRole, profil
                     setCurrentPage((prev) => Math.min(prev + 1, totalPages))
                   }
                   disabled={currentPage === totalPages}
-                  className="px-3 py-1.5 rounded-lg border border-slate-700 bg-slate-900 text-slate-400 text-xs hover:text-white hover:bg-slate-800 disabled:opacity-50"
+                  className={`px-3 py-1.5 rounded-lg border text-xs disabled:opacity-50 ${
+                    isDark ? "border-slate-700 bg-slate-900 text-slate-400 hover:text-white hover:bg-slate-800" : "border-slate-300 bg-white text-slate-600 hover:text-slate-900 hover:bg-slate-100"
+                  }`}
                 >
                   <FontAwesomeIcon icon={faChevronRight} />
                 </button>
@@ -345,12 +364,14 @@ const ShipmentBoard = forwardRef(function ShipmentBoard({ user, userRole, profil
         isOpen={!!selectedShipmentId}
         onClose={() => setSelectedShipmentId(null)}
         data={selectedShipment}
+        isDark={isDark}
       />
 
       <UnifiedShipmentModal
         profile={profile}
         isOpen={isNewOrderModalOpen}
         onClose={() => setIsNewOrderModalOpen(false)}
+        isDark={isDark}
       />
     </div>
   );

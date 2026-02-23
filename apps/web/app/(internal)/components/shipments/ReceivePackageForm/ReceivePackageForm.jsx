@@ -23,7 +23,7 @@ const INITIAL_CONTACT = {
   province: "",
 };
 
-export default function ReceivePackageForm({ profile, onNext, initialData }) {
+export default function ReceivePackageForm({ profile, onNext, initialData, isDark = false }) {
   const { showAlert, showConfirm } = useAlert();
 
   // Use initialData if the user clicked "Back" from Step 2
@@ -267,6 +267,7 @@ export default function ReceivePackageForm({ profile, onNext, initialData }) {
           <RouteSection
             routeInfo={routeInfo}
             onWarehouseChange={handleWarehouseChange}
+            isDark={isDark}
           />
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-8">
@@ -275,12 +276,14 @@ export default function ReceivePackageForm({ profile, onNext, initialData }) {
               values={sender}
               onChange={setSender}
               color="blue"
+              isDark={isDark}
             />
             <InputGroup
               label="Recipient Contact"
               values={recipient}
               onChange={setRecipient}
               color="emerald"
+              isDark={isDark}
             />
           </div>
 
@@ -303,25 +306,28 @@ export default function ReceivePackageForm({ profile, onNext, initialData }) {
               newItems[idx][tag] = !newItems[idx][tag];
               setItems(newItems);
             }}
+            isDark={isDark}
           />
 
           {/* --- IMAGE UPLOAD SECTION --- */}
-          <div className="bg-slate-950/50 p-4 rounded-xl border border-slate-800/50 space-y-3">
+          <div className={`p-4 rounded-xl border space-y-3 ${
+            isDark ? "bg-slate-950/50 border-slate-800/50" : "bg-slate-50 border-slate-200"
+          }`}>
             <div className="flex justify-between items-center">
-              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">
+              <h3 className={`text-xs font-bold uppercase tracking-wider ${isDark ? "text-slate-400" : "text-slate-600"}`}>
                 Shipment Photos (Optional)
               </h3>
-              <span className="text-[10px] text-slate-500">
+              <span className={`text-[10px] ${isDark ? "text-slate-500" : "text-slate-600"}`}>
                 {imageFiles.length}/3
               </span>
             </div>
 
             <div className="flex gap-4 items-start overflow-x-auto pb-2 sm:pb-0 custom-scrollbar">
-              {/* BUTTON GROUP: Show if less than 3 images */}
               {imageFiles.length < 3 && (
                 <div className="flex gap-3 shrink-0">
-                  {/* 1. UPLOAD FILE BUTTON */}
-                  <label className="w-20 h-20 sm:w-24 sm:h-24 flex flex-col items-center justify-center bg-slate-900 border-2 border-dashed border-slate-700 rounded-xl cursor-pointer hover:border-blue-500 hover:text-blue-500 transition-colors text-slate-500">
+                  <label className={`w-20 h-20 sm:w-24 sm:h-24 flex flex-col items-center justify-center border-2 border-dashed rounded-xl cursor-pointer transition-colors ${
+                    isDark ? "bg-slate-900 border-slate-700 hover:border-blue-500 hover:text-blue-500 text-slate-500" : "bg-white border-slate-300 hover:border-blue-400 hover:text-blue-600 text-slate-600"
+                  }`}>
                     <FontAwesomeIcon icon={faImage} className="text-xl mb-1" />
                     <span className="text-[9px] sm:text-[10px] font-bold">
                       Upload
@@ -335,11 +341,12 @@ export default function ReceivePackageForm({ profile, onNext, initialData }) {
                     />
                   </label>
 
-                  {/* 2. CAMERA BUTTON */}
                   <button
                     type="button"
                     onClick={startCamera}
-                    className="w-20 h-20 sm:w-24 sm:h-24 flex flex-col items-center justify-center bg-slate-900 border-2 border-dashed border-slate-700 rounded-xl cursor-pointer hover:border-emerald-500 hover:text-emerald-500 transition-colors text-slate-500"
+                    className={`w-20 h-20 sm:w-24 sm:h-24 flex flex-col items-center justify-center border-2 border-dashed rounded-xl cursor-pointer transition-colors ${
+                      isDark ? "bg-slate-900 border-slate-700 hover:border-emerald-500 hover:text-emerald-500 text-slate-500" : "bg-white border-slate-300 hover:border-emerald-500 hover:text-emerald-600 text-slate-600"
+                    }`}
                   >
                     <FontAwesomeIcon icon={faCamera} className="text-xl mb-1" />
                     <span className="text-[9px] sm:text-[10px] font-bold">
@@ -349,11 +356,12 @@ export default function ReceivePackageForm({ profile, onNext, initialData }) {
                 </div>
               )}
 
-              {/* Previews */}
               {previews.map((src, idx) => (
                 <div
                   key={idx}
-                  className="relative shrink-0 w-20 h-20 sm:w-24 sm:h-24 rounded-xl overflow-hidden border border-slate-700 group"
+                  className={`relative shrink-0 w-20 h-20 sm:w-24 sm:h-24 rounded-xl overflow-hidden border group ${
+                    isDark ? "border-slate-700" : "border-slate-300"
+                  }`}
                 >
                   <img
                     src={src}
@@ -370,14 +378,16 @@ export default function ReceivePackageForm({ profile, onNext, initialData }) {
                 </div>
               ))}
             </div>
-            <p className="text-[10px] text-slate-600 italic">
+            <p className={`text-[10px] italic ${isDark ? "text-slate-600" : "text-slate-500"}`}>
               Max 3 images. 10MB limit per file.
             </p>
           </div>
 
           <textarea
             placeholder="Additional Remarks..."
-            className="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-2.5 text-white text-sm resize-none"
+            className={`w-full border rounded-lg px-4 py-2.5 text-sm resize-none ${
+              isDark ? "bg-slate-900 border-slate-700 text-white" : "bg-white border-slate-300 text-slate-900"
+            }`}
             value={remarks}
             onChange={(e) => setRemarks(e.target.value)}
             rows={3}
@@ -385,8 +395,9 @@ export default function ReceivePackageForm({ profile, onNext, initialData }) {
         </form>
       </div>
 
-      {/* Footer Navigation (Fixed at bottom) */}
-      <div className="p-4 sm:p-6 border-t border-slate-800 bg-slate-950 shrink-0">
+      <div className={`p-4 sm:p-6 border-t shrink-0 ${
+        isDark ? "border-slate-800 bg-slate-950" : "border-slate-200 bg-slate-50"
+      }`}>
         <button
           type="submit"
           form="step1-form"

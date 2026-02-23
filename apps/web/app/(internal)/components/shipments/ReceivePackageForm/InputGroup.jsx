@@ -7,10 +7,10 @@ export default function InputGroup({
   values,
   onChange,
   color = "blue",
+  isDark = false,
 }) {
   const [cities, setCities] = useState([]);
 
-  // Update city list when province changes
   useEffect(() => {
     if (values.province) {
       setCities(getCities(values.province));
@@ -20,12 +20,9 @@ export default function InputGroup({
   }, [values.province]);
 
   const handleChange = (field, val) => {
-    // If province changes, reset city and code
     if (field === "province") {
       onChange({ ...values, province: val, city: "", code: "" });
-    }
-    // If city changes, automatically find and set the code
-    else if (field === "city") {
+    } else if (field === "city") {
       const selectedCity = cities.find((c) => c.name === val);
       onChange({
         ...values,
@@ -41,34 +38,34 @@ export default function InputGroup({
     color === "emerald" ? "focus:ring-emerald-500" : "focus:ring-blue-500";
   const borderColor =
     color === "emerald" ? "focus:border-emerald-500" : "focus:border-blue-500";
-  const titleColor = color === "emerald" ? "text-emerald-400" : "text-blue-400";
+  const titleColor = color === "emerald" ? (isDark ? "text-emerald-400" : "text-emerald-600") : (isDark ? "text-blue-400" : "text-blue-600");
+  const inputClass = isDark
+    ? `w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm ${ringColor} ${borderColor} focus:ring-1`
+    : `w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-slate-900 text-sm ${ringColor} ${borderColor} focus:ring-1`;
 
   return (
-    <div className="space-y-4 bg-slate-950/50 p-4 rounded-xl border border-slate-800/50">
+    <div className={`space-y-4 p-4 rounded-xl border ${isDark ? "bg-slate-950/50 border-slate-800/50" : "bg-slate-50 border-slate-200"}`}>
       <div className="flex justify-between items-center mb-2">
-        <h3
-          className={`text-xs font-bold uppercase tracking-wider ${titleColor}`}
-        >
+        <h3 className={`text-xs font-bold uppercase tracking-wider ${titleColor}`}>
           {label} Details
         </h3>
         {values.code && (
-          <span className="bg-slate-800 text-white text-[10px] font-mono px-2 py-1 rounded border border-slate-700">
+          <span className={`text-[10px] font-mono px-2 py-1 rounded border ${isDark ? "bg-slate-800 text-white border-slate-700" : "bg-slate-200 text-slate-800 border-slate-300"}`}>
             CODE: {values.code}
           </span>
         )}
       </div>
 
-      {/* NAME & PHONE */}
       <div className="grid grid-cols-2 gap-3">
         <input
           placeholder="Contact Name"
-          className={`w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm ${ringColor} ${borderColor} focus:ring-1`}
+          className={inputClass}
           value={values.name}
           onChange={(e) => handleChange("name", e.target.value)}
         />
         <input
           placeholder="Phone Number"
-          className={`w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm ${ringColor} ${borderColor} focus:ring-1`}
+          className={inputClass}
           value={values.phone}
           // onChange={(e) => handleChange("phone", e.target.value)}
           // 1. ALLOW TYPING: Let them type dashes/spaces if they want
@@ -88,13 +85,13 @@ export default function InputGroup({
       <div className="grid grid-cols-3 gap-3">
         <input
           placeholder="Unit/House/Block"
-          className={`col-span-1 w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm ${ringColor} ${borderColor} focus:ring-1`}
+          className={inputClass + " col-span-1"}
           value={values.unit}
           onChange={(e) => handleChange("unit", e.target.value)}
         />
         <input
           placeholder="Street Name"
-          className={`col-span-2 w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm ${ringColor} ${borderColor} focus:ring-1`}
+          className={inputClass + " col-span-2"}
           value={values.street}
           onChange={(e) => handleChange("street", e.target.value)}
         />
@@ -104,12 +101,12 @@ export default function InputGroup({
       <div className="grid grid-cols-2 gap-3">
         <input
           placeholder="Barangay"
-          className={`w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm ${ringColor} ${borderColor} focus:ring-1`}
+          className={inputClass}
           value={values.barangay}
           onChange={(e) => handleChange("barangay", e.target.value)}
         />
         <select
-          className={`w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm ${ringColor} ${borderColor} focus:ring-1`}
+          className={inputClass}
           value={values.province}
           onChange={(e) => handleChange("province", e.target.value)}
         >
@@ -124,7 +121,7 @@ export default function InputGroup({
 
       {/* CITY */}
       <select
-        className={`w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm ${ringColor} ${borderColor} focus:ring-1 disabled:opacity-50`}
+        className={inputClass + " disabled:opacity-50"}
         value={values.city}
         onChange={(e) => handleChange("city", e.target.value)}
         disabled={!values.province}
