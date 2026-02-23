@@ -135,10 +135,13 @@ export default function UserManagementTable({
       </div>
 
       {/* C. TABLE */}
-      <div className="overflow-x-auto">
-        <table
-          className={`w-full text-left text-sm ${isDark ? "text-slate-400" : "text-slate-600"}`}
-        >
+      <div className="overflow-x-auto -mx-4 sm:mx-0">
+        <div className="min-w-[720px] px-4 sm:px-0">
+          <table
+            className={`w-full text-left text-sm ${
+              isDark ? "text-slate-400" : "text-slate-600"
+            }`}
+          >
           <thead className={`uppercase font-semibold text-xs ${theadClasses}`}>
             <tr>
               <th className="px-6 py-3">Name / Email</th>
@@ -209,6 +212,7 @@ export default function UserManagementTable({
             )}
           </tbody>
         </table>
+        </div>
       </div>
 
       {/* D. PAGINATION FOOTER */}
