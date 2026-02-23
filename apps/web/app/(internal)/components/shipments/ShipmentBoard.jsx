@@ -284,38 +284,55 @@ const ShipmentBoard = forwardRef(function ShipmentBoard({ user, userRole, profil
             </div>
           </div>
 
-          {/* TABLE HEADER (Hidden on mobile) */}
-          <div className={`hidden md:grid grid-cols-12 gap-4 px-6 py-3 border-b text-xs font-semibold uppercase tracking-wider ${
-            isDark ? "border-slate-800 bg-slate-950 text-slate-500" : "border-slate-200 bg-slate-50 text-slate-600"
-          }`}>
-            <div className="col-span-4">Tracking / Customer</div>
-            <div className="col-span-2">Route</div>
-            <div className="col-span-3">Progress</div>
-            <div className="col-span-2">Last Update</div>
-            <div className="col-span-1 text-right">Action</div>
-          </div>
+          {/* TABLE: wrap header + body for horizontal scroll on smaller widths */}
+          <div className="md:overflow-x-auto">
+            <div className="md:min-w-[900px]">
+              {/* TABLE HEADER (Hidden on mobile) */}
+              <div
+                className={`hidden md:grid grid-cols-12 gap-4 px-6 py-3 border-b text-xs font-semibold uppercase tracking-wider ${
+                  isDark
+                    ? "border-slate-800 bg-slate-950 text-slate-500"
+                    : "border-slate-200 bg-slate-50 text-slate-600"
+                }`}
+              >
+                <div className="col-span-4">Tracking / Customer</div>
+                <div className="col-span-2">Route</div>
+                <div className="col-span-3">Progress</div>
+                <div className="col-span-2">Last Update</div>
+                <div className="col-span-1 text-right">Action</div>
+              </div>
 
-          {/* TABLE BODY */}
-          <div className="min-h-[300px]">
-            {loading ? (
-              <div className={`p-10 text-center animate-pulse ${isDark ? "text-slate-500" : "text-slate-600"}`}>
-                Loading orders...
+              {/* TABLE BODY */}
+              <div className="min-h-[300px]">
+                {loading ? (
+                  <div
+                    className={`p-10 text-center animate-pulse ${
+                      isDark ? "text-slate-500" : "text-slate-600"
+                    }`}
+                  >
+                    Loading orders...
+                  </div>
+                ) : filteredShipments.length === 0 ? (
+                  <div
+                    className={`p-10 text-center ${
+                      isDark ? "text-slate-500" : "text-slate-600"
+                    }`}
+                  >
+                    No orders found matching filters.
+                  </div>
+                ) : (
+                  currentItems.map((s) => (
+                    <ShipmentRow
+                      key={s.id}
+                      s={s}
+                      onClick={setSelectedShipmentId}
+                      onMessage={() => handleMessageCustomer(s)}
+                      isDark={isDark}
+                    />
+                  ))
+                )}
               </div>
-            ) : filteredShipments.length === 0 ? (
-              <div className={`p-10 text-center ${isDark ? "text-slate-500" : "text-slate-600"}`}>
-                No orders found matching filters.
-              </div>
-            ) : (
-              currentItems.map((s) => (
-                <ShipmentRow
-                  key={s.id}
-                  s={s}
-                  onClick={setSelectedShipmentId}
-                  onMessage={() => handleMessageCustomer(s)}
-                  isDark={isDark}
-                />
-              ))
-            )}
+            </div>
           </div>
 
           {/* 5. PAGINATION FOOTER */}

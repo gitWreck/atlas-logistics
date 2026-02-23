@@ -63,7 +63,7 @@ export default function AdminOverview({ user, isDark = false }) {
       <DelayApprovalWidget isDark={isDark} />
 
       {/* 1. STATS GRID (DYNAMIC) */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         <StatusCard
           title="Total Users"
           value={stats.total}
@@ -161,7 +161,7 @@ export default function AdminOverview({ user, isDark = false }) {
         isDark={isDark}
       />
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 h-[500px] mb-8">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
         {/* LEFT: INCOMING ALERTS */}
         <RecentAlertsLogs isDark={isDark} />
 

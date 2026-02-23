@@ -193,64 +193,69 @@ const TruckBoard = forwardRef(function TruckBoard(
               isDark ? "border-slate-800/50" : "border-slate-200"
             }`}
           >
-            {/* TABLE HEADER (Hidden on Mobile) */}
-            <div
-              className={`hidden md:grid grid-cols-12 gap-4 px-6 py-3 border-b text-[10px] font-bold uppercase tracking-widest ${
-                isDark
-                  ? "border-slate-800 bg-slate-950 text-slate-500"
-                  : "border-slate-200 bg-slate-50 text-slate-600"
-              }`}
-            >
-              <div className="col-span-4">Truck / Model</div>
-              <div className="col-span-2">Status</div>
-              <div className="col-span-3">PMS Health</div>
-              <div className="col-span-2">Details</div>
-              <div className="col-span-1 text-right">Action</div>
-            </div>
+            {/* TABLE: wrap header + body for horizontal scroll on smaller widths */}
+            <div className="md:overflow-x-auto">
+              <div className="md:min-w-[900px]">
+                {/* TABLE HEADER (Hidden on Mobile) */}
+                <div
+                  className={`hidden md:grid grid-cols-12 gap-4 px-6 py-3 border-b text-[10px] font-bold uppercase tracking-widest ${
+                    isDark
+                      ? "border-slate-800 bg-slate-950 text-slate-500"
+                      : "border-slate-200 bg-slate-50 text-slate-600"
+                  }`}
+                >
+                  <div className="col-span-4">Truck / Model</div>
+                  <div className="col-span-2">Status</div>
+                  <div className="col-span-3">PMS Health</div>
+                  <div className="col-span-2">Details</div>
+                  <div className="col-span-1 text-right">Action</div>
+                </div>
 
-            {/* TABLE BODY */}
-            <div
-              className={`min-h-[400px] divide-y ${
-                isDark ? "divide-slate-800/50" : "divide-slate-200"
-              }`}
-            >
-              {loading ? (
-                <div className="flex flex-col items-center justify-center p-20 space-y-4">
-                  <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
-                  <p
-                    className={`text-sm animate-pulse ${
-                      isDark ? "text-slate-500" : "text-slate-600"
-                    }`}
-                  >
-                    Fetching fleet data...
-                  </p>
+                {/* TABLE BODY */}
+                <div
+                  className={`min-h-[400px] divide-y ${
+                    isDark ? "divide-slate-800/50" : "divide-slate-200"
+                  }`}
+                >
+                  {loading ? (
+                    <div className="flex flex-col items-center justify-center p-20 space-y-4">
+                      <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+                      <p
+                        className={`text-sm animate-pulse ${
+                          isDark ? "text-slate-500" : "text-slate-600"
+                        }`}
+                      >
+                        Fetching fleet data...
+                      </p>
+                    </div>
+                  ) : currentItems.length === 0 ? (
+                    <div className="p-20 text-center">
+                      <FontAwesomeIcon
+                        icon={faTruck}
+                        className={`text-4xl mb-4 ${
+                          isDark ? "text-slate-800" : "text-slate-200"
+                        }`}
+                      />
+                      <p
+                        className={`italic ${
+                          isDark ? "text-slate-500" : "text-slate-600"
+                        }`}
+                      >
+                        No trucks found.
+                      </p>
+                    </div>
+                  ) : (
+                    currentItems.map((truck) => (
+                      <TruckRow
+                        key={truck.id}
+                        truck={truck}
+                        onEdit={() => openEditModal(truck)}
+                        isDark={isDark}
+                      />
+                    ))
+                  )}
                 </div>
-              ) : currentItems.length === 0 ? (
-                <div className="p-20 text-center">
-                  <FontAwesomeIcon
-                    icon={faTruck}
-                    className={`text-4xl mb-4 ${
-                      isDark ? "text-slate-800" : "text-slate-200"
-                    }`}
-                  />
-                  <p
-                    className={`italic ${
-                      isDark ? "text-slate-500" : "text-slate-600"
-                    }`}
-                  >
-                    No trucks found.
-                  </p>
-                </div>
-              ) : (
-                currentItems.map((truck) => (
-                  <TruckRow
-                    key={truck.id}
-                    truck={truck}
-                    onEdit={() => openEditModal(truck)}
-                    isDark={isDark}
-                  />
-                ))
-              )}
+              </div>
             </div>
           </div>
 
