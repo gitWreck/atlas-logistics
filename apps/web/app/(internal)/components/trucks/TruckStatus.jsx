@@ -6,7 +6,7 @@ import {
   faExclamationTriangle,
 } from "@fortawesome/free-solid-svg-icons";
 
-export default function TruckStatus({ trucks = [] }) {
+export default function TruckStatus({ trucks = [], isDark = false }) {
   // Logic to calculate counts from your truck array
   const total = trucks.length;
   const active = trucks.filter((t) => t.status === "ACTIVE").length;
@@ -21,6 +21,7 @@ export default function TruckStatus({ trucks = [] }) {
         icon={faTruck}
         color="text-blue-500"
         bg="bg-blue-500/10"
+        isDark={isDark}
       />
       <StatusCard
         title="In Transit"
@@ -28,6 +29,7 @@ export default function TruckStatus({ trucks = [] }) {
         icon={faCheckCircle}
         color="text-emerald-500"
         bg="bg-emerald-500/10"
+        isDark={isDark}
       />
       <StatusCard
         title="Under Repair"
@@ -35,6 +37,7 @@ export default function TruckStatus({ trucks = [] }) {
         icon={faTools}
         color="text-amber-500"
         bg="bg-amber-500/10"
+        isDark={isDark}
       />
       <StatusCard
         title="Critical PMS"
@@ -42,6 +45,7 @@ export default function TruckStatus({ trucks = [] }) {
         icon={faExclamationTriangle}
         color="text-red-500"
         bg="bg-red-500/10"
+        isDark={isDark}
       />
     </div>
   );
