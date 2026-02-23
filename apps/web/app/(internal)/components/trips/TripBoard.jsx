@@ -343,8 +343,8 @@ const TripBoard = forwardRef(function TripBoard({ user, userRole, profile, isDar
         isOpen={!!selectedTripId}
         onClose={() => setSelectedTripId(null)}
         data={selectedTrip}
-        // onAddShipment={() => setBulkModalOpen(true)}
         onRefreshTrips={fetchTrips}
+        isDark={isDark}
       />
       <CreateTripModal
         isOpen={isNewTripModalOpen}

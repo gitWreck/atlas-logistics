@@ -55,7 +55,7 @@ const TEMPLATES = [
   },
 ];
 
-export default function TripBroadcastWidget({ trip }) {
+export default function TripBroadcastWidget({ trip, isDark = false }) {
   const [messageBody, setMessageBody] = useState("");
   const [selectedTemplateId, setSelectedTemplateId] = useState("");
   const [scheduledDate, setScheduledDate] = useState("");
@@ -135,13 +135,17 @@ export default function TripBroadcastWidget({ trip }) {
   )?.requiresDate;
 
   return (
-    <div className="bg-gradient-to-br from-slate-800 to-slate-900 border border-slate-700 rounded-xl p-5 shadow-lg">
-      <h3 className="text-sm font-bold text-white mb-3 flex items-center gap-2">
+    <div className={`border rounded-xl p-5 shadow-lg ${
+      isDark ? "bg-gradient-to-br from-slate-800 to-slate-900 border-slate-700" : "bg-white border-slate-200"
+    }`}>
+      <h3 className={`text-sm font-bold mb-3 flex items-center gap-2 ${
+        isDark ? "text-white" : "text-slate-900"
+      }`}>
         <FontAwesomeIcon icon={faBullhorn} className="text-amber-500" />
         Broadcast to Customers
       </h3>
 
-      <p className="text-xs text-slate-400 mb-4">
+      <p className={`text-xs mb-4 ${isDark ? "text-slate-400" : "text-slate-600"}`}>
         Send a bulk SMS notification to all customers with active shipments on{" "}
         <strong>{trip.tripId || "this trip"}</strong>.
       </p>
@@ -152,7 +156,9 @@ export default function TripBroadcastWidget({ trip }) {
         <select
           value={selectedTemplateId}
           onChange={handleTemplateChange}
-          className="flex-1 bg-slate-950 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-white focus:border-amber-500 outline-none"
+          className={`flex-1 border rounded-lg px-3 py-2.5 text-sm focus:border-amber-500 outline-none ${
+            isDark ? "bg-slate-950 border-slate-700 text-white" : "bg-white border-slate-300 text-slate-900"
+          }`}
         >
           <option value="">-- Select a Message Template --</option>
           {TEMPLATES.map((t) => (
@@ -176,7 +182,9 @@ export default function TripBroadcastWidget({ trip }) {
                 type="datetime-local"
                 value={scheduledDate}
                 onChange={(e) => setScheduledDate(e.target.value)}
-                className="pl-9 bg-slate-950 border border-amber-500/50 rounded-lg px-3 py-2.5 text-sm text-white focus:border-amber-500 outline-none w-full sm:w-auto"
+                className={`pl-9 border rounded-lg px-3 py-2.5 text-sm focus:border-amber-500 outline-none w-full sm:w-auto ${
+                  isDark ? "bg-slate-950 border-amber-500/50 text-white [color-scheme:dark]" : "bg-white border-amber-300 text-slate-900 [color-scheme:light]"
+                }`}
               />
             </div>
           </div>
@@ -185,7 +193,9 @@ export default function TripBroadcastWidget({ trip }) {
 
       {/* Input */}
       <textarea
-        className="w-full bg-slate-950 border border-slate-700 rounded-lg p-3 text-sm text-slate-200 focus:border-amber-500 focus:outline-none mb-3 h-24 resize-none"
+        className={`w-full border rounded-lg p-3 text-sm focus:border-amber-500 focus:outline-none mb-3 h-24 resize-none ${
+          isDark ? "bg-slate-950 border-slate-700 text-slate-200" : "bg-white border-slate-300 text-slate-900"
+        }`}
         placeholder="Message preview..."
         value={messageBody}
         onChange={(e) => setMessageBody(e.target.value)}
@@ -194,13 +204,15 @@ export default function TripBroadcastWidget({ trip }) {
 
       {/* Result Stats */}
       {result && (
-        <div className="mb-4 p-3 bg-emerald-900/20 border border-emerald-500/30 rounded-lg flex justify-between items-center text-xs">
-          <span className="text-emerald-400 font-bold">
+        <div className={`mb-4 p-3 border rounded-lg flex justify-between items-center text-xs ${
+          isDark ? "bg-emerald-900/20 border-emerald-500/30" : "bg-emerald-50 border-emerald-200"
+        }`}>
+          <span className={`font-bold ${isDark ? "text-emerald-400" : "text-emerald-700"}`}>
             Broadcast Complete!
           </span>
           <div className="flex gap-3">
-            <span className="text-slate-300">
-              Sent: <b className="text-white">{result.sent}</b>
+            <span className={isDark ? "text-slate-300" : "text-slate-600"}>
+              Sent: <b className={isDark ? "text-white" : "text-slate-900"}>{result.sent}</b>
             </span>
             {result.failed > 0 && (
               <span className="text-red-400">
@@ -228,7 +240,9 @@ export default function TripBroadcastWidget({ trip }) {
         )}
       </button>
 
-      <div className="mt-3 flex items-start gap-2 text-[10px] text-slate-500 bg-slate-950/50 p-2 rounded">
+      <div className={`mt-3 flex items-start gap-2 text-[10px] p-2 rounded ${
+        isDark ? "text-slate-500 bg-slate-950/50" : "text-slate-600 bg-slate-50"
+      }`}>
         <FontAwesomeIcon
           icon={faExclamationTriangle}
           className="text-slate-600 mt-0.5"

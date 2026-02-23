@@ -7,7 +7,7 @@ import {
 } from "@fortawesome/free-solid-svg-icons";
 import { sendManualSms } from "@/app/utility/FirebaseFunctions";
 
-export default function DriverMessageWidget({ trip }) {
+export default function DriverMessageWidget({ trip, isDark = false }) {
   const [messageBody, setMessageBody] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -42,24 +42,32 @@ export default function DriverMessageWidget({ trip }) {
   if (!trip) return null;
 
   return (
-    <div className="bg-slate-800/40 border border-slate-700 rounded-xl p-5 shadow-sm">
-      <h3 className="text-sm font-bold text-slate-300 mb-3 flex items-center gap-2">
+    <div className={`border rounded-xl p-5 shadow-sm ${
+      isDark ? "bg-slate-800/40 border-slate-700" : "bg-slate-50 border-slate-200"
+    }`}>
+      <h3 className={`text-sm font-bold mb-3 flex items-center gap-2 ${
+        isDark ? "text-slate-300" : "text-slate-800"
+      }`}>
         <FontAwesomeIcon icon={faTruckFast} className="text-blue-500" />
         Message Driver
       </h3>
 
-      <div className="text-xs text-slate-500 mb-3 flex justify-between bg-slate-900/50 p-2 rounded border border-slate-700/50">
+      <div className={`text-xs mb-3 flex justify-between p-2 rounded border ${
+        isDark ? "text-slate-500 bg-slate-900/50 border-slate-700/50" : "text-slate-600 bg-white border-slate-200"
+      }`}>
         <span>
           Driver:{" "}
-          <span className="text-slate-300 font-medium">{driverName}</span>
+          <span className={`font-medium ${isDark ? "text-slate-300" : "text-slate-700"}`}>{driverName}</span>
         </span>
-        <span className="font-mono text-slate-400">
+        <span className={`font-mono ${isDark ? "text-slate-400" : "text-slate-600"}`}>
           {driverPhone || "No Phone Linked"}
         </span>
       </div>
 
       <textarea
-        className="w-full bg-slate-950 border border-slate-700 rounded-lg p-3 text-sm text-slate-200 focus:border-blue-500 focus:outline-none mb-3 h-20 resize-none placeholder:text-slate-600"
+        className={`w-full border rounded-lg p-3 text-sm focus:border-blue-500 focus:outline-none mb-3 h-20 resize-none ${
+          isDark ? "bg-slate-950 border-slate-700 text-slate-200 placeholder:text-slate-600" : "bg-white border-slate-300 text-slate-900 placeholder:text-slate-500"
+        }`}
         placeholder="Update location, delays, or instructions..."
         value={messageBody}
         onChange={(e) => setMessageBody(e.target.value)}
