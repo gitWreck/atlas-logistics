@@ -7,6 +7,7 @@ import {
   faFilter,
   faChevronLeft,
   faChevronRight,
+  faRoute,
 } from "@fortawesome/free-solid-svg-icons";
 import TripRow from "./TripRow";
 import { calculateProgress } from "@/app/utility/utilities";
