@@ -48,6 +48,13 @@ exports.upsertTruck = onCall(
           payloadCapacity: Number(data.payload),
           registrationExpiry: data.registrationExpiry,
           lastPmsOdometer: Number(data.lastPmsOdometer),
+
+          // --- NEW ---
+          lastOilChange: data.lastOilChange ? Number(data.lastOilChange) : null,
+          lastTireChange: data.lastTireChange
+            ? Number(data.lastTireChange)
+            : null,
+
           updatedAt: timestamp,
           updatedBy: request.auth.uid,
         };
@@ -74,6 +81,14 @@ exports.upsertTruck = onCall(
             payload: Number(data.payload),
             registrationExpiry: data.registrationExpiry,
             odometerAtLog: Number(data.lastPmsOdometer),
+
+            // --- NEW ---
+            lastOilChangeAtLog: data.lastOilChange
+              ? Number(data.lastOilChange)
+              : null,
+            lastTireChangeAtLog: data.lastTireChange
+              ? Number(data.lastTireChange)
+              : null,
           },
         });
       });

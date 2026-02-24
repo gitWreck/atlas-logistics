@@ -41,6 +41,14 @@ exports.updatePackageStatus = onCall(async (req) => {
             loadedAt: new Date().toISOString(),
             loadedOnTrip: truckTripId,
           };
+        } else if (action === "COLLECT") {
+          // Inside your transaction logic for collection
+          return {
+            ...pkg,
+            status: "PICKED_UP",
+            pickedUpAt: new Date().toISOString(),
+            currentLocation: `Truck: ${truckTripId}`,
+          };
         } else {
           // UNLOAD
           return {

@@ -11,6 +11,7 @@ import {
   faWeightHanging,
   faTools,
   faCalendarCheck,
+  faWrench,
 } from "@fortawesome/free-solid-svg-icons";
 import {
   upsertTruck,
@@ -32,6 +33,8 @@ export default function TruckModal({
     payload: "",
     registrationExpiry: "",
     lastPmsOdometer: "",
+    lastOilChange: "", // NEW
+    lastTireChange: "", // NEW
   });
 
   const isEdit = !!initialData;
@@ -45,6 +48,8 @@ export default function TruckModal({
         payload: initialData?.payload || "",
         registrationExpiry: initialData?.registrationExpiry || "",
         lastPmsOdometer: initialData?.lastPmsOdometer || "",
+        lastOilChange: initialData?.lastOilChange || "", // NEW
+        lastTireChange: initialData?.lastTireChange || "", // NEW
       });
     }
   }, [isOpen, initialData]);
@@ -212,7 +217,7 @@ export default function TruckModal({
             </p>
             <div className="grid grid-cols-2 gap-4">
               <InputField
-                label="Reg. Expiry"
+                label="LTO Expiry"
                 type="date"
                 icon={faCalendarCheck}
                 value={formData.registrationExpiry}
@@ -229,6 +234,22 @@ export default function TruckModal({
                   handleChange("lastPmsOdometer", e.target.value)
                 }
                 required
+              />
+              <InputField
+                label="Last Oil Change (ODO)"
+                type="number"
+                icon={faTools}
+                placeholder="e.g. 50000"
+                value={formData.lastOilChange}
+                onChange={(e) => handleChange("lastOilChange", e.target.value)}
+              />
+              <InputField
+                label="Last Tires (ODO)"
+                type="number"
+                icon={faWrench}
+                placeholder="e.g. 40000"
+                value={formData.lastTireChange}
+                onChange={(e) => handleChange("lastTireChange", e.target.value)}
               />
             </div>
           </div>

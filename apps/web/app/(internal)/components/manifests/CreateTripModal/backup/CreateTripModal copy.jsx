@@ -6,9 +6,9 @@ import { createTruckTrip } from "@/app/utility/FirebaseFunctions";
 import { WAREHOUSES } from "@/app/utility/WarehouseData";
 
 // Sub-components
-import RouteSelector from "./RouteSelector";
-import ScheduleSection from "./ScheduleSection";
-import VehicleDetails from "./VehicleDetails";
+import RouteSelector from "../RouteSelector";
+import ScheduleSection from "../ScheduleSection";
+import VehicleDetails from "../VehicleDetails";
 
 const INITIAL_FORM_STATE = {
   origin: "",
@@ -21,6 +21,7 @@ const INITIAL_FORM_STATE = {
   driverName: "",
   driverId: null,
   truckPlateNumber: "",
+  truckId: null,
 };
 
 export default function CreateTripModal({ isOpen, onClose, onSuccess }) {

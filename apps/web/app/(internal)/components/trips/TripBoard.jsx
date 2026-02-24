@@ -23,6 +23,7 @@ const TripBoard = forwardRef(function TripBoard({ user, userRole, profile, isDar
 
   // Search & Filter State
   const [activeFilter, setActiveFilter] = useState("ALL");
+  const [typeFilter, setTypeFilter] = useState("ALL");
   const [searchQuery, setSearchQuery] = useState("");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
@@ -109,13 +110,14 @@ const TripBoard = forwardRef(function TripBoard({ user, userRole, profile, isDar
         if (activeFilter === "ACTIVE")
           return ["IN_TRANSIT", "LOADED"].includes(t.status);
 
-        // Critical: "Delayed" logic based on our previous discussion
-        if (activeFilter === "DELAYED") {
-          // It is delayed if delayCleared is FALSE
-          return t.delayCleared === false;
-        }
+        if (activeFilter === "DELAYED") return t.delayCleared === false;
 
         if (activeFilter === "COMPLETED") return t.status === "COMPLETED";
+      }
+
+      // 4. NEW: Trip Type Filter
+      if (typeFilter !== "ALL") {
+        if (t.tripType !== typeFilter) return false;
       }
 
       return true;
@@ -226,6 +228,23 @@ const TripBoard = forwardRef(function TripBoard({ user, userRole, profile, isDar
                     value={endDate}
                     onChange={(e) => setEndDate(e.target.value)}
                   />
+                </div>
+
+                {/* Type Filter (NEW) */}
+                <div className="relative w-full sm:w-40">
+                  <FontAwesomeIcon
+                    icon={faRoute}
+                    className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-sm"
+                  />
+                  <select
+                    className="w-full bg-slate-900 border border-slate-700 rounded-lg pl-9 pr-4 py-2 text-sm text-white focus:border-blue-500 focus:outline-none appearance-none cursor-pointer"
+                    value={typeFilter}
+                    onChange={(e) => setTypeFilter(e.target.value)}
+                  >
+                    <option value="ALL">All Route Types</option>
+                    <option value="TRANSFER">Transfers</option>
+                    <option value="LOCAL">Local Pickups</option>
+                  </select>
                 </div>
 
                 {/* Status Filter */}

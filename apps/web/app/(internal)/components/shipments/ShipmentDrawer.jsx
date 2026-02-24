@@ -190,53 +190,119 @@ export default function ShipmentDrawer({ isOpen, onClose, data, isDark = false }
               </div>
               <div className={isDark ? "text-slate-500" : "text-slate-600"}>
                 <div>
-                  <h3 className={`text-xs font-bold uppercase mb-4 pl-1 ${isDark ? "text-slate-500" : "text-slate-600"}`}>
+                  <h3
+                    className={`text-xs font-bold uppercase mb-4 pl-1 ${
+                      isDark ? "text-slate-500" : "text-slate-600"
+                    }`}
+                  >
                     Status Flow
                   </h3>
-                  <div className={`space-y-0 relative pl-4 border-l-2 ml-2 ${isDark ? "border-slate-800" : "border-slate-200"}`}>
-                    {[
-                      "CREATED",
-                      "RECEIVED",
-                      "ASSIGNED",
-                      "LOADED",
-                      "IN_TRANSIT",
-                      "OUT_FOR_DELIVERY",
-                      "DELIVERED",
-                    ].map((step, idx) => {
-                      const isDone = idx * 16 <= (data.progress || 0);
-                      const isCurrent =
-                        calculateCurrentStep(data.status) === step;
+                  <div
+                    className={`space-y-0 relative pl-4 border-l-2 ml-2 ${
+                      isDark ? "border-slate-800" : "border-slate-200"
+                    }`}
+                  >
+                    {(() => {
+                      // 1. Determine if this started as a Home Pickup
+                      const isPickupOrder =
+                        data.status === "PENDING_PICKUP" ||
+                        data.status === "PICKED_UP" ||
+                        (data.statusHistory || []).some((h) =>
+                          h.status.includes("PICKUP"),
+                        );
 
-                      return (
-                        <div key={step} className="relative pb-8 last:pb-0">
-                          <div
-                            className={`
-                                            absolute -left-[21px] top-0 w-4 h-4 rounded-full border-2 flex items-center justify-center
-                                            ${isDone ? "bg-blue-600 border-blue-600" : isDark ? "bg-slate-900 border-slate-700" : "bg-slate-100 border-slate-300"}
-                                            ${isCurrent ? "ring-4 ring-blue-500/20" : ""}
-                                          `}
-                          >
-                            {isDone && (
-                              <FontAwesomeIcon
-                                icon={faCheckCircle}
-                                className="text-white text-[8px]"
-                              />
-                            )}
-                          </div>
+                      // 2. Build the continuous timeline dynamically
+                      const STEPS = isPickupOrder
+                        ? [
+                            "PENDING_PICKUP",
+                            "PICKED_UP",
+                            "RECEIVED", // Merges into standard flow here (at Origin Hub)
+                            "ASSIGNED",
+                            "LOADED",
+                            "IN_TRANSIT",
+                            "OUT_FOR_DELIVERY",
+                            "DELIVERED",
+                          ]
+                        : [
+                            "CREATED", // Standard Drop-off
+                            "RECEIVED",
+                            "ASSIGNED",
+                            "LOADED",
+                            "IN_TRANSIT",
+                            "OUT_FOR_DELIVERY",
+                            "DELIVERED",
+                          ];
 
-                          <div className={`-mt-1.5 ml-2 ${isDone ? "opacity-100" : "opacity-40"}`}>
-                            <p className={`text-sm font-bold ${isDone ? (isDark ? "text-white" : "text-slate-900") : (isDark ? "text-slate-400" : "text-slate-500")}`}>
-                              {step.replace(/_/g, " ")}
-                            </p>
-                            {isCurrent && (
-                              <p className={`text-[10px] mt-0.5 ${isDark ? "text-blue-400" : "text-blue-600"}`}>
-                                Last updated: {data.updatedAt}
+                      const currentStepIndex = STEPS.indexOf(data.status);
+
+                      return STEPS.map((step, idx) => {
+                        // 3. Check progress based on array index, not strict percentage
+                        const isDone = currentStepIndex >= idx;
+                        const isCurrent = data.status === step;
+
+                        return (
+                          <div key={step} className="relative pb-8 last:pb-0">
+                            {/* Dot */}
+                            <div
+                              className={`
+                                absolute -left-[21px] top-0 w-4 h-4 rounded-full border-2 flex items-center justify-center transition-all duration-300
+                                ${
+                                  isDone
+                                    ? "bg-blue-600 border-blue-600"
+                                    : isDark
+                                    ? "bg-slate-900 border-slate-700"
+                                    : "bg-slate-100 border-slate-300"
+                                }
+                                ${
+                                  isCurrent
+                                    ? "ring-4 ring-blue-500/20 scale-110"
+                                    : ""
+                                }
+                              `}
+                            >
+                              {isDone && (
+                                <FontAwesomeIcon
+                                  icon={faCheckCircle}
+                                  className="text-white text-[8px]"
+                                />
+                              )}
+                            </div>
+
+                            {/* Text */}
+                            <div
+                              className={`-mt-1.5 ml-2 transition-opacity duration-300 ${
+                                isDone || isCurrent
+                                  ? "opacity-100"
+                                  : "opacity-40"
+                              }`}
+                            >
+                              <p
+                                className={`text-sm font-bold ${
+                                  isDone || isCurrent
+                                    ? isDark
+                                      ? "text-white"
+                                      : "text-slate-900"
+                                    : isDark
+                                    ? "text-slate-400"
+                                    : "text-slate-500"
+                                }`}
+                              >
+                                {step.replace(/_/g, " ")}
                               </p>
-                            )}
+                              {isCurrent && (
+                                <p
+                                  className={`text-[10px] mt-0.5 ${
+                                    isDark ? "text-blue-400" : "text-blue-600"
+                                  }`}
+                                >
+                                  Current Stage • {data.updatedAt}
+                                </p>
+                              )}
+                            </div>
                           </div>
-                        </div>
-                      );
-                    })}
+                        );
+                      });
+                    })()}
                   </div>
                 </div>
               </div>
@@ -246,24 +312,6 @@ export default function ShipmentDrawer({ isOpen, onClose, data, isDark = false }
           {/* --- TAB 2: ITEMS --- */}
           {activeTab === "ITEMS" && (
             <PackagesTable data={data} isDark={isDark} />
-            // <div className="space-y-3 animate-in fade-in slide-in-from-right-4 duration-300">
-            //   <button
-            //     onClick={() =>
-            //       // window.open(`../print/labels?id=${data.id}`, "_blank")
-            //       window.open(
-            //         `/components/print/labels?id=${encodeURIComponent(data.id)}`,
-            //         "_blank",
-            //       )
-            //     }
-            //     className="flex items-center gap-2 bg-slate-700 hover:bg-slate-600 text-white px-4 py-2 rounded-lg transition-colors text-sm font-bold"
-            //   >
-            //     <FontAwesomeIcon icon={faPrint} />
-            //     <span>Print {data.packages?.length} Labels</span>
-            //   </button>
-            //   {data.packages.map((pkg, idx) => (
-            //     <PackageRow key={idx} pkg={pkg} idx={idx} />
-            //   ))}
-            // </div>
           )}
 
           {/* --- TAB 3: TOOLS (EMBEDDED QR & MESSAGE) --- */}
