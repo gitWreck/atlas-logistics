@@ -21,6 +21,7 @@ import {
 } from "@fortawesome/free-solid-svg-icons";
 import { auth, functions } from "@/lib/firebase";
 import { httpsCallable } from "firebase/functions";
+import { splitShipments } from "@/app/utility/FirebaseFunctions";
 
 // --- CONSTANTS ---
 const PACKAGING_TYPES = ["Box", "Sack", "Crate", "Bundle", "Roll", "Envelope"];
@@ -229,8 +230,8 @@ export default function ViewPackagesModal({
         (idx) => packages[idx].trackingNumber,
       );
 
-      const splitFn = httpsCallable(functions, "splitShipment");
-      const result = await splitFn({
+      // const splitFn = httpsCallable(functions, "splitShipment");
+      const result = await splitShipments({
         originalShipmentId: shipment.id,
         itemsToSplit: barcodesToSplit, // Pass the array of barcodes
       });
@@ -526,15 +527,15 @@ export default function ViewPackagesModal({
                                 )}
                               </div>
                               <div className="flex gap-4 mt-1 text-sm">
-                                <div className="font-mono text-slate-400">
+                                {/* <div className="font-mono text-slate-400">
                                   {pkg.weight}{" "}
                                   <span className="text-xs text-slate-600">
                                     kg
                                   </span>
-                                </div>
+                                </div> */}
                                 {pkg.declaredValue > 0 && (
                                   <div className="font-mono text-emerald-500">
-                                    ₱{pkg.declaredValue}
+                                    ₱ {pkg.declaredValue}
                                   </div>
                                 )}
                               </div>

@@ -186,6 +186,10 @@ export default function TripDrawer({ isOpen, onClose, data, onRefreshTrips, isDa
         shipment={selectedShipmentForModal}
         onClose={() => setSelectedShipmentForModal(null)}
         isLocked={data.manifestLocked}
+        onRefresh={() => {
+          fetchShipments();
+          onRefreshTrips();
+        }}
         isDark={isDark}
       />
       <UnassignShipmentModal

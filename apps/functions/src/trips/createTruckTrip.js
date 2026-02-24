@@ -43,6 +43,9 @@ exports.createTruckTrip = onCall(
     const driverName = optionalString(req.data?.driverName);
     const driverId = optionalString(req.data?.driverId);
 
+    // ---> NEW: Extract tripType
+    const tripType = req.data?.tripType || "TRANSFER";
+
     // Add this near tripRef definition
     const truckDocId = req.data?.truckId; // Ensure you pass 'truckId' from the frontend
     const truckRef = truckDocId
@@ -90,6 +93,9 @@ exports.createTruckTrip = onCall(
         destination: req.data?.destination,
         destinationCode,
         route: originCode + " -> " + destinationCode || null,
+
+        // ---> NEW: Save tripType to DB
+        tripType: tripType,
 
         // assignment (optional)
         truckPlateNumber: truckPlateNumber || null,
