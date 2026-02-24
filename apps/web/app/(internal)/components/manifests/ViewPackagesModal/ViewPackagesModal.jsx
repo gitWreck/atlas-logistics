@@ -4,8 +4,7 @@ import { PackageBulkActions } from "./PackageBulkActions";
 import { PackageItemCard } from "./PackageItemCard";
 import { PackageStatusCard } from "./PackageStatusCard";
 
-import { auth, functions } from "@/lib/firebase";
-import { httpsCallable } from "firebase/functions";
+import { auth } from "@/lib/firebase";
 import {
   faBoxOpen,
   faCheckSquare,
@@ -19,8 +18,18 @@ import {
   faTimes,
   faWeightHanging,
   faWineGlass,
+  faBox,
+  faCamera,
+  faExpand,
+  faChevronUp,
+  faChevronDown,
+  faTrash,
+  faUpload,
 } from "@fortawesome/free-solid-svg-icons";
-import { splitShipments } from "@/app/utility/FirebaseFunctions";
+import {
+  splitShipments,
+  updateShipmentImages,
+} from "@/app/utility/FirebaseFunctions";
 
 // --- CONSTANTS ---
 const PACKAGING_TYPES = ["Box", "Sack", "Crate", "Bundle", "Roll", "Envelope"];
@@ -63,6 +72,17 @@ export default function ViewPackagesModal({
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 5; // You can adjust this number
 
+  // --- NEW IMAGE STATE ---
+  const [lightboxSrc, setLightboxSrc] = useState(null);
+
+  // We initialize these from the shipment object
+  const [receiptImages, setReceiptImages] = useState(
+    shipment?.proofOfReceipt || [],
+  );
+  const [deliveryImages, setDeliveryImages] = useState(
+    shipment?.proofOfDelivery || [],
+  );
+
   const filteredAndPaginatedPackages = useMemo(() => {
     // 1. Filter based on Search
     const filtered = packages.filter(
@@ -95,6 +115,79 @@ export default function ViewPackagesModal({
       setSelectedIndices(new Set());
     }
   }, [isOpen, shipment]);
+
+  useEffect(() => {
+    if (shipment) {
+      setReceiptImages(shipment.proofOfReceipt || []);
+      setDeliveryImages(shipment.proofOfDelivery || []);
+    }
+  }, [shipment]);
+
+  // --- IMAGE HANDLERS ---
+  const handleAddImage = async (e, type) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    try {
+      setIsSaving(true);
+      // TODO: Replace with your actual upload logic to Firebase Storage
+      // const downloadURL = await uploadImageToStorage(file, shipment.id);
+
+      // Placeholder for testing UI before backend integration
+      const downloadURL = URL.createObjectURL(file);
+
+      const updatedImages =
+        type === "receipt"
+          ? [...receiptImages, downloadURL]
+          : [...deliveryImages, downloadURL];
+
+      // Update Local State
+      if (type === "receipt") setReceiptImages(updatedImages);
+      else setDeliveryImages(updatedImages);
+
+      // Call your backend to save the new image array to the shipment document
+      await updateShipmentImages({
+        shipmentId: shipment.id,
+        type,
+        images: updatedImages,
+      });
+    } catch (err) {
+      alert("Error uploading image: " + err.message);
+    } finally {
+      setIsSaving(false);
+      // Reset input
+      e.target.value = null;
+    }
+  };
+
+  const handleRemoveImage = async (urlToRemove, type) => {
+    if (!confirm("Remove this image?")) return;
+
+    try {
+      setIsSaving(true);
+      const updatedImages =
+        type === "receipt"
+          ? receiptImages.filter((url) => url !== urlToRemove)
+          : deliveryImages.filter((url) => url !== urlToRemove);
+
+      // Update Local State
+      if (type === "receipt") setReceiptImages(updatedImages);
+      else setDeliveryImages(updatedImages);
+
+      // Call your backend to save the updated array
+      await updateShipmentImages({
+        shipmentId: shipment.id,
+        type,
+        images: updatedImages,
+      });
+
+      // TODO: Optionally delete the actual file from Firebase Storage here
+    } catch (err) {
+      alert("Error removing image: " + err.message);
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   const fetchFullShipmentDetails = async (id) => {
     try {
@@ -134,7 +227,6 @@ export default function ViewPackagesModal({
   const saveUpdates = async (updatedPackages) => {
     try {
       setIsSaving(true);
-      const updateFn = httpsCallable(functions, "updateShipmentPackages");
 
       await updateShipmentPackages({
         shipmentId: shipment.id,
@@ -287,10 +379,10 @@ export default function ViewPackagesModal({
 
       <div
         className="relative bg-slate-900 border-0 sm:border border-slate-700 sm:rounded-xl shadow-2xl flex flex-col overflow-hidden w-full h-full sm:h-[85vh]"
-        style={{ maxWidth: "1200px" }} // Replaced the inline min() style for better Tailwind compatibility
+        style={{ maxWidth: "1200px" }}
       >
         {/* 1. HEADER */}
-        <div className="flex items-center justify-between p-4 sm:p-6 border-b border-slate-800 bg-slate-950/50 sm:rounded-t-xl shrink-0">
+        <div className="flex items-center justify-between p-4 sm:p-6 border-b border-slate-800 bg-slate-950/50 sm:rounded-t-xl shrink-0 z-10">
           <div>
             <div className="text-[10px] sm:text-xs font-bold text-blue-400 uppercase tracking-wider mb-1">
               Shipment Contents
@@ -308,11 +400,17 @@ export default function ViewPackagesModal({
           </button>
         </div>
 
-        {/* 2. THE BODY: Stacks on mobile, Row on desktop */}
-        <div className="flex-1 flex flex-col md:flex-row overflow-hidden min-h-0">
-          {/* LEFT COLUMN / TOP ROW (Sidebar) */}
-          <div className="w-full md:w-[300px] shrink-0 border-b md:border-b-0 md:border-r border-slate-800 bg-slate-950/20 p-4 sm:p-6 flex flex-col gap-4 sm:gap-6 overflow-y-auto md:overflow-y-auto max-h-[40vh] md:max-h-none custom-scrollbar">
-            {/* Stats - Grid on mobile, Stack on Desktop */}
+        {/* 2. THE BODY: 
+        Mobile: 'overflow-y-auto' on this wrapper so the whole thing scrolls.
+        Desktop: 'overflow-hidden' here, so inner columns can scroll independently.
+    */}
+        <div className="flex-1 flex flex-col md:flex-row overflow-y-auto md:overflow-hidden min-h-0 custom-scrollbar">
+          {/* LEFT COLUMN / TOP ROW (Sidebar) 
+          Mobile: No max-height, no overflow. It just stacks naturally.
+          Desktop: Fixed width, independent scroll.
+      */}
+          <div className="w-full md:w-[400px] shrink-0 border-b md:border-b-0 md:border-r border-slate-800 bg-slate-950/20 p-4 sm:p-6 flex flex-col gap-4 sm:gap-6 overflow-visible md:overflow-y-auto custom-scrollbar">
+            {/* Stats */}
             <div className="grid grid-cols-2 md:grid-cols-1 gap-3">
               <PackageStatusCard
                 icon={faCube}
@@ -442,12 +540,42 @@ export default function ViewPackagesModal({
                 </button>
               )}
             </div>
+
+            {/* GALLERIES */}
+            <div className="border-t border-slate-800 mt-2 md:mt-4 -mx-4 sm:-mx-6 pt-2">
+              <ImageGallery
+                title="Proof of Receipt"
+                count={receiptImages.length}
+                images={receiptImages}
+                icon={faBox}
+                onView={setLightboxSrc}
+                onAdd={(e) => handleAddImage(e, "receipt")}
+                onRemove={(url) => handleRemoveImage(url, "receipt")}
+                defaultOpen={false}
+                isSaving={isSaving}
+              />
+              <div className="h-px bg-slate-800 mx-6" />
+              <ImageGallery
+                title="Proof of Delivery"
+                count={deliveryImages.length}
+                images={deliveryImages}
+                icon={faCamera}
+                onView={setLightboxSrc}
+                onAdd={(e) => handleAddImage(e, "delivery")}
+                onRemove={(url) => handleRemoveImage(url, "delivery")}
+                defaultOpen={true}
+                isSaving={isSaving}
+              />
+            </div>
           </div>
 
-          {/* RIGHT COLUMN / BOTTOM ROW: List & Actions */}
-          <div className="flex-1 flex flex-col bg-slate-900 overflow-hidden min-h-0">
-            {/* Bulk Actions & Search */}
-            <div className="bg-slate-950/40 border-b border-slate-800 shrink-0">
+          {/* RIGHT COLUMN / BOTTOM ROW: List & Actions 
+          Mobile: No independent scrolling. Just flows naturally down.
+          Desktop: Flex-col, overflow-hidden wrapper, scrolling inner list.
+      */}
+          <div className="flex-1 flex flex-col bg-slate-900 md:overflow-hidden min-h-0">
+            {/* Bulk Actions & Search (Sticky on Desktop) */}
+            <div className="bg-slate-950/40 border-b border-slate-800 shrink-0 sticky top-0 z-10 md:static">
               <PackageBulkActions
                 selectedCount={selectedIndices.size}
                 canSplit={canSplit}
@@ -457,7 +585,6 @@ export default function ViewPackagesModal({
                 onStatusChange={handleBulkStatusChange}
               />
               <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center border-t border-slate-800 px-4 py-3 gap-3">
-                {/* LEFT SIDE (Select All) */}
                 <div className="flex items-center gap-4">
                   <button
                     onClick={handleSelectAll}
@@ -482,7 +609,6 @@ export default function ViewPackagesModal({
                   </span>
                 </div>
 
-                {/* RIGHT SIDE (Search) */}
                 <div className="relative w-full sm:w-80">
                   <FontAwesomeIcon
                     icon={faSearch}
@@ -499,8 +625,11 @@ export default function ViewPackagesModal({
               </div>
             </div>
 
-            {/* Scrollable Package List */}
-            <div className="flex-1 overflow-y-auto p-4 sm:p-6 custom-scrollbar space-y-3 min-h-0">
+            {/* Package List 
+            Mobile: overflow-visible so it expands fully. 
+            Desktop: overflow-y-auto so it scrolls inside its column.
+        */}
+            <div className="flex-1 overflow-visible md:overflow-y-auto p-4 sm:p-6 custom-scrollbar space-y-3 min-h-0">
               {filteredAndPaginatedPackages.paginated.map((pkg, idx) => {
                 const originalIdx = packages.findIndex(
                   (p) => p.trackingNumber === pkg.trackingNumber,
@@ -573,7 +702,7 @@ export default function ViewPackagesModal({
         </div>
 
         {/* 3. FOOTER */}
-        <div className="p-4 border-t border-slate-800 bg-slate-950/50 sm:rounded-b-xl flex justify-end shrink-0">
+        <div className="p-4 border-t border-slate-800 bg-slate-950/50 sm:rounded-b-xl flex justify-end shrink-0 z-10">
           <button
             onClick={onClose}
             className="w-full sm:w-auto px-6 py-3 sm:py-2.5 bg-slate-800 hover:bg-slate-700 text-white text-sm font-bold rounded-lg border border-slate-700 transition-colors"
@@ -582,6 +711,125 @@ export default function ViewPackagesModal({
           </button>
         </div>
       </div>
+
+      {/* Lightbox Modal */}
+      {lightboxSrc && (
+        <div
+          className="fixed inset-0 z-[70] bg-black/90 flex items-center justify-center p-4"
+          onClick={() => setLightboxSrc(null)}
+        >
+          <img
+            src={lightboxSrc}
+            alt="Proof"
+            className="max-w-full max-h-full object-contain rounded-lg shadow-2xl"
+          />
+          <button
+            className="absolute top-4 right-4 text-white bg-slate-800/50 p-3 rounded-full hover:bg-slate-700 transition-colors"
+            onClick={() => setLightboxSrc(null)}
+          >
+            <FontAwesomeIcon icon={faTimes} size="lg" />
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ImageGallery({
+  title,
+  count,
+  images,
+  icon,
+  onView,
+  onAdd,
+  onRemove,
+  defaultOpen = false,
+  isSaving = false,
+}) {
+  const [isOpen, setIsOpen] = useState(defaultOpen);
+
+  return (
+    <div>
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className="w-full px-6 py-4 flex items-center justify-between hover:bg-slate-800/50 transition-colors group"
+      >
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-full bg-slate-800 flex items-center justify-center text-slate-500 group-hover:text-blue-400 group-hover:bg-blue-500/10 transition-colors">
+            <FontAwesomeIcon icon={icon} className="text-xs" />
+          </div>
+          <span className="text-xs font-bold uppercase text-slate-400 group-hover:text-white transition-colors">
+            {title} <span className="text-slate-600">({count})</span>
+          </span>
+        </div>
+        <FontAwesomeIcon
+          icon={isOpen ? faChevronUp : faChevronDown}
+          className="text-slate-600 text-xs transition-transform duration-300"
+        />
+      </button>
+
+      {/* Scrollable List */}
+      {isOpen && (
+        <div className="px-6 pb-6 pt-0 animate-in slide-in-from-top-2 duration-300">
+          <div className="flex gap-3 overflow-x-auto pb-2 custom-scrollbar snap-x">
+            {/* ADD IMAGE BUTTON */}
+            <div className="snap-center shrink-0">
+              <label
+                className={`w-24 h-24 rounded-xl border-2 border-dashed border-slate-700 flex flex-col items-center justify-center gap-2 cursor-pointer transition-colors ${isSaving ? "opacity-50 cursor-not-allowed" : "hover:border-blue-500 hover:text-blue-400 text-slate-500"}`}
+              >
+                <FontAwesomeIcon icon={faUpload} />
+                <span className="text-[10px] font-bold uppercase tracking-wider">
+                  Upload
+                </span>
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={onAdd}
+                  disabled={isSaving}
+                />
+              </label>
+            </div>
+
+            {/* EXISTING IMAGES */}
+            {images.map((src, idx) => (
+              <div
+                key={idx}
+                className="snap-center shrink-0 relative group block"
+              >
+                <button
+                  onClick={() => onView(src)}
+                  className="w-24 h-24 rounded-xl bg-slate-800 border border-slate-700 overflow-hidden relative block hover:border-blue-500 transition-colors"
+                >
+                  <img
+                    src={src}
+                    alt={`${title} ${idx + 1}`}
+                    className="w-full h-full object-cover opacity-90 group-hover:opacity-100 transition-opacity"
+                  />
+                  <div className="absolute inset-0 bg-black/40 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                    <FontAwesomeIcon
+                      icon={faExpand}
+                      className="text-white drop-shadow-md mb-2"
+                    />
+                  </div>
+                </button>
+
+                {/* REMOVE BUTTON (Shows on hover) */}
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onRemove(src);
+                  }}
+                  disabled={isSaving}
+                  className="absolute -top-2 -right-2 w-6 h-6 bg-red-600 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center shadow-lg hover:bg-red-500 border-2 border-slate-900 disabled:opacity-50"
+                >
+                  <FontAwesomeIcon icon={faTrash} className="text-[10px]" />
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
