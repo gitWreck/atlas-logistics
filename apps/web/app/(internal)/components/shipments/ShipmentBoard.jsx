@@ -254,7 +254,11 @@ const ShipmentBoard = forwardRef(function ShipmentBoard({ user, userRole, profil
                     className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-sm"
                   />
                   <select
-                    className="w-full bg-slate-900 border border-slate-700 rounded-lg pl-9 pr-4 py-2 text-sm text-white focus:border-blue-500 focus:outline-none appearance-none cursor-pointer"
+                    className={`w-full rounded-lg pl-9 pr-4 py-2 text-sm focus:border-blue-500 focus:outline-none appearance-none cursor-pointer border ${
+                      isDark
+                        ? "bg-slate-900 border-slate-700 text-white"
+                        : "bg-white border-slate-300 text-slate-900"
+                    }`}
                     value={modeFilter}
                     onChange={(e) => {
                       setModeFilter(e.target.value);
