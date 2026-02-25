@@ -35,7 +35,7 @@ const CheckerTripCard = ({ trip, onPress }) => {
 
       {/* BODY: Plate & Route */}
       <View style={styles.body}>
-        <Text style={styles.plateText}>{trip.plate || "NO PLATE"}</Text>
+        <Text style={styles.plateText}>TRK-{trip.plate || "NO PLATE"}</Text>
         <Text style={styles.routeText}>{trip.route || "No Route Info"}</Text>
       </View>
 

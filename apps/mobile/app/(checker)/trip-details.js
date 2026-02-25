@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import {
   View,
   StyleSheet,
@@ -8,9 +8,11 @@ import {
   Text,
   SafeAreaView,
   RefreshControl,
+  TextInput,
+  TouchableOpacity,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
-// import { useActionSheet } from "@expo/react-native-action-sheet";
+import { FontAwesome5 } from "@expo/vector-icons";
 import {
   collection,
   onSnapshot,
@@ -21,20 +23,44 @@ import {
 import { db } from "../../firebase";
 import GetLocation from "react-native-get-location";
 
-// ✅ IMPORT NEW COMPONENTS
+// ✅ IMPORT COMPONENTS
 import TripDetailsHeader from "../../components/checker/trip-details/TripDetailsHeader";
-import ShipmentControls from "../../components/checker/trip-details/ShipmentControls";
+import ShipmentControls from "../../components/checker/trip-details/ShipmentControlsModal";
 import ShipmentListItem from "../../components/checker/trip-details/ShipmentListItem";
 import TripFooter from "../../components/checker/trip-details/TripFooter";
 import {
   bulkShipmentAction,
-  bulkUpdateShipmentStatus,
   finishLoadingTruck,
 } from "../../components/utilities/FirebaseFunctions";
-import ShipmentActionModal from "../../components/checker/trip-details/ShipmentActionModal"; // <--- Import
+import ShipmentActionModal from "../../components/checker/trip-details/ShipmentActionModal";
+import TripFilterModal from "../../components/driver/trip/TripFilterModal"; // ✅ Import the Filter Modal
+import ShipmentControlsModal from "../../components/checker/trip-details/ShipmentControlsModal";
+
+// Define the filter options for shipments inside a trip
+const SHIPMENT_FILTER_OPTIONS = [
+  { label: "Show All", value: "ALL", icon: "list", color: "#64748b" },
+  {
+    label: "Assigned",
+    value: "ASSIGNED",
+    icon: "clipboard",
+    color: "#64748b",
+  },
+  { label: "Loaded", value: "LOADED", icon: "arrow-up", color: "#3b82f6" },
+  {
+    label: "Unloaded",
+    value: "UNLOADED",
+    icon: "arrow-down",
+    color: "#f59e0b",
+  },
+  {
+    label: "Delivered",
+    value: "DELIVERED",
+    icon: "check-circle",
+    color: "#10b981",
+  },
+];
 
 export default function TripDetailsScreen() {
-  // const { showActionSheetWithOptions } = useActionSheet();
   const { tripId, plate } = useLocalSearchParams();
   const router = useRouter();
 
@@ -46,7 +72,13 @@ export default function TripDetailsScreen() {
 
   const [selectedShipment, setSelectedShipment] = useState(null);
   const [modalVisible, setModalVisible] = useState(false);
-  const [refreshing, setRefreshing] = useState(false); // <--- ADD THIS
+  const [refreshing, setRefreshing] = useState(false);
+
+  // ✅ NEW FILTER STATES
+  const [filterModalVisible, setFilterModalVisible] = useState(false);
+  const [activeStatusFilter, setActiveStatusFilter] = useState("ALL");
+
+  const [bulkModalVisible, setBulkModalVisible] = useState(false);
 
   const getCurrentLocationSafe = async () => {
     try {
@@ -56,10 +88,7 @@ export default function TripDetailsScreen() {
       });
 
       if (!loc) return null;
-      return {
-        lat: loc.latitude,
-        lng: loc.longitude,
-      };
+      return { lat: loc.latitude, lng: loc.longitude };
     } catch (error) {
       console.log("Location error (checker trip-details):", error);
       return null;
@@ -108,12 +137,27 @@ export default function TripDetailsScreen() {
     return () => unsubscribe();
   }, [tripId]);
 
-  // 3. FILTER
-  const filteredData = shipments.filter(
-    (s) =>
-      s.id.toLowerCase().includes(search.toLowerCase()) ||
-      s.destination.toLowerCase().includes(search.toLowerCase()),
-  );
+  // 3. ✅ UPDATED FILTER & SEARCH LOGIC
+  const filteredData = useMemo(() => {
+    let filtered = shipments;
+
+    // A. Filter by Status
+    if (activeStatusFilter !== "ALL") {
+      filtered = filtered.filter((s) => s.status === activeStatusFilter);
+    }
+
+    // B. Filter by Search Text
+    if (search) {
+      const term = search.toLowerCase();
+      filtered = filtered.filter(
+        (s) =>
+          s.id.toLowerCase().includes(term) ||
+          s.destination.toLowerCase().includes(term),
+      );
+    }
+
+    return filtered;
+  }, [shipments, search, activeStatusFilter]);
 
   // 4. ACTIONS
   const updateStatus = async (ids, newStatus) => {
@@ -144,53 +188,11 @@ export default function TripDetailsScreen() {
     setModalVisible(true);
   };
 
-  // NEW HANDLER for the modal
   const onModalAction = (actionType) => {
     if (selectedShipment) {
       updateStatus([selectedShipment.id], actionType);
     }
   };
-
-  // const handleSingleAction = (shipment) => {
-  //   const options = [
-  //     "Unload",
-  //     "Load",
-  //     "Mark Out for Delivery",
-  //     "Mark Delivered",
-  //     "Cancel",
-  //   ];
-  //   const destructiveButtonIndex = 4; // Index of 'Cancel' (or a delete action)
-  //   const cancelButtonIndex = 4;
-
-  //   showActionSheetWithOptions(
-  //     {
-  //       options,
-  //       cancelButtonIndex,
-  //       destructiveButtonIndex,
-  //       title: `Shipment: ${shipment.id}`,
-  //       message: "Select an action",
-  //     },
-  //     (selectedIndex) => {
-  //       switch (selectedIndex) {
-  //         case 0:
-  //           updateStatus([shipment.id], "UNLOAD");
-  //           break;
-  //         case 1:
-  //           updateStatus([shipment.id], "LOAD");
-  //           break;
-  //         case 2:
-  //           updateStatus([shipment.id], "OUT_FOR_DELIVERY");
-  //           break;
-  //         case 3:
-  //           updateStatus([shipment.id], "DELIVERED");
-  //           break;
-  //         case 4:
-  //           // Cancelled
-  //           break;
-  //       }
-  //     },
-  //   );
-  // };
 
   const handleBulkStatusChange = (newStatus) => {
     const ids = filteredData.map((s) => s.id);
@@ -255,8 +257,6 @@ export default function TripDetailsScreen() {
 
   const onRefresh = () => {
     setRefreshing(true);
-    // Since onSnapshot is live, we just wait briefly to simulate a "check"
-    // and let any pending updates catch up.
     setTimeout(() => {
       setRefreshing(false);
     }, 1500);
@@ -279,15 +279,53 @@ export default function TripDetailsScreen() {
         </View>
       )}
 
-      {/* 3. CONTROLS */}
-      <ShipmentControls
-        search={search}
-        onSearchChange={setSearch}
-        onBulkOutForDelivery={() => handleBulkStatusChange("OUT_FOR_DELIVERY")}
-        onBulkDelivered={() => handleBulkStatusChange("DELIVERED")}
-      />
+      {/* 3. SEARCH, FILTER & BULK ACTIONS ROW */}
+      <View style={styles.searchRow}>
+        {/* Search Input */}
+        <View style={styles.searchContainer}>
+          <FontAwesome5 name="search" size={16} color="#94a3b8" />
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Search ID or dest..."
+            placeholderTextColor="#94a3b8"
+            value={search}
+            onChangeText={setSearch}
+          />
+          {search.length > 0 && (
+            <TouchableOpacity onPress={() => setSearch("")}>
+              <FontAwesome5 name="times-circle" size={16} color="#94a3b8" />
+            </TouchableOpacity>
+          )}
+        </View>
 
-      {/* 4. LIST */}
+        {/* Filter Button */}
+        <TouchableOpacity
+          style={[
+            styles.actionSquareBtn,
+            activeStatusFilter !== "ALL" && {
+              backgroundColor: "#e0f2fe",
+              borderColor: "#38bdf8",
+            },
+          ]}
+          onPress={() => setFilterModalVisible(true)}
+        >
+          <FontAwesome5
+            name="sliders-h"
+            size={16}
+            color={activeStatusFilter !== "ALL" ? "#0284c7" : "#0f172a"}
+          />
+        </TouchableOpacity>
+
+        {/* Bulk Actions Button */}
+        <TouchableOpacity
+          style={styles.actionSquareBtn}
+          onPress={() => setBulkModalVisible(true)}
+        >
+          <FontAwesome5 name="layer-group" size={16} color="#0f172a" />
+        </TouchableOpacity>
+      </View>
+
+      {/* 5. LIST */}
       {loading ? (
         <View style={styles.loadingWrapper}>
           <ActivityIndicator size="large" color="#042C83" />
@@ -301,8 +339,8 @@ export default function TripDetailsScreen() {
             <RefreshControl
               refreshing={refreshing}
               onRefresh={onRefresh}
-              colors={["#042C83"]} // Match your app theme
-              tintColor="#042C83" // iOS spinner color
+              colors={["#042C83"]}
+              tintColor="#042C83"
             />
           }
           renderItem={({ item }) => (
@@ -313,20 +351,41 @@ export default function TripDetailsScreen() {
             />
           )}
           ListEmptyComponent={
-            <Text style={styles.emptyText}>No shipments assigned.</Text>
+            <Text style={styles.emptyText}>
+              {search || activeStatusFilter !== "ALL"
+                ? "No shipments match your filters."
+                : "No shipments assigned."}
+            </Text>
           }
         />
       )}
 
-      {/* 5. FOOTER */}
+      {/* 6. FOOTER */}
       <TripFooter trip={trip} onFinish={handleFinishLoading} />
 
-      {/* 6. ACTION MODAL (Add this at the bottom) */}
+      {/* 7. ACTION MODAL */}
       <ShipmentActionModal
         visible={modalVisible}
         shipment={selectedShipment}
         onClose={() => setModalVisible(false)}
         onAction={onModalAction}
+      />
+
+      {/* ✅ 8. FILTER MODAL */}
+      <TripFilterModal
+        visible={filterModalVisible}
+        onClose={() => setFilterModalVisible(false)}
+        activeFilter={activeStatusFilter}
+        onApplyFilter={setActiveStatusFilter}
+        options={SHIPMENT_FILTER_OPTIONS}
+      />
+
+      {/* 9. BULK ACTION MODAL */}
+      <ShipmentControlsModal
+        visible={bulkModalVisible}
+        onClose={() => setBulkModalVisible(false)}
+        onBulkOutForDelivery={() => handleBulkStatusChange("OUT_FOR_DELIVERY")}
+        onBulkDelivered={() => handleBulkStatusChange("DELIVERED")}
       />
     </SafeAreaView>
   );
@@ -351,8 +410,48 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
+
+  // ✅ STYLES FOR SEARCH ROW
+  searchRow: {
+    flexDirection: "row",
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    paddingBottom: 8,
+    gap: 12,
+    backgroundColor: "#f1f5f9",
+  },
+  searchContainer: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#ffffff",
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    height: 48,
+    borderWidth: 1,
+    borderColor: "#e2e8f0",
+  },
+  searchInput: {
+    flex: 1,
+    color: "#0f172a",
+    marginLeft: 10,
+    fontSize: 15,
+  },
+  // ✅ Replace your old `filterBtn` style with this:
+  actionSquareBtn: {
+    width: 48,
+    height: 48,
+    backgroundColor: "#ffffff",
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#e2e8f0",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
   listContent: {
     paddingBottom: 120,
+    paddingTop: 8,
   },
   emptyText: { textAlign: "center", color: "#475569", marginTop: 40 },
 });
