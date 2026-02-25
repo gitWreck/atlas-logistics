@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import {
   View,
   Text,
@@ -20,19 +20,30 @@ export default function ShipmentActionModal({
   const ACTION_BUTTONS = [
     { label: "Unload", action: "UNLOAD", icon: "arrow-down", color: "#f59e0b" }, // Orange
     { label: "Load", action: "LOAD", icon: "arrow-up", color: "#3b82f6" }, // Blue
+    // {
+    //   label: "Arrived",
+    //   action: "ARRIVED",
+    //   icon: "warehouse", // Or "map-marker-alt"
+    //   color: "#8b5cf6", // Purple (distinct from the delivery steps)
+    // },
     {
-      label: "Mark Out for Delivery",
+      label: "Out for Delivery",
       action: "OUT_FOR_DELIVERY",
       icon: "shipping-fast",
       color: "#10b981",
     }, // Green
     {
-      label: "Mark Delivered",
+      label: "Delivered",
       action: "DELIVERED",
       icon: "check-circle",
       color: "#059669",
     }, // Dark Green
   ];
+
+  const handleActionPress = (actionCode) => {
+    onAction(actionCode, { sendText: true });
+    onClose();
+  };
 
   return (
     <Modal
@@ -42,7 +53,6 @@ export default function ShipmentActionModal({
       onRequestClose={onClose}
     >
       <View style={styles.modalOverlay}>
-        {/* Transparent backdrop to close on tap */}
         <Pressable style={styles.backdrop} onPress={onClose} />
 
         <View style={styles.modalContent}>
@@ -60,21 +70,18 @@ export default function ShipmentActionModal({
             </TouchableOpacity>
           </View>
 
-          {/* Action Grid */}
-          <View style={styles.actionsContainer}>
+          {/* Quadrant Action Grid (Matched to PackageActionModal Style) */}
+          <View style={styles.grid}>
             {ACTION_BUTTONS.map((btn) => (
               <TouchableOpacity
                 key={btn.action}
-                style={[styles.actionBtn, { borderColor: btn.color }]}
-                onPress={() => {
-                  onAction(btn.action);
-                  onClose();
-                }}
+                style={[styles.btn, { borderColor: btn.color }]}
+                onPress={() => handleActionPress(btn.action)}
               >
                 <View
                   style={[styles.iconCircle, { backgroundColor: btn.color }]}
                 >
-                  <FontAwesome5 name={btn.icon} size={20} color="#fff" />
+                  <FontAwesome5 name={btn.icon} size={16} color="#fff" />
                 </View>
                 <Text style={[styles.btnText, { color: btn.color }]}>
                   {btn.label}
@@ -108,7 +115,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "flex-start",
-    marginBottom: 24,
+    marginBottom: 20,
   },
   title: { fontSize: 20, fontWeight: "800", color: "#0f172a" },
   subtitle: { fontSize: 14, color: "#64748b", marginTop: 4 },
@@ -118,27 +125,56 @@ const styles = StyleSheet.create({
     backgroundColor: "#f1f5f9",
     borderRadius: 20,
   },
-  actionsContainer: {
-    gap: 12,
+  toggleContainer: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    backgroundColor: "#f8fafc",
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: "#e2e8f0",
   },
-  actionBtn: {
+  toggleTextContainer: {
     flexDirection: "row",
     alignItems: "center",
-    padding: 16,
-    borderRadius: 16,
+  },
+  toggleIcon: {
+    marginRight: 10,
+  },
+  toggleLabel: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#334155",
+  },
+
+  // Copied & Adjusted Grid Styles
+  grid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 12,
+  },
+  btn: {
+    width: "48%",
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 12,
+    borderRadius: 12,
     borderWidth: 1,
     backgroundColor: "#fff",
   },
   iconCircle: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     alignItems: "center",
     justifyContent: "center",
-    marginRight: 16,
+    marginRight: 10,
   },
   btnText: {
-    fontSize: 16,
-    fontWeight: "700",
+    fontWeight: "600",
+    fontSize: 13,
+    flex: 1, // Ensures long text wraps instead of breaking the box
   },
 });

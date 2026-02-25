@@ -126,14 +126,16 @@ export default function NotificationBell() {
 
                   {/* Content */}
                   <div className="flex-1">
-                    <p className="text-sm font-bold text-slate-200 leading-tight mb-1">
-                      {/* ✅ FIX: Construct message since 'message' field is missing in data */}
-                      {alert.details.driverName
+                    <p className="flex items-center flex-wrap text-sm font-bold text-slate-200 leading-tight mb-1 gap-1.5">
+                      {/* ✅ FIX 1: Safely check details using ?. */}
+                      {alert.details?.driverName
                         ? `${alert.details.driverName}: `
-                        : ""}
-                      {alert.details.reason ? (
+                        : `${alert.tripId || "Unknown Trip"} `}
+
+                      {/* ✅ FIX 2: Added flex & items-center above so the badge aligns perfectly with the text */}
+                      {alert.details?.reason ? (
                         <StatusBadge
-                          status={"delayed"}
+                          status="delayed"
                           reason={alert.details.reason}
                         />
                       ) : (

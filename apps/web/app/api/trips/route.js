@@ -31,7 +31,7 @@ export async function GET(request) {
     // 3. FETCH TRIPS PARENT DOCS
     const snapshot = await adminDb
       .collection("truck_trips")
-      .orderBy("createdAt", "desc")
+      .orderBy("updatedAt", "desc")
       .limit(50)
       .get();
 

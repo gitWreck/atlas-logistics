@@ -11,7 +11,7 @@ import {
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { FontAwesome5 } from "@expo/vector-icons";
-import { doc, onSnapshot } from "firebase/firestore";
+import { doc, onSnapshot, updateDoc } from "firebase/firestore"; // ADDED updateDoc
 import { db } from "../../firebase";
 import { StatusBar } from "expo-status-bar";
 import GetLocation from "react-native-get-location";
@@ -20,7 +20,10 @@ import TripSummaryCard from "../../components/driver/trip/TripSummaryCard";
 import TripProgressStepper from "../../components/driver/trip/TripProgressStepper";
 import TripStatusRow from "../../components/driver/trip/TripStatusRow";
 import GradientButton from "../../components/ui/figma/GradientButton";
-import { startTrip } from "../../components/utilities/FirebaseFunctions";
+import {
+  clearTruckDelay,
+  startTrip,
+} from "../../components/utilities/FirebaseFunctions";
 import { Image } from "expo-image";
 
 export default function TripDetailsScreen() {
@@ -108,29 +111,87 @@ export default function TripDetailsScreen() {
             }
           },
         },
-      ]
+      ],
     );
   };
 
-  const isReadyToStart = trip?.status === "LOADED" || trip?.status === "ASSIGNED";
+  // --- NEW: Clear Delay Function ---
+  // Make sure to add these imports at the top of your file if you haven't already:
+  // import { getFunctions, httpsCallable } from "firebase/functions";
+
+  const handleClearDelay = async () => {
+    Alert.alert(
+      "Resume Trip",
+      "Are you ready to clear the delay and resume driving?",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Resume",
+          onPress: async () => {
+            try {
+              setActionLoading(true);
+
+              // 2. Call the Cloud Function with the expected payload
+              await clearTruckDelay({
+                truckTripId: trip.id,
+                notify: true, // Set to false if you want to silently clear the delay without SMS
+              });
+
+              Alert.alert("Success", "Delay cleared. Drive safely!");
+            } catch (error) {
+              console.error("Clear delay error:", error);
+              Alert.alert(
+                "Error",
+                error.message || "Failed to clear the delay.",
+              );
+            } finally {
+              setActionLoading(false);
+            }
+          },
+        },
+      ],
+    );
+  };
+
+  const isReadyToStart =
+    trip?.status === "LOADED" || trip?.status === "ASSIGNED";
   const isDriving = trip?.status === "IN_TRANSIT";
+
+  // --- NEW: Delay Logic Variable ---
+  const isDelayed = trip?.delayCleared === false && !!trip?.delayReason;
 
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar style="dark" />
-      {/* Header: back | title | count (right) - same as shipments */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-          <Image
-            source={require("../../assets/icons/back.svg")}
-            style={{ width: 20, height: 20 }}
-          />
+          <FontAwesome5 name="arrow-left" size={15} color="#0f172a" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Trip Details</Text>
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
         <TripSummaryCard trip={trip} />
+
+        {/* --- NEW: DELAY BANNER --- */}
+        {isDelayed && (
+          <View style={styles.delayBanner}>
+            <FontAwesome5
+              name="exclamation-triangle"
+              size={18}
+              color="#991b1b"
+            />
+            <View style={styles.delayTextContainer}>
+              <Text style={styles.delayTitle}>Delay Approved</Text>
+              <Text style={styles.delaySubtitle}>
+                {trip.delayReason
+                  ? trip.delayReason.replace(/_/g, " ")
+                  : "Admin has approved your delay."}
+              </Text>
+            </View>
+          </View>
+        )}
+
         <TripProgressStepper currentStatus={trip.status} />
         <TripStatusRow
           totalShipments={trip.loadedCount ?? 0}
@@ -138,7 +199,6 @@ export default function TripDetailsScreen() {
         />
       </ScrollView>
 
-      {/* Bottom CTA: GradientButton - View Shipments or Start Trip */}
       <View style={styles.bottomActions}>
         {isReadyToStart ? (
           <GradientButton
@@ -153,14 +213,48 @@ export default function TripDetailsScreen() {
             onPress={handleViewShipments}
           />
         )}
-        {isDriving && (
+
+        {/* --- NEW: DYNAMIC REPORT/CLEAR DELAY LINKS --- */}
+
+        {/* 1. Show "Report Delay" ONLY if driving AND not currently delayed */}
+        {isDriving && !isDelayed && (
           <TouchableOpacity
             style={styles.reportDelayLink}
             onPress={handleReportDelay}
             activeOpacity={0.7}
           >
-            <FontAwesome5 name="exclamation-triangle" size={14} color="#ef4444" style={{ marginRight: 6 }} />
+            <FontAwesome5
+              name="exclamation-triangle"
+              size={14}
+              color="#ef4444"
+              style={{ marginRight: 6 }}
+            />
             <Text style={styles.reportDelayText}>Report Delay</Text>
+          </TouchableOpacity>
+        )}
+
+        {/* 2. Show "Clear Delay" ONLY if currently delayed */}
+        {isDelayed && (
+          <TouchableOpacity
+            style={[styles.reportDelayLink, { marginTop: 16 }]}
+            onPress={handleClearDelay}
+            activeOpacity={0.7}
+            disabled={actionLoading}
+          >
+            <FontAwesome5
+              name="check-circle"
+              size={16}
+              color="#10b981"
+              style={{ marginRight: 6 }}
+            />
+            <Text
+              style={[
+                styles.reportDelayText,
+                { color: "#10b981", fontSize: 16 },
+              ]}
+            >
+              {actionLoading ? "Clearing..." : "Clear Delay & Resume Trip"}
+            </Text>
           </TouchableOpacity>
         )}
       </View>
@@ -199,10 +293,6 @@ const styles = StyleSheet.create({
     flex: 1,
     marginLeft: 12,
   },
-  headerCount: {
-    color: "#0f172a",
-    fontSize: 14,
-  },
   scrollContent: {
     paddingHorizontal: 20,
     paddingTop: 16,
@@ -230,5 +320,39 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: "#ef4444",
     fontWeight: "500",
+  },
+
+  // --- NEW DELAY BANNER STYLES ---
+  delayBanner: {
+    flexDirection: "row",
+    backgroundColor: "#fef2f2",
+    borderColor: "#f87171",
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 16,
+
+    marginBottom: 16,
+    alignItems: "center",
+
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  delayTextContainer: {
+    marginLeft: 12,
+    flex: 1,
+  },
+  delayTitle: {
+    color: "#991b1b",
+    fontSize: 14,
+    fontWeight: "bold",
+    textTransform: "uppercase",
+  },
+  delaySubtitle: {
+    color: "#b91c1c",
+    fontSize: 12,
+    marginTop: 2,
   },
 });

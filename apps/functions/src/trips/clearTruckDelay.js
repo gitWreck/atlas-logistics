@@ -24,7 +24,7 @@ exports.clearTruckDelay = onCall(
     secrets: [SEMAPHORE_API_KEY, SEMAPHORE_SENDER_NAME],
   },
   async (req) => {
-    await requireRole(db, req, ["admin", "manager"]);
+    await requireRole(db, req, ["admin", "manager", "driver"]);
 
     const { truckTripId } = req.data || {};
     if (!truckTripId || typeof truckTripId !== "string") {
@@ -34,6 +34,8 @@ exports.clearTruckDelay = onCall(
     const uid = req.auth.uid;
     const role = req.auth.token?.role || "unknown";
     const tripRef = db.collection("truck_trips").doc(truckTripId);
+    // ✅ NEW: Reference for the Admin Alert
+    const alertRef = db.collection("admin_alerts").doc();
     const notify = !!req.data?.notify; // Optional: whether to send SMS notifications for this status change
 
     await db.runTransaction(async (tx) => {
@@ -75,6 +77,24 @@ exports.clearTruckDelay = onCall(
         truckTripId,
         actorId: uid,
         actorRole: role,
+        createdAt: now,
+      });
+
+      // =========================================================
+      // ✅ NEW: ADMIN ALERT LOGGING
+      // =========================================================
+      tx.set(alertRef, {
+        type: "DELAY_CLEARED",
+        subType: trip.delayReason || "UNKNOWN_DELAY",
+        tripId: truckTripId,
+        details: {
+          reason: `Driver has cleared the delay and resumed the trip.`,
+          previousDelay: trip.delayReason || "Unknown",
+          userId: uid,
+          userRole: role,
+        },
+        status: "UNREAD",
+        priority: "MEDIUM",
         createdAt: now,
       });
     });

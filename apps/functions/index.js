@@ -52,6 +52,8 @@ exports.unassignShipmentFromTruckTrip =
 
 exports.startTrip = require("./src/trips/startTrip").startTrip;
 
+exports.reportCheckerTrip =
+  require("./src/trips/reportCheckerTrip").reportCheckerTrip;
 exports.reportTripDelay =
   require("./src/trips/reportTripDelay").reportTripDelay;
 exports.setTruckDelay = require("./src/trips/setTruckDelay").setTruckDelay;
@@ -106,6 +108,7 @@ const {
   syncTrackingPublicHttp,
   propagateTripUpdates,
 } = require("./src/tracking/syncTrackingPublic");
+const { reportCheckerTrip } = require("./src/trips/reportCheckerTrip");
 
 exports.mirrorShipmentToPublic = mirrorShipmentToPublic;
 exports.syncTrackingPublicHttp = syncTrackingPublicHttp;

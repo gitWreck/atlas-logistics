@@ -82,6 +82,7 @@ export default function TripBoard({ user, userRole, profile }) {
         t.driverName,
         t.truckPlateNumber,
         t.route,
+        t.tripType,
       ]
         .filter(Boolean)
         .join(" ")
@@ -124,7 +125,7 @@ export default function TripBoard({ user, userRole, profile }) {
 
       return true;
     });
-  }, [searchQuery, activeFilter, trips, startDate, endDate]);
+  }, [searchQuery, activeFilter, typeFilter, trips, startDate, endDate]);
 
   // --- PAGINATION ---
   const indexOfLastItem = currentPage * itemsPerPage;

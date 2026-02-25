@@ -19,6 +19,8 @@ export const updateShipmentStatus = httpsCallable(
 
 export const startTrip = httpsCallable(functions, "startTrip");
 export const reportTripDelay = httpsCallable(functions, "reportTripDelay");
+export const reportCheckerTrip = httpsCallable(functions, "reportCheckerTrip");
+export const clearTruckDelay = httpsCallable(functions, "clearTruckDelay");
 
 // Customer helpers
 export const addTrackedShipment = httpsCallable(

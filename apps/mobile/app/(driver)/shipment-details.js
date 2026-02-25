@@ -7,29 +7,23 @@ import {
   ScrollView,
   ActivityIndicator,
   Alert,
-  TouchableOpacity,
-  Image as RNImage, // Rename native Image to avoid conflict if using expo-image
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { doc, getDoc } from "firebase/firestore";
-import { getFunctions, httpsCallable } from "firebase/functions";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import * as ImagePicker from "expo-image-picker";
-import { FontAwesome5 } from "@expo/vector-icons";
 import GetLocation from "react-native-get-location";
-
-import { db, storage } from "../../firebase"; // Ensure 'storage' is exported from your firebase config
 import { StatusBar } from "expo-status-bar";
-import { Image } from "expo-image";
 
-// IMPORTS
+import { db, storage } from "../../firebase";
+import { updateShipmentStatus } from "../../components/utilities/FirebaseFunctions";
+
+// IMPORT NEW MODULAR COMPONENTS
+import ShipmentDetailHeader from "../../components/driver/shipment/ShipmentDetailHeader";
 import ShipmentHeaderCard from "../../components/driver/shipment/ShipmentHeaderCard";
+import ProofOfDeliverySection from "../../components/driver/shipment/ProofOfDeliverySection";
 import PackageItemCard from "../../components/driver/shipment/PackageItemCard";
-import GradientButton from "../../components/ui/figma/GradientButton";
-import {
-  updateShipmentPackages,
-  updateShipmentStatus,
-} from "../../components/utilities/FirebaseFunctions";
+import ShipmentActionFooter from "../../components/driver/shipment/ShipmentActionFooter";
 
 export default function ShipmentDetailsScreen() {
   const { shipmentId, tripId } = useLocalSearchParams();
@@ -38,8 +32,6 @@ export default function ShipmentDetailsScreen() {
   const [shipment, setShipment] = useState(null);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
-
-  // ✅ NEW STATE: Photos
   const [photos, setPhotos] = useState([]);
 
   // 1. Fetch Shipment
@@ -77,7 +69,7 @@ export default function ShipmentDetailsScreen() {
     }
   };
 
-  // 3. Image Pickers
+  // 3. Image Picker Logic
   const pickImage = async (useCamera) => {
     if (photos.length >= 3) {
       Alert.alert("Limit Reached", "You can only upload up to 3 photos.");
@@ -88,7 +80,7 @@ export default function ShipmentDetailsScreen() {
     const options = {
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsEditing: true,
-      quality: 0.5, // Compress to save data
+      quality: 0.5,
     };
 
     if (useCamera) {
@@ -131,14 +123,12 @@ export default function ShipmentDetailsScreen() {
     return urls;
   };
 
-  // 5. Updated Handle Action
+  // 5. Handle Action
   const handleAction = async () => {
     if (!shipment) return;
     setActionLoading(true);
 
     try {
-      const functions = getFunctions(undefined, "asia-southeast1");
-      const updateFn = httpsCallable(functions, "updateShipmentStatus");
       const location = await getCurrentLocationSafe();
 
       // CASE A: Mark Out For Delivery
@@ -158,13 +148,12 @@ export default function ShipmentDetailsScreen() {
       ) {
         Alert.alert(
           "Action Blocked",
-          "This shipment must be scanned as ARRIVED at the warehouse before it can be taken out for delivery.",
+          "This shipment must be marked as ARRIVED at the warehouse before it can be taken out for delivery.",
         );
         return;
       }
-      // CASE B: Complete Delivery (With Photos)
+      // CASE B: Complete Delivery
       else if (shipment.status === "OUT_FOR_DELIVERY") {
-        // 1. Validation (Optional: Require at least 1 photo)
         if (photos.length === 0) {
           Alert.alert(
             "Proof Required",
@@ -174,16 +163,13 @@ export default function ShipmentDetailsScreen() {
           return;
         }
 
-        // 2. Upload Photos
         const photoUrls = await uploadPhotos();
 
-        // 3. Call Cloud Function
         await updateShipmentStatus({
           shipmentId,
           tripId,
           newStatus: "DELIVERED",
           location,
-          // Pass the URLs in remarks or a specific field if your CF supports it
           remarks: `Proof of Delivery: ${photoUrls.length} images uploaded.`,
           proofOfDelivery: photoUrls,
         });
@@ -214,59 +200,23 @@ export default function ShipmentDetailsScreen() {
     <SafeAreaView style={styles.container}>
       <StatusBar style="dark" />
 
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-          <FontAwesome5 name="arrow-left" size={20} color="#0f172a" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Shipment Details</Text>
-      </View>
+      {/* 1. Header Component */}
+      <ShipmentDetailHeader onBack={() => router.back()} />
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
+        {/* 2. Main Shipment Details */}
         <ShipmentHeaderCard shipment={shipment} />
 
-        {/* ✅ PROOF OF DELIVERY SECTION (Only Show when Out For Delivery) */}
+        {/* 3. Proof of Delivery Component (Conditional) */}
         {isOutForDelivery && (
-          <View style={styles.proofContainer}>
-            <Text style={styles.sectionTitle}>Proof of Delivery</Text>
-            <Text style={styles.helperText}>
-              Take up to 3 photos of the delivered items.
-            </Text>
-
-            <View style={styles.photoRow}>
-              {/* Photo Thumbnails */}
-              {photos.map((uri, index) => (
-                <View key={index} style={styles.photoWrapper}>
-                  <Image source={{ uri }} style={styles.thumbnail} />
-                  <TouchableOpacity
-                    style={styles.removeBtn}
-                    onPress={() => removePhoto(index)}
-                  >
-                    <FontAwesome5 name="times" size={10} color="#fff" />
-                  </TouchableOpacity>
-                </View>
-              ))}
-
-              {/* Add Button (Hide if 3 photos) */}
-              {photos.length < 3 && (
-                <TouchableOpacity
-                  style={styles.addPhotoBtn}
-                  onPress={() => {
-                    Alert.alert("Add Photo", "Choose a source", [
-                      { text: "Camera", onPress: () => pickImage(true) },
-                      { text: "Gallery", onPress: () => pickImage(false) },
-                      { text: "Cancel", style: "cancel" },
-                    ]);
-                  }}
-                >
-                  <FontAwesome5 name="camera" size={24} color="#3b82f6" />
-                  <Text style={styles.addPhotoText}>Add</Text>
-                </TouchableOpacity>
-              )}
-            </View>
-          </View>
+          <ProofOfDeliverySection
+            photos={photos}
+            onPickImage={pickImage}
+            onRemovePhoto={removePhoto}
+          />
         )}
 
+        {/* 4. Packages List */}
         <Text style={styles.sectionTitle}>Packages ({packages.length})</Text>
         {packages.length > 0 ? (
           packages.map((pkg, i) => (
@@ -277,23 +227,12 @@ export default function ShipmentDetailsScreen() {
         )}
       </ScrollView>
 
-      {/* Footer Action */}
-      <View style={styles.footer}>
-        <GradientButton
-          title={
-            shipment.status === "OUT_FOR_DELIVERY"
-              ? "Complete Delivery"
-              : shipment.status === "ARRIVED"
-                ? "Mark Out for Delivery" // Only show this if Arrived
-                : "Waiting for Arrival" // Show this if Loaded
-          }
-          disabled={shipment.status === "LOADED" || actionLoading} // Disable if Loaded
-          onPress={handleAction}
-          loading={actionLoading}
-          // Optional: Change color based on status
-          colors={isOutForDelivery ? ["#16a34a", "#15803d"] : undefined}
-        />
-      </View>
+      {/* 5. Footer Action Component */}
+      <ShipmentActionFooter
+        status={shipment.status}
+        actionLoading={actionLoading}
+        onAction={handleAction}
+      />
     </SafeAreaView>
   );
 }
@@ -301,22 +240,6 @@ export default function ShipmentDetailsScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#f1f5f9" },
   center: { flex: 1, justifyContent: "center", alignItems: "center" },
-  header: {
-    paddingHorizontal: 20,
-    paddingTop: 50,
-    paddingBottom: 15,
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#ffffff",
-    borderBottomWidth: 1,
-    borderBottomColor: "#e2e8f0",
-  },
-  headerTitle: {
-    color: "#0f172a",
-    fontSize: 16,
-    fontWeight: "bold",
-    marginLeft: 16,
-  },
   scrollContent: { paddingHorizontal: 20, paddingTop: 16, paddingBottom: 120 },
   sectionTitle: {
     fontSize: 16,
@@ -326,57 +249,4 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   emptyText: { color: "#64748b", fontStyle: "italic", marginTop: 10 },
-  footer: {
-    position: "absolute",
-    bottom: 0,
-    left: 0,
-    right: 0,
-    paddingHorizontal: 20,
-    paddingTop: 16,
-    paddingBottom: 34,
-    backgroundColor: "#ffffff",
-    borderTopWidth: 1,
-    borderTopColor: "#e2e8f0",
-  },
-
-  // ✅ NEW STYLES FOR PHOTOS
-  proofContainer: { marginTop: 20 },
-  helperText: { fontSize: 13, color: "#64748b", marginBottom: 12 },
-  photoRow: { flexDirection: "row", gap: 12 },
-  photoWrapper: {
-    width: 80,
-    height: 80,
-    borderRadius: 12,
-    overflow: "hidden",
-    position: "relative",
-  },
-  thumbnail: { width: "100%", height: "100%" },
-  removeBtn: {
-    position: "absolute",
-    top: 4,
-    right: 4,
-    backgroundColor: "rgba(0,0,0,0.6)",
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  addPhotoBtn: {
-    width: 80,
-    height: 80,
-    borderRadius: 12,
-    borderWidth: 2,
-    borderColor: "#cbd5e1",
-    borderStyle: "dashed",
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "#fff",
-  },
-  addPhotoText: {
-    fontSize: 12,
-    color: "#3b82f6",
-    fontWeight: "600",
-    marginTop: 4,
-  },
 });
