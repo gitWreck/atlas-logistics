@@ -40,9 +40,16 @@ exports.createShipmentWithPackages = onCall(
       manualShipmentId,
       proofOfReceipt = [],
 
-      status = "RECEIVED", // <-- NEW
+      status, // <-- NEW
       currentLocation = null,
     } = request.data || {};
+
+    // 2. DEFINE THE STARTING STATUS BASED ON WORKFLOW
+    const initialStatus = status === "PENDING_PICKUP" ? status : "RECEIVED";
+    const initialNote =
+      status === "PENDING_PICKUP"
+        ? "Scheduled for Pickup"
+        : "Dropped off at Hub";
 
     // --- VALIDATION ---
     if (!origin || !destination) {
@@ -138,7 +145,7 @@ exports.createShipmentWithPackages = onCall(
           isPerishable: Boolean(item.isPerishable),
 
           // --- CHANGED FIELDS ---
-          status: status,
+          status: initialStatus,
           currentLocation: currentLocation || originSummary,
 
           loadedOnTrip: null,
@@ -197,12 +204,12 @@ exports.createShipmentWithPackages = onCall(
       updatedAt: nowAt,
       updatedBy: request.auth.uid,
 
-      status: "RECEIVED",
+      status: initialStatus,
       statusHistory: [
         {
-          status: "RECEIVED",
+          status: initialStatus,
           at: now,
-          note: "Shipment Created",
+          note: initialNote,
           location: location || null,
         },
       ],

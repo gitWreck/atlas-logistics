@@ -1,5 +1,12 @@
 import React from "react";
-import { View, Text, TouchableOpacity, StyleSheet, Platform, StatusBar } from "react-native";
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  StyleSheet,
+  Platform,
+  StatusBar,
+} from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 
 export default function TripDetailsHeader({ tripId, plate, onBack }) {
@@ -9,7 +16,7 @@ export default function TripDetailsHeader({ tripId, plate, onBack }) {
         <Ionicons name="arrow-back" size={22} color="#0f172a" />
       </TouchableOpacity>
       <View style={styles.textBlock}>
-        <Text style={styles.label}>Trip</Text>
+        {/* <Text style={styles.label}>Trip</Text> */}
         <Text style={styles.title} numberOfLines={1}>
           {tripId}
         </Text>
@@ -23,9 +30,7 @@ const styles = StyleSheet.create({
   header: {
     paddingHorizontal: 20,
     paddingTop:
-      Platform.OS === "android"
-        ? (StatusBar.currentHeight || 0) + 12
-        : 24,
+      Platform.OS === "android" ? (StatusBar.currentHeight || 0) + 12 : 24,
     paddingBottom: 16,
     flexDirection: "row",
     alignItems: "center",

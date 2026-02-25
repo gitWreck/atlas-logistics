@@ -1,5 +1,12 @@
 import React from "react";
-import { View, Text, TouchableOpacity, StyleSheet, Platform, StatusBar } from "react-native";
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  StyleSheet,
+  Platform,
+  StatusBar,
+} from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 
 export default function ShipmentHeader({ shipmentId, onBack }) {
@@ -9,8 +16,9 @@ export default function ShipmentHeader({ shipmentId, onBack }) {
         <Ionicons name="arrow-back" size={22} color="#0f172a" />
       </TouchableOpacity>
       <View style={styles.textBlock}>
-        <Text style={styles.label}>Shipment</Text>
-        <Text style={styles.title}>Contents</Text>
+        <View style={styles.headerRow}>
+          <Text style={styles.title}>Shipment Contents</Text>
+        </View>
         <Text style={styles.subtitle}>ID: {shipmentId}</Text>
       </View>
     </View>
@@ -21,9 +29,7 @@ const styles = StyleSheet.create({
   header: {
     paddingHorizontal: 20,
     paddingTop:
-      Platform.OS === "android"
-        ? (StatusBar.currentHeight || 0) + 12
-        : 24,
+      Platform.OS === "android" ? (StatusBar.currentHeight || 0) + 12 : 24,
     paddingBottom: 16,
     backgroundColor: "#ffffff",
     flexDirection: "row",
@@ -31,15 +37,13 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderColor: "#cbd5e1",
   },
+  headerRow: {
+    flexDirection: "row", // ✅ This puts them on the same line
+    alignItems: "baseline", // ✅ Aligns the bottom of the texts perfectly
+    gap: 6, // ✅ Adds a little space between the two words
+  },
   backBtn: { padding: 8, marginRight: 8 },
   textBlock: { flex: 1 },
-  label: {
-    fontSize: 11,
-    fontWeight: "600",
-    color: "#64748b",
-    textTransform: "uppercase",
-    marginBottom: 2,
-  },
   title: { fontSize: 16, fontWeight: "700", color: "#0f172a" },
   subtitle: { color: "#475569", fontSize: 12, marginTop: 2 },
 });
