@@ -9,28 +9,34 @@ import {
 } from "react-native";
 import { FontAwesome5 } from "@expo/vector-icons";
 
+// ✅ 1. Add `options` to your props
 export default function TripFilterModal({
   visible,
   onClose,
   activeFilter,
   onApplyFilter,
+  options,
 }) {
-  const FILTER_OPTIONS = [
-    { label: "Show All", value: "ALL", icon: "list", color: "#64748b" }, // Slate
-    { label: "Loaded", value: "LOADED", icon: "arrow-up", color: "#3b82f6" }, // Blue
+  // ✅ 2. Setup a default fallback (so the Driver app doesn't break)
+  const defaultOptions = [
+    { label: "Show All", value: "ALL", icon: "list", color: "#64748b" },
+    { label: "Loaded", value: "LOADED", icon: "arrow-up", color: "#3b82f6" },
     {
       label: "In Transit",
       value: "IN_TRANSIT",
       icon: "truck",
       color: "#f59e0b",
-    }, // Orange
+    },
     {
       label: "Arrived",
       value: "ARRIVED",
       icon: "map-marker-alt",
       color: "#10b981",
-    }, // Green
+    },
   ];
+
+  // Use the passed options, or default to the Driver ones
+  const activeOptions = options || defaultOptions;
 
   return (
     <Modal
@@ -55,17 +61,17 @@ export default function TripFilterModal({
 
           {/* Quadrant Grid */}
           <View style={styles.grid}>
-            {FILTER_OPTIONS.map((btn) => {
+            {/* ✅ 3. Map over `activeOptions` instead of the hardcoded list */}
+            {activeOptions.map((btn) => {
               const isActive = activeFilter === btn.value;
               return (
                 <TouchableOpacity
                   key={btn.value}
-                  // Highlight the border and add a light background tint if active
                   style={[
                     styles.btn,
                     {
                       borderColor: isActive ? btn.color : "#e2e8f0",
-                      backgroundColor: isActive ? `${btn.color}10` : "#fff", // '10' adds 10% opacity in hex
+                      backgroundColor: isActive ? `${btn.color}10` : "#fff",
                     },
                   ]}
                   onPress={() => {
@@ -76,7 +82,7 @@ export default function TripFilterModal({
                   <View
                     style={[
                       styles.iconCircle,
-                      { backgroundColor: isActive ? btn.color : "#94a3b8" }, // Grey out icon if not active
+                      { backgroundColor: isActive ? btn.color : "#94a3b8" },
                     ]}
                   >
                     <FontAwesome5 name={btn.icon} size={16} color="#fff" />
@@ -99,15 +105,14 @@ export default function TripFilterModal({
   );
 }
 
+// ... Keep all your existing StyleSheet styles exactly the same ...
 const styles = StyleSheet.create({
   modalOverlay: {
     flex: 1,
     justifyContent: "flex-end",
     backgroundColor: "rgba(0,0,0,0.5)",
   },
-  backdrop: {
-    ...StyleSheet.absoluteFillObject,
-  },
+  backdrop: { ...StyleSheet.absoluteFillObject },
   modalContent: {
     backgroundColor: "#fff",
     borderTopLeftRadius: 24,
@@ -123,16 +128,8 @@ const styles = StyleSheet.create({
   },
   title: { fontSize: 20, fontWeight: "800", color: "#0f172a" },
   subtitle: { fontSize: 14, color: "#64748b", marginTop: 4 },
-  closeBtn: {
-    padding: 8,
-    backgroundColor: "#f1f5f9",
-    borderRadius: 20,
-  },
-  grid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 12,
-  },
+  closeBtn: { padding: 8, backgroundColor: "#f1f5f9", borderRadius: 20 },
+  grid: { flexDirection: "row", flexWrap: "wrap", gap: 12 },
   btn: {
     width: "48%",
     flexDirection: "row",
@@ -149,9 +146,5 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     marginRight: 10,
   },
-  btnText: {
-    fontWeight: "600",
-    fontSize: 13,
-    flex: 1,
-  },
+  btnText: { fontWeight: "600", fontSize: 13, flex: 1 },
 });

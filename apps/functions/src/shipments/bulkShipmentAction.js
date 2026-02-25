@@ -213,6 +213,22 @@ exports.bulkShipmentAction = onCall(
             deltaArrived: tripDeltaArrived,
           },
         });
+
+        const alertRef = db.collection("admin_alerts").doc();
+        t.set(alertRef, {
+          type: "BULK_SHIPMENT_ACTION",
+          subType: action, // e.g., "LOAD", "DELIVERED", etc.
+          tripId: tripId,
+          details: {
+            reason: `Bulk status update (${action}) executed on ${shipmentIds.length} shipments.`,
+            userId: userId,
+            shipmentCount: shipmentIds.length,
+          },
+          status: "UNREAD",
+          // Optional: You can make destructive actions like UNLOAD higher priority
+          priority: action === "UNLOAD" ? "HIGH" : "LOW",
+          createdAt: FieldValue.serverTimestamp(),
+        });
       });
 
       return { success: true };

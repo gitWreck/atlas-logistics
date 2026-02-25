@@ -20,12 +20,12 @@ export default function ShipmentActionModal({
   const ACTION_BUTTONS = [
     { label: "Unload", action: "UNLOAD", icon: "arrow-down", color: "#f59e0b" }, // Orange
     { label: "Load", action: "LOAD", icon: "arrow-up", color: "#3b82f6" }, // Blue
-    // {
-    //   label: "Arrived",
-    //   action: "ARRIVED",
-    //   icon: "warehouse", // Or "map-marker-alt"
-    //   color: "#8b5cf6", // Purple (distinct from the delivery steps)
-    // },
+    {
+      label: "Arrived",
+      action: "ARRIVED",
+      icon: "warehouse", // Or "map-marker-alt"
+      color: "#8b5cf6", // Purple (distinct from the delivery steps)
+    },
     {
       label: "Out for Delivery",
       action: "OUT_FOR_DELIVERY",
