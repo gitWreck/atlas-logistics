@@ -44,7 +44,24 @@
       }
     },
     "owner": "atlas-transport",
-    "plugins": ["expo-router", "expo-font"],
+    "plugins": [
+      "expo-router",
+      "expo-font",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Atlas accesses your camera and photos so drivers can capture and upload proof-of-delivery images and shipment documents.",
+          "colors": {
+            "cropToolbarColor": "#000000"
+          },
+          "dark": {
+            "colors": {
+              "cropToolbarColor": "#000000"
+            }
+          }
+        }
+      ]
+    ],
     "runtimeVersion": {
       "policy": "appVersion"
     },

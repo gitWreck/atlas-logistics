@@ -195,7 +195,8 @@ export default function DriverDashboard() {
           <Text style={styles.headerTitle}>My Trips</Text>
         </View>
         <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
-          <FontAwesome5 name="sign-out-alt" size={20} color={COLORS.logout} />
+          <FontAwesome5 name="sign-out-alt" size={16} color="#475569" />
+          <Text style={styles.logoutText}>Log out</Text>
         </TouchableOpacity>
       </View>
 
@@ -307,7 +308,20 @@ const styles = StyleSheet.create({
     marginLeft: 12,
   },
   logoutBtn: {
-    padding: 8,
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: "#e2e8f0",
+    backgroundColor: "#f8fafc",
+    gap: 6,
+  },
+  logoutText: {
+    color: "#475569",
+    fontSize: 14,
+    fontWeight: "500",
   },
 
   // ✅ NEW STYLES FOR SEARCH ROW
