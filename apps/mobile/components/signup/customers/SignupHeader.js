@@ -13,7 +13,7 @@ export default function SignupHeader({ onBack }) {
           activeOpacity={0.7}
         >
           <Image
-            // source={require("../../../assets/icons/back.svg")}
+            source={require("../../../assets/icons/back.svg")}
             style={{ width: 20, height: 20 }}
           />
         </TouchableOpacity>
