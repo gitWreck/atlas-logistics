@@ -69,9 +69,11 @@ export default function UnifiedShipmentModal({
         uploadedUrls = await Promise.all(uploadPromises);
       }
 
-      if (uploadedUrls.length === 0) {
-        setLoading(false);
-        return alert("Add Images before proceeding");
+      if (isPickup !== true) {
+        if (uploadedUrls.length === 0) {
+          setLoading(false);
+          return alert("Add Images before proceeding");
+        }
       }
 
       // --- Construct Payload ---
