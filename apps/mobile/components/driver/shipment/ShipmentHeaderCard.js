@@ -1,10 +1,48 @@
 import React from "react";
-import { View, Text, StyleSheet, Platform } from "react-native";
+import {
+  View,
+  Text,
+  StyleSheet,
+  Platform,
+  TouchableOpacity,
+  Alert,
+} from "react-native";
 import { FontAwesome5 } from "@expo/vector-icons";
 import { COLORS } from "../../constants/theme"; // Adjust path
 import StatusBadge from "../../ui/StatusBadge"; // Reuse your badge
+import * as Clipboard from "expo-clipboard"; // ✅ Add this
 
 const ShipmentHeaderCard = ({ shipment }) => {
+  // Safely extract the address object to avoid crashes
+  const address = shipment?.recipient?.address;
+
+  // 1. Street Fallback Logic
+  const streetText = address?.street
+    ? address.street
+    : address?.barangay
+      ? `Street no., ${address.barangay}`
+      : shipment?.destination || "No Address";
+
+  // 2. City & Province Fallback Logic
+  // This array filters out empty values so you don't get weird commas like ", Laguna" or "Lucban, "
+  const cityProvinceText =
+    [address?.city, address?.province].filter(Boolean).join(", ") ||
+    "City/Province Not Specified";
+
+  // Safely extract the recipient object
+  const recipient = shipment?.recipient;
+
+  // Fallback Logic
+  const receiverName = recipient?.name || "N/A";
+  const receiverPhone = recipient?.phone || "No Phone";
+
+  const copyPhoneToClipboard = async () => {
+    if (receiverPhone && receiverPhone !== "No Phone") {
+      await Clipboard.setStringAsync(receiverPhone);
+      Alert.alert("Copied!", "Phone number copied to clipboard.");
+    }
+  };
+
   return (
     <View style={styles.card}>
       {/* Top Row: ID & Status */}
@@ -23,39 +61,57 @@ const ShipmentHeaderCard = ({ shipment }) => {
             style={{ width: 24 }}
           />
           <View style={{ flex: 1 }}>
-            <Text style={styles.addressText}>
-              {shipment.recipient.address.street +
-                ", " +
-                shipment.recipient.address.barangay ||
-                shipment.destination ||
-                "No Address"}
-            </Text>
-            <Text style={styles.subText}>
-              {shipment.recipient.address.city +
-                ", " +
-                shipment.recipient.address.province || "City Not Specified"}
-            </Text>
+            <Text style={styles.addressText}>{streetText}</Text>
+
+            <Text style={styles.subText}>{cityProvinceText}</Text>
           </View>
         </View>
       </View>
 
       {/* Receiver Info */}
       <View style={[styles.section, { borderBottomWidth: 0 }]}>
-        <View style={styles.row}>
-          <FontAwesome5
-            name="user-check"
-            size={16}
-            color={COLORS.primary}
-            style={{ width: 24 }}
-          />
-          <View>
-            <Text style={styles.label}>Receiver</Text>
-            <Text style={styles.valueText}>
-              {shipment.recipient.name || "N/A"}
+        {/* We add justifyContent: 'space-between' to push items to opposite ends */}
+        <View
+          style={[
+            styles.row,
+            { justifyContent: "space-between", alignItems: "center" },
+          ]}
+        >
+          {/* --- LEFT SIDE: Icon & Name --- */}
+          <View style={{ flexDirection: "row", alignItems: "center", flex: 1 }}>
+            <FontAwesome5
+              name="user-check"
+              size={16}
+              color={COLORS.primary}
+              style={{ width: 24 }}
+            />
+            <View>
+              <Text style={styles.label}>Receiver</Text>
+              <Text style={styles.valueText} numberOfLines={1}>
+                {receiverName}
+              </Text>
+            </View>
+          </View>
+
+          {/* --- RIGHT SIDE: Phone & Copy Button --- */}
+          <View style={{ flexDirection: "row", alignItems: "center" }}>
+            <Text style={[styles.phoneText, { marginRight: 8, marginTop: 0 }]}>
+              {receiverPhone}
             </Text>
-            <Text style={styles.phoneText}>
-              {shipment.recipient.phone || "No Phone"}
-            </Text>
+
+            {/* Only show the copy button if there is an actual phone number */}
+            {receiverPhone !== "No Phone" && (
+              <TouchableOpacity
+                onPress={copyPhoneToClipboard}
+                style={{
+                  padding: 6,
+                  backgroundColor: "#f1f5f9",
+                  borderRadius: 8,
+                }}
+              >
+                <FontAwesome5 name="copy" size={14} color="#3b82f6" />
+              </TouchableOpacity>
+            )}
           </View>
         </View>
       </View>

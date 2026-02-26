@@ -78,3 +78,21 @@ export const DRIVER_STEPS = [
     icon: "check-circle", // Represents successful completion
   },
 ];
+
+// constants/tracking-constants.js
+
+export const PICKUP_STEPS = [
+  { key: "PENDING_PICKUP", label: "Pending Pickup", icon: "clipboard-list" },
+  { key: "IN_TRANSIT", label: "Driver En Route", icon: "truck" },
+  { key: "ARRIVED", label: "Arrived at Location", icon: "map-marker-alt" },
+  { key: "PICKED_UP", label: "Picked Up Successfully", icon: "check-circle" },
+];
+
+export const DELIVERY_STEPS = [
+  { key: "RECEIVED", label: "Shipment Received", icon: "box" },
+  { key: "LOADED", label: "Loaded on Truck", icon: "arrow-up" },
+  { key: "IN_TRANSIT", label: "In Transit", icon: "route" },
+  { key: "ARRIVED", label: "Arrived at Hub", icon: "warehouse" },
+  { key: "OUT_FOR_DELIVERY", label: "Out for Delivery", icon: "shipping-fast" },
+  { key: "DELIVERED", label: "Delivered Successfully", icon: "check-circle" },
+];

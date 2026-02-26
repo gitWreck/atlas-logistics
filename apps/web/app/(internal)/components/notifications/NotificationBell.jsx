@@ -167,17 +167,19 @@ export default function NotificationBell({ isDark = false }) {
                   {/* Content */}
                   <div className="flex-1">
                     <p
-                      className={`text-sm font-bold leading-tight mb-1 ${
+                      className={`flex items-center flex-wrap text-sm font-bold leading-tight mb-1 gap-1.5 ${
                         isDark ? "text-slate-200" : "text-slate-900"
                       }`}
                     >
-                      {/* ✅ FIX: Construct message since 'message' field is missing in data */}
-                      {alert.details.driverName
+                      {/* Construct message since 'message' field is missing in data */}
+                      {alert.details?.driverName
                         ? `${alert.details.driverName}: `
-                        : ""}
-                      {alert.details.reason ? (
+                        : `${alert.tripId || "Unknown Trip"} `}
+
+                      {/* Badge aligns nicely beside text */}
+                      {alert.details?.reason ? (
                         <StatusBadge
-                          status={"delayed"}
+                          status="delayed"
                           reason={alert.details.reason}
                         />
                       ) : (

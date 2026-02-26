@@ -8,14 +8,13 @@ import {
   TouchableOpacity,
   SafeAreaView,
   ActivityIndicator,
+  RefreshControl, // ✅ ADD THIS
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { FontAwesome5 } from "@expo/vector-icons";
 import { StatusBar } from "expo-status-bar";
 import { collection, query, onSnapshot, orderBy } from "firebase/firestore";
 import { db } from "../../firebase";
-import { COLORS } from "../../components/constants/theme";
-import { Image } from "expo-image";
 import ShipmentCard from "../../components/driver/shipment/ShipmentCard";
 
 export default function ShipmentsListScreen() {
@@ -25,6 +24,18 @@ export default function ShipmentsListScreen() {
   const [shipments, setShipments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchText, setSearchText] = useState("");
+
+  // ✅ ADD THESE LINES
+  const [refreshing, setRefreshing] = useState(false);
+
+  const onRefresh = () => {
+    setRefreshing(true);
+    // Since onSnapshot is already real-time, we just simulate a brief network
+    // delay to give the user the visual satisfaction of a refresh.
+    setTimeout(() => {
+      setRefreshing(false);
+    }, 1000);
+  };
 
   useEffect(() => {
     if (!tripId) return;
@@ -76,10 +87,12 @@ export default function ShipmentsListScreen() {
       {/* Header: back | title | count (right) */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-          <Image
+          {/* <Image
             source={require("../../assets/icons/back.svg")}
             style={{ width: 20, height: 20 }}
-          />
+          /> */}
+
+          <FontAwesome5 name="arrow-left" size={15} color="#0f172a" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Shipments</Text>
         <Text style={styles.headerCount}>{shipments.length} Items</Text>
@@ -107,6 +120,15 @@ export default function ShipmentsListScreen() {
           data={filteredData}
           keyExtractor={(item) => item.id}
           contentContainerStyle={styles.listContent}
+          // ✅ ADD THIS PROP
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              tintColor="#042C83" // iOS spinner color
+              colors={["#042C83"]} // Android spinner color
+            />
+          }
           renderItem={({ item }) => (
             <ShipmentCard shipment={item} onPress={handlePressShipment} />
           )}

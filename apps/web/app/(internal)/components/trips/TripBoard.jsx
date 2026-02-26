@@ -81,6 +81,7 @@ const TripBoard = forwardRef(function TripBoard({ user, userRole, profile, isDar
         t.driverName,
         t.truckPlateNumber,
         t.route,
+        t.tripType,
       ]
         .filter(Boolean)
         .join(" ")
@@ -123,7 +124,7 @@ const TripBoard = forwardRef(function TripBoard({ user, userRole, profile, isDar
 
       return true;
     });
-  }, [searchQuery, activeFilter, trips, startDate, endDate]);
+  }, [searchQuery, activeFilter, typeFilter, trips, startDate, endDate]);
 
   // --- PAGINATION ---
   const indexOfLastItem = currentPage * itemsPerPage;

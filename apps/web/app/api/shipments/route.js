@@ -37,7 +37,7 @@ export async function GET() {
     // 3. FETCH SHIPMENTS (The Base Data)
     const snapshot = await adminDb
       .collection("shipments")
-      .orderBy("createdAt", "desc")
+      .orderBy("updatedAt", "desc")
       .limit(50)
       .get();
 

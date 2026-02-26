@@ -1,10 +1,5 @@
 import React from "react";
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  StyleSheet,
-} from "react-native";
+import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 
 // Same gradient as GradientButton for consistency
@@ -50,9 +45,9 @@ export default TabSelector;
 const styles = StyleSheet.create({
   tabContainer: {
     flexDirection: "row",
-    marginBottom: 16,
+    // marginBottom: 1,
     marginHorizontal: 16,
-    marginTop: 25,
+    marginTop: 16,
     padding: 4,
     borderWidth: 1,
     borderColor: "#e2e8f0",

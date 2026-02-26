@@ -15,19 +15,36 @@ const LABEL_GREY = "#6b7280";
 const VALUE_DARK = "#111827";
 const SEPARATOR = "#e5e7eb";
 const LINK_BLUE = "#067FC6";
+const DANGER_RED = "#ef4444"; // Added red for delay
 
 const TripCard = ({ trip, onPress, actionLabel = "View Trip" }) => {
   const tripDisplayId = trip.tripId?.startsWith("TRIP")
     ? trip.tripId
     : `TRIP - ${trip.tripId || "—"}`;
+
   const truckDisplay = trip.truckPlateNumber?.startsWith("TRK")
     ? trip.truckPlateNumber
     : trip.truckPlateNumber
       ? `TRK - ${trip.truckPlateNumber}`
       : "No Truck Assigned";
 
+  // Check if there is an active delay
+  const isDelayed = trip.delayReason && !trip.delayCleared;
+
+  console.log("show delay: ", trip);
+
   return (
-    <View style={styles.card}>
+    <View style={[styles.card, isDelayed && styles.cardDelayed]}>
+      {/* 🚨 DELAY BANNER (Only shows if delayed) */}
+      {isDelayed && (
+        <View style={styles.delayBanner}>
+          <FontAwesome5 name="exclamation-triangle" size={12} color="#fff" />
+          <Text style={styles.delayText}>
+            DELAYED: {trip.delayReason.replace(/_/g, " ")}
+          </Text>
+        </View>
+      )}
+
       {/* Header: Trip Number label + value, Status badge */}
       <View style={styles.cardHeader}>
         <View style={styles.tripNumberBlock}>
@@ -38,7 +55,7 @@ const TripCard = ({ trip, onPress, actionLabel = "View Trip" }) => {
       </View>
 
       <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
-        {/* From: row1 = icon + label (fixed gap); row2 = spacer + value (aligned with icon) */}
+        {/* From Block */}
         <View style={[styles.locationBlock, { flex: 1 }]}>
           <View style={styles.locationRow1}>
             <View style={styles.iconColumn}>
@@ -59,7 +76,7 @@ const TripCard = ({ trip, onPress, actionLabel = "View Trip" }) => {
           </View>
         </View>
 
-        {/* To: same layout */}
+        {/* To Block */}
         <View style={[styles.locationBlock, { flex: 1 }]}>
           <View style={styles.locationRow1}>
             <View style={styles.iconColumn}>
@@ -116,6 +133,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 16,
     marginBottom: 16,
+    overflow: "hidden", // ensures the delay banner stays inside the rounded corners
     ...Platform.select({
       ios: {
         shadowColor: "#000",
@@ -125,6 +143,27 @@ const styles = StyleSheet.create({
       },
       android: { elevation: 3 },
     }),
+  },
+  cardDelayed: {
+    borderColor: DANGER_RED,
+    borderWidth: 1.5,
+  },
+  delayBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: DANGER_RED,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    marginHorizontal: -16, // Pulls it to the edges of the card
+    marginTop: -16,
+    marginBottom: 12,
+  },
+  delayText: {
+    color: "#fff",
+    fontSize: 12,
+    fontWeight: "bold",
+    marginLeft: 6,
+    textTransform: "uppercase",
   },
   cardHeader: {
     flexDirection: "row",
@@ -143,6 +182,7 @@ const styles = StyleSheet.create({
   tripValue: {
     fontSize: 13,
     color: VALUE_DARK,
+    fontWeight: "600",
   },
   locationBlock: {
     marginBottom: 12,
@@ -209,10 +249,6 @@ const styles = StyleSheet.create({
   viewTripText: {
     fontSize: 14,
     color: LINK_BLUE,
-  },
-  viewTripChevron: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: LINK_BLUE,
+    fontWeight: "500",
   },
 });

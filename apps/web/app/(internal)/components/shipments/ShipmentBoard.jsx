@@ -123,13 +123,19 @@ const ShipmentBoard = forwardRef(function ShipmentBoard({ user, userRole, profil
       // C. Status Filter Logic
       if (activeFilter !== "ALL") {
         if (activeFilter === "ACTIVE" && s.status === "DELIVERED") return false;
+
+        // Handle DELAYED logic
         if (activeFilter === "DELAYED") {
           if (s.status !== "DELAYED") return false;
           // D. Specific Delay Type Filter
           if (delayType !== "ALL" && s.delayReason !== delayType) return false;
         }
-        if (activeFilter === "DELIVERED" && s.status !== "DELIVERED")
-          return false;
+
+        // Standard explicit status matching
+        else if (activeFilter !== "ACTIVE") {
+          // This covers CREATED, PENDING_PICKUP, PICKED_UP, RECEIVED, ASSIGNED, IN_TRANSIT, DELIVERED
+          if (s.status !== activeFilter) return false;
+        }
       }
 
       // D. NEW: Shipment Mode Logic
@@ -148,7 +154,15 @@ const ShipmentBoard = forwardRef(function ShipmentBoard({ user, userRole, profil
 
       return true;
     });
-  }, [searchQuery, activeFilter, shipments, startDate, endDate, delayType]);
+  }, [
+    searchQuery,
+    activeFilter,
+    modeFilter,
+    shipments,
+    startDate,
+    endDate,
+    delayType,
+  ]);
 
   // --- 3. PAGINATION LOGIC ---
   const indexOfLastItem = currentPage * itemsPerPage;
@@ -267,7 +281,7 @@ const ShipmentBoard = forwardRef(function ShipmentBoard({ user, userRole, profil
                   >
                     <option value="ALL">All Modes</option>
                     <option value="DROP_OFF">Hub Drop-offs</option>
-                    <option value="PICKUP">Home Pickups</option>
+                    <option value="PICKUP">Pickups</option>
                   </select>
                 </div>
 
@@ -289,10 +303,13 @@ const ShipmentBoard = forwardRef(function ShipmentBoard({ user, userRole, profil
                   >
                     <option value="ALL">All View</option>
                     <option value="CREATED">Created</option>
+                    <option value="PENDING_PICKUP">Pending Pickup</option>
+                    <option value="PICKED_UP">Picked up</option>
+                    <option value="RECEIVED">Received</option>
                     <option value="ASSIGNED">Assigned</option>
                     <option value="IN_TRANSIT">In Transit</option>
-                    <option value="DELAYED">Delayed</option>
                     <option value="DELIVERED">Delivered</option>
+                    <option value="DELAYED">Delayed</option>
                   </select>
                 </div>
               </div>

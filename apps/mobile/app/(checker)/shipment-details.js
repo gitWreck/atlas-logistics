@@ -21,7 +21,10 @@ import ShipmentSearch from "../../components/checker/shipment-details/ShipmentSe
 import PackageListItem from "../../components/checker/shipment-details/PackageListItem";
 
 import PackageActionModal from "../../components/checker/shipment-details/PackageActionModal";
-import { updateShipmentPackages } from "../../components/utilities/FirebaseFunctions";
+import {
+  reportCheckerTrip,
+  updateShipmentPackages,
+} from "../../components/utilities/FirebaseFunctions";
 
 export default function ShipmentDetailsScreen() {
   const { shipmentId, parentTripId, parentPlate } = useLocalSearchParams();
@@ -52,6 +55,43 @@ export default function ShipmentDetailsScreen() {
     } catch (error) {
       console.log("Location error (checker shipment-details):", error);
       return null;
+    }
+  };
+
+  const executeAction = async (actionCode, { sendText }) => {
+    setActionLoading(true);
+    try {
+      // const functions = getFunctions(undefined, "asia-southeast1");
+      // const reportCheckerTrip = httpsCallable(functions, "reportCheckerTrip");
+      // const sendManualSms = httpsCallable(functions, "sendManualSms");
+
+      const location = await getCurrentLocationSafe();
+      const trackingId = targetPackage?.trackingNumber || shipmentId;
+
+      // 1. UPDATE DATABASE FIRST
+      const dbResult = await reportCheckerTrip({
+        shipmentId: trackingId,
+        tripId: tripId,
+        actionCode: actionCode,
+        sendText: sendText,
+        location: location,
+      });
+
+      Alert.alert(
+        "Success",
+        `Updated status to ${actionCode.replace(/_/g, " ")}` +
+          (sendText && dbResult.data.phone
+            ? "\nCustomer notified via SMS."
+            : ""),
+      );
+
+      setModalVisible(false); // Closes the modal
+      setTargetPackage(null); // Clears the selection
+    } catch (error) {
+      console.error(error);
+      Alert.alert("Error", error.message);
+    } finally {
+      setActionLoading(false);
     }
   };
 
@@ -103,54 +143,54 @@ export default function ShipmentDetailsScreen() {
   };
 
   // ✅ UPDATED ACTION HANDLER (Handles Single & Bulk)
-  const executeAction = async (newMode) => {
-    setActionLoading(true);
+  // const executeAction = async (newMode) => {
+  //   setActionLoading(true);
 
-    // STEP 1: Decide WHO to update
-    // If 'targetPackage' exists (Menu Press), we create a Set with JUST that one ID.
-    // If 'targetPackage' is null (Bulk Button), we use the 'selectedIds' Set.
-    const idsToUpdate = targetPackage
-      ? new Set([targetPackage.trackingNumber])
-      : selectedIds;
+  //   // STEP 1: Decide WHO to update
+  //   // If 'targetPackage' exists (Menu Press), we create a Set with JUST that one ID.
+  //   // If 'targetPackage' is null (Bulk Button), we use the 'selectedIds' Set.
+  //   const idsToUpdate = targetPackage
+  //     ? new Set([targetPackage.trackingNumber])
+  //     : selectedIds;
 
-    // STEP 2: Create the NEW full list
-    // We loop through the CURRENT full list of packages.
-    const updatedPackages = packages.map((pkg) => {
-      // If this package's ID is in our "idsToUpdate" set...
-      if (idsToUpdate.has(pkg.trackingNumber)) {
-        // ...we clone it and change its status.
-        return { ...pkg, status: newMode };
-      }
-      // Otherwise, keep it exactly as it is.
-      return pkg;
-    });
+  //   // STEP 2: Create the NEW full list
+  //   // We loop through the CURRENT full list of packages.
+  //   const updatedPackages = packages.map((pkg) => {
+  //     // If this package's ID is in our "idsToUpdate" set...
+  //     if (idsToUpdate.has(pkg.trackingNumber)) {
+  //       // ...we clone it and change its status.
+  //       return { ...pkg, status: newMode };
+  //     }
+  //     // Otherwise, keep it exactly as it is.
+  //     return pkg;
+  //   });
 
-    try {
-      console.log("updated packages: ", updatedPackages.trim());
-      console.log("shipment id: ", shipmentId.trim());
+  //   try {
+  //     console.log("updated packages: ", updatedPackages.trim());
+  //     console.log("shipment id: ", shipmentId.trim());
 
-      // const functions = getFunctions(undefined, "asia-southeast1");
-      // const updateFn = httpsCallable(functions, "updateShipmentPackages");
+  //     // const functions = getFunctions(undefined, "asia-southeast1");
+  //     // const updateFn = httpsCallable(functions, "updateShipmentPackages");
 
-      // STEP 3: Send the ENTIRE list (with the changes) to the server
-      await updateShipmentPackages({
-        shipmentId: shipmentId.trim(),
-        packages: updatedPackages, // This contains 99 unchanged items + 1 updated item
-      });
+  //     // STEP 3: Send the ENTIRE list (with the changes) to the server
+  //     await updateShipmentPackages({
+  //       shipmentId: shipmentId.trim(),
+  //       packages: updatedPackages, // This contains 99 unchanged items + 1 updated item
+  //     });
 
-      Alert.alert("Success", `Updated status to ${newMode}`);
+  //     Alert.alert("Success", `Updated status to ${newMode}`);
 
-      // Cleanup
-      setSelectedIds(new Set());
-      setTargetPackage(null);
-      setModalVisible(false); // Don't forget to close the modal!
-    } catch (error) {
-      console.error("Update Error:", error);
-      Alert.alert("Update Failed", error.message);
-    } finally {
-      setActionLoading(false);
-    }
-  };
+  //     // Cleanup
+  //     setSelectedIds(new Set());
+  //     setTargetPackage(null);
+  //     setModalVisible(false); // Don't forget to close the modal!
+  //   } catch (error) {
+  //     console.error("Update Error:", error);
+  //     Alert.alert("Update Failed", error.message);
+  //   } finally {
+  //     setActionLoading(false);
+  //   }
+  // };
 
   // ✅ UPDATED PRESS HANDLERS
   const handleMenuPress = (pkg) => {

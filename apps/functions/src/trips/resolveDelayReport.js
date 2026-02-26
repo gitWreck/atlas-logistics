@@ -47,9 +47,11 @@ exports.resolveDelayReport = onCall(
         // --- APPROVE LOGIC ---
         // 1. Update Trip: Set status to DELAYED
         tx.update(tripRef, {
-          status: "DELAYED",
+          // status: "DELAYED",
           delayReason: details?.reason || "Delay Approved",
-          delayCleared: true, // Keep this true
+          delayCleared: false, // <-- CHANGED: False means the delay is currently active!
+          delayStartedAt: now, // <-- ADDED: Track when the delay officially began
+          delayClearedAt: null,
           updatedAt: now,
         });
       } else {
@@ -57,6 +59,7 @@ exports.resolveDelayReport = onCall(
         // 1. Update Trip: Clear the "Active Delay" flag so it stops flashing red
         tx.update(tripRef, {
           delayCleared: true,
+          delayReason: null,
           // We don't change the status back to IN_TRANSIT here
           // just in case it was something else, but we remove the flag.
           updatedAt: now,
