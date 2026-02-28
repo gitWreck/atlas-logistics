@@ -301,7 +301,39 @@ export default function TripDetailsScreen() {
               <GradientButton
                 title="Complete Trip"
                 onPress={async () => {
-                  Alert.alert("Complete", "Confirm truck is fully unloaded?");
+                  // Alert.alert("Complete", "Confirm truck is fully unloaded?");
+                  Alert.alert(
+                    "Mark Completed",
+                    "Have you completed the trip?",
+                    [
+                      { text: "Cancel", style: "cancel" },
+                      {
+                        text: "Yes",
+                        onPress: async () => {
+                          try {
+                            setActionLoading(true);
+                            await updateTripStatus({
+                              tripId: trip.id,
+                              status: "COMPLETED",
+                              notify: true, // Set to false if you don't want an automated SMS sent
+                            });
+                            Alert.alert(
+                              "Success",
+                              "You have completed the trip.",
+                            );
+                          } catch (error) {
+                            console.error("Mark completed error:", error);
+                            Alert.alert(
+                              "Error",
+                              error.message || "Failed to update trip status.",
+                            );
+                          } finally {
+                            setActionLoading(false);
+                          }
+                        },
+                      },
+                    ],
+                  );
                 }}
                 loading={actionLoading}
                 disabled={actionLoading}
