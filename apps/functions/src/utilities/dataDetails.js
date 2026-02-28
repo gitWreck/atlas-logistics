@@ -1,3 +1,5 @@
+// connected to
+//
 const STATUS_MESSAGES = {
   LOADING:
     "Atlas Logistics: Your package is currently being loaded onto the delivery truck.",
@@ -26,6 +28,33 @@ const STATUS_MESSAGES = {
     "Atlas Logistics: The delay has been resolved and your shipment is back on the move. Thank you for your patience.",
 };
 
+// connected to
+// updateTripStatus
+const VALID_TRIP_STATUSES = [
+  "CREATED",
+  "ASSIGNED",
+  "LOADING",
+  "LOADED",
+  "IN_TRANSIT",
+  "ARRIVED",
+  "OUT_FOR_DELIVERY",
+  "COMPLETED",
+  "CANCELLED",
+];
+
+// connected to
+// updateShipmentStatus
+const ALLOWED_SHIPMENT_STATUSES = [
+  "OUT_FOR_DELIVERY",
+  "DELIVERED",
+  "FAILED_DELIVERY",
+  "PICKED_UP",
+  "FAILED_PICKUP",
+  "ARRIVED",
+];
+
 module.exports = {
   STATUS_MESSAGES,
+  VALID_TRIP_STATUSES,
+  ALLOWED_SHIPMENT_STATUSES,
 };

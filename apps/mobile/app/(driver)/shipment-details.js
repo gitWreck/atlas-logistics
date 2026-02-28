@@ -18,21 +18,24 @@ import { StatusBar } from "expo-status-bar";
 import { db, storage } from "../../firebase";
 import { updateShipmentStatus } from "../../components/utilities/FirebaseFunctions";
 
-// IMPORT NEW MODULAR COMPONENTS
+// COMPONENTS
 import ShipmentDetailHeader from "../../components/driver/shipment/ShipmentDetailHeader";
 import ShipmentHeaderCard from "../../components/driver/shipment/ShipmentHeaderCard";
-import ProofOfDeliverySection from "../../components/driver/shipment/ProofOfDeliverySection";
-import PackageItemCard from "../../components/driver/shipment/PackageItemCard";
+import PhotoUploadSection from "../../components/driver/shipment/PhotoUploadSection";
+import PackageTable from "../../components/driver/shipment/PackageTable";
 import ShipmentActionFooter from "../../components/driver/shipment/ShipmentActionFooter";
+import ExistingProofsViewer from "../../components/driver/shipment/ExistingProofsViewer";
+import ReportIssueModal from "../../components/driver/shipment/ReportIssueModal";
 
 export default function ShipmentDetailsScreen() {
-  const { shipmentId, tripId } = useLocalSearchParams();
+  const { shipmentId, tripId, tripType } = useLocalSearchParams();
   const router = useRouter();
 
   const [shipment, setShipment] = useState(null);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
   const [photos, setPhotos] = useState([]);
+  const [isIssueModalVisible, setIsIssueModalVisible] = useState(false);
 
   // 1. Fetch Shipment
   useEffect(() => {
@@ -110,7 +113,7 @@ export default function ShipmentDetailsScreen() {
     const urls = [];
     for (let i = 0; i < photos.length; i++) {
       const uri = photos[i];
-      const filename = `proof_of_delivery_${shipmentId}_${Date.now()}_${i}.jpg`;
+      const filename = `proof_${shipmentId}_${Date.now()}_${i}.jpg`;
       const storageRef = ref(storage, `shipments/${shipmentId}/${filename}`);
 
       const response = await fetch(uri);
@@ -123,7 +126,7 @@ export default function ShipmentDetailsScreen() {
     return urls;
   };
 
-  // 5. Handle Action
+  // 5. Handle Action (Happy Path & COD)
   const handleAction = async () => {
     if (!shipment) return;
     setActionLoading(true);
@@ -131,18 +134,44 @@ export default function ShipmentDetailsScreen() {
     try {
       const location = await getCurrentLocationSafe();
 
-      // CASE A: Mark Out For Delivery
-      if (shipment.status === "ARRIVED") {
+      // CASE A: Local Pickup Collection
+      if (shipment.status === "PENDING_PICKUP") {
+        if (photos.length === 0) {
+          Alert.alert(
+            "Proof Required",
+            "Please take at least one photo of the collected package.",
+          );
+          setActionLoading(false);
+          return;
+        }
+        const photoUrls = await uploadPhotos();
+        await updateShipmentStatus({
+          shipmentId,
+          tripId,
+          newStatus: "PICKED_UP",
+          location,
+          remarks: `Proof of Receipt: ${photoUrls.length} images uploaded.`,
+          proofOfReceipt: photoUrls,
+        });
+        Alert.alert("Success", "Package collected successfully!");
+        router.back();
+      }
+
+      // CASE B: Hub-to-Hub Marking Out For Delivery
+      else if (shipment.status === "ARRIVED") {
         await updateShipmentStatus({
           shipmentId,
           tripId,
           newStatus: "OUT_FOR_DELIVERY",
           location,
         });
-
         Alert.alert("Success", "Shipment is now Out for Delivery.");
         setShipment((prev) => ({ ...prev, status: "OUT_FOR_DELIVERY" }));
-      } else if (
+        setActionLoading(false);
+      }
+
+      // Prevent Invalid Hub Actions
+      else if (
         shipment.status === "LOADED" ||
         shipment.status === "IN_TRANSIT"
       ) {
@@ -150,9 +179,11 @@ export default function ShipmentDetailsScreen() {
           "Action Blocked",
           "This shipment must be marked as ARRIVED at the warehouse before it can be taken out for delivery.",
         );
+        setActionLoading(false);
         return;
       }
-      // CASE B: Complete Delivery
+
+      // CASE C: Complete Final Delivery
       else if (shipment.status === "OUT_FOR_DELIVERY") {
         if (photos.length === 0) {
           Alert.alert(
@@ -163,23 +194,87 @@ export default function ShipmentDetailsScreen() {
           return;
         }
 
-        const photoUrls = await uploadPhotos();
+        // The core completion logic wrapped in a reusable function
+        const executeDeliveryCompletion = async () => {
+          setActionLoading(true);
+          try {
+            const photoUrls = await uploadPhotos();
 
-        await updateShipmentStatus({
-          shipmentId,
-          tripId,
-          newStatus: "DELIVERED",
-          location,
-          remarks: `Proof of Delivery: ${photoUrls.length} images uploaded.`,
-          proofOfDelivery: photoUrls,
-        });
+            await updateShipmentStatus({
+              shipmentId,
+              tripId,
+              newStatus: "DELIVERED",
+              location,
+              remarks: `Proof of Delivery: ${photoUrls.length} images uploaded.`,
+              proofOfDelivery: photoUrls,
+              paymentStatus: shipment.isCOD ? "COLLECTED_BY_DRIVER" : "PAID",
+            });
 
-        Alert.alert("Success", "Delivery Completed!");
-        router.back();
+            Alert.alert("Success", "Delivery Completed!");
+            router.back();
+          } catch (err) {
+            console.error(err);
+            Alert.alert("Error", err.message || "Failed to complete delivery.");
+          } finally {
+            setActionLoading(false);
+          }
+        };
+
+        // Intercept COD Deliveries
+        if (shipment.isCOD && shipment.paymentStatus !== "PAID") {
+          setActionLoading(false); // Stop the spinner while waiting for user input
+          Alert.alert(
+            "⚠️ CASH COLLECTION REQUIRED",
+            `Do you have exactly ₱${shipment.codAmount?.toLocaleString()} in your hand from the customer?`,
+            [
+              { text: "No, cancel", style: "cancel" },
+              {
+                text: "Yes, Cash Collected",
+                style: "destructive",
+                onPress: executeDeliveryCompletion,
+              },
+            ],
+          );
+        } else {
+          // If not COD, just proceed normally
+          await executeDeliveryCompletion();
+        }
       }
     } catch (error) {
       console.error(error);
       Alert.alert("Error", error.message || "Action failed.");
+      setActionLoading(false);
+    }
+  };
+
+  // 6. Handle Issue Reporting (Unhappy Path)
+  const handleReportIssue = async (reasonId, reasonText) => {
+    setIsIssueModalVisible(false);
+    setActionLoading(true);
+
+    try {
+      const location = await getCurrentLocationSafe();
+      const newStatus =
+        shipment.status === "PENDING_PICKUP"
+          ? "FAILED_PICKUP"
+          : "FAILED_DELIVERY";
+
+      await updateShipmentStatus({
+        shipmentId,
+        tripId,
+        newStatus,
+        location,
+        remarks: `Exception: ${reasonText} (${reasonId})`,
+      });
+
+      Alert.alert(
+        "Issue Reported",
+        `The shipment was marked as ${newStatus.replace("_", " ")}.`,
+      );
+      router.back();
+    } catch (error) {
+      console.error(error);
+      Alert.alert("Error", error.message || "Failed to report issue.");
     } finally {
       setActionLoading(false);
     }
@@ -194,44 +289,82 @@ export default function ShipmentDetailsScreen() {
   }
 
   const packages = shipment?.packages || [];
-  const isOutForDelivery = shipment?.status === "OUT_FOR_DELIVERY";
+  const needsPhotoUpload =
+    shipment?.status === "PENDING_PICKUP" ||
+    shipment?.status === "OUT_FOR_DELIVERY";
+
+  console.log("tripType", tripType);
 
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar style="dark" />
 
-      {/* 1. Header Component */}
+      {/* Header Component */}
       <ShipmentDetailHeader onBack={() => router.back()} />
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
-        {/* 2. Main Shipment Details */}
+        {/* Main Shipment Details (Contains the new COD Banner) */}
         <ShipmentHeaderCard shipment={shipment} />
 
-        {/* 3. Proof of Delivery Component (Conditional) */}
-        {isOutForDelivery && (
-          <ProofOfDeliverySection
+        {/* Existing Proofs */}
+        <ExistingProofsViewer
+          proofOfReceipt={shipment.proofOfReceipt}
+          proofOfDelivery={shipment.proofOfDelivery}
+        />
+
+        {/* Photo Upload (Dynamic Title) */}
+        {needsPhotoUpload && (
+          <PhotoUploadSection
+            title={
+              shipment?.status === "PENDING_PICKUP"
+                ? "Proof of Receipt"
+                : "Proof of Delivery"
+            }
             photos={photos}
             onPickImage={pickImage}
             onRemovePhoto={removePhoto}
           />
         )}
 
-        {/* 4. Packages List */}
-        <Text style={styles.sectionTitle}>Packages ({packages.length})</Text>
-        {packages.length > 0 ? (
-          packages.map((pkg, i) => (
-            <PackageItemCard key={i} pkg={pkg} index={i} />
-          ))
-        ) : (
-          <Text style={styles.emptyText}>No package details available.</Text>
+        {/* --- DYNAMIC UI: ONLY SHOW ACTIONS FOR LOCAL ROUTES --- */}
+        {tripType !== "HUB_TRANSFER" && (
+          <>
+            {/* 4. Photo Upload (Dynamic Title) */}
+            {needsPhotoUpload && (
+              <PhotoUploadSection
+                title={
+                  shipment?.status === "PENDING_PICKUP"
+                    ? "Proof of Receipt"
+                    : "Proof of Delivery"
+                }
+                photos={photos}
+                onPickImage={pickImage}
+                onRemovePhoto={removePhoto}
+              />
+            )}
+          </>
         )}
+
+        {/* Paginated Packages Table */}
+        <Text style={styles.sectionTitle}>Packages ({packages.length})</Text>
+        <PackageTable packages={packages} itemsPerPage={5} />
       </ScrollView>
 
-      {/* 5. Footer Action Component */}
-      <ShipmentActionFooter
-        status={shipment.status}
-        actionLoading={actionLoading}
-        onAction={handleAction}
+      {/* --- ACTION FOOTER: HIDDEN FOR HUB-TO-HUB --- */}
+      {tripType !== "HUB_TRANSFER" && (
+        <ShipmentActionFooter
+          status={shipment.status}
+          actionLoading={actionLoading}
+          onAction={handleAction}
+          onReportIssue={() => setIsIssueModalVisible(true)}
+        />
+      )}
+      {/* Report Issue Modal */}
+      <ReportIssueModal
+        visible={isIssueModalVisible}
+        onClose={() => setIsIssueModalVisible(false)}
+        onSubmit={handleReportIssue}
+        isPickup={shipment?.status === "PENDING_PICKUP"}
       />
     </SafeAreaView>
   );
@@ -248,5 +381,4 @@ const styles = StyleSheet.create({
     marginTop: 24,
     marginBottom: 8,
   },
-  emptyText: { color: "#64748b", fontStyle: "italic", marginTop: 10 },
 });

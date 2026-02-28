@@ -1,7 +1,13 @@
 import React from "react";
-import { View, Text, TouchableOpacity, StyleSheet, Platform } from "react-native";
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  StyleSheet,
+  Platform,
+} from "react-native";
 import { FontAwesome5 } from "@expo/vector-icons";
-import StatusBadge from "../../ui/StatusBadge";
+import StatusBadge from "../../ui/figma/StatusBadge";
 
 const LABEL_GREY = "#6b7280";
 const VALUE_DARK = "#111827";
@@ -9,6 +15,8 @@ const SEPARATOR_COLOR = "#e5e7eb";
 const LINK_BLUE = "#2563eb";
 
 const ShipmentCard = ({ shipment, onPress }) => {
+  console.log("shipments: ", shipment);
+
   const tripId = shipment.id || shipment.trackingNumber || "—";
   const address = shipment.recipient?.address;
   const destination =
@@ -20,11 +28,7 @@ const ShipmentCard = ({ shipment, onPress }) => {
       : null) ||
     shipment.destination ||
     "No Address";
-  const itemLabel =
-    shipment.itemDescription ||
-    shipment.description ||
-    shipment.recipient?.name ||
-    "Shipment";
+
   const quantity = shipment.totalItems ?? shipment.loadedCount ?? 0;
 
   return (
@@ -35,8 +39,8 @@ const ShipmentCard = ({ shipment, onPress }) => {
           <View style={styles.iconBox}>
             <FontAwesome5 name="box" size={14} color={LABEL_GREY} />
           </View>
-          <View>
-            <Text style={styles.label}>Trip Number</Text>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.label}>Tracking Number</Text>
             <Text style={styles.value} numberOfLines={1}>
               {tripId}
             </Text>
@@ -47,12 +51,21 @@ const ShipmentCard = ({ shipment, onPress }) => {
 
       {/* CONTENT: Item, Destination */}
       <View style={styles.body}>
-        <View style={styles.contentRow}>
+        {/* <View style={styles.contentRow}>
           <Text style={styles.label}>Item</Text>
           <Text style={styles.value} numberOfLines={1}>
             {itemLabel}
           </Text>
+        </View> */}
+
+        {/* ✅ NEW: Customer Name Row */}
+        <View style={styles.contentRow}>
+          <Text style={styles.label}>Customer</Text>
+          <Text style={styles.value} numberOfLines={1}>
+            {shipment.recipient?.name || shipment.sender?.name || "Unknown"}
+          </Text>
         </View>
+
         <View style={[styles.contentRow, styles.contentRowLast]}>
           <Text style={styles.label}>Destination</Text>
           <Text style={styles.value} numberOfLines={2}>

@@ -23,8 +23,8 @@ import GradientButton from "../../components/ui/figma/GradientButton";
 import {
   clearTruckDelay,
   startTrip,
+  updateTripStatus,
 } from "../../components/utilities/FirebaseFunctions";
-import { Image } from "expo-image";
 
 export default function TripDetailsScreen() {
   const { tripId } = useLocalSearchParams();
@@ -83,7 +83,7 @@ export default function TripDetailsScreen() {
   const handleReportDelay = () => {
     router.push({
       pathname: "/(driver)/report-delay",
-      params: { tripId: trip.id },
+      params: { tripId: trip.id, tripType: trip.tripType },
     });
   };
 
@@ -173,22 +173,43 @@ export default function TripDetailsScreen() {
       <ScrollView contentContainerStyle={styles.scrollContent}>
         <TripSummaryCard trip={trip} />
 
-        {/* --- NEW: DELAY BANNER --- */}
+        {/* --- DELAY BANNER WITH CLEAR BUTTON --- */}
         {isDelayed && (
           <View style={styles.delayBanner}>
-            <FontAwesome5
-              name="exclamation-triangle"
-              size={18}
-              color="#991b1b"
-            />
-            <View style={styles.delayTextContainer}>
-              <Text style={styles.delayTitle}>Delay Approved</Text>
-              <Text style={styles.delaySubtitle}>
-                {trip.delayReason
-                  ? trip.delayReason.replace(/_/g, " ")
-                  : "Admin has approved your delay."}
-              </Text>
+            <View style={{ flexDirection: "row", alignItems: "center" }}>
+              <FontAwesome5
+                name="exclamation-triangle"
+                size={18}
+                color="#991b1b"
+              />
+              <View style={styles.delayTextContainer}>
+                <Text style={styles.delayTitle}>Delay Approved</Text>
+                <Text style={styles.delaySubtitle}>
+                  {trip.delayReason
+                    ? trip.delayReason.replace(/_/g, " ")
+                    : "Admin has approved your delay."}
+                </Text>
+              </View>
             </View>
+
+            {/* The Clear Button embedded in the banner */}
+            <TouchableOpacity
+              style={{
+                marginTop: 12,
+                backgroundColor: "#fff",
+                paddingVertical: 8,
+                borderRadius: 6,
+                alignItems: "center",
+              }}
+              onPress={handleClearDelay}
+              disabled={actionLoading}
+            >
+              <Text
+                style={{ color: "#991b1b", fontWeight: "bold", fontSize: 13 }}
+              >
+                {actionLoading ? "Clearing..." : "CLEAR DELAY"}
+              </Text>
+            </TouchableOpacity>
           </View>
         )}
 
@@ -200,61 +221,102 @@ export default function TripDetailsScreen() {
       </ScrollView>
 
       <View style={styles.bottomActions}>
-        {isReadyToStart ? (
-          <GradientButton
-            title="Start Trip"
-            onPress={handleStartTrip}
-            loading={actionLoading}
-            disabled={actionLoading}
-          />
-        ) : (
-          <GradientButton
-            title="View Shipments"
-            onPress={handleViewShipments}
-          />
-        )}
-
-        {/* --- NEW: DYNAMIC REPORT/CLEAR DELAY LINKS --- */}
-
-        {/* 1. Show "Report Delay" ONLY if driving AND not currently delayed */}
-        {isDriving && !isDelayed && (
-          <TouchableOpacity
-            style={styles.reportDelayLink}
-            onPress={handleReportDelay}
-            activeOpacity={0.7}
-          >
-            <FontAwesome5
-              name="exclamation-triangle"
-              size={14}
-              color="#ef4444"
-              style={{ marginRight: 6 }}
-            />
-            <Text style={styles.reportDelayText}>Report Delay</Text>
-          </TouchableOpacity>
-        )}
-
-        {/* 2. Show "Clear Delay" ONLY if currently delayed */}
-        {isDelayed && (
-          <TouchableOpacity
-            style={[styles.reportDelayLink, { marginTop: 16 }]}
-            onPress={handleClearDelay}
-            activeOpacity={0.7}
-            disabled={actionLoading}
-          >
-            <FontAwesome5
-              name="check-circle"
-              size={16}
-              color="#10b981"
-              style={{ marginRight: 6 }}
-            />
-            <Text
-              style={[
-                styles.reportDelayText,
-                { color: "#10b981", fontSize: 16 },
-              ]}
+        {/* ROW 1: PRIMARY ACTION BUTTONS */}
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+          {/* PHASE 2: Report Delay Button (Only visible when driving and NOT delayed) */}
+          {isDriving && !isDelayed && (
+            <TouchableOpacity
+              style={styles.hazardButton}
+              onPress={handleReportDelay}
+              activeOpacity={0.7}
             >
-              {actionLoading ? "Clearing..." : "Clear Delay & Resume Trip"}
-            </Text>
+              <FontAwesome5
+                name="exclamation-triangle"
+                size={18}
+                color="#ef4444"
+              />
+            </TouchableOpacity>
+          )}
+
+          {/* PHASE 1: START TRIP */}
+          {isReadyToStart && (
+            <View style={{ flex: 1 }}>
+              <GradientButton
+                title="Start Trip"
+                onPress={handleStartTrip}
+                loading={actionLoading}
+                disabled={actionLoading}
+              />
+            </View>
+          )}
+
+          {/* PHASE 2: MARK ARRIVED */}
+          {isDriving && (
+            <View style={{ flex: 1 }}>
+              <GradientButton
+                title="Mark Arrived"
+                onPress={() => {
+                  Alert.alert(
+                    "Mark Arrived",
+                    "Have you reached the destination hub?",
+                    [
+                      { text: "Cancel", style: "cancel" },
+                      {
+                        text: "Yes, Arrived",
+                        onPress: async () => {
+                          try {
+                            setActionLoading(true);
+                            await updateTripStatus({
+                              tripId: trip.id,
+                              status: "ARRIVED",
+                              notify: true, // Set to false if you don't want an automated SMS sent
+                            });
+                            Alert.alert(
+                              "Success",
+                              "You have arrived at the hub.",
+                            );
+                          } catch (error) {
+                            console.error("Mark arrived error:", error);
+                            Alert.alert(
+                              "Error",
+                              error.message || "Failed to update trip status.",
+                            );
+                          } finally {
+                            setActionLoading(false);
+                          }
+                        },
+                      },
+                    ],
+                  );
+                }}
+                loading={actionLoading}
+                disabled={actionLoading}
+              />
+            </View>
+          )}
+
+          {/* PHASE 3: COMPLETE TRIP */}
+          {trip?.status === "ARRIVED" && (
+            <View style={{ flex: 1 }}>
+              <GradientButton
+                title="Complete Trip"
+                onPress={async () => {
+                  Alert.alert("Complete", "Confirm truck is fully unloaded?");
+                }}
+                loading={actionLoading}
+                disabled={actionLoading}
+              />
+            </View>
+          )}
+        </View>
+
+        {/* ALWAYS VISIBLE UNLESS COMPLETED: View Shipments */}
+        {trip?.status !== "COMPLETED" && (
+          <TouchableOpacity
+            style={styles.secondaryLink}
+            onPress={handleViewShipments}
+          >
+            <Text style={styles.secondaryLinkText}>View Shipments</Text>
           </TouchableOpacity>
         )}
       </View>
@@ -306,7 +368,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#ffffff",
     paddingHorizontal: 20,
     paddingTop: 16,
-    paddingBottom: 34,
+    paddingBottom: 14,
     borderTopWidth: 1,
     borderTopColor: "#e2e8f0",
   },
@@ -354,5 +416,27 @@ const styles = StyleSheet.create({
     color: "#b91c1c",
     fontSize: 12,
     marginTop: 2,
+  },
+
+  // --- BOTTOM BAR NEW STYLES ---
+  hazardButton: {
+    height: 52,
+    width: 52,
+    borderRadius: 26,
+    backgroundColor: "#fef2f2",
+    borderWidth: 1,
+    borderColor: "#f87171",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  secondaryLink: {
+    marginTop: 16,
+    alignItems: "center",
+    paddingVertical: 8,
+  },
+  secondaryLinkText: {
+    color: "#067FC6",
+    fontWeight: "600",
+    fontSize: 15,
   },
 });
