@@ -32,6 +32,8 @@ exports.createUserProfile =
 exports.toggleUserStatus = require("./src/users/toggleUserStatus");
 exports.addTrackedShipment =
   require("./src/users/addTrackedShipment").addTrackedShipment;
+exports.resolveDelayReport =
+  require("./src/trips/resolveDelayReport").resolveDelayReport;
 
 // packages
 // exports.createPackage = require("./src/packages/createPackage").createPackage;
@@ -51,16 +53,14 @@ exports.unassignShipmentFromTruckTrip =
   require("./src/trips/unassignShipmentFromTruckTrip").unassignShipmentFromTruckTrip;
 
 exports.startTrip = require("./src/trips/startTrip").startTrip;
-
-exports.reportCheckerTrip =
-  require("./src/trips/reportCheckerTrip").reportCheckerTrip;
 exports.reportTripDelay =
   require("./src/trips/reportTripDelay").reportTripDelay;
 exports.setTruckDelay = require("./src/trips/setTruckDelay").setTruckDelay;
 exports.clearTruckDelay =
   require("./src/trips/clearTruckDelay").clearTruckDelay;
-exports.resolveDelayReport =
-  require("./src/trips/resolveDelayReport").resolveDelayReport;
+
+exports.reportCheckerTrip =
+  require("./src/trips/reportCheckerTrip").reportCheckerTrip;
 
 exports.assignDriverToTruckTrip =
   require("./src/trips/assignDriverToTruckTrip").assignDriverToTruckTrip;

@@ -26,14 +26,46 @@ const TripSummaryCard = ({ trip }) => {
 
       <View style={styles.separator} />
 
-      {/* Row 1: Trip Number */}
+      {/* Row 1: Trip Number & Type */}
       <View style={styles.twoColRow}>
         <View style={styles.half}>
-          <Text style={styles.label}>Trip Number</Text>
-          <Text style={styles.value}>{tripDisplayId}</Text>
+          <View
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              marginBottom: 2,
+            }}
+          >
+            <Text style={[styles.label, { marginBottom: 0, marginRight: 8 }]}>
+              Trip Number
+            </Text>
+
+            {/* NEW: Trip Type Badge */}
+            <View
+              style={[
+                styles.typeBadge,
+                trip.tripType === "LOCAL"
+                  ? styles.typeLocalBg
+                  : styles.typeTransferBg,
+              ]}
+            >
+              <Text
+                style={[
+                  styles.typeText,
+                  trip.tripType === "LOCAL"
+                    ? styles.typeLocalText
+                    : styles.typeTransferText,
+                ]}
+              >
+                {trip.tripType === "LOCAL" ? "LOCAL PICKUP" : "TRANSFER"}
+              </Text>
+            </View>
+          </View>
+          <Text style={[styles.value, { fontWeight: "600" }]}>
+            {tripDisplayId}
+          </Text>
         </View>
       </View>
-
       <View style={styles.separator} />
 
       <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
@@ -165,5 +197,31 @@ const styles = StyleSheet.create({
     height: 1,
     backgroundColor: SEPARATOR,
     marginVertical: 14,
+  },
+
+  // --- NEW TRIP TYPE BADGE STYLES ---
+  typeBadge: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+    borderWidth: 1,
+  },
+  typeLocalBg: {
+    backgroundColor: "rgba(245, 158, 11, 0.1)", // Amber background
+    borderColor: "rgba(245, 158, 11, 0.2)",
+  },
+  typeTransferBg: {
+    backgroundColor: "rgba(59, 130, 246, 0.1)", // Blue background
+    borderColor: "rgba(59, 130, 246, 0.2)",
+  },
+  typeText: {
+    fontSize: 9,
+    fontWeight: "bold",
+  },
+  typeLocalText: {
+    color: "#f59e0b", // Amber text
+  },
+  typeTransferText: {
+    color: "#3b82f6", // Blue text
   },
 });

@@ -1,45 +1,39 @@
 import React from "react";
 import { View, Text, StyleSheet } from "react-native";
 import { FontAwesome5 } from "@expo/vector-icons";
-import {
-  PICKUP_STEPS,
-  DELIVERY_STEPS,
-} from "../../constants/tracking-constants";
+import { TRACKING_WORKFLOWS } from "../../constants/tracking-constants";
 
 const BLUE = "#155DFC";
 const GREY = "#94a3b8";
 const GREY_LINE = "#e2e8f0";
 const SEPARATOR = "#e5e7eb";
 
-const TripProgressStepper = ({ currentStatus, isPickup = false }) => {
-  const s = (currentStatus || "").toUpperCase();
-  let activeIndex = 0;
+// Pass `tripType` instead of `isPickup` (Defaults to HUB_TRANSFER)
+const TripProgressStepper = ({ currentStatus, tripType = "HUB_TRANSFER" }) => {
+  const s = (currentStatus || "CREATED").toUpperCase();
 
-  // 1. Set the correct steps array based on the workflow
-  const activeSteps = isPickup ? PICKUP_STEPS : DELIVERY_STEPS;
+  // 2. Select the correct workflow array based on the prop
+  const activeSteps =
+    TRACKING_WORKFLOWS[tripType] || TRACKING_WORKFLOWS.HUB_TRANSFER;
 
-  // 2. Calculate the Active Index
-  if (isPickup) {
-    if (s === "PICKED_UP" || s === "RECEIVED" || s === "COMPLETED")
-      activeIndex = 3;
-    else if (s === "ARRIVED") activeIndex = 2;
-    else if (s === "IN_TRANSIT" || s === "EN_ROUTE") activeIndex = 1;
-    else activeIndex = 0; // PENDING_PICKUP or CREATED
-  } else {
-    // Delivery Workflow
-    if (s === "DELIVERED" || s === "COMPLETED") activeIndex = 5;
-    else if (s === "OUT_FOR_DELIVERY" || s === "DELIVERING") activeIndex = 4;
-    else if (s === "ARRIVED") activeIndex = 3;
-    else if (s === "IN_TRANSIT") activeIndex = 2;
-    else if (s === "LOADED") activeIndex = 1;
-    else activeIndex = 0; // RECEIVED or CREATED
-  }
+  // 3. One-line Array Method to find the active index
+  // Note: We use findLastIndex in case multiple steps share a status, or if we skip a step.
+  let activeIndex = activeSteps
+    .map((step) => step.statuses.includes(s))
+    .lastIndexOf(true);
+
+  // Fallback: If status isn't in the array (e.g. CANCELLED), default to step 0 or handle uniquely
+  if (activeIndex === -1) activeIndex = 0;
+
+  const getTitle = () => {
+    if (tripType === "LOCAL_PICKUP") return "Pickup Route Progress";
+    if (tripType === "LOCAL_DELIVERY") return "Delivery Route Progress";
+    return "Hub Transfer Progress";
+  };
 
   return (
     <View style={styles.card}>
-      <Text style={styles.sectionTitle}>
-        {isPickup ? "Pickup Progress" : "Delivery Progress"}
-      </Text>
+      <Text style={styles.sectionTitle}>{getTitle()}</Text>
 
       <View style={styles.separator} />
 
@@ -105,33 +99,22 @@ const styles = StyleSheet.create({
     borderRadius: 15,
     padding: 16,
     marginBottom: 16,
+    elevation: 3,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.08,
     shadowRadius: 8,
-    elevation: 3,
   },
-  sectionTitle: {
-    fontSize: 15,
-    fontWeight: "600",
-    color: "#111827",
-  },
+  sectionTitle: { fontSize: 15, fontWeight: "600", color: "#111827" },
   verticalTimeline: {},
-  stepRow: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-  },
+  stepRow: { flexDirection: "row", alignItems: "flex-start" },
   labelWrapper: {
     height: 36,
     justifyContent: "flex-start",
     paddingTop: 2,
     flex: 1,
   },
-  leftColumn: {
-    width: 28,
-    alignItems: "center",
-    marginRight: 12,
-  },
+  leftColumn: { width: 28, alignItems: "center", marginRight: 12 },
   circle: {
     width: 24,
     height: 24,
@@ -141,30 +124,13 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     backgroundColor: "#fff",
   },
-  circleActive: {
-    backgroundColor: BLUE,
-    borderColor: BLUE,
-  },
-  circleInactive: {
-    backgroundColor: "#fff",
-    borderColor: GREY_LINE,
-  },
-  connector: {
-    width: 2,
-    height: 24,
-    marginVertical: 4,
-  },
+  circleActive: { backgroundColor: BLUE, borderColor: BLUE },
+  circleInactive: { backgroundColor: "#fff", borderColor: GREY_LINE },
+  connector: { width: 2, height: 24, marginVertical: 4 },
   connectorActive: { backgroundColor: BLUE },
   connectorInactive: { backgroundColor: GREY_LINE },
-  stepLabel: {
-    fontSize: 14,
-    fontWeight: "500",
-  },
+  stepLabel: { fontSize: 14, fontWeight: "500" },
   stepLabelActive: { color: "#111827" },
   stepLabelInactive: { color: GREY },
-  separator: {
-    height: 1,
-    backgroundColor: SEPARATOR,
-    marginVertical: 14,
-  },
+  separator: { height: 1, backgroundColor: SEPARATOR, marginVertical: 14 },
 });

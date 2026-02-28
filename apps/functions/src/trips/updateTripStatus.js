@@ -4,10 +4,7 @@ const { onCall, HttpsError } = require("firebase-functions/v2/https");
 // const { defineSecret } = require("firebase-functions/params"); // 1. Import this
 const admin = require("firebase-admin");
 const { requireRole, requireString } = require("../utilities/helpers");
-
-// 2. Define/Import the secrets SAME as you did in the broadcast file
-// const SEMAPHORE_API_KEY = defineSecret("SEMAPHORE_API_KEY");
-// const SEMAPHORE_SENDER_NAME = defineSecret("SEMAPHORE_SENDER_NAME");
+const { VALID_TRIP_STATUSES } = require("../utilities/dataDetails");
 const {
   SEMAPHORE_API_KEY,
   SEMAPHORE_SENDER_NAME,
@@ -33,7 +30,7 @@ exports.updateTripStatus = onCall(
   },
   async (req) => {
     // 1. Auth & Role Check
-    await requireRole(db, req, ["admin", "manager"]);
+    await requireRole(db, req, ["admin", "manager", "driver"]);
     const uid = req.auth.uid;
 
     const tripId = requireString(req.data?.tripId, "tripId");
@@ -41,20 +38,11 @@ exports.updateTripStatus = onCall(
     const notify = !!req.data?.notify; // Optional: whether to send SMS notifications for this status change
 
     // Validate Status Enum
-    const VALID_STATUSES = [
-      "CREATED",
-      "LOADING",
-      "LOADED",
-      "IN_TRANSIT",
-      "ARRIVED",
-      "COMPLETED",
-      "CANCELLED",
-    ];
 
-    if (!VALID_STATUSES.includes(newStatus)) {
+    if (!VALID_TRIP_STATUSES.includes(newStatus)) {
       throw new HttpsError(
         "invalid-argument",
-        `Invalid status. Must be one of: ${VALID_STATUSES.join(", ")}`,
+        `Invalid status. Must be one of: ${VALID_TRIP_STATUSES.join(", ")}`,
       );
     }
 
@@ -146,19 +134,27 @@ exports.updateTripStatus = onCall(
         .get();
 
       // Helper to add updates to batch safely
-      const addToBatch = (docRef, status) => {
-        // If Trip is CANCELLED, we might want to unassign the shipment?
-        // For now, we will just sync the status.
-        const updateData = {
-          status: status,
+      const addToBatch = (docRef, tripStatus) => {
+        let safeShipmentStatus = tripStatus;
+
+        // 1. Protect the Chain of Custody
+        if (tripStatus === "ARRIVED" || tripStatus === "COMPLETED") {
+          // Do nothing to the shipments! They stay IN_TRANSIT until the
+          // warehouse workers physically scan the barcodes.
+          return;
+        }
+
+        // 2. Handle Cancellations Safely
+        if (tripStatus === "CANCELLED") {
+          // Send the boxes back to the warehouse floor status, don't cancel the customer's order!
+          safeShipmentStatus = "RECEIVED";
+        }
+
+        // Apply the safe update
+        batch.update(docRef, {
+          status: safeShipmentStatus,
           updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-        };
-
-        // Edge Case: If Trip is COMPLETED, mark shipment as COMPLETED/DELIVERED
-        // If Trip is CANCELLED, maybe revert to RECEIVED?
-        // (You can customize this logic)
-
-        batch.update(docRef, updateData);
+        });
         operationCount++;
       };
 
