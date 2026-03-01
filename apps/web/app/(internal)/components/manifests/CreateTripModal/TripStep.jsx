@@ -43,7 +43,7 @@ export default function TripStep({ shipmentDraft, onComplete, isPickupMode }) {
     driverId: null,
     truckPlateNumber: "",
     truckId: null,
-    tripType: isPickupMode ? "LOCAL" : "TRANSFER", // Automatically set type on creation
+    tripType: isPickupMode ? "LOCAL_PICKUP" : "HUB_TRANSFER", // Automatically set type on creation
   });
 
   const fetchTrips = async () => {

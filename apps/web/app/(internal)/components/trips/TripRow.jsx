@@ -43,7 +43,7 @@ export default function TripRow({ trip, onClick }) {
   const driverName = trip.driverName || "Unassigned";
 
   // NEW: Determine trip type
-  const isLocal = trip.tripType === "LOCAL";
+  const isLocal = trip.tripType === "LOCAL_PICKUP";
 
   return (
     <div
@@ -72,7 +72,7 @@ export default function TripRow({ trip, onClick }) {
                   : "bg-blue-500/10 text-blue-500 border-blue-500/20"
               }`}
             >
-              {isLocal ? "LOCAL PICKUP" : "TRANSFER"}
+              {isLocal ? "LOCAL PICKUP" : "HUB TRANSFER"}
             </span>
 
             <span
@@ -114,12 +114,6 @@ export default function TripRow({ trip, onClick }) {
                 />
                 {trip.tripId}
               </span>
-              {/* NEW: Desktop Trip Type Badge */}
-              <span
-                className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${isLocal ? "bg-amber-500/10 text-amber-500 border-amber-500/20" : "bg-blue-500/10 text-blue-500 border-blue-500/20"}`}
-              >
-                {isLocal ? "LOCAL" : "TRANSFER"}
-              </span>
             </div>
           </div>
 
@@ -147,17 +141,21 @@ export default function TripRow({ trip, onClick }) {
           <span className="text-slate-600">{isLocal ? "↻" : "→"}</span>
           {/* If it's local, the destination code might be the same, so we format it slightly differently */}
           {isLocal && trip.originCode === trip.destinationCode
-            ? "HUB ROUTE"
+            ? "HUB TRANSFER"
             : trip.destinationCode}
         </div>
         <div
           className="text-[10px] text-slate-500 font-mono md:mt-0.5 truncate max-w-[150px] md:max-w-[120px]"
           title={trip.route}
         >
-          {isLocal
-            ? "Local Collection"
-            : `${trip.origin} → ${trip.destination}`}
+          {isLocal ? "LOCAL PICKUP" : `${trip.origin} → ${trip.destination}`}
         </div>
+        {/* NEW: Desktop Trip Type Badge */}
+        <span
+          className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${isLocal ? "bg-amber-500/10 text-amber-500 border-amber-500/20" : "bg-blue-500/10 text-blue-500 border-blue-500/20"}`}
+        >
+          {isLocal ? "LOCAL PICKUP" : "HUB TRANSFER"}
+        </span>
       </div>
 
       {/* --- COL 3: Stats (Desktop Only - Mobile Moved to Driver Row) --- */}

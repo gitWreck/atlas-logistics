@@ -121,18 +121,18 @@ export default function TruckRow({ truck: t, onEdit }) {
         {/* Show context only if it's not IDLE or DISABLED */}
         {(t.status === "IN_TRANSIT" || t.status === "ASSIGNED") && (
           <div className="md:mt-1.5 flex items-center gap-2 md:block">
-            <div className="flex items-center gap-1 text-[9px] font-mono text-blue-400 bg-blue-500/5 w-fit px-1.5 py-0.5 rounded border border-blue-500/10">
+            {/* <div className="flex items-center gap-1 text-[9px] font-mono text-blue-400 bg-blue-500/5 w-fit px-1.5 py-0.5 rounded border border-blue-500/10">
               <FontAwesomeIcon icon={faRoute} className="text-[8px]" />
               {t.currentTripId || "TRP-XXXX"}
-            </div>
+            </div> */}
             {/* Mobile ETA inline */}
-            <span className="md:hidden text-[9px] text-slate-500 italic">
+            {/* <span className="md:hidden text-[9px] text-slate-500 italic">
               ETA: {t.eta || "Pending"}
-            </span>
+            </span> */}
             {/* Desktop ETA block */}
-            <p className="hidden md:block text-[9px] text-slate-500 italic pl-1 mt-1">
+            {/* <p className="hidden md:block text-[9px] text-slate-500 italic pl-1 mt-1">
               ETA: {t.eta || "Pending"}
-            </p>
+            </p> */}
           </div>
         )}
       </div>
