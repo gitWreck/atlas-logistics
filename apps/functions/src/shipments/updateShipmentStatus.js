@@ -3,6 +3,7 @@
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const admin = require("firebase-admin");
 const { FieldValue } = require("firebase-admin/firestore");
+const { ALLOWED_SHIPMENT_STATUSES } = require("../utilities/dataDetails");
 
 if (!admin.apps.length) admin.initializeApp();
 const db = admin.firestore();
@@ -24,13 +25,15 @@ exports.updateShipmentStatus = onCall(
       remarks,
       location,
       proofOfDelivery,
+      proofOfReceipt, // ✅ NEW: For local pickups
+      paymentStatus, // ✅ NEW: For COD collection
     } = req.data;
 
     if (!shipmentId || !newStatus) {
       throw new HttpsError("invalid-argument", "Missing shipmentId or status.");
     }
 
-    const ALLOWED = ["OUT_FOR_DELIVERY", "DELIVERED", "FAILED"];
+    const ALLOWED = ALLOWED_SHIPMENT_STATUSES;
     if (!ALLOWED.includes(newStatus)) {
       throw new HttpsError("invalid-argument", "Invalid status transition.");
     }
@@ -97,6 +100,8 @@ exports.updateShipmentStatus = onCall(
 
       if (location) updateData.lastLocation = location;
       if (proofOfDelivery) updateData.proofOfDelivery = proofOfDelivery;
+      if (proofOfReceipt) updateData.proofOfReceipt = proofOfReceipt; // ✅ NEW
+      if (paymentStatus) updateData.paymentStatus = paymentStatus; // ✅ NEW
 
       // WRITE 1: Update Main Shipment
       tx.update(shipmentRef, updateData);
@@ -147,7 +152,9 @@ exports.updateShipmentStatus = onCall(
           newStatus: newStatus,
           tripId: tripId || null, // <--- FORCE NULL IF UNDEFINED
           remarks: remarks || null, // <--- FORCE NULL IF UNDEFINED
-          photoCount: proofOfDelivery ? proofOfDelivery.length : 0,
+          photoCount:
+            (proofOfDelivery ? proofOfDelivery.length : 0) +
+            (proofOfReceipt ? proofOfReceipt.length : 0),
         },
         timestamp: FieldValue.serverTimestamp(),
       });

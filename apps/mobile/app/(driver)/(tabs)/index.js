@@ -10,6 +10,7 @@ import {
   SafeAreaView,
   TextInput,
   RefreshControl,
+  Platform,
 } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { useRouter } from "expo-router";
@@ -25,13 +26,14 @@ import {
 } from "firebase/firestore";
 import { signOut } from "firebase/auth";
 import { db, auth } from "../../../firebase";
-import { COLORS, GLOBAL_STYLES } from "../../../components/constants/theme";
-import { Image } from "expo-image";
+import { GLOBAL_STYLES } from "../../../components/constants/theme";
 
 // ✅ IMPORT THE NEW COMPONENTS
 import TabSelector from "../../../components/driver/TabSelector";
 import TripCard from "../../../components/driver/trip/TripCard";
 import TripFilterModal from "../../../components/driver/trip/TripFilterModal"; // Adjust path as needed
+import DriverHeader from "../../../components/driver/DriverHeader";
+import { Image } from "expo-image";
 
 export default function DriverDashboard() {
   const router = useRouter();
@@ -184,7 +186,8 @@ export default function DriverDashboard() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar style="dark" />
+      <StatusBar barStyle="dark-content" backgroundColor="#f1f5f9" />
+
       {/* HEADER */}
       <View style={styles.header}>
         <View style={styles.titleRow}>

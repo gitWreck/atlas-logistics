@@ -3,7 +3,7 @@ import { View, Text, TouchableOpacity, Alert, StyleSheet } from "react-native";
 import { FontAwesome5 } from "@expo/vector-icons";
 import { Image } from "expo-image";
 
-export default function ProofOfDeliverySection({
+export default function PhotoUploadSection({
   photos,
   onPickImage,
   onRemovePhoto,

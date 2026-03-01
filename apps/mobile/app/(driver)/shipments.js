@@ -16,14 +16,17 @@ import { StatusBar } from "expo-status-bar";
 import { collection, query, onSnapshot, orderBy } from "firebase/firestore";
 import { db } from "../../firebase";
 import ShipmentCard from "../../components/driver/shipment/ShipmentCard";
+import ShipmentFilterModal from "../../components/driver/shipment/ShipmentFilterModal";
 
 export default function ShipmentsListScreen() {
-  const { tripId } = useLocalSearchParams();
+  const { tripId, tripType } = useLocalSearchParams();
   const router = useRouter();
 
   const [shipments, setShipments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchText, setSearchText] = useState("");
+  const [activeFilter, setActiveFilter] = useState("ALL"); // NEW
+  const [isFilterModalVisible, setFilterModalVisible] = useState(false); // NEW
 
   // ✅ ADD THESE LINES
   const [refreshing, setRefreshing] = useState(false);
@@ -60,12 +63,22 @@ export default function ShipmentsListScreen() {
 
   // Search Logic
   const filteredData = shipments.filter((item) => {
+    // 1. Status Filter Check
+    if (activeFilter !== "ALL" && item.status !== activeFilter) {
+      return false;
+    }
+
+    // 2. Search Text Check
     const term = searchText.toLowerCase();
-    return (
-      item.id.toLowerCase().includes(term) ||
-      (item.destinationAddress || "").toLowerCase().includes(term) ||
-      (item.receiverName || "").toLowerCase().includes(term)
-    );
+    if (term) {
+      return (
+        (item.id && item.id.toLowerCase().includes(term)) ||
+        (item.destinationAddress &&
+          item.destinationAddress.toLowerCase().includes(term)) ||
+        (item.receiverName && item.receiverName.toLowerCase().includes(term))
+      );
+    }
+    return true;
   });
 
   const handlePressShipment = (shipment) => {
@@ -73,11 +86,7 @@ export default function ShipmentsListScreen() {
     // You can reuse a general "Shipment Details" page or a specific "Scan" page
     router.push({
       pathname: "/(driver)/shipment-details",
-      params: {
-        mode: "delivered", // Default action is to deliver
-        shipmentId: shipment.id,
-        tripId: tripId,
-      },
+      params: { shipmentId: shipment.id, tripId: tripId, tripType: tripType },
     });
   };
 
@@ -87,27 +96,47 @@ export default function ShipmentsListScreen() {
       {/* Header: back | title | count (right) */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-          {/* <Image
-            source={require("../../assets/icons/back.svg")}
-            style={{ width: 20, height: 20 }}
-          /> */}
-
           <FontAwesome5 name="arrow-left" size={15} color="#0f172a" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Shipments</Text>
         <Text style={styles.headerCount}>{shipments.length} Items</Text>
       </View>
 
-      {/* Search Bar - light mode */}
-      <View style={styles.searchContainer}>
-        <FontAwesome5 name="search" size={16} color="#94a3b8" />
-        <TextInput
-          style={styles.searchInput}
-          placeholder="Search address, ID, or name..."
-          placeholderTextColor="#94a3b8"
-          value={searchText}
-          onChangeText={setSearchText}
-        />
+      {/* ✅ NEW: SEARCH & FILTER BAR */}
+      <View style={styles.searchRow}>
+        <View style={styles.searchContainer}>
+          <FontAwesome5 name="search" size={16} color="#94a3b8" />
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Search address, ID, or name..."
+            placeholderTextColor="#94a3b8"
+            value={searchText}
+            onChangeText={setSearchText}
+          />
+          {searchText.length > 0 && (
+            <TouchableOpacity onPress={() => setSearchText("")}>
+              <FontAwesome5 name="times-circle" size={16} color="#94a3b8" />
+            </TouchableOpacity>
+          )}
+        </View>
+
+        {/* Filter Button */}
+        <TouchableOpacity
+          style={[
+            styles.filterBtn,
+            activeFilter !== "ALL" && {
+              backgroundColor: "#e0f2fe",
+              borderColor: "#38bdf8",
+            },
+          ]}
+          onPress={() => setFilterModalVisible(true)}
+        >
+          <FontAwesome5
+            name="sliders-h"
+            size={16}
+            color={activeFilter !== "ALL" ? "#0284c7" : "#0f172a"}
+          />
+        </TouchableOpacity>
       </View>
 
       {/* List */}
@@ -140,6 +169,12 @@ export default function ShipmentsListScreen() {
           }
         />
       )}
+      <ShipmentFilterModal
+        visible={isFilterModalVisible}
+        onClose={() => setFilterModalVisible(false)}
+        activeFilter={activeFilter}
+        onApplyFilter={setActiveFilter}
+      />
     </SafeAreaView>
   );
 }
@@ -180,16 +215,22 @@ const styles = StyleSheet.create({
     color: "#0f172a",
     fontSize: 14,
   },
+  searchRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginHorizontal: 20,
+    marginTop: 16,
+    marginBottom: 16,
+    gap: 12, // Creates perfect spacing between the bar and the button
+  },
   searchContainer: {
+    flex: 1, // Tells the search bar to take up all remaining horizontal space
     flexDirection: "row",
     alignItems: "center",
     backgroundColor: "#ffffff",
-    marginHorizontal: 20,
-    marginTop: 16,
     paddingHorizontal: 16,
     borderRadius: 12,
     height: 50,
-    marginBottom: 16,
     borderWidth: 1,
     borderColor: "#e2e8f0",
   },
@@ -198,6 +239,16 @@ const styles = StyleSheet.create({
     color: "#0f172a",
     marginLeft: 12,
     fontSize: 16,
+  },
+  filterBtn: {
+    width: 50,
+    height: 50,
+    backgroundColor: "#ffffff",
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#e2e8f0",
+    alignItems: "center",
+    justifyContent: "center",
   },
   listContent: { paddingHorizontal: 20, paddingBottom: 40 },
   emptyBox: { alignItems: "center", marginTop: 60, gap: 12 },

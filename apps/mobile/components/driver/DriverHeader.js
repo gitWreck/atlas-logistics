@@ -1,0 +1,52 @@
+import React from "react";
+import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
+import { FontAwesome5 } from "@expo/vector-icons";
+
+export default function DriverHeader({ userName, onLogout }) {
+  return (
+    <View style={styles.header}>
+      <View style={styles.profileInfo}>
+        <View style={styles.avatar}>
+          <FontAwesome5 name="truck" size={16} color="#3b82f6" />
+        </View>
+        <View>
+          <Text style={styles.greeting}>Hello,</Text>
+          <Text style={styles.username}>{userName || "Driver"}</Text>
+        </View>
+      </View>
+      <TouchableOpacity style={styles.logoutBtn} onPress={onLogout}>
+        <FontAwesome5 name="sign-out-alt" size={18} color="#ef4444" />
+      </TouchableOpacity>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  header: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "#cbd5e1",
+    backgroundColor: "#ffffff",
+  },
+  profileInfo: { flexDirection: "row", alignItems: "center", gap: 12 },
+  avatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "#eff6ff",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  greeting: { color: "#475569", fontSize: 12 },
+  username: { color: "#0f172a", fontWeight: "700", fontSize: 16 },
+  logoutBtn: {
+    padding: 8,
+    borderRadius: 8,
+    backgroundColor: "rgba(239,68,68,0.05)",
+  },
+});

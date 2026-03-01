@@ -8,6 +8,7 @@ export const finishLoadingTruck = httpsCallable(
   functions,
   "finishLoadingTruck",
 );
+
 export const updateShipmentPackages = httpsCallable(
   functions,
   "updateShipmentPaackages",
@@ -16,6 +17,7 @@ export const updateShipmentStatus = httpsCallable(
   functions,
   "updateShipmentStatus",
 );
+export const updateTripStatus = httpsCallable(functions, "updateTripStatus");
 
 export const startTrip = httpsCallable(functions, "startTrip");
 export const reportTripDelay = httpsCallable(functions, "reportTripDelay");
