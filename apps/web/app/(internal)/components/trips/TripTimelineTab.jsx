@@ -27,7 +27,7 @@ function InfoCard({ label, value, isDark }) {
       </div>
       <div
         className={`text-sm font-medium truncate ${
-          isDark ? "text-slate-300" : "text-slate-700"
+          isDark ? "text-slate-300" : "text-slate-800"
         }`}
         title={value || "—"}
       >
@@ -75,8 +75,12 @@ export default function TripTimelineTab({
           <span
             className={`text-[10px] font-bold mt-1 uppercase w-max px-1.5 py-0.5 rounded border ${
               isLocal
-                ? "bg-amber-500/10 text-amber-500 border-amber-500/20"
-                : "bg-blue-500/10 text-blue-500 border-blue-500/20"
+                ? isDark
+                  ? "bg-amber-500/10 text-amber-500 border-amber-500/20"
+                  : "bg-amber-100 text-amber-800 border-amber-300"
+                : isDark
+                  ? "bg-blue-500/10 text-blue-500 border-blue-500/20"
+                  : "bg-blue-100 text-blue-800 border-blue-300"
             }`}
           >
             {isLocal ? "Local Pickup Route" : "Warehouse Transfer"}

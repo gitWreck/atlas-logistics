@@ -17,7 +17,7 @@ const delayIcons = {
   OTHER: faExclamationTriangle,
 };
 
-export default function StatusBadge({ status, reason }) {
+export default function StatusBadge({ status, reason, isDark = true }) {
   if (!status) return null;
 
   let normalizedStatus = status.toUpperCase();
@@ -29,7 +29,7 @@ export default function StatusBadge({ status, reason }) {
     normalizedStatus = "DELAYED";
   }
 
-  const styles = {
+  const stylesDark = {
     CREATED: "bg-stone-200/10 text-slate-300 border-slate-500/20",
 
     // --- NEW PICKUP STATUSES ---
@@ -62,7 +62,38 @@ export default function StatusBadge({ status, reason }) {
     OUT_OF_SERVICE: "bg-red-500/10 text-red-400 border-red-500/20",
   };
 
-  const defaultStyle = "bg-slate-800 text-slate-400 border-slate-700";
+  const stylesLight = {
+    CREATED: "bg-stone-200/80 text-slate-600 border-slate-300",
+
+    PENDING_PICKUP: "bg-sky-500/15 text-sky-600 border-sky-400/40",
+    DISPATCHED: "bg-indigo-500/15 text-indigo-600 border-indigo-400/40",
+    PICKED_UP: "bg-teal-500/15 text-teal-600 border-teal-400/40",
+
+    RECEIVED: "bg-cyan-500/15 text-cyan-600 border-cyan-400/40",
+    ASSIGNED: "bg-yellow-500/15 text-yellow-700 border-yellow-400/40",
+    LOADED: "bg-orange-500/15 text-orange-600 border-orange-400/40",
+
+    IN_TRANSIT: "bg-blue-500/15 text-blue-600 border-blue-400/40",
+    ARRIVED_PORT: "bg-indigo-500/15 text-indigo-600 border-indigo-400/40",
+    OUT_FOR_DELIVERY: "bg-purple-500/15 text-purple-600 border-purple-400/40",
+
+    DELAYED: "bg-amber-500/15 text-amber-700 border-amber-400/40",
+    DELIVERED: "bg-emerald-500/15 text-emerald-600 border-emerald-400/40",
+    COMPLETED: "bg-emerald-500/20 text-emerald-600 border-emerald-400/40",
+
+    UNASSIGNED: "bg-amber-500/15 text-amber-700 border-amber-400/40",
+    CANCELLED: "bg-red-500/15 text-red-600 border-red-400/40",
+
+    ACTIVE: "bg-emerald-500/15 text-emerald-600 border-emerald-400/40",
+    IDLE: "bg-slate-500/15 text-slate-600 border-slate-400/40",
+    MAINTENANCE: "bg-amber-500/15 text-amber-700 border-amber-400/40",
+    REPAIR: "bg-orange-500/15 text-orange-600 border-orange-400/40",
+    DISABLED: "bg-rose-500/15 text-rose-600 border-rose-400/40",
+    OUT_OF_SERVICE: "bg-red-500/15 text-red-600 border-red-400/40",
+  };
+
+  const styles = isDark ? stylesDark : stylesLight;
+  const defaultStyle = isDark ? "bg-slate-800 text-slate-400 border-slate-700" : "bg-slate-200 text-slate-700 border-slate-300";
 
   return (
     <span

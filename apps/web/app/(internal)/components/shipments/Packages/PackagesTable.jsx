@@ -265,7 +265,7 @@ function PackageTableRow({ pkg, idx, shipmentData, isDark = false }) {
         </td>
 
         <td className="p-4">
-          <StatusBadge status={pkg.status} size="xs" />
+          <StatusBadge status={pkg.status} size="xs" isDark={isDark} />
         </td>
 
         <td className="p-4 text-right">
@@ -365,7 +365,7 @@ function PackageMobileCard({ pkg, idx, shipmentData, isDark = false }) {
         )}
 
         <div className="mt-3">
-          <StatusBadge status={pkg.status} size="xs" />
+          <StatusBadge status={pkg.status} size="xs" isDark={isDark} />
         </div>
       </div>
 
