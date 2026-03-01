@@ -49,6 +49,19 @@ export default function ShipmentActionFooter({
         // Turns green only for the final completion step
         colors={isFinalAction ? ["#16a34a", "#15803d"] : undefined}
       />
+
+      {/* ✅ NEW: Report Issue Secondary Button */}
+      {(status === "PENDING_PICKUP" || status === "OUT_FOR_DELIVERY") && (
+        <TouchableOpacity
+          style={{ marginTop: 16, alignItems: "center", paddingVertical: 8 }}
+          onPress={onReportIssue}
+          disabled={actionLoading}
+        >
+          <Text style={{ color: "#ef4444", fontWeight: "600", fontSize: 15 }}>
+            Report an Issue
+          </Text>
+        </TouchableOpacity>
+      )}
     </View>
   );
 }

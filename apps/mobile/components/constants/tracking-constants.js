@@ -8,91 +8,136 @@ export const COLORS = {
   TEXT_DARK: "#0f172a",
 };
 
-export const STATUS_STEPS = [
-  {
-    code: "RECEIVED",
-    label: "RECEIVED",
-    iconName: "box-open", // Was picked-requested
-  },
-  {
-    code: "ASSIGNED",
-    label: "ASSIGNED TO A TRIP",
-    iconName: "clipboard-list", // Was picked-requested
-  },
-  {
-    code: ["LOADED", "IN_TRANSIT"],
-    label: "LOADED ON TRUCK",
-    iconName: "truck-loading", // Was picked-requested
-  },
-  {
-    code: ["OUT_FOR_DELIVERY"],
-    label: "IN TRANSIT",
-    iconName: "shipping-fast", // Was in-transit
-  },
-  {
-    code: "COMPLETED",
-    label: "FOR DELIVERY TO CUSTOMER",
-    iconName: "warehouse", // Was picked-requested
-  },
-  {
-    code: "OUT_FOR_DELIVERY_CUSTOMER",
-    label: "OUT FOR DELIVERY",
-    iconName: "biking", // or "motorcycle" depending on your fleet
-  },
-  {
-    code: "DELIVERED",
-    label: "DELIVERED TO YOUR ADDRESS",
-    iconName: "check-circle", // Was delivered
-  },
-];
+// 1. Define the 3 Workflows with their triggering statuses built-in
+export const TRACKING_WORKFLOWS = {
+  HUB_TRANSFER: [
+    {
+      key: "assigned",
+      label: "Trip Assigned",
+      icon: "clipboard-list",
+      statuses: ["CREATED"],
+    },
+    {
+      key: "loaded",
+      label: "Truck Loaded",
+      icon: "dolly",
+      statuses: ["LOADING", "LOADED"],
+    },
+    {
+      key: "transit",
+      label: "In Transit",
+      icon: "truck-moving",
+      statuses: ["IN_TRANSIT"],
+    },
+    {
+      key: "arrived",
+      label: "Arrived at Hub",
+      icon: "building",
+      statuses: ["ARRIVED"],
+    },
+    {
+      key: "completed",
+      label: "Trip Completed",
+      icon: "check-double",
+      statuses: ["COMPLETED"],
+    },
+  ],
+  LOCAL_DELIVERY: [
+    {
+      key: "assigned",
+      label: "Route Assigned",
+      icon: "route",
+      statuses: ["CREATED"],
+    },
+    {
+      key: "loaded",
+      label: "Van Loaded",
+      icon: "box",
+      statuses: ["LOADING", "LOADED"],
+    },
+    {
+      key: "out",
+      label: "Out for Delivery",
+      icon: "shipping-fast",
+      statuses: ["OUT_FOR_DELIVERY"],
+    },
+    {
+      key: "delivered",
+      label: "Drop-offs Complete",
+      icon: "check-circle",
+      statuses: ["DELIVERED"],
+    },
+    {
+      key: "completed",
+      label: "Returned to Hub",
+      icon: "warehouse",
+      statuses: ["COMPLETED"],
+    },
+  ],
+  LOCAL_PICKUP: [
+    {
+      key: "assigned",
+      label: "Pickup Assigned",
+      icon: "clipboard",
+      statuses: ["CREATED", "PENDING_PICKUP"],
+    },
+    {
+      key: "transit",
+      label: "En Route to Sender",
+      icon: "truck",
+      statuses: ["IN_TRANSIT"],
+    },
+    {
+      key: "arrived",
+      label: "Arrived at Location",
+      icon: "map-marker-alt",
+      statuses: ["ARRIVED"],
+    },
+    {
+      key: "picked",
+      label: "Packages Collected",
+      icon: "hand-holding-box",
+      statuses: ["PICKED_UP"],
+    },
+    {
+      key: "completed",
+      label: "Brought to Hub",
+      icon: "warehouse",
+      statuses: ["COMPLETED", "RECEIVED"],
+    },
+  ],
+};
 
-export const DRIVER_STEPS = [
+export const DRIVER_SHIPMENT_FILTER = [
+  { label: "Show All", value: "ALL", icon: "list", color: "#64748b" },
   {
-    key: "RECEIVED",
-    label: "Received",
-    icon: "box", // Represents the package entering the system
+    label: "To Pickup",
+    value: "PENDING_PICKUP",
+    icon: "box-open",
+    color: "#f59e0b",
   },
   {
-    key: "LOADED",
-    label: "Loaded",
-    icon: "truck-loading", // Represents loading onto the vehicle
+    label: "Assigned",
+    value: "ASSIGNED",
+    icon: "clipboard-list",
+    color: "#8b5cf6",
   },
   {
-    key: "IN_TRANSIT",
     label: "In Transit",
-    icon: "truck", // Represents the vehicle moving
+    value: "truck",
+    icon: "truck-moving",
+    color: "#3b82f6",
   },
   {
-    key: "ARRIVED",
-    label: "Arrived",
-    icon: "warehouse", // Represents arrival at the destination hub
+    label: "Delivering",
+    value: "OUT_FOR_DELIVERY",
+    icon: "route",
+    color: "#0ea5e9",
   },
   {
-    key: "OUT_FOR_DELIVERY",
-    label: "Out for Delivery",
-    icon: "shipping-fast", // Represents the last-mile delivery run
-  },
-  {
-    key: "DELIVERED",
     label: "Delivered",
-    icon: "check-circle", // Represents successful completion
+    value: "DELIVERED",
+    icon: "check-circle",
+    color: "#10b981",
   },
-];
-
-// constants/tracking-constants.js
-
-export const PICKUP_STEPS = [
-  { key: "PENDING_PICKUP", label: "Pending Pickup", icon: "clipboard-list" },
-  { key: "IN_TRANSIT", label: "Driver En Route", icon: "truck" },
-  { key: "ARRIVED", label: "Arrived at Location", icon: "map-marker-alt" },
-  { key: "PICKED_UP", label: "Picked Up Successfully", icon: "check-circle" },
-];
-
-export const DELIVERY_STEPS = [
-  { key: "RECEIVED", label: "Shipment Received", icon: "box" },
-  { key: "LOADED", label: "Loaded on Truck", icon: "arrow-up" },
-  { key: "IN_TRANSIT", label: "In Transit", icon: "route" },
-  { key: "ARRIVED", label: "Arrived at Hub", icon: "warehouse" },
-  { key: "OUT_FOR_DELIVERY", label: "Out for Delivery", icon: "shipping-fast" },
-  { key: "DELIVERED", label: "Delivered Successfully", icon: "check-circle" },
 ];

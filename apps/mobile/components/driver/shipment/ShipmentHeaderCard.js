@@ -6,10 +6,11 @@ import {
   Platform,
   TouchableOpacity,
   Alert,
+  Linking, // ✅ ADD THIS
 } from "react-native";
 import { FontAwesome5 } from "@expo/vector-icons";
 import { COLORS } from "../../constants/theme"; // Adjust path
-import StatusBadge from "../../ui/StatusBadge"; // Reuse your badge
+import StatusBadge from "../../ui/figma/StatusBadge"; // Reuse your badge
 import * as Clipboard from "expo-clipboard"; // ✅ Add this
 
 const ShipmentHeaderCard = ({ shipment }) => {
@@ -43,6 +44,42 @@ const ShipmentHeaderCard = ({ shipment }) => {
     }
   };
 
+  // --- NEW: QUICK ACTIONS ---
+  const callCustomer = async () => {
+    if (!receiverPhone || receiverPhone === "No Phone") return;
+    const url = `tel:${receiverPhone}`;
+    try {
+      const supported = await Linking.canOpenURL(url);
+      if (supported) {
+        await Linking.openURL(url);
+      } else {
+        Alert.alert("Error", "Phone dialer is not available on this device.");
+      }
+    } catch (err) {
+      console.error("Dialer error:", err);
+    }
+  };
+
+  const openMaps = async () => {
+    // Combine street and city for the most accurate map search
+    const fullAddress = `${streetText}, ${cityProvinceText}`;
+    const encodedAddress = encodeURIComponent(fullAddress);
+
+    // This creates a universal Google Maps search URL that works on both iOS and Android
+    const url = `https://www.google.com/maps/search/?api=1&query=${encodedAddress}`;
+
+    try {
+      const supported = await Linking.canOpenURL(url);
+      if (supported) {
+        await Linking.openURL(url);
+      } else {
+        Alert.alert("Error", "Cannot open maps on this device.");
+      }
+    } catch (err) {
+      console.error("Maps error:", err);
+    }
+  };
+
   return (
     <View style={styles.card}>
       {/* Top Row: ID & Status */}
@@ -53,18 +90,25 @@ const ShipmentHeaderCard = ({ shipment }) => {
 
       {/* Destination (Big) */}
       <View style={styles.section}>
-        <View style={styles.row}>
+        <View style={[styles.row, { alignItems: "center" }]}>
           <FontAwesome5
             name="map-marker-alt"
             size={20}
             color={COLORS.danger}
             style={{ width: 24 }}
           />
-          <View style={{ flex: 1 }}>
+          <View style={{ flex: 1, paddingRight: 10 }}>
             <Text style={styles.addressText}>{streetText}</Text>
-
             <Text style={styles.subText}>{cityProvinceText}</Text>
           </View>
+
+          {/* ✅ NEW: Navigate Button */}
+          <TouchableOpacity
+            style={[styles.actionBtn, { backgroundColor: "#e0f2fe" }]}
+            onPress={openMaps}
+          >
+            <FontAwesome5 name="directions" size={16} color="#0284c7" />
+          </TouchableOpacity>
         </View>
       </View>
 
@@ -90,27 +134,34 @@ const ShipmentHeaderCard = ({ shipment }) => {
               <Text style={styles.valueText} numberOfLines={1}>
                 {receiverName}
               </Text>
+              <Text
+                style={[styles.phoneText, { marginRight: 12, marginTop: 2 }]}
+              >
+                {receiverPhone}
+              </Text>
             </View>
           </View>
 
-          {/* --- RIGHT SIDE: Phone & Copy Button --- */}
+          {/* --- RIGHT SIDE: Phone & Quick Actions --- */}
           <View style={{ flexDirection: "row", alignItems: "center" }}>
-            <Text style={[styles.phoneText, { marginRight: 8, marginTop: 0 }]}>
-              {receiverPhone}
-            </Text>
-
-            {/* Only show the copy button if there is an actual phone number */}
             {receiverPhone !== "No Phone" && (
-              <TouchableOpacity
-                onPress={copyPhoneToClipboard}
-                style={{
-                  padding: 6,
-                  backgroundColor: "#f1f5f9",
-                  borderRadius: 8,
-                }}
-              >
-                <FontAwesome5 name="copy" size={14} color="#3b82f6" />
-              </TouchableOpacity>
+              <View style={{ flexDirection: "row", gap: 8 }}>
+                {/* ✅ NEW: Call Button */}
+                <TouchableOpacity
+                  onPress={callCustomer}
+                  style={[styles.actionBtn, { backgroundColor: "#dcfce7" }]}
+                >
+                  <FontAwesome5 name="phone-alt" size={14} color="#16a34a" />
+                </TouchableOpacity>
+
+                {/* Existing Copy Button */}
+                <TouchableOpacity
+                  onPress={copyPhoneToClipboard}
+                  style={[styles.actionBtn, { backgroundColor: "#f1f5f9" }]}
+                >
+                  <FontAwesome5 name="copy" size={14} color="#3b82f6" />
+                </TouchableOpacity>
+              </View>
             )}
           </View>
         </View>
@@ -174,5 +225,14 @@ const styles = StyleSheet.create({
   subText: { color: LABEL_GREY, marginTop: 4 },
   label: { color: LABEL_GREY, fontSize: 12, marginBottom: 2 },
   valueText: { color: VALUE_DARK, fontSize: 16, fontWeight: "600" },
-  phoneText: { color: COLORS.primary, fontSize: 14, marginTop: 2 },
+  phoneText: { color: "#333", fontSize: 14, marginTop: 2 },
+  // --- NEW QUICK ACTION BUTTON STYLE ---
+  actionBtn: {
+    padding: 8,
+    borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center",
+    width: 36,
+    height: 36,
+  },
 });
