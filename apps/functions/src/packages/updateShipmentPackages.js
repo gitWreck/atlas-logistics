@@ -1,162 +1,137 @@
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const admin = require("firebase-admin");
 const { FieldValue } = admin.firestore;
+const { requireRole } = require("../utilities/helpers");
 
 if (!admin.apps.length) admin.initializeApp();
 const db = admin.firestore();
 
 exports.updateShipmentPackages = onCall(
   { region: "asia-southeast1", maxInstances: 10 },
-  async (request) => {
-    // 1. Auth Check (Automatic with onCall)
-    if (!request.auth) {
-      throw new HttpsError(
-        "unauthenticated",
-        "The function must be called while authenticated.",
-      );
+  async (req) => {
+    // 1. AUTH & ROLE CHECK
+    if (!req.auth) throw new HttpsError("unauthenticated", "Auth required.");
+    // Note: requireRole needs to be imported or defined in your helpers
+    await requireRole(db, req, ["admin", "manager", "checker"]);
+
+    const uid = req.auth.uid;
+    const { shipmentId, packageIds, newStatus, tripId, remarks, location } =
+      req.data;
+
+    if (!shipmentId || !packageIds || !newStatus) {
+      throw new HttpsError("invalid-argument", "Missing required fields.");
     }
 
-    const { shipmentId, packages } = request.data;
-    const userId = request.auth.uid;
+    const shipmentRef = db.collection("shipments").doc(shipmentId);
+    const tripRef = tripId ? db.collection("truck_trips").doc(tripId) : null;
 
-    if (!shipmentId || !packages || !Array.isArray(packages)) {
-      throw new HttpsError(
-        "invalid-argument",
-        "shipmentId and packages array are required.",
-      );
-    }
+    // ✅ NEW: Reference to the specific shipment inside this trip
+    const tripShipmentRef = tripRef
+      ? tripRef.collection("trip_shipments").doc(shipmentId)
+      : null;
 
-    try {
-      // 2. Calculate New Stats (In-Memory)
-      const newStats = packages.reduce(
-        (acc, pkg) => {
-          acc.totalItems += 1;
-          // Collect barcodes if they exist
-          if (pkg.trackingNumber) acc.barcodes.push(pkg.trackingNumber);
+    // 2. TRANSACTION
+    await db.runTransaction(async (tx) => {
+      const shipmentSnap = await tx.get(shipmentRef);
+      if (!shipmentSnap.exists)
+        throw new HttpsError("not-found", "Shipment not found.");
 
-          const status = pkg.status || "RECEIVED";
+      const data = shipmentSnap.data();
+      const packages = data.packages || [];
 
-          // Count specific statuses
-          if (status === "RECEIVED") acc.pending += 1;
-          if (status === "LOADED" || status === "IN_TRANSIT") acc.loaded += 1;
-          if (status === "DELIVERED") acc.delivered += 1;
+      // Initialize deltas for Trip-level counters
+      let localDeltaLoaded = 0;
+      let localDeltaArrived = 0;
+      let localDeltaMissing = 0;
 
-          // ✅ ADD THIS LINE:
-          if (status === "ARRIVED") acc.arrived += 1;
+      // 3. UPDATE SPECIFIC PACKAGES
+      const updatedPackages = packages.map((pkg) => {
+        if (packageIds.includes(pkg.trackingNumber)) {
+          const oldStatus = pkg.status;
 
-          return acc;
-        },
-        {
-          totalItems: 0,
-          pending: 0,
-          loaded: 0,
-          delivered: 0,
-          received: 0, // Customize if needed
-          arrived: 0, // ✅ ADD THIS LINE (Initialize counter)
-          barcodes: [],
-        },
-      );
+          if (oldStatus !== newStatus) {
+            // --- DECREMENT OLD COUNTERS ---
+            if (oldStatus === "LOADED") localDeltaLoaded--;
+            if (oldStatus === "RECEIVED") localDeltaArrived--;
+            if (oldStatus === "MISSING") localDeltaMissing--;
 
-      // 3. Run Firestore Transaction
-      await db.runTransaction(async (t) => {
-        // A. References
-        const shipmentRef = db.collection("shipments").doc(shipmentId);
-
-        // B. Reads
-        const shipmentDoc = await t.get(shipmentRef);
-        if (!shipmentDoc.exists) {
-          throw new HttpsError("not-found", "Shipment not found");
-        }
-
-        const shipmentData = shipmentDoc.data();
-        const tripId = shipmentData.currentTruckTripId;
-
-        let tripRef = null;
-        let tripShipmentRef = null;
-        let oldTripShipmentData = null;
-
-        // Check if assigned to a Trip
-        if (tripId) {
-          tripRef = db.collection("truck_trips").doc(tripId);
-          tripShipmentRef = tripRef
-            .collection("trip_shipments")
-            .doc(shipmentId);
-          const tripShipmentDoc = await t.get(tripShipmentRef);
-
-          if (tripShipmentDoc.exists) {
-            oldTripShipmentData = tripShipmentDoc.data();
+            // --- INCREMENT NEW COUNTERS ---
+            if (newStatus === "LOADED") localDeltaLoaded++;
+            if (newStatus === "RECEIVED") localDeltaArrived++;
+            if (newStatus === "MISSING") localDeltaMissing++;
           }
+
+          return {
+            ...pkg,
+            status: newStatus,
+            remarks: remarks || pkg.remarks || null, // Keep existing remarks if new ones aren't provided
+            updatedAt: new Date().toISOString(),
+            updatedBy: uid,
+          };
         }
-
-        // --- WRITES ---
-
-        // C. Update Shipment (Root)
-        t.update(shipmentRef, {
-          packages: packages,
-          packageBarcodes: newStats.barcodes,
-          totals: {
-            totalItems: newStats.totalItems,
-            pending: newStats.pending,
-            loaded: newStats.loaded,
-            delivered: newStats.delivered,
-            received: newStats.received,
-            arrived: newStats.arrived, // ✅ ADD THIS LINE
-          },
-          updatedAt: FieldValue.serverTimestamp(),
-          updatedBy: userId,
-          audit_log: FieldValue.arrayUnion({
-            action: "UPDATE_PACKAGES",
-            at: new Date().toISOString(),
-            by: userId,
-            note: `Packages updated via Cloud Function. Count: ${newStats.totalItems}`,
-          }),
-        });
-
-        // D. Update Trip & Subcollection (If assigned)
-        if (tripId && tripRef && tripShipmentRef && oldTripShipmentData) {
-          // 1. Update Sub-document
-          t.update(tripShipmentRef, {
-            totalItems: newStats.totalItems,
-            pendingCount: newStats.pending,
-            loadedCount: newStats.loaded,
-            deliveredCount: newStats.delivered,
-            arrived: newStats.arrived, // ✅ ADD THIS LINE
-            packageBarcodes: newStats.barcodes,
-            updatedAt: FieldValue.serverTimestamp(),
-          });
-
-          // 2. Update Parent Trip (Deltas)
-          // Calculate difference: New - Old
-          const deltaTotal =
-            newStats.totalItems - (oldTripShipmentData.totalItems || 0);
-          const deltaPending =
-            newStats.pending - (oldTripShipmentData.pendingCount || 0);
-          const deltaLoaded =
-            newStats.loaded - (oldTripShipmentData.loadedCount || 0);
-          const deltaDelivered =
-            newStats.delivered - (oldTripShipmentData.deliveredCount || 0);
-          // ✅ ADD THIS LINE:
-          const deltaArrived =
-            newStats.arrived - (oldTripShipmentData.arrivedCount || 0);
-
-          // Atomic Increment
-          t.update(tripRef, {
-            totalItems: FieldValue.increment(deltaTotal),
-            itemPending: FieldValue.increment(deltaPending),
-            totalLoaded: FieldValue.increment(deltaLoaded),
-            totalDelivered: FieldValue.increment(deltaDelivered),
-            totalArrived: FieldValue.increment(deltaArrived),
-            updatedAt: FieldValue.serverTimestamp(),
-          });
-        }
+        return pkg;
       });
 
-      return { success: true, message: "Packages updated successfully" };
-    } catch (error) {
-      console.error("Transaction Error:", error);
-      // Re-throw known HttpsErrors, wrap others
-      if (error instanceof HttpsError) throw error;
-      throw new HttpsError("internal", error.message);
-    }
+      // 4. CALCULATE NEW SHIPMENT STATUS & TOTALS
+      const totalLoaded = updatedPackages.filter(
+        (p) => p.status === "LOADED",
+      ).length;
+      const totalMissing = updatedPackages.filter(
+        (p) => p.status === "MISSING",
+      ).length;
+      const totalItems = updatedPackages.length;
+
+      let finalStatus = data.status;
+      // Logical priority: If all items are loaded, status is LOADED.
+      // If some items are loaded but others are missing/pending, it's PARTIALLY_LOADED.
+      if (totalLoaded === totalItems) {
+        finalStatus = "LOADED";
+      } else if (totalLoaded + totalMissing === totalItems && totalLoaded > 0) {
+        // All items accounted for, but some are missing
+        finalStatus = "LOADED_WITH_EXCEPTIONS";
+      } else if (totalLoaded > 0 || totalMissing > 0) {
+        finalStatus = "PARTIALLY_PROCESSED";
+      }
+
+      // 5. WRITE UPDATES TO SHIPMENT
+      tx.update(shipmentRef, {
+        packages: updatedPackages,
+        status: finalStatus,
+        "totals.loaded": totalLoaded,
+        "totals.missing": totalMissing, // ✅ Syncs with your Progress Bar
+        updatedAt: FieldValue.serverTimestamp(),
+        statusHistory: FieldValue.arrayUnion({
+          status: `PKG_BULK_${newStatus}`,
+          at: new Date(),
+          by: uid,
+          note:
+            remarks || `${packageIds.length} packages marked as ${newStatus}.`,
+          location: location || null,
+        }),
+      });
+
+      // 6. ✅ NEW: UPDATE TRIP_SHIPMENT (The Manifest Entry)
+      if (tripShipmentRef) {
+        tx.update(tripShipmentRef, {
+          status: finalStatus,
+          loadedCount: totalLoaded,
+          missingCount: totalMissing, // Ensure your schema supports this
+          updatedAt: FieldValue.serverTimestamp(),
+          updatedBy: uid,
+        });
+      }
+
+      // 6. UPDATE TRIP COUNTERS (The Handshake)
+      if (tripRef) {
+        tx.update(tripRef, {
+          totalLoaded: FieldValue.increment(localDeltaLoaded),
+          totalArrived: FieldValue.increment(localDeltaArrived),
+          totalMissing: FieldValue.increment(localDeltaMissing), // ✅ Keeps Truck Dashboard in sync
+          updatedAt: FieldValue.serverTimestamp(),
+        });
+      }
+    });
+
+    return { success: true };
   },
 );
