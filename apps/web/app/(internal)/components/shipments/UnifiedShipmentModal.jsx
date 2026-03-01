@@ -205,7 +205,7 @@ export default function UnifiedShipmentModal({ profile, isOpen, onClose }) {
                     onClick={() => setIsPickup(true)}
                     className={`flex-1 py-2.5 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-2 ${isPickup ? "bg-amber-600 text-white shadow" : "text-slate-500 hover:text-slate-300"}`}
                   >
-                    <FontAwesomeIcon icon={faTruckPickup} /> Home Pickup
+                    <FontAwesomeIcon icon={faTruckPickup} /> Pickup
                   </button>
                 </div>
               </div>

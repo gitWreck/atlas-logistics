@@ -149,8 +149,12 @@ export default function TruckModal({
                 onChange={(e) => handleChange("type", e.target.value)}
                 className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-white outline-none focus:border-blue-500 appearance-none cursor-pointer"
               >
+                <option>12-Wheeler Wing Van</option>
+                <option>12-Wheeler Closed Van</option>
                 <option>10-Wheeler Wing Van</option>
                 <option>6-Wheeler Closed Van</option>
+                <option>6-Wheeler Boom Truck</option>
+                <option>6-Wheeler Wing Van</option>
                 <option>4-Wheeler Reefer</option>
                 <option>Tractor Head</option>
               </select>
