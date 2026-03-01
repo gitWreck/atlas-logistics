@@ -91,7 +91,7 @@ export default function ShipmentDrawer({ isOpen, onClose, data, isDark = false }
               <FontAwesomeIcon icon={faQrcode} />
             </button>
 
-            <StatusBadge status={pkg.status} size="xs" />
+            <StatusBadge status={pkg.status} size="xs" isDark={isDark} />
           </div>
         </div>
 
@@ -134,7 +134,7 @@ export default function ShipmentDrawer({ isOpen, onClose, data, isDark = false }
               {data.trackingNumber}
             </h2>
             <div className="flex gap-2 mt-2 items-center">
-              <StatusBadge status={data.status} />
+              <StatusBadge status={data.status} isDark={isDark} />
               <span className={`text-xs border-l pl-2 ml-1 ${
                 isDark ? "text-slate-400 border-slate-700" : "text-slate-600 border-slate-300"
               }`}>

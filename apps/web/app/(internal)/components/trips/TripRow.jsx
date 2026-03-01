@@ -68,8 +68,12 @@ export default function TripRow({ trip, onClick, isDark = false }) {
             <span
               className={`text-[8px] tracking-wider font-bold px-1.5 py-[1px] rounded border w-max ${
                 isLocal
-                  ? "bg-amber-500/10 text-amber-500 border-amber-500/20"
-                  : "bg-blue-500/10 text-blue-500 border-blue-500/20"
+                  ? isDark
+                    ? "bg-amber-500/10 text-amber-500 border-amber-500/20"
+                    : "bg-amber-100 text-amber-800 border-amber-300"
+                  : isDark
+                    ? "bg-blue-500/10 text-blue-500 border-blue-500/20"
+                    : "bg-blue-100 text-blue-800 border-blue-300"
               }`}
             >
               {isLocal ? "LOCAL PICKUP" : "TRANSFER"}
@@ -139,8 +143,12 @@ export default function TripRow({ trip, onClick, isDark = false }) {
               <span
                 className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${
                   isLocal
-                    ? "bg-amber-500/10 text-amber-500 border-amber-500/20"
-                    : "bg-blue-500/10 text-blue-500 border-blue-500/20"
+                    ? isDark
+                      ? "bg-amber-500/10 text-amber-500 border-amber-500/20"
+                      : "bg-amber-100 text-amber-800 border-amber-300"
+                    : isDark
+                      ? "bg-blue-500/10 text-blue-500 border-blue-500/20"
+                      : "bg-blue-100 text-blue-800 border-blue-300"
                 }`}
               >
                 {isLocal ? "LOCAL" : "TRANSFER"}
@@ -165,7 +173,7 @@ export default function TripRow({ trip, onClick, isDark = false }) {
         </div>
       </div>
 
-      {/* --- COL 2: Route --- */}
+      {/* --- COL 2: Route (origin warehouse / destination) --- */}
       <div
         className={`md:col-span-2 flex justify-between md:block items-center border-t md:border-0 pt-2 md:pt-0 ${
           isDark ? "border-slate-800/50" : "border-slate-200"
@@ -173,7 +181,7 @@ export default function TripRow({ trip, onClick, isDark = false }) {
       >
         <div
           className={`text-sm font-medium flex items-center gap-2 ${
-            isDark ? "text-slate-300" : "text-slate-700"
+            isDark ? "text-slate-300" : "text-slate-800"
           }`}
         >
           {trip.originCode}
@@ -187,7 +195,9 @@ export default function TripRow({ trip, onClick, isDark = false }) {
             : trip.destinationCode}
         </div>
         <div
-          className={`text-[10px] font-mono md:mt-0.5 truncate max-w-[150px] md:max-w-[120px] ${isDark ? "text-slate-500" : "text-slate-600"}`}
+          className={`text-[10px] font-mono md:mt-0.5 truncate max-w-[150px] md:max-w-[120px] ${
+            isDark ? "text-slate-500" : "text-slate-600"
+          }`}
           title={trip.route}
         >
           {isLocal

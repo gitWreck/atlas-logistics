@@ -182,9 +182,11 @@ export default function UnifiedShipmentModal({
         )}
 
         {/* --- GLOBAL HEADER --- */}
-        <div className="p-4 sm:p-6 border-b border-slate-800 flex justify-between items-center shrink-0 bg-slate-950">
+        <div className={`p-4 sm:p-6 border-b flex justify-between items-center shrink-0 ${
+          isDark ? "border-slate-800 bg-slate-950" : "border-slate-200 bg-slate-50"
+        }`}>
           <div className="flex flex-col">
-            <h2 className="text-lg sm:text-xl font-bold text-white">
+            <h2 className={`text-lg sm:text-xl font-bold ${isDark ? "text-white" : "text-slate-900"}`}>
               {step === 1
                 ? "1. Shipment Details"
                 : step === 2
@@ -192,14 +194,16 @@ export default function UnifiedShipmentModal({
                   : "3. Complete"}
             </h2>
             {step === 1 && (
-              <p className="text-xs text-slate-500 mt-1">
+              <p className={`text-xs mt-1 ${isDark ? "text-slate-500" : "text-slate-600"}`}>
                 Fill in the package and routing info.
               </p>
             )}
           </div>
           <button
             onClick={onClose}
-            className="text-slate-500 hover:text-white p-2 bg-slate-900 rounded-lg"
+            className={`p-2 rounded-lg transition-colors ${
+              isDark ? "text-slate-500 hover:text-white bg-slate-900" : "text-slate-500 hover:text-slate-900 bg-slate-200 hover:bg-slate-300"
+            }`}
           >
             ✕
           </button>
@@ -410,7 +414,9 @@ export default function UnifiedShipmentModal({
         </div>
 
         {/* --- UNIFIED FOOTER --- */}
-        <div className="p-4 sm:p-6 border-t border-slate-800 bg-slate-950 flex flex-col sm:flex-row items-center gap-4 shrink-0">
+        <div className={`p-4 sm:p-6 border-t flex flex-col sm:flex-row items-center gap-4 shrink-0 ${
+          isDark ? "border-slate-800 bg-slate-950" : "border-slate-200 bg-slate-50"
+        }`}>
           {step === 1 && (
             <button
               type="submit"
@@ -432,12 +438,16 @@ export default function UnifiedShipmentModal({
               <label className="flex items-center gap-2 cursor-pointer group w-full sm:w-auto mb-2 sm:mb-0">
                 <input
                   type="checkbox"
-                  className="w-4 h-4 rounded border-slate-700 bg-slate-800 text-blue-600 focus:ring-blue-500"
+                  className={`w-4 h-4 rounded text-blue-600 focus:ring-blue-500 ${
+                    isDark ? "border-slate-700 bg-slate-800 focus:ring-offset-slate-900" : "border-slate-300 bg-white focus:ring-offset-white"
+                  }`}
                   checked={sendSms}
                   onChange={(e) => setSendSms(e.target.checked)}
                 />
                 <span
-                  className={`text-xs font-bold uppercase tracking-tight ${sendSms ? "text-slate-200" : "text-slate-500"}`}
+                  className={`text-xs font-bold uppercase tracking-tight ${
+                    sendSms ? (isDark ? "text-slate-200" : "text-slate-800") : (isDark ? "text-slate-500" : "text-slate-500")
+                  }`}
                 >
                   Notify Sender/Recipient via SMS
                 </span>
@@ -447,7 +457,9 @@ export default function UnifiedShipmentModal({
               <div className="flex w-full sm:w-auto sm:ml-auto gap-2">
                 <button
                   onClick={() => setStep(1)}
-                  className="px-6 py-3 rounded-xl border border-slate-700 text-slate-400 font-bold hover:bg-slate-800 transition-colors"
+                  className={`px-6 py-3 rounded-xl border font-bold transition-colors ${
+                    isDark ? "border-slate-700 text-slate-400 hover:bg-slate-800" : "border-slate-300 text-slate-600 hover:bg-slate-200"
+                  }`}
                 >
                   Back
                 </button>

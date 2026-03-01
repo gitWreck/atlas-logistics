@@ -78,7 +78,7 @@ export default function ShipmentRow({ s, onClick, isDark = false }) {
 
           {/* DRIVER & LOAD COUNTS (Visible on both) */}
           <div className="flex flex-wrap md:flex-nowrap items-center gap-3 mt-1">
-            <StatusBadge status={s.status} size="xs" />
+            <StatusBadge status={s.status} size="xs" isDark={isDark} />
             {/* Mobile Loaded Info */}
             <span className={`text-xs font-mono border-l pl-2 ${isDark ? "text-slate-500 border-slate-700" : "text-slate-600 border-slate-300"}`}>
               {loadedCount}/{totalCount} Loaded
@@ -148,6 +148,7 @@ export default function ShipmentRow({ s, onClick, isDark = false }) {
             <StatusBadge
               status={s.truckDetails?.status}
               reason={s.truckDetails?.delayReason}
+              isDark={isDark}
             />
           </div>
         )}

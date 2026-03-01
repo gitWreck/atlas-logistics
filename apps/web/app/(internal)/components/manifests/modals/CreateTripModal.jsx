@@ -176,9 +176,8 @@ export default function CreateTripModal({ isOpen, onClose, onSuccess, isDark = f
             <RouteSelector
               formData={formData}
               onWarehouseChange={handleWarehouseChange}
-              // You can pass the tripType down to RouteSelector if you want to
-              // conditionally hide/make optional the Destination dropdown, just like we did in ReceivePackageForm.
               isLocalRoute={formData.tripType === "LOCAL"}
+              isDark={isDark}
             />
 
             <ScheduleSection
