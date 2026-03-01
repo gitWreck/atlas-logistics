@@ -31,9 +31,8 @@ import { GLOBAL_STYLES } from "../../../components/constants/theme";
 // ✅ IMPORT THE NEW COMPONENTS
 import TabSelector from "../../../components/driver/TabSelector";
 import TripCard from "../../../components/driver/trip/TripCard";
-import TripFilterModal from "../../../components/driver/trip/TripFilterModal"; // Adjust path as needed
+import TripFilterModal from "../../../components/driver/trip/TripFilterModal";
 import DriverHeader from "../../../components/driver/DriverHeader";
-import { Image } from "expo-image";
 
 export default function DriverDashboard() {
   const router = useRouter();
@@ -189,19 +188,11 @@ export default function DriverDashboard() {
       <StatusBar barStyle="dark-content" backgroundColor="#f1f5f9" />
 
       {/* HEADER */}
-      <View style={styles.header}>
-        <View style={styles.titleRow}>
-          <Image
-            source={require("../../../assets/icons/driver-icon.svg")}
-            style={{ width: 45, height: 45 }}
-          />
-          <Text style={styles.headerTitle}>My Trips</Text>
-        </View>
-        <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
-          <FontAwesome5 name="sign-out-alt" size={16} color="#475569" />
-          <Text style={styles.logoutText}>Log out</Text>
-        </TouchableOpacity>
-      </View>
+      <DriverHeader
+        title="My Trips"
+        userName={driverName}
+        onLogout={handleLogout}
+      />
 
       {/* COMPONENT 1: TABS */}
       <TabSelector activeTab={activeTab} onTabChange={setActiveTab} />
@@ -292,42 +283,8 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#f1f5f9",
   },
-  header: {
-    paddingHorizontal: 20,
-    paddingTop: 35,
-    paddingBottom: 15,
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    backgroundColor: "#ffffff",
-    borderBottomWidth: 1,
-    borderBottomColor: "#e2e8f0",
-  },
-  titleRow: { flexDirection: "row", alignItems: "center" },
-  headerTitle: {
-    color: "#0f172a",
-    fontSize: 16,
-    fontWeight: "600",
-    marginLeft: 12,
-  },
-  logoutBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: "#e2e8f0",
-    backgroundColor: "#f8fafc",
-    gap: 6,
-  },
-  logoutText: {
-    color: "#475569",
-    fontSize: 14,
-    fontWeight: "500",
-  },
 
-  // ✅ NEW STYLES FOR SEARCH ROW
+  // ✅ SEARCH ROW
   searchRow: {
     flexDirection: "row",
     paddingHorizontal: 20,
