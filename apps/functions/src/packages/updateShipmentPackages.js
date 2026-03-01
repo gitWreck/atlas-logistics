@@ -15,11 +15,34 @@ exports.updateShipmentPackages = onCall(
     await requireRole(db, req, ["admin", "manager", "checker"]);
 
     const uid = req.auth.uid;
-    const { shipmentId, packageIds, newStatus, tripId, remarks, location } =
+    let { shipmentId, packageIds, newStatus, tripId, remarks, location } =
       req.data;
 
     if (!shipmentId || !packageIds || !newStatus) {
       throw new HttpsError("invalid-argument", "Missing required fields.");
+    }
+
+    // If the app only sent a package barcode, find its home
+    if (packageIds.length > 0) {
+      const packageBarcode = packageIds[0];
+
+      const shipmentQuery = await db
+        .collection("shipments")
+        .where("packageBarcodes", "array-contains", packageBarcode)
+        .limit(1)
+        .get();
+
+      if (shipmentQuery.empty) {
+        throw new HttpsError("not-found", "Package not found in any shipment.");
+      }
+
+      const shipmentDoc = shipmentQuery.docs[0];
+      shipmentId = shipmentDoc.id;
+
+      // ✅ AUTO-DISCOVERY: If tripId wasn't sent, get it from the shipment
+      if (!tripId) {
+        tripId = shipmentDoc.data().currentTruckTripId || null;
+      }
     }
 
     const shipmentRef = db.collection("shipments").doc(shipmentId);

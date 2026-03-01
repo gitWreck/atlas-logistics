@@ -14,10 +14,15 @@ import {
 import { db } from "../../firebase";
 
 // Import Custom Components
-import { scanPackages } from "../../components/utilities/FirebaseFunctions";
+import {
+  scanPackages,
+  updateShipmentPackages,
+} from "../../components/utilities/FirebaseFunctions";
 import PermissionRequest from "../../components/scanner/PermissionRequest";
 import ScannerOverlay from "../../components/scanner/ScannerOverlay";
 import ManualEntryModal from "../../components/scanner/ManualEntryModal";
+import { getCurrentLocationSafe } from "../../components/utilities/helpers";
+import ShipmentInfoModal from "../../components/checker/shipment-details/ShipmentInfoModal";
 
 export default function ScannerScreen() {
   const router = useRouter();
@@ -26,7 +31,10 @@ export default function ScannerScreen() {
   const [processing, setProcessing] = useState(false);
   const [showManual, setShowManual] = useState(false);
 
-  const { mode } = useLocalSearchParams();
+  const [infoModalVisible, setInfoModalVisible] = useState(false);
+  const [scannedData, setScannedData] = useState(null);
+
+  const { mode, title } = useLocalSearchParams();
 
   // --- PERMISSION CHECK ---
   if (!permission) return <View />;
@@ -34,26 +42,21 @@ export default function ScannerScreen() {
     return <PermissionRequest onRequest={requestPermission} />;
   }
 
-  // --- HELPERS ---
-  const getCurrentLocationSafe = async () => {
-    try {
-      const loc = await GetLocation.getCurrentPosition({
-        enableHighAccuracy: true,
-        timeout: 15000,
-      });
-      return loc ? { lat: loc.latitude, lng: loc.longitude } : null;
-    } catch (error) {
-      console.log("Location error:", error);
-      return null;
-    }
-  };
-
   const handleProcessPackage = async (barcode) => {
     if (processing) return;
     setProcessing(true);
     Vibration.vibrate();
 
     try {
+      // const isShipment = barcode.startsWith("AT-");
+      // if (isShipment) {
+      //   router.push({
+      //     pathname: "/(checker)/shipment-details",
+      //     params: { shipmentId: barcode },
+      //   });
+      //   return; // Navigation will unmount this, so no need to reset
+      // }
+
       // ------------------------------------------
       // MODE: INFO (Read Directly from Phone)
       // ------------------------------------------
@@ -86,18 +89,8 @@ export default function ScannerScreen() {
 
         // STEP 3: Display Results
         if (shipmentData) {
-          const infoText = `
-          Shipment: ${shipmentData.trackingNumber}
-          Status: ${shipmentData.status || "N/A"}
-          Origin: ${shipmentData.originCode} ➔ ${shipmentData.destinationCode}
-          Sender: ${shipmentData.sender?.name || "N/A"}
-          Receiver: ${shipmentData.recipient?.name || "N/A"}
-          Packages: ${shipmentData.packageBarcodes?.length || 0} items
-        `.trim();
-
-          Alert.alert("Shipment Found", infoText, [
-            { text: "OK", onPress: resetScanner },
-          ]);
+          setScannedData(shipmentData);
+          setInfoModalVisible(true);
         } else {
           Alert.alert(
             "Not Found",
@@ -111,21 +104,25 @@ export default function ScannerScreen() {
       // ------------------------------------------
       // MODE: LOAD/OFFLOAD (Cloud Function)
       // ------------------------------------------
-      // The Cloud Function should already handle this logic internally,
-      // but if it doesn't, you might need to update it too.
-      // For now, we assume your 'scanPackages' function handles the lookup.
 
       const location = await getCurrentLocationSafe();
+      const statusToApply = mode === "loading" ? "LOADED" : "RECEIVED";
 
-      const result = await scanPackages({
-        barcode: barcode,
-        mode: mode,
-        ...(location ? { location } : {}),
+      // We use the same Cloud Function as the manual selection screen
+      await updateShipmentPackages({
+        packageIds: [barcode],
+        newStatus: statusToApply,
+        location: location,
+        // tripId: ??? -> You'll need to pass the current tripId from the dashboard
       });
 
-      Alert.alert("Success", result.data.message, [
-        { text: "Next", onPress: resetScanner },
-      ]);
+      // ✅ TOAST STYLE FEEDBACK (Optional: avoid Alert here for high-speed scanning)
+      console.log(`Successfully marked ${barcode} as ${statusToApply}`);
+
+      // Auto-reset after a short delay for "Rapid Fire" scanning
+      setTimeout(() => {
+        resetScanner();
+      }, 1000);
     } catch (error) {
       console.error(error);
       Alert.alert("Error", error.message || "Scan failed", [
@@ -180,6 +177,21 @@ export default function ScannerScreen() {
         visible={showManual}
         onClose={() => setShowManual(false)}
         onSubmit={onManualSubmit}
+      />
+      <ShipmentInfoModal
+        visible={infoModalVisible}
+        data={scannedData}
+        onClose={() => {
+          setInfoModalVisible(false);
+          resetScanner();
+        }}
+        onDetails={() => {
+          setInfoModalVisible(false);
+          router.push({
+            pathname: "/(checker)/shipment-details",
+            params: { shipmentId: scannedData.id || barcode }, // barcode works if it was a direct hit
+          });
+        }}
       />
     </View>
   );

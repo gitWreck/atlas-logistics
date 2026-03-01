@@ -75,6 +75,10 @@ export default function CheckerIndex() {
       const firestoreDate = Timestamp.fromDate(startDate);
 
       const pendingQ = query(shipmentsRef, where("status", "==", "RECEIVED"));
+      const partiallyQ = query(
+        shipmentsRef,
+        where("status", "==", "PARTIALLY_PROCESSED"),
+      );
 
       const receivedQ = query(
         shipmentsRef,
@@ -155,7 +159,8 @@ const styles = StyleSheet.create({
     paddingTop: Platform.OS === "android" ? StatusBar.currentHeight : 0,
   },
   content: {
-    padding: 20,
-    paddingBottom: 40,
+    paddingLeft: 20,
+    paddingRight: 20,
+    // paddingBottom: 40,
   },
 });

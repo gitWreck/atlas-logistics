@@ -10,6 +10,9 @@ import {
   RefreshControl,
   TextInput,
   TouchableOpacity,
+  LayoutAnimation,
+  Platform,
+  UIManager,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { FontAwesome5 } from "@expo/vector-icons";
@@ -21,46 +24,30 @@ import {
   doc,
 } from "firebase/firestore";
 import { db } from "../../firebase";
-import GetLocation from "react-native-get-location";
 
 // ✅ IMPORT COMPONENTS
 import TripDetailsHeader from "../../components/checker/trip-details/TripDetailsHeader";
-import ShipmentControls from "../../components/checker/trip-details/ShipmentControlsModal";
 import ShipmentListItem from "../../components/checker/trip-details/ShipmentListItem";
-import TripFooter from "../../components/checker/trip-details/TripFooter";
+import ShipmentActionModal from "../../components/checker/trip-details/ShipmentActionModal";
+import TripFilterModal from "../../components/driver/trip/TripFilterModal";
+import ShipmentControlsModal from "../../components/checker/trip-details/ShipmentControlsModal";
 import {
   bulkShipmentAction,
-  finishLoadingTruck,
+  finalizeHubProcessing,
+  updateShipmentStatusChecker,
 } from "../../components/utilities/FirebaseFunctions";
-import ShipmentActionModal from "../../components/checker/trip-details/ShipmentActionModal";
-import TripFilterModal from "../../components/driver/trip/TripFilterModal"; // ✅ Import the Filter Modal
-import ShipmentControlsModal from "../../components/checker/trip-details/ShipmentControlsModal";
-
-// Define the filter options for shipments inside a trip
-const SHIPMENT_FILTER_OPTIONS = [
-  { label: "Show All", value: "ALL", icon: "list", color: "#64748b" },
-  {
-    label: "Assigned",
-    value: "ASSIGNED",
-    icon: "clipboard",
-    color: "#64748b",
-  },
-  { label: "Loaded", value: "LOADED", icon: "arrow-up", color: "#3b82f6" },
-  {
-    label: "Unloaded",
-    value: "UNLOADED",
-    icon: "arrow-down",
-    color: "#f59e0b",
-  },
-  {
-    label: "Delivered",
-    value: "DELIVERED",
-    icon: "check-circle",
-    color: "#10b981",
-  },
-];
+import { CHECKER_SHIPMENT_FILTER } from "../../components/constants/tracking-constants";
+import { getCurrentLocationSafe } from "../../components/utilities/helpers";
 
 export default function TripDetailsScreen() {
+  // Enable LayoutAnimation for Android
+  if (
+    Platform.OS === "android" &&
+    UIManager.setLayoutAnimationEnabledExperimental
+  ) {
+    UIManager.setLayoutAnimationEnabledExperimental(true);
+  }
+
   const { tripId, plate } = useLocalSearchParams();
   const router = useRouter();
 
@@ -74,28 +61,13 @@ export default function TripDetailsScreen() {
   const [modalVisible, setModalVisible] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
-  // ✅ NEW FILTER STATES
   const [filterModalVisible, setFilterModalVisible] = useState(false);
   const [activeStatusFilter, setActiveStatusFilter] = useState("ALL");
-
   const [bulkModalVisible, setBulkModalVisible] = useState(false);
 
-  const getCurrentLocationSafe = async () => {
-    try {
-      const loc = await GetLocation.getCurrentPosition({
-        enableHighAccuracy: true,
-        timeout: 15000,
-      });
+  const [showScanOptions, setShowScanOptions] = React.useState(false);
 
-      if (!loc) return null;
-      return { lat: loc.latitude, lng: loc.longitude };
-    } catch (error) {
-      console.log("Location error (checker trip-details):", error);
-      return null;
-    }
-  };
-
-  // 1. FETCH SHIPMENTS
+  // FETCH SHIPMENTS
   useEffect(() => {
     if (!tripId) return;
     const shipmentsRef = collection(
@@ -110,6 +82,7 @@ export default function TripDetailsScreen() {
       const fetchedShipments = snapshot.docs.map((doc) => {
         const data = doc.data();
         return {
+          ...data,
           id: doc.id,
           destination: data.route || "No Route Info",
           status: data.status || "ASSIGNED",
@@ -123,7 +96,7 @@ export default function TripDetailsScreen() {
     return () => unsubscribe();
   }, [tripId]);
 
-  // 2. FETCH TRIP DOC
+  // FETCH TRIP DOC
   useEffect(() => {
     if (!tripId) return;
     const unsubscribe = onSnapshot(
@@ -137,16 +110,21 @@ export default function TripDetailsScreen() {
     return () => unsubscribe();
   }, [tripId]);
 
-  // 3. ✅ UPDATED FILTER & SEARCH LOGIC
+  // FILTER & SEARCH LOGIC
   const filteredData = useMemo(() => {
     let filtered = shipments;
 
-    // A. Filter by Status
+    // Filter by Status (Grouping Failures into "EXCEPTION")
     if (activeStatusFilter !== "ALL") {
-      filtered = filtered.filter((s) => s.status === activeStatusFilter);
+      if (activeStatusFilter === "EXCEPTION") {
+        filtered = filtered.filter(
+          (s) => s.status.includes("FAILED") || s.status.includes("MISSING"),
+        );
+      } else {
+        filtered = filtered.filter((s) => s.status === activeStatusFilter);
+      }
     }
 
-    // B. Filter by Search Text
     if (search) {
       const term = search.toLowerCase();
       filtered = filtered.filter(
@@ -155,45 +133,44 @@ export default function TripDetailsScreen() {
           s.destination.toLowerCase().includes(term),
       );
     }
-
     return filtered;
   }, [shipments, search, activeStatusFilter]);
 
-  // 4. ACTIONS
-  const updateStatus = async (ids, newStatus) => {
+  const updateStatus = async (ids, newStatus, remarks = "") => {
     if (ids.length === 0) return;
     setUpdating(true);
+
     try {
       const location = await getCurrentLocationSafe();
-      await bulkShipmentAction({
-        tripId: tripId,
-        shipmentIds: ids,
-        action: newStatus,
-        ...(location ? { location } : {}),
-      });
 
-      Alert.alert(
-        "Success",
-        `Updated ${ids.length} shipment(s) to ${newStatus}`,
-      );
+      // Check if it's a single update or bulk
+      if (ids.length === 1) {
+        // ✅ Use the Precision Scalpel for 1 item
+        await updateShipmentStatusChecker({
+          shipmentId: ids[0],
+          tripId: tripId,
+          newStatus: newStatus,
+          remarks: remarks,
+          ...(location ? { location } : {}),
+        });
+      } else {
+        // ✅ Use the Power Tool for many items
+        await bulkShipmentAction({
+          tripId: tripId,
+          shipmentIds: ids,
+          action: newStatus,
+          remarks: remarks,
+          ...(location ? { location } : {}),
+        });
+      }
+
+      Alert.alert("Success", "Shipment status updated.");
     } catch (error) {
       Alert.alert("Error", error.message);
     } finally {
       setUpdating(false);
     }
   };
-
-  const handleSingleAction = (shipment) => {
-    setSelectedShipment(shipment);
-    setModalVisible(true);
-  };
-
-  const onModalAction = (actionType) => {
-    if (selectedShipment) {
-      updateStatus([selectedShipment.id], actionType);
-    }
-  };
-
   const handleBulkStatusChange = (newStatus) => {
     const ids = filteredData.map((s) => s.id);
     if (ids.length === 0) {
@@ -205,34 +182,48 @@ export default function TripDetailsScreen() {
       `Mark ${ids.length} shipments as ${newStatus}?`,
       [
         { text: "Cancel", style: "cancel" },
-        { text: "Confirm", onPress: () => updateStatus(ids, newStatus) },
+        {
+          text: "Confirm",
+          onPress: () =>
+            updateStatus(ids, newStatus, "Updated via Bulk Action"),
+        },
       ],
     );
   };
 
-  const handleFinishLoading = () => {
+  // ✅ UPDATED: Now accepts 'remarks' from the ShipmentControlsModal
+  const handleFinishTrip = (forcedStatus = null, remarksText = "") => {
     if (!trip) return;
-    if ((trip.totalLoaded || 0) === 0) {
-      Alert.alert("Empty Truck", "You must scan at least one package.");
-      return;
-    }
 
     const total = trip.totalItems || 0;
-    const loaded = trip.totalLoaded || 0;
-    const message =
-      loaded >= total
-        ? "All items loaded. Release?"
-        : `Only ${loaded}/${total} loaded. Release anyway?`;
+    const processed = trip.totalLoaded || trip.totalArrived || 0;
 
-    Alert.alert("Confirm Seal", message, [
+    // Determine if we are loading an outbound truck or receiving an inbound truck
+    const isReceiving =
+      trip.status === "IN_TRANSIT" || trip.status === "ARRIVED";
+    const actionWord = isReceiving ? "Receive" : "Seal";
+    const statusWord = forcedStatus || (isReceiving ? "ARRIVED" : "LOADED");
+
+    const message =
+      processed >= total
+        ? `All items processed. ${actionWord} Truck?`
+        : `Only ${processed}/${total} processed. ${actionWord} anyway?`;
+
+    Alert.alert(`Confirm ${actionWord}`, message, [
       { text: "Cancel", style: "cancel" },
       {
-        text: "SEAL TRUCK",
+        text: `YES, ${actionWord.toUpperCase()}`,
+        style: "destructive",
         onPress: async () => {
           setUpdating(true);
           try {
-            await finishLoadingTruck({ tripId: tripId });
-            Alert.alert("Success", "Truck marked as LOADED.");
+            // ✅ Now passing tripId AND remarks to the cloud function
+            await finalizeHubProcessing({
+              tripId,
+              remarks: remarksText,
+            });
+
+            Alert.alert("Success", `Trip marked as ${statusWord}.`);
             router.back();
           } catch (err) {
             Alert.alert("Error", err.message);
@@ -244,34 +235,25 @@ export default function TripDetailsScreen() {
     ]);
   };
 
-  const handleShipmentPress = (item) => {
-    router.push({
-      pathname: "/(checker)/shipment-details",
-      params: {
-        shipmentId: item.id,
-        parentTripId: tripId,
-        parentPlate: plate,
-      },
-    });
-  };
-
   const onRefresh = () => {
     setRefreshing(true);
-    setTimeout(() => {
-      setRefreshing(false);
-    }, 1500);
+    setTimeout(() => setRefreshing(false), 1500);
+  };
+
+  const toggleOptions = () => {
+    // Configures the next layout change to be animated
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setShowScanOptions(!showScanOptions);
   };
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* 1. HEADER */}
       <TripDetailsHeader
         tripId={tripId}
         plate={plate}
         onBack={() => router.back()}
       />
 
-      {/* 2. LOADING OVERLAY */}
       {updating && (
         <View style={styles.loaderOverlay}>
           <ActivityIndicator size="large" color="#042C83" />
@@ -279,9 +261,8 @@ export default function TripDetailsScreen() {
         </View>
       )}
 
-      {/* 3. SEARCH, FILTER & BULK ACTIONS ROW */}
+      {/* SEARCH, FILTER & BULK ACTIONS ROW */}
       <View style={styles.searchRow}>
-        {/* Search Input */}
         <View style={styles.searchContainer}>
           <FontAwesome5 name="search" size={16} color="#94a3b8" />
           <TextInput
@@ -298,7 +279,6 @@ export default function TripDetailsScreen() {
           )}
         </View>
 
-        {/* Filter Button */}
         <TouchableOpacity
           style={[
             styles.actionSquareBtn,
@@ -316,7 +296,6 @@ export default function TripDetailsScreen() {
           />
         </TouchableOpacity>
 
-        {/* Bulk Actions Button */}
         <TouchableOpacity
           style={styles.actionSquareBtn}
           onPress={() => setBulkModalVisible(true)}
@@ -325,67 +304,129 @@ export default function TripDetailsScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* 5. LIST */}
-      {loading ? (
-        <View style={styles.loadingWrapper}>
-          <ActivityIndicator size="large" color="#042C83" />
+      {/* LIST */}
+      <View style={{ flex: 1 }}>
+        {loading ? (
+          <View style={styles.loadingWrapper}>
+            <ActivityIndicator size="large" color="#042C83" />
+          </View>
+        ) : (
+          <FlatList
+            data={filteredData}
+            keyExtractor={(item) => item.id}
+            contentContainerStyle={styles.listContent}
+            refreshControl={
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={onRefresh}
+                colors={["#042C83"]}
+                tintColor="#042C83"
+              />
+            }
+            renderItem={({ item }) => (
+              <ShipmentListItem
+                item={item}
+                onPress={() =>
+                  router.push({
+                    pathname: "/(checker)/shipment-details",
+                    params: {
+                      shipmentId: item.id,
+                      parentTripId: tripId,
+                      parentPlate: plate,
+                    },
+                  })
+                }
+                onMenuPress={(shipment) => {
+                  setSelectedShipment(shipment);
+                  setModalVisible(true);
+                }}
+              />
+            )}
+            ListEmptyComponent={
+              <Text style={styles.emptyText}>
+                {search || activeStatusFilter !== "ALL"
+                  ? "No shipments match your filters."
+                  : "No shipments assigned."}
+              </Text>
+            }
+          />
+        )}
+      </View>
+
+      {/* SCAN OPTIONS OVERLAY */}
+      {showScanOptions && (
+        <View style={styles.optionContainer}>
+          {/* Buttons slide up from the FAB position */}
+          <TouchableOpacity
+            style={[styles.optionBtn, { backgroundColor: "#059669" }]}
+            onPress={() => {
+              toggleOptions(); // Close with animation
+              router.push({
+                pathname: "/(checker)/scan",
+                params: { mode: "delivering", tripId },
+              });
+            }}
+          >
+            <FontAwesome5 name="file-import" size={16} color="#fff" />
+            <Text style={styles.optionText}>OFFLOAD</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.optionBtn, { backgroundColor: "#2563eb" }]}
+            onPress={() => {
+              toggleOptions(); // Close with animation
+              router.push({
+                pathname: "/(checker)/scan",
+                params: { mode: "loading", tripId },
+              });
+            }}
+          >
+            <FontAwesome5 name="truck-loading" size={16} color="#fff" />
+            <Text style={styles.optionText}>LOAD</Text>
+          </TouchableOpacity>
         </View>
-      ) : (
-        <FlatList
-          data={filteredData}
-          keyExtractor={(item) => item.id}
-          contentContainerStyle={styles.listContent}
-          refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={onRefresh}
-              colors={["#042C83"]}
-              tintColor="#042C83"
-            />
-          }
-          renderItem={({ item }) => (
-            <ShipmentListItem
-              item={item}
-              onPress={handleShipmentPress}
-              onMenuPress={handleSingleAction}
-            />
-          )}
-          ListEmptyComponent={
-            <Text style={styles.emptyText}>
-              {search || activeStatusFilter !== "ALL"
-                ? "No shipments match your filters."
-                : "No shipments assigned."}
-            </Text>
-          }
-        />
       )}
 
-      {/* 6. FOOTER */}
-      <TripFooter trip={trip} onFinish={handleFinishLoading} />
+      {/* THE MAIN FAB */}
+      <TouchableOpacity
+        style={[styles.fab, showScanOptions && styles.fabActive]}
+        activeOpacity={0.8}
+        onPress={toggleOptions} // Uses the animated toggle
+      >
+        <FontAwesome5
+          name={showScanOptions ? "times" : "barcode"}
+          size={22}
+          color="#ffffff"
+        />
+      </TouchableOpacity>
 
-      {/* 7. ACTION MODAL */}
+      {/* MODALS */}
       <ShipmentActionModal
         visible={modalVisible}
         shipment={selectedShipment}
         onClose={() => setModalVisible(false)}
-        onAction={onModalAction}
+        onAction={(actionType, remarksText) => {
+          if (selectedShipment)
+            updateStatus([selectedShipment.id], actionType, remarksText);
+        }}
       />
 
-      {/* ✅ 8. FILTER MODAL */}
       <TripFilterModal
         visible={filterModalVisible}
         onClose={() => setFilterModalVisible(false)}
         activeFilter={activeStatusFilter}
         onApplyFilter={setActiveStatusFilter}
-        options={SHIPMENT_FILTER_OPTIONS}
+        options={CHECKER_SHIPMENT_FILTER}
       />
 
-      {/* 9. BULK ACTION MODAL */}
       <ShipmentControlsModal
         visible={bulkModalVisible}
         onClose={() => setBulkModalVisible(false)}
-        onBulkOutForDelivery={() => handleBulkStatusChange("OUT_FOR_DELIVERY")}
-        onBulkDelivered={() => handleBulkStatusChange("DELIVERED")}
+        tripStatus={trip?.status}
+        // ✅ Update these handlers to accept the remarks string
+        onBulkLoad={(remarks) => handleBulkStatusChange("LOADED", remarks)}
+        onBulkReceive={(remarks) => handleBulkStatusChange("RECEIVED", remarks)}
+        onFinalize={(remarks) => handleFinishTrip(null, remarks)}
       />
     </SafeAreaView>
   );
@@ -405,13 +446,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   loaderText: { marginTop: 10, fontWeight: "bold", color: "#042C83" },
-  loadingWrapper: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-  },
+  loadingWrapper: { flex: 1, justifyContent: "center", alignItems: "center" },
 
-  // ✅ STYLES FOR SEARCH ROW
   searchRow: {
     flexDirection: "row",
     paddingHorizontal: 20,
@@ -431,13 +467,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#e2e8f0",
   },
-  searchInput: {
-    flex: 1,
-    color: "#0f172a",
-    marginLeft: 10,
-    fontSize: 15,
-  },
-  // ✅ Replace your old `filterBtn` style with this:
+  searchInput: { flex: 1, color: "#0f172a", marginLeft: 10, fontSize: 15 },
   actionSquareBtn: {
     width: 48,
     height: 48,
@@ -449,9 +479,48 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
 
-  listContent: {
-    paddingBottom: 120,
-    paddingTop: 8,
-  },
+  listContent: { paddingBottom: 80, paddingTop: 8 },
   emptyText: { textAlign: "center", color: "#475569", marginTop: 40 },
+
+  fab: {
+    position: "absolute",
+    bottom: 30,
+    right: 20,
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: "#0f172a",
+    justifyContent: "center",
+    alignItems: "center",
+    elevation: 5,
+    zIndex: 100,
+  },
+  fabActive: {
+    backgroundColor: "#64748b",
+  },
+  optionContainer: {
+    position: "absolute",
+    bottom: 100,
+    right: 20,
+    gap: 12,
+    alignItems: "flex-end",
+    zIndex: 99,
+  },
+  optionBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 30,
+    gap: 10,
+    elevation: 3,
+    shadowColor: "#000",
+    shadowOpacity: 0.2,
+    shadowRadius: 5,
+  },
+  optionText: {
+    color: "#fff",
+    fontWeight: "800",
+    fontSize: 13,
+  },
 });

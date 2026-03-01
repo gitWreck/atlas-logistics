@@ -27,36 +27,18 @@ import { COLORS, GLOBAL_STYLES } from "../../../components/constants/theme";
 // ✅ Import your components
 import CheckerTripCard from "../../../components/checker/CheckerTripCard";
 import TripFilterModal from "../../../components/driver/trip/TripFilterModal"; // Assuming you reuse the same modal
+import { CHECKER_TRIP_FILTER } from "../../../components/constants/tracking-constants";
+import CheckerHeader from "../../../components/checker/CheckerHeader";
 
 export default function CheckerTripsScreen() {
   const router = useRouter();
 
   const [trips, setTrips] = useState([]);
   const [loading, setLoading] = useState(true);
-
-  // ✅ NEW STATES FOR REFRESH, SEARCH & FILTER
   const [refreshing, setRefreshing] = useState(false);
   const [searchText, setSearchText] = useState("");
   const [filterModalVisible, setFilterModalVisible] = useState(false);
   const [activeStatusFilter, setActiveStatusFilter] = useState("ALL");
-
-  // Define the custom options for the Checker
-  const CHECKER_FILTER_OPTIONS = [
-    { label: "Show All", value: "ALL", icon: "list", color: "#64748b" },
-    {
-      label: "Created",
-      value: "CREATED",
-      icon: "plus-circle",
-      color: "#8b5cf6",
-    }, // Purple
-    {
-      label: "Assigned",
-      value: "ASSIGNED",
-      icon: "user-check",
-      color: "#f59e0b",
-    }, // Orange
-    { label: "Loading", value: "LOADING", icon: "spinner", color: "#3b82f6" }, // Blue
-  ];
 
   useEffect(() => {
     // 1. QUERY: Active Trips for Checkers
@@ -77,7 +59,11 @@ export default function CheckerTripsScreen() {
       (snapshot) => {
         const fetchedTrips = snapshot.docs.map((doc) => {
           const data = doc.data();
+
           return {
+            ...data, // ✅ NEW: This instantly grabs EVERY field in the document (driverName, tripType, etc.)
+
+            // Your custom mappings and fallbacks applied on top:
             id: doc.id,
             plate: data.truckPlateNumber || "No Plate",
             status: data.status || "UNKNOWN",
@@ -86,7 +72,9 @@ export default function CheckerTripsScreen() {
             total: data.totalItems || 0,
           };
         });
+
         setTrips(fetchedTrips);
+        console.log("Fetched Trips:", fetchedTrips);
         setLoading(false);
       },
       (error) => {
@@ -140,13 +128,8 @@ export default function CheckerTripsScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <Text style={styles.title}>Active Loads</Text>
-        <Text style={styles.subtitle}>
-          {filteredTrips.length} trucks in yard
-        </Text>
-      </View>
+      {/* 1. Global Checker Header */}
+      {/* <CheckerHeader userName={currentUser.name} onLogout={handleLogout} /> */}
 
       {/* ✅ NEW: SEARCH & FILTER BAR */}
       <View style={styles.searchRow}>
@@ -192,8 +175,10 @@ export default function CheckerTripsScreen() {
       ) : (
         <FlatList
           data={filteredTrips}
-          keyExtractor={(item) => item.id}
-          // ✅ ATTACH REFRESH CONTROL
+          keyExtractor={(item) => item.id} // ✅ NEW: Performance optimizations
+          initialNumToRender={8}
+          maxToRenderPerBatch={10}
+          windowSize={11}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
@@ -230,7 +215,7 @@ export default function CheckerTripsScreen() {
         onClose={() => setFilterModalVisible(false)}
         activeFilter={activeStatusFilter}
         onApplyFilter={setActiveStatusFilter}
-        options={CHECKER_FILTER_OPTIONS}
+        options={CHECKER_TRIP_FILTER}
       />
     </SafeAreaView>
   );
@@ -257,7 +242,7 @@ const styles = StyleSheet.create({
   searchRow: {
     flexDirection: "row",
     paddingHorizontal: 20,
-    paddingTop: 12,
+    paddingTop: 34,
     paddingBottom: 6,
     gap: 12,
     backgroundColor: "#f1f5f9",
@@ -266,7 +251,7 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#ffffff",
+    backgroundColor: "#f8fafc",
     paddingHorizontal: 16,
     borderRadius: 12,
     height: 48,
@@ -291,7 +276,6 @@ const styles = StyleSheet.create({
   },
 
   listContent: { padding: 20, paddingBottom: 50 },
-
   emptyContainer: { alignItems: "center", marginTop: 50 },
   emptyText: { color: "#64748b" },
 });

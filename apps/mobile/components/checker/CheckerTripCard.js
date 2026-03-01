@@ -8,13 +8,16 @@ import {
 } from "react-native";
 import { FontAwesome5 } from "@expo/vector-icons";
 import { COLORS } from "../../components/constants/theme"; // Adjust path
-import StatusBadge from "../../components/ui/StatusBadge"; // Adjust path
+import StatusBadge from "../../components/ui/figma/StatusBadge"; // Adjust path
+import { getFormattedTime } from "../utilities/helpers";
 
 const CheckerTripCard = ({ trip, onPress }) => {
+  console.log("trip details: ", trip);
+
   // Calculate Progress
   const total = trip.total || 0;
   const loaded = trip.loaded || 0;
-  const progressPercent = total > 0 ? (loaded / total) * 100 : 0;
+  const progressPercent = total > 0 ? Math.round((loaded / total) * 100) : 0;
 
   // Determine Bar Color based on fullness
   let barColor = COLORS.primary;
@@ -22,29 +25,56 @@ const CheckerTripCard = ({ trip, onPress }) => {
     barColor = COLORS.success; // Green if full
   else if (progressPercent > 50) barColor = COLORS.secondary; // Blue if half
 
+  // Helper variables for missing data
+  const driverName = trip.driverName || "Unassigned Driver";
+
+  // Format the Trip Type nicely
+  let tripTypeLabel = "Hub Transfer";
+  if (trip.tripType === "LOCAL_DELIVERY")
+    tripTypeLabel = "Local Delivery Route";
+  if (trip.tripType === "LOCAL_PICKUP") tripTypeLabel = "Local Pickup Route";
+
   return (
     <View style={styles.card}>
       {/* HEADER: ID + Status */}
       <View style={styles.cardHeader}>
         <View style={styles.idBox}>
           <FontAwesome5 name="hashtag" size={10} color="#94a3b8" />
+          {/* Sliced the ID so it doesn't overflow the screen */}
           <Text style={styles.idText}>{trip.id}</Text>
         </View>
         <StatusBadge status={trip.status} />
       </View>
 
-      {/* BODY: Plate & Route */}
+      {/* BODY: Two-Column Layout */}
       <View style={styles.body}>
-        <Text style={styles.plateText}>TRK-{trip.plate || "NO PLATE"}</Text>
-        <Text style={styles.routeText}>{trip.route || "No Route Info"}</Text>
+        {/* Left Side: Plate & Trip Type */}
+        <View style={styles.leftContent}>
+          <Text style={styles.plateText}>{trip.plate || "NO PLATE"}</Text>
+          <Text style={styles.typeText}>{tripTypeLabel}</Text>
+        </View>
+
+        {/* Right Side: Route, Driver, & Updated At */}
+        <View style={styles.rightContent}>
+          <Text style={styles.routeText} numberOfLines={1}>
+            {trip.route || "No Route Info"}
+          </Text>
+          <Text style={styles.driverText} numberOfLines={1}>
+            {driverName}
+          </Text>
+          <Text style={styles.dateText}>
+            Last Update: {getFormattedTime(trip.updatedAt)}
+          </Text>
+        </View>
       </View>
 
       {/* PROGRESS SECTION */}
       <View style={styles.progressContainer}>
         <View style={styles.progressRow}>
-          <Text style={styles.progressLabel}>Status</Text>
+          <Text style={styles.progressLabel}>Loading Progress</Text>
           <Text style={styles.progressValue}>
-            {loaded} / {total} Items
+            {/* ✅ NEW: Added percentage to text */}
+            {loaded} / {total} Items ({progressPercent}%)
           </Text>
         </View>
 
@@ -113,14 +143,55 @@ const styles = StyleSheet.create({
   },
   idText: { color: "#0f172a", fontWeight: "600", fontSize: 12 },
 
-  body: { marginBottom: 16 },
+  body: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    marginBottom: 16,
+  },
+  leftContent: {
+    flex: 1,
+    paddingRight: 10,
+  },
+  rightContent: {
+    flex: 1.2, // Gives the right side a bit more room for long names/routes
+    alignItems: "flex-end", // Aligns all text inside to the right edge
+  },
+
   plateText: {
     color: "#0f172a",
     fontSize: 18,
-    fontWeight: "700",
+    fontWeight: "800",
     letterSpacing: 1,
   },
-  routeText: { color: "#475569", fontSize: 12, marginTop: 2 },
+  typeText: {
+    color: "#067FC6",
+    fontSize: 11,
+    fontWeight: "700",
+    marginTop: 4,
+    textTransform: "uppercase",
+  },
+
+  // Right side text styles
+  routeText: {
+    color: "#0f172a",
+    fontSize: 13,
+    fontWeight: "600",
+    textAlign: "right",
+  },
+  driverText: {
+    color: "#475569",
+    fontSize: 12,
+    marginTop: 4,
+    textAlign: "right",
+  },
+  dateText: {
+    color: "#94a3b8",
+    fontSize: 11,
+    marginTop: 4,
+    fontStyle: "italic",
+    textAlign: "right",
+  },
 
   progressContainer: { marginBottom: 16 },
   progressRow: {
