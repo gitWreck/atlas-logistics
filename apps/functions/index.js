@@ -86,10 +86,12 @@ exports.bulkShipmentAction =
   require("./src/shipments/bulkShipmentAction").bulkShipmentAction;
 exports.splitShipments =
   require("./src/shipments/splitShipments").splitShipments;
-exports.updateShipmentStatus =
-  require("./src/shipments/updateShipmentStatus").updateShipmentStatus;
-exports.finishLoadingTruck =
-  require("./src/trips/finishLoadingTruck").finishLoadingTruck;
+exports.updateShipmentStatusDriver =
+  require("./src/shipments/updateShipmentStatusDriver").updateShipmentStatusDriver;
+exports.updateShipmentStatusChecker =
+  require("./src/shipments/updateShipmentStatusChecker").updateShipmentStatusChecker;
+exports.finalizeHubProcessing =
+  require("./src/trips/finalizeHubProcessing").finalizeHubProcessing;
 
 // Manifests & Certificates
 exports.generateTripManifest =
