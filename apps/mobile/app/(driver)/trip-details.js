@@ -11,7 +11,7 @@ import {
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { FontAwesome5 } from "@expo/vector-icons";
-import { doc, onSnapshot, updateDoc } from "firebase/firestore"; // ADDED updateDoc
+import { doc, onSnapshot } from "firebase/firestore"; // ADDED updateDoc
 import { db } from "../../firebase";
 import { StatusBar } from "expo-status-bar";
 import GetLocation from "react-native-get-location";

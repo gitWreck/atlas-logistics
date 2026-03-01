@@ -35,7 +35,11 @@ export default function StatusBoard({ stats, filterMode }) {
 }
 
 const styles = StyleSheet.create({
-  statsRow: { flexDirection: "row", gap: 12, marginBottom: 20 },
+  statsRow: {
+    flexDirection: "row",
+    gap: 12,
+    // marginBottom: 20
+  },
   statCard: {
     flex: 1,
     backgroundColor: "#ffffff",

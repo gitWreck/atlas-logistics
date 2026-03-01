@@ -4,18 +4,22 @@ import { app } from "../../firebase";
 const functions = getFunctions(app, "asia-southeast1");
 
 export const scanPackages = httpsCallable(functions, "scanPackages");
-export const finishLoadingTruck = httpsCallable(
+export const finalizeHubProcessing = httpsCallable(
   functions,
-  "finishLoadingTruck",
+  "finalizeHubProcessing",
 );
 
 export const updateShipmentPackages = httpsCallable(
   functions,
-  "updateShipmentPaackages",
+  "updateShipmentPackages",
 );
-export const updateShipmentStatus = httpsCallable(
+export const updateShipmentStatusDriver = httpsCallable(
   functions,
-  "updateShipmentStatus",
+  "updateShipmentStatusDriver",
+);
+export const updateShipmentStatusChecker = httpsCallable(
+  functions,
+  "updateShipmentStatusChecker",
 );
 export const updateTripStatus = httpsCallable(functions, "updateTripStatus");
 

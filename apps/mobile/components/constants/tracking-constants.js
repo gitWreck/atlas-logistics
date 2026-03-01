@@ -141,3 +141,67 @@ export const DRIVER_SHIPMENT_FILTER = [
     color: "#10b981",
   },
 ];
+
+// Define the custom options for the Checker
+export const CHECKER_TRIP_FILTER = [
+  { label: "Show All", value: "ALL", icon: "list", color: "#64748b" },
+  { label: "Created", value: "CREATED", icon: "plus-circle", color: "#8b5cf6" },
+  {
+    label: "Assigned",
+    value: "ASSIGNED",
+    icon: "user-check",
+    color: "#f59e0b",
+  },
+  { label: "Loading", value: "LOADING", icon: "spinner", color: "#3b82f6" },
+  { label: "Loaded", value: "LOADED", icon: "box", color: "#10b981" }, // Added Loaded just in case!
+];
+
+export const CHECKER_SHIPMENT_FILTER = [
+  { label: "Show All", value: "ALL", icon: "list", color: "#64748b" },
+  { label: "Assigned", value: "ASSIGNED", icon: "clipboard", color: "#64748b" },
+  {
+    label: "Loaded (Outbound)",
+    value: "LOADED",
+    icon: "arrow-up",
+    color: "#3b82f6",
+  },
+  {
+    label: "Received (Inbound)",
+    value: "RECEIVED",
+    icon: "warehouse",
+    color: "#10b981",
+  },
+  {
+    label: "Exceptions",
+    value: "EXCEPTION",
+    icon: "exclamation-triangle",
+    color: "#ef4444",
+  },
+];
+
+export const CHECKER_SHIPMENT_ACTION = [
+  {
+    label: "Load to Truck",
+    action: "LOADED",
+    icon: "arrow-up",
+    color: "#3b82f6",
+  }, // Blue
+  {
+    label: "Unload from Truck",
+    action: "UNLOADED",
+    icon: "arrow-down",
+    color: "#f59e0b",
+  }, // Orange
+  {
+    label: "Receive into Hub",
+    action: "RECEIVED",
+    icon: "warehouse",
+    color: "#10b981",
+  }, // Green
+  {
+    label: "Mark as Missing",
+    action: "MISSING",
+    icon: "question-circle",
+    color: "#ef4444",
+  }, // Red
+];
