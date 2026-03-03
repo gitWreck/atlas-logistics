@@ -252,7 +252,7 @@ function ManifestContent() {
       };
 
       setManifest(data);
-      setStatus("OK");
+      tripData.manifestLocked ? setStatus("OK") : setStatus("BAD");
     } catch (err) {
       console.error(err);
       setError(err.message || "Failed to load manifest");
@@ -434,7 +434,18 @@ function ManifestContent() {
             <MetaItem label="Route" value={manifest.route} />
             <MetaItem
               label="Sealed At"
-              value={new Date(manifest.sealedAt).toLocaleString()}
+              value={
+                manifest.sealedAt
+                  ? new Date(manifest.sealedAt).toLocaleString("en-PH", {
+                      year: "numeric",
+                      month: "long",
+                      day: "numeric",
+                      hour: "numeric",
+                      minute: "2-digit",
+                      hour12: true,
+                    })
+                  : "-"
+              }
             />
             <MetaItem label="Version" value={manifest.version} />
           </div>

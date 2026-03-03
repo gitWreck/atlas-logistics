@@ -163,30 +163,40 @@ export default function UnifiedShipmentModal({
       {/* Modal Container */}
       <div
         className={`relative w-full max-w-4xl sm:rounded-xl shadow-xl overflow-hidden flex flex-col h-full sm:h-auto sm:min-h-[600px] sm:max-h-[90vh] border ${
-          isDark
-            ? "bg-slate-900 border-slate-700"
-            : "bg-white border-slate-200"
+          isDark ? "bg-slate-900 border-slate-700" : "bg-white border-slate-200"
         }`}
       >
         {loading && (
-          <div className={`absolute inset-0 z-[100] backdrop-blur-sm flex flex-col items-center justify-center ${
-            isDark ? "bg-slate-900/80" : "bg-white/90"
-          }`}>
+          <div
+            className={`absolute inset-0 z-[100] backdrop-blur-sm flex flex-col items-center justify-center ${
+              isDark ? "bg-slate-900/80" : "bg-white/90"
+            }`}
+          >
             <FontAwesomeIcon
               icon={faCircleNotch}
               spin
               className="text-4xl text-blue-500 mb-4"
             />
-            <p className={`font-bold ${isDark ? "text-white" : "text-slate-900"}`}>Processing Shipment...</p>
+            <p
+              className={`font-bold ${isDark ? "text-white" : "text-slate-900"}`}
+            >
+              Processing Shipment...
+            </p>
           </div>
         )}
 
         {/* --- GLOBAL HEADER --- */}
-        <div className={`p-4 sm:p-6 border-b flex justify-between items-center shrink-0 ${
-          isDark ? "border-slate-800 bg-slate-950" : "border-slate-200 bg-slate-50"
-        }`}>
+        <div
+          className={`p-4 sm:p-6 border-b flex justify-between items-center shrink-0 ${
+            isDark
+              ? "border-slate-800 bg-slate-950"
+              : "border-slate-200 bg-slate-50"
+          }`}
+        >
           <div className="flex flex-col">
-            <h2 className={`text-lg sm:text-xl font-bold ${isDark ? "text-white" : "text-slate-900"}`}>
+            <h2
+              className={`text-lg sm:text-xl font-bold ${isDark ? "text-white" : "text-slate-900"}`}
+            >
               {step === 1
                 ? "1. Shipment Details"
                 : step === 2
@@ -194,7 +204,9 @@ export default function UnifiedShipmentModal({
                   : "3. Complete"}
             </h2>
             {step === 1 && (
-              <p className={`text-xs mt-1 ${isDark ? "text-slate-500" : "text-slate-600"}`}>
+              <p
+                className={`text-xs mt-1 ${isDark ? "text-slate-500" : "text-slate-600"}`}
+              >
                 Fill in the package and routing info.
               </p>
             )}
@@ -202,7 +214,9 @@ export default function UnifiedShipmentModal({
           <button
             onClick={onClose}
             className={`p-2 rounded-lg transition-colors ${
-              isDark ? "text-slate-500 hover:text-white bg-slate-900" : "text-slate-500 hover:text-slate-900 bg-slate-200 hover:bg-slate-300"
+              isDark
+                ? "text-slate-500 hover:text-white bg-slate-900"
+                : "text-slate-500 hover:text-slate-900 bg-slate-200 hover:bg-slate-300"
             }`}
           >
             ✕
@@ -234,8 +248,8 @@ export default function UnifiedShipmentModal({
                       !isPickup
                         ? "bg-blue-600 text-white shadow"
                         : isDark
-                        ? "text-slate-400 hover:text-slate-200"
-                        : "text-slate-500 hover:text-slate-900"
+                          ? "text-slate-400 hover:text-slate-200"
+                          : "text-slate-500 hover:text-slate-900"
                     }`}
                   >
                     <FontAwesomeIcon icon={faStore} /> Warehouse Drop-off
@@ -246,11 +260,11 @@ export default function UnifiedShipmentModal({
                       isPickup
                         ? "bg-amber-600 text-white shadow"
                         : isDark
-                        ? "text-slate-400 hover:text-slate-200"
-                        : "text-slate-500 hover:text-slate-900"
+                          ? "text-slate-400 hover:text-slate-200"
+                          : "text-slate-500 hover:text-slate-900"
                     }`}
                   >
-                    <FontAwesomeIcon icon={faTruckPickup} /> Home Pickup
+                    <FontAwesomeIcon icon={faTruckPickup} /> Pickup
                   </button>
                 </div>
               </div>
@@ -271,7 +285,7 @@ export default function UnifiedShipmentModal({
 
           {step === 2 && (
             <div className="flex flex-col h-full overflow-hidden">
-              <div
+              {/* <div
                 className={`p-4 sm:p-6 border-b flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 shrink-0 ${
                   isDark
                     ? "border-slate-800 bg-slate-950"
@@ -347,7 +361,7 @@ export default function UnifiedShipmentModal({
                     ✕
                   </button>
                 </div>
-              </div>
+              </div> */}
 
               <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
                 <TripStep
@@ -414,9 +428,13 @@ export default function UnifiedShipmentModal({
         </div>
 
         {/* --- UNIFIED FOOTER --- */}
-        <div className={`p-4 sm:p-6 border-t flex flex-col sm:flex-row items-center gap-4 shrink-0 ${
-          isDark ? "border-slate-800 bg-slate-950" : "border-slate-200 bg-slate-50"
-        }`}>
+        <div
+          className={`p-4 sm:p-6 border-t flex flex-col sm:flex-row items-center gap-4 shrink-0 ${
+            isDark
+              ? "border-slate-800 bg-slate-950"
+              : "border-slate-200 bg-slate-50"
+          }`}
+        >
           {step === 1 && (
             <button
               type="submit"
@@ -439,14 +457,22 @@ export default function UnifiedShipmentModal({
                 <input
                   type="checkbox"
                   className={`w-4 h-4 rounded text-blue-600 focus:ring-blue-500 ${
-                    isDark ? "border-slate-700 bg-slate-800 focus:ring-offset-slate-900" : "border-slate-300 bg-white focus:ring-offset-white"
+                    isDark
+                      ? "border-slate-700 bg-slate-800 focus:ring-offset-slate-900"
+                      : "border-slate-300 bg-white focus:ring-offset-white"
                   }`}
                   checked={sendSms}
                   onChange={(e) => setSendSms(e.target.checked)}
                 />
                 <span
                   className={`text-xs font-bold uppercase tracking-tight ${
-                    sendSms ? (isDark ? "text-slate-200" : "text-slate-800") : (isDark ? "text-slate-500" : "text-slate-500")
+                    sendSms
+                      ? isDark
+                        ? "text-slate-200"
+                        : "text-slate-800"
+                      : isDark
+                        ? "text-slate-500"
+                        : "text-slate-500"
                   }`}
                 >
                   Notify Sender/Recipient via SMS
@@ -458,7 +484,9 @@ export default function UnifiedShipmentModal({
                 <button
                   onClick={() => setStep(1)}
                   className={`px-6 py-3 rounded-xl border font-bold transition-colors ${
-                    isDark ? "border-slate-700 text-slate-400 hover:bg-slate-800" : "border-slate-300 text-slate-600 hover:bg-slate-200"
+                    isDark
+                      ? "border-slate-700 text-slate-400 hover:bg-slate-800"
+                      : "border-slate-300 text-slate-600 hover:bg-slate-200"
                   }`}
                 >
                   Back
