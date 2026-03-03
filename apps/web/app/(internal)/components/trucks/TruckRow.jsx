@@ -88,9 +88,7 @@ export default function TruckRow({ truck: t, onEdit, isDark = false }) {
         </div>
         <button
           className={`p-2 -mr-2 ${
-            isDark
-              ? "text-slate-500"
-              : "text-slate-400 hover:text-slate-700"
+            isDark ? "text-slate-500" : "text-slate-400 hover:text-slate-700"
           }`}
           onClick={(e) => {
             e.stopPropagation();
@@ -158,10 +156,10 @@ export default function TruckRow({ truck: t, onEdit, isDark = false }) {
         {/* Show context only if it's not IDLE or DISABLED */}
         {(t.status === "IN_TRANSIT" || t.status === "ASSIGNED") && (
           <div className="md:mt-1.5 flex items-center gap-2 md:block">
-            <div className="flex items-center gap-1 text-[9px] font-mono text-blue-400 bg-blue-500/5 w-fit px-1.5 py-0.5 rounded border border-blue-500/10">
+            {/* <div className="flex items-center gap-1 text-[9px] font-mono text-blue-400 bg-blue-500/5 w-fit px-1.5 py-0.5 rounded border border-blue-500/10">
               <FontAwesomeIcon icon={faRoute} className="text-[8px]" />
               {t.currentTripId || "TRP-XXXX"}
-            </div>
+            </div> */}
             {/* Mobile ETA inline */}
             <span
               className={`md:hidden text-[9px] italic ${
@@ -202,8 +200,8 @@ export default function TruckRow({ truck: t, onEdit, isDark = false }) {
               isCritical
                 ? "text-red-500"
                 : isDark
-                ? "text-slate-500"
-                : "text-slate-700"
+                  ? "text-slate-500"
+                  : "text-slate-700"
             }`}
           >
             {isCritical ? "Service Required" : "PMS Health"}
@@ -276,7 +274,13 @@ export default function TruckRow({ truck: t, onEdit, isDark = false }) {
                 isDark ? "text-slate-300" : "text-slate-800"
               }`}
             >
-              {t.registrationExpiry || "—"}
+              {t.registrationExpiry
+                ? new Date(t.registrationExpiry).toLocaleDateString("en-PH", {
+                    year: "numeric",
+                    month: "long",
+                    day: "numeric",
+                  })
+                : "—"}
             </span>
           </span>
         </div>
