@@ -6,6 +6,7 @@ import {
   faFilter,
   faChevronLeft,
   faChevronRight,
+  faEdit,
 } from "@fortawesome/free-solid-svg-icons";
 
 export default function UserManagementTable({
@@ -13,11 +14,13 @@ export default function UserManagementTable({
   loading,
   onDeleteUser,
   onAddUser,
+  onEditUser, // Add this prop
   isDark = false,
 }) {
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState("ALL");
   const [page, setPage] = useState(1);
+
   const itemsPerPage = 5;
 
   const filteredUsers = useMemo(() => {
@@ -77,6 +80,10 @@ export default function UserManagementTable({
     ? "border-slate-700 bg-slate-900 text-slate-400 hover:text-white hover:bg-slate-800"
     : "border-slate-200 bg-white text-slate-700 hover:bg-slate-100 hover:text-slate-900";
 
+  const editBtnClasses = isDark
+    ? "text-slate-500 hover:text-blue-400 hover:bg-slate-800"
+    : "text-slate-600 hover:text-blue-600 hover:bg-slate-100";
+
   return (
     <div
       className={`border rounded-xl overflow-hidden shadow-lg ${containerClasses}`}
@@ -85,9 +92,7 @@ export default function UserManagementTable({
       <div
         className={`px-6 py-4 border-b flex justify-between items-center ${headerClasses}`}
       >
-        <h2
-          className={`font-bold ${isDark ? "text-white" : "text-slate-900"}`}
-        >
+        <h2 className={`font-bold ${isDark ? "text-white" : "text-slate-900"}`}>
           User Management
         </h2>
         <button
@@ -142,76 +147,87 @@ export default function UserManagementTable({
               isDark ? "text-slate-400" : "text-slate-600"
             }`}
           >
-          <thead className={`uppercase font-semibold text-xs ${theadClasses}`}>
-            <tr>
-              <th className="px-6 py-3">Name / Email</th>
-              <th className="px-6 py-3">Role</th>
-              <th className="px-6 py-3">Status</th>
-              <th className="px-6 py-3 text-right">Action</th>
-            </tr>
-          </thead>
-          <tbody className={`divide-y ${tbodyDivide}`}>
-            {loading ? (
+            <thead
+              className={`uppercase font-semibold text-xs ${theadClasses}`}
+            >
               <tr>
-                <td
-                  colSpan="4"
-                  className={`px-6 py-8 text-center ${isDark ? "text-slate-600" : "text-slate-500"}`}
-                >
-                  <div className="animate-pulse">Loading users...</div>
-                </td>
+                <th className="px-6 py-3">Name / Email</th>
+                <th className="px-6 py-3">Role</th>
+                <th className="px-6 py-3">Status</th>
+                <th className="px-6 py-3 text-right">Action</th>
               </tr>
-            ) : paginatedUsers.length === 0 ? (
-              <tr>
-                <td
-                  colSpan="4"
-                  className={`px-6 py-8 text-center italic ${isDark ? "text-slate-600" : "text-slate-500"}`}
-                >
-                  {users.length === 0
-                    ? "No users found."
-                    : "No matching users found."}
-                </td>
-              </tr>
-            ) : (
-              paginatedUsers.map((u) => (
-                <tr key={u.id} className={`${rowHover} transition-colors`}>
-                  <td className="px-6 py-4">
-                    <div className={`font-medium ${cellPrimary}`}>
-                      {u.name || "—"}
-                    </div>
-                    <div className={`text-xs ${cellSecondary}`}>{u.email}</div>
-                  </td>
-                  <td className="px-6 py-4">
-                    <span
-                      className={`px-2 py-1 rounded text-xs border font-mono uppercase ${roleBadgeClasses}`}
-                    >
-                      {u.role || "USER"}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4">
-                    <span
-                      className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase border ${
-                        u.status === "active"
-                          ? statusActiveClasses
-                          : statusInactiveClasses
-                      }`}
-                    >
-                      {u.status === "active" ? "Active" : "Inactive"}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 text-right">
-                    <button
-                      onClick={() => onDeleteUser(u)}
-                      className={`transition-colors p-2 rounded ${actionBtnClasses}`}
-                      title="Disable User"
-                    >
-                      <FontAwesomeIcon icon={faTrash} />
-                    </button>
+            </thead>
+            <tbody className={`divide-y ${tbodyDivide}`}>
+              {loading ? (
+                <tr>
+                  <td
+                    colSpan="4"
+                    className={`px-6 py-8 text-center ${isDark ? "text-slate-600" : "text-slate-500"}`}
+                  >
+                    <div className="animate-pulse">Loading users...</div>
                   </td>
                 </tr>
-              ))
-            )}
-          </tbody>
-        </table>
+              ) : paginatedUsers.length === 0 ? (
+                <tr>
+                  <td
+                    colSpan="4"
+                    className={`px-6 py-8 text-center italic ${isDark ? "text-slate-600" : "text-slate-500"}`}
+                  >
+                    {users.length === 0
+                      ? "No users found."
+                      : "No matching users found."}
+                  </td>
+                </tr>
+              ) : (
+                paginatedUsers.map((u) => (
+                  <tr key={u.id} className={`${rowHover} transition-colors`}>
+                    <td className="px-6 py-4">
+                      <div className={`font-medium ${cellPrimary}`}>
+                        {u.name || "—"}
+                      </div>
+                      <div className={`text-xs ${cellSecondary}`}>
+                        {u.email}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <span
+                        className={`px-2 py-1 rounded text-xs border font-mono uppercase ${roleBadgeClasses}`}
+                      >
+                        {u.role || "USER"}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4">
+                      <span
+                        className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase border ${
+                          u.status === "active"
+                            ? statusActiveClasses
+                            : statusInactiveClasses
+                        }`}
+                      >
+                        {u.status === "active" ? "Active" : "Inactive"}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 text-right">
+                      <button
+                        onClick={() => onEditUser(u)} // Trigger the edit modal
+                        className={`transition-colors p-2 rounded ${editBtnClasses}`}
+                        title="Edit User"
+                      >
+                        <FontAwesomeIcon icon={faEdit} />
+                      </button>
+                      <button
+                        onClick={() => onDeleteUser(u)}
+                        className={`transition-colors p-2 rounded ${actionBtnClasses}`}
+                        title="Disable User"
+                      >
+                        <FontAwesomeIcon icon={faTrash} />
+                      </button>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
         </div>
       </div>
 
@@ -221,11 +237,11 @@ export default function UserManagementTable({
           className={`px-6 py-4 border-t flex justify-between items-center text-xs ${footerClasses}`}
         >
           <span>
-            Showing{" "}
-            <span className={`font-bold ${footerBold}`}>
+            Page{" "}
+            {/* <span className={`font-bold ${footerBold}`}>
               {(page - 1) * itemsPerPage + 1}
             </span>{" "}
-            to{" "}
+            to{" "} */}
             <span className={`font-bold ${footerBold}`}>
               {Math.min(page * itemsPerPage, filteredUsers.length)}
             </span>{" "}
@@ -237,14 +253,14 @@ export default function UserManagementTable({
               disabled={page === 1}
               className={`px-3 py-1.5 rounded-lg border disabled:opacity-50 disabled:cursor-not-allowed transition-all ${paginationBtnClasses}`}
             >
-              <FontAwesomeIcon icon={faChevronLeft} className="mr-1" /> Prev
+              <FontAwesomeIcon icon={faChevronLeft} className="mr-1" />
             </button>
             <button
               onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
               disabled={page === totalPages}
               className={`px-3 py-1.5 rounded-lg border disabled:opacity-50 disabled:cursor-not-allowed transition-all ${paginationBtnClasses}`}
             >
-              Next <FontAwesomeIcon icon={faChevronRight} className="ml-1" />
+              <FontAwesomeIcon icon={faChevronRight} className="ml-1" />
             </button>
           </div>
         </div>

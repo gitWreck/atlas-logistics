@@ -81,6 +81,7 @@ export const broadcastTripMessage = httpsCallable(
 // ADMIN
 export const createUserProfile = httpsCallable(functions, "createUserProfile");
 export const toggleUserStatus = httpsCallable(functions, "toggleUserStatus");
+export const updateUserProfile = httpsCallable(functions, "updateUserProfile");
 
 // TRUCKS
 export const upsertTruck = httpsCallable(functions, "upsertTruck");

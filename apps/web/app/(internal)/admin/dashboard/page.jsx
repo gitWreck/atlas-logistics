@@ -28,10 +28,34 @@ import NotificationBell from "../../components/notifications/NotificationBell";
 import TruckBoard from "../../components/trucks/TruckBoard";
 
 const mainNavItems = [
-  { id: "overview", label: "Dashboard", icon: faChartPie, title: "Overview", description: "Operations dashboard" },
-  { id: "trips", label: "Trips", icon: faMapSigns, title: "Trip Board", description: "Manage truck assignments and routes." },
-  { id: "shipments", label: "Shipments", icon: faTruck, title: "Shipments", description: "Manage shipments and orders." },
-  { id: "trucks", label: "Trucks", icon: faTruckLoading, title: "Truck Board", description: "Manage fleet health and availability." },
+  {
+    id: "overview",
+    label: "Dashboard",
+    icon: faChartPie,
+    title: "Overview",
+    description: "Operations dashboard",
+  },
+  {
+    id: "trips",
+    label: "Trips",
+    icon: faMapSigns,
+    title: "Trip Board",
+    description: "Manage truck assignments and routes.",
+  },
+  {
+    id: "shipments",
+    label: "Shipments",
+    icon: faTruck,
+    title: "Shipments",
+    description: "Manage shipments and orders.",
+  },
+  {
+    id: "trucks",
+    label: "Trucks",
+    icon: faTruckLoading,
+    title: "Truck Board",
+    description: "Manage fleet health and availability.",
+  },
 ];
 
 const secondaryNavItems = [
@@ -53,7 +77,10 @@ export default function AdminDashboardPage() {
   const truckBoardRef = useRef(null);
   const mainScrollRef = useRef(null);
 
-  const currentTabConfig = useMemo(() => mainNavItems.find((t) => t.id === activeTab) || mainNavItems[0], [activeTab]);
+  const currentTabConfig = useMemo(
+    () => mainNavItems.find((t) => t.id === activeTab) || mainNavItems[0],
+    [activeTab],
+  );
 
   useEffect(() => {
     mainScrollRef.current?.scrollTo(0, 0);
@@ -65,9 +92,27 @@ export default function AdminDashboardPage() {
   }, [activeTab]);
 
   const headerButton = useMemo(() => {
-    if (activeTab === "trips") return { label: "Trip", icon: faPlus, accent: "emerald", onClick: () => tripBoardRef.current?.openCreateTripModal?.() };
-    if (activeTab === "shipments") return { label: "Shipment", icon: faPlus, accent: "blue", onClick: () => shipmentBoardRef.current?.openCreateModal?.() };
-    if (activeTab === "trucks") return { label: "Register Truck", icon: faPlus, accent: "blue", onClick: () => truckBoardRef.current?.openRegisterModal?.() };
+    if (activeTab === "trips")
+      return {
+        label: "Trip",
+        icon: faPlus,
+        accent: "emerald",
+        onClick: () => tripBoardRef.current?.openCreateTripModal?.(),
+      };
+    if (activeTab === "shipments")
+      return {
+        label: "Shipment",
+        icon: faPlus,
+        accent: "blue",
+        onClick: () => shipmentBoardRef.current?.openCreateModal?.(),
+      };
+    if (activeTab === "trucks")
+      return {
+        label: "Register Truck",
+        icon: faPlus,
+        accent: "blue",
+        onClick: () => truckBoardRef.current?.openRegisterModal?.(),
+      };
     return null;
   }, [activeTab]);
 
@@ -117,15 +162,28 @@ export default function AdminDashboardPage() {
     >
       {/* Mobile sidebar (off-canvas) */}
       {isMobileSidebarOpen && (
-        <div className="fixed inset-0 z-40 md:hidden">
+        // <div className="fixed inset-0 z-40 md:hidden">
+        <div
+          className={`fixed inset-0 z-40 md:hidden transition-opacity duration-300 ${
+            isMobileSidebarOpen
+              ? "opacity-100 pointer-events-auto"
+              : "opacity-0 pointer-events-none"
+          }`}
+        >
           <button
             type="button"
             aria-label="Close navigation"
             className="absolute inset-0 bg-black/40 backdrop-blur-sm"
             onClick={() => setIsMobileSidebarOpen(false)}
           />
-          <aside
+          {/* <aside
             className={`relative h-full w-64 max-w-[80vw] shrink-0 border-r px-4 py-6 overflow-y-auto ${sidebarClasses}`}
+          > */}
+          <aside
+            className={`relative h-full w-64 max-w-[80vw] shrink-0 border-r px-4 py-6 overflow-y-auto
+            transform transition-transform duration-300 ease-in-out
+            ${isMobileSidebarOpen ? "translate-x-0" : "-translate-x-full"}
+            ${sidebarClasses}`}
           >
             <SidebarContent
               isDark={isDark}
@@ -140,10 +198,16 @@ export default function AdminDashboardPage() {
       )}
 
       {/* Sidebar - fixed height, does not scroll (desktop and tablet) */}
-      <aside
+      {/* <aside
         className={`hidden md:flex flex-col ${
           isSidebarCollapsed ? "w-20" : "w-64"
         } shrink-0 border-r px-4 py-6 overflow-y-auto ${sidebarClasses}`}
+      > */}
+      <aside
+        className={`hidden md:flex flex-col shrink-0 border-r px-4 py-6 overflow-y-auto
+        transition-all duration-300 ease-in-out
+        ${isSidebarCollapsed ? "w-20" : "w-64"}
+        ${sidebarClasses}`}
       >
         <SidebarContent
           isDark={isDark}
@@ -195,11 +259,15 @@ export default function AdminDashboardPage() {
           </div>
 
           {/* Tab title & description */}
-          <div className={`flex-1 min-w-0 px-1 sm:px-2 ${isDark ? "text-white" : "text-slate-900"}`}>
+          <div
+            className={`flex-1 min-w-0 px-1 sm:px-2 ${isDark ? "text-white" : "text-slate-900"}`}
+          >
             <h1 className="font-bold tracking-wide text-lg uppercase leading-tight">
               {currentTabConfig?.title ?? "Dashboard"}
             </h1>
-            <p className={`text-xs mt-0.5 leading-tight ${isDark ? "text-slate-400" : "text-slate-600"}`}>
+            <p
+              className={`text-xs mt-0.5 leading-tight ${isDark ? "text-slate-400" : "text-slate-600"}`}
+            >
               {currentTabConfig?.description ?? "Operations dashboard"}
             </p>
           </div>
@@ -383,41 +451,41 @@ export default function AdminDashboardPage() {
 
             {/* Active tab content */}
             <div>
-                {activeTab === "overview" && (
-                  <AdminOverview
-                    user={user}
-                    userRole="admin"
-                    profile={profile}
-                    isDark={isDark}
-                  />
-                )}
-                {activeTab === "trips" && (
-                  <TripBoard
-                    ref={tripBoardRef}
-                    user={user}
-                    userRole="admin"
-                    profile={profile}
-                    isDark={isDark}
-                  />
-                )}
-                {activeTab === "shipments" && (
-                  <ShipmentBoard
-                    ref={shipmentBoardRef}
-                    user={user}
-                    userRole="admin"
-                    profile={profile}
-                    isDark={isDark}
-                  />
-                )}
-                {activeTab === "trucks" && (
-                  <TruckBoard
-                    ref={truckBoardRef}
-                    user={user}
-                    userRole="admin"
-                    profile={profile}
-                    isDark={isDark}
-                  />
-                )}
+              {activeTab === "overview" && (
+                <AdminOverview
+                  user={user}
+                  userRole="admin"
+                  profile={profile}
+                  isDark={isDark}
+                />
+              )}
+              {activeTab === "trips" && (
+                <TripBoard
+                  ref={tripBoardRef}
+                  user={user}
+                  userRole="admin"
+                  profile={profile}
+                  isDark={isDark}
+                />
+              )}
+              {activeTab === "shipments" && (
+                <ShipmentBoard
+                  ref={shipmentBoardRef}
+                  user={user}
+                  userRole="admin"
+                  profile={profile}
+                  isDark={isDark}
+                />
+              )}
+              {activeTab === "trucks" && (
+                <TruckBoard
+                  ref={truckBoardRef}
+                  user={user}
+                  userRole="admin"
+                  profile={profile}
+                  isDark={isDark}
+                />
+              )}
             </div>
           </div>
         </main>
@@ -508,7 +576,16 @@ function SidebarContent({
                 >
                   <FontAwesomeIcon icon={item.icon} size="sm" />
                 </span>
-                {!isSidebarCollapsed && <span>{item.label}</span>}
+                {/* {!isSidebarCollapsed && <span>{item.label}</span>} */}
+                <span
+                  className={`whitespace-nowrap transition-opacity duration-200 ${
+                    isSidebarCollapsed
+                      ? "opacity-0 w-0 overflow-hidden"
+                      : "opacity-100"
+                  }`}
+                >
+                  {item.label}
+                </span>
               </button>
             );
           })}

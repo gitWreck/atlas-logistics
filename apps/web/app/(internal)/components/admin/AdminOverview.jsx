@@ -15,6 +15,7 @@ import UserManagementTable from "./UserManagementTable";
 import DelayApprovalWidget from "../delay/DelayWidget";
 import RecentAlertsLogs from "../logs/RecentAlertsLogs";
 import RecentSmsLogs from "../logs/RecentSmsLogs";
+import EditUserModal from "./EditUserModal";
 
 export default function AdminOverview({ user, isDark = false }) {
   if (user?.customClaims?.admin) {
@@ -33,6 +34,12 @@ export default function AdminOverview({ user, isDark = false }) {
   const [isUserModalOpen, setUserModalOpen] = useState(false);
   const [isDisableModalOpen, setDisableModalOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState(null);
+  const [isEditModalOpen, setEditModalOpen] = useState(false);
+
+  const handleEditClick = (user) => {
+    setSelectedUser(user);
+    setEditModalOpen(true);
+  };
 
   // const listUsers = httpsCallable(functions, "listUsers");
   const fetchUsers = async () => {
@@ -115,7 +122,9 @@ export default function AdminOverview({ user, isDark = false }) {
           </div>
           <div
             className={`h-10 w-10 rounded-lg flex items-center justify-center ${
-              isDark ? "bg-indigo-500/20 text-indigo-400" : "bg-indigo-100 text-indigo-600"
+              isDark
+                ? "bg-indigo-500/20 text-indigo-400"
+                : "bg-indigo-100 text-indigo-600"
             }`}
           >
             <FontAwesomeIcon icon={faShieldAlt} />
@@ -144,7 +153,9 @@ export default function AdminOverview({ user, isDark = false }) {
           </div>
           <div
             className={`h-10 w-10 rounded-lg flex items-center justify-center ${
-              isDark ? "bg-slate-600/30 text-slate-300" : "bg-slate-100 text-slate-600"
+              isDark
+                ? "bg-slate-600/30 text-slate-300"
+                : "bg-slate-100 text-slate-600"
             }`}
           >
             <FontAwesomeIcon icon={faHistory} />
@@ -156,6 +167,7 @@ export default function AdminOverview({ user, isDark = false }) {
       <UserManagementTable
         users={users}
         loading={loading}
+        onEditUser={handleEditClick} // Pass the handler
         onDeleteUser={initiateDisable}
         onAddUser={() => setUserModalOpen(true)}
         isDark={isDark}
@@ -175,6 +187,15 @@ export default function AdminOverview({ user, isDark = false }) {
         onClose={() => setUserModalOpen(false)}
         isDark={isDark}
       />
+
+      <EditUserModal
+        isOpen={isEditModalOpen}
+        user={selectedUser}
+        onClose={() => setEditModalOpen(false)}
+        onSuccess={fetchUsers} // Refresh table data
+        isDark={isDark}
+      />
+
       <DisableUserModal
         isOpen={isDisableModalOpen}
         user={selectedUser}
