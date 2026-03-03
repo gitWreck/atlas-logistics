@@ -72,7 +72,11 @@ export default function TripStep({
       setTrips(snap.docs.map((doc) => ({ id: doc.id, ...doc.data() })));
     } catch (err) {
       console.error(err);
-      showAlert("error", "Failed to load trips", err.message || "Unknown error");
+      showAlert(
+        "error",
+        "Failed to load trips",
+        err.message || "Unknown error",
+      );
     } finally {
       setLoading(false);
     }
@@ -93,7 +97,11 @@ export default function TripStep({
       fetchTrips();
     } catch (err) {
       console.error(err);
-      showAlert("error", "Failed to create trip", err.message || "Unknown error");
+      showAlert(
+        "error",
+        "Failed to create trip",
+        err.message || "Unknown error",
+      );
     } finally {
       setLoading(false);
     }
@@ -284,7 +292,7 @@ export default function TripStep({
       </div>
 
       {/* Footer pinned at bottom */}
-      <div
+      {/* <div
         className={`shrink-0 p-3 sm:p-4 border-t flex items-center gap-3 z-10 ${
           isDark
             ? "border-slate-800 bg-slate-950"
@@ -312,7 +320,7 @@ export default function TripStep({
             {loading ? "Creating Trip..." : "Confirm & Add to List"}
           </button>
         )}
-      </div>
+      </div> */}
     </div>
   );
 }

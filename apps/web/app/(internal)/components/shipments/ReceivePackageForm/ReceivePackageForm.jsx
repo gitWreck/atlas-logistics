@@ -331,22 +331,29 @@ export default function ReceivePackageForm({
           />
 
           {/* --- IMAGE UPLOAD SECTION --- */}
-          <div className={`p-4 rounded-xl border space-y-3 ${isDark ? "bg-slate-950/50 border-slate-800/50" : "bg-slate-50 border-slate-200"}`}>
+          <div
+            className={`p-4 rounded-xl border space-y-3 ${isDark ? "bg-slate-950/50 border-slate-800/50" : "bg-slate-50 border-slate-200"}`}
+          >
             <div className="flex justify-between items-center">
-              <h3 className={`text-xs font-bold uppercase tracking-wider ${isDark ? "text-slate-400" : "text-slate-600"}`}>
-                Shipment Photos (Optional)
+              <h3
+                className={`text-xs font-bold uppercase tracking-wider ${isDark ? "text-slate-400" : "text-slate-600"}`}
+              >
+                Shipment Photos
               </h3>
-              <span className={`text-[10px] ${isDark ? "text-slate-500" : "text-slate-500"}`}>
+              <span
+                className={`text-[10px] ${isDark ? "text-slate-500" : "text-slate-500"}`}
+              >
                 {imageFiles.length}/3
               </span>
             </div>
-
             <div className="flex gap-4 items-start overflow-x-auto pb-2 sm:pb-0 custom-scrollbar">
               {/* BUTTON GROUP: Show if less than 3 images */}
               {imageFiles.length < 3 && (
                 <div className="flex gap-3 shrink-0">
                   {/* 1. UPLOAD FILE BUTTON */}
-                  <label className={`w-20 h-20 sm:w-24 sm:h-24 flex flex-col items-center justify-center border-2 border-dashed rounded-xl cursor-pointer transition-colors ${isDark ? "bg-slate-900 border-slate-700 hover:border-blue-500 hover:text-blue-500 text-slate-500" : "bg-white border-slate-300 hover:border-blue-500 hover:text-blue-600 text-slate-600"}`}>
+                  <label
+                    className={`w-20 h-20 sm:w-24 sm:h-24 flex flex-col items-center justify-center border-2 border-dashed rounded-xl cursor-pointer transition-colors ${isDark ? "bg-slate-900 border-slate-700 hover:border-blue-500 hover:text-blue-500 text-slate-500" : "bg-white border-slate-300 hover:border-blue-500 hover:text-blue-600 text-slate-600"}`}
+                  >
                     <FontAwesomeIcon icon={faImage} className="text-xl mb-1" />
                     <span className="text-[9px] sm:text-[10px] font-bold">
                       Upload
@@ -395,7 +402,9 @@ export default function ReceivePackageForm({
                 </div>
               ))}
             </div>
-            <p className={`text-[10px] italic ${isDark ? "text-slate-500" : "text-slate-600"}`}>
+            <p
+              className={`text-[10px] italic ${isDark ? "text-slate-500" : "text-slate-600"}`}
+            >
               Max 3 images. 10MB limit per file.
             </p>
           </div>

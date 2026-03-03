@@ -25,17 +25,21 @@ export default function ItemSection({
   return (
     <div className="pt-2">
       <div className="flex justify-between items-center mb-4">
-        <h3 className={`text-sm font-bold uppercase tracking-wider ${isDark ? "text-slate-400" : "text-slate-600"}`}>
+        <h3
+          className={`text-sm font-bold uppercase tracking-wider ${isDark ? "text-slate-400" : "text-slate-600"}`}
+        >
           Package Items
         </h3>
         <button
           type="button"
           onClick={onAdd}
           className={`text-xs border px-4 py-2 rounded-lg flex items-center gap-2 ${
-            isDark ? "bg-slate-800 hover:bg-slate-700 border-slate-700 text-blue-400" : "bg-slate-200 hover:bg-slate-300 border-slate-300 text-blue-600"
+            isDark
+              ? "bg-slate-800 hover:bg-slate-700 border-slate-700 text-blue-400"
+              : "bg-slate-200 hover:bg-slate-300 border-slate-300 text-blue-600"
           }`}
         >
-          <FontAwesomeIcon icon={faPlus} /> Box
+          <FontAwesomeIcon icon={faPlus} /> Item
         </button>
       </div>
 
@@ -44,17 +48,25 @@ export default function ItemSection({
           <div
             key={idx}
             className={`rounded-xl border p-4 shadow-sm animate-in slide-in-from-left-2 duration-300 ${
-              isDark ? "bg-slate-950 border-slate-800" : "bg-white border-slate-200"
+              isDark
+                ? "bg-slate-950 border-slate-800"
+                : "bg-white border-slate-200"
             }`}
           >
             <div className="flex gap-4 items-start">
-              <div className={`flex items-center justify-center w-8 h-8 rounded-lg font-mono text-xs border mt-6 ${
-                isDark ? "bg-slate-900 text-slate-500 border-slate-800" : "bg-slate-100 text-slate-600 border-slate-200"
-              }`}>
+              <div
+                className={`flex items-center justify-center w-8 h-8 rounded-lg font-mono text-xs border mt-6 ${
+                  isDark
+                    ? "bg-slate-900 text-slate-500 border-slate-800"
+                    : "bg-slate-100 text-slate-600 border-slate-200"
+                }`}
+              >
                 {idx + 1}
               </div>
               <div className="w-32">
-                <label className={`text-[10px] uppercase font-bold mb-1 block pl-1 ${isDark ? "text-slate-500" : "text-slate-600"}`}>
+                <label
+                  className={`text-[10px] uppercase font-bold mb-1 block pl-1 ${isDark ? "text-slate-500" : "text-slate-600"}`}
+                >
                   Type
                 </label>
                 <select
@@ -72,7 +84,9 @@ export default function ItemSection({
                 </select>
               </div>
               <div className="flex-1">
-                <label className={`text-[10px] uppercase font-bold mb-1 block pl-1 ${isDark ? "text-slate-500" : "text-slate-600"}`}>
+                <label
+                  className={`text-[10px] uppercase font-bold mb-1 block pl-1 ${isDark ? "text-slate-500" : "text-slate-600"}`}
+                >
                   Description
                 </label>
                 <input
@@ -85,7 +99,9 @@ export default function ItemSection({
                 />
               </div>
               <div className="w-24 relative">
-                <label className={`text-[10px] uppercase font-bold mb-1 block pl-1 ${isDark ? "text-slate-500" : "text-slate-600"}`}>
+                <label
+                  className={`text-[10px] uppercase font-bold mb-1 block pl-1 ${isDark ? "text-slate-500" : "text-slate-600"}`}
+                >
                   Quantity
                 </label>
                 <input
@@ -130,11 +146,15 @@ export default function ItemSection({
             </div>
             <div className="flex gap-4 mt-3 pl-12 items-end">
               <div className="w-40 relative">
-                <label className={`text-[10px] uppercase font-bold mb-1 block pl-1 ${isDark ? "text-slate-500" : "text-slate-600"}`}>
+                <label
+                  className={`text-[10px] uppercase font-bold mb-1 block pl-1 ${isDark ? "text-slate-500" : "text-slate-600"}`}
+                >
                   Declared Value
                 </label>
                 <div className="relative">
-                  <span className={`absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold ${isDark ? "text-slate-500" : "text-slate-600"}`}>
+                  <span
+                    className={`absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold ${isDark ? "text-slate-500" : "text-slate-600"}`}
+                  >
                     ₱
                   </span>
                   <input

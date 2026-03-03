@@ -51,7 +51,7 @@ export default function TripRow({ trip, onClick, isDark = false }) {
         relative flex flex-col gap-3 p-4 border-b cursor-pointer transition-colors group
         md:grid md:grid-cols-12 md:gap-4 md:px-6 md:items-center
         ${isDark ? "border-slate-800/50" : "border-slate-200"}
-        ${isDelayed ? (isDark ? "bg-amber-500/5 hover:bg-amber-500/10" : "bg-amber-50 hover:bg-amber-50/80") : (isDark ? "hover:bg-slate-800/30" : "hover:bg-slate-50")}
+        ${isDelayed ? (isDark ? "bg-amber-500/5 hover:bg-amber-500/10" : "bg-amber-50 hover:bg-amber-50/80") : isDark ? "hover:bg-slate-800/30" : "hover:bg-slate-50"}
       `}
     >
       {/* --- MOBILE ONLY HEADER (Top Row) --- */}
@@ -106,7 +106,9 @@ export default function TripRow({ trip, onClick, isDark = false }) {
           </div>
         </div>
         {/* Mobile Action Button */}
-        <button className={`p-2 -mr-2 ${isDark ? "text-slate-500" : "text-slate-600"}`}>
+        <button
+          className={`p-2 -mr-2 ${isDark ? "text-slate-500" : "text-slate-600"}`}
+        >
           <FontAwesomeIcon icon={faEllipsisV} />
         </button>
       </div>
@@ -139,34 +141,32 @@ export default function TripRow({ trip, onClick, isDark = false }) {
                 />
                 {trip.tripId}
               </span>
-              {/* Desktop Trip Type Badge */}
-              <span
-                className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${
-                  isLocal
-                    ? isDark
-                      ? "bg-amber-500/10 text-amber-500 border-amber-500/20"
-                      : "bg-amber-100 text-amber-800 border-amber-300"
-                    : isDark
-                      ? "bg-blue-500/10 text-blue-500 border-blue-500/20"
-                      : "bg-blue-100 text-blue-800 border-blue-300"
-                }`}
-              >
-                {isLocal ? "LOCAL" : "TRANSFER"}
-              </span>
             </div>
           </div>
 
           {/* Driver Info (Visible on both) */}
-          <div className={`text-xs md:mt-1 flex items-center justify-between md:justify-start gap-2 w-full ${isDark ? "text-slate-400" : "text-slate-600"}`}>
+          <div
+            className={`text-xs md:mt-1 flex items-center justify-between md:justify-start gap-2 w-full ${isDark ? "text-slate-400" : "text-slate-600"}`}
+          >
             <div className="flex items-center gap-2">
-              <span className={`font-medium ${isDark ? "text-slate-300" : "text-slate-700"}`}>{driverName}</span>
-              <span className={isDark ? "text-slate-600" : "text-slate-400"}>•</span>
-              <span className={`font-mono ${isDark ? "text-slate-500" : "text-slate-600"}`}>
+              <span
+                className={`font-medium ${isDark ? "text-slate-300" : "text-slate-700"}`}
+              >
+                {driverName}
+              </span>
+              <span className={isDark ? "text-slate-600" : "text-slate-400"}>
+                •
+              </span>
+              <span
+                className={`font-mono ${isDark ? "text-slate-500" : "text-slate-600"}`}
+              >
                 {trip.truckPlateNumber || "No Plate"}
               </span>
             </div>
             {/* Mobile Loaded Count (Moved here for space) */}
-            <span className={`md:hidden font-mono text-[10px] ${isDark ? "text-slate-500" : "text-slate-600"}`}>
+            <span
+              className={`md:hidden font-mono text-[10px] ${isDark ? "text-slate-500" : "text-slate-600"}`}
+            >
               {loadedCount}/{totalCount} Items
             </span>
           </div>
@@ -185,13 +185,11 @@ export default function TripRow({ trip, onClick, isDark = false }) {
           }`}
         >
           {trip.originCode}
-          <span
-            className={isDark ? "text-slate-600" : "text-slate-500"}
-          >
+          <span className={isDark ? "text-slate-600" : "text-slate-500"}>
             {isLocal ? "↻" : "→"}
           </span>
           {isLocal && trip.originCode === trip.destinationCode
-            ? "HUB ROUTE"
+            ? "HUB TRANSFER"
             : trip.destinationCode}
         </div>
         <div
@@ -204,12 +202,26 @@ export default function TripRow({ trip, onClick, isDark = false }) {
             ? "Local Collection"
             : `${trip.origin} → ${trip.destination}`}
         </div>
+
+        <span
+          className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${
+            isLocal
+              ? isDark
+                ? "bg-amber-500/10 text-amber-500 border-amber-500/20"
+                : "bg-amber-100 text-amber-800 border-amber-300"
+              : isDark
+                ? "bg-blue-500/10 text-blue-500 border-blue-500/20"
+                : "bg-blue-100 text-blue-800 border-blue-300"
+          }`}
+        >
+          {isLocal ? "LOCAL PICKUP" : "HUB TRANSFER"}
+        </span>
       </div>
 
       {/* --- COL 3: Stats (Desktop Only - Mobile Moved to Driver Row) --- */}
       <div className="hidden md:block col-span-1 pr-4">
         <span
-          className={`text-xs font-mono border-l pl-2 ${
+          className={`text-[14px] font-mono border-l pl-2 ${
             isDark
               ? "text-slate-500 border-slate-700"
               : "text-slate-600 border-slate-300"
@@ -222,12 +234,16 @@ export default function TripRow({ trip, onClick, isDark = false }) {
       {/* --- COL 4: Progress Bar --- */}
       <div className="md:col-span-3 md:pr-4 w-full">
         {/* Load Stats (Desktop Only) */}
-        <div className={`hidden md:flex justify-between text-[10px] mb-1 ${isDark ? "text-slate-500" : "text-slate-600"}`}>
+        <div
+          className={`hidden md:flex justify-between text-[10px] mb-1 ${isDark ? "text-slate-500" : "text-slate-600"}`}
+        >
           <span>{trip.progress}%</span>
         </div>
 
         {/* Bar */}
-        <div className={`h-1.5 w-full rounded-full overflow-hidden mt-1 md:mt-0 ${isDark ? "bg-slate-800" : "bg-slate-200"}`}>
+        <div
+          className={`h-1.5 w-full rounded-full overflow-hidden mt-1 md:mt-0 ${isDark ? "bg-slate-800" : "bg-slate-200"}`}
+        >
           <div
             className={`h-full rounded-full transition-all duration-500 ${
               trip.status === "COMPLETED"
@@ -243,17 +259,25 @@ export default function TripRow({ trip, onClick, isDark = false }) {
         {/* Status Text (Desktop Only) */}
         <div className="mt-1.5 gap-2 hidden md:flex">
           {isDelayed && (
-            <span className={`text-[10px] px-1.5 rounded animate-pulse font-bold ${isDark ? "bg-amber-600 text-white" : "bg-amber-100 text-amber-800"}`}>
+            <span
+              className={`text-[14px] px-1.5 rounded animate-pulse font-bold ${isDark ? "bg-amber-600 text-white" : "bg-amber-100 text-amber-800"}`}
+            >
               DELAYED
             </span>
           )}
           <span
-            className={`text-[10px] font-bold uppercase tracking-wide ${
+            className={`text-[12px] font-bold uppercase tracking-wide ${
               isDelayed
-                ? isDark ? "text-amber-400" : "text-amber-700"
+                ? isDark
+                  ? "text-amber-400"
+                  : "text-amber-700"
                 : trip.status === "COMPLETED"
-                  ? isDark ? "text-emerald-400" : "text-emerald-600"
-                  : isDark ? "text-blue-400" : "text-blue-600"
+                  ? isDark
+                    ? "text-emerald-400"
+                    : "text-emerald-600"
+                  : isDark
+                    ? "text-blue-400"
+                    : "text-blue-600"
             }`}
           >
             {isDelayed
@@ -265,11 +289,15 @@ export default function TripRow({ trip, onClick, isDark = false }) {
 
       {/* --- COL 5: Time (Desktop Only) --- */}
       <div className="hidden md:flex col-span-2 flex-col gap-1">
-        <div className={`text-xs flex items-center gap-1.5 ${isDark ? "text-slate-500" : "text-slate-600"}`}>
+        <div
+          className={`text-[14px] flex items-center gap-1.5 ${isDark ? "text-slate-500" : "text-slate-600"}`}
+        >
           {formatFirestoreDate(trip.updatedAt)}
         </div>
         {trip.status !== "COMPLETED" && trip.estimatedArrival && (
-          <div className={`text-xs ${isDark ? "text-slate-600" : "text-slate-500"}`}>
+          <div
+            className={`text-xs ${isDark ? "text-slate-600" : "text-slate-500"}`}
+          >
             ETA: {new Date(trip.estimatedArrival).toLocaleDateString()}
           </div>
         )}
