@@ -22,7 +22,12 @@ function calculateCurrentStep(status) {
   return status;
 }
 
-export default function ShipmentDrawer({ isOpen, onClose, data, isDark = false }) {
+export default function ShipmentDrawer({
+  isOpen,
+  onClose,
+  data,
+  isDark = false,
+}) {
   const [activeTab, setActiveTab] = useState("TIMELINE");
   const [messageBody, setMessageBody] = useState(""); // State for the message input
   // const [packages, setPackages] = useState([]);
@@ -41,65 +46,7 @@ export default function ShipmentDrawer({ isOpen, onClose, data, isDark = false }
     console.log("shipment data: ", data);
   }, [isOpen, data]);
 
-  const handleSendMessage = () => {
-    // Integration logic here
-    alert(`Sending SMS to ${data.recipient?.phone}:\n\n"${messageBody}"`);
-  };
-
   if (!data) return null;
-
-  function PackageRow({ pkg, idx, isDark: pkgIsDark }) {
-    const [showQR, setShowQR] = useState(false);
-
-    return (
-      <div className={`p-3 rounded-lg flex flex-col gap-3 ${
-        pkgIsDark ? "bg-slate-800/40 border border-slate-700" : "bg-slate-50 border border-slate-200"
-      }`}>
-        {/* TOP ROW: INFO */}
-        <div className="flex justify-between items-center">
-          <div className="flex gap-3 items-center">
-            {/* SEQUENCE BADGE */}
-            <div className={`h-8 w-8 rounded flex items-center justify-center text-xs font-mono font-bold border ${
-              pkgIsDark ? "bg-slate-900 text-slate-500 border-slate-700" : "bg-white text-slate-600 border-slate-300"
-            }`}>
-              {pkg.sequence || idx + 1}
-            </div>
-
-            {/* TEXT DETAILS */}
-            <div>
-              <div className={`text-sm font-medium ${pkgIsDark ? "text-slate-200" : "text-slate-900"}`}>
-                {pkg.description}
-              </div>
-              <div className={`text-xs font-mono ${pkgIsDark ? "text-slate-500" : "text-slate-600"}`}>
-                {pkg.trackingNumber}
-              </div>
-            </div>
-          </div>
-
-          {/* ACTIONS & STATUS */}
-          <div className="flex items-center gap-3">
-            {/* QR TOGGLE BUTTON */}
-            <button
-              onClick={() => setShowQR(!showQR)}
-              className={`h-8 w-8 rounded flex items-center justify-center transition-all ${
-                showQR
-                  ? "bg-white text-black"
-                  : pkgIsDark ? "bg-slate-700 text-slate-400 hover:bg-slate-600 hover:text-white" : "bg-slate-200 text-slate-600 hover:bg-slate-300 hover:text-slate-900"
-              }`}
-              title="Show QR Code"
-            >
-              <FontAwesomeIcon icon={faQrcode} />
-            </button>
-
-            <StatusBadge status={pkg.status} size="xs" isDark={isDark} />
-          </div>
-        </div>
-
-        {/* QR CODE REVEAL (CONDITIONAL) */}
-        {showQR && <ShipmentLabel shipment={data} packages={pkg} index={idx} />}
-      </div>
-    );
-  }
 
   return (
     <>
@@ -119,25 +66,37 @@ export default function ShipmentDrawer({ isOpen, onClose, data, isDark = false }
         `}
       >
         {/* HEADER */}
-        <div className={`p-6 border-b flex justify-between items-start ${
-          isDark ? "border-slate-800 bg-slate-950" : "border-slate-200 bg-slate-50"
-        }`}>
+        <div
+          className={`p-6 border-b flex justify-between items-start ${
+            isDark
+              ? "border-slate-800 bg-slate-950"
+              : "border-slate-200 bg-slate-50"
+          }`}
+        >
           <div>
-            <div className={`text-[10px] uppercase font-bold tracking-wider mb-1 ${
-              isDark ? "text-slate-500" : "text-slate-600"
-            }`}>
+            <div
+              className={`text-[10px] uppercase font-bold tracking-wider mb-1 ${
+                isDark ? "text-slate-500" : "text-slate-600"
+              }`}
+            >
               Shipment Order
             </div>
-            <h2 className={`text-xl font-mono font-bold tracking-tight ${
-              isDark ? "text-white" : "text-slate-900"
-            }`}>
+            <h2
+              className={`text-xl font-mono font-bold tracking-tight ${
+                isDark ? "text-white" : "text-slate-900"
+              }`}
+            >
               {data.trackingNumber}
             </h2>
             <div className="flex gap-2 mt-2 items-center">
               <StatusBadge status={data.status} isDark={isDark} />
-              <span className={`text-xs border-l pl-2 ml-1 ${
-                isDark ? "text-slate-400 border-slate-700" : "text-slate-600 border-slate-300"
-              }`}>
+              <span
+                className={`text-xs border-l pl-2 ml-1 ${
+                  isDark
+                    ? "text-slate-400 border-slate-700"
+                    : "text-slate-600 border-slate-300"
+                }`}
+              >
                 {data.route}
               </span>
             </div>
@@ -145,7 +104,9 @@ export default function ShipmentDrawer({ isOpen, onClose, data, isDark = false }
           <button
             onClick={onClose}
             className={`p-2 rounded-lg transition-colors ${
-              isDark ? "text-slate-500 hover:text-white hover:bg-slate-800" : "text-slate-500 hover:text-slate-900 hover:bg-slate-200"
+              isDark
+                ? "text-slate-500 hover:text-white hover:bg-slate-800"
+                : "text-slate-500 hover:text-slate-900 hover:bg-slate-200"
             }`}
           >
             <FontAwesomeIcon icon={faTimes} size="lg" />
@@ -153,7 +114,9 @@ export default function ShipmentDrawer({ isOpen, onClose, data, isDark = false }
         </div>
 
         {/* TABS */}
-        <div className={`flex border-b ${isDark ? "border-slate-800 bg-slate-900" : "border-slate-200 bg-slate-50"}`}>
+        <div
+          className={`flex border-b ${isDark ? "border-slate-800 bg-slate-900" : "border-slate-200 bg-slate-50"}`}
+        >
           <TabButton
             isActive={activeTab === "TIMELINE"}
             onClick={() => setActiveTab("TIMELINE")}
@@ -178,15 +141,39 @@ export default function ShipmentDrawer({ isOpen, onClose, data, isDark = false }
         </div>
 
         {/* CONTENT */}
-        <div className={`flex-1 overflow-y-auto p-6 ${isDark ? "bg-slate-900" : "bg-white"}`}>
+        <div
+          className={`flex-1 overflow-y-auto p-6 ${isDark ? "bg-slate-900" : "bg-white"}`}
+        >
           {/* --- TAB 1: TIMELINE --- */}
           {activeTab === "TIMELINE" && (
             <div className="animate-in fade-in slide-in-from-left-4 duration-300">
               <div className="grid grid-cols-2 gap-3 mb-8">
-                <InfoCard label="Customer" value={data.recipient?.name} isDark={isDark} />
-                <InfoCard label="Phone" value={data.recipient?.phone} isDark={isDark} />
+                <InfoCard
+                  label="Sender"
+                  value={data.sender?.name}
+                  isDark={isDark}
+                />
+                <InfoCard
+                  label="Sender Phone"
+                  value={data.sender?.phone}
+                  isDark={isDark}
+                />
+                <InfoCard
+                  label="Recipient"
+                  value={data.recipient?.name}
+                  isDark={isDark}
+                />
+                <InfoCard
+                  label="Recipient Phone"
+                  value={data.recipient?.phone}
+                  isDark={isDark}
+                />
                 <InfoCard label="Origin" value={data.origin} isDark={isDark} />
-                <InfoCard label="Destination" value={data.destination} isDark={isDark} />
+                <InfoCard
+                  label="Destination"
+                  value={data.destination}
+                  isDark={isDark}
+                />
               </div>
               <div className={isDark ? "text-slate-500" : "text-slate-600"}>
                 <div>
@@ -250,8 +237,8 @@ export default function ShipmentDrawer({ isOpen, onClose, data, isDark = false }
                                   isDone
                                     ? "bg-blue-600 border-blue-600"
                                     : isDark
-                                    ? "bg-slate-900 border-slate-700"
-                                    : "bg-slate-100 border-slate-300"
+                                      ? "bg-slate-900 border-slate-700"
+                                      : "bg-slate-100 border-slate-300"
                                 }
                                 ${
                                   isCurrent
@@ -283,8 +270,8 @@ export default function ShipmentDrawer({ isOpen, onClose, data, isDark = false }
                                       ? "text-white"
                                       : "text-slate-900"
                                     : isDark
-                                    ? "text-slate-400"
-                                    : "text-slate-500"
+                                      ? "text-slate-400"
+                                      : "text-slate-500"
                                 }`}
                               >
                                 {step.replace(/_/g, " ")}
@@ -334,8 +321,11 @@ function TabButton({ isActive, onClick, icon, label, isDark = false }) {
       onClick={onClick}
       className={`flex-1 py-3 text-xs font-bold border-b-2 transition-colors flex items-center justify-center gap-2 uppercase tracking-wide ${
         isActive
-          ? "border-blue-500 bg-blue-500/5 " + (isDark ? "text-blue-400" : "text-blue-600")
-          : isDark ? "border-transparent text-slate-500 hover:text-slate-300 hover:bg-slate-800/50" : "border-transparent text-slate-600 hover:text-slate-900 hover:bg-slate-100"
+          ? "border-blue-500 bg-blue-500/5 " +
+            (isDark ? "text-blue-400" : "text-blue-600")
+          : isDark
+            ? "border-transparent text-slate-500 hover:text-slate-300 hover:bg-slate-800/50"
+            : "border-transparent text-slate-600 hover:text-slate-900 hover:bg-slate-100"
       }`}
     >
       <FontAwesomeIcon icon={icon} /> {label}
@@ -345,13 +335,21 @@ function TabButton({ isActive, onClick, icon, label, isDark = false }) {
 
 function InfoCard({ label, value, isDark = false }) {
   return (
-    <div className={`p-3 rounded-lg border ${
-      isDark ? "bg-slate-800/30 border-slate-800" : "bg-slate-50 border-slate-200"
-    }`}>
-      <div className={`text-[10px] uppercase font-bold mb-1 ${isDark ? "text-slate-500" : "text-slate-600"}`}>
+    <div
+      className={`p-3 rounded-lg border ${
+        isDark
+          ? "bg-slate-800/30 border-slate-800"
+          : "bg-slate-50 border-slate-200"
+      }`}
+    >
+      <div
+        className={`text-[10px] uppercase font-bold mb-1 ${isDark ? "text-slate-500" : "text-slate-600"}`}
+      >
         {label}
       </div>
-      <div className={`text-sm font-medium truncate ${isDark ? "text-slate-300" : "text-slate-700"}`}>
+      <div
+        className={`text-sm font-medium truncate ${isDark ? "text-slate-300" : "text-slate-700"}`}
+      >
         {value || "—"}
       </div>
     </div>

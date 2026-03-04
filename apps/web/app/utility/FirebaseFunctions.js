@@ -5,7 +5,11 @@ import { app as mainApp } from "@/lib/firebase";
 const functions = getFunctions(mainApp, "asia-southeast1");
 
 // PACKAGES
-export const createPackage = httpsCallable(functions, "createPackage");
+// export const createPackage = httpsCallable(functions, "createPackage");
+export const createShipmentBundle = httpsCallable(
+  functions,
+  "createShipmentBundle",
+);
 export const createShipmentWithPackages = httpsCallable(
   functions,
   "createShipmentWithPackages",

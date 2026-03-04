@@ -49,30 +49,23 @@ export async function GET() {
     const uniqueTripIds = new Set();
     snapshot.docs.forEach((doc) => {
       const tripId = doc.data().currentTruckTripId;
-      if (tripId && typeof tripId === "string") {
-        uniqueTripIds.add(tripId);
-      }
+      if (tripId) uniqueTripIds.add(tripId);
     });
 
     // B. Fetch all related Trips in ONE batch request (Efficient)
     let tripMap = {}; // Will store { "TRIP-DOC-ID": { ...tripData } }
-
     if (uniqueTripIds.size > 0) {
       const tripRefs = Array.from(uniqueTripIds).map((id) =>
         adminDb.collection("truck_trips").doc(id),
       );
 
-      // getAll() is much faster than looping with await
       const tripSnapshots = await adminDb.getAll(...tripRefs);
-
       tripSnapshots.forEach((snap) => {
         if (snap.exists) {
-          const tripData = snap.data();
-
-          // ✅ UPDATE: Only add to map if the trip is active
-          if (tripData.active === true) {
-            tripMap[snap.id] = tripData;
-          }
+          tripMap[snap.id] = snap.data();
+          // Note: Removed the hard 'active === true' filter here so
+          // that the dashboard still shows the trip info even if
+          // it was recently completed or in a different state.
         }
       });
     }
@@ -82,16 +75,21 @@ export async function GET() {
     // ---------------------------------------------------------
     const shipments = snapshot.docs.map((doc) => {
       const data = doc.data();
-
-      // Find the truck info from our pre-fetched map
       const assignedTrip = data.currentTruckTripId
         ? tripMap[data.currentTruckTripId]
         : null;
 
-      // Safe math for progress
-      const total = data.totals?.totalItems || 1;
-      const delivered = data.totals?.delivered || 0;
-      const percent = Math.round((delivered / total) * 100);
+      // ✅ ADJUSTED MATH: Progress based on Bundled Quantity
+      // Use totalContentQty if it exists (Bundled Mode), fallback to totalItems
+      const totalUnits =
+        data.totals?.totalContentQty || data.totals?.totalItems || 1;
+      const deliveredUnits = data.totals?.delivered || 0;
+      const loadedUnits = data.totals?.loaded || 0;
+
+      const progressPercent = Math.round((deliveredUnits / totalUnits) * 100);
+      const loadPercent = Math.round(
+        (loadedUnits / (data.totals?.totalItems || 1)) * 100,
+      );
 
       // Handle Dates
       const createdAt = data.createdAt
@@ -104,31 +102,29 @@ export async function GET() {
       return {
         id: doc.id,
         ...data,
-        createdAt: createdAt,
-        updatedAt: updatedAt,
+        createdAt,
+        updatedAt,
 
-        // --- NEW: ENRICHED TRUCK DATA ---
-        // This makes it easy to show "Driver: Juan" or "Status: DELAYED" on the board
+        // Calculated Metrics for Dashboard
+        metrics: {
+          totalContent: totalUnits,
+          totalPackages: data.totals?.totalItems || 0,
+          totalDelivered: deliveredUnits,
+          totalLoaded: loadedUnits,
+          progressPercent,
+          loadPercent, // Shows how many Sacks/Bundles are actually on the truck
+        },
+
         truckDetails: assignedTrip
           ? {
-              tripId: assignedTrip.tripId, // Human ID (e.g. TRIP-2023...)
+              tripId: assignedTrip.tripId,
               driverName: assignedTrip.driverName || "Unassigned",
               truckPlate: assignedTrip.truckPlateNumber || "N/A",
               status: assignedTrip.status,
-              delayCleared: assignedTrip.delayCleared, // Boolean flag
+              delayCleared: assignedTrip.delayCleared,
               delayReason: assignedTrip.delayReason || null,
             }
           : null,
-
-        // Calculated Fields
-        // route:
-        //   data.origin && data.destination
-        //     ? `${data.origin.substring(0, 3)} → ${data.destination.substring(
-        //         0,
-        //         3
-        //       )}`
-        //     : "—",
-        // progressPercent: percent,
       };
     });
 

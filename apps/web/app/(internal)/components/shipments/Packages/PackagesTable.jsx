@@ -21,6 +21,8 @@ export default function PackagesTable({ data, isDark = false }) {
   const [filter, setFilter] = useState("ALL");
   const [currentPage, setCurrentPage] = useState(1);
 
+  console.log("packages table data: ", data);
+
   // 1. FILTER & SEARCH LOGIC
   const filteredPackages = data.packages.filter((pkg) => {
     const term = search.toLowerCase();
@@ -51,13 +53,20 @@ export default function PackagesTable({ data, isDark = false }) {
   return (
     <div className="space-y-4 animate-in fade-in slide-in-from-right-4 duration-300">
       {/* --- CONTROLS BAR --- */}
-      <div className={`flex flex-col md:flex-row gap-3 justify-between items-stretch md:items-center p-3 rounded-xl border ${
-        isDark ? "bg-slate-800/40 border-slate-700/50" : "bg-slate-50 border-slate-200"
-      }`}>
+      <div
+        className={`flex flex-col md:flex-row gap-3 justify-between items-stretch md:items-center p-3 rounded-xl border ${
+          isDark
+            ? "bg-slate-800/40 border-slate-700/50"
+            : "bg-slate-50 border-slate-200"
+        }`}
+      >
         <div className="flex flex-col sm:flex-row flex-1 gap-2 w-full md:w-auto">
           <div className="relative flex-1">
             <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none">
-              <FontAwesomeIcon icon={faSearch} className={isDark ? "text-slate-500" : "text-slate-400"} />
+              <FontAwesomeIcon
+                icon={faSearch}
+                className={isDark ? "text-slate-500" : "text-slate-400"}
+              />
             </div>
             <input
               type="text"
@@ -68,14 +77,19 @@ export default function PackagesTable({ data, isDark = false }) {
                 setCurrentPage(1);
               }}
               className={`w-full border rounded-lg pl-9 pr-3 py-2 text-sm focus:ring-1 focus:ring-blue-500 outline-none ${
-                isDark ? "bg-slate-900 border-slate-700 text-white" : "bg-white border-slate-300 text-slate-900"
+                isDark
+                  ? "bg-slate-900 border-slate-700 text-white"
+                  : "bg-white border-slate-300 text-slate-900"
               }`}
             />
           </div>
 
           <div className="relative">
             <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none">
-              <FontAwesomeIcon icon={faFilter} className={isDark ? "text-slate-500" : "text-slate-400"} />
+              <FontAwesomeIcon
+                icon={faFilter}
+                className={isDark ? "text-slate-500" : "text-slate-400"}
+              />
             </div>
             <select
               value={filter}
@@ -84,7 +98,9 @@ export default function PackagesTable({ data, isDark = false }) {
                 setCurrentPage(1);
               }}
               className={`w-full sm:w-auto border rounded-lg pl-9 pr-8 py-2 text-sm focus:ring-1 focus:ring-blue-500 outline-none appearance-none cursor-pointer ${
-                isDark ? "bg-slate-900 border-slate-700 text-white" : "bg-white border-slate-300 text-slate-900"
+                isDark
+                  ? "bg-slate-900 border-slate-700 text-white"
+                  : "bg-white border-slate-300 text-slate-900"
               }`}
             >
               {uniqueStatuses.map((status) => (
@@ -104,32 +120,44 @@ export default function PackagesTable({ data, isDark = false }) {
             )
           }
           className={`flex justify-center items-center gap-2 px-4 py-2 rounded-lg transition-colors text-xs font-bold whitespace-nowrap ${
-            isDark ? "bg-slate-700 hover:bg-slate-600 text-white" : "bg-slate-200 hover:bg-slate-300 text-slate-800"
+            isDark
+              ? "bg-slate-700 hover:bg-slate-600 text-white"
+              : "bg-slate-200 hover:bg-slate-300 text-slate-800"
           }`}
         >
           <FontAwesomeIcon icon={faPrint} />
-          <span>Print {filteredPackages.length} Labels</span>
+          <span>Print {filteredPackages.length} Label/s</span>
         </button>
       </div>
 
       {/* --- CONTENT AREA --- */}
-      <div className={`border rounded-xl overflow-hidden ${
-        isDark ? "border-slate-700 bg-slate-900/50" : "border-slate-200 bg-white"
-      }`}>
+      <div
+        className={`border rounded-xl overflow-hidden ${
+          isDark
+            ? "border-slate-700 bg-slate-900/50"
+            : "border-slate-200 bg-white"
+        }`}
+      >
         <div className="hidden md:block">
           <table className="w-full text-left border-collapse">
             <thead>
-              <tr className={`border-b text-xs uppercase tracking-wider ${
-                isDark ? "bg-slate-900 border-slate-700 text-slate-400" : "bg-slate-50 border-slate-200 text-slate-600"
-              }`}>
+              <tr
+                className={`border-b text-xs uppercase tracking-wider ${
+                  isDark
+                    ? "bg-slate-900 border-slate-700 text-slate-400"
+                    : "bg-slate-50 border-slate-200 text-slate-600"
+                }`}
+              >
                 <th className="p-4 w-16 text-center">#</th>
                 <th className="p-4">Item Details</th>
                 <th className="p-4">Tracking No.</th>
                 <th className="p-4">Status</th>
-                <th className="p-4 text-right">Actions</th>
+                {/* <th className="p-4 text-right">Actions</th> */}
               </tr>
             </thead>
-            <tbody className={`divide-y ${isDark ? "divide-slate-800" : "divide-slate-200"}`}>
+            <tbody
+              className={`divide-y ${isDark ? "divide-slate-800" : "divide-slate-200"}`}
+            >
               {currentPackages.length > 0 ? (
                 currentPackages.map((pkg, idx) => (
                   <PackageTableRow
@@ -155,7 +183,9 @@ export default function PackagesTable({ data, isDark = false }) {
         </div>
 
         {/* MOBILE: CARD LIST VIEW */}
-        <div className={`md:hidden divide-y ${isDark ? "divide-slate-800" : "divide-slate-200"}`}>
+        <div
+          className={`md:hidden divide-y ${isDark ? "divide-slate-800" : "divide-slate-200"}`}
+        >
           {currentPackages.length > 0 ? (
             currentPackages.map((pkg, idx) => (
               <PackageMobileCard
@@ -167,7 +197,9 @@ export default function PackagesTable({ data, isDark = false }) {
               />
             ))
           ) : (
-            <div className={`p-8 text-center italic ${isDark ? "text-slate-500" : "text-slate-600"}`}>
+            <div
+              className={`p-8 text-center italic ${isDark ? "text-slate-500" : "text-slate-600"}`}
+            >
               No packages found.
             </div>
           )}
@@ -177,7 +209,9 @@ export default function PackagesTable({ data, isDark = false }) {
       {/* --- PAGINATION --- */}
       {totalPages > 1 && (
         <div className="flex justify-between items-center px-2">
-          <span className={`text-xs ${isDark ? "text-slate-500" : "text-slate-600"}`}>
+          <span
+            className={`text-xs ${isDark ? "text-slate-500" : "text-slate-600"}`}
+          >
             Showing {startIndex + 1}-
             {Math.min(startIndex + ITEMS_PER_PAGE, filteredPackages.length)} of{" "}
             {filteredPackages.length}
@@ -187,15 +221,21 @@ export default function PackagesTable({ data, isDark = false }) {
               onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
               disabled={currentPage === 1}
               className={`w-8 h-8 flex items-center justify-center rounded-lg border disabled:opacity-50 disabled:cursor-not-allowed ${
-                isDark ? "bg-slate-800 border-slate-700 text-slate-400 hover:text-white" : "bg-white border-slate-300 text-slate-600 hover:text-slate-900 hover:bg-slate-50"
+                isDark
+                  ? "bg-slate-800 border-slate-700 text-slate-400 hover:text-white"
+                  : "bg-white border-slate-300 text-slate-600 hover:text-slate-900 hover:bg-slate-50"
               }`}
             >
               <FontAwesomeIcon icon={faChevronLeft} size="xs" />
             </button>
 
-            <div className={`flex items-center px-3 border rounded-lg text-xs font-bold ${
-              isDark ? "bg-slate-900 border-slate-700 text-slate-300" : "bg-slate-50 border-slate-200 text-slate-700"
-            }`}>
+            <div
+              className={`flex items-center px-3 border rounded-lg text-xs font-bold ${
+                isDark
+                  ? "bg-slate-900 border-slate-700 text-slate-300"
+                  : "bg-slate-50 border-slate-200 text-slate-700"
+              }`}
+            >
               Page {currentPage} of {totalPages}
             </div>
 
@@ -203,7 +243,9 @@ export default function PackagesTable({ data, isDark = false }) {
               onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
               disabled={currentPage === totalPages}
               className={`w-8 h-8 flex items-center justify-center rounded-lg border disabled:opacity-50 disabled:cursor-not-allowed ${
-                isDark ? "bg-slate-800 border-slate-700 text-slate-400 hover:text-white" : "bg-white border-slate-300 text-slate-600 hover:text-slate-900 hover:bg-slate-50"
+                isDark
+                  ? "bg-slate-800 border-slate-700 text-slate-400 hover:text-white"
+                  : "bg-white border-slate-300 text-slate-600 hover:text-slate-900 hover:bg-slate-50"
               }`}
             >
               <FontAwesomeIcon icon={faChevronRight} size="xs" />
@@ -221,37 +263,57 @@ function PackageTableRow({ pkg, idx, shipmentData, isDark = false }) {
 
   return (
     <>
-      <tr className={`transition-colors group ${isDark ? "hover:bg-slate-800/50" : "hover:bg-slate-50"}`}>
+      <tr
+        className={`transition-colors group ${isDark ? "hover:bg-slate-800/50" : "hover:bg-slate-50"}`}
+      >
         <td className="p-4 text-center">
-          <span className={`inline-flex items-center justify-center w-6 h-6 rounded border text-xs font-mono font-bold transition-colors ${
-            isDark ? "bg-slate-800 border-slate-700 text-slate-500 group-hover:bg-slate-700 group-hover:text-white" : "bg-slate-100 border-slate-200 text-slate-600 group-hover:bg-slate-200 group-hover:text-slate-900"
-          }`}>
+          <span
+            className={`inline-flex items-center justify-center w-6 h-6 rounded border text-xs font-mono font-bold transition-colors ${
+              isDark
+                ? "bg-slate-800 border-slate-700 text-slate-500 group-hover:bg-slate-700 group-hover:text-white"
+                : "bg-slate-100 border-slate-200 text-slate-600 group-hover:bg-slate-200 group-hover:text-slate-900"
+            }`}
+          >
             {pkg.sequence || idx + 1}
           </span>
         </td>
 
         <td className="p-4">
-          <div className={`font-medium text-sm ${isDark ? "text-slate-200" : "text-slate-900"}`}>
+          <div
+            className={`font-medium text-sm ${isDark ? "text-slate-200" : "text-slate-900"}`}
+          >
             {pkg.description || "No Description"}
           </div>
-          <div className={`text-xs ${isDark ? "text-slate-500" : "text-slate-600"}`}>
+          <div
+            className={`text-xs ${isDark ? "text-slate-500" : "text-slate-600"}`}
+          >
             {pkg.packagingType || "Package"} •{" "}
-            {pkg.weight ? `${pkg.weight}kg` : "N/A"}
+            {pkg.quantity ? `${pkg.quantity} qty` : "N/A"}
           </div>
           {(pkg.isFragile || pkg.isPerishable) && (
             <div className="flex flex-wrap gap-1.5 mt-1.5">
               {pkg.isFragile && (
-                <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold uppercase ${
-                  isDark ? "bg-amber-500/10 border border-amber-500/30 text-amber-400" : "bg-amber-50 border border-amber-200 text-amber-700"
-                }`}>
-                  <FontAwesomeIcon icon={faWineGlass} className="text-[8px]" /> Fragile
+                <span
+                  className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold uppercase ${
+                    isDark
+                      ? "bg-amber-500/10 border border-amber-500/30 text-amber-400"
+                      : "bg-amber-50 border border-amber-200 text-amber-700"
+                  }`}
+                >
+                  <FontAwesomeIcon icon={faWineGlass} className="text-[8px]" />{" "}
+                  Fragile
                 </span>
               )}
               {pkg.isPerishable && (
-                <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold uppercase ${
-                  isDark ? "bg-cyan-500/10 border border-cyan-500/30 text-cyan-400" : "bg-cyan-50 border border-cyan-200 text-cyan-700"
-                }`}>
-                  <FontAwesomeIcon icon={faSnowflake} className="text-[8px]" /> Perishable
+                <span
+                  className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold uppercase ${
+                    isDark
+                      ? "bg-cyan-500/10 border border-cyan-500/30 text-cyan-400"
+                      : "bg-cyan-50 border border-cyan-200 text-cyan-700"
+                  }`}
+                >
+                  <FontAwesomeIcon icon={faSnowflake} className="text-[8px]" />{" "}
+                  Perishable
                 </span>
               )}
             </div>
@@ -268,27 +330,35 @@ function PackageTableRow({ pkg, idx, shipmentData, isDark = false }) {
           <StatusBadge status={pkg.status} size="xs" isDark={isDark} />
         </td>
 
-        <td className="p-4 text-right">
+        {/* <td className="p-4 text-right">
           <button
             onClick={() => setShowQR(!showQR)}
             className={`w-8 h-8 rounded inline-flex items-center justify-center transition-all ${
               showQR
                 ? "bg-blue-600 text-white shadow-lg shadow-blue-900/50"
-                : isDark ? "bg-slate-800 text-slate-400 hover:bg-slate-700 hover:text-white border border-slate-700" : "bg-slate-200 text-slate-600 hover:bg-slate-300 hover:text-slate-900 border border-slate-300"
+                : isDark
+                  ? "bg-slate-800 text-slate-400 hover:bg-slate-700 hover:text-white border border-slate-700"
+                  : "bg-slate-200 text-slate-600 hover:bg-slate-300 hover:text-slate-900 border border-slate-300"
             }`}
             title="Toggle QR Code"
           >
             <FontAwesomeIcon icon={faQrcode} />
           </button>
-        </td>
+        </td> */}
       </tr>
 
       {showQR && (
-        <tr className={`animate-in fade-in zoom-in-95 duration-200 ${isDark ? "bg-slate-900/50" : "bg-slate-50"}`}>
+        <tr
+          className={`animate-in fade-in zoom-in-95 duration-200 ${isDark ? "bg-slate-900/50" : "bg-slate-50"}`}
+        >
           <td colSpan="5" className="p-4">
-            <div className={`flex items-center gap-6 border rounded-xl p-4 max-w-lg mx-auto shadow-inner ${
-              isDark ? "bg-slate-950 border-slate-800" : "bg-white border-slate-200"
-            }`}>
+            <div
+              className={`flex items-center gap-6 border rounded-xl p-4 max-w-lg mx-auto shadow-inner ${
+                isDark
+                  ? "bg-slate-950 border-slate-800"
+                  : "bg-white border-slate-200"
+              }`}
+            >
               <ShipmentLabel
                 shipment={shipmentData}
                 packages={pkg}
@@ -307,14 +377,22 @@ function PackageMobileCard({ pkg, idx, shipmentData, isDark = false }) {
   const [showQR, setShowQR] = useState(false);
 
   return (
-    <div className={`p-4 space-y-3 transition-colors ${
-      isDark ? "bg-slate-900/50 hover:bg-slate-800/30" : "bg-white hover:bg-slate-50"
-    }`}>
+    <div
+      className={`p-4 space-y-3 transition-colors ${
+        isDark
+          ? "bg-slate-900/50 hover:bg-slate-800/30"
+          : "bg-white hover:bg-slate-50"
+      }`}
+    >
       <div className="flex justify-between items-start">
         <div className="flex gap-3 items-center">
-          <span className={`inline-flex items-center justify-center w-8 h-8 rounded border text-xs font-mono font-bold ${
-            isDark ? "bg-slate-800 border-slate-700 text-slate-400" : "bg-slate-100 border-slate-200 text-slate-600"
-          }`}>
+          <span
+            className={`inline-flex items-center justify-center w-8 h-8 rounded border text-xs font-mono font-bold ${
+              isDark
+                ? "bg-slate-800 border-slate-700 text-slate-400"
+                : "bg-slate-100 border-slate-200 text-slate-600"
+            }`}
+          >
             {pkg.sequence || idx + 1}
           </span>
           <div className="font-mono text-xs text-amber-500 bg-amber-500/10 px-2 py-1 rounded w-fit border border-amber-500/20">
@@ -327,7 +405,9 @@ function PackageMobileCard({ pkg, idx, shipmentData, isDark = false }) {
           className={`w-8 h-8 rounded inline-flex items-center justify-center transition-all ${
             showQR
               ? "bg-blue-600 text-white shadow-lg shadow-blue-900/50"
-              : isDark ? "bg-slate-800 text-slate-400 border border-slate-700" : "bg-slate-200 text-slate-600 border border-slate-300"
+              : isDark
+                ? "bg-slate-800 text-slate-400 border border-slate-700"
+                : "bg-slate-200 text-slate-600 border border-slate-300"
           }`}
         >
           <FontAwesomeIcon icon={faQrcode} />
@@ -335,30 +415,49 @@ function PackageMobileCard({ pkg, idx, shipmentData, isDark = false }) {
       </div>
 
       <div className="pl-11">
-        <div className={`font-medium text-sm ${isDark ? "text-slate-200" : "text-slate-900"}`}>
+        <div
+          className={`font-medium text-sm ${isDark ? "text-slate-200" : "text-slate-900"}`}
+        >
           {pkg.description || "No Description"}
         </div>
-        <div className={`text-xs mt-1 flex gap-2 items-center ${isDark ? "text-slate-500" : "text-slate-600"}`}>
-          <FontAwesomeIcon icon={faBoxOpen} className={isDark ? "text-slate-600" : "text-slate-500"} />
+        <div
+          className={`text-xs mt-1 flex gap-2 items-center ${isDark ? "text-slate-500" : "text-slate-600"}`}
+        >
+          <FontAwesomeIcon
+            icon={faBoxOpen}
+            className={isDark ? "text-slate-600" : "text-slate-500"}
+          />
           {pkg.packagingType || "Package"}
-          <span className={isDark ? "text-slate-700" : "text-slate-400"}>|</span>
+          <span className={isDark ? "text-slate-700" : "text-slate-400"}>
+            |
+          </span>
           {pkg.weight ? `${pkg.weight}kg` : "N/A"}
         </div>
 
         {(pkg.isFragile || pkg.isPerishable) && (
           <div className="flex flex-wrap gap-1.5 mt-2">
             {pkg.isFragile && (
-              <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold uppercase ${
-                isDark ? "bg-amber-500/10 border border-amber-500/30 text-amber-400" : "bg-amber-50 border border-amber-200 text-amber-700"
-              }`}>
-                <FontAwesomeIcon icon={faWineGlass} className="text-[8px]" /> Fragile
+              <span
+                className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold uppercase ${
+                  isDark
+                    ? "bg-amber-500/10 border border-amber-500/30 text-amber-400"
+                    : "bg-amber-50 border border-amber-200 text-amber-700"
+                }`}
+              >
+                <FontAwesomeIcon icon={faWineGlass} className="text-[8px]" />{" "}
+                Fragile
               </span>
             )}
             {pkg.isPerishable && (
-              <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold uppercase ${
-                isDark ? "bg-cyan-500/10 border border-cyan-500/30 text-cyan-400" : "bg-cyan-50 border border-cyan-200 text-cyan-700"
-              }`}>
-                <FontAwesomeIcon icon={faSnowflake} className="text-[8px]" /> Perishable
+              <span
+                className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold uppercase ${
+                  isDark
+                    ? "bg-cyan-500/10 border border-cyan-500/30 text-cyan-400"
+                    : "bg-cyan-50 border border-cyan-200 text-cyan-700"
+                }`}
+              >
+                <FontAwesomeIcon icon={faSnowflake} className="text-[8px]" />{" "}
+                Perishable
               </span>
             )}
           </div>
@@ -370,10 +469,16 @@ function PackageMobileCard({ pkg, idx, shipmentData, isDark = false }) {
       </div>
 
       {showQR && (
-        <div className={`mt-4 pt-4 border-t animate-in fade-in zoom-in-95 duration-200 ${isDark ? "border-slate-800" : "border-slate-200"}`}>
-          <div className={`border rounded-xl p-4 flex justify-center shadow-inner ${
-            isDark ? "bg-slate-950 border-slate-800" : "bg-white border-slate-200"
-          }`}>
+        <div
+          className={`mt-4 pt-4 border-t animate-in fade-in zoom-in-95 duration-200 ${isDark ? "border-slate-800" : "border-slate-200"}`}
+        >
+          <div
+            className={`border rounded-xl p-4 flex justify-center shadow-inner ${
+              isDark
+                ? "bg-slate-950 border-slate-800"
+                : "bg-white border-slate-200"
+            }`}
+          >
             {/* Scale down label slightly on mobile if needed via CSS in ShipmentLabel */}
             <ShipmentLabel shipment={shipmentData} packages={pkg} index={idx} />
           </div>
