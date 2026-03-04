@@ -15,6 +15,7 @@ import TripStep from "../manifests/CreateTripModal/TripStep";
 import {
   createShipmentWithPackages,
   assignShipmentToTruckTrip,
+  createShipmentBundle,
 } from "@/app/utility/FirebaseFunctions";
 import { useAlert } from "@/app/context/AlertContext";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
@@ -122,7 +123,7 @@ export default function UnifiedShipmentModal({
       };
 
       // --- Save to DB ---
-      const shipmentRes = await createShipmentWithPackages(payload);
+      const shipmentRes = await createShipmentBundle(payload);
       const newShipmentId = shipmentRes?.data?.shipmentId || manualShipmentId;
       setCreatedShipmentId(newShipmentId);
 
