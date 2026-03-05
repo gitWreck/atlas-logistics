@@ -16,7 +16,8 @@ export default function DashboardHeader({ firstName, onLogout }) {
       </View>
 
       <TouchableOpacity style={styles.logoutBtn} onPress={onLogout}>
-        <FontAwesome5 name="sign-out-alt" size={20} color={COLORS.logout} />
+        <FontAwesome5 name="sign-out-alt" size={16} color="#475569" />
+        <Text style={styles.logoutText}>Log out</Text>
       </TouchableOpacity>
     </View>
   );
@@ -49,6 +50,19 @@ const styles = StyleSheet.create({
   },
   logoutBtn: {
     marginLeft: 16,
-    padding: 8,
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: "#e2e8f0",
+    backgroundColor: "#f8fafc",
+    gap: 6,
+  },
+  logoutText: {
+    color: "#475569",
+    fontSize: 14,
+    fontWeight: "500",
   },
 });

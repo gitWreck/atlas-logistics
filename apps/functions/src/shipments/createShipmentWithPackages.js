@@ -31,8 +31,8 @@ exports.createShipmentWithPackages = onCall(
       recipient,
       origin,
       destination,
-      originCode, // NEW
-      destinationCode, // NEW
+      originCode,
+      destinationCode,
       items,
       remarks,
       location, // Optional { lat, lng } for initial status location
@@ -40,7 +40,7 @@ exports.createShipmentWithPackages = onCall(
       manualShipmentId,
       proofOfReceipt = [],
 
-      status, // <-- NEW
+      status,
       currentLocation = null,
     } = request.data || {};
 
@@ -100,9 +100,6 @@ exports.createShipmentWithPackages = onCall(
 
     // Example: AT-20231027-MNL-CEB-123456
     if (!shipmentId) {
-      // ... your old ID generation logic as backup ...
-      //  const dateStr = ...
-      //  shipmentId = `AT-...`;
       const dateStr = timestamp.toISOString().slice(0, 10).replace(/-/g, "");
       shipmentId = `AT-${dateStr}-${originCode}-${destinationCode}-${Date.now().toString().slice(-6)}`;
     }
@@ -120,7 +117,6 @@ exports.createShipmentWithPackages = onCall(
     const now = Timestamp.now();
     const nowAt = admin.firestore.FieldValue.serverTimestamp();
 
-    // 3. Construct the Packages Array (In Memory)
     const packagesArray = [];
     const packageBarcodes = []; // Helper for fast scanning
 
@@ -222,9 +218,6 @@ exports.createShipmentWithPackages = onCall(
 
       // AGGREGATES
       totals: {
-        // totalItems: items.length,
-        // received: items.length, // Starts fully received
-        // pending: items.length, // All items pending loading
         totalItems: packagesArray.length, // Total physical boxes
         received: packagesArray.length,
         pending: packagesArray.length,
@@ -236,7 +229,6 @@ exports.createShipmentWithPackages = onCall(
       remarks: remarks || null,
       proofOfReceipt: proofOfReceipt,
 
-      // *** THE CRITICAL CHANGE ***
       // We store the data here instead of subcollections
       packages: packagesArray,
       packageBarcodes: packageBarcodes,
@@ -247,7 +239,6 @@ exports.createShipmentWithPackages = onCall(
       action: "CREATE_SHIPMENT",
       trackingDocId: shipmentRef.id,
       trackingNumber: shipmentId,
-      // totalItems: items.length,
       totalItems: packagesArray.length, // Log the actual box count
       originCode: finalOriginCode,
       destinationCode: finalDestCode,
@@ -257,16 +248,9 @@ exports.createShipmentWithPackages = onCall(
 
     // 6. Commit
     try {
-      // await batch.commit();
-
-      // --- 6. Commit ---
       try {
         await batch.commit();
-
-        // NEW: TRIGGER SMS NOTIFICATION
         if (notifySms === true) {
-          // We don't 'await' this if we want to return to the UI faster,
-          // but we catch errors to prevent crashing the response.
           sendShipmentCreatedSmsLogic({
             shipmentId,
             senderPhone: sender.phone,
@@ -286,15 +270,7 @@ exports.createShipmentWithPackages = onCall(
         };
       } catch (error) {
         console.error("[Notify] Failed to queue SMS:", err);
-        // ... existing error handling
       }
-
-      // return {
-      //   success: true,
-      //   shipmentId,
-      //   // Return barcodes so UI can print labels immediately
-      //   packageBarcodes,
-      // };
     } catch (error) {
       console.error("Transaction failure:", error);
       throw new HttpsError("internal", "Failed to create shipment records.");

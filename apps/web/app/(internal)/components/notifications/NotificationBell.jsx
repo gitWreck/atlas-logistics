@@ -18,7 +18,7 @@ import {
 import { formatDistanceToNow } from "date-fns"; // Recommended for "5 mins ago"
 import StatusBadge from "../ui/StatusBadge";
 
-export default function NotificationBell() {
+export default function NotificationBell({ isDark = false }) {
   const [alerts, setAlerts] = useState([]);
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef(null);
@@ -82,11 +82,19 @@ export default function NotificationBell() {
       {/* BELL ICON BUTTON */}
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="relative p-2 text-slate-400 hover:text-white transition-colors"
+        className={`relative p-2 transition-colors ${
+          isDark
+            ? "text-slate-400 hover:text-white"
+            : "text-slate-500 hover:text-slate-900"
+        }`}
       >
         <FontAwesomeIcon icon={faBell} size="lg" />
         {alerts.length > 0 && (
-          <span className="absolute top-0 right-0 h-5 w-5 bg-red-600 text-white text-[10px] font-bold flex items-center justify-center rounded-full border-2 border-slate-900 animate-pulse">
+          <span
+            className={`absolute top-0 right-0 h-5 w-5 bg-red-600 text-white text-[10px] font-bold flex items-center justify-center rounded-full border-2 ${
+              isDark ? "border-slate-900" : "border-white"
+            } animate-pulse`}
+          >
             {alerts.length > 9 ? "9+" : alerts.length}
           </span>
         )}
@@ -94,13 +102,33 @@ export default function NotificationBell() {
 
       {/* DROPDOWN MENU */}
       {isOpen && (
-        <div className="absolute right-0 mt-2 w-80 bg-slate-900 border border-slate-700 rounded-xl shadow-2xl z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
+        <div
+          className={`absolute right-0 mt-2 w-80 rounded-xl shadow-2xl z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200 border ${
+            isDark
+              ? "bg-slate-900 border-slate-700"
+              : "bg-white border-slate-200"
+          }`}
+        >
           {/* Header */}
-          <div className="p-3 bg-slate-950 border-b border-slate-800 flex justify-between items-center">
-            <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+          <div
+            className={`p-3 border-b flex justify-between items-center ${
+              isDark
+                ? "bg-slate-950 border-slate-800"
+                : "bg-slate-50 border-slate-200"
+            }`}
+          >
+            <h3
+              className={`text-xs font-bold uppercase tracking-wider ${
+                isDark ? "text-slate-400" : "text-slate-600"
+              }`}
+            >
               Notifications
             </h3>
-            <span className="text-xs text-blue-400 font-bold">
+            <span
+              className={`text-xs font-bold ${
+                isDark ? "text-blue-400" : "text-blue-600"
+              }`}
+            >
               {alerts.length} New
             </span>
           </div>
@@ -108,31 +136,47 @@ export default function NotificationBell() {
           {/* List */}
           <div className="max-h-[300px] overflow-y-auto custom-scrollbar">
             {alerts.length === 0 ? (
-              <div className="p-8 text-center text-slate-500 text-sm">
+              <div
+                className={`p-8 text-center text-sm ${
+                  isDark ? "text-slate-500" : "text-slate-500"
+                }`}
+              >
                 No new alerts. All clear!
               </div>
             ) : (
               alerts.map((alert) => (
                 <div
                   key={alert.id}
-                  className="p-4 border-b border-slate-800 hover:bg-slate-800/50 transition-colors flex gap-3 group"
+                  className={`p-4 border-b transition-colors flex gap-3 group ${
+                    isDark
+                      ? "border-slate-800 hover:bg-slate-800/50"
+                      : "border-slate-100 hover:bg-slate-50"
+                  }`}
                 >
                   {/* Icon */}
                   <div
-                    className={`mt-1 ${alert.type === "DELAY_REPORT" ? "text-amber-500" : "text-blue-500"}`}
+                    className={`mt-1 ${
+                      alert.type === "DELAY_REPORT"
+                        ? "text-amber-500"
+                        : "text-blue-500"
+                    }`}
                   >
                     <FontAwesomeIcon icon={faTriangleExclamation} />
                   </div>
 
                   {/* Content */}
                   <div className="flex-1">
-                    <p className="flex items-center flex-wrap text-sm font-bold text-slate-200 leading-tight mb-1 gap-1.5">
-                      {/* ✅ FIX 1: Safely check details using ?. */}
+                    <p
+                      className={`flex items-center flex-wrap text-sm font-bold leading-tight mb-1 gap-1.5 ${
+                        isDark ? "text-slate-200" : "text-slate-900"
+                      }`}
+                    >
+                      {/* Construct message since 'message' field is missing in data */}
                       {alert.details?.driverName
                         ? `${alert.details.driverName}: `
                         : `${alert.tripId || "Unknown Trip"} `}
 
-                      {/* ✅ FIX 2: Added flex & items-center above so the badge aligns perfectly with the text */}
+                      {/* Badge aligns nicely beside text */}
                       {alert.details?.reason ? (
                         <StatusBadge
                           status="delayed"
@@ -143,7 +187,11 @@ export default function NotificationBell() {
                       )}
                     </p>
                     <div className="flex justify-between items-center mt-2">
-                      <span className="text-[10px] text-slate-500 font-mono">
+                      <span
+                        className={`text-[10px] font-mono ${
+                          isDark ? "text-slate-500" : "text-slate-500"
+                        }`}
+                      >
                         {/* ✅ FIX: Safe check for toDate() in case data is incomplete */}
                         {alert.createdAt?.toDate
                           ? formatDistanceToNow(alert.createdAt.toDate(), {
@@ -155,7 +203,11 @@ export default function NotificationBell() {
                       {/* Mark Read Button (Visible on Hover) */}
                       <button
                         onClick={(e) => markAsRead(e, alert.id)}
-                        className="text-[10px] bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-green-400 px-2 py-1 rounded border border-slate-700 transition-all opacity-100 md:opacity-0 group-hover:opacity-100 flex items-center gap-1"
+                        className={`text-[10px] px-2 py-1 rounded border transition-all opacity-100 md:opacity-0 group-hover:opacity-100 flex items-center gap-1 ${
+                          isDark
+                            ? "bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-green-400 border-slate-700"
+                            : "bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-emerald-600 border-slate-200"
+                        }`}
                       >
                         <FontAwesomeIcon icon={faCheck} /> Mark Read
                       </button>
@@ -168,8 +220,20 @@ export default function NotificationBell() {
 
           {/* Footer */}
           {alerts.length > 0 && (
-            <div className="p-2 bg-slate-950/50 border-t border-slate-800 text-center">
-              <button className="text-xs text-slate-500 hover:text-white transition-colors">
+            <div
+              className={`p-2 border-t text-center ${
+                isDark
+                  ? "bg-slate-950/50 border-slate-800"
+                  : "bg-slate-50 border-slate-200"
+              }`}
+            >
+              <button
+                className={`text-xs transition-colors ${
+                  isDark
+                    ? "text-slate-500 hover:text-white"
+                    : "text-slate-500 hover:text-slate-900"
+                }`}
+              >
                 View All History
               </button>
             </div>

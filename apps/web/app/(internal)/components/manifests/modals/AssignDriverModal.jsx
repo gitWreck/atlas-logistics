@@ -19,6 +19,7 @@ export default function AssignDriverModal({
   onClose,
   trip,
   onSuccess,
+  isDark = false,
 }) {
   const [formData, setFormData] = useState({
     driverName: "",
@@ -79,15 +80,26 @@ export default function AssignDriverModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-      <div className="bg-slate-900 border border-slate-700 rounded-xl w-full max-w-sm shadow-2xl">
-        <div className="p-4 border-b border-slate-800 rounded-t-xl flex justify-between items-center bg-slate-950">
-          <h3 className="font-bold text-white flex items-center gap-2">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+      <div className={`w-full max-w-sm shadow-2xl rounded-xl ${
+        isDark ? "bg-slate-900 border border-slate-700" : "bg-white border border-slate-200"
+      }`}>
+        <div className={`p-4 border-b rounded-t-xl flex justify-between items-center ${
+          isDark ? "border-slate-800 bg-slate-950" : "border-slate-200 bg-slate-50"
+        }`}>
+          <h3 className={`font-bold flex items-center gap-2 ${
+            isDark ? "text-white" : "text-slate-900"
+          }`}>
             <FontAwesomeIcon icon={faIdCard} className="text-blue-500" />
             Manage Driver
           </h3>
-          <button onClick={onClose}>
-            <FontAwesomeIcon icon={faTimes} className="text-slate-500" />
+          <button
+            onClick={onClose}
+            className={`transition-colors p-1 rounded ${
+              isDark ? "text-slate-500 hover:text-white hover:bg-slate-800" : "text-slate-500 hover:text-slate-900 hover:bg-slate-100"
+            }`}
+          >
+            <FontAwesomeIcon icon={faTimes} />
           </button>
         </div>
 
@@ -104,6 +116,7 @@ export default function AssignDriverModal({
               onSelectId={(id) =>
                 setFormData((prev) => ({ ...prev, driverId: id }))
               }
+              isDark={isDark}
             />
           </div>
 
@@ -115,6 +128,7 @@ export default function AssignDriverModal({
             onSelectId={(id) =>
               setFormData((prev) => ({ ...prev, truckId: id }))
             }
+            isDark={isDark}
           />
 
           {/* <div className="space-y-1">
@@ -148,7 +162,9 @@ export default function AssignDriverModal({
                     handleSubmitUnassign(null, true);
                 }}
                 disabled={loading}
-                className="px-3 rounded-lg border border-red-500/30 text-red-400 hover:bg-red-500/10"
+                className={`px-3 rounded-lg border transition-colors ${
+                  isDark ? "border-red-500/30 text-red-400 hover:bg-red-500/10" : "border-red-300 text-red-600 hover:bg-red-50"
+                }`}
                 title="Unassign Driver"
               >
                 <FontAwesomeIcon icon={faUserSlash} />

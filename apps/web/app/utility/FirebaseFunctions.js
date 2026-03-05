@@ -5,7 +5,11 @@ import { app as mainApp } from "@/lib/firebase";
 const functions = getFunctions(mainApp, "asia-southeast1");
 
 // PACKAGES
-export const createPackage = httpsCallable(functions, "createPackage");
+// export const createPackage = httpsCallable(functions, "createPackage");
+export const createShipmentBundle = httpsCallable(
+  functions,
+  "createShipmentBundle",
+);
 export const createShipmentWithPackages = httpsCallable(
   functions,
   "createShipmentWithPackages",
@@ -81,6 +85,7 @@ export const broadcastTripMessage = httpsCallable(
 // ADMIN
 export const createUserProfile = httpsCallable(functions, "createUserProfile");
 export const toggleUserStatus = httpsCallable(functions, "toggleUserStatus");
+export const updateUserProfile = httpsCallable(functions, "updateUserProfile");
 
 // TRUCKS
 export const upsertTruck = httpsCallable(functions, "upsertTruck");

@@ -28,7 +28,7 @@ function StatusDot({ status }) {
   );
 }
 
-export default function TruckRow({ truck: t, onEdit }) {
+export default function TruckRow({ truck: t, onEdit, isDark = false }) {
   // PMS Logic
   const serviceInterval = 5000;
   const currentOdo = Number(t.lastPmsOdometer) || 0;
@@ -56,8 +56,13 @@ export default function TruckRow({ truck: t, onEdit }) {
   return (
     <div
       className={`
-      relative flex flex-col gap-3 p-4 hover:bg-slate-800/30 transition-colors cursor-pointer group border-b border-slate-800/50 last:border-0
+      relative flex flex-col gap-3 p-4 transition-colors cursor-pointer group last:border-0
       md:grid md:grid-cols-12 md:gap-4 md:px-6 md:items-center
+      ${
+        isDark
+          ? "hover:bg-slate-800/30 border-b border-slate-800/50"
+          : "hover:bg-slate-50 border-b border-slate-200 bg-white"
+      }
     `}
     >
       {/* --- MOBILE HEADER: Plate, Status & Action --- */}
@@ -65,16 +70,26 @@ export default function TruckRow({ truck: t, onEdit }) {
         <div className="flex items-center gap-3">
           <StatusDot status={t.status} />
           <div>
-            <div className="font-mono text-sm font-medium text-slate-200 uppercase">
+            <div
+              className={`font-mono text-sm font-medium uppercase ${
+                isDark ? "text-slate-200" : "text-slate-900"
+              }`}
+            >
               {t.plateNumber}
             </div>
-            <div className="text-[10px] font-bold text-slate-500 uppercase tracking-tight">
+            <div
+              className={`text-[10px] font-bold uppercase tracking-tight ${
+                isDark ? "text-slate-500" : "text-slate-600"
+              }`}
+            >
               {t.model}
             </div>
           </div>
         </div>
         <button
-          className="text-slate-500 p-2 -mr-2"
+          className={`p-2 -mr-2 ${
+            isDark ? "text-slate-500" : "text-slate-400 hover:text-slate-700"
+          }`}
           onClick={(e) => {
             e.stopPropagation();
             onEdit();
@@ -94,21 +109,41 @@ export default function TruckRow({ truck: t, onEdit }) {
         <div className="w-full">
           {/* Hide Plate/Model on Mobile (Moved to header) */}
           <div className="hidden md:block">
-            <div className="font-mono text-sm font-medium text-slate-200 group-hover:text-blue-400 transition-colors uppercase">
+            <div
+              className={`font-mono text-sm font-medium uppercase transition-colors ${
+                isDark
+                  ? "text-slate-200 group-hover:text-blue-400"
+                  : "text-slate-900 group-hover:text-blue-600"
+              }`}
+            >
               {t.plateNumber}
             </div>
             <div className="flex items-center gap-3 mt-1">
-              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-tight">
+              <span
+                className={`text-[10px] font-bold uppercase tracking-tight ${
+                  isDark ? "text-slate-500" : "text-slate-600"
+                }`}
+              >
                 {t.model}
               </span>
-              <span className="text-xs text-slate-600 font-mono border-l border-slate-700 pl-2">
+              <span
+                className={`text-xs font-mono border-l pl-2 ${
+                  isDark
+                    ? "text-slate-600 border-slate-700"
+                    : "text-slate-500 border-slate-200"
+                }`}
+              >
                 {t.type}
               </span>
             </div>
           </div>
 
           {/* Mobile Only: Extra Type Info under header */}
-          <div className="md:hidden text-xs text-slate-500 font-mono mt-1">
+          <div
+            className={`md:hidden text-xs font-mono mt-1 ${
+              isDark ? "text-slate-500" : "text-slate-600"
+            }`}
+          >
             Type: {t.type}
           </div>
         </div>
@@ -126,11 +161,27 @@ export default function TruckRow({ truck: t, onEdit }) {
               {t.currentTripId || "TRP-XXXX"}
             </div> */}
             {/* Mobile ETA inline */}
+<<<<<<< HEAD
             {/* <span className="md:hidden text-[9px] text-slate-500 italic">
+=======
+            <span
+              className={`md:hidden text-[9px] italic ${
+                isDark ? "text-slate-500" : "text-slate-600"
+              }`}
+            >
+>>>>>>> 67f55e5810f6b5ad601143ca2669dc577d39c2ef
               ETA: {t.eta || "Pending"}
             </span> */}
             {/* Desktop ETA block */}
+<<<<<<< HEAD
             {/* <p className="hidden md:block text-[9px] text-slate-500 italic pl-1 mt-1">
+=======
+            <p
+              className={`hidden md:block text-[9px] italic pl-1 mt-1 ${
+                isDark ? "text-slate-500" : "text-slate-600"
+              }`}
+            >
+>>>>>>> 67f55e5810f6b5ad601143ca2669dc577d39c2ef
               ETA: {t.eta || "Pending"}
             </p> */}
           </div>
@@ -139,7 +190,11 @@ export default function TruckRow({ truck: t, onEdit }) {
 
       {/* --- COL 3: PMS Health Bar --- */}
       <div className="md:col-span-3 md:pr-4 w-full mt-2 md:mt-0">
-        <div className="h-1.5 w-full bg-slate-800 rounded-full overflow-hidden">
+        <div
+          className={`h-1.5 w-full rounded-full overflow-hidden ${
+            isDark ? "bg-slate-800" : "bg-slate-200"
+          }`}
+        >
           <div
             className={`h-full rounded-full transition-all duration-500 ${
               isCritical ? "bg-red-500" : "bg-blue-500"
@@ -149,20 +204,49 @@ export default function TruckRow({ truck: t, onEdit }) {
         </div>
         <div className="flex justify-between mt-1.5">
           <span
-            className={`text-[10px] font-bold uppercase ${isCritical ? "text-red-500" : "text-slate-500"}`}
+            className={`text-[10px] font-bold uppercase ${
+              isCritical
+                ? "text-red-500"
+                : isDark
+                  ? "text-slate-500"
+                  : "text-slate-700"
+            }`}
           >
             {isCritical ? "Service Required" : "PMS Health"}
           </span>
-          <span className="text-[10px] text-slate-600 font-mono">
+          <span
+            className={`text-[10px] font-mono ${
+              isDark ? "text-slate-600" : "text-slate-700"
+            }`}
+          >
             {t.lastPmsOdometer} KM
           </span>
         </div>
       </div>
 
-      {/* --- COL 4: Compliance & Alerts --- */}
-      <div className="md:col-span-2 flex flex-col justify-center gap-1.5 mt-2 md:mt-0 border-t border-slate-800/50 md:border-0 pt-2 md:pt-0">
+      {/* --- COL 4: Payload, Compliance & Alerts --- */}
+      <div
+        className={`md:col-span-2 flex flex-col justify-center gap-1.5 mt-2 md:mt-0 border-t md:border-0 pt-2 md:pt-0 ${
+          isDark ? "border-slate-800/50" : "border-slate-200"
+        }`}
+      >
+        {/* Payload */}
+        <div
+          className={`text-xs flex items-center gap-2 ${
+            isDark ? "text-slate-300" : "text-slate-800"
+          }`}
+        >
+          <FontAwesomeIcon
+            icon={faWeightHanging}
+            className={`text-[10px] ${
+              isDark ? "text-slate-500" : "text-slate-600"
+            }`}
+          />
+          {t.payloadCapacity || t.payload} KG
+        </div>
+
         {/* Dynamic Alert Badges */}
-        <div className="flex flex-wrap gap-1.5">
+        <div className="flex flex-wrap gap-1.5 mt-1">
           {isLtoDue && (
             <span className="text-[9px] font-bold bg-amber-500/20 text-amber-400 px-1.5 py-0.5 rounded border border-amber-500/30">
               LTO RENEWAL
@@ -185,11 +269,26 @@ export default function TruckRow({ truck: t, onEdit }) {
           )}
         </div>
 
-        <div className="text-[10px] text-slate-500 flex items-center gap-2">
+        {/* Registration info */}
+        <div
+          className={`text-[10px] flex items-center gap-2 ${
+            isDark ? "text-slate-600" : "text-slate-700"
+          }`}
+        >
           <span>
             LTO:{" "}
-            <span className="text-slate-300 font-mono">
-              {t.registrationExpiry || "—"}
+            <span
+              className={`font-mono ${
+                isDark ? "text-slate-300" : "text-slate-800"
+              }`}
+            >
+              {t.registrationExpiry
+                ? new Date(t.registrationExpiry).toLocaleDateString("en-PH", {
+                    year: "numeric",
+                    month: "long",
+                    day: "numeric",
+                  })
+                : "—"}
             </span>
           </span>
         </div>
@@ -198,7 +297,11 @@ export default function TruckRow({ truck: t, onEdit }) {
       {/* --- COL 5: Actions (Desktop Only) --- */}
       <div className="hidden md:block col-span-1 text-right">
         <button
-          className="text-slate-500 hover:text-white p-2 hover:bg-slate-800 rounded-full transition-colors"
+          className={`p-2 rounded-full transition-colors ${
+            isDark
+              ? "text-slate-500 hover:text-white hover:bg-slate-800"
+              : "text-slate-400 hover:text-slate-900 hover:bg-slate-100"
+          }`}
           onClick={(e) => {
             e.stopPropagation();
             onEdit();

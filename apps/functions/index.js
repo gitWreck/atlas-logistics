@@ -29,14 +29,18 @@ if (!admin.apps.length) {
 // admin actions
 exports.createUserProfile =
   require("./src/users/createUserProfile").createUserProfile;
-exports.toggleUserStatus = require("./src/users/toggleUserStatus");
+exports.updateUserProfile =
+  require("./src/users/updateUserProfile").updateUserProfile;
+exports.toggleUserStatus =
+  require("./src/users/toggleUserStatus").toggleUserStatus;
 exports.addTrackedShipment =
   require("./src/users/addTrackedShipment").addTrackedShipment;
 exports.resolveDelayReport =
   require("./src/trips/resolveDelayReport").resolveDelayReport;
 
 // packages
-// exports.createPackage = require("./src/packages/createPackage").createPackage;
+exports.createShipmentBundle =
+  require("./src/shipments/createShipmentBundle").createShipmentBundle;
 exports.createShipmentWithPackages =
   require("./src/shipments/createShipmentWithPackages").createShipmentWithPackages;
 exports.scanPackages = require("./src/packages/scanPackages").scanPackages;
@@ -111,6 +115,7 @@ const {
   propagateTripUpdates,
 } = require("./src/tracking/syncTrackingPublic");
 const { reportCheckerTrip } = require("./src/trips/reportCheckerTrip");
+exports.reportCheckerTrip = reportCheckerTrip;
 
 exports.mirrorShipmentToPublic = mirrorShipmentToPublic;
 exports.syncTrackingPublicHttp = syncTrackingPublicHttp;

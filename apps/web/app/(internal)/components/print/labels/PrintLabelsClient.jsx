@@ -197,6 +197,12 @@ function StandardLabel({ shipment, pkg, index, total }) {
               className="h-8 w-auto object-contain"
             />
           </div>
+          <div className="text-right flex flex-row items-end gap-1">
+            <div className="text-xl font-bold text-dark uppercase">ATLAS: </div>
+            <div className="text-xl font-medium text-gray-600">
+              Fast & Easy Shipping
+            </div>
+          </div>
 
           {/* WEIGHT */}
           {/* <div className="text-right">
@@ -212,7 +218,7 @@ function StandardLabel({ shipment, pkg, index, total }) {
           {shipment.destinationCode || "DEST"}
         </div> */}
       </div>
-      <div className="my-2 flex-1 flex justify-between gap-3">
+      <div className="my-1 flex-1 flex justify-between gap-3">
         {/* LEFT: RECIPIENT + PACKAGE INFO */}
         <div className="flex-1 flex flex-col justify-start">
           <div className="text-[10px] font-bold text-gray-500 uppercase mb-0.5">
@@ -288,10 +294,13 @@ function StandardLabel({ shipment, pkg, index, total }) {
       </div>
 
       {/* QR CODE - WITH SAFETY CHECK */}
-      <div className="flex flex-col items-center justify-center border-4 border-black rounded-xl py-5 my-1">
+      <div className="flex flex-col items-center justify-center border-4 border-black rounded-xl pt-3 pb-2 my-1">
         <QRCode value={qrValue} size={140} level="M" />
         <div className="text-xs font-mono font-bold mt-2 tracking-widest text-center">
           {pkg.trackingNumber || "NO ID"}
+        </div>
+        <div className="text-xs font-mono  mt-2 tracking-widest text-center">
+          ATLAS TRACKING NUMBER
         </div>
       </div>
 

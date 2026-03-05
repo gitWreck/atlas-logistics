@@ -31,7 +31,7 @@ import { GLOBAL_STYLES } from "../../../components/constants/theme";
 // ✅ IMPORT THE NEW COMPONENTS
 import TabSelector from "../../../components/driver/TabSelector";
 import TripCard from "../../../components/driver/trip/TripCard";
-import TripFilterModal from "../../../components/driver/trip/TripFilterModal"; // Adjust path as needed
+import TripFilterModal from "../../../components/driver/trip/TripFilterModal";
 import DriverHeader from "../../../components/driver/DriverHeader";
 
 export default function DriverDashboard() {
@@ -188,7 +188,11 @@ export default function DriverDashboard() {
       <StatusBar barStyle="dark-content" backgroundColor="#f1f5f9" />
 
       {/* HEADER */}
-      <DriverHeader userName={driverName} onLogout={handleLogout} />
+      <DriverHeader
+        title="My Trips"
+        userName={driverName}
+        onLogout={handleLogout}
+      />
 
       {/* COMPONENT 1: TABS */}
       <TabSelector activeTab={activeTab} onTabChange={setActiveTab} />
@@ -278,10 +282,9 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#f1f5f9",
-    paddingTop: Platform.OS === "android" ? StatusBar.currentHeight : 0,
   },
 
-  // ✅ NEW STYLES FOR SEARCH ROW
+  // ✅ SEARCH ROW
   searchRow: {
     flexDirection: "row",
     paddingHorizontal: 20,

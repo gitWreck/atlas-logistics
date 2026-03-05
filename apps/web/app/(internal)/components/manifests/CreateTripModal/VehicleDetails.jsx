@@ -1,15 +1,20 @@
 import DriverSelectInput from "../DriverSelectInput";
 import TruckSelectInput from "../TruckSelectInput";
 
-export default function VehicleDetails({ formData, setFormData }) {
+export default function VehicleDetails({ formData, setFormData, isDark = false }) {
   return (
-    <div className="space-y-4 pt-2 border-t border-slate-800">
+    <div
+      className={`space-y-4 pt-2 border-t ${
+        isDark ? "border-slate-800" : "border-slate-200"
+      }`}
+    >
       <DriverSelectInput
         value={formData.driverName}
         onChange={(text) =>
           setFormData((prev) => ({ ...prev, driverName: text }))
         }
         onSelectId={(id) => setFormData((prev) => ({ ...prev, driverId: id }))}
+        isDark={isDark}
       />
 
       <TruckSelectInput
@@ -18,14 +23,23 @@ export default function VehicleDetails({ formData, setFormData }) {
           setFormData((prev) => ({ ...prev, truckPlateNumber: val }))
         }
         onSelectId={(id) => setFormData((prev) => ({ ...prev, truckId: id }))}
+        isDark={isDark}
       />
 
       <div className="space-y-1">
-        <label className="text-xs font-bold text-slate-400 uppercase">
+        <label
+          className={`text-xs font-bold uppercase ${
+            isDark ? "text-slate-400" : "text-slate-600"
+          }`}
+        >
           Truck Helper
         </label>
         <input
-          className="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-white outline-none"
+          className={`w-full border rounded-lg p-2 outline-none ${
+            isDark
+              ? "bg-slate-950 border-slate-700 text-white"
+              : "bg-white border-slate-300 text-slate-900"
+          }`}
           placeholder="Optional Name"
           value={formData.helperName}
           onChange={(e) =>

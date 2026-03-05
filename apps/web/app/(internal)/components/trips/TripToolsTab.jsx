@@ -3,26 +3,23 @@ import TripOperations from "./TripOperations"; // Your existing operations compo
 import DriverMessageWidget from "../messaging/DriverMessageWidget";
 import TripBroadcastWidget from "../messaging/TripBroadcastWidget";
 
-export default function TripToolsTab({ data, onRefresh }) {
+export default function TripToolsTab({ data, onRefresh, isDark = false }) {
   return (
     <div className="animate-in zoom-in-95 duration-200 space-y-6">
       {/* 1. CRITICAL OPERATIONS (Status, Delay, Assign) */}
       <TripOperations
         tripId={data.tripId}
         isLocked={data.manifestLocked}
-        onSuccess={() => {
-          onRefresh();
-          // Optional: Trigger a parent refresh if needed
-          console.log("Operation successful");
-        }}
+        onSuccess={() => onRefresh()}
+        isDark={isDark}
       />
 
-      <hr className="border-slate-800" />
+      <hr className={isDark ? "border-slate-800" : "border-slate-200"} />
 
       {/* 2. COMMUNICATION CARD */}
-      <TripBroadcastWidget trip={data} />
+      <TripBroadcastWidget trip={data} isDark={isDark} />
 
-      <DriverMessageWidget trip={data} />
+      <DriverMessageWidget trip={data} isDark={isDark} />
 
       {/* 3. QUICK ACTIONS GRID */}
       {/* <div className="grid grid-cols-2 gap-3">
