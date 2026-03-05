@@ -1,16 +1,30 @@
 "use client";
-import React from "react";
+import React, { Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import PrintLabelsBundle from "./PrintLabelsBundle";
 import PrintLabelsClient from "./PrintLabelsClient";
 
-// Now this works because it's a Server Component
-export const dynamic = "force-dynamic";
+// ❌ REMOVED: export const dynamic = "force-dynamic";
+// (Move the above line to a separate layout.js or page.js that is a Server Component)
+
+function PrintSwitcher() {
+  const searchParams = useSearchParams();
+  const mode = searchParams.get("mode") || "shipment";
+
+  // ✅ This is fine, but ensure both components handle the "id" param correctly
+  if (mode === "shipment") {
+    return <PrintLabelsBundle />;
+  }
+
+  return <PrintLabelsClient />;
+}
 
 export default function Page() {
-  // Inside PrintLabelsBundle fetchData...
-  const mode = useSearchParams().get("mode") || "shipment"; // Default to shipment level
-
-  if (mode === "shipment") return <PrintLabelsBundle />;
-  else return <PrintLabelsClient />;
+  return (
+    <Suspense
+      fallback={<div className="p-10 text-center">Loading Print Engine...</div>}
+    >
+      <PrintSwitcher />
+    </Suspense>
+  );
 }
