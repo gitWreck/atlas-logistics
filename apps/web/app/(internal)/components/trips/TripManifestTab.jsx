@@ -24,6 +24,7 @@ export default function TripManifestTab({
   onUnassign,
   tripId,
   onRefresh,
+  isDark = false,
 }) {
   const [search, setSearch] = useState("");
 
@@ -84,16 +85,18 @@ export default function TripManifestTab({
   return (
     <div className="space-y-4 animate-in fade-in slide-in-from-right-4 duration-300">
       {/* HEADER: STATS + CONTROLS */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-slate-800/20 p-3 rounded-lg border border-slate-800">
+      <div className={`flex flex-col md:flex-row justify-between items-start md:items-center gap-4 p-3 rounded-lg border ${
+        isDark ? "bg-slate-800/20 border-slate-800" : "bg-slate-50 border-slate-200"
+      }`}>
         {/* Stats Section */}
         <div className="w-full md:w-auto flex justify-between md:block items-center">
           <div>
-            <div className="text-xs font-bold text-slate-400 uppercase">
+            <div className={`text-xs font-bold uppercase ${isDark ? "text-slate-400" : "text-slate-600"}`}>
               Total Cargo
             </div>
-            <div className="text-xl font-bold text-white">
+            <div className={`text-xl font-bold ${isDark ? "text-white" : "text-slate-900"}`}>
               {shipments.length + " "}
-              <span className="text-sm font-normal text-slate-500">
+              <span className={`text-sm font-normal ${isDark ? "text-slate-500" : "text-slate-600"}`}>
                 shipment{shipments.length > 1 ? "s" : ""}
               </span>
             </div>
@@ -117,7 +120,9 @@ export default function TripManifestTab({
             <input
               type="text"
               placeholder="Search tracking..."
-              className="w-full bg-slate-900 border border-slate-700 rounded-lg pl-8 pr-3 py-1.5 text-xs text-white focus:border-blue-500 outline-none"
+              className={`w-full border rounded-lg pl-8 pr-3 py-1.5 text-xs focus:border-blue-500 outline-none ${
+                isDark ? "bg-slate-900 border-slate-700 text-white" : "bg-white border-slate-300 text-slate-900"
+              }`}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
@@ -131,7 +136,9 @@ export default function TripManifestTab({
                   "_blank",
                 )
               }
-              className="bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-xs font-bold px-3 py-1.5 rounded flex items-center justify-center gap-2 transition-colors flex-1 sm:flex-none"
+              className={`text-xs font-bold px-3 py-1.5 rounded flex items-center justify-center gap-2 transition-colors flex-1 sm:flex-none ${
+              isDark ? "bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700" : "bg-slate-200 hover:bg-slate-300 text-slate-800 border border-slate-300"
+            }`}
               title="Print All Labels"
             >
               <FontAwesomeIcon icon={faPrint} />
@@ -199,17 +206,25 @@ export default function TripManifestTab({
       )}
 
       {/* TABLE CONTAINER (Horizontal Scroll wrapper) */}
-      <div className="border border-slate-800 rounded-lg overflow-hidden bg-slate-900/50">
+      <div className={`border rounded-lg overflow-hidden ${
+        isDark ? "border-slate-800 bg-slate-900/50" : "border-slate-200 bg-slate-50"
+      }`}>
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm text-slate-400 min-w-[600px] md:min-w-0">
-            <thead className="bg-slate-950 text-slate-500 uppercase font-bold text-[10px] tracking-wider">
+          <table className={`w-full text-left text-sm min-w-[600px] md:min-w-0 ${
+            isDark ? "text-slate-400" : "text-slate-600"
+          }`}>
+            <thead className={`uppercase font-bold text-[10px] tracking-wider ${
+              isDark ? "bg-slate-950 text-slate-500" : "bg-slate-100 text-slate-600"
+            }`}>
               <tr>
                 {/* CHECKBOX HEADER */}
-                <th className="px-4 py-3 w-10 text-center sticky left-0 bg-slate-950 z-10">
+                <th className={`px-4 py-3 w-10 text-center sticky left-0 z-10 ${
+                isDark ? "bg-slate-950" : "bg-slate-100"
+              }`}>
                   <button
                     onClick={handleSelectAll}
                     disabled={filteredData.length === 0}
-                    className="hover:text-white transition-colors"
+                    className={`transition-colors ${isDark ? "hover:text-white" : "hover:text-slate-900"}`}
                   >
                     <FontAwesomeIcon
                       icon={
@@ -221,7 +236,7 @@ export default function TripManifestTab({
                       className={
                         selectedIds.size > 0
                           ? "text-blue-500"
-                          : "text-slate-700"
+                          : isDark ? "text-slate-700" : "text-slate-400"
                       }
                     />
                   </button>
@@ -231,12 +246,14 @@ export default function TripManifestTab({
                 {/* Destination: Hidden on small screens */}
                 <th className="hidden sm:table-cell px-4 py-3">Destination</th>
                 <th className="px-4 py-3 text-center">Status</th>
-                <th className="px-4 py-3 text-right sticky right-0 bg-slate-950 z-10">
+                <th className={`px-4 py-3 text-right sticky right-0 z-10 ${
+                isDark ? "bg-slate-950" : "bg-slate-100"
+              }`}>
                   Action
                 </th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-800">
+            <tbody className={`divide-y ${isDark ? "divide-slate-800" : "divide-slate-200"}`}>
               {loading ? (
                 <tr>
                   <td
@@ -264,19 +281,25 @@ export default function TripManifestTab({
                   return (
                     <tr
                       key={s.id || idx}
-                      className={`transition-colors ${isSelected ? "bg-blue-900/10" : "hover:bg-slate-800/50"}`}
+                      className={`transition-colors ${
+                    isSelected
+                      ? isDark ? "bg-blue-900/10" : "bg-blue-50"
+                      : isDark ? "hover:bg-slate-800/50" : "hover:bg-slate-100"
+                  }`}
                       onClick={() => handleSelectOne(s.id)}
                     >
                       {/* CHECKBOX ROW */}
                       <td
-                        className={`px-4 py-3 text-center sticky left-0 z-10 ${isSelected ? "bg-blue-900/10" : "bg-slate-900/50"}`}
+                        className={`px-4 py-3 text-center sticky left-0 z-10 ${
+                        isSelected ? (isDark ? "bg-blue-900/10" : "bg-blue-50") : (isDark ? "bg-slate-900/50" : "bg-white")
+                      }`}
                         onClick={(e) => e.stopPropagation()}
                       >
                         <button onClick={() => handleSelectOne(s.id)}>
                           <FontAwesomeIcon
                             icon={isSelected ? faCheckSquare : faSquare}
                             className={
-                              isSelected ? "text-blue-500" : "text-slate-700"
+                              isSelected ? "text-blue-500" : (isDark ? "text-slate-700" : "text-slate-400")
                             }
                           />
                         </button>
@@ -286,7 +309,9 @@ export default function TripManifestTab({
                         {idx + 1}
                       </td>
                       <td className="px-4 py-3">
-                        <div className="font-bold text-white text-xs font-mono">
+                        <div className={`font-bold text-xs font-mono ${
+                          isDark ? "text-white" : "text-slate-900"
+                        }`}>
                           {s.trackingNumber}
                         </div>
                         <div className="text-[11px] text-slate-500 truncate max-w-[150px]">
@@ -308,8 +333,8 @@ export default function TripManifestTab({
                         <span
                           className={`text-[10px] font-bold px-2 py-0.5 rounded border ${
                             isFullyLoaded
-                              ? "bg-emerald-900/30 text-emerald-400 border-emerald-500/30"
-                              : "bg-slate-800 text-slate-500 border-slate-700"
+                              ? isDark ? "bg-emerald-900/30 text-emerald-400 border-emerald-500/30" : "bg-emerald-100 text-emerald-700 border-emerald-300"
+                              : isDark ? "bg-slate-800 text-slate-500 border-slate-700" : "bg-slate-100 text-slate-600 border-slate-300"
                           }`}
                         >
                           {s.loadedCount || 0} / {s.totalItems || 0}
@@ -317,13 +342,17 @@ export default function TripManifestTab({
                       </td>
 
                       <td
-                        className={`px-4 py-3 text-right sticky right-0 z-10 ${isSelected ? "bg-blue-900/10" : "bg-slate-900/50"}`}
+                        className={`px-4 py-3 text-right sticky right-0 z-10 ${
+                          isSelected ? (isDark ? "bg-blue-900/10" : "bg-blue-50") : (isDark ? "bg-slate-900/50" : "bg-white")
+                        }`}
                         onClick={(e) => e.stopPropagation()}
                       >
                         <div className="flex justify-end gap-2">
                           <button
                             onClick={() => onViewPackages && onViewPackages(s)}
-                            className="text-xs bg-slate-800 hover:bg-slate-700 text-blue-400 border border-slate-700 px-3 py-1.5 rounded transition-all flex items-center gap-1"
+                            className={`text-xs border px-3 py-1.5 rounded transition-all flex items-center gap-1 ${
+                            isDark ? "bg-slate-800 hover:bg-slate-700 text-blue-400 border-slate-700" : "bg-slate-100 hover:bg-slate-200 text-blue-600 border-slate-300"
+                          }`}
                           >
                             <FontAwesomeIcon icon={faBoxOpen} />
                           </button>

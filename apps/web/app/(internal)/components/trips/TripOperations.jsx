@@ -16,7 +16,7 @@ import StatusButton from "../ui/StatusButton";
 import { runAction } from "@/app/utility/utilities";
 import NotifyToggle from "../messaging/NotifyToggle";
 
-export default function TripOperations({ tripId, isLocked, onSuccess }) {
+export default function TripOperations({ tripId, isLocked, onSuccess, isDark = false }) {
   // --- INTERNAL STATE ---
   const [assignId, setAssignId] = useState("");
   const [delaySelect, setDelaySelect] = useState("");
@@ -36,8 +36,12 @@ export default function TripOperations({ tripId, isLocked, onSuccess }) {
     <div className="space-y-4">
       {/* --- TOP ROW: ASSIGNMENT & STATUS --- */}
       {/* 1. MANUAL ASSIGNMENT CARD */}
-      <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-4 flex flex-col gap-3 shadow-lg h-full">
-        <h4 className="text-xs font-bold text-slate-500 uppercase flex items-center gap-2">
+      <div className={`border rounded-xl p-4 flex flex-col gap-3 shadow-lg h-full ${
+        isDark ? "bg-slate-900/50 border-slate-800" : "bg-slate-50 border-slate-200"
+      }`}>
+        <h4 className={`text-xs font-bold uppercase flex items-center gap-2 ${
+          isDark ? "text-slate-500" : "text-slate-600"
+        }`}>
           <FontAwesomeIcon icon={faPlus} /> Manual Assignment
         </h4>
         <div className="flex gap-2 mt-auto">
@@ -45,7 +49,9 @@ export default function TripOperations({ tripId, isLocked, onSuccess }) {
             value={assignId}
             onChange={(e) => setAssignId(e.target.value.trim())}
             placeholder="Shipment ID..."
-            className="flex-1 bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white outline-none focus:border-blue-500 transition-colors"
+            className={`flex-1 border rounded-lg px-3 py-2 text-xs outline-none focus:border-blue-500 transition-colors ${
+              isDark ? "bg-slate-950 border-slate-700 text-white" : "bg-white border-slate-300 text-slate-900"
+            }`}
             disabled={isLocked}
             onKeyDown={(e) => {
               if (e.key === "Enter" && assignId) {
@@ -82,8 +88,12 @@ export default function TripOperations({ tripId, isLocked, onSuccess }) {
       </div>
 
       {/* 2. FORCE STATUS CHANGE CARD */}
-      <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-4 flex flex-col gap-3 shadow-lg h-full">
-        <h4 className="text-xs font-bold text-slate-500 uppercase flex items-center justify-between gap-2">
+      <div className={`border rounded-xl p-4 flex flex-col gap-3 shadow-lg h-full ${
+        isDark ? "bg-slate-900/50 border-slate-800" : "bg-slate-50 border-slate-200"
+      }`}>
+        <h4 className={`text-xs font-bold uppercase flex items-center justify-between gap-2 ${
+          isDark ? "text-slate-500" : "text-slate-600"
+        }`}>
           <span className="flex items-center gap-2">
             <FontAwesomeIcon icon={faTruckFast} /> Force Status
           </span>
@@ -100,7 +110,9 @@ export default function TripOperations({ tripId, isLocked, onSuccess }) {
           <div className="flex-1 flex flex-col gap-2">
             {/* The Select Box */}
             <select
-              className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white focus:border-blue-500 outline-none"
+              className={`w-full border rounded-lg px-3 py-2 text-xs focus:border-blue-500 outline-none ${
+                isDark ? "bg-slate-950 border-slate-700 text-white" : "bg-white border-slate-300 text-slate-900"
+              }`}
               value={statusSelect}
               onChange={(e) => setStatusSelect(e.target.value)}
             >
@@ -142,8 +154,12 @@ export default function TripOperations({ tripId, isLocked, onSuccess }) {
       </div>
 
       {/* --- BOTTOM ROW: DELAY CONTROLS --- */}
-      <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-4 flex flex-col gap-3 shadow-lg">
-        <h4 className="text-xs font-bold text-slate-500 uppercase flex items-center justify-between gap-2">
+      <div className={`border rounded-xl p-4 flex flex-col gap-3 shadow-lg ${
+        isDark ? "bg-slate-900/50 border-slate-800" : "bg-slate-50 border-slate-200"
+      }`}>
+        <h4 className={`text-xs font-bold uppercase flex items-center justify-between gap-2 ${
+          isDark ? "text-slate-500" : "text-slate-600"
+        }`}>
           <span className="flex items-center gap-2">
             <FontAwesomeIcon icon={faPause} /> Delay Controls
           </span>
@@ -162,7 +178,9 @@ export default function TripOperations({ tripId, isLocked, onSuccess }) {
           <select
             value={delaySelect}
             onChange={(e) => setDelaySelect(e.target.value)}
-            className="flex-1 bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white focus:border-amber-500 outline-none"
+            className={`flex-1 border rounded-lg px-3 py-2 text-xs focus:border-amber-500 outline-none ${
+              isDark ? "bg-slate-950 border-slate-700 text-white" : "bg-white border-slate-300 text-slate-900"
+            }`}
           >
             <option value="">Select Reason...</option>
             <option value="WEATHER">Weather</option>
@@ -247,7 +265,9 @@ export default function TripOperations({ tripId, isLocked, onSuccess }) {
               value={customReason}
               onChange={(e) => setCustomReason(e.target.value)}
               placeholder="Type specific reason..."
-              className="w-full bg-slate-950 border border-amber-500/50 rounded-lg px-3 py-2 text-xs text-white focus:border-amber-500 outline-none"
+              className={`w-full border rounded-lg px-3 py-2 text-xs focus:border-amber-500 outline-none ${
+                isDark ? "bg-slate-950 border-amber-500/50 text-white" : "bg-white border-amber-300 text-slate-900"
+              }`}
             />
           </div>
         )}

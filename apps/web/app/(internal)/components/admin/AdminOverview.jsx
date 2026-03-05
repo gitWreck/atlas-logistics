@@ -15,8 +15,9 @@ import UserManagementTable from "./UserManagementTable";
 import DelayApprovalWidget from "../delay/DelayWidget";
 import RecentAlertsLogs from "../logs/RecentAlertsLogs";
 import RecentSmsLogs from "../logs/RecentSmsLogs";
+import EditUserModal from "./EditUserModal";
 
-export default function AdminOverview({ user }) {
+export default function AdminOverview({ user, isDark = false }) {
   if (user?.customClaims?.admin) {
     console.log("This user is definitely an admin.");
   }
@@ -33,6 +34,12 @@ export default function AdminOverview({ user }) {
   const [isUserModalOpen, setUserModalOpen] = useState(false);
   const [isDisableModalOpen, setDisableModalOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState(null);
+  const [isEditModalOpen, setEditModalOpen] = useState(false);
+
+  const handleEditClick = (user) => {
+    setSelectedUser(user);
+    setEditModalOpen(true);
+  };
 
   // const listUsers = httpsCallable(functions, "listUsers");
   const fetchUsers = async () => {
@@ -60,58 +67,97 @@ export default function AdminOverview({ user }) {
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
-      <DelayApprovalWidget />
+      <DelayApprovalWidget isDark={isDark} />
 
       {/* 1. STATS GRID (DYNAMIC) */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         <StatusCard
           title="Total Users"
           value={stats.total}
           icon={faUsers}
-          color="text-blue-400"
-          bg="bg-blue-500/10"
+          color={isDark ? "text-blue-400" : "text-blue-600"}
+          bg={isDark ? "bg-blue-500/20" : "bg-blue-100"}
+          isDark={isDark}
         />
         <StatusCard
           title="Active Accounts"
           value={stats.active}
           icon={faUserCheck}
-          color="text-emerald-400"
-          bg="bg-emerald-500/10"
+          color={isDark ? "text-emerald-400" : "text-emerald-600"}
+          bg={isDark ? "bg-emerald-500/20" : "bg-emerald-100"}
+          isDark={isDark}
         />
         <StatusCard
           title="Inactive / Banned"
           value={stats.inactive}
           icon={faUserTimes}
-          color="text-red-400"
-          bg="bg-red-500/10"
+          color={isDark ? "text-red-400" : "text-red-600"}
+          bg={isDark ? "bg-red-500/20" : "bg-red-100"}
+          isDark={isDark}
         />
       </div>
 
       {/* 2. ANALYTICS GRID (MOCKED FOR NOW) */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="p-5 rounded-xl border border-slate-800 bg-slate-900/50 backdrop-blur-sm flex items-center justify-between">
+        <div
+          className={`p-5 rounded-xl border shadow-sm flex items-center justify-between ${
+            isDark
+              ? "border-slate-700 bg-slate-800/50"
+              : "border-slate-200 bg-white"
+          }`}
+        >
           <div>
-            <p className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-1">
+            <p
+              className={`text-xs font-bold uppercase tracking-wider mb-1 ${
+                isDark ? "text-slate-400" : "text-slate-500"
+              }`}
+            >
               Admin Actions (24h)
             </p>
-            <p className="text-2xl font-mono text-slate-200">
+            <p
+              className={`text-2xl font-mono ${isDark ? "text-slate-100" : "text-slate-900"}`}
+            >
               {stats.actions24h}
             </p>
           </div>
-          <div className="h-10 w-10 rounded-lg bg-indigo-500/10 flex items-center justify-center text-indigo-400">
+          <div
+            className={`h-10 w-10 rounded-lg flex items-center justify-center ${
+              isDark
+                ? "bg-indigo-500/20 text-indigo-400"
+                : "bg-indigo-100 text-indigo-600"
+            }`}
+          >
             <FontAwesomeIcon icon={faShieldAlt} />
           </div>
         </div>
-        <div className="p-5 rounded-xl border border-slate-800 bg-slate-900/50 backdrop-blur-sm flex items-center justify-between">
+        <div
+          className={`p-5 rounded-xl border shadow-sm flex items-center justify-between ${
+            isDark
+              ? "border-slate-700 bg-slate-800/50"
+              : "border-slate-200 bg-white"
+          }`}
+        >
           <div>
-            <p className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-1">
+            <p
+              className={`text-xs font-bold uppercase tracking-wider mb-1 ${
+                isDark ? "text-slate-400" : "text-slate-500"
+              }`}
+            >
               Total Audit Events
             </p>
-            <p className="text-2xl font-mono text-slate-200">
+            <p
+              className={`text-2xl font-mono ${isDark ? "text-slate-100" : "text-slate-900"}`}
+            >
               {stats.actionsTotal}
             </p>
           </div>
-          <div className="h-10 w-10 rounded-lg bg-slate-700/30 flex items-center justify-center text-slate-400">
+          <div
+            className={`h-10 w-10 rounded-lg flex items-center justify-center ${
+              isDark
+                ? "bg-slate-600/30 text-slate-300"
+                : "bg-slate-100 text-slate-600"
+            }`}
+          >
             <FontAwesomeIcon icon={faHistory} />
           </div>
         </div>
@@ -121,23 +167,35 @@ export default function AdminOverview({ user }) {
       <UserManagementTable
         users={users}
         loading={loading}
+        onEditUser={handleEditClick} // Pass the handler
         onDeleteUser={initiateDisable}
         onAddUser={() => setUserModalOpen(true)}
+        isDark={isDark}
       />
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 h-[500px] mb-8">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
         {/* LEFT: INCOMING ALERTS */}
-        <RecentAlertsLogs />
+        <RecentAlertsLogs isDark={isDark} />
 
         {/* RIGHT: OUTGOING LOGS */}
-        <RecentSmsLogs />
+        <RecentSmsLogs isDark={isDark} />
       </div>
 
       {/* MODALS */}
       <AddUserModal
         isOpen={isUserModalOpen}
         onClose={() => setUserModalOpen(false)}
+        isDark={isDark}
       />
+
+      <EditUserModal
+        isOpen={isEditModalOpen}
+        user={selectedUser}
+        onClose={() => setEditModalOpen(false)}
+        onSuccess={fetchUsers} // Refresh table data
+        isDark={isDark}
+      />
+
       <DisableUserModal
         isOpen={isDisableModalOpen}
         user={selectedUser}

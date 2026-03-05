@@ -12,9 +12,12 @@ export const PackageBulkActions = ({
   isSaving,
   onSplit,
   onStatusChange,
+  isDark = false,
 }) => (
-  <div className="bg-blue-900/20 border-b border-blue-500/20 px-6 py-3 flex items-center justify-between animate-in slide-in-from-top-2">
-    <div className="text-xs font-bold text-blue-300">
+  <div className={`border-b px-6 py-3 flex items-center justify-between animate-in slide-in-from-top-2 ${
+    isDark ? "bg-blue-900/20 border-blue-500/20" : "bg-blue-50 border-blue-200"
+  }`}>
+    <div className={`text-xs font-bold ${isDark ? "text-blue-300" : "text-blue-700"}`}>
       {selectedCount} Items Selected
     </div>
     <div className="flex gap-2">
@@ -30,7 +33,9 @@ export const PackageBulkActions = ({
       <button
         onClick={() => onStatusChange("RECEIVED")}
         disabled={isLocked || isSaving}
-        className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 border border-slate-600 text-slate-300 text-xs font-bold rounded flex items-center gap-2 transition-colors disabled:opacity-50"
+        className={`px-3 py-1.5 border text-xs font-bold rounded flex items-center gap-2 transition-colors disabled:opacity-50 ${
+          isDark ? "bg-slate-800 hover:bg-slate-700 border-slate-600 text-slate-300" : "bg-slate-200 hover:bg-slate-300 border-slate-300 text-slate-700"
+        }`}
       >
         <FontAwesomeIcon icon={faDolly} /> Unload
       </button>

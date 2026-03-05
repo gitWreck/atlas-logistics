@@ -12,7 +12,7 @@ import {
 import StatusCard from "../ui/StatusCard"; // Assuming this exists from your template
 import { useRouter } from "next/navigation";
 
-export default function CheckerOverview() {
+export default function CheckerOverview({ isDark = true }) {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState({ received: 0, loaded: 0, pending: 0 });
@@ -58,15 +58,29 @@ export default function CheckerOverview() {
     return () => clearInterval(interval);
   }, []);
 
+  const titleClass = isDark ? "text-white" : "text-slate-900";
+  const subtitleClass = isDark ? "text-slate-400" : "text-slate-600";
+  const inputClass = isDark
+    ? "w-full bg-slate-900 border border-slate-700 rounded-lg pl-9 pr-4 py-2 text-sm text-white focus:border-blue-500 outline-none placeholder:text-slate-500"
+    : "w-full bg-white border border-slate-200 rounded-lg pl-9 pr-4 py-2 text-sm text-slate-900 focus:border-blue-500 outline-none placeholder:text-slate-400";
+  const tableWrapClass = isDark
+    ? "border border-slate-800 rounded-xl bg-slate-900/50 overflow-hidden"
+    : "border border-slate-200 rounded-xl bg-white overflow-hidden";
+  const tableHeaderClass = isDark ? "bg-slate-950 text-slate-500" : "bg-slate-50 text-slate-600";
+  const tableRowHoverClass = isDark ? "hover:bg-slate-800/30" : "hover:bg-slate-50";
+  const cellPrimaryClass = isDark ? "text-slate-200" : "text-slate-800";
+  const cellSecondaryClass = isDark ? "text-slate-500" : "text-slate-500";
+  const badgeClass = isDark ? "bg-slate-800 border-slate-700" : "bg-slate-100 border-slate-200";
+
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
       {/* 1. HEADER & QUICK ACTIONS */}
       <div className="flex flex-col md:flex-row justify-between items-end md:items-center gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-white">
+          <h1 className={`text-2xl font-bold ${titleClass}`}>
             Warehouse Operations
           </h1>
-          <p className="text-slate-400 text-xs">
+          <p className={`${subtitleClass} text-xs`}>
             Overview for {new Date().toLocaleDateString()}
           </p>
         </div>
@@ -78,7 +92,7 @@ export default function CheckerOverview() {
               value={quickScan}
               onChange={(e) => setQuickScan(e.target.value)}
               placeholder="Quick Lookup ID..."
-              className="w-full bg-slate-900 border border-slate-700 rounded-lg pl-9 pr-4 py-2 text-sm text-white focus:border-blue-500 outline-none"
+              className={inputClass}
             />
             <FontAwesomeIcon
               icon={faSearch}
@@ -121,20 +135,20 @@ export default function CheckerOverview() {
       </div>
 
       {/* 3. RECENT ACTIVITY TABLE */}
-      <div className="border border-slate-800 rounded-xl bg-slate-900/50 overflow-hidden">
-        <div className="px-6 py-4 border-b border-slate-800 flex justify-between items-center">
-          <h2 className="font-bold text-white flex items-center gap-2">
+      <div className={tableWrapClass}>
+        <div className={`px-6 py-4 border-b flex justify-between items-center ${isDark ? "border-slate-800" : "border-slate-200"}`}>
+          <h2 className={`font-bold flex items-center gap-2 ${titleClass}`}>
             <FontAwesomeIcon icon={faTruck} className="text-slate-500" />
             Out for Delivery / Loaded
           </h2>
-          <button className="text-xs text-slate-500 hover:text-white transition-colors">
+          <button className={`text-xs text-slate-500 transition-colors ${isDark ? "hover:text-white" : "hover:text-slate-900"}`}>
             View All History
           </button>
         </div>
 
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm text-slate-400">
-            <thead className="bg-slate-950 text-slate-500 uppercase font-semibold text-xs">
+          <table className={`w-full text-left text-sm ${subtitleClass}`}>
+            <thead className={`${tableHeaderClass} uppercase font-semibold text-xs`}>
               <tr>
                 <th className="px-6 py-3">Tracking #</th>
                 <th className="px-6 py-3">Destination</th>
@@ -142,7 +156,7 @@ export default function CheckerOverview() {
                 <th className="px-6 py-3 text-right">Status</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-800">
+            <tbody className={`divide-y ${isDark ? "divide-slate-800" : "divide-slate-200"}`}>
               {loading ? (
                 <tr>
                   <td
@@ -165,15 +179,15 @@ export default function CheckerOverview() {
                 recentShipments.map((s) => (
                   <tr
                     key={s.id}
-                    className="hover:bg-slate-800/30 transition-colors"
+                    className={`${tableRowHoverClass} transition-colors`}
                   >
                     <td className="px-6 py-4">
-                      <div className="font-medium text-slate-200">{s.id}</div>
-                      <div className="text-xs text-slate-500">{s.receiver}</div>
+                      <div className={`font-medium ${cellPrimaryClass}`}>{s.id}</div>
+                      <div className={`text-xs ${cellSecondaryClass}`}>{s.receiver}</div>
                     </td>
                     <td className="px-6 py-4">{s.area}</td>
                     <td className="px-6 py-4">
-                      <span className="font-mono bg-slate-800 px-2 py-1 rounded text-xs border border-slate-700">
+                      <span className={`font-mono px-2 py-1 rounded text-xs border ${badgeClass}`}>
                         {s.truck}
                       </span>
                     </td>

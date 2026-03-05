@@ -14,6 +14,7 @@ export default function BulkAssignmentModal({
   trip,
   onClose,
   onSuccess,
+  isDark = false,
 }) {
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -122,49 +123,63 @@ export default function BulkAssignmentModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-      <div className="bg-slate-900 border border-slate-700 rounded-xl w-full max-w-4xl shadow-2xl flex flex-col h-[85vh]">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+      <div className={`w-full max-w-4xl shadow-2xl flex flex-col h-[85vh] rounded-xl ${
+        isDark ? "bg-slate-900 border border-slate-700" : "bg-white border border-slate-200"
+      }`}>
         {/* HEADER */}
-        <div className="p-5 border-b border-slate-800 bg-slate-950 rounded-t-xl flex justify-between items-center">
+        <div className={`p-5 border-b rounded-t-xl flex justify-between items-center ${
+          isDark ? "border-slate-800 bg-slate-950" : "border-slate-200 bg-slate-50"
+        }`}>
           <div>
-            <h2 className="text-xl font-bold text-white flex items-center gap-2">
+            <h2 className={`text-xl font-bold flex items-center gap-2 ${
+              isDark ? "text-white" : "text-slate-900"
+            }`}>
               <FontAwesomeIcon icon={faTruck} className="text-blue-500" />
               Add Shipments to Trip
             </h2>
-            <div className="text-sm text-slate-500 mt-1">
+            <div className={`text-sm mt-1 ${isDark ? "text-slate-500" : "text-slate-600"}`}>
               Selecting for {trip.tripId} ({trip.route})
             </div>
           </div>
           <button
             onClick={onClose}
-            className="text-slate-500 hover:text-white transition-colors"
+            className={`transition-colors p-1 rounded ${
+              isDark ? "text-slate-500 hover:text-white hover:bg-slate-800" : "text-slate-500 hover:text-slate-900 hover:bg-slate-100"
+            }`}
           >
             <FontAwesomeIcon icon={faTimes} size="lg" />
           </button>
         </div>
 
         {/* TOOLBAR */}
-        <div className="p-4 bg-slate-900 border-b border-slate-800 flex gap-4">
+        <div className={`p-4 border-b flex gap-4 ${
+          isDark ? "bg-slate-900 border-slate-800" : "bg-slate-50 border-slate-200"
+        }`}>
           <div className="relative flex-1">
             <input
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               placeholder="Search destination, name, or tracking..."
-              className="w-full bg-slate-800 border border-slate-700 rounded-lg pl-10 pr-4 py-2.5 text-sm text-white focus:border-blue-500 outline-none"
+              className={`w-full border rounded-lg pl-10 pr-4 py-2.5 text-sm focus:border-blue-500 outline-none ${
+                isDark ? "bg-slate-800 border-slate-700 text-white" : "bg-white border-slate-300 text-slate-900"
+              }`}
             />
             <FontAwesomeIcon
               icon={faSearch}
               className="absolute left-3.5 top-3.5 text-slate-500"
             />
           </div>
-          <div className="flex items-center gap-2 text-sm text-slate-400">
-            <span className="font-bold text-white">{selectedIds.length}</span>{" "}
+          <div className={`flex items-center gap-2 text-sm ${isDark ? "text-slate-400" : "text-slate-600"}`}>
+            <span className={`font-bold ${isDark ? "text-white" : "text-slate-900"}`}>{selectedIds.length}</span>{" "}
             selected
           </div>
         </div>
 
         {/* TABLE HEADER */}
-        <div className="grid grid-cols-[50px_1.5fr_1fr_1fr_100px] bg-slate-950/50 p-3 text-xs font-bold text-slate-500 uppercase border-b border-slate-800">
+        <div className={`grid grid-cols-[50px_1.5fr_1fr_1fr_100px] p-3 text-xs font-bold uppercase border-b ${
+          isDark ? "bg-slate-950/50 text-slate-500 border-slate-800" : "bg-slate-100 text-slate-600 border-slate-200"
+        }`}>
           <div className="flex justify-center">
             <input
               type="checkbox"
@@ -173,7 +188,7 @@ export default function BulkAssignmentModal({
                 filteredList.length > 0 &&
                 selectedIds.length === filteredList.length
               }
-              className="rounded bg-slate-800 border-slate-600"
+              className={`rounded ${isDark ? "bg-slate-800 border-slate-600" : "border-slate-400"}`}
             />
           </div>
           <div>Tracking / Sender</div>
@@ -185,7 +200,7 @@ export default function BulkAssignmentModal({
         {/* SCROLLABLE LIST */}
         <div className="flex-1 overflow-y-auto custom-scrollbar">
           {filteredList.length === 0 && !loading ? (
-            <div className="p-10 text-center text-slate-500 italic">
+            <div className={`p-10 text-center italic ${isDark ? "text-slate-500" : "text-slate-600"}`}>
               No unassigned shipments found.
             </div>
           ) : (
@@ -196,8 +211,10 @@ export default function BulkAssignmentModal({
                   <div
                     key={item.id}
                     onClick={() => toggleSelect(item.id)}
-                    className={`grid grid-cols-[50px_1.5fr_1fr_1fr_100px] p-3 border-b border-slate-800 items-center text-sm cursor-pointer transition-colors ${
-                      isSelected ? "bg-blue-600/10" : "hover:bg-slate-800/50"
+                    className={`grid grid-cols-[50px_1.5fr_1fr_1fr_100px] p-3 border-b items-center text-sm cursor-pointer transition-colors ${
+                      isSelected
+                        ? isDark ? "bg-blue-600/10" : "bg-blue-50"
+                        : isDark ? "hover:bg-slate-800/50 border-slate-800" : "hover:bg-slate-100 border-slate-200"
                     }`}
                   >
                     <div className="flex justify-center">
@@ -205,27 +222,29 @@ export default function BulkAssignmentModal({
                         type="checkbox"
                         checked={isSelected}
                         readOnly
-                        className="rounded bg-slate-800 border-slate-600 accent-blue-500"
+                        className={`rounded accent-blue-500 ${isDark ? "bg-slate-800 border-slate-600" : "border-slate-400"}`}
                       />
                     </div>
                     <div>
-                      <div className="font-mono font-bold text-white">
+                      <div className={`font-mono font-bold ${isDark ? "text-white" : "text-slate-900"}`}>
                         {item.trackingNumber}
                       </div>
-                      <div className="text-xs text-slate-500">
+                      <div className={`text-xs ${isDark ? "text-slate-500" : "text-slate-600"}`}>
                         {item.sender?.name}
                       </div>
                     </div>
-                    <div className="text-slate-300">
+                    <div className={isDark ? "text-slate-300" : "text-slate-700"}>
                       {item.destination}
-                      <span className="ml-2 text-[10px] bg-slate-800 px-1 rounded border border-slate-700">
+                      <span className={`ml-2 text-[10px] px-1 rounded ${
+                        isDark ? "bg-slate-800 border border-slate-700" : "bg-slate-100 border border-slate-200"
+                      }`}>
                         {item.destinationCode}
                       </span>
                     </div>
-                    <div className="text-slate-400 text-xs">
+                    <div className={`text-xs ${isDark ? "text-slate-400" : "text-slate-600"}`}>
                       {item.recipient?.name}
                     </div>
-                    <div className="text-right font-mono text-slate-400">
+                    <div className={`text-right font-mono ${isDark ? "text-slate-400" : "text-slate-600"}`}>
                       {item.totals?.totalItems || 1} pkg
                     </div>
                   </div>
@@ -234,21 +253,25 @@ export default function BulkAssignmentModal({
 
               {/* PAGINATION / LOAD MORE BUTTON */}
               {loading ? (
-                <div className="p-4 text-center text-xs text-slate-500 animate-pulse">
+                <div className={`p-4 text-center text-xs animate-pulse ${isDark ? "text-slate-500" : "text-slate-600"}`}>
                   Loading more shipments...
                 </div>
               ) : hasMore ? (
                 <div className="p-4 text-center">
                   <button
                     onClick={handleLoadMore}
-                    className="text-xs font-bold text-blue-400 hover:text-blue-300 flex items-center justify-center gap-2 mx-auto px-4 py-2 rounded border border-slate-700 hover:bg-slate-800 transition-all"
+                    className={`text-xs font-bold flex items-center justify-center gap-2 mx-auto px-4 py-2 rounded border transition-all ${
+                    isDark ? "text-blue-400 hover:text-blue-300 border-slate-700 hover:bg-slate-800" : "text-blue-600 hover:text-blue-700 border-slate-300 hover:bg-slate-100"
+                  }`}
                   >
                     <FontAwesomeIcon icon={faArrowDown} /> Load More Shipments
                   </button>
                 </div>
               ) : (
                 candidates.length > 0 && (
-                  <div className="p-6 text-center text-xs text-slate-600 border-t border-slate-800/50">
+                  <div className={`p-6 text-center text-xs border-t ${
+                  isDark ? "text-slate-600 border-slate-800/50" : "text-slate-500 border-slate-200"
+                }`}>
                     End of list
                   </div>
                 )
@@ -258,10 +281,14 @@ export default function BulkAssignmentModal({
         </div>
 
         {/* FOOTER */}
-        <div className="p-5 border-t border-slate-800 bg-slate-950 rounded-b-xl flex justify-end gap-3">
+        <div className={`p-5 border-t rounded-b-xl flex justify-end gap-3 ${
+          isDark ? "border-slate-800 bg-slate-950" : "border-slate-200 bg-slate-50"
+        }`}>
           <button
             onClick={onClose}
-            className="px-6 py-2.5 rounded-lg border border-slate-700 text-slate-400 hover:text-white font-bold text-sm transition-colors"
+            className={`px-6 py-2.5 rounded-lg border font-bold text-sm transition-colors ${
+              isDark ? "border-slate-700 text-slate-400 hover:text-white hover:bg-slate-800" : "border-slate-300 text-slate-600 hover:text-slate-900 hover:bg-slate-100"
+            }`}
           >
             Cancel
           </button>

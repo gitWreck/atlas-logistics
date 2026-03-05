@@ -1,26 +1,33 @@
 "use client";
-import React, { useState, useMemo, useEffect } from "react";
+import React, {
+  useState,
+  useMemo,
+  useEffect,
+  forwardRef,
+  useImperativeHandle,
+} from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faSearch,
-  faPlus,
   faSync,
   faFilter,
   faTruckFast,
   faFileCsv,
-  faCalendarAlt, // Added
-  faChevronLeft, // Added
-  faChevronRight, // Added
-  faExclamationCircle, // Added
+  faCalendarAlt,
+  faChevronLeft,
+  faChevronRight,
+  faExclamationCircle,
 } from "@fortawesome/free-solid-svg-icons";
 import ShipmentRow from "./ShipmentRow";
 import ShipmentDrawer from "./ShipmentDrawer";
 import ReceivePackageForm from "./ReceivePackageForm";
-// import { auth } from "@/lib/firebase";
 import { calculateProgress } from "@/app/utility/utilities";
 import UnifiedShipmentModal from "./UnifiedShipmentModal";
 
-export default function ShipmentBoard({ user, userRole, profile }) {
+const ShipmentBoard = forwardRef(function ShipmentBoard(
+  { user, userRole, profile, isDark = false },
+  ref,
+) {
   const [shipments, setShipments] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -197,65 +204,51 @@ export default function ShipmentBoard({ user, userRole, profile }) {
     fetchShipments();
   };
 
+  useImperativeHandle(
+    ref,
+    () => ({
+      openCreateModal: () => setIsNewOrderModalOpen(true),
+    }),
+    [],
+  );
+
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-200 font-sans">
-      {/* --- PAGE HEADER --- */}
-      <div className="sticky top-0 z-30 bg-slate-950/80 backdrop-blur-md border-b border-slate-800 px-4 sm:px-6 py-4">
-        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-          {/* Title Section */}
-          <div className="flex items-center gap-3 w-full sm:w-auto">
-            <div className="h-10 w-10 bg-blue-600/20 rounded-xl flex items-center justify-center text-blue-500 shrink-0">
-              <FontAwesomeIcon icon={faTruckFast} size="lg" />
-            </div>
-            <div className="flex-1">
-              <h1 className="flex text-xl font-bold text-white tracking-tight gap-2 items-center">
-                Shipments
-                <button
-                  onClick={fetchShipments}
-                  disabled={loading}
-                  className="text-slate-500 hover:text-white transition-colors p-1"
-                >
-                  <FontAwesomeIcon
-                    icon={faSync}
-                    spin={loading}
-                    className="text-xs"
-                  />
-                </button>
-              </h1>
-              <p className="text-xs text-slate-500 line-clamp-1">
-                Manage shipments and orders.
-              </p>
-            </div>
-
-            {/* Mobile Create Button */}
-            <button
-              onClick={() => setIsNewOrderModalOpen(true)}
-              className="sm:hidden bg-blue-600 text-white h-10 w-10 rounded-lg flex items-center justify-center shadow-lg shadow-blue-500/20"
-            >
-              <FontAwesomeIcon icon={faPlus} />
-            </button>
-          </div>
-
-          {/* Desktop Create Button */}
-          <div className="hidden sm:flex gap-3">
-            <button
-              onClick={() => setIsNewOrderModalOpen(true)}
-              className="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 shadow-lg shadow-blue-500/20 transition-all"
-            >
-              <FontAwesomeIcon icon={faPlus} />
-              <span>Shipment</span>
-            </button>
-          </div>
-        </div>
-      </div>
-
+    <div
+      className={`min-h-screen font-sans ${isDark ? "bg-slate-950 text-slate-200" : "bg-slate-50 text-slate-900"}`}
+    >
       {/* --- MAIN CONTENT --- */}
       <main className="max-w-7xl mx-auto p-4 sm:p-6">
-        <div className="border border-slate-800 rounded-xl bg-slate-900/50 overflow-hidden shadow-xl backdrop-blur-sm">
+        <div
+          className={`border rounded-xl overflow-hidden shadow-xl backdrop-blur-sm ${
+            isDark
+              ? "border-slate-800 bg-slate-900/50"
+              : "border-slate-200 bg-white"
+          }`}
+        >
           {/* CARD HEADER: Search & Filters */}
-          <div className="px-4 sm:px-6 py-4 border-b border-slate-800 flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4 bg-slate-950/30">
-            <h3 className="font-bold text-white whitespace-nowrap hidden xl:block">
+          <div
+            className={`px-4 sm:px-6 py-4 border-b flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4 ${
+              isDark
+                ? "border-slate-800 bg-slate-950/30"
+                : "border-slate-200 bg-slate-50"
+            }`}
+          >
+            <h3
+              className={`font-bold whitespace-nowrap hidden xl:flex items-center gap-2 ${isDark ? "text-white" : "text-slate-900"}`}
+            >
               Recent Orders
+              <button
+                onClick={fetchShipments}
+                disabled={loading}
+                className={`transition-colors p-1 rounded ${isDark ? "text-slate-500 hover:text-white hover:bg-slate-800" : "text-slate-500 hover:text-slate-900 hover:bg-slate-200"}`}
+                title="Refresh"
+              >
+                <FontAwesomeIcon
+                  icon={faSync}
+                  spin={loading}
+                  className="text-xs"
+                />
+              </button>
             </h3>
 
             {/* CONTROL GROUP */}
@@ -264,12 +257,16 @@ export default function ShipmentBoard({ user, userRole, profile }) {
               <div className="relative flex-1 min-w-[200px]">
                 <FontAwesomeIcon
                   icon={faSearch}
-                  className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-sm"
+                  className={`absolute left-3 top-1/2 -translate-y-1/2 text-sm ${isDark ? "text-slate-500" : "text-slate-400"}`}
                 />
                 <input
                   type="text"
                   placeholder="Search Tracking..."
-                  className="w-full bg-slate-900 border border-slate-700 rounded-lg pl-9 pr-4 py-2 text-sm text-white focus:border-blue-500 focus:outline-none"
+                  className={`w-full border rounded-lg pl-9 pr-4 py-2 text-sm focus:border-blue-500 focus:outline-none ${
+                    isDark
+                      ? "bg-slate-900 border-slate-700 text-white"
+                      : "bg-white border-slate-300 text-slate-900"
+                  }`}
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                 />
@@ -277,17 +274,27 @@ export default function ShipmentBoard({ user, userRole, profile }) {
 
               <div className="flex gap-2 w-full sm:w-auto">
                 {/* 2. DATE FILTERS */}
-                <div className="flex items-center gap-2 bg-slate-900 border border-slate-700 rounded-lg px-2 py-1 flex-1 sm:flex-none justify-center">
+                <div
+                  className={`flex items-center gap-2 border rounded-lg px-2 py-1 flex-1 sm:flex-none justify-center ${
+                    isDark
+                      ? "bg-slate-900 border-slate-700"
+                      : "bg-white border-slate-300"
+                  }`}
+                >
                   <input
                     type="date"
-                    className="bg-transparent text-xs text-white outline-none w-24 [color-scheme:dark]"
+                    className={`bg-transparent text-xs outline-none w-24 ${isDark ? "text-white [color-scheme:dark]" : "text-slate-900 [color-scheme:light]"}`}
                     value={startDate}
                     onChange={(e) => setStartDate(e.target.value)}
                   />
-                  <span className="text-slate-600">-</span>
+                  <span
+                    className={isDark ? "text-slate-600" : "text-slate-400"}
+                  >
+                    -
+                  </span>
                   <input
                     type="date"
-                    className="bg-transparent text-xs text-white outline-none w-24 [color-scheme:dark]"
+                    className={`bg-transparent text-xs outline-none w-24 ${isDark ? "text-white [color-scheme:dark]" : "text-slate-900 [color-scheme:light]"}`}
                     value={endDate}
                     onChange={(e) => setEndDate(e.target.value)}
                   />
@@ -300,7 +307,11 @@ export default function ShipmentBoard({ user, userRole, profile }) {
                     className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-sm"
                   />
                   <select
-                    className="w-full bg-slate-900 border border-slate-700 rounded-lg pl-9 pr-4 py-2 text-sm text-white focus:border-blue-500 focus:outline-none appearance-none cursor-pointer"
+                    className={`w-full rounded-lg pl-9 pr-4 py-2 text-sm focus:border-blue-500 focus:outline-none appearance-none cursor-pointer border ${
+                      isDark
+                        ? "bg-slate-900 border-slate-700 text-white"
+                        : "bg-white border-slate-300 text-slate-900"
+                    }`}
                     value={modeFilter}
                     onChange={(e) => {
                       setModeFilter(e.target.value);
@@ -317,10 +328,14 @@ export default function ShipmentBoard({ user, userRole, profile }) {
                 <div className="relative w-full sm:w-36">
                   <FontAwesomeIcon
                     icon={faFilter}
-                    className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-sm"
+                    className={`absolute left-3 top-1/2 -translate-y-1/2 text-sm ${isDark ? "text-slate-500" : "text-slate-400"}`}
                   />
                   <select
-                    className="w-full bg-slate-900 border border-slate-700 rounded-lg pl-9 pr-4 py-2 text-sm text-white focus:border-blue-500 focus:outline-none appearance-none cursor-pointer"
+                    className={`w-full border rounded-lg pl-9 pr-4 py-2 text-sm focus:border-blue-500 focus:outline-none appearance-none cursor-pointer ${
+                      isDark
+                        ? "bg-slate-900 border-slate-700 text-white"
+                        : "bg-white border-slate-300 text-slate-900"
+                    }`}
                     value={activeFilter}
                     onChange={(e) => {
                       setActiveFilter(e.target.value);
@@ -348,7 +363,11 @@ export default function ShipmentBoard({ user, userRole, profile }) {
                     className="absolute left-3 top-1/2 -translate-y-1/2 text-amber-500 text-sm"
                   />
                   <select
-                    className="w-full bg-slate-900 border border-amber-500/50 rounded-lg pl-9 pr-4 py-2 text-sm text-amber-100 focus:border-amber-500 focus:outline-none appearance-none cursor-pointer"
+                    className={`w-full border border-amber-500/50 rounded-lg pl-9 pr-4 py-2 text-sm focus:border-amber-500 focus:outline-none appearance-none cursor-pointer ${
+                      isDark
+                        ? "bg-slate-900 text-amber-100"
+                        : "bg-amber-50 text-amber-900"
+                    }`}
                     value={delayType}
                     onChange={(e) => setDelayType(e.target.value)}
                   >
@@ -364,46 +383,74 @@ export default function ShipmentBoard({ user, userRole, profile }) {
             </div>
           </div>
 
-          {/* TABLE HEADER (Hidden on mobile) */}
-          <div className="hidden md:grid grid-cols-12 gap-4 px-6 py-3 border-b border-slate-800 bg-slate-950 text-xs font-semibold text-slate-500 uppercase tracking-wider">
-            <div className="col-span-4">Tracking / Customer</div>
-            <div className="col-span-2">Route</div>
-            <div className="col-span-3">Progress</div>
-            <div className="col-span-2">Last Update</div>
-            <div className="col-span-1 text-right">Action</div>
-          </div>
+          {/* TABLE: wrap header + body for horizontal scroll on smaller widths */}
+          <div className="md:overflow-x-auto">
+            <div className="md:min-w-[900px]">
+              {/* TABLE HEADER (Hidden on mobile) */}
+              <div
+                className={`hidden md:grid grid-cols-12 gap-4 px-6 py-3 border-b text-xs font-semibold uppercase tracking-wider ${
+                  isDark
+                    ? "border-slate-800 bg-slate-950 text-slate-500"
+                    : "border-slate-200 bg-slate-50 text-slate-600"
+                }`}
+              >
+                <div className="col-span-4">Tracking / Customer</div>
+                <div className="col-span-2">Route</div>
+                <div className="col-span-3">Progress</div>
+                <div className="col-span-2">Last Update</div>
+                <div className="col-span-1 text-right">Action</div>
+              </div>
 
-          {/* TABLE BODY */}
-          <div className="min-h-[300px]">
-            {loading ? (
-              <div className="p-10 text-center text-slate-500 animate-pulse">
-                Loading orders...
+              {/* TABLE BODY */}
+              <div className="min-h-[300px]">
+                {loading ? (
+                  <div
+                    className={`p-10 text-center animate-pulse ${
+                      isDark ? "text-slate-500" : "text-slate-600"
+                    }`}
+                  >
+                    Loading orders...
+                  </div>
+                ) : filteredShipments.length === 0 ? (
+                  <div
+                    className={`p-10 text-center ${
+                      isDark ? "text-slate-500" : "text-slate-600"
+                    }`}
+                  >
+                    No orders found matching filters.
+                  </div>
+                ) : (
+                  currentItems.map((s) => (
+                    <ShipmentRow
+                      key={s.id}
+                      s={s}
+                      onClick={setSelectedShipmentId}
+                      onMessage={() => handleMessageCustomer(s)}
+                      isDark={isDark}
+                    />
+                  ))
+                )}
               </div>
-            ) : filteredShipments.length === 0 ? (
-              <div className="p-10 text-center text-slate-500">
-                No orders found matching filters.
-              </div>
-            ) : (
-              currentItems.map((s) => (
-                <ShipmentRow
-                  key={s.id}
-                  s={s}
-                  onClick={setSelectedShipmentId}
-                  onMessage={() => handleMessageCustomer(s)}
-                />
-              ))
-            )}
+            </div>
           </div>
 
           {/* 5. PAGINATION FOOTER */}
           {filteredShipments.length > 0 && (
-            <div className="px-4 sm:px-6 py-4 border-t border-slate-800 bg-slate-950/30 flex justify-between items-center">
-              <span className="text-xs text-slate-500">
+            <div
+              className={`px-4 sm:px-6 py-4 border-t flex justify-between items-center ${
+                isDark
+                  ? "border-slate-800 bg-slate-950/30"
+                  : "border-slate-200 bg-slate-50"
+              }`}
+            >
+              <span
+                className={`text-xs ${isDark ? "text-slate-500" : "text-slate-600"}`}
+              >
                 Showing{" "}
-                <span className="text-white font-bold">
+                <span
+                  className={`font-bold ${isDark ? "text-white" : "text-slate-900"}`}
+                >
                   {indexOfFirstItem + 1}
-                  {/* - */}
-                  {/* {Math.min(indexOfLastItem, filteredShipments.length)} */}
                 </span>{" "}
                 of {filteredShipments.length}
               </span>
@@ -414,7 +461,11 @@ export default function ShipmentBoard({ user, userRole, profile }) {
                     setCurrentPage((prev) => Math.max(prev - 1, 1))
                   }
                   disabled={currentPage === 1}
-                  className="px-3 py-1.5 rounded-lg border border-slate-700 bg-slate-900 text-slate-400 text-xs hover:text-white hover:bg-slate-800 disabled:opacity-50"
+                  className={`px-3 py-1.5 rounded-lg border text-xs disabled:opacity-50 ${
+                    isDark
+                      ? "border-slate-700 bg-slate-900 text-slate-400 hover:text-white hover:bg-slate-800"
+                      : "border-slate-300 bg-white text-slate-600 hover:text-slate-900 hover:bg-slate-100"
+                  }`}
                 >
                   <FontAwesomeIcon icon={faChevronLeft} />
                 </button>
@@ -423,7 +474,11 @@ export default function ShipmentBoard({ user, userRole, profile }) {
                     setCurrentPage((prev) => Math.min(prev + 1, totalPages))
                   }
                   disabled={currentPage === totalPages}
-                  className="px-3 py-1.5 rounded-lg border border-slate-700 bg-slate-900 text-slate-400 text-xs hover:text-white hover:bg-slate-800 disabled:opacity-50"
+                  className={`px-3 py-1.5 rounded-lg border text-xs disabled:opacity-50 ${
+                    isDark
+                      ? "border-slate-700 bg-slate-900 text-slate-400 hover:text-white hover:bg-slate-800"
+                      : "border-slate-300 bg-white text-slate-600 hover:text-slate-900 hover:bg-slate-100"
+                  }`}
                 >
                   <FontAwesomeIcon icon={faChevronRight} />
                 </button>
@@ -437,13 +492,18 @@ export default function ShipmentBoard({ user, userRole, profile }) {
         isOpen={!!selectedShipmentId}
         onClose={() => setSelectedShipmentId(null)}
         data={selectedShipment}
+        isDark={isDark}
       />
 
       <UnifiedShipmentModal
         profile={profile}
         isOpen={isNewOrderModalOpen}
         onClose={() => setIsNewOrderModalOpen(false)}
+        isDark={isDark}
+        user={user}
       />
     </div>
   );
-}
+});
+
+export default ShipmentBoard;

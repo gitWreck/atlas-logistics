@@ -9,19 +9,27 @@ import {
   faArrowRight,
   faStore,
   faTruckPickup,
+  faPlus,
 } from "@fortawesome/free-solid-svg-icons";
 import ReceivePackageForm from "./ReceivePackageForm/ReceivePackageForm";
 import TripStep from "../manifests/CreateTripModal/TripStep";
 import {
   createShipmentWithPackages,
   assignShipmentToTruckTrip,
+  createShipmentBundle,
 } from "@/app/utility/FirebaseFunctions";
 import { useAlert } from "@/app/context/AlertContext";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { storage } from "@/lib/firebase";
 
-export default function UnifiedShipmentModal({ profile, isOpen, onClose }) {
-  const { showAlert } = useAlert();
+export default function UnifiedShipmentModal({
+  profile,
+  isOpen,
+  onClose,
+  isDark = false,
+  user,
+}) {
+  const { showAlert, showConfirm } = useAlert();
 
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
@@ -117,7 +125,7 @@ export default function UnifiedShipmentModal({ profile, isOpen, onClose }) {
       };
 
       // --- Save to DB ---
-      const shipmentRes = await createShipmentWithPackages(payload);
+      const shipmentRes = await createShipmentBundle(payload);
       const newShipmentId = shipmentRes?.data?.shipmentId || manualShipmentId;
       setCreatedShipmentId(newShipmentId);
 
@@ -130,6 +138,9 @@ export default function UnifiedShipmentModal({ profile, isOpen, onClose }) {
         });
 
         setFinalTripId(targetTripId);
+
+        setShipmentDraft(null);
+
         window.open(
           `/components/print/labels?tripId=${targetTripId}`,
           "_blank",
@@ -150,24 +161,48 @@ export default function UnifiedShipmentModal({ profile, isOpen, onClose }) {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/90 backdrop-blur-md sm:p-4">
+    <div
+      className={`fixed inset-0 z-50 flex items-center justify-center backdrop-blur-md sm:p-4 ${
+        isDark ? "bg-slate-950/90" : "bg-black/40"
+      }`}
+    >
       {/* Modal Container */}
-      <div className="relative bg-slate-900 border-x border-y border-slate-700 w-full max-w-4xl sm:rounded-xl shadow-xl overflow-hidden flex flex-col h-full sm:h-auto sm:min-h-[600px] sm:max-h-[90vh]">
+      <div
+        className={`relative w-full max-w-4xl sm:rounded-xl shadow-xl overflow-hidden flex flex-col h-full sm:h-auto sm:min-h-[600px] sm:max-h-[90vh] border ${
+          isDark ? "bg-slate-900 border-slate-700" : "bg-white border-slate-200"
+        }`}
+      >
         {loading && (
-          <div className="absolute inset-0 z-[100] bg-slate-900/80 backdrop-blur-sm flex flex-col items-center justify-center">
+          <div
+            className={`absolute inset-0 z-[100] backdrop-blur-sm flex flex-col items-center justify-center ${
+              isDark ? "bg-slate-900/80" : "bg-white/90"
+            }`}
+          >
             <FontAwesomeIcon
               icon={faCircleNotch}
               spin
               className="text-4xl text-blue-500 mb-4"
             />
-            <p className="text-white font-bold">Processing Shipment...</p>
+            <p
+              className={`font-bold ${isDark ? "text-white" : "text-slate-900"}`}
+            >
+              Processing Shipment...
+            </p>
           </div>
         )}
 
         {/* --- GLOBAL HEADER --- */}
-        <div className="p-4 sm:p-6 border-b border-slate-800 flex justify-between items-center shrink-0 bg-slate-950">
+        <div
+          className={`p-4 sm:p-6 border-b flex justify-between items-center shrink-0 ${
+            isDark
+              ? "border-slate-800 bg-slate-950"
+              : "border-slate-200 bg-slate-50"
+          }`}
+        >
           <div className="flex flex-col">
-            <h2 className="text-lg sm:text-xl font-bold text-white">
+            <h2
+              className={`text-lg sm:text-xl font-bold ${isDark ? "text-white" : "text-slate-900"}`}
+            >
               {step === 1
                 ? "1. Shipment Details"
                 : step === 2
@@ -175,14 +210,20 @@ export default function UnifiedShipmentModal({ profile, isOpen, onClose }) {
                   : "3. Complete"}
             </h2>
             {step === 1 && (
-              <p className="text-xs text-slate-500 mt-1">
+              <p
+                className={`text-xs mt-1 ${isDark ? "text-slate-500" : "text-slate-600"}`}
+              >
                 Fill in the package and routing info.
               </p>
             )}
           </div>
           <button
             onClick={onClose}
-            className="text-slate-500 hover:text-white p-2 bg-slate-900 rounded-lg"
+            className={`p-2 rounded-lg transition-colors ${
+              isDark
+                ? "text-slate-500 hover:text-white"
+                : "text-slate-500 hover:text-slate-900 hover:bg-slate-300"
+            }`}
           >
             ✕
           </button>
@@ -191,19 +232,43 @@ export default function UnifiedShipmentModal({ profile, isOpen, onClose }) {
         {/* --- MAIN CONTENT AREA --- */}
         <div className="flex-1 flex flex-col overflow-hidden">
           {step === 1 && (
-            <div className="flex flex-col h-full overflow-hidden relative">
+            <div className="flex flex-col h-full overflow-hidden">
               {/* Pickup / Drop-off Toggle Bar */}
-              <div className="bg-slate-950/50 p-4 border-b border-slate-800 flex justify-center shrink-0">
-                <div className="bg-slate-900 p-1 rounded-xl border border-slate-700 flex w-full max-w-md">
+              <div
+                className={`p-4 border-b flex justify-center shrink-0 ${
+                  isDark
+                    ? "bg-slate-950 border-slate-800"
+                    : "bg-slate-50 border-slate-200"
+                }`}
+              >
+                <div
+                  className={`p-1 rounded-xl border flex w-full max-w-md ${
+                    isDark
+                      ? "bg-slate-900 border-slate-700"
+                      : "bg-white border-slate-300"
+                  }`}
+                >
                   <button
                     onClick={() => setIsPickup(false)}
-                    className={`flex-1 py-2.5 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-2 ${!isPickup ? "bg-blue-600 text-white shadow" : "text-slate-500 hover:text-slate-300"}`}
+                    className={`flex-1 py-2.5 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-2 ${
+                      !isPickup
+                        ? "bg-blue-600 text-white shadow"
+                        : isDark
+                          ? "text-slate-400 hover:text-slate-200"
+                          : "text-slate-500 hover:text-slate-900"
+                    }`}
                   >
                     <FontAwesomeIcon icon={faStore} /> Warehouse Drop-off
                   </button>
                   <button
                     onClick={() => setIsPickup(true)}
-                    className={`flex-1 py-2.5 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-2 ${isPickup ? "bg-amber-600 text-white shadow" : "text-slate-500 hover:text-slate-300"}`}
+                    className={`flex-1 py-2.5 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-2 ${
+                      isPickup
+                        ? "bg-amber-600 text-white shadow"
+                        : isDark
+                          ? "text-slate-400 hover:text-slate-200"
+                          : "text-slate-500 hover:text-slate-900"
+                    }`}
                   >
                     <FontAwesomeIcon icon={faTruckPickup} /> Pickup
                   </button>
@@ -212,25 +277,37 @@ export default function UnifiedShipmentModal({ profile, isOpen, onClose }) {
 
               {/* The Form */}
               <ReceivePackageForm
+                key={shipmentDraft ? "draft-active" : "new-form"} // ✅ Force re-mount when draft is cleared
                 profile={profile}
                 onNext={(data) => {
                   setShipmentDraft(data);
                   setStep(2);
                 }}
                 initialData={shipmentDraft}
-                isPickupMode={isPickup} // Pass mode so form can adjust fields if needed
+                isDark={isDark}
+                isPickupMode={isPickup}
+                user={user}
               />
             </div>
           )}
 
           {step === 2 && (
-            // Notice we removed the header and buttons from TripStep in previous steps
-            // so it just renders the list cleanly here.
-            <TripStep
-              shipmentDraft={shipmentDraft}
-              isPickupMode={isPickup} // So TripStep can filter by Local vs Transfer
-              onComplete={handleMasterSubmit}
-            />
+            <div className="flex flex-col h-full overflow-hidden">
+              <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
+                <TripStep
+                  key={
+                    shipmentDraft
+                      ? `trip-${shipmentDraft.routeInfo.destinationCode}`
+                      : "trip-reset"
+                  }
+                  shipmentDraft={shipmentDraft}
+                  onBack={() => setStep(1)}
+                  onComplete={handleMasterSubmit}
+                  isDark={isDark}
+                  isPickupMode={isPickup}
+                />
+              </div>
+            </div>
           )}
 
           {step === 3 && (
@@ -240,19 +317,27 @@ export default function UnifiedShipmentModal({ profile, isOpen, onClose }) {
                 className={`text-5xl sm:text-6xl ${finalTripId ? "text-emerald-500" : "text-amber-500"}`}
               />
               <div>
-                <h2 className="text-xl sm:text-2xl font-bold text-white">
+                <h2
+                  className={`text-xl sm:text-2xl font-bold ${
+                    isDark ? "text-white" : "text-slate-900"
+                  }`}
+                >
                   {finalTripId
                     ? `Shipment Assigned to ${finalTripId}`
                     : `Shipment Created (${isPickup ? "Pending Pickup" : "Pending"})`}
                 </h2>
                 {sendSms && (
-                  <p className="text-emerald-400 text-xs font-bold mt-2 uppercase tracking-widest flex justify-center items-center gap-2">
-                    <FontAwesomeIcon icon={faCommentSms} /> SMS Notifications
-                    Queued
+                  <p
+                    className={`text-xs font-bold mt-2 uppercase tracking-widest flex justify-center items-center gap-2 ${
+                      isDark ? "text-emerald-400" : "text-emerald-600"
+                    }`}
+                  >
+                    <FontAwesomeIcon icon={faCommentSms} />
+                    <span>SMS Notifications Queued</span>
                   </p>
                 )}
               </div>
-              <div className="w-full max-w-xs space-y-3 mt-4">
+              {/* <div className="w-full max-w-xs space-y-3 mt-4">
                 <button
                   onClick={() =>
                     window.open(
@@ -262,11 +347,47 @@ export default function UnifiedShipmentModal({ profile, isOpen, onClose }) {
                       "_blank",
                     )
                   }
-                  className="w-full py-3 bg-slate-800 text-white rounded-xl font-bold border border-slate-700 hover:bg-slate-700 transition-colors text-sm"
+                  className={`w-full py-3 sm:py-4 rounded-xl font-bold border transition-colors text-sm sm:text-base ${
+                    isDark
+                      ? "bg-slate-800 text-white border-slate-700 hover:bg-slate-700"
+                      : "bg-slate-200 text-slate-800 border-slate-300 hover:bg-slate-300"
+                  }`}
                 >
                   {finalTripId
                     ? "Print Trip Labels"
                     : "Print Individual Waybill"}
+                </button>
+              </div> */}
+              <div className="w-full max-w-xs space-y-3 mt-4">
+                {/* PRINT BUTTON */}
+                <button
+                  onClick={() =>
+                    window.open(
+                      finalTripId
+                        ? `/components/print/labels?tripId=${finalTripId}`
+                        : `/components/print/labels?id=${createdShipmentId}`,
+                      "_blank",
+                    )
+                  }
+                  className={`w-full py-3 rounded-xl font-bold border transition-colors ${isDark ? "bg-slate-800 text-white border-slate-700 hover:bg-slate-700" : "bg-slate-200 text-slate-800 border-slate-300 hover:bg-slate-300"}`}
+                >
+                  {finalTripId
+                    ? "Print Trip Labels"
+                    : "Print Individual Waybill"}
+                </button>
+
+                {/* ✅ NEW: CREATE ANOTHER BUTTON */}
+                <button
+                  onClick={() => {
+                    setStep(1);
+                    setFinalTripId(null);
+                    setCreatedShipmentId(null);
+                    setShipmentDraft(null); // This triggers the 'key' reset we set up
+                  }}
+                  className="w-full py-3 rounded-xl font-bold bg-blue-600 hover:bg-blue-500 text-white shadow-lg transition-all flex items-center justify-center gap-2"
+                >
+                  <FontAwesomeIcon icon={faPlus} />
+                  <span>Create Another Shipment</span>
                 </button>
               </div>
             </div>
@@ -274,7 +395,13 @@ export default function UnifiedShipmentModal({ profile, isOpen, onClose }) {
         </div>
 
         {/* --- UNIFIED FOOTER --- */}
-        <div className="p-4 sm:p-6 border-t border-slate-800 bg-slate-950 flex flex-col sm:flex-row items-center gap-4 shrink-0">
+        <div
+          className={`p-4 sm:p-6 border-t flex flex-col sm:flex-row items-center gap-4 shrink-0 ${
+            isDark
+              ? "border-slate-800 bg-slate-950"
+              : "border-slate-200 bg-slate-50"
+          }`}
+        >
           {step === 1 && (
             <button
               type="submit"
@@ -296,12 +423,24 @@ export default function UnifiedShipmentModal({ profile, isOpen, onClose }) {
               <label className="flex items-center gap-2 cursor-pointer group w-full sm:w-auto mb-2 sm:mb-0">
                 <input
                   type="checkbox"
-                  className="w-4 h-4 rounded border-slate-700 bg-slate-800 text-blue-600 focus:ring-blue-500"
+                  className={`w-4 h-4 rounded text-blue-600 focus:ring-blue-500 ${
+                    isDark
+                      ? "border-slate-700 bg-slate-800 focus:ring-offset-slate-900"
+                      : "border-slate-300 bg-white focus:ring-offset-white"
+                  }`}
                   checked={sendSms}
                   onChange={(e) => setSendSms(e.target.checked)}
                 />
                 <span
-                  className={`text-xs font-bold uppercase tracking-tight ${sendSms ? "text-slate-200" : "text-slate-500"}`}
+                  className={`text-xs font-bold uppercase tracking-tight ${
+                    sendSms
+                      ? isDark
+                        ? "text-slate-200"
+                        : "text-slate-800"
+                      : isDark
+                        ? "text-slate-500"
+                        : "text-slate-500"
+                  }`}
                 >
                   Notify Sender/Recipient via SMS
                 </span>
@@ -311,7 +450,11 @@ export default function UnifiedShipmentModal({ profile, isOpen, onClose }) {
               <div className="flex w-full sm:w-auto sm:ml-auto gap-2">
                 <button
                   onClick={() => setStep(1)}
-                  className="px-6 py-3 rounded-xl border border-slate-700 text-slate-400 font-bold hover:bg-slate-800 transition-colors"
+                  className={`px-6 py-3 rounded-xl border font-bold transition-colors ${
+                    isDark
+                      ? "border-slate-700 text-slate-400 hover:bg-slate-800"
+                      : "border-slate-300 text-slate-600 hover:bg-slate-200"
+                  }`}
                 >
                   Back
                 </button>
@@ -330,6 +473,8 @@ export default function UnifiedShipmentModal({ profile, isOpen, onClose }) {
               onClick={() => {
                 onClose();
                 setStep(1);
+                setFinalTripId(null); // ✅ Clear success state
+                setCreatedShipmentId(null); // ✅ Clear success state
               }}
               className="w-full bg-blue-600 hover:bg-blue-500 py-3.5 rounded-xl font-bold text-white transition-colors"
             >

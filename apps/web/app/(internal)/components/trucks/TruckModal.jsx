@@ -23,6 +23,7 @@ export default function TruckModal({
   onClose,
   initialData,
   onRefresh,
+  isDark = false,
 }) {
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
@@ -102,24 +103,43 @@ export default function TruckModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-      <div className="bg-slate-900 border border-slate-700 rounded-xl w-full max-w-md shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
-        {/* Header - Matched to p-4 and bg-slate-950 */}
-        <div className="p-4 border-b border-slate-800 flex justify-between items-center bg-slate-950">
-          <h3 className="font-bold text-white flex items-center gap-2">
-            <FontAwesomeIcon icon={faTruck} className="text-blue-500" />
+      <div
+        className={`w-full max-w-md rounded-xl border shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200 ${
+          isDark ? "bg-slate-900 border-slate-700" : "bg-white border-slate-200"
+        }`}
+      >
+        {/* Header */}
+        <div
+          className={`p-4 border-b flex justify-between items-center ${
+            isDark ? "border-slate-800 bg-slate-950" : "border-slate-200 bg-slate-50"
+          }`}
+        >
+          <h3
+            className={`font-bold flex items-center gap-2 ${
+              isDark ? "text-white" : "text-slate-900"
+            }`}
+          >
+            <FontAwesomeIcon
+              icon={faTruck}
+              className={isDark ? "text-blue-500" : "text-blue-600"}
+            />
             {isEdit
               ? `Edit Truck: ${initialData.plateNumber}`
               : "Register New Truck"}
           </h3>
           <button
             onClick={onClose}
-            className="text-slate-500 hover:text-white transition-colors"
+            className={`transition-colors ${
+              isDark
+                ? "text-slate-500 hover:text-white"
+                : "text-slate-400 hover:text-slate-900"
+            }`}
           >
             <FontAwesomeIcon icon={faTimes} size="lg" />
           </button>
         </div>
 
-        {/* Form - Matched to p-6 and space-y-4 */}
+        {/* Form */}
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
           {/* Main Details Section */}
           <div className="space-y-4">
@@ -140,14 +160,28 @@ export default function TruckModal({
               />
             </div>
 
-            <div className="bg-slate-950/50 p-3 rounded-lg border border-slate-800">
-              <label className="text-[10px] font-bold text-blue-400 uppercase flex items-center gap-2 mb-2">
+            <div
+              className={`p-3 rounded-lg border ${
+                isDark
+                  ? "bg-slate-950/50 border-slate-800"
+                  : "bg-blue-50 border-blue-200"
+              }`}
+            >
+              <label
+                className={`text-[10px] font-bold uppercase flex items-center gap-2 mb-2 ${
+                  isDark ? "text-blue-400" : "text-blue-700"
+                }`}
+              >
                 <FontAwesomeIcon icon={faTruck} /> Truck Type
               </label>
               <select
                 value={formData.type}
                 onChange={(e) => handleChange("type", e.target.value)}
-                className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-white outline-none focus:border-blue-500 appearance-none cursor-pointer"
+                className={`w-full border rounded-lg p-2 text-xs outline-none focus:border-blue-500 appearance-none cursor-pointer ${
+                  isDark
+                    ? "bg-slate-900 border-slate-700 text-white"
+                    : "bg-white border-slate-300 text-slate-900"
+                }`}
               >
                 <option>12-Wheeler Wing Van</option>
                 <option>12-Wheeler Closed Van</option>
@@ -171,8 +205,18 @@ export default function TruckModal({
           </div>
 
           {/* Compliance Section */}
-          <div className="bg-slate-950/50 p-3 rounded-lg border border-slate-800 space-y-4">
-            <p className="text-[10px] font-bold text-emerald-400 uppercase flex items-center gap-2">
+          <div
+            className={`p-3 rounded-lg border space-y-4 ${
+              isDark
+                ? "bg-slate-950/50 border-slate-800"
+                : "bg-emerald-50 border-emerald-200"
+            }`}
+          >
+            <p
+              className={`text-[10px] font-bold uppercase flex items-center gap-2 ${
+                isDark ? "text-emerald-400" : "text-emerald-700"
+              }`}
+            >
               <FontAwesomeIcon icon={faTools} /> Maintenance & Compliance
             </p>
             <div className="grid grid-cols-2 gap-4">
@@ -243,7 +287,11 @@ export default function TruckModal({
               type="button"
               onClick={onClose}
               disabled={loading}
-              className="flex-1 py-2.5 rounded-lg border border-slate-700 text-slate-400 hover:bg-slate-800 font-bold text-sm"
+              className={`flex-1 py-2.5 rounded-lg border font-bold text-sm transition-colors ${
+                isDark
+                  ? "border-slate-700 text-slate-400 hover:bg-slate-800"
+                  : "border-slate-300 text-slate-700 hover:bg-slate-100"
+              }`}
             >
               Cancel
             </button>
@@ -266,14 +314,22 @@ export default function TruckModal({
   );
 }
 
-function InputField({ label, icon, ...props }) {
+function InputField({ label, icon, isDark = false, ...props }) {
   return (
     <div className="space-y-1">
-      <label className="text-[10px] font-bold text-slate-400 uppercase flex items-center gap-2">
+      <label
+        className={`text-[10px] font-bold uppercase flex items-center gap-2 ${
+          isDark ? "text-slate-400" : "text-slate-600"
+        }`}
+      >
         {icon && <FontAwesomeIcon icon={icon} className="text-[9px]" />} {label}
       </label>
       <input
-        className="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-sm text-white outline-none focus:border-blue-500 [color-scheme:dark] transition-colors"
+        className={`w-full border rounded-lg p-2 text-sm outline-none focus:border-blue-500 transition-colors ${
+          isDark
+            ? "bg-slate-950 border-slate-700 text-white [color-scheme:dark]"
+            : "bg-white border-slate-300 text-slate-900 [color-scheme:light]"
+        }`}
         {...props}
       />
     </div>
