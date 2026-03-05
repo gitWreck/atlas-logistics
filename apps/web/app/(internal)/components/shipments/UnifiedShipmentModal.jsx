@@ -125,7 +125,19 @@ export default function UnifiedShipmentModal({
       };
 
       // --- Save to DB ---
-      const shipmentRes = await createShipmentBundle(payload);
+      const hasBundles = shipmentDraft.items.some(
+        (item) =>
+          item.packagingType === "Sack" || item.packagingType === "Bundle",
+      );
+
+      let shipmentRes;
+      if (hasBundles) {
+        // Calls the version that puts Quantity INSIDE the package object
+        shipmentRes = await createShipmentBundle(payload);
+      } else {
+        // Calls the original version that loops and creates SHP-01, SHP-02, etc.
+        shipmentRes = await createShipmentWithPackages(payload);
+      }
       const newShipmentId = shipmentRes?.data?.shipmentId || manualShipmentId;
       setCreatedShipmentId(newShipmentId);
 

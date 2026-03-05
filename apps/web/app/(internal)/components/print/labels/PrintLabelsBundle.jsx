@@ -132,7 +132,7 @@ export default function PrintLabelsBundle() {
                 Total Labels
               </div>
               <div className="text-lg font-bold text-blue-600">
-                {stats.packages}
+                {stats.packages || printItems.length}
               </div>
             </div>
           </div>
@@ -145,7 +145,7 @@ export default function PrintLabelsBundle() {
           onClick={() => window.print()}
           className="bg-blue-600 text-white px-8 py-3 rounded-full font-bold shadow-xl hover:bg-blue-500 hover:scale-105 transition-all flex items-center gap-2 mx-auto"
         >
-          <span>🖨️ Print {stats.packages} Labels</span>
+          <span>🖨️ Print {stats.packages || printItems.length} Label/s</span>
         </button>
       </div>
 

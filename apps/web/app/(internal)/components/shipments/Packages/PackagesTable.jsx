@@ -10,6 +10,8 @@ import {
   faBoxOpen,
   faWineGlass,
   faSnowflake,
+  faDotCircle,
+  faEllipsisV,
 } from "@fortawesome/free-solid-svg-icons";
 import StatusBadge from "../../ui/StatusBadge";
 import ShipmentLabel from "../ShipmentLabel";
@@ -115,7 +117,7 @@ export default function PackagesTable({ data, isDark = false }) {
         <button
           onClick={() =>
             window.open(
-              `/components/print/labels?id=${encodeURIComponent(data.id)}`,
+              `/components/print/labels?id=${encodeURIComponent(data.id)}&mode=shipment`,
               "_blank",
             )
           }
@@ -126,7 +128,23 @@ export default function PackagesTable({ data, isDark = false }) {
           }`}
         >
           <FontAwesomeIcon icon={faPrint} />
-          <span>Print {filteredPackages.length} Label/s</span>
+          <span>Shipment Label</span>
+        </button>
+        <button
+          onClick={() =>
+            window.open(
+              `/components/print/labels?id=${encodeURIComponent(data.id)}&mode=individual`,
+              "_blank",
+            )
+          }
+          className={`flex justify-center items-center gap-2 px-4 py-2 rounded-lg transition-colors text-xs font-bold whitespace-nowrap ${
+            isDark
+              ? "bg-slate-700 hover:bg-slate-600 text-white"
+              : "bg-slate-200 hover:bg-slate-300 text-slate-800"
+          }`}
+        >
+          <FontAwesomeIcon icon={faPrint} />
+          <span>Package Label/s</span>
         </button>
       </div>
 
@@ -152,7 +170,7 @@ export default function PackagesTable({ data, isDark = false }) {
                 <th className="p-4">Item Details</th>
                 <th className="p-4">Tracking No.</th>
                 <th className="p-4">Status</th>
-                {/* <th className="p-4 text-right">Actions</th> */}
+                <th className="p-4 text-right">Actions</th>
               </tr>
             </thead>
             <tbody
@@ -330,7 +348,7 @@ function PackageTableRow({ pkg, idx, shipmentData, isDark = false }) {
           <StatusBadge status={pkg.status} size="xs" isDark={isDark} />
         </td>
 
-        <td className="p-4 text-right">
+        <td className="p-4 text-right gap-1 flex justify-end">
           <button
             onClick={() => setShowQR(!showQR)}
             className={`w-8 h-8 rounded inline-flex items-center justify-center transition-all ${
@@ -343,6 +361,19 @@ function PackageTableRow({ pkg, idx, shipmentData, isDark = false }) {
             title="Toggle QR Code"
           >
             <FontAwesomeIcon icon={faQrcode} />
+          </button>
+          <button
+            onClick={() => setShowQR(!showQR)}
+            className={`w-8 h-8 rounded inline-flex items-center justify-center transition-all ${
+              showQR
+                ? "bg-blue-600 text-white shadow-lg shadow-blue-900/50"
+                : isDark
+                  ? "bg-slate-800 text-slate-400 hover:bg-slate-700 hover:text-white border border-slate-700"
+                  : "bg-slate-200 text-slate-600 hover:bg-slate-300 hover:text-slate-900 border border-slate-300"
+            }`}
+            title="Action"
+          >
+            <FontAwesomeIcon icon={faEllipsisV} />
           </button>
         </td>
       </tr>

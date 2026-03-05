@@ -125,7 +125,7 @@ export default function PrintLabelsClient() {
           onClick={() => window.print()}
           className="bg-blue-600 text-white px-8 py-3 rounded-full font-bold shadow-xl hover:bg-blue-500 hover:scale-105 transition-all flex items-center gap-2 mx-auto"
         >
-          <span>🖨️ Print {stats.packages} Labels</span>
+          <span>🖨️ Print {stats.packages} Label/s</span>
         </button>
       </div>
 
@@ -245,10 +245,13 @@ function StandardLabel({ shipment, pkg, index, total }) {
               Package Details
             </div>
             <div className="font-semibold uppercase">
-              {pkg.description || "No Description"}
+              Description: {pkg.description || "No Description"}
             </div>
             <div className="text-gray-600 uppercase">
-              {pkg.packagingType || "Standard Packaging"}
+              Package Type: {pkg.packagingType || "Standard Packaging"}
+            </div>
+            <div className="text-gray-600 uppercase">
+              Quantity: {pkg.quantity || 1}
             </div>
           </div>
         </div>
@@ -331,7 +334,7 @@ function StandardLabel({ shipment, pkg, index, total }) {
 
         <div className="text-center">
           <div className="text-[10px] font-bold text-gray-500 uppercase">
-            Box
+            {pkg.packagingType || "Standard Packaging"}
           </div>
           <div className="text-3xl font-bold leading-none">
             {index + 1}
