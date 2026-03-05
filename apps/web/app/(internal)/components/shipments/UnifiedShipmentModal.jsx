@@ -9,6 +9,7 @@ import {
   faArrowRight,
   faStore,
   faTruckPickup,
+  faPlus,
 } from "@fortawesome/free-solid-svg-icons";
 import ReceivePackageForm from "./ReceivePackageForm/ReceivePackageForm";
 import TripStep from "../manifests/CreateTripModal/TripStep";
@@ -26,6 +27,7 @@ export default function UnifiedShipmentModal({
   isOpen,
   onClose,
   isDark = false,
+  user,
 }) {
   const { showAlert, showConfirm } = useAlert();
 
@@ -136,6 +138,9 @@ export default function UnifiedShipmentModal({
         });
 
         setFinalTripId(targetTripId);
+
+        setShipmentDraft(null);
+
         window.open(
           `/components/print/labels?tripId=${targetTripId}`,
           "_blank",
@@ -216,8 +221,8 @@ export default function UnifiedShipmentModal({
             onClick={onClose}
             className={`p-2 rounded-lg transition-colors ${
               isDark
-                ? "text-slate-500 hover:text-white bg-slate-900"
-                : "text-slate-500 hover:text-slate-900 bg-slate-200 hover:bg-slate-300"
+                ? "text-slate-500 hover:text-white"
+                : "text-slate-500 hover:text-slate-900 hover:bg-slate-300"
             }`}
           >
             ✕
@@ -272,6 +277,7 @@ export default function UnifiedShipmentModal({
 
               {/* The Form */}
               <ReceivePackageForm
+                key={shipmentDraft ? "draft-active" : "new-form"} // ✅ Force re-mount when draft is cleared
                 profile={profile}
                 onNext={(data) => {
                   setShipmentDraft(data);
@@ -280,92 +286,20 @@ export default function UnifiedShipmentModal({
                 initialData={shipmentDraft}
                 isDark={isDark}
                 isPickupMode={isPickup}
+                user={user}
               />
             </div>
           )}
 
           {step === 2 && (
             <div className="flex flex-col h-full overflow-hidden">
-              {/* <div
-                className={`p-4 sm:p-6 border-b flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 shrink-0 ${
-                  isDark
-                    ? "border-slate-800 bg-slate-950"
-                    : "border-slate-200 bg-slate-50"
-                }`}
-              >
-                <div className="flex justify-between items-center w-full sm:w-auto">
-                  <h2
-                    className={`text-lg sm:text-xl font-bold ${
-                      isDark ? "text-white" : "text-slate-900"
-                    }`}
-                  >
-                    2. Select Trip
-                  </h2>
-                  <button
-                    onClick={onClose}
-                    className={`sm:hidden p-2 ${
-                      isDark ? "text-slate-500" : "text-slate-600"
-                    }`}
-                  >
-                    ✕
-                  </button>
-                </div>
-
-                <div className="flex flex-wrap items-center gap-3 sm:gap-6 w-full sm:w-auto">
-                  <label
-                    className={`flex items-center gap-2 cursor-pointer group p-2 sm:p-0 rounded-lg sm:border-0 ${
-                      isDark
-                        ? "bg-slate-900 border border-slate-800"
-                        : "bg-slate-100 border border-slate-200 sm:bg-transparent"
-                    }`}
-                  >
-                    <input
-                      type="checkbox"
-                      className={`w-4 h-4 rounded text-blue-600 focus:ring-blue-500 ${
-                        isDark
-                          ? "border-slate-700 bg-slate-800 focus:ring-offset-slate-900"
-                          : "border-slate-300 bg-white focus:ring-offset-white"
-                      }`}
-                      checked={sendSms}
-                      onChange={(e) => setSendSms(e.target.checked)}
-                    />
-                    <div className="flex items-center gap-1.5">
-                      <span
-                        className={`text-xs font-bold uppercase tracking-tight ${
-                          sendSms
-                            ? isDark
-                              ? "text-slate-200"
-                              : "text-slate-800"
-                            : "text-slate-500"
-                        }`}
-                      >
-                        Notify SMS
-                      </span>
-                    </div>
-                  </label>
-
-                  <button
-                    onClick={() => handleMasterSubmit(null)}
-                    className="flex-1 sm:flex-none text-xs sm:text-sm font-bold text-amber-500 hover:text-amber-400 border border-amber-500/30 bg-amber-500/10 px-3 py-2 sm:py-1.5 rounded-lg transition-colors whitespace-nowrap"
-                  >
-                    Skip trip assignment & Save
-                  </button>
-
-                  <button
-                    onClick={onClose}
-                    className={`hidden sm:block transition-colors ${
-                      isDark
-                        ? "text-slate-500 hover:text-white"
-                        : "text-slate-500 hover:text-slate-900"
-                    }`}
-                  >
-                    ✕
-                  </button>
-                </div>
-              </div> */}
-
               <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
                 <TripStep
+                  key={
+                    shipmentDraft
+                      ? `trip-${shipmentDraft.routeInfo.destinationCode}`
+                      : "trip-reset"
+                  }
                   shipmentDraft={shipmentDraft}
                   onBack={() => setStep(1)}
                   onComplete={handleMasterSubmit}
@@ -403,7 +337,7 @@ export default function UnifiedShipmentModal({
                   </p>
                 )}
               </div>
-              <div className="w-full max-w-xs space-y-3 mt-4">
+              {/* <div className="w-full max-w-xs space-y-3 mt-4">
                 <button
                   onClick={() =>
                     window.open(
@@ -422,6 +356,38 @@ export default function UnifiedShipmentModal({
                   {finalTripId
                     ? "Print Trip Labels"
                     : "Print Individual Waybill"}
+                </button>
+              </div> */}
+              <div className="w-full max-w-xs space-y-3 mt-4">
+                {/* PRINT BUTTON */}
+                <button
+                  onClick={() =>
+                    window.open(
+                      finalTripId
+                        ? `/components/print/labels?tripId=${finalTripId}`
+                        : `/components/print/labels?id=${createdShipmentId}`,
+                      "_blank",
+                    )
+                  }
+                  className={`w-full py-3 rounded-xl font-bold border transition-colors ${isDark ? "bg-slate-800 text-white border-slate-700 hover:bg-slate-700" : "bg-slate-200 text-slate-800 border-slate-300 hover:bg-slate-300"}`}
+                >
+                  {finalTripId
+                    ? "Print Trip Labels"
+                    : "Print Individual Waybill"}
+                </button>
+
+                {/* ✅ NEW: CREATE ANOTHER BUTTON */}
+                <button
+                  onClick={() => {
+                    setStep(1);
+                    setFinalTripId(null);
+                    setCreatedShipmentId(null);
+                    setShipmentDraft(null); // This triggers the 'key' reset we set up
+                  }}
+                  className="w-full py-3 rounded-xl font-bold bg-blue-600 hover:bg-blue-500 text-white shadow-lg transition-all flex items-center justify-center gap-2"
+                >
+                  <FontAwesomeIcon icon={faPlus} />
+                  <span>Create Another Shipment</span>
                 </button>
               </div>
             </div>
@@ -507,6 +473,8 @@ export default function UnifiedShipmentModal({
               onClick={() => {
                 onClose();
                 setStep(1);
+                setFinalTripId(null); // ✅ Clear success state
+                setCreatedShipmentId(null); // ✅ Clear success state
               }}
               className="w-full bg-blue-600 hover:bg-blue-500 py-3.5 rounded-xl font-bold text-white transition-colors"
             >

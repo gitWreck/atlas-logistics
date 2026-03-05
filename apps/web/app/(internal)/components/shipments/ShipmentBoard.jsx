@@ -500,6 +500,7 @@ const ShipmentBoard = forwardRef(function ShipmentBoard(
         isOpen={isNewOrderModalOpen}
         onClose={() => setIsNewOrderModalOpen(false)}
         isDark={isDark}
+        user={user}
       />
     </div>
   );
