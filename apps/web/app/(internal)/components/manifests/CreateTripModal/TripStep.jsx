@@ -48,7 +48,7 @@ export default function TripStep({
     driverId: null,
     truckPlateNumber: "",
     truckId: null,
-    tripType: isPickupMode ? "LOCAL" : "TRANSFER",
+    tripType: isPickupMode ? "LOCAL_PICKUP" : "HUB_TRANSFER",
   });
 
   const fetchTrips = async () => {
@@ -81,6 +81,18 @@ export default function TripStep({
       setLoading(false);
     }
   };
+  // Inside TripStep.js
+  useEffect(() => {
+    if (shipmentDraft) {
+      setNewTripData((prev) => ({
+        ...prev,
+        origin: shipmentDraft.routeInfo?.origin || "",
+        originCode: shipmentDraft.routeInfo?.originCode || "",
+        destination: shipmentDraft.routeInfo?.destination || "",
+        destinationCode: shipmentDraft.routeInfo?.destinationCode || "",
+      }));
+    }
+  }, [shipmentDraft]);
 
   useEffect(() => {
     if (view === "selection") {

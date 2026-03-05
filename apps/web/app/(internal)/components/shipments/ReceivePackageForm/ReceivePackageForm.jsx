@@ -23,11 +23,13 @@ const INITIAL_CONTACT = {
   province: "",
 };
 export default function ReceivePackageForm({
+  // key,
   profile,
   onNext,
   initialData,
   isPickupMode,
   isDark = false,
+  user,
 }) {
   const { showAlert, showConfirm } = useAlert();
 
@@ -298,6 +300,7 @@ export default function ReceivePackageForm({
               onChange={setSender}
               color="blue"
               isDark={isDark}
+              user={user}
             />
             <InputGroup
               label="Recipient Contact"
@@ -305,6 +308,7 @@ export default function ReceivePackageForm({
               onChange={setRecipient}
               color="emerald"
               isDark={isDark}
+              user={user}
             />
           </div>
 

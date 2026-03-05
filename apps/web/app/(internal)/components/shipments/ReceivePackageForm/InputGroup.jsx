@@ -8,8 +8,12 @@ export default function InputGroup({
   onChange,
   color = "blue",
   isDark = false,
+  user,
 }) {
   const [cities, setCities] = useState([]);
+  // ✅ New States for Search
+  const [suggestions, setSuggestions] = useState([]);
+  const [showDropdown, setShowDropdown] = useState(false);
 
   useEffect(() => {
     if (values.province) {
@@ -19,7 +23,43 @@ export default function InputGroup({
     }
   }, [values.province]);
 
+  // ✅ New Function to Search Customers
+  const searchCustomers = async (namePart) => {
+    if (namePart.length < 2) return;
+
+    try {
+      const token = await user.getIdToken(); // Get current user token
+      const res = await fetch(`/api/customers?search=${namePart}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+
+      setSuggestions(data.customers || []);
+      setShowDropdown(true);
+    } catch (err) {
+      console.error("API Call failed:", err);
+    }
+  };
+  // ✅ New Function to Select a Customer
+  const handleSelectCustomer = (customer) => {
+    const addr = customer.address || {};
+    onChange({
+      ...values,
+      name: customer.name,
+      phone: customer.phoneNumber || "",
+      unit: addr.unit || "",
+      street: addr.street || "",
+      barangay: addr.barangay || "",
+      province: addr.province || "",
+      city: addr.city || "",
+    });
+    setShowDropdown(false);
+  };
+
   const handleChange = (field, val) => {
+    if (field === "name") {
+      searchCustomers(val);
+    }
     if (field === "province") {
       onChange({ ...values, province: val, city: "", code: "" });
     } else if (field === "city") {
@@ -38,31 +78,69 @@ export default function InputGroup({
     color === "emerald" ? "focus:ring-emerald-500" : "focus:ring-blue-500";
   const borderColor =
     color === "emerald" ? "focus:border-emerald-500" : "focus:border-blue-500";
-  const titleColor = color === "emerald" ? (isDark ? "text-emerald-400" : "text-emerald-600") : (isDark ? "text-blue-400" : "text-blue-600");
+  const titleColor =
+    color === "emerald"
+      ? isDark
+        ? "text-emerald-400"
+        : "text-emerald-600"
+      : isDark
+        ? "text-blue-400"
+        : "text-blue-600";
   const inputClass = isDark
     ? `w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm ${ringColor} ${borderColor} focus:ring-1`
     : `w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-slate-900 text-sm ${ringColor} ${borderColor} focus:ring-1`;
 
   return (
-    <div className={`space-y-4 p-4 rounded-xl border ${isDark ? "bg-slate-950/50 border-slate-800/50" : "bg-slate-50 border-slate-200"}`}>
+    <div
+      className={`space-y-4 p-4 rounded-xl border ${isDark ? "bg-slate-950/50 border-slate-800/50" : "bg-slate-50 border-slate-200"}`}
+    >
       <div className="flex justify-between items-center mb-2">
-        <h3 className={`text-xs font-bold uppercase tracking-wider ${titleColor}`}>
+        <h3
+          className={`text-xs font-bold uppercase tracking-wider ${titleColor}`}
+        >
           {label} Details
         </h3>
         {values.code && (
-          <span className={`text-[10px] font-mono px-2 py-1 rounded border ${isDark ? "bg-slate-800 text-white border-slate-700" : "bg-slate-200 text-slate-800 border-slate-300"}`}>
+          <span
+            className={`text-[10px] font-mono px-2 py-1 rounded border ${isDark ? "bg-slate-800 text-white border-slate-700" : "bg-slate-200 text-slate-800 border-slate-300"}`}
+          >
             CODE: {values.code}
           </span>
         )}
       </div>
 
       <div className="grid grid-cols-2 gap-3">
-        <input
-          placeholder="Contact Name"
-          className={inputClass}
-          value={values.name}
-          onChange={(e) => handleChange("name", e.target.value)}
-        />
+        <div className="relative">
+          <input
+            placeholder="Contact Name"
+            className={inputClass}
+            value={values.name}
+            onChange={(e) => handleChange("name", e.target.value)}
+            onFocus={() => values.name?.length > 1 && setShowDropdown(true)}
+          />
+
+          {/* ✅ DROPDOWN SUGGESTIONS */}
+          {showDropdown && suggestions.length > 0 && (
+            <div
+              className={`absolute z-50 w-full mt-1 rounded-lg border shadow-xl overflow-hidden ${isDark ? "bg-slate-900 border-slate-700" : "bg-white border-slate-200"}`}
+            >
+              {suggestions.map((cust) => (
+                <button
+                  key={cust.uid}
+                  type="button"
+                  onClick={() => handleSelectCustomer(cust)}
+                  className={`w-full text-left px-3 py-2 text-xs transition-colors ${isDark ? "hover:bg-slate-800 text-slate-300" : "hover:bg-slate-100 text-slate-700"}`}
+                >
+                  <div className="font-bold">{cust.name}</div>
+                  <div className="opacity-60 text-[10px]">
+                    {cust.phoneNumber}
+                  </div>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
         <input
           placeholder="Phone Number"
           className={inputClass}

@@ -58,7 +58,7 @@ export default function ShipmentDrawer({
       />
 
       <aside
-        style={{ width: "min(100%, 600px)" }}
+        style={{ width: "min(100%, 780px)" }}
         className={`
           fixed top-0 right-0 h-full z-50 shadow-2xl transform transition-transform duration-300 flex flex-col
           ${isDark ? "bg-slate-900 border-l border-slate-800" : "bg-white border-l border-slate-200"}

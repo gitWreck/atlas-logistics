@@ -330,7 +330,7 @@ function PackageTableRow({ pkg, idx, shipmentData, isDark = false }) {
           <StatusBadge status={pkg.status} size="xs" isDark={isDark} />
         </td>
 
-        {/* <td className="p-4 text-right">
+        <td className="p-4 text-right">
           <button
             onClick={() => setShowQR(!showQR)}
             className={`w-8 h-8 rounded inline-flex items-center justify-center transition-all ${
@@ -344,7 +344,7 @@ function PackageTableRow({ pkg, idx, shipmentData, isDark = false }) {
           >
             <FontAwesomeIcon icon={faQrcode} />
           </button>
-        </td> */}
+        </td>
       </tr>
 
       {showQR && (
