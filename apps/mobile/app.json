@@ -44,7 +44,7 @@
       }
     },
     "owner": "atlas-transport",
-    "plugins": ["expo-router", "expo-font"],
+    "plugins": ["expo-router", "expo-font", "./withMonorepoFix.js"],
     "runtimeVersion": {
       "policy": "appVersion"
     },
