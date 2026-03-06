@@ -18,6 +18,10 @@ export const updateShipmentPackages = httpsCallable(
   functions,
   "updateShipmentPackages",
 );
+export const updatePackageStatus = httpsCallable(
+  functions,
+  "updatePackageStatus",
+);
 
 // TRIPS
 export const createTruckTrip = httpsCallable(functions, "createTruckTrip");

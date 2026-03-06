@@ -77,7 +77,7 @@ exports.updatePackageStatus = onCall(async (req) => {
       loadedCount: loadedCount,
       "totals.loaded": loadedCount,
       "totals.pending": totalCount - loadedCount,
-      lastUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     });
   });
 
