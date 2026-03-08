@@ -1,3 +1,5 @@
+"use strict";
+
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const admin = require("firebase-admin");
 const { FieldValue } = admin.firestore;
@@ -9,147 +11,124 @@ const db = admin.firestore();
 exports.updateShipmentPackages = onCall(
   { region: "asia-southeast1", maxInstances: 10 },
   async (req) => {
-    // 1. AUTH & ROLE CHECK
-    if (!req.auth) throw new HttpsError("unauthenticated", "Auth required.");
-    // Note: requireRole needs to be imported or defined in your helpers
     await requireRole(db, req, ["admin", "manager", "checker"]);
 
     const uid = req.auth.uid;
-    let { shipmentId, packageIds, newStatus, tripId, remarks, location } =
-      req.data;
+    const {
+      shipmentId,
+      packages: newPackagesArray, // Used by Web Modal (Full Replace)
+      packageIds, // Used by Scanner (Partial Update)
+      newStatus, // Used by Scanner
+      manualQty, // Used by Scanner
+      remarks,
+      location,
+    } = req.data;
 
-    if (!shipmentId || !packageIds || !newStatus) {
-      throw new HttpsError("invalid-argument", "Missing required fields.");
-    }
-
-    // If the app only sent a package barcode, find its home
-    if (packageIds.length > 0) {
-      const packageBarcode = packageIds[0];
-
-      const shipmentQuery = await db
-        .collection("shipments")
-        .where("packageBarcodes", "array-contains", packageBarcode)
-        .limit(1)
-        .get();
-
-      if (shipmentQuery.empty) {
-        throw new HttpsError("not-found", "Package not found in any shipment.");
-      }
-
-      const shipmentDoc = shipmentQuery.docs[0];
-      shipmentId = shipmentDoc.id;
-
-      // ✅ AUTO-DISCOVERY: If tripId wasn't sent, get it from the shipment
-      if (!tripId) {
-        tripId = shipmentDoc.data().currentTruckTripId || null;
-      }
-    }
+    if (!shipmentId)
+      throw new HttpsError("invalid-argument", "Missing shipmentId.");
 
     const shipmentRef = db.collection("shipments").doc(shipmentId);
-    const tripRef = tripId ? db.collection("truck_trips").doc(tripId) : null;
 
-    // ✅ NEW: Reference to the specific shipment inside this trip
-    const tripShipmentRef = tripRef
-      ? tripRef.collection("trip_shipments").doc(shipmentId)
-      : null;
-
-    // 2. TRANSACTION
     await db.runTransaction(async (tx) => {
       const shipmentSnap = await tx.get(shipmentRef);
       if (!shipmentSnap.exists)
         throw new HttpsError("not-found", "Shipment not found.");
 
-      const data = shipmentSnap.data();
-      const packages = data.packages || [];
+      const oldData = shipmentSnap.data();
+      const oldPackages = oldData.packages || [];
+      const tripId = oldData.currentTruckTripId;
 
-      // Initialize deltas for Trip-level counters
-      let localDeltaLoaded = 0;
-      let localDeltaArrived = 0;
-      let localDeltaMissing = 0;
+      let finalPackages = [];
 
-      // 3. UPDATE SPECIFIC PACKAGES
-      const updatedPackages = packages.map((pkg) => {
-        if (packageIds.includes(pkg.trackingNumber)) {
-          const oldStatus = pkg.status;
+      // --- LOGIC BRANCH: SCANNER VS MODAL ---
+      if (packageIds && Array.isArray(packageIds)) {
+        // SCANNER LOGIC: Update specific items in the existing array
+        finalPackages = oldPackages.map((pkg) => {
+          if (packageIds.includes(pkg.trackingNumber)) {
+            const qtyToApply = Number(manualQty) || Number(pkg.quantity) || 1;
+            const isPartial = qtyToApply < (Number(pkg.quantity) || 1);
 
-          if (oldStatus !== newStatus) {
-            // --- DECREMENT OLD COUNTERS ---
-            if (oldStatus === "LOADED") localDeltaLoaded--;
-            if (oldStatus === "RECEIVED") localDeltaArrived--;
-            if (oldStatus === "MISSING") localDeltaMissing--;
-
-            // --- INCREMENT NEW COUNTERS ---
-            if (newStatus === "LOADED") localDeltaLoaded++;
-            if (newStatus === "RECEIVED") localDeltaArrived++;
-            if (newStatus === "MISSING") localDeltaMissing++;
+            return {
+              ...pkg,
+              status: isPartial ? "PARTIALLY_LOADED" : newStatus,
+              loadedQty: newStatus === "LOADED" ? qtyToApply : 0,
+              updatedAt: new Date().toISOString(),
+            };
           }
-
-          return {
-            ...pkg,
-            status: newStatus,
-            remarks: remarks || pkg.remarks || null, // Keep existing remarks if new ones aren't provided
-            updatedAt: new Date().toISOString(),
-            updatedBy: uid,
-          };
-        }
-        return pkg;
-      });
-
-      // 4. CALCULATE NEW SHIPMENT STATUS & TOTALS
-      const totalLoaded = updatedPackages.filter(
-        (p) => p.status === "LOADED",
-      ).length;
-      const totalMissing = updatedPackages.filter(
-        (p) => p.status === "MISSING",
-      ).length;
-      const totalItems = updatedPackages.length;
-
-      let finalStatus = data.status;
-      // Logical priority: If all items are loaded, status is LOADED.
-      // If some items are loaded but others are missing/pending, it's PARTIALLY_LOADED.
-      if (totalLoaded === totalItems) {
-        finalStatus = "LOADED";
-      } else if (totalLoaded + totalMissing === totalItems && totalLoaded > 0) {
-        // All items accounted for, but some are missing
-        finalStatus = "LOADED_WITH_EXCEPTIONS";
-      } else if (totalLoaded > 0 || totalMissing > 0) {
-        finalStatus = "PARTIALLY_PROCESSED";
+          return pkg;
+        });
+      } else if (newPackagesArray) {
+        // WEB MODAL LOGIC: Use the provided array
+        finalPackages = newPackagesArray;
       }
 
-      // 5. WRITE UPDATES TO SHIPMENT
+      // --- PIECE-LEVEL MATH ---
+      const sumTotalPieces = (pkgs) =>
+        pkgs.reduce((acc, p) => acc + (Number(p.quantity) || 1), 0);
+      const sumLoadedPieces = (pkgs) =>
+        pkgs.reduce((acc, p) => {
+          if (p.status === "LOADED") return acc + (Number(p.quantity) || 1);
+          if (p.status === "PARTIALLY_LOADED")
+            return acc + (Number(p.loadedQty) || 0);
+          return acc;
+        }, 0);
+
+      const oldTotalPieces = sumTotalPieces(oldPackages);
+      const newTotalPieces = sumTotalPieces(finalPackages);
+      const oldLoadedPieces = sumLoadedPieces(oldPackages);
+      const newLoadedPieces = sumLoadedPieces(finalPackages);
+
+      const deltaTotal = newTotalPieces - oldTotalPieces;
+      const deltaLoaded = newLoadedPieces - oldLoadedPieces;
+
+      // Calculate Status
+      const totalItems = finalPackages.length;
+      const loadedCount = finalPackages.filter(
+        (p) => p.status === "LOADED",
+      ).length;
+      const partialCount = finalPackages.filter(
+        (p) => p.status === "PARTIALLY_LOADED",
+      ).length;
+
+      let shipmentStatus = oldData.status;
+      if (loadedCount === totalItems && totalItems > 0)
+        shipmentStatus = "LOADED";
+      else if (loadedCount > 0 || partialCount > 0)
+        shipmentStatus = "PARTIALLY_LOADED";
+      else shipmentStatus = "RECEIVED";
+
+      // --- WRITES ---
       tx.update(shipmentRef, {
-        packages: updatedPackages,
-        status: finalStatus,
-        "totals.loaded": totalLoaded,
-        "totals.missing": totalMissing, // ✅ Syncs with your Progress Bar
+        packages: finalPackages,
+        status: shipmentStatus,
+        "totals.totalItems": totalItems,
+        "totals.totalContentQty": newTotalPieces,
+        "totals.loaded": newLoadedPieces,
         updatedAt: FieldValue.serverTimestamp(),
+        updatedBy: uid,
         statusHistory: FieldValue.arrayUnion({
-          status: `PKG_BULK_${newStatus}`,
+          status: shipmentStatus,
           at: new Date(),
           by: uid,
           note:
-            remarks || `${packageIds.length} packages marked as ${newStatus}.`,
+            remarks || `Scanner/Modal update: ${newLoadedPieces} pieces loaded`,
           location: location || null,
         }),
       });
 
-      // 6. ✅ NEW: UPDATE TRIP_SHIPMENT (The Manifest Entry)
-      if (tripShipmentRef) {
-        tx.update(tripShipmentRef, {
-          status: finalStatus,
-          loadedCount: totalLoaded,
-          missingCount: totalMissing, // Ensure your schema supports this
-          updatedAt: FieldValue.serverTimestamp(),
-          updatedBy: uid,
-        });
-      }
-
-      // 6. UPDATE TRIP COUNTERS (The Handshake)
-      if (tripRef) {
+      if (tripId) {
+        const tripRef = db.collection("truck_trips").doc(tripId);
         tx.update(tripRef, {
-          totalLoaded: FieldValue.increment(localDeltaLoaded),
-          totalArrived: FieldValue.increment(localDeltaArrived),
-          totalMissing: FieldValue.increment(localDeltaMissing), // ✅ Keeps Truck Dashboard in sync
+          totalItems: FieldValue.increment(deltaTotal),
+          totalLoaded: FieldValue.increment(deltaLoaded),
+          itemPending: FieldValue.increment(deltaTotal - deltaLoaded),
+          updatedAt: FieldValue.serverTimestamp(),
+        });
+
+        tx.update(tripRef.collection("trip_shipments").doc(shipmentId), {
+          status: shipmentStatus,
+          loadedCount: newLoadedPieces,
+          totalItems: newTotalPieces,
           updatedAt: FieldValue.serverTimestamp(),
         });
       }

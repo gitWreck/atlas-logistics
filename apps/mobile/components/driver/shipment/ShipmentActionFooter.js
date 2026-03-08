@@ -1,5 +1,5 @@
 import React from "react";
-import { View, StyleSheet } from "react-native";
+import { Text, View, StyleSheet, TouchableOpacity } from "react-native";
 import GradientButton from "../../ui/figma/GradientButton";
 
 export default function ShipmentActionFooter({
@@ -7,6 +7,7 @@ export default function ShipmentActionFooter({
   actionLoading,
   onAction,
   isPickup = false, // ✅ NEW PROP: Tells the footer which mode to use
+  onReportIssue,
 }) {
   // 1. HIDE BUTTON IF DONE
   // If the item is successfully finished, return null to make the footer disappear.

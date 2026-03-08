@@ -161,29 +161,6 @@ export default function TruckRow({ truck: t, onEdit, isDark = false }) {
               {t.currentTripId || "TRP-XXXX"}
             </div> */}
             {/* Mobile ETA inline */}
-<<<<<<< HEAD
-            {/* <span className="md:hidden text-[9px] text-slate-500 italic">
-=======
-            <span
-              className={`md:hidden text-[9px] italic ${
-                isDark ? "text-slate-500" : "text-slate-600"
-              }`}
-            >
->>>>>>> 67f55e5810f6b5ad601143ca2669dc577d39c2ef
-              ETA: {t.eta || "Pending"}
-            </span> */}
-            {/* Desktop ETA block */}
-<<<<<<< HEAD
-            {/* <p className="hidden md:block text-[9px] text-slate-500 italic pl-1 mt-1">
-=======
-            <p
-              className={`hidden md:block text-[9px] italic pl-1 mt-1 ${
-                isDark ? "text-slate-500" : "text-slate-600"
-              }`}
-            >
->>>>>>> 67f55e5810f6b5ad601143ca2669dc577d39c2ef
-              ETA: {t.eta || "Pending"}
-            </p> */}
           </div>
         )}
       </div>

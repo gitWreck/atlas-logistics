@@ -43,9 +43,13 @@ exports.createShipmentBundle =
   require("./src/shipments/createShipmentBundle").createShipmentBundle;
 exports.createShipmentWithPackages =
   require("./src/shipments/createShipmentWithPackages").createShipmentWithPackages;
-exports.scanPackages = require("./src/packages/scanPackages").scanPackages;
+exports.updateShipmentStatus =
+  require("./src/shipments/updateShipmentStatus").updateShipmentStatus;
+exports.updatePackageStatus =
+  require("./src/shipments/updatePackageStatus").updatePackageStatus;
 exports.updateShipmentPackages =
   require("./src/packages/updateShipmentPackages").updateShipmentPackages;
+exports.scanPackages = require("./src/packages/scanPackages").scanPackages;
 
 // ------------------------------------------
 // Trips

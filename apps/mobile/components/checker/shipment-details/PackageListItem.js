@@ -89,7 +89,9 @@ export default function PackageListItem({
 
         <View style={styles.locationRow}>
           <FontAwesome5 name="map-marker-alt" size={10} color="#94a3b8" />
-          <Text style={styles.locationText}>{item.currentLocation}</Text>
+          <Text style={styles.locationText}>
+            {item.currentLocation} • {item.quantity} pcs
+          </Text>
         </View>
       </View>
 

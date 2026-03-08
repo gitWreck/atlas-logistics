@@ -13,6 +13,10 @@ export const updateShipmentPackages = httpsCallable(
   functions,
   "updateShipmentPackages",
 );
+export const updateShipmentStatus = httpsCallable(
+  functions,
+  "updateShipmentStatus",
+);
 export const updateShipmentStatusDriver = httpsCallable(
   functions,
   "updateShipmentStatusDriver",

@@ -200,11 +200,6 @@ export default function TripRow({ trip, onClick, isDark = false }) {
         >
           {isLocal ? "LOCAL PICKUP" : `${trip.origin} → ${trip.destination}`}
         </div>
-<<<<<<< HEAD
-        {/* NEW: Desktop Trip Type Badge */}
-        <span
-          className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${isLocal ? "bg-amber-500/10 text-amber-500 border-amber-500/20" : "bg-blue-500/10 text-blue-500 border-blue-500/20"}`}
-=======
 
         <span
           className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${
@@ -216,7 +211,6 @@ export default function TripRow({ trip, onClick, isDark = false }) {
                 ? "bg-blue-500/10 text-blue-500 border-blue-500/20"
                 : "bg-blue-100 text-blue-800 border-blue-300"
           }`}
->>>>>>> 67f55e5810f6b5ad601143ca2669dc577d39c2ef
         >
           {isLocal ? "LOCAL PICKUP" : "HUB TRANSFER"}
         </span>
