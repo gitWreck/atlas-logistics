@@ -37,25 +37,24 @@ function InfoCard({ label, value, isDark }) {
   );
 }
 
-export default function TripTimelineTab({
-  data,
-  onRefresh,
-  isDark = false,
-}) {
+export default function TripTimelineTab({ data, onRefresh, isDark = false }) {
   const [isDriverModalOpen, setIsDriverModalOpen] = useState(false);
 
   // Dynamic steps based on trip type
-  const isLocal = data.tripType === "LOCAL";
+  const isLocal = data.tripType === "LOCAL_PICKUP";
 
-  const STEPS = isLocal
-    ? [
-        "CREATED",
-        "DISPATCHED", // Van leaves hub
-        "IN_TRANSIT", // Collecting around houses
-        "ARRIVED", // Returned to hub
-        "COMPLETED", // Items scanned by warehouse
-      ]
-    : ["CREATED", "LOADING", "LOADED", "IN_TRANSIT", "ARRIVED", "COMPLETED"];
+  const STEPS =
+    isLocal === true
+      ? ["CREATED", "DISPATCHED", "IN_TRANSIT", "ARRIVED", "COMPLETED"]
+      : [
+          "CREATED",
+          "ASSIGNED",
+          "LOADING",
+          "LOADED",
+          "IN_TRANSIT",
+          "ARRIVED",
+          "COMPLETED",
+        ];
 
   const isCancelled = data.status === "CANCELLED";
   const currentStepIndex = isCancelled ? -1 : STEPS.indexOf(data.status);
@@ -74,7 +73,7 @@ export default function TripTimelineTab({
           </h4>
           <span
             className={`text-[10px] font-bold mt-1 uppercase w-max px-1.5 py-0.5 rounded border ${
-              isLocal
+              isLocal === true
                 ? isDark
                   ? "bg-amber-500/10 text-amber-500 border-amber-500/20"
                   : "bg-amber-100 text-amber-800 border-amber-300"
@@ -83,7 +82,7 @@ export default function TripTimelineTab({
                   : "bg-blue-100 text-blue-800 border-blue-300"
             }`}
           >
-            {isLocal ? "Local Pickup Route" : "Warehouse Transfer"}
+            {isLocal === true ? "Local Pickup" : "Hub Transfer"}
           </span>
         </div>
 
@@ -102,25 +101,21 @@ export default function TripTimelineTab({
 
       {/* 1. KEY INFO GRID */}
       <div className="grid grid-cols-2 gap-3 mb-8 mt-4">
-        <InfoCard
-          label="Driver"
-          value={data.driverName}
-          isDark={isDark}
-        />
+        <InfoCard label="Driver" value={data.driverName} isDark={isDark} />
         <InfoCard
           label="Plate Number"
           value={data.truckPlateNumber}
           isDark={isDark}
         />
         <InfoCard
-          label={isLocal ? "Processing Hub" : "Origin"}
+          label={isLocal === true ? "Processing Hub" : "Origin"}
           value={data.origin}
           isDark={isDark}
         />
         <InfoCard
-          label={isLocal ? "Route" : "Destination"}
+          label={isLocal === true ? "Route" : "Destination"}
           value={
-            isLocal && data.origin === data.destination
+            isLocal === true && data.origin === data.destination
               ? "Hub Collection"
               : data.destination
           }
@@ -135,7 +130,7 @@ export default function TripTimelineTab({
             isDark ? "text-slate-500" : "text-slate-600"
           }`}
         >
-          {isLocal ? "Collection Progress" : "Trip Progress"}
+          {isLocal === true ? "Collection Progress" : "Trip Progress"}
         </h3>
 
         <div
@@ -180,11 +175,7 @@ export default function TripTimelineTab({
                             ? "bg-slate-900 border-slate-700"
                             : "bg-slate-300 border-slate-400"
                       }
-                      ${
-                        isCurrent
-                          ? "ring-4 ring-emerald-500/20 scale-110"
-                          : ""
-                      }
+                      ${isCurrent ? "ring-4 ring-emerald-500/20 scale-110" : ""}
                     `}
                   >
                     {isDone && (

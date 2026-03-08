@@ -161,9 +161,7 @@ export default function PackageActionModal({
             <FontAwesomeIcon icon={faCircleNotch} spin />
           )}
           <span>
-            {isLoading("UNLOAD-true")
-              ? "Processing..."
-              : "Reset / Unload Package"}
+            {isLoading("UNLOAD-true") ? "Processing..." : "Unload Package"}
           </span>
         </button>
       </div>

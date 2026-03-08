@@ -1,6 +1,7 @@
 import {
   faBan,
   faCheckSquare,
+  faCube,
   faPen,
   faSave,
   faSnowflake,
@@ -50,7 +51,12 @@ export const PackageItemCard = ({
       ? isDark
         ? "border-blue-500/50 bg-blue-900/5"
         : "border-blue-400 bg-blue-50"
-      : baseBorder + (isDark ? " hover:border-slate-600" : " hover:border-slate-400");
+      : baseBorder +
+        (isDark ? " hover:border-slate-600" : " hover:border-slate-400");
+
+  const isBulkType = ["Sack", "Bundle", "Roll"].includes(
+    editForm.packagingType,
+  );
 
   return (
     <div
@@ -144,7 +150,7 @@ export const PackageItemCard = ({
                   </select>
                 </div>
 
-                <div>
+                {/* <div>
                   <label
                     className={`text-[10px] uppercase font-bold ${
                       isDark ? "text-slate-500" : "text-slate-600"
@@ -166,6 +172,25 @@ export const PackageItemCard = ({
                         weight: e.target.value,
                       })
                     }
+                  />
+                </div> */}
+
+                {/* ✅ NEW: Quantity Input (Only for Bulk/Sack) */}
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold uppercase text-slate-500">
+                    Quantity {isBulkType ? "(Pieces)" : ""}
+                  </label>
+                  <input
+                    type="number"
+                    disabled={!isBulkType} // 🔒 Lock for non-bulk types
+                    className={`w-full px-3 py-2 rounded-lg border text-sm transition-opacity ${
+                      !isBulkType ? "opacity-50 cursor-not-allowed" : ""
+                    } ${isDark ? "bg-slate-900 border-slate-700" : "bg-white border-slate-300"}`}
+                    value={isBulkType ? editForm.quantity : 1}
+                    onChange={(e) =>
+                      setEditForm({ ...editForm, quantity: e.target.value })
+                    }
+                    placeholder={isBulkType ? "Enter pieces..." : "1"}
                   />
                 </div>
 
@@ -239,6 +264,13 @@ export const PackageItemCard = ({
                       Perishable
                     </span>
                   )}
+                  {/* Only show quantity if it's more than 1 or a bulk type */}
+                  {(pkg.quantity > 1 || isBulkType) && (
+                    <span className="text-blue-500 font-bold">
+                      <FontAwesomeIcon icon={faCube} className="mr-1" />{" "}
+                      {pkg.quantity || 1} Pcs
+                    </span>
+                  )}
                 </div>
               </>
             )}
@@ -266,7 +298,7 @@ export const PackageItemCard = ({
                   disabled={isSaving}
                   className="h-8 sm:w-8 px-4 sm:px-0 bg-blue-600 hover:bg-blue-500 text-white rounded flex items-center justify-center text-xs sm:text-sm font-bold disabled:opacity-50"
                 >
-                  <FontAwesomeIcon icon={faSave} className="sm:hidden mr-2" />
+                  {/* <FontAwesomeIcon icon={faSave} className="sm:hidden mr-2" /> */}
                   <span className="sm:hidden">Save</span>
                   <FontAwesomeIcon icon={faSave} className="hidden sm:block" />
                 </button>

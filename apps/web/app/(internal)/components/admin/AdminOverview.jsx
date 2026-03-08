@@ -204,6 +204,7 @@ export default function AdminOverview({ user, isDark = false }) {
           setSelectedUser(null);
         }}
         refreshUsers={fetchUsers}
+        isDark={isDark}
       />
     </div>
   );

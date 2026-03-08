@@ -23,7 +23,7 @@ export default function RecentAlertsLogs({ isDark = false }) {
     const q = query(
       collection(db, "admin_alerts"),
       orderBy("createdAt", "desc"), // Newest first
-      limit(20),
+      limit(10),
     );
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -103,11 +103,9 @@ export default function RecentAlertsLogs({ isDark = false }) {
               {/* Header: Driver & Time */}
               <div className="flex justify-between items-start">
                 <span className={`font-bold text-xs ${driverText}`}>
-                  {alert.driverName || "Unknown Driver"}
+                  {alert.details.driverName || "Unknown Driver"}
                 </span>
-                <span
-                  className={`text-[10px] whitespace-nowrap ${timeText}`}
-                >
+                <span className={`text-[10px] whitespace-nowrap ${timeText}`}>
                   {formatDistanceToNow(alert.createdAt, { addSuffix: true })}
                 </span>
               </div>
@@ -120,7 +118,7 @@ export default function RecentAlertsLogs({ isDark = false }) {
                   {alert.tripId || "No Trip"}
                 </span>
                 <span className={`text-xs font-bold ${reasonClasses}`}>
-                  {alert.reason?.replace(/_/g, " ") || "Delay Reported"}
+                  {alert.details.reason?.replace(/_/g, " ") || "Delay Reported"}
                 </span>
               </div>
 
@@ -131,11 +129,16 @@ export default function RecentAlertsLogs({ isDark = false }) {
                 <p
                   className={`text-[10px] italic truncate max-w-[200px] ${notesClasses}`}
                 >
-                  {alert.notes || "No additional notes"}
+                  {alert.details.notes || "No additional notes"}
                 </p>
-                {alert.status === "RESOLVED" ? (
+                {alert.status ? (
                   <span className="text-[10px] text-emerald-600 flex items-center gap-1">
-                    <FontAwesomeIcon icon={faCheckCircle} /> Resolved
+                    <FontAwesomeIcon icon={faCheckCircle} />{" "}
+                    {alert.status === "RESOLVED"
+                      ? "Resolved"
+                      : alert.status === "APPROVED"
+                        ? "Approved"
+                        : alert.status}
                   </span>
                 ) : (
                   <span className="text-[10px] text-amber-600 flex items-center gap-1 animate-pulse">

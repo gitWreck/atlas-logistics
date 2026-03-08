@@ -11,6 +11,7 @@ export default function DisableUserModal({
   onClose,
   user,
   refreshUsers,
+  isDark = false, // Added isDark prop
 }) {
   const [loading, setLoading] = useState(false);
 
@@ -41,10 +42,18 @@ export default function DisableUserModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div
-        className="absolute inset-0 bg-slate-950/80 backdrop-blur-sm"
+        className={`absolute inset-0 backdrop-blur-sm ${
+          isDark ? "bg-slate-950/80" : "bg-slate-500/40"
+        }`}
         onClick={!loading ? onClose : undefined}
       />
-      <div className="relative bg-slate-900 border border-red-500/30 w-full max-w-md rounded-2xl shadow-2xl overflow-hidden">
+      <div
+        className={`relative w-full max-w-md rounded-2xl shadow-2xl overflow-hidden border animate-in zoom-in-95 duration-200 ${
+          isDark
+            ? "bg-slate-900 border-red-500/30"
+            : "bg-white border-slate-200"
+        }`}
+      >
         <div className="p-6 text-center">
           {/* Icon */}
           <div
@@ -61,33 +70,43 @@ export default function DisableUserModal({
           </div>
 
           {/* Title */}
-          <h3 className="text-xl font-bold text-white mb-2">
+          <h3
+            className={`text-xl font-bold mb-2 ${
+              isDark ? "text-white" : "text-slate-900"
+            }`}
+          >
             {isActive ? "Disable Account?" : "Activate Account?"}
           </h3>
 
           {/* Body Text */}
-          <p className="text-slate-400 text-sm mb-6">
+          <p
+            className={`text-sm mb-6 ${isDark ? "text-slate-400" : "text-slate-600"}`}
+          >
             Are you sure you want to {isActive ? "disable" : "activate"}{" "}
-            <span className="text-white font-semibold">{user.email}</span>?
-            {isActive && (
-              <span className="block mt-2 text-xs text-red-400/80">
-                {/* * They will be logged out immediately and cannot access the app. */}
-              </span>
-            )}
+            <span
+              className={`font-semibold ${isDark ? "text-white" : "text-slate-900"}`}
+            >
+              {user.email}
+            </span>
+            ?
           </p>
 
           <div className="flex gap-3 justify-center">
             <button
               onClick={onClose}
               disabled={loading}
-              className="flex-1 px-5 py-2.5 rounded-lg border border-slate-700 text-slate-300 hover:bg-slate-800 disabled:opacity-50 transition-colors"
+              className={`flex-1 px-5 py-2.5 rounded-lg border disabled:opacity-50 transition-colors font-medium text-sm ${
+                isDark
+                  ? "border-slate-700 text-slate-300 hover:bg-slate-800"
+                  : "border-slate-200 text-slate-600 hover:bg-slate-50"
+              }`}
             >
               Cancel
             </button>
             <button
               onClick={handleToggle}
               disabled={loading}
-              className={`flex-1 px-5 py-2.5 rounded-lg text-white shadow-lg flex items-center justify-center gap-2 disabled:opacity-50 transition-all ${
+              className={`flex-1 px-5 py-2.5 rounded-lg text-white shadow-lg flex items-center justify-center gap-2 disabled:opacity-50 transition-all font-medium text-sm ${
                 isActive
                   ? "bg-red-600 hover:bg-red-500 shadow-red-500/20"
                   : "bg-emerald-600 hover:bg-emerald-500 shadow-emerald-500/20"
@@ -95,13 +114,12 @@ export default function DisableUserModal({
             >
               {loading ? (
                 <>
-                  {/* Simple Spinner */}
                   <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                  Processing...
+                  <span>Processing...</span>
                 </>
               ) : isActive ? (
                 <>
-                  <FontAwesomeIcon icon={faBan} /> Disable User
+                  <FontAwesomeIcon icon={faBan} /> <span>Disable User</span>
                 </>
               ) : (
                 "Activate User"

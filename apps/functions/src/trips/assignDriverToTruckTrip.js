@@ -75,6 +75,8 @@ exports.assignDriverToTruckTrip = onCall(
         driverAssignedAt: now,
         driverPhone: driver.phone || null, // <--- CRITICAL FIX
 
+        status: "ASSIGNED",
+
         updatedAt: now,
         updatedBy: uid,
         updatedRole: role,

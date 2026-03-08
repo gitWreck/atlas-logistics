@@ -23,7 +23,7 @@ export default function RecentSmsLogs({ isDark = false }) {
     const q = query(
       collection(db, "sms_logs"),
       orderBy("at", "desc"), // 'at' is your timestamp field
-      limit(20),
+      limit(10),
     );
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -116,13 +116,12 @@ export default function RecentSmsLogs({ isDark = false }) {
                       <span
                         className={`border text-[10px] px-1.5 py-0.5 rounded font-bold flex items-center gap-1 ${manualBadgeClasses}`}
                       >
-                        <FontAwesomeIcon icon={faPaperPlane} size="xs" /> MANUAL
+                        <FontAwesomeIcon icon={faPaperPlane} size="xs" />{" "}
+                        {log.type.replace(/_/g, " ")}
                       </span>
                     )}
 
-                    <span
-                      className={`text-[10px] font-mono ${targetClasses}`}
-                    >
+                    <span className={`text-[10px] font-mono ${targetClasses}`}>
                       {isBroadcast
                         ? `${log.successCount}/${log.totalTargets} Sent`
                         : log.phone || "No Phone"}

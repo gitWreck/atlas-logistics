@@ -42,11 +42,11 @@ export default function TripRow({ trip, onClick, isDark = false }) {
   const driverName = trip.driverName || "Unassigned";
 
   // NEW: Determine trip type
-  const isLocal = trip.tripType === "LOCAL";
+  const isLocal = trip.tripType === "LOCAL_PICKUP";
 
   return (
     <div
-      onClick={() => onClick(trip.id)}
+      // onClick={() => onClick(trip.id)}
       className={`
         relative flex flex-col gap-3 p-4 border-b cursor-pointer transition-colors group
         md:grid md:grid-cols-12 md:gap-4 md:px-6 md:items-center
@@ -76,7 +76,7 @@ export default function TripRow({ trip, onClick, isDark = false }) {
                     : "bg-blue-100 text-blue-800 border-blue-300"
               }`}
             >
-              {isLocal ? "LOCAL PICKUP" : "TRANSFER"}
+              {isLocal ? "LOCAL PICKUP" : "HUB TRANSFER"}
             </span>
 
             <span

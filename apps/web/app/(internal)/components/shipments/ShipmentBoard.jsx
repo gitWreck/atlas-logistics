@@ -200,9 +200,9 @@ const ShipmentBoard = forwardRef(function ShipmentBoard(
     alert(`Logic to SMS ${phone} for Order ${shipment.trackingNumber}`);
   };
 
-  const handleSuccess = () => {
-    fetchShipments();
-  };
+  // const handleSuccess = () => {
+  //   fetchShipments();
+  // };
 
   useImperativeHandle(
     ref,
@@ -493,6 +493,7 @@ const ShipmentBoard = forwardRef(function ShipmentBoard(
         onClose={() => setSelectedShipmentId(null)}
         data={selectedShipment}
         isDark={isDark}
+        onRefresh={fetchShipments}
       />
 
       <UnifiedShipmentModal
@@ -501,6 +502,11 @@ const ShipmentBoard = forwardRef(function ShipmentBoard(
         onClose={() => setIsNewOrderModalOpen(false)}
         isDark={isDark}
         user={user}
+        onSuccess={() => {
+          fetchShipments();
+          // setIsNewOrderModalOpen(false);
+        }}
+        resetTrigger={isNewOrderModalOpen} // Reset form when modal is opened
       />
     </div>
   );

@@ -5,33 +5,25 @@ import {
   faTimes,
   faTruck,
   faBoxOpen,
-  faWrench, // Icon for Tools/Actions
-  faPaperPlane,
-  faPrint,
+  faWrench,
   faCheckCircle,
-  faQrcode,
 } from "@fortawesome/free-solid-svg-icons";
 import StatusBadge from "../ui/StatusBadge";
-import ShipmentLabel from "./ShipmentLabel";
 import CustomerMessageWidget from "../messaging/CustomerMessageWidget";
 import PackagesTable from "./Packages/PackagesTable";
-// import ShipmentBoard from "./ShipmentBoard";
-
-function calculateCurrentStep(status) {
-  // You can reuse your logic here to determine which step is "Active"
-  return status;
-}
+import ShipmentOperations from "./ShipmentOperations";
 
 export default function ShipmentDrawer({
   isOpen,
   onClose,
   data,
   isDark = false,
+  onRefresh, // New prop to trigger data refresh after operations
 }) {
   const [activeTab, setActiveTab] = useState("TIMELINE");
-  const [messageBody, setMessageBody] = useState(""); // State for the message input
-  // const [packages, setPackages] = useState([]);
-  // const [loadingPackages, setLoadingPackages] = useState(false);
+  const [messageBody, setMessageBody] = useState("");
+
+  console.log("ShipmentDrawer Rendered with data:", data);
 
   // Reset when opening
   useEffect(() => {
@@ -293,6 +285,105 @@ export default function ShipmentDrawer({
                   </div>
                 </div>
               </div>
+              {/* --- STATUS HISTORY LOG (Add after the Status Flow block) --- */}
+              <div className="mt-12 border-t pt-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                <h3
+                  className={`text-xs font-bold uppercase mb-4 tracking-widest pl-1 ${
+                    isDark ? "text-slate-500" : "text-slate-400"
+                  }`}
+                >
+                  Detailed Activity Log
+                </h3>
+
+                <div className="space-y-4">
+                  {data.statusHistory && data.statusHistory.length > 0 ? (
+                    // Sort history to show newest first
+                    [...data.statusHistory].reverse().map((log, idx) => (
+                      <div key={idx} className="flex gap-4 group">
+                        {/* Timestamp column */}
+                        {/* --- Timestamp Column --- */}
+                        <div className="w-24 shrink-0 pt-1">
+                          <p
+                            className={`text-[12px] font-mono font-bold leading-none ${isDark ? "text-slate-400" : "text-slate-700"}`}
+                          >
+                            {log.at?._seconds
+                              ? // Convert the _seconds property to a JS Date object
+                                new Date(
+                                  log.at._seconds * 1000,
+                                ).toLocaleTimeString([], {
+                                  hour: "2-digit",
+                                  minute: "2-digit",
+                                })
+                              : "—"}
+                          </p>
+                          <p
+                            className={`text-[11px] font-medium mt-1 opacity-60 ${isDark ? "text-slate-500" : "text-slate-500"}`}
+                          >
+                            {log.at?._seconds
+                              ? new Date(
+                                  log.at._seconds * 1000,
+                                ).toLocaleDateString(undefined, {
+                                  month: "short",
+                                  day: "numeric",
+                                })
+                              : "—"}
+                          </p>
+                        </div>
+
+                        {/* Activity Info */}
+                        <div
+                          className={`flex-1 p-3 rounded-xl border transition-colors ${
+                            isDark
+                              ? "bg-slate-800/20 border-slate-800 group-hover:border-slate-700"
+                              : "bg-slate-50 border-slate-200 group-hover:border-slate-300"
+                          }`}
+                        >
+                          <div className="flex justify-between items-start mb-1">
+                            <span
+                              className={`text-[10px] font-bold px-1.5 py-0.5 rounded uppercase tracking-tighter ${
+                                isDark
+                                  ? "bg-slate-800 text-slate-400"
+                                  : "bg-white text-slate-600 border"
+                              }`}
+                            >
+                              {log.status.replace(/_/g, " ")}
+                            </span>
+                            {/* <span
+                              className={`text-[9px] italic ${isDark ? "text-slate-600" : "text-slate-400"}`}
+                            >
+                              by Admin
+                            </span> */}
+                          </div>
+                          {log.note && (
+                            <p
+                              className={`text-xs mt-2 italic leading-relaxed ${isDark ? "text-slate-400" : "text-slate-600"}`}
+                            >
+                              "{log.note}"
+                            </p>
+                          )}
+                          {log.location && (
+                            <div
+                              className={`mt-2 flex items-center gap-1.5 text-[9px] font-bold ${isDark ? "text-blue-400/60" : "text-blue-600/60"}`}
+                            >
+                              <FontAwesomeIcon
+                                icon={faTruck}
+                                className="text-[7px]"
+                              />
+                              {log.location}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <div
+                      className={`text-xs italic text-center p-8 border border-dashed rounded-xl ${isDark ? "border-slate-800 text-slate-600" : "border-slate-200 text-slate-400"}`}
+                    >
+                      No detailed logs available for this shipment yet.
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
           )}
 
@@ -304,6 +395,15 @@ export default function ShipmentDrawer({
           {/* --- TAB 3: TOOLS (EMBEDDED QR & MESSAGE) --- */}
           {activeTab === "TOOLS" && (
             <div className="space-y-8 animate-in zoom-in-95 duration-200">
+              <ShipmentOperations
+                shipmentId={data.id}
+                currentStatus={data.status}
+                isDark={isDark}
+                onRefresh={() => {
+                  // Optionally refresh shipment data here after an operation
+                  onRefresh();
+                }}
+              />
               <CustomerMessageWidget shipment={data} isDark={isDark} />
             </div>
           )}

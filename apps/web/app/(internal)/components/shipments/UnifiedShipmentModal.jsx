@@ -1,5 +1,5 @@
 "use client";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faCheckCircle,
@@ -28,6 +28,8 @@ export default function UnifiedShipmentModal({
   onClose,
   isDark = false,
   user,
+  onSuccess, // Callback to trigger after successful shipment creation
+  resetTrigger, // A prop that can be used to reset the form when needed
 }) {
   const { showAlert, showConfirm } = useAlert();
 
@@ -46,6 +48,16 @@ export default function UnifiedShipmentModal({
     const random = Date.now().toString().slice(-6);
     return `AT-${dateStr}-${originCode || "GEN"}-${destCode || "GEN"}-${random}`;
   };
+
+  useEffect(() => {
+    if (resetTrigger) {
+      setShipmentDraft(null);
+      setFinalTripId(null);
+      setCreatedShipmentId(null);
+      setSendSms(true);
+      setIsPickup(false);
+    }
+  }, [resetTrigger]);
 
   const handleMasterSubmit = async (tripDecision) => {
     setLoading(true);
@@ -106,7 +118,7 @@ export default function UnifiedShipmentModal({
         },
 
         // Dynamic Status based on Pickup Toggle
-        status: isPickup ? "PENDING_PICKUP" : "RECEIVED",
+        status: isPickup === true ? "PENDING_PICKUP" : "RECEIVED",
 
         // If pickup, the location is the sender's city. If dropoff, it's the origin warehouse.
         currentLocation: isPickup
@@ -161,6 +173,7 @@ export default function UnifiedShipmentModal({
         setFinalTripId(null);
       }
 
+      onSuccess(); // Trigger parent callback to refresh data and close modal if needed
       setStep(3);
     } catch (err) {
       console.error(err);
