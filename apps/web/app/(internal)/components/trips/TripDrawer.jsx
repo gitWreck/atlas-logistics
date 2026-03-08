@@ -17,8 +17,15 @@ import StatusBadge from "../ui/StatusBadge";
 import UnassignShipmentModal from "../manifests/modals/UnassignShipmentModal";
 import BulkAssignmentModal from "../manifests/modals/BulkAssignmentModal";
 import ViewPackagesModal from "../manifests/ViewPackagesModal/ViewPackagesModal";
+import { unlockTripManifest } from "@/app/utility/FirebaseFunctions";
 
-export default function TripDrawer({ isOpen, onClose, data, onRefreshTrips, isDark = false }) {
+export default function TripDrawer({
+  isOpen,
+  onClose,
+  data,
+  onRefreshTrips,
+  isDark = false,
+}) {
   const [activeTab, setActiveTab] = useState("TIMELINE");
   const [shipments, setShipments] = useState([]);
   const [loadingShips, setLoadingShips] = useState(false);
@@ -76,25 +83,37 @@ export default function TripDrawer({ isOpen, onClose, data, onRefreshTrips, isDa
         `}
       >
         {/* HEADER */}
-        <div className={`p-6 border-b flex justify-between items-start ${
-          isDark ? "border-slate-800 bg-slate-950" : "border-slate-200 bg-slate-50"
-        }`}>
+        <div
+          className={`p-6 border-b flex justify-between items-start ${
+            isDark
+              ? "border-slate-800 bg-slate-950"
+              : "border-slate-200 bg-slate-50"
+          }`}
+        >
           <div>
-            <div className={`text-[10px] uppercase font-bold tracking-wider mb-1 ${
-              isDark ? "text-emerald-500" : "text-emerald-600"
-            }`}>
+            <div
+              className={`text-[10px] uppercase font-bold tracking-wider mb-1 ${
+                isDark ? "text-emerald-500" : "text-emerald-600"
+              }`}
+            >
               Active Trip Details
             </div>
-            <h2 className={`text-xl font-mono font-bold tracking-tight ${
-              isDark ? "text-white" : "text-slate-900"
-            }`}>
+            <h2
+              className={`text-xl font-mono font-bold tracking-tight ${
+                isDark ? "text-white" : "text-slate-900"
+              }`}
+            >
               {data.tripId}
             </h2>
             <div className="flex gap-2 mt-2 items-center">
               <StatusBadge status={data.status} isDark={isDark} />
-              <span className={`text-xs border-l pl-2 ml-1 ${
-                isDark ? "text-slate-400 border-slate-700" : "text-slate-600 border-slate-300"
-              }`}>
+              <span
+                className={`text-xs border-l pl-2 ml-1 ${
+                  isDark
+                    ? "text-slate-400 border-slate-700"
+                    : "text-slate-600 border-slate-300"
+                }`}
+              >
                 {data.route}
               </span>
             </div>
@@ -102,7 +121,9 @@ export default function TripDrawer({ isOpen, onClose, data, onRefreshTrips, isDa
           <button
             onClick={onClose}
             className={`p-2 rounded-lg transition-colors ${
-              isDark ? "text-slate-500 hover:text-white hover:bg-slate-800" : "text-slate-500 hover:text-slate-900 hover:bg-slate-100"
+              isDark
+                ? "text-slate-500 hover:text-white hover:bg-slate-800"
+                : "text-slate-500 hover:text-slate-900 hover:bg-slate-100"
             }`}
           >
             <FontAwesomeIcon icon={faTimes} size="lg" />
@@ -116,8 +137,7 @@ export default function TripDrawer({ isOpen, onClose, data, onRefreshTrips, isDa
                 );
                 if (!reason) return;
 
-                const unlockFn = httpsCallable(functions, "unlockTripManifest");
-                await unlockFn({ tripDocId: trip.id, reason });
+                await unlockTripManifest({ tripDocId: trip.id, reason });
                 // Refresh logic...
               }}
               className="bg-amber-500 text-white px-4 py-2 rounded shadow hover:bg-amber-600"
@@ -128,14 +148,36 @@ export default function TripDrawer({ isOpen, onClose, data, onRefreshTrips, isDa
         </div>
 
         {/* TABS */}
-        <div className={`flex border-b ${isDark ? "border-slate-800 bg-slate-900" : "border-slate-200 bg-slate-50"}`}>
-          <TabButton isDark={isDark} isActive={activeTab === "TIMELINE"} onClick={() => setActiveTab("TIMELINE")} icon={faTruck} label="Status" />
-          <TabButton isDark={isDark} isActive={activeTab === "MANIFEST"} onClick={() => setActiveTab("MANIFEST")} icon={faClipboardList} label={`Manifest (${shipments.length})`} />
-          <TabButton isDark={isDark} isActive={activeTab === "TOOLS"} onClick={() => setActiveTab("TOOLS")} icon={faWrench} label="Actions" />
+        <div
+          className={`flex border-b ${isDark ? "border-slate-800 bg-slate-900" : "border-slate-200 bg-slate-50"}`}
+        >
+          <TabButton
+            isDark={isDark}
+            isActive={activeTab === "TIMELINE"}
+            onClick={() => setActiveTab("TIMELINE")}
+            icon={faTruck}
+            label="Status"
+          />
+          <TabButton
+            isDark={isDark}
+            isActive={activeTab === "MANIFEST"}
+            onClick={() => setActiveTab("MANIFEST")}
+            icon={faClipboardList}
+            label={`Manifest (${shipments.length})`}
+          />
+          <TabButton
+            isDark={isDark}
+            isActive={activeTab === "TOOLS"}
+            onClick={() => setActiveTab("TOOLS")}
+            icon={faWrench}
+            label="Actions"
+          />
         </div>
 
         {/* CONTENT AREA */}
-        <div className={`flex-1 overflow-y-auto p-6 ${isDark ? "bg-slate-900" : "bg-white"}`}>
+        <div
+          className={`flex-1 overflow-y-auto p-6 ${isDark ? "bg-slate-900" : "bg-white"}`}
+        >
           {activeTab === "TIMELINE" && (
             <TripTimelineTab
               data={data}
@@ -177,7 +219,16 @@ export default function TripDrawer({ isOpen, onClose, data, onRefreshTrips, isDa
         </div>
 
         {/* FOOTER */}
-        <TripDrawerFooter data={data} onClose={onClose} shipments={shipments} isDark={isDark} />
+        <TripDrawerFooter
+          data={data}
+          onClose={onClose}
+          shipments={shipments}
+          isDark={isDark}
+          onSuccess={() => {
+            // fetchShipments();
+            onRefreshTrips();
+          }}
+        />
       </aside>
 
       {/* --- RENDER THE NEW MODAL OUTSIDE THE ASIDE --- */}

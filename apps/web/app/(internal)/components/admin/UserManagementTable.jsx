@@ -135,6 +135,7 @@ export default function UserManagementTable({
             <option value="manager">Manager</option>
             <option value="driver">Driver</option>
             <option value="checker">Checker</option>
+            <option value="customer">Customer</option>
           </select>
         </div>
       </div>
@@ -237,7 +238,7 @@ export default function UserManagementTable({
           className={`px-6 py-4 border-t flex justify-between items-center text-xs ${footerClasses}`}
         >
           <span>
-            Page{" "}
+            Showing{" "}
             {/* <span className={`font-bold ${footerBold}`}>
               {(page - 1) * itemsPerPage + 1}
             </span>{" "}

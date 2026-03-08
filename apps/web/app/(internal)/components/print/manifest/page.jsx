@@ -125,7 +125,7 @@ const DestinationCard = ({ group }) => {
           ))}
           <tr className="bg-slate-50 font-bold">
             <td className="px-4 py-2 text-right text-slate-500 text-[10px] uppercase">
-              Subtotal
+              Total Pieces
             </td>
             <td className="px-4 py-2 text-right text-slate-900">{subtotal}</td>
           </tr>
@@ -185,16 +185,21 @@ function ManifestContent() {
       shipments.forEach((ship) => {
         const destCode = ship.destinationCode || "UNKNOWN";
         const itemsCount =
-          ship.packages?.length || ship.totals?.totalItems || 0;
+          ship.packages?.reduce(
+            (acc, p) => acc + (Number(p.quantity) || 1),
+            0,
+          ) ||
+          ship.totals?.totalContentQty ||
+          0;
         totalPackages += itemsCount;
 
         // --- NEW: Calculate Description Breakdown ---
         const descCounts = {};
         if (ship.packages && Array.isArray(ship.packages)) {
           ship.packages.forEach((p) => {
-            // Use description or fallback to "Standard Pkg"
             const d = p.description ? p.description.trim() : "Standard Pkg";
-            descCounts[d] = (descCounts[d] || 0) + 1;
+            const qty = Number(p.quantity) || 1; // Use the actual quantity
+            descCounts[d] = (descCounts[d] || 0) + qty; // Increment by quantity, not 1
           });
         }
 
@@ -218,10 +223,9 @@ function ManifestContent() {
 
         groupedDestinations[destCode].items.push({
           trackingNumber: ship.trackingNumber,
-          packageCount: itemsCount,
+          packageCount: itemsCount, // Now correctly reflects total pieces (e.g., 50 for a sack)
           note: ship.packages?.some((p) => p.isFragile) ? "Fragile" : "",
-
-          descriptionBreakdown: descriptionBreakdown, // <--- Add this new field
+          descriptionBreakdown: descriptionBreakdown,
         });
       });
 

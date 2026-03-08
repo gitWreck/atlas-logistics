@@ -14,13 +14,18 @@ export const createShipmentWithPackages = httpsCallable(
   functions,
   "createShipmentWithPackages",
 );
-export const updateShipmentPackages = httpsCallable(
+export const updateShipmentStatus = httpsCallable(
   functions,
-  "updateShipmentPackages",
+  "updateShipmentStatus",
 );
 export const updatePackageStatus = httpsCallable(
   functions,
   "updatePackageStatus",
+);
+
+export const updateShipmentPackages = httpsCallable(
+  functions,
+  "updateShipmentPackages",
 );
 
 // TRIPS
@@ -73,7 +78,6 @@ export const bulkShipmentAction = httpsCallable(
   functions,
   "bulkShipmentAction",
 );
-
 export const updateShipmentImages = httpsCallable(
   functions,
   "updateShipmentImages",

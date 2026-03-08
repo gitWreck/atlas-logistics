@@ -1,5 +1,11 @@
 "use client";
-import React, { useState, useMemo, useEffect, forwardRef, useImperativeHandle } from "react";
+import React, {
+  useState,
+  useMemo,
+  useEffect,
+  forwardRef,
+  useImperativeHandle,
+} from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faSearch,
@@ -14,7 +20,10 @@ import { calculateProgress } from "@/app/utility/utilities";
 import TripDrawer from "./TripDrawer";
 import CreateTripModal from "../manifests/modals/CreateTripModal";
 
-const TripBoard = forwardRef(function TripBoard({ user, userRole, profile, isDark = false }, ref) {
+const TripBoard = forwardRef(function TripBoard(
+  { user, userRole, profile, isDark = false },
+  ref,
+) {
   const [trips, setTrips] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -134,9 +143,13 @@ const TripBoard = forwardRef(function TripBoard({ user, userRole, profile, isDar
 
   const selectedTrip = trips.find((t) => t.id === selectedTripId);
 
-  useImperativeHandle(ref, () => ({
-    openCreateTripModal: () => setIsNewTripModalOpen(true),
-  }), []);
+  useImperativeHandle(
+    ref,
+    () => ({
+      openCreateTripModal: () => setIsNewTripModalOpen(true),
+    }),
+    [],
+  );
 
   return (
     <div
@@ -148,7 +161,9 @@ const TripBoard = forwardRef(function TripBoard({ user, userRole, profile, isDar
       <main className="max-w-7xl mx-auto p-4 sm:p-6">
         <div
           className={`rounded-xl overflow-hidden shadow-xl backdrop-blur-sm border ${
-            isDark ? "border-slate-800 bg-slate-900/50" : "border-slate-200 bg-white"
+            isDark
+              ? "border-slate-800 bg-slate-900/50"
+              : "border-slate-200 bg-white"
           }`}
         >
           {/* CONTROLS */}
@@ -175,7 +190,11 @@ const TripBoard = forwardRef(function TripBoard({ user, userRole, profile, isDar
                 }`}
                 title="Refresh"
               >
-                <FontAwesomeIcon icon={faSync} spin={loading} className="text-xs" />
+                <FontAwesomeIcon
+                  icon={faSync}
+                  spin={loading}
+                  className="text-xs"
+                />
               </button>
             </h3>
 

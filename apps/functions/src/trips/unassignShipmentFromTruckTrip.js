@@ -7,9 +7,6 @@ const { requireRole } = require("../utilities/helpers");
 if (!admin.apps.length) admin.initializeApp();
 const db = admin.firestore();
 
-/* ======================================================
-   UNASSIGN SHIPMENT FROM TRUCK TRIP (OPTION B — CANONICAL)
-====================================================== */
 exports.unassignShipmentFromTruckTrip = onCall(
   { region: "asia-southeast1", maxInstances: 10 },
   async (req) => {
@@ -24,161 +21,108 @@ exports.unassignShipmentFromTruckTrip = onCall(
     }
 
     const uid = req.auth.uid;
-    const userSnap = await db.collection("users").doc(uid).get();
-    if (!userSnap.exists || userSnap.data().active !== true) {
-      throw new HttpsError("permission-denied", "Inactive user");
-    }
-    const role = userSnap.data().role;
-
-    const trackingRef = db.collection("shipments").doc(trackingDocId);
+    const shipmentRef = db.collection("shipments").doc(trackingDocId);
     const tripRef = db.collection("truck_trips").doc(truckTripId);
-    const shipRef = tripRef.collection("trip_shipments").doc(trackingDocId);
+    const tripShipmentRef = tripRef
+      .collection("trip_shipments")
+      .doc(trackingDocId);
 
     await db.runTransaction(async (tx) => {
-      const [trackingSnap, tripSnap, shipSnap] = await Promise.all([
-        tx.get(trackingRef),
+      const [shipmentSnap, tripSnap, tripShipmentSnap] = await Promise.all([
+        tx.get(shipmentRef),
         tx.get(tripRef),
-        tx.get(shipRef),
+        tx.get(tripShipmentRef),
       ]);
 
-      if (!trackingSnap.exists) {
-        throw new HttpsError("not-found", "Tracking record not found");
-      }
-      if (!tripSnap.exists) {
-        throw new HttpsError("not-found", "Truck trip not found");
-      }
-      if (!shipSnap.exists) {
-        // Optional: just return success if it's already gone
-        return;
+      if (!shipmentSnap.exists || !tripSnap.exists) {
+        throw new HttpsError("not-found", "Shipment or Trip not found");
       }
 
-      const tracking = trackingSnap.data();
+      const tracking = shipmentSnap.data();
       const trip = tripSnap.data();
-      const tripShipment = shipSnap.data();
 
-      // 🔒 LOCK CHECK: Fixed your commented-out code
-      if (trip.status === "COMPLETED") {
+      // If it's already gone from the manifest, just exit
+      if (!tripShipmentSnap.exists) return { success: true };
+
+      const tripShipment = tripShipmentSnap.data();
+
+      // 🔒 LOCK CHECK
+      if (trip.status === "COMPLETED" || trip.manifestLocked === true) {
         throw new HttpsError(
           "failed-precondition",
-          "Cannot unassign from completed trip.",
-        );
-      }
-      // If you use a strict lock flag:
-      if (trip.manifestLocked === true) {
-        throw new HttpsError(
-          "failed-precondition",
-          "Trip Manifest is LOCKED. Reopen it first.",
+          "Cannot modify a locked/completed trip.",
         );
       }
 
-      // --------------------------
       // ======================================================
-      // 1. CALCULATE VALUES TO REMOVE (The Subtraction Logic)
+      // 1. CALCULATE VALUES TO REMOVE (Based on Piece counts)
       // ======================================================
+      // We use the counts stored in the trip_shipment manifest entry
       const removeTotal = Number(tripShipment.totalItems || 0);
-      const removePending = Number(tripShipment.pendingCount || 0);
       const removeLoaded = Number(tripShipment.loadedCount || 0);
       const removeDelivered = Number(tripShipment.deliveredCount || 0);
+      const removePending = removeTotal - removeLoaded;
 
       const now = admin.firestore.FieldValue.serverTimestamp();
 
       // ======================================================
-      // 2. UPDATE TRUCK TRIP (Subtract Everything)
+      // 2. UPDATE TRUCK TRIP (Dashboard Reset)
       // ======================================================
-      // We subtract ALL counters that this shipment contributed
       tx.update(tripRef, {
         totalItems: admin.firestore.FieldValue.increment(-removeTotal),
         itemPending: admin.firestore.FieldValue.increment(-removePending),
-
-        // 🆕 Handle Scenario 2: Remove loaded/delivered stats too
         totalLoaded: admin.firestore.FieldValue.increment(-removeLoaded),
         totalDelivered: admin.firestore.FieldValue.increment(-removeDelivered),
-
         updatedAt: now,
-        updatedBy: uid,
       });
 
       // ======================================================
-      // 3. RESET SHIPMENT (Revert Packages)
+      // 3. RESET SHIPMENT & INTERNAL PACKAGES
       // ======================================================
-      // If items were loaded, we must reset the individual packages back to "RECEIVED"
-      let updatedPackages = tracking.packages || [];
+      const updatedPackages = (tracking.packages || []).map((pkg) => {
+        // Only reset packages that were part of THIS trip
+        // This ensures we don't accidentally reset a package that might be on a different leg
+        return {
+          ...pkg,
+          status: "RECEIVED", // Revert back to hub inventory
+          loadedQty: 0, // ✅ RESET INTERNAL QUANTITY
+          loadedAt: null,
+          loadedOnTrip: null,
+          deliveredAt: null,
+        };
+      });
 
-      if (removeLoaded > 0 || removeDelivered > 0) {
-        updatedPackages = updatedPackages.map((pkg) => {
-          // Only reset packages that belong to THIS trip
-          if (pkg.loadedOnTrip === truckTripId) {
-            return {
-              ...pkg,
-              status: "RECEIVED", // Reset to warehouse inventory
-
-              loadedAt: null,
-              loadedBy: null,
-              loadedOnTrip: null,
-
-              deliveredAt: null,
-              deliveredBy: null,
-            };
-          }
-          return pkg;
-        });
-      }
-
-      tx.update(trackingRef, {
+      tx.update(shipmentRef, {
         currentTruckTripId: null,
         status: "RECEIVED",
-
-        // 🆕 Reset Totals
-        // We assume the whole shipment is now back at the warehouse
-        "totals.pending": removeTotal,
+        packages: updatedPackages,
         "totals.loaded": 0,
         "totals.delivered": 0,
-        "totals.received": removeTotal, // Assuming they are all physically present
-
-        packages: updatedPackages,
-
+        "totals.pending": removeTotal, // All pieces are now pending again
         updatedAt: now,
-        updatedBy: uid,
-        updatedRole: role,
-
-        // Append History
-        statusHistory: [
-          ...(tracking.statusHistory ?? []),
-          {
-            status: "RECEIVED",
-            at: admin.firestore.Timestamp.now(),
-            note: `Unassigned from ${truckTripId}`,
-          },
-        ],
+        statusHistory: admin.firestore.FieldValue.arrayUnion({
+          status: "RECEIVED",
+          at: new Date(),
+          by: uid,
+          note: `Unassigned from trip ${truckTripId}. Quantities reset.`,
+        }),
       });
 
       // ======================================================
       // 4. CLEANUP
       // ======================================================
-      tx.delete(shipRef);
+      tx.delete(tripShipmentRef); // Remove from the Manifest collection
 
-      // Logs...
-      tx.set(trackingRef.collection("status_events").doc(), {
-        type: "UNASSIGN_FROM_TRIP",
-        message: `Unassigned from trip ${trip.tripId || truckTripId}`,
-        truckTripId,
-        createdAt: now,
-        createdBy: uid,
-      });
-
+      // Audit Log
       tx.set(db.collection("admin_logs").doc(), {
         action: "UNASSIGN_SHIPMENT_FROM_TRIP",
         trackingDocId,
         truckTripId,
-        details: {
-          removedLoaded: removeLoaded,
-          removedPending: removePending,
-        },
         actorId: uid,
-        createdAt: now,
+        timestamp: now,
       });
     });
 
-    return { success: true, trackingDocId, truckTripId };
+    return { success: true };
   },
 );

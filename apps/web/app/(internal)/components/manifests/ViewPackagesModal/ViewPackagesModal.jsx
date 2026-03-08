@@ -6,30 +6,20 @@ import {
   faTimes,
   faSpinner,
   faCube,
-  faWeightHanging,
   faPlus,
-  faTrash,
-  faPen,
-  faSave,
-  faBan,
-  faWineGlass,
-  faSnowflake,
   faCheckSquare,
   faSquare,
-  faTruckLoading,
-  faDolly,
-  faArrowsSplitUpAndLeft,
 } from "@fortawesome/free-solid-svg-icons";
-import { auth, functions } from "@/lib/firebase";
-import { httpsCallable } from "firebase/functions";
-import { splitShipments } from "@/app/utility/FirebaseFunctions";
+import { auth } from "@/lib/firebase";
+import { updateShipmentPackages } from "@/app/utility/FirebaseFunctions";
 import { PackageItemCard } from "./PackageItemCard";
+import SplitShipmentModal from "./SplitShipmentModal";
+import PackageBulkActionBar from "./PackageBulkActionBar";
+import AddPackageForm from "./AddPackageForm";
 
 const PACKAGING_TYPES = ["Box", "Sack", "Crate", "Bundle", "Roll", "Envelope"];
-
 const isPackageLocked = (status) =>
   ["IN_TRANSIT", "DELIVERED"].includes(status);
-
 const INITIAL_PACKAGE_STATE = {
   description: "",
   weight: "",
@@ -51,17 +41,16 @@ export default function ViewPackagesModal({
   const [packages, setPackages] = useState([]);
   const [loading, setLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-
   const [selectedIndices, setSelectedIndices] = useState(new Set());
   const [editingId, setEditingId] = useState(null);
   const [editForm, setEditForm] = useState({});
   const [isAdding, setIsAdding] = useState(false);
   const [newPackage, setNewPackage] = useState(INITIAL_PACKAGE_STATE);
+  const [isSplitModalOpen, setIsSplitModalOpen] = useState(false);
 
   useEffect(() => {
-    if (isOpen && shipment?.id) {
-      fetchFullShipmentDetails(shipment.id);
-    } else {
+    if (isOpen && shipment?.id) fetchFullShipmentDetails(shipment.id);
+    else {
       setPackages([]);
       setEditingId(null);
       setIsAdding(false);
@@ -80,18 +69,15 @@ export default function ViewPackagesModal({
       const json = await res.json();
       setPackages(json.shipment?.packages || []);
     } catch (err) {
-      console.error("Error fetching packages:", err);
+      console.error(err);
     } finally {
       setLoading(false);
     }
   };
 
   const handleSelectAll = () => {
-    if (selectedIndices.size === packages.length) {
-      setSelectedIndices(new Set());
-    } else {
-      setSelectedIndices(new Set(packages.map((_, i) => i)));
-    }
+    if (selectedIndices.size === packages.length) setSelectedIndices(new Set());
+    else setSelectedIndices(new Set(packages.map((_, i) => i)));
   };
 
   const handleSelectOne = (index) => {
@@ -104,8 +90,10 @@ export default function ViewPackagesModal({
   const saveUpdates = async (updatedPackages) => {
     try {
       setIsSaving(true);
-      const updateFn = httpsCallable(functions, "updateShipmentPackages");
-      await updateFn({ shipmentId: shipment.id, packages: updatedPackages });
+      await updateShipmentPackages({
+        shipmentId: shipment.id,
+        packages: updatedPackages,
+      });
       setPackages(updatedPackages);
       setEditingId(null);
       setIsAdding(false);
@@ -113,7 +101,6 @@ export default function ViewPackagesModal({
       setNewPackage(INITIAL_PACKAGE_STATE);
       if (onRefresh) onRefresh();
     } catch (err) {
-      console.error(err);
       alert("Error saving: " + err.message);
     } finally {
       setIsSaving(false);
@@ -123,8 +110,7 @@ export default function ViewPackagesModal({
   const handleBulkStatusChange = (newStatus) => {
     if (selectedIndices.size === 0) return;
     const updated = packages.map((pkg, idx) => {
-      if (!selectedIndices.has(idx)) return pkg;
-      if (pkg.status === "DELIVERED") return pkg;
+      if (!selectedIndices.has(idx) || pkg.status === "DELIVERED") return pkg;
       return { ...pkg, status: newStatus };
     });
     saveUpdates(updated);
@@ -132,13 +118,7 @@ export default function ViewPackagesModal({
 
   const handleRemove = (idx) => {
     if (!confirm("Remove this package?")) return;
-    const updated = packages.filter((_, i) => i !== idx);
-    saveUpdates(updated);
-  };
-
-  const handleEditClick = (pkg, idx) => {
-    setEditingId(idx);
-    setEditForm({ ...pkg });
+    saveUpdates(packages.filter((_, i) => i !== idx));
   };
 
   const handleEditSave = () => {
@@ -149,81 +129,33 @@ export default function ViewPackagesModal({
 
   const handleAddSave = () => {
     if (!newPackage.description) return alert("Description required");
-
+    const isBulk = ["Sack", "Bundle", "Roll"].includes(
+      newPackage.packagingType,
+    );
     const nextSequence = packages.length + 1;
-    const generatedTracking = `${shipment.trackingNumber}-${String(
-      nextSequence,
-    ).padStart(2, "0")}`;
-
     const packageToAdd = {
-      description: newPackage.description,
-      weight: Number(newPackage.weight) || 0,
+      ...newPackage,
       declaredValue: Number(newPackage.declaredValue) || 0,
-      packagingType: newPackage.packagingType,
-      isFragile: newPackage.isFragile,
-      isPerishable: newPackage.isPerishable,
+      quantity: isBulk ? Number(newPackage.quantity) || 1 : 1,
+      weight: Number(newPackage.weight) || 0,
       status: "RECEIVED",
       sequence: nextSequence,
-      trackingNumber: generatedTracking,
+      trackingNumber: `${shipment.trackingNumber}-${String(nextSequence).padStart(2, "0")}`,
       currentLocation: "",
-      isDelayed: false,
       loadedAt: null,
       loadedOnTrip: null,
-      height: "",
-      length: "",
-      width: "",
     };
-
-    const updated = [...packages, packageToAdd];
-    saveUpdates(updated);
+    saveUpdates([...packages, packageToAdd]);
   };
 
   const canSplit = useMemo(() => {
     if (selectedIndices.size === 0) return false;
-    return Array.from(selectedIndices).every((idx) => {
-      const pkg = packages[idx];
-      return pkg.status === "RECEIVED";
-    });
+    return Array.from(selectedIndices).every(
+      (idx) => packages[idx].status === "RECEIVED",
+    );
   }, [selectedIndices, packages]);
 
-  const handleSplitShipment = async () => {
-    if (
-      !confirm(
-        `Create a new shipment with these ${selectedIndices.size} items?`,
-      )
-    )
-      return;
-
-    try {
-      setIsSaving(true);
-      const barcodesToSplit = Array.from(selectedIndices).map(
-        (idx) => packages[idx].trackingNumber,
-      );
-
-      const result = await splitShipments({
-        originalShipmentId: shipment.id,
-        itemsToSplit: barcodesToSplit,
-      });
-
-      alert(
-        "Shipment Split Successfully! New Tracking: " +
-          result.data.newShipmentId,
-      );
-
-      onClose();
-      if (onRefresh) onRefresh();
-    } catch (error) {
-      alert("Split Failed: " + error.message);
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
   if (!isOpen || !shipment) return null;
-
-  const containerClasses = isDark
-    ? "bg-slate-900 border border-slate-700 text-white"
-    : "bg-white border border-slate-200 text-slate-900";
 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
@@ -231,31 +163,20 @@ export default function ViewPackagesModal({
         className="absolute inset-0 bg-black/70 backdrop-blur-sm"
         onClick={onClose}
       />
-
       <div
-        className={`relative w-full max-w-xl rounded-xl shadow-2xl flex flex-col max-h-[85vh] animate-in zoom-in-95 duration-200 ${containerClasses}`}
+        className={`relative w-full max-w-xl rounded-xl shadow-2xl flex flex-col max-h-[85vh] animate-in zoom-in-95 duration-200 ${isDark ? "bg-slate-900 border border-slate-700 text-white" : "bg-white border border-slate-200 text-slate-900"}`}
       >
         {/* HEADER */}
         <div
-          className={`flex items-center justify-between p-6 border-b rounded-t-xl ${
-            isDark
-              ? "border-slate-800 bg-slate-950/50"
-              : "border-slate-200 bg-slate-50"
-          }`}
+          className={`flex items-center justify-between p-6 border-b rounded-t-xl ${isDark ? "border-slate-800 bg-slate-950/50" : "border-slate-200 bg-slate-50"}`}
         >
           <div>
             <div
-              className={`text-xs font-bold uppercase tracking-wider mb-1 ${
-                isDark ? "text-blue-400" : "text-blue-600"
-              }`}
+              className={`text-xs font-bold uppercase tracking-wider mb-1 ${isDark ? "text-blue-400" : "text-blue-600"}`}
             >
               Shipment Contents
             </div>
-            <h2
-              className={`text-xl font-bold flex items-center gap-3 ${
-                isDark ? "text-white" : "text-slate-900"
-              }`}
-            >
+            <h2 className="text-xl font-bold flex items-center gap-3">
               <FontAwesomeIcon
                 icon={faBoxOpen}
                 className={isDark ? "text-slate-500" : "text-slate-600"}
@@ -263,82 +184,29 @@ export default function ViewPackagesModal({
               {shipment.trackingNumber}
             </h2>
           </div>
-          <button
-            onClick={onClose}
-            className={`transition-colors p-2 rounded-lg ${
-              isDark
-                ? "text-slate-500 hover:text-white hover:bg-slate-800"
-                : "text-slate-500 hover:text-slate-900 hover:bg-slate-100"
-            }`}
-          >
+          <button onClick={onClose} className="p-2 rounded-lg">
             <FontAwesomeIcon icon={faTimes} size="lg" />
           </button>
         </div>
 
         {/* BULK ACTION BAR */}
         {selectedIndices.size > 0 && (
-          <div
-            className={`px-6 py-3 flex items-center justify-between ${
-              isDark
-                ? "bg-blue-900/20 border-b border-blue-500/20"
-                : "bg-blue-50 border-b border-blue-200"
-            }`}
-          >
-            <div
-              className={`text-xs font-bold ${
-                isDark ? "text-blue-300" : "text-blue-700"
-              }`}
-            >
-              {selectedIndices.size} Items Selected
-            </div>
-            <div className="flex gap-2">
-              {canSplit && (
-                <button
-                  onClick={handleSplitShipment}
-                  disabled={isLocked || isSaving}
-                  className="px-3 py-1.5 bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold rounded flex items-center gap-2 transition-colors mr-auto disabled:opacity-50"
-                  title="Create new shipment from selected items"
-                >
-                  <FontAwesomeIcon icon={faArrowsSplitUpAndLeft} /> Split
-                </button>
-              )}
-
-              <button
-                onClick={() => handleBulkStatusChange("RECEIVED")}
-                disabled={isLocked || isSaving}
-                className={`px-3 py-1.5 text-xs font-bold rounded flex items-center gap-2 transition-colors disabled:opacity-50 ${
-                  isDark
-                    ? "bg-slate-800 hover:bg-slate-700 border border-slate-600 text-slate-300"
-                    : "bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-700"
-                }`}
-              >
-                <FontAwesomeIcon icon={faDolly} /> Unload
-              </button>
-              <button
-                onClick={() => handleBulkStatusChange("LOADED")}
-                disabled={isLocked || isSaving}
-                className={`px-3 py-1.5 text-xs font-bold rounded flex items-center gap-2 transition-colors shadow-lg disabled:opacity-50 ${
-                  isDark
-                    ? "bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-900/20"
-                    : "bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-500/20"
-                }`}
-              >
-                <FontAwesomeIcon icon={faTruckLoading} /> Load
-              </button>
-            </div>
-          </div>
+          <PackageBulkActionBar
+            selectedCount={selectedIndices.size}
+            canSplit={canSplit}
+            handleSplitClick={() => setIsSplitModalOpen(true)}
+            handleBulkStatusChange={handleBulkStatusChange}
+            isLocked={isLocked}
+            isSaving={isSaving}
+            isDark={isDark}
+          />
         )}
 
         {/* BODY */}
         <div className="flex-1 overflow-y-auto p-6 custom-scrollbar">
-          {/* STATS */}
           <div className="flex gap-4 mb-6">
             <div
-              className={`px-5 py-3 rounded-xl flex items-center gap-4 flex-1 border ${
-                isDark
-                  ? "bg-slate-800/30 border-slate-700"
-                  : "bg-slate-100 border-slate-200"
-              }`}
+              className={`px-5 py-3 rounded-xl flex items-center gap-4 flex-1 border ${isDark ? "bg-slate-800/30 border-slate-700" : "bg-slate-100 border-slate-200"}`}
             >
               <FontAwesomeIcon
                 icon={faCube}
@@ -348,62 +216,20 @@ export default function ViewPackagesModal({
                 <div className="text-[10px] text-slate-500 font-bold uppercase">
                   Count
                 </div>
-                <div
-                  className={`text-base font-bold ${
-                    isDark ? "text-white" : "text-slate-900"
-                  }`}
-                >
+                <div className="text-base font-bold">
                   {packages.length} items
-                </div>
-              </div>
-            </div>
-            <div
-              className={`px-5 py-3 rounded-xl flex items-center gap-4 flex-1 border ${
-                isDark
-                  ? "bg-slate-800/30 border-slate-700"
-                  : "bg-slate-100 border-slate-200"
-              }`}
-            >
-              <FontAwesomeIcon
-                icon={faWeightHanging}
-                className="text-slate-500 text-lg"
-              />
-              <div>
-                <div className="text-[10px] text-slate-500 font-bold uppercase">
-                  Total Weight
-                </div>
-                <div
-                  className={`text-base font-bold ${
-                    isDark ? "text-white" : "text-slate-900"
-                  }`}
-                >
-                  {packages.reduce(
-                    (acc, curr) => acc + (Number(curr.weight) || 0),
-                    0,
-                  )}{" "}
-                  kg
                 </div>
               </div>
             </div>
           </div>
 
-          {/* LIST */}
           <div className="space-y-4">
-            {/* Header Row with Checkbox */}
             <div
-              className={`flex items-center gap-4 px-4 pb-2 border-b mb-2 ${
-                isDark ? "border-slate-800" : "border-slate-200"
-              }`}
+              className={`flex items-center gap-4 px-4 pb-2 border-b mb-2 ${isDark ? "border-slate-800" : "border-slate-200"}`}
             >
-              <button
-                onClick={handleSelectAll}
-                className={`hover:text-white transition-colors ${
-                  isDark ? "" : "hover:text-slate-900"
-                }`}
-              >
+              <button onClick={handleSelectAll}>
                 <FontAwesomeIcon
                   icon={
-                    selectedIndices.size > 0 &&
                     selectedIndices.size === packages.length
                       ? faCheckSquare
                       : faSquare
@@ -411,213 +237,60 @@ export default function ViewPackagesModal({
                   className={
                     selectedIndices.size > 0
                       ? "text-blue-500"
-                      : isDark
-                      ? "text-slate-700"
                       : "text-slate-400"
                   }
                 />
               </button>
-              <span
-                className={`text-[10px] uppercase font-bold ${
-                  isDark ? "text-slate-500" : "text-slate-600"
-                }`}
-              >
+              <span className="text-[10px] uppercase font-bold text-slate-500">
                 Select All Packages
               </span>
             </div>
 
             {loading ? (
-              <div
-                className={`text-center py-10 flex flex-col items-center gap-2 ${
-                  isDark ? "text-slate-500" : "text-slate-600"
-                }`}
-              >
+              <div className="text-center py-10 flex flex-col items-center gap-2 text-slate-500">
                 <FontAwesomeIcon icon={faSpinner} spin size="2x" />
                 <span>Loading packages...</span>
               </div>
             ) : (
               <>
-                {packages.map((pkg, idx) => {
-                  const locked = isPackageLocked(pkg.status);
-                  const isEditingThis = editingId === idx;
-                  const isSelected = selectedIndices.has(idx);
-
-                  return (
-                    <PackageItemCard
-                      key={idx}
-                      pkg={pkg}
-                      idx={idx}
-                      isEditing={isEditingThis}
-                      editForm={editForm}
-                      setEditForm={setEditForm}
-                      isSelected={isSelected}
-                      onSelect={handleSelectOne}
-                      onEdit={handleEditClick}
-                      onCancelEdit={() => setEditingId(null)}
-                      onSaveEdit={handleEditSave}
-                      onRemove={handleRemove}
-                      isLocked={isLocked || locked}
-                      isSaving={isSaving}
-                      isDark={isDark}
-                    />
-                  );
-                })}
-
-                {/* ADD NEW PACKAGE CARD */}
+                {packages.map((pkg, idx) => (
+                  <PackageItemCard
+                    key={idx}
+                    pkg={pkg}
+                    idx={idx}
+                    isEditing={editingId === idx}
+                    editForm={editForm}
+                    setEditForm={setEditForm}
+                    isSelected={selectedIndices.has(idx)}
+                    onSelect={handleSelectOne}
+                    onEdit={(p, i) => {
+                      setEditingId(i);
+                      setEditForm({ ...p });
+                    }}
+                    onCancelEdit={() => setEditingId(null)}
+                    onSaveEdit={handleEditSave}
+                    onRemove={handleRemove}
+                    isLocked={isLocked || isPackageLocked(pkg.status)}
+                    isSaving={isSaving}
+                    isDark={isDark}
+                  />
+                ))}
                 {isAdding ? (
-                  <div
-                    className={`border p-4 rounded-xl space-y-3 ${
-                      isDark
-                        ? "bg-blue-500/5 border-blue-500/30"
-                        : "bg-blue-50 border-blue-200"
-                    }`}
-                  >
-                    <div
-                      className={`text-xs font-bold uppercase mb-2 ${
-                        isDark ? "text-blue-400" : "text-blue-600"
-                      }`}
-                    >
-                      New Package Details
-                    </div>
-                    <input
-                      placeholder="Description (e.g. Large Box)"
-                      className={`w-full border rounded-lg px-3 py-2 text-sm outline-none ${
-                        isDark
-                          ? "bg-slate-900 border-slate-700 text-white focus:border-blue-500"
-                          : "bg-white border-slate-300 text-slate-900 focus:border-blue-500"
-                      }`}
-                      value={newPackage.description}
-                      onChange={(e) =>
-                        setNewPackage((p) => ({
-                          ...p,
-                          description: e.target.value,
-                        }))
-                      }
-                      autoFocus
-                    />
-                    <div className="grid grid-cols-2 gap-2">
-                      <select
-                        className={`border rounded-lg px-3 py-2 text-sm outline-none ${
-                          isDark
-                            ? "bg-slate-900 border-slate-700 text-white focus:border-blue-500"
-                            : "bg-white border-slate-300 text-slate-900 focus:border-blue-500"
-                        }`}
-                        value={newPackage.packagingType}
-                        onChange={(e) =>
-                          setNewPackage((p) => ({
-                            ...p,
-                            packagingType: e.target.value,
-                          }))
-                        }
-                      >
-                        {PACKAGING_TYPES.map((t) => (
-                          <option key={t} value={t}>
-                            {t}
-                          </option>
-                        ))}
-                      </select>
-                      <input
-                        type="number"
-                        placeholder="Weight (kg)"
-                        className={`border rounded-lg px-3 py-2 text-sm outline-none ${
-                          isDark
-                            ? "bg-slate-900 border-slate-700 text-white focus:border-blue-500"
-                            : "bg-white border-slate-300 text-slate-900 focus:border-blue-500"
-                        }`}
-                        value={newPackage.weight}
-                        onChange={(e) =>
-                          setNewPackage((p) => ({
-                            ...p,
-                            weight: e.target.value,
-                          }))
-                        }
-                      />
-                    </div>
-                    <div className="grid grid-cols-2 gap-2">
-                      <input
-                        type="number"
-                        placeholder="Value (PHP)"
-                        className={`border rounded-lg px-3 py-2 text-sm outline-none ${
-                          isDark
-                            ? "bg-slate-900 border-slate-700 text-white focus:border-blue-500"
-                            : "bg-white border-slate-300 text-slate-900 focus:border-blue-500"
-                        }`}
-                        value={newPackage.declaredValue}
-                        onChange={(e) =>
-                          setNewPackage((p) => ({
-                            ...p,
-                            declaredValue: e.target.value,
-                          }))
-                        }
-                      />
-                      <div className="flex gap-2 items-center">
-                        <button
-                          onClick={() =>
-                            setNewPackage((p) => ({
-                              ...p,
-                              isFragile: !p.isFragile,
-                            }))
-                          }
-                          className={`flex-1 h-full rounded-lg border text-xs font-bold flex items-center justify-center gap-2 transition-all ${
-                            newPackage.isFragile
-                              ? "bg-amber-500/10 border-amber-500 text-amber-500"
-                              : isDark
-                              ? "bg-slate-900 border-slate-700 text-slate-500 hover:border-slate-500"
-                              : "bg-slate-100 border-slate-300 text-slate-600 hover:border-slate-400"
-                          }`}
-                        >
-                          <FontAwesomeIcon icon={faWineGlass} /> Fragile
-                        </button>
-                        <button
-                          onClick={() =>
-                            setNewPackage((p) => ({
-                              ...p,
-                              isPerishable: !p.isPerishable,
-                            }))
-                          }
-                          className={`flex-1 h-full rounded-lg border text-xs font-bold flex items-center justify-center gap-2 transition-all ${
-                            newPackage.isPerishable
-                              ? "bg-cyan-500/10 border-cyan-500 text-cyan-500"
-                              : isDark
-                              ? "bg-slate-900 border-slate-700 text-slate-500 hover;border-slate-500"
-                              : "bg-slate-100 border-slate-300 text-slate-600 hover:border-slate-400"
-                          }`}
-                        >
-                          <FontAwesomeIcon icon={faSnowflake} /> Perishable
-                        </button>
-                      </div>
-                    </div>
-                    <div className="flex justify-end gap-2 pt-2">
-                      <button
-                        onClick={() => setIsAdding(false)}
-                        className={`px-4 py-2 rounded-lg text-sm font-bold transition-colors ${
-                          isDark
-                            ? "text-slate-400 hover:text-white"
-                            : "text-slate-600 hover:text-slate-900"
-                        }`}
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        onClick={handleAddSave}
-                        disabled={isSaving}
-                        className="px-4 py-2 rounded-lg text-sm font-bold bg-blue-600 hover:bg-blue-500 text-white shadow-lg shadow-blue-500/20 transition-colors disabled:opacity-50"
-                      >
-                        {isSaving ? "Saving..." : "Save Package"}
-                      </button>
-                    </div>
-                  </div>
+                  <AddPackageForm
+                    newPackage={newPackage}
+                    setNewPackage={setNewPackage}
+                    setIsAdding={setIsAdding}
+                    handleAddSave={handleAddSave}
+                    isSaving={isSaving}
+                    isDark={isDark}
+                    packagingTypes={PACKAGING_TYPES}
+                  />
                 ) : (
                   <button
                     onClick={() => setIsAdding(true)}
-                    className={`w-full py-6 border-2 border-dashed rounded-xl transition-all font-bold text-xs uppercase flex flex-col items-center gap-2 ${
-                      isDark
-                        ? "border-slate-800 text-slate-500 hover:text-blue-400 hover:border-blue-500/30"
-                        : "border-slate-300 text-slate-600 hover:text-blue-600 hover:border-blue-300"
-                    }`}
+                    className="w-full py-6 border-2 border-dashed rounded-xl text-xs font-bold uppercase flex flex-col items-center gap-2"
                   >
-                    <FontAwesomeIcon icon={faPlus} />
-                    Add Item
+                    <FontAwesomeIcon icon={faPlus} /> Add Item
                   </button>
                 )}
               </>
@@ -625,26 +298,34 @@ export default function ViewPackagesModal({
           </div>
         </div>
 
-        {/* FOOTER */}
         <div
-          className={`p-4 border-t rounded-b-xl flex justify-end ${
-            isDark
-              ? "border-slate-800 bg-slate-950/50"
-              : "border-slate-200 bg-slate-50"
-          }`}
+          className={`p-4 border-t rounded-b-xl flex justify-end ${isDark ? "border-slate-800 bg-slate-950/50" : "border-slate-200 bg-slate-50"}`}
         >
           <button
             onClick={onClose}
-            className={`px-6 py-2.5 text-sm font-bold rounded-lg border transition-colors ${
-              isDark
-                ? "bg-slate-800 hover:bg-slate-700 text-white border-slate-700"
-                : "bg-slate-200 hover:bg-slate-300 text-slate-800 border-slate-300"
-            }`}
+            className="px-6 py-2.5 text-sm font-bold rounded-lg border"
           >
             Close
           </button>
         </div>
       </div>
+
+      {isSplitModalOpen && (
+        <SplitShipmentModal
+          isOpen={isSplitModalOpen}
+          onClose={() => setIsSplitModalOpen(false)}
+          originalShipmentId={shipment.id}
+          isDark={isDark}
+          onSuccess={() => {
+            setIsSplitModalOpen(false);
+            onClose();
+            if (onRefresh) onRefresh();
+          }}
+          selectedItems={Array.from(selectedIndices).map(
+            (idx) => packages[idx],
+          )}
+        />
+      )}
     </div>
   );
 }

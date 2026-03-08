@@ -48,7 +48,7 @@ export default function TripStep({
     driverId: null,
     truckPlateNumber: "",
     truckId: null,
-    tripType: isPickupMode ? "LOCAL_PICKUP" : "HUB_TRANSFER",
+    tripType: isPickupMode === true ? "LOCAL_PICKUP" : "HUB_TRANSFER",
   });
 
   const fetchTrips = async () => {
@@ -63,8 +63,8 @@ export default function TripStep({
         limit(10),
       ];
 
-      if (isPickupMode) {
-        constraints.push(where("tripType", "==", "LOCAL"));
+      if (isPickupMode === true) {
+        constraints.push(where("tripType", "==", "LOCAL_PICKUP"));
       }
 
       const q = query(collection(db, "truck_trips"), ...constraints);
@@ -302,37 +302,6 @@ export default function TripStep({
           </div>
         )}
       </div>
-
-      {/* Footer pinned at bottom */}
-      {/* <div
-        className={`shrink-0 p-3 sm:p-4 border-t flex items-center gap-3 z-10 ${
-          isDark
-            ? "border-slate-800 bg-slate-950"
-            : "border-slate-200 bg-slate-50"
-        }`}
-      >
-        {onBack && (
-          <button
-            onClick={onBack}
-            className={`px-5 py-3 sm:py-2 rounded-xl border font-bold transition-colors ${
-              isDark
-                ? "border-slate-700 text-slate-400 hover:bg-slate-800"
-                : "border-slate-300 text-slate-700 hover:bg-slate-100"
-            }`}
-          >
-            Back
-          </button>
-        )}
-        {view === "create" && (
-          <button
-            onClick={handleCreateTrip}
-            disabled={loading}
-            className="flex-1 bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 sm:py-2 rounded-xl shadow-lg transition-all disabled:opacity-60"
-          >
-            {loading ? "Creating Trip..." : "Confirm & Add to List"}
-          </button>
-        )}
-      </div> */}
     </div>
   );
 }
