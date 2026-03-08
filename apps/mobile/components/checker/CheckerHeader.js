@@ -17,7 +17,7 @@ export default function CheckerHeader({ userName, onLogout }) {
       </View>
       <TouchableOpacity style={styles.logoutBtn} onPress={onLogout}>
         <FontAwesome5 name="sign-out-alt" size={16} color="#475569" />
-        <Text style={styles.logoutText}>Log out</Text>
+        {/* <Text style={styles.logoutText}>Log out</Text> */}
       </TouchableOpacity>
     </View>
   );

@@ -53,13 +53,16 @@ export default function ShipmentDetailsScreen() {
     );
   }, [packages, search]);
 
-  const executeAction = async (actionCode, remarks = "") => {
+  const executeAction = async (actionCode, remarks = "", quantity) => {
     const idsToUpdate = targetPackage
       ? [targetPackage.trackingNumber]
       : Array.from(selectedIds);
+
     setActionLoading(true);
     try {
       const location = await getCurrentLocationSafe();
+
+      // ✅ ADJUSTED: Pass the manualQty to the Firebase function
       await updateShipmentPackages({
         shipmentId,
         packageIds: idsToUpdate,
@@ -67,7 +70,9 @@ export default function ShipmentDetailsScreen() {
         tripId: parentTripId,
         remarks,
         location,
+        manualQty: quantity, // This supports the partial loading of Sacks/Bundles
       });
+
       setSelectedIds(new Set());
       setTargetPackage(null);
       setModalVisible(false);
@@ -76,6 +81,16 @@ export default function ShipmentDetailsScreen() {
     } finally {
       setActionLoading(false);
     }
+  };
+
+  const getAvailableQuantity = () => {
+    if (targetPackage) {
+      return Number(targetPackage.quantity) || 1;
+    }
+    // For bulk selection, we sum the quantities of all selected items
+    return packages
+      .filter((p) => selectedIds.has(p.trackingNumber))
+      .reduce((acc, curr) => acc + (Number(curr.quantity) || 1), 0);
   };
 
   // --- RENDER HEADER COMPONENTS ---
@@ -200,6 +215,8 @@ export default function ShipmentDetailsScreen() {
         visible={modalVisible}
         onClose={() => setModalVisible(false)}
         count={targetPackage ? 1 : selectedIds.size}
+        // ✅ NEW: Pass the pieces count so the user can do partial loading
+        maxQty={getAvailableQuantity()}
         onAction={executeAction}
       />
     </SafeAreaView>

@@ -51,9 +51,6 @@
       }
     },
     "owner": "atlas-transport",
-<<<<<<< HEAD
-    "plugins": ["expo-router", "expo-font", "./withMonorepoFix.js"],
-=======
     "plugins": [
       "expo-router",
       "expo-font",
@@ -72,7 +69,6 @@
         }
       ]
     ],
->>>>>>> 67f55e5810f6b5ad601143ca2669dc577d39c2ef
     "runtimeVersion": {
       "policy": "appVersion"
     },

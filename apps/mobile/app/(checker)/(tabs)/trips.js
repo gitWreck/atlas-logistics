@@ -275,7 +275,11 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
 
-  listContent: { padding: 20, paddingBottom: 50 },
+  listContent: {
+    // backgroundColor: "#000000ff",
+    padding: 20,
+    paddingBottom: 50,
+  },
   emptyContainer: { alignItems: "center", marginTop: 50 },
   emptyText: { color: "#64748b" },
 });

@@ -15,7 +15,7 @@ const db = admin.firestore();
    ✅ Logs the security event (Important!)
 ====================================================== */
 exports.unlockTripManifest = onCall(
-  { region: "asia-southeast1" },
+  { region: "asia-southeast1", maxInstances: 10 },
   async (req) => {
     // 1. Auth & Role Check
     await requireRole(db, req, ["admin", "manager"]);

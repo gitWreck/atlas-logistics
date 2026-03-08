@@ -1,8 +1,8 @@
+"use client";
 import React, { useState } from "react";
 import { View, Alert, Vibration, StyleSheet } from "react-native";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import GetLocation from "react-native-get-location";
 import {
   doc,
   getDoc,
@@ -14,15 +14,13 @@ import {
 import { db } from "../../firebase";
 
 // Import Custom Components
-import {
-  scanPackages,
-  updateShipmentPackages,
-} from "../../components/utilities/FirebaseFunctions";
+import { updateShipmentPackages } from "../../components/utilities/FirebaseFunctions";
 import PermissionRequest from "../../components/scanner/PermissionRequest";
 import ScannerOverlay from "../../components/scanner/ScannerOverlay";
 import ManualEntryModal from "../../components/scanner/ManualEntryModal";
-import { getCurrentLocationSafe } from "../../components/utilities/helpers";
+import PackageActionModal from "../../components/checker/shipment-details/PackageActionModal"; // ✅ New Import
 import ShipmentInfoModal from "../../components/checker/shipment-details/ShipmentInfoModal";
+import { getCurrentLocationSafe } from "../../components/utilities/helpers";
 
 export default function ScannerScreen() {
   const router = useRouter();
@@ -31,109 +29,120 @@ export default function ScannerScreen() {
   const [processing, setProcessing] = useState(false);
   const [showManual, setShowManual] = useState(false);
 
+  // --- NEW STATES FOR BULK HANDLING ---
+  const [actionModalVisible, setActionModalVisible] = useState(false);
+  const [targetPackage, setTargetPackage] = useState(null);
+  const [parentShipmentId, setParentShipmentId] = useState(null);
+
   const [infoModalVisible, setInfoModalVisible] = useState(false);
   const [scannedData, setScannedData] = useState(null);
 
-  const { mode, title } = useLocalSearchParams();
+  const { mode, tripId } = useLocalSearchParams();
 
-  // --- PERMISSION CHECK ---
   if (!permission) return <View />;
-  if (!permission.granted) {
+  if (!permission.granted)
     return <PermissionRequest onRequest={requestPermission} />;
-  }
 
-  const handleProcessPackage = async (barcode) => {
-    if (processing) return;
-    setProcessing(true);
-    Vibration.vibrate();
+  const resetScanner = () => {
+    setScanned(false);
+    setProcessing(false);
+    setTargetPackage(null);
+    setActionModalVisible(false);
+  };
 
+  /**
+   * Main execution logic for updating status
+   */
+  const executeStatusUpdate = async (
+    shipmentId,
+    barcode,
+    status,
+    qty = null,
+    remarks = "",
+  ) => {
     try {
-      // const isShipment = barcode.startsWith("AT-");
-      // if (isShipment) {
-      //   router.push({
-      //     pathname: "/(checker)/shipment-details",
-      //     params: { shipmentId: barcode },
-      //   });
-      //   return; // Navigation will unmount this, so no need to reset
-      // }
-
-      // ------------------------------------------
-      // MODE: INFO (Read Directly from Phone)
-      // ------------------------------------------
-      if (mode === "info") {
-        let shipmentData = null;
-        let shipmentId = barcode;
-
-        // STEP 1: Try finding the document directly (Shipment Level Scan)
-        const shipmentRef = doc(db, "shipments", barcode);
-        const docSnap = await getDoc(shipmentRef);
-
-        if (docSnap.exists()) {
-          shipmentData = docSnap.data();
-        } else {
-          // STEP 2: If not found, search inside packages (Package Level Scan)
-          // "Find the shipment where packageBarcodes array contains this barcode"
-          const q = query(
-            collection(db, "shipments"),
-            where("packageBarcodes", "array-contains", barcode),
-          );
-          const querySnap = await getDocs(q);
-
-          if (!querySnap.empty) {
-            // Found the parent shipment!
-            const parentDoc = querySnap.docs[0];
-            shipmentData = parentDoc.data();
-            shipmentId = parentDoc.id;
-          }
-        }
-
-        // STEP 3: Display Results
-        if (shipmentData) {
-          setScannedData(shipmentData);
-          setInfoModalVisible(true);
-        } else {
-          Alert.alert(
-            "Not Found",
-            "No shipment or package found with this ID.",
-            [{ text: "Scan Again", onPress: resetScanner }],
-          );
-        }
-        return;
-      }
-
-      // ------------------------------------------
-      // MODE: LOAD/OFFLOAD (Cloud Function)
-      // ------------------------------------------
-
       const location = await getCurrentLocationSafe();
-      const statusToApply = mode === "loading" ? "LOADED" : "RECEIVED";
 
-      // We use the same Cloud Function as the manual selection screen
       await updateShipmentPackages({
+        shipmentId,
         packageIds: [barcode],
-        newStatus: statusToApply,
+        newStatus: status,
         location: location,
-        // tripId: ??? -> You'll need to pass the current tripId from the dashboard
+        tripId: tripId,
+        manualQty: qty, // ✅ Supports partial sack loading
+        remarks: remarks,
       });
 
-      // ✅ TOAST STYLE FEEDBACK (Optional: avoid Alert here for high-speed scanning)
-      console.log(`Successfully marked ${barcode} as ${statusToApply}`);
-
-      // Auto-reset after a short delay for "Rapid Fire" scanning
-      setTimeout(() => {
-        resetScanner();
-      }, 1000);
+      console.log(`Successfully updated ${barcode} to ${status}`);
+      resetScanner();
     } catch (error) {
-      console.error(error);
-      Alert.alert("Error", error.message || "Scan failed", [
+      Alert.alert("Action Failed", error.message, [
         { text: "Retry", onPress: resetScanner },
       ]);
     }
   };
 
-  const resetScanner = () => {
-    setScanned(false);
-    setProcessing(false);
+  const onManualSubmit = (code, qty) => {
+    setShowManual(false);
+
+    // we bypass the normal "lookup" flow and execute immediately
+    if (qty) {
+      // (Usually this is already done in handleLookup inside the modal)
+      handleProcessPackage(code, qty);
+    } else {
+      handleProcessPackage(code);
+    }
+  };
+
+  /**
+   * Scanned Barcode Handler
+   */
+  // Adjust handleProcessPackage to accept an optional qty override
+  const handleProcessPackage = async (barcode, manualQtyOverride = null) => {
+    if (processing) return;
+    setProcessing(true);
+    Vibration.vibrate();
+
+    try {
+      const q = query(
+        collection(db, "shipments"),
+        where("packageBarcodes", "array-contains", barcode),
+      );
+      const querySnap = await getDocs(q);
+
+      if (querySnap.empty) throw new Error("Package not found.");
+
+      const shipmentDoc = querySnap.docs[0];
+      const shipmentData = shipmentDoc.data();
+      const pkg = shipmentData.packages.find(
+        (p) => p.trackingNumber === barcode,
+      );
+
+      const isBulk = ["Sack", "Bundle", "Roll"].includes(pkg?.packagingType);
+      const statusToApply = mode === "loading" ? "LOADED" : "RECEIVED";
+
+      // ✅ LOGIC CHANGE:
+      // If we already have a manualQtyOverride (from ManualEntryModal), use it.
+      // If we scanned a bulk item and DON'T have an override, open the popup.
+      if (isBulk && !manualQtyOverride && mode !== "info") {
+        setTargetPackage(pkg);
+        setParentShipmentId(shipmentDoc.id);
+        setActionModalVisible(true);
+        return;
+      }
+
+      // Execute immediately using manualQtyOverride or full quantity
+      await executeStatusUpdate(
+        shipmentDoc.id,
+        barcode,
+        statusToApply,
+        manualQtyOverride || (isBulk ? null : pkg.quantity),
+      );
+    } catch (error) {
+      Alert.alert("Error", error.message, [
+        { text: "Retry", onPress: resetScanner },
+      ]);
+    }
   };
 
   const onCameraScan = ({ data }) => {
@@ -143,11 +152,6 @@ export default function ScannerScreen() {
     }
   };
 
-  const onManualSubmit = (code) => {
-    setShowManual(false);
-    handleProcessPackage(code);
-  };
-
   return (
     <View style={styles.container}>
       <CameraView
@@ -155,15 +159,7 @@ export default function ScannerScreen() {
         facing="back"
         onBarcodeScanned={scanned ? undefined : onCameraScan}
         barcodeScannerSettings={{
-          barcodeTypes: [
-            "qr",
-            "ean13",
-            "ean8",
-            "upc_e",
-            "code128",
-            "code39",
-            "pdf417",
-          ],
+          barcodeTypes: ["qr", "code128", "code39", "pdf417"],
         }}
       >
         <ScannerOverlay
@@ -173,23 +169,41 @@ export default function ScannerScreen() {
         />
       </CameraView>
 
+      {/* ✅ QUANTITY MODAL: Intercepts Sacks and Bundles */}
+      <PackageActionModal
+        visible={actionModalVisible}
+        onClose={resetScanner}
+        count={1}
+        maxQty={targetPackage?.quantity || 1}
+        onAction={(status, remarks, qty) => {
+          executeStatusUpdate(
+            parentShipmentId,
+            targetPackage.trackingNumber,
+            status,
+            qty,
+            remarks,
+          );
+        }}
+      />
+
       <ManualEntryModal
         visible={showManual}
         onClose={() => setShowManual(false)}
-        onSubmit={onManualSubmit}
+        onSubmit={(code, qty) => {
+          setShowManual(false);
+          onManualSubmit(code, qty); // Pass the quantity forward
+        }}
       />
+
       <ShipmentInfoModal
         visible={infoModalVisible}
         data={scannedData}
-        onClose={() => {
-          setInfoModalVisible(false);
-          resetScanner();
-        }}
+        onClose={resetScanner}
         onDetails={() => {
           setInfoModalVisible(false);
           router.push({
             pathname: "/(checker)/shipment-details",
-            params: { shipmentId: scannedData.id || barcode }, // barcode works if it was a direct hit
+            params: { shipmentId: scannedData.id, parentTripId: tripId },
           });
         }}
       />

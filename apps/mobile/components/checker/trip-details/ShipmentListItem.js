@@ -15,7 +15,9 @@ export default function ShipmentListItem({ item, onPress, onMenuPress }) {
         </View>
         <View style={{ flex: 1 }}>
           <Text style={styles.itemTitle}>{item.id}</Text>
-          <Text style={styles.itemSub}>{item.destination}</Text>
+          <Text style={styles.itemSub}>
+            {item.destination} {item.type}
+          </Text>
 
           {/* Status Badge Text */}
           <View style={styles.statusRow}>
@@ -52,6 +54,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     backgroundColor: "#ffffff",
     marginHorizontal: 16,
+    marginVertical: -12,
     // marginBottom: 8,
     borderRadius: 12,
     alignItems: "center",
@@ -62,7 +65,10 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: "row",
     alignItems: "center",
-    padding: 16,
+    // padding: 16,
+    paddingBottom: 16,
+    paddingTop: 16,
+    paddingStart: 12,
     gap: 12,
   },
   iconCircle: {

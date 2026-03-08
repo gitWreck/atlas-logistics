@@ -45,12 +45,22 @@ const VALID_TRIP_STATUSES = [
 // connected to
 // updateShipmentStatus
 const ALLOWED_SHIPMENT_STATUSES = [
+  "CREATED",
+  "IN_TRANSIT",
+  "PENDING_PICKUP",
+  "PICKED_UP",
+  "ASSIGNED",
   "OUT_FOR_DELIVERY",
   "DELIVERED",
   "FAILED_DELIVERY",
-  "PICKED_UP",
   "FAILED_PICKUP",
-  "ARRIVED",
+  "CANCELLED",
+  "MISSING",
+  "UNLOAD",
+  "LOADED",
+  "RECEIVED",
+  "PARTIALLY_LOADED",
+  "PARTIALLY_RECEIVED",
 ];
 
 module.exports = {

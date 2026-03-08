@@ -34,6 +34,7 @@ import ShipmentControlsModal from "../../components/checker/trip-details/Shipmen
 import {
   bulkShipmentAction,
   finalizeHubProcessing,
+  updateShipmentStatus,
   updateShipmentStatusChecker,
 } from "../../components/utilities/FirebaseFunctions";
 import { CHECKER_SHIPMENT_FILTER } from "../../components/constants/tracking-constants";
@@ -146,7 +147,7 @@ export default function TripDetailsScreen() {
       // Check if it's a single update or bulk
       if (ids.length === 1) {
         // ✅ Use the Precision Scalpel for 1 item
-        await updateShipmentStatusChecker({
+        await updateShipmentStatus({
           shipmentId: ids[0],
           tripId: tripId,
           newStatus: newStatus,
@@ -171,6 +172,7 @@ export default function TripDetailsScreen() {
       setUpdating(false);
     }
   };
+
   const handleBulkStatusChange = (newStatus) => {
     const ids = filteredData.map((s) => s.id);
     if (ids.length === 0) {
@@ -201,7 +203,7 @@ export default function TripDetailsScreen() {
     // Determine if we are loading an outbound truck or receiving an inbound truck
     const isReceiving =
       trip.status === "IN_TRANSIT" || trip.status === "ARRIVED";
-    const actionWord = isReceiving ? "Receive" : "Seal";
+    const actionWord = isReceiving ? "Receive" : "Load";
     const statusWord = forcedStatus || (isReceiving ? "ARRIVED" : "LOADED");
 
     const message =
@@ -479,7 +481,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
 
-  listContent: { paddingBottom: 80, paddingTop: 8 },
+  listContent: { paddingBottom: 80, paddingTop: 20 },
   emptyText: { textAlign: "center", color: "#475569", marginTop: 40 },
 
   fab: {

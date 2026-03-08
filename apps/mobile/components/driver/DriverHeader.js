@@ -3,7 +3,11 @@ import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
 import { FontAwesome5 } from "@expo/vector-icons";
 import { Image } from "expo-image";
 
-export default function DriverHeader({ title = "My Trips", userName, onLogout }) {
+export default function DriverHeader({
+  title = "My Trips",
+  userName,
+  onLogout,
+}) {
   return (
     <View style={styles.header}>
       <View style={styles.titleRow}>
@@ -24,7 +28,7 @@ export default function DriverHeader({ title = "My Trips", userName, onLogout })
       </View>
       <TouchableOpacity style={styles.logoutBtn} onPress={onLogout}>
         <FontAwesome5 name="sign-out-alt" size={16} color="#475569" />
-        <Text style={styles.logoutText}>Log out</Text>
+        {/* <Text style={styles.logoutText}>Log out</Text> */}
       </TouchableOpacity>
     </View>
   );
