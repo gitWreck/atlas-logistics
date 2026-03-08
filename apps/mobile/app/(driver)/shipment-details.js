@@ -37,6 +37,8 @@ export default function ShipmentDetailsScreen() {
   const [photos, setPhotos] = useState([]);
   const [isIssueModalVisible, setIsIssueModalVisible] = useState(false);
 
+  const [actionMessage, setActionMessage] = useState("");
+
   // 1. Fetch Shipment
   useEffect(() => {
     if (!shipmentId) return;
@@ -357,6 +359,8 @@ export default function ShipmentDetailsScreen() {
           actionLoading={actionLoading}
           onAction={handleAction}
           onReportIssue={() => setIsIssueModalVisible(true)}
+          message={actionMessage} // ✅ Pass state
+          onMessageChange={setActionMessage} // ✅ Pass setter
         />
       )}
       {/* Report Issue Modal */}
