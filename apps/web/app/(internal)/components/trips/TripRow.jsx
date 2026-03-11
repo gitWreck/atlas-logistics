@@ -108,6 +108,10 @@ export default function TripRow({ trip, onClick, isDark = false }) {
         {/* Mobile Action Button */}
         <button
           className={`p-2 -mr-2 ${isDark ? "text-slate-500" : "text-slate-600"}`}
+          onClick={(e) => {
+            e.stopPropagation();
+            onClick(trip.id);
+          }}
         >
           <FontAwesomeIcon icon={faEllipsisV} />
         </button>

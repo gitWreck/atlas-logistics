@@ -2,6 +2,8 @@
 import React, { useEffect, useState } from "react";
 import QRCode from "react-qr-code";
 import { useSearchParams } from "next/navigation";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faSnowflake, faWineGlass } from "@fortawesome/free-solid-svg-icons";
 import {
   doc,
   getDoc,
@@ -254,7 +256,7 @@ function StandardLabel({ shipment, pkg, totalQuantity, allPackages = [] }) {
 
           {/* DELIVERY ATTEMPTS */}
           <div className="w-full">
-            <div className="text-[9px] font-bold uppercase text-gray-400 mb-1">
+            {/* <div className="text-[9px] font-bold uppercase text-gray-400 mb-1">
               Delivery
             </div>
             <div className="flex gap-1 mb-2">
@@ -279,7 +281,7 @@ function StandardLabel({ shipment, pkg, totalQuantity, allPackages = [] }) {
                   {n}
                 </span>
               ))}
-            </div>
+            </div> */}
           </div>
           {/* ✅ DETAILED PACKAGE BREAKDOWN */}
           <div className="mt-3 border-t pt-2">
@@ -287,7 +289,7 @@ function StandardLabel({ shipment, pkg, totalQuantity, allPackages = [] }) {
               Package Breakdown
             </div>
             <div className="space-y-1">
-              {allPackages.slice(0, 5).map((p, i) => (
+              {allPackages.slice(0, 15).map((p, i) => (
                 <div
                   key={i}
                   className="flex justify-between text-[10px] border-b border-gray-100 pb-0.5"
@@ -298,9 +300,9 @@ function StandardLabel({ shipment, pkg, totalQuantity, allPackages = [] }) {
                   <span className="font-bold">{p.quantity} PCS</span>
                 </div>
               ))}
-              {allPackages.length > 5 && (
+              {allPackages.length > 15 && (
                 <div className="text-[9px] text-gray-400 italic">
-                  + {allPackages.length - 5} more units...
+                  + {allPackages.length - 15} more units...
                 </div>
               )}
             </div>

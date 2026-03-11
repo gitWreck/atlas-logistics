@@ -158,7 +158,7 @@ export default function ShipmentRow({ s, onClick, isDark = false }) {
                     : "text-blue-600"
             }`}
           >
-            {s.status?.replace("_", " ")}
+            {s.status?.replaceAll("_", " ")}
           </span>
           <span
             className={`text-[10px] ${isDark ? "text-slate-600" : "text-slate-500"}`}

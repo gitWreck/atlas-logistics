@@ -71,7 +71,7 @@ export default function StandardLabel({ shipment, packages, index, total }) {
 
           {/* PACKAGE INFO */}
           <div className="mt-3 border-t pt-2 text-[10px]">
-            <div className="font-bold uppercase text-gray-500">
+            {/* <div className="font-bold uppercase text-gray-500">
               Package Details
             </div>
             <div className="font-semibold uppercase">
@@ -82,53 +82,30 @@ export default function StandardLabel({ shipment, packages, index, total }) {
             </div>
             <div className="text-gray-600 uppercase">
               Quantity: {packages?.quantity || 1}
-            </div>
+            </div> */}
           </div>
         </div>
 
         {/* RIGHT: DELIVERY / RETURN ATTEMPTS */}
-        <div className="w-[1.2in] flex flex-col justify-start ">
-          <div className="text-[10px] font-bold uppercase text-gray-500 mb-1">
-            Attempts
+        <div className="w-[1.2in] flex flex-col justify-start text-[10px]">
+          <div className="font-bold uppercase text-gray-500">
+            Package Details
           </div>
-
-          {/* DELIVERY */}
-          <div className="mb-2">
-            <div className="text-xs font-bold uppercase mb-1">Delivery</div>
-            <div className="flex gap-1">
-              <span className="w-5 h-5 border-2 border-black text-xs flex items-center justify-center font-bold">
-                1
-              </span>
-              <span className="w-5 h-5 border-2 border-black text-xs flex items-center justify-center font-bold">
-                2
-              </span>
-              <span className="w-5 h-5 border-2 border-black text-xs flex items-center justify-center font-bold">
-                3
-              </span>
-            </div>
+          <div className="font-semibold uppercase">
+            Description: {packages?.description || "No Description"}
           </div>
-
-          {/* RETURN */}
-          <div>
-            <div className="text-xs font-bold uppercase mb-1">Return</div>
-            <div className="flex gap-1">
-              <span className="w-5 h-5 border-2 border-black text-xs flex items-center justify-center font-bold">
-                1
-              </span>
-              <span className="w-5 h-5 border-2 border-black text-xs flex items-center justify-center font-bold">
-                2
-              </span>
-              <span className="w-5 h-5 border-2 border-black text-xs flex items-center justify-center font-bold">
-                3
-              </span>
-            </div>
+          <div className="text-gray-600 uppercase">
+            Package Type: {packages?.packagingType || "Standard Packaging"}
+          </div>
+          <div className="text-gray-600 uppercase">
+            Quantity: {packages?.quantity || 1}
           </div>
         </div>
       </div>
 
       {/* QR CODE - WITH SAFETY CHECK */}
       <div className="flex flex-col items-center justify-center border-4 border-black rounded-xl pt-3 pb-2 my-1">
-        <QRCode value={qrValue} size={140} level="M" />
+        <QRCode value={qrValue} size={180} level="M" />
         <div className="text-xs font-mono font-bold mt-2 tracking-widest text-center">
           {packages?.trackingNumber || "NO ID"}
         </div>
