@@ -361,7 +361,7 @@ export default function ShipmentDrawer({
                               "{log.note}"
                             </p>
                           )}
-                          {log.location && (
+                          {/* {log?.location && (
                             <div
                               className={`mt-2 flex items-center gap-1.5 text-[9px] font-bold ${isDark ? "text-blue-400/60" : "text-blue-600/60"}`}
                             >
@@ -369,9 +369,9 @@ export default function ShipmentDrawer({
                                 icon={faTruck}
                                 className="text-[7px]"
                               />
-                              {log.location}
+                              {log?.location}
                             </div>
-                          )}
+                          )} */}
                         </div>
                       </div>
                     ))
