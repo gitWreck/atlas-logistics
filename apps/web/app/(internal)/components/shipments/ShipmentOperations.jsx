@@ -25,6 +25,8 @@ export default function ShipmentOperations({
   console.log("Selected Status:", statusSelect);
 
   const STATUS_OPTIONS = [
+    { value: "PENDING_PICKUP", label: "Pending Pickup" },
+    { value: "PICKED_UP", label: "Picked Up" },
     { value: "RECEIVED", label: "Received at Hub" },
     { value: "LOADED", label: "Loaded on Truck" },
     { value: "IN_TRANSIT", label: "In Transit" },
