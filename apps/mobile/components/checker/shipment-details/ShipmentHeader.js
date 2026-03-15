@@ -21,7 +21,9 @@ export default function ShipmentHeader({ shipmentId, shipment, onBack }) {
           <Text style={styles.subtitle}>ID: {shipmentId}</Text>
         </View>
         <View style={styles.statusBadge}>
-          <Text style={styles.statusText}>{shipment?.status || "PENDING"}</Text>
+          <Text style={styles.statusText}>
+            {shipment?.status.replaceAll("_", " ") || "PENDING"}
+          </Text>
         </View>
       </View>
     </View>

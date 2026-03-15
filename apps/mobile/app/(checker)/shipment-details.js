@@ -70,7 +70,10 @@ export default function ShipmentDetailsScreen() {
         tripId: parentTripId,
         remarks,
         location,
-        manualQty: quantity, // This supports the partial loading of Sacks/Bundles
+        // manualQty: quantity, // This supports the partial loading of Sacks/Bundles
+        // ✅ FIX: Only send quantity if a SINGLE package is targeted.
+        // For bulk, sending null tells the backend to use individual package quantities.
+        manualQty: targetPackage ? quantity : null,
       });
 
       setSelectedIds(new Set());
@@ -218,6 +221,7 @@ export default function ShipmentDetailsScreen() {
         // ✅ NEW: Pass the pieces count so the user can do partial loading
         maxQty={getAvailableQuantity()}
         onAction={executeAction}
+        noteRemarks={targetPackage?.remarks || ""}
       />
     </SafeAreaView>
   );

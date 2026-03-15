@@ -42,6 +42,9 @@ export const bulkShipmentAction = httpsCallable(
   "bulkShipmentAction",
 );
 
+// Messaging
+export const sendManualSMS = httpsCallable(functions, "sendManualSMS");
+
 // ----------------------------
 export const bulkUpdateShipmentStatus = httpsCallable(
   functions,

@@ -18,6 +18,7 @@ export default function PackageActionModal({
   count, // Number of selected items (barcodes)
   maxQty = 1, // Total pieces available in the selected item(s)
   onAction,
+  noteRemarks,
 }) {
   const [remarks, setRemarks] = useState("");
   const [manualQty, setManualQty] = useState("");
@@ -25,7 +26,7 @@ export default function PackageActionModal({
   // Initialize/Reset values when modal opens
   useEffect(() => {
     if (visible) {
-      setRemarks("");
+      setRemarks(noteRemarks || "");
       // Default manual quantity to the total available pieces
       setManualQty(maxQty.toString());
     }
@@ -104,18 +105,6 @@ export default function PackageActionModal({
             </View>
           </View>
 
-          {/* Remarks Input */}
-          <Text style={styles.label}>Notes / Remarks</Text>
-          <TextInput
-            style={styles.remarksInput}
-            placeholder="Add an optional note..."
-            placeholderTextColor="#94a3b8"
-            value={remarks}
-            onChangeText={setRemarks}
-            multiline
-            numberOfLines={2}
-          />
-
           <View style={styles.grid}>
             {ACTIONS.map((btn) => (
               <TouchableOpacity
@@ -134,6 +123,18 @@ export default function PackageActionModal({
               </TouchableOpacity>
             ))}
           </View>
+
+          {/* Remarks Input */}
+          <Text style={[styles.label, { marginTop: 12 }]}>Notes / Remarks</Text>
+          <TextInput
+            style={styles.remarksInput}
+            placeholder="Add an optional note..."
+            placeholderTextColor="#94a3b8"
+            value={remarks}
+            onChangeText={setRemarks}
+            multiline
+            numberOfLines={2}
+          />
         </View>
       </KeyboardAvoidingView>
     </Modal>
@@ -158,7 +159,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "flex-start",
-    marginBottom: 20,
+    marginBottom: 12,
   },
   closeBtn: { padding: 4 },
   title: { fontSize: 18, fontWeight: "800", color: "#0f172a" },
@@ -171,6 +172,7 @@ const styles = StyleSheet.create({
     color: "#64748b",
     textTransform: "uppercase",
     marginBottom: 8,
+    // marginTop: 12,
   },
   qtyContainer: {
     flexDirection: "row",

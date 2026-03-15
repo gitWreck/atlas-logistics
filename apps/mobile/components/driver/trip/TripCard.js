@@ -30,6 +30,7 @@ const TripCard = ({ trip, onPress, actionLabel = "View Trip" }) => {
 
   // Check if there is an active delay
   const isDelayed = trip.delayReason && !trip.delayCleared;
+  const isLocalPickup = trip.tripType === "LOCAL_PICKUP";
 
   console.log("show delay: ", trip);
 
@@ -63,20 +64,18 @@ const TripCard = ({ trip, onPress, actionLabel = "View Trip" }) => {
             <View
               style={[
                 styles.typeBadge,
-                trip.tripType === "LOCAL"
-                  ? styles.typeLocalBg
-                  : styles.typeTransferBg,
+                isLocalPickup ? styles.typeLocalBg : styles.typeTransferBg,
               ]}
             >
               <Text
                 style={[
                   styles.typeText,
-                  trip.tripType === "LOCAL"
+                  isLocalPickup
                     ? styles.typeLocalText
                     : styles.typeTransferText,
                 ]}
               >
-                {trip.tripType === "LOCAL" ? "LOCAL PICKUP" : "TRANSFER"}
+                {isLocalPickup ? "LOCAL PICKUP" : "HUB TRANSFER"}
               </Text>
             </View>
           </View>

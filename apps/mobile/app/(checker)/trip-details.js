@@ -35,7 +35,6 @@ import {
   bulkShipmentAction,
   finalizeHubProcessing,
   updateShipmentStatus,
-  updateShipmentStatusChecker,
 } from "../../components/utilities/FirebaseFunctions";
 import { CHECKER_SHIPMENT_FILTER } from "../../components/constants/tracking-constants";
 import { getCurrentLocationSafe } from "../../components/utilities/helpers";
