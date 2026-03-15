@@ -140,6 +140,10 @@ export default function TripDetailsScreen() {
     if (ids.length === 0) return;
     setUpdating(true);
 
+    console.log(
+      `Updating ${ids.length} shipments to ${newStatus} with remarks: ${remarks} ids: ${ids[0]} tripId: ${tripId}`,
+    );
+
     try {
       const location = await getCurrentLocationSafe();
 
@@ -364,7 +368,7 @@ export default function TripDetailsScreen() {
               toggleOptions(); // Close with animation
               router.push({
                 pathname: "/(checker)/scan",
-                params: { mode: "delivering", tripId },
+                params: { mode: "offloading", tripId },
               });
             }}
           >

@@ -17,14 +17,14 @@ export const updateShipmentStatus = httpsCallable(
   functions,
   "updateShipmentStatus",
 );
-export const updateShipmentStatusDriver = httpsCallable(
-  functions,
-  "updateShipmentStatusDriver",
-);
-export const updateShipmentStatusChecker = httpsCallable(
-  functions,
-  "updateShipmentStatusChecker",
-);
+// export const updateShipmentStatusDriver = httpsCallable(
+//   functions,
+//   "updateShipmentStatusDriver",
+// );
+// export const updateShipmentStatusChecker = httpsCallable(
+//   functions,
+//   "updateShipmentStatusChecker",
+// );
 export const updateTripStatus = httpsCallable(functions, "updateTripStatus");
 
 export const startTrip = httpsCallable(functions, "startTrip");
@@ -46,7 +46,7 @@ export const bulkShipmentAction = httpsCallable(
 export const sendManualSMS = httpsCallable(functions, "sendManualSMS");
 
 // ----------------------------
-export const bulkUpdateShipmentStatus = httpsCallable(
-  functions,
-  "bulkUpdateShipmentStatus",
-);
+// export const bulkUpdateShipmentStatus = httpsCallable(
+//   functions,
+//   "bulkUpdateShipmentStatus",
+// );
