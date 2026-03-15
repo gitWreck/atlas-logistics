@@ -90,7 +90,7 @@ export default function TripDetailsScreen() {
   const handleStartTrip = async () => {
     Alert.alert(
       "Start Trip",
-      "Are you sure you want to start the route? This will mark all packages as Out for Delivery.",
+      "Are you sure you want to start the route? This will mark all shipment with packages as In Transit.",
       [
         { text: "Cancel", style: "cancel" },
         {
