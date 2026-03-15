@@ -76,7 +76,7 @@ export default function TripDetailsScreen() {
   const handleViewShipments = () => {
     router.push({
       pathname: "/(driver)/shipments",
-      params: { tripId: trip.id },
+      params: { tripId: trip.id, tripType: trip.tripType },
     });
   };
 
@@ -159,6 +159,8 @@ export default function TripDetailsScreen() {
 
   // --- NEW: Delay Logic Variable ---
   const isDelayed = trip?.delayCleared === false && !!trip?.delayReason;
+
+  console.log("Trip data:", trip);
 
   return (
     <SafeAreaView style={styles.container}>

@@ -75,16 +75,30 @@ export default function PackageListItem({
           <Text style={[styles.itemTitle, selected && styles.selectedText]}>
             {item.trackingNumber}
           </Text>
+          {/* {item.isFragile && (
+            <View style={styles.fragileBadge}>
+              <FontAwesome5 name="wine-glass-alt" size={8} color="#991b1b" />
+              <Text style={styles.fragileText}>FRAGILE</Text>
+            </View>
+          )} */}
+        </View>
+
+        <Text style={styles.itemDescription} numberOfLines={1}>
+          {item.description} • {item.packagingType}
           {item.isFragile && (
             <View style={styles.fragileBadge}>
               <FontAwesome5 name="wine-glass-alt" size={8} color="#991b1b" />
               <Text style={styles.fragileText}>FRAGILE</Text>
             </View>
           )}
-        </View>
-
-        <Text style={styles.itemDescription} numberOfLines={1}>
-          {item.description} • {item.packagingType}
+          {item.isPerishable && (
+            <View style={styles.fragileBadge}>
+              <FontAwesome5 name="calendar-alt" size={8} color="#065f46" />
+              <Text style={[styles.fragileText, { color: "#065f46" }]}>
+                PERISHABLE
+              </Text>
+            </View>
+          )}
         </Text>
 
         <View style={styles.locationRow}>
@@ -178,6 +192,7 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
     borderRadius: 4,
     gap: 4,
+    marginBottom: -20,
   },
   fragileText: {
     fontSize: 9,

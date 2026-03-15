@@ -50,6 +50,7 @@ export default function CheckerTripsScreen() {
         "LOADING",
         "LOADED",
         "IN_TRANSIT",
+        // "RECEIVED",
       ]),
       orderBy("updatedAt", "desc"),
     );

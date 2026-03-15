@@ -20,6 +20,8 @@ const TripSummaryCard = ({ trip }) => {
       ? `TRK - ${trip.truckPlateNumber}`
       : "—";
 
+  const isLocalPickup = trip.tripType === "LOCAL_PICKUP";
+
   return (
     <View style={styles.card}>
       <Text style={styles.sectionTitle}>Trip Summary</Text>
@@ -44,20 +46,18 @@ const TripSummaryCard = ({ trip }) => {
             <View
               style={[
                 styles.typeBadge,
-                trip.tripType === "LOCAL"
-                  ? styles.typeLocalBg
-                  : styles.typeTransferBg,
+                isLocalPickup ? styles.typeLocalBg : styles.typeTransferBg,
               ]}
             >
               <Text
                 style={[
                   styles.typeText,
-                  trip.tripType === "LOCAL"
+                  isLocalPickup
                     ? styles.typeLocalText
                     : styles.typeTransferText,
                 ]}
               >
-                {trip.tripType === "LOCAL" ? "LOCAL PICKUP" : "TRANSFER"}
+                {isLocalPickup ? "LOCAL PICKUP" : "HUB TRANSFER"}
               </Text>
             </View>
           </View>
