@@ -52,6 +52,12 @@ exports.updateShipmentStatus = onCall(
       if (!shipmentSnap.exists)
         throw new HttpsError("not-found", "Shipment not found.");
 
+      // Move manifest read to the top to avoid the "reads after writes" error
+      let tripShipSnap = null;
+      if (tripShipmentRef) {
+        tripShipSnap = await tx.get(tripShipmentRef);
+      }
+
       const currentData = shipmentSnap.data();
       const oldStatus = currentData.status;
 
@@ -59,10 +65,12 @@ exports.updateShipmentStatus = onCall(
       if (oldStatus === newStatus)
         return { success: true, message: "No change" };
 
-      // Calculate package count for counter increments
-      const pkgCount =
-        currentData.packages?.length || currentData.totals?.totalItems || 0;
-
+      // To this (summing actual pieces):
+      const pkgCount = Number(
+        currentData.totals?.totalContentQty ||
+          currentData.totals?.totalItems ||
+          0,
+      );
       // 4. PREPARE UPDATES
       const updatedPackages = (currentData.packages || []).map((pkg) => ({
         ...pkg,
@@ -102,42 +110,48 @@ exports.updateShipmentStatus = onCall(
           newStatus === "DELIVERED"
             ? pkgCount
             : currentData.totals?.delivered || 0,
+        // Add this inside shipmentUpdate to keep the shipment doc in sync:
+        "totals.received":
+          newStatus === "RECEIVED"
+            ? pkgCount
+            : currentData.totals?.received || 0,
       };
 
       tx.update(shipmentRef, shipmentUpdate);
 
       // 5. UPDATE TRIP & MANIFEST (The Handshake)
-      if (tripRef && tripShipmentRef) {
-        const tripShipSnap = await tx.get(tripShipmentRef);
+      // if (tripRef && tripShipmentRef) {
+      if (tripRef && tripShipmentRef && tripShipSnap?.exists) {
+        // const tripShipSnap = await tx.get(tripShipmentRef);
 
-        if (tripShipSnap.exists) {
-          const tripUpdate = { updatedAt: FieldValue.serverTimestamp() };
+        // if (tripShipSnap.exists) {
+        const tripUpdate = { updatedAt: FieldValue.serverTimestamp() };
 
-          // --- DECREMENT OLD COUNTERS ---
-          if (oldStatus === "LOADED")
-            tripUpdate.totalLoaded = FieldValue.increment(-pkgCount);
-          if (oldStatus === "RECEIVED")
-            tripUpdate.totalArrived = FieldValue.increment(-pkgCount);
+        // --- DECREMENT OLD COUNTERS ---
+        if (oldStatus === "LOADED")
+          tripUpdate.totalLoaded = FieldValue.increment(-pkgCount);
+        if (oldStatus === "RECEIVED")
+          tripUpdate.totalReceived = FieldValue.increment(-pkgCount);
 
-          // --- INCREMENT NEW COUNTERS ---
-          if (newStatus === "LOADED")
-            tripUpdate.totalLoaded = FieldValue.increment(pkgCount);
-          if (newStatus === "RECEIVED")
-            tripUpdate.totalArrived = FieldValue.increment(pkgCount);
-          if (newStatus === "DELIVERED")
-            tripUpdate.totalDelivered = FieldValue.increment(pkgCount);
-          if (newStatus === "MISSING")
-            tripUpdate.totalExceptions = FieldValue.increment(pkgCount);
+        // --- INCREMENT NEW COUNTERS ---
+        if (newStatus === "LOADED")
+          tripUpdate.totalLoaded = FieldValue.increment(pkgCount);
+        if (newStatus === "RECEIVED")
+          tripUpdate.totalReceived = FieldValue.increment(pkgCount);
+        if (newStatus === "DELIVERED")
+          tripUpdate.totalDelivered = FieldValue.increment(pkgCount);
+        if (newStatus === "MISSING")
+          tripUpdate.totalExceptions = FieldValue.increment(pkgCount);
 
-          tx.update(tripRef, tripUpdate);
-          tx.update(tripShipmentRef, {
-            status: newStatus,
-            loadedCount: newStatus === "LOADED" ? pkgCount : 0,
-            deliveredCount: newStatus === "DELIVERED" ? pkgCount : 0,
-            arrivedCount: newStatus === "RECEIVED" ? pkgCount : 0,
-            updatedAt: FieldValue.serverTimestamp(),
-          });
-        }
+        tx.update(tripRef, tripUpdate);
+        tx.update(tripShipmentRef, {
+          status: newStatus,
+          loadedCount: newStatus === "LOADED" ? pkgCount : 0,
+          deliveredCount: newStatus === "DELIVERED" ? pkgCount : 0,
+          receivedCount: newStatus === "RECEIVED" ? pkgCount : 0,
+          updatedAt: FieldValue.serverTimestamp(),
+        });
+        // }
       }
 
       // 6. AUDIT LOG

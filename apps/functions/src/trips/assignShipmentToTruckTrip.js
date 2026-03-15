@@ -7,121 +7,183 @@ const { requireRole } = require("../utilities/helpers");
 if (!admin.apps.length) admin.initializeApp();
 const db = admin.firestore();
 
+/* ======================================================
+   ASSIGN SHIPMENT TO TRUCK TRIP (OPTION B — CANONICAL)
+====================================================== */
 exports.assignShipmentToTruckTrip = onCall(
   { region: "asia-southeast1", maxInstances: 10 },
   async (req) => {
     await requireRole(db, req, ["admin", "manager"]);
 
     const { trackingDocId, truckTripId } = req.data || {};
-    if (!trackingDocId || !truckTripId) {
-      throw new HttpsError(
-        "invalid-argument",
-        "trackingDocId and truckTripId required",
-      );
+    if (!trackingDocId || typeof trackingDocId !== "string") {
+      throw new HttpsError("invalid-argument", "trackingDocId required");
+    }
+    if (!truckTripId || typeof truckTripId !== "string") {
+      throw new HttpsError("invalid-argument", "truckTripId required");
     }
 
     const uid = req.auth.uid;
-    const userSnap = await db.collection("users").doc(uid).get();
-    const role = userSnap.data()?.role;
 
-    const shipmentRef = db.collection("shipments").doc(trackingDocId);
+    const userSnap = await db.collection("users").doc(uid).get();
+    if (!userSnap.exists || userSnap.data().active !== true) {
+      throw new HttpsError("permission-denied", "Inactive user");
+    }
+    const role = userSnap.data().role;
+
+    const trackingRef = db.collection("shipments").doc(trackingDocId);
     const tripRef = db.collection("truck_trips").doc(truckTripId);
-    const tripShipmentRef = tripRef
-      .collection("trip_shipments")
-      .doc(trackingDocId);
+    const shipRef = tripRef.collection("trip_shipments").doc(trackingDocId);
 
     await db.runTransaction(async (tx) => {
-      const [shipmentSnap, tripSnap, tripShipmentSnap] = await Promise.all([
-        tx.get(shipmentRef),
+      const [trackingSnap, tripSnap, shipSnap] = await Promise.all([
+        tx.get(trackingRef),
         tx.get(tripRef),
-        tx.get(tripShipmentRef),
+        tx.get(shipRef),
       ]);
 
-      if (!shipmentSnap.exists)
+      if (!trackingSnap.exists)
         throw new HttpsError("not-found", "Shipment not found");
       if (!tripSnap.exists) throw new HttpsError("not-found", "Trip not found");
 
-      const tracking = shipmentSnap.data();
+      const tracking = trackingSnap.data();
       const trip = tripSnap.data();
 
-      if (trip.status === "COMPLETED" || trip.manifestLocked === true) {
+      // 🔒 Hard stop: completed trip
+      if (trip.active === false || trip.status === "COMPLETED") {
         throw new HttpsError(
           "failed-precondition",
-          "Trip is locked or completed.",
+          "Cannot assign shipment to completed trip",
         );
       }
 
-      // Idempotency check
-      if (tracking.currentTruckTripId === truckTripId) return;
-
-      if (tracking.currentTruckTripId) {
+      // ❌ NEW CHECK: Do not allow changes if Manifest is Locked
+      if (trip.manifestLocked === true) {
         throw new HttpsError(
           "failed-precondition",
-          `Shipment already on trip: ${tracking.currentTruckTripId}`,
+          "Trip Manifest is LOCKED. Unlock it first.",
+        );
+      }
+
+      // 🔁 Idempotency: already assigned to this trip
+      if (tracking.currentTruckTripId === truckTripId) {
+        return;
+      }
+
+      // 🛑 CRITICAL FIX: PREVENT DOUBLE ASSIGNMENT
+      if (
+        tracking.currentTruckTripId &&
+        tracking.currentTruckTripId !== truckTripId
+      ) {
+        throw new HttpsError(
+          "failed-precondition",
+          `Shipment is already assigned to another trip (${tracking.currentTruckTripId}). Please unassign it there first.`,
         );
       }
 
       const now = admin.firestore.FieldValue.serverTimestamp();
 
-      // ✅ 1. CALCULATE PIECE TOTALS (Bundled vs Individual logic)
-      // We prioritize totalContentQty (sum of pieces in sacks) over totalItems (count of boxes)
-      const pieceCount = Number(
+      // ✅ PIECE-LEVEL MATH: Use totalContentQty for sacks/bundles, totalItems for boxes
+      const itemsToAdd = Number(
         tracking.totals?.totalContentQty || tracking.totals?.totalItems || 0,
       );
 
-      // ✅ 2. SET TRIP MANIFEST (trip_shipments)
-      if (!tripShipmentSnap.exists) {
-        tx.set(tripShipmentRef, {
+      // 📦 Ensure trip_shipments exists (NO loading yet)
+      if (!shipSnap.exists) {
+        tx.set(shipRef, {
           trackingDocId,
-          trackingNumber: tracking.trackingNumber,
-          route: `${tracking.originCode} -> ${tracking.destinationCode}`,
-          totalItems: pieceCount, // True piece count for the driver to see
-          pendingCount: pieceCount,
+          trackingNumber: tracking.trackingNumber || null,
+          route:
+            tracking.originCode + " -> " + tracking.destinationCode || null,
+
+          totalItems: itemsToAdd || 0,
+          // pendingCount: itemsToAdd, // Initially, all items are pending
+          receivedCount: 0, // ✅ Initialized (replaces pendingCount)
           loadedCount: 0,
           deliveredCount: 0,
-          sender: { name: tracking.sender.name, phone: tracking.sender.phone },
-          recipient: {
-            name: tracking.recipient.name,
-            phone: tracking.recipient.phone,
-          },
+
+          sender: tracking.sender,
+          recipient: tracking.recipient,
+
+          // Copy barcodes for the Checker API (Important for scanning!)
+          packageBarcodes: tracking.packageBarcodes || [],
+
           createdAt: now,
           createdBy: uid,
+
+          updatedAt: now,
+          updatedBy: uid,
+          updatedRole: role,
+
           status: "ASSIGNED",
         });
       }
 
-      // ✅ 3. UPDATE MAIN SHIPMENT
-      tx.update(shipmentRef, {
+      // 🔗 Update tracking record
+      tx.update(trackingRef, {
         currentTruckTripId: truckTripId,
         assignedToTruckTripAt: now,
+
         updatedAt: now,
         updatedBy: uid,
+
         status: "ASSIGNED",
-        statusHistory: admin.firestore.FieldValue.arrayUnion({
-          status: "ASSIGNED",
-          at: new Date(),
-          by: uid,
-          note: `Assigned to trip ${truckTripId}`,
-        }),
+
+        "totals.received": 0, // ✅ Reset internal counters for new trip
+        "totals.loaded": 0,
+
+        statusHistory: [
+          ...(tracking.statusHistory ?? []),
+          {
+            status: "ASSIGNED",
+            at: admin.firestore.Timestamp.now(),
+            note: `Assigned to trip ${truckTripId}`,
+          },
+        ],
+
+        updatedRole: role,
       });
 
-      // ✅ 4. UPDATE TRIP COUNTERS (Dashboard Sync)
+      // --------------------------------------------------------
+      // 🆕 NEW: Update Trip Counters (itemPending)
+      // --------------------------------------------------------
       tx.update(tripRef, {
-        totalItems: admin.firestore.FieldValue.increment(pieceCount),
-        itemPending: admin.firestore.FieldValue.increment(pieceCount),
+        // Also update totalItems (optional, but good practice to track capacity)
+        totalItems: admin.firestore.FieldValue.increment(itemsToAdd),
+        // itemPending: admin.firestore.FieldValue.increment(itemsToAdd),
+
+        // totalLoaded: 0,
+        // totalDelivered: 0,
+
         updatedAt: now,
+        updatedBy: uid,
       });
 
-      // 5. Audit Log
+      // 🧾 Status event (timeline-visible)
+      tx.set(trackingRef.collection("status_events").doc(), {
+        type: "ASSIGN_TO_TRIP",
+        message: "Assigned to truck trip",
+        truckTripId,
+        createdAt: now,
+        createdBy: uid,
+        // createdRole: role,
+      });
+
+      // 🧾 Admin audit log
       tx.set(db.collection("admin_logs").doc(), {
         action: "ASSIGN_SHIPMENT_TO_TRIP",
         trackingDocId,
         truckTripId,
         actorId: uid,
-        timestamp: now,
+        actorRole: role,
+        // createdAt: now,
       });
     });
 
-    return { success: true };
+    return {
+      success: true,
+      trackingDocId,
+      truckTripId,
+    };
   },
 );
