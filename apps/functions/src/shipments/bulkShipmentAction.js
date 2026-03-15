@@ -12,7 +12,7 @@ exports.bulkShipmentAction = onCall(
   { region: "asia-southeast1", maxInstances: 10 },
   async (request) => {
     if (!request.auth) throw new HttpsError("unauthenticated", "Auth required");
-    await requireRole(db, request, ["admin", "manager", "checker"]);
+    await requireRole(db, req, ["admin", "manager", "checker"]);
 
     const { tripId, shipmentIds, action, location, remarks } = request.data;
     const userId = request.auth.uid;
@@ -40,7 +40,7 @@ exports.bulkShipmentAction = onCall(
         ]);
 
         let tripDeltaLoaded = 0;
-        let tripDeltaPending = 0;
+        let tripDeltaReceived = 0; // ✅ REPLACED tripDeltaPending
         let tripDeltaDelivered = 0;
 
         for (let i = 0; i < shipmentIds.length; i++) {
@@ -51,102 +51,95 @@ exports.bulkShipmentAction = onCall(
           const shipData = shipDoc.data();
           const packages = shipData.packages || [];
 
-          let shipPieceLoadedChange = 0;
-          let shipPiecePendingChange = 0;
-          let shipPieceDeliveredChange = 0;
+          let localLoadedChange = 0;
+          let localReceivedChange = 0; // ✅ REPLACED localPendingChange
+          let localDeliveredChange = 0;
 
-          // ✅ 1. CALCULATE DELTAS BASED ON PIECE QUANTITY
           const updatedPackages = packages.map((pkg) => {
             if (pkg.status === targetStatus) return pkg;
-
             const qty = Number(pkg.quantity) || 1;
-            const currentLoadedQty = Number(pkg.loadedQty) || 0;
+            const oldStatus = pkg.status;
 
-            if (targetStatus === "LOADED") {
-              // Moving to Loaded: Add the remaining pieces not yet loaded
-              const toLoad = qty - currentLoadedQty;
-              shipPieceLoadedChange += toLoad;
-              shipPiecePendingChange -= toLoad;
-              return {
-                ...pkg,
-                status: "LOADED",
-                loadedQty: qty,
-                loadedAt: new Date().toISOString(),
-              };
-            } else if (targetStatus === "RECEIVED") {
-              // Moving back to Hub: Remove whatever was loaded
-              shipPieceLoadedChange -= currentLoadedQty;
-              shipPiecePendingChange += currentLoadedQty;
-              return {
-                ...pkg,
-                status: "RECEIVED",
-                loadedQty: 0,
-                loadedAt: null,
-              };
-            } else if (targetStatus === "DELIVERED") {
-              // Deliver everything
-              shipPieceDeliveredChange += qty;
-              shipPieceLoadedChange -= currentLoadedQty;
-              // If it wasn't loaded but is being forced to delivered:
-              if (pkg.status !== "LOADED")
-                shipPiecePendingChange -= qty - currentLoadedQty;
+            // --- 1. DECREMENT OLD STATUS PIECES ---
+            if (oldStatus === "LOADED") localLoadedChange -= qty;
+            if (oldStatus === "RECEIVED") localReceivedChange -= qty;
+            if (oldStatus === "DELIVERED") localDeliveredChange -= qty;
 
-              return {
-                ...pkg,
-                status: "DELIVERED",
-                loadedQty: qty,
-                deliveredAt: new Date().toISOString(),
-              };
-            }
+            // --- 2. INCREMENT NEW STATUS PIECES ---
+            if (targetStatus === "LOADED") localLoadedChange += qty;
+            if (targetStatus === "RECEIVED") localReceivedChange += qty;
+            if (targetStatus === "DELIVERED") localDeliveredChange += qty;
 
-            return { ...pkg, status: targetStatus };
+            return {
+              ...pkg,
+              status: targetStatus,
+              updatedAt: new Date().toISOString(),
+            };
           });
 
-          // Accumulate for Trip Document
-          tripDeltaLoaded += shipPieceLoadedChange;
-          tripDeltaPending += shipPiecePendingChange;
-          tripDeltaDelivered += shipPieceDeliveredChange;
+          tripDeltaLoaded += localLoadedChange;
+          tripDeltaReceived += localReceivedChange;
+          tripDeltaDelivered += localDeliveredChange;
 
-          // Write 1: Shipment Doc
+          // Write 1: Update Main Shipment
           t.update(shipmentRefs[i], {
             status: targetStatus,
             packages: updatedPackages,
-            "totals.loaded": FieldValue.increment(shipPieceLoadedChange),
-            "totals.pending": FieldValue.increment(shipPiecePendingChange),
-            "totals.delivered": FieldValue.increment(shipPieceDeliveredChange),
+            "totals.loaded": FieldValue.increment(localLoadedChange),
+            "totals.received": FieldValue.increment(localReceivedChange), // ✅ New field
+            "totals.delivered": FieldValue.increment(localDeliveredChange),
             updatedAt: FieldValue.serverTimestamp(),
+            updatedBy: userId,
+            // Track the reason/remarks
+            remarks: remarks || null,
             statusHistory: FieldValue.arrayUnion({
-              status: `BULK_${targetStatus}`,
+              status: targetStatus,
               at: new Date(),
               by: userId,
-              note: remarks || `Bulk ${action} applied to pieces.`,
+              note: remarks ? `Remarks: ${remarks}` : `Bulk ${action} applied.`,
+              location: location || null,
             }),
+            ...(location ? { lastLocation: location } : {}),
           });
 
-          // Write 2: Trip-Shipment Manifest
+          // Write 2: Update Manifest Entry
           if (tripShipDoc.exists) {
             t.update(tripShipmentRefs[i], {
               status: targetStatus,
-              loadedCount: FieldValue.increment(shipPieceLoadedChange),
-              pendingCount: FieldValue.increment(shipPiecePendingChange),
-              deliveredCount: FieldValue.increment(shipPieceDeliveredChange),
+              loadedCount: FieldValue.increment(localLoadedChange),
+              receivedCount: FieldValue.increment(localReceivedChange), // ✅ Corrected name
+              deliveredCount: FieldValue.increment(localDeliveredChange),
               updatedAt: FieldValue.serverTimestamp(),
             });
           }
         }
 
-        // Write 3: Trip Dashboard Counters
+        // Write 3: Update Parent Trip Document
         t.update(tripRef, {
           totalLoaded: FieldValue.increment(tripDeltaLoaded),
-          itemPending: FieldValue.increment(tripDeltaPending),
+          totalReceived: FieldValue.increment(tripDeltaReceived), // ✅ Replaced itemPending
           totalDelivered: FieldValue.increment(tripDeltaDelivered),
           updatedAt: FieldValue.serverTimestamp(),
+        });
+
+        // Write 4: Audit Logging
+        const logRef = db.collection("audit_logs").doc();
+        t.set(logRef, {
+          action: `BULK_${targetStatus}`,
+          targetId: tripId,
+          targetCollection: "truck_trips",
+          by: userId,
+          at: FieldValue.serverTimestamp(),
+          details: {
+            shipmentCount: shipmentIds.length,
+            remarks: remarks || "N/A",
+            deltas: { loaded: tripDeltaLoaded, pending: tripDeltaPending },
+          },
         });
       });
 
       return { success: true };
     } catch (error) {
-      console.error("Bulk Action Error:", error);
       throw new HttpsError("internal", error.message);
     }
   },
