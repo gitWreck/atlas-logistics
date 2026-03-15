@@ -75,11 +75,16 @@ exports.updateShipmentPackages = onCall(
 
       const oldTotalPieces = sumTotalPieces(oldPackages);
       const newTotalPieces = sumTotalPieces(finalPackages);
+
       const oldLoadedPieces = sumLoadedPieces(oldPackages);
       const newLoadedPieces = sumLoadedPieces(finalPackages);
 
+      const oldReceivedPieces = sumReceivedPieces(oldPackages);
+      const newReceivedPieces = sumReceivedPieces(finalPackages);
+
       const deltaTotal = newTotalPieces - oldTotalPieces;
       const deltaLoaded = newLoadedPieces - oldLoadedPieces;
+      const deltaReceived = newReceivedPieces - oldReceivedPieces;
 
       // Calculate Status
       const totalItems = finalPackages.length;
@@ -104,6 +109,7 @@ exports.updateShipmentPackages = onCall(
         "totals.totalItems": totalItems,
         "totals.totalContentQty": newTotalPieces,
         "totals.loaded": newLoadedPieces,
+        "totals.received": newReceivedPieces, // ✅ Syncing received pieces
         updatedAt: FieldValue.serverTimestamp(),
         updatedBy: uid,
         statusHistory: FieldValue.arrayUnion({
@@ -121,17 +127,37 @@ exports.updateShipmentPackages = onCall(
         tx.update(tripRef, {
           totalItems: FieldValue.increment(deltaTotal),
           totalLoaded: FieldValue.increment(deltaLoaded),
-          itemPending: FieldValue.increment(deltaTotal - deltaLoaded),
+          // itemPending: FieldValue.increment(deltaTotal - deltaLoaded),
+          totalArrived: FieldValue.increment(deltaReceived), // ✅ Replaced itemPending with totalReceived (mapped to totalArrived)
           updatedAt: FieldValue.serverTimestamp(),
         });
 
         tx.update(tripRef.collection("trip_shipments").doc(shipmentId), {
           status: shipmentStatus,
           loadedCount: newLoadedPieces,
+          receivedCount: newReceivedPieces, // ✅ Consistent manifest naming
           totalItems: newTotalPieces,
           updatedAt: FieldValue.serverTimestamp(),
         });
       }
+
+      // ✅ NEW: AUDIT LOG ENTRY
+      const logRef = db.collection("admin_logs").doc();
+      tx.set(logRef, {
+        action: "UPDATE_SHIPMENT_PACKAGES",
+        actorId: uid,
+        shipmentId: shipmentId,
+        tripId: tripId || null,
+        timestamp: FieldValue.serverTimestamp(),
+        details: {
+          status: shipmentStatus,
+          affectedPackages: targetedTrackingNumbers,
+          loadedPieces: newLoadedPieces,
+          receivedPieces: newReceivedPieces,
+          source: packageIds ? "SCANNER" : "WEB_MODAL",
+          remarks: remarks || "No remarks provided",
+        },
+      });
     });
 
     return { success: true };
