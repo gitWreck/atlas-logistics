@@ -40,6 +40,8 @@ export default function ShipmentDrawer({
 
   if (!data) return null;
 
+  console.log("Rendering ShipmentDrawer with data:", data);
+
   return (
     <>
       <div
@@ -197,6 +199,7 @@ export default function ShipmentDrawer({
                             "PICKED_UP",
                             "RECEIVED", // Merges into standard flow here (at Origin Hub)
                             "ASSIGNED",
+                            "PARTIALLY_LOADED", // Optional step if partial items are received at hub
                             "LOADED",
                             "IN_TRANSIT",
                             "OUT_FOR_DELIVERY",
@@ -206,6 +209,7 @@ export default function ShipmentDrawer({
                             "CREATED", // Standard Drop-off
                             "RECEIVED",
                             "ASSIGNED",
+                            "PARTIALLY_LOADED", // Optional step if partial items are received at hub
                             "LOADED",
                             "IN_TRANSIT",
                             "OUT_FOR_DELIVERY",

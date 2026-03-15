@@ -10,8 +10,10 @@ export function calculateProgress(status) {
     case "RECEIVED": // 3. Arrived at the Origin Hub
       return 25;
     case "ASSIGNED":
-      return 40;
+      return 30;
     case "LOADING":
+      return 40;
+    case "PARTIALLY_LOADED":
       return 50;
     case "LOADED":
       return 60;
