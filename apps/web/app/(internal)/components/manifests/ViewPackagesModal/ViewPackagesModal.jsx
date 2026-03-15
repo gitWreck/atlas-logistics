@@ -184,9 +184,9 @@ export default function ViewPackagesModal({
               {shipment.trackingNumber}
             </h2>
           </div>
-          <button onClick={onClose} className="p-2 rounded-lg">
+          {/* <button onClick={onClose} className="p-2 rounded-lg">
             <FontAwesomeIcon icon={faTimes} size="lg" />
-          </button>
+          </button> */}
         </div>
 
         {/* BULK ACTION BAR */}
