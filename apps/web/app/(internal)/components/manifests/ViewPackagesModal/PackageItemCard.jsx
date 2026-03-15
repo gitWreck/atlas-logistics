@@ -288,7 +288,7 @@ export const PackageItemCard = ({
               statusStyles[pkg.status] || statusStyles.RECEIVED
             }`}
           >
-            {pkg.status}
+            {pkg.status.replaceAll("_", " ")}
           </span>
           <div className="flex gap-2 sm:gap-1 mt-0 sm:mt-1">
             {isEditing ? (

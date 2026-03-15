@@ -63,7 +63,8 @@ export default function TripRow({ trip, onClick, isDark = false }) {
           </div>
 
           {/* Desktop ID (Hidden on mobile) */}
-          <div className="hidden md:flex flex-col items-start gap-0.5 mt-1">
+          {/* <div className="hidden md:flex flex-col items-start gap-0.5 mt-1"> */}
+          <div className="flex flex-col items-start gap-0.5 mt-1">
             {/* Trip Type Badge (Mobile Header) */}
             <span
               className={`text-[8px] tracking-wider font-bold px-1.5 py-[1px] rounded border w-max ${
@@ -261,7 +262,9 @@ export default function TripRow({ trip, onClick, isDark = false }) {
         </div>
 
         {/* Status Text (Desktop Only) */}
-        <div className="mt-1.5 gap-2 hidden md:flex">
+        {/* <div className="mt-1.5 gap-2 hidden md:flex"> */}
+        {/* Status Text */}
+        <div className="mt-1.5 gap-2 flex">
           {isDelayed && (
             <span
               className={`text-[14px] px-1.5 rounded animate-pulse font-bold ${isDark ? "bg-amber-600 text-white" : "bg-amber-100 text-amber-800"}`}
