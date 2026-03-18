@@ -1,12 +1,17 @@
-// components/checker/CheckerHeader.js
 import React from "react";
 import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
 import { FontAwesome5 } from "@expo/vector-icons";
 
-export default function CheckerHeader({ userName, onLogout }) {
+// Added onProfilePress prop
+export default function CheckerHeader({ userName, onLogout, onProfilePress }) {
   return (
     <View style={styles.header}>
-      <View style={styles.profileInfo}>
+      {/* Wrapped profileInfo in TouchableOpacity */}
+      <TouchableOpacity
+        style={styles.profileInfo}
+        onPress={onProfilePress}
+        activeOpacity={0.7}
+      >
         <View style={styles.avatar}>
           <FontAwesome5 name="user-check" size={18} color="#3b82f6" />
         </View>
@@ -14,10 +19,10 @@ export default function CheckerHeader({ userName, onLogout }) {
           <Text style={styles.greeting}>Hello,</Text>
           <Text style={styles.username}>{userName}</Text>
         </View>
-      </View>
+      </TouchableOpacity>
+
       <TouchableOpacity style={styles.logoutBtn} onPress={onLogout}>
         <FontAwesome5 name="sign-out-alt" size={16} color="#475569" />
-        {/* <Text style={styles.logoutText}>Log out</Text> */}
       </TouchableOpacity>
     </View>
   );
@@ -35,7 +40,12 @@ const styles = StyleSheet.create({
     borderBottomColor: "#cbd5e1",
     backgroundColor: "#ffffff",
   },
-  profileInfo: { flexDirection: "row", alignItems: "center", gap: 12 },
+  profileInfo: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    flex: 1, // Allow it to take up available space
+  },
   avatar: {
     width: 40,
     height: 40,
@@ -56,10 +66,5 @@ const styles = StyleSheet.create({
     borderColor: "#e2e8f0",
     backgroundColor: "#f8fafc",
     gap: 6,
-  },
-  logoutText: {
-    color: "#475569",
-    fontSize: 14,
-    fontWeight: "500",
   },
 });
