@@ -186,6 +186,7 @@ export default function AdminOverview({ user, isDark = false }) {
         isOpen={isUserModalOpen}
         onClose={() => setUserModalOpen(false)}
         isDark={isDark}
+        onSuccess={fetchUsers} // Refresh table data}
       />
 
       <EditUserModal

@@ -1,5 +1,5 @@
 "use client";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faTimes,
@@ -7,10 +7,13 @@ import {
   faExclamationTriangle,
   faCircleNotch,
   faCheckCircle,
+  faEyeSlash,
+  faEye,
 } from "@fortawesome/free-solid-svg-icons";
 import { createUserProfile } from "../../../utility/FirebaseFunctions";
 import { WAREHOUSES } from "@/app/utility/WarehouseData";
 import { normalizePhoneNumber } from "@/app/utility/utilities";
+import { PROVINCES, getCities } from "@/app/utility/PhilippinesData";
 
 const INITIAL_FORM_STATE = {
   displayName: "",
@@ -30,12 +33,23 @@ const INITIAL_FORM_STATE = {
 export default function AddUserModal({
   isOpen,
   onClose,
-  onSuccess,
   isDark = false,
+  onSuccess,
 }) {
   const [step, setStep] = useState("FORM");
   const [error, setError] = useState("");
   const [formData, setFormData] = useState(INITIAL_FORM_STATE);
+  const [cities, setCities] = useState([]); // ✅ Added to store dynamic city list
+  const [showPassword, setShowPassword] = useState(false);
+
+  // ✅ Trigger city updates when province changes
+  useEffect(() => {
+    if (formData.province) {
+      setCities(getCities(formData.province));
+    } else {
+      setCities([]);
+    }
+  }, [formData.province]);
 
   if (!isOpen) return null;
 
@@ -59,8 +73,16 @@ export default function AddUserModal({
   const confirmStrongClasses = isDark ? "text-white" : "text-slate-900";
 
   // --- Handlers ---
-  const handleChange = (e) =>
-    setFormData({ ...formData, [e.target.name]: e.target.value });
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+
+    if (name === "province") {
+      // ✅ Reset city when province changes
+      setFormData({ ...formData, province: value, city: "" });
+    } else {
+      setFormData({ ...formData, [name]: value });
+    }
+  };
 
   const handleWarehouseChange = (e) => {
     const selectedCode = e.target.value;
@@ -144,7 +166,7 @@ export default function AddUserModal({
                 <label
                   className={`block text-xs font-bold uppercase tracking-wider mb-1 ${labelClasses}`}
                 >
-                  Full Name
+                  Name
                 </label>
                 <input
                   name="displayName"
@@ -172,21 +194,31 @@ export default function AddUserModal({
                   required
                 />
               </div>
-              <div>
+              <div className="relative">
                 <label
                   className={`block text-xs font-bold uppercase tracking-wider mb-1 ${labelClasses}`}
                 >
                   Temporary Password
                 </label>
-                <input
-                  name="password"
-                  type="password"
-                  placeholder="••••••••"
-                  className={`w-full border rounded-lg px-4 py-2.5 focus:border-blue-500 outline-none ${inputClasses}`}
-                  value={formData.password}
-                  onChange={handleChange}
-                  required
-                />
+                <div className="relative">
+                  <input
+                    name="password"
+                    // ✅ Toggle type between "password" and "text"
+                    type={showPassword ? "text" : "password"}
+                    placeholder="••••••••"
+                    className={`w-full border rounded-lg px-4 py-2.5 pr-12 focus:border-blue-500 outline-none ${inputClasses}`}
+                    value={formData.password}
+                    onChange={handleChange}
+                    required
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-blue-500 transition-colors"
+                  >
+                    <FontAwesomeIcon icon={showPassword ? faEyeSlash : faEye} />
+                  </button>
+                </div>
               </div>
               <div>
                 <label
@@ -197,7 +229,7 @@ export default function AddUserModal({
                 <input
                   name="phoneNumber"
                   type="tel"
-                  placeholder="+63 917 123 4567"
+                  placeholder="0917 123 4567"
                   className={`w-full border rounded-lg px-4 py-2.5 focus:border-blue-500 outline-none ${inputClasses}`}
                   value={formData.phoneNumber}
                   onChange={handleChange}
@@ -231,37 +263,69 @@ export default function AddUserModal({
             {/* Address Fields - Visible only for Customers */}
             {formData.role === "customer" && (
               <div className="space-y-3 pt-4 border-t border-slate-700/30 animate-in fade-in slide-in-from-top-2">
-                <p className="text-[10px] font-black uppercase tracking-widest text-blue-500">
+                <p className="text-xs font-black uppercase tracking-widest text-blue-500">
                   Address Details
                 </p>
+
                 <div className="grid grid-cols-2 gap-3">
-                  <input
-                    name="province"
-                    placeholder="Province"
-                    className={`border rounded-lg px-3 py-2 text-xs ${inputClasses}`}
-                    value={formData.province}
-                    onChange={handleChange}
-                  />
-                  <input
-                    name="city"
-                    placeholder="City/Municipality"
-                    className={`border rounded-lg px-3 py-2 text-xs ${inputClasses}`}
-                    value={formData.city}
-                    onChange={handleChange}
-                  />
+                  {/* Province Select */}
+                  <div className="col-span-1">
+                    <label
+                      className={`block text-[10px] font-bold mb-1 ${labelClasses}`}
+                    >
+                      Province
+                    </label>
+                    <select
+                      name="province"
+                      className={`w-full border rounded-lg px-3 py-2 appearance-none outline-none ${inputClasses}`}
+                      value={formData.province}
+                      onChange={handleChange}
+                    >
+                      <option value="">Select Province</option>
+                      {PROVINCES.map((p) => (
+                        <option key={p} value={p}>
+                          {p}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* City Select */}
+                  <div className="col-span-1">
+                    <label
+                      className={`block text-[10px] font-bold mb-1 ${labelClasses}`}
+                    >
+                      City / Municipality
+                    </label>
+                    <select
+                      name="city"
+                      className={`w-full border rounded-lg px-3 py-2 appearance-none outline-none ${inputClasses} disabled:opacity-50`}
+                      value={formData.city}
+                      onChange={handleChange}
+                      disabled={!formData.province}
+                    >
+                      <option value="">Select City</option>
+                      {cities.map((c) => (
+                        <option key={c.name} value={c.name}>
+                          {c.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
+
                 <div className="grid grid-cols-2 gap-3">
                   <input
                     name="barangay"
                     placeholder="Barangay"
-                    className={`border rounded-lg px-3 py-2 text-xs ${inputClasses}`}
+                    className={`border rounded-lg px-3 py-2  ${inputClasses}`}
                     value={formData.barangay}
                     onChange={handleChange}
                   />
                   <input
                     name="street"
-                    placeholder="Street/House No."
-                    className={`border rounded-lg px-3 py-2 text-xs ${inputClasses}`}
+                    placeholder="Street Name"
+                    className={`border rounded-lg px-3 py-2  ${inputClasses}`}
                     value={formData.street}
                     onChange={handleChange}
                   />
