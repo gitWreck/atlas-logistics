@@ -122,7 +122,12 @@ export default function CheckerIndex() {
       <StatusBar barStyle="dark-content" backgroundColor="#f1f5f9" />
 
       {/* 1. HEADER */}
-      <CheckerHeader userName={userName} onLogout={handleLogout} />
+      <CheckerHeader
+        userName={userName}
+        onLogout={handleLogout}
+        // ✅ This points to the profile.js you just created
+        onProfilePress={() => router.push("/(checker)/profile")}
+      />
 
       <ScrollView
         contentContainerStyle={styles.content}
