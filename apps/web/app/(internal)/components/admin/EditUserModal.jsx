@@ -6,10 +6,13 @@ import {
   faEdit,
   faCircleNotch,
   faCheckCircle,
+  faEyeSlash,
+  faEye,
 } from "@fortawesome/free-solid-svg-icons";
 import { WAREHOUSES } from "@/app/utility/WarehouseData";
 import { normalizePhoneNumber } from "@/app/utility/utilities";
 import { updateUserProfile } from "../../../utility/FirebaseFunctions"; // Ensure this is imported
+import { PROVINCES, getCities } from "@/app/utility/PhilippinesData";
 
 export default function EditUserModal({
   isOpen,
@@ -22,6 +25,17 @@ export default function EditUserModal({
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState("");
+  const [citiesList, setCitiesList] = useState([]); // ✅ Added to store dynamic city options
+  const [showPassword, setShowPassword] = useState(false);
+
+  // ✅ Update city list whenever the province in formData changes
+  useEffect(() => {
+    if (formData?.province) {
+      setCitiesList(getCities(formData.province));
+    } else {
+      setCitiesList([]);
+    }
+  }, [formData?.province]);
 
   useEffect(() => {
     if (user && isOpen) {
@@ -29,7 +43,9 @@ export default function EditUserModal({
         uid: user.id,
         displayName: user.name || "",
         role: user.role || "driver",
+        email: user.email || "", // ✅ Add this
         phoneNumber: user.phoneNumber || "",
+        password: "", // ✅ Initialize empty password
         status: user.status || "active",
         warehouseCode: user.warehouseCode || "",
         warehouseName: user.warehouseName || "",
@@ -47,7 +63,13 @@ export default function EditUserModal({
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
+
+    if (name === "province") {
+      // ✅ Reset city when province changes to prevent invalid data
+      setFormData((prev) => ({ ...prev, province: value, city: "" }));
+    } else {
+      setFormData((prev) => ({ ...prev, [name]: value }));
+    }
   };
 
   const handleWarehouseChange = (e) => {
@@ -174,6 +196,22 @@ export default function EditUserModal({
               </div>
             </div>
 
+            <div>
+              <label
+                className={`block text-[10px] font-bold uppercase tracking-wider mb-1 ${labelClasses}`}
+              >
+                Email Address
+              </label>
+              <input
+                name="email"
+                type="email"
+                className={`w-full border rounded-lg px-4 py-2 ${inputClasses}`}
+                value={formData.email}
+                onChange={handleChange}
+                required
+              />
+            </div>
+
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label
@@ -212,6 +250,38 @@ export default function EditUserModal({
               </div>
             </div>
 
+            <div>
+              <label
+                className={`block text-[10px] font-bold uppercase tracking-wider mb-1 ${labelClasses}`}
+              >
+                Reset Password (Optional)
+              </label>
+              <div className="relative">
+                <input
+                  name="password"
+                  // ✅ Toggle type between "password" and "text"
+                  type={showPassword ? "text" : "password"}
+                  autoComplete="new-password"
+                  placeholder="Leave blank to keep current"
+                  className={`w-full border rounded-lg px-4 py-2 pr-12 ${inputClasses}`}
+                  value={formData.password}
+                  onChange={handleChange}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-blue-500 transition-colors"
+                >
+                  {/* Import faEye and faEyeSlash from fontawesome icons */}
+                  <FontAwesomeIcon icon={showPassword ? faEyeSlash : faEye} />
+                </button>
+              </div>
+              <p className="text-[9px] text-slate-500 mt-1">
+                Min. 6 characters. User will need to use this new password on
+                their next login.
+              </p>
+            </div>
+
             {/* Warehouse - Hidden for customers/admins depending on your logic */}
             {formData.role !== "customer" && formData.role !== "admin" && (
               <div className="animate-in fade-in slide-in-from-top-1">
@@ -245,33 +315,50 @@ export default function EditUserModal({
                   Address Details
                 </p>
                 <div className="grid grid-cols-2 gap-3">
-                  <input
+                  {/* ✅ Province Select */}
+                  <select
                     name="province"
-                    placeholder="Province"
-                    className={`border rounded-lg px-3 py-2 text-xs ${inputClasses}`}
+                    className={`border rounded-lg px-3 py-2 outline-none appearance-none cursor-pointer ${inputClasses}`}
                     value={formData.province}
                     onChange={handleChange}
-                  />
-                  <input
+                  >
+                    <option value="">Select Province</option>
+                    {PROVINCES.map((p) => (
+                      <option key={p} value={p}>
+                        {p}
+                      </option>
+                    ))}
+                  </select>
+
+                  {/* ✅ City Select */}
+                  <select
                     name="city"
-                    placeholder="City/Municipality"
-                    className={`border rounded-lg px-3 py-2 text-xs ${inputClasses}`}
+                    disabled={!formData.province}
+                    className={`border rounded-lg px-3 py-2 outline-none appearance-none cursor-pointer ${inputClasses} disabled:opacity-50`}
                     value={formData.city}
                     onChange={handleChange}
-                  />
+                  >
+                    <option value="">Select City / Municipality</option>
+                    {citiesList.map((c) => (
+                      <option key={c.name} value={c.name}>
+                        {c.name}
+                      </option>
+                    ))}
+                  </select>
                 </div>
+
                 <div className="grid grid-cols-2 gap-3">
                   <input
                     name="barangay"
                     placeholder="Barangay"
-                    className={`border rounded-lg px-3 py-2 text-xs ${inputClasses}`}
+                    className={`border rounded-lg px-3 py-2 ${inputClasses}`}
                     value={formData.barangay}
                     onChange={handleChange}
                   />
                   <input
                     name="street"
                     placeholder="Street/House No."
-                    className={`border rounded-lg px-3 py-2 text-xs ${inputClasses}`}
+                    className={`border rounded-lg px-3 py-2 ${inputClasses}`}
                     value={formData.street}
                     onChange={handleChange}
                   />
