@@ -7,6 +7,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
+  TouchableOpacity,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { signInWithEmailAndPassword, signOut } from "firebase/auth";
@@ -156,6 +157,13 @@ export default function LoginScreen() {
             </Text>
           </Text>
         </View>
+        {/* Forgot Password Link */}
+        <TouchableOpacity
+          style={styles.forgotPassword}
+          onPress={() => router.push("/(auth)/forgot-password")}
+        >
+          <Text style={styles.forgotPasswordText}>Forgot your password?</Text>
+        </TouchableOpacity>
       </ScrollView>
     </KeyboardAvoidingView>
   );
@@ -184,5 +192,13 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     color: "#2563eb",
     textDecorationLine: "underline",
+  },
+  forgotPassword: {
+    marginTop: 24,
+    alignItems: "center",
+  },
+  forgotPasswordText: {
+    fontSize: 13,
+    color: "#64748b",
   },
 });

@@ -38,6 +38,14 @@ exports.addTrackedShipment =
 exports.resolveDelayReport =
   require("./src/trips/resolveDelayReport").resolveDelayReport;
 
+// user actions
+exports.updateUserProfileMobile =
+  require("./src/users/updateUserProfileMobile").updateUserProfileMobile;
+exports.requestRecoveryOTP = require("./src/users/recovery").requestRecoveryOTP;
+exports.verifyRecoveryOTP = require("./src/users/recovery").verifyRecoveryOTP;
+
+// ------------------------------------------
+
 // packages
 exports.createShipmentBundle =
   require("./src/shipments/createShipmentBundle").createShipmentBundle;

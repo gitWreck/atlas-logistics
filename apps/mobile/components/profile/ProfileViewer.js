@@ -3,19 +3,32 @@ import {
   View,
   Text,
   StyleSheet,
-  TextInput,
   TouchableOpacity,
   ScrollView,
   Alert,
   ActivityIndicator,
 } from "react-native";
-import { FontAwesome5 } from "@expo/vector-icons";
+import { useRouter } from "expo-router";
+import { normalizePhoneNumber } from "../utilities/helpers";
+import { useAuth } from "../../contexts/AuthContext";
+import { updateUserProfileMobile } from "../utilities/FirebaseFunctions";
+import AtlasInput from "../ui/AtlasInput";
 
-export default function ProfileViewer({ user, onUpdate, updating }) {
+export default function ProfileViewer() {
+  const router = useRouter();
+  const { user, refreshUser, signOut } = useAuth();
+
   const [isEditing, setIsEditing] = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  const isCustomer = user?.role === "customer";
+  const isStaff = user?.role === "checker" || user?.role === "driver";
+
   const [formData, setFormData] = useState({
     name: user?.name || "",
+    phoneNumber: user?.phoneNumber || "",
     password: "",
+    confirmPassword: "",
     address: {
       unit: user?.address?.unit || "",
       street: user?.address?.street || "",
@@ -28,37 +41,98 @@ export default function ProfileViewer({ user, onUpdate, updating }) {
   const handleSave = async () => {
     if (!formData.name.trim()) return Alert.alert("Error", "Name is required");
 
-    // Logic to only send password if it's actually filled
-    const updatePayload = { ...formData };
-    if (!formData.password) delete updatePayload.password;
+    // 1. Password Match Check
+    const hasPassword =
+      formData.password && formData.password.trim().length > 0;
+    if (hasPassword) {
+      if (formData.password.length < 6)
+        return Alert.alert("Error", "Password too short");
+      if (formData.password !== formData.confirmPassword)
+        return Alert.alert("Error", "Passwords do not match");
+    }
 
-    const success = await onUpdate(updatePayload);
-    if (success) setIsEditing(false);
+    setLoading(true);
+    try {
+      const payload = {
+        targetUid: user.uid,
+        name: formData.name,
+      };
+
+      if (isCustomer) {
+        payload.phoneNumber = normalizePhoneNumber(formData.phoneNumber);
+        payload.address = formData.address;
+      }
+
+      if (hasPassword) payload.password = formData.password;
+
+      // Execute the cloud function
+      await updateUserProfileMobile(payload);
+
+      // If we reach this line, the cloud function succeeded without throwing an error.
+      if (hasPassword) {
+        // Show the alert, but don't wait for the user to press a button
+        Alert.alert(
+          "Security Update",
+          "Password changed. Please log in again.",
+        );
+
+        // Immediately force the sign out and redirect
+        try {
+          await signOut();
+        } catch (err) {
+          console.log("Forced sign out error:", err);
+        } finally {
+          router.replace("/(auth)/login");
+        }
+      } else {
+        await refreshUser();
+        setIsEditing(false);
+        Alert.alert("Success", "Profile updated!");
+      }
+    } catch (error) {
+      Alert.alert("Error", error.message || "Failed to update profile.");
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const renderField = (label, value, key, isAddress = false) => {
+  const renderField = (
+    label,
+    value,
+    key,
+    isAddress = false,
+    editable = true,
+    isSecure = false,
+  ) => {
+    const showInput = isEditing && editable;
+
+    if (showInput) {
+      return (
+        <AtlasInput
+          label={label}
+          value={isAddress ? formData.address[key] : formData[key]}
+          placeholder={`Enter ${label}`}
+          secureTextEntry={isSecure}
+          onChangeText={(text) => {
+            if (isAddress) {
+              setFormData({
+                ...formData,
+                address: { ...formData.address, [key]: text },
+              });
+            } else {
+              setFormData({ ...formData, [key]: text });
+            }
+          }}
+        />
+      );
+    }
+
     return (
       <View style={styles.fieldGroup}>
         <Text style={styles.label}>{label}</Text>
-        {isEditing ? (
-          <TextInput
-            style={styles.input}
-            value={value}
-            onChangeText={(text) => {
-              if (isAddress) {
-                setFormData({
-                  ...formData,
-                  address: { ...formData.address, [key]: text },
-                });
-              } else {
-                setFormData({ ...formData, [key]: text });
-              }
-            }}
-            placeholder={`Enter ${label}`}
-          />
-        ) : (
-          <Text style={styles.valueText}>{value || "Not Set"}</Text>
-        )}
+        <Text style={styles.valueText}>
+          {value ? (isSecure ? "••••••••" : value) : "—"}
+        </Text>
       </View>
     );
   };
@@ -70,55 +144,58 @@ export default function ProfileViewer({ user, onUpdate, updating }) {
           <Text style={styles.cardTitle}>Account Details</Text>
           <TouchableOpacity onPress={() => setIsEditing(!isEditing)}>
             <Text style={styles.editToggle}>
-              {isEditing ? "Cancel" : "Edit Profile"}
+              {isEditing
+                ? "Cancel"
+                : isStaff
+                  ? "Update Password"
+                  : "Edit Profile"}
             </Text>
           </TouchableOpacity>
         </View>
 
-        {/* BASIC INFO */}
-        {renderField("Full Name", formData.name, "name")}
+        {renderField("Name", formData.name, "name", false, isCustomer)}
 
-        {isEditing && (
+        <View style={styles.fieldGroup}>
+          <Text style={styles.label}>Email Address</Text>
+          <Text style={styles.valueText}>{user?.email}</Text>
+        </View>
+
+        {renderField(
+          "Phone",
+          formData.phoneNumber,
+          "phoneNumber",
+          false,
+          isCustomer,
+        )}
+
+        {isStaff && (
           <View style={styles.fieldGroup}>
-            <Text style={styles.label}>New Password (Optional)</Text>
-            <TextInput
-              style={styles.input}
-              value={formData.password}
-              onChangeText={(text) =>
-                setFormData({ ...formData, password: text })
-              }
-              placeholder="Leave blank to keep current"
-              secureTextEntry
-            />
+            <Text style={styles.label}>Warehouse</Text>
+            <Text style={styles.valueText}>
+              {user?.warehouseName} ({user?.warehouseCode})
+            </Text>
           </View>
         )}
 
-        {/* ADDRESS SECTION (Only if role is customer or in edit mode) */}
-        {(user?.role === "customer" || isEditing) && (
-          <View style={styles.addressSection}>
+        {isEditing && (
+          <View>
             <View style={styles.sectionDivider} />
-            <Text style={styles.sectionTitle}>Shipping Address</Text>
-
-            <View style={styles.row}>
-              <View style={{ flex: 1 }}>
-                {renderField("Unit/No.", formData.address.unit, "unit", true)}
-              </View>
-              <View style={{ flex: 2, marginLeft: 10 }}>
-                {renderField("Street", formData.address.street, "street", true)}
-              </View>
-            </View>
 
             {renderField(
-              "Barangay",
-              formData.address.barangay,
-              "barangay",
+              "New Password",
+              formData.password,
+              "password",
+              false,
+              true,
               true,
             )}
-            {renderField("City", formData.address.city, "city", true)}
+
             {renderField(
-              "Province",
-              formData.address.province,
-              "province",
+              "Confirm Password",
+              formData.confirmPassword,
+              "confirmPassword",
+              false,
+              true,
               true,
             )}
           </View>
@@ -128,9 +205,9 @@ export default function ProfileViewer({ user, onUpdate, updating }) {
           <TouchableOpacity
             style={styles.saveBtn}
             onPress={handleSave}
-            disabled={updating}
+            disabled={loading}
           >
-            {updating ? (
+            {loading ? (
               <ActivityIndicator color="#fff" />
             ) : (
               <Text style={styles.saveBtnText}>Save Changes</Text>
@@ -138,22 +215,17 @@ export default function ProfileViewer({ user, onUpdate, updating }) {
           </TouchableOpacity>
         )}
       </View>
-
-      {/* READ ONLY INFO */}
-      <View style={styles.infoCard}>
-        <Text style={styles.infoLabel}>
-          Email: <Text style={styles.infoValue}>{user?.email}</Text>
-        </Text>
-        <Text style={styles.infoLabel}>
-          Phone: <Text style={styles.infoValue}>+{user?.phoneNumber}</Text>
-        </Text>
-      </View>
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 16, backgroundColor: "#f8fafc" },
+  container: {
+    flex: 1,
+    paddingTop: 35,
+    paddingHorizontal: 16,
+    backgroundColor: "#f8fafc",
+  },
   card: {
     backgroundColor: "#fff",
     borderRadius: 16,
@@ -162,6 +234,7 @@ const styles = StyleSheet.create({
     shadowColor: "#000",
     shadowOpacity: 0.05,
     shadowRadius: 10,
+    marginBottom: 30,
   },
   cardHeader: {
     flexDirection: "row",
@@ -170,15 +243,21 @@ const styles = StyleSheet.create({
   },
   cardTitle: { fontSize: 16, fontWeight: "700", color: "#1e293b" },
   editToggle: { color: "#3b82f6", fontWeight: "600" },
-  fieldGroup: { marginBottom: 16 },
+  fieldGroup: { marginBottom: 18 },
   label: {
-    fontSize: 12,
-    fontWeight: "600",
+    fontSize: 11,
+    fontWeight: "700",
     color: "#94a3b8",
     marginBottom: 6,
     textTransform: "uppercase",
   },
   valueText: { fontSize: 15, color: "#1e293b", fontWeight: "500" },
+  lockedNote: {
+    fontSize: 10,
+    color: "#cbd5e1",
+    marginTop: 2,
+    fontStyle: "italic",
+  },
   input: {
     backgroundColor: "#f1f5f9",
     borderRadius: 8,
@@ -204,7 +283,6 @@ const styles = StyleSheet.create({
     marginTop: 10,
   },
   saveBtnText: { color: "#fff", fontWeight: "700", fontSize: 16 },
-  infoCard: { marginTop: 20, padding: 16, alignItems: "center" },
-  infoLabel: { color: "#94a3b8", fontSize: 13, marginBottom: 4 },
-  infoValue: { color: "#475569", fontWeight: "600" },
+  footer: { alignItems: "center", marginBottom: 40 },
+  footerText: { fontSize: 10, color: "#cbd5e1", marginBottom: 4 },
 });

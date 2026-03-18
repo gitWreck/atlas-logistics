@@ -17,14 +17,6 @@ export const updateShipmentStatus = httpsCallable(
   functions,
   "updateShipmentStatus",
 );
-// export const updateShipmentStatusDriver = httpsCallable(
-//   functions,
-//   "updateShipmentStatusDriver",
-// );
-// export const updateShipmentStatusChecker = httpsCallable(
-//   functions,
-//   "updateShipmentStatusChecker",
-// );
 export const updateTripStatus = httpsCallable(functions, "updateTripStatus");
 
 export const startTrip = httpsCallable(functions, "startTrip");
@@ -45,8 +37,13 @@ export const bulkShipmentAction = httpsCallable(
 // Messaging
 export const sendManualSMS = httpsCallable(functions, "sendManualSMS");
 
-// ----------------------------
-// export const bulkUpdateShipmentStatus = httpsCallable(
-//   functions,
-//   "bulkUpdateShipmentStatus",
-// );
+// user actions
+export const updateUserProfileMobile = httpsCallable(
+  functions,
+  "updateUserProfileMobile",
+);
+export const requestRecoveryOTP = httpsCallable(
+  functions,
+  "requestRecoveryOTP",
+);
+export const verifyRecoveryOTP = httpsCallable(functions, "verifyRecoveryOTP");

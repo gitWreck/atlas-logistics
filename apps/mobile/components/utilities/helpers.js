@@ -31,3 +31,31 @@ export const getCurrentLocationSafe = async () => {
     return null;
   }
 };
+
+// src/utils/formatters.js
+export const normalizePhoneNumber = (input) => {
+  if (!input) return "";
+
+  // 1. Remove all non-numeric characters (spaces, dashes, parentheses)
+  //    Example: "(0917) 123-4567" -> "09171234567"
+  let cleaned = input.replace(/\D/g, "");
+
+  // 2. Handle Philippines specific cases
+  // Case A: Starts with "09" (Standard local) -> Replace "0" with "63"
+  if (cleaned.startsWith("09") && cleaned.length === 11) {
+    cleaned = "63" + cleaned.substring(1);
+  }
+  // Case B: Starts with "9" (Short local) -> Add "63"
+  else if (cleaned.startsWith("9") && cleaned.length === 10) {
+    cleaned = "63" + cleaned;
+  }
+
+  // 3. Check for valid length (PH numbers are 12 digits including country code 63)
+  if (cleaned.length !== 12 || !cleaned.startsWith("63")) {
+    // Return original or null if you want strict validation failure
+    return input;
+  }
+
+  // 4. Return E.164 Standard (with +)
+  return `${cleaned}`;
+};
