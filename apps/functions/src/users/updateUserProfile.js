@@ -5,104 +5,104 @@ const admin = require("firebase-admin");
 const { FieldValue } = require("firebase-admin/firestore");
 const { toE164 } = require("../utilities/helpers");
 
-if (admin.apps.length === 0) admin.initializeApp();
-const db = admin.firestore();
+if (admin.apps.length === 0) {
+  admin.initializeApp();
+}
 
 exports.updateUserProfile = onCall(
   { region: "asia-southeast1", maxInstances: 10 },
   async (request) => {
-    if (!request.auth) throw new HttpsError("unauthenticated", "Auth required.");
+    // 1. Check Admin Permissions
+    if (!request.auth || !request.auth.token.admin) {
+      throw new HttpsError(
+        "permission-denied",
+        "Only admins can update users.",
+      );
+    }
 
-    const callerUid = request.auth.uid;
-    const isAdmin = !!request.auth.token.admin;
-    
     const {
-      uid, // The user being updated
+      uid,
       displayName,
-      password, // ✅ NEW: Password update
+      email, // ✅ Add this
+      password, // ✅ New
       role,
       phoneNumber,
       warehouseCode,
       warehouseName,
       status,
-      // Destructure address fields
       province,
       city,
       barangay,
       street,
-      unit, // ✅ Added unit
     } = request.data;
 
-    if (!uid) throw new HttpsError("invalid-argument", "User UID is required.");
-
-    // 🔒 SECURITY: Only admins can update others. Regular users can only update themselves.
-    if (!isAdmin && callerUid !== uid) {
-      throw new HttpsError("permission-denied", "You can only update your own profile.");
+    if (!uid) {
+      throw new HttpsError("invalid-argument", "User UID is required.");
     }
 
     try {
-      // 1. Prepare Auth Updates
-      const authUpdates = {};
-      if (displayName) authUpdates.displayName = displayName;
-      if (status) authUpdates.disabled = status === "inactive";
-      if (password && password.length >= 6) authUpdates.password = password; // ✅ Handle Password
+      // 2. Prepare Auth Updates
+      const authUpdates = {
+        displayName: displayName,
+        email: email, // ✅ Add this to update the login identifier
+        disabled: status === "inactive",
+      };
 
-      // 2. Update Firebase Auth
-      if (Object.keys(authUpdates).length > 0) {
-        await admin.auth().updateUser(uid, authUpdates);
+      // ✅ Only update password if provided and valid length
+      if (password && password.length >= 6) {
+        authUpdates.password = password;
       }
 
-      // 3. Update Custom Claims (RESTRICTED TO ADMINS)
-      if (role && isAdmin) {
+      await admin.auth().updateUser(uid, authUpdates);
+
+      // 3. Update Custom Claims (Roles)
+      if (role) {
         await admin.auth().setCustomUserClaims(uid, { role });
       }
 
       // 4. Prepare Firestore Document
       const updateData = {
+        name: displayName,
+        role: role,
+        email: email, // ✅ Keep Firestore in sync with Auth
+        phoneNumber: phoneNumber ? toE164(phoneNumber) : null,
+        // ✅ Suggestion: If role is customer, clear warehouse data
+        warehouseName: role === "customer" ? null : warehouseName || null,
+        warehouseCode: role === "customer" ? null : warehouseCode || null,
+        status: status,
+        active: status === "active",
         updatedAt: FieldValue.serverTimestamp(),
       };
 
-      if (displayName) updateData.name = displayName;
-      if (phoneNumber) updateData.phoneNumber = toE164(phoneNumber);
-      
-      // Admin-only fields
-      if (isAdmin) {
-        if (role) updateData.role = role;
-        if (warehouseName) updateData.warehouseName = warehouseName;
-        if (warehouseCode) updateData.warehouseCode = warehouseCode;
-        if (status) {
-          updateData.status = status;
-          updateData.active = status === "active";
-        }
-      }
-
-      // 5. Handle Address (Nested Object)
-      // Allow update if admin OR if caller is a customer updating themselves
-      if (province || city || barangay || street || unit) {
+      if (role === "customer") {
         updateData.address = {
           province: province || null,
           city: city || null,
           barangay: barangay || null,
           street: street || null,
-          unit: unit || null,
         };
       }
 
-      await db.collection("users").doc(uid).update(updateData);
+      await admin.firestore().collection("users").doc(uid).update(updateData);
 
-      // 6. Optional: Audit Log for Password/Name changes
-      await db.collection("admin_logs").doc().set({
-        action: "PROFILE_UPDATE",
-        targetUid: uid,
-        actorId: callerUid,
-        timestamp: FieldValue.serverTimestamp(),
-        isSelfUpdate: callerUid === uid
-      });
+      // 5. ✅ Suggestion: Dedicated Audit Log for Password/Security changes
+      if (password) {
+        await admin.firestore().collection("admin_logs").add({
+          action: "ADMIN_PASSWORD_RESET",
+          targetUid: uid,
+          actorId: request.auth.uid,
+          createdAt: FieldValue.serverTimestamp(),
+          details: "Password manually updated by admin via dashboard.",
+        });
+      }
 
       return { success: true };
     } catch (err) {
       console.error("Update Error:", err);
-      throw new HttpsError("internal", err.message || "Failed to update profile.");
+      if (err.code === "auth/user-not-found") {
+        throw new HttpsError("not-found", "User does not exist.");
+      }
+      throw new HttpsError("internal", "Failed to update user profile.");
     }
-  }
+  },
 );
