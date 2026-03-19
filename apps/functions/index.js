@@ -35,6 +35,8 @@ exports.toggleUserStatus =
   require("./src/users/toggleUserStatus").toggleUserStatus;
 exports.addTrackedShipment =
   require("./src/users/addTrackedShipment").addTrackedShipment;
+exports.requestShipmentPickup =
+  require("./src/users/requestShipmentPickup").requestShipmentPickup;
 exports.resolveDelayReport =
   require("./src/trips/resolveDelayReport").resolveDelayReport;
 
