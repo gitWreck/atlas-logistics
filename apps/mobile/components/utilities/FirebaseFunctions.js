@@ -29,6 +29,10 @@ export const addTrackedShipment = httpsCallable(
   functions,
   "addTrackedShipment",
 );
+export const requestShipmentPickup = httpsCallable(
+  functions,
+  "requestShipmentPickup",
+);
 export const bulkShipmentAction = httpsCallable(
   functions,
   "bulkShipmentAction",
