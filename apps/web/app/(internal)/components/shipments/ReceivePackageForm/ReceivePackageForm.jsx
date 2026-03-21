@@ -352,7 +352,7 @@ export default function ReceivePackageForm({
             </div>
             <div className="flex gap-4 items-start overflow-x-auto pb-2 sm:pb-0 custom-scrollbar">
               {/* BUTTON GROUP: Show if less than 3 images */}
-              {imageFiles.length < 3 && (
+              {imageFiles.length <= 5 && (
                 <div className="flex gap-3 shrink-0">
                   {/* 1. UPLOAD FILE BUTTON */}
                   <label
@@ -409,7 +409,7 @@ export default function ReceivePackageForm({
             <p
               className={`text-[10px] italic ${isDark ? "text-slate-500" : "text-slate-600"}`}
             >
-              Max 3 images. 10MB limit per file.
+              Max 5 images. 10MB limit per file.
             </p>
           </div>
 
