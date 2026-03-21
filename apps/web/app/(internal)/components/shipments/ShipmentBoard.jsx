@@ -217,7 +217,11 @@ const ShipmentBoard = forwardRef(function ShipmentBoard(
       className={`min-h-screen font-sans ${isDark ? "bg-slate-950 text-slate-200" : "bg-slate-50 text-slate-900"}`}
     >
       {/* --- MAIN CONTENT --- */}
-      <main className="max-w-7xl mx-auto p-4 sm:p-6">
+      <main
+        // style={{ width: 1500 }}
+
+        className="mx-auto p-4 sm:p-6"
+      >
         <div
           className={`border rounded-xl overflow-hidden shadow-xl backdrop-blur-sm ${
             isDark
@@ -388,7 +392,7 @@ const ShipmentBoard = forwardRef(function ShipmentBoard(
             <div className="md:min-w-[900px]">
               {/* TABLE HEADER (Hidden on mobile) */}
               <div
-                className={`hidden md:grid grid-cols-12 gap-4 px-6 py-3 border-b text-xs font-semibold uppercase tracking-wider ${
+                className={`hidden md:grid grid-cols-13 gap-4 px-6 py-3 border-b text-xs font-semibold uppercase tracking-wider ${
                   isDark
                     ? "border-slate-800 bg-slate-950 text-slate-500"
                     : "border-slate-200 bg-slate-50 text-slate-600"
@@ -396,8 +400,9 @@ const ShipmentBoard = forwardRef(function ShipmentBoard(
               >
                 <div className="col-span-4">Tracking / Customer</div>
                 <div className="col-span-2">Route</div>
+                <div className="col-span-2">Details</div>
                 <div className="col-span-3">Progress</div>
-                <div className="col-span-2">Last Update</div>
+                <div className="col-span-1">Last Update</div>
                 <div className="col-span-1 text-right">Action</div>
               </div>
 

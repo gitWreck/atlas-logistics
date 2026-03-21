@@ -20,9 +20,10 @@ export default function ShipmentOperations({
   const [notifySms, setNotifySms] = useState(true);
   const [opStatus, setOpStatus] = useState("IDLE");
 
-  console.log("ShipmentOperations Rendered with shipmentId:", shipmentId);
-  console.log("Current Status:", currentStatus);
-  console.log("Selected Status:", statusSelect);
+  // console.log("ShipmentOperations Rendered with shipmentId:", shipmentId);
+  // console.log("Current Status:", currentStatus);
+  // console.log("Selected Status:", statusSelect);
+  // console.log("Notify SMS:", notifySms);
 
   const STATUS_OPTIONS = [
     { value: "PENDING_PICKUP", label: "Pending Pickup" },
