@@ -192,6 +192,7 @@ export default function DriverDashboard() {
         title="My Trips"
         userName={driverName}
         onLogout={handleLogout}
+        onProfilePress={() => router.push("/(driver)/profile")}
       />
 
       {/* COMPONENT 1: TABS */}
