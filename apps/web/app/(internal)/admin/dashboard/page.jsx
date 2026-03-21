@@ -156,6 +156,61 @@ export default function AdminDashboardPage() {
     ? "bg-slate-800 border-slate-700 text-slate-200 hover:bg-slate-700 hover:text-slate-50"
     : "bg-slate-50 border-slate-200 text-slate-500 hover:bg-slate-100 hover:text-slate-900";
 
+  const statCards = [
+    {
+      title: "Active Trips",
+      value: "2",
+      subtitle: "Trips currently in progress",
+      colors: {
+        bg: isDark
+          ? "bg-indigo-950/40 border-indigo-800"
+          : "bg-indigo-50 border-indigo-100",
+        title: isDark ? "text-indigo-300" : "text-indigo-700",
+        val: isDark ? "text-indigo-100" : "text-indigo-900",
+        sub: isDark ? "text-indigo-400" : "text-indigo-600",
+      },
+    },
+    {
+      title: "Delayed Trips",
+      value: "2",
+      subtitle: "Trips requiring attention",
+      colors: {
+        bg: isDark
+          ? "bg-amber-950/40 border-amber-800"
+          : "bg-amber-50 border-amber-100",
+        title: isDark ? "text-amber-300" : "text-amber-700",
+        val: isDark ? "text-amber-100" : "text-amber-900",
+        sub: isDark ? "text-amber-400" : "text-amber-600",
+      },
+    },
+    {
+      title: "Pickup Requests",
+      value: "3",
+      subtitle: "Pending driver assignments",
+      colors: {
+        bg: isDark
+          ? "bg-sky-950/40 border-sky-800"
+          : "bg-sky-50 border-sky-100",
+        title: isDark ? "text-sky-300" : "text-sky-700",
+        val: isDark ? "text-sky-100" : "text-sky-900",
+        sub: isDark ? "text-sky-400" : "text-sky-600",
+      },
+    },
+    {
+      title: "Delivered Trips",
+      value: "4",
+      subtitle: "Completed within SLA",
+      colors: {
+        bg: isDark
+          ? "bg-emerald-950/40 border-emerald-800"
+          : "bg-emerald-50 border-emerald-100",
+        title: isDark ? "text-emerald-300" : "text-emerald-700",
+        val: isDark ? "text-emerald-100" : "text-emerald-900",
+        sub: isDark ? "text-emerald-400" : "text-emerald-600",
+      },
+    },
+  ];
+
   return (
     <div
       className={`h-screen flex font-sans overflow-hidden ${rootBackgroundClasses}`}
@@ -334,7 +389,7 @@ export default function AdminDashboardPage() {
           <div className="w-full">
             {/* <div className="max-w-7xl mx-auto w-full px-4 sm:px-6 py-6 space-y-6"> */}
             {/* Summary cards row - only show on Overview tab */}
-            <div className="max-w-7xl mx-auto w-full px-4 sm:px-6 py-6 space-y-6">
+            {/* <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 space-y-6">
               {activeTab === "overview" && (
                 <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
                   <div
@@ -457,6 +512,47 @@ export default function AdminDashboardPage() {
                   profile={profile}
                   isDark={isDark}
                 />
+              )}
+            </div> */}
+
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 sm:py-6">
+              {activeTab === "overview" && (
+                <div className="space-y-4 sm:space-y-6">
+                  {/* --- STATS GRID --- */}
+                  {/* grid-cols-2 makes it a 2x2 square on phones, lg:grid-cols-4 makes it a single row on desktop */}
+                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+                    {statCards.map((stat, index) => (
+                      <div
+                        key={index}
+                        className={`rounded-xl sm:rounded-2xl border px-3 py-3 sm:px-4 sm:py-4 flex flex-col justify-center ${stat.colors.bg}`}
+                      >
+                        <div
+                          className={`text-[10px] sm:text-xs font-bold uppercase tracking-wide ${stat.colors.title}`}
+                        >
+                          {stat.title}
+                        </div>
+                        <div
+                          className={`mt-1 sm:mt-2 text-xl sm:text-2xl font-semibold ${stat.colors.val}`}
+                        >
+                          {stat.value}
+                        </div>
+                        <div
+                          className={`mt-1 text-[9px] sm:text-xs leading-tight ${stat.colors.sub}`}
+                        >
+                          {stat.subtitle}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* --- ADMIN OVERVIEW --- */}
+                  <AdminOverview
+                    user={user}
+                    userRole="admin"
+                    profile={profile}
+                    isDark={isDark}
+                  />
+                </div>
               )}
             </div>
 

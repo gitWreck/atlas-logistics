@@ -7,6 +7,7 @@ import {
   faChevronLeft,
   faChevronRight,
   faEdit,
+  faPlus,
 } from "@fortawesome/free-solid-svg-icons";
 
 export default function UserManagementTable({
@@ -14,7 +15,7 @@ export default function UserManagementTable({
   loading,
   onDeleteUser,
   onAddUser,
-  onEditUser, // Add this prop
+  onEditUser,
   isDark = false,
 }) {
   const [search, setSearch] = useState("");
@@ -41,6 +42,7 @@ export default function UserManagementTable({
     page * itemsPerPage,
   );
 
+  // Styling Constants
   const containerClasses = isDark
     ? "border-slate-800 bg-slate-900/50"
     : "border-slate-200 bg-white shadow-sm";
@@ -61,7 +63,7 @@ export default function UserManagementTable({
   const cellPrimary = isDark ? "text-slate-200" : "text-slate-900";
   const cellSecondary = isDark ? "text-slate-500" : "text-slate-600";
   const roleBadgeClasses = isDark
-    ? "bg-slate-800 border-slate-700"
+    ? "bg-slate-800 border-slate-700 text-slate-300"
     : "bg-slate-100 border-slate-200 text-slate-700";
   const statusActiveClasses = isDark
     ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
@@ -79,7 +81,6 @@ export default function UserManagementTable({
   const paginationBtnClasses = isDark
     ? "border-slate-700 bg-slate-900 text-slate-400 hover:text-white hover:bg-slate-800"
     : "border-slate-200 bg-white text-slate-700 hover:bg-slate-100 hover:text-slate-900";
-
   const editBtnClasses = isDark
     ? "text-slate-500 hover:text-blue-400 hover:bg-slate-800"
     : "text-slate-600 hover:text-blue-600 hover:bg-slate-100";
@@ -90,45 +91,46 @@ export default function UserManagementTable({
     >
       {/* A. HEADER */}
       <div
-        className={`px-6 py-4 border-b flex justify-between items-center ${headerClasses}`}
+        className={`px-4 sm:px-6 py-4 border-b flex justify-between items-center ${headerClasses}`}
       >
         <h2 className={`font-bold ${isDark ? "text-white" : "text-slate-900"}`}>
           User Management
         </h2>
         <button
           onClick={onAddUser}
-          className="text-xs bg-blue-600 hover:bg-blue-500 text-white px-3 py-1.5 rounded-lg transition-colors flex items-center gap-2 font-bold shadow-lg shadow-blue-900/20"
+          className=" bg-blue-600 hover:bg-blue-500 text-white px-3 py-1.5 rounded-lg transition-colors flex items-center gap-2 font-bold shadow-lg shadow-blue-900/20"
         >
-          + Add User
+          <FontAwesomeIcon icon={faPlus} className="hidden sm:inline-block" />
+          User
         </button>
       </div>
 
       {/* B. FILTERS */}
       <div
-        className={`px-6 py-3 border-b flex flex-col sm:flex-row gap-3 ${filtersClasses}`}
+        className={`px-4 sm:px-6 py-3 border-b flex flex-col  sm:flex-row gap-3 ${filtersClasses}`}
       >
         <div className="relative flex-1">
           <FontAwesomeIcon
             icon={faSearch}
-            className={`absolute left-3 top-2.5 text-xs ${isDark ? "text-slate-500" : "text-slate-400"}`}
+            className={`absolute left-3 top-2.5 ${isDark ? "text-slate-500" : "text-slate-400"}`}
           />
           <input
             type="text"
             placeholder="Search name or email..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className={`w-full border rounded-lg pl-8 pr-3 py-1.5 text-xs focus:border-blue-500 outline-none transition-colors ${inputClasses}`}
+            className={`border rounded-lg pl-8 pr-3 py-1.5 focus:border-blue-500 outline-none transition-colors ${inputClasses}`}
           />
         </div>
         <div className="relative w-full sm:w-40">
           <FontAwesomeIcon
             icon={faFilter}
-            className={`absolute left-3 top-2.5 text-xs ${isDark ? "text-slate-500" : "text-slate-400"}`}
+            className={`absolute left-3 top-2.5 ${isDark ? "text-slate-500" : "text-slate-400"}`}
           />
           <select
             value={roleFilter}
             onChange={(e) => setRoleFilter(e.target.value)}
-            className={`w-full border rounded-lg pl-8 pr-3 py-1.5 text-xs focus:border-blue-500 outline-none appearance-none cursor-pointer ${inputClasses}`}
+            className={`w-full border rounded-lg pl-8 pr-3 py-1.5 focus:border-blue-500 outline-none appearance-none cursor-pointer ${inputClasses}`}
           >
             <option value="ALL">All Roles</option>
             <option value="admin">Admin</option>
@@ -140,13 +142,82 @@ export default function UserManagementTable({
         </div>
       </div>
 
-      {/* C. TABLE */}
-      <div className="overflow-x-auto -mx-4 sm:mx-0">
-        <div className="min-w-[720px] px-4 sm:px-0">
+      {/* C. CONTENT AREA */}
+      <div className="w-full">
+        {/* --- MOBILE VIEW: CARD LIST --- */}
+        <div className={`md:hidden flex flex-col divide-y ${tbodyDivide}`}>
+          {loading ? (
+            <div
+              className={`px-6 py-8 text-center ${isDark ? "text-slate-600" : "text-slate-500"}`}
+            >
+              <div className="animate-pulse">Loading users...</div>
+            </div>
+          ) : paginatedUsers.length === 0 ? (
+            <div
+              className={`px-6 py-8 text-center italic ${isDark ? "text-slate-600" : "text-slate-500"}`}
+            >
+              {users.length === 0
+                ? "No users found."
+                : "No matching users found."}
+            </div>
+          ) : (
+            paginatedUsers.map((u) => (
+              <div
+                key={u.id}
+                className={`p-4 flex flex-col gap-3 transition-colors ${rowHover}`}
+              >
+                {/* Top Row: Name/Email & Status */}
+                <div className="flex justify-between items-start gap-2">
+                  <div className="truncate">
+                    <div className={`font-medium truncate ${cellPrimary}`}>
+                      {u.name || "—"}
+                    </div>
+                    <div className={`text-xs truncate ${cellSecondary}`}>
+                      {u.email}
+                    </div>
+                  </div>
+                  <span
+                    className={`shrink-0 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase border ${
+                      u.status === "active"
+                        ? statusActiveClasses
+                        : statusInactiveClasses
+                    }`}
+                  >
+                    {u.status === "active" ? "Active" : "Inactive"}
+                  </span>
+                </div>
+
+                {/* Bottom Row: Role & Actions */}
+                <div className="flex justify-between items-end mt-1">
+                  <span
+                    className={`px-2 py-1 rounded text-[10px] border font-mono uppercase ${roleBadgeClasses}`}
+                  >
+                    {u.role || "USER"}
+                  </span>
+                  <div className="flex gap-1">
+                    <button
+                      onClick={() => onEditUser(u)}
+                      className={`transition-colors p-2 rounded ${editBtnClasses}`}
+                    >
+                      <FontAwesomeIcon icon={faEdit} />
+                    </button>
+                    <button
+                      onClick={() => onDeleteUser(u)}
+                      className={`transition-colors p-2 rounded ${actionBtnClasses}`}
+                    >
+                      <FontAwesomeIcon icon={faTrash} />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+
+        {/* --- DESKTOP VIEW: TABLE --- */}
+        <div className="hidden md:block overflow-x-auto">
           <table
-            className={`w-full text-left text-sm ${
-              isDark ? "text-slate-400" : "text-slate-600"
-            }`}
+            className={`w-full text-left text-sm ${isDark ? "text-slate-400" : "text-slate-600"}`}
           >
             <thead
               className={`uppercase font-semibold text-xs ${theadClasses}`}
@@ -210,7 +281,7 @@ export default function UserManagementTable({
                     </td>
                     <td className="px-6 py-4 text-right">
                       <button
-                        onClick={() => onEditUser(u)} // Trigger the edit modal
+                        onClick={() => onEditUser(u)}
                         className={`transition-colors p-2 rounded ${editBtnClasses}`}
                         title="Edit User"
                       >
@@ -235,14 +306,10 @@ export default function UserManagementTable({
       {/* D. PAGINATION FOOTER */}
       {!loading && filteredUsers.length > 0 && (
         <div
-          className={`px-6 py-4 border-t flex justify-between items-center text-xs ${footerClasses}`}
+          className={`px-4 sm:px-6 py-4 border-t flex flex-col sm:flex-row justify-between items-center gap-3 text-xs ${footerClasses}`}
         >
           <span>
             Showing{" "}
-            {/* <span className={`font-bold ${footerBold}`}>
-              {(page - 1) * itemsPerPage + 1}
-            </span>{" "}
-            to{" "} */}
             <span className={`font-bold ${footerBold}`}>
               {Math.min(page * itemsPerPage, filteredUsers.length)}
             </span>{" "}
