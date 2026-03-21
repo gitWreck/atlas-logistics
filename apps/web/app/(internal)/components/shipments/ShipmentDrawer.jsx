@@ -12,6 +12,7 @@ import StatusBadge from "../ui/StatusBadge";
 import CustomerMessageWidget from "../messaging/CustomerMessageWidget";
 import PackagesTable from "./Packages/PackagesTable";
 import ShipmentOperations from "./ShipmentOperations";
+import ShipmentProofs from "./ShipmentProofs";
 
 export default function ShipmentDrawer({
   isOpen,
@@ -148,13 +149,13 @@ export default function ShipmentDrawer({
                   isDark={isDark}
                 />
                 <InfoCard
-                  label="Sender Phone"
-                  value={data.sender?.phone}
+                  label="Recipient"
+                  value={data.recipient?.name}
                   isDark={isDark}
                 />
                 <InfoCard
-                  label="Recipient"
-                  value={data.recipient?.name}
+                  label="Sender Phone"
+                  value={data.sender?.phone}
                   isDark={isDark}
                 />
                 <InfoCard
@@ -409,6 +410,7 @@ export default function ShipmentDrawer({
                 }}
               />
               <CustomerMessageWidget shipment={data} isDark={isDark} />
+              <ShipmentProofs shipment={data} isDark={isDark} />
             </div>
           )}
         </div>

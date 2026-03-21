@@ -331,126 +331,125 @@ export default function AdminDashboardPage() {
 
         {/* Scrollable content area */}
         <main ref={mainScrollRef} className="flex-1 overflow-y-auto">
-          <div className="max-w-7xl mx-auto w-full px-4 sm:px-6 py-6 space-y-6">
+          <div className="w-full">
+            {/* <div className="max-w-7xl mx-auto w-full px-4 sm:px-6 py-6 space-y-6"> */}
             {/* Summary cards row - only show on Overview tab */}
-            {activeTab === "overview" && (
-              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-                <div
-                  className={`rounded-2xl border px-4 py-3 ${
-                    isDark
-                      ? "bg-indigo-950/40 border-indigo-800 text-indigo-200"
-                      : "bg-indigo-50 border-indigo-100"
-                  }`}
-                >
+            <div className="max-w-7xl mx-auto w-full px-4 sm:px-6 py-6 space-y-6">
+              {activeTab === "overview" && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
                   <div
-                    className={`text-xs font-medium uppercase tracking-wide ${
-                      isDark ? "text-indigo-300" : "text-indigo-700"
+                    className={`rounded-2xl border px-4 py-3 ${
+                      isDark
+                        ? "bg-indigo-950/40 border-indigo-800 text-indigo-200"
+                        : "bg-indigo-50 border-indigo-100"
                     }`}
                   >
-                    Active Trips
+                    <div
+                      className={`text-xs font-medium uppercase tracking-wide ${
+                        isDark ? "text-indigo-300" : "text-indigo-700"
+                      }`}
+                    >
+                      Active Trips
+                    </div>
+                    <div
+                      className={`mt-2 text-2xl font-semibold ${
+                        isDark ? "text-indigo-100" : "text-indigo-900"
+                      }`}
+                    >
+                      2
+                    </div>
+                    <div
+                      className={`mt-1 text-xs ${isDark ? "text-indigo-400" : "text-indigo-600"}`}
+                    >
+                      Trips currently in progress
+                    </div>
                   </div>
+
                   <div
-                    className={`mt-2 text-2xl font-semibold ${
-                      isDark ? "text-indigo-100" : "text-indigo-900"
+                    className={`rounded-2xl border px-4 py-3 ${
+                      isDark
+                        ? "bg-amber-950/40 border-amber-800 text-amber-200"
+                        : "bg-amber-50 border-amber-100"
                     }`}
                   >
-                    2
+                    <div
+                      className={`text-xs font-medium uppercase tracking-wide ${
+                        isDark ? "text-amber-300" : "text-amber-700"
+                      }`}
+                    >
+                      Delayed Trips
+                    </div>
+                    <div
+                      className={`mt-2 text-2xl font-semibold ${
+                        isDark ? "text-amber-100" : "text-amber-900"
+                      }`}
+                    >
+                      2
+                    </div>
+                    <div
+                      className={`mt-1 text-xs ${isDark ? "text-amber-400" : "text-amber-600"}`}
+                    >
+                      Trips requiring attention
+                    </div>
                   </div>
+
                   <div
-                    className={`mt-1 text-xs ${isDark ? "text-indigo-400" : "text-indigo-600"}`}
+                    className={`rounded-2xl border px-4 py-3 ${
+                      isDark
+                        ? "bg-sky-950/40 border-sky-800 text-sky-200"
+                        : "bg-sky-50 border-sky-100"
+                    }`}
                   >
-                    Trips currently in progress
+                    <div
+                      className={`text-xs font-medium uppercase tracking-wide ${
+                        isDark ? "text-sky-300" : "text-sky-700"
+                      }`}
+                    >
+                      Pickup Requests
+                    </div>
+                    <div
+                      className={`mt-2 text-2xl font-semibold ${
+                        isDark ? "text-sky-100" : "text-sky-900"
+                      }`}
+                    >
+                      3
+                    </div>
+                    <div
+                      className={`mt-1 text-xs ${isDark ? "text-sky-400" : "text-sky-600"}`}
+                    >
+                      Pending driver assignments
+                    </div>
+                  </div>
+
+                  <div
+                    className={`rounded-2xl border px-4 py-3 ${
+                      isDark
+                        ? "bg-emerald-950/40 border-emerald-800 text-emerald-200"
+                        : "bg-emerald-50 border-emerald-100"
+                    }`}
+                  >
+                    <div
+                      className={`text-xs font-medium uppercase tracking-wide ${
+                        isDark ? "text-emerald-300" : "text-emerald-700"
+                      }`}
+                    >
+                      Delivered Trips
+                    </div>
+                    <div
+                      className={`mt-2 text-2xl font-semibold ${
+                        isDark ? "text-emerald-100" : "text-emerald-900"
+                      }`}
+                    >
+                      4
+                    </div>
+                    <div
+                      className={`mt-1 text-xs ${isDark ? "text-emerald-400" : "text-emerald-600"}`}
+                    >
+                      Completed within SLA
+                    </div>
                   </div>
                 </div>
-
-                <div
-                  className={`rounded-2xl border px-4 py-3 ${
-                    isDark
-                      ? "bg-amber-950/40 border-amber-800 text-amber-200"
-                      : "bg-amber-50 border-amber-100"
-                  }`}
-                >
-                  <div
-                    className={`text-xs font-medium uppercase tracking-wide ${
-                      isDark ? "text-amber-300" : "text-amber-700"
-                    }`}
-                  >
-                    Delayed Trips
-                  </div>
-                  <div
-                    className={`mt-2 text-2xl font-semibold ${
-                      isDark ? "text-amber-100" : "text-amber-900"
-                    }`}
-                  >
-                    2
-                  </div>
-                  <div
-                    className={`mt-1 text-xs ${isDark ? "text-amber-400" : "text-amber-600"}`}
-                  >
-                    Trips requiring attention
-                  </div>
-                </div>
-
-                <div
-                  className={`rounded-2xl border px-4 py-3 ${
-                    isDark
-                      ? "bg-sky-950/40 border-sky-800 text-sky-200"
-                      : "bg-sky-50 border-sky-100"
-                  }`}
-                >
-                  <div
-                    className={`text-xs font-medium uppercase tracking-wide ${
-                      isDark ? "text-sky-300" : "text-sky-700"
-                    }`}
-                  >
-                    Pickup Requests
-                  </div>
-                  <div
-                    className={`mt-2 text-2xl font-semibold ${
-                      isDark ? "text-sky-100" : "text-sky-900"
-                    }`}
-                  >
-                    3
-                  </div>
-                  <div
-                    className={`mt-1 text-xs ${isDark ? "text-sky-400" : "text-sky-600"}`}
-                  >
-                    Pending driver assignments
-                  </div>
-                </div>
-
-                <div
-                  className={`rounded-2xl border px-4 py-3 ${
-                    isDark
-                      ? "bg-emerald-950/40 border-emerald-800 text-emerald-200"
-                      : "bg-emerald-50 border-emerald-100"
-                  }`}
-                >
-                  <div
-                    className={`text-xs font-medium uppercase tracking-wide ${
-                      isDark ? "text-emerald-300" : "text-emerald-700"
-                    }`}
-                  >
-                    Delivered Trips
-                  </div>
-                  <div
-                    className={`mt-2 text-2xl font-semibold ${
-                      isDark ? "text-emerald-100" : "text-emerald-900"
-                    }`}
-                  >
-                    4
-                  </div>
-                  <div
-                    className={`mt-1 text-xs ${isDark ? "text-emerald-400" : "text-emerald-600"}`}
-                  >
-                    Completed within SLA
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Active tab content */}
-            <div>
+              )}
               {activeTab === "overview" && (
                 <AdminOverview
                   user={user}
@@ -459,6 +458,10 @@ export default function AdminDashboardPage() {
                   isDark={isDark}
                 />
               )}
+            </div>
+
+            {/* Active tab content */}
+            <div>
               {activeTab === "trips" && (
                 <TripBoard
                   ref={tripBoardRef}

@@ -25,10 +25,34 @@ import NotificationBell from "../../components/notifications/NotificationBell";
 import TruckBoard from "../../components/trucks/TruckBoard";
 
 const mainNavItems = [
-  { id: "overview", label: "Dashboard", icon: faChartPie, title: "Overview", description: "Operations dashboard" },
-  { id: "trips", label: "Trips", icon: faMapSigns, title: "Trip Board", description: "Manage truck assignments and routes." },
-  { id: "shipments", label: "Shipments", icon: faTruck, title: "Shipments", description: "Manage shipments and orders." },
-  { id: "trucks", label: "Trucks", icon: faTruckLoading, title: "Truck Board", description: "Manage fleet health and availability." },
+  {
+    id: "overview",
+    label: "Dashboard",
+    icon: faChartPie,
+    title: "Overview",
+    description: "Operations dashboard",
+  },
+  {
+    id: "trips",
+    label: "Trips",
+    icon: faMapSigns,
+    title: "Trip Board",
+    description: "Manage truck assignments and routes.",
+  },
+  {
+    id: "shipments",
+    label: "Shipments",
+    icon: faTruck,
+    title: "Shipments",
+    description: "Manage shipments and orders.",
+  },
+  {
+    id: "trucks",
+    label: "Trucks",
+    icon: faTruckLoading,
+    title: "Truck Board",
+    description: "Manage fleet health and availability.",
+  },
 ];
 
 export default function ManagerDashboardPage() {
@@ -43,12 +67,33 @@ export default function ManagerDashboardPage() {
   const truckBoardRef = useRef(null);
   const mainScrollRef = useRef(null);
 
-  const currentTabConfig = useMemo(() => mainNavItems.find((t) => t.id === activeTab) || mainNavItems[0], [activeTab]);
+  const currentTabConfig = useMemo(
+    () => mainNavItems.find((t) => t.id === activeTab) || mainNavItems[0],
+    [activeTab],
+  );
 
   const headerButton = useMemo(() => {
-    if (activeTab === "trips") return { label: "Trip", icon: faPlus, accent: "emerald", onClick: () => tripBoardRef.current?.openCreateTripModal?.() };
-    if (activeTab === "shipments") return { label: "Shipment", icon: faPlus, accent: "blue", onClick: () => shipmentBoardRef.current?.openCreateModal?.() };
-    if (activeTab === "trucks") return { label: "Register Truck", icon: faPlus, accent: "blue", onClick: () => truckBoardRef.current?.openRegisterModal?.() };
+    if (activeTab === "trips")
+      return {
+        label: "Trip",
+        icon: faPlus,
+        accent: "emerald",
+        onClick: () => tripBoardRef.current?.openCreateTripModal?.(),
+      };
+    if (activeTab === "shipments")
+      return {
+        label: "Shipment",
+        icon: faPlus,
+        accent: "blue",
+        onClick: () => shipmentBoardRef.current?.openCreateModal?.(),
+      };
+    if (activeTab === "trucks")
+      return {
+        label: "Register Truck",
+        icon: faPlus,
+        accent: "blue",
+        onClick: () => truckBoardRef.current?.openRegisterModal?.(),
+      };
     return null;
   }, [activeTab]);
 
@@ -175,11 +220,15 @@ export default function ManagerDashboardPage() {
             </button>
           </div>
 
-          <div className={`flex-1 min-w-0 px-1 sm:px-2 ${isDark ? "text-white" : "text-slate-900"}`}>
+          <div
+            className={`flex-1 min-w-0 px-1 sm:px-2 ${isDark ? "text-white" : "text-slate-900"}`}
+          >
             <h1 className="font-bold tracking-wide text-lg uppercase leading-tight">
               {currentTabConfig?.title ?? "Manager Console"}
             </h1>
-            <p className={`text-xs mt-0.5 leading-tight ${isDark ? "text-slate-400" : "text-slate-600"}`}>
+            <p
+              className={`text-xs mt-0.5 leading-tight ${isDark ? "text-slate-400" : "text-slate-600"}`}
+            >
               {currentTabConfig?.description ?? "Operations dashboard"}
             </p>
           </div>
@@ -238,16 +287,20 @@ export default function ManagerDashboardPage() {
         </header>
 
         <main ref={mainScrollRef} className="flex-1 overflow-y-auto">
-          <div className="max-w-7xl mx-auto w-full px-4 sm:px-6 py-6 space-y-6">
-            {activeTab === "overview" && (
-              <ManagerOverview
-                user={user}
-                userRole="manager"
-                profile={profile}
-                onNavigateToShipments={() => setActiveTab("shipments")}
-                isDark={isDark}
-              />
-            )}
+          {/* <div className="max-w-7xl mx-auto w-full px-4 sm:px-6 py-6 space-y-6"> */}
+          <div className="w-full">
+            <div className="max-w-7xl mx-auto w-full px-4 sm:px-6 py-6 space-y-6">
+              {activeTab === "overview" && (
+                <ManagerOverview
+                  user={user}
+                  userRole="manager"
+                  profile={profile}
+                  onNavigateToShipments={() => setActiveTab("shipments")}
+                  isDark={isDark}
+                />
+              )}
+            </div>
+
             {activeTab === "trips" && (
               <TripBoard
                 ref={tripBoardRef}

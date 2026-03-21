@@ -34,11 +34,14 @@ export default function ShipmentRow({ s, onClick, isDark = false }) {
   // 2. Extract "Latest Trip" Data
   const driverName = s.truckDetails?.driverName || "Unassigned";
 
+  console.log("Rendering ShipmentRow for:", s);
+
   return (
     <div
+      // md:grid md:grid-cols-12 md:gap-4 md:px-6 md:items-center
       className={`
         relative flex flex-col gap-3 p-4 border-b cursor-pointer transition-colors group
-        md:grid md:grid-cols-12 md:gap-4 md:px-6 md:items-center
+        md:grid md:grid-cols-13 md:gap-4 md:px-6 md:items-center
         ${isDark ? "border-slate-800/50 hover:bg-slate-800/30" : "border-slate-200 hover:bg-slate-50"}
       `}
     >
@@ -130,6 +133,61 @@ export default function ShipmentRow({ s, onClick, isDark = false }) {
         </div>
       </div>
 
+      <div
+        className={`md:col-span-2 flex flex-col justify-center gap-1.5 md:border-0 pt-2 md:pt-0 ${
+          isDark ? "border-t border-slate-800/50" : "border-t border-slate-200"
+        }`}
+      >
+        {/* SENDER */}
+        <div className="flex items-center gap-2 truncate">
+          <span
+            className={`text-[9px] font-bold uppercase w-8 shrink-0 ${
+              isDark ? "text-slate-500" : "text-slate-400"
+            }`}
+          >
+            From
+          </span>
+          <span
+            className={`text-sm font-medium truncate ${
+              isDark ? "text-slate-300" : "text-slate-700"
+            }`}
+          >
+            {s.sender?.name || "Unknown"}
+          </span>
+          <span
+            className={`text-[10px] shrink-0 ${
+              isDark ? "text-slate-600" : "text-slate-500"
+            }`}
+          >
+            • {s.sender?.address?.city || s.origin || "—"}
+          </span>
+        </div>
+
+        {/* RECIPIENT */}
+        <div className="flex items-center gap-2 truncate">
+          <span
+            className={`text-[9px] font-bold uppercase w-8 shrink-0 ${
+              isDark ? "text-slate-500" : "text-slate-400"
+            }`}
+          >
+            To
+          </span>
+          <span
+            className={`text-sm font-medium truncate ${
+              isDark ? "text-slate-300" : "text-slate-700"
+            }`}
+          >
+            {s.recipient?.name || "Unknown"}
+          </span>
+          <span
+            className={`text-[10px] shrink-0 ${
+              isDark ? "text-slate-600" : "text-slate-500"
+            }`}
+          >
+            • {s.recipient?.address?.city || s.destination || "—"}
+          </span>
+        </div>
+      </div>
       {/* --- COL 3: Progress Bar --- */}
       <div className="md:col-span-3 md:pr-4 w-full mt-2 md:mt-0">
         <div
@@ -169,7 +227,7 @@ export default function ShipmentRow({ s, onClick, isDark = false }) {
       </div>
 
       {/* --- COL 4: Delay/Time (Desktop Only) --- */}
-      <div className="hidden md:flex col-span-2 flex-col gap-2">
+      <div className="hidden md:flex col-span-1 flex-col gap-2">
         <div
           className={`text-xs ${isDark ? "text-slate-500" : "text-slate-600"}`}
         >
