@@ -13,11 +13,11 @@ export default function TrackedShipmentList({ shipments, onShipmentPress }) {
     return (
       <View style={styles.emptyState}>
         <Text style={styles.emptyText}>
-          You haven’t added any tracking numbers yet.
+          You haven’t added any shipments yet.
         </Text>
-        <Text style={styles.emptyTextMuted}>
+        {/* <Text style={styles.emptyTextMuted}>
           Use “Add tracking” to link a shipment to your dashboard.
-        </Text>
+        </Text> */}
       </View>
     );
   }

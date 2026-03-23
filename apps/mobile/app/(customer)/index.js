@@ -14,20 +14,20 @@ import {
 
 // Firebase & Utils
 import { auth, db } from "../../firebase";
-import { addTrackedShipment } from "../../components/utilities/FirebaseFunctions";
 
 // Imported Components
-import DashboardHeader from "../../components/customer/DashboardHeader";
+import CustomerHeader from "../../components/customer/CustomerHeader";
 import TrackedShipmentList from "../../components/customer/TrackedShipmentList";
-import AddTrackingModal from "../../components/customer/AddTrackingModal";
 import FloatingAddButton from "../../components/customer/FloatingAddButton";
+import RequestPickupModal from "../../components/customer/RequestPickup/RequestPickupModal";
+import { requestShipmentPickup } from "../../components/utilities/FirebaseFunctions";
 
 export default function CustomerDashboard() {
   const router = useRouter();
-  const [addModalVisible, setAddModalVisible] = useState(false);
   const [trackedShipments, setTrackedShipments] = useState([]);
-  const [adding, setAdding] = useState(false);
   const [firstName, setFirstName] = useState("");
+  const [pickupModalVisible, setPickupModalVisible] = useState(false);
+  const [requesting, setRequesting] = useState(false);
 
   // 1. Fetch User Data
   useEffect(() => {
@@ -50,7 +50,7 @@ export default function CustomerDashboard() {
     if (!user) return;
 
     const ref = collection(db, "users", user.uid, "tracked_shipments");
-    const q = query(ref, orderBy("createdAt", "desc"));
+    const q = query(ref, orderBy("addedAt", "desc"));
 
     const unsubscribe = onSnapshot(
       q,
@@ -82,41 +82,6 @@ export default function CustomerDashboard() {
     ]);
   };
 
-  const handleAddTracking = async (trackingNumber) => {
-    const normalizedTracking = trackingNumber.trim().toUpperCase();
-    if (!normalizedTracking) return;
-
-    try {
-      setAdding(true);
-      await addTrackedShipment({ trackingNumber: normalizedTracking });
-      setAddModalVisible(false);
-    } catch (error) {
-      console.error("Failed to add tracked shipment:", error);
-      const code = error?.code || "";
-
-      if (code.endsWith("already-exists")) {
-        Alert.alert(
-          "Already added",
-          "This shipment is already in your tracked list.",
-        );
-      } else if (code.endsWith("not-found")) {
-        Alert.alert(
-          "Shipment not found",
-          "We couldn't find a shipment with that tracking number.",
-        );
-      } else if (code.endsWith("permission-denied")) {
-        Alert.alert(
-          "Not authorized",
-          "Details do not match sender or receiver.",
-        );
-      } else {
-        Alert.alert("Something went wrong", "Please try again later.");
-      }
-    } finally {
-      setAdding(false);
-    }
-  };
-
   const handleShipmentPress = (item) => {
     router.push({
       pathname: "/(customer)/tracking/",
@@ -124,11 +89,26 @@ export default function CustomerDashboard() {
     });
   };
 
+  const handleRequestPickup = async (pickupData) => {
+    try {
+      setRequesting(true);
+      // We will define this Firebase function later
+      // await createPickupRequest(pickupData);
+      await requestShipmentPickup(pickupData);
+      setPickupModalVisible(false);
+      Alert.alert("Success", "Pickup request submitted successfully!");
+    } catch (error) {
+      Alert.alert("Error", "Failed to submit request. Please try again.");
+    } finally {
+      setRequesting(false);
+    }
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar style="dark" />
 
-      <DashboardHeader firstName={firstName} onLogout={handleLogout} />
+      <CustomerHeader firstName={firstName} onLogout={handleLogout} />
 
       <View style={styles.body}>
         <TrackedShipmentList
@@ -137,13 +117,14 @@ export default function CustomerDashboard() {
         />
       </View>
 
-      <FloatingAddButton onPress={() => setAddModalVisible(true)} />
+      {/* <FloatingAddButton onPress={() => setAddModalVisible(true)} /> */}
+      <FloatingAddButton onPress={() => setPickupModalVisible(true)} />
 
-      <AddTrackingModal
-        visible={addModalVisible}
-        onClose={() => setAddModalVisible(false)}
-        onAdd={handleAddTracking}
-        isAdding={adding}
+      <RequestPickupModal
+        visible={pickupModalVisible}
+        onClose={() => setPickupModalVisible(false)}
+        onSubmit={handleRequestPickup}
+        isSubmitting={requesting}
       />
     </SafeAreaView>
   );

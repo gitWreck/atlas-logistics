@@ -1,4 +1,10 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -15,13 +21,11 @@ import { doc, getDoc } from "firebase/firestore";
 import { Image } from "expo-image";
 
 import { db } from "../../../firebase";
-import { STATUS_STEPS } from "../../../components/constants/tracking-constants"; // Import constants
-import { requestShipmentPickup } from "../../../components/utilities/FirebaseFunctions";
+import { STATUS_STEPS } from "../../../components/constants/tracking-constants";
 
 // Import our new components
 import StatusRouteCard from "../../../components/tracking/StatusRouteCard";
 import TrackingMap from "../../../components/tracking/TrackingMap";
-// import TrackingTimeline from "../../../components/tracking/TrackingTimeline";
 import TrackingTimeline from "../../../components/tracking/TrackingTimelines";
 import ProofOfDelivery from "../../../components/tracking/ProofOfDelivery";
 import ShipmentStats from "../../../components/tracking/ShipmentStats";
@@ -43,7 +47,7 @@ export default function CustomerTrackingDetailsScreen() {
   const [data, setData] = useState(null);
   const [photos, setPhotos] = useState([]);
   const [selectedStepIndex, setSelectedStepIndex] = useState(null);
-  const [pickupLoading, setPickupLoading] = useState(false);
+  // const [pickupLoading, setPickupLoading] = useState(false);
   const mapRef = useRef(null);
 
   const normalizedTracking = useMemo(
@@ -53,6 +57,31 @@ export default function CustomerTrackingDetailsScreen() {
         .toUpperCase(),
     [trackingId],
   );
+
+  // --- LOGIC: Dynamic Status Steps ---
+  const dynamicStatusSteps = useMemo(() => {
+    // Determine if it's a pickup order based on your Firebase data flag
+    const isPickupOrder = data?.isPickupRequested === true;
+
+    return isPickupOrder
+      ? [
+          { code: "PENDING_PICKUP", label: "Pending Pickup" },
+          { code: "PICKED_UP", label: "Picked Up" },
+          { code: "RECEIVED", label: "Received at Hub" },
+          { code: "LOADED", label: "Loaded" },
+          { code: "IN_TRANSIT", label: "In Transit" },
+          { code: "OUT_FOR_DELIVERY", label: "Out for Delivery" },
+          { code: "DELIVERED", label: "Delivered" },
+        ]
+      : [
+          { code: "CREATED", label: "Created" },
+          { code: "RECEIVED", label: "Received at Hub" },
+          { code: "LOADED", label: "Loaded" },
+          { code: "IN_TRANSIT", label: "In Transit" },
+          { code: "OUT_FOR_DELIVERY", label: "Out for Delivery" },
+          { code: "DELIVERED", label: "Delivered" },
+        ];
+  }, [data?.isPickupRequested]);
 
   const fetchData = useCallback(async () => {
     if (!normalizedTracking) {
@@ -89,54 +118,10 @@ export default function CustomerTrackingDetailsScreen() {
     fetchData();
   }, [fetchData]);
 
-  const currentStatus = String(data?.status || "")
-    .trim()
-    .toUpperCase();
-  const blockedForPickup = [
-    "DELIVERED",
-    "CANCELLED",
-    "PENDING_PICKUP",
-    "PICKED_UP",
-    "FAILED_PICKUP",
-  ];
-  const canRequestPickup = Boolean(
-    data && !blockedForPickup.includes(currentStatus),
-  );
-
-  const submitPickupRequest = async () => {
-    if (!normalizedTracking || !canRequestPickup || pickupLoading) return;
-
-    try {
-      setPickupLoading(true);
-      await requestShipmentPickup({ trackingNumber: normalizedTracking });
-      await fetchData();
-      Alert.alert("Pickup requested", "Your shipment is now marked for pickup.");
-    } catch (err) {
-      const fallback = "Unable to request pickup right now. Please try again.";
-      const message = err?.message || err?.details || fallback;
-      Alert.alert("Request failed", message);
-    } finally {
-      setPickupLoading(false);
-    }
-  };
-
-  const onPressRequestPickup = () => {
-    if (!canRequestPickup || pickupLoading) return;
-    Alert.alert(
-      "Request pickup?",
-      "This will mark your shipment as pending pickup.",
-      [
-        { text: "Cancel", style: "cancel" },
-        { text: "Request Pickup", onPress: submitPickupRequest },
-      ],
-    );
-  };
-
-  // --- LOGIC: Active Step Calculation ---
   const activeStepIndex = useMemo(() => {
     if (!data?.status) return 0;
     const current = String(data.status).toUpperCase();
-    const idx = STATUS_STEPS.findIndex((s) => {
+    const idx = dynamicStatusSteps.findIndex((s) => {
       if (Array.isArray(s.code)) return s.code.includes(current);
       return s.code === current;
     });
@@ -159,7 +144,7 @@ export default function CustomerTrackingDetailsScreen() {
         const status = String(rawStatus).toUpperCase().trim();
 
         // Only include if status is in our known steps
-        const stepIndex = STATUS_STEPS.findIndex((step) => {
+        const stepIndex = dynamicStatusSteps.findIndex((step) => {
           const codes = Array.isArray(step.code) ? step.code : [step.code];
           return codes.some((c) => String(c).toUpperCase() === status);
         });
@@ -176,7 +161,7 @@ export default function CustomerTrackingDetailsScreen() {
   }, [data?.statusHistory]);
 
   const statusLocationsPerStep = useMemo(() => {
-    const buckets = STATUS_STEPS.map(() => []);
+    const buckets = dynamicStatusSteps.map(() => []);
     if (!data?.statusHistory) return buckets;
 
     data.statusHistory.forEach((entry) => {
@@ -188,7 +173,7 @@ export default function CustomerTrackingDetailsScreen() {
       if (!lat || !lng) return;
 
       const coordinate = { latitude: lat, longitude: lng };
-      const stepIndex = STATUS_STEPS.findIndex((step) => {
+      const stepIndex = dynamicStatusSteps.findIndex((step) => {
         const codes = Array.isArray(step.code) ? step.code : [step.code];
         return codes.some((c) => String(c).toUpperCase() === status);
       });
@@ -315,6 +300,7 @@ export default function CustomerTrackingDetailsScreen() {
 
         {/* 3. Timeline */}
         <TrackingTimeline
+          steps={dynamicStatusSteps}
           activeIndex={activeStepIndex}
           selectedIndex={selectedStepIndex}
           onSelectStep={(idx) =>
@@ -328,23 +314,6 @@ export default function CustomerTrackingDetailsScreen() {
 
         {/* 5. Footer Stats */}
         <ShipmentStats total={totalItems} loaded={loaded} pending={pending} />
-
-        {canRequestPickup ? (
-          <TouchableOpacity
-            style={[
-              styles.requestPickupButton,
-              pickupLoading && styles.requestPickupButtonDisabled,
-            ]}
-            onPress={onPressRequestPickup}
-            disabled={pickupLoading}
-          >
-            {pickupLoading ? (
-              <ActivityIndicator size="small" color="#ffffff" />
-            ) : (
-              <Text style={styles.requestPickupButtonText}>Request Pickup</Text>
-            )}
-          </TouchableOpacity>
-        ) : null}
       </ScrollView>
     </SafeAreaView>
   );
