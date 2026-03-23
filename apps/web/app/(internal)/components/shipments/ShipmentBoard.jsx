@@ -305,7 +305,7 @@ const ShipmentBoard = forwardRef(function ShipmentBoard(
                 </div>
 
                 {/* NEW: Mode Filter */}
-                <div className="relative w-full sm:w-36">
+                {/* <div className="relative w-full sm:w-36">
                   <FontAwesomeIcon
                     icon={faTruckFast} // Or faStore / faTruckPickup
                     className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-sm"
@@ -326,7 +326,7 @@ const ShipmentBoard = forwardRef(function ShipmentBoard(
                     <option value="DROP_OFF">Hub Drop-offs</option>
                     <option value="PICKUP">Pickups</option>
                   </select>
-                </div>
+                </div> */}
 
                 {/* 3. MAIN FILTER */}
                 <div className="relative w-full sm:w-36">

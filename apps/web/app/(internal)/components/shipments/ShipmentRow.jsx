@@ -154,13 +154,13 @@ export default function ShipmentRow({ s, onClick, isDark = false }) {
           >
             {s.sender?.name || "Unknown"}
           </span>
-          <span
+          {/* <span
             className={`text-[10px] shrink-0 ${
               isDark ? "text-slate-600" : "text-slate-500"
             }`}
           >
             • {s.sender?.address?.city || s.origin || "—"}
-          </span>
+          </span> */}
         </div>
 
         {/* RECIPIENT */}
@@ -179,13 +179,13 @@ export default function ShipmentRow({ s, onClick, isDark = false }) {
           >
             {s.recipient?.name || "Unknown"}
           </span>
-          <span
+          {/* <span
             className={`text-[10px] shrink-0 ${
               isDark ? "text-slate-600" : "text-slate-500"
             }`}
           >
             • {s.recipient?.address?.city || s.destination || "—"}
-          </span>
+          </span> */}
         </div>
       </div>
       {/* --- COL 3: Progress Bar --- */}
