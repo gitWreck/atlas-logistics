@@ -4,6 +4,7 @@ import { COLORS, STATUS_STEPS } from "../constants/tracking-constants";
 import { FontAwesome5 } from "@expo/vector-icons";
 
 export default function TrackingTimeline({
+  steps,
   activeIndex,
   selectedIndex,
   onSelectStep,
@@ -11,10 +12,10 @@ export default function TrackingTimeline({
 }) {
   return (
     <View style={styles.timelineWrapper}>
-      {STATUS_STEPS.map((step, index) => {
+      {steps.map((step, index) => {
         const isActive = index <= activeIndex;
         const isLineActive = index < activeIndex;
-        const isLast = index === STATUS_STEPS.length - 1;
+        const isLast = index === steps.length - 1;
         const hasLocation =
           locationsPerStep[index] && locationsPerStep[index].length > 0;
         const isSelected = selectedIndex === index;

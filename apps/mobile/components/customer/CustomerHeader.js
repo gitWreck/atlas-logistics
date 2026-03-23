@@ -1,9 +1,8 @@
 import React from "react";
 import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
 import { FontAwesome5 } from "@expo/vector-icons";
-import { COLORS } from "../constants/theme"; // Adjust path as needed
 
-export default function DashboardHeader({ firstName, onLogout }) {
+export default function CustomerHeader({ firstName, onLogout }) {
   return (
     <View style={styles.header}>
       <View style={styles.headerTextWrapper}>

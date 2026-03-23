@@ -6,7 +6,7 @@ export default function ProofOfDelivery({ photos }) {
   return (
     <View style={styles.sectionCard}>
       <View style={styles.sectionHeaderRow}>
-        <Text style={styles.sectionTitle}>Proof of Delivery / Images</Text>
+        <Text style={styles.sectionTitle}>Proof of Delivery</Text>
         {photos.length > 0 && (
           <Text style={styles.sectionCount}>({photos.length})</Text>
         )}

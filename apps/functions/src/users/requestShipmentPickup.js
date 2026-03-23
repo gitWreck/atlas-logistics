@@ -1,112 +1,243 @@
-"use strict";
-
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const admin = require("firebase-admin");
-const { FieldValue } = require("firebase-admin/firestore");
-const { requireRole } = require("../utilities/helpers");
+const { sendShipmentPickup } = require("../messaging/sendShipmentPickup");
+const {
+  SEMAPHORE_API_KEY,
+  SEMAPHORE_SENDER_NAME,
+} = require("../../shared/sms-service");
+const { Timestamp } = admin.firestore;
 
 if (!admin.apps.length) admin.initializeApp();
 const db = admin.firestore();
 
-const PICKUP_RELATED_STATUSES = new Set(["PENDING_PICKUP", "PICKED_UP"]);
-const BLOCKED_STATUSES = new Set(["DELIVERED", "CANCELLED"]);
-
-const normalizePhone = (value) => {
-  let digits = String(value || "").replace(/[^\d]/g, "");
-  if (digits.length === 11 && digits.startsWith("0")) {
-    digits = "63" + digits.slice(1);
-  } else if (digits.length === 10 && digits.startsWith("9")) {
-    digits = "63" + digits;
-  }
-  return digits;
-};
-
 exports.requestShipmentPickup = onCall(
-  { region: "asia-southeast1", maxInstances: 10 },
-  async (req) => {
-    const { uid, user } = await requireRole(db, req, ["customer"]);
-    const trackingNumber = String(req.data?.trackingNumber || "")
-      .trim()
-      .toUpperCase();
+  {
+    region: "asia-southeast1",
+    secrets: [SEMAPHORE_API_KEY, SEMAPHORE_SENDER_NAME],
+    maxInstances: 10,
+  },
+  async (request) => {
+    // 1. AUTH & VALIDATION
+    if (!request.auth) {
+      throw new HttpsError(
+        "unauthenticated",
+        "Login required to request pickup.",
+      );
+    }
 
-    if (!trackingNumber) {
+    const {
+      sender,
+      recipient,
+      items,
+      remarks,
+      notifySms = true, // Default to true for customer peace of mind
+    } = request.data || {};
+
+    if (!sender || !recipient) {
       throw new HttpsError(
         "invalid-argument",
-        "A valid tracking number is required.",
+        "Missing sender or recipient details.",
       );
     }
 
-    const userPhone = normalizePhone(user.phoneNumber || user.phone);
-    if (!userPhone) {
+    if (!items || !Array.isArray(items) || items.length === 0) {
       throw new HttpsError(
-        "failed-precondition",
-        "Please update your profile with a valid phone number.",
+        "invalid-argument",
+        "Items array is empty or invalid.",
       );
     }
 
-    const shipmentRef = db.collection("shipments").doc(trackingNumber);
-    const shipmentSnap = await shipmentRef.get();
-
-    if (!shipmentSnap.exists) {
-      throw new HttpsError("not-found", "Shipment not found.");
-    }
-
-    const shipment = shipmentSnap.data() || {};
-    const currentStatus = String(shipment.status || "")
-      .trim()
-      .toUpperCase();
-    const senderPhone = normalizePhone(shipment.sender?.phone);
-    const recipientPhone = normalizePhone(shipment.recipient?.phone);
-
-    if (!senderPhone || !recipientPhone) {
+    if (items.length > 200) {
       throw new HttpsError(
-        "failed-precondition",
-        "Shipment is missing sender or recipient contact details.",
+        "invalid-argument",
+        "Too many items. Max 200 per request.",
       );
     }
 
-    if (userPhone !== senderPhone && userPhone !== recipientPhone) {
-      throw new HttpsError(
-        "permission-denied",
-        "You can only request pickup for your own shipments.",
-      );
-    }
+    // 2. STATUS & CODES (Hardcoded for Customer Pickup Requests)
+    const initialStatus = "PENDING_PICKUP";
+    const initialNote = "Requested for Pickup by Customer";
 
-    if (BLOCKED_STATUSES.has(currentStatus)) {
-      throw new HttpsError(
-        "failed-precondition",
-        "Pickup cannot be requested for this shipment status.",
-      );
-    }
+    const originCity = sender.city || sender.details?.city || "Unknown";
+    const destCity = recipient.city || recipient.details?.city || "Unknown";
+    const originSummary = `${originCity}, ${sender.province || sender.details?.province || ""}`;
 
-    if (PICKUP_RELATED_STATUSES.has(currentStatus)) {
-      return {
-        success: true,
-        trackingNumber,
-        status: currentStatus,
-        message: "Pickup request already active.",
-      };
-    }
+    // Default to GEN since customers don't know routing codes
+    const finalOriginCode = "GEN";
+    const finalDestCode = "GEN";
 
-    await shipmentRef.update({
-      status: "PENDING_PICKUP",
-      pickupRequestedAt: FieldValue.serverTimestamp(),
-      updatedAt: FieldValue.serverTimestamp(),
-      updatedBy: uid,
-      remarks: "Pickup requested by customer",
-      statusHistory: FieldValue.arrayUnion({
-        status: "PENDING_PICKUP",
-        at: new Date(),
-        by: uid,
-        note: "Pickup requested by customer",
-        sourceUI: "CUSTOMER_APP",
-      }),
+    // 3. ID GENERATION
+    const timestamp = new Date();
+    const dateStr = timestamp.toISOString().slice(0, 10).replace(/-/g, "");
+    const shipmentId = `AT-${dateStr}-PKUP-${Date.now().toString().slice(-6)}`;
+
+    const shipmentRef = db.collection("shipments").doc(shipmentId);
+
+    // 4. COMBINED PACKAGING LOGIC (Standard vs Bundle)
+    const packagesArray = [];
+    const packageBarcodes = [];
+    let globalSeq = 1;
+    let totalContentQuantity = 0;
+
+    items.forEach((item) => {
+      const qty = Number(item.quantity || item.weight) || 1; // Fallback to weight if qty isn't passed
+      const pkgType = item.packagingType || item.packaging || "Box";
+
+      totalContentQuantity += qty;
+
+      // Determine if this item should be bundled or split
+      const isBundle = pkgType === "Sack" || pkgType === "Bundle";
+
+      if (isBundle) {
+        // BUNDLE LOGIC: 1 Physical Barcode, Internal Quantity = QTY
+        const seqNum = globalSeq.toString().padStart(2, "0");
+        const pkgId = `${shipmentId}-${seqNum}`;
+
+        packagesArray.push({
+          trackingNumber: pkgId,
+          sequence: globalSeq,
+          description: item.description || "Bundled Cargo",
+          quantity: qty, // Stores internal piece count
+          packagingType: pkgType,
+          declaredValue: Number(item.declaredValue) || 0,
+          isFragile: Boolean(item.isFragile),
+          isPerishable: Boolean(item.isPerishable),
+          status: initialStatus,
+          currentLocation: originSummary,
+          loadedOnTrip: null,
+          isDelayed: false,
+        });
+
+        packageBarcodes.push(pkgId);
+        globalSeq++;
+      } else {
+        // STANDARD LOGIC: 'QTY' Physical Barcodes, Internal Quantity = 1 per box
+        for (let i = 0; i < qty; i++) {
+          const seqNum = globalSeq.toString().padStart(2, "0");
+          const pkgId = `${shipmentId}-${seqNum}`;
+
+          packagesArray.push({
+            trackingNumber: pkgId,
+            sequence: globalSeq,
+            description: item.description || "Standard Package",
+            quantity: 1, // 1 unit per physical box
+            packagingType: pkgType,
+            declaredValue: (Number(item.declaredValue) || 0) / qty, // Split value evenly
+            isFragile: Boolean(item.isFragile),
+            isPerishable: Boolean(item.isPerishable),
+            status: initialStatus,
+            currentLocation: originSummary,
+            loadedOnTrip: null,
+            isDelayed: false,
+          });
+
+          packageBarcodes.push(pkgId);
+          globalSeq++;
+        }
+      }
     });
 
-    return {
-      success: true,
-      trackingNumber,
-      status: "PENDING_PICKUP",
-    };
+    const now = Timestamp.now();
+    const nowAt = admin.firestore.FieldValue.serverTimestamp();
+    const batch = db.batch();
+
+    // 5. CREATE SHIPMENT (Parent Document)
+    batch.set(shipmentRef, {
+      trackingNumber: shipmentId,
+      currentTruckTripId: null,
+
+      sender: {
+        name: sender.name,
+        phone: sender.phone,
+        address: sender,
+        formattedAddress:
+          `${sender.unit || ""} ${sender.street || ""}, ${sender.barangay || ""}, ${originCity}, ${sender.province || ""}`.trim(),
+      },
+      recipient: {
+        name: recipient.name,
+        phone: recipient.phone,
+        address: recipient,
+        formattedAddress:
+          `${recipient.unit || ""} ${recipient.street || ""}, ${recipient.barangay || ""}, ${destCity}, ${recipient.province || ""}`.trim(),
+      },
+
+      origin: originCity,
+      originCode: finalOriginCode,
+      destination: destCity,
+      destinationCode: finalDestCode,
+
+      createdAt: nowAt,
+      updatedAt: nowAt,
+      createdBy: request.auth.uid, // The customer's UID
+
+      status: initialStatus,
+      statusHistory: [
+        {
+          status: initialStatus,
+          at: now,
+          note: initialNote,
+          location: originSummary,
+        },
+      ],
+
+      public: true,
+      archived: false,
+      isPickupRequested: true, // Flag specifically for operations dashboard
+
+      // AGGREGATES
+      totals: {
+        totalItems: packagesArray.length, // Total physical barcodes to scan
+        totalContentQty: totalContentQuantity, // Total items inside
+        received: 0,
+        pending: packagesArray.length,
+        loaded: 0,
+        delivered: 0,
+      },
+
+      remarks: remarks || null,
+      packages: packagesArray,
+      packageBarcodes: packageBarcodes,
+    });
+
+    // 6. AUTO-TRACK FOR CUSTOMER
+    // Automatically link this shipment to the customer's tracked list so it shows up on their dashboard immediately
+    const userTrackingRef = db
+      .collection("users")
+      .doc(request.auth.uid)
+      .collection("tracked_shipments")
+      .doc(shipmentId);
+    batch.set(userTrackingRef, {
+      trackingNumber: shipmentId,
+      addedAt: nowAt,
+    });
+
+    // 7. AUDIT LOGGING
+    batch.set(db.collection("admin_logs").doc(), {
+      action: "CUSTOMER_REQUESTED_PICKUP",
+      trackingDocId: shipmentRef.id,
+      trackingNumber: shipmentId,
+      totalUnits: packagesArray.length,
+      actorId: request.auth.uid,
+      createdAt: nowAt,
+    });
+
+    // 8. COMMIT & NOTIFY
+    try {
+      await batch.commit();
+
+      if (notifySms) {
+        sendShipmentPickup({
+          shipmentId,
+          senderPhone: sender.phone,
+          recipientPhone: recipient.phone,
+          actorUid: request.auth.uid,
+        }).catch((err) => console.error("[SMS_ERROR]", err));
+      }
+
+      return { success: true, shipmentId, packageBarcodes };
+    } catch (error) {
+      console.error("Transaction failure:", error);
+      throw new HttpsError("internal", "Failed to submit pickup request.");
+    }
   },
 );
