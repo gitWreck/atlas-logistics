@@ -1,6 +1,7 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   SafeAreaView,
   ScrollView,
   StyleSheet,
@@ -15,6 +16,7 @@ import { Image } from "expo-image";
 
 import { db } from "../../../firebase";
 import { STATUS_STEPS } from "../../../components/constants/tracking-constants"; // Import constants
+import { requestShipmentPickup } from "../../../components/utilities/FirebaseFunctions";
 
 // Import our new components
 import StatusRouteCard from "../../../components/tracking/StatusRouteCard";
@@ -41,6 +43,7 @@ export default function CustomerTrackingDetailsScreen() {
   const [data, setData] = useState(null);
   const [photos, setPhotos] = useState([]);
   const [selectedStepIndex, setSelectedStepIndex] = useState(null);
+  const [pickupLoading, setPickupLoading] = useState(false);
   const mapRef = useRef(null);
 
   const normalizedTracking = useMemo(
@@ -51,40 +54,83 @@ export default function CustomerTrackingDetailsScreen() {
     [trackingId],
   );
 
-  // --- DATA FETCHING ---
-  useEffect(() => {
-    const fetchData = async () => {
-      if (!normalizedTracking) {
-        setError("Invalid tracking number.");
+  const fetchData = useCallback(async () => {
+    if (!normalizedTracking) {
+      setError("Invalid tracking number.");
+      setLoading(false);
+      return;
+    }
+
+    try {
+      setLoading(true);
+      setError("");
+
+      const publicRef = doc(db, "shipments", normalizedTracking);
+      const snap = await getDoc(publicRef);
+
+      if (!snap.exists()) {
+        setError("Shipment not found. Please check your tracking ID.");
         setLoading(false);
         return;
       }
 
-      try {
-        setLoading(true);
-        setError("");
-
-        const publicRef = doc(db, "shipments", normalizedTracking);
-        const snap = await getDoc(publicRef);
-
-        if (!snap.exists()) {
-          setError("Shipment not found. Please check your tracking ID.");
-          setLoading(false);
-          return;
-        }
-
-        setData({ id: snap.id, ...snap.data() });
-        // NOTE: Add Photos fetching here if needed later
-      } catch (err) {
-        console.error("Failed to load tracking details:", err);
-        setError("System offline. Please try again later.");
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchData();
+      setData({ id: snap.id, ...snap.data() });
+      // NOTE: Add Photos fetching here if needed later
+    } catch (err) {
+      console.error("Failed to load tracking details:", err);
+      setError("System offline. Please try again later.");
+    } finally {
+      setLoading(false);
+    }
   }, [normalizedTracking]);
+
+  // --- DATA FETCHING ---
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
+  const currentStatus = String(data?.status || "")
+    .trim()
+    .toUpperCase();
+  const blockedForPickup = [
+    "DELIVERED",
+    "CANCELLED",
+    "PENDING_PICKUP",
+    "PICKED_UP",
+    "FAILED_PICKUP",
+  ];
+  const canRequestPickup = Boolean(
+    data && !blockedForPickup.includes(currentStatus),
+  );
+
+  const submitPickupRequest = async () => {
+    if (!normalizedTracking || !canRequestPickup || pickupLoading) return;
+
+    try {
+      setPickupLoading(true);
+      await requestShipmentPickup({ trackingNumber: normalizedTracking });
+      await fetchData();
+      Alert.alert("Pickup requested", "Your shipment is now marked for pickup.");
+    } catch (err) {
+      const fallback = "Unable to request pickup right now. Please try again.";
+      const message = err?.message || err?.details || fallback;
+      Alert.alert("Request failed", message);
+    } finally {
+      setPickupLoading(false);
+    }
+  };
+
+  const onPressRequestPickup = () => {
+    if (!canRequestPickup || pickupLoading) return;
+    Alert.alert(
+      "Request pickup?",
+      "This will mark your shipment as pending pickup.",
+      [
+        { text: "Cancel", style: "cancel" },
+        { text: "Request Pickup", onPress: submitPickupRequest },
+      ],
+    );
+  };
 
   // --- LOGIC: Active Step Calculation ---
   const activeStepIndex = useMemo(() => {
@@ -282,6 +328,23 @@ export default function CustomerTrackingDetailsScreen() {
 
         {/* 5. Footer Stats */}
         <ShipmentStats total={totalItems} loaded={loaded} pending={pending} />
+
+        {canRequestPickup ? (
+          <TouchableOpacity
+            style={[
+              styles.requestPickupButton,
+              pickupLoading && styles.requestPickupButtonDisabled,
+            ]}
+            onPress={onPressRequestPickup}
+            disabled={pickupLoading}
+          >
+            {pickupLoading ? (
+              <ActivityIndicator size="small" color="#ffffff" />
+            ) : (
+              <Text style={styles.requestPickupButtonText}>Request Pickup</Text>
+            )}
+          </TouchableOpacity>
+        ) : null}
       </ScrollView>
     </SafeAreaView>
   );
@@ -339,4 +402,21 @@ const styles = StyleSheet.create({
     backgroundColor: "#fee2e2",
   },
   errorButtonText: { color: "#991b1b", fontSize: 13, fontWeight: "600" },
+  requestPickupButton: {
+    marginTop: 14,
+    marginBottom: 12,
+    backgroundColor: "#042C83",
+    borderRadius: 10,
+    paddingVertical: 14,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  requestPickupButtonDisabled: {
+    opacity: 0.7,
+  },
+  requestPickupButtonText: {
+    color: "#ffffff",
+    fontSize: 15,
+    fontWeight: "700",
+  },
 });
