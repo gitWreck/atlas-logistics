@@ -197,7 +197,7 @@ const styles = StyleSheet.create({
     padding: 16,
     borderWidth: 1,
     borderColor: "#e2e8f0",
-    elevation: 2,
+    // elevation: 2,
   },
   itemHeader: {
     flexDirection: "row",

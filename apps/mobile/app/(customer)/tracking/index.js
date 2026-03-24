@@ -19,9 +19,7 @@ import { StatusBar } from "expo-status-bar";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { doc, getDoc } from "firebase/firestore";
 import { Image } from "expo-image";
-
 import { db } from "../../../firebase";
-import { STATUS_STEPS } from "../../../components/constants/tracking-constants";
 
 // Import our new components
 import StatusRouteCard from "../../../components/tracking/StatusRouteCard";
@@ -29,6 +27,7 @@ import TrackingMap from "../../../components/tracking/TrackingMap";
 import TrackingTimeline from "../../../components/tracking/TrackingTimelines";
 import ProofOfDelivery from "../../../components/tracking/ProofOfDelivery";
 import ShipmentStats from "../../../components/tracking/ShipmentStats";
+import ExistingProofsViewer from "../../../components/tracking/ExistingProofsViewer";
 
 // Hardcoded package location for Divisoria
 const PACKAGE_LOCATION = {
@@ -59,27 +58,40 @@ export default function CustomerTrackingDetailsScreen() {
   );
 
   // --- LOGIC: Dynamic Status Steps ---
+  // --- LOGIC: Dynamic Status Steps ---
   const dynamicStatusSteps = useMemo(() => {
     // Determine if it's a pickup order based on your Firebase data flag
     const isPickupOrder = data?.isPickupRequested === true;
 
     return isPickupOrder
       ? [
-          { code: "PENDING_PICKUP", label: "Pending Pickup" },
-          { code: "PICKED_UP", label: "Picked Up" },
-          { code: "RECEIVED", label: "Received at Hub" },
-          { code: "LOADED", label: "Loaded" },
-          { code: "IN_TRANSIT", label: "In Transit" },
-          { code: "OUT_FOR_DELIVERY", label: "Out for Delivery" },
-          { code: "DELIVERED", label: "Delivered" },
+          {
+            code: "PENDING_PICKUP",
+            label: "Pending Pickup",
+            iconName: "clock",
+          },
+          { code: "PICKED_UP", label: "Picked Up", iconName: "box-open" },
+          { code: "RECEIVED", label: "Received at Hub", iconName: "warehouse" },
+          { code: "LOADED", label: "Loaded", iconName: "pallet" },
+          { code: "IN_TRANSIT", label: "In Transit", iconName: "truck" },
+          {
+            code: "OUT_FOR_DELIVERY",
+            label: "Out for Delivery",
+            iconName: "route",
+          },
+          { code: "DELIVERED", label: "Delivered", iconName: "check-circle" },
         ]
       : [
-          { code: "CREATED", label: "Created" },
-          { code: "RECEIVED", label: "Received at Hub" },
-          { code: "LOADED", label: "Loaded" },
-          { code: "IN_TRANSIT", label: "In Transit" },
-          { code: "OUT_FOR_DELIVERY", label: "Out for Delivery" },
-          { code: "DELIVERED", label: "Delivered" },
+          { code: "CREATED", label: "Created", iconName: "file-signature" },
+          { code: "RECEIVED", label: "Received at Hub", iconName: "warehouse" },
+          { code: "LOADED", label: "Loaded", iconName: "pallet" },
+          { code: "IN_TRANSIT", label: "In Transit", iconName: "truck" },
+          {
+            code: "OUT_FOR_DELIVERY",
+            label: "Out for Delivery",
+            iconName: "route",
+          },
+          { code: "DELIVERED", label: "Delivered", iconName: "check-circle" },
         ];
   }, [data?.isPickupRequested]);
 
@@ -310,7 +322,11 @@ export default function CustomerTrackingDetailsScreen() {
         />
 
         {/* 4. Photos */}
-        <ProofOfDelivery photos={photos} />
+        {/* <ProofOfDelivery photos={photos} /> */}
+        <ExistingProofsViewer
+          proofOfReceipt={data?.proofOfReceipt}
+          proofOfDelivery={data?.proofOfDelivery}
+        />
 
         {/* 5. Footer Stats */}
         <ShipmentStats total={totalItems} loaded={loaded} pending={pending} />

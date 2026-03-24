@@ -36,13 +36,6 @@ export default function TrackingTimeline({
                   isSelected && styles.selectedCircle,
                 ]}
               >
-                {/* <Image
-                  source={step.source}
-                  style={[
-                    styles.timelineStepIcon,
-                    { tintColor: isActive ? "#fff" : COLORS.GREY },
-                  ]}
-                /> */}
                 <FontAwesome5
                   name={step.iconName}
                   size={14}
@@ -101,7 +94,7 @@ const styles = StyleSheet.create({
   inactiveCircle: { backgroundColor: "#fff", borderColor: COLORS.GREY_LINE },
   selectedCircle: { borderColor: COLORS.ORANGE, borderWidth: 2.5 },
   timelineStepIcon: { width: 16, height: 16 },
-  timelineConnector: { width: 2, height: 28, marginVertical: 4 },
+  timelineConnector: { width: 2, height: 15, marginVertical: 4 },
   activeLine: { backgroundColor: COLORS.BLUE },
   inactiveLine: { backgroundColor: COLORS.GREY_LINE },
   timelineLabelWrapper: { justifyContent: "center", paddingTop: 4 },

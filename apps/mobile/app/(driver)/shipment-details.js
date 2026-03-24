@@ -27,8 +27,8 @@ import ShipmentHeaderCard from "../../components/driver/shipment/ShipmentHeaderC
 import PhotoUploadSection from "../../components/driver/shipment/PhotoUploadSection";
 import PackageTable from "../../components/driver/shipment/PackageTable";
 import ShipmentActionFooter from "../../components/driver/shipment/ShipmentActionFooter";
-import ExistingProofsViewer from "../../components/driver/shipment/ExistingProofsViewer";
 import ReportIssueModal from "../../components/driver/shipment/ReportIssueModal";
+import ExistingProofsViewer from "../../components/tracking/ExistingProofsViewer";
 
 export default function ShipmentDetailsScreen() {
   const { shipmentId, tripId, tripType } = useLocalSearchParams();

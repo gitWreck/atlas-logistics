@@ -13,12 +13,14 @@ import {
 } from "react-native";
 import { FontAwesome5 } from "@expo/vector-icons";
 import { auth } from "../../../firebase";
+import { useRef } from "react";
 
 // We use the logic from your Web InputGroup but adapted for React Native
 import InputGroupMobile from "./InputGroupMobile";
 import ItemSectionMobile from "./ItemSectionMobile";
 
 import { useAuth } from "../../../contexts/AuthContext";
+import MapPickupModal from "./MapPickupModal";
 
 export default function RequestPickupModal({
   visible,
@@ -28,6 +30,7 @@ export default function RequestPickupModal({
   userData,
 }) {
   const { user } = useAuth();
+  const mapRef = useRef(null);
 
   // Initialize Sender with logged-in user info if available
   const [sender, setSender] = useState({
@@ -54,6 +57,9 @@ export default function RequestPickupModal({
     { description: "", quantity: "", packaging: "Box" },
   ]);
   const [remarks, setRemarks] = useState("");
+
+  const [location, setLocation] = useState(null);
+  const [showMapModal, setShowMapModal] = useState(false);
 
   // Auto-fill Sender with User Data on open
   useEffect(() => {
@@ -86,6 +92,7 @@ export default function RequestPickupModal({
       recipient,
       items,
       remarks,
+      location,
       timestamp: new Date().toISOString(),
     });
   };
@@ -148,6 +155,49 @@ export default function RequestPickupModal({
                 }}
               />
 
+              <View style={styles.sectionCard}>
+                <Text style={styles.sectionLabel}>
+                  Exact Pickup Coordinates
+                </Text>
+
+                {/* Open Map Button */}
+                <TouchableOpacity
+                  style={[
+                    styles.input,
+                    {
+                      flexDirection: "row",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      backgroundColor: location ? "#ecfeff" : "#f8fafc",
+                      borderColor: location ? "#06b6d4" : "#e2e8f0",
+                      marginTop: 10,
+                      marginBottom: 0,
+                      paddingVertical: 16,
+                    },
+                  ]}
+                  onPress={() => setShowMapModal(true)}
+                >
+                  <FontAwesome5
+                    name={location ? "map-marked-alt" : "map-marker-alt"}
+                    size={16}
+                    color={location ? "#0891b2" : "#64748b"}
+                    style={{ marginRight: 10 }}
+                  />
+                  <Text
+                    style={{
+                      color: location ? "#0891b2" : "#64748b",
+                      fontWeight: "700",
+                    }}
+                  >
+                    {location
+                      ? "Location Pinned (Tap to Edit) ✓"
+                      : "Open Map to Pin Location"}
+                  </Text>
+                </TouchableOpacity>
+
+                {/* Optional: Add the auto-fetch GPS button back below it if you still want a 1-click option without opening the map */}
+              </View>
+
               {/* REMARKS */}
               <TextInput
                 style={styles.textArea}
@@ -179,6 +229,12 @@ export default function RequestPickupModal({
           </View>
         </KeyboardAvoidingView>
       </View>
+      <MapPickupModal
+        visible={showMapModal}
+        initialLocation={location}
+        onClose={() => setShowMapModal(false)}
+        onConfirm={(newLoc) => setLocation(newLoc)}
+      />
     </Modal>
   );
 }
@@ -289,5 +345,17 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontWeight: "800",
     fontSize: 16,
+  },
+  mapContainer: {
+    height: 180,
+    borderRadius: 12,
+    overflow: "hidden",
+    marginTop: 12,
+    borderWidth: 1,
+    borderColor: "#e2e8f0",
+  },
+  map: {
+    width: "100%",
+    height: "100%",
   },
 });
