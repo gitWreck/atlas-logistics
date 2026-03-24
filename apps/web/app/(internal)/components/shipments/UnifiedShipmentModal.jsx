@@ -46,7 +46,8 @@ export default function UnifiedShipmentModal({
   const generateShipmentId = (originCode, destCode) => {
     const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, "");
     const random = Date.now().toString().slice(-6);
-    return `AT-${dateStr}-${originCode || "GEN"}-${destCode || "GEN"}-${random}`;
+    // return `AT-${dateStr}-${originCode || "GEN"}-${destCode || "GEN"}-${random}`;
+    return `AT-${dateStr}-SHP-${random}`;
   };
 
   useEffect(() => {
@@ -362,27 +363,6 @@ export default function UnifiedShipmentModal({
                   </p>
                 )}
               </div>
-              {/* <div className="w-full max-w-xs space-y-3 mt-4">
-                <button
-                  onClick={() =>
-                    window.open(
-                      finalTripId
-                        ? `/components/print/labels?tripId=${finalTripId}`
-                        : `/components/print/labels?id=${createdShipmentId}`,
-                      "_blank",
-                    )
-                  }
-                  className={`w-full py-3 sm:py-4 rounded-xl font-bold border transition-colors text-sm sm:text-base ${
-                    isDark
-                      ? "bg-slate-800 text-white border-slate-700 hover:bg-slate-700"
-                      : "bg-slate-200 text-slate-800 border-slate-300 hover:bg-slate-300"
-                  }`}
-                >
-                  {finalTripId
-                    ? "Print Trip Labels"
-                    : "Print Individual Waybill"}
-                </button>
-              </div> */}
               <div className="w-full max-w-xs space-y-3 mt-4">
                 {/* PRINT BUTTON */}
                 <button

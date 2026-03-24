@@ -26,6 +26,7 @@ import { useAuth } from "@/app/context/AuthContext";
 import { handleLogout } from "@/app/utility/utilities";
 import NotificationBell from "../../components/notifications/NotificationBell";
 import TruckBoard from "../../components/trucks/TruckBoard";
+import PickupBoard from "../../components/shipments/PickupBoard";
 
 const mainNavItems = [
   {
@@ -568,13 +569,22 @@ export default function AdminDashboardPage() {
                 />
               )}
               {activeTab === "shipments" && (
-                <ShipmentBoard
-                  ref={shipmentBoardRef}
-                  user={user}
-                  userRole="admin"
-                  profile={profile}
-                  isDark={isDark}
-                />
+                <>
+                  <ShipmentBoard
+                    ref={shipmentBoardRef}
+                    user={user}
+                    userRole="admin"
+                    profile={profile}
+                    isDark={isDark}
+                  />
+                  <PickupBoard
+                    ref={shipmentBoardRef}
+                    user={user}
+                    userRole="admin"
+                    profile={profile}
+                    isDark={isDark}
+                  />
+                </>
               )}
               {activeTab === "trucks" && (
                 <TruckBoard

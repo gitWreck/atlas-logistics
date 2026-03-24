@@ -35,22 +35,47 @@ export async function GET() {
     }
 
     // 3. FETCH SHIPMENTS (The Base Data)
+    // const snapshot = await adminDb
+    //   .collection("shipments")
+    //   // .where("status", "!=", "PENDING_PICKUP") // ✅ ONLY fetch pickup requests
+    //   .where("isPickupRequested", "==", false) // ✅ ONLY fetch pickup requests
+    //   .orderBy("updatedAt", "desc")
+    //   .limit(50)
+    //   .get();
+
     const snapshot = await adminDb
       .collection("shipments")
       .orderBy("updatedAt", "desc")
       .limit(50)
       .get();
 
+    // THE 1-LINE FIX: Drop any document where it explicitly equals true.
+    // This perfectly allows false, null, and missing fields to pass through.
+    const standardDocs = snapshot.docs.filter(
+      (doc) => doc.data().isPickupRequested !== true,
+    );
+
+    // ---------------------------------------------------------
+    // 4. PRE-FETCH TRUCK DATA
+    // ---------------------------------------------------------
+
+    // A. Extract all Unique Trip IDs from the FILTERED shipments
+    const uniqueTripIds = new Set();
+    standardDocs.forEach((doc) => {
+      const tripId = doc.data().currentTruckTripId;
+      if (tripId) uniqueTripIds.add(tripId);
+    });
+
     // ---------------------------------------------------------
     // 4. NEW LOGIC: PRE-FETCH TRUCK DATA
     // ---------------------------------------------------------
 
     // A. Extract all Unique Trip IDs from the shipments
-    const uniqueTripIds = new Set();
-    snapshot.docs.forEach((doc) => {
-      const tripId = doc.data().currentTruckTripId;
-      if (tripId) uniqueTripIds.add(tripId);
-    });
+    // const uniqueTripIds = new Set();
+    // snapshot.docs.forEach((doc) => {
+    //   const tripId = doc.data().currentTruckTripId;
+    //   if (tripId) uniqueTripIds.add(tripId);
+    // });
 
     // B. Fetch all related Trips in ONE batch request (Efficient)
     let tripMap = {}; // Will store { "TRIP-DOC-ID": { ...tripData } }
