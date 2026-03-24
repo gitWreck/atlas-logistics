@@ -50,7 +50,7 @@ export default function CustomerDashboard() {
     if (!user) return;
 
     const ref = collection(db, "users", user.uid, "tracked_shipments");
-    const q = query(ref, orderBy("addedAt", "desc"));
+    const q = query(ref, orderBy("createdAt", "desc"));
 
     const unsubscribe = onSnapshot(
       q,

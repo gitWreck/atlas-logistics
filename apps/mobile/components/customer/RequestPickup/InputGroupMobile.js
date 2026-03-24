@@ -20,6 +20,7 @@ export default function InputGroupMobile({
   values,
   onChange,
   color = "blue",
+  user,
 }) {
   const [cities, setCities] = useState([]);
   const [showProvinceModal, setShowProvinceModal] = useState(false);
@@ -120,9 +121,9 @@ export default function InputGroupMobile({
       <DropdownModal
         visible={showProvinceModal}
         title="Select Province"
-        options={cities} // This is an array of objects
+        options={PROVINCES} // This is an array of objects
         onSelect={(selectedProvince) => {
-          onChange({ ...values, city: selectedProvince.name });
+          onChange({ ...values, province: selectedProvince.name });
           setShowProvinceModal(false);
         }}
         onClose={() => setShowProvinceModal(false)}
