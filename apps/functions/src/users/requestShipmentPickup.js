@@ -30,6 +30,7 @@ exports.requestShipmentPickup = onCall(
       recipient,
       items,
       remarks,
+      location, // ✅ Extract the passed location {lat, lng}
       notifySms = true, // Default to true for customer peace of mind
     } = request.data || {};
 
@@ -69,7 +70,7 @@ exports.requestShipmentPickup = onCall(
     // 3. ID GENERATION
     const timestamp = new Date();
     const dateStr = timestamp.toISOString().slice(0, 10).replace(/-/g, "");
-    const shipmentId = `AT-${dateStr}-PKUP-${Date.now().toString().slice(-6)}`;
+    const shipmentId = `AT-${dateStr}-SHP-${Date.now().toString().slice(-6)}`;
 
     const shipmentRef = db.collection("shipments").doc(shipmentId);
 
@@ -176,10 +177,10 @@ exports.requestShipmentPickup = onCall(
           status: initialStatus,
           at: now,
           note: initialNote,
-          location: originSummary,
+          location: location ? location : originSummary,
         },
       ],
-
+      ...(location ? { lastLocation: location } : {}),
       public: true,
       archived: false,
       isPickupRequested: true, // Flag specifically for operations dashboard
@@ -208,7 +209,7 @@ exports.requestShipmentPickup = onCall(
       .doc(shipmentId);
     batch.set(userTrackingRef, {
       trackingNumber: shipmentId,
-      addedAt: nowAt,
+      createdAt: nowAt,
     });
 
     // 7. AUDIT LOGGING
