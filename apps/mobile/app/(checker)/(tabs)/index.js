@@ -11,15 +11,16 @@ import {
 } from "react-native";
 import { useRouter } from "expo-router";
 import {
-  getFirestore,
   collection,
   query,
   where,
   getCountFromServer,
   Timestamp,
 } from "firebase/firestore";
-import { getAuth, signOut } from "firebase/auth";
+import { signOut } from "firebase/auth";
 import { startOfDay, subDays } from "date-fns";
+
+import { auth, db } from "../../../firebase";
 
 // ✅ IMPORT NEW COMPONENTS
 import CheckerHeader from "../../../components/checker/CheckerHeader";
@@ -29,8 +30,8 @@ import OperationsGrid from "../../../components/checker/OperationsGrid";
 
 export default function CheckerIndex() {
   const router = useRouter();
-  const auth = getAuth();
-  const db = getFirestore();
+  // const auth = getAuth();
+  // const db = getFirestore();
 
   // STATE
   const [filter, setFilter] = useState("TODAY"); // 'TODAY' | 'WEEK'

@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   StyleSheet,
 } from "react-native";
+import StatusBadge from "../ui/StatusBadge";
 
 export default function TrackedShipmentList({ shipments, onShipmentPress }) {
   // Empty State
@@ -26,7 +27,7 @@ export default function TrackedShipmentList({ shipments, onShipmentPress }) {
   return (
     <ScrollView contentContainerStyle={styles.listContent}>
       <View style={styles.sectionHeaderRow}>
-        <Text style={styles.sectionTitle}>My tracked shipments</Text>
+        <Text style={styles.sectionTitle}>My Shipments</Text>
       </View>
 
       {shipments.map((item) => (
@@ -36,13 +37,22 @@ export default function TrackedShipmentList({ shipments, onShipmentPress }) {
           activeOpacity={0.85}
           onPress={() => onShipmentPress(item)}
         >
-          <Text style={styles.trackingLabel}>Tracking number</Text>
-          <Text style={styles.trackingValue}>
-            {item.trackingNumber || item.id}
-          </Text>
-          <Text style={styles.trackingHint}>
-            Tap to view live status and details.
-          </Text>
+          {/* Top Row: Tracking & Badge */}
+          <View style={styles.cardTopRow}>
+            <View>
+              <Text style={styles.trackingLabel}>Tracking number</Text>
+              <Text style={styles.trackingValue}>
+                {item.trackingNumber || item.id}
+              </Text>
+            </View>
+            <StatusBadge status={item.status} />
+          </View>
+
+          {/* Bottom Row: Hint & Time */}
+          <View style={styles.cardBottomRow}>
+            <Text style={styles.trackingHint}>Tap to view live status...</Text>
+            <Text style={styles.timeText}>{item.updatedAt || "Just now"}</Text>
+          </View>
         </TouchableOpacity>
       ))}
     </ScrollView>
@@ -106,5 +116,24 @@ const styles = StyleSheet.create({
   trackingHint: {
     fontSize: 12,
     color: "#64748b",
+  },
+  cardTopRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    marginBottom: 12,
+  },
+  cardBottomRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    borderTopWidth: 1,
+    borderTopColor: "#f1f5f9",
+    paddingTop: 12,
+  },
+  timeText: {
+    fontSize: 11,
+    color: "#94a3b8",
+    fontWeight: "600",
   },
 });
