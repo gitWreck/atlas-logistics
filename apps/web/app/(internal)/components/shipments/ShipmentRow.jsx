@@ -1,6 +1,10 @@
 import React from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faEllipsisV, faTruck } from "@fortawesome/free-solid-svg-icons";
+import {
+  faEdit,
+  faEllipsisV,
+  faTruck,
+} from "@fortawesome/free-solid-svg-icons";
 import StatusBadge from "../ui/StatusBadge";
 
 // Keeping your visual component
@@ -22,7 +26,7 @@ function StatusDot({ status, isDelayed }) {
   );
 }
 
-export default function ShipmentRow({ s, onClick, isDark = false }) {
+export default function ShipmentRow({ s, onClick, isDark = false, onEdit }) {
   // 1. Data Safety Checks
   const isDelayed =
     !!s.truckDetails?.delayReason && !s.truckDetails?.delayCleared;
@@ -64,12 +68,30 @@ export default function ShipmentRow({ s, onClick, isDark = false }) {
             </div>
           </div>
         </div>
-        {/* Mobile Action Button */}
-        <button
-          className={`p-2 -mr-2 ${isDark ? "text-slate-500" : "text-slate-400"}`}
-        >
-          <FontAwesomeIcon icon={faEllipsisV} />
-        </button>
+
+        {/* ✅ FIXED: Mobile Action Buttons */}
+        <div className="flex items-center">
+          {s.isPickupRequested == true && (
+            <button
+              className={`p-2 transition-colors ${isDark ? "text-slate-500 hover:text-white" : "text-slate-400 hover:text-slate-900"}`}
+              onClick={(e) => {
+                e.stopPropagation();
+                if (onEdit) onEdit(s);
+              }}
+            >
+              <FontAwesomeIcon icon={faEdit} />
+            </button>
+          )}
+          <button
+            className={`p-2 -mr-2 transition-colors ${isDark ? "text-slate-500 hover:text-white" : "text-slate-400 hover:text-slate-900"}`}
+            onClick={(e) => {
+              e.stopPropagation();
+              onClick(s.id);
+            }}
+          >
+            <FontAwesomeIcon icon={faEllipsisV} />
+          </button>
+        </div>
       </div>
 
       {/* --- COL 1: Tracking/Driver --- */}
@@ -246,6 +268,20 @@ export default function ShipmentRow({ s, onClick, isDark = false }) {
 
       {/* --- COL 5: Actions (Desktop Only) --- */}
       <div className="hidden md:block col-span-1 text-right">
+        {s.isPickupRequested == true && (
+          <button
+            className={`p-2 rounded-full transition-colors ${isDark ? "text-slate-500 hover:text-white hover:bg-slate-800" : "text-slate-500 hover:text-slate-900 hover:bg-slate-200"}`}
+            onClick={(e) => {
+              // ✅ Actually change this word to onClick
+              e.stopPropagation();
+              if (onEdit) onEdit(s);
+
+              console.log("edit button clicked", s);
+            }}
+          >
+            <FontAwesomeIcon icon={faEdit} />
+          </button>
+        )}
         <button
           className={`p-2 rounded-full transition-colors ${isDark ? "text-slate-500 hover:text-white hover:bg-slate-800" : "text-slate-500 hover:text-slate-900 hover:bg-slate-200"}`}
           onClick={(e) => {

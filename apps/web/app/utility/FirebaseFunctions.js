@@ -68,7 +68,6 @@ export const unlockTripManifest = httpsCallable(
   functions,
   "unlockTripManifest",
 );
-
 export const bulkAssignShipments = httpsCallable(
   functions,
   "bulkAssignShipments",
@@ -81,6 +80,10 @@ export const bulkShipmentAction = httpsCallable(
 export const updateShipmentImages = httpsCallable(
   functions,
   "updateShipmentImages",
+);
+export const updateShipmentDetails = httpsCallable(
+  functions,
+  "updateShipmentDetails",
 );
 
 // SMS & COMMUNICATION

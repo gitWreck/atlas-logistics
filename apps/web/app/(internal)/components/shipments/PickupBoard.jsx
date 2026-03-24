@@ -30,6 +30,7 @@ const PickupBoard = forwardRef(function PickupBoard(
   // Modal & Drawer State
   const [isNewPickupModalOpen, setIsNewPickupModalOpen] = useState(false);
   const [selectedPickupId, setSelectedPickupId] = useState(null);
+  const [editingPickup, setEditingPickup] = useState(null); // ✅ NEW: Tracks which shipment is being edited
 
   // Search & Filter State
   const [activeFilter, setActiveFilter] = useState("ALL");
@@ -161,7 +162,10 @@ const PickupBoard = forwardRef(function PickupBoard(
   useImperativeHandle(
     ref,
     () => ({
-      openCreateModal: () => setIsNewPickupModalOpen(true),
+      openCreateModal: () => {
+        setEditingPickup(null); // ✅ Ensure it opens in Create Mode
+        setIsNewPickupModalOpen(true);
+      },
     }),
     [],
   );
@@ -323,6 +327,10 @@ const PickupBoard = forwardRef(function PickupBoard(
                       s={p}
                       onClick={setSelectedPickupId}
                       isDark={isDark}
+                      onEdit={() => {
+                        setEditingPickup(p); // ✅ Pass the specific shipment data
+                        setIsNewPickupModalOpen(true);
+                      }}
                     />
                   ))
                 )}
@@ -390,11 +398,18 @@ const PickupBoard = forwardRef(function PickupBoard(
       <UnifiedShipmentModal
         profile={profile}
         isOpen={isNewPickupModalOpen}
-        onClose={() => setIsNewPickupModalOpen(false)}
+        onClose={() => {
+          setIsNewPickupModalOpen(false);
+          setEditingPickup(null); // ✅ Clear data on close
+        }}
         isDark={isDark}
         user={user}
-        onSuccess={fetchPickups}
+        onSuccess={() => {
+          fetchPickups();
+          setEditingPickup(null); // ✅ Clear data on success
+        }}
         resetTrigger={isNewPickupModalOpen}
+        editData={editingPickup} // ✅ Pass the data down to trigger Update Mode
       />
     </div>
   );
