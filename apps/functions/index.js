@@ -110,6 +110,8 @@ exports.updateShipmentStatusChecker =
   require("./src/shipments/updateShipmentStatusChecker").updateShipmentStatusChecker;
 exports.finalizeHubProcessing =
   require("./src/trips/finalizeHubProcessing").finalizeHubProcessing;
+exports.updateShipmentDetails =
+  require("./src/shipments/updateShipmentDetails").updateShipmentDetails;
 
 // Manifests & Certificates
 exports.generateTripManifest =

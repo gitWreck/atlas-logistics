@@ -25,9 +25,11 @@ import { requestShipmentPickup } from "../../components/utilities/FirebaseFuncti
 export default function CustomerDashboard() {
   const router = useRouter();
   const [trackedShipments, setTrackedShipments] = useState([]);
-  const [firstName, setFirstName] = useState("");
+  // const [firstName, setFirstName] = useState("");
   const [pickupModalVisible, setPickupModalVisible] = useState(false);
   const [requesting, setRequesting] = useState(false);
+
+  const [userName, setUserName] = useState("Customer");
 
   // 1. Fetch User Data
   useEffect(() => {
@@ -48,6 +50,10 @@ export default function CustomerDashboard() {
   useEffect(() => {
     const user = auth.currentUser;
     if (!user) return;
+
+    if (auth.currentUser?.displayName) {
+      setUserName(auth.currentUser.displayName);
+    }
 
     const ref = collection(db, "users", user.uid, "tracked_shipments");
     const q = query(ref, orderBy("createdAt", "desc"));
@@ -108,7 +114,12 @@ export default function CustomerDashboard() {
     <SafeAreaView style={styles.container}>
       <StatusBar style="dark" />
 
-      <CustomerHeader firstName={firstName} onLogout={handleLogout} />
+      <CustomerHeader
+        userName={userName}
+        // firstName={firstName}
+        onLogout={handleLogout}
+        onProfilePress={() => router.push("/(customer)/profile")}
+      />
 
       <View style={styles.body}>
         <TrackedShipmentList
