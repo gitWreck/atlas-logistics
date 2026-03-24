@@ -30,6 +30,7 @@ export default function UnifiedShipmentModal({
   user,
   onSuccess, // Callback to trigger after successful shipment creation
   resetTrigger, // A prop that can be used to reset the form when needed
+  editData = null, // ✅ NEW: Accept existing shipment data
 }) {
   const { showAlert, showConfirm } = useAlert();
 
@@ -50,22 +51,66 @@ export default function UnifiedShipmentModal({
     return `AT-${dateStr}-SHP-${random}`;
   };
 
+  // ✅ FIXED 1 & 2: Pre-fill form and explicitly flatten the nested address data
   useEffect(() => {
-    if (resetTrigger) {
+    if (editData && isOpen) {
+      setShipmentDraft({
+        routeInfo: {
+          origin: editData.origin || "",
+          originCode: editData.originCode || "",
+          destination: editData.destination || "",
+          destinationCode: editData.destinationCode || "",
+        },
+        // Flatten the sender address so ReceivePackageForm can read it properly
+        sender: {
+          name: editData.sender?.name || "",
+          phone: editData.sender?.phone || "",
+          ...(editData.sender?.address || editData.sender?.details || {}),
+        },
+        // Flatten the recipient address
+        recipient: {
+          name: editData.recipient?.name || "",
+          phone: editData.recipient?.phone || "",
+          ...(editData.recipient?.address || editData.recipient?.details || {}),
+        },
+        items: editData.packages || editData.items || [],
+        remarks: editData.remarks || "",
+        imageFiles: [],
+        previews: [],
+      });
+
+      // Force it into pickup mode if the original was a pickup
+      setIsPickup(
+        editData.isPickupRequested === true ||
+          editData.status === "PENDING_PICKUP",
+      );
+    }
+  }, [editData, isOpen]);
+
+  // ✅ FIXED 3: Prevent race condition by NOT resetting if we are in "Edit Mode"
+  useEffect(() => {
+    // Only reset if resetTrigger fires AND we are not trying to edit
+    if (resetTrigger && !editData) {
       setShipmentDraft(null);
       setFinalTripId(null);
       setCreatedShipmentId(null);
       setSendSms(true);
       setIsPickup(false);
     }
-  }, [resetTrigger]);
+  }, [resetTrigger, editData]);
 
+  // to update with new firebase function
   const handleMasterSubmit = async (tripDecision) => {
     setLoading(true);
     try {
       const originCode = shipmentDraft.routeInfo.originCode || "GEN";
       const destCode = shipmentDraft.routeInfo.destinationCode || "GEN";
-      const manualShipmentId = generateShipmentId(originCode, destCode);
+
+      // We only generate a manual ID if we are creating a NEW shipment
+      const isEditMode = !!(editData && editData.id);
+      const targetShipmentId = isEditMode
+        ? editData.id
+        : generateShipmentId(originCode, destCode);
 
       // --- Upload Images ---
       let uploadedUrls = [];
@@ -73,10 +118,10 @@ export default function UnifiedShipmentModal({
         const uploadPromises = shipmentDraft.imageFiles.map(
           async (file, index) => {
             const ext = file.name.split(".").pop();
-            const fileName = `proof_of_receipt_${manualShipmentId}_${index + 1}.${ext}`;
+            const fileName = `proof_of_receipt_${targetShipmentId}_${index + 1}.${ext}`;
             const storageRef = ref(
               storage,
-              `shipments/${manualShipmentId}/${fileName}`,
+              `shipments/${targetShipmentId}/${fileName}`,
             );
             const snapshot = await uploadBytes(storageRef, file);
             return await getDownloadURL(snapshot.ref);
@@ -85,14 +130,13 @@ export default function UnifiedShipmentModal({
         uploadedUrls = await Promise.all(uploadPromises);
       }
 
-      if (isPickup !== true) {
-        if (uploadedUrls.length === 0) {
-          setLoading(false);
-          return alert("Add Images before proceeding");
-        }
+      // Enforce image rule only for new drop-offs
+      if (!isPickup && !isEditMode && uploadedUrls.length === 0) {
+        setLoading(false);
+        return alert("Add Images before proceeding");
       }
 
-      // --- Construct Payload ---
+      // --- Construct Base Payload ---
       const payload = {
         sender: {
           name: shipmentDraft.sender.name,
@@ -101,11 +145,10 @@ export default function UnifiedShipmentModal({
             unit: shipmentDraft.sender.unit,
             street: shipmentDraft.sender.street,
             barangay: shipmentDraft.sender.barangay,
-            city: shipmentDraft.sender.city, // Optional: Keep manual city entry for door-to-door info
+            city: shipmentDraft.sender.city,
             province: shipmentDraft.sender.province,
           },
         },
-
         recipient: {
           name: shipmentDraft.recipient.name,
           phone: shipmentDraft.recipient.phone,
@@ -117,11 +160,14 @@ export default function UnifiedShipmentModal({
             province: shipmentDraft.recipient.province,
           },
         },
+        // If it's an edit, we don't force it back to PENDING_PICKUP if it's already past that
+        status:
+          isEditMode && editData.status !== "PENDING_PICKUP"
+            ? editData.status
+            : isPickup
+              ? "PENDING_PICKUP"
+              : "RECEIVED",
 
-        // Dynamic Status based on Pickup Toggle
-        status: isPickup === true ? "PENDING_PICKUP" : "RECEIVED",
-
-        // If pickup, the location is the sender's city. If dropoff, it's the origin warehouse.
         currentLocation: isPickup
           ? `${shipmentDraft.sender.barangay || ""} ${shipmentDraft.sender.city}`.trim()
           : shipmentDraft.routeInfo.origin,
@@ -133,37 +179,46 @@ export default function UnifiedShipmentModal({
         items: shipmentDraft.items,
         remarks: shipmentDraft.remarks,
         notifySms: sendSms,
-        manualShipmentId: manualShipmentId,
         proofOfReceipt: uploadedUrls,
       };
 
-      // --- Save to DB ---
-      const hasBundles = shipmentDraft.items.some(
-        (item) =>
-          item.packagingType === "Sack" || item.packagingType === "Bundle",
-      );
+      // --- Save to DB (Branch: Edit vs Create) ---
+      let finalDocId = targetShipmentId;
 
-      let shipmentRes;
-      if (hasBundles) {
-        // Calls the version that puts Quantity INSIDE the package object
-        shipmentRes = await createShipmentBundle(payload);
+      if (isEditMode) {
+        // ✅ UPDATE MODE
+        await updateShipmentDetails({
+          shipmentId: finalDocId,
+          ...payload,
+        });
       } else {
-        // Calls the original version that loops and creates SHP-01, SHP-02, etc.
-        shipmentRes = await createShipmentWithPackages(payload);
+        // ❌ CREATE MODE
+        payload.manualShipmentId = finalDocId; // Only pass manual ID on creation
+        const hasBundles = shipmentDraft.items.some(
+          (item) =>
+            item.packagingType === "Sack" || item.packagingType === "Bundle",
+        );
+
+        let shipmentRes;
+        if (hasBundles) {
+          shipmentRes = await createShipmentBundle(payload);
+        } else {
+          shipmentRes = await createShipmentWithPackages(payload);
+        }
+        finalDocId = shipmentRes?.data?.shipmentId || finalDocId;
       }
-      const newShipmentId = shipmentRes?.data?.shipmentId || manualShipmentId;
-      setCreatedShipmentId(newShipmentId);
+
+      setCreatedShipmentId(finalDocId);
 
       // --- Assign to Trip if selected ---
       if (tripDecision && tripDecision.tripId) {
         const targetTripId = tripDecision.tripId;
         await assignShipmentToTruckTrip({
-          trackingDocId: newShipmentId,
+          trackingDocId: finalDocId,
           truckTripId: targetTripId,
         });
 
         setFinalTripId(targetTripId);
-
         setShipmentDraft(null);
 
         window.open(
@@ -174,8 +229,8 @@ export default function UnifiedShipmentModal({
         setFinalTripId(null);
       }
 
-      onSuccess(); // Trigger parent callback to refresh data and close modal if needed
-      setStep(3);
+      if (onSuccess) onSuccess(); // Refresh the board
+      setStep(3); // Show completion screen
     } catch (err) {
       console.error(err);
       alert("Error: " + err.message);
@@ -344,13 +399,13 @@ export default function UnifiedShipmentModal({
               />
               <div>
                 <h2
-                  className={`text-xl sm:text-2xl font-bold ${
-                    isDark ? "text-white" : "text-slate-900"
-                  }`}
+                  className={`text-xl sm:text-2xl font-bold ${isDark ? "text-white" : "text-slate-900"}`}
                 >
                   {finalTripId
                     ? `Shipment Assigned to ${finalTripId}`
-                    : `Shipment Created (${isPickup ? "Pending Pickup" : "Pending"})`}
+                    : editData
+                      ? "Shipment Updated Successfully" // ✅ New text for updates
+                      : `Shipment Created (${isPickup ? "Pending Pickup" : "Pending"})`}
                 </h2>
                 {sendSms && (
                   <p

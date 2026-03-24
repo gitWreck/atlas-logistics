@@ -214,21 +214,21 @@ export default function ReceivePackageForm({
     }));
 
     // 2. Auto-fill Contact Address if warehouse has data
-    if (selected?.city && selected?.province) {
-      if (type === "origin") {
-        setSender((prev) => ({
-          ...prev,
-          city: selected.city,
-          province: selected.province,
-        }));
-      } else if (type === "destination") {
-        setRecipient((prev) => ({
-          ...prev,
-          city: selected.city,
-          province: selected.province,
-        }));
-      }
-    }
+    // if (selected?.city && selected?.province) {
+    //   if (type === "origin") {
+    //     setSender((prev) => ({
+    //       ...prev,
+    //       city: selected.city,
+    //       province: selected.province,
+    //     }));
+    //   } else if (type === "destination") {
+    //     setRecipient((prev) => ({
+    //       ...prev,
+    //       city: selected.city,
+    //       province: selected.province,
+    //     }));
+    //   }
+    // }
   };
 
   const handleNext = (e) => {
