@@ -111,7 +111,9 @@ export default function TruckModal({
         {/* Header */}
         <div
           className={`p-4 border-b flex justify-between items-center ${
-            isDark ? "border-slate-800 bg-slate-950" : "border-slate-200 bg-slate-50"
+            isDark
+              ? "border-slate-800 bg-slate-950"
+              : "border-slate-200 bg-slate-50"
           }`}
         >
           <h3
@@ -183,7 +185,9 @@ export default function TruckModal({
                     : "bg-white border-slate-300 text-slate-900"
                 }`}
               >
+                <option>12-Wheeler Wing Van</option>
                 <option>10-Wheeler Wing Van</option>
+                <option>8-Wheeler Wing Van</option>
                 <option>6-Wheeler Closed Van</option>
                 <option>4-Wheeler Reefer</option>
                 <option>Tractor Head</option>
