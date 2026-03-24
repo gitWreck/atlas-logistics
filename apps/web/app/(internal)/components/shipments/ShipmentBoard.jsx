@@ -11,21 +11,17 @@ import {
   faSearch,
   faSync,
   faFilter,
-  faTruckFast,
-  faFileCsv,
-  faCalendarAlt,
   faChevronLeft,
   faChevronRight,
   faExclamationCircle,
 } from "@fortawesome/free-solid-svg-icons";
 import ShipmentRow from "./ShipmentRow";
 import ShipmentDrawer from "./ShipmentDrawer";
-import ReceivePackageForm from "./ReceivePackageForm";
 import { calculateProgress } from "@/app/utility/utilities";
 import UnifiedShipmentModal from "./UnifiedShipmentModal";
 
 const ShipmentBoard = forwardRef(function ShipmentBoard(
-  { user, userRole, profile, isDark = false },
+  { user, profile, isDark = false },
   ref,
 ) {
   const [shipments, setShipments] = useState([]);
@@ -200,10 +196,6 @@ const ShipmentBoard = forwardRef(function ShipmentBoard(
     alert(`Logic to SMS ${phone} for Order ${shipment.trackingNumber}`);
   };
 
-  // const handleSuccess = () => {
-  //   fetchShipments();
-  // };
-
   useImperativeHandle(
     ref,
     () => ({
@@ -214,7 +206,7 @@ const ShipmentBoard = forwardRef(function ShipmentBoard(
 
   return (
     <div
-      className={`min-h-screen font-sans ${isDark ? "bg-slate-950 text-slate-200" : "bg-slate-50 text-slate-900"}`}
+      className={`font-sans ${isDark ? "bg-slate-950 text-slate-200" : "bg-slate-50 text-slate-900"}`}
     >
       {/* --- MAIN CONTENT --- */}
       <main
@@ -303,30 +295,6 @@ const ShipmentBoard = forwardRef(function ShipmentBoard(
                     onChange={(e) => setEndDate(e.target.value)}
                   />
                 </div>
-
-                {/* NEW: Mode Filter */}
-                {/* <div className="relative w-full sm:w-36">
-                  <FontAwesomeIcon
-                    icon={faTruckFast} // Or faStore / faTruckPickup
-                    className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-sm"
-                  />
-                  <select
-                    className={`w-full rounded-lg pl-9 pr-4 py-2 text-sm focus:border-blue-500 focus:outline-none appearance-none cursor-pointer border ${
-                      isDark
-                        ? "bg-slate-900 border-slate-700 text-white"
-                        : "bg-white border-slate-300 text-slate-900"
-                    }`}
-                    value={modeFilter}
-                    onChange={(e) => {
-                      setModeFilter(e.target.value);
-                      setCurrentPage(1);
-                    }}
-                  >
-                    <option value="ALL">All Modes</option>
-                    <option value="DROP_OFF">Hub Drop-offs</option>
-                    <option value="PICKUP">Pickups</option>
-                  </select>
-                </div> */}
 
                 {/* 3. MAIN FILTER */}
                 <div className="relative w-full sm:w-36">
