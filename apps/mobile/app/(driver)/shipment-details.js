@@ -16,7 +16,10 @@ import GetLocation from "react-native-get-location";
 import { StatusBar } from "expo-status-bar";
 
 import { db, storage } from "../../firebase";
-import { updateShipmentStatus } from "../../components/utilities/FirebaseFunctions";
+import {
+  updateShipmentStatus,
+  sendManualSMS,
+} from "../../components/utilities/FirebaseFunctions";
 
 // COMPONENTS
 import ShipmentDetailHeader from "../../components/driver/shipment/ShipmentDetailHeader";
@@ -24,8 +27,8 @@ import ShipmentHeaderCard from "../../components/driver/shipment/ShipmentHeaderC
 import PhotoUploadSection from "../../components/driver/shipment/PhotoUploadSection";
 import PackageTable from "../../components/driver/shipment/PackageTable";
 import ShipmentActionFooter from "../../components/driver/shipment/ShipmentActionFooter";
-import ExistingProofsViewer from "../../components/driver/shipment/ExistingProofsViewer";
 import ReportIssueModal from "../../components/driver/shipment/ReportIssueModal";
+import ExistingProofsViewer from "../../components/tracking/ExistingProofsViewer";
 
 export default function ShipmentDetailsScreen() {
   const { shipmentId, tripId, tripType } = useLocalSearchParams();
@@ -36,6 +39,8 @@ export default function ShipmentDetailsScreen() {
   const [actionLoading, setActionLoading] = useState(false);
   const [photos, setPhotos] = useState([]);
   const [isIssueModalVisible, setIsIssueModalVisible] = useState(false);
+
+  const [actionMessage, setActionMessage] = useState("");
 
   // 1. Fetch Shipment
   useEffect(() => {
@@ -280,6 +285,30 @@ export default function ShipmentDetailsScreen() {
     }
   };
 
+  const handleManualSMS = async () => {
+    if (!actionMessage.trim()) {
+      Alert.alert("Empty Message", "Please type a message before sending.");
+      return;
+    }
+
+    try {
+      // Call your Cloud Function
+      await sendManualSMS({
+        phoneNumber: shipment.consigneePhone || shipment.customerPhone, // Adjust based on your schema
+        message: actionMessage,
+        shipmentId: shipmentId,
+        tripId: tripId,
+        reason: "driver_update",
+      });
+
+      Alert.alert("Success", "SMS sent to customer.");
+      setActionMessage(""); // Clear message after manual send
+    } catch (error) {
+      console.error(error);
+      Alert.alert("SMS Failed", error.message);
+    }
+  };
+
   if (loading) {
     return (
       <View style={[styles.center, { backgroundColor: "#f1f5f9" }]}>
@@ -294,6 +323,7 @@ export default function ShipmentDetailsScreen() {
     shipment?.status === "OUT_FOR_DELIVERY";
 
   console.log("tripType", tripType);
+  console.log("shipment under shipment-details", shipment);
 
   return (
     <SafeAreaView style={styles.container}>
@@ -312,8 +342,8 @@ export default function ShipmentDetailsScreen() {
           proofOfDelivery={shipment.proofOfDelivery}
         />
 
-        {/* Photo Upload (Dynamic Title) */}
-        {needsPhotoUpload && (
+        {/* --- DYNAMIC UI: ONLY SHOW ACTIONS FOR LOCAL ROUTES --- */}
+        {tripType !== "HUB_TRANSFER" && needsPhotoUpload && (
           <PhotoUploadSection
             title={
               shipment?.status === "PENDING_PICKUP"
@@ -324,25 +354,6 @@ export default function ShipmentDetailsScreen() {
             onPickImage={pickImage}
             onRemovePhoto={removePhoto}
           />
-        )}
-
-        {/* --- DYNAMIC UI: ONLY SHOW ACTIONS FOR LOCAL ROUTES --- */}
-        {tripType !== "HUB_TRANSFER" && (
-          <>
-            {/* 4. Photo Upload (Dynamic Title) */}
-            {needsPhotoUpload && (
-              <PhotoUploadSection
-                title={
-                  shipment?.status === "PENDING_PICKUP"
-                    ? "Proof of Receipt"
-                    : "Proof of Delivery"
-                }
-                photos={photos}
-                onPickImage={pickImage}
-                onRemovePhoto={removePhoto}
-              />
-            )}
-          </>
         )}
 
         {/* Paginated Packages Table */}
@@ -357,8 +368,15 @@ export default function ShipmentDetailsScreen() {
           actionLoading={actionLoading}
           onAction={handleAction}
           onReportIssue={() => setIsIssueModalVisible(true)}
+          message={actionMessage} // ✅ Pass state
+          onMessageChange={setActionMessage} // ✅ Pass setter
+          isPickup={shipment?.status === "PENDING_PICKUP"}
+          photoCount={photos.length} // ✅ Pass photo count
+          tripType={tripType} // ✅ Pass trip type
+          onSendSMS={handleManualSMS}
         />
       )}
+
       {/* Report Issue Modal */}
       <ReportIssueModal
         visible={isIssueModalVisible}

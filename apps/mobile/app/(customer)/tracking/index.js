@@ -1,6 +1,13 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   ActivityIndicator,
+  Alert,
   SafeAreaView,
   ScrollView,
   StyleSheet,
@@ -12,17 +19,15 @@ import { StatusBar } from "expo-status-bar";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { doc, getDoc } from "firebase/firestore";
 import { Image } from "expo-image";
-
 import { db } from "../../../firebase";
-import { STATUS_STEPS } from "../../../components/constants/tracking-constants"; // Import constants
 
 // Import our new components
 import StatusRouteCard from "../../../components/tracking/StatusRouteCard";
 import TrackingMap from "../../../components/tracking/TrackingMap";
-// import TrackingTimeline from "../../../components/tracking/TrackingTimeline";
 import TrackingTimeline from "../../../components/tracking/TrackingTimelines";
 import ProofOfDelivery from "../../../components/tracking/ProofOfDelivery";
 import ShipmentStats from "../../../components/tracking/ShipmentStats";
+import ExistingProofsViewer from "../../../components/tracking/ExistingProofsViewer";
 
 // Hardcoded package location for Divisoria
 const PACKAGE_LOCATION = {
@@ -41,6 +46,7 @@ export default function CustomerTrackingDetailsScreen() {
   const [data, setData] = useState(null);
   const [photos, setPhotos] = useState([]);
   const [selectedStepIndex, setSelectedStepIndex] = useState(null);
+  // const [pickupLoading, setPickupLoading] = useState(false);
   const mapRef = useRef(null);
 
   const normalizedTracking = useMemo(
@@ -51,46 +57,83 @@ export default function CustomerTrackingDetailsScreen() {
     [trackingId],
   );
 
-  // --- DATA FETCHING ---
-  useEffect(() => {
-    const fetchData = async () => {
-      if (!normalizedTracking) {
-        setError("Invalid tracking number.");
+  // --- LOGIC: Dynamic Status Steps ---
+  // --- LOGIC: Dynamic Status Steps ---
+  const dynamicStatusSteps = useMemo(() => {
+    // Determine if it's a pickup order based on your Firebase data flag
+    const isPickupOrder = data?.isPickupRequested === true;
+
+    return isPickupOrder
+      ? [
+          {
+            code: "PENDING_PICKUP",
+            label: "Pending Pickup",
+            iconName: "clock",
+          },
+          { code: "PICKED_UP", label: "Picked Up", iconName: "box-open" },
+          { code: "RECEIVED", label: "Received at Hub", iconName: "warehouse" },
+          { code: "LOADED", label: "Loaded", iconName: "pallet" },
+          { code: "IN_TRANSIT", label: "In Transit", iconName: "truck" },
+          {
+            code: "OUT_FOR_DELIVERY",
+            label: "Out for Delivery",
+            iconName: "route",
+          },
+          { code: "DELIVERED", label: "Delivered", iconName: "check-circle" },
+        ]
+      : [
+          { code: "CREATED", label: "Created", iconName: "file-signature" },
+          { code: "RECEIVED", label: "Received at Hub", iconName: "warehouse" },
+          { code: "LOADED", label: "Loaded", iconName: "pallet" },
+          { code: "IN_TRANSIT", label: "In Transit", iconName: "truck" },
+          {
+            code: "OUT_FOR_DELIVERY",
+            label: "Out for Delivery",
+            iconName: "route",
+          },
+          { code: "DELIVERED", label: "Delivered", iconName: "check-circle" },
+        ];
+  }, [data?.isPickupRequested]);
+
+  const fetchData = useCallback(async () => {
+    if (!normalizedTracking) {
+      setError("Invalid tracking number.");
+      setLoading(false);
+      return;
+    }
+
+    try {
+      setLoading(true);
+      setError("");
+
+      const publicRef = doc(db, "shipments", normalizedTracking);
+      const snap = await getDoc(publicRef);
+
+      if (!snap.exists()) {
+        setError("Shipment not found. Please check your tracking ID.");
         setLoading(false);
         return;
       }
 
-      try {
-        setLoading(true);
-        setError("");
-
-        const publicRef = doc(db, "shipments", normalizedTracking);
-        const snap = await getDoc(publicRef);
-
-        if (!snap.exists()) {
-          setError("Shipment not found. Please check your tracking ID.");
-          setLoading(false);
-          return;
-        }
-
-        setData({ id: snap.id, ...snap.data() });
-        // NOTE: Add Photos fetching here if needed later
-      } catch (err) {
-        console.error("Failed to load tracking details:", err);
-        setError("System offline. Please try again later.");
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchData();
+      setData({ id: snap.id, ...snap.data() });
+      // NOTE: Add Photos fetching here if needed later
+    } catch (err) {
+      console.error("Failed to load tracking details:", err);
+      setError("System offline. Please try again later.");
+    } finally {
+      setLoading(false);
+    }
   }, [normalizedTracking]);
 
-  // --- LOGIC: Active Step Calculation ---
+  // --- DATA FETCHING ---
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
   const activeStepIndex = useMemo(() => {
     if (!data?.status) return 0;
     const current = String(data.status).toUpperCase();
-    const idx = STATUS_STEPS.findIndex((s) => {
+    const idx = dynamicStatusSteps.findIndex((s) => {
       if (Array.isArray(s.code)) return s.code.includes(current);
       return s.code === current;
     });
@@ -113,7 +156,7 @@ export default function CustomerTrackingDetailsScreen() {
         const status = String(rawStatus).toUpperCase().trim();
 
         // Only include if status is in our known steps
-        const stepIndex = STATUS_STEPS.findIndex((step) => {
+        const stepIndex = dynamicStatusSteps.findIndex((step) => {
           const codes = Array.isArray(step.code) ? step.code : [step.code];
           return codes.some((c) => String(c).toUpperCase() === status);
         });
@@ -130,7 +173,7 @@ export default function CustomerTrackingDetailsScreen() {
   }, [data?.statusHistory]);
 
   const statusLocationsPerStep = useMemo(() => {
-    const buckets = STATUS_STEPS.map(() => []);
+    const buckets = dynamicStatusSteps.map(() => []);
     if (!data?.statusHistory) return buckets;
 
     data.statusHistory.forEach((entry) => {
@@ -142,7 +185,7 @@ export default function CustomerTrackingDetailsScreen() {
       if (!lat || !lng) return;
 
       const coordinate = { latitude: lat, longitude: lng };
-      const stepIndex = STATUS_STEPS.findIndex((step) => {
+      const stepIndex = dynamicStatusSteps.findIndex((step) => {
         const codes = Array.isArray(step.code) ? step.code : [step.code];
         return codes.some((c) => String(c).toUpperCase() === status);
       });
@@ -269,6 +312,7 @@ export default function CustomerTrackingDetailsScreen() {
 
         {/* 3. Timeline */}
         <TrackingTimeline
+          steps={dynamicStatusSteps}
           activeIndex={activeStepIndex}
           selectedIndex={selectedStepIndex}
           onSelectStep={(idx) =>
@@ -278,7 +322,11 @@ export default function CustomerTrackingDetailsScreen() {
         />
 
         {/* 4. Photos */}
-        <ProofOfDelivery photos={photos} />
+        {/* <ProofOfDelivery photos={photos} /> */}
+        <ExistingProofsViewer
+          proofOfReceipt={data?.proofOfReceipt}
+          proofOfDelivery={data?.proofOfDelivery}
+        />
 
         {/* 5. Footer Stats */}
         <ShipmentStats total={totalItems} loaded={loaded} pending={pending} />
@@ -339,4 +387,21 @@ const styles = StyleSheet.create({
     backgroundColor: "#fee2e2",
   },
   errorButtonText: { color: "#991b1b", fontSize: 13, fontWeight: "600" },
+  requestPickupButton: {
+    marginTop: 14,
+    marginBottom: 12,
+    backgroundColor: "#042C83",
+    borderRadius: 10,
+    paddingVertical: 14,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  requestPickupButtonDisabled: {
+    opacity: 0.7,
+  },
+  requestPickupButtonText: {
+    color: "#ffffff",
+    fontSize: 15,
+    fontWeight: "700",
+  },
 });

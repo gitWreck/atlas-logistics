@@ -7,43 +7,59 @@ import {
   Platform,
   StatusBar,
 } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+import { FontAwesome5 } from "@expo/vector-icons";
 
-export default function ShipmentHeader({ shipmentId, onBack }) {
+export default function ShipmentHeader({ shipmentId, shipment, onBack }) {
   return (
-    <View style={styles.header}>
-      <TouchableOpacity onPress={onBack} style={styles.backBtn}>
-        <Ionicons name="arrow-back" size={22} color="#0f172a" />
-      </TouchableOpacity>
-      <View style={styles.textBlock}>
-        <View style={styles.headerRow}>
+    <View style={styles.container}>
+      <View style={styles.navBar}>
+        <TouchableOpacity onPress={onBack} style={styles.backBtn}>
+          <FontAwesome5 name="arrow-left" size={18} color="#0f172a" />
+        </TouchableOpacity>
+        <View style={styles.titleBlock}>
           <Text style={styles.title}>Shipment Contents</Text>
+          <Text style={styles.subtitle}>ID: {shipmentId}</Text>
         </View>
-        <Text style={styles.subtitle}>ID: {shipmentId}</Text>
+        <View style={styles.statusBadge}>
+          <Text style={styles.statusText}>
+            {shipment?.status.replaceAll("_", " ") || "PENDING"}
+          </Text>
+        </View>
       </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  header: {
-    paddingHorizontal: 20,
-    paddingTop:
-      Platform.OS === "android" ? (StatusBar.currentHeight || 0) + 12 : 24,
-    paddingBottom: 16,
+  container: {
     backgroundColor: "#ffffff",
+    paddingTop:
+      Platform.OS === "android" ? (StatusBar.currentHeight || 0) + 8 : 44,
+    zIndex: 10,
+  },
+  navBar: {
     flexDirection: "row",
     alignItems: "center",
-    borderBottomWidth: 1,
-    borderColor: "#cbd5e1",
+    paddingHorizontal: 16,
+    paddingBottom: 12,
   },
-  headerRow: {
-    flexDirection: "row", // ✅ This puts them on the same line
-    alignItems: "baseline", // ✅ Aligns the bottom of the texts perfectly
-    gap: 6, // ✅ Adds a little space between the two words
+  backBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: "#f8fafc",
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 12,
   },
-  backBtn: { padding: 8, marginRight: 8 },
-  textBlock: { flex: 1 },
-  title: { fontSize: 16, fontWeight: "700", color: "#0f172a" },
-  subtitle: { color: "#475569", fontSize: 12, marginTop: 2 },
+  titleBlock: { flex: 1 },
+  title: { fontSize: 16, fontWeight: "800", color: "#0f172a" },
+  subtitle: { color: "#64748b", fontSize: 11, fontWeight: "600" },
+  statusBadge: {
+    backgroundColor: "#eff6ff",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  statusText: { fontSize: 10, fontWeight: "700", color: "#2563eb" },
 });

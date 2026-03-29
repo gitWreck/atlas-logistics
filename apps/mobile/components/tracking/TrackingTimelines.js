@@ -4,6 +4,7 @@ import { COLORS, STATUS_STEPS } from "../constants/tracking-constants";
 import { FontAwesome5 } from "@expo/vector-icons";
 
 export default function TrackingTimeline({
+  steps,
   activeIndex,
   selectedIndex,
   onSelectStep,
@@ -11,10 +12,10 @@ export default function TrackingTimeline({
 }) {
   return (
     <View style={styles.timelineWrapper}>
-      {STATUS_STEPS.map((step, index) => {
+      {steps.map((step, index) => {
         const isActive = index <= activeIndex;
         const isLineActive = index < activeIndex;
-        const isLast = index === STATUS_STEPS.length - 1;
+        const isLast = index === steps.length - 1;
         const hasLocation =
           locationsPerStep[index] && locationsPerStep[index].length > 0;
         const isSelected = selectedIndex === index;
@@ -35,13 +36,6 @@ export default function TrackingTimeline({
                   isSelected && styles.selectedCircle,
                 ]}
               >
-                {/* <Image
-                  source={step.source}
-                  style={[
-                    styles.timelineStepIcon,
-                    { tintColor: isActive ? "#fff" : COLORS.GREY },
-                  ]}
-                /> */}
                 <FontAwesome5
                   name={step.iconName}
                   size={14}
@@ -100,7 +94,7 @@ const styles = StyleSheet.create({
   inactiveCircle: { backgroundColor: "#fff", borderColor: COLORS.GREY_LINE },
   selectedCircle: { borderColor: COLORS.ORANGE, borderWidth: 2.5 },
   timelineStepIcon: { width: 16, height: 16 },
-  timelineConnector: { width: 2, height: 28, marginVertical: 4 },
+  timelineConnector: { width: 2, height: 15, marginVertical: 4 },
   activeLine: { backgroundColor: COLORS.BLUE },
   inactiveLine: { backgroundColor: COLORS.GREY_LINE },
   timelineLabelWrapper: { justifyContent: "center", paddingTop: 4 },

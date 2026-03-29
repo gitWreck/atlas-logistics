@@ -65,7 +65,8 @@ exports.createShipmentBundle = onCall(
     let shipmentId = manualShipmentId;
     if (!shipmentId) {
       const dateStr = timestamp.toISOString().slice(0, 10).replace(/-/g, "");
-      shipmentId = `AT-${dateStr}-${finalOriginCode}-${finalDestCode}-${Date.now().toString().slice(-6)}`;
+      // shipmentId = `AT-${dateStr}-${finalOriginCode}-${finalDestCode}-${Date.now().toString().slice(-6)}`;
+      shipmentId = `AT-${dateStr}-SHP-${Date.now().toString().slice(-6)}`;
     }
 
     // Check for ID Collision

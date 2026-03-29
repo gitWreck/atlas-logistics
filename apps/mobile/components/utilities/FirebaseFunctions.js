@@ -4,14 +4,14 @@ import { app } from "../../firebase";
 const functions = getFunctions(app, "asia-southeast1");
 
 export const scanPackages = httpsCallable(functions, "scanPackages");
-export const finishLoadingTruck = httpsCallable(
+export const finalizeHubProcessing = httpsCallable(
   functions,
-  "finishLoadingTruck",
+  "finalizeHubProcessing",
 );
 
 export const updateShipmentPackages = httpsCallable(
   functions,
-  "updateShipmentPaackages",
+  "updateShipmentPackages",
 );
 export const updateShipmentStatus = httpsCallable(
   functions,
@@ -29,13 +29,25 @@ export const addTrackedShipment = httpsCallable(
   functions,
   "addTrackedShipment",
 );
+export const requestShipmentPickup = httpsCallable(
+  functions,
+  "requestShipmentPickup",
+);
 export const bulkShipmentAction = httpsCallable(
   functions,
   "bulkShipmentAction",
 );
 
-// ----------------------------
-export const bulkUpdateShipmentStatus = httpsCallable(
+// Messaging
+export const sendManualSMS = httpsCallable(functions, "sendManualSMS");
+
+// user actions
+export const updateUserProfileMobile = httpsCallable(
   functions,
-  "bulkUpdateShipmentStatus",
+  "updateUserProfileMobile",
 );
+export const requestRecoveryOTP = httpsCallable(
+  functions,
+  "requestRecoveryOTP",
+);
+export const verifyRecoveryOTP = httpsCallable(functions, "verifyRecoveryOTP");

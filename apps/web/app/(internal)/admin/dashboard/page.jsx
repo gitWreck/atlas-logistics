@@ -109,7 +109,7 @@ export default function AdminDashboardPage() {
       };
     if (activeTab === "trucks")
       return {
-        label: "Register Truck",
+        label: "Truck",
         icon: faPlus,
         accent: "blue",
         onClick: () => truckBoardRef.current?.openRegisterModal?.(),

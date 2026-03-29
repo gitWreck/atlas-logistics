@@ -35,17 +35,31 @@ exports.toggleUserStatus =
   require("./src/users/toggleUserStatus").toggleUserStatus;
 exports.addTrackedShipment =
   require("./src/users/addTrackedShipment").addTrackedShipment;
+exports.requestShipmentPickup =
+  require("./src/users/requestShipmentPickup").requestShipmentPickup;
 exports.resolveDelayReport =
   require("./src/trips/resolveDelayReport").resolveDelayReport;
+
+// user actions
+exports.updateUserProfileMobile =
+  require("./src/users/updateUserProfileMobile").updateUserProfileMobile;
+exports.requestRecoveryOTP = require("./src/users/recovery").requestRecoveryOTP;
+exports.verifyRecoveryOTP = require("./src/users/recovery").verifyRecoveryOTP;
+
+// ------------------------------------------
 
 // packages
 exports.createShipmentBundle =
   require("./src/shipments/createShipmentBundle").createShipmentBundle;
 exports.createShipmentWithPackages =
   require("./src/shipments/createShipmentWithPackages").createShipmentWithPackages;
-exports.scanPackages = require("./src/packages/scanPackages").scanPackages;
+exports.updateShipmentStatus =
+  require("./src/shipments/updateShipmentStatus").updateShipmentStatus;
+exports.updatePackageStatus =
+  require("./src/shipments/updatePackageStatus").updatePackageStatus;
 exports.updateShipmentPackages =
   require("./src/packages/updateShipmentPackages").updateShipmentPackages;
+exports.scanPackages = require("./src/packages/scanPackages").scanPackages;
 
 // ------------------------------------------
 // Trips
@@ -98,6 +112,8 @@ exports.updateShipmentStatusChecker =
   require("./src/shipments/updateShipmentStatusChecker").updateShipmentStatusChecker;
 exports.finalizeHubProcessing =
   require("./src/trips/finalizeHubProcessing").finalizeHubProcessing;
+exports.updateShipmentDetails =
+  require("./src/shipments/updateShipmentDetails").updateShipmentDetails;
 
 // Manifests & Certificates
 exports.generateTripManifest =
