@@ -1,5 +1,10 @@
+"use client";
+
+import React from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faWineGlass, faSnowflake } from "@fortawesome/free-solid-svg-icons";
+import { getModalThemeClasses } from "@/app/utility/constant/theme";
+import { getModalActionClasses } from "@/app/utility/constant/action";
 
 export default function AddPackageForm({
   newPackage,
@@ -7,109 +12,145 @@ export default function AddPackageForm({
   setIsAdding,
   handleAddSave,
   isSaving,
-  isDark,
-  packagingTypes,
+  isDark = false,
+  packagingTypes = [],
 }) {
-  const inputClass = `w-full border rounded-lg px-3 py-2 text-sm outline-none focus:border-blue-500 ${
-    isDark
-      ? "bg-slate-900 border-slate-700 text-white"
-      : "bg-white border-slate-300 text-slate-900"
-  }`;
+  const theme = getModalThemeClasses(isDark);
+  const action = getModalActionClasses();
+
+  const inactiveToggleClass = isDark
+    ? "bg-slate-900 border-slate-700 text-slate-500"
+    : "bg-slate-100 border-slate-300 text-slate-600";
 
   return (
     <div
-      className={`border p-4 rounded-xl space-y-3 ${isDark ? "bg-blue-500/5 border-blue-500/30" : "bg-blue-50 border-blue-200"}`}
+      className={`border p-4 rounded-xl space-y-3 ${
+        isDark
+          ? "bg-blue-500/5 border-blue-500/30"
+          : "bg-blue-50 border-blue-200"
+      }`}
     >
       <div
-        className={`text-xs font-bold uppercase mb-2 ${isDark ? "text-blue-400" : "text-blue-600"}`}
+        className={`text-xs font-bold uppercase mb-2 ${
+          isDark ? "text-blue-400" : "text-blue-600"
+        }`}
       >
         New Package Details
       </div>
+
       <input
+        type="text"
         placeholder="Description (e.g. Large Box)"
-        className={inputClass}
+        className={`w-full border rounded-lg px-3 py-2 text-sm outline-none focus:border-blue-500 ${theme.input}`}
         value={newPackage.description}
         onChange={(e) =>
-          setNewPackage((p) => ({ ...p, description: e.target.value }))
+          setNewPackage((prev) => ({
+            ...prev,
+            description: e.target.value,
+          }))
         }
         autoFocus
       />
+
       <div className="grid grid-cols-2 gap-2">
         <select
-          className={inputClass}
+          className={`w-full border rounded-lg px-3 py-2 text-sm outline-none focus:border-blue-500 ${theme.input}`}
           value={newPackage.packagingType}
           onChange={(e) =>
-            setNewPackage((p) => ({ ...p, packagingType: e.target.value }))
+            setNewPackage((prev) => ({
+              ...prev,
+              packagingType: e.target.value,
+            }))
           }
         >
-          {packagingTypes.map((t) => (
-            <option key={t} value={t}>
-              {t}
+          {packagingTypes.map((type) => (
+            <option key={type} value={type}>
+              {type}
             </option>
           ))}
         </select>
+
         <input
           type="number"
           placeholder="Quantity"
-          className={inputClass}
-          value={newPackage.quantity}
+          className={`w-full border rounded-lg px-3 py-2 text-sm outline-none focus:border-blue-500 ${theme.input}`}
+          value={newPackage.quantity || ""}
           onChange={(e) =>
-            setNewPackage((p) => ({ ...p, quantity: e.target.value }))
+            setNewPackage((prev) => ({
+              ...prev,
+              quantity: e.target.value,
+            }))
           }
         />
       </div>
+
       <div className="grid grid-cols-2 gap-2">
         <input
           type="number"
           placeholder="Value (PHP)"
-          className={inputClass}
-          value={newPackage.declaredValue}
+          className={`w-full border rounded-lg px-3 py-2 text-sm outline-none focus:border-blue-500 ${theme.input}`}
+          value={newPackage.declaredValue || ""}
           onChange={(e) =>
-            setNewPackage((p) => ({ ...p, declaredValue: e.target.value }))
+            setNewPackage((prev) => ({
+              ...prev,
+              declaredValue: e.target.value,
+            }))
           }
         />
+
         <div className="flex gap-2 items-center">
           <button
+            type="button"
             onClick={() =>
-              setNewPackage((p) => ({ ...p, isFragile: !p.isFragile }))
+              setNewPackage((prev) => ({
+                ...prev,
+                isFragile: !prev.isFragile,
+              }))
             }
             className={`flex-1 h-full rounded-lg border text-xs font-bold flex items-center justify-center gap-2 transition-all ${
               newPackage.isFragile
                 ? "bg-amber-500/10 border-amber-500 text-amber-500"
-                : isDark
-                  ? "bg-slate-900 border-slate-700 text-slate-500"
-                  : "bg-slate-100 border-slate-300 text-slate-600"
+                : inactiveToggleClass
             }`}
           >
-            <FontAwesomeIcon icon={faWineGlass} /> Fragile
+            <FontAwesomeIcon icon={faWineGlass} />
+            Fragile
           </button>
+
           <button
+            type="button"
             onClick={() =>
-              setNewPackage((p) => ({ ...p, isPerishable: !p.isPerishable }))
+              setNewPackage((prev) => ({
+                ...prev,
+                isPerishable: !prev.isPerishable,
+              }))
             }
             className={`flex-1 h-full rounded-lg border text-xs font-bold flex items-center justify-center gap-2 transition-all ${
               newPackage.isPerishable
                 ? "bg-cyan-500/10 border-cyan-500 text-cyan-500"
-                : isDark
-                  ? "bg-slate-900 border-slate-700 text-slate-500"
-                  : "bg-slate-100 border-slate-300 text-slate-600"
+                : inactiveToggleClass
             }`}
           >
-            <FontAwesomeIcon icon={faSnowflake} /> Perishable
+            <FontAwesomeIcon icon={faSnowflake} />
+            Perishable
           </button>
         </div>
       </div>
+
       <div className="flex justify-end gap-2 pt-2">
         <button
+          type="button"
           onClick={() => setIsAdding(false)}
-          className={`px-4 py-2 text-sm font-bold ${isDark ? "text-slate-400" : "text-slate-600"}`}
+          className={theme.secondaryButton}
         >
           Cancel
         </button>
+
         <button
+          type="button"
           onClick={handleAddSave}
           disabled={isSaving}
-          className="px-4 py-2 rounded-lg text-sm font-bold bg-blue-600 text-white disabled:opacity-50"
+          className={action.primaryInline}
         >
           {isSaving ? "Saving..." : "Save"}
         </button>

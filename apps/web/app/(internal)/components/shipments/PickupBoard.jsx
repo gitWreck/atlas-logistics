@@ -1,4 +1,5 @@
 "use client";
+
 import React, {
   useState,
   useMemo,
@@ -19,6 +20,7 @@ import ShipmentRow from "./ShipmentRow";
 import ShipmentDrawer from "./ShipmentDrawer";
 import UnifiedShipmentModal from "./UnifiedShipmentModal";
 import { calculateProgress } from "@/app/utility/utilities";
+import { getBoardThemeClasses } from "@/app/utility/constant/theme";
 
 const PickupBoard = forwardRef(function PickupBoard(
   { user, profile, isDark = false },
@@ -27,23 +29,21 @@ const PickupBoard = forwardRef(function PickupBoard(
   const [pickups, setPickups] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // Modal & Drawer State
   const [isNewPickupModalOpen, setIsNewPickupModalOpen] = useState(false);
   const [selectedPickupId, setSelectedPickupId] = useState(null);
-  const [editingPickup, setEditingPickup] = useState(null); // ✅ NEW: Tracks which shipment is being edited
+  const [editingPickup, setEditingPickup] = useState(null);
 
-  // Search & Filter State
   const [activeFilter, setActiveFilter] = useState("ALL");
   const [searchQuery, setSearchQuery] = useState("");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [delayType, setDelayType] = useState("ALL");
 
-  // Pagination
   const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage] = useState(10);
+  const itemsPerPage = 10;
 
-  // --- 1. DATA FETCHING ---
+  const theme = getBoardThemeClasses(isDark);
+
   const fetchPickups = async () => {
     try {
       setLoading(true);
@@ -55,7 +55,6 @@ const PickupBoard = forwardRef(function PickupBoard(
 
       const token = await user.getIdToken();
 
-      // ✅ Calling a dedicated API that ONLY returns pickup requests
       const res = await fetch("/api/shipments/pickups", {
         method: "GET",
         headers: {
@@ -72,9 +71,9 @@ const PickupBoard = forwardRef(function PickupBoard(
 
       const data = await res.json();
 
-      const formatted = data.pickups.map((p) => ({
-        ...p,
-        progress: calculateProgress(p.status),
+      const formatted = (data.pickups || []).map((pickup) => ({
+        ...pickup,
+        progress: calculateProgress(pickup.status),
       }));
 
       setPickups(formatted);
@@ -90,16 +89,12 @@ const PickupBoard = forwardRef(function PickupBoard(
     fetchPickups();
   }, [user]);
 
-  // --- 2. FILTER LOGIC ---
   const filteredPickups = useMemo(() => {
-    setCurrentPage(1); // Reset pagination on filter change
-
-    return pickups.filter((p) => {
-      // A. Search
+    return pickups.filter((pickup) => {
       const searchContent = [
-        p.trackingNumber,
-        p.sender?.name,
-        p.recipient?.name,
+        pickup.trackingNumber,
+        pickup.sender?.name,
+        pickup.recipient?.name,
       ]
         .filter(Boolean)
         .join(" ")
@@ -107,63 +102,71 @@ const PickupBoard = forwardRef(function PickupBoard(
 
       if (!searchContent.includes(searchQuery.toLowerCase())) return false;
 
-      // B. Date Range
       if (startDate || endDate) {
-        const reqDate = p.createdAt?._seconds
-          ? new Date(p.createdAt._seconds * 1000)
-          : new Date(p.createdAt);
+        const pickupDate = pickup.createdAt?._seconds
+          ? new Date(pickup.createdAt._seconds * 1000)
+          : new Date(pickup.createdAt);
 
         if (startDate) {
           const start = new Date(startDate);
           start.setHours(0, 0, 0, 0);
-          if (reqDate < start) return false;
+          if (pickupDate < start) return false;
         }
+
         if (endDate) {
           const end = new Date(endDate);
           end.setHours(23, 59, 59, 999);
-          if (reqDate > end) return false;
+          if (pickupDate > end) return false;
         }
       }
 
-      // C. Status & Delay
       if (activeFilter !== "ALL") {
-        if (activeFilter === "ACTIVE" && p.status === "DELIVERED") return false;
+        if (activeFilter === "ACTIVE" && pickup.status === "DELIVERED") {
+          return false;
+        }
 
         if (activeFilter === "DELAYED") {
-          if (p.status !== "DELAYED") return false;
-          if (delayType !== "ALL" && p.delayReason !== delayType) return false;
+          if (pickup.status !== "DELAYED") return false;
+          if (delayType !== "ALL" && pickup.delayReason !== delayType) {
+            return false;
+          }
         } else if (activeFilter !== "ACTIVE") {
-          if (p.status !== activeFilter) return false;
+          if (pickup.status !== activeFilter) return false;
         }
       }
 
       return true;
     });
-  }, [searchQuery, activeFilter, pickups, startDate, endDate, delayType]);
+  }, [pickups, searchQuery, startDate, endDate, activeFilter, delayType]);
 
-  // --- 3. PAGINATION ---
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, startDate, endDate, activeFilter, delayType]);
+
   const indexOfLastItem = currentPage * itemsPerPage;
   const indexOfFirstItem = indexOfLastItem - itemsPerPage;
   const currentItems = filteredPickups.slice(indexOfFirstItem, indexOfLastItem);
   const totalPages = Math.ceil(filteredPickups.length / itemsPerPage) || 1;
 
-  // --- 4. HELPERS ---
   const uniqueDelayReasons = useMemo(() => {
     const reasons = new Set(
       pickups
-        .filter((p) => p.status === "DELAYED" && p.delayReason)
-        .map((p) => p.delayReason),
+        .filter((pickup) => pickup.status === "DELAYED" && pickup.delayReason)
+        .map((pickup) => pickup.delayReason),
     );
+
     return Array.from(reasons);
   }, [pickups]);
 
-  const selectedPickup = pickups.find((p) => p.id === selectedPickupId);
+  const selectedPickup = pickups.find(
+    (pickup) => pickup.id === selectedPickupId,
+  );
 
   useImperativeHandle(
     ref,
     () => ({
       openCreateModal: () => {
-        setEditingPickup(null); // ✅ Ensure it opens in Create Mode
+        setEditingPickup(null);
         setIsNewPickupModalOpen(true);
       },
     }),
@@ -171,25 +174,24 @@ const PickupBoard = forwardRef(function PickupBoard(
   );
 
   return (
-    <div
-      className={`min-h-screen font-sans ${isDark ? "bg-slate-950 text-slate-200" : "bg-slate-50 text-slate-900"}`}
-    >
+    <div className={`min-h-screen font-sans ${theme.page}`}>
       <main className="mx-auto p-4 sm:p-6">
         <div
-          className={`border rounded-xl overflow-hidden shadow-xl backdrop-blur-sm ${isDark ? "border-slate-800 bg-slate-900/50" : "border-slate-200 bg-white"}`}
+          className={`border rounded-xl overflow-hidden shadow-xl backdrop-blur-sm ${theme.board}`}
         >
-          {/* --- HEADER & CONTROLS --- */}
+          {/* Header */}
           <div
-            className={`px-4 sm:px-6 py-4 border-b flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4 ${isDark ? "border-slate-800 bg-slate-950/30" : "border-slate-200 bg-slate-50"}`}
+            className={`px-4 sm:px-6 py-4 border-b flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4 ${theme.header}`}
           >
             <h3
-              className={`font-bold whitespace-nowrap hidden xl:flex items-center gap-2 ${isDark ? "text-white" : "text-slate-900"}`}
+              className={`font-bold whitespace-nowrap hidden xl:flex items-center gap-2 ${theme.title}`}
             >
               Pickup Requests
               <button
+                type="button"
                 onClick={fetchPickups}
                 disabled={loading}
-                className={`transition-colors p-1 rounded ${isDark ? "text-slate-500 hover:text-white hover:bg-slate-800" : "text-slate-500 hover:text-slate-900 hover:bg-slate-200"}`}
+                className={`transition-colors p-1 rounded ${theme.refreshButton}`}
                 title="Refresh"
               >
                 <FontAwesomeIcon
@@ -205,46 +207,42 @@ const PickupBoard = forwardRef(function PickupBoard(
               <div className="relative flex-1 min-w-[200px]">
                 <FontAwesomeIcon
                   icon={faSearch}
-                  className={`absolute left-3 top-1/2 -translate-y-1/2 text-sm ${isDark ? "text-slate-500" : "text-slate-400"}`}
+                  className={`absolute left-3 top-1/2 -translate-y-1/2 text-sm ${theme.iconMuted}`}
                 />
                 <input
                   type="text"
                   placeholder="Search Tracking or Name..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className={`w-full border rounded-lg pl-9 pr-4 py-2 text-sm focus:border-blue-500 focus:outline-none ${isDark ? "bg-slate-900 border-slate-700 text-white" : "bg-white border-slate-300 text-slate-900"}`}
+                  className={`w-full border rounded-lg pl-9 pr-4 py-2 text-sm focus:border-blue-500 focus:outline-none ${theme.input}`}
                 />
               </div>
 
               <div className="flex gap-2 w-full sm:w-auto">
-                {/* Date Filter */}
+                {/* Date filter */}
                 <div
-                  className={`flex items-center gap-2 border rounded-lg px-2 py-1 flex-1 sm:flex-none justify-center ${isDark ? "bg-slate-900 border-slate-700" : "bg-white border-slate-300"}`}
+                  className={`flex items-center gap-2 border rounded-lg px-2 py-1 flex-1 sm:flex-none justify-center ${theme.filterWrap}`}
                 >
                   <input
                     type="date"
                     value={startDate}
                     onChange={(e) => setStartDate(e.target.value)}
-                    className={`bg-transparent text-xs outline-none w-24 ${isDark ? "text-white [color-scheme:dark]" : "text-slate-900 [color-scheme:light]"}`}
+                    className={`bg-transparent text-xs outline-none w-24 ${theme.dateInput}`}
                   />
-                  <span
-                    className={isDark ? "text-slate-600" : "text-slate-400"}
-                  >
-                    -
-                  </span>
+                  <span className={theme.iconMuted}>-</span>
                   <input
                     type="date"
                     value={endDate}
                     onChange={(e) => setEndDate(e.target.value)}
-                    className={`bg-transparent text-xs outline-none w-24 ${isDark ? "text-white [color-scheme:dark]" : "text-slate-900 [color-scheme:light]"}`}
+                    className={`bg-transparent text-xs outline-none w-24 ${theme.dateInput}`}
                   />
                 </div>
 
-                {/* Status Filter */}
+                {/* Status filter */}
                 <div className="relative w-full sm:w-40">
                   <FontAwesomeIcon
                     icon={faFilter}
-                    className={`absolute left-3 top-1/2 -translate-y-1/2 text-sm ${isDark ? "text-slate-500" : "text-slate-400"}`}
+                    className={`absolute left-3 top-1/2 -translate-y-1/2 text-sm ${theme.iconMuted}`}
                   />
                   <select
                     value={activeFilter}
@@ -252,7 +250,7 @@ const PickupBoard = forwardRef(function PickupBoard(
                       setActiveFilter(e.target.value);
                       setDelayType("ALL");
                     }}
-                    className={`w-full border rounded-lg pl-9 pr-4 py-2 text-sm focus:border-blue-500 focus:outline-none appearance-none cursor-pointer ${isDark ? "bg-slate-900 border-slate-700 text-white" : "bg-white border-slate-300 text-slate-900"}`}
+                    className={`w-full border rounded-lg pl-9 pr-4 py-2 text-sm focus:border-blue-500 focus:outline-none appearance-none cursor-pointer ${theme.input}`}
                   >
                     <option value="ALL">All Pickups</option>
                     <option value="ACTIVE">Active Only</option>
@@ -267,17 +265,17 @@ const PickupBoard = forwardRef(function PickupBoard(
                 </div>
               </div>
 
-              {/* Conditional Delay Filter */}
+              {/* Delay reason filter */}
               {activeFilter === "DELAYED" && (
                 <div className="relative w-full sm:w-40 animate-in fade-in slide-in-from-right-2 duration-300">
                   <FontAwesomeIcon
                     icon={faExclamationCircle}
-                    className="absolute left-3 top-1/2 -translate-y-1/2 text-amber-500 text-sm"
+                    className={`absolute left-3 top-1/2 -translate-y-1/2 text-sm ${theme.warningIcon}`}
                   />
                   <select
                     value={delayType}
                     onChange={(e) => setDelayType(e.target.value)}
-                    className={`w-full border border-amber-500/50 rounded-lg pl-9 pr-4 py-2 text-sm focus:border-amber-500 focus:outline-none appearance-none cursor-pointer ${isDark ? "bg-slate-900 text-amber-100" : "bg-amber-50 text-amber-900"}`}
+                    className={`w-full border rounded-lg pl-9 pr-4 py-2 text-sm focus:border-amber-500 focus:outline-none appearance-none cursor-pointer ${theme.warningFilter}`}
                   >
                     <option value="ALL">All Reasons</option>
                     {uniqueDelayReasons.map((reason) => (
@@ -291,12 +289,11 @@ const PickupBoard = forwardRef(function PickupBoard(
             </div>
           </div>
 
-          {/* --- TABLE AREA --- */}
+          {/* Table */}
           <div className="md:overflow-x-auto">
             <div className="md:min-w-[900px]">
-              {/* Header Row */}
               <div
-                className={`hidden md:grid grid-cols-13 gap-4 px-6 py-3 border-b text-xs font-semibold uppercase tracking-wider ${isDark ? "border-slate-800 bg-slate-950 text-slate-500" : "border-slate-200 bg-slate-50 text-slate-600"}`}
+                className={`hidden md:grid grid-cols-13 gap-4 px-6 py-3 border-b text-xs font-semibold uppercase tracking-wider ${theme.tableHead}`}
               >
                 <div className="col-span-4">Tracking / Customer</div>
                 <div className="col-span-2">Pickup Route</div>
@@ -306,29 +303,26 @@ const PickupBoard = forwardRef(function PickupBoard(
                 <div className="col-span-1 text-right">Action</div>
               </div>
 
-              {/* Body */}
               <div className="min-h-[300px]">
                 {loading ? (
                   <div
-                    className={`p-10 text-center animate-pulse ${isDark ? "text-slate-500" : "text-slate-600"}`}
+                    className={`p-10 text-center animate-pulse ${theme.emptyText}`}
                   >
                     Loading pickup requests...
                   </div>
                 ) : filteredPickups.length === 0 ? (
-                  <div
-                    className={`p-10 text-center ${isDark ? "text-slate-500" : "text-slate-600"}`}
-                  >
+                  <div className={`p-10 text-center ${theme.emptyText}`}>
                     No pickup requests found.
                   </div>
                 ) : (
-                  currentItems.map((p) => (
+                  currentItems.map((pickup) => (
                     <ShipmentRow
-                      key={p.id}
-                      s={p}
+                      key={pickup.id}
+                      s={pickup}
                       onClick={setSelectedPickupId}
                       isDark={isDark}
                       onEdit={() => {
-                        setEditingPickup(p); // ✅ Pass the specific shipment data
+                        setEditingPickup(pickup);
                         setIsNewPickupModalOpen(true);
                       }}
                     />
@@ -338,24 +332,18 @@ const PickupBoard = forwardRef(function PickupBoard(
             </div>
           </div>
 
-          {/* --- PAGINATION FOOTER --- */}
+          {/* Pagination */}
           {filteredPickups.length > 0 && (
             <div
-              className={`px-4 sm:px-6 py-4 border-t flex justify-between items-center ${isDark ? "border-slate-800 bg-slate-950/30" : "border-slate-200 bg-slate-50"}`}
+              className={`px-4 sm:px-6 py-4 border-t flex flex-col sm:flex-row justify-between items-center gap-3 text-xs ${theme.footer}`}
             >
-              <span
-                className={`text-xs ${isDark ? "text-slate-500" : "text-slate-600"}`}
-              >
+              <span className={theme.footerText}>
                 Showing{" "}
-                <span
-                  className={`font-bold ${isDark ? "text-white" : "text-slate-900"}`}
-                >
+                <span className={`font-bold ${theme.footerStrong}`}>
                   {indexOfFirstItem + 1}
                 </span>{" "}
                 to{" "}
-                <span
-                  className={`font-bold ${isDark ? "text-white" : "text-slate-900"}`}
-                >
+                <span className={`font-bold ${theme.footerStrong}`}>
                   {Math.min(indexOfLastItem, filteredPickups.length)}
                 </span>{" "}
                 of {filteredPickups.length}
@@ -363,20 +351,23 @@ const PickupBoard = forwardRef(function PickupBoard(
 
               <div className="flex gap-2">
                 <button
+                  type="button"
                   onClick={() =>
                     setCurrentPage((prev) => Math.max(prev - 1, 1))
                   }
                   disabled={currentPage === 1}
-                  className={`px-3 py-1.5 rounded-lg border text-xs disabled:opacity-50 ${isDark ? "border-slate-700 bg-slate-900 text-slate-400 hover:text-white hover:bg-slate-800" : "border-slate-300 bg-white text-slate-600 hover:text-slate-900 hover:bg-slate-100"}`}
+                  className={`px-3 py-1.5 rounded-lg border text-xs disabled:opacity-50 disabled:cursor-not-allowed transition-all ${theme.paginationButton}`}
                 >
                   <FontAwesomeIcon icon={faChevronLeft} />
                 </button>
+
                 <button
+                  type="button"
                   onClick={() =>
                     setCurrentPage((prev) => Math.min(prev + 1, totalPages))
                   }
                   disabled={currentPage === totalPages}
-                  className={`px-3 py-1.5 rounded-lg border text-xs disabled:opacity-50 ${isDark ? "border-slate-700 bg-slate-900 text-slate-400 hover:text-white hover:bg-slate-800" : "border-slate-300 bg-white text-slate-600 hover:text-slate-900 hover:bg-slate-100"}`}
+                  className={`px-3 py-1.5 rounded-lg border text-xs disabled:opacity-50 disabled:cursor-not-allowed transition-all ${theme.paginationButton}`}
                 >
                   <FontAwesomeIcon icon={faChevronRight} />
                 </button>
@@ -386,7 +377,6 @@ const PickupBoard = forwardRef(function PickupBoard(
         </div>
       </main>
 
-      {/* --- DRAWERS & MODALS --- */}
       <ShipmentDrawer
         isOpen={!!selectedPickupId}
         onClose={() => setSelectedPickupId(null)}
@@ -400,16 +390,16 @@ const PickupBoard = forwardRef(function PickupBoard(
         isOpen={isNewPickupModalOpen}
         onClose={() => {
           setIsNewPickupModalOpen(false);
-          setEditingPickup(null); // ✅ Clear data on close
+          setEditingPickup(null);
         }}
         isDark={isDark}
         user={user}
         onSuccess={() => {
           fetchPickups();
-          setEditingPickup(null); // ✅ Clear data on success
+          setEditingPickup(null);
         }}
         resetTrigger={isNewPickupModalOpen}
-        editData={editingPickup} // ✅ Pass the data down to trigger Update Mode
+        editData={editingPickup}
       />
     </div>
   );

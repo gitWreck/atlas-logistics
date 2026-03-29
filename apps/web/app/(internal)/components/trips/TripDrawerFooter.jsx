@@ -1,3 +1,5 @@
+"use client";
+
 import React, { useState } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
@@ -15,6 +17,7 @@ import {
 } from "@/app/utility/FirebaseFunctions";
 import { runAction } from "@/app/utility/utilities";
 import ExportTripButton from "../exports/ExportTripManifest";
+import { getDrawerThemeClasses } from "@/app/utility/constant/theme";
 
 export default function TripDrawerFooter({
   data,
@@ -23,20 +26,19 @@ export default function TripDrawerFooter({
   isDark = false,
   onSuccess,
 }) {
-  // --- Loading States for StatusButtons ---
   const [lockStatus, setLockStatus] = useState("IDLE");
   const [unlockStatus, setUnlockStatus] = useState("IDLE");
   const [reopenStatus, setReopenStatus] = useState("IDLE");
 
-  // --- UI States for Unlock Reason ---
   const [showUnlockReason, setShowUnlockReason] = useState(false);
   const [unlockReason, setUnlockReason] = useState("");
+
+  const theme = getDrawerThemeClasses(isDark);
 
   if (!data) return null;
 
   const isLocked = data.manifestLocked;
 
-  // Helper to reset unlock UI after success
   const handleUnlockSuccess = () => {
     setTimeout(() => {
       setShowUnlockReason(false);
@@ -45,53 +47,39 @@ export default function TripDrawerFooter({
   };
 
   return (
-    <div
-      className={`p-4 border-t flex flex-col gap-3 ${
-        isDark
-          ? "border-slate-800 bg-slate-950"
-          : "border-slate-200 bg-slate-50"
-      }`}
-    >
-      {/* 1. CONDITIONAL UNLOCK REASON TEXTAREA */}
+    <div className={`p-4 border-t flex flex-col gap-3 ${theme.footerPanel}`}>
       {showUnlockReason && (
         <div
-          className={`p-3 rounded-xl border animate-in slide-in-from-bottom-2 duration-200 ${
-            isDark
-              ? "bg-slate-900 border-slate-800"
-              : "bg-white border-slate-200"
-          }`}
+          className={`p-3 rounded-xl border animate-in slide-in-from-bottom-2 duration-200 ${theme.reasonBox}`}
         >
           <div className="flex justify-between items-center mb-2">
-            <label className="text-[10px] font-bold uppercase text-amber-500 tracking-wider">
+            <label className={theme.reasonLabel}>
               Reason for Unlocking Manifest
             </label>
+
             <button
+              type="button"
               onClick={() => {
                 setShowUnlockReason(false);
                 setUnlockReason("");
               }}
-              className="text-slate-500 hover:text-red-500 transition-colors"
+              className={theme.closeButton}
             >
               <FontAwesomeIcon icon={faTimes} />
             </button>
           </div>
+
           <textarea
             autoFocus
             value={unlockReason}
             onChange={(e) => setUnlockReason(e.target.value)}
             placeholder="Please explain why the manifest is being unlocked..."
-            className={`w-full p-3 rounded-lg text-xs min-h-[80px] outline-none focus:ring-1 focus:ring-amber-500 transition-all ${
-              isDark
-                ? "bg-slate-950 border-slate-800 text-white"
-                : "bg-slate-50 border-slate-300 text-slate-900"
-            }`}
+            className={`w-full p-3 rounded-lg text-xs min-h-[80px] outline-none focus:ring-1 focus:ring-amber-500 transition-all border ${theme.textarea}`}
           />
         </div>
       )}
 
-      {/* 2. PRIMARY ACTIONS ROW */}
       <div className="flex gap-3">
-        {/* LOCK BUTTON */}
         <StatusButton
           status={lockStatus}
           label="Lock Manifest"
@@ -104,19 +92,20 @@ export default function TripDrawerFooter({
             runAction(
               setLockStatus,
               () => generateTripManifest({ tripDocId: data.tripId }),
-              () => onSuccess(),
+              () => onSuccess?.(),
             )
           }
         />
 
-        {/* UNLOCK BUTTON TOGGLE / CONFIRM */}
         {!showUnlockReason ? (
           <button
+            type="button"
             disabled={!isLocked}
             onClick={() => setShowUnlockReason(true)}
-            className="flex-1 py-2 rounded-lg border border-amber-500/30 text-amber-400 hover:bg-amber-600/20 text-xs font-bold disabled:opacity-30 transition-colors flex justify-center items-center gap-2"
+            className={theme.warningOutlineButton}
           >
-            <FontAwesomeIcon icon={faUnlock} /> Unlock Manifest
+            <FontAwesomeIcon icon={faUnlock} />
+            Unlock Manifest
           </button>
         ) : (
           <StatusButton
@@ -136,7 +125,7 @@ export default function TripDrawerFooter({
                     reason: unlockReason,
                   }),
                 () => {
-                  onSuccess();
+                  onSuccess?.();
                   handleUnlockSuccess();
                 },
               )
@@ -144,7 +133,6 @@ export default function TripDrawerFooter({
           />
         )}
 
-        {/* REOPEN BUTTON */}
         <StatusButton
           status={reopenStatus}
           label="Reopen"
@@ -169,9 +157,9 @@ export default function TripDrawerFooter({
         />
       </div>
 
-      {/* 3. SECONDARY ACTIONS ROW (PRINT & EXPORT) */}
       <div className="flex gap-3 pt-1">
         <button
+          type="button"
           disabled={showUnlockReason}
           onClick={() =>
             window.open(
@@ -179,13 +167,12 @@ export default function TripDrawerFooter({
               "_blank",
             )
           }
-          className={`flex-1 py-3 rounded-lg font-medium text-sm transition-colors flex items-center justify-center gap-2 ${
-            isDark
-              ? "bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700"
-              : "bg-slate-200 hover:bg-slate-300 text-slate-800 border border-slate-300"
-          } ${showUnlockReason ? "opacity-30 pointer-events-none" : ""}`}
+          className={`${theme.secondaryActionButton} ${
+            showUnlockReason ? "opacity-30 pointer-events-none" : ""
+          }`}
         >
-          <FontAwesomeIcon icon={faPrint} /> Print Manifest
+          <FontAwesomeIcon icon={faPrint} />
+          Print Manifest
         </button>
 
         <ExportTripButton trip={data} shipments={shipments} />

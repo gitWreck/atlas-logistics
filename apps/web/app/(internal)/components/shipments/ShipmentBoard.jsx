@@ -1,4 +1,5 @@
 "use client";
+
 import React, {
   useState,
   useMemo,
@@ -19,6 +20,7 @@ import ShipmentRow from "./ShipmentRow";
 import ShipmentDrawer from "./ShipmentDrawer";
 import { calculateProgress } from "@/app/utility/utilities";
 import UnifiedShipmentModal from "./UnifiedShipmentModal";
+import { getBoardThemeClasses } from "@/app/utility/constant/theme";
 
 const ShipmentBoard = forwardRef(function ShipmentBoard(
   { user, profile, isDark = false },
@@ -27,32 +29,31 @@ const ShipmentBoard = forwardRef(function ShipmentBoard(
   const [shipments, setShipments] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // Modal & Drawer State
   const [isNewOrderModalOpen, setIsNewOrderModalOpen] = useState(false);
   const [selectedShipmentId, setSelectedShipmentId] = useState(null);
 
-  // Search & Filter State
   const [activeFilter, setActiveFilter] = useState("ALL");
   const [searchQuery, setSearchQuery] = useState("");
   const [modeFilter, setModeFilter] = useState("ALL");
 
-  // --- NEW STATES ---
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
-  const [delayType, setDelayType] = useState("ALL"); // For specific delay reasons
+  const [delayType, setDelayType] = useState("ALL");
+
   const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage] = useState(10); // Change this number to show more/less rows
+  const itemsPerPage = 10;
+
+  const theme = getBoardThemeClasses(isDark);
 
   const fetchShipments = async () => {
     try {
       setLoading(true);
-      // const user = auth.currentUser;
 
       if (!user) {
         console.error("User is not logged in yet.");
-        setLoading(false);
         return;
       }
+
       const token = await user.getIdToken();
 
       const res = await fetch("/api/shipments", {
@@ -71,9 +72,9 @@ const ShipmentBoard = forwardRef(function ShipmentBoard(
 
       const data = await res.json();
 
-      const formatted = data.shipments.map((s) => ({
-        ...s,
-        progress: calculateProgress(s.status),
+      const formatted = (data.shipments || []).map((shipment) => ({
+        ...shipment,
+        progress: calculateProgress(shipment.status),
       }));
 
       setShipments(formatted);
@@ -89,17 +90,12 @@ const ShipmentBoard = forwardRef(function ShipmentBoard(
     fetchShipments();
   }, []);
 
-  // --- 2. UPDATED LOGIC (Includes Date & Delay Filter) ---
   const filteredShipments = useMemo(() => {
-    // Reset to page 1 when filters change
-    setCurrentPage(1);
-
-    return shipments.filter((s) => {
-      // A. Search Logic
+    return shipments.filter((shipment) => {
       const searchContent = [
-        s.trackingNumber,
-        s.sender?.name,
-        s.recipient?.name,
+        shipment.trackingNumber,
+        shipment.sender?.name,
+        shipment.recipient?.name,
       ]
         .filter(Boolean)
         .join(" ")
@@ -107,17 +103,17 @@ const ShipmentBoard = forwardRef(function ShipmentBoard(
 
       if (!searchContent.includes(searchQuery.toLowerCase())) return false;
 
-      // B. Date Range Logic (Checks createdAt or updatedAt)
       if (startDate || endDate) {
-        const shipmentDate = s.createdAt?._seconds
-          ? new Date(s.createdAt._seconds * 1000)
-          : new Date(s.createdAt);
+        const shipmentDate = shipment.createdAt?._seconds
+          ? new Date(shipment.createdAt._seconds * 1000)
+          : new Date(shipment.createdAt);
 
         if (startDate) {
           const start = new Date(startDate);
           start.setHours(0, 0, 0, 0);
           if (shipmentDate < start) return false;
         }
+
         if (endDate) {
           const end = new Date(endDate);
           end.setHours(23, 59, 59, 999);
@@ -125,33 +121,29 @@ const ShipmentBoard = forwardRef(function ShipmentBoard(
         }
       }
 
-      // C. Status Filter Logic
       if (activeFilter !== "ALL") {
-        if (activeFilter === "ACTIVE" && s.status === "DELIVERED") return false;
-
-        // Handle DELAYED logic
-        if (activeFilter === "DELAYED") {
-          if (s.status !== "DELAYED") return false;
-          // D. Specific Delay Type Filter
-          if (delayType !== "ALL" && s.delayReason !== delayType) return false;
+        if (activeFilter === "ACTIVE" && shipment.status === "DELIVERED") {
+          return false;
         }
 
-        // Standard explicit status matching
-        else if (activeFilter !== "ACTIVE") {
-          // This covers CREATED, PENDING_PICKUP, PICKED_UP, RECEIVED, ASSIGNED, IN_TRANSIT, DELIVERED
-          if (s.status !== activeFilter) return false;
+        if (activeFilter === "DELAYED") {
+          if (shipment.status !== "DELAYED") return false;
+          if (delayType !== "ALL" && shipment.delayReason !== delayType) {
+            return false;
+          }
+        } else if (activeFilter !== "ACTIVE") {
+          if (shipment.status !== activeFilter) return false;
         }
       }
 
-      // D. NEW: Shipment Mode Logic
       if (modeFilter !== "ALL") {
-        // We know it's a home pickup if the initial status or current status includes 'PICKUP'
-        // Or if the originCode equals the destinationCode (Local Collection)
         const isPickup =
-          s.status === "PENDING_PICKUP" ||
-          s.status === "PICKED_UP" ||
-          (s.statusHistory &&
-            s.statusHistory.some((h) => h.status.includes("PICKUP")));
+          shipment.status === "PENDING_PICKUP" ||
+          shipment.status === "PICKED_UP" ||
+          (shipment.statusHistory &&
+            shipment.statusHistory.some((history) =>
+              history.status.includes("PICKUP"),
+            ));
 
         if (modeFilter === "PICKUP" && !isPickup) return false;
         if (modeFilter === "DROP_OFF" && isPickup) return false;
@@ -160,16 +152,19 @@ const ShipmentBoard = forwardRef(function ShipmentBoard(
       return true;
     });
   }, [
-    searchQuery,
-    activeFilter,
-    modeFilter,
     shipments,
+    searchQuery,
     startDate,
     endDate,
+    activeFilter,
+    modeFilter,
     delayType,
   ]);
 
-  // --- 3. PAGINATION LOGIC ---
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, startDate, endDate, activeFilter, modeFilter, delayType]);
+
   const indexOfLastItem = currentPage * itemsPerPage;
   const indexOfFirstItem = indexOfLastItem - itemsPerPage;
   const currentItems = filteredShipments.slice(
@@ -178,18 +173,21 @@ const ShipmentBoard = forwardRef(function ShipmentBoard(
   );
   const totalPages = Math.ceil(filteredShipments.length / itemsPerPage);
 
-  // --- Helpers ---
-  // Get unique delay reasons for the dropdown
   const uniqueDelayReasons = useMemo(() => {
     const reasons = new Set(
       shipments
-        .filter((s) => s.status === "DELAYED" && s.delayReason)
-        .map((s) => s.delayReason),
+        .filter(
+          (shipment) => shipment.status === "DELAYED" && shipment.delayReason,
+        )
+        .map((shipment) => shipment.delayReason),
     );
+
     return Array.from(reasons);
   }, [shipments]);
 
-  const selectedShipment = shipments.find((s) => s.id === selectedShipmentId);
+  const selectedShipment = shipments.find(
+    (shipment) => shipment.id === selectedShipmentId,
+  );
 
   const handleMessageCustomer = (shipment) => {
     const phone = shipment.sender?.phone || shipment.recipient?.phone;
@@ -205,38 +203,24 @@ const ShipmentBoard = forwardRef(function ShipmentBoard(
   );
 
   return (
-    <div
-      className={`font-sans ${isDark ? "bg-slate-950 text-slate-200" : "bg-slate-50 text-slate-900"}`}
-    >
-      {/* --- MAIN CONTENT --- */}
-      <main
-        // style={{ width: 1500 }}
-
-        className="mx-auto p-4 sm:p-6"
-      >
+    <div className={`font-sans ${theme.page}`}>
+      <main className="mx-auto p-4 sm:p-6">
         <div
-          className={`border rounded-xl overflow-hidden shadow-xl backdrop-blur-sm ${
-            isDark
-              ? "border-slate-800 bg-slate-900/50"
-              : "border-slate-200 bg-white"
-          }`}
+          className={`border rounded-xl overflow-hidden shadow-xl backdrop-blur-sm ${theme.board}`}
         >
-          {/* CARD HEADER: Search & Filters */}
+          {/* Header */}
           <div
-            className={`px-4 sm:px-6 py-4 border-b flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4 ${
-              isDark
-                ? "border-slate-800 bg-slate-950/30"
-                : "border-slate-200 bg-slate-50"
-            }`}
+            className={`px-4 sm:px-6 py-4 border-b flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4 ${theme.header}`}
           >
             <h3
-              className={`font-bold whitespace-nowrap hidden xl:flex items-center gap-2 ${isDark ? "text-white" : "text-slate-900"}`}
+              className={`font-bold whitespace-nowrap hidden xl:flex items-center gap-2 ${theme.title}`}
             >
               Recent Orders
               <button
+                type="button"
                 onClick={fetchShipments}
                 disabled={loading}
-                className={`transition-colors p-1 rounded ${isDark ? "text-slate-500 hover:text-white hover:bg-slate-800" : "text-slate-500 hover:text-slate-900 hover:bg-slate-200"}`}
+                className={`transition-colors p-1 rounded ${theme.refreshButton}`}
                 title="Refresh"
               >
                 <FontAwesomeIcon
@@ -247,67 +231,50 @@ const ShipmentBoard = forwardRef(function ShipmentBoard(
               </button>
             </h3>
 
-            {/* CONTROL GROUP */}
             <div className="flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center gap-2 w-full xl:w-auto">
-              {/* 1. SEARCH */}
+              {/* Search */}
               <div className="relative flex-1 min-w-[200px]">
                 <FontAwesomeIcon
                   icon={faSearch}
-                  className={`absolute left-3 top-1/2 -translate-y-1/2 text-sm ${isDark ? "text-slate-500" : "text-slate-400"}`}
+                  className={`absolute left-3 top-1/2 -translate-y-1/2 text-sm ${theme.iconMuted}`}
                 />
                 <input
                   type="text"
                   placeholder="Search Tracking..."
-                  className={`w-full border rounded-lg pl-9 pr-4 py-2 text-sm focus:border-blue-500 focus:outline-none ${
-                    isDark
-                      ? "bg-slate-900 border-slate-700 text-white"
-                      : "bg-white border-slate-300 text-slate-900"
-                  }`}
+                  className={`w-full border rounded-lg pl-9 pr-4 py-2 text-sm focus:border-blue-500 focus:outline-none ${theme.input}`}
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                 />
               </div>
 
               <div className="flex gap-2 w-full sm:w-auto">
-                {/* 2. DATE FILTERS */}
+                {/* Date filters */}
                 <div
-                  className={`flex items-center gap-2 border rounded-lg px-2 py-1 flex-1 sm:flex-none justify-center ${
-                    isDark
-                      ? "bg-slate-900 border-slate-700"
-                      : "bg-white border-slate-300"
-                  }`}
+                  className={`flex items-center gap-2 border rounded-lg px-2 py-1 flex-1 sm:flex-none justify-center ${theme.filterWrap}`}
                 >
                   <input
                     type="date"
-                    className={`bg-transparent text-xs outline-none w-24 ${isDark ? "text-white [color-scheme:dark]" : "text-slate-900 [color-scheme:light]"}`}
+                    className={`bg-transparent text-xs outline-none w-24 ${theme.dateInput}`}
                     value={startDate}
                     onChange={(e) => setStartDate(e.target.value)}
                   />
-                  <span
-                    className={isDark ? "text-slate-600" : "text-slate-400"}
-                  >
-                    -
-                  </span>
+                  <span className={theme.iconMuted}>-</span>
                   <input
                     type="date"
-                    className={`bg-transparent text-xs outline-none w-24 ${isDark ? "text-white [color-scheme:dark]" : "text-slate-900 [color-scheme:light]"}`}
+                    className={`bg-transparent text-xs outline-none w-24 ${theme.dateInput}`}
                     value={endDate}
                     onChange={(e) => setEndDate(e.target.value)}
                   />
                 </div>
 
-                {/* 3. MAIN FILTER */}
+                {/* Main filter */}
                 <div className="relative w-full sm:w-36">
                   <FontAwesomeIcon
                     icon={faFilter}
-                    className={`absolute left-3 top-1/2 -translate-y-1/2 text-sm ${isDark ? "text-slate-500" : "text-slate-400"}`}
+                    className={`absolute left-3 top-1/2 -translate-y-1/2 text-sm ${theme.iconMuted}`}
                   />
                   <select
-                    className={`w-full border rounded-lg pl-9 pr-4 py-2 text-sm focus:border-blue-500 focus:outline-none appearance-none cursor-pointer ${
-                      isDark
-                        ? "bg-slate-900 border-slate-700 text-white"
-                        : "bg-white border-slate-300 text-slate-900"
-                    }`}
+                    className={`w-full border rounded-lg pl-9 pr-4 py-2 text-sm focus:border-blue-500 focus:outline-none appearance-none cursor-pointer ${theme.input}`}
                     value={activeFilter}
                     onChange={(e) => {
                       setActiveFilter(e.target.value);
@@ -327,19 +294,15 @@ const ShipmentBoard = forwardRef(function ShipmentBoard(
                 </div>
               </div>
 
-              {/* 4. CONDITIONAL: DELAY TYPE FILTER */}
+              {/* Delayed reason filter */}
               {activeFilter === "DELAYED" && (
                 <div className="relative w-full sm:w-40 animate-in fade-in slide-in-from-right-2 duration-300">
                   <FontAwesomeIcon
                     icon={faExclamationCircle}
-                    className="absolute left-3 top-1/2 -translate-y-1/2 text-amber-500 text-sm"
+                    className={`absolute left-3 top-1/2 -translate-y-1/2 text-sm ${theme.warningIcon}`}
                   />
                   <select
-                    className={`w-full border border-amber-500/50 rounded-lg pl-9 pr-4 py-2 text-sm focus:border-amber-500 focus:outline-none appearance-none cursor-pointer ${
-                      isDark
-                        ? "bg-slate-900 text-amber-100"
-                        : "bg-amber-50 text-amber-900"
-                    }`}
+                    className={`w-full border rounded-lg pl-9 pr-4 py-2 text-sm focus:border-amber-500 focus:outline-none appearance-none cursor-pointer ${theme.warningFilter}`}
                     value={delayType}
                     onChange={(e) => setDelayType(e.target.value)}
                   >
@@ -355,16 +318,11 @@ const ShipmentBoard = forwardRef(function ShipmentBoard(
             </div>
           </div>
 
-          {/* TABLE: wrap header + body for horizontal scroll on smaller widths */}
+          {/* Table */}
           <div className="md:overflow-x-auto">
             <div className="md:min-w-[900px]">
-              {/* TABLE HEADER (Hidden on mobile) */}
               <div
-                className={`hidden md:grid grid-cols-13 gap-4 px-6 py-3 border-b text-xs font-semibold uppercase tracking-wider ${
-                  isDark
-                    ? "border-slate-800 bg-slate-950 text-slate-500"
-                    : "border-slate-200 bg-slate-50 text-slate-600"
-                }`}
+                className={`hidden md:grid grid-cols-13 gap-4 px-6 py-3 border-b text-xs font-semibold uppercase tracking-wider ${theme.tableHead}`}
               >
                 <div className="col-span-4">Tracking / Customer</div>
                 <div className="col-span-2">Route</div>
@@ -374,31 +332,24 @@ const ShipmentBoard = forwardRef(function ShipmentBoard(
                 <div className="col-span-1 text-right">Action</div>
               </div>
 
-              {/* TABLE BODY */}
               <div className="min-h-[300px]">
                 {loading ? (
                   <div
-                    className={`p-10 text-center animate-pulse ${
-                      isDark ? "text-slate-500" : "text-slate-600"
-                    }`}
+                    className={`p-10 text-center animate-pulse ${theme.emptyText}`}
                   >
                     Loading orders...
                   </div>
                 ) : filteredShipments.length === 0 ? (
-                  <div
-                    className={`p-10 text-center ${
-                      isDark ? "text-slate-500" : "text-slate-600"
-                    }`}
-                  >
+                  <div className={`p-10 text-center ${theme.emptyText}`}>
                     No orders found matching filters.
                   </div>
                 ) : (
-                  currentItems.map((s) => (
+                  currentItems.map((shipment) => (
                     <ShipmentRow
-                      key={s.id}
-                      s={s}
+                      key={shipment.id}
+                      s={shipment}
                       onClick={setSelectedShipmentId}
-                      onMessage={() => handleMessageCustomer(s)}
+                      onMessage={() => handleMessageCustomer(shipment)}
                       isDark={isDark}
                     />
                   ))
@@ -407,22 +358,14 @@ const ShipmentBoard = forwardRef(function ShipmentBoard(
             </div>
           </div>
 
-          {/* 5. PAGINATION FOOTER */}
+          {/* Pagination */}
           {filteredShipments.length > 0 && (
             <div
-              className={`px-4 sm:px-6 py-4 border-t flex justify-between items-center ${
-                isDark
-                  ? "border-slate-800 bg-slate-950/30"
-                  : "border-slate-200 bg-slate-50"
-              }`}
+              className={`px-4 sm:px-6 py-4 border-t flex flex-col sm:flex-row justify-between items-center gap-3 text-xs ${theme.footer}`}
             >
-              <span
-                className={`text-xs ${isDark ? "text-slate-500" : "text-slate-600"}`}
-              >
+              <span className={theme.footerText}>
                 Showing{" "}
-                <span
-                  className={`font-bold ${isDark ? "text-white" : "text-slate-900"}`}
-                >
+                <span className={`font-bold ${theme.footerStrong}`}>
                   {indexOfFirstItem + 1}
                 </span>{" "}
                 of {filteredShipments.length}
@@ -430,28 +373,23 @@ const ShipmentBoard = forwardRef(function ShipmentBoard(
 
               <div className="flex gap-2">
                 <button
+                  type="button"
                   onClick={() =>
                     setCurrentPage((prev) => Math.max(prev - 1, 1))
                   }
                   disabled={currentPage === 1}
-                  className={`px-3 py-1.5 rounded-lg border text-xs disabled:opacity-50 ${
-                    isDark
-                      ? "border-slate-700 bg-slate-900 text-slate-400 hover:text-white hover:bg-slate-800"
-                      : "border-slate-300 bg-white text-slate-600 hover:text-slate-900 hover:bg-slate-100"
-                  }`}
+                  className={`px-3 py-1.5 rounded-lg border text-xs disabled:opacity-50 disabled:cursor-not-allowed transition-all ${theme.paginationButton}`}
                 >
                   <FontAwesomeIcon icon={faChevronLeft} />
                 </button>
+
                 <button
+                  type="button"
                   onClick={() =>
                     setCurrentPage((prev) => Math.min(prev + 1, totalPages))
                   }
                   disabled={currentPage === totalPages}
-                  className={`px-3 py-1.5 rounded-lg border text-xs disabled:opacity-50 ${
-                    isDark
-                      ? "border-slate-700 bg-slate-900 text-slate-400 hover:text-white hover:bg-slate-800"
-                      : "border-slate-300 bg-white text-slate-600 hover:text-slate-900 hover:bg-slate-100"
-                  }`}
+                  className={`px-3 py-1.5 rounded-lg border text-xs disabled:opacity-50 disabled:cursor-not-allowed transition-all ${theme.paginationButton}`}
                 >
                   <FontAwesomeIcon icon={faChevronRight} />
                 </button>
@@ -477,9 +415,8 @@ const ShipmentBoard = forwardRef(function ShipmentBoard(
         user={user}
         onSuccess={() => {
           fetchShipments();
-          // setIsNewOrderModalOpen(false);
         }}
-        resetTrigger={isNewOrderModalOpen} // Reset form when modal is opened
+        resetTrigger={isNewOrderModalOpen}
       />
     </div>
   );
