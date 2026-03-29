@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -6,8 +6,12 @@ import {
   TouchableOpacity,
   StyleSheet,
   Pressable,
+  TextInput,
+  KeyboardAvoidingView,
+  Platform,
 } from "react-native";
 import { FontAwesome5 } from "@expo/vector-icons";
+import { CHECKER_SHIPMENT_ACTION } from "../../constants/tracking-constants";
 
 export default function ShipmentActionModal({
   visible,
@@ -15,35 +19,25 @@ export default function ShipmentActionModal({
   shipment,
   onAction,
 }) {
+  const [remarks, setRemarks] = useState("");
+
+  // Clear the input field every time the modal opens
+  useEffect(() => {
+    if (visible) {
+      setRemarks("");
+    }
+  }, [visible]);
+
   if (!shipment) return null;
 
-  const ACTION_BUTTONS = [
-    { label: "Unload", action: "UNLOAD", icon: "arrow-down", color: "#f59e0b" }, // Orange
-    { label: "Load", action: "LOAD", icon: "arrow-up", color: "#3b82f6" }, // Blue
-    {
-      label: "Arrived",
-      action: "ARRIVED",
-      icon: "warehouse", // Or "map-marker-alt"
-      color: "#8b5cf6", // Purple (distinct from the delivery steps)
-    },
-    {
-      label: "Out for Delivery",
-      action: "OUT_FOR_DELIVERY",
-      icon: "shipping-fast",
-      color: "#10b981",
-    }, // Green
-    {
-      label: "Delivered",
-      action: "DELIVERED",
-      icon: "check-circle",
-      color: "#059669",
-    }, // Dark Green
-  ];
-
   const handleActionPress = (actionCode) => {
-    onAction(actionCode, { sendText: true });
+    // Pass both the action and the newly typed remarks back to the parent
+    onAction(actionCode, remarks?.trim());
     onClose();
   };
+
+  // Safely grab the most recent remark (fallback to "None" if empty)
+  const recentRemarks = shipment.remarks || "No recent remarks.";
 
   return (
     <Modal
@@ -52,7 +46,10 @@ export default function ShipmentActionModal({
       visible={visible}
       onRequestClose={onClose}
     >
-      <View style={styles.modalOverlay}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        style={styles.modalOverlay}
+      >
         <Pressable style={styles.backdrop} onPress={onClose} />
 
         <View style={styles.modalContent}>
@@ -70,9 +67,9 @@ export default function ShipmentActionModal({
             </TouchableOpacity>
           </View>
 
-          {/* Quadrant Action Grid (Matched to PackageActionModal Style) */}
+          {/* Quadrant Action Grid */}
           <View style={styles.grid}>
-            {ACTION_BUTTONS.map((btn) => (
+            {CHECKER_SHIPMENT_ACTION.map((btn) => (
               <TouchableOpacity
                 key={btn.action}
                 style={[styles.btn, { borderColor: btn.color }]}
@@ -81,7 +78,7 @@ export default function ShipmentActionModal({
                 <View
                   style={[styles.iconCircle, { backgroundColor: btn.color }]}
                 >
-                  <FontAwesome5 name={btn.icon} size={16} color="#fff" />
+                  <FontAwesome5 name={btn.icon} size={14} color="#fff" />
                 </View>
                 <Text style={[styles.btnText, { color: btn.color }]}>
                   {btn.label}
@@ -89,8 +86,27 @@ export default function ShipmentActionModal({
               </TouchableOpacity>
             ))}
           </View>
+
+          {/* ✅ NEW: Recent Remarks Display */}
+          <View style={styles.recentRemarksBox}>
+            <Text style={styles.remarksLabel}>Recent Notes:</Text>
+            <Text style={styles.recentRemarksText} numberOfLines={2}>
+              {recentRemarks}
+            </Text>
+          </View>
+
+          {/* ✅ NEW: Remarks Input */}
+          <TextInput
+            style={styles.remarksInput}
+            placeholder="Add an optional note (e.g., Damaged box, Wrong hub)"
+            placeholderTextColor="#94a3b8"
+            value={remarks}
+            onChangeText={setRemarks}
+            multiline={true}
+            maxLength={150} // Keep it concise for the database
+          />
         </View>
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }
@@ -115,44 +131,55 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "flex-start",
-    marginBottom: 20,
+    marginBottom: 16,
   },
   title: { fontSize: 20, fontWeight: "800", color: "#0f172a" },
   subtitle: { fontSize: 14, color: "#64748b", marginTop: 4 },
-  status: { fontSize: 12, fontWeight: "600", color: "#3b82f6", marginTop: 4 },
-  closeBtn: {
-    padding: 8,
-    backgroundColor: "#f1f5f9",
-    borderRadius: 20,
+  status: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#3b82f6",
+    marginTop: 4,
+    textTransform: "uppercase",
   },
-  toggleContainer: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
+  closeBtn: { padding: 8, backgroundColor: "#f1f5f9", borderRadius: 20 },
+
+  // ✅ Remarks Styles
+  recentRemarksBox: {
     backgroundColor: "#f8fafc",
-    padding: 16,
-    borderRadius: 12,
-    marginBottom: 20,
+    padding: 12,
+    borderRadius: 8,
+    marginTop: 16,
+    marginBottom: 12,
+    borderLeftWidth: 3,
+    borderLeftColor: "#cbd5e1",
+  },
+  remarksLabel: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: "#64748b",
+    textTransform: "uppercase",
+    marginBottom: 4,
+  },
+  recentRemarksText: { fontSize: 13, color: "#334155", fontStyle: "italic" },
+  remarksInput: {
+    backgroundColor: "#ffffff",
     borderWidth: 1,
     borderColor: "#e2e8f0",
-  },
-  toggleTextContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  toggleIcon: {
-    marginRight: 10,
-  },
-  toggleLabel: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#334155",
+    borderRadius: 12,
+    padding: 12,
+    fontSize: 14,
+    color: "#0f172a",
+    minHeight: 60,
+    textAlignVertical: "top",
+    // marginBottom: 20,
   },
 
-  // Copied & Adjusted Grid Styles
+  // Grid Styles
   grid: {
     flexDirection: "row",
     flexWrap: "wrap",
+    justifyContent: "space-between",
     gap: 12,
   },
   btn: {
@@ -172,9 +199,5 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     marginRight: 10,
   },
-  btnText: {
-    fontWeight: "600",
-    fontSize: 13,
-    flex: 1, // Ensures long text wraps instead of breaking the box
-  },
+  btnText: { fontWeight: "600", fontSize: 13, flex: 1 },
 });

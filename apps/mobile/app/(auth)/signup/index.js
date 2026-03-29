@@ -5,6 +5,7 @@ import {
   Platform,
   ScrollView,
   StyleSheet,
+  View,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { createUserWithEmailAndPassword } from "firebase/auth";
@@ -21,7 +22,7 @@ import {
 import { auth, db } from "../../../firebase";
 import GradientButton from "../../../components/ui/figma/GradientButton";
 
-// Import new components
+// Import components
 import SignupHeader from "../../../components/signup/customers/SignupHeader";
 import SignupForm from "../../../components/signup/customers/SignupForm";
 import SignupFooter from "../../../components/signup/customers/SignupFooter";
@@ -36,21 +37,40 @@ export default function CustomerSignupScreen() {
     password: "",
     confirmPassword: "",
     phoneNumber: "",
+    // ✅ NEW: Address State
+    unit: "",
+    street: "",
+    barangay: "",
+    province: "",
+    city: "",
   });
 
   const [loading, setLoading] = useState(false);
 
-  // Derived state for button disabling
+  // Derived state for button disabling (Unit is left optional)
   const isDisabled =
     !formData.fullName ||
     !formData.email ||
     !formData.password ||
     !formData.confirmPassword ||
-    !formData.phoneNumber;
+    !formData.phoneNumber ||
+    !formData.street ||
+    !formData.barangay ||
+    !formData.province ||
+    !formData.city;
 
   // --- HANDLERS ---
   const handleChange = (field, value) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
+  };
+
+  // Special handler to reset city when province changes
+  const handleProvinceChange = (newProvince) => {
+    setFormData((prev) => ({
+      ...prev,
+      province: newProvince,
+      city: "", // Reset city so they don't submit a mismatched city/province
+    }));
   };
 
   const validateEmail = (value) => /\S+@\S+\.\S+/.test(value.trim());
@@ -68,11 +88,21 @@ export default function CustomerSignupScreen() {
   };
 
   const handleSignup = async () => {
-    const { fullName, email, password, confirmPassword, phoneNumber } =
-      formData;
+    const {
+      fullName,
+      email,
+      password,
+      confirmPassword,
+      phoneNumber,
+      unit,
+      street,
+      barangay,
+      province,
+      city,
+    } = formData;
 
     if (isDisabled) {
-      Alert.alert("Missing Fields", "Please fill out all fields.");
+      Alert.alert("Missing Fields", "Please fill out all required fields.");
       return;
     }
 
@@ -135,14 +165,20 @@ export default function CustomerSignupScreen() {
       );
       const user = userCredential.user;
 
-      // 4. Create Firestore Profile
+      // 4. Create Firestore Profile (✅ NOW INCLUDES ADDRESS OBJECT)
       await setDoc(doc(db, "users", user.uid), {
         uid: user.uid,
         email: email.trim(),
         name: fullName.trim(),
         role: "customer",
         phoneNumber: normalizedPhone,
-        // warehouseId: null,
+        address: {
+          unit: unit.trim(),
+          street: street.trim(),
+          barangay: barangay.trim(),
+          city: city,
+          province: province,
+        },
         active: true,
         status: "active",
         provider: "password",
@@ -177,7 +213,10 @@ export default function CustomerSignupScreen() {
       behavior={Platform.OS === "ios" ? "padding" : "height"}
       style={styles.container}
     >
-      <ScrollView contentContainerStyle={styles.scrollContainer}>
+      <ScrollView
+        contentContainerStyle={styles.scrollContainer}
+        showsVerticalScrollIndicator={false}
+      >
         {/* Header Component */}
         <SignupHeader onBack={() => router.back()} />
 
@@ -193,15 +232,28 @@ export default function CustomerSignupScreen() {
           onPasswordChange={(v) => handleChange("password", v)}
           onConfirmPasswordChange={(v) => handleChange("confirmPassword", v)}
           onPhoneChange={(v) => handleChange("phoneNumber", v)}
+          // ✅ NEW: Address Props
+          unit={formData.unit}
+          street={formData.street}
+          barangay={formData.barangay}
+          province={formData.province}
+          city={formData.city}
+          onUnitChange={(v) => handleChange("unit", v)}
+          onStreetChange={(v) => handleChange("street", v)}
+          onBarangayChange={(v) => handleChange("barangay", v)}
+          onProvinceChange={handleProvinceChange} // Uses the special handler to reset city
+          onCityChange={(v) => handleChange("city", v)}
         />
 
         {/* Action Button */}
-        <GradientButton
-          title="Create Account"
-          onPress={handleSignup}
-          loading={loading}
-          disabled={isDisabled}
-        />
+        <View style={styles.buttonWrapper}>
+          <GradientButton
+            title="Create Account"
+            onPress={handleSignup}
+            loading={loading}
+            disabled={isDisabled}
+          />
+        </View>
 
         {/* Footer Component */}
         <SignupFooter onLoginPress={() => router.replace("/login")} />
@@ -212,5 +264,6 @@ export default function CustomerSignupScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#FFFFFF" },
-  scrollContainer: { flexGrow: 1, justifyContent: "center", padding: 20 },
+  scrollContainer: { flexGrow: 1, padding: 20 },
+  buttonWrapper: { marginTop: 20 },
 });

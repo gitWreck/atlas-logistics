@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Modal,
   View,
@@ -9,15 +9,81 @@ import {
   Platform,
   StyleSheet,
 } from "react-native";
+import { db } from "../../firebase";
+import { collection, query, where, getDocs } from "firebase/firestore";
 
 export default function ManualEntryModal({ visible, onClose, onSubmit }) {
   const [code, setCode] = useState("");
+  const [quantity, setQuantity] = useState("");
+  const [foundPackage, setFoundPackage] = useState(null);
+  const [loading, setLoading] = useState(false);
 
-  const handleSubmit = () => {
-    if (code.trim()) {
-      onSubmit(code);
-      setCode(""); // Reset after submit
+  // Reset state when modal closes/opens
+  useEffect(() => {
+    if (!visible) {
+      setCode("");
+      setQuantity("");
+      setFoundPackage(null);
+      setLoading(false);
     }
+  }, [visible]);
+
+  const handleLookup = async () => {
+    console.log("Looking up code:", code);
+    if (!code.trim()) return;
+
+    setLoading(true);
+    try {
+      // Find the package to check if it's a Sack or Bundle
+      const q = query(
+        collection(db, "shipments"),
+        where("packageBarcodes", "array-contains", code.trim()),
+      );
+      const querySnap = await getDocs(q);
+
+      if (!querySnap.empty) {
+        const shipmentData = querySnap.docs[0].data();
+        const pkg = shipmentData.packages.find(
+          (p) => p.trackingNumber === code.trim(),
+        );
+
+        const isBulk = ["Sack", "Bundle", "Roll"].includes(pkg?.packagingType);
+
+        if (isBulk) {
+          // If bulk, stay in modal to ask for quantity
+          setFoundPackage(pkg);
+          setQuantity(pkg.quantity?.toString() || "1");
+        } else {
+          // If standard box, submit immediately
+          onSubmit(code.trim());
+        }
+      } else {
+        // Fallback: just submit and let the parent handle the "Not Found" error
+        onSubmit(code.trim());
+      }
+    } catch (err) {
+      console.error(err);
+      onSubmit(code.trim()); // Submit anyway so parent handles error logic
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleFinalSubmit = () => {
+    if (!quantity.trim()) return;
+
+    const numQty = Number(quantity);
+    const max = foundPackage?.quantity || 1;
+
+    // Validation to prevent over-loading
+    if (numQty > max) {
+      alert(`Cannot exceed maximum quantity of ${max}`);
+      return;
+    }
+
+    // Pass code and quantity back to handleProcessPackage in ScannerScreen
+    onSubmit(code.trim(), numQty);
+    onClose();
   };
 
   return (
@@ -32,20 +98,41 @@ export default function ManualEntryModal({ visible, onClose, onSubmit }) {
         style={styles.modalOverlay}
       >
         <View style={styles.modalContent}>
-          <Text style={styles.modalTitle}>Manual Entry</Text>
+          <Text style={styles.modalTitle}>
+            {foundPackage ? "Enter Quantity" : "Manual Entry"}
+          </Text>
           <Text style={styles.modalSubtitle}>
-            Type the tracking number exactly
+            {foundPackage
+              ? `This ${foundPackage.packagingType} contains ${foundPackage.quantity} pcs.`
+              : "Type the tracking number exactly"}
           </Text>
 
-          <TextInput
-            style={styles.input}
-            placeholder="AT-2026..."
-            placeholderTextColor="#94a3b8"
-            value={code}
-            onChangeText={setCode}
-            autoCapitalize="characters"
-            autoCorrect={false}
-          />
+          {!foundPackage ? (
+            <TextInput
+              style={styles.input}
+              placeholder="AT-2026..."
+              placeholderTextColor="#94a3b8"
+              value={code}
+              onChangeText={setCode}
+              autoCapitalize="characters"
+              autoCorrect={false}
+            />
+          ) : (
+            <View style={styles.qtyContainer}>
+              <Text style={styles.qtyLabel}>Quantity to process:</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="1"
+                keyboardType="numeric"
+                value={quantity}
+                onChangeText={setQuantity}
+                autoFocus
+              />
+              <Text style={styles.maxText}>
+                Max: {foundPackage.quantity} pcs
+              </Text>
+            </View>
+          )}
 
           <View style={styles.modalActions}>
             <TouchableOpacity
@@ -56,10 +143,17 @@ export default function ManualEntryModal({ visible, onClose, onSubmit }) {
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={[styles.actionBtn, styles.submitBtn]}
-              onPress={handleSubmit}
+              style={[
+                styles.actionBtn,
+                styles.submitBtn,
+                loading && { opacity: 0.7 },
+              ]}
+              onPress={foundPackage ? handleFinalSubmit : handleLookup}
+              disabled={loading}
             >
-              <Text style={styles.submitText}>SUBMIT</Text>
+              <Text style={styles.submitText}>
+                {loading ? "SEARCHING..." : foundPackage ? "CONFIRM" : "NEXT"}
+              </Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -105,9 +199,26 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     color: "#0f172a",
     textAlign: "center",
-    marginBottom: 24,
+    marginBottom: 10,
   },
-  modalActions: { flexDirection: "row", gap: 12, width: "100%" },
+  qtyContainer: {
+    marginBottom: 20,
+  },
+  qtyLabel: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#64748b",
+    textAlign: "center",
+    marginBottom: 8,
+    textTransform: "uppercase",
+  },
+  maxText: {
+    textAlign: "center",
+    fontSize: 12,
+    color: "#94a3b8",
+    fontWeight: "600",
+  },
+  modalActions: { flexDirection: "row", gap: 12, width: "100%", marginTop: 10 },
   actionBtn: {
     flex: 1,
     height: 50,

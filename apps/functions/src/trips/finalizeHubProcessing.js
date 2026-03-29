@@ -31,12 +31,12 @@ exports.finalizeHubProcessing = onCall(
     // 3. DYNAMIC WORKFLOW ROUTING (Inbound vs Outbound)
     const isInbound = currentStatus === "IN_TRANSIT";
     const newStatus = isInbound ? "ARRIVED" : "LOADED";
-    const timestampField = isInbound ? "arrivedAt" : "sealedAt";
+    const timestampField = isInbound ? "arrivedAt" : "loadedAt";
     const actionName = isInbound ? "FINISH_RECEIVING" : "FINISH_LOADING";
     const processedCount = isInbound
       ? trip.totalArrived || 0
       : trip.totalLoaded || 0;
-    const actionVerb = isInbound ? "receive" : "seal";
+    const actionVerb = isInbound ? "receive" : "load";
 
     // 4. VALIDATION
     // Prevent processing an empty truck
@@ -97,7 +97,7 @@ exports.finalizeHubProcessing = onCall(
       success: true,
       message: isInbound
         ? `Truck received with ${processedCount} items.`
-        : `Truck sealed with ${processedCount} items. Ready for driver.`,
+        : `Truck loaded with ${processedCount} items. Ready for driver.`,
       newStatus: newStatus,
     };
   },

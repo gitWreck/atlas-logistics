@@ -1,9 +1,18 @@
 import React from "react";
-import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
+import { View, Text, StyleSheet } from "react-native";
 import GradientButton from "../../ui/figma/GradientButton";
 
 export default function TripFooter({ trip, onFinish }) {
-  if (!trip || (trip.status !== "ASSIGNED" && trip.status !== "LOADING")) {
+  // Show the footer if the trip is being Loaded OR if it's being Received (Inbound)
+  const activeStatuses = [
+    "ASSIGNED",
+    "LOADING",
+    "IN_TRANSIT",
+    "RECEIVED",
+    "ARRIVED",
+  ];
+
+  if (!trip || !activeStatuses.includes(trip.status)) {
     return null;
   }
 
@@ -41,6 +50,9 @@ export default function TripFooter({ trip, onFinish }) {
 
 const styles = StyleSheet.create({
   footer: {
+    zIndex: 99, // Force it to the front
+    elevation: 5, // For Android
+    position: "relative", // Ensure it stays in the layout flow
     paddingHorizontal: 20,
     paddingTop: 12,
     paddingBottom: 20,

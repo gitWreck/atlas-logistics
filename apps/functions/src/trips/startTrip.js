@@ -46,25 +46,29 @@ exports.startTrip = onCall({ region: "asia-southeast1" }, async (req) => {
   const shipmentCount = shipQuery.size; // Capture count for the log
 
   shipQuery.docs.forEach((doc) => {
+    const realShipmentRef = db.collection("shipments").doc(doc.id);
     // 1. Update the link record (trip_shipments)
     batch.update(doc.ref, {
-      status: "OUT_FOR_DELIVERY",
+      // status: "OUT_FOR_DELIVERY",
+      status: "IN_TRANSIT", // We keep the trip_ship
       updatedAt: FieldValue.serverTimestamp(),
     });
 
     // 2. Update the REAL shipment record (shipments)
-    const realShipmentRef = db.collection("shipments").doc(doc.id);
+    // const realShipmentRef = db.collection("shipments").doc(doc.id);
 
     const historyEntry = {
-      status: "OUT_FOR_DELIVERY",
-      at: new Date(), // Firestore converts JS Date to Timestamp in arrayUnion
+      // status: "OUT_FOR_DELIVERY",
+      status: "IN_TRANSIT",
+      at: admin.firestore.Timestamp.now(),
       note: `Trip ${trip.tripId || tripId} Started`,
       by: uid,
       location: location || null, // { lat, lng }
     };
 
     const shipmentUpdate = {
-      status: "OUT_FOR_DELIVERY",
+      // status: "OUT_FOR_DELIVERY",
+      status: "IN_TRANSIT",
       updatedAt: FieldValue.serverTimestamp(),
       // 3. Add to History Timeline
       statusHistory: FieldValue.arrayUnion(historyEntry),

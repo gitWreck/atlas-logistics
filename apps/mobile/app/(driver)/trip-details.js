@@ -11,7 +11,7 @@ import {
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { FontAwesome5 } from "@expo/vector-icons";
-import { doc, onSnapshot, updateDoc } from "firebase/firestore"; // ADDED updateDoc
+import { doc, onSnapshot } from "firebase/firestore"; // ADDED updateDoc
 import { db } from "../../firebase";
 import { StatusBar } from "expo-status-bar";
 import GetLocation from "react-native-get-location";
@@ -76,7 +76,7 @@ export default function TripDetailsScreen() {
   const handleViewShipments = () => {
     router.push({
       pathname: "/(driver)/shipments",
-      params: { tripId: trip.id },
+      params: { tripId: trip.id, tripType: trip.tripType },
     });
   };
 
@@ -90,7 +90,7 @@ export default function TripDetailsScreen() {
   const handleStartTrip = async () => {
     Alert.alert(
       "Start Trip",
-      "Are you sure you want to start the route? This will mark all packages as Out for Delivery.",
+      "Are you sure you want to start the route? This will mark all shipment with packages as In Transit.",
       [
         { text: "Cancel", style: "cancel" },
         {
@@ -159,6 +159,8 @@ export default function TripDetailsScreen() {
 
   // --- NEW: Delay Logic Variable ---
   const isDelayed = trip?.delayCleared === false && !!trip?.delayReason;
+
+  console.log("Trip data:", trip);
 
   return (
     <SafeAreaView style={styles.container}>

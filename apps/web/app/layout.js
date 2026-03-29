@@ -10,6 +10,12 @@ import { AlertProvider } from "./context/AlertContext";
 export default function RootLayout({ children }) {
   return (
     <html lang="en">
+      <head>
+        <meta
+          name="facebook-domain-verification"
+          content="8mze9lni2dy386ipxkb22m5tp3rvxm"
+        />
+      </head>
       <body suppressHydrationWarning={true}>
         <AlertProvider>
           <AuthProvider>{children}</AuthProvider>

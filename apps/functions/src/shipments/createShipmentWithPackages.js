@@ -101,7 +101,8 @@ exports.createShipmentWithPackages = onCall(
     // Example: AT-20231027-MNL-CEB-123456
     if (!shipmentId) {
       const dateStr = timestamp.toISOString().slice(0, 10).replace(/-/g, "");
-      shipmentId = `AT-${dateStr}-${originCode}-${destinationCode}-${Date.now().toString().slice(-6)}`;
+      // shipmentId = `AT-${dateStr}-${originCode}-${destinationCode}-${Date.now().toString().slice(-6)}`;
+      shipmentId = `AT-${dateStr}-SHP-${Date.now().toString().slice(-6)}`;
     }
 
     const doc = await db.collection("shipments").doc(shipmentId).get();

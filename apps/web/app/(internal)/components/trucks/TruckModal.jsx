@@ -186,11 +186,13 @@ export default function TruckModal({
                 }`}
               >
                 <option>12-Wheeler Wing Van</option>
+                <option>12-Wheeler Closed Van</option>
                 <option>10-Wheeler Wing Van</option>
                 <option>8-Wheeler Wing Van</option>
                 <option>6-Wheeler Closed Van</option>
+                <option>6-Wheeler Boom Truck</option>
+                <option>6-Wheeler Wing Van</option>
                 <option>4-Wheeler Reefer</option>
-                <option>Tractor Head</option>
               </select>
             </div>
 

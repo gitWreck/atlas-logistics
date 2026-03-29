@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -6,15 +6,29 @@ import {
   TouchableOpacity,
   StyleSheet,
   Pressable,
+  TextInput,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
 } from "react-native";
 import { FontAwesome5 } from "@expo/vector-icons";
 
 export default function ShipmentControlsModal({
   visible,
   onClose,
-  onBulkOutForDelivery,
-  onBulkDelivered,
+  onBulkLoad,
+  onBulkReceive,
+  onFinalize,
+  tripStatus,
 }) {
+  const [remarks, setRemarks] = useState("");
+  const isReceiving = tripStatus === "IN_TRANSIT" || tripStatus === "ARRIVED";
+
+  // Reset remarks when modal opens
+  useEffect(() => {
+    if (visible) setRemarks("");
+  }, [visible]);
+
   return (
     <Modal
       animationType="slide"
@@ -22,7 +36,10 @@ export default function ShipmentControlsModal({
       visible={visible}
       onRequestClose={onClose}
     >
-      <View style={styles.modalOverlay}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        style={styles.modalOverlay}
+      >
         <Pressable style={styles.backdrop} onPress={onClose} />
         <View style={styles.modalContent}>
           {/* Header */}
@@ -30,7 +47,7 @@ export default function ShipmentControlsModal({
             <View>
               <Text style={styles.title}>Bulk Actions</Text>
               <Text style={styles.subtitle}>
-                Update the status of all shipments
+                Update status and add trip notes
               </Text>
             </View>
             <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
@@ -41,33 +58,62 @@ export default function ShipmentControlsModal({
           {/* Action Buttons */}
           <View style={styles.actionColumn}>
             <TouchableOpacity
-              style={[styles.actionBtn, { backgroundColor: "#8b5cf6" }]} // Purple
+              style={[styles.actionBtn, { backgroundColor: "#3b82f6" }]}
               onPress={() => {
                 onClose();
-                setTimeout(() => onBulkOutForDelivery(), 300); // Small delay allows modal to close smoothly before alert appears
+                setTimeout(() => onBulkLoad(remarks), 300); // Pass remarks to bulk
               }}
             >
               <View style={styles.iconCircle}>
-                <FontAwesome5 name="truck" size={16} color="#8b5cf6" />
+                <FontAwesome5 name="arrow-up" size={16} color="#3b82f6" />
               </View>
-              <Text style={styles.btnText}>Set All Out for Delivery</Text>
+              <Text style={styles.btnText}>Set All Loaded (Outbound)</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={[styles.actionBtn, { backgroundColor: "#10b981" }]} // Green
+              style={[styles.actionBtn, { backgroundColor: "#10b981" }]}
               onPress={() => {
                 onClose();
-                setTimeout(() => onBulkDelivered(), 300);
+                setTimeout(() => onBulkReceive(remarks), 300);
               }}
             >
               <View style={styles.iconCircle}>
-                <FontAwesome5 name="check-circle" size={16} color="#10b981" />
+                <FontAwesome5 name="warehouse" size={14} color="#10b981" />
               </View>
-              <Text style={styles.btnText}>Set All Delivered</Text>
+              <Text style={styles.btnText}>Set All Received (Inbound)</Text>
             </TouchableOpacity>
+
+            <View style={styles.separator} />
+
+            <TouchableOpacity
+              style={[styles.actionBtn, { backgroundColor: "#6366f1" }]}
+              onPress={() => {
+                onClose();
+                setTimeout(() => onFinalize(remarks), 300); // Pass remarks to finalize
+              }}
+            >
+              <View style={styles.iconCircle}>
+                <FontAwesome5 name="check-double" size={16} color="#6366f1" />
+              </View>
+              <Text style={styles.btnText}>
+                {isReceiving ? "Mark Trip as Arrived" : "Mark Trip as Loaded"}
+              </Text>
+            </TouchableOpacity>
+
+            {/* Remarks Input Section */}
+            <Text style={styles.label}>Trip / Bulk Remarks (Optional)</Text>
+            <TextInput
+              style={styles.remarksInput}
+              placeholder="e.g., Seal #12345, 2 boxes wet, etc."
+              placeholderTextColor="#94a3b8"
+              value={remarks}
+              onChangeText={setRemarks}
+              multiline
+              numberOfLines={3}
+            />
           </View>
         </View>
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }
@@ -78,32 +124,43 @@ const styles = StyleSheet.create({
     justifyContent: "flex-end",
     backgroundColor: "rgba(0,0,0,0.5)",
   },
-  backdrop: {
-    ...StyleSheet.absoluteFillObject,
-  },
+  backdrop: { ...StyleSheet.absoluteFillObject },
   modalContent: {
     backgroundColor: "#fff",
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     padding: 24,
-    paddingBottom: 40,
+    paddingBottom: Platform.OS === "ios" ? 40 : 24,
   },
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "flex-start",
-    marginBottom: 24,
+    marginBottom: 16,
   },
   title: { fontSize: 20, fontWeight: "800", color: "#0f172a" },
   subtitle: { fontSize: 14, color: "#64748b", marginTop: 4 },
-  closeBtn: {
-    padding: 8,
-    backgroundColor: "#f1f5f9",
-    borderRadius: 20,
+  label: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#64748b",
+    textTransform: "uppercase",
+    marginBottom: 8,
   },
-  actionColumn: {
-    gap: 12,
+  remarksInput: {
+    backgroundColor: "#f8fafc",
+    borderWidth: 1,
+    borderColor: "#e2e8f0",
+    borderRadius: 12,
+    padding: 12,
+    fontSize: 14,
+    color: "#0f172a",
+    minHeight: 80,
+    textAlignVertical: "top",
+    // marginBottom: 20,
   },
+  closeBtn: { padding: 8, backgroundColor: "#f1f5f9", borderRadius: 20 },
+  actionColumn: { gap: 12 },
   actionBtn: {
     flexDirection: "row",
     alignItems: "center",
@@ -119,9 +176,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     marginRight: 12,
   },
-  btnText: {
-    color: "#fff",
-    fontWeight: "600",
-    fontSize: 15,
-  },
+  btnText: { color: "#fff", fontWeight: "600", fontSize: 15 },
+  separator: { height: 1, backgroundColor: "#e2e8f0", marginVertical: 8 },
 });

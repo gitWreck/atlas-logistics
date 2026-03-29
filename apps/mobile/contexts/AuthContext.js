@@ -28,10 +28,23 @@ export function AuthProvider({ children }) {
       try {
         const userDocRef = doc(db, "users", firebaseUser.uid);
         const userDoc = await getDoc(userDocRef);
-        const r = userDoc.exists()
-          ? (userDoc.data().role ?? "").toString().toLowerCase()
-          : null;
-        setRole(r);
+
+        if (userDoc.exists()) {
+          const userData = userDoc.data();
+          const r = (userData.role ?? "").toString().toLowerCase();
+
+          setRole(r);
+          // ✅ MERGE: Combine Auth UID/Email with all Firestore details
+          setUser({
+            uid: firebaseUser.uid,
+            email: firebaseUser.email,
+            ...userData,
+          });
+        } else {
+          // Fallback if Auth exists but Firestore doc doesn't
+          setUser({ uid: firebaseUser.uid, email: firebaseUser.email });
+          setRole(null);
+        }
       } catch (err) {
         console.error("AuthContext: fetch role error", err);
         setRole(null);
@@ -43,6 +56,18 @@ export function AuthProvider({ children }) {
 
     return () => unsub();
   }, []);
+
+  const refreshUser = async () => {
+    if (!auth.currentUser) return;
+    const userDoc = await getDoc(doc(db, "users", auth.currentUser.uid));
+    if (userDoc.exists()) {
+      setUser({
+        uid: auth.currentUser.uid,
+        email: auth.currentUser.email,
+        ...userDoc.data(),
+      });
+    }
+  };
 
   const signOut = async () => {
     try {
@@ -67,11 +92,10 @@ export function AuthProvider({ children }) {
     isDriver,
     isCustomer,
     signOut,
+    refreshUser, // ✅ Exported so ProfileViewer can trigger a refresh
   };
 
-  return (
-    <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
-  );
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
 export function useAuth() {

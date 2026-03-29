@@ -203,9 +203,7 @@ export default function TripRow({ trip, onClick, isDark = false }) {
           }`}
           title={trip.route}
         >
-          {isLocal
-            ? "Local Collection"
-            : `${trip.origin} → ${trip.destination}`}
+          {isLocal ? "LOCAL PICKUP" : `${trip.origin} → ${trip.destination}`}
         </div>
 
         <span
