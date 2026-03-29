@@ -1,4 +1,5 @@
 "use client";
+
 import React, { useEffect, useRef, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
@@ -24,6 +25,8 @@ import TripBoard from "../../components/trips/TripBoard";
 import NotificationBell from "../../components/notifications/NotificationBell";
 import TruckBoard from "../../components/trucks/TruckBoard";
 import PickupBoard from "../../components/shipments/PickupBoard";
+
+import { getDashboardThemeClasses } from "@/app/utility/constant/theme";
 
 const mainNavItems = [
   {
@@ -62,39 +65,49 @@ export default function ManagerDashboardPage() {
   const [isDark, setIsDark] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+
   const { user, profile, loading } = useAuth();
+
   const tripBoardRef = useRef(null);
   const shipmentBoardRef = useRef(null);
   const truckBoardRef = useRef(null);
   const mainScrollRef = useRef(null);
 
+  const theme = getDashboardThemeClasses(isDark);
+
   const currentTabConfig = useMemo(
-    () => mainNavItems.find((t) => t.id === activeTab) || mainNavItems[0],
+    () => mainNavItems.find((tab) => tab.id === activeTab) || mainNavItems[0],
     [activeTab],
   );
 
   const headerButton = useMemo(() => {
-    if (activeTab === "trips")
+    if (activeTab === "trips") {
       return {
         label: "Trip",
         icon: faPlus,
         accent: "emerald",
         onClick: () => tripBoardRef.current?.openCreateTripModal?.(),
       };
-    if (activeTab === "shipments")
+    }
+
+    if (activeTab === "shipments") {
       return {
         label: "Shipment",
         icon: faPlus,
         accent: "blue",
         onClick: () => shipmentBoardRef.current?.openCreateModal?.(),
       };
-    if (activeTab === "trucks")
+    }
+
+    if (activeTab === "trucks") {
       return {
         label: "Register Truck",
         icon: faPlus,
         accent: "blue",
         onClick: () => truckBoardRef.current?.openRegisterModal?.(),
       };
+    }
+
     return null;
   }, [activeTab]);
 
@@ -108,57 +121,54 @@ export default function ManagerDashboardPage() {
 
   useEffect(() => {
     if (loading) return;
+
     if (!user) {
       router.push("/login");
       return;
     }
+
     if (profile?.role !== "manager") {
-      handleLogout(auth, router);
       console.warn("Unauthorized access attempt by:", user.email);
+      handleLogout(auth, router);
       router.push("/login");
     }
   }, [user, profile, loading, router]);
 
-  if (loading)
+  if (loading) {
     return (
       <div className="p-10 text-slate-400">Loading Manager Console...</div>
     );
+  }
+
   if (!user || profile?.role !== "manager") return null;
-
-  const rootBackgroundClasses = isDark
-    ? "bg-slate-950 text-slate-100"
-    : "bg-slate-50 text-slate-900";
-
-  const sidebarClasses = isDark
-    ? "bg-slate-900 border-slate-800"
-    : "bg-white border-slate-200";
-
-  const topbarClasses = isDark
-    ? "bg-slate-900 border-slate-800"
-    : "bg-white border-slate-200";
-
-  const sidebarToggleClasses = isDark
-    ? "bg-slate-800 border-slate-700 text-slate-200 hover:bg-slate-700 hover:text-slate-50"
-    : "bg-slate-50 border-slate-200 text-slate-500 hover:bg-slate-100 hover:text-slate-900";
 
   return (
     <div
-      className={`h-screen flex font-sans overflow-hidden ${rootBackgroundClasses}`}
+      className={`h-screen flex font-sans overflow-hidden ${theme.rootBackground}`}
     >
-      {/* Mobile sidebar (off-canvas) */}
       {isMobileSidebarOpen && (
-        <div className="fixed inset-0 z-40 md:hidden">
+        <div
+          className={`fixed inset-0 z-40 md:hidden transition-opacity duration-300 ${
+            isMobileSidebarOpen
+              ? "opacity-100 pointer-events-auto"
+              : "opacity-0 pointer-events-none"
+          }`}
+        >
           <button
             type="button"
             aria-label="Close navigation"
             className="absolute inset-0 bg-black/40 backdrop-blur-sm"
             onClick={() => setIsMobileSidebarOpen(false)}
           />
+
           <aside
-            className={`relative h-full w-64 max-w-[80vw] shrink-0 border-r px-4 py-6 overflow-y-auto ${sidebarClasses}`}
+            className={`relative h-full w-64 max-w-[80vw] shrink-0 border-r px-4 py-6 overflow-y-auto transform transition-transform duration-300 ease-in-out ${
+              isMobileSidebarOpen ? "translate-x-0" : "-translate-x-full"
+            } ${theme.sidebar}`}
           >
             <SidebarContent
               isDark={isDark}
+              theme={theme}
               isSidebarCollapsed={false}
               activeTab={activeTab}
               setActiveTab={setActiveTab}
@@ -169,14 +179,14 @@ export default function ManagerDashboardPage() {
         </div>
       )}
 
-      {/* Sidebar - desktop and tablet */}
       <aside
-        className={`hidden md:flex flex-col ${
+        className={`hidden md:flex flex-col shrink-0 border-r px-4 py-6 overflow-y-auto transition-all duration-300 ease-in-out ${
           isSidebarCollapsed ? "w-20" : "w-64"
-        } shrink-0 border-r px-4 py-6 overflow-y-auto ${sidebarClasses}`}
+        } ${theme.sidebar}`}
       >
         <SidebarContent
           isDark={isDark}
+          theme={theme}
           isSidebarCollapsed={isSidebarCollapsed}
           activeTab={activeTab}
           setActiveTab={setActiveTab}
@@ -184,20 +194,15 @@ export default function ManagerDashboardPage() {
         />
       </aside>
 
-      {/* Main content area */}
       <section className="flex-1 flex flex-col min-h-0">
         <header
-          className={`flex items-center justify-between gap-4 border-b pl-4 pr-4 sm:pl-6 sm:pr-6 py-4 min-h-[56px] ${topbarClasses}`}
+          className={`flex items-center justify-between gap-4 border-b pl-4 pr-4 sm:pl-6 sm:pr-6 py-4 min-h-[56px] ${theme.topbar}`}
         >
           <div className="flex items-center gap-2">
             <button
               type="button"
               onClick={() => setIsMobileSidebarOpen(true)}
-              className={`md:hidden h-9 w-9 shrink-0 flex items-center justify-center rounded-full border text-sm ${
-                isDark
-                  ? "border-slate-700 bg-slate-900 text-slate-100"
-                  : "border-slate-200 bg-white text-slate-700"
-              }`}
+              className={`md:hidden h-9 w-9 shrink-0 flex items-center justify-center rounded-full border text-sm ${theme.mobileMenuButton}`}
               aria-label="Open navigation"
               aria-expanded={isMobileSidebarOpen}
             >
@@ -211,7 +216,7 @@ export default function ManagerDashboardPage() {
             <button
               type="button"
               onClick={() => setIsSidebarCollapsed((prev) => !prev)}
-              className={`hidden md:flex h-7 w-7 shrink-0 items-center justify-center rounded-full shadow-sm ${sidebarToggleClasses}`}
+              className={`hidden md:flex h-7 w-7 shrink-0 items-center justify-center rounded-full shadow-sm border ${theme.sidebarToggle}`}
               title={isSidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
             >
               <FontAwesomeIcon
@@ -221,15 +226,11 @@ export default function ManagerDashboardPage() {
             </button>
           </div>
 
-          <div
-            className={`flex-1 min-w-0 px-1 sm:px-2 ${isDark ? "text-white" : "text-slate-900"}`}
-          >
+          <div className={`flex-1 min-w-0 px-1 sm:px-2 ${theme.titleText}`}>
             <h1 className="font-bold tracking-wide text-lg uppercase leading-tight">
               {currentTabConfig?.title ?? "Manager Console"}
             </h1>
-            <p
-              className={`text-xs mt-0.5 leading-tight ${isDark ? "text-slate-400" : "text-slate-600"}`}
-            >
+            <p className={`text-xs mt-0.5 leading-tight ${theme.subtitleText}`}>
               {currentTabConfig?.description ?? "Operations dashboard"}
             </p>
           </div>
@@ -248,6 +249,7 @@ export default function ManagerDashboardPage() {
                   <FontAwesomeIcon icon={headerButton.icon} />
                   <span>{headerButton.label}</span>
                 </button>
+
                 <button
                   onClick={headerButton.onClick}
                   className={`sm:hidden h-10 w-10 rounded-lg flex items-center justify-center text-white ${
@@ -260,10 +262,11 @@ export default function ManagerDashboardPage() {
                 </button>
               </>
             )}
+
             <button
               type="button"
               onClick={() => setIsDark((prev) => !prev)}
-              className="h-9 w-9 rounded-full border border-slate-200 bg-slate-50 flex items-center justify-center text-slate-500 hover:bg-slate-100 hover:text-slate-900 dark:border-slate-700 dark:bg-slate-900 dark:hover:bg-slate-800"
+              className={`h-9 w-9 rounded-full border flex items-center justify-center ${theme.themeToggle}`}
               title="Toggle theme"
             >
               <FontAwesomeIcon icon={isDark ? faSun : faMoon} size="sm" />
@@ -288,7 +291,6 @@ export default function ManagerDashboardPage() {
         </header>
 
         <main ref={mainScrollRef} className="flex-1 overflow-y-auto">
-          {/* <div className="max-w-7xl mx-auto w-full px-4 sm:px-6 py-6 space-y-6"> */}
           <div className="w-full">
             <div className="max-w-7xl mx-auto w-full px-4 sm:px-6 py-6 space-y-6">
               {activeTab === "overview" && (
@@ -311,6 +313,7 @@ export default function ManagerDashboardPage() {
                 isDark={isDark}
               />
             )}
+
             {activeTab === "shipments" && (
               <>
                 <ShipmentBoard
@@ -323,12 +326,13 @@ export default function ManagerDashboardPage() {
                 <PickupBoard
                   ref={shipmentBoardRef}
                   user={user}
-                  userRole="admin"
+                  userRole="manager"
                   profile={profile}
                   isDark={isDark}
                 />
               </>
             )}
+
             {activeTab === "trucks" && (
               <TruckBoard
                 ref={truckBoardRef}
@@ -347,6 +351,7 @@ export default function ManagerDashboardPage() {
 
 function SidebarContent({
   isDark,
+  theme,
   isSidebarCollapsed,
   activeTab,
   setActiveTab,
@@ -365,20 +370,15 @@ function SidebarContent({
           alt="Atlas"
           className="w-10 h-10 rounded-2xl object-contain shrink-0"
         />
+
         {!isSidebarCollapsed && (
           <div className="ml-3">
             <div
-              className={`text-xs font-semibold tracking-[0.2em] uppercase ${
-                isDark ? "text-slate-400" : "text-slate-600"
-              }`}
+              className={`text-xs font-semibold tracking-[0.2em] uppercase ${theme.brandLabel}`}
             >
               Atlas
             </div>
-            <div
-              className={`text-sm font-semibold ${
-                isDark ? "text-white" : "text-slate-900"
-              }`}
-            >
+            <div className={`text-sm font-semibold ${theme.brandTitle}`}>
               Manager
             </div>
           </div>
@@ -387,16 +387,16 @@ function SidebarContent({
 
       <div className="mt-8">
         {!isSidebarCollapsed && (
-          <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+          <div
+            className={`text-[11px] font-semibold uppercase tracking-wide ${theme.secondaryLabel}`}
+          >
             Main
           </div>
         )}
+
         <div className="mt-3 space-y-1">
           {mainNavItems.map((item) => {
             const isActive = activeTab === item.id;
-            const idleClasses = isDark
-              ? "text-slate-200 hover:bg-slate-800"
-              : "text-slate-700 hover:bg-slate-100";
 
             return (
               <button
@@ -411,21 +411,26 @@ function SidebarContent({
                 } rounded-xl px-3 py-2 text-sm font-medium transition-colors ${
                   isActive
                     ? "bg-gradient-to-br from-indigo-600 to-purple-600 text-white shadow-md shadow-indigo-500/25"
-                    : idleClasses
+                    : theme.navIdle
                 }`}
               >
                 <span
                   className={`inline-flex h-8 w-8 items-center justify-center rounded-xl ${
-                    isActive
-                      ? "bg-white/20 text-white"
-                      : isDark
-                        ? "bg-slate-100/10 text-slate-400"
-                        : "bg-slate-900/5 text-slate-500"
+                    isActive ? "bg-white/20 text-white" : theme.navIconIdle
                   }`}
                 >
                   <FontAwesomeIcon icon={item.icon} size="sm" />
                 </span>
-                {!isSidebarCollapsed && <span>{item.label}</span>}
+
+                <span
+                  className={`whitespace-nowrap transition-opacity duration-200 ${
+                    isSidebarCollapsed
+                      ? "opacity-0 w-0 overflow-hidden"
+                      : "opacity-100"
+                  }`}
+                >
+                  {item.label}
+                </span>
               </button>
             );
           })}
@@ -440,21 +445,14 @@ function SidebarContent({
           onClick={() => handleLogout(auth, router)}
           className={`w-full flex items-center ${
             isSidebarCollapsed ? "justify-center" : "gap-3"
-          } rounded-xl px-3 py-2 text-sm font-medium transition-colors ${
-            isDark
-              ? "text-slate-300 hover:bg-slate-800"
-              : "text-slate-700 hover:bg-slate-100"
-          }`}
+          } rounded-xl px-3 py-2 text-sm font-medium transition-colors ${theme.logoutButton}`}
         >
           <span
-            className={`inline-flex h-8 w-8 items-center justify-center rounded-xl ${
-              isDark
-                ? "bg-slate-900 text-slate-300"
-                : "bg-slate-100 text-slate-600"
-            }`}
+            className={`inline-flex h-8 w-8 items-center justify-center rounded-xl ${theme.logoutIcon}`}
           >
             <FontAwesomeIcon icon={faSignOutAlt} size="sm" />
           </span>
+
           {!isSidebarCollapsed && <span>Logout</span>}
         </button>
       </div>

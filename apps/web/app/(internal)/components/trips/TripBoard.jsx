@@ -1,4 +1,5 @@
 "use client";
+
 import React, {
   useState,
   useMemo,
@@ -19,6 +20,7 @@ import TripRow from "./TripRow";
 import { calculateProgress } from "@/app/utility/utilities";
 import TripDrawer from "./TripDrawer";
 import CreateTripModal from "../manifests/modals/CreateTripModal";
+import { getBoardThemeClasses } from "@/app/utility/constant/theme";
 
 const TripBoard = forwardRef(function TripBoard(
   { user, userRole, profile, isDark = false },
@@ -27,29 +29,28 @@ const TripBoard = forwardRef(function TripBoard(
   const [trips, setTrips] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // Modal & Drawer State
   const [isNewTripModalOpen, setIsNewTripModalOpen] = useState(false);
   const [selectedTripId, setSelectedTripId] = useState(null);
 
-  // Search & Filter State
   const [activeFilter, setActiveFilter] = useState("ALL");
   const [typeFilter, setTypeFilter] = useState("ALL");
   const [searchQuery, setSearchQuery] = useState("");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
 
-  // Pagination State
   const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage] = useState(10);
+  const itemsPerPage = 10;
+
+  const theme = getBoardThemeClasses(isDark);
 
   const fetchTrips = async () => {
     try {
       setLoading(true);
-      // const user = auth.currentUser;
+
       if (!user) return;
+
       const token = await user.getIdToken();
 
-      // Change this to your actual API endpoint for trips
       const res = await fetch("/api/trips", {
         method: "GET",
         headers: {
@@ -62,12 +63,13 @@ const TripBoard = forwardRef(function TripBoard(
       if (!res.ok) throw new Error("Failed to fetch trips");
 
       const data = await res.json();
-      const formatted = data.trips.map((t) => ({
-        ...t,
-        progress: calculateProgress(t.status),
+
+      const formatted = (data.trips || []).map((trip) => ({
+        ...trip,
+        progress: calculateProgress(trip.status),
       }));
 
-      setTrips(formatted || []);
+      setTrips(formatted);
     } catch (err) {
       console.error("Error fetching trips:", err);
     } finally {
@@ -79,18 +81,14 @@ const TripBoard = forwardRef(function TripBoard(
     fetchTrips();
   }, []);
 
-  // --- FILTER LOGIC ---
   const filteredTrips = useMemo(() => {
-    setCurrentPage(1); // Reset page on filter change
-
-    return trips.filter((t) => {
-      // 1. Search (ID, Driver, Plate)
+    return trips.filter((trip) => {
       const searchContent = [
-        t.tripId,
-        t.driverName,
-        t.truckPlateNumber,
-        t.route,
-        t.tripType,
+        trip.tripId,
+        trip.driverName,
+        trip.truckPlateNumber,
+        trip.route,
+        trip.tripType,
       ]
         .filter(Boolean)
         .join(" ")
@@ -98,17 +96,17 @@ const TripBoard = forwardRef(function TripBoard(
 
       if (!searchContent.includes(searchQuery.toLowerCase())) return false;
 
-      // 2. Date Range (createdAt or startedAt)
       if (startDate || endDate) {
-        const tripDate = t.createdAt?._seconds
-          ? new Date(t.createdAt._seconds * 1000)
-          : new Date(t.createdAt);
+        const tripDate = trip.createdAt?._seconds
+          ? new Date(trip.createdAt._seconds * 1000)
+          : new Date(trip.createdAt);
 
         if (startDate) {
           const start = new Date(startDate);
           start.setHours(0, 0, 0, 0);
           if (tripDate < start) return false;
         }
+
         if (endDate) {
           const end = new Date(endDate);
           end.setHours(23, 59, 59, 999);
@@ -116,32 +114,38 @@ const TripBoard = forwardRef(function TripBoard(
         }
       }
 
-      // 3. Status Filter
       if (activeFilter !== "ALL") {
-        if (activeFilter === "ACTIVE")
-          return ["IN_TRANSIT", "LOADED"].includes(t.status);
+        if (activeFilter === "ACTIVE") {
+          return ["IN_TRANSIT", "LOADED"].includes(trip.status);
+        }
 
-        if (activeFilter === "DELAYED") return t.delayCleared === false;
+        if (activeFilter === "DELAYED") {
+          return trip.delayCleared === false;
+        }
 
-        if (activeFilter === "COMPLETED") return t.status === "COMPLETED";
+        if (activeFilter === "COMPLETED") {
+          return trip.status === "COMPLETED";
+        }
       }
 
-      // 4. NEW: Trip Type Filter
-      if (typeFilter !== "ALL") {
-        if (t.tripType !== typeFilter) return false;
+      if (typeFilter !== "ALL" && trip.tripType !== typeFilter) {
+        return false;
       }
 
       return true;
     });
   }, [searchQuery, activeFilter, typeFilter, trips, startDate, endDate]);
 
-  // --- PAGINATION ---
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, activeFilter, typeFilter, startDate, endDate]);
+
   const indexOfLastItem = currentPage * itemsPerPage;
   const indexOfFirstItem = indexOfLastItem - itemsPerPage;
   const currentItems = filteredTrips.slice(indexOfFirstItem, indexOfLastItem);
   const totalPages = Math.ceil(filteredTrips.length / itemsPerPage);
 
-  const selectedTrip = trips.find((t) => t.id === selectedTripId);
+  const selectedTrip = trips.find((trip) => trip.id === selectedTripId);
 
   useImperativeHandle(
     ref,
@@ -152,42 +156,24 @@ const TripBoard = forwardRef(function TripBoard(
   );
 
   return (
-    <div
-      className={`min-h-screen font-sans ${
-        isDark ? "bg-slate-950 text-slate-200" : "bg-slate-50 text-slate-900"
-      }`}
-    >
-      {/* --- CONTENT --- */}
+    <div className={`min-h-screen font-sans ${theme.page}`}>
       <main className="max-w-7xl mx-auto p-4 sm:p-6">
         <div
-          className={`rounded-xl overflow-hidden shadow-xl backdrop-blur-sm border ${
-            isDark
-              ? "border-slate-800 bg-slate-900/50"
-              : "border-slate-200 bg-white"
-          }`}
+          className={`rounded-xl overflow-hidden shadow-xl backdrop-blur-sm border ${theme.board}`}
         >
-          {/* CONTROLS */}
+          {/* Controls */}
           <div
-            className={`px-4 sm:px-6 py-4 border-b flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4 ${
-              isDark
-                ? "border-slate-800 bg-slate-950/30"
-                : "border-slate-200 bg-slate-50"
-            }`}
+            className={`px-4 sm:px-6 py-4 border-b flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4 ${theme.header}`}
           >
             <h3
-              className={`font-bold whitespace-nowrap hidden xl:flex items-center gap-2 ${
-                isDark ? "text-white" : "text-slate-900"
-              }`}
+              className={`font-bold whitespace-nowrap hidden xl:flex items-center gap-2 ${theme.title}`}
             >
               Active Manifests
               <button
+                type="button"
                 onClick={fetchTrips}
                 disabled={loading}
-                className={`transition-colors p-1 rounded ${
-                  isDark
-                    ? "text-slate-500 hover:text-white hover:bg-slate-800"
-                    : "text-slate-400 hover:text-slate-700 hover:bg-slate-200"
-                }`}
+                className={`transition-colors p-1 rounded ${theme.refreshButton}`}
                 title="Refresh"
               >
                 <FontAwesomeIcon
@@ -198,71 +184,50 @@ const TripBoard = forwardRef(function TripBoard(
               </button>
             </h3>
 
-            {/* Filter Container - Stack on mobile, Row on Desktop */}
             <div className="flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center gap-2 w-full xl:w-auto">
               {/* Search */}
               <div className="relative flex-1 min-w-[200px]">
                 <FontAwesomeIcon
                   icon={faSearch}
-                  className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm"
+                  className={`absolute left-3 top-1/2 -translate-y-1/2 text-sm ${theme.iconMuted}`}
                 />
                 <input
                   type="text"
                   placeholder="Search Trip ID..."
-                  className={`w-full rounded-lg pl-9 pr-4 py-2 text-sm focus:border-emerald-500 focus:outline-none border ${
-                    isDark
-                      ? "bg-slate-900 border-slate-700 text-white"
-                      : "bg-white border-slate-300 text-slate-900"
-                  }`}
+                  className={`w-full rounded-lg pl-9 pr-4 py-2 text-sm focus:border-emerald-500 focus:outline-none border ${theme.input}`}
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                 />
               </div>
 
               <div className="flex gap-2 w-full sm:w-auto">
-                {/* Date Picker (Scrollable on very small screens) */}
+                {/* Date Range */}
                 <div
-                  className={`flex items-center gap-2 rounded-lg px-2 py-1 flex-1 sm:flex-none justify-center border ${
-                    isDark
-                      ? "bg-slate-900 border-slate-700"
-                      : "bg-white border-slate-300"
-                  }`}
+                  className={`flex items-center gap-2 rounded-lg px-2 py-1 flex-1 sm:flex-none justify-center border ${theme.filterWrap}`}
                 >
                   <input
                     type="date"
-                    className={`bg-transparent text-xs outline-none w-24 ${
-                      isDark
-                        ? "text-white [color-scheme:dark]"
-                        : "text-slate-900 [color-scheme:light]"
-                    }`}
+                    className={`bg-transparent text-xs outline-none w-24 ${theme.dateInput}`}
                     value={startDate}
                     onChange={(e) => setStartDate(e.target.value)}
                   />
-                  <span className="text-slate-400">-</span>
+                  <span className={theme.iconMuted}>-</span>
                   <input
                     type="date"
-                    className={`bg-transparent text-xs outline-none w-24 ${
-                      isDark
-                        ? "text-white [color-scheme:dark]"
-                        : "text-slate-900 [color-scheme:light]"
-                    }`}
+                    className={`bg-transparent text-xs outline-none w-24 ${theme.dateInput}`}
                     value={endDate}
                     onChange={(e) => setEndDate(e.target.value)}
                   />
                 </div>
 
-                {/* Type Filter (NEW) */}
+                {/* Type Filter */}
                 <div className="relative w-full sm:w-40">
                   <FontAwesomeIcon
                     icon={faRoute}
-                    className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-sm"
+                    className={`absolute left-3 top-1/2 -translate-y-1/2 text-sm ${theme.iconMuted}`}
                   />
                   <select
-                    className={`w-full rounded-lg pl-9 pr-4 py-2 text-sm focus:border-blue-500 focus:outline-none appearance-none cursor-pointer border ${
-                      isDark
-                        ? "bg-slate-900 border-slate-700 text-white"
-                        : "bg-white border-slate-300 text-slate-900"
-                    }`}
+                    className={`w-full rounded-lg pl-9 pr-4 py-2 text-sm focus:border-blue-500 focus:outline-none appearance-none cursor-pointer border ${theme.input}`}
                     value={typeFilter}
                     onChange={(e) => setTypeFilter(e.target.value)}
                   >
@@ -276,14 +241,10 @@ const TripBoard = forwardRef(function TripBoard(
                 <div className="relative w-full sm:w-40">
                   <FontAwesomeIcon
                     icon={faFilter}
-                    className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm"
+                    className={`absolute left-3 top-1/2 -translate-y-1/2 text-sm ${theme.iconMuted}`}
                   />
                   <select
-                    className={`w-full rounded-lg pl-9 pr-4 py-2 text-sm focus:border-emerald-500 focus:outline-none appearance-none cursor-pointer border ${
-                      isDark
-                        ? "bg-slate-900 border-slate-700 text-white"
-                        : "bg-white border-slate-300 text-slate-900"
-                    }`}
+                    className={`w-full rounded-lg pl-9 pr-4 py-2 text-sm focus:border-emerald-500 focus:outline-none appearance-none cursor-pointer border ${theme.input}`}
                     value={activeFilter}
                     onChange={(e) => setActiveFilter(e.target.value)}
                   >
@@ -297,16 +258,11 @@ const TripBoard = forwardRef(function TripBoard(
             </div>
           </div>
 
-          {/* TABLE: wrap header + body for horizontal scroll on smaller widths */}
+          {/* Table */}
           <div className="md:overflow-x-auto">
             <div className="md:min-w-[900px]">
-              {/* TABLE HEADER (Hidden on Mobile) */}
               <div
-                className={`hidden md:grid grid-cols-12 gap-4 px-6 py-3 border-b text-xs font-semibold uppercase tracking-wider ${
-                  isDark
-                    ? "border-slate-800 bg-slate-950 text-slate-500"
-                    : "border-slate-200 bg-slate-50 text-slate-700"
-                }`}
+                className={`hidden md:grid grid-cols-12 gap-4 px-6 py-3 border-b text-xs font-semibold uppercase tracking-wider ${theme.tableHead}`}
               >
                 <div className="col-span-3">Trip Info / Driver</div>
                 <div className="col-span-2">Route</div>
@@ -316,21 +272,22 @@ const TripBoard = forwardRef(function TripBoard(
                 <div className="col-span-1 text-right">Action</div>
               </div>
 
-              {/* TABLE BODY */}
               <div className="min-h-[300px]">
                 {loading ? (
-                  <div className="p-10 text-center text-slate-600 animate-pulse">
+                  <div
+                    className={`p-10 text-center animate-pulse ${theme.emptyText}`}
+                  >
                     Loading trips...
                   </div>
                 ) : currentItems.length === 0 ? (
-                  <div className="p-10 text-center text-slate-600">
+                  <div className={`p-10 text-center ${theme.emptyText}`}>
                     No trips found.
                   </div>
                 ) : (
-                  currentItems.map((t) => (
+                  currentItems.map((trip) => (
                     <TripRow
-                      key={t.id}
-                      trip={t}
+                      key={trip.id}
+                      trip={trip}
                       onClick={setSelectedTripId}
                       isDark={isDark}
                     />
@@ -340,49 +297,38 @@ const TripBoard = forwardRef(function TripBoard(
             </div>
           </div>
 
-          {/* PAGINATION */}
-          {/* ... (Your pagination code remains mostly the same, just ensure flex-wrap if needed) ... */}
+          {/* Pagination */}
           {filteredTrips.length > 0 && (
             <div
-              className={`px-4 sm:px-6 py-4 border-t flex justify-between items-center ${
-                isDark
-                  ? "border-slate-800 bg-slate-950/30"
-                  : "border-slate-200 bg-slate-50"
-              }`}
+              className={`px-4 sm:px-6 py-4 border-t flex flex-col sm:flex-row justify-between items-center gap-3 text-xs ${theme.footer}`}
             >
-              <span className="text-xs text-slate-600">
+              <span className={theme.footerText}>
                 Page{" "}
-                <span
-                  className={`font-bold ${
-                    isDark ? "text-white" : "text-slate-900"
-                  }`}
-                >
+                <span className={`font-bold ${theme.footerStrong}`}>
                   {currentPage}
                 </span>{" "}
                 of {totalPages}
               </span>
+
               <div className="flex gap-2">
                 <button
-                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                  type="button"
+                  onClick={() =>
+                    setCurrentPage((page) => Math.max(1, page - 1))
+                  }
                   disabled={currentPage === 1}
-                  className={`px-3 py-1.5 rounded-lg border text-xs disabled:opacity-50 ${
-                    isDark
-                      ? "border-slate-700 bg-slate-900 text-slate-400 hover:text-white"
-                      : "border-slate-300 bg-white text-slate-700 hover:text-slate-900"
-                  }`}
+                  className={`px-3 py-1.5 rounded-lg border disabled:opacity-50 disabled:cursor-not-allowed transition-all ${theme.paginationButton}`}
                 >
                   <FontAwesomeIcon icon={faChevronLeft} />
                 </button>
+
                 <button
+                  type="button"
                   onClick={() =>
-                    setCurrentPage((p) => Math.min(totalPages, p + 1))
+                    setCurrentPage((page) => Math.min(totalPages, page + 1))
                   }
                   disabled={currentPage === totalPages}
-                  className={`px-3 py-1.5 rounded-lg border text-xs disabled:opacity-50 ${
-                    isDark
-                      ? "border-slate-700 bg-slate-900 text-slate-400 hover:text-white"
-                      : "border-slate-300 bg-white text-slate-700 hover:text-slate-900"
-                  }`}
+                  className={`px-3 py-1.5 rounded-lg border disabled:opacity-50 disabled:cursor-not-allowed transition-all ${theme.paginationButton}`}
                 >
                   <FontAwesomeIcon icon={faChevronRight} />
                 </button>
@@ -392,7 +338,6 @@ const TripBoard = forwardRef(function TripBoard(
         </div>
       </main>
 
-      {/* --- PLACEHOLDERS FOR DRAWER/MODAL --- */}
       <TripDrawer
         isOpen={!!selectedTripId}
         onClose={() => setSelectedTripId(null)}
@@ -400,6 +345,7 @@ const TripBoard = forwardRef(function TripBoard(
         onRefreshTrips={fetchTrips}
         isDark={isDark}
       />
+
       <CreateTripModal
         isOpen={isNewTripModalOpen}
         onClose={() => setIsNewTripModalOpen(false)}

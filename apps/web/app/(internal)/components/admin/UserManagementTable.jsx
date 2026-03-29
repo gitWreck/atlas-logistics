@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faTrash,
@@ -9,10 +9,11 @@ import {
   faEdit,
   faPlus,
 } from "@fortawesome/free-solid-svg-icons";
+import { getTableTheme } from "@/app/utility/constant/theme";
 
 export default function UserManagementTable({
-  users,
-  loading,
+  users = [],
+  loading = false,
   onDeleteUser,
   onAddUser,
   onEditUser,
@@ -23,114 +24,88 @@ export default function UserManagementTable({
   const [page, setPage] = useState(1);
 
   const itemsPerPage = 5;
+  const theme = getTableTheme(isDark);
 
   const filteredUsers = useMemo(() => {
-    if (page !== 1 && (search || roleFilter !== "ALL")) setPage(1);
+    return users.filter((user) => {
+      const name = (user.name || "").toLowerCase();
+      const email = (user.email || "").toLowerCase();
+      const keyword = search.toLowerCase();
 
-    return users.filter((u) => {
-      const matchesSearch =
-        (u.name || "").toLowerCase().includes(search.toLowerCase()) ||
-        (u.email || "").toLowerCase().includes(search.toLowerCase());
-      const matchesRole = roleFilter === "ALL" || u.role === roleFilter;
+      const matchesSearch = name.includes(keyword) || email.includes(keyword);
+
+      const matchesRole = roleFilter === "ALL" || user.role === roleFilter;
+
       return matchesSearch && matchesRole;
     });
-  }, [users, search, roleFilter, page]);
+  }, [users, search, roleFilter]);
 
-  const totalPages = Math.ceil(filteredUsers.length / itemsPerPage);
-  const paginatedUsers = filteredUsers.slice(
-    (page - 1) * itemsPerPage,
-    page * itemsPerPage,
+  useEffect(() => {
+    setPage(1);
+  }, [search, roleFilter]);
+
+  const totalPages = Math.max(
+    1,
+    Math.ceil(filteredUsers.length / itemsPerPage),
   );
 
-  // Styling Constants
-  const containerClasses = isDark
-    ? "border-slate-800 bg-slate-900/50"
-    : "border-slate-200 bg-white shadow-sm";
-  const headerClasses = isDark
-    ? "border-slate-800 bg-slate-950/30"
-    : "border-slate-200 bg-slate-50";
-  const filtersClasses = isDark
-    ? "border-slate-800 bg-slate-950/20"
-    : "border-slate-200 bg-slate-50/50";
-  const inputClasses = isDark
-    ? "bg-slate-900 border-slate-700 text-slate-200"
-    : "bg-white border-slate-200 text-slate-900";
-  const theadClasses = isDark
-    ? "bg-slate-950 text-slate-500"
-    : "bg-slate-50 text-slate-600";
-  const tbodyDivide = isDark ? "divide-slate-800" : "divide-slate-200";
-  const rowHover = isDark ? "hover:bg-slate-800/30" : "hover:bg-slate-50";
-  const cellPrimary = isDark ? "text-slate-200" : "text-slate-900";
-  const cellSecondary = isDark ? "text-slate-500" : "text-slate-600";
-  const roleBadgeClasses = isDark
-    ? "bg-slate-800 border-slate-700 text-slate-300"
-    : "bg-slate-100 border-slate-200 text-slate-700";
-  const statusActiveClasses = isDark
-    ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
-    : "bg-emerald-100 text-emerald-700 border-emerald-200";
-  const statusInactiveClasses = isDark
-    ? "bg-red-500/10 text-red-400 border-red-500/20"
-    : "bg-red-100 text-red-700 border-red-200";
-  const actionBtnClasses = isDark
-    ? "text-slate-500 hover:text-red-400 hover:bg-slate-800"
-    : "text-slate-600 hover:text-red-600 hover:bg-slate-100";
-  const footerClasses = isDark
-    ? "border-slate-800 bg-slate-950/30 text-slate-500"
-    : "border-slate-200 bg-slate-50 text-slate-600";
-  const footerBold = isDark ? "text-white" : "text-slate-900";
-  const paginationBtnClasses = isDark
-    ? "border-slate-700 bg-slate-900 text-slate-400 hover:text-white hover:bg-slate-800"
-    : "border-slate-200 bg-white text-slate-700 hover:bg-slate-100 hover:text-slate-900";
-  const editBtnClasses = isDark
-    ? "text-slate-500 hover:text-blue-400 hover:bg-slate-800"
-    : "text-slate-600 hover:text-blue-600 hover:bg-slate-100";
+  const currentPage = Math.min(page, totalPages);
+
+  const paginatedUsers = filteredUsers.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage,
+  );
+
+  const emptyMessage =
+    users.length === 0 ? "No users found." : "No matching users found.";
 
   return (
     <div
-      className={`border rounded-xl overflow-hidden shadow-lg ${containerClasses}`}
+      className={`border rounded-xl overflow-hidden shadow-lg ${theme.container}`}
     >
-      {/* A. HEADER */}
+      {/* Header */}
       <div
-        className={`px-4 sm:px-6 py-4 border-b flex justify-between items-center ${headerClasses}`}
+        className={`px-4 sm:px-6 py-4 border-b flex justify-between items-center ${theme.header}`}
       >
-        <h2 className={`font-bold ${isDark ? "text-white" : "text-slate-900"}`}>
-          User Management
-        </h2>
+        <h2 className={`font-bold ${theme.headingText}`}>User Management</h2>
+
         <button
+          type="button"
           onClick={onAddUser}
-          className=" bg-blue-600 hover:bg-blue-500 text-white px-3 py-1.5 rounded-lg transition-colors flex items-center gap-2 font-bold shadow-lg shadow-blue-900/20"
+          className="bg-blue-600 hover:bg-blue-500 text-white px-3 py-1.5 rounded-lg transition-colors flex items-center gap-2 font-bold shadow-lg shadow-blue-900/20"
         >
           <FontAwesomeIcon icon={faPlus} className="hidden sm:inline-block" />
-          User
+          <span>User</span>
         </button>
       </div>
 
-      {/* B. FILTERS */}
+      {/* Filters */}
       <div
-        className={`px-4 sm:px-6 py-3 border-b flex flex-col  sm:flex-row gap-3 ${filtersClasses}`}
+        className={`px-4 sm:px-6 py-3 border-b flex flex-col sm:flex-row gap-3 ${theme.filters}`}
       >
         <div className="relative flex-1">
           <FontAwesomeIcon
             icon={faSearch}
-            className={`absolute left-3 top-2.5 ${isDark ? "text-slate-500" : "text-slate-400"}`}
+            className={`absolute left-3 top-2.5 ${theme.inputIcon}`}
           />
           <input
             type="text"
             placeholder="Search name or email..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className={`border rounded-lg pl-8 pr-3 py-1.5 focus:border-blue-500 outline-none transition-colors ${inputClasses}`}
+            className={`w-full border rounded-lg pl-8 pr-3 py-1.5 focus:border-blue-500 outline-none transition-colors ${theme.input}`}
           />
         </div>
+
         <div className="relative w-full sm:w-40">
           <FontAwesomeIcon
             icon={faFilter}
-            className={`absolute left-3 top-2.5 ${isDark ? "text-slate-500" : "text-slate-400"}`}
+            className={`absolute left-3 top-2.5 ${theme.inputIcon}`}
           />
           <select
             value={roleFilter}
             onChange={(e) => setRoleFilter(e.target.value)}
-            className={`w-full border rounded-lg pl-8 pr-3 py-1.5 focus:border-blue-500 outline-none appearance-none cursor-pointer ${inputClasses}`}
+            className={`w-full border rounded-lg pl-8 pr-3 py-1.5 focus:border-blue-500 outline-none appearance-none cursor-pointer ${theme.input}`}
           >
             <option value="ALL">All Roles</option>
             <option value="admin">Admin</option>
@@ -142,86 +117,89 @@ export default function UserManagementTable({
         </div>
       </div>
 
-      {/* C. CONTENT AREA */}
+      {/* Content */}
       <div className="w-full">
-        {/* --- MOBILE VIEW: CARD LIST --- */}
-        <div className={`md:hidden flex flex-col divide-y ${tbodyDivide}`}>
+        {/* Mobile */}
+        <div
+          className={`md:hidden flex flex-col divide-y ${theme.tbodyDivide}`}
+        >
           {loading ? (
-            <div
-              className={`px-6 py-8 text-center ${isDark ? "text-slate-600" : "text-slate-500"}`}
-            >
+            <div className={`px-6 py-8 text-center ${theme.emptyText}`}>
               <div className="animate-pulse">Loading users...</div>
             </div>
           ) : paginatedUsers.length === 0 ? (
-            <div
-              className={`px-6 py-8 text-center italic ${isDark ? "text-slate-600" : "text-slate-500"}`}
-            >
-              {users.length === 0
-                ? "No users found."
-                : "No matching users found."}
+            <div className={`px-6 py-8 text-center italic ${theme.emptyText}`}>
+              {emptyMessage}
             </div>
           ) : (
-            paginatedUsers.map((u) => (
-              <div
-                key={u.id}
-                className={`p-4 flex flex-col gap-3 transition-colors ${rowHover}`}
-              >
-                {/* Top Row: Name/Email & Status */}
-                <div className="flex justify-between items-start gap-2">
-                  <div className="truncate">
-                    <div className={`font-medium truncate ${cellPrimary}`}>
-                      {u.name || "—"}
-                    </div>
-                    <div className={`text-xs truncate ${cellSecondary}`}>
-                      {u.email}
-                    </div>
-                  </div>
-                  <span
-                    className={`shrink-0 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase border ${
-                      u.status === "active"
-                        ? statusActiveClasses
-                        : statusInactiveClasses
-                    }`}
-                  >
-                    {u.status === "active" ? "Active" : "Inactive"}
-                  </span>
-                </div>
+            paginatedUsers.map((user) => {
+              const isActive = user.status === "active";
 
-                {/* Bottom Row: Role & Actions */}
-                <div className="flex justify-between items-end mt-1">
-                  <span
-                    className={`px-2 py-1 rounded text-[10px] border font-mono uppercase ${roleBadgeClasses}`}
-                  >
-                    {u.role || "USER"}
-                  </span>
-                  <div className="flex gap-1">
-                    <button
-                      onClick={() => onEditUser(u)}
-                      className={`transition-colors p-2 rounded ${editBtnClasses}`}
+              return (
+                <div
+                  key={user.id}
+                  className={`p-4 flex flex-col gap-3 transition-colors ${theme.rowHover}`}
+                >
+                  <div className="flex justify-between items-start gap-2">
+                    <div className="truncate">
+                      <div
+                        className={`font-medium truncate ${theme.cellPrimary}`}
+                      >
+                        {user.name || "—"}
+                      </div>
+                      <div
+                        className={`text-xs truncate ${theme.cellSecondary}`}
+                      >
+                        {user.email}
+                      </div>
+                    </div>
+
+                    <span
+                      className={`shrink-0 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase border ${
+                        isActive ? theme.statusActive : theme.statusInactive
+                      }`}
                     >
-                      <FontAwesomeIcon icon={faEdit} />
-                    </button>
-                    <button
-                      onClick={() => onDeleteUser(u)}
-                      className={`transition-colors p-2 rounded ${actionBtnClasses}`}
+                      {isActive ? "Active" : "Inactive"}
+                    </span>
+                  </div>
+
+                  <div className="flex justify-between items-end mt-1">
+                    <span
+                      className={`px-2 py-1 rounded text-[10px] border font-mono uppercase ${theme.roleBadge}`}
                     >
-                      <FontAwesomeIcon icon={faTrash} />
-                    </button>
+                      {user.role || "USER"}
+                    </span>
+
+                    <div className="flex gap-1">
+                      <button
+                        type="button"
+                        onClick={() => onEditUser(user)}
+                        className={`transition-colors p-2 rounded ${theme.editButton}`}
+                        title="Edit User"
+                      >
+                        <FontAwesomeIcon icon={faEdit} />
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => onDeleteUser(user)}
+                        className={`transition-colors p-2 rounded ${theme.deleteButton}`}
+                        title="Disable User"
+                      >
+                        <FontAwesomeIcon icon={faTrash} />
+                      </button>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))
+              );
+            })
           )}
         </div>
 
-        {/* --- DESKTOP VIEW: TABLE --- */}
+        {/* Desktop */}
         <div className="hidden md:block overflow-x-auto">
-          <table
-            className={`w-full text-left text-sm ${isDark ? "text-slate-400" : "text-slate-600"}`}
-          >
-            <thead
-              className={`uppercase font-semibold text-xs ${theadClasses}`}
-            >
+          <table className={`w-full text-left text-sm ${theme.tableText}`}>
+            <thead className={`uppercase font-semibold text-xs ${theme.thead}`}>
               <tr>
                 <th className="px-6 py-3">Name / Email</th>
                 <th className="px-6 py-3">Role</th>
@@ -229,12 +207,13 @@ export default function UserManagementTable({
                 <th className="px-6 py-3 text-right">Action</th>
               </tr>
             </thead>
-            <tbody className={`divide-y ${tbodyDivide}`}>
+
+            <tbody className={`divide-y ${theme.tbodyDivide}`}>
               {loading ? (
                 <tr>
                   <td
                     colSpan="4"
-                    className={`px-6 py-8 text-center ${isDark ? "text-slate-600" : "text-slate-500"}`}
+                    className={`px-6 py-8 text-center ${theme.emptyText}`}
                   >
                     <div className="animate-pulse">Loading users...</div>
                   </td>
@@ -243,90 +222,103 @@ export default function UserManagementTable({
                 <tr>
                   <td
                     colSpan="4"
-                    className={`px-6 py-8 text-center italic ${isDark ? "text-slate-600" : "text-slate-500"}`}
+                    className={`px-6 py-8 text-center italic ${theme.emptyText}`}
                   >
-                    {users.length === 0
-                      ? "No users found."
-                      : "No matching users found."}
+                    {emptyMessage}
                   </td>
                 </tr>
               ) : (
-                paginatedUsers.map((u) => (
-                  <tr key={u.id} className={`${rowHover} transition-colors`}>
-                    <td className="px-6 py-4">
-                      <div className={`font-medium ${cellPrimary}`}>
-                        {u.name || "—"}
-                      </div>
-                      <div className={`text-xs ${cellSecondary}`}>
-                        {u.email}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span
-                        className={`px-2 py-1 rounded text-xs border font-mono uppercase ${roleBadgeClasses}`}
-                      >
-                        {u.role || "USER"}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span
-                        className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase border ${
-                          u.status === "active"
-                            ? statusActiveClasses
-                            : statusInactiveClasses
-                        }`}
-                      >
-                        {u.status === "active" ? "Active" : "Inactive"}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 text-right">
-                      <button
-                        onClick={() => onEditUser(u)}
-                        className={`transition-colors p-2 rounded ${editBtnClasses}`}
-                        title="Edit User"
-                      >
-                        <FontAwesomeIcon icon={faEdit} />
-                      </button>
-                      <button
-                        onClick={() => onDeleteUser(u)}
-                        className={`transition-colors p-2 rounded ${actionBtnClasses}`}
-                        title="Disable User"
-                      >
-                        <FontAwesomeIcon icon={faTrash} />
-                      </button>
-                    </td>
-                  </tr>
-                ))
+                paginatedUsers.map((user) => {
+                  const isActive = user.status === "active";
+
+                  return (
+                    <tr
+                      key={user.id}
+                      className={`transition-colors ${theme.rowHover}`}
+                    >
+                      <td className="px-6 py-4">
+                        <div className={`font-medium ${theme.cellPrimary}`}>
+                          {user.name || "—"}
+                        </div>
+                        <div className={`text-xs ${theme.cellSecondary}`}>
+                          {user.email}
+                        </div>
+                      </td>
+
+                      <td className="px-6 py-4">
+                        <span
+                          className={`px-2 py-1 rounded text-xs border font-mono uppercase ${theme.roleBadge}`}
+                        >
+                          {user.role || "USER"}
+                        </span>
+                      </td>
+
+                      <td className="px-6 py-4">
+                        <span
+                          className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase border ${
+                            isActive ? theme.statusActive : theme.statusInactive
+                          }`}
+                        >
+                          {isActive ? "Active" : "Inactive"}
+                        </span>
+                      </td>
+
+                      <td className="px-6 py-4 text-right">
+                        <button
+                          type="button"
+                          onClick={() => onEditUser(user)}
+                          className={`transition-colors p-2 rounded ${theme.editButton}`}
+                          title="Edit User"
+                        >
+                          <FontAwesomeIcon icon={faEdit} />
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => onDeleteUser(user)}
+                          className={`transition-colors p-2 rounded ${theme.deleteButton}`}
+                          title="Disable User"
+                        >
+                          <FontAwesomeIcon icon={faTrash} />
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>
         </div>
       </div>
 
-      {/* D. PAGINATION FOOTER */}
+      {/* Pagination */}
       {!loading && filteredUsers.length > 0 && (
         <div
-          className={`px-4 sm:px-6 py-4 border-t flex flex-col sm:flex-row justify-between items-center gap-3 text-xs ${footerClasses}`}
+          className={`px-4 sm:px-6 py-4 border-t flex flex-col sm:flex-row justify-between items-center gap-3 text-xs ${theme.footer}`}
         >
           <span>
             Showing{" "}
-            <span className={`font-bold ${footerBold}`}>
-              {Math.min(page * itemsPerPage, filteredUsers.length)}
+            <span className={`font-bold ${theme.footerBold}`}>
+              {Math.min(currentPage * itemsPerPage, filteredUsers.length)}
             </span>{" "}
             of {filteredUsers.length}
           </span>
+
           <div className="flex gap-2">
             <button
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
-              disabled={page === 1}
-              className={`px-3 py-1.5 rounded-lg border disabled:opacity-50 disabled:cursor-not-allowed transition-all ${paginationBtnClasses}`}
+              type="button"
+              onClick={() => setPage((prev) => Math.max(1, prev - 1))}
+              disabled={currentPage === 1}
+              className={`px-3 py-1.5 rounded-lg border disabled:opacity-50 disabled:cursor-not-allowed transition-all ${theme.paginationButton}`}
             >
               <FontAwesomeIcon icon={faChevronLeft} className="mr-1" />
             </button>
+
             <button
-              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-              disabled={page === totalPages}
-              className={`px-3 py-1.5 rounded-lg border disabled:opacity-50 disabled:cursor-not-allowed transition-all ${paginationBtnClasses}`}
+              type="button"
+              onClick={() => setPage((prev) => Math.min(totalPages, prev + 1))}
+              disabled={currentPage === totalPages}
+              className={`px-3 py-1.5 rounded-lg border disabled:opacity-50 disabled:cursor-not-allowed transition-all ${theme.paginationButton}`}
             >
               <FontAwesomeIcon icon={faChevronRight} className="ml-1" />
             </button>

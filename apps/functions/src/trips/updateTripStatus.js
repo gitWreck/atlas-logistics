@@ -91,7 +91,7 @@ exports.updateTripStatus = onCall(
       tx.update(tripRef, updates);
 
       // 4. Audit Log
-      const logRef = db.collection("audit_log").doc();
+      const logRef = db.collection("audit_logs").doc();
       tx.set(logRef, {
         action: "FORCE_UPDATE_TRIP_STATUS",
         targetId: tripId,
