@@ -4,6 +4,10 @@ import React from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faCheckCircle } from "@fortawesome/free-solid-svg-icons";
 import { InfoCard } from "../ui/InfoCard";
+import {
+  SHIPMENT_STEPS_HUB_TRANSFER,
+  SHIPMENT_STEPS_LOCAL_PICKUP,
+} from "@/app/utility/constant/templates";
 
 export default function ShipmentTimelineTab({ data, isDark = false }) {
   if (!data) return null;
@@ -14,27 +18,8 @@ export default function ShipmentTimelineTab({ data, isDark = false }) {
     (data.statusHistory || []).some((h) => h.status.includes("PICKUP"));
 
   const STEPS = isPickupOrder
-    ? [
-        "PENDING_PICKUP",
-        "PICKED_UP",
-        "RECEIVED",
-        "ASSIGNED",
-        "PARTIALLY_LOADED",
-        "LOADED",
-        "IN_TRANSIT",
-        "OUT_FOR_DELIVERY",
-        "DELIVERED",
-      ]
-    : [
-        "CREATED",
-        "RECEIVED",
-        "ASSIGNED",
-        "PARTIALLY_LOADED",
-        "LOADED",
-        "IN_TRANSIT",
-        "OUT_FOR_DELIVERY",
-        "DELIVERED",
-      ];
+    ? SHIPMENT_STEPS_LOCAL_PICKUP
+    : SHIPMENT_STEPS_HUB_TRANSFER;
 
   const currentStepIndex = STEPS.indexOf(data.status);
 
