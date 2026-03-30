@@ -12,8 +12,8 @@ const db = admin.firestore();
 // Secrets
 const SEMAPHORE_API_KEY = defineSecret("SEMAPHORE_API_KEY");
 const SEMAPHORE_SENDER_NAME = defineSecret("SEMAPHORE_SENDER_NAME");
-// const SMTP_EMAIL = defineSecret("SMTP_EMAIL"); // e.g., your generic support@atlas.com
-// const SMTP_PASSWORD = defineSecret("SMTP_PASSWORD"); // App password for your email
+const SMTP_EMAIL = defineSecret("SMTP_EMAIL"); // e.g., your generic support@atlas.com
+const SMTP_PASSWORD = defineSecret("SMTP_PASSWORD"); // App password for your email
 
 // --- HELPER: Secure Hashing ---
 const hashOTP = (otp) => crypto.createHash("sha256").update(otp).digest("hex");
@@ -28,8 +28,8 @@ exports.requestRecoveryOTP = onCall(
     secrets: [
       SEMAPHORE_API_KEY,
       SEMAPHORE_SENDER_NAME,
-      //   SMTP_EMAIL,
-      //   SMTP_PASSWORD,
+      SMTP_EMAIL,
+      SMTP_PASSWORD,
     ],
   },
   async (req) => {
@@ -118,8 +118,8 @@ exports.requestRecoveryOTP = onCall(
         const transporter = nodemailer.createTransport({
           service: "gmail", // Or your provider (SendGrid, Outlook, etc.)
           auth: {
-            // user: SMTP_EMAIL.value(),
-            // pass: SMTP_PASSWORD.value(),
+            user: SMTP_EMAIL.value(),
+            pass: SMTP_PASSWORD.value(),
           },
         });
 

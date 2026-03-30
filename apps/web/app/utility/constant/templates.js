@@ -72,3 +72,26 @@ export const SHIPMENT_STATUS = [
   { value: "DELIVERED", label: "Delivered" },
   { value: "CANCELLED", label: "Cancelled" },
 ];
+
+export const SHIPMENT_STEPS_LOCAL_PICKUP = [
+  "PENDING_PICKUP",
+  "PICKED_UP",
+  "RECEIVED",
+  "ASSIGNED",
+  "PARTIALLY_LOADED",
+  "LOADED",
+  "IN_TRANSIT",
+  "OUT_FOR_DELIVERY",
+  "DELIVERED",
+];
+
+export const SHIPMENT_STEPS_HUB_TRANSFER = [
+  "CREATED",
+  "RECEIVED",
+  "ASSIGNED",
+  "PARTIALLY_LOADED",
+  "LOADED",
+  "IN_TRANSIT",
+  "OUT_FOR_DELIVERY",
+  "DELIVERED",
+];
