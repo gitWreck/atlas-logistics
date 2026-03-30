@@ -76,6 +76,8 @@ export function getOverviewThemeClasses(isDark) {
       ? "text-slate-500 hover:text-slate-300"
       : "text-slate-600 hover:text-slate-900",
 
+    // ------------------------
+
     highlightText: "text-blue-500 font-bold uppercase",
   };
 }
@@ -212,9 +214,6 @@ export function getBoardThemeClasses(isDark) {
       ? "bg-slate-900 text-amber-100 border-amber-500/50"
       : "bg-amber-50 text-amber-900 border-amber-500/50",
 
-    warningIcon: "text-amber-500",
-
-    // ----------------------------
     actionButton: isDark
       ? "bg-slate-700 hover:bg-slate-600 text-white"
       : "bg-slate-200 hover:bg-slate-300 text-slate-800",
@@ -230,6 +229,10 @@ export function getBoardThemeClasses(isDark) {
     pageBadge: isDark
       ? "bg-slate-900 border-slate-700 text-slate-300"
       : "bg-slate-50 border-slate-200 text-slate-700",
+
+    // ----------------------------
+
+    warningIcon: "text-amber-500",
   };
 }
 
@@ -267,10 +270,6 @@ export function getRowThemeClasses(isDark) {
 
     progressTrack: isDark ? "bg-slate-800" : "bg-slate-200",
 
-    progressBlue: "bg-blue-500",
-    progressAmber: "bg-amber-500",
-    progressEmerald: "bg-emerald-500",
-
     statusTextDefault: isDark ? "text-blue-400" : "text-blue-600",
     statusTextDelayed: isDark ? "text-amber-400" : "text-amber-700",
     statusTextCompleted: isDark ? "text-emerald-400" : "text-emerald-600",
@@ -285,13 +284,9 @@ export function getRowThemeClasses(isDark) {
 
     tripIdTextShipment: isDark ? "text-blue-400" : "text-blue-600",
 
-    // ----------------------------
     packageIndexBadge: isDark
       ? "bg-slate-800 border-slate-700 text-slate-500 group-hover:bg-slate-700 group-hover:text-white"
       : "bg-slate-100 border-slate-200 text-slate-600 group-hover:bg-slate-200 group-hover:text-slate-900",
-
-    trackingBadge:
-      "font-mono text-xs text-amber-500 bg-amber-500/10 px-2 py-1 rounded w-fit border border-amber-500/20",
 
     fragileBadge: isDark
       ? "bg-amber-500/10 border border-amber-500/30 text-amber-400"
@@ -305,14 +300,23 @@ export function getRowThemeClasses(isDark) {
       ? "bg-slate-800 text-slate-400 hover:bg-slate-700 hover:text-white border border-slate-700"
       : "bg-slate-200 text-slate-600 hover:bg-slate-300 hover:text-slate-900 border border-slate-300",
 
-    iconActionButtonActive:
-      "bg-blue-600 text-white shadow-lg shadow-blue-900/50",
-
     expandedRow: isDark ? "bg-slate-900/50" : "bg-slate-50",
 
     expandedCard: isDark
       ? "bg-slate-950 border-slate-800"
       : "bg-white border-slate-200",
+
+    // -------------------
+
+    progressBlue: "bg-blue-500",
+    progressAmber: "bg-amber-500",
+    progressEmerald: "bg-emerald-500",
+
+    trackingBadge:
+      "font-mono text-xs text-amber-500 bg-amber-500/10 px-2 py-1 rounded w-fit border border-amber-500/20",
+
+    iconActionButtonActive:
+      "bg-blue-600 text-white shadow-lg shadow-blue-900/50",
   };
 }
 
@@ -358,10 +362,6 @@ export function getDrawerThemeClasses(isDark) {
       ? "border-transparent text-slate-500 hover:text-slate-300 hover:bg-slate-800/50"
       : "border-transparent text-slate-600 hover:text-slate-800 hover:bg-slate-100",
 
-    unlockButton:
-      "bg-amber-500 text-white px-4 py-2 rounded shadow hover:bg-amber-600 transition-colors",
-
-    // ------------------------------------
     footerPanel: isDark
       ? "border-slate-800 bg-slate-950"
       : "border-slate-200 bg-slate-50",
@@ -370,19 +370,23 @@ export function getDrawerThemeClasses(isDark) {
       ? "bg-slate-900 border-slate-800"
       : "bg-white border-slate-200",
 
-    reasonLabel:
-      "text-[10px] font-bold uppercase text-amber-500 tracking-wider",
-
     textarea: isDark
       ? "bg-slate-950 border-slate-800 text-white"
       : "bg-slate-50 border-slate-300 text-slate-900",
 
-    warningOutlineButton:
-      "flex-1 py-2 rounded-lg border border-amber-500/30 text-amber-400 hover:bg-amber-600/20 text-xs font-bold disabled:opacity-30 transition-colors flex justify-center items-center gap-2",
-
     secondaryActionButton: isDark
       ? "flex-1 py-3 rounded-lg font-medium text-sm transition-colors flex items-center justify-center gap-2 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700"
       : "flex-1 py-3 rounded-lg font-medium text-sm transition-colors flex items-center justify-center gap-2 bg-slate-200 hover:bg-slate-300 text-slate-800 border border-slate-300",
+
+    // ----------------------------------
+    unlockButton:
+      "bg-amber-500 text-white px-4 py-2 rounded shadow hover:bg-amber-600 transition-colors",
+
+    reasonLabel:
+      "text-[10px] font-bold uppercase text-amber-500 tracking-wider",
+
+    warningOutlineButton:
+      "flex-1 py-2 rounded-lg border border-amber-500/30 text-amber-400 hover:bg-amber-600/20 text-xs font-bold disabled:opacity-30 transition-colors flex justify-center items-center gap-2",
   };
 }
 
@@ -468,12 +472,8 @@ export function getTableTheme(isDark) {
       ? "bg-slate-800 text-slate-400"
       : "bg-slate-100 text-slate-600",
 
-    linkButton:
-      "text-xs text-blue-500 hover:text-blue-600 font-bold flex items-center gap-1 px-2 py-1",
-
     topDivider: isDark ? "border-slate-800/50" : "border-slate-200",
 
-    // added
     statCard: isDark
       ? "bg-slate-800/20 border-slate-800"
       : "bg-slate-50 border-slate-200",
@@ -498,8 +498,6 @@ export function getTableTheme(isDark) {
 
     checkboxIdle: isDark ? "text-slate-700" : "text-slate-400",
 
-    checkboxActive: "text-blue-500",
-
     actionButtonSoft: isDark
       ? "bg-slate-800 hover:bg-slate-700 text-blue-400 border-slate-700"
       : "bg-slate-100 hover:bg-slate-200 text-blue-600 border-slate-300",
@@ -511,10 +509,6 @@ export function getTableTheme(isDark) {
       ? "bg-slate-800 hover:bg-slate-700 border-slate-600 text-slate-300"
       : "bg-slate-200 hover:bg-slate-300 border-slate-300 text-slate-700",
 
-    bulkButtonLoad: "bg-emerald-600 hover:bg-emerald-500 text-white",
-    bulkButtonOut: "bg-amber-600 hover:bg-amber-500 text-white",
-    bulkButtonDelivered: "bg-purple-600 hover:bg-purple-500 text-white",
-
     countBadgeLoaded: isDark
       ? "bg-emerald-900/30 text-emerald-400 border-emerald-500/30"
       : "bg-emerald-100 text-emerald-700 border-emerald-300",
@@ -523,8 +517,6 @@ export function getTableTheme(isDark) {
       ? "bg-slate-800 text-slate-500 border-slate-700"
       : "bg-slate-100 text-slate-600 border-slate-300",
 
-    // ---------------------------------
-
     dangerSoft: isDark
       ? "bg-slate-800 hover:bg-slate-700 text-red-400 border-slate-700"
       : "bg-slate-100 hover:bg-slate-200 text-red-600 border-slate-300",
@@ -532,6 +524,17 @@ export function getTableTheme(isDark) {
     countBadge: isDark
       ? "bg-slate-800 text-slate-300 border-slate-700"
       : "bg-slate-100 text-slate-700 border-slate-300",
+
+    // ---------------------------------
+
+    linkButton:
+      "text-xs text-blue-500 hover:text-blue-600 font-bold flex items-center gap-1 px-2 py-1",
+
+    checkboxActive: "text-blue-500",
+
+    bulkButtonLoad: "bg-emerald-600 hover:bg-emerald-500 text-white",
+    bulkButtonOut: "bg-amber-600 hover:bg-amber-500 text-white",
+    bulkButtonDelivered: "bg-purple-600 hover:bg-purple-500 text-white",
   };
 }
 
@@ -564,8 +567,6 @@ export function getModalThemeClasses(isDark) {
     iconButton: isDark
       ? "absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 hover:text-blue-400 transition-colors"
       : "absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-blue-600 transition-colors",
-
-    helperText: "text-slate-500",
 
     divider: isDark ? "border-slate-700/30" : "border-slate-200",
 
@@ -600,95 +601,95 @@ export function getModalThemeClasses(isDark) {
       : "bg-slate-100 border-slate-200",
 
     accentText: isDark ? "text-blue-400" : "text-blue-600",
+
+    // --------------------------------
+
+    helperText: "text-slate-500",
+  };
+}
+
+export function getWidgetThemeClasses(isDark) {
+  return {
+    container: isDark
+      ? "bg-gradient-to-br from-slate-800 to-slate-900 border-slate-700"
+      : "bg-white border-slate-200",
+
+    title: isDark ? "text-white" : "text-slate-900",
+
+    bodyText: isDark ? "text-slate-400" : "text-slate-600",
+
+    input: isDark
+      ? "bg-slate-950 border-slate-700 text-white"
+      : "bg-white border-slate-300 text-slate-900",
+
+    textarea: isDark
+      ? "bg-slate-950 border-slate-700 text-slate-200"
+      : "bg-white border-slate-300 text-slate-900",
+
+    iconMuted: isDark ? "text-slate-500" : "text-slate-400",
+
+    warningInput: isDark
+      ? "bg-slate-950 border-amber-500/50 text-white [color-scheme:dark]"
+      : "bg-white border-amber-300 text-slate-900 [color-scheme:light]",
+
+    successBox: isDark
+      ? "bg-emerald-900/20 border-emerald-500/30"
+      : "bg-emerald-50 border-emerald-200",
+
+    successText: isDark ? "text-emerald-400" : "text-emerald-700",
+
+    statText: isDark ? "text-slate-300" : "text-slate-600",
+
+    statStrong: isDark ? "text-white" : "text-slate-900",
+
+    noteBox: isDark
+      ? "text-slate-500 bg-slate-950/50"
+      : "text-slate-600 bg-slate-50",
+
+    infoBox: isDark
+      ? "text-slate-500 bg-slate-900/50 border-slate-700/50"
+      : "text-slate-600 bg-white border-slate-200",
+
+    warningText: "text-red-400",
+
+    // ---------------------------------
+    primaryButton:
+      "w-full bg-amber-600 hover:bg-amber-500 disabled:opacity-50 disabled:cursor-not-allowed text-white py-3 rounded-lg font-bold text-sm transition-all flex items-center justify-center gap-2 shadow-lg shadow-amber-600/20",
+
+    primaryBlueButton:
+      "w-full bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed text-white py-2 rounded-lg font-bold text-sm transition-all flex items-center justify-center gap-2 shadow-lg shadow-blue-500/20",
+  };
+}
+
+export function getTimelineThemeClasses(isDark) {
+  return {
+    sectionLabel: isDark ? "text-slate-500" : "text-slate-600",
+
+    title: isDark ? "text-white" : "text-slate-900",
+
+    mutedText: isDark ? "text-slate-500" : "text-slate-600",
+
+    fadedText: isDark ? "text-slate-400" : "text-slate-500",
+
+    rail: isDark ? "border-slate-800" : "border-slate-300",
+
+    pendingDot: isDark
+      ? "bg-slate-900 border-slate-700"
+      : "bg-slate-300 border-slate-400",
+
+    infoCardGrid: "grid grid-cols-2 gap-3 mb-8 mt-4",
   };
 }
 
 // -----------------------------------
 
-export function getUserManagementTableTheme(isDark) {
+export function getButtonThemeClasses(isDark) {
   return {
-    container: isDark
-      ? "border-slate-800 bg-slate-900/50"
-      : "border-slate-200 bg-white shadow-sm",
+    base: "w-full flex-1 py-2 rounded text-xs font-bold transition-all duration-300 flex items-center justify-center gap-2 border disabled:opacity-50 disabled:cursor-not-allowed",
 
-    header: isDark
-      ? "border-slate-800 bg-slate-950/30"
-      : "border-slate-200 bg-slate-50",
-
-    headingText: isDark ? "text-white" : "text-slate-900",
-
-    filters: isDark
-      ? "border-slate-800 bg-slate-950/20"
-      : "border-slate-200 bg-slate-50/50",
-
-    input: isDark
-      ? "bg-slate-900 border-slate-700 text-slate-200"
-      : "bg-white border-slate-200 text-slate-900",
-
-    inputIcon: isDark ? "text-slate-500" : "text-slate-400",
-
-    tableText: isDark ? "text-slate-400" : "text-slate-600",
-
-    thead: isDark
-      ? "bg-slate-950 text-slate-500"
-      : "bg-slate-50 text-slate-600",
-
-    tbodyDivide: isDark ? "divide-slate-800" : "divide-slate-200",
-
-    rowHover: isDark ? "hover:bg-slate-800/30" : "hover:bg-slate-50",
-
-    cellPrimary: isDark ? "text-slate-200" : "text-slate-900",
-
-    cellSecondary: isDark ? "text-slate-500" : "text-slate-600",
-
-    roleBadge: isDark
-      ? "bg-slate-800 border-slate-700 text-slate-300"
-      : "bg-slate-100 border-slate-200 text-slate-700",
-
-    statusActive: isDark
-      ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
-      : "bg-emerald-100 text-emerald-700 border-emerald-200",
-
-    statusInactive: isDark
-      ? "bg-red-500/10 text-red-400 border-red-500/20"
-      : "bg-red-100 text-red-700 border-red-200",
-
-    editButton: isDark
-      ? "text-slate-500 hover:text-blue-400 hover:bg-slate-800"
-      : "text-slate-600 hover:text-blue-600 hover:bg-slate-100",
-
-    deleteButton: isDark
-      ? "text-slate-500 hover:text-red-400 hover:bg-slate-800"
-      : "text-slate-600 hover:text-red-600 hover:bg-slate-100",
-
-    emptyText: isDark ? "text-slate-600" : "text-slate-500",
-
-    footer: isDark
-      ? "border-slate-800 bg-slate-950/30 text-slate-500"
-      : "border-slate-200 bg-slate-50 text-slate-600",
-
-    footerBold: isDark ? "text-white" : "text-slate-900",
-
-    paginationButton: isDark
-      ? "border-slate-700 bg-slate-900 text-slate-400 hover:text-white hover:bg-slate-800"
-      : "border-slate-200 bg-white text-slate-700 hover:bg-slate-100 hover:text-slate-900",
-    sectionTitle: isDark ? "text-slate-300" : "text-slate-700",
-
-    miniLabel: isDark ? "text-slate-500" : "text-slate-600",
-
-    selectWrap: isDark
-      ? "bg-slate-900 border-slate-700"
-      : "bg-white border-slate-300",
-
-    selectText: isDark ? "text-white" : "text-slate-900",
-
-    neutralBadge: isDark
-      ? "bg-slate-800 text-slate-400"
-      : "bg-slate-100 text-slate-600",
-
-    linkButton:
-      "text-xs text-blue-500 hover:text-blue-600 font-bold flex items-center gap-1 px-2 py-1",
-
-    topDivider: isDark ? "border-slate-800/50" : "border-slate-200",
+    // Optional if you want neutral buttons later
+    neutral: isDark
+      ? "bg-slate-900 border-slate-700 text-slate-300 hover:bg-slate-800"
+      : "bg-white border-slate-200 text-slate-700 hover:bg-slate-50",
   };
 }

@@ -17,6 +17,7 @@ import {
 } from "@fortawesome/free-solid-svg-icons";
 import { bulkShipmentAction } from "@/app/utility/FirebaseFunctions";
 import { getTableTheme } from "@/app/utility/constant/theme";
+import { getTableActionClasses } from "@/app/utility/constant/action";
 
 export default function TripManifestTab({
   shipments,
@@ -34,6 +35,7 @@ export default function TripManifestTab({
   const [isBulkProcessing, setIsBulkProcessing] = useState(false);
 
   const theme = getTableTheme(isDark);
+  const action = getTableActionClasses(isDark);
 
   const filteredData = useMemo(() => {
     return shipments.filter((shipment) => {
@@ -69,7 +71,7 @@ export default function TripManifestTab({
     setSelectedIds(next);
   };
 
-  const handleBulkAction = async (action) => {
+  const handleBulkAction = async (bulkAction) => {
     if (selectedIds.size === 0) return;
 
     try {
@@ -78,7 +80,7 @@ export default function TripManifestTab({
       await bulkShipmentAction({
         tripId,
         shipmentIds: Array.from(selectedIds),
-        action,
+        action: bulkAction,
       });
 
       setSelectedIds(new Set());
@@ -144,7 +146,7 @@ export default function TripManifestTab({
                   "_blank",
                 )
               }
-              className={`text-xs font-bold px-3 py-1.5 rounded flex items-center justify-center gap-2 transition-colors flex-1 sm:flex-none border ${theme.actionButtonSoft}`}
+              className={`text-xs font-bold px-3 py-1.5 rounded flex items-center justify-center gap-2 transition-colors flex-1 sm:flex-none border ${action.soft}`}
               title="Print All Labels"
             >
               <FontAwesomeIcon icon={faPrint} />
@@ -155,7 +157,7 @@ export default function TripManifestTab({
               type="button"
               onClick={onAddShipment}
               disabled={isLocked}
-              className={`text-xs font-bold px-3 py-1.5 rounded flex items-center justify-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap flex-1 sm:flex-none ${theme.actionButtonSolid}`}
+              className={`text-xs font-bold px-3 py-1.5 rounded flex items-center justify-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap flex-1 sm:flex-none ${action.solid}`}
             >
               <FontAwesomeIcon icon={faPlus} />
               <span>Shipments</span>
@@ -180,7 +182,7 @@ export default function TripManifestTab({
               type="button"
               onClick={() => handleBulkAction("UNLOAD")}
               disabled={isBulkProcessing || isLocked}
-              className={`px-3 py-1.5 border text-xs font-bold rounded flex items-center gap-2 transition-colors disabled:opacity-50 whitespace-nowrap ${theme.bulkButtonNeutral}`}
+              className={`px-3 py-1.5 border text-xs font-bold rounded flex items-center gap-2 transition-colors disabled:opacity-50 whitespace-nowrap ${action.bulkNeutral}`}
             >
               <FontAwesomeIcon icon={faDolly} />
               Unload
@@ -190,7 +192,7 @@ export default function TripManifestTab({
               type="button"
               onClick={() => handleBulkAction("LOAD")}
               disabled={isBulkProcessing || isLocked}
-              className={`px-3 py-1.5 text-xs font-bold rounded flex items-center gap-2 transition-colors disabled:opacity-50 whitespace-nowrap ${theme.bulkButtonLoad}`}
+              className={`px-3 py-1.5 text-xs font-bold rounded flex items-center gap-2 transition-colors disabled:opacity-50 whitespace-nowrap ${action.bulkLoad}`}
             >
               {isBulkProcessing ? (
                 "Processing..."
@@ -206,7 +208,7 @@ export default function TripManifestTab({
               type="button"
               onClick={() => handleBulkAction("OUT_FOR_DELIVERY")}
               disabled={isBulkProcessing || isLocked}
-              className={`px-3 py-1.5 text-xs font-bold rounded flex items-center gap-2 transition-colors disabled:opacity-50 whitespace-nowrap ${theme.bulkButtonOut}`}
+              className={`px-3 py-1.5 text-xs font-bold rounded flex items-center gap-2 transition-colors disabled:opacity-50 whitespace-nowrap ${action.bulkOut}`}
             >
               <FontAwesomeIcon icon={faTruckFast} />
               Out
@@ -216,7 +218,7 @@ export default function TripManifestTab({
               type="button"
               onClick={() => handleBulkAction("DELIVERED")}
               disabled={isBulkProcessing || isLocked}
-              className={`px-3 py-1.5 text-xs font-bold rounded flex items-center gap-2 transition-colors disabled:opacity-50 whitespace-nowrap ${theme.bulkButtonDelivered}`}
+              className={`px-3 py-1.5 text-xs font-bold rounded flex items-center gap-2 transition-colors disabled:opacity-50 whitespace-nowrap ${action.bulkDelivered}`}
             >
               <FontAwesomeIcon icon={faCheckDouble} />
               Delivered
@@ -383,7 +385,7 @@ export default function TripManifestTab({
                           <button
                             type="button"
                             onClick={() => onViewPackages?.(shipment)}
-                            className={`text-xs border px-3 py-1.5 rounded transition-all flex items-center gap-1 ${theme.actionButtonSoft}`}
+                            className={`text-xs border px-3 py-1.5 rounded transition-all flex items-center gap-1 ${action.soft}`}
                           >
                             <FontAwesomeIcon icon={faBoxOpen} />
                           </button>
@@ -391,7 +393,7 @@ export default function TripManifestTab({
                           <button
                             type="button"
                             onClick={() => onUnassign(shipment)}
-                            className={`w-8 h-8 text-xs border px-3 py-1.5 rounded transition-all flex items-center justify-center ${theme.actionButtonSoft}`}
+                            className={`w-8 h-8 text-xs border px-3 py-1.5 rounded transition-all flex items-center justify-center ${action.soft}`}
                             disabled={isLocked}
                           >
                             <FontAwesomeIcon icon={faMinus} />

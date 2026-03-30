@@ -1,3 +1,5 @@
+"use client";
+
 import React, { useState } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
@@ -5,6 +7,7 @@ import {
   faPause,
   faPlay,
   faTruckFast,
+  faExclamationTriangle,
 } from "@fortawesome/free-solid-svg-icons";
 import {
   assignShipmentToTruckTrip,
@@ -15,15 +18,19 @@ import {
 import StatusButton from "../ui/StatusButton";
 import { runAction } from "@/app/utility/utilities";
 import NotifyToggle from "../messaging/NotifyToggle";
+import { getWidgetThemeClasses } from "@/app/utility/constant/theme";
 
-export default function TripOperations({ tripId, isLocked, onSuccess, isDark = false }) {
-  // --- INTERNAL STATE ---
+export default function TripOperations({
+  tripId,
+  isLocked,
+  onSuccess,
+  isDark = false,
+}) {
   const [assignId, setAssignId] = useState("");
   const [delaySelect, setDelaySelect] = useState("");
   const [customReason, setCustomReason] = useState("");
   const [statusSelect, setStatusSelect] = useState("");
 
-  // --- INTERNAL LOADING STATES ---
   const [assignStatus, setAssignStatus] = useState("IDLE");
   const [delayStatus, setDelayStatus] = useState("IDLE");
   const [clearStatus, setClearStatus] = useState("IDLE");
@@ -32,34 +39,38 @@ export default function TripOperations({ tripId, isLocked, onSuccess, isDark = f
   const [notifySms, setNotifySms] = useState(true);
   const [notifyDelay, setNotifyDelay] = useState(true);
 
+  const theme = getWidgetThemeClasses(isDark);
+
   return (
     <div className="space-y-4">
-      {/* --- TOP ROW: ASSIGNMENT & STATUS --- */}
-      {/* 1. MANUAL ASSIGNMENT CARD */}
-      <div className={`border rounded-xl p-4 flex flex-col gap-3 shadow-lg h-full ${
-        isDark ? "bg-slate-900/50 border-slate-800" : "bg-slate-50 border-slate-200"
-      }`}>
-        <h4 className={`text-xs font-bold uppercase flex items-center gap-2 ${
-          isDark ? "text-slate-500" : "text-slate-600"
-        }`}>
-          <FontAwesomeIcon icon={faPlus} /> Manual Assignment
-        </h4>
-        <div className="flex gap-2 mt-auto">
+      {/* Manual Assignment */}
+      <div className={`border rounded-xl p-5 shadow-lg ${theme.container}`}>
+        <h3
+          className={`text-sm font-bold mb-3 flex items-center gap-2 ${theme.title}`}
+        >
+          <FontAwesomeIcon icon={faPlus} className="text-blue-500" />
+          Manual Assignment
+        </h3>
+
+        <p className={`text-xs mb-4 ${theme.bodyText}`}>
+          Add a shipment directly to this trip by entering its shipment ID.
+        </p>
+
+        <div className="flex gap-2">
           <input
             value={assignId}
             onChange={(e) => setAssignId(e.target.value.trim())}
             placeholder="Shipment ID..."
-            className={`flex-1 border rounded-lg px-3 py-2 text-xs outline-none focus:border-blue-500 transition-colors ${
-              isDark ? "bg-slate-950 border-slate-700 text-white" : "bg-white border-slate-300 text-slate-900"
-            }`}
+            className={`flex-1 border rounded-lg px-3 py-2.5 text-sm focus:border-blue-500 outline-none ${theme.input}`}
             disabled={isLocked}
             onKeyDown={(e) => {
               if (e.key === "Enter" && assignId) {
-                // Trigger click logic if needed
+                e.preventDefault();
               }
             }}
           />
-          <div className="w-20">
+
+          <div className="w-24">
             <StatusButton
               status={assignStatus}
               onClick={() =>
@@ -72,7 +83,7 @@ export default function TripOperations({ tripId, isLocked, onSuccess, isDark = f
                     }),
                   () => {
                     setAssignId("");
-                    if (onSuccess) onSuccess();
+                    onSuccess?.();
                   },
                 )
               }
@@ -85,48 +96,60 @@ export default function TripOperations({ tripId, isLocked, onSuccess, isDark = f
             />
           </div>
         </div>
+
+        <div
+          className={`mt-3 flex items-start gap-2 text-[10px] p-2 rounded ${theme.noteBox}`}
+        >
+          <FontAwesomeIcon
+            icon={faExclamationTriangle}
+            className="text-slate-600 mt-0.5"
+          />
+          <span>
+            Make sure the shipment is valid and still eligible for assignment
+            before adding it to the trip.
+          </span>
+        </div>
       </div>
 
-      {/* 2. FORCE STATUS CHANGE CARD */}
-      <div className={`border rounded-xl p-4 flex flex-col gap-3 shadow-lg h-full ${
-        isDark ? "bg-slate-900/50 border-slate-800" : "bg-slate-50 border-slate-200"
-      }`}>
-        <h4 className={`text-xs font-bold uppercase flex items-center justify-between gap-2 ${
-          isDark ? "text-slate-500" : "text-slate-600"
-        }`}>
+      {/* Force Status */}
+      <div className={`border rounded-xl p-5 shadow-lg ${theme.container}`}>
+        <h3
+          className={`text-sm font-bold mb-3 flex items-center justify-between gap-2 ${theme.title}`}
+        >
           <span className="flex items-center gap-2">
-            <FontAwesomeIcon icon={faTruckFast} /> Force Status
+            <FontAwesomeIcon icon={faTruckFast} className="text-blue-500" />
+            Force Status
           </span>
 
-          {/* 2. THE NEW CHECKBOX */}
           <NotifyToggle
             checked={notifySms}
             onChange={setNotifySms}
             color="emerald"
             labelOff="Silent Update"
           />
-        </h4>
-        <div className="flex gap-2 mt-auto">
-          <div className="flex-1 flex flex-col gap-2">
-            {/* The Select Box */}
-            <select
-              className={`w-full border rounded-lg px-3 py-2 text-xs focus:border-blue-500 outline-none ${
-                isDark ? "bg-slate-950 border-slate-700 text-white" : "bg-white border-slate-300 text-slate-900"
-              }`}
-              value={statusSelect}
-              onChange={(e) => setStatusSelect(e.target.value)}
-            >
-              <option value="">Select Status...</option>
-              <option value="CREATED">Created</option>
-              <option value="LOADING">Loading</option>
-              <option value="LOADED">Loaded</option>
-              <option value="IN_TRANSIT">In Transit</option>
-              <option value="ARRIVED">Arrived</option>
-              <option value="COMPLETED">Completed</option>
-              <option value="CANCELLED">Cancelled</option>
-            </select>
-          </div>
-          <div className="w-20">
+        </h3>
+
+        <p className={`text-xs mb-4 ${theme.bodyText}`}>
+          Override the current trip status and optionally notify customers.
+        </p>
+
+        <div className="flex gap-2">
+          <select
+            className={`flex-1 border rounded-lg px-3 py-2.5 text-sm focus:border-blue-500 outline-none ${theme.input}`}
+            value={statusSelect}
+            onChange={(e) => setStatusSelect(e.target.value)}
+          >
+            <option value="">Select Status...</option>
+            <option value="CREATED">Created</option>
+            <option value="LOADING">Loading</option>
+            <option value="LOADED">Loaded</option>
+            <option value="IN_TRANSIT">In Transit</option>
+            <option value="ARRIVED">Arrived</option>
+            <option value="COMPLETED">Completed</option>
+            <option value="CANCELLED">Cancelled</option>
+          </select>
+
+          <div className="w-24">
             <StatusButton
               status={statusChangeStatus}
               label="Set"
@@ -143,8 +166,8 @@ export default function TripOperations({ tripId, isLocked, onSuccess, isDark = f
                     }),
                   () => {
                     setStatusSelect("");
-                    setNotifySms(true); // Reset to default
-                    if (onSuccess) onSuccess();
+                    setNotifySms(true);
+                    onSuccess?.();
                   },
                 )
               }
@@ -153,34 +176,33 @@ export default function TripOperations({ tripId, isLocked, onSuccess, isDark = f
         </div>
       </div>
 
-      {/* --- BOTTOM ROW: DELAY CONTROLS --- */}
-      <div className={`border rounded-xl p-4 flex flex-col gap-3 shadow-lg ${
-        isDark ? "bg-slate-900/50 border-slate-800" : "bg-slate-50 border-slate-200"
-      }`}>
-        <h4 className={`text-xs font-bold uppercase flex items-center justify-between gap-2 ${
-          isDark ? "text-slate-500" : "text-slate-600"
-        }`}>
+      {/* Delay Controls */}
+      <div className={`border rounded-xl p-5 shadow-lg ${theme.container}`}>
+        <h3
+          className={`text-sm font-bold mb-3 flex items-center justify-between gap-2 ${theme.title}`}
+        >
           <span className="flex items-center gap-2">
-            <FontAwesomeIcon icon={faPause} /> Delay Controls
+            <FontAwesomeIcon icon={faPause} className="text-amber-500" />
+            Delay Controls
           </span>
 
-          {/* 2. THE CHECKBOX (Top Right for visibility) */}
           <NotifyToggle
             checked={notifyDelay}
             onChange={setNotifyDelay}
             color="amber"
             labelOff="Silent Log"
           />
-        </h4>
+        </h3>
 
-        {/* Row: Dropdown + Buttons */}
+        <p className={`text-xs mb-4 ${theme.bodyText}`}>
+          Mark the trip as delayed, log a reason, or clear the active delay.
+        </p>
+
         <div className="flex gap-2">
           <select
             value={delaySelect}
             onChange={(e) => setDelaySelect(e.target.value)}
-            className={`flex-1 border rounded-lg px-3 py-2 text-xs focus:border-amber-500 outline-none ${
-              isDark ? "bg-slate-950 border-slate-700 text-white" : "bg-white border-slate-300 text-slate-900"
-            }`}
+            className={`flex-1 border rounded-lg px-3 py-2.5 text-sm focus:border-amber-500 outline-none ${theme.input}`}
           >
             <option value="">Select Reason...</option>
             <option value="WEATHER">Weather</option>
@@ -190,33 +212,32 @@ export default function TripOperations({ tripId, isLocked, onSuccess, isDark = f
             <option value="OTHER">Other / Custom...</option>
           </select>
 
-          {/* Action Buttons Group */}
-          <div className="flex gap-2 w-auto shrink-0">
+          <div className="flex gap-2 shrink-0">
             <div className="w-24">
               <StatusButton
                 status={delayStatus}
                 icon={faPause}
                 label="Set Delay"
-                idleColor="bg-amber-600/20 hover:bg-amber-600/40 text-amber-400 border border-amber-500/30"
+                variant="amber"
                 onClick={() => {
                   const finalReason =
                     delaySelect === "OTHER" ? customReason : delaySelect;
+
                   if (!finalReason) return;
 
                   runAction(
                     setDelayStatus,
-                    // 3. PASS THE NOTIFY FLAG
                     () =>
                       setTruckDelay({
                         truckTripId: tripId,
                         reason: finalReason,
-                        notify: notifyDelay, // <--- Send this to backend
+                        notify: notifyDelay,
                       }),
                     () => {
                       setDelaySelect("");
                       setCustomReason("");
-                      setNotifyDelay(true); // Reset to default
-                      if (onSuccess) onSuccess();
+                      setNotifyDelay(true);
+                      onSuccess?.();
                     },
                   );
                 }}
@@ -234,11 +255,10 @@ export default function TripOperations({ tripId, isLocked, onSuccess, isDark = f
                 label="Clear"
                 loadingLabel="..."
                 successLabel="OK"
-                idleColor="bg-emerald-600/20 hover:bg-emerald-600/40 text-emerald-400 border border-emerald-500/30"
+                variant="emerald"
                 onClick={() =>
                   runAction(
                     setClearStatus,
-                    // 3. PASS THE NOTIFY FLAG HERE TOO
                     () =>
                       clearTruckDelay({
                         truckTripId: tripId,
@@ -248,7 +268,7 @@ export default function TripOperations({ tripId, isLocked, onSuccess, isDark = f
                       setDelaySelect("");
                       setCustomReason("");
                       setNotifyDelay(true);
-                      if (onSuccess) onSuccess();
+                      onSuccess?.();
                     },
                   )
                 }
@@ -257,20 +277,30 @@ export default function TripOperations({ tripId, isLocked, onSuccess, isDark = f
           </div>
         </div>
 
-        {/* Conditional Custom Reason Input */}
         {delaySelect === "OTHER" && (
-          <div className="animate-in fade-in slide-in-from-top-1 duration-200">
+          <div className="animate-in fade-in slide-in-from-top-1 duration-200 mt-3">
             <input
               type="text"
               value={customReason}
               onChange={(e) => setCustomReason(e.target.value)}
               placeholder="Type specific reason..."
-              className={`w-full border rounded-lg px-3 py-2 text-xs focus:border-amber-500 outline-none ${
-                isDark ? "bg-slate-950 border-amber-500/50 text-white" : "bg-white border-amber-300 text-slate-900"
-              }`}
+              className={`w-full border rounded-lg px-3 py-2.5 text-sm focus:border-amber-500 outline-none ${theme.warningInput}`}
             />
           </div>
         )}
+
+        <div
+          className={`mt-3 flex items-start gap-2 text-[10px] p-2 rounded ${theme.noteBox}`}
+        >
+          <FontAwesomeIcon
+            icon={faExclamationTriangle}
+            className="text-slate-600 mt-0.5"
+          />
+          <span>
+            Delay notifications can be sent to customers, or logged silently for
+            internal tracking only.
+          </span>
+        </div>
       </div>
     </div>
   );
