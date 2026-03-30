@@ -693,3 +693,11 @@ export function getButtonThemeClasses(isDark) {
       : "bg-white border-slate-200 text-slate-700 hover:bg-slate-50",
   };
 }
+
+export function getUserManagementTableTheme(isDark) {
+  return {
+    container: isDark
+      ? "border-slate-800 bg-slate-900/50"
+      : "border-slate-200 ",
+  };
+}
