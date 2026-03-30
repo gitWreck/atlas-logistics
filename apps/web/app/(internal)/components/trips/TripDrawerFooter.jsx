@@ -86,7 +86,8 @@ export default function TripDrawerFooter({
           loadingLabel="Locking..."
           successLabel="Locked!"
           icon={faLock}
-          idleColor="bg-emerald-600/20 hover:bg-emerald-600/40 text-emerald-400 border border-emerald-500/30"
+          // idleColor="bg-emerald-600/20 hover:bg-emerald-600/40 text-emerald-400 border border-emerald-500/30"
+          variant="emerald"
           disabled={isLocked || showUnlockReason}
           onClick={() =>
             runAction(
@@ -114,7 +115,8 @@ export default function TripDrawerFooter({
             loadingLabel="Unlocking..."
             successLabel="Unlocked!"
             icon={faUnlock}
-            idleColor="bg-amber-600 text-white shadow-lg shadow-amber-600/20"
+            // idleColor="bg-amber-600 text-white shadow-lg shadow-amber-600/20"
+            variant="amber"
             disabled={!unlockReason.trim()}
             onClick={() =>
               runAction(
@@ -139,7 +141,8 @@ export default function TripDrawerFooter({
           loadingLabel="..."
           successLabel="Reopened!"
           icon={faRotateLeft}
-          idleColor="border border-red-500/30 text-red-400 hover:bg-red-600/20"
+          // idleColor="border border-red-500/30 text-red-400 hover:bg-red-600/20"
+          variant="red"
           disabled={!isLocked || showUnlockReason}
           onClick={() => {
             if (
