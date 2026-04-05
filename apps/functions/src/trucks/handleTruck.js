@@ -1,94 +1,135 @@
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const admin = require("firebase-admin");
+const { ALLOWED_TRUCK_STATUSES } = require("../utilities/dataDetails");
+const {
+  normalizePlateNumber,
+  requireNonEmptyString,
+  parseRequiredNumber,
+  parseOptionalNumber,
+  parseOptionalDateString,
+} = require("../utilities/helpers");
 
-/**
- * UPSERT TRUCK with TRANSACTIONAL LOGGING
- * Handles both Register (New) and Update (Existing)
- */
+const REGION = "asia-southeast1";
+const ALLOWED_ROLES = new Set(["admin", "manager"]);
+
+function requireAuth(request) {
+  if (!request.auth) {
+    throw new HttpsError("unauthenticated", "You must be logged in.");
+  }
+
+  const role = String(request.auth.token.role || "").toLowerCase();
+  if (!ALLOWED_ROLES.has(role)) {
+    throw new HttpsError(
+      "permission-denied",
+      "You are not allowed to do this.",
+    );
+  }
+
+  return {
+    uid: request.auth.uid,
+    role,
+  };
+}
+
 exports.upsertTruck = onCall(
-  { region: "asia-southeast1", maxInstances: 10 },
+  { region: REGION, maxInstances: 10 },
   async (request) => {
-    // 1. Auth & Role Check
-    if (!request.auth) {
-      throw new HttpsError("unauthenticated", "You must be logged in.");
+    const { uid, role } = requireAuth(request);
+    const db = admin.firestore();
+
+    const { id, ...data } = request.data || {};
+
+    const plateNumber = normalizePlateNumber(data.plateNumber);
+    if (!plateNumber) {
+      throw new HttpsError("invalid-argument", "Plate number is required.");
     }
 
-    const { id, ...data } = request.data;
-    const db = admin.firestore();
-    const plate = data.plateNumber.toUpperCase().trim();
+    const model = requireNonEmptyString(data.model, "Model");
+    const type = requireNonEmptyString(data.type, "Type");
+    const payloadCapacity = parseRequiredNumber(data.payload, "Payload");
+    const lastPmsOdometer = parseRequiredNumber(
+      data.lastPmsOdometer,
+      "Current odometer",
+    );
 
-    // References
+    const registrationExpiry = parseOptionalDateString(
+      data.registrationExpiry,
+      "Registration expiry",
+    );
+
+    const lastOilChange = parseOptionalNumber(data.lastOilChange);
+    const lastTireChange = parseOptionalNumber(data.lastTireChange);
+
     const truckRef = id
-      ? db.collection("trucks").doc(id)
+      ? db.collection("trucks").doc(String(id))
       : db.collection("trucks").doc();
+
     const logRef = db.collection("admin_logs").doc();
 
     try {
       await db.runTransaction(async (transaction) => {
-        // 2. Duplicate Plate Check (Only if registering a new truck)
-        if (!id) {
-          const duplicateCheck = await db
-            .collection("trucks")
-            .where("plateNumber", "==", plate)
-            .limit(1)
-            .get();
+        let existingTruckSnap = null;
 
-          if (!duplicateCheck.empty) {
-            throw new Error("PLATE_EXISTS");
+        if (id) {
+          existingTruckSnap = await transaction.get(truckRef);
+          if (!existingTruckSnap.exists) {
+            throw new Error("NOT_FOUND");
           }
+        }
+
+        const duplicateQuery = db
+          .collection("trucks")
+          .where("plateNumber", "==", plateNumber)
+          .limit(5);
+
+        const duplicateSnap = await transaction.get(duplicateQuery);
+
+        const duplicateExists = duplicateSnap.docs.some(
+          (doc) => doc.id !== truckRef.id,
+        );
+        if (duplicateExists) {
+          throw new Error("PLATE_EXISTS");
         }
 
         const timestamp = admin.firestore.FieldValue.serverTimestamp();
 
-        // 3. Prepare Truck Data
         const truckPayload = {
-          plateNumber: plate,
-          model: data.model,
-          type: data.type,
-          payloadCapacity: Number(data.payload),
-          registrationExpiry: data.registrationExpiry,
-          lastPmsOdometer: Number(data.lastPmsOdometer),
-
-          // --- NEW ---
-          lastOilChange: data.lastOilChange ? Number(data.lastOilChange) : null,
-          lastTireChange: data.lastTireChange
-            ? Number(data.lastTireChange)
-            : null,
-
+          plateNumber,
+          model,
+          type,
+          payloadCapacity,
+          registrationExpiry,
+          lastPmsOdometer,
+          lastOilChange,
+          lastTireChange,
           updatedAt: timestamp,
-          updatedBy: request.auth.uid,
+          updatedBy: uid,
         };
 
         if (!id) {
           truckPayload.createdAt = timestamp;
-          truckPayload.status = "IDLE"; // Initial state for new assets
+          truckPayload.createdBy = uid;
+          truckPayload.status = "IDLE";
           transaction.set(truckRef, truckPayload);
         } else {
           transaction.update(truckRef, truckPayload);
         }
 
-        // 4. Write to admin_logs (Matching your exact template)
         transaction.set(logRef, {
           action: id ? "UPDATE_TRUCK" : "REGISTER_TRUCK",
           truckDocId: truckRef.id,
-          actorUid: request.auth.uid,
-          actorRole: request.auth.token.role || "admin",
+          actorUid: uid,
+          actorRole: role,
           createdAt: timestamp,
           meta: {
-            plateNumber: plate,
-            model: data.model,
-            type: data.type,
-            payload: Number(data.payload),
-            registrationExpiry: data.registrationExpiry,
-            odometerAtLog: Number(data.lastPmsOdometer),
-
-            // --- NEW ---
-            lastOilChangeAtLog: data.lastOilChange
-              ? Number(data.lastOilChange)
-              : null,
-            lastTireChangeAtLog: data.lastTireChange
-              ? Number(data.lastTireChange)
-              : null,
+            plateNumber,
+            model,
+            type,
+            payloadCapacity,
+            registrationExpiry,
+            odometerAtLog: lastPmsOdometer,
+            lastOilChangeAtLog: lastOilChange,
+            lastTireChangeAtLog: lastTireChange,
           },
         });
       });
@@ -96,51 +137,86 @@ exports.upsertTruck = onCall(
       return { success: true, id: truckRef.id };
     } catch (error) {
       console.error("UPSERT_TRUCK_ERROR:", error);
+
       if (error.message === "PLATE_EXISTS") {
         throw new HttpsError(
           "already-exists",
           "A truck with this plate number is already registered.",
         );
       }
-      throw new HttpsError("internal", error.message);
+
+      if (error.message === "NOT_FOUND") {
+        throw new HttpsError("not-found", "Truck not found.");
+      }
+
+      if (error instanceof HttpsError) {
+        throw error;
+      }
+
+      throw new HttpsError("internal", "Failed to save truck.");
     }
   },
 );
 
-/**
- * TOGGLE TRUCK STATUS with LOGGING
- */
 exports.updateTruckStatus = onCall(
-  { region: "asia-southeast1", maxInstances: 10 },
+  { region: REGION, maxInstances: 10 },
   async (request) => {
-    if (!request.auth) throw new HttpsError("unauthenticated", "Unauthorized.");
-
-    const { truckId, status, plateNumber } = request.data;
+    const { uid, role } = requireAuth(request);
     const db = admin.firestore();
+
+    const { truckId, status, plateNumber } = request.data || {};
+
+    if (!truckId || typeof truckId !== "string") {
+      throw new HttpsError("invalid-argument", "truckId is required.");
+    }
+
+    if (!status || typeof status !== "string") {
+      throw new HttpsError("invalid-argument", "status is required.");
+    }
+
+    const normalizedStatus = status.trim().toUpperCase();
+    if (!ALLOWED_TRUCK_STATUSES.has(normalizedStatus)) {
+      throw new HttpsError("invalid-argument", "Invalid truck status.");
+    }
+
     const truckRef = db.collection("trucks").doc(truckId);
     const logRef = db.collection("admin_logs").doc();
 
     try {
       await db.runTransaction(async (transaction) => {
         const truckSnap = await transaction.get(truckRef);
-        if (!truckSnap.exists) throw new Error("NOT_FOUND");
+        if (!truckSnap.exists) {
+          throw new Error("NOT_FOUND");
+        }
 
-        const oldStatus = truckSnap.data().status;
+        const truckData = truckSnap.data() || {};
+        const oldStatus = String(truckData.status || "").toUpperCase();
+
+        if (oldStatus === normalizedStatus) {
+          throw new Error("NO_CHANGE");
+        }
+
+        const timestamp = admin.firestore.FieldValue.serverTimestamp();
 
         transaction.update(truckRef, {
-          status: status,
-          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          status: normalizedStatus,
+          updatedAt: timestamp,
+          updatedBy: uid,
         });
 
         transaction.set(logRef, {
           action: "UPDATE_TRUCK_STATUS",
           truckDocId: truckId,
-          actorUid: request.auth.uid,
-          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+          actorUid: uid,
+          actorRole: role,
+          createdAt: timestamp,
           meta: {
-            plateNumber: plateNumber || truckSnap.data().plateNumber,
-            previousStatus: oldStatus,
-            newStatus: status,
+            plateNumber:
+              normalizePlateNumber(plateNumber) ||
+              truckData.plateNumber ||
+              null,
+            previousStatus: oldStatus || null,
+            newStatus: normalizedStatus,
           },
         });
       });
@@ -148,7 +224,23 @@ exports.updateTruckStatus = onCall(
       return { success: true };
     } catch (error) {
       console.error("STATUS_UPDATE_ERROR:", error);
-      throw new HttpsError("internal", error.message);
+
+      if (error.message === "NOT_FOUND") {
+        throw new HttpsError("not-found", "Truck not found.");
+      }
+
+      if (error.message === "NO_CHANGE") {
+        throw new HttpsError(
+          "failed-precondition",
+          "Truck already has that status.",
+        );
+      }
+
+      if (error instanceof HttpsError) {
+        throw error;
+      }
+
+      throw new HttpsError("internal", "Failed to update truck status.");
     }
   },
 );

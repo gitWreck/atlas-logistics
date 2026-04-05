@@ -35,7 +35,13 @@ function StatusDot({ status, isDelayed }) {
   );
 }
 
-export default function ShipmentRow({ s, onClick, isDark = false, onEdit }) {
+export default function ShipmentRow({
+  shipmentBoard,
+  s,
+  onClick,
+  isDark = false,
+  onEdit,
+}) {
   const theme = getRowThemeClasses(isDark);
 
   const isDelayed =
@@ -233,7 +239,7 @@ export default function ShipmentRow({ s, onClick, isDark = false, onEdit }) {
 
       {/* Col 6: Actions */}
       <div className="hidden md:block col-span-1 text-right">
-        {s.isPickupRequested === true && (
+        {s.isPickupRequested === true && shipmentBoard !== true && (
           <button
             type="button"
             className={`p-2 rounded-full transition-colors ${theme.actionButton}`}

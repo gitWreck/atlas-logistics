@@ -346,6 +346,7 @@ const ShipmentBoard = forwardRef(function ShipmentBoard(
                 ) : (
                   currentItems.map((shipment) => (
                     <ShipmentRow
+                      shipmentBoard={true}
                       key={shipment.id}
                       s={shipment}
                       onClick={setSelectedShipmentId}
