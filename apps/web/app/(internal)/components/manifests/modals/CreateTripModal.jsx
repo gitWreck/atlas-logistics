@@ -29,7 +29,7 @@ const INITIAL_FORM_STATE = {
   driverId: null,
   truckPlateNumber: "",
   truckId: null,
-  tripType: "HUB TRANSFER",
+  tripType: "HUB_TRANSFER",
 };
 
 export default function CreateTripModal({
@@ -67,7 +67,7 @@ export default function CreateTripModal({
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    if (formData.tripType === "HUB TRANSFER" && !formData.destinationCode) {
+    if (formData.tripType === "HUB_TRANSFER" && !formData.destinationCode) {
       setError("Destination is required for Warehouse Transfers.");
       return;
     }
@@ -144,11 +144,11 @@ export default function CreateTripModal({
                 onClick={() =>
                   setFormData((prev) => ({
                     ...prev,
-                    tripType: "HUB TRANSFER",
+                    tripType: "HUB_TRANSFER",
                   }))
                 }
                 className={
-                  formData.tripType === "HUB TRANSFER"
+                  formData.tripType === "HUB_TRANSFER"
                     ? action.primaryInlineCompact
                     : `flex-1 py-2 text-xs font-bold rounded-lg transition-all flex justify-center items-center gap-2 ${theme.toggleIdle}`
                 }
@@ -162,11 +162,11 @@ export default function CreateTripModal({
                 onClick={() =>
                   setFormData((prev) => ({
                     ...prev,
-                    tripType: "LOCAL",
+                    tripType: "LOCAL_PICKUP",
                   }))
                 }
                 className={
-                  formData.tripType === "LOCAL"
+                  formData.tripType === "LOCAL_PICKUP"
                     ? action.warningInline
                     : `flex-1 py-2 text-xs font-bold rounded-lg transition-all flex justify-center items-center gap-2 ${theme.toggleIdle}`
                 }
@@ -179,7 +179,7 @@ export default function CreateTripModal({
             <RouteSelector
               formData={formData}
               onWarehouseChange={handleWarehouseChange}
-              isLocalRoute={formData.tripType === "LOCAL"}
+              isLocalRoute={formData.tripType === "LOCAL_PICKUP"}
               isDark={isDark}
             />
 
@@ -208,7 +208,6 @@ export default function CreateTripModal({
           >
             Cancel
           </button>
-
           <button
             type="submit"
             form="create-trip-form"
