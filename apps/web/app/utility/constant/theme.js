@@ -79,6 +79,46 @@ export function getOverviewThemeClasses(isDark) {
     // ------------------------
 
     highlightText: "text-blue-500 font-bold uppercase",
+
+    // ----------------------------
+
+    wrapper: isDark
+      ? "bg-slate-900/40 border border-slate-800 shadow-xl"
+      : "bg-white border border-slate-200 shadow-sm",
+
+    panel: isDark
+      ? "bg-slate-950/60 border border-slate-800"
+      : "bg-white border border-slate-200",
+
+    subPanel: isDark
+      ? "bg-slate-900/60 border border-slate-800"
+      : "bg-slate-50 border border-slate-200",
+
+    tableHead: isDark
+      ? "bg-slate-950 text-slate-400 border-slate-800"
+      : "bg-slate-100 text-slate-600 border-slate-200",
+
+    tableRow: isDark
+      ? "border-slate-800 hover:bg-slate-800/40"
+      : "border-slate-200 hover:bg-slate-50",
+
+    infoBadge: isDark
+      ? "bg-blue-500/10 text-blue-400 border border-blue-500/20"
+      : "bg-blue-50 text-blue-700 border border-blue-200",
+
+    warningBadge: isDark
+      ? "bg-red-500/10 text-red-400 border border-red-500/20"
+      : "bg-red-50 text-red-700 border border-red-200",
+
+    successBadge: isDark
+      ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
+      : "bg-emerald-50 text-emerald-700 border border-emerald-200",
+
+    amberBadge: isDark
+      ? "bg-amber-500/10 text-amber-400 border border-amber-500/20"
+      : "bg-amber-50 text-amber-700 border border-amber-200",
+
+    tinyMuted: "text-slate-500",
   };
 }
 

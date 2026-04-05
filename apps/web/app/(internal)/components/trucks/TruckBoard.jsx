@@ -21,6 +21,7 @@ import TruckRow from "./TruckRow";
 import TruckStatus from "./TruckStatus";
 import TruckModal from "./TruckModal";
 import { getBoardThemeClasses } from "@/app/utility/constant/theme";
+import TruckScheduleOverview from "./TruckScheduleOverview";
 
 const TruckBoard = forwardRef(function TruckBoard(
   { user, userRole, profile, isDark = false },
@@ -177,6 +178,8 @@ const TruckBoard = forwardRef(function TruckBoard(
                   <option value="ALL">All Trucks</option>
                   <option value="ACTIVE">Active</option>
                   <option value="MAINTENANCE">In Shop</option>
+                  {/* <option value="ASSIGNED">Assigned</option>
+                  <option value="IDLE">Idle</option> */}
                   <option value="OUT_OF_SERVICE">Retired</option>
                 </select>
               </div>
@@ -282,6 +285,8 @@ const TruckBoard = forwardRef(function TruckBoard(
             </div>
           )}
         </div>
+
+        <TruckScheduleOverview trucks={trucks} isDark={isDark} />
       </main>
 
       <TruckModal
