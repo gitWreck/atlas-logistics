@@ -45,13 +45,21 @@ export const updateTripStatus = httpsCallable(functions, "updateTripStatus");
 export const resolveDelay = httpsCallable(functions, "resolveDelayReport");
 
 // DRIVERS
-export const assignDriverToTruckTrip = httpsCallable(
+// export const assignDriverToTruckTrip = httpsCallable(
+//   functions,
+//   "assignDriverToTruckTrip",
+// );
+// export const unassignDriverFromTruckTrip = httpsCallable(
+//   functions,
+//   "unassignDriverFromTruckTrip",
+// );
+export const removeAssignmentFromTruckTrip = httpsCallable(
   functions,
-  "assignDriverToTruckTrip",
+  "removeAssignmentFromTruckTrip",
 );
-export const unassignDriverFromTruckTrip = httpsCallable(
+export const assignmentToTruckTrip = httpsCallable(
   functions,
-  "unassignDriverFromTruckTrip",
+  "assignmentToTruckTrip",
 );
 
 // SHIPMENTS

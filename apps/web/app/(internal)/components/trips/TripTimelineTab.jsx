@@ -8,7 +8,7 @@ import {
   faTimesCircle,
 } from "@fortawesome/free-solid-svg-icons";
 import { formatFirestoreDate } from "@/app/utility/utilities";
-import AssignDriverModal from "../manifests/modals/AssignDriverModal";
+import AssignDriverModal from "../manifests/modals/TripAssignmentModal";
 import {
   STEP_HUB_TRANSFER,
   STEP_LOCAL_PICKUP,

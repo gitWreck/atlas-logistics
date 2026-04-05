@@ -16,14 +16,14 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.atlas.atlastracking",
+      "bundleIdentifier": "com.atlas.tracking",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
         "NSLocationWhenInUseUsageDescription": "Atlas uses your location to update package tracking and trip progress while you are on the road."
       }
     },
     "android": {
-      "package": "com.atlas.atlastracking",
+      "package": "com.atlas.tracking",
       "permissions": [
         "android.permission.ACCESS_FINE_LOCATION",
         "android.permission.ACCESS_COARSE_LOCATION",

@@ -233,6 +233,7 @@ export function getBoardThemeClasses(isDark) {
     // ----------------------------
 
     warningIcon: "text-amber-500",
+    emptyIcon: isDark ? "text-slate-800" : "text-slate-200",
   };
 }
 
@@ -305,6 +306,23 @@ export function getRowThemeClasses(isDark) {
     expandedCard: isDark
       ? "bg-slate-950 border-slate-800"
       : "bg-white border-slate-200",
+
+    // ---------------------------------
+    truckPlateText: isDark ? "text-blue-400" : "text-blue-600",
+
+    complianceWarningBadge: isDark
+      ? "bg-amber-500/10 border border-amber-500/30 text-amber-400"
+      : "bg-amber-50 border border-amber-200 text-amber-700",
+
+    complianceDangerBadge: isDark
+      ? "bg-rose-500/10 border border-rose-500/30 text-rose-400"
+      : "bg-rose-50 border border-rose-200 text-rose-700",
+
+    complianceOkText: isDark ? "text-emerald-400" : "text-emerald-600",
+
+    truckTypeText: isDark ? "text-slate-500" : "text-slate-600",
+
+    truckMetaText: isDark ? "text-slate-300" : "text-slate-800",
 
     // -------------------
 
@@ -650,9 +668,12 @@ export function getWidgetThemeClasses(isDark) {
       ? "text-slate-500 bg-slate-900/50 border-slate-700/50"
       : "text-slate-600 bg-white border-slate-200",
 
-    warningText: "text-red-400",
+    successPanel: isDark
+      ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-400"
+      : "bg-emerald-50 border-emerald-200 text-emerald-700",
 
     // ---------------------------------
+    warningText: "text-red-400",
     primaryButton:
       "w-full bg-amber-600 hover:bg-amber-500 disabled:opacity-50 disabled:cursor-not-allowed text-white py-3 rounded-lg font-bold text-sm transition-all flex items-center justify-center gap-2 shadow-lg shadow-amber-600/20",
 

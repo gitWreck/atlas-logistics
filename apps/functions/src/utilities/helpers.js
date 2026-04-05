@@ -205,6 +205,66 @@ function toLocal(e164Number) {
   return cleaned; // assume already local
 }
 
+// -----------------------------------
+
+function normalizePlateNumber(value) {
+  if (typeof value !== "string") return "";
+  return value.trim().toUpperCase();
+}
+
+function requireNonEmptyString(value, fieldName) {
+  if (typeof value !== "string" || !value.trim()) {
+    throw new HttpsError("invalid-argument", `${fieldName} is required.`);
+  }
+  return value.trim();
+}
+
+function parseRequiredNumber(value, fieldName) {
+  const num = Number(value);
+  if (!Number.isFinite(num)) {
+    throw new HttpsError(
+      "invalid-argument",
+      `${fieldName} must be a valid number.`,
+    );
+  }
+  return num;
+}
+
+function parseOptionalNumber(value) {
+  if (value === null || value === undefined || value === "") return null;
+  const num = Number(value);
+  if (!Number.isFinite(num)) {
+    throw new HttpsError(
+      "invalid-argument",
+      "A numeric field has an invalid value.",
+    );
+  }
+  return num;
+}
+
+function parseOptionalDateString(value, fieldName) {
+  if (value === null || value === undefined || value === "") return null;
+  if (typeof value !== "string") {
+    throw new HttpsError(
+      "invalid-argument",
+      `${fieldName} must be a date string.`,
+    );
+  }
+
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+
+  const testDate = new Date(trimmed);
+  if (Number.isNaN(testDate.getTime())) {
+    throw new HttpsError(
+      "invalid-argument",
+      `${fieldName} is not a valid date.`,
+    );
+  }
+
+  return trimmed;
+}
+
 // Export everything
 module.exports = {
   requireString,
@@ -227,4 +287,10 @@ module.exports = {
   assertAdminOrManager,
   requireRole,
   requireAuth,
+
+  normalizePlateNumber,
+  requireNonEmptyString,
+  parseRequiredNumber,
+  parseOptionalNumber,
+  parseOptionalDateString,
 };

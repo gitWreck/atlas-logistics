@@ -1,4 +1,5 @@
 "use client";
+
 import React, { useState, useEffect } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
@@ -17,6 +18,8 @@ import {
   upsertTruck,
   updateTruckStatus,
 } from "@/app/utility/FirebaseFunctions";
+import { getModalThemeClasses } from "@/app/utility/constant/theme";
+import { getModalActionClasses } from "@/app/utility/constant/action";
 
 export default function TruckModal({
   isOpen,
@@ -33,10 +36,13 @@ export default function TruckModal({
     payload: "",
     registrationExpiry: "",
     lastPmsOdometer: "",
-    lastOilChange: "", // NEW
-    lastTireChange: "", // NEW
+    currentOdometer: "",
+    lastOilChange: "",
+    lastTireChange: "",
   });
 
+  const theme = getModalThemeClasses(isDark);
+  const action = getModalActionClasses();
   const isEdit = !!initialData;
 
   useEffect(() => {
@@ -48,8 +54,10 @@ export default function TruckModal({
         payload: initialData?.payload || "",
         registrationExpiry: initialData?.registrationExpiry || "",
         lastPmsOdometer: initialData?.lastPmsOdometer || "",
-        lastOilChange: initialData?.lastOilChange || "", // NEW
-        lastTireChange: initialData?.lastTireChange || "", // NEW
+        currentOdometer:
+          initialData?.currentOdometer || initialData?.lastPmsOdometer || "",
+        lastOilChange: initialData?.lastOilChange || "",
+        lastTireChange: initialData?.lastTireChange || "",
       });
     }
   }, [isOpen, initialData]);
@@ -63,14 +71,16 @@ export default function TruckModal({
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
+
     try {
       await upsertTruck({
         id: initialData?.id || null,
         ...formData,
         plateNumber: formData.plateNumber.toUpperCase(),
       });
-      onRefresh();
-      onClose();
+
+      onRefresh?.();
+      onClose?.();
     } catch (err) {
       alert("Error: " + err.message);
     } finally {
@@ -83,8 +93,10 @@ export default function TruckModal({
       !confirm(
         `Change status to ${initialData.status === "ACTIVE" ? "DISABLED" : "ACTIVE"}?`,
       )
-    )
+    ) {
       return;
+    }
+
     setLoading(true);
     try {
       await updateTruckStatus({
@@ -92,8 +104,9 @@ export default function TruckModal({
         status: initialData.status === "ACTIVE" ? "DISABLED" : "ACTIVE",
         plateNumber: initialData.plateNumber,
       });
-      onRefresh();
-      onClose();
+
+      onRefresh?.();
+      onClose?.();
     } catch (err) {
       alert(err.message);
     } finally {
@@ -102,41 +115,24 @@ export default function TruckModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className={`absolute inset-0 ${theme.overlay}`} onClick={onClose} />
+
       <div
-        className={`w-full max-w-md rounded-xl border shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200 ${
-          isDark ? "bg-slate-900 border-slate-700" : "bg-white border-slate-200"
-        }`}
+        className={`relative w-full max-w-md rounded-xl border shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200 ${theme.modal}`}
       >
         {/* Header */}
         <div
-          className={`p-4 border-b flex justify-between items-center ${
-            isDark
-              ? "border-slate-800 bg-slate-950"
-              : "border-slate-200 bg-slate-50"
-          }`}
+          className={`p-4 border-b flex justify-between items-center ${theme.header}`}
         >
-          <h3
-            className={`font-bold flex items-center gap-2 ${
-              isDark ? "text-white" : "text-slate-900"
-            }`}
-          >
-            <FontAwesomeIcon
-              icon={faTruck}
-              className={isDark ? "text-blue-500" : "text-blue-600"}
-            />
+          <h3 className={`font-bold flex items-center gap-2 ${theme.title}`}>
+            <FontAwesomeIcon icon={faTruck} className="text-blue-500" />
             {isEdit
               ? `Edit Truck: ${initialData.plateNumber}`
               : "Register New Truck"}
           </h3>
-          <button
-            onClick={onClose}
-            className={`transition-colors ${
-              isDark
-                ? "text-slate-500 hover:text-white"
-                : "text-slate-400 hover:text-slate-900"
-            }`}
-          >
+
+          <button type="button" onClick={onClose} className={theme.closeButton}>
             <FontAwesomeIcon icon={faTimes} size="lg" />
           </button>
         </div>
@@ -152,38 +148,31 @@ export default function TruckModal({
                 value={formData.plateNumber}
                 onChange={(e) => handleChange("plateNumber", e.target.value)}
                 required
+                icon={faTruck}
+                theme={theme}
               />
+
               <InputField
                 label="Truck Model"
                 placeholder="Isuzu Giga"
                 value={formData.model}
                 onChange={(e) => handleChange("model", e.target.value)}
                 required
+                theme={theme}
               />
             </div>
 
-            <div
-              className={`p-3 rounded-lg border ${
-                isDark
-                  ? "bg-slate-950/50 border-slate-800"
-                  : "bg-blue-50 border-blue-200"
-              }`}
-            >
+            <div className={`p-3 rounded-lg border ${theme.panelSurface}`}>
               <label
-                className={`text-[10px] font-bold uppercase flex items-center gap-2 mb-2 ${
-                  isDark ? "text-blue-400" : "text-blue-700"
-                }`}
+                className={`text-[10px] font-bold uppercase flex items-center gap-2 mb-2 ${theme.accentText}`}
               >
                 <FontAwesomeIcon icon={faTruck} /> Truck Type
               </label>
+
               <select
                 value={formData.type}
                 onChange={(e) => handleChange("type", e.target.value)}
-                className={`w-full border rounded-lg p-2 text-xs outline-none focus:border-blue-500 appearance-none cursor-pointer ${
-                  isDark
-                    ? "bg-slate-900 border-slate-700 text-white"
-                    : "bg-white border-slate-300 text-slate-900"
-                }`}
+                className={`w-full border rounded-lg p-2 text-xs outline-none focus:border-blue-500 appearance-none cursor-pointer ${theme.input}`}
               >
                 <option>12-Wheeler Wing Van</option>
                 <option>12-Wheeler Closed Van</option>
@@ -203,24 +192,20 @@ export default function TruckModal({
               value={formData.payload}
               onChange={(e) => handleChange("payload", e.target.value)}
               required
+              theme={theme}
             />
           </div>
 
           {/* Compliance Section */}
           <div
-            className={`p-3 rounded-lg border space-y-4 ${
-              isDark
-                ? "bg-slate-950/50 border-slate-800"
-                : "bg-emerald-50 border-emerald-200"
-            }`}
+            className={`p-3 rounded-lg border space-y-4 ${theme.panelSurface}`}
           >
             <p
-              className={`text-[10px] font-bold uppercase flex items-center gap-2 ${
-                isDark ? "text-emerald-400" : "text-emerald-700"
-              }`}
+              className={`text-[10px] font-bold uppercase flex items-center gap-2 text-emerald-500`}
             >
               <FontAwesomeIcon icon={faTools} /> Maintenance & Compliance
             </p>
+
             <div className="grid grid-cols-2 gap-4">
               <InputField
                 label="LTO Expiry"
@@ -231,8 +216,10 @@ export default function TruckModal({
                   handleChange("registrationExpiry", e.target.value)
                 }
                 required
+                theme={theme}
               />
-              <InputField
+
+              {/* <InputField
                 label="Current ODO"
                 type="number"
                 value={formData.lastPmsOdometer}
@@ -240,7 +227,34 @@ export default function TruckModal({
                   handleChange("lastPmsOdometer", e.target.value)
                 }
                 required
+                theme={theme}
+              /> */}
+
+              <InputField
+                label="Last PMS ODO"
+                type="number"
+                icon={faTools}
+                placeholder="e.g. 45000"
+                value={formData.lastPmsOdometer}
+                onChange={(e) =>
+                  handleChange("lastPmsOdometer", e.target.value)
+                }
+                required
+                theme={theme}
               />
+
+              <InputField
+                label="Current ODO"
+                type="number"
+                placeholder="e.g. 47000"
+                value={formData.currentOdometer}
+                onChange={(e) =>
+                  handleChange("currentOdometer", e.target.value)
+                }
+                required
+                theme={theme}
+              />
+
               <InputField
                 label="Last Oil Change (ODO)"
                 type="number"
@@ -248,14 +262,17 @@ export default function TruckModal({
                 placeholder="e.g. 50000"
                 value={formData.lastOilChange}
                 onChange={(e) => handleChange("lastOilChange", e.target.value)}
+                theme={theme}
               />
+
               <InputField
-                label="Last Tires (ODO)"
+                label="Last Tires Change (ODO)"
                 type="number"
                 icon={faWrench}
                 placeholder="e.g. 40000"
                 value={formData.lastTireChange}
                 onChange={(e) => handleChange("lastTireChange", e.target.value)}
+                theme={theme}
               />
             </div>
           </div>
@@ -283,31 +300,28 @@ export default function TruckModal({
             </div>
           )}
 
-          {/* Actions - Matched to pt-2 and flex gap-3 */}
+          {/* Actions */}
           <div className="pt-2 flex gap-3">
             <button
               type="button"
               onClick={onClose}
               disabled={loading}
-              className={`flex-1 py-2.5 rounded-lg border font-bold text-sm transition-colors ${
-                isDark
-                  ? "border-slate-700 text-slate-400 hover:bg-slate-800"
-                  : "border-slate-300 text-slate-700 hover:bg-slate-100"
-              }`}
+              className={theme.secondaryButton}
             >
               Cancel
             </button>
+
             <button
               type="submit"
               disabled={loading}
-              className="flex-1 py-2.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-bold text-sm shadow-lg shadow-blue-500/20 disabled:opacity-50 flex justify-center items-center gap-2"
+              className={action.primaryInline}
             >
               {loading ? (
                 <FontAwesomeIcon icon={faCircleNotch} spin />
               ) : (
                 <FontAwesomeIcon icon={faSave} />
               )}
-              {loading ? "Saving..." : isEdit ? "Update Truck" : "Save Truck"}
+              {loading ? "Saving..." : isEdit ? "Update" : "Save"}
             </button>
           </div>
         </form>
@@ -316,22 +330,18 @@ export default function TruckModal({
   );
 }
 
-function InputField({ label, icon, isDark = false, ...props }) {
+function InputField({ label, icon, theme, ...props }) {
   return (
     <div className="space-y-1">
       <label
-        className={`text-[10px] font-bold uppercase flex items-center gap-2 ${
-          isDark ? "text-slate-400" : "text-slate-600"
-        }`}
+        className={`text-[10px] font-bold uppercase flex items-center gap-2 ${theme.label}`}
       >
-        {icon && <FontAwesomeIcon icon={icon} className="text-[9px]" />} {label}
+        {icon && <FontAwesomeIcon icon={icon} className="text-[9px]" />}
+        {label}
       </label>
+
       <input
-        className={`w-full border rounded-lg p-2 text-sm outline-none focus:border-blue-500 transition-colors ${
-          isDark
-            ? "bg-slate-950 border-slate-700 text-white [color-scheme:dark]"
-            : "bg-white border-slate-300 text-slate-900 [color-scheme:light]"
-        }`}
+        className={`w-full border rounded-lg p-2 text-sm outline-none focus:border-blue-500 transition-colors ${theme.input}`}
         {...props}
       />
     </div>
