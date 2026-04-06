@@ -193,12 +193,13 @@ const TruckBoard = forwardRef(function TruckBoard(
               <div className="md:min-w-[900px]">
                 {/* TABLE HEADER */}
                 <div
-                  className={`hidden md:grid grid-cols-12 gap-4 px-6 py-3 border-b text-[10px] font-bold uppercase tracking-widest ${theme.tableHead}`}
+                  className={`hidden md:grid grid-cols-13 gap-4 px-6 py-3 border-b text-[10px] font-bold uppercase tracking-widest ${theme.tableHead}`}
                 >
                   <div className="col-span-4">Truck / Model</div>
                   <div className="col-span-2">Status</div>
                   <div className="col-span-3">PMS Health</div>
                   <div className="col-span-2">Details</div>
+                  <div className="col-span-1 text-right">Update</div>
                   <div className="col-span-1 text-right">Action</div>
                 </div>
 

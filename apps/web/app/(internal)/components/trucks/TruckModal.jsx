@@ -20,6 +20,7 @@ import {
 } from "@/app/utility/FirebaseFunctions";
 import { getModalThemeClasses } from "@/app/utility/constant/theme";
 import { getModalActionClasses } from "@/app/utility/constant/action";
+import { TRUCK_STATUSES } from "@/app/utility/constant/templates";
 
 export default function TruckModal({
   isOpen,
@@ -33,7 +34,8 @@ export default function TruckModal({
     plateNumber: "",
     model: "",
     type: "10-Wheeler Wing Van",
-    payload: "",
+    status: "IDLE",
+    payloadCapacity: "",
     registrationExpiry: "",
     lastPmsOdometer: "",
     currentOdometer: "",
@@ -51,7 +53,8 @@ export default function TruckModal({
         plateNumber: initialData?.plateNumber || "",
         model: initialData?.model || "",
         type: initialData?.type || "10-Wheeler Wing Van",
-        payload: initialData?.payload || "",
+        status: initialData?.status || "IDLE",
+        payloadCapacity: initialData?.payloadCapacity || "",
         registrationExpiry: initialData?.registrationExpiry || "",
         lastPmsOdometer: initialData?.lastPmsOdometer || "",
         currentOdometer:
@@ -88,31 +91,31 @@ export default function TruckModal({
     }
   };
 
-  const handleToggleStatus = async () => {
-    if (
-      !confirm(
-        `Change status to ${initialData.status === "ACTIVE" ? "DISABLED" : "ACTIVE"}?`,
-      )
-    ) {
-      return;
-    }
+  // const handleToggleStatus = async () => {
+  //   if (
+  //     !confirm(
+  //       `Change status to ${initialData.status === "ACTIVE" ? "DISABLED" : "ACTIVE"}?`,
+  //     )
+  //   ) {
+  //     return;
+  //   }
 
-    setLoading(true);
-    try {
-      await updateTruckStatus({
-        truckId: initialData.id,
-        status: initialData.status === "ACTIVE" ? "DISABLED" : "ACTIVE",
-        plateNumber: initialData.plateNumber,
-      });
+  //   setLoading(true);
+  //   try {
+  //     await updateTruckStatus({
+  //       truckId: initialData.id,
+  //       status: initialData.status === "ACTIVE" ? "DISABLED" : "ACTIVE",
+  //       plateNumber: initialData.plateNumber,
+  //     });
 
-      onRefresh?.();
-      onClose?.();
-    } catch (err) {
-      alert(err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
+  //     onRefresh?.();
+  //     onClose?.();
+  //   } catch (err) {
+  //     alert(err.message);
+  //   } finally {
+  //     setLoading(false);
+  //   }
+  // };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -185,12 +188,32 @@ export default function TruckModal({
               </select>
             </div>
 
+            <div className={`p-3 rounded-lg border ${theme.panelSurface}`}>
+              <label
+                className={`text-[10px] font-bold uppercase flex items-center gap-2 mb-2 ${theme.accentText}`}
+              >
+                <FontAwesomeIcon icon={faCheck} /> Truck Status
+              </label>
+
+              <select
+                value={formData.status}
+                onChange={(e) => handleChange("status", e.target.value)}
+                className={`w-full border rounded-lg p-2 text-xs outline-none focus:border-blue-500 appearance-none cursor-pointer ${theme.input}`}
+              >
+                {[...TRUCK_STATUSES].map((status) => (
+                  <option key={status} value={status}>
+                    {status.replaceAll("_", " ")}
+                  </option>
+                ))}
+              </select>
+            </div>
+
             <InputField
               label="Max Payload (KG)"
               icon={faWeightHanging}
               type="number"
-              value={formData.payload}
-              onChange={(e) => handleChange("payload", e.target.value)}
+              value={formData.payloadCapacity}
+              onChange={(e) => handleChange("payloadCapacity", e.target.value)}
               required
               theme={theme}
             />
@@ -218,17 +241,6 @@ export default function TruckModal({
                 required
                 theme={theme}
               />
-
-              {/* <InputField
-                label="Current ODO"
-                type="number"
-                value={formData.lastPmsOdometer}
-                onChange={(e) =>
-                  handleChange("lastPmsOdometer", e.target.value)
-                }
-                required
-                theme={theme}
-              /> */}
 
               <InputField
                 label="Last PMS ODO"
@@ -278,7 +290,7 @@ export default function TruckModal({
           </div>
 
           {/* Edit-only Status Toggle */}
-          {isEdit && (
+          {/* {isEdit && (
             <div className="pt-2">
               <button
                 type="button"
@@ -298,7 +310,7 @@ export default function TruckModal({
                   : "Enable Truck Asset"}
               </button>
             </div>
-          )}
+          )} */}
 
           {/* Actions */}
           <div className="pt-2 flex gap-3">

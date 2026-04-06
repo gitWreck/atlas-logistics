@@ -328,7 +328,7 @@ const ShipmentBoard = forwardRef(function ShipmentBoard(
                 <div className="col-span-2">Route</div>
                 <div className="col-span-2">Details</div>
                 <div className="col-span-3">Progress</div>
-                <div className="col-span-1">Last Update</div>
+                <div className="col-span-1">Update</div>
                 <div className="col-span-1 text-right">Action</div>
               </div>
 

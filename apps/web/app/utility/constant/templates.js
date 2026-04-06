@@ -95,3 +95,13 @@ export const SHIPMENT_STEPS_HUB_TRANSFER = [
   "OUT_FOR_DELIVERY",
   "DELIVERED",
 ];
+
+export const TRUCK_STATUSES = [
+  "IDLE",
+  // "ACTIVE",
+  "ASSIGNED",
+  "IN_TRANSIT",
+  "MAINTENANCE",
+  "DISABLED",
+  "OUT_OF_SERVICE",
+];
