@@ -81,10 +81,11 @@ export default function TruckRow({ truck: t, onEdit, isDark = false }) {
   const hasComplianceAlerts = isLtoDue || isOilDue || isTireDue;
 
   const payloadValue = t.payloadCapacity || t.payload || "—";
+  const updatedAt = t.updatedAt ? new Date(t.updatedAt) : null;
 
   return (
     <div
-      className={`relative flex flex-col gap-3 p-4 transition-colors cursor-pointer group last:border-0 md:grid md:grid-cols-12 md:gap-4 md:px-6 md:items-center ${theme.rowBorder} ${theme.rowDefaultHover}`}
+      className={`relative flex flex-col gap-3 p-4 transition-colors cursor-pointer group last:border-0 md:grid md:grid-cols-13 md:gap-4 md:px-6 md:items-center ${theme.rowBorder} ${theme.rowDefaultHover}`}
     >
       {/* MOBILE HEADER */}
       <div className="flex md:hidden justify-between items-start mb-1">
@@ -247,6 +248,14 @@ export default function TruckRow({ truck: t, onEdit, isDark = false }) {
                 : "—"}
             </span>
           </span>
+        </div>
+      </div>
+
+      <div className="hidden md:block col-span-1 text-right">
+        <div
+          className={`text-[14px] flex items-center gap-1.5 ${theme.mutedText}`}
+        >
+          {updatedAt}
         </div>
       </div>
 
