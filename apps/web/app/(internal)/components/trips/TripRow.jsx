@@ -243,7 +243,14 @@ export default function TripRow({ trip, onClick, isDark = false }) {
 
         {trip.status !== "COMPLETED" && trip.estimatedArrival && (
           <div className={`text-xs ${theme.subtleText}`}>
-            ETA: {new Date(trip.estimatedArrival).toLocaleDateString()}
+            ETA:{" "}
+            {new Date(trip.estimatedArrival).toLocaleString("en-PH", {
+              weekday: "short",
+              month: "short",
+              day: "numeric",
+              hour: "numeric",
+              minute: "2-digit",
+            })}
           </div>
         )}
       </div>

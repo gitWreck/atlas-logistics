@@ -8,6 +8,7 @@ import {
 } from "@fortawesome/free-solid-svg-icons";
 import StatusBadge from "../ui/StatusBadge";
 import { getRowThemeClasses } from "@/app/utility/constant/theme";
+import { formatFirestoreDate } from "@/app/utility/utilities";
 
 function StatusDot({ status }) {
   let color = "bg-emerald-500";
@@ -81,7 +82,7 @@ export default function TruckRow({ truck: t, onEdit, isDark = false }) {
   const hasComplianceAlerts = isLtoDue || isOilDue || isTireDue;
 
   const payloadValue = t.payloadCapacity || t.payload || "—";
-  const updatedAt = t.updatedAt ? new Date(t.updatedAt) : null;
+  const updatedAt = t.updatedAt ? formatFirestoreDate(t.updatedAt) : null;
 
   return (
     <div
@@ -252,9 +253,7 @@ export default function TruckRow({ truck: t, onEdit, isDark = false }) {
       </div>
 
       <div className="hidden md:block col-span-1 text-right">
-        <div
-          className={`text-[14px] flex items-center gap-1.5 ${theme.mutedText}`}
-        >
+        <div className={`text-xs flex items-center gap-1.5 ${theme.mutedText}`}>
           {updatedAt}
         </div>
       </div>
