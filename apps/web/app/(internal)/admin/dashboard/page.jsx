@@ -20,6 +20,8 @@ import {
   faChevronLeft,
   faChevronRight,
   faPlus,
+  faFileInvoice,
+  faFileCirclePlus,
 } from "@fortawesome/free-solid-svg-icons";
 import { useRouter } from "next/navigation";
 import { auth } from "@/lib/firebase";
@@ -28,6 +30,7 @@ import { handleLogout } from "@/app/utility/utilities";
 import NotificationBell from "../../components/notifications/NotificationBell";
 import TruckBoard from "../../components/trucks/TruckBoard";
 import PickupBoard from "../../components/shipments/PickupBoard";
+import InvoiceBoard from "../../components/invoice/InvoiceBoard";
 
 import {
   getDashboardThemeClasses,
@@ -63,6 +66,13 @@ const mainNavItems = [
     title: "Truck Board",
     description: "Manage fleet health and availability.",
   },
+  {
+    id: "invoice",
+    label: "Invoices",
+    icon: faFileInvoice,
+    title: "Invoice Board",
+    description: "Manage invoices and payments.",
+  },
 ];
 
 const secondaryNavItems = [
@@ -84,6 +94,7 @@ export default function AdminDashboardPage() {
   const tripBoardRef = useRef(null);
   const shipmentBoardRef = useRef(null);
   const truckBoardRef = useRef(null);
+  const invoiceBoardRef = useRef(null);
   const mainScrollRef = useRef(null);
 
   const currentTabConfig = useMemo(
@@ -126,6 +137,15 @@ export default function AdminDashboardPage() {
         icon: faPlus,
         accent: "blue",
         onClick: () => truckBoardRef.current?.openRegisterModal?.(),
+      };
+    }
+
+    if (activeTab === "invoice") {
+      return {
+        label: "Invoice",
+        icon: faFileCirclePlus,
+        accent: "emerald",
+        onClick: () => invoiceBoardRef.current?.openCreateInvoice?.(),
       };
     }
 
@@ -349,6 +369,14 @@ export default function AdminDashboardPage() {
                   user={user}
                   userRole="admin"
                   profile={profile}
+                  isDark={isDark}
+                />
+              )}
+
+              {activeTab === "invoice" && (
+                <InvoiceBoard
+                  ref={invoiceBoardRef}
+                  user={user}
                   isDark={isDark}
                 />
               )}

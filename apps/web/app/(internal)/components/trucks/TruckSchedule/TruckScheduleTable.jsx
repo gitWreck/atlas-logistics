@@ -53,8 +53,9 @@ export default function TruckScheduleTable({
       const allowedStatuses = [
         "CREATED",
         "IN_TRANSIT",
-        "COMPLETED",
+        "LOADED",
         "ARRIVED",
+        "COMPLETED",
         "CANCELLED",
       ];
 

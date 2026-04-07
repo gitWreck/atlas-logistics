@@ -70,6 +70,7 @@ export const SHIPMENT_STATUS = [
   // { value: "ARRIVED", label: "Arrived at Destination" },
   { value: "OUT_FOR_DELIVERY", label: "Out for Delivery" },
   { value: "DELIVERED", label: "Delivered" },
+  { value: "COMPLETED", label: "Completed" },
   { value: "CANCELLED", label: "Cancelled" },
 ];
 
@@ -105,3 +106,5 @@ export const TRUCK_STATUSES = [
   "DISABLED",
   "OUT_OF_SERVICE",
 ];
+
+export const INVOICE_STATUSES = ["DRAFT", "ISSUED", "PAID", "CANCELLED"];
