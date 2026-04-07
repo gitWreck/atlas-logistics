@@ -44,6 +44,8 @@ export default function ShipmentRow({
 }) {
   const theme = getRowThemeClasses(isDark);
 
+  console.log("Rendering ShipmentRow for:", s);
+
   const isDelayed =
     !!s.truckDetails?.delayReason && !s.truckDetails?.delayCleared;
 

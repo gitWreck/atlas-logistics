@@ -24,7 +24,6 @@ const INITIAL_FORM_STATE = {
   originCode: "",
   destination: "",
   destinationCode: "",
-  // scheduledDeparture: "",
   plannedDeparture: "",
   estimatedArrival: "",
   helperName: "",

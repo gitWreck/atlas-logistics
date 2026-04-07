@@ -101,6 +101,9 @@ export const broadcastTripMessage = httpsCallable(
   "broadcastTripMessage",
 );
 
+// INVOICES
+export const createInvoice = httpsCallable(functions, "createInvoice");
+
 // ADMIN
 export const createUserProfile = httpsCallable(functions, "createUserProfile");
 export const toggleUserStatus = httpsCallable(functions, "toggleUserStatus");
