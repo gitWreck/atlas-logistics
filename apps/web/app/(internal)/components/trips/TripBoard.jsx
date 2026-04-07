@@ -19,8 +19,10 @@ import {
 import TripRow from "./TripRow";
 import { calculateProgress } from "@/app/utility/utilities";
 import TripDrawer from "./TripDrawer";
-import CreateTripModal from "../manifests/modals/CreateTripModal";
+// import CreateTripModal from "../manifests/modals/CreateTripModal";
+import CreateTripModal from "./modals/CreateTripModal";
 import { getBoardThemeClasses } from "@/app/utility/constant/theme";
+import TruckScheduleOverview from "../trucks/TruckSchedule/TruckScheduleOverview";
 
 const TripBoard = forwardRef(function TripBoard(
   { user, userRole, profile, isDark = false },
@@ -158,6 +160,7 @@ const TripBoard = forwardRef(function TripBoard(
   return (
     <div className={`min-h-screen font-sans ${theme.page}`}>
       <main className="max-w-7xl mx-auto p-4 sm:p-6">
+        <TruckScheduleOverview truckTrips={trips} isDark={isDark} />
         <div
           className={`rounded-xl overflow-hidden shadow-xl backdrop-blur-sm border ${theme.board}`}
         >
@@ -232,8 +235,8 @@ const TripBoard = forwardRef(function TripBoard(
                     onChange={(e) => setTypeFilter(e.target.value)}
                   >
                     <option value="ALL">All Route Types</option>
-                    <option value="TRANSFER">Transfers</option>
-                    <option value="LOCAL">Local Pickups</option>
+                    <option value="HUB_TRANSFER">Hub Transfers</option>
+                    <option value="LOCAL_PICKUP">Local Pickups</option>
                   </select>
                 </div>
 

@@ -21,7 +21,7 @@ import TruckRow from "./TruckRow";
 import TruckStatus from "./TruckStatus";
 import TruckModal from "./TruckModal";
 import { getBoardThemeClasses } from "@/app/utility/constant/theme";
-import TruckScheduleOverview from "./TruckScheduleOverview";
+import TruckScheduleOverview from "./TruckSchedule/TruckScheduleOverview";
 
 const TruckBoard = forwardRef(function TruckBoard(
   { user, userRole, profile, isDark = false },
@@ -193,7 +193,7 @@ const TruckBoard = forwardRef(function TruckBoard(
               <div className="md:min-w-[900px]">
                 {/* TABLE HEADER */}
                 <div
-                  className={`hidden md:grid grid-cols-13 gap-4 px-6 py-3 border-b text-[10px] font-bold uppercase tracking-widest ${theme.tableHead}`}
+                  className={`hidden md:grid grid-cols-13 gap-4 px-6 py-3 border-b text-xs font-bold uppercase tracking-widest ${theme.tableHead}`}
                 >
                   <div className="col-span-4">Truck / Model</div>
                   <div className="col-span-2">Status</div>
@@ -230,6 +230,7 @@ const TruckBoard = forwardRef(function TruckBoard(
                         isDark ? "divide-slate-800/50" : "divide-slate-200"
                       }`}
                     >
+                      {console.log("Rendering trucks:", currentItems)}
                       {currentItems.map((truck) => (
                         <TruckRow
                           key={truck.id}
@@ -286,8 +287,6 @@ const TruckBoard = forwardRef(function TruckBoard(
             </div>
           )}
         </div>
-
-        <TruckScheduleOverview trucks={trucks} isDark={isDark} />
       </main>
 
       <TruckModal
