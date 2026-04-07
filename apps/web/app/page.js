@@ -82,7 +82,9 @@ export default function Home() {
         </section>
 
         <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-[0_10px_25px_rgba(15,23,42,0.04)] sm:p-8">
-          <h2 className="text-2xl font-bold tracking-tight text-slate-950">About Us</h2>
+          <h2 className="text-2xl font-bold tracking-tight text-slate-950">
+            About Us
+          </h2>
           <p className="mt-3 max-w-4xl text-base leading-8 text-slate-700 sm:text-[17px]">
             Atlas Transport Corporation is a Philippine logistics and land
             transportation company focused on dependable cargo handling,
@@ -93,7 +95,9 @@ export default function Home() {
         </section>
 
         <section className="rounded-2xl border border-blue-200 bg-gradient-to-br from-blue-50 to-white p-6 shadow-[0_10px_25px_rgba(15,23,42,0.04)] sm:p-8">
-          <h2 className="text-2xl font-bold tracking-tight text-slate-950">Services</h2>
+          <h2 className="text-2xl font-bold tracking-tight text-slate-950">
+            Services
+          </h2>
           <ul className="mt-3 list-disc space-y-1 pl-5 text-base leading-8 text-slate-800">
             <li>Land transportation services</li>
             <li>Logistics coordination</li>
