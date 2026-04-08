@@ -51,7 +51,7 @@ export default function Home() {
                 Registered Office
               </strong>
               <span className="text-base leading-7 text-slate-900">
-                Poctoy, Odiongan, Romblon, Philippines
+                Poctoy, Odiongan, Romblon, 5505
               </span>
             </p>
             <p className="m-0 grid gap-1">
