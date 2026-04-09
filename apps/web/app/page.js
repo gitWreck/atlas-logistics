@@ -5,6 +5,8 @@ import { useState, useEffect } from "react";
 export default function Home() {
   const [trackingNumber, setTrackingNumber] = useState("");
   const [isMobile, setIsMobile] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [showStickyNav, setShowStickyNav] = useState(false);
   const [pickupForm, setPickupForm] = useState({
     fullName: "",
     phone: "",
@@ -16,13 +18,28 @@ export default function Home() {
 
   useEffect(() => {
     const handleResize = () => {
-      setIsMobile(window.innerWidth < 768);
+      const mobile = window.innerWidth < 768;
+      setIsMobile(mobile);
+      if (!mobile) {
+        setMobileMenuOpen(false);
+      }
     };
 
     handleResize();
     window.addEventListener("resize", handleResize);
 
     return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      setShowStickyNav(window.scrollY > 140);
+    };
+
+    handleScroll();
+    window.addEventListener("scroll", handleScroll, { passive: true });
+
+    return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
   const handleTrackSubmit = (e) => {
@@ -54,49 +71,53 @@ export default function Home() {
         color: "#0f172a",
       }}
     >
-      <div style={{ maxWidth: "1320px", margin: "0 auto" }}>
-        {/* TOP NAVBAR */}
-        <nav
+      <nav
+        style={{
+          position: "fixed",
+          top: 0,
+          left: 0,
+          right: 0,
+          transform: showStickyNav ? "translateY(0)" : "translateY(-14px)",
+          width: "100%",
+          background: "rgba(255,255,255,0.94)",
+          border: "1px solid #dbe4ef",
+          borderRadius: 0,
+          boxShadow: "0 14px 30px rgba(15, 23, 42, 0.1)",
+          backdropFilter: "blur(10px)",
+          WebkitBackdropFilter: "blur(10px)",
+          padding: isMobile ? "10px 12px" : "12px 18px",
+          zIndex: 110,
+          opacity: showStickyNav ? 1 : 0,
+          pointerEvents: showStickyNav ? "auto" : "none",
+          transition: "opacity 0.24s ease, transform 0.24s ease",
+        }}
+      >
+        <div
           style={{
-            background: "rgba(255,255,255,0.88)",
-            backdropFilter: "blur(12px)",
-            WebkitBackdropFilter: "blur(12px)",
-            border: "1px solid rgba(226,232,240,0.9)",
-            boxShadow: "0 10px 30px rgba(15, 23, 42, 0.05)",
-            borderRadius: "22px",
-            padding: isMobile ? "16px" : "16px 22px",
-            marginBottom: "24px",
             display: "flex",
-            flexDirection: isMobile ? "column" : "row",
-            alignItems: isMobile ? "flex-start" : "center",
+            alignItems: "center",
             justifyContent: "space-between",
-            gap: "16px",
-            flexWrap: "wrap",
+            gap: "14px",
           }}
         >
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "12px",
-            }}
-          >
+          <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
             <img
               src="/atlas-logo-white.png"
               alt="Atlas Logo"
               style={{
-                width: "42px",
-                height: "42px",
-                objectFit: "contain",
+                width: isMobile ? "34px" : "40px",
+                height: "auto",
+                display: "block",
               }}
             />
-            <div>
+            <div style={{ lineHeight: 1.15 }}>
               <p
                 style={{
                   margin: 0,
-                  fontSize: "15px",
+                  fontSize: isMobile ? "13px" : "14px",
                   fontWeight: 800,
-                  color: "#020617",
+                  color: "#0f172a",
+                  letterSpacing: "-0.01em",
                 }}
               >
                 Atlas Transport Corporation
@@ -104,8 +125,9 @@ export default function Home() {
               <p
                 style={{
                   margin: "2px 0 0",
-                  fontSize: "12px",
-                  color: "#64748b",
+                  fontSize: isMobile ? "11px" : "12px",
+                  fontWeight: 600,
+                  color: "#475569",
                 }}
               >
                 Fast & Easy Shipping
@@ -113,35 +135,65 @@ export default function Home() {
             </div>
           </div>
 
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: isMobile ? "12px" : "18px",
-              flexWrap: "wrap",
-            }}
-          >
-            <a href="#tracking" style={navLinkStyle}>
-              Tracking
-            </a>
-            <a href="#schedule" style={navLinkStyle}>
-              Schedule
-            </a>
-            <a href="#warehouses" style={navLinkStyle}>
-              Warehouses
-            </a>
-            <a href="#pickup" style={navLinkStyle}>
-              Book Pickup
-            </a>
-          </div>
-        </nav>
+          {isMobile ? (
+            <button
+              type="button"
+              onClick={() => setMobileMenuOpen((prev) => !prev)}
+              aria-label="Toggle menu"
+              aria-expanded={mobileMenuOpen}
+              style={{
+                width: "40px",
+                height: "40px",
+                borderRadius: "10px",
+                border: "1px solid #cbd5e1",
+                background: "#ffffff",
+                color: "#0f172a",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                cursor: "pointer",
+                fontSize: "22px",
+                lineHeight: 1,
+                padding: 0,
+                flexShrink: 0,
+              }}
+            >
+              {mobileMenuOpen ? "x" : "\u2261"}
+            </button>
+          ) : (
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "18px",
+                justifyContent: "flex-end",
+                flexWrap: "wrap",
+              }}
+            >
+              <a href="#tracking" style={navLinkStyle}>
+                Tracking
+              </a>
+              <a href="#schedule" style={navLinkStyle}>
+                Schedule
+              </a>
+              <a href="#warehouses" style={navLinkStyle}>
+                Warehouses
+              </a>
+              <a href="#pickup" style={navLinkStyle}>
+                Book Pickup
+              </a>
+            </div>
+          )}
+        </div>
+      </nav>
 
+      <div style={{ maxWidth: "1320px", margin: "0 auto" }}>
         {/* HERO */}
         <section
           style={{
             background: "linear-gradient(135deg, #ffffff 0%, #f8fbff 100%)",
             borderRadius: isMobile ? "24px" : "32px",
-            padding: isMobile ? "36px 18px 22px" : "64px 42px 42px",
+            padding: isMobile ? "20px 18px 22px" : "30px 42px 42px",
             boxShadow: "0 18px 50px rgba(15, 23, 42, 0.07)",
             border: "1px solid #e2e8f0",
             marginBottom: "28px",
@@ -149,11 +201,168 @@ export default function Home() {
             position: "relative",
           }}
         >
+           {/* TOP NAVBAR */}
+        <nav
+          style={{
+            background: "transparent",
+            backdropFilter: "none",
+            WebkitBackdropFilter: "none",
+            border: "none",
+            boxShadow: "none",
+            borderRadius: 0,
+            padding: 0,
+            marginBottom: "24px",
+            display: "flex",
+            flexDirection: "column",
+            alignItems: isMobile ? "stretch" : "center",
+            justifyContent: "center",
+            gap: "12px",
+            position: "relative",
+          }}
+        >
+          {isMobile ? (
+            <>
+              <button
+                type="button"
+                onClick={() => setMobileMenuOpen((prev) => !prev)}
+                aria-label="Toggle menu"
+                aria-expanded={mobileMenuOpen}
+                style={{
+                  alignSelf: "flex-end",
+                  width: "42px",
+                  height: "42px",
+                  borderRadius: "10px",
+                  border: "1px solid #cbd5e1",
+                  background: "#ffffff",
+                  color: "#0f172a",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  cursor: "pointer",
+                  fontSize: "22px",
+                  lineHeight: 1,
+                  padding: 0,
+                }}
+              >
+                {mobileMenuOpen ? "x" : "\u2261"}
+              </button>
+
+              <div
+                onClick={() => setMobileMenuOpen(false)}
+                style={{
+                  position: "fixed",
+                  inset: 0,
+                  background: "rgba(2, 6, 23, 0.42)",
+                  opacity: mobileMenuOpen ? 1 : 0,
+                  pointerEvents: mobileMenuOpen ? "auto" : "none",
+                  transition: "opacity 0.24s ease",
+                  zIndex: 60,
+                }}
+              >
+                <div
+                  onClick={(e) => e.stopPropagation()}
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "flex-start",
+                    gap: "16px",
+                    width: "min(84vw, 320px)",
+                    height: "100vh",
+                    background: "#ffffff",
+                    boxShadow: "16px 0 32px rgba(15, 23, 42, 0.22)",
+                    padding: "18px 18px 26px",
+                    boxSizing: "border-box",
+                    transform: mobileMenuOpen
+                      ? "translateX(0)"
+                      : "translateX(-105%)",
+                    transition: "transform 0.3s ease",
+                  }}
+                >
+                  <button
+                    type="button"
+                    onClick={() => setMobileMenuOpen(false)}
+                    aria-label="Close menu"
+                    style={{
+                      marginLeft: "auto",
+                      width: "40px",
+                      height: "40px",
+                      borderRadius: "10px",
+                      border: "1px solid #cbd5e1",
+                      background: "#ffffff",
+                      color: "#0f172a",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      cursor: "pointer",
+                      fontSize: "20px",
+                      lineHeight: 1,
+                      padding: 0,
+                    }}
+                  >
+                    x
+                  </button>
+                  <a
+                    href="#tracking"
+                    style={navLinkStyle}
+                    onClick={() => setMobileMenuOpen(false)}
+                  >
+                    Tracking
+                  </a>
+                  <a
+                    href="#schedule"
+                    style={navLinkStyle}
+                    onClick={() => setMobileMenuOpen(false)}
+                  >
+                    Schedule
+                  </a>
+                  <a
+                    href="#warehouses"
+                    style={navLinkStyle}
+                    onClick={() => setMobileMenuOpen(false)}
+                  >
+                    Warehouses
+                  </a>
+                  <a
+                    href="#pickup"
+                    style={navLinkStyle}
+                    onClick={() => setMobileMenuOpen(false)}
+                  >
+                    Book Pickup
+                  </a>
+                </div>
+              </div>
+            </>
+          ) : (
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "18px",
+                flexWrap: "wrap",
+                width: "100%",
+                justifyContent: "flex-end",
+              }}
+            >
+              <a href="#tracking" style={navLinkStyle}>
+                Tracking
+              </a>
+              <a href="#schedule" style={navLinkStyle}>
+                Schedule
+              </a>
+              <a href="#warehouses" style={navLinkStyle}>
+                Warehouses
+              </a>
+              <a href="#pickup" style={navLinkStyle}>
+                Book Pickup
+              </a>
+            </div>
+          )}
+        </nav>
           <div
             style={{
               position: "absolute",
               top: "-120px",
-              right: "-60px",
+              left: "-60px",
               width: isMobile ? "180px" : "280px",
               height: isMobile ? "180px" : "280px",
               borderRadius: "999px",
@@ -165,7 +374,7 @@ export default function Home() {
             style={{
               position: "absolute",
               bottom: "-140px",
-              left: "-90px",
+              right: "-90px",
               width: isMobile ? "220px" : "320px",
               height: isMobile ? "220px" : "320px",
               borderRadius: "999px",
@@ -181,6 +390,16 @@ export default function Home() {
                 textAlign: "center",
               }}
             >
+              <img
+                src="/atlas-logo-white.png"
+                alt="Atlas Logo"
+                style={{
+                  width: isMobile ? "140px" : "200px",
+                  display: "block",
+                  margin: "0 auto 20px",
+                }}
+              />
+
               <h1
                 style={{
                   fontSize: isMobile ? "36px" : "64px",
@@ -537,7 +756,7 @@ export default function Home() {
 
             <iframe
               title="Divisoria Warehouse"
-              src="https://www.google.com/maps?q=619+Asuncion+St+Binondo+Manila&output=embed"
+              src="https://www.google.com/maps?q=14.600025,120.969801&output=embed"
               style={{
                 width: "100%",
                 height: "180px",
@@ -551,7 +770,7 @@ export default function Home() {
             <div style={warehouseInfoBlockStyle}>
               <p style={warehouseInfoLabelStyle}>Address</p>
               <p style={warehouseInfoValueStyle}>
-                619 Asuncion St, Binondo, Manila, Metro Manila, Philippines
+                Unit 615, 619 Asuncion St, San Nicolas, Manila, 1000 Philippines
               </p>
             </div>
 
@@ -602,7 +821,7 @@ export default function Home() {
             <div style={warehouseInfoBlockStyle}>
               <p style={warehouseInfoLabelStyle}>Address</p>
               <p style={warehouseInfoValueStyle}>
-                Poctoy, Poctoy, Odiongan, Romblon, 5505
+                Poctoy, Odiongan, Romblon, 5505
               </p>
             </div>
 
