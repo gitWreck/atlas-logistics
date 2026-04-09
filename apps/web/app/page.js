@@ -1,3 +1,5 @@
+"use client";
+
 import { useState, useEffect } from "react";
 
 export default function Home() {
@@ -80,7 +82,7 @@ export default function Home() {
             }}
           >
             <img
-              src="/Atlas.png"
+              src="/atlas-logo-white.png"
               alt="Atlas Logo"
               style={{
                 width: "42px",
@@ -180,11 +182,12 @@ export default function Home() {
               }}
             >
               <img
-                src="/Atlas.png"
+                src="/atlas-logo-white.png"
                 alt="Atlas Logo"
                 style={{
-                  width: isMobile ? "96px" : "140px",
-                  marginBottom: "20px",
+                  width: isMobile ? "140px" : "200px",
+                  display: "block",
+                  margin: "0 auto 20px",
                 }}
               />
 
