@@ -7,6 +7,11 @@ export default function Home() {
   const [isMobile, setIsMobile] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [showStickyNav, setShowStickyNav] = useState(false);
+  const [pickupSubmitState, setPickupSubmitState] = useState({
+    isSubmitting: false,
+    message: "",
+    type: "",
+  });
   const [pickupForm, setPickupForm] = useState({
     fullName: "",
     phone: "",
@@ -47,9 +52,52 @@ export default function Home() {
     alert(`Track shipment: ${trackingNumber}`);
   };
 
-  const handlePickupSubmit = (e) => {
+  const handlePickupSubmit = async (e) => {
     e.preventDefault();
-    alert("Pickup request submitted.");
+
+    setPickupSubmitState({
+      isSubmitting: true,
+      message: "",
+      type: "",
+    });
+
+    try {
+      const response = await fetch("/api/public/pickup-request", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(pickupForm),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data?.error || "Unable to submit pickup request.");
+      }
+
+      setPickupSubmitState({
+        isSubmitting: false,
+        message: "Pickup request submitted. We will contact you shortly.",
+        type: "success",
+      });
+
+      setPickupForm({
+        fullName: "",
+        phone: "",
+        email: "",
+        pickupAddress: "",
+        deliveryAddress: "",
+        packageDetails: "",
+      });
+    } catch (error) {
+      setPickupSubmitState({
+        isSubmitting: false,
+        message:
+          error?.message || "Something went wrong while submitting the request.",
+        type: "error",
+      });
+    }
   };
 
   const handlePickupChange = (e) => {
@@ -807,7 +855,7 @@ export default function Home() {
 
             <iframe
               title="Odiongan Warehouse"
-              src="https://www.google.com/maps?q=Poctoy+Odiongan+Romblon&output=embed"
+              src="https://www.google.com/maps?q=12.4106667,121.9907778&output=embed"
               style={{
                 width: "100%",
                 height: "180px",
@@ -885,37 +933,47 @@ export default function Home() {
           >
             <input
               name="fullName"
+              type="text"
               placeholder="Full name"
               value={pickupForm.fullName}
               onChange={handlePickupChange}
+              required
               style={inputStyle}
             />
             <input
               name="phone"
+              type="tel"
               placeholder="Phone number"
               value={pickupForm.phone}
               onChange={handlePickupChange}
+              required
               style={inputStyle}
             />
             <input
               name="email"
+              type="email"
               placeholder="Email address"
               value={pickupForm.email}
               onChange={handlePickupChange}
+              required
               style={inputStyle}
             />
             <input
               name="deliveryAddress"
+              type="text"
               placeholder="Delivery address"
               value={pickupForm.deliveryAddress}
               onChange={handlePickupChange}
+              required
               style={inputStyle}
             />
             <input
               name="pickupAddress"
+              type="text"
               placeholder="Pickup address"
               value={pickupForm.pickupAddress}
               onChange={handlePickupChange}
+              required
               style={{ ...inputStyle, gridColumn: "1 / -1" }}
             />
             <textarea
@@ -924,6 +982,7 @@ export default function Home() {
               value={pickupForm.packageDetails}
               onChange={handlePickupChange}
               rows={5}
+              required
               style={{
                 ...inputStyle,
                 gridColumn: "1 / -1",
@@ -936,21 +995,37 @@ export default function Home() {
             <div style={{ gridColumn: "1 / -1" }}>
               <button
                 type="submit"
+                disabled={pickupSubmitState.isSubmitting}
                 style={{
                   width: isMobile ? "100%" : "auto",
                   padding: "16px 24px",
                   borderRadius: "14px",
                   border: "none",
-                  background: "#2563eb",
+                  background: pickupSubmitState.isSubmitting ? "#93c5fd" : "#2563eb",
                   color: "#ffffff",
                   fontSize: "15px",
                   fontWeight: 700,
-                  cursor: "pointer",
+                  cursor: pickupSubmitState.isSubmitting ? "not-allowed" : "pointer",
                   boxShadow: "0 10px 20px rgba(37, 99, 235, 0.18)",
                 }}
               >
-                Submit Pickup Request
+                {pickupSubmitState.isSubmitting
+                  ? "Submitting..."
+                  : "Submit Pickup Request"}
               </button>
+              {pickupSubmitState.message ? (
+                <p
+                  style={{
+                    margin: "12px 0 0",
+                    color:
+                      pickupSubmitState.type === "error" ? "#b91c1c" : "#15803d",
+                    fontSize: "14px",
+                    fontWeight: 600,
+                  }}
+                >
+                  {pickupSubmitState.message}
+                </p>
+              ) : null}
             </div>
           </form>
         </section>
