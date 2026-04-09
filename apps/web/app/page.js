@@ -776,7 +776,7 @@ export default function Home() {
             <div style={warehouseInfoBlockStyle}>
               <p style={warehouseInfoLabelStyle}>Address</p>
               <p style={warehouseInfoValueStyle}>
-                Unit 615, 619 Asuncion St, San Nicolas, Manila, 1000 Philippines
+                Unit 615, 619 Asuncion St, San Nicolas, Manila, 1000
               </p>
             </div>
 
