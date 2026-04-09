@@ -181,16 +181,6 @@ export default function Home() {
                 textAlign: "center",
               }}
             >
-              <img
-                src="/atlas-logo-white.png"
-                alt="Atlas Logo"
-                style={{
-                  width: isMobile ? "140px" : "200px",
-                  display: "block",
-                  margin: "0 auto 20px",
-                }}
-              />
-
               <h1
                 style={{
                   fontSize: isMobile ? "36px" : "64px",
