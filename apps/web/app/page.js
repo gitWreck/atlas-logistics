@@ -671,13 +671,13 @@ export default function Home() {
                 Schedule Contacts
               </p>
               <p style={{ margin: "0 0 4px", fontWeight: 700, fontSize: "16px" }}>
-                Lean Mangaoil
+                Lean
               </p>
               <p style={{ margin: "0 0 10px", color: "#475569", fontSize: "14px" }}>
                 09757427941
               </p>
               <p style={{ margin: "0 0 4px", fontWeight: 700, fontSize: "16px" }}>
-                Roselyn Hindap
+                Rose
               </p>
               <p style={{ margin: 0, color: "#475569", fontSize: "14px" }}>
                 09125453219
@@ -789,7 +789,7 @@ export default function Home() {
             >
               <div style={warehouseSmallCardStyle}>
                 <p style={warehouseInfoLabelStyle}>Contact Person</p>
-                <p style={warehouseSmallValueStyle}>Lean Mangaoil</p>
+                <p style={warehouseSmallValueStyle}>Lean</p>
               </div>
 
               <div style={warehouseSmallCardStyle}>
@@ -841,7 +841,7 @@ export default function Home() {
               <div style={warehouseSmallCardStyle}>
                 <p style={warehouseInfoLabelStyle}>Contact Person</p>
                 <p style={warehouseSmallValueStyle}>
-                  Roselyn Merculesio Hindap
+                  Rose
                 </p>
               </div>
 
