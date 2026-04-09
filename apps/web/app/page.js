@@ -487,67 +487,6 @@ export default function Home() {
                 professional logistics support.
               </p>
 
-              {/* HERO TRACKING */}
-              <form
-                onSubmit={handleTrackSubmit}
-                style={{
-                  margin: "34px auto 0",
-                  maxWidth: "820px",
-                  background: "#ffffff",
-                  border: "1px solid #dbe4ef",
-                  boxShadow: "0 14px 30px rgba(15, 23, 42, 0.06)",
-                  borderRadius: "20px",
-                  padding: "14px",
-                  display: "grid",
-                  gridTemplateColumns: isMobile ? "1fr" : "1fr auto auto",
-                  gap: "12px",
-                }}
-              >
-                <input
-                  type="text"
-                  placeholder="Enter your tracking number"
-                  value={trackingNumber}
-                  onChange={(e) => setTrackingNumber(e.target.value)}
-                  style={inputStyle}
-                />
-
-                <button
-                  type="submit"
-                  style={{
-                    padding: "16px 22px",
-                    borderRadius: "14px",
-                    border: "none",
-                    background: "#0f172a",
-                    color: "#ffffff",
-                    fontSize: "15px",
-                    fontWeight: 700,
-                    cursor: "pointer",
-                    whiteSpace: "nowrap",
-                  }}
-                >
-                  Track Shipment
-                </button>
-
-                <a
-                  href="#pickup"
-                  style={{
-                    textDecoration: "none",
-                    padding: "16px 22px",
-                    borderRadius: "14px",
-                    border: "1px solid #bfdbfe",
-                    background: "#eff6ff",
-                    color: "#1d4ed8",
-                    fontSize: "15px",
-                    fontWeight: 700,
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    whiteSpace: "nowrap",
-                  }}
-                >
-                  Request Pickup
-                </a>
-              </form>
             </header>
 
             <div
@@ -609,7 +548,7 @@ export default function Home() {
             onSubmit={handleTrackSubmit}
             style={{
               display: "grid",
-              gridTemplateColumns: isMobile ? "1fr" : "1fr auto",
+              gridTemplateColumns: isMobile ? "1fr" : "1fr auto auto",
               gap: "14px",
             }}
           >
@@ -635,6 +574,25 @@ export default function Home() {
             >
               Track Now
             </button>
+            <a
+              href="#pickup"
+              style={{
+                textDecoration: "none",
+                padding: "16px 22px",
+                borderRadius: "14px",
+                border: "1px solid #bfdbfe",
+                background: "#eff6ff",
+                color: "#1d4ed8",
+                fontSize: "15px",
+                fontWeight: 700,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                whiteSpace: "nowrap",
+              }}
+            >
+              Request Pickup
+            </a>
           </form>
         </section>
 
