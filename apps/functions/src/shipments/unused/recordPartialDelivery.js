@@ -1,7 +1,7 @@
 "use strict";
 
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
-const { db, now, requireRole } = require("../../_shared");
+const { db, now, requireRole } = require("../../../_shared");
 const { transitionPackageStatus } = require("./transitionPackageStatus");
 
 exports.recordPartialDelivery = onCall(async (req) => {

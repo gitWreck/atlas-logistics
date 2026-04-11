@@ -15,10 +15,10 @@
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const admin = require("firebase-admin");
 
-const { assertAdminOrManager } = require("../system/authGuards");
+const { assertAdminOrManager } = require("../../system/authGuards");
 const { buildStatusSMS } = require("./buildStatusSMS");
-const { calculateSmsCost } = require("../../shared/sms-cost");
-const { writeAuditEvent } = require("../../shared/audit");
+const { calculateSmsCost } = require("../../../shared/sms-cost");
+const { writeAuditEvent } = require("../../../shared/audit");
 
 // Safe init
 if (!admin.apps.length) admin.initializeApp();

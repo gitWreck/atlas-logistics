@@ -4,20 +4,20 @@ import React, { useState } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faPlus,
-  faPause,
   faPlay,
+  faPause,
   faTruckFast,
   faExclamationTriangle,
 } from "@fortawesome/free-solid-svg-icons";
 import {
   assignShipmentToTruckTrip,
+  updateTripStatus,
   clearTruckDelay,
   setTruckDelay,
-  updateTripStatus,
 } from "@/app/utility/FirebaseFunctions";
 import StatusButton from "../ui/StatusButton";
-import { runAction } from "@/app/utility/utilities";
 import NotifyToggle from "../messaging/NotifyToggle";
+import { runAction } from "@/app/utility/utilities";
 import { getWidgetThemeClasses } from "@/app/utility/constant/theme";
 
 export default function TripOperations({

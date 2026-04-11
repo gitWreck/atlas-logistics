@@ -7,22 +7,13 @@ import React, {
   forwardRef,
   useImperativeHandle,
 } from "react";
-import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import {
-  faFileInvoiceDollar,
-  faSync,
-  faSearch,
-  faFilter,
-} from "@fortawesome/free-solid-svg-icons";
 
-import InvoiceBoardHeader from "./InvoiceBoardHeader";
-import InvoiceBoardFilters from "./InvoiceBoardFilters";
-import InvoiceStatusBoard from "./unusend/InvoiceStatusBoard";
 import InvoiceFormModal from "./InvoiceFormModal";
 import InvoiceDetailsModal from "./InvoiceDetailsModal";
+import InvoiceTable from "./InvoiceTable";
+import InvoiceStatistics from "./InvoiceStatistics";
 import { getBoardThemeClasses } from "@/app/utility/constant/theme";
 import { INVOICE_STATUSES } from "@/app/utility/constant/templates";
-import InvoiceTable from "./InvoiceTable";
 
 const InvoiceBoard = forwardRef(function InvoiceBoard(
   { user, isDark = false },
@@ -31,9 +22,6 @@ const InvoiceBoard = forwardRef(function InvoiceBoard(
   const [shipments, setShipments] = useState([]);
   const [invoices, setInvoices] = useState([]);
   const [loading, setLoading] = useState(false);
-
-  const [searchQuery, setSearchQuery] = useState("");
-  const [activeFilter, setActiveFilter] = useState("ALL");
 
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
@@ -140,43 +128,6 @@ const InvoiceBoard = forwardRef(function InvoiceBoard(
     });
   }, [shipments, invoiceByShipmentId]);
 
-  const filteredInvoices = useMemo(() => {
-    return mappedInvoices.filter((invoice) => {
-      const searchContent = `
-        ${invoice.invoiceNumber || ""}
-        ${invoice.shipmentTrackingNumber || ""}
-        ${invoice.senderName || ""}
-        ${invoice.recipientName || ""}
-        ${invoice.routeLabel || ""}
-        ${invoice.status || ""}
-      `.toLowerCase();
-
-      if (!searchContent.includes(searchQuery.toLowerCase())) return false;
-
-      if (activeFilter !== "ALL" && invoice.status !== activeFilter) {
-        return false;
-      }
-
-      return true;
-    });
-  }, [mappedInvoices, searchQuery, activeFilter]);
-
-  const groupedInvoices = useMemo(() => {
-    const initialGroups = INVOICE_STATUSES.reduce((acc, status) => {
-      acc[status] = [];
-      return acc;
-    }, {});
-
-    filteredInvoices.forEach((invoice) => {
-      const status = INVOICE_STATUSES.includes(invoice.status)
-        ? invoice.status
-        : "DRAFT";
-      initialGroups[status].push(invoice);
-    });
-
-    return initialGroups;
-  }, [filteredInvoices]);
-
   const counts = useMemo(() => {
     return {
       total: mappedInvoices.length,
@@ -220,6 +171,7 @@ const InvoiceBoard = forwardRef(function InvoiceBoard(
     setSelectedShipment(null);
   };
 
+  // change this to a firebase function and move to backend, then call it from here
   const handleSubmitInvoice = async (payload) => {
     try {
       if (!user) return;
@@ -288,7 +240,7 @@ const InvoiceBoard = forwardRef(function InvoiceBoard(
   return (
     <div className={`min-h-screen font-sans ${theme.page}`}>
       <main className="max-w-7xl mx-auto p-4 sm:p-6 space-y-6">
-        <InvoiceBoardHeader
+        <InvoiceStatistics
           isDark={isDark}
           totalCount={counts.total}
           draftCount={counts.draft}
@@ -321,11 +273,12 @@ const InvoiceBoard = forwardRef(function InvoiceBoard(
         mode={formMode}
         shipment={selectedShipment}
         invoice={selectedInvoice}
+        eligibleShipments={eligibleShipments}
+        user={user}
         onClose={handleCloseForm}
         onSubmit={handleSubmitInvoice}
         isDark={isDark}
       />
-
       <InvoiceDetailsModal
         isOpen={isDetailsOpen}
         invoice={selectedInvoice}

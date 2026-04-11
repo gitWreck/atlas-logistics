@@ -11,7 +11,7 @@
  *************************************************/
 
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
-const { requireRole } = require("../../_shared");
+const { requireRole } = require("../../../_shared");
 const { buildStatusSMS } = require("./buildStatusSMS");
 
 /* ======================================================

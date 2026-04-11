@@ -1,6 +1,6 @@
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const admin = require("firebase-admin");
-const { assertAdminOrManager } = require("../system/authGuards");
+const { assertAdminOrManager } = require("../../system/authGuards");
 
 exports.syncShipmentItems = onCall(
   { region: "asia-southeast1" },

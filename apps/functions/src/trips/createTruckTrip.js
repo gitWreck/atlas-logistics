@@ -42,18 +42,60 @@ exports.createTruckTrip = onCall(
     const truckInternalCode = optionalString(req.data?.truckInternalCode);
     const driverName = optionalString(req.data?.driverName);
     const driverId = optionalString(req.data?.driverId);
+    const helperName = req.data?.helperName;
 
-    // ---> NEW: Extract tripType
+    const plannedDeparture = req.data?.plannedDeparture; // ISO string from frontend
+    const estimatedArrival = req.data?.estimatedArrival; // ISO string from frontend
+
+    if (!plannedDeparture) {
+      throw new HttpsError(
+        "invalid-argument",
+        "Planned departure is required.",
+      );
+    }
+
+    if (!estimatedArrival) {
+      throw new HttpsError(
+        "invalid-argument",
+        "Estimated arrival is required.",
+      );
+    }
+
+    const plannedDepartureDate = new Date(plannedDeparture);
+    const estimatedArrivalDate = new Date(estimatedArrival);
+
+    if (Number.isNaN(plannedDepartureDate.getTime())) {
+      throw new HttpsError("invalid-argument", "Planned departure is invalid.");
+    }
+
+    if (Number.isNaN(estimatedArrivalDate.getTime())) {
+      throw new HttpsError("invalid-argument", "Estimated arrival is invalid.");
+    }
+
+    if (estimatedArrivalDate <= plannedDepartureDate) {
+      throw new HttpsError(
+        "invalid-argument",
+        "Estimated arrival must be later than planned departure.",
+      );
+    }
+
     const tripType = req.data?.tripType || "HUB_TRANSFER";
-
-    // Add this near tripRef definition
     const truckDocId = req.data?.truckId; // Ensure you pass 'truckId' from the frontend
     const truckRef = truckDocId
       ? db.collection("trucks").doc(truckDocId)
       : null;
 
-    const snap = await db.collection("users").doc(driverId).get();
-    const driver = snap.data();
+    // const snap = await db.collection("users").doc(driverId).get();
+    // const driver = snap.data() || null;
+    let driver = null;
+
+    if (driverId) {
+      const snap = await db.collection("users").doc(driverId).get();
+      if (!snap.exists) {
+        throw new HttpsError("not-found", "Selected driver was not found.");
+      }
+      driver = snap.data() || null;
+    }
 
     // We store a trip counter per day+route to generate a nice tripId
     const today = yyyymmddFromDate(new Date());
@@ -92,17 +134,23 @@ exports.createTruckTrip = onCall(
         originCode,
         destination: req.data?.destination,
         destinationCode,
-        route: originCode + " -> " + destinationCode || null,
+        route:
+          originCode && destinationCode
+            ? `${originCode} -> ${destinationCode}`
+            : null,
+        // route: originCode + " -> " + destinationCode || null,
 
-        // ---> NEW: Save tripType to DB
-        tripType: tripType,
-
-        // assignment (optional)
+        tripType: tripType || "HUB_TRANSFER", // default to HUB_TRANSFER if not provided
+        truckId: truckDocId || null,
         truckPlateNumber: truckPlateNumber || null,
-        // truckInternalCode: truckInternalCode || null,
+
         driverName: driverName || null,
         driverId: driverId || null,
-        driverPhone: driver.phoneNumber || null, // set when assigned
+        driverPhone: driver?.phoneNumber || null, // set when assigned
+
+        helperName: helperName || null,
+        plannedDeparture: plannedDeparture || null,
+        estimatedArrival: estimatedArrival || null,
 
         // operational state
         status: "CREATED",
@@ -111,14 +159,14 @@ exports.createTruckTrip = onCall(
 
         // counters used by your load/unload pipeline
         // lastSequence: 0, // used by createShipmentWithSequence
-        totalLoaded: 0, // aggregate across packages (optional)
         // totalPackages: 0, // optional (you can maintain in functions)
-        totalItems: 0, // optional
         // totalItemsLoaded: 0, // optional
+        totalLoaded: 0, // aggregate across packages (optional)
+        totalItems: 0, // optional
 
         // delay system (optional)
-        delayReason: null,
         // delayCleared: false,
+        delayReason: null,
         delayStartedAt: null,
         delayClearedAt: null,
 
@@ -146,7 +194,7 @@ exports.createTruckTrip = onCall(
         // Logic: Change status from IDLE to ASSIGNED
         tx.update(truckRef, {
           status: "ASSIGNED",
-          currentTripId: tripId,
+          // currentTripId: tripId,
           updatedAt: admin.firestore.FieldValue.serverTimestamp(),
           updatedBy: req.auth.uid,
         });
@@ -181,7 +229,7 @@ exports.createTruckTrip = onCall(
           truckInternalCode: truckInternalCode || null,
           driverName: driverName || null,
           driverId: driverId || null,
-          driverPhone: driver.phoneNumber || null, // set when assigned
+          driverPhone: driver?.phoneNumber || null, // set when assigned
         },
       });
 

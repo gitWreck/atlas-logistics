@@ -17,9 +17,9 @@ const { onDocumentUpdated } = require("firebase-functions/v2/firestore");
 const admin = require("firebase-admin");
 
 const { buildStatusSMS } = require("./buildStatusSMS");
-const { calculateSmsCost } = require("../../shared/sms-cost");
-const { buildSmsSignature } = require("../../shared/sms-suppression");
-const { writeAuditEvent } = require("../../shared/audit");
+const { calculateSmsCost } = require("../../../shared/sms-cost");
+const { buildSmsSignature } = require("../../../shared/sms-suppression");
+const { writeAuditEvent } = require("../../../shared/audit");
 
 if (!admin.apps.length) admin.initializeApp();
 const db = admin.firestore();
