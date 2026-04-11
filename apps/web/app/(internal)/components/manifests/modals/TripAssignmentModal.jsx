@@ -2,18 +2,16 @@ import React, { useEffect, useMemo, useState } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faIdCard,
-  faTruck,
   faUserSlash,
   faSave,
   faTimes,
-  faUser,
   faCircleInfo,
 } from "@fortawesome/free-solid-svg-icons";
 import {
-  assignDriverToTruckTrip,
-  assignmentToTruckTrip,
-  removeAssignmentFromTruckTrip,
-  unassignDriverFromTruckTrip,
+  // assignDriverToTrip,
+  assignmentToTrip,
+  removeAssignmentFromTrip,
+  // unassignDriverFromTrip,
 } from "@/app/utility/FirebaseFunctions";
 import DriverSelectInput from "../DriverSelectInput";
 import TruckSelectInput from "../TruckSelectInput";
@@ -72,8 +70,8 @@ export default function TripAssignmentModal({
 
     try {
       // await assignDriverToTruckTrip({
-      await assignmentToTruckTrip({
-        truckTripId: trip.id,
+      await assignmentToTrip({
+        tripId: trip.id,
         driverId: formData.driverId || null,
         truckId: formData.truckId || null,
         truckPlateNumber: formData.truckPlateNumber || null,
@@ -98,8 +96,8 @@ export default function TripAssignmentModal({
 
     try {
       // await unassignDriverFromTruckTrip({
-      await removeAssignmentFromTruckTrip({
-        truckTripId: trip.id,
+      await removeAssignmentFromTrip({
+        tripId: trip.id,
       });
 
       onSuccess?.();

@@ -1,13 +1,7 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import {
-  faBoxOpen,
-  faArrowRight,
-  faCamera,
-  faTrash,
-  faImage,
-} from "@fortawesome/free-solid-svg-icons";
+import { faCamera, faTrash, faImage } from "@fortawesome/free-solid-svg-icons";
 import RouteSection from "./RouteSection";
 import ItemSection from "./ItemSection";
 import InputGroup from "./InputGroup";
@@ -22,6 +16,7 @@ const INITIAL_CONTACT = {
   city: "",
   province: "",
 };
+
 export default function ReceivePackageForm({
   // key,
   profile,
