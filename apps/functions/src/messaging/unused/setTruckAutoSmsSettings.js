@@ -12,7 +12,7 @@
 
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const admin = require("firebase-admin");
-const { db, requireRole, now } = require("../../_shared");
+const { db, requireRole, now } = require("../../../_shared");
 
 if (!admin.apps.length) admin.initializeApp();
 

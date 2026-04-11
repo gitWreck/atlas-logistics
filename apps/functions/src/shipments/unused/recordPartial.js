@@ -2,7 +2,7 @@
 
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const admin = require("firebase-admin");
-const { writeAuditLog } = require("../../_shared");
+const { writeAuditLog } = require("../../../_shared");
 
 if (!admin.apps.length) admin.initializeApp();
 const db = admin.firestore();
@@ -27,7 +27,7 @@ function requirePosInt(v, field) {
   if (!Number.isInteger(n) || n <= 0) {
     throw new HttpsError(
       "invalid-argument",
-      `${field} must be a positive integer`
+      `${field} must be a positive integer`,
     );
   }
   return n;
@@ -96,7 +96,7 @@ exports.recordPartial = onCall({ region: "asia-southeast1" }, async (req) => {
     if (loaded <= 0) {
       throw new HttpsError(
         "failed-precondition",
-        "No loaded items to mark partial"
+        "No loaded items to mark partial",
       );
     }
 

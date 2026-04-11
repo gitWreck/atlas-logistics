@@ -10,7 +10,7 @@ import {
 } from "@fortawesome/free-solid-svg-icons";
 import StatsCard from "../statistics/StatsCard";
 
-export default function InvoiceBoardHeader({
+export default function InvoiceStatistics({
   isDark = false,
   totalCount = 0,
   draftCount = 0,

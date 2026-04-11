@@ -51,10 +51,8 @@ export function getButtonActionClasses() {
 
     loading:
       "bg-blue-600/10 text-blue-400 border-blue-500/30 cursor-wait opacity-80",
-
     success:
       "bg-emerald-500 text-white border-emerald-600 shadow-emerald-500/20",
-
     error: "bg-red-500 text-white border-red-600",
   };
 }

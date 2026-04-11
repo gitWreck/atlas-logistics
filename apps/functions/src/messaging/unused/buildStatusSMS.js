@@ -9,7 +9,7 @@
  * ======================================================
  */
 
-const { DELAY_REASONS } = require("../../shared/delay-reasons.js");
+const { DELAY_REASONS } = require("../../../shared/delay-reasons.js");
 
 const SMS_VERSION = "v1.2";
 

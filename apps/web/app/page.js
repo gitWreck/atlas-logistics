@@ -94,7 +94,8 @@ export default function Home() {
       setPickupSubmitState({
         isSubmitting: false,
         message:
-          error?.message || "Something went wrong while submitting the request.",
+          error?.message ||
+          "Something went wrong while submitting the request.",
         type: "error",
       });
     }
@@ -249,163 +250,163 @@ export default function Home() {
             position: "relative",
           }}
         >
-           {/* TOP NAVBAR */}
-        <nav
-          style={{
-            background: "transparent",
-            backdropFilter: "none",
-            WebkitBackdropFilter: "none",
-            border: "none",
-            boxShadow: "none",
-            borderRadius: 0,
-            padding: 0,
-            marginBottom: "24px",
-            display: "flex",
-            flexDirection: "column",
-            alignItems: isMobile ? "stretch" : "center",
-            justifyContent: "center",
-            gap: "12px",
-            position: "relative",
-          }}
-        >
-          {isMobile ? (
-            <>
-              <button
-                type="button"
-                onClick={() => setMobileMenuOpen((prev) => !prev)}
-                aria-label="Toggle menu"
-                aria-expanded={mobileMenuOpen}
-                style={{
-                  alignSelf: "flex-end",
-                  width: "42px",
-                  height: "42px",
-                  borderRadius: "10px",
-                  border: "1px solid #cbd5e1",
-                  background: "#ffffff",
-                  color: "#0f172a",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  cursor: "pointer",
-                  fontSize: "22px",
-                  lineHeight: 1,
-                  padding: 0,
-                }}
-              >
-                {mobileMenuOpen ? "x" : "\u2261"}
-              </button>
-
-              <div
-                onClick={() => setMobileMenuOpen(false)}
-                style={{
-                  position: "fixed",
-                  inset: 0,
-                  background: "rgba(2, 6, 23, 0.42)",
-                  opacity: mobileMenuOpen ? 1 : 0,
-                  pointerEvents: mobileMenuOpen ? "auto" : "none",
-                  transition: "opacity 0.24s ease",
-                  zIndex: 60,
-                }}
-              >
-                <div
-                  onClick={(e) => e.stopPropagation()}
+          {/* TOP NAVBAR */}
+          <nav
+            style={{
+              background: "transparent",
+              backdropFilter: "none",
+              WebkitBackdropFilter: "none",
+              border: "none",
+              boxShadow: "none",
+              borderRadius: 0,
+              padding: 0,
+              marginBottom: "24px",
+              display: "flex",
+              flexDirection: "column",
+              alignItems: isMobile ? "stretch" : "center",
+              justifyContent: "center",
+              gap: "12px",
+              position: "relative",
+            }}
+          >
+            {isMobile ? (
+              <>
+                <button
+                  type="button"
+                  onClick={() => setMobileMenuOpen((prev) => !prev)}
+                  aria-label="Toggle menu"
+                  aria-expanded={mobileMenuOpen}
                   style={{
-                    display: "flex",
-                    flexDirection: "column",
-                    alignItems: "flex-start",
-                    gap: "16px",
-                    width: "min(84vw, 320px)",
-                    height: "100vh",
+                    alignSelf: "flex-end",
+                    width: "42px",
+                    height: "42px",
+                    borderRadius: "10px",
+                    border: "1px solid #cbd5e1",
                     background: "#ffffff",
-                    boxShadow: "16px 0 32px rgba(15, 23, 42, 0.22)",
-                    padding: "18px 18px 26px",
-                    boxSizing: "border-box",
-                    transform: mobileMenuOpen
-                      ? "translateX(0)"
-                      : "translateX(-105%)",
-                    transition: "transform 0.3s ease",
+                    color: "#0f172a",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    cursor: "pointer",
+                    fontSize: "22px",
+                    lineHeight: 1,
+                    padding: 0,
                   }}
                 >
-                  <button
-                    type="button"
-                    onClick={() => setMobileMenuOpen(false)}
-                    aria-label="Close menu"
+                  {mobileMenuOpen ? "x" : "\u2261"}
+                </button>
+
+                <div
+                  onClick={() => setMobileMenuOpen(false)}
+                  style={{
+                    position: "fixed",
+                    inset: 0,
+                    background: "rgba(2, 6, 23, 0.42)",
+                    opacity: mobileMenuOpen ? 1 : 0,
+                    pointerEvents: mobileMenuOpen ? "auto" : "none",
+                    transition: "opacity 0.24s ease",
+                    zIndex: 60,
+                  }}
+                >
+                  <div
+                    onClick={(e) => e.stopPropagation()}
                     style={{
-                      marginLeft: "auto",
-                      width: "40px",
-                      height: "40px",
-                      borderRadius: "10px",
-                      border: "1px solid #cbd5e1",
-                      background: "#ffffff",
-                      color: "#0f172a",
                       display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      cursor: "pointer",
-                      fontSize: "20px",
-                      lineHeight: 1,
-                      padding: 0,
+                      flexDirection: "column",
+                      alignItems: "flex-start",
+                      gap: "16px",
+                      width: "min(84vw, 320px)",
+                      height: "100vh",
+                      background: "#ffffff",
+                      boxShadow: "16px 0 32px rgba(15, 23, 42, 0.22)",
+                      padding: "18px 18px 26px",
+                      boxSizing: "border-box",
+                      transform: mobileMenuOpen
+                        ? "translateX(0)"
+                        : "translateX(-105%)",
+                      transition: "transform 0.3s ease",
                     }}
                   >
-                    x
-                  </button>
-                  <a
-                    href="#tracking"
-                    style={navLinkStyle}
-                    onClick={() => setMobileMenuOpen(false)}
-                  >
-                    Tracking
-                  </a>
-                  <a
-                    href="#schedule"
-                    style={navLinkStyle}
-                    onClick={() => setMobileMenuOpen(false)}
-                  >
-                    Schedule
-                  </a>
-                  <a
-                    href="#warehouses"
-                    style={navLinkStyle}
-                    onClick={() => setMobileMenuOpen(false)}
-                  >
-                    Warehouses
-                  </a>
-                  <a
-                    href="#pickup"
-                    style={navLinkStyle}
-                    onClick={() => setMobileMenuOpen(false)}
-                  >
-                    Book Pickup
-                  </a>
+                    <button
+                      type="button"
+                      onClick={() => setMobileMenuOpen(false)}
+                      aria-label="Close menu"
+                      style={{
+                        marginLeft: "auto",
+                        width: "40px",
+                        height: "40px",
+                        borderRadius: "10px",
+                        border: "1px solid #cbd5e1",
+                        background: "#ffffff",
+                        color: "#0f172a",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        cursor: "pointer",
+                        fontSize: "20px",
+                        lineHeight: 1,
+                        padding: 0,
+                      }}
+                    >
+                      x
+                    </button>
+                    <a
+                      href="#tracking"
+                      style={navLinkStyle}
+                      onClick={() => setMobileMenuOpen(false)}
+                    >
+                      Tracking
+                    </a>
+                    <a
+                      href="#schedule"
+                      style={navLinkStyle}
+                      onClick={() => setMobileMenuOpen(false)}
+                    >
+                      Schedule
+                    </a>
+                    <a
+                      href="#warehouses"
+                      style={navLinkStyle}
+                      onClick={() => setMobileMenuOpen(false)}
+                    >
+                      Warehouses
+                    </a>
+                    <a
+                      href="#pickup"
+                      style={navLinkStyle}
+                      onClick={() => setMobileMenuOpen(false)}
+                    >
+                      Book Pickup
+                    </a>
+                  </div>
                 </div>
+              </>
+            ) : (
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "18px",
+                  flexWrap: "wrap",
+                  width: "100%",
+                  justifyContent: "flex-end",
+                }}
+              >
+                <a href="#tracking" style={navLinkStyle}>
+                  Tracking
+                </a>
+                <a href="#schedule" style={navLinkStyle}>
+                  Schedule
+                </a>
+                <a href="#warehouses" style={navLinkStyle}>
+                  Warehouses
+                </a>
+                <a href="#pickup" style={navLinkStyle}>
+                  Book Pickup
+                </a>
               </div>
-            </>
-          ) : (
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: "18px",
-                flexWrap: "wrap",
-                width: "100%",
-                justifyContent: "flex-end",
-              }}
-            >
-              <a href="#tracking" style={navLinkStyle}>
-                Tracking
-              </a>
-              <a href="#schedule" style={navLinkStyle}>
-                Schedule
-              </a>
-              <a href="#warehouses" style={navLinkStyle}>
-                Warehouses
-              </a>
-              <a href="#pickup" style={navLinkStyle}>
-                Book Pickup
-              </a>
-            </div>
-          )}
-        </nav>
+            )}
+          </nav>
           <div
             style={{
               position: "absolute",
@@ -486,7 +487,6 @@ export default function Home() {
                 tracking, and pickup requests for customers who need organized,
                 professional logistics support.
               </p>
-
             </header>
 
             <div
@@ -670,13 +670,23 @@ export default function Home() {
               >
                 Schedule Contacts
               </p>
-              <p style={{ margin: "0 0 4px", fontWeight: 700, fontSize: "16px" }}>
+              <p
+                style={{ margin: "0 0 4px", fontWeight: 700, fontSize: "16px" }}
+              >
                 Lean
               </p>
-              <p style={{ margin: "0 0 10px", color: "#475569", fontSize: "14px" }}>
+              <p
+                style={{
+                  margin: "0 0 10px",
+                  color: "#475569",
+                  fontSize: "14px",
+                }}
+              >
                 09757427941
               </p>
-              <p style={{ margin: "0 0 4px", fontWeight: 700, fontSize: "16px" }}>
+              <p
+                style={{ margin: "0 0 4px", fontWeight: 700, fontSize: "16px" }}
+              >
                 Rose
               </p>
               <p style={{ margin: 0, color: "#475569", fontSize: "14px" }}>
@@ -840,9 +850,7 @@ export default function Home() {
             >
               <div style={warehouseSmallCardStyle}>
                 <p style={warehouseInfoLabelStyle}>Contact Person</p>
-                <p style={warehouseSmallValueStyle}>
-                  Rose
-                </p>
+                <p style={warehouseSmallValueStyle}>Rose</p>
               </div>
 
               <div style={warehouseSmallCardStyle}>
@@ -959,11 +967,15 @@ export default function Home() {
                   padding: "16px 24px",
                   borderRadius: "14px",
                   border: "none",
-                  background: pickupSubmitState.isSubmitting ? "#93c5fd" : "#2563eb",
+                  background: pickupSubmitState.isSubmitting
+                    ? "#93c5fd"
+                    : "#2563eb",
                   color: "#ffffff",
                   fontSize: "15px",
                   fontWeight: 700,
-                  cursor: pickupSubmitState.isSubmitting ? "not-allowed" : "pointer",
+                  cursor: pickupSubmitState.isSubmitting
+                    ? "not-allowed"
+                    : "pointer",
                   boxShadow: "0 10px 20px rgba(37, 99, 235, 0.18)",
                 }}
               >
@@ -976,7 +988,9 @@ export default function Home() {
                   style={{
                     margin: "12px 0 0",
                     color:
-                      pickupSubmitState.type === "error" ? "#b91c1c" : "#15803d",
+                      pickupSubmitState.type === "error"
+                        ? "#b91c1c"
+                        : "#15803d",
                     fontSize: "14px",
                     fontWeight: 600,
                   }}

@@ -26,11 +26,11 @@ const admin = require("firebase-admin");
 
 // Internal modules
 const { buildStatusSMS } = require("./buildStatusSMS");
-const { calculateSmsCost } = require("../../shared/sms-cost");
-const { DELAY_REASONS } = require("../../shared/delay-reasons");
-const { buildSmsSignature } = require("../../shared/sms-suppression"); // you said you have this
-const { writeAuditEvent } = require("../../shared/audit"); // you said you have this
-const { assertAdminOrManager } = require("../system/authGuards");
+const { calculateSmsCost } = require("../../../shared/sms-cost");
+const { DELAY_REASONS } = require("../../../shared/delay-reasons");
+const { buildSmsSignature } = require("../../../shared/sms-suppression"); // you said you have this
+const { writeAuditEvent } = require("../../../shared/audit"); // you said you have this
+const { assertAdminOrManager } = require("../../system/authGuards");
 
 if (!admin.apps.length) admin.initializeApp();
 const db = admin.firestore();

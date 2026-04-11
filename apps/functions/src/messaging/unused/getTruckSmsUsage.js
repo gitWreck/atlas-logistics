@@ -1,7 +1,7 @@
 "use strict";
 
 const { onCall } = require("firebase-functions/v2/https");
-const { db, requireRole } = require("../../_shared");
+const { db, requireRole } = require("../../../_shared");
 
 exports.getTruckSmsUsage = onCall(async (req) => {
   await requireRole(req, ["admin", "manager"]);

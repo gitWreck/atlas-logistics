@@ -5,12 +5,10 @@ const { onDocumentUpdated } = require("firebase-functions/v2/firestore");
 const { defineSecret } = require("firebase-functions/params");
 const admin = require("firebase-admin");
 
-const { buildStatusSMS } = require(path.join(
-  __dirname,
-  "../messaging/",
-  "buildStatusSMS"
-));
-const { buildSmsSignature } = require("../../shared/sms-suppression");
+const { buildStatusSMS } = require(
+  path.join(__dirname, "../messaging/", "buildStatusSMS"),
+);
+const { buildSmsSignature } = require("../../../shared/sms-suppression");
 
 if (!admin.apps.length) admin.initializeApp();
 const db = admin.firestore();
@@ -77,5 +75,5 @@ exports.autoStatusSMS = onDocumentUpdated(
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
       attempts: 0,
     });
-  }
+  },
 );

@@ -117,31 +117,6 @@ exports.updatePackageStatus = onCall(
         });
       }
     });
-
-<<<<<<< HEAD
-    // 3. Recalculate Totals
-    const loadedCount = newPkgArray.filter((p) => p.status === "LOADED").length;
-    const totalCount = newPkgArray.length;
-
-    let newStatus = "RECEIVED";
-    if (loadedCount === totalCount) newStatus = "LOADED";
-    else if (loadedCount > 0) newStatus = "PARTIALLY_LOADED";
-
-    // 4. Save
-    tx.update(shipmentRef, {
-      packages: newPkgArray,
-      status: newStatus,
-      loadedCount: loadedCount,
-      "totals.loaded": loadedCount,
-      "totals.pending": totalCount - loadedCount,
-      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-    });
-  });
-
-  return { success: true };
-});
-=======
     return { success: true };
   },
 );
->>>>>>> 1e96fa07aebda305237fba42d8e25897dacf33eb

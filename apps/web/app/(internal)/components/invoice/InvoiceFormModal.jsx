@@ -9,79 +9,21 @@ import {
 } from "@fortawesome/free-solid-svg-icons";
 import { getModalThemeClasses } from "@/app/utility/constant/theme";
 import { getModalActionClasses } from "@/app/utility/constant/action";
-
-function buildInitialForm(shipment, invoice, mode) {
-  if (mode === "edit" && invoice) {
-    return {
-      shipmentId: invoice.shipmentId || shipment?.id || "",
-      shipmentTrackingNumber:
-        invoice.shipmentTrackingNumber ||
-        shipment?.trackingNumber ||
-        shipment?.id ||
-        "",
-      invoiceNumber: invoice.invoiceNumber || "",
-      invoiceDate: invoice.invoiceDate || "",
-      dueDate: invoice.dueDate || "",
-      billingName: invoice.billingName || shipment?.sender?.name || "",
-      billingAddress:
-        invoice.billingAddress || shipment?.sender?.formattedAddress || "",
-      senderName: invoice.senderName || shipment?.sender?.name || "",
-      senderPhone: invoice.senderPhone || shipment?.sender?.phone || "",
-      recipientName: invoice.recipientName || shipment?.recipient?.name || "",
-      recipientPhone:
-        invoice.recipientPhone || shipment?.recipient?.phone || "",
-      origin: invoice.origin || shipment?.origin || "",
-      destination: invoice.destination || shipment?.destination || "",
-      routeLabel:
-        invoice.routeLabel ||
-        `${shipment?.origin || "Unknown"} → ${shipment?.destination || "Unknown"}`,
-      shipmentStatus: invoice.shipmentStatus || shipment?.status || "",
-      truckTripId: invoice.truckTripId || shipment?.currentTruckTripId || "",
-      totalPackages: invoice.totalPackages || shipment?.packages?.length || 0,
-      totalItems: invoice.totalItems || shipment?.totals?.totalItems || 0,
-      amount: invoice.amount ?? 0,
-      notes: invoice.notes || "",
-      status: invoice.status || "DRAFT",
-      shipmentSnapshot: invoice.shipmentSnapshot || shipment || null,
-    };
-  }
-
-  return {
-    shipmentId: shipment?.id || "",
-    shipmentTrackingNumber: shipment?.trackingNumber || shipment?.id || "",
-    invoiceNumber: "",
-    invoiceDate: "",
-    dueDate: "",
-    billingName: shipment?.sender?.name || "",
-    billingAddress: shipment?.sender?.formattedAddress || "",
-    senderName: shipment?.sender?.name || "",
-    senderPhone: shipment?.sender?.phone || "",
-    recipientName: shipment?.recipient?.name || "",
-    recipientPhone: shipment?.recipient?.phone || "",
-    origin: shipment?.origin || "",
-    destination: shipment?.destination || "",
-    routeLabel: `${shipment?.origin || "Unknown"} → ${shipment?.destination || "Unknown"}`,
-    shipmentStatus: shipment?.status || "",
-    truckTripId: shipment?.currentTruckTripId || "",
-    totalPackages: shipment?.packages?.length || 0,
-    totalItems: shipment?.totals?.totalItems || 0,
-    amount: 0,
-    notes: "",
-    status: "DRAFT",
-    shipmentSnapshot: shipment || null,
-  };
-}
+import { buildInitialForm } from "./utils";
 
 export default function InvoiceFormModal({
   isOpen = false,
   mode = "create",
   shipment = null,
   invoice = null,
+  eligibleShipments = [],
   onClose,
   onSubmit,
   isDark = false,
 }) {
   const [form, setForm] = useState(buildInitialForm(shipment, invoice, mode));
+  const [shipmentQuery, setShipmentQuery] = useState("");
+  const [showShipmentDropdown, setShowShipmentDropdown] = useState(false);
 
   const modalTheme = getModalThemeClasses(isDark);
   const actionTheme = getModalActionClasses();
@@ -97,6 +39,21 @@ export default function InvoiceFormModal({
   const updateField = (key, value) => {
     setForm((prev) => ({ ...prev, [key]: value }));
   };
+
+  const filteredShipments = eligibleShipments.filter((item) => {
+    const keyword = shipmentQuery.toLowerCase();
+
+    return `
+    ${item.id || ""}
+    ${item.sender?.name || ""}
+    ${item.recipient?.name || ""}
+    ${item.origin || ""}
+    ${item.destination || ""}
+    ${item.currentTruckTripId || ""}
+  `
+      .toLowerCase()
+      .includes(keyword);
+  });
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -158,33 +115,98 @@ export default function InvoiceFormModal({
                     </p>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
-                    <div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+                    <div className="relative">
                       <label
                         className={`text-xs font-semibold ${modalTheme.label}`}
                       >
-                        Shipment ID
+                        Shipment
                       </label>
-                      <input
-                        type="text"
-                        value={form.shipmentId}
-                        readOnly
-                        className={`w-full rounded-lg border px-3 py-2 text-sm mt-1 ${modalTheme.input}`}
-                      />
-                    </div>
 
-                    <div>
-                      <label
-                        className={`text-xs font-semibold ${modalTheme.label}`}
-                      >
-                        Tracking Number
-                      </label>
                       <input
                         type="text"
-                        value={form.shipmentTrackingNumber}
-                        readOnly
+                        value={
+                          mode === "edit"
+                            ? form.shipmentId || ""
+                            : shipmentQuery
+                        }
+                        placeholder="Search shipment ID, sender, recipient..."
+                        disabled={mode === "edit"}
+                        onChange={(e) => {
+                          setShipmentQuery(e.target.value);
+                          setShowShipmentDropdown(true);
+                        }}
+                        onFocus={() => {
+                          if (mode !== "edit") setShowShipmentDropdown(true);
+                        }}
                         className={`w-full rounded-lg border px-3 py-2 text-sm mt-1 ${modalTheme.input}`}
                       />
+
+                      {mode !== "edit" &&
+                        showShipmentDropdown &&
+                        filteredShipments.length > 0 && (
+                          <div
+                            className={`absolute z-50 w-full mt-1 rounded-lg border shadow-xl overflow-hidden max-h-64 overflow-y-auto ${
+                              isDark
+                                ? "bg-slate-900 border-slate-700"
+                                : "bg-white border-slate-200"
+                            }`}
+                          >
+                            {filteredShipments.slice(0, 10).map((item) => (
+                              <button
+                                key={item.id}
+                                type="button"
+                                onClick={() => {
+                                  setShipmentQuery(
+                                    `${item.id} — ${item.sender?.name || "Unknown Sender"} → ${item.recipient?.name || "Unknown Recipient"}`,
+                                  );
+
+                                  setForm((prev) => ({
+                                    ...prev,
+                                    shipmentId: item.id || "",
+                                    shipmentTrackingNumber:
+                                      item.trackingNumber || item.id || "",
+                                    shipmentStatus: item.status || "",
+                                    truckTripId: item.currentTruckTripId || "",
+                                    senderName: item.sender?.name || "",
+                                    senderPhone: item.sender?.phone || "",
+                                    recipientName: item.recipient?.name || "",
+                                    recipientPhone: item.recipient?.phone || "",
+                                    origin: item.origin || "",
+                                    destination: item.destination || "",
+                                    routeLabel: `${item.origin || "Unknown"} → ${item.destination || "Unknown"}`,
+                                    billingName: item.sender?.name || "",
+                                    billingAddress:
+                                      item.sender?.formattedAddress || "",
+                                    totalPackages: item.packages?.length || 0,
+                                    totalItems: item.totals?.totalItems || 0,
+                                    shipmentSnapshot: item,
+                                  }));
+
+                                  setShowShipmentDropdown(false);
+                                }}
+                                className={`w-full text-left px-3 py-2 text-xs transition-colors ${
+                                  isDark
+                                    ? "hover:bg-slate-800 text-slate-300"
+                                    : "hover:bg-slate-100 text-slate-700"
+                                }`}
+                              >
+                                <div className="font-bold">{item.id}</div>
+                                <div className="opacity-70">
+                                  {item.sender?.name || "Unknown Sender"} →{" "}
+                                  {item.recipient?.name || "Unknown Recipient"}
+                                </div>
+                                <div className="opacity-50 text-[10px]">
+                                  {item.origin || "Unknown"} →{" "}
+                                  {item.destination || "Unknown"}
+                                  {item.currentTruckTripId
+                                    ? ` • ${item.currentTruckTripId}`
+                                    : ""}
+                                </div>
+                              </button>
+                            ))}
+                          </div>
+                        )}
                     </div>
 
                     <div>
@@ -224,8 +246,8 @@ export default function InvoiceFormModal({
                     Invoice Details
                   </h3>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
-                    <div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+                    {/* <div>
                       <label
                         className={`text-xs font-semibold ${modalTheme.label}`}
                       >
@@ -240,7 +262,7 @@ export default function InvoiceFormModal({
                         placeholder="e.g. INV-202604-0001"
                         className={`w-full rounded-lg border px-3 py-2 text-sm mt-1 ${modalTheme.input}`}
                       />
-                    </div>
+                    </div> */}
 
                     <div>
                       <label

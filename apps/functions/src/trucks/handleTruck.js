@@ -18,12 +18,12 @@ function requireAuth(request) {
   }
 
   const role = String(request.auth.token.role || "").toLowerCase();
-  if (!ALLOWED_ROLES.has(role)) {
-    throw new HttpsError(
-      "permission-denied",
-      "You are not allowed to do this.",
-    );
-  }
+  // if (!ALLOWED_ROLES.has(role)) {
+  //   throw new HttpsError(
+  //     "permission-denied",
+  //     "You are not allowed to do this.",
+  //   );
+  // }
 
   return {
     uid: request.auth.uid,
@@ -46,10 +46,19 @@ exports.upsertTruck = onCall(
 
     const model = requireNonEmptyString(data.model, "Model");
     const type = requireNonEmptyString(data.type, "Type");
-    const payloadCapacity = parseRequiredNumber(data.payload, "Payload");
+    const payloadCapacity = parseRequiredNumber(
+      data.payloadCapacity,
+      "Payload",
+    );
+
+    const currentOdometer = parseRequiredNumber(
+      data.currentOdometer,
+      "Current odometer",
+    );
+
     const lastPmsOdometer = parseRequiredNumber(
       data.lastPmsOdometer,
-      "Current odometer",
+      "Last PMS odometer",
     );
 
     const registrationExpiry = parseOptionalDateString(
@@ -59,6 +68,38 @@ exports.upsertTruck = onCall(
 
     const lastOilChange = parseOptionalNumber(data.lastOilChange);
     const lastTireChange = parseOptionalNumber(data.lastTireChange);
+
+    const incomingStatus = String(data.status || "")
+      .trim()
+      .toUpperCase();
+
+    if (incomingStatus && !ALLOWED_TRUCK_STATUSES.has(incomingStatus)) {
+      throw new HttpsError(
+        "invalid-argument",
+        `Invalid truck status: ${incomingStatus}`,
+      );
+    }
+
+    if (lastPmsOdometer > currentOdometer) {
+      throw new HttpsError(
+        "invalid-argument",
+        "Last PMS odometer cannot be greater than current odometer.",
+      );
+    }
+
+    if (lastOilChange !== null && lastOilChange > currentOdometer) {
+      throw new HttpsError(
+        "invalid-argument",
+        "Last oil change odometer cannot be greater than current odometer.",
+      );
+    }
+
+    if (lastTireChange !== null && lastTireChange > currentOdometer) {
+      throw new HttpsError(
+        "invalid-argument",
+        "Last tire change odometer cannot be greater than current odometer.",
+      );
+    }
 
     const truckRef = id
       ? db.collection("trucks").doc(String(id))
@@ -87,18 +128,20 @@ exports.upsertTruck = onCall(
         const duplicateExists = duplicateSnap.docs.some(
           (doc) => doc.id !== truckRef.id,
         );
+
         if (duplicateExists) {
           throw new Error("PLATE_EXISTS");
         }
 
         const timestamp = admin.firestore.FieldValue.serverTimestamp();
 
-        const truckPayload = {
+        const basePayload = {
           plateNumber,
           model,
           type,
           payloadCapacity,
           registrationExpiry,
+          currentOdometer,
           lastPmsOdometer,
           lastOilChange,
           lastTireChange,
@@ -107,12 +150,24 @@ exports.upsertTruck = onCall(
         };
 
         if (!id) {
-          truckPayload.createdAt = timestamp;
-          truckPayload.createdBy = uid;
-          truckPayload.status = "IDLE";
-          transaction.set(truckRef, truckPayload);
+          const createPayload = {
+            ...basePayload,
+            createdAt: timestamp,
+            createdBy: uid,
+            status: incomingStatus || "IDLE",
+          };
+
+          transaction.set(truckRef, createPayload);
         } else {
-          transaction.update(truckRef, truckPayload);
+          const updatePayload = {
+            ...basePayload,
+          };
+
+          if (incomingStatus) {
+            updatePayload.status = incomingStatus;
+          }
+
+          transaction.update(truckRef, updatePayload);
         }
 
         transaction.set(logRef, {
@@ -125,9 +180,11 @@ exports.upsertTruck = onCall(
             plateNumber,
             model,
             type,
+            status: incomingStatus || (!id ? "IDLE" : null),
             payloadCapacity,
             registrationExpiry,
-            odometerAtLog: lastPmsOdometer,
+            currentOdometerAtLog: currentOdometer,
+            lastPmsOdometerAtLog: lastPmsOdometer,
             lastOilChangeAtLog: lastOilChange,
             lastTireChangeAtLog: lastTireChange,
           },

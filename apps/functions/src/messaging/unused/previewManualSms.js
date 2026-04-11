@@ -12,7 +12,7 @@
  *************************************************/
 
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
-const { assertAdminOrManager } = require("../../_shared");
+const { assertAdminOrManager } = require("../../../_shared");
 const { buildStatusSMS } = require("./buildStatusSMS");
 
 /* ======================================================
