@@ -10,7 +10,7 @@ import {
   faExclamationTriangle,
 } from "@fortawesome/free-solid-svg-icons";
 import {
-  assignShipmentToTruckTrip,
+  assignShipmentToTrip,
   updateTripStatus,
   clearTruckDelay,
   setTruckDelay,
@@ -77,9 +77,9 @@ export default function TripOperations({
                 runAction(
                   setAssignStatus,
                   () =>
-                    assignShipmentToTruckTrip({
-                      trackingDocId: assignId,
-                      truckTripId: tripId,
+                    assignShipmentToTrip({
+                      trackingShipmentId: assignId,
+                      tripId: tripId,
                     }),
                   () => {
                     setAssignId("");

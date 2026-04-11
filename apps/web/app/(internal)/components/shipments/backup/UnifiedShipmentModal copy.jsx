@@ -11,8 +11,8 @@ import {
   faTruckPickup,
   faPlus,
 } from "@fortawesome/free-solid-svg-icons";
-import ReceivePackageForm from "./ReceivePackageForm/ReceivePackageForm";
-import TripStep from "../manifests/CreateTripModal/TripStep";
+import ReceivePackageForm from "../ReceivePackageForm/ReceivePackageForm";
+import TripStep from "../../manifests/CreateTripModal/TripStep";
 import {
   createShipmentWithPackages,
   assignShipmentToTruckTrip,

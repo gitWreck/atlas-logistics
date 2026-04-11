@@ -7,7 +7,7 @@ import {
   faTimes,
   faMinusCircle,
 } from "@fortawesome/free-solid-svg-icons";
-import { unassignShipmentFromTruckTrip } from "@/app/utility/FirebaseFunctions";
+import { unassignShipmentFromTrip } from "@/app/utility/FirebaseFunctions";
 import { getModalThemeClasses } from "@/app/utility/constant/theme";
 import { getModalActionClasses } from "@/app/utility/constant/action";
 
@@ -32,9 +32,9 @@ export default function UnassignShipmentModal({
     setError("");
 
     try {
-      await unassignShipmentFromTruckTrip({
-        trackingDocId: shipment.id,
-        truckTripId: tripId,
+      await unassignShipmentFromTrip({
+        trackingShipmentId: shipment.id,
+        tripId: tripId,
       });
 
       onSuccess?.();

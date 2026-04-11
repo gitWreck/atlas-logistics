@@ -6,6 +6,7 @@ const functions = getFunctions(mainApp, "asia-southeast1");
 
 // PACKAGES
 // export const createPackage = httpsCallable(functions, "createPackage");
+export const createShipment = httpsCallable(functions, "createShipment");
 export const createShipmentBundle = httpsCallable(
   functions,
   "createShipmentBundle",
@@ -30,11 +31,11 @@ export const updateShipmentPackages = httpsCallable(
 
 // TRIPS
 export const createTruckTrip = httpsCallable(functions, "createTruckTrip");
-export const assignShipmentToTruckTrip = httpsCallable(
+export const assignShipmentToTrip = httpsCallable(
   functions,
   "assignShipmentToTruckTrip",
 );
-export const unassignShipmentFromTruckTrip = httpsCallable(
+export const unassignShipmentFromTrip = httpsCallable(
   functions,
   "unassignShipmentFromTruckTrip",
 );
@@ -45,22 +46,19 @@ export const updateTripStatus = httpsCallable(functions, "updateTripStatus");
 export const resolveDelay = httpsCallable(functions, "resolveDelayReport");
 
 // DRIVERS
-// export const assignDriverToTruckTrip = httpsCallable(
-//   functions,
-//   "assignDriverToTruckTrip",
-// );
-// export const unassignDriverFromTruckTrip = httpsCallable(
-//   functions,
-//   "unassignDriverFromTruckTrip",
-// );
-export const removeAssignmentFromTruckTrip = httpsCallable(
+export const assignDriverToTrip = httpsCallable(
   functions,
-  "removeAssignmentFromTruckTrip",
+  "assignDriverToTrip",
 );
-export const assignmentToTruckTrip = httpsCallable(
+export const unassignDriverFromTrip = httpsCallable(
   functions,
-  "assignmentToTruckTrip",
+  "unassignDriverFromTrip",
 );
+export const removeAssignmentFromTrip = httpsCallable(
+  functions,
+  "removeAssignmentFromTrip",
+);
+export const assignmentToTrip = httpsCallable(functions, "assignmentToTrip");
 
 // SHIPMENTS
 export const generateTripManifest = httpsCallable(

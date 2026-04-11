@@ -18,7 +18,7 @@ import {
 } from "@fortawesome/free-solid-svg-icons";
 import ShipmentRow from "./ShipmentRow";
 import ShipmentDrawer from "./ShipmentDrawer";
-import UnifiedShipmentModal from "./UnifiedShipmentModal";
+import UnifiedShipmentModal from "./modals/UnifiedShipmentModal";
 import { calculateProgress } from "@/app/utility/utilities";
 import { getBoardThemeClasses } from "@/app/utility/constant/theme";
 
@@ -299,7 +299,7 @@ const PickupBoard = forwardRef(function PickupBoard(
                 <div className="col-span-2">Pickup Route</div>
                 <div className="col-span-2">Details</div>
                 <div className="col-span-3">Status</div>
-                <div className="col-span-1">Last Update</div>
+                <div className="col-span-1">Update</div>
                 <div className="col-span-1 text-right">Action</div>
               </div>
 
