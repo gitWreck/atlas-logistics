@@ -26,7 +26,7 @@ export default function LoadPackagesModal({
       // Pre-select items that are already LOADED
       const loadedIds = shipment.packages
         .filter((p) => p.status === "LOADED")
-        .map((p) => p.trackingNumber);
+        .map((p) => p.packageId || p.packageId); // Fallback to packageId if packageId is not available
       setSelectedPkgs(loadedIds);
     }
   }, [isOpen, shipment]);
@@ -39,23 +39,55 @@ export default function LoadPackagesModal({
   const modalPanel = isDark
     ? "bg-slate-900 border border-slate-700 rounded-xl w-full max-w-lg shadow-2xl flex flex-col max-h-[80vh]"
     : "bg-white border border-slate-200 rounded-xl w-full max-w-lg shadow-2xl flex flex-col max-h-[80vh]";
-  const headerBg = isDark ? "p-4 border-b border-slate-800 flex justify-between items-center bg-slate-950 rounded-t-xl" : "p-4 border-b border-slate-200 flex justify-between items-center bg-slate-50 rounded-t-xl";
-  const headerTitle = isDark ? "font-bold text-white flex items-center gap-2" : "font-bold text-slate-900 flex items-center gap-2";
-  const headerSub = isDark ? "text-xs text-slate-500 font-mono mt-1" : "text-xs text-slate-600 font-mono mt-1";
-  const closeBtn = isDark ? "text-slate-500 hover:text-white" : "text-slate-500 hover:text-slate-900";
-  const toolbar = isDark ? "p-3 bg-slate-900 border-b border-slate-800 flex justify-between items-center" : "p-3 bg-slate-50 border-b border-slate-200 flex justify-between items-center";
-  const toolbarLabel = isDark ? "text-xs font-bold text-slate-400" : "text-xs font-bold text-slate-600";
+  const headerBg = isDark
+    ? "p-4 border-b border-slate-800 flex justify-between items-center bg-slate-950 rounded-t-xl"
+    : "p-4 border-b border-slate-200 flex justify-between items-center bg-slate-50 rounded-t-xl";
+  const headerTitle = isDark
+    ? "font-bold text-white flex items-center gap-2"
+    : "font-bold text-slate-900 flex items-center gap-2";
+  const headerSub = isDark
+    ? "text-xs text-slate-500 font-mono mt-1"
+    : "text-xs text-slate-600 font-mono mt-1";
+  const closeBtn = isDark
+    ? "text-slate-500 hover:text-white"
+    : "text-slate-500 hover:text-slate-900";
+  const toolbar = isDark
+    ? "p-3 bg-slate-900 border-b border-slate-800 flex justify-between items-center"
+    : "p-3 bg-slate-50 border-b border-slate-200 flex justify-between items-center";
+  const toolbarLabel = isDark
+    ? "text-xs font-bold text-slate-400"
+    : "text-xs font-bold text-slate-600";
   const toolbarCount = isDark ? "text-white" : "text-slate-900";
-  const toggleAllBtn = isDark ? "text-xs text-blue-400 hover:text-blue-300 font-bold underline" : "text-xs text-blue-600 hover:text-blue-700 font-bold underline";
-  const itemChecked = isDark ? "bg-blue-600/10 border-blue-500/50" : "bg-blue-50 border-blue-300";
-  const itemUnchecked = isDark ? "bg-slate-800 border-slate-700 hover:border-slate-600" : "bg-white border-slate-200 hover:border-slate-300";
-  const checkboxChecked = isDark ? "bg-blue-500 border-blue-500 text-white" : "bg-blue-600 border-blue-600 text-white";
-  const checkboxUnchecked = isDark ? "border-slate-600 bg-slate-900" : "border-slate-300 bg-slate-100";
-  const itemDesc = isDark ? "text-xs font-bold text-slate-200" : "text-xs font-bold text-slate-800";
-  const itemMono = isDark ? "text-[10px] text-slate-500 font-mono" : "text-[10px] text-slate-600 font-mono";
-  const itemWeight = isDark ? "text-xs font-mono text-slate-500" : "text-xs font-mono text-slate-600";
-  const footer = isDark ? "p-4 border-t border-slate-800 bg-slate-900 rounded-b-xl flex gap-3" : "p-4 border-t border-slate-200 bg-slate-50 rounded-b-xl flex gap-3";
-  const cancelBtn = isDark ? "flex-1 py-2 rounded-lg border border-slate-700 text-slate-400 hover:bg-slate-800 text-xs font-bold" : "flex-1 py-2 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-100 text-xs font-bold";
+  const toggleAllBtn = isDark
+    ? "text-xs text-blue-400 hover:text-blue-300 font-bold underline"
+    : "text-xs text-blue-600 hover:text-blue-700 font-bold underline";
+  const itemChecked = isDark
+    ? "bg-blue-600/10 border-blue-500/50"
+    : "bg-blue-50 border-blue-300";
+  const itemUnchecked = isDark
+    ? "bg-slate-800 border-slate-700 hover:border-slate-600"
+    : "bg-white border-slate-200 hover:border-slate-300";
+  const checkboxChecked = isDark
+    ? "bg-blue-500 border-blue-500 text-white"
+    : "bg-blue-600 border-blue-600 text-white";
+  const checkboxUnchecked = isDark
+    ? "border-slate-600 bg-slate-900"
+    : "border-slate-300 bg-slate-100";
+  const itemDesc = isDark
+    ? "text-xs font-bold text-slate-200"
+    : "text-xs font-bold text-slate-800";
+  const itemMono = isDark
+    ? "text-[10px] text-slate-500 font-mono"
+    : "text-[10px] text-slate-600 font-mono";
+  const itemWeight = isDark
+    ? "text-xs font-mono text-slate-500"
+    : "text-xs font-mono text-slate-600";
+  const footer = isDark
+    ? "p-4 border-t border-slate-800 bg-slate-900 rounded-b-xl flex gap-3"
+    : "p-4 border-t border-slate-200 bg-slate-50 rounded-b-xl flex gap-3";
+  const cancelBtn = isDark
+    ? "flex-1 py-2 rounded-lg border border-slate-700 text-slate-400 hover:bg-slate-800 text-xs font-bold"
+    : "flex-1 py-2 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-100 text-xs font-bold";
 
   // Toggle Logic
   const togglePkg = (id) => {
@@ -68,7 +100,7 @@ export default function LoadPackagesModal({
     if (selectedPkgs.length === total) {
       setSelectedPkgs([]); // Deselect All
     } else {
-      setSelectedPkgs(shipment.packages.map((p) => p.trackingNumber)); // Select All
+      setSelectedPkgs(shipment.packages.map((p) => p.packageId)); // Select All
     }
   };
 
@@ -76,7 +108,7 @@ export default function LoadPackagesModal({
   const handleSave = async () => {
     setLoading(true);
     try {
-      const allIds = shipment.packages.map((p) => p.trackingNumber);
+      const allIds = shipment.packages.map((p) => p.packageId);
 
       // We need to send two requests: one to LOAD selected, one to UNLOAD deselected
       // Or simply overwrite. Here is the logic for "Syncing state"
@@ -128,9 +160,7 @@ export default function LoadPackagesModal({
               />
               Load Packages
             </h3>
-            <div className={headerSub}>
-              {shipment.trackingNumber}
-            </div>
+            <div className={headerSub}>{shipment.shipmentId}</div>
           </div>
           <button onClick={onClose} className={closeBtn}>
             <FontAwesomeIcon icon={faTimes} />
@@ -140,13 +170,11 @@ export default function LoadPackagesModal({
         {/* TOOLBAR */}
         <div className={toolbar}>
           <div className={toolbarLabel}>
-            Selected: <span className={toolbarCount}>{selectedPkgs.length}</span>{" "}
-            / {total}
+            Selected:{" "}
+            <span className={toolbarCount}>{selectedPkgs.length}</span> /{" "}
+            {total}
           </div>
-          <button
-            onClick={toggleAll}
-            className={toggleAllBtn}
-          >
+          <button onClick={toggleAll} className={toggleAllBtn}>
             {selectedPkgs.length === total ? "Deselect All" : "Select All"}
           </button>
         </div>
@@ -154,11 +182,11 @@ export default function LoadPackagesModal({
         {/* SCROLLABLE LIST */}
         <div className="flex-1 overflow-y-auto p-2 space-y-1">
           {shipment.packages?.map((pkg) => {
-            const isChecked = selectedPkgs.includes(pkg.trackingNumber);
+            const isChecked = selectedPkgs.includes(pkg.packageId);
             return (
               <div
-                key={pkg.trackingNumber}
-                onClick={() => togglePkg(pkg.trackingNumber)}
+                key={pkg.packageId}
+                onClick={() => togglePkg(pkg.packageId)}
                 className={`
                   p-3 rounded-lg border cursor-pointer flex items-center justify-between transition-all
                   ${isChecked ? itemChecked : itemUnchecked}
@@ -176,17 +204,11 @@ export default function LoadPackagesModal({
                     )}
                   </div>
                   <div>
-                    <div className={itemDesc}>
-                      {pkg.description}
-                    </div>
-                    <div className={itemMono}>
-                      {pkg.trackingNumber}
-                    </div>
+                    <div className={itemDesc}>{pkg.description}</div>
+                    <div className={itemMono}>{pkg.packageId}</div>
                   </div>
                 </div>
-                <div className={itemWeight}>
-                  {pkg.weight}kg
-                </div>
+                <div className={itemWeight}>{pkg.weight}kg</div>
               </div>
             );
           })}
@@ -194,10 +216,7 @@ export default function LoadPackagesModal({
 
         {/* FOOTER ACTIONS */}
         <div className={footer}>
-          <button
-            onClick={onClose}
-            className={cancelBtn}
-          >
+          <button onClick={onClose} className={cancelBtn}>
             Cancel
           </button>
           <button

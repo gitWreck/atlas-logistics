@@ -40,7 +40,7 @@ export default function PackageMobileCard({
             {pkg.sequence || idx + 1}
           </span>
           <div className="font-mono text-xs text-amber-500 bg-amber-500/10 px-2 py-1 rounded w-fit border border-amber-500/20">
-            {pkg.trackingNumber}
+            {pkg.packageId}
           </div>
         </div>
 

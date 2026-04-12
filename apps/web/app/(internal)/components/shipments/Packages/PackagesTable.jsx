@@ -28,7 +28,7 @@ export default function PackagesTable({ data, isDark = false }) {
 
     return packages.filter((pkg) => {
       const matchesSearch =
-        pkg.trackingNumber?.toLowerCase().includes(term) ||
+        pkg.packageId?.toLowerCase().includes(term) ||
         pkg.description?.toLowerCase().includes(term) ||
         pkg.sequence?.toString().includes(term);
 
@@ -140,7 +140,7 @@ export default function PackagesTable({ data, isDark = false }) {
               {currentPackages.length > 0 ? (
                 currentPackages.map((pkg, idx) => (
                   <PackageTableRow
-                    key={pkg.trackingNumber || idx}
+                    key={pkg.packageId || idx}
                     pkg={pkg}
                     idx={startIndex + idx}
                     shipmentData={data}
@@ -168,7 +168,7 @@ export default function PackagesTable({ data, isDark = false }) {
           {currentPackages.length > 0 ? (
             currentPackages.map((pkg, idx) => (
               <PackageMobileCard
-                key={pkg.trackingNumber || idx}
+                key={pkg.packageId || idx}
                 pkg={pkg}
                 idx={startIndex + idx}
                 shipmentData={data}

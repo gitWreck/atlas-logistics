@@ -63,7 +63,7 @@ export default function ShipmentDrawer({
             <h2
               className={`text-xl font-mono font-bold tracking-tight ${theme.title}`}
             >
-              {data.trackingNumber}
+              {data.shipmentId || "Shipment #" + data.id}
             </h2>
 
             <div className="flex gap-2 mt-2 items-center">
@@ -71,7 +71,7 @@ export default function ShipmentDrawer({
               <span
                 className={`text-xs border-l pl-2 ml-1 ${theme.mutedText} ${theme.divider}`}
               >
-                {data.route}
+                {data.route || data.originCode + " → " + data.destinationCode}
               </span>
             </div>
           </div>

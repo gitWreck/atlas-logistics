@@ -178,7 +178,8 @@ function StandardLabel({ shipment, pkg, index, total }) {
   const address = recipient.address || {};
   const qrValue = pkg.packageId || "NO_ID";
 
-  console.log("Rendering label for package:", pkg);
+  console.log("Rendering label for pkg:", pkg);
+  // console.log("Rendering label for package:", pkg);
 
   return (
     <div

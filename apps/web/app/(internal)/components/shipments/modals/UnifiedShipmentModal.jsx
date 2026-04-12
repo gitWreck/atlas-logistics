@@ -17,6 +17,7 @@ import {
   assignShipmentToTrip,
   // createShipmentWithPackages,
   // createShipmentBundle,
+  createShipment,
 } from "@/app/utility/FirebaseFunctions";
 import { useAlert } from "@/app/context/AlertContext";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
@@ -141,7 +142,7 @@ export default function UnifiedShipmentModal({
         sender: {
           name: shipmentDraft.sender.name,
           phone: shipmentDraft.sender.phone,
-          details: {
+          address: {
             unit: shipmentDraft.sender.unit,
             street: shipmentDraft.sender.street,
             barangay: shipmentDraft.sender.barangay,
@@ -152,7 +153,7 @@ export default function UnifiedShipmentModal({
         recipient: {
           name: shipmentDraft.recipient.name,
           phone: shipmentDraft.recipient.phone,
-          details: {
+          address: {
             unit: shipmentDraft.recipient.unit,
             street: shipmentDraft.recipient.street,
             barangay: shipmentDraft.recipient.barangay,

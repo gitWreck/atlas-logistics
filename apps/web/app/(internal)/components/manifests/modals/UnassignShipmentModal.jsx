@@ -88,7 +88,7 @@ export default function UnassignShipmentModal({
                       : "bg-red-500/5 border border-red-500/10"
                   }`}
                 >
-                  {shipment.trackingNumber}
+                  {shipment.shipmentId || "Shipment #" + shipment.id}
                 </span>{" "}
                 from this trip. It will be returned to{" "}
                 <b>Received / Warehouse</b> status.

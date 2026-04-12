@@ -1,8 +1,8 @@
-import { updatePackageStatus } from "@/app/utility/FirebaseFunctions";
 import { useState } from "react";
 import { createPortal } from "react-dom";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faCircleNotch } from "@fortawesome/free-solid-svg-icons";
+import { updatePackageStatus } from "@/app/utility/FirebaseFunctions";
 
 export default function PackageActionModal({
   pkg,
@@ -20,7 +20,7 @@ export default function PackageActionModal({
     try {
       await updatePackageStatus({
         shipmentId,
-        packageId: pkg.trackingNumber,
+        packageId: pkg.packageId,
         newStatus: actionType,
         manualQty: updateAll ? pkg.quantity : manualQty,
         updateAll: updateAll,
@@ -68,7 +68,7 @@ export default function PackageActionModal({
           }`}
         >
           <div className="flex justify-between font-mono text-amber-500 mb-1">
-            <span>{pkg.trackingNumber}</span>
+            <span>{pkg.packageId}</span>
             <span className="text-slate-500">{pkg.packagingType}</span>
           </div>
           <div className={isDark ? "text-slate-400" : "text-slate-600"}>
