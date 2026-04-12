@@ -660,6 +660,14 @@ export function getModalThemeClasses(isDark) {
 
     accentText: isDark ? "text-blue-400" : "text-blue-600",
 
+    processLoading: isDark ? "bg-slate-900/80" : "bg-white/90",
+    notifySendSms: isDark ? "text-emerald-400" : "text-emerald-600",
+
+    checkboxActive: isDark
+      ? "border-slate-700 bg-slate-800 focus:ring-offset-slate-900"
+      : "border-slate-300 bg-white focus:ring-offset-white",
+
+    spanText: isDark ? "text-slate-200" : "text-slate-800",
     // --------------------------------
 
     helperText: "text-slate-500",

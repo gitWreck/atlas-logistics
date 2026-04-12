@@ -55,7 +55,7 @@ export async function GET(request) {
       const d = doc.data();
       return {
         id: doc.id,
-        trackingNumber: d.trackingNumber,
+        shipmentId: d.shipmentId,
         receiver: d.receiverName || "Unknown",
         area: d.destinationCity || d.destinationArea || "N/A",
         truck: d.currentTruckPlate || "—",

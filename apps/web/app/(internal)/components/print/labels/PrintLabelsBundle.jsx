@@ -79,7 +79,7 @@ export default function PrintLabelsBundle() {
             uniqueKey: `shipment-${shipment.id}`,
             shipment: shipment,
             pkg: {
-              trackingNumber: shipment.trackingNumber, // Shipment-Level QR
+              trackingNumber: shipment.shipmentId, // Shipment-Level QR
               description:
                 shipment.remarks || `${trueTotalQuantity} Total Pieces`,
               summaryText: summaryText || "Multiple Units", // e.g., "1 Sack, 2 Boxes"
@@ -195,7 +195,7 @@ export default function PrintLabelsBundle() {
 function StandardLabel({ shipment, pkg, totalQuantity, allPackages = [] }) {
   const recipient = shipment.recipient || {};
   const address = recipient.address || {};
-  const qrValue = shipment.trackingNumber || "NO_ID";
+  const qrValue = shipment.shipmentId || "NO_ID";
 
   return (
     <div className="w-[4in] h-[6in] bg-white border-2 border-black p-4 flex flex-col justify-between relative mx-auto shadow-2xl print:shadow-none">
@@ -236,7 +236,7 @@ function StandardLabel({ shipment, pkg, totalQuantity, allPackages = [] }) {
           <div className="flex flex-col items-center justify-center border-2 rounded-xl border-black mt-5 p-3 mb-3">
             <QRCode value={qrValue} size={170} level="M" />
             <div className="text-[13px] font-mono font-bold mt-1 tracking-tighter text-center uppercase mt-3">
-              {shipment.trackingNumber}
+              {shipment.shipmentId}
             </div>
             <div className="text-xs font-mono  mt-2 tracking-widest text-center">
               ATLAS TRACKING NUMBER

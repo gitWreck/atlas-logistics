@@ -11,8 +11,8 @@ import {
 } from "@fortawesome/free-solid-svg-icons";
 import {
   splitShipments,
-  unassignShipmentFromTruckTrip,
-  assignShipmentToTruckTrip,
+  unassignShipmentFromTrip,
+  assignShipmentToTrip,
 } from "@/app/utility/FirebaseFunctions";
 import {
   getModalThemeClasses,
@@ -61,9 +61,9 @@ export default function SplitShipmentModal({
         const currentTripId = activeTripId;
 
         setStep("Offloading shipment...");
-        await unassignShipmentFromTruckTrip({
-          trackingDocId: shipment.id,
-          truckTripId: currentTripId,
+        await unassignShipmentFromTrip({
+          trackingShipmentId: shipment.id,
+          tripId: currentTripId,
         });
 
         setStep("Splitting items...");
@@ -73,9 +73,9 @@ export default function SplitShipmentModal({
         });
 
         setStep("Loading remaining items back...");
-        await assignShipmentToTruckTrip({
-          trackingDocId: shipment.id,
-          truckTripId: currentTripId,
+        await assignShipmentToTrip({
+          trackingShipmentId: shipment.id,
+          tripId: currentTripId,
         });
       } else {
         setStep("Processing split...");

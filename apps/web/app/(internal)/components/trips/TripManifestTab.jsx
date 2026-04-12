@@ -40,7 +40,7 @@ export default function TripManifestTab({
   const filteredData = useMemo(() => {
     return shipments.filter((shipment) => {
       return (
-        (shipment.trackingNumber || "")
+        (shipment.shipmentId || "")
           .toLowerCase()
           .includes(search.toLowerCase()) ||
         (shipment.recipient?.name || "")
@@ -345,7 +345,7 @@ export default function TripManifestTab({
                         <div
                           className={`font-bold text-xs font-mono ${theme.cellPrimary}`}
                         >
-                          {shipment.trackingNumber}
+                          {shipment.shipmentId}
                         </div>
                         <div className="text-[11px] text-slate-500 truncate max-w-[150px]">
                           {shipment.recipient?.name || "Unknown"}

@@ -8,8 +8,8 @@ import {
   faSearch,
 } from "@fortawesome/free-solid-svg-icons";
 import { formatFirestoreDate } from "@/app/utility/utilities";
-import StatusBadge from "../../components/ui/StatusBadge";
 import { getUserManagementTableTheme } from "@/app/utility/constant/theme";
+import StatusBadge from "../../components/ui/StatusBadge";
 
 export default function ManagerRecentTable({
   shipments = [],
@@ -29,7 +29,7 @@ export default function ManagerRecentTable({
 
     return shipments.filter((shipment) => {
       return (
-        shipment.trackingNumber?.toLowerCase().includes(lowerTerm) ||
+        shipment.shipmentIdber?.toLowerCase().includes(lowerTerm) ||
         shipment.status?.toLowerCase().includes(lowerTerm) ||
         shipment.route?.toLowerCase().includes(lowerTerm) ||
         shipment.originCode?.toLowerCase().includes(lowerTerm) ||
@@ -120,7 +120,7 @@ export default function ManagerRecentTable({
                     <div
                       className={`font-mono font-bold truncate ${theme.cellPrimary}`}
                     >
-                      {shipment.trackingNumber || shipment.id}
+                      {shipment.shipmentIdber || shipment.id}
                     </div>
                     <div className={`text-xs truncate ${theme.cellSecondary}`}>
                       {formatFirestoreDate(shipment.updatedAt)}
@@ -192,7 +192,7 @@ export default function ManagerRecentTable({
                     <td
                       className={`px-6 py-4 font-mono font-bold ${theme.cellPrimary}`}
                     >
-                      {shipment.trackingNumber || shipment.id}
+                      {shipment.shipmentIdber || shipment.id}
                     </td>
 
                     <td className="px-6 py-4">

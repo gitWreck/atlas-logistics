@@ -46,10 +46,10 @@ export default function PackagesTable({ refreshTrigger }) {
       const lowerTerm = searchTerm.toLowerCase();
       result = result.filter(
         (pkg) =>
-          pkg.trackingNumber.toLowerCase().includes(lowerTerm) ||
+          pkg.packageId.toLowerCase().includes(lowerTerm) ||
           (pkg.description &&
             pkg.description.toLowerCase().includes(lowerTerm)) ||
-          (pkg.shipmentId && pkg.shipmentId.toLowerCase().includes(lowerTerm))
+          (pkg.shipmentId && pkg.shipmentId.toLowerCase().includes(lowerTerm)),
       );
     }
 
@@ -135,12 +135,12 @@ export default function PackagesTable({ refreshTrigger }) {
             ) : (
               filteredPackages.map((pkg) => (
                 <tr
-                  key={pkg.trackingNumber}
+                  key={pkg.packageId}
                   className="hover:bg-slate-800/40 transition-colors"
                 >
                   <td className="px-6 py-4">
                     <div className="font-mono text-blue-400 font-bold">
-                      {pkg.trackingNumber}
+                      {pkg.packageId}
                     </div>
                     <div className="text-[10px] text-slate-600">
                       Shipment: {pkg.shipmentId}

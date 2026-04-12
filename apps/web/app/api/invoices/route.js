@@ -100,8 +100,8 @@ export async function GET() {
         shipmentSnapshot: linkedShipment
           ? {
               id: data.shipmentId,
-              trackingNumber:
-                linkedShipment.trackingNumber || linkedShipment.id || doc.id,
+              shipmentId:
+                linkedShipment.shipmentId || linkedShipment.id || doc.id,
               origin: linkedShipment.origin || null,
               destination: linkedShipment.destination || null,
               status: linkedShipment.status || null,
@@ -109,7 +109,7 @@ export async function GET() {
               recipient: linkedShipment.recipient || null,
               totals: linkedShipment.totals || null,
               packages: linkedShipment.packages || [],
-              currentTruckTripId: linkedShipment.currentTruckTripId || null,
+              currentTripId: linkedShipment.currentTripId || null,
               createdAt: linkedShipment.createdAt
                 ? formatFirestoreDate(linkedShipment.createdAt)
                 : null,

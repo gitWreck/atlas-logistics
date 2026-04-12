@@ -204,8 +204,8 @@ export default function UnifiedShipmentModal({
       if (tripDecision && tripDecision.tripId) {
         const targetTripId = tripDecision.tripId;
         await assignShipmentToTrip({
-          trackingDocId: finalDocId,
-          truckTripId: targetTripId,
+          trackingShipmentId: finalDocId,
+          tripId: targetTripId,
         });
 
         setFinalTripId(targetTripId);

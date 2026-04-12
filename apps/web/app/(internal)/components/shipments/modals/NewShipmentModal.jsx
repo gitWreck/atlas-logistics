@@ -22,7 +22,7 @@ import { storage } from "@/lib/firebase";
 import { getModalThemeClasses } from "@/app/utility/constant/theme";
 import { getModalActionClasses } from "@/app/utility/constant/action";
 
-export default function UnifiedShipmentModal({
+export default function NewShipmentModal({
   profile,
   isOpen,
   onClose,
@@ -224,7 +224,7 @@ export default function UnifiedShipmentModal({
         {loading && (
           <div
             className={`absolute inset-0 z-[100] backdrop-blur-sm flex flex-col items-center justify-center ${
-              isDark ? "bg-slate-900/80" : "bg-white/90"
+              theme.processLoading
             }`}
           >
             <FontAwesomeIcon
@@ -357,7 +357,7 @@ export default function UnifiedShipmentModal({
                 {sendSms && (
                   <p
                     className={`text-xs font-bold mt-2 uppercase tracking-widest flex justify-center items-center gap-2 ${
-                      isDark ? "text-emerald-400" : "text-emerald-600"
+                      theme.notifySendSms
                     }`}
                   >
                     <FontAwesomeIcon icon={faCommentSms} />
@@ -425,20 +425,14 @@ export default function UnifiedShipmentModal({
                 <input
                   type="checkbox"
                   className={`w-4 h-4 rounded text-blue-600 focus:ring-blue-500 ${
-                    isDark
-                      ? "border-slate-700 bg-slate-800 focus:ring-offset-slate-900"
-                      : "border-slate-300 bg-white focus:ring-offset-white"
+                    theme.checkboxActive
                   }`}
                   checked={sendSms}
                   onChange={(e) => setSendSms(e.target.checked)}
                 />
                 <span
                   className={`text-xs font-bold uppercase tracking-tight ${
-                    sendSms
-                      ? isDark
-                        ? "text-slate-200"
-                        : "text-slate-800"
-                      : theme.helperText
+                    sendSms ? theme.spanText : theme.helperText
                   }`}
                 >
                   Notify Sender/Recipient via SMS

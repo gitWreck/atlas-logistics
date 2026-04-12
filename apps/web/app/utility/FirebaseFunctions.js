@@ -7,6 +7,7 @@ const functions = getFunctions(mainApp, "asia-southeast1");
 // PACKAGES
 // export const createPackage = httpsCallable(functions, "createPackage");
 export const createShipment = httpsCallable(functions, "createShipment");
+
 export const createShipmentBundle = httpsCallable(
   functions,
   "createShipmentBundle",
@@ -23,7 +24,6 @@ export const updatePackageStatus = httpsCallable(
   functions,
   "updatePackageStatus",
 );
-
 export const updateShipmentPackages = httpsCallable(
   functions,
   "updateShipmentPackages",

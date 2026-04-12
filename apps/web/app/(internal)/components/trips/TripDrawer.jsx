@@ -81,7 +81,7 @@ export default function TripDrawer({
 
     try {
       await unlockTripManifest({
-        tripDocId: data?.id || data?.tripId,
+        tripId: data?.id || data?.tripId,
         reason,
       });
 

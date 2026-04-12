@@ -62,7 +62,7 @@ export async function GET() {
     // A. Extract all Unique Trip IDs from the FILTERED shipments
     const uniqueTripIds = new Set();
     standardDocs.forEach((doc) => {
-      const tripId = doc.data().currentTruckTripId;
+      const tripId = doc.data().currentTripId;
       if (tripId) uniqueTripIds.add(tripId);
     });
 
@@ -73,7 +73,7 @@ export async function GET() {
     // A. Extract all Unique Trip IDs from the shipments
     // const uniqueTripIds = new Set();
     // snapshot.docs.forEach((doc) => {
-    //   const tripId = doc.data().currentTruckTripId;
+    //   const tripId = doc.data().currentTripId;
     //   if (tripId) uniqueTripIds.add(tripId);
     // });
 
@@ -100,8 +100,8 @@ export async function GET() {
     // ---------------------------------------------------------
     const shipments = snapshot.docs.map((doc) => {
       const data = doc.data();
-      const assignedTrip = data.currentTruckTripId
-        ? tripMap[data.currentTruckTripId]
+      const assignedTrip = data.currentTripId
+        ? tripMap[data.currentTripId]
         : null;
 
       // ✅ ADJUSTED MATH: Progress based on Bundled Quantity

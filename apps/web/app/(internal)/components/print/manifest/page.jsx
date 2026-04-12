@@ -90,7 +90,7 @@ const DestinationCard = ({ group }) => {
           {items.map((item, i) => (
             <tr key={i}>
               <td className="px-4 py-2 font-mono text-slate-700 font-medium">
-                {item.trackingNumber}
+                {item.packageId}
                 {item.note && (
                   <span className="block text-[9px] text-slate-400 font-sans">
                     {item.note}
@@ -222,7 +222,7 @@ function ManifestContent() {
         }
 
         groupedDestinations[destCode].items.push({
-          trackingNumber: ship.trackingNumber,
+          shipmentId: ship.shipmentId,
           packageCount: itemsCount, // Now correctly reflects total pieces (e.g., 50 for a sack)
           note: ship.packages?.some((p) => p.isFragile) ? "Fragile" : "",
           descriptionBreakdown: descriptionBreakdown,

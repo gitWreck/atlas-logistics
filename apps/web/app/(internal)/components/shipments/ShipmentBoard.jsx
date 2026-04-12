@@ -19,7 +19,7 @@ import {
 import ShipmentRow from "./ShipmentRow";
 import ShipmentDrawer from "./ShipmentDrawer";
 import { calculateProgress } from "@/app/utility/utilities";
-import UnifiedShipmentModal from "./modals/UnifiedShipmentModal";
+// import UnifiedShipmentModal from "./modals/UnifiedShipmentModal";
 import NewShipmentModal from "./modals/NewShipmentModal";
 import { getBoardThemeClasses } from "@/app/utility/constant/theme";
 
@@ -94,7 +94,7 @@ const ShipmentBoard = forwardRef(function ShipmentBoard(
   const filteredShipments = useMemo(() => {
     return shipments.filter((shipment) => {
       const searchContent = [
-        shipment.trackingNumber,
+        shipment.shipmentId,
         shipment.sender?.name,
         shipment.recipient?.name,
       ]
@@ -192,7 +192,7 @@ const ShipmentBoard = forwardRef(function ShipmentBoard(
 
   const handleMessageCustomer = (shipment) => {
     const phone = shipment.sender?.phone || shipment.recipient?.phone;
-    alert(`Logic to SMS ${phone} for Order ${shipment.trackingNumber}`);
+    alert(`Logic to SMS ${phone} for Order ${shipment.shipmentId}`);
   };
 
   useImperativeHandle(
