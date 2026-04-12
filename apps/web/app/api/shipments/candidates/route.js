@@ -18,7 +18,7 @@ export async function GET(request) {
     let q = adminDb
       .collection("shipments")
       .where("originCode", "==", origin)
-      .where("currentTruckTripId", "==", null) // Unassigned
+      .where("currentTripId", "==", null) // Unassigned
       .where("status", "==", "RECEIVED") // In Warehouse
       .orderBy("createdAt", "desc")
       .limit(limitSize);

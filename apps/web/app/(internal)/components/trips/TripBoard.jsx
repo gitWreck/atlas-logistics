@@ -18,10 +18,10 @@ import {
 } from "@fortawesome/free-solid-svg-icons";
 import TripRow from "./TripRow";
 import { calculateProgress } from "@/app/utility/utilities";
+import { getBoardThemeClasses } from "@/app/utility/constant/theme";
 import TripDrawer from "./TripDrawer";
 // import CreateTripModal from "../manifests/modals/CreateTripModal";
 import CreateTripModal from "./modals/CreateTripModal";
-import { getBoardThemeClasses } from "@/app/utility/constant/theme";
 import TruckScheduleOverview from "../trucks/TruckSchedule/TruckScheduleOverview";
 
 const TripBoard = forwardRef(function TripBoard(

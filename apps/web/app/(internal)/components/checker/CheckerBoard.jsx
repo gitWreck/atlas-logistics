@@ -75,7 +75,7 @@ export default function CheckerBoard({ isDark = true }) {
     // A. LOCAL PRE-CHECK (We still do this for speed!)
     // We use the 'shipments' state we fetched from API
     const match = shipments.find(
-      (s) => s.packageBarcodes?.includes(code) || s.trackingNumber === code,
+      (s) => s.packageBarcodes?.includes(code) || s.shipmentId === code,
     );
 
     if (!match) {
@@ -136,8 +136,12 @@ export default function CheckerBoard({ isDark = true }) {
     const tripCardBadge = isDark
       ? "px-2 py-1 rounded bg-slate-950 border border-slate-800 text-[10px] text-slate-500 uppercase font-bold"
       : "px-2 py-1 rounded bg-slate-100 border border-slate-200 text-[10px] text-slate-600 uppercase font-bold";
-    const tripCardRoute = isDark ? "text-sm text-slate-400 mb-1" : "text-sm text-slate-600 mb-1";
-    const tripCardDriver = isDark ? "text-xs text-slate-600" : "text-xs text-slate-500";
+    const tripCardRoute = isDark
+      ? "text-sm text-slate-400 mb-1"
+      : "text-sm text-slate-600 mb-1";
+    const tripCardDriver = isDark
+      ? "text-xs text-slate-600"
+      : "text-xs text-slate-500";
     const emptyTripsClass = isDark
       ? "text-slate-600 text-center py-10 border border-dashed border-slate-800 rounded-xl"
       : "text-slate-500 text-center py-10 border border-dashed border-slate-300 rounded-xl bg-slate-50/50";
@@ -149,7 +153,9 @@ export default function CheckerBoard({ isDark = true }) {
             <div className="inline-block p-3 rounded-full bg-blue-600/10 text-blue-500 mb-4">
               <FontAwesomeIcon icon={faTruck} size="2x" />
             </div>
-            <h1 className={`text-2xl font-bold uppercase tracking-widest ${selectTripTitle}`}>
+            <h1
+              className={`text-2xl font-bold uppercase tracking-widest ${selectTripTitle}`}
+            >
               Select Trip
             </h1>
             <p className={`${selectTripSubtitle} text-sm`}>
@@ -165,28 +171,22 @@ export default function CheckerBoard({ isDark = true }) {
                 className={tripCardClass}
               >
                 <div className="flex justify-between items-start mb-2">
-                  <span className={tripCardTitle}>
-                    {t.tripId}
-                  </span>
-                  <div className={tripCardBadge}>
-                    {t.status}
-                  </div>
+                  <span className={tripCardTitle}>{t.tripId}</span>
+                  <div className={tripCardBadge}>{t.status}</div>
                 </div>
-                <div className={tripCardRoute}>
-                  {t.route || "No Route"}
-                </div>
+                <div className={tripCardRoute}>{t.route || "No Route"}</div>
                 <div className={tripCardDriver}>
                   Driver:{" "}
-                  <span className={isDark ? "text-slate-500" : "text-slate-600"}>
+                  <span
+                    className={isDark ? "text-slate-500" : "text-slate-600"}
+                  >
                     {t.driverName || "Unassigned"}
                   </span>
                 </div>
               </button>
             ))}
             {activeTrips.length === 0 && (
-              <div className={emptyTripsClass}>
-                No active trips found.
-              </div>
+              <div className={emptyTripsClass}>No active trips found.</div>
             )}
           </div>
         </div>
@@ -209,43 +209,73 @@ export default function CheckerBoard({ isDark = true }) {
 
   // Theme-aware classes for loading view
   const loadingRootBg = isDark
-    ? (scanStatus === "SUCCESS" ? "bg-emerald-950" : scanStatus === "ERROR" ? "bg-red-950" : "bg-slate-950")
-    : (scanStatus === "SUCCESS" ? "bg-emerald-50" : scanStatus === "ERROR" ? "bg-red-50" : "bg-transparent");
+    ? scanStatus === "SUCCESS"
+      ? "bg-emerald-950"
+      : scanStatus === "ERROR"
+        ? "bg-red-950"
+        : "bg-slate-950"
+    : scanStatus === "SUCCESS"
+      ? "bg-emerald-50"
+      : scanStatus === "ERROR"
+        ? "bg-red-50"
+        : "bg-transparent";
   const loadingHeader = isDark
     ? "bg-slate-900/50 backdrop-blur-md p-4 border-b border-slate-800 flex justify-between items-center sticky top-0 z-10"
     : "bg-white/80 backdrop-blur-md p-4 border-b border-slate-200 flex justify-between items-center sticky top-0 z-10";
-  const loadingHeaderLabel = isDark ? "text-[10px] text-slate-500 uppercase font-bold tracking-wider" : "text-[10px] text-slate-500 uppercase font-bold tracking-wider";
-  const loadingHeaderTitle = isDark ? "font-mono font-bold text-white text-lg leading-tight" : "font-mono font-bold text-slate-900 text-lg leading-tight";
+  const loadingHeaderLabel = isDark
+    ? "text-[10px] text-slate-500 uppercase font-bold tracking-wider"
+    : "text-[10px] text-slate-500 uppercase font-bold tracking-wider";
+  const loadingHeaderTitle = isDark
+    ? "font-mono font-bold text-white text-lg leading-tight"
+    : "font-mono font-bold text-slate-900 text-lg leading-tight";
   const exitBtn = isDark
     ? "text-xs font-bold text-slate-400 hover:text-white border border-slate-700 hover:bg-slate-800 px-4 py-2 rounded-lg transition-all"
     : "text-xs font-bold text-slate-600 hover:text-slate-900 border border-slate-200 hover:bg-slate-100 px-4 py-2 rounded-lg transition-all";
-  const progressSection = isDark ? "bg-slate-900/50 p-6 pb-8" : "bg-slate-50/80 p-6 pb-8 border-b border-slate-200";
-  const progressLabel = isDark ? "flex justify-between text-xs font-bold text-slate-400 mb-2 uppercase tracking-wide" : "flex justify-between text-xs font-bold text-slate-600 mb-2 uppercase tracking-wide";
-  const progressTrack = isDark ? "h-3 bg-slate-800 rounded-full overflow-hidden shadow-inner" : "h-3 bg-slate-200 rounded-full overflow-hidden shadow-inner";
+  const progressSection = isDark
+    ? "bg-slate-900/50 p-6 pb-8"
+    : "bg-slate-50/80 p-6 pb-8 border-b border-slate-200";
+  const progressLabel = isDark
+    ? "flex justify-between text-xs font-bold text-slate-400 mb-2 uppercase tracking-wide"
+    : "flex justify-between text-xs font-bold text-slate-600 mb-2 uppercase tracking-wide";
+  const progressTrack = isDark
+    ? "h-3 bg-slate-800 rounded-full overflow-hidden shadow-inner"
+    : "h-3 bg-slate-200 rounded-full overflow-hidden shadow-inner";
   const scannerBox = isDark
     ? "bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-2xl"
     : "bg-white border border-slate-200 rounded-2xl p-4 shadow-lg";
   const scannerInput = isDark
     ? "w-full bg-slate-950 border-2 border-slate-800 focus:border-blue-500 rounded-xl py-4 pl-4 pr-12 text-center text-white text-xl font-mono shadow-inner outline-none transition-colors placeholder:text-slate-700"
     : "w-full bg-white border-2 border-slate-200 focus:border-blue-500 rounded-xl py-4 pl-4 pr-12 text-center text-slate-900 text-xl font-mono shadow-inner outline-none transition-colors placeholder:text-slate-400";
-  const statusIdleClass = isDark ? "bg-slate-800 border-slate-700 text-slate-500" : "bg-slate-100 border-slate-200 text-slate-600";
+  const statusIdleClass = isDark
+    ? "bg-slate-800 border-slate-700 text-slate-500"
+    : "bg-slate-100 border-slate-200 text-slate-600";
   const listContainer = isDark
     ? "flex-1 bg-slate-900 border-t border-slate-800 rounded-t-3xl overflow-hidden flex flex-col"
     : "flex-1 bg-white border-t border-slate-200 rounded-t-3xl overflow-hidden flex flex-col shadow-sm";
   const listHeader = isDark
     ? "p-4 border-b border-slate-800 bg-slate-900 sticky top-0"
     : "p-4 border-b border-slate-200 bg-slate-50 sticky top-0";
-  const listHeaderText = isDark ? "text-xs font-bold text-slate-500 uppercase tracking-wider text-center" : "text-xs font-bold text-slate-600 uppercase tracking-wider text-center";
+  const listHeaderText = isDark
+    ? "text-xs font-bold text-slate-500 uppercase tracking-wider text-center"
+    : "text-xs font-bold text-slate-600 uppercase tracking-wider text-center";
   const itemLoadedClass = isDark
     ? "bg-slate-900/50 border-slate-800 opacity-60"
     : "bg-slate-50 border-slate-200 opacity-70";
   const itemActiveClass = isDark
     ? "bg-slate-800 border-slate-700 hover:border-blue-500 hover:bg-slate-700 active:scale-[0.98] shadow-md"
     : "bg-white border-slate-200 hover:border-blue-400 hover:bg-slate-50 active:scale-[0.98] shadow-sm";
-  const itemIconLoaded = isDark ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-500" : "bg-emerald-500/10 border-emerald-500/20 text-emerald-600";
-  const itemIconActive = isDark ? "bg-slate-900 border-slate-600 text-slate-500 group-hover:text-blue-400" : "bg-slate-100 border-slate-300 text-slate-600 group-hover:text-blue-600";
-  const itemTitle = isDark ? "font-mono text-sm font-bold text-white" : "font-mono text-sm font-bold text-slate-900";
-  const emptyListClass = isDark ? "text-center text-slate-600 text-sm mt-10" : "text-center text-slate-500 text-sm mt-10";
+  const itemIconLoaded = isDark
+    ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-500"
+    : "bg-emerald-500/10 border-emerald-500/20 text-emerald-600";
+  const itemIconActive = isDark
+    ? "bg-slate-900 border-slate-600 text-slate-500 group-hover:text-blue-400"
+    : "bg-slate-100 border-slate-300 text-slate-600 group-hover:text-blue-600";
+  const itemTitle = isDark
+    ? "font-mono text-sm font-bold text-white"
+    : "font-mono text-sm font-bold text-slate-900";
+  const emptyListClass = isDark
+    ? "text-center text-slate-600 text-sm mt-10"
+    : "text-center text-slate-500 text-sm mt-10";
 
   return (
     <div
@@ -254,17 +284,10 @@ export default function CheckerBoard({ isDark = true }) {
       {/* 1. HEADER */}
       <div className={loadingHeader}>
         <div>
-          <div className={loadingHeaderLabel}>
-            Loading Trip
-          </div>
-          <div className={loadingHeaderTitle}>
-            {selectedTrip.tripId}
-          </div>
+          <div className={loadingHeaderLabel}>Loading Trip</div>
+          <div className={loadingHeaderTitle}>{selectedTrip.tripId}</div>
         </div>
-        <button
-          onClick={() => setSelectedTrip(null)}
-          className={exitBtn}
-        >
+        <button onClick={() => setSelectedTrip(null)} className={exitBtn}>
           Exit
         </button>
       </div>
@@ -307,7 +330,9 @@ export default function CheckerBoard({ isDark = true }) {
               placeholder="Scan Barcode..."
               className={scannerInput}
             />
-            <div className={`absolute right-4 top-1/2 -translate-y-1/2 ${isDark ? "text-slate-600" : "text-slate-400"}`}>
+            <div
+              className={`absolute right-4 top-1/2 -translate-y-1/2 ${isDark ? "text-slate-600" : "text-slate-400"}`}
+            >
               <FontAwesomeIcon icon={faBarcode} size="lg" />
             </div>
           </form>
@@ -340,9 +365,7 @@ export default function CheckerBoard({ isDark = true }) {
       {/* 4. SHIPMENT LIST */}
       <div className={listContainer}>
         <div className={listHeader}>
-          <h3 className={listHeaderText}>
-            Tap Item for Manual Checklist
-          </h3>
+          <h3 className={listHeaderText}>Tap Item for Manual Checklist</h3>
         </div>
 
         <div className="overflow-y-auto p-4 space-y-2 pb-20">
@@ -379,10 +402,10 @@ export default function CheckerBoard({ isDark = true }) {
                     </div>
 
                     <div>
-                      <div className={itemTitle}>
-                        {s.trackingNumber}
-                      </div>
-                      <div className={`text-[10px] ${isDark ? "text-slate-500" : "text-slate-600"} mt-0.5`}>
+                      <div className={itemTitle}>{s.shipmentId}</div>
+                      <div
+                        className={`text-[10px] ${isDark ? "text-slate-500" : "text-slate-600"} mt-0.5`}
+                      >
                         {s.route || "No Route"}
                       </div>
                     </div>
@@ -405,7 +428,9 @@ export default function CheckerBoard({ isDark = true }) {
                         Done
                       </span>
                     ) : (
-                      <span className={`text-[10px] flex items-center justify-end gap-1 group-hover:text-blue-600 ${isDark ? "text-slate-600" : "text-slate-500"}`}>
+                      <span
+                        className={`text-[10px] flex items-center justify-end gap-1 group-hover:text-blue-600 ${isDark ? "text-slate-600" : "text-slate-500"}`}
+                      >
                         Manual <FontAwesomeIcon icon={faPen} size="xs" />
                       </span>
                     )}

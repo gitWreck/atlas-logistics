@@ -9,8 +9,8 @@ import {
   faClock,
 } from "@fortawesome/free-solid-svg-icons";
 import { formatFirestoreDate } from "@/app/utility/utilities";
-import StatusBadge from "../ui/StatusBadge";
 import { resolveDelay } from "@/app/utility/FirebaseFunctions";
+import StatusBadge from "../ui/StatusBadge";
 
 export default function DelayApprovalWidget({ isDark = false }) {
   const [requests, setRequests] = useState([]);
@@ -120,9 +120,7 @@ export default function DelayApprovalWidget({ isDark = false }) {
             {/* Info */}
             <div>
               <div className="flex items-center gap-2 mb-1">
-                <span
-                  className={`font-mono font-bold text-sm ${tripText}`}
-                >
+                <span className={`font-mono font-bold text-sm ${tripText}`}>
                   {req.tripId || "Unknown Trip"}
                 </span>
                 <span className={`text-xs ${timeText}`}>•</span>

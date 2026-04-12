@@ -16,8 +16,8 @@ import {
   unlockTripManifest,
 } from "@/app/utility/FirebaseFunctions";
 import { runAction } from "@/app/utility/utilities";
-import ExportTripButton from "../exports/ExportTripManifest";
 import { getDrawerThemeClasses } from "@/app/utility/constant/theme";
+import ExportTripButton from "../exports/ExportTripManifest";
 
 export default function TripDrawerFooter({
   data,
@@ -92,7 +92,7 @@ export default function TripDrawerFooter({
           onClick={() =>
             runAction(
               setLockStatus,
-              () => generateTripManifest({ tripDocId: data.tripId }),
+              () => generateTripManifest({ tripId: data.tripId }),
               () => onSuccess?.(),
             )
           }
@@ -135,7 +135,7 @@ export default function TripDrawerFooter({
           />
         )}
 
-        <StatusButton
+        {/* <StatusButton
           status={reopenStatus}
           label="Reopen"
           loadingLabel="..."
@@ -157,7 +157,7 @@ export default function TripDrawerFooter({
               );
             }
           }}
-        />
+        /> */}
       </div>
 
       <div className="flex gap-3 pt-1">

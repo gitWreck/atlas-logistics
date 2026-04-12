@@ -229,7 +229,7 @@ export default function TripOperations({
                     setDelayStatus,
                     () =>
                       setTruckDelay({
-                        truckTripId: tripId,
+                        tripId: tripId,
                         reason: finalReason,
                         notify: notifyDelay,
                       }),
@@ -261,7 +261,7 @@ export default function TripOperations({
                     setClearStatus,
                     () =>
                       clearTruckDelay({
-                        truckTripId: tripId,
+                        tripId: tripId,
                         notify: notifyDelay,
                       }),
                     () => {

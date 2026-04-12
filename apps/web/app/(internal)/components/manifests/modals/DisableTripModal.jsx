@@ -17,7 +17,7 @@ export default function DisableTripModal({ isOpen, onClose, trip, onSuccess }) {
     e.preventDefault();
     setLoading(true);
     try {
-      await disableTruckTrip({ tripDocId: trip.id, reason });
+      await disableTruckTrip({ tripId: trip.id, reason });
       onSuccess();
       onClose();
     } catch (err) {

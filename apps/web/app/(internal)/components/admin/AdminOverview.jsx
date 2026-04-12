@@ -22,8 +22,8 @@ import UserManagementTable from "./UserManagementTable";
 import DelayApprovalWidget from "../delay/DelayWidget";
 import RecentAlertsLogs from "../logs/RecentAlertsLogs";
 import RecentSmsLogs from "../logs/RecentSmsLogs";
-import { getOverviewThemeClasses } from "@/app/utility/constant/theme";
 import Statistics from "../statistics/Statistics";
+import { getOverviewThemeClasses } from "@/app/utility/constant/theme";
 
 export default function AdminOverview({ user, isDark = false }) {
   const [users, setUsers] = useState([]);

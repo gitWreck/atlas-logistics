@@ -29,7 +29,7 @@ export default function ShipmentRow({
   const totalCount = s.metrics?.totalContent || 0;
   const driverName = s.truckDetails?.driverName || "Unassigned";
 
-  const trackingNumber = s.trackingNumber || "—";
+  const trackingNumber = s.shipmentId || "—";
   const routeCode = `${s.originCode || "N/A"} -> ${s.destinationCode || "N/A"}`;
   const routeLabel = `${s.origin || "—"} -> ${s.destination || "—"}`;
   const updatedLabel = s.updatedAt || "Just now";

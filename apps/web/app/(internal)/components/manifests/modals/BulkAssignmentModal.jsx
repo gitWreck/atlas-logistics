@@ -82,7 +82,7 @@ export default function BulkAssignmentModal({
     return candidates.filter((item) => {
       const search = searchTerm.toLowerCase();
       return (
-        item.trackingNumber?.toLowerCase().includes(search) ||
+        item.shipmentId?.toLowerCase().includes(search) ||
         item.destination?.toLowerCase().includes(search) ||
         item.recipient?.name?.toLowerCase().includes(search)
       );
@@ -240,7 +240,7 @@ export default function BulkAssignmentModal({
                       <div
                         className={`font-mono font-bold ${tableTheme.cellPrimary}`}
                       >
-                        {item.trackingNumber}
+                        {item.shipmentId}
                       </div>
                       <div className={`text-xs ${tableTheme.cellSecondary}`}>
                         {item.sender?.name}

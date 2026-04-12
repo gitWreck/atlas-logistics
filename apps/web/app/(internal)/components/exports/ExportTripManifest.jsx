@@ -51,7 +51,7 @@ export default function ExportTripButton({ trip, shipments }) {
 
     // 2. Prepare Table Headers
     const tableHeaders = [
-      "Tracking Number",
+      "Shipment ID",
       "Sender",
       "Recipient",
       "Destination",
@@ -63,7 +63,7 @@ export default function ExportTripButton({ trip, shipments }) {
 
     // 3. Flatten Data (Map shipments to rows)
     const rows = shipments.map((s) => [
-      s.trackingNumber,
+      s.shipmentId,
       s.sender?.name || "—",
       s.recipient?.name || "—",
       s.recipient?.address?.city || "—",
