@@ -77,7 +77,7 @@ export default function PackageTableRow({
         </td>
 
         <td className="p-4">
-          <div className={theme.trackingBadge}>{pkg.trackingNumber}</div>
+          <div className={theme.trackingBadge}>{pkg.packageId}</div>
         </td>
 
         <td className="p-4">
