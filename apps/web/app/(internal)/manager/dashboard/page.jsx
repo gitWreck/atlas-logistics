@@ -15,6 +15,7 @@ import {
   faChevronRight,
   faPlus,
   faFileCirclePlus,
+  faFileInvoice,
 } from "@fortawesome/free-solid-svg-icons";
 import { auth } from "@/lib/firebase";
 import { useAuth } from "@/app/context/AuthContext";
