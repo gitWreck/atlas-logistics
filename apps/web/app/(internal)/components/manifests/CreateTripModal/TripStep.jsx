@@ -20,6 +20,7 @@ import { createTruckTrip } from "@/app/utility/FirebaseFunctions";
 import { useAlert } from "@/app/context/AlertContext";
 import ScheduleSection from "./ScheduleSection";
 import VehicleDetails from "./VehicleDetails";
+import TripScheduleFields from "../../trips/modals/TripScheduleFields";
 
 export default function TripStep({
   shipmentDraft,
@@ -42,7 +43,7 @@ export default function TripStep({
     originCode: shipmentDraft?.routeInfo?.originCode || "",
     destination: shipmentDraft?.routeInfo?.destination || "",
     destinationCode: destinationCode || "",
-    scheduledDeparture: "",
+    plannedDeparture: "",
     estimatedArrival: "",
     driverName: "",
     driverId: null,
@@ -281,11 +282,19 @@ export default function TripStep({
               </p>
             </div>
 
-            <ScheduleSection
+            {/* <ScheduleSection
               formData={newTripData}
               setFormData={setNewTripData}
               isDark={isDark}
+            /> */}
+
+            <TripScheduleFields
+              formData={newTripData}
+              setFormData={setNewTripData}
+              isDark={isDark}
+              // errors={scheduleErrors}
             />
+
             <VehicleDetails
               formData={newTripData}
               setFormData={setNewTripData}

@@ -32,11 +32,11 @@ export const updateShipmentPackages = httpsCallable(
 export const createTruckTrip = httpsCallable(functions, "createTruckTrip");
 export const assignShipmentToTrip = httpsCallable(
   functions,
-  "assignShipmentToTruckTrip",
+  "assignShipmentToTrip",
 );
 export const unassignShipmentFromTrip = httpsCallable(
   functions,
-  "unassignShipmentFromTruckTrip",
+  "unassignShipmentFromTrip",
 );
 
 export const updateTripSchedule = httpsCallable(
