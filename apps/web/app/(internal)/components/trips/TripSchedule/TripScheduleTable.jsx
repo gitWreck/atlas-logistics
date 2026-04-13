@@ -3,27 +3,39 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
-  faBoxesStacked,
   faChevronLeft,
   faChevronRight,
+  faEdit,
   faFilter,
   faMagnifyingGlass,
 } from "@fortawesome/free-solid-svg-icons";
-import { getTableTheme } from "@/app/utility/constant/theme";
+import {
+  getRowThemeClasses,
+  getTableTheme,
+} from "@/app/utility/constant/theme";
 import { formatFirestoreDate } from "@/app/utility/utilities";
 import {
   getTripDeparture,
   getTripDisplayId,
   getTripEta,
-  getTripRoute,
-  getTripShipmentCount,
   getTripTruckLabel,
 } from "@/app/utility/tripScheduleHelpers";
+import StatusBadge from "../../ui/StatusBadge";
+import { renderTimePair } from "../utils";
 
-export default function TruckScheduleTable({
+function getPlannedLoadingStart(trip) {
+  return trip?.plannedLoadingStart || null;
+}
+
+function getPlannedLoadingEnd(trip) {
+  return trip?.plannedLoadingEnd || null;
+}
+
+export default function TripScheduleTable({
   trips = [],
   conflicts = [],
   isDark = false,
+  onOpenTripSchedule,
 }) {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("ALL");
@@ -31,6 +43,7 @@ export default function TruckScheduleTable({
 
   const itemsPerPage = 5;
   const theme = getTableTheme(isDark);
+  const themeRow = getRowThemeClasses(isDark);
 
   const hasTripConflict = (trip) => {
     return conflicts.some(
@@ -40,10 +53,6 @@ export default function TruckScheduleTable({
         item.currentTrip?.tripId === trip.tripId ||
         item.nextTrip?.tripId === trip.tripId,
     );
-  };
-
-  const getTripStatusValue = (trip) => {
-    return String(trip.status || "").toUpperCase();
   };
 
   const filteredTrips = useMemo(() => {
@@ -61,20 +70,21 @@ export default function TruckScheduleTable({
 
       const truckLabel = String(getTripTruckLabel(trip) || "").toLowerCase();
       const tripId = String(getTripDisplayId(trip) || "").toLowerCase();
-      const route = String(getTripRoute(trip) || "").toLowerCase();
       const departure = String(
         formatFirestoreDate(getTripDeparture(trip)) || "",
       ).toLowerCase();
       const eta = String(
         formatFirestoreDate(getTripEta(trip)) || "",
       ).toLowerCase();
+      const loadingStart = String(
+        formatFirestoreDate(getPlannedLoadingStart(trip)) || "",
+      ).toLowerCase();
+      const loadingEnd = String(
+        formatFirestoreDate(getPlannedLoadingEnd(trip)) || "",
+      ).toLowerCase();
 
       const statusValue = String(trip.status || "").toUpperCase();
-
-      // hide rows not in allowed list
-      if (!allowedStatuses.includes(statusValue)) {
-        return false;
-      }
+      if (!allowedStatuses.includes(statusValue)) return false;
 
       const statusText = String(trip.status || "Scheduled").toLowerCase();
       const hasConflict = hasTripConflict(trip);
@@ -83,9 +93,10 @@ export default function TruckScheduleTable({
         !keyword ||
         truckLabel.includes(keyword) ||
         tripId.includes(keyword) ||
-        route.includes(keyword) ||
         departure.includes(keyword) ||
         eta.includes(keyword) ||
+        loadingStart.includes(keyword) ||
+        loadingEnd.includes(keyword) ||
         statusText.includes(keyword) ||
         (hasConflict && "conflict".includes(keyword));
 
@@ -118,20 +129,20 @@ export default function TruckScheduleTable({
 
   const emptyMessage =
     trips.length === 0
-      ? "No truck-linked trip schedules available."
+      ? "No trip schedules available."
       : "No matching trip schedules found.";
 
   return (
-    <div className={`rounded-2xl overflow-hidden border ${theme.container}`}>
-      {/* Header */}
+    <div
+      className={`rounded-xl overflow-hidden shadow-xl backdrop-blur-sm border mb-10 ${theme.container}`}
+    >
       <div className={`px-4 py-4 border-b ${theme.header}`}>
         <h3 className={`font-bold ${theme.headingText}`}>Schedule List</h3>
         <p className={`text-xs mt-1 ${theme.tableText}`}>
-          Planned departure and estimated arrival per truck-assigned trip
+          Planned trip movement and loading schedule
         </p>
       </div>
 
-      {/* Filters */}
       <div
         className={`px-4 py-3 border-b flex flex-col sm:flex-row gap-3 ${theme.filters}`}
       >
@@ -142,7 +153,7 @@ export default function TruckScheduleTable({
           />
           <input
             type="text"
-            placeholder="Search truck, trip, route, or status..."
+            placeholder="Search truck, trip, time, or status..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className={`w-full border rounded-lg pl-8 pr-3 py-1.5 focus:border-blue-500 outline-none transition-colors ${theme.input}`}
@@ -163,6 +174,7 @@ export default function TruckScheduleTable({
             <option value="CONFLICT">Conflict</option>
             <option value="CREATED">Created</option>
             <option value="IN_TRANSIT">In Transit</option>
+            <option value="LOADED">Loaded</option>
             <option value="ARRIVED">Arrived</option>
             <option value="COMPLETED">Completed</option>
             <option value="CANCELLED">Cancelled</option>
@@ -170,7 +182,6 @@ export default function TruckScheduleTable({
         </div>
       </div>
 
-      {/* Table */}
       <div className={theme.topDivider ? `border-t ${theme.topDivider}` : ""}>
         <div className="overflow-x-auto">
           <table className={`w-full text-sm ${theme.tableText}`}>
@@ -183,19 +194,16 @@ export default function TruckScheduleTable({
                   Trip
                 </th>
                 <th className="text-left px-4 py-3 text-[11px] uppercase font-bold">
-                  Route
+                  Departure / ETA
                 </th>
                 <th className="text-left px-4 py-3 text-[11px] uppercase font-bold">
-                  Departure
-                </th>
-                <th className="text-left px-4 py-3 text-[11px] uppercase font-bold">
-                  ETA
-                </th>
-                <th className="text-left px-4 py-3 text-[11px] uppercase font-bold">
-                  Shipments
+                  Loading Window
                 </th>
                 <th className="text-left px-4 py-3 text-[11px] uppercase font-bold">
                   Status
+                </th>
+                <th className="text-left px-4 py-3 text-[11px] uppercase font-bold">
+                  Action
                 </th>
               </tr>
             </thead>
@@ -211,47 +219,59 @@ export default function TruckScheduleTable({
                       key={trip.id || trip.tripId}
                       className={`transition-colors ${theme.rowHover}`}
                     >
-                      <td
-                        className={`px-4 py-3 font-bold ${theme.cellPrimary}`}
-                      >
-                        {getTripTruckLabel(trip)}
-                      </td>
-
-                      <td className={`px-4 py-3 ${theme.cellSecondary}`}>
-                        {getTripDisplayId(trip)}
-                      </td>
-
-                      <td className={`px-4 py-3 ${theme.cellSecondary}`}>
-                        {getTripRoute(trip)}
-                      </td>
-
-                      <td className={`px-4 py-3 ${theme.cellPrimary}`}>
-                        {formatFirestoreDate(getTripDeparture(trip))}
-                      </td>
-
-                      <td className={`px-4 py-3 ${theme.cellPrimary}`}>
-                        {formatFirestoreDate(getTripEta(trip))}
-                      </td>
-
-                      <td className={`px-4 py-3 ${theme.cellSecondary}`}>
-                        <div
-                          className={`inline-flex items-center gap-2 px-2 py-1 rounded-md border text-xs ${theme.countBadge}`}
-                        >
-                          <FontAwesomeIcon
-                            icon={faBoxesStacked}
-                            className="text-amber-500"
-                          />
-                          {getTripShipmentCount(trip)}
+                      <td className="px-4 py-3 align-top">
+                        <div className="space-y-1">
+                          <div className={`font-bold ${theme.cellPrimary}`}>
+                            {getTripTruckLabel(trip)}
+                          </div>
+                          {trip.driverName && (
+                            <div className={`text-xs ${theme.cellSecondary}`}>
+                              {trip.driverName}
+                            </div>
+                          )}
                         </div>
                       </td>
 
-                      <td className="px-4 py-3">
+                      <td className="px-4 py-3 align-top">
+                        <div className="space-y-1">
+                          <div className={`font-semibold ${theme.cellPrimary}`}>
+                            {getTripDisplayId(trip)}
+                          </div>
+                          <div className={`text-xs ${theme.cellSecondary}`}>
+                            {trip.status || "Scheduled"}
+                          </div>
+                        </div>
+                      </td>
+
+                      <td className="px-4 py-3 align-top">
+                        {renderTimePair({
+                          primaryLabel: "Departure",
+                          primaryValue: formatFirestoreDate(
+                            getTripDeparture(trip),
+                          ),
+                          secondaryLabel: "ETA",
+                          secondaryValue: formatFirestoreDate(getTripEta(trip)),
+                          theme,
+                        })}
+                      </td>
+
+                      <td className="px-4 py-3 align-top">
+                        {renderTimePair({
+                          primaryLabel: "Loading Start",
+                          primaryValue: formatFirestoreDate(
+                            getPlannedLoadingStart(trip),
+                          ),
+                          secondaryLabel: "Loading End",
+                          secondaryValue: formatFirestoreDate(
+                            getPlannedLoadingEnd(trip),
+                          ),
+                          theme,
+                        })}
+                      </td>
+
+                      <td className="px-4 py-3 align-top">
                         <div className="flex flex-wrap items-center gap-2">
-                          <span
-                            className={`inline-flex px-2 py-1 rounded-full text-[10px] border ${theme.roleBadge}`}
-                          >
-                            {statusLabel}
-                          </span>
+                          <StatusBadge status={statusLabel} isDark={isDark} />
 
                           {hasConflict && (
                             <span
@@ -262,13 +282,23 @@ export default function TruckScheduleTable({
                           )}
                         </div>
                       </td>
+                      <td className="px-4 py-3 align-top">
+                        <button
+                          type="button"
+                          onClick={() => onOpenTripSchedule(trip)}
+                          className={`w-8 h-8 rounded inline-flex items-center justify-center transition-all ${themeRow.actionButton}`}
+                          title="Edit Invoice"
+                        >
+                          <FontAwesomeIcon icon={faEdit} />
+                        </button>
+                      </td>
                     </tr>
                   );
                 })
               ) : (
                 <tr>
                   <td
-                    colSpan={7}
+                    colSpan={6}
                     className={`px-4 py-8 text-center text-sm ${theme.emptyText}`}
                   >
                     {emptyMessage}
@@ -280,7 +310,6 @@ export default function TruckScheduleTable({
         </div>
       </div>
 
-      {/* Pagination */}
       {filteredTrips.length > 0 && (
         <div
           className={`px-4 sm:px-6 py-4 border-t flex flex-col sm:flex-row justify-between items-center gap-3 text-xs ${theme.footer}`}

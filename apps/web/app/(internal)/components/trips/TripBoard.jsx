@@ -6,6 +6,7 @@ import React, {
   useEffect,
   forwardRef,
   useImperativeHandle,
+  use,
 } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
@@ -22,7 +23,8 @@ import { getBoardThemeClasses } from "@/app/utility/constant/theme";
 import TripDrawer from "./TripDrawer";
 // import CreateTripModal from "../manifests/modals/CreateTripModal";
 import CreateTripModal from "./modals/CreateTripModal";
-import TruckScheduleOverview from "../trucks/TruckSchedule/TruckScheduleOverview";
+import TripScheduleOverview from "./TripSchedule/TripScheduleOverview";
+import TripScheduleModal from "./TripSchedule/TripScheduleModal";
 
 const TripBoard = forwardRef(function TripBoard(
   { user, userRole, profile, isDark = false },
@@ -33,6 +35,10 @@ const TripBoard = forwardRef(function TripBoard(
 
   const [isNewTripModalOpen, setIsNewTripModalOpen] = useState(false);
   const [selectedTripId, setSelectedTripId] = useState(null);
+  const [selectedTripSchedule, setSelectedTripSchedule] = useState(null);
+
+  const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
+  const [tripsSchedules, setTripsSchedules] = useState([]);
 
   const [activeFilter, setActiveFilter] = useState("ALL");
   const [typeFilter, setTypeFilter] = useState("ALL");
@@ -81,6 +87,25 @@ const TripBoard = forwardRef(function TripBoard(
 
   useEffect(() => {
     fetchTrips();
+  }, []);
+
+  const fetchTripSchedules = () => {
+    try {
+      const cleaned = (trips || []).map((trip) => {
+        // remove heavy shipment data
+        const { shipments, ...rest } = trip;
+
+        return rest;
+      });
+
+      setTripsSchedules(cleaned);
+    } catch (err) {
+      console.error("Error filtering trip schedules:", err);
+    }
+  };
+
+  useEffect(() => {
+    fetchTripSchedules(); // filter the fetched trips to get only the ones needed for trip modal search input
   }, []);
 
   const filteredTrips = useMemo(() => {
@@ -157,10 +182,25 @@ const TripBoard = forwardRef(function TripBoard(
     [],
   );
 
+  const handleSaveTripSchedule = async (payload) => {
+    // call your update schedule function
+    // then refresh trips
+    // then close modal
+  };
+
   return (
     <div className={`min-h-screen font-sans ${theme.page}`}>
       <main className="max-w-7xl mx-auto p-4 sm:p-6">
-        <TruckScheduleOverview truckTrips={trips} isDark={isDark} />
+        <TripScheduleOverview
+          trips={trips}
+          isDark={isDark}
+          onOpenScheduleModal={() => setIsScheduleModalOpen(true)}
+          onOpenTripSchedule={(trip) => {
+            // setSelectedTripId(trip.id);
+            setSelectedTripSchedule(trip);
+            setIsScheduleModalOpen(true);
+          }}
+        />
         <div
           className={`rounded-xl overflow-hidden shadow-xl backdrop-blur-sm border ${theme.board}`}
         >
@@ -346,6 +386,17 @@ const TripBoard = forwardRef(function TripBoard(
         onClose={() => setSelectedTripId(null)}
         data={selectedTrip}
         onRefreshTrips={fetchTrips}
+        isDark={isDark}
+      />
+
+      <TripScheduleModal
+        isOpen={isScheduleModalOpen}
+        onClose={() => setIsScheduleModalOpen(false)}
+        onSubmit={handleSaveTripSchedule}
+        // selectedTrip={selectedTrip || null}
+        selectedTripSchedule={selectedTripSchedule}
+        trips={tripsSchedules}
+        // fetchingTrips={loading}
         isDark={isDark}
       />
 

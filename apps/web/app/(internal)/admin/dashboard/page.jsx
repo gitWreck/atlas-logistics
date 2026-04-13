@@ -92,6 +92,7 @@ export default function AdminDashboardPage() {
   const { user, profile, loading } = useAuth();
 
   const tripBoardRef = useRef(null);
+  // const tripScheduleRef = useRef(null);
   const shipmentBoardRef = useRef(null);
   const truckBoardRef = useRef(null);
   const invoiceBoardRef = useRef(null);

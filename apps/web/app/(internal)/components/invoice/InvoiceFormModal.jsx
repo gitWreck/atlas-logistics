@@ -6,6 +6,7 @@ import {
   faTimes,
   faFileInvoiceDollar,
   faFloppyDisk,
+  faCircleNotch,
 } from "@fortawesome/free-solid-svg-icons";
 import { getModalThemeClasses } from "@/app/utility/constant/theme";
 import { getModalActionClasses } from "@/app/utility/constant/action";
@@ -13,6 +14,7 @@ import { buildInitialForm } from "./utils";
 
 export default function InvoiceFormModal({
   isOpen = false,
+  loading = false,
   mode = "create",
   shipment = null,
   invoice = null,
@@ -49,7 +51,7 @@ export default function InvoiceFormModal({
     ${item.recipient?.name || ""}
     ${item.origin || ""}
     ${item.destination || ""}
-    ${item.currentTruckTripId || ""}
+    ${item.currentTripId || ""}
   `
       .toLowerCase()
       .includes(keyword);
@@ -167,7 +169,7 @@ export default function InvoiceFormModal({
                                     shipmentTrackingNumber:
                                       item.trackingNumber || item.id || "",
                                     shipmentStatus: item.status || "",
-                                    truckTripId: item.currentTruckTripId || "",
+                                    truckTripId: item.currentTripId || "",
                                     senderName: item.sender?.name || "",
                                     senderPhone: item.sender?.phone || "",
                                     recipientName: item.recipient?.name || "",
@@ -199,8 +201,8 @@ export default function InvoiceFormModal({
                                 <div className="opacity-50 text-[10px]">
                                   {item.origin || "Unknown"} →{" "}
                                   {item.destination || "Unknown"}
-                                  {item.currentTruckTripId
-                                    ? ` • ${item.currentTruckTripId}`
+                                  {item.currentTripId
+                                    ? ` • ${item.currentTripId}`
                                     : ""}
                                 </div>
                               </button>
@@ -466,10 +468,14 @@ export default function InvoiceFormModal({
                   type="submit"
                   className={`${actionTheme.primaryInlineCompact} px-4`}
                 >
-                  <span className="inline-flex items-center gap-2">
-                    <FontAwesomeIcon icon={faFloppyDisk} />
-                    {mode === "edit" ? "Save Changes" : "Save Invoice"}
-                  </span>
+                  {loading ? (
+                    <FontAwesomeIcon icon={faCircleNotch} spin />
+                  ) : (
+                    <span className="inline-flex items-center gap-2">
+                      <FontAwesomeIcon icon={faFloppyDisk} />
+                      {mode === "edit" ? "Save Changes" : "Save Invoice"}
+                    </span>
+                  )}
                 </button>
               </div>
             </form>

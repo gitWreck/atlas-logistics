@@ -149,6 +149,7 @@ const InvoiceBoard = forwardRef(function InvoiceBoard(
   };
 
   const handleOpenEdit = (invoice) => {
+    console.log("Opening edit form for invoice:", invoice);
     setFormMode("edit");
     setSelectedInvoice(invoice);
     setSelectedShipment(invoice?.shipment || null);
@@ -175,6 +176,7 @@ const InvoiceBoard = forwardRef(function InvoiceBoard(
 
   // change this to a firebase function and move to backend, then call it from here
   const handleSubmitInvoice = async (payload) => {
+    setLoading(true);
     try {
       if (!user) return;
 
@@ -194,6 +196,8 @@ const InvoiceBoard = forwardRef(function InvoiceBoard(
       handleCloseForm();
     } catch (err) {
       console.error("Error saving invoice:", err);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -259,6 +263,7 @@ const InvoiceBoard = forwardRef(function InvoiceBoard(
 
       <InvoiceFormModal
         isOpen={isFormOpen}
+        loading={loading}
         mode={formMode}
         shipment={selectedShipment}
         invoice={selectedInvoice}
@@ -268,6 +273,7 @@ const InvoiceBoard = forwardRef(function InvoiceBoard(
         onSubmit={handleSubmitInvoice}
         isDark={isDark}
       />
+
       <InvoiceDetailsModal
         isOpen={isDetailsOpen}
         invoice={selectedInvoice}
