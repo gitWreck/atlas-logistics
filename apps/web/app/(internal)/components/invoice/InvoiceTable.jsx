@@ -14,35 +14,11 @@ import {
   faCircleCheck,
   faBan,
 } from "@fortawesome/free-solid-svg-icons";
-import { getTableTheme } from "@/app/utility/constant/theme";
-
-function getStatusBadgeClass(status, isDark = false) {
-  if (status === "PAID") {
-    return isDark
-      ? "bg-emerald-500/10 text-emerald-300 border-emerald-500/20"
-      : "bg-emerald-50 text-emerald-700 border-emerald-200";
-  }
-
-  if (status === "ISSUED") {
-    return isDark
-      ? "bg-violet-500/10 text-violet-300 border-violet-500/20"
-      : "bg-violet-50 text-violet-700 border-violet-200";
-  }
-
-  if (status === "CANCELLED") {
-    return isDark
-      ? "bg-rose-500/10 text-rose-300 border-rose-500/20"
-      : "bg-rose-50 text-rose-700 border-rose-200";
-  }
-
-  return isDark
-    ? "bg-amber-500/10 text-amber-300 border-amber-500/20"
-    : "bg-amber-50 text-amber-700 border-amber-200";
-}
-
-function formatAmount(value) {
-  return `₱${Number(value || 0).toLocaleString()}`;
-}
+import {
+  getRowThemeClasses,
+  getTableTheme,
+} from "@/app/utility/constant/theme";
+import { formatAmount, StatusBadge } from "./utils";
 
 export default function InvoiceTable({
   invoices = [],
@@ -61,6 +37,7 @@ export default function InvoiceTable({
 
   const itemsPerPage = 10;
   const theme = getTableTheme(isDark);
+  const themeRow = getRowThemeClasses(isDark);
 
   const filteredInvoices = useMemo(() => {
     return invoices.filter((invoice) => {
@@ -198,7 +175,7 @@ export default function InvoiceTable({
                   </div>
 
                   <span
-                    className={`shrink-0 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase border ${getStatusBadgeClass(
+                    className={`shrink-0 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase border ${StatusBadge(
                       invoice.status || "DRAFT",
                       isDark,
                     )}`}
@@ -370,54 +347,50 @@ export default function InvoiceTable({
                     </td>
 
                     <td className="px-6 py-4">
-                      <span
-                        className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase border ${getStatusBadgeClass(
-                          invoice.status || "DRAFT",
-                          isDark,
-                        )}`}
-                      >
-                        {invoice.status || "DRAFT"}
-                      </span>
+                      <StatusBadge
+                        status={invoice.status || "DRAFT"}
+                        isDark={isDark}
+                      />
                     </td>
 
                     <td className="px-6 py-4 text-right">
-                      <div className="flex justify-end gap-1 flex-wrap">
+                      <div className="flex justify-end gap-1">
                         <button
                           type="button"
                           onClick={() => onViewInvoice?.(invoice)}
-                          className={`transition-colors p-2 rounded ${theme.editButton}`}
+                          className={`w-8 h-8 rounded inline-flex items-center justify-center transition-all ${themeRow.iconActionButton}`}
                           title="View Invoice"
                         >
                           <FontAwesomeIcon icon={faEye} />
                         </button>
 
                         {invoice.status === "DRAFT" && (
-                          <>
-                            <button
-                              type="button"
-                              onClick={() => onEditInvoice?.(invoice)}
-                              className={`transition-colors p-2 rounded ${theme.editButton}`}
-                              title="Edit Invoice"
-                            >
-                              <FontAwesomeIcon icon={faEdit} />
-                            </button>
+                          <button
+                            type="button"
+                            onClick={() => onEditInvoice?.(invoice)}
+                            className={`w-8 h-8 rounded inline-flex items-center justify-center transition-all ${themeRow.iconActionButton}`}
+                            title="Edit Invoice"
+                          >
+                            <FontAwesomeIcon icon={faEdit} />
+                          </button>
+                        )}
 
-                            <button
-                              type="button"
-                              onClick={() => onIssueInvoice?.(invoice)}
-                              className="transition-colors p-2 rounded bg-violet-600 hover:bg-violet-500 text-white"
-                              title="Issue Invoice"
-                            >
-                              <FontAwesomeIcon icon={faPaperPlane} />
-                            </button>
-                          </>
+                        {invoice.status === "DRAFT" && (
+                          <button
+                            type="button"
+                            onClick={() => onIssueInvoice?.(invoice)}
+                            className="w-8 h-8 rounded inline-flex items-center justify-center transition-all bg-violet-600 hover:bg-violet-500 text-white"
+                            title="Issue Invoice"
+                          >
+                            <FontAwesomeIcon icon={faPaperPlane} />
+                          </button>
                         )}
 
                         {invoice.status === "ISSUED" && (
                           <button
                             type="button"
                             onClick={() => onMarkPaid?.(invoice)}
-                            className="transition-colors p-2 rounded bg-emerald-600 hover:bg-emerald-500 text-white"
+                            className="w-8 h-8 rounded inline-flex items-center justify-center transition-all bg-emerald-600 hover:bg-emerald-500 text-white"
                             title="Mark Paid"
                           >
                             <FontAwesomeIcon icon={faCircleCheck} />
@@ -429,7 +402,7 @@ export default function InvoiceTable({
                             <button
                               type="button"
                               onClick={() => onCancelInvoice?.(invoice)}
-                              className="transition-colors p-2 rounded bg-rose-600 hover:bg-rose-500 text-white"
+                              className="w-8 h-8 rounded inline-flex items-center justify-center transition-all bg-rose-600 hover:bg-rose-500 text-white"
                               title="Cancel Invoice"
                             >
                               <FontAwesomeIcon icon={faBan} />

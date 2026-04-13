@@ -41,7 +41,7 @@ export default function PrintLabelsBundle() {
           // NOTE: We query the ROOT 'shipments' collection to get full package details
           const q = query(
             collection(db, "shipments"),
-            where("currentTruckTripId", "==", tripId),
+            where("currentTripId", "==", tripId),
           );
           const querySnapshot = await getDocs(q);
           querySnapshot.forEach((doc) => {

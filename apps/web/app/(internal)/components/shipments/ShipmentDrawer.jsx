@@ -15,6 +15,7 @@ import ShipmentOperations from "./ShipmentOperations";
 import ShipmentProofs from "./ShipmentProofs";
 import ShipmentTimelineTab from "./ShipmentTimelineTab";
 import { getDrawerThemeClasses } from "@/app/utility/constant/theme";
+import { TabButton } from "./utils";
 
 export default function ShipmentDrawer({
   isOpen,
@@ -141,20 +142,5 @@ export default function ShipmentDrawer({
         </div>
       </aside>
     </>
-  );
-}
-
-function TabButton({ isActive, onClick, icon, label, theme }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`flex-1 py-3 text-xs font-bold border-b-2 transition-colors flex items-center justify-center gap-2 uppercase tracking-wide ${
-        isActive ? theme.tabActive : theme.tabIdle
-      }`}
-    >
-      <FontAwesomeIcon icon={icon} />
-      {label}
-    </button>
   );
 }

@@ -14,6 +14,12 @@ import InvoiceTable from "./InvoiceTable";
 import InvoiceStatistics from "./InvoiceStatistics";
 import { getBoardThemeClasses } from "@/app/utility/constant/theme";
 import { INVOICE_STATUSES } from "@/app/utility/constant/templates";
+import {
+  createInvoice,
+  editInvoice,
+  updateInvoice,
+  updateInvoiceStatus,
+} from "@/app/utility/FirebaseFunctions";
 
 const InvoiceBoard = forwardRef(function InvoiceBoard(
   { user, isDark = false },
@@ -96,11 +102,7 @@ const InvoiceBoard = forwardRef(function InvoiceBoard(
       return {
         ...invoice,
         shipment,
-        shipmentTrackingNumber:
-          invoice.shipmentTrackingNumber ||
-          shipment?.trackingNumber ||
-          shipment?.id ||
-          "—",
+        shipmentId: invoice.shipmentId || shipment?.id || "—",
         senderName:
           invoice.senderName || shipment?.sender?.name || "Unknown Sender",
         recipientName:
@@ -176,22 +178,17 @@ const InvoiceBoard = forwardRef(function InvoiceBoard(
     try {
       if (!user) return;
 
-      const token = await user.getIdToken();
       const isEdit = formMode === "edit" && selectedInvoice?.id;
 
-      const res = await fetch(
-        isEdit ? `/api/invoices/${selectedInvoice.id}` : "/api/invoices",
-        {
-          method: isEdit ? "PUT" : "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify(payload),
-        },
-      );
-
-      if (!res.ok) throw new Error("Failed to save invoice");
+      if (isEdit) {
+        // keep existing PUT/update logic for now
+        await editInvoice({
+          invoiceId: selectedInvoice.id,
+          ...payload,
+        });
+      } else {
+        await createInvoice(payload);
+      }
 
       await fetchInvoicesAndShipments();
       handleCloseForm();
@@ -204,18 +201,10 @@ const InvoiceBoard = forwardRef(function InvoiceBoard(
     try {
       if (!user || !invoice?.id) return;
 
-      const token = await user.getIdToken();
-
-      const res = await fetch(`/api/invoices/${invoice.id}/status`, {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ status }),
+      await updateInvoiceStatus({
+        invoiceId: invoice.id,
+        status,
       });
-
-      if (!res.ok) throw new Error(`Failed to update invoice to ${status}`);
 
       await fetchInvoicesAndShipments();
 
