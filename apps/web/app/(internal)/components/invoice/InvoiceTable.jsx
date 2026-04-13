@@ -174,14 +174,10 @@ export default function InvoiceTable({
                     </div>
                   </div>
 
-                  <span
-                    className={`shrink-0 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase border ${StatusBadge(
-                      invoice.status || "DRAFT",
-                      isDark,
-                    )}`}
-                  >
-                    {invoice.status || "DRAFT"}
-                  </span>
+                  <StatusBadge
+                    status={invoice.status || "DRAFT"}
+                    isDark={isDark}
+                  />
                 </div>
 
                 <div>
