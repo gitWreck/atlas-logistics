@@ -7,7 +7,6 @@ const functions = getFunctions(mainApp, "asia-southeast1");
 // PACKAGES
 // export const createPackage = httpsCallable(functions, "createPackage");
 export const createShipment = httpsCallable(functions, "createShipment");
-
 export const createShipmentBundle = httpsCallable(
   functions,
   "createShipmentBundle",
@@ -101,6 +100,11 @@ export const broadcastTripMessage = httpsCallable(
 
 // INVOICES
 export const createInvoice = httpsCallable(functions, "createInvoice");
+export const editInvoice = httpsCallable(functions, "editInvoice");
+export const updateInvoiceStatus = httpsCallable(
+  functions,
+  "updateInvoiceStatus",
+);
 
 // ADMIN
 export const createUserProfile = httpsCallable(functions, "createUserProfile");

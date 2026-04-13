@@ -70,8 +70,8 @@ export default function InvoiceDetailsModal({
                   </div>
                   <p className={`text-sm mt-1 ${modalTheme.bodyText}`}>
                     Shipment:{" "}
-                    {invoice.shipmentTrackingNumber ||
-                      connectedShipment?.trackingNumber ||
+                    {invoice.shipmentId ||
+                      connectedShipment?.shipmentId ||
                       connectedShipment?.id ||
                       "—"}
                   </p>
@@ -185,8 +185,7 @@ export default function InvoiceDetailsModal({
                     <InfoBlock
                       label="Tracking Number"
                       value={
-                        invoice.shipmentTrackingNumber ||
-                        connectedShipment?.trackingNumber
+                        invoice.shipmentId || connectedShipment?.shipmentId
                       }
                       isDark={isDark}
                     />
@@ -208,8 +207,7 @@ export default function InvoiceDetailsModal({
                     <InfoBlock
                       label="Trip ID"
                       value={
-                        invoice.truckTripId ||
-                        connectedShipment?.currentTruckTripId
+                        invoice.truckTripId || connectedShipment?.currentTripId
                       }
                       isDark={isDark}
                     />
@@ -317,15 +315,13 @@ export default function InvoiceDetailsModal({
                   <div className="space-y-3">
                     {packages.map((pkg, index) => (
                       <div
-                        key={
-                          pkg.trackingNumber || `${pkg.description}-${index}`
-                        }
+                        key={pkg.packageId || `${pkg.description}-${index}`}
                         className={`rounded-lg border p-3 ${modalTheme.statsCard}`}
                       >
                         <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
                           <InfoBlock
                             label="Package Tracking"
-                            value={pkg.trackingNumber}
+                            value={pkg.packageId}
                             isDark={isDark}
                           />
                           <InfoBlock

@@ -71,6 +71,7 @@ function formatAmount(value) {
 }
 
 function StatusBadge({ status, isDark = false }) {
+  console.log("Rendering StatusBadge with status:", status, "isDark:", isDark);
   const tone = {
     DRAFT: isDark
       ? "bg-amber-500/10 text-amber-300 border-amber-500/20"
