@@ -18,6 +18,7 @@ import {
 import { getModalThemeClasses } from "@/app/utility/constant/theme";
 import { getModalActionClasses } from "@/app/utility/constant/action";
 import { formatAmount, StatusBadge, InfoBlock } from "./utils";
+import StatusButton from "../ui/StatusButton";
 
 export default function InvoiceDetailsModal({
   isOpen = false,
@@ -89,48 +90,58 @@ export default function InvoiceDetailsModal({
 
             <div className="p-5 sm:p-6 space-y-6 max-h-[75vh] overflow-y-auto">
               <section className="flex flex-wrap gap-2">
-                <button
-                  type="button"
+                <StatusButton
                   onClick={onEdit}
-                  className={actionTheme.secondary}
-                >
-                  <span className="inline-flex items-center gap-2">
-                    <FontAwesomeIcon icon={faPenToSquare} />
-                    Edit
-                  </span>
-                </button>
+                  icon={faPenToSquare}
+                  loadingLabel="Loading..."
+                  successLabel="Saved"
+                  errorLabel="Error"
+                  label="Edit"
+                  variant="blue"
+                  isDark={isDark}
+                  className="w-auto px-4 py-2 text-sm"
+                />
 
                 {status === "DRAFT" && (
-                  <button
-                    type="button"
+                  <StatusButton
                     onClick={onIssue}
-                    className={actionTheme.warningInline}
-                  >
-                    <FontAwesomeIcon icon={faPaperPlane} />
-                    Issue Invoice
-                  </button>
+                    icon={faPaperPlane}
+                    loadingLabel="Loading..."
+                    successLabel="Saved"
+                    errorLabel="Error"
+                    label="Issue Invoice"
+                    variant="amber"
+                    isDark={isDark}
+                    className="w-auto px-4 py-2 text-sm"
+                  />
                 )}
 
                 {status === "ISSUED" && (
-                  <button
-                    type="button"
+                  <StatusButton
                     onClick={onMarkPaid}
-                    className={actionTheme.success}
-                  >
-                    <FontAwesomeIcon icon={faCircleCheck} />
-                    Mark as Paid
-                  </button>
+                    icon={faCircleCheck}
+                    loadingLabel="Loading..."
+                    successLabel="Saved"
+                    errorLabel="Error"
+                    label="Mark as Paid"
+                    variant="emerald"
+                    isDark={isDark}
+                    className="w-auto px-4 py-2 text-sm"
+                  />
                 )}
 
                 {status !== "CANCELLED" && status !== "PAID" && (
-                  <button
-                    type="button"
+                  <StatusButton
                     onClick={onCancel}
-                    className={actionTheme.danger}
-                  >
-                    <FontAwesomeIcon icon={faBan} />
-                    Cancel Invoice
-                  </button>
+                    icon={faBan}
+                    loadingLabel="Loading..."
+                    successLabel="Saved"
+                    errorLabel="Error"
+                    label="Cancel Invoice"
+                    variant="red"
+                    isDark={isDark}
+                    className="w-auto px-4 py-2 text-sm"
+                  />
                 )}
               </section>
 

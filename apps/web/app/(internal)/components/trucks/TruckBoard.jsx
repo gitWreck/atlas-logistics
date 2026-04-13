@@ -21,7 +21,7 @@ import TruckRow from "./TruckRow";
 import TruckStatus from "./TruckStatus";
 import TruckModal from "./TruckModal";
 import { getBoardThemeClasses } from "@/app/utility/constant/theme";
-import TruckScheduleOverview from "./TruckSchedule/TruckScheduleOverview";
+import TruckScheduleOverview from "../trips/TripSchedule/TripScheduleOverview";
 
 const TruckBoard = forwardRef(function TruckBoard(
   { user, userRole, profile, isDark = false },

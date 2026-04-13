@@ -19,7 +19,7 @@ import {
   getTripTruckLabel,
 } from "@/app/utility/tripScheduleHelpers";
 
-export default function TruckScheduleSummaryCards({ summary, isDark = false }) {
+export default function TripScheduleSummaryCards({ summary, isDark = false }) {
   const theme = getOverviewThemeClasses(isDark);
   const stat = getStatCardTheme(isDark);
 

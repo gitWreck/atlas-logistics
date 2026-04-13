@@ -14,7 +14,7 @@ import {
   getTripRoute,
 } from "@/app/utility/tripScheduleHelpers";
 
-export default function TruckScheduleConflictList({
+export default function TripScheduleConflictList({
   conflicts = [],
   isDark = false,
 }) {

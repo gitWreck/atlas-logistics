@@ -12,10 +12,7 @@ import {
   getTripTruckLabel,
 } from "@/app/utility/tripScheduleHelpers";
 
-export default function TruckUpcomingDepartures({
-  trips = [],
-  isDark = false,
-}) {
+export default function TripUpcomingDepartures({ trips = [], isDark = false }) {
   const theme = getOverviewThemeClasses(isDark);
 
   return (

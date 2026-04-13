@@ -14,6 +14,7 @@ import {
   faChevronLeft,
   faChevronRight,
   faPlus,
+  faFileCirclePlus,
 } from "@fortawesome/free-solid-svg-icons";
 import { auth } from "@/lib/firebase";
 import { useAuth } from "@/app/context/AuthContext";
@@ -27,6 +28,7 @@ import TruckBoard from "../../components/trucks/TruckBoard";
 import PickupBoard from "../../components/shipments/PickupBoard";
 
 import { getDashboardThemeClasses } from "@/app/utility/constant/theme";
+import InvoiceBoard from "../../components/invoice/InvoiceBoard";
 
 const mainNavItems = [
   {
@@ -71,6 +73,7 @@ export default function ManagerDashboardPage() {
   const tripBoardRef = useRef(null);
   const shipmentBoardRef = useRef(null);
   const truckBoardRef = useRef(null);
+  const invoiceBoardRef = useRef(null);
   const mainScrollRef = useRef(null);
 
   const theme = getDashboardThemeClasses(isDark);
@@ -105,6 +108,15 @@ export default function ManagerDashboardPage() {
         icon: faPlus,
         accent: "blue",
         onClick: () => truckBoardRef.current?.openRegisterModal?.(),
+      };
+    }
+
+    if (activeTab === "invoice") {
+      return {
+        label: "Invoice",
+        icon: faFileCirclePlus,
+        accent: "emerald",
+        onClick: () => invoiceBoardRef.current?.openCreateInvoice?.(),
       };
     }
 
@@ -341,6 +353,10 @@ export default function ManagerDashboardPage() {
                 profile={profile}
                 isDark={isDark}
               />
+            )}
+
+            {activeTab === "invoice" && (
+              <InvoiceBoard ref={invoiceBoardRef} user={user} isDark={isDark} />
             )}
           </div>
         </main>
