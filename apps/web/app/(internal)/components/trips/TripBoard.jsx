@@ -25,6 +25,7 @@ import TripDrawer from "./TripDrawer";
 import CreateTripModal from "./modals/CreateTripModal";
 import TripScheduleOverview from "./TripSchedule/TripScheduleOverview";
 import TripScheduleModal from "./TripSchedule/TripScheduleModal";
+import { updateTripSchedule } from "@/app/utility/FirebaseFunctions";
 
 const TripBoard = forwardRef(function TripBoard(
   { user, userRole, profile, isDark = false },
@@ -183,9 +184,21 @@ const TripBoard = forwardRef(function TripBoard(
   );
 
   const handleSaveTripSchedule = async (payload) => {
-    // call your update schedule function
-    // then refresh trips
-    // then close modal
+    try {
+      setLoading(true);
+
+      await updateTripSchedule(payload);
+
+      await fetchTrips();
+
+      setIsScheduleModalOpen(false);
+      setSelectedTripSchedule?.(null);
+    } catch (err) {
+      console.error("Error updating trip schedule:", err);
+      alert(err.message || "Failed to update trip schedule.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -194,7 +207,10 @@ const TripBoard = forwardRef(function TripBoard(
         <TripScheduleOverview
           trips={trips}
           isDark={isDark}
-          onOpenScheduleModal={() => setIsScheduleModalOpen(true)}
+          onOpenScheduleModal={() => {
+            setSelectedTripSchedule(null);
+            setIsScheduleModalOpen(true);
+          }}
           onOpenTripSchedule={(trip) => {
             // setSelectedTripId(trip.id);
             setSelectedTripSchedule(trip);
@@ -391,12 +407,16 @@ const TripBoard = forwardRef(function TripBoard(
 
       <TripScheduleModal
         isOpen={isScheduleModalOpen}
-        onClose={() => setIsScheduleModalOpen(false)}
+        onClose={() => {
+          setSelectedTripSchedule(null);
+          setIsScheduleModalOpen(false);
+        }}
         onSubmit={handleSaveTripSchedule}
         // selectedTrip={selectedTrip || null}
         selectedTripSchedule={selectedTripSchedule}
         trips={tripsSchedules}
         // fetchingTrips={loading}
+        loading={loading}
         isDark={isDark}
       />
 

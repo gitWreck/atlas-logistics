@@ -38,6 +38,12 @@ export const unassignShipmentFromTrip = httpsCallable(
   functions,
   "unassignShipmentFromTruckTrip",
 );
+
+export const updateTripSchedule = httpsCallable(
+  functions,
+  "updateTripSchedule",
+);
+
 export const disableTruckTrip = httpsCallable(functions, "disableTruckTrip");
 export const setTruckDelay = httpsCallable(functions, "setTruckDelay");
 export const clearTruckDelay = httpsCallable(functions, "clearTruckDelay");

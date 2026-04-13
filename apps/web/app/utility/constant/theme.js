@@ -76,6 +76,17 @@ export function getOverviewThemeClasses(isDark) {
       ? "text-slate-500 hover:text-slate-300"
       : "text-slate-600 hover:text-slate-900",
 
+    overviewModernCard: isDark
+      ? "bg-slate-950/70 border-slate-800 hover:border-slate-700"
+      : "bg-white border-slate-200 hover:border-slate-300",
+
+    overviewMetaPill: isDark
+      ? "bg-slate-900/80 border-slate-700 text-slate-300"
+      : "bg-slate-50 border-slate-200 text-slate-700",
+
+    overviewStatCard: isDark
+      ? "bg-slate-900/70 border-slate-800"
+      : "bg-slate-50/80 border-slate-200",
     // ------------------------
 
     highlightText: "text-blue-500 font-bold uppercase",
