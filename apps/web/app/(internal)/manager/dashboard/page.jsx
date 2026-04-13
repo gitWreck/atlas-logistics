@@ -59,6 +59,13 @@ const mainNavItems = [
     title: "Truck Board",
     description: "Manage fleet health and availability.",
   },
+  {
+    id: "invoice",
+    label: "Invoices",
+    icon: faFileInvoice,
+    title: "Invoice Board",
+    description: "Manage invoices and payments.",
+  },
 ];
 
 export default function ManagerDashboardPage() {
