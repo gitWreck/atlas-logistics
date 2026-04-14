@@ -6,7 +6,7 @@ import QRCode from "react-qr-code";
 export default function StandardLabel({ shipment, packages, index, total }) {
   const recipient = shipment.recipient || {};
   const address = recipient.address || {};
-  const qrValue = packages?.trackingNumber || "NO_ID";
+  const qrValue = packages?.packageId || "NO_ID";
 
   console.log("Rendering label for package:", packages);
 
@@ -107,7 +107,7 @@ export default function StandardLabel({ shipment, packages, index, total }) {
       <div className="flex flex-col items-center justify-center border-4 border-black rounded-xl pt-3 pb-2 my-1">
         <QRCode value={qrValue} size={180} level="M" />
         <div className="text-xs font-mono font-bold mt-2 tracking-widest text-center">
-          {packages?.trackingNumber || "NO ID"}
+          {packages?.packageId || "NO ID"}
         </div>
         <div className="text-xs font-mono  mt-2 tracking-widest text-center">
           ATLAS TRACKING NUMBER
