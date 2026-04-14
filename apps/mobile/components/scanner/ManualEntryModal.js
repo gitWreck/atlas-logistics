@@ -44,7 +44,7 @@ export default function ManualEntryModal({ visible, onClose, onSubmit }) {
       if (!querySnap.empty) {
         const shipmentData = querySnap.docs[0].data();
         const pkg = shipmentData.packages.find(
-          (p) => p.trackingNumber === code.trim(),
+          (p) => (p.packageId || p.trackingNumber) === code.trim(),
         );
 
         const isBulk = ["Sack", "Bundle", "Roll"].includes(pkg?.packagingType);
