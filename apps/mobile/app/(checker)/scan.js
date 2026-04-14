@@ -1,6 +1,6 @@
 "use client";
-import React, { useState } from "react";
-import { View, Alert, Vibration, StyleSheet } from "react-native";
+import React, { useEffect, useRef, useState } from "react";
+import { View, Alert, Vibration, StyleSheet, Text } from "react-native";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import {
@@ -36,18 +36,34 @@ export default function ScannerScreen() {
 
   const [infoModalVisible, setInfoModalVisible] = useState(false);
   const [scannedData, setScannedData] = useState(null);
+  const [successToast, setSuccessToast] = useState("");
+  const toastTimerRef = useRef(null);
 
   const { mode, tripId } = useLocalSearchParams();
+
+  useEffect(() => {
+    return () => {
+      if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    };
+  }, []);
 
   if (!permission) return <View />;
   if (!permission.granted)
     return <PermissionRequest onRequest={requestPermission} />;
+
+  const showSuccessToast = (message) => {
+    setSuccessToast(message || "Scan successful");
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    toastTimerRef.current = setTimeout(() => setSuccessToast(""), 1800);
+  };
 
   const resetScanner = () => {
     setScanned(false);
     setProcessing(false);
     setTargetPackage(null);
     setActionModalVisible(false);
+    setInfoModalVisible(false);
+    setScannedData(null);
   };
 
   /**
@@ -74,6 +90,7 @@ export default function ScannerScreen() {
       });
 
       console.log(`Successfully updated ${barcode} to ${status}`);
+      showSuccessToast(`Scan successful: ${barcode}`);
       resetScanner();
     } catch (error) {
       Alert.alert("Action Failed", error.message, [
@@ -115,8 +132,21 @@ export default function ScannerScreen() {
       const shipmentDoc = querySnap.docs[0];
       const shipmentData = shipmentDoc.data();
       const pkg = shipmentData.packages.find(
-        (p) => p.trackingNumber === barcode,
+        (p) => p.packageId === barcode,
       );
+      if (!pkg) throw new Error("Package not found.");
+
+      // Info mode should only preview shipment details.
+      if (mode === "info") {
+        setScannedData({
+          id: shipmentDoc.id,
+          ...shipmentData,
+          scannedPackageId: pkg.packageId || barcode,
+        });
+        showSuccessToast("Scan successful");
+        setInfoModalVisible(true);
+        return;
+      }
 
       const isBulk = ["Sack", "Bundle", "Roll"].includes(pkg?.packagingType);
       const statusToApply = mode === "loading" ? "LOADED" : "RECEIVED";
@@ -178,7 +208,7 @@ export default function ScannerScreen() {
         onAction={(status, remarks, qty) => {
           executeStatusUpdate(
             parentShipmentId,
-            targetPackage.trackingNumber,
+            targetPackage.packageId,
             status,
             qty,
             remarks,
@@ -207,6 +237,12 @@ export default function ScannerScreen() {
           });
         }}
       />
+
+      {!!successToast && (
+        <View style={styles.toastContainer}>
+          <Text style={styles.toastText}>{successToast}</Text>
+        </View>
+      )}
     </View>
   );
 }
@@ -214,4 +250,20 @@ export default function ScannerScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   camera: { flex: 1 },
+  toastContainer: {
+    position: "absolute",
+    bottom: 36,
+    left: 20,
+    right: 20,
+    backgroundColor: "rgba(15, 23, 42, 0.92)",
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    alignItems: "center",
+  },
+  toastText: {
+    color: "#fff",
+    fontWeight: "700",
+    fontSize: 13,
+  },
 });

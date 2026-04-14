@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   Text,
   View,
@@ -20,6 +20,20 @@ export default function DriverScannerScreen() {
   const [permission, requestPermission] = useCameraPermissions();
   const [scanned, setScanned] = useState(false);
   const [processing, setProcessing] = useState(false);
+  const [successToast, setSuccessToast] = useState("");
+  const toastTimerRef = useRef(null);
+
+  useEffect(() => {
+    return () => {
+      if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    };
+  }, []);
+
+  const showSuccessToast = (message) => {
+    setSuccessToast(message || "Scan successful");
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    toastTimerRef.current = setTimeout(() => setSuccessToast(""), 1800);
+  };
 
   if (!permission) return <View />;
   if (!permission.granted) {
@@ -65,9 +79,10 @@ export default function DriverScannerScreen() {
       const location = await getCurrentLocationSafe();
       const result = await scanPackageFn({
         barcode: data,
-        mode: mode || "delivered", // Default to delivered for drivers
+        mode: mode || "delivering", // Cloud function expects "delivering"
         ...(location ? { location } : {}),
       });
+      showSuccessToast(result?.data?.message || "Scan successful");
 
       Alert.alert("Success", result.data.message, [
         {
@@ -132,6 +147,12 @@ export default function DriverScannerScreen() {
           <Text style={styles.instruction}>Align barcode within frame</Text>
         </View>
       </CameraView>
+
+      {!!successToast && (
+        <View style={styles.toastContainer}>
+          <Text style={styles.toastText}>{successToast}</Text>
+        </View>
+      )}
     </View>
   );
 }
@@ -197,4 +218,20 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   btnText: { fontWeight: "bold" },
+  toastContainer: {
+    position: "absolute",
+    bottom: 36,
+    left: 20,
+    right: 20,
+    backgroundColor: "rgba(15, 23, 42, 0.92)",
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    alignItems: "center",
+  },
+  toastText: {
+    color: "#fff",
+    fontWeight: "700",
+    fontSize: 13,
+  },
 });

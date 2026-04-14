@@ -32,6 +32,7 @@ export default function ShipmentDetailsScreen() {
   const [selectedIds, setSelectedIds] = useState(new Set());
   const [modalVisible, setModalVisible] = useState(false);
   const [targetPackage, setTargetPackage] = useState(null);
+  const getPackageKey = (pkg) => pkg?.packageId || pkg?.trackingNumber;
 
   useEffect(() => {
     if (!shipmentId) return;
@@ -49,13 +50,13 @@ export default function ShipmentDetailsScreen() {
 
   const filteredPackages = useMemo(() => {
     return packages.filter((p) =>
-      p.trackingNumber?.toLowerCase().includes(search.toLowerCase()),
+      getPackageKey(p)?.toLowerCase().includes(search.toLowerCase()),
     );
   }, [packages, search]);
 
   const executeAction = async (actionCode, remarks = "", quantity) => {
     const idsToUpdate = targetPackage
-      ? [targetPackage.trackingNumber]
+      ? [getPackageKey(targetPackage)]
       : Array.from(selectedIds);
 
     setActionLoading(true);
@@ -92,7 +93,7 @@ export default function ShipmentDetailsScreen() {
     }
     // For bulk selection, we sum the quantities of all selected items
     return packages
-      .filter((p) => selectedIds.has(p.trackingNumber))
+      .filter((p) => selectedIds.has(getPackageKey(p)))
       .reduce((acc, curr) => acc + (Number(curr.quantity) || 1), 0);
   };
 
@@ -146,7 +147,7 @@ export default function ShipmentDetailsScreen() {
                   setSelectedIds(new Set());
                 else
                   setSelectedIds(
-                    new Set(filteredPackages.map((p) => p.trackingNumber)),
+                    new Set(filteredPackages.map((p) => getPackageKey(p))),
                   );
               }}
             >
@@ -173,14 +174,14 @@ export default function ShipmentDetailsScreen() {
 
       <FlatList
         data={filteredPackages}
-        keyExtractor={(item) => item.trackingNumber}
+        keyExtractor={(item) => getPackageKey(item)}
         ListHeaderComponent={renderListHeader}
         stickyHeaderIndices={[0]} // This references the wrapper inside ListHeaderComponent
         contentContainerStyle={styles.list}
         renderItem={({ item }) => (
           <PackageListItem
             item={item}
-            selected={selectedIds.has(item.trackingNumber)}
+            selected={selectedIds.has(getPackageKey(item))}
             isSelectionMode={selectedIds.size > 0} // ✅ ADD THIS LINE
             onMenuPress={(pkg) => {
               setTargetPackage(pkg);
@@ -188,8 +189,9 @@ export default function ShipmentDetailsScreen() {
             }}
             onLongPress={(pkg) => {
               const next = new Set(selectedIds);
-              if (next.has(pkg.trackingNumber)) next.delete(pkg.trackingNumber);
-              else next.add(pkg.trackingNumber);
+              const packageKey = getPackageKey(pkg);
+              if (next.has(packageKey)) next.delete(packageKey);
+              else next.add(packageKey);
               setSelectedIds(next);
             }}
           />

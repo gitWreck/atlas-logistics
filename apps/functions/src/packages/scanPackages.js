@@ -111,7 +111,7 @@ exports.scanPackages = onCall(
 
     // 6. FIND PACKAGE & VALIDATE
     const targetPackage = shipmentData.packages.find(
-      (p) => p.trackingNumber === barcode,
+      (p) => (p.packageId || p.trackingNumber) === barcode,
     );
     if (!targetPackage)
       throw new HttpsError(
@@ -155,7 +155,7 @@ exports.scanPackages = onCall(
     };
 
     const updatedPackages = shipmentData.packages.map((pkg) => {
-      if (pkg.trackingNumber === barcode) {
+      if ((pkg.packageId || pkg.trackingNumber) === barcode) {
         return {
           ...pkg,
           status: newStatus,

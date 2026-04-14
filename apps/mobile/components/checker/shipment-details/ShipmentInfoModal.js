@@ -35,7 +35,11 @@ export default function ShipmentInfoModal({
           </View>
 
           <View style={styles.infoGrid}>
-            <InfoRow label="Tracking #" value={data.trackingNumber} bold />
+            <InfoRow
+              label="Tracking #"
+              value={data.trackingNumber || data.id || "N/A"}
+              bold
+            />
             <InfoRow label="Status" value={data.status || "N/A"} isStatus />
             <InfoRow
               label="Route"
