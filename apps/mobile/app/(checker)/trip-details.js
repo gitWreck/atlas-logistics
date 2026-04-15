@@ -334,7 +334,7 @@ export default function TripDetailsScreen() {
                 onPress={() =>
                   router.push({
                     pathname: "/(checker)/shipment-details",
-                    params: { 
+                    params: {
                       shipmentId: item.id,
                       parentTripId: tripId,
                       parentPlate: plate,
