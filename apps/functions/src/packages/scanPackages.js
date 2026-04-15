@@ -232,6 +232,7 @@ exports.scanPackages = onCall(
       action: "SCAN_ITEM",
       subAction: mode.toUpperCase(),
       trackingNumber: barcode,
+      packageId: barcode,
       shipmentId: shipmentId,
       tripId: tripId,
       performedBy: uid,

@@ -133,7 +133,7 @@ export default function TripDetailsScreen() {
 
               // 2. Call the Cloud Function with the expected payload
               await clearTruckDelay({
-                truckTripId: trip.id,
+                tripId: trip.id,
                 notify: true, // Set to false if you want to silently clear the delay without SMS
               });
 
