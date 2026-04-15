@@ -29,7 +29,7 @@ export default function TripManifestTable({
     return shipments.filter((p) => {
       // Search Logic (Tracking or Route)
       const matchesSearch =
-        p.trackingNumber.toLowerCase().includes(search.toLowerCase()) ||
+        p.packageId.toLowerCase().includes(search.toLowerCase()) ||
         p.route?.toLowerCase().includes(search.toLowerCase());
 
       if (!matchesSearch) return false;
@@ -148,9 +148,7 @@ export default function TripManifestTable({
                   className="hover:bg-slate-800/30 transition-colors"
                 >
                   <td className="p-3">
-                    <div className="font-bold text-white">
-                      {p.trackingNumber}
-                    </div>
+                    <div className="font-bold text-white">{p.packageId}</div>
                     <div className="font-mono text-[10px] text-slate-500">
                       {p.id}
                     </div>

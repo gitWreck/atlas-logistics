@@ -200,7 +200,7 @@ export default function ViewPackagesModal({
       weight: Number(newPackage.weight) || 0,
       status: "RECEIVED",
       sequence: nextSequence,
-      trackingNumber: `${shipment.trackingNumber}-${String(nextSequence).padStart(2, "0")}`,
+      packageId: `${shipment.shipmentId}-${String(nextSequence).padStart(2, "0")}`,
       currentLocation: "",
       loadedAt: null,
       loadedOnTrip: null,
@@ -248,7 +248,7 @@ export default function ViewPackagesModal({
                   icon={faBoxOpen}
                   className={modalTheme.label}
                 />
-                {shipment.trackingNumber}
+                {shipment.shipmentId}
               </h2>
             </div>
 
@@ -595,7 +595,7 @@ export default function ViewPackagesModal({
                                 {/* TRACKING */}
                                 <td className="px-4 py-3">
                                   <span className="font-mono text-[11px] text-amber-500 bg-amber-500/10 px-2 py-1 rounded border border-amber-500/20">
-                                    {pkg.trackingNumber}
+                                    {pkg.packageId}
                                   </span>
                                 </td>
 

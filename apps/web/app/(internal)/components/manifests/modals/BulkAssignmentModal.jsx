@@ -263,7 +263,7 @@ export default function BulkAssignmentModal({
                     <div
                       className={`text-right font-mono ${tableTheme.cellSecondary}`}
                     >
-                      {item.totals?.totalItems || 1} pkg
+                      {item.totals?.totalContentQty || 0} quantity
                     </div>
                   </div>
                 );
