@@ -8,7 +8,7 @@ import {
   faSearch,
 } from "@fortawesome/free-solid-svg-icons";
 import { formatFirestoreDate } from "@/app/utility/utilities";
-import { getUserManagementTableTheme } from "@/app/utility/constant/theme";
+import { getTableTheme } from "@/app/utility/constant/theme";
 import StatusBadge from "../../components/ui/StatusBadge";
 
 export default function ManagerRecentTable({
@@ -20,7 +20,7 @@ export default function ManagerRecentTable({
   isDark = false,
 }) {
   const [searchTerm, setSearchTerm] = useState("");
-  const theme = getUserManagementTableTheme(isDark);
+  const theme = getTableTheme(isDark);
 
   const filteredShipments = useMemo(() => {
     if (!searchTerm) return shipments;
@@ -29,7 +29,7 @@ export default function ManagerRecentTable({
 
     return shipments.filter((shipment) => {
       return (
-        shipment.shipmentIdber?.toLowerCase().includes(lowerTerm) ||
+        shipment.trackingNumber?.toLowerCase().includes(lowerTerm) ||
         shipment.status?.toLowerCase().includes(lowerTerm) ||
         shipment.route?.toLowerCase().includes(lowerTerm) ||
         shipment.originCode?.toLowerCase().includes(lowerTerm) ||
@@ -43,17 +43,13 @@ export default function ManagerRecentTable({
     : "No recent activity found.";
 
   return (
-    <div
-      className={`border rounded-xl overflow-hidden shadow-lg ${theme.container}`}
-    >
+    <div className={`border rounded-xl overflow-hidden ${theme.container}`}>
       {/* Header */}
       <div
         className={`px-4 sm:px-6 py-4 border-b flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 ${theme.header}`}
       >
         <h3
-          className={`font-bold text-sm uppercase flex items-center gap-2 ${
-            isDark ? "text-slate-300" : "text-slate-700"
-          }`}
+          className={`font-bold text-sm uppercase flex items-center gap-2 ${theme.headingText}`}
         >
           <FontAwesomeIcon icon={faCalendarAlt} className={theme.inputIcon} />
           Recent Activity
@@ -75,17 +71,17 @@ export default function ManagerRecentTable({
           </div>
 
           <div
-            className={`flex items-center gap-2 rounded-lg px-3 py-1.5 border ${isDark ? "bg-slate-900 border-slate-700" : "bg-white border-slate-200"}`}
+            className={`flex items-center gap-2 rounded-lg px-3 py-1.5 border ${theme.selectWrap}`}
           >
             <span
-              className={`text-xs font-semibold uppercase tracking-wide ${isDark ? "text-slate-500" : "text-slate-600"}`}
+              className={`text-xs font-semibold uppercase tracking-wide ${theme.miniLabel}`}
             >
               Rows
             </span>
             <select
               value={viewLimit}
               onChange={(e) => setViewLimit(Number(e.target.value))}
-              className={`bg-transparent text-sm font-medium outline-none cursor-pointer ${isDark ? "text-slate-200" : "text-slate-900"}`}
+              className={`bg-transparent text-sm font-medium outline-none cursor-pointer ${theme.selectText}`}
             >
               <option value={5}>5</option>
               <option value={10}>10</option>
@@ -120,7 +116,7 @@ export default function ManagerRecentTable({
                     <div
                       className={`font-mono font-bold truncate ${theme.cellPrimary}`}
                     >
-                      {shipment.shipmentIdber || shipment.id}
+                      {shipment.trackingNumber || shipment.id}
                     </div>
                     <div className={`text-xs truncate ${theme.cellSecondary}`}>
                       {formatFirestoreDate(shipment.updatedAt)}
@@ -137,11 +133,7 @@ export default function ManagerRecentTable({
 
                 <div className="flex justify-between items-end gap-2">
                   <span
-                    className={`px-2 py-1 rounded text-[10px] border font-mono uppercase ${
-                      isDark
-                        ? "bg-slate-800 border-slate-700 text-slate-300"
-                        : "bg-slate-100 border-slate-200 text-slate-700"
-                    }`}
+                    className={`px-2 py-1 rounded text-[10px] border font-mono uppercase ${theme.roleBadge}`}
                   >
                     {shipment.originCode || "N/A"} {" -> "}{" "}
                     {shipment.destinationCode || "N/A"}
@@ -192,16 +184,12 @@ export default function ManagerRecentTable({
                     <td
                       className={`px-6 py-4 font-mono font-bold ${theme.cellPrimary}`}
                     >
-                      {shipment.shipmentIdber || shipment.id}
+                      {shipment.trackingNumber || shipment.id}
                     </td>
 
                     <td className="px-6 py-4">
                       <span
-                        className={`px-2 py-1 rounded text-xs border font-mono uppercase ${
-                          isDark
-                            ? "bg-slate-800 border-slate-700 text-slate-300"
-                            : "bg-slate-100 border-slate-200 text-slate-700"
-                        }`}
+                        className={`px-2 py-1 rounded text-xs border font-mono uppercase ${theme.roleBadge}`}
                       >
                         {shipment.originCode || "N/A"} {" -> "}{" "}
                         {shipment.destinationCode || "N/A"}

@@ -7,10 +7,15 @@ import {
   faCalendarDays,
   faCircleNotch,
   faFloppyDisk,
+  faTruck,
+  faRoute,
+  faBell,
 } from "@fortawesome/free-solid-svg-icons";
 import { getModalThemeClasses } from "@/app/utility/constant/theme";
 import { getModalActionClasses } from "@/app/utility/constant/action";
-import { buildInitialForm, ReadOnlyField, DateTimeField } from "../utils";
+import { buildInitialForm } from "../utils";
+import TripScheduleInfoCard from "../modals/TripScheduleInfoCard";
+import TripScheduleDateField from "../modals/TripScheduleDateField";
 
 export default function TripScheduleModal({
   isOpen = false,
@@ -26,24 +31,28 @@ export default function TripScheduleModal({
   const [tripQuery, setTripQuery] = useState("");
   const [showTripDropdown, setShowTripDropdown] = useState(false);
   const [error, setError] = useState("");
+  const [sendNotification, setsendNotification] = useState(false);
 
   const modalTheme = getModalThemeClasses(isDark);
   const actionTheme = getModalActionClasses();
 
   useEffect(() => {
-    if (isOpen) {
-      setForm(buildInitialForm(selectedTripSchedule));
-      setTripQuery(
-        selectedTripSchedule
-          ? `${selectedTripSchedule.tripId || selectedTripSchedule.id} — ${
-              selectedTripSchedule.route ||
-              `${selectedTripSchedule.origin || ""} → ${selectedTripSchedule.destination || ""}`
-            }`
-          : "",
-      );
-      setError("");
-      setShowTripDropdown(false);
-    }
+    if (!isOpen) return;
+
+    const nextForm = buildInitialForm(selectedTripSchedule);
+
+    setForm(nextForm);
+    setTripQuery(
+      selectedTripSchedule
+        ? `${selectedTripSchedule.tripId || selectedTripSchedule.id} — ${
+            selectedTripSchedule.route ||
+            `${selectedTripSchedule.origin || ""} → ${selectedTripSchedule.destination || ""}`
+          }`
+        : "",
+    );
+    setError("");
+    setShowTripDropdown(false);
+    setsendNotification(false);
   }, [isOpen, selectedTripSchedule]);
 
   const updateField = (key, value) => {
@@ -82,35 +91,33 @@ export default function TripScheduleModal({
     );
     setForm(buildInitialForm(trip));
     setShowTripDropdown(false);
+    setError("");
   };
 
   const handleSubmit = (e) => {
     e.preventDefault();
 
-    if (
-      form.plannedLoadingStart &&
-      form.plannedLoadingEnd &&
-      new Date(form.plannedLoadingEnd) < new Date(form.plannedLoadingStart)
-    ) {
-      setError("Planned loading end must be later than planned loading start.");
+    if (!form.tripId) {
+      setError("Please select a trip first.");
+      return;
+    }
+
+    if (!form.plannedDeparture) {
+      setError("Planned departure is required.");
+      return;
+    }
+
+    if (!form.estimatedArrival) {
+      setError("Estimated arrival is required.");
       return;
     }
 
     if (
-      form.actualLoadingStart &&
-      form.actualLoadingEnd &&
-      new Date(form.actualLoadingEnd) < new Date(form.actualLoadingStart)
+      form.plannedDeparture &&
+      form.estimatedArrival &&
+      new Date(form.estimatedArrival) < new Date(form.plannedDeparture)
     ) {
-      setError("Actual loading end must be later than actual loading start.");
-      return;
-    }
-
-    if (
-      form.actualDeparture &&
-      form.actualArrival &&
-      new Date(form.actualArrival) < new Date(form.actualDeparture)
-    ) {
-      setError("Actual arrival must be later than actual departure.");
+      setError("Estimated arrival must be later than planned departure.");
       return;
     }
 
@@ -118,12 +125,10 @@ export default function TripScheduleModal({
 
     onSubmit?.({
       tripId: form.tripId,
+      plannedDeparture: form.plannedDeparture || null,
+      estimatedArrival: form.estimatedArrival || null,
       plannedLoadingStart: form.plannedLoadingStart || null,
-      plannedLoadingEnd: form.plannedLoadingEnd || null,
-      actualLoadingStart: form.actualLoadingStart || null,
-      actualLoadingEnd: form.actualLoadingEnd || null,
-      actualDeparture: form.actualDeparture || null,
-      actualArrival: form.actualArrival || null,
+      sendNotification,
     });
   };
 
@@ -155,7 +160,7 @@ export default function TripScheduleModal({
                   <h2
                     className={`text-base sm:text-lg font-bold ${modalTheme.title}`}
                   >
-                    Trip Schedule Modal
+                    {mode === "edit" ? "Edit Trip Schedule" : "Trip Schedule"}
                   </h2>
                   <p
                     className={`text-xs sm:text-sm truncate ${modalTheme.bodyText}`}
@@ -179,9 +184,9 @@ export default function TripScheduleModal({
               onSubmit={handleSubmit}
               className="flex min-h-0 flex-1 flex-col"
             >
-              {/* Content */}
               <div className="flex-1 min-h-0 overflow-y-auto px-4 sm:px-6 py-4 sm:py-5 space-y-6">
-                <section className="space-y-3">
+                {/* Trip Reference */}
+                <section className="space-y-4">
                   <div>
                     <h3
                       className={`text-xs sm:text-sm font-bold uppercase tracking-widest ${modalTheme.title}`}
@@ -189,13 +194,12 @@ export default function TripScheduleModal({
                       Trip Reference
                     </h3>
                     <p className={`text-xs mt-1 ${modalTheme.helperText}`}>
-                      Search a trip and update its loading and actual execution
-                      schedule.
+                      Select a trip and update its planned schedule.
                     </p>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
-                    <div className="relative xl:col-span-1">
+                  <div className="space-y-3">
+                    <div className="relative">
                       <label
                         className={`text-xs font-semibold ${modalTheme.label}`}
                       >
@@ -270,123 +274,118 @@ export default function TripScheduleModal({
                       )}
                     </div>
 
-                    <ReadOnlyField
-                      label="Truck"
-                      value={form.truckPlateNumber}
-                      theme={modalTheme}
-                    />
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                      <TripScheduleInfoCard
+                        label="Truck"
+                        value={form.truckPlateNumber}
+                        icon={faTruck}
+                        theme={modalTheme}
+                      />
 
-                    <ReadOnlyField
-                      label="Route"
-                      value={
-                        form.route ||
-                        `${form.origin || ""} → ${form.destination || ""}`
+                      <TripScheduleInfoCard
+                        label="Route"
+                        value={
+                          form.route ||
+                          `${form.origin || ""} → ${form.destination || ""}`
+                        }
+                        icon={faRoute}
+                        theme={modalTheme}
+                      />
+
+                      <TripScheduleInfoCard
+                        label="Trip Status"
+                        value={form.status}
+                        icon={faCalendarDays}
+                        theme={modalTheme}
+                      />
+                    </div>
+                  </div>
+                </section>
+
+                {/* Schedule */}
+                <section className="space-y-4">
+                  <div>
+                    <h3
+                      className={`text-xs sm:text-sm font-bold uppercase tracking-widest ${modalTheme.title}`}
+                    >
+                      Planned Schedule
+                    </h3>
+                    <p className={`text-xs mt-1 ${modalTheme.helperText}`}>
+                      Edit the departure, arrival, and loading start. Each field
+                      shows its weekday automatically.
+                    </p>
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-4">
+                    <TripScheduleDateField
+                      label="Planned Departure"
+                      icon={faCalendarDays}
+                      value={form.plannedDeparture}
+                      onChange={(value) =>
+                        updateField("plannedDeparture", value)
                       }
                       theme={modalTheme}
                     />
 
-                    <ReadOnlyField
-                      label="Planned Departure"
-                      type="datetime-local"
-                      value={form.plannedDeparture}
-                      theme={modalTheme}
-                    />
-
-                    <ReadOnlyField
+                    <TripScheduleDateField
                       label="Estimated Arrival"
-                      type="datetime-local"
+                      icon={faCalendarDays}
                       value={form.estimatedArrival}
+                      onChange={(value) =>
+                        updateField("estimatedArrival", value)
+                      }
                       theme={modalTheme}
                     />
 
-                    <ReadOnlyField
-                      label="Trip Status"
-                      value={form.status}
-                      theme={modalTheme}
-                    />
-                  </div>
-                </section>
-
-                <section className="space-y-3">
-                  <h3
-                    className={`text-xs sm:text-sm font-bold uppercase tracking-widest ${modalTheme.title}`}
-                  >
-                    Planned Loading Schedule
-                  </h3>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <DateTimeField
+                    <TripScheduleDateField
                       label="Planned Loading Start"
+                      icon={faCalendarDays}
                       value={form.plannedLoadingStart}
                       onChange={(value) =>
                         updateField("plannedLoadingStart", value)
                       }
                       theme={modalTheme}
                     />
-
-                    <DateTimeField
-                      label="Planned Loading End"
-                      value={form.plannedLoadingEnd}
-                      onChange={(value) =>
-                        updateField("plannedLoadingEnd", value)
-                      }
-                      theme={modalTheme}
-                    />
                   </div>
                 </section>
 
+                {/* Notification */}
                 <section className="space-y-3">
-                  <h3
-                    className={`text-xs sm:text-sm font-bold uppercase tracking-widest ${modalTheme.title}`}
-                  >
-                    Actual Loading Schedule
-                  </h3>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <DateTimeField
-                      label="Actual Loading Start"
-                      value={form.actualLoadingStart}
-                      onChange={(value) =>
-                        updateField("actualLoadingStart", value)
-                      }
-                      theme={modalTheme}
-                    />
-
-                    <DateTimeField
-                      label="Actual Loading End"
-                      value={form.actualLoadingEnd}
-                      onChange={(value) =>
-                        updateField("actualLoadingEnd", value)
-                      }
-                      theme={modalTheme}
-                    />
+                  <div>
+                    <h3
+                      className={`text-xs sm:text-sm font-bold uppercase tracking-widest ${modalTheme.title}`}
+                    >
+                      Customer Notification
+                    </h3>
+                    <p className={`text-xs mt-1 ${modalTheme.helperText}`}>
+                      Choose whether the Firebase Function should send schedule
+                      updates to customers.
+                    </p>
                   </div>
-                </section>
 
-                <section className="space-y-3">
-                  <h3
-                    className={`text-xs sm:text-sm font-bold uppercase tracking-widest ${modalTheme.title}`}
+                  <label
+                    className={`flex items-start gap-3 rounded-xl border p-4 cursor-pointer ${modalTheme.panelSurface}`}
                   >
-                    Actual Trip Movement
-                  </h3>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <DateTimeField
-                      label="Actual Departure"
-                      value={form.actualDeparture}
-                      onChange={(value) =>
-                        updateField("actualDeparture", value)
-                      }
-                      theme={modalTheme}
+                    <input
+                      type="checkbox"
+                      checked={sendNotification}
+                      onChange={(e) => setsendNotification(e.target.checked)}
+                      className="mt-1 h-4 w-4"
                     />
 
-                    <DateTimeField
-                      label="Actual Arrival"
-                      value={form.actualArrival}
-                      onChange={(value) => updateField("actualArrival", value)}
-                      theme={modalTheme}
-                    />
-                  </div>
+                    <div className="min-w-0">
+                      <div
+                        className={`text-sm font-semibold flex items-center gap-2 ${modalTheme.title}`}
+                      >
+                        <FontAwesomeIcon icon={faBell} />
+                        Send notification to customers
+                      </div>
+                      {/* <p className={`text-xs mt-1 ${modalTheme.helperText}`}>
+                        When enabled, `sendNotification` will be passed
+                        to your `onSubmit` payload.
+                      </p> */}
+                    </div>
+                  </label>
                 </section>
 
                 {error ? (

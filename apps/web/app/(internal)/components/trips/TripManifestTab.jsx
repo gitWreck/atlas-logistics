@@ -18,6 +18,7 @@ import {
 import { bulkShipmentAction } from "@/app/utility/FirebaseFunctions";
 import { getTableTheme } from "@/app/utility/constant/theme";
 import { getTableActionClasses } from "@/app/utility/constant/action";
+import { packageLabelUrl } from "@/app/utility/constant/templates";
 
 export default function TripManifestTab({
   shipments,
@@ -382,6 +383,18 @@ export default function TripManifestTab({
                         onClick={(e) => e.stopPropagation()}
                       >
                         <div className="flex justify-end gap-2">
+                          <button
+                            type="button"
+                            onClick={() =>
+                              window.open(
+                                packageLabelUrl(shipment.shipmentId),
+                                "_blank",
+                              )
+                            }
+                            className={`text-xs border px-3 py-1.5 rounded transition-all flex items-center gap-1 ${action.soft}`}
+                          >
+                            <FontAwesomeIcon icon={faPrint} />
+                          </button>
                           <button
                             type="button"
                             onClick={() => onViewPackages?.(shipment)}

@@ -64,6 +64,13 @@ const DestinationCard = ({ group }) => {
   const items = group.items || [];
   const subtotal = items.reduce((acc, it) => acc + (it.packageCount || 0), 0);
 
+  console.log(
+    "Rendering DestinationCard for",
+    group.destination,
+    "with items:",
+    items,
+  );
+
   return (
     <div className="border border-slate-200 rounded-lg overflow-hidden break-inside-avoid">
       <div className="bg-slate-50 border-b border-slate-200 px-4 py-2 flex justify-between items-center">
@@ -90,7 +97,7 @@ const DestinationCard = ({ group }) => {
           {items.map((item, i) => (
             <tr key={i}>
               <td className="px-4 py-2 font-mono text-slate-700 font-medium">
-                {item.packageId}
+                {item.shipmentId}
                 {item.note && (
                   <span className="block text-[9px] text-slate-400 font-sans">
                     {item.note}
@@ -172,7 +179,7 @@ function ManifestContent() {
 
       const q = query(
         collection(db, "shipments"),
-        where("currentTruckTripId", "==", tripId),
+        where("currentTripId", "==", tripId),
       );
       const shipSnaps = await getDocs(q);
 
@@ -243,7 +250,7 @@ function ManifestContent() {
           new Date().toISOString(),
         version: tripData.manifestLocked ? "v1.0-LOCKED" : "DRAFT-PREVIEW",
         manifestHash: tripData.manifestHash || "DRAFT-NO-HASH-GENERATED",
-        verifyUrl: `https://atlas-trucking-platform.vercel.app/verify/${tripSnap.id}`,
+        verifyUrl: `https://atlastransport.ph/verify/${tripSnap.id}`,
         stamps: tripData.manifestLocked
           ? ["LOCKED", "OFFICIAL_RECORD"]
           : ["DRAFT", "UNVERIFIED"],
@@ -394,7 +401,7 @@ function ManifestContent() {
                       key={stamp}
                       className="px-2 py-0.5 rounded-full border border-slate-300 bg-slate-100 text-[10px] font-bold text-slate-600 uppercase tracking-wide"
                     >
-                      {stamp}
+                      {stamp.replace(/_/g, " ")}
                     </span>
                   ))}
                 </div>
@@ -431,7 +438,7 @@ function ManifestContent() {
           {/* METADATA GRID */}
           <div className="grid grid-cols-2 gap-4 border border-slate-200 rounded-xl p-4 bg-white mb-6">
             <MetaItem label="Trip ID" value={manifest.tripId} />
-            <MetaItem label="Trip Number" value={manifest.tripNumber} />
+            {/* <MetaItem label="Trip Number" value={manifest.tripNumber} /> */}
             <MetaItem label="Driver" value={manifest.driverName} />
             <MetaItem label="Truck Plate" value={manifest.truckPlate} />
             <MetaItem label="Origin" value={manifest.origin} />

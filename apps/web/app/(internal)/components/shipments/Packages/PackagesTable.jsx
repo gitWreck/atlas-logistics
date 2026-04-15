@@ -12,6 +12,10 @@ import {
 import PackageTableRow from "./PackagesTableRow";
 import PackageMobileCard from "./PackageMobileCard";
 import { getBoardThemeClasses } from "@/app/utility/constant/theme";
+import {
+  packageLabelUrl,
+  shipmentLabelUrl,
+} from "@/app/utility/constant/templates";
 
 const ITEMS_PER_PAGE = 5;
 
@@ -50,9 +54,6 @@ export default function PackagesTable({ data, isDark = false }) {
   );
 
   const uniqueStatuses = ["ALL", ...new Set(packages.map((pkg) => pkg.status))];
-
-  const shipmentLabelUrl = `/components/print/labels?id=${encodeURIComponent(data.id)}&mode=shipment`;
-  const packageLabelUrl = `/components/print/labels?id=${encodeURIComponent(data.id)}&mode=individual`;
 
   return (
     <div className="space-y-4 animate-in fade-in slide-in-from-right-4 duration-300">
@@ -97,7 +98,7 @@ export default function PackagesTable({ data, isDark = false }) {
         <div className="flex flex-col sm:flex-row gap-2">
           <button
             type="button"
-            onClick={() => window.open(shipmentLabelUrl, "_blank")}
+            onClick={() => window.open(shipmentLabelUrl(data.id), "_blank")}
             className={`flex justify-center items-center gap-2 px-4 py-2 rounded-lg transition-colors text-xs font-bold whitespace-nowrap ${theme.actionButton}`}
           >
             <FontAwesomeIcon icon={faPrint} />
@@ -106,7 +107,7 @@ export default function PackagesTable({ data, isDark = false }) {
 
           <button
             type="button"
-            onClick={() => window.open(packageLabelUrl, "_blank")}
+            onClick={() => window.open(packageLabelUrl(data.id), "_blank")}
             className={`flex justify-center items-center gap-2 px-4 py-2 rounded-lg transition-colors text-xs font-bold whitespace-nowrap ${theme.actionButton}`}
           >
             <FontAwesomeIcon icon={faPrint} />
