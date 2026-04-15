@@ -14,6 +14,7 @@ import {
   faChevronRight,
   faPen,
   faTrash,
+  faSearch,
 } from "@fortawesome/free-solid-svg-icons";
 import { auth } from "@/lib/firebase";
 import { updateShipmentPackages } from "@/app/utility/FirebaseFunctions";
@@ -25,6 +26,7 @@ import {
   getTableTheme,
 } from "@/app/utility/constant/theme";
 import { getModalActionClasses } from "@/app/utility/constant/action";
+import StatusBadge from "../../ui/StatusBadge";
 
 const PACKAGING_TYPES = ["Box", "Sack", "Crate", "Bundle", "Roll", "Envelope"];
 const ITEMS_PER_PAGE = 6;
@@ -63,8 +65,10 @@ export default function ViewPackagesModal({
   const [newPackage, setNewPackage] = useState(INITIAL_PACKAGE_STATE);
 
   const [isSplitModalOpen, setIsSplitModalOpen] = useState(false);
-
   const [currentPage, setCurrentPage] = useState(1);
+
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("ALL");
 
   const modalTheme = getModalThemeClasses(isDark);
   const modalAction = getModalActionClasses();
@@ -79,6 +83,9 @@ export default function ViewPackagesModal({
       setIsAdding(false);
       setSelectedIndices(new Set());
       setCurrentPage(1);
+
+      setSearch("");
+      setStatusFilter("ALL");
     }
   }, [isOpen, shipment]);
 
@@ -102,13 +109,35 @@ export default function ViewPackagesModal({
     }
   };
 
+  const filteredPackages = useMemo(() => {
+    return packages.filter((pkg) => {
+      const matchesSearch =
+        (pkg.description || "").toLowerCase().includes(search.toLowerCase()) ||
+        (pkg.packageId || "").toLowerCase().includes(search.toLowerCase()) ||
+        (pkg.packagingType || "").toLowerCase().includes(search.toLowerCase());
+
+      const matchesStatus =
+        statusFilter === "ALL" ? true : pkg.status === statusFilter;
+
+      return matchesSearch && matchesStatus;
+    });
+  }, [packages, search, statusFilter]);
+
   const paginatedPackages = useMemo(() => {
     const start = (currentPage - 1) * ITEMS_PER_PAGE;
-    return packages.slice(start, start + ITEMS_PER_PAGE);
-  }, [packages, currentPage]);
+    return filteredPackages.slice(start, start + ITEMS_PER_PAGE);
+  }, [filteredPackages, currentPage]);
 
-  const totalPages = Math.max(1, Math.ceil(packages.length / ITEMS_PER_PAGE));
+  const totalPages = Math.max(
+    1,
+    Math.ceil(filteredPackages.length / ITEMS_PER_PAGE),
+  );
   const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+
+  useEffect(() => {
+    setCurrentPage(1);
+    setSelectedIndices(new Set());
+  }, [search, statusFilter]);
 
   useEffect(() => {
     if (currentPage > totalPages) {
@@ -117,10 +146,22 @@ export default function ViewPackagesModal({
   }, [currentPage, totalPages]);
 
   const handleSelectAll = () => {
-    if (selectedIndices.size === packages.length) {
-      setSelectedIndices(new Set());
+    const filteredIndexes = filteredPackages.map((pkg) =>
+      packages.findIndex((p) => p.packageId === pkg.packageId),
+    );
+
+    const allFilteredSelected =
+      filteredIndexes.length > 0 &&
+      filteredIndexes.every((idx) => selectedIndices.has(idx));
+
+    if (allFilteredSelected) {
+      const next = new Set(selectedIndices);
+      filteredIndexes.forEach((idx) => next.delete(idx));
+      setSelectedIndices(next);
     } else {
-      setSelectedIndices(new Set(packages.map((_, i) => i)));
+      const next = new Set(selectedIndices);
+      filteredIndexes.forEach((idx) => next.add(idx));
+      setSelectedIndices(next);
     }
   };
 
@@ -217,6 +258,14 @@ export default function ViewPackagesModal({
     );
   }, [selectedIndices, packages]);
 
+  const filteredIndexes = filteredPackages.map((pkg) =>
+    packages.findIndex((p) => p.packageId === pkg.packageId),
+  );
+
+  const allFilteredSelected =
+    filteredIndexes.length > 0 &&
+    filteredIndexes.every((idx) => selectedIndices.has(idx));
+
   if (!isOpen || !shipment) return null;
 
   return (
@@ -294,12 +343,27 @@ export default function ViewPackagesModal({
                       <div
                         className={`text-[10px] font-bold uppercase ${modalTheme.label}`}
                       >
-                        Count
+                        Items
                       </div>
                       <div
                         className={`text-base font-bold ${modalTheme.title}`}
                       >
-                        {packages.length} items
+                        {packages.length} package/s
+                      </div>
+                    </div>
+                    <div>
+                      <div
+                        className={`text-[10px] font-bold uppercase ${modalTheme.label}`}
+                      >
+                        Quantity
+                      </div>
+                      <div
+                        className={`text-base font-bold ${modalTheme.title}`}
+                      >
+                        {packages
+                          .map((pkg) => pkg.quantity)
+                          .reduce((a, b) => a + b, 0)}{" "}
+                        count
                       </div>
                     </div>
                   </div>
@@ -360,41 +424,82 @@ export default function ViewPackagesModal({
                 <div
                   className={`border rounded-xl overflow-hidden ${tableTheme.container}`}
                 >
-                  {/* TABLE HEADER */}
                   <div
-                    className={`px-4 sm:px-6 py-4 border-b flex items-center justify-between gap-4 ${tableTheme.header}`}
+                    className={`flex flex-col md:flex-row justify-between items-start md:items-center gap-4 p-4 border-b ${tableTheme.header}`}
                   >
-                    <div>
-                      <h3 className={`font-bold ${tableTheme.headingText}`}>
-                        Package Items
-                      </h3>
-                      <p className={`text-xs ${tableTheme.emptyText}`}>
-                        Manage, edit, and review shipment contents
-                      </p>
+                    <div className="w-full md:w-auto flex justify-between md:block items-center">
+                      <div>
+                        <div
+                          className={`text-xs font-bold uppercase ${tableTheme.cellSecondary}`}
+                        >
+                          Package Items
+                        </div>
+                        <div
+                          className={`text-lg font-bold ${tableTheme.headingText}`}
+                        >
+                          {filteredPackages.length}{" "}
+                          <span
+                            className={`text-sm font-normal ${tableTheme.cellSecondary}`}
+                          >
+                            result{filteredPackages.length > 1 ? "s" : ""}
+                          </span>
+                        </div>
+                      </div>
+
+                      {selectedIndices.size > 0 && (
+                        <div
+                          className={`md:hidden text-xs font-bold px-2 py-1 rounded border ${tableTheme.selectedInfo || ""}`}
+                        >
+                          {selectedIndices.size} Selected
+                        </div>
+                      )}
                     </div>
 
-                    <button
-                      type="button"
-                      onClick={handleSelectAll}
-                      className={`flex items-center gap-2 text-xs font-bold ${tableTheme.linkButton}`}
-                    >
-                      <FontAwesomeIcon
-                        icon={
-                          selectedIndices.size === packages.length &&
-                          packages.length > 0
-                            ? faCheckSquare
-                            : faSquare
-                        }
-                        className={
-                          selectedIndices.size > 0
-                            ? tableTheme.checkboxActive || "text-blue-500"
-                            : tableTheme.checkboxIdle || "text-slate-400"
-                        }
-                      />
-                      Select All
-                    </button>
-                  </div>
+                    <div className="flex flex-col sm:flex-row gap-2 w-full md:w-auto">
+                      <div className="relative flex-1 sm:w-56">
+                        <FontAwesomeIcon
+                          icon={faSearch}
+                          className={`absolute left-3 top-2.5 text-xs ${tableTheme.inputIcon}`}
+                        />
+                        <input
+                          type="text"
+                          placeholder="Search packages..."
+                          className={`w-full border rounded-lg pl-8 pr-3 py-1.5 text-xs outline-none ${tableTheme.input}`}
+                          value={search}
+                          onChange={(e) => setSearch(e.target.value)}
+                        />
+                      </div>
 
+                      <select
+                        value={statusFilter}
+                        onChange={(e) => setStatusFilter(e.target.value)}
+                        className={`border rounded-lg px-3 py-1.5 text-xs font-medium ${tableTheme.input}`}
+                      >
+                        <option value="ALL">All Status</option>
+                        <option value="RECEIVED">Received</option>
+                        <option value="LOADED">Loaded</option>
+                        <option value="IN_TRANSIT">In Transit</option>
+                        <option value="DELIVERED">Delivered</option>
+                      </select>
+
+                      <button
+                        type="button"
+                        onClick={handleSelectAll}
+                        disabled={filteredPackages.length === 0}
+                        className={`flex items-center justify-center gap-2 px-3 py-1.5 rounded-lg  text-xs font-bold disabled:opacity-50 ${tableTheme.linkButton}`}
+                      >
+                        <FontAwesomeIcon
+                          icon={allFilteredSelected ? faCheckSquare : faSquare}
+                          className={
+                            allFilteredSelected
+                              ? tableTheme.checkboxActive || "text-blue-500"
+                              : tableTheme.checkboxIdle || "text-slate-400"
+                          }
+                        />
+                        Select All
+                      </button>
+                    </div>
+                  </div>
                   {/* TABLE BODY */}
                   <div className="overflow-x-auto">
                     <table
@@ -445,23 +550,6 @@ export default function ViewPackagesModal({
                             const locked =
                               isLocked || isPackageLocked(pkg.status);
                             const isEditing = editingId === actualIdx;
-
-                            const statusClass =
-                              pkg.status === "LOADED"
-                                ? isDark
-                                  ? "bg-emerald-900/30 text-emerald-400 border-emerald-500/30"
-                                  : "bg-emerald-100 text-emerald-700 border-emerald-300"
-                                : pkg.status === "IN_TRANSIT"
-                                  ? isDark
-                                    ? "bg-blue-900/30 text-blue-400 border-blue-500/30"
-                                    : "bg-blue-100 text-blue-700 border-blue-300"
-                                  : pkg.status === "DELIVERED"
-                                    ? isDark
-                                      ? "bg-purple-900/30 text-purple-400 border-purple-500/30"
-                                      : "bg-purple-100 text-purple-700 border-purple-300"
-                                    : isDark
-                                      ? "bg-slate-800 text-slate-400 border-slate-700"
-                                      : "bg-slate-100 text-slate-600 border-slate-300";
 
                             return (
                               <tr
@@ -584,7 +672,7 @@ export default function ViewPackagesModal({
                                           </span>
                                         )}
 
-                                        <span className="text-blue-500 font-bold">
+                                        <span className="text-blue-500 font-bold ">
                                           {pkg.quantity || 1} pcs
                                         </span>
                                       </div>
@@ -601,11 +689,10 @@ export default function ViewPackagesModal({
 
                                 {/* STATUS */}
                                 <td className="px-4 py-3">
-                                  <span
-                                    className={`text-[10px] font-bold px-2 py-1 rounded uppercase border ${statusClass}`}
-                                  >
-                                    {pkg.status?.replaceAll("_", " ")}
-                                  </span>
+                                  <StatusBadge
+                                    status={pkg.status}
+                                    isDark={isDark}
+                                  />
                                 </td>
 
                                 {/* ACTIONS */}
@@ -680,7 +767,7 @@ export default function ViewPackagesModal({
                   </div>
 
                   {/* PAGINATION */}
-                  {!loading && packages.length > 0 && (
+                  {!loading && filteredPackages.length > 0 && (
                     <div
                       className={`px-4 sm:px-6 py-4 border-t flex flex-col sm:flex-row justify-between items-center gap-3 text-xs ${tableTheme.footer}`}
                     >
@@ -693,10 +780,10 @@ export default function ViewPackagesModal({
                         <span className={`font-bold ${tableTheme.footerBold}`}>
                           {Math.min(
                             startIndex + ITEMS_PER_PAGE,
-                            packages.length,
+                            filteredPackages.length,
                           )}
                         </span>{" "}
-                        of {packages.length}
+                        of {filteredPackages.length}
                       </span>
 
                       <div className="flex gap-2">

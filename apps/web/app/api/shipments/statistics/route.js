@@ -62,7 +62,7 @@ export async function GET(request) {
 
     const qDelayed = shipmentsRef
       .where("updatedAt", ">=", startTimestamp)
-      // .where("delayCleared", "==", false)
+      .where("delayCleared", "==", false)
       .count()
       .get();
 

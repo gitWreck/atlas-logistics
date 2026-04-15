@@ -1,4 +1,10 @@
 // 1. UPDATED TEMPLATES (Added 'requiresDate' flag)
+
+export const shipmentLabelUrl = (data) =>
+  `/components/print/labels?id=${encodeURIComponent(data)}&mode=shipment`;
+export const packageLabelUrl = (data) =>
+  `/components/print/labels?id=${encodeURIComponent(data)}&mode=individual`;
+
 export const TEMPLATES = [
   {
     id: "SCHEDULED",

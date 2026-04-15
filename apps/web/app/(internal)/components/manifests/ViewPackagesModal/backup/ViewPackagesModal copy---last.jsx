@@ -12,10 +12,10 @@ import {
 } from "@fortawesome/free-solid-svg-icons";
 import { auth } from "@/lib/firebase";
 import { updateShipmentPackages } from "@/app/utility/FirebaseFunctions";
-import { PackageItemCard } from "./PackageItemCard";
-import SplitShipmentModal from "./SplitShipmentModal";
-import PackageBulkActionBar from "./PackageBulkActionBar";
-import AddPackageForm from "./AddPackageForm";
+import { PackageItemCard } from "../PackageItemCard";
+import SplitShipmentModal from "../SplitShipmentModal";
+import PackageBulkActionBar from "../PackageBulkActionBar";
+import AddPackageForm from "../AddPackageForm";
 
 const PACKAGING_TYPES = ["Box", "Sack", "Crate", "Bundle", "Roll", "Envelope"];
 const isPackageLocked = (status) =>

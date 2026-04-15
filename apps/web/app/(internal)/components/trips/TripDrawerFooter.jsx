@@ -123,7 +123,7 @@ export default function TripDrawerFooter({
                 setUnlockStatus,
                 () =>
                   unlockTripManifest({
-                    tripDocId: data.tripId,
+                    tripId: data.tripId,
                     reason: unlockReason,
                   }),
                 () => {

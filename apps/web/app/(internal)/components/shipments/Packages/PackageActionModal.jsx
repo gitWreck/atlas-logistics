@@ -154,7 +154,7 @@ export default function PackageActionModal({
         {/* Reset / Unload */}
         <button
           disabled={isDisabled}
-          onClick={() => handleAction("UNLOADED", true)}
+          onClick={() => handleAction("RECEIVED", true)}
           className="w-full py-2.5 rounded-xl border border-red-500/30 text-red-500 text-xs font-bold hover:bg-red-500/10 flex items-center justify-center gap-2 disabled:opacity-50"
         >
           {isLoading("UNLOAD-true") && (
