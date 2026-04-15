@@ -79,7 +79,7 @@ export default function PrintLabelsBundle() {
             uniqueKey: `shipment-${shipment.id}`,
             shipment: shipment,
             pkg: {
-              trackingNumber: shipment.shipmentId, // Shipment-Level QR
+              packageId: shipment.shipmentId, // Shipment-Level QR
               description:
                 shipment.remarks || `${trueTotalQuantity} Total Pieces`,
               summaryText: summaryText || "Multiple Units", // e.g., "1 Sack, 2 Boxes"
