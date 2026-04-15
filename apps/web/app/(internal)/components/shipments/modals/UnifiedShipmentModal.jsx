@@ -34,6 +34,7 @@ export default function UnifiedShipmentModal({
   editData = null, // ✅ NEW: Accept existing shipment data
 }) {
   const { showAlert, showConfirm } = useAlert();
+  console.log("UnifiedShipmentModal Rendered with editData:", editData);
 
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
