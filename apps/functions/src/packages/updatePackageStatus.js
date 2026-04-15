@@ -34,11 +34,11 @@ exports.updatePackageStatus = onCall(
 
       const data = snap.data();
       const pkgArray = data.packages || [];
-      const currentTripId = data.currentTruckTripId;
+      const currentTripId = data.currentTripId;
 
       // 1. Find the target package
       const pkgIndex = pkgArray.findIndex(
-        (p) => p.trackingNumber === packageId,
+        (p) => p.packageId === packageId || p.trackingNumber === packageId,
       );
       if (pkgIndex === -1)
         throw new HttpsError("not-found", "Package not found");

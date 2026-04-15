@@ -36,7 +36,7 @@ exports.updateShipmentPackages = onCall(
 
       const oldData = shipmentSnap.data();
       const oldPackages = oldData.packages || [];
-      const tripId = oldData.currentTruckTripId;
+      const tripId = oldData.currentTripId;
 
       let finalPackages = [];
       let affectedIds = [];
@@ -49,11 +49,8 @@ exports.updateShipmentPackages = onCall(
 
           const pkgQuantity = Number(pkg.quantity) || 1;
           const qtyToApply =
-            newStatus === "LOADED"
-              ? Number(manualQty) || pkgQuantity
-              : 0;
-          const isPartial =
-            newStatus === "LOADED" && qtyToApply < pkgQuantity;
+            newStatus === "LOADED" ? Number(manualQty) || pkgQuantity : 0;
+          const isPartial = newStatus === "LOADED" && qtyToApply < pkgQuantity;
 
           return {
             ...pkg,
@@ -85,12 +82,14 @@ exports.updateShipmentPackages = onCall(
         }, 0);
       const sumReceivedPieces = (pkgs) =>
         pkgs.reduce(
-          (acc, p) => acc + (p.status === "RECEIVED" ? (Number(p.quantity) || 1) : 0),
+          (acc, p) =>
+            acc + (p.status === "RECEIVED" ? Number(p.quantity) || 1 : 0),
           0,
         );
       const sumMissingPieces = (pkgs) =>
         pkgs.reduce(
-          (acc, p) => acc + (p.status === "MISSING" ? (Number(p.quantity) || 1) : 0),
+          (acc, p) =>
+            acc + (p.status === "MISSING" ? Number(p.quantity) || 1 : 0),
           0,
         );
 
