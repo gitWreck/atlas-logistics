@@ -60,7 +60,7 @@ export default function PrintLabelsClient() {
 
           packages.forEach((pkg, index) => {
             flatList.push({
-              uniqueKey: `${shipment.id}-${pkg.trackingNumber}-${index}`,
+              uniqueKey: `${shipment.id}-${pkg.packageId}-${index}`,
               pkg: pkg,
               shipment: shipment, // Pass parent shipment data for address/routing
               index: index, // 1 of X
@@ -176,7 +176,7 @@ export default function PrintLabelsClient() {
 function StandardLabel({ shipment, pkg, index, total }) {
   const recipient = shipment.recipient || {};
   const address = recipient.address || {};
-  const qrValue = pkg.trackingNumber || "NO_ID";
+  const qrValue = pkg.packageId || "NO_ID";
 
   console.log("Rendering label for pkg:", pkg);
   // console.log("Rendering label for package:", pkg);
@@ -278,10 +278,10 @@ function StandardLabel({ shipment, pkg, index, total }) {
       <div className="flex flex-col items-center justify-center border-4 border-black rounded-xl pt-3 pb-2 my-1">
         <QRCode value={qrValue} size={180} level="M" />
         <div className="text-xs font-mono font-bold mt-2 tracking-widest text-center">
-          {pkg.trackingNumber || "NO ID"}
+          {pkg.packageId || "NO ID"}
         </div>
         <div className="text-xs font-mono  mt-2 tracking-widest text-center">
-          ATLAS TRACKING NUMBER
+          ATLAS PACKAGE ID
         </div>
       </div>
 
