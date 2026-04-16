@@ -382,6 +382,21 @@ export default function NewShipmentModal({
                     ? "Print Trip Labels"
                     : "Print Individual Waybill"}
                 </button>
+                <button
+                  onClick={() =>
+                    window.open(
+                      finalTripId
+                        ? `/components/print/labels?tripId=${finalTripId}`
+                        : `/components/print/labels?id=${createdShipmentId}`,
+                      "_blank",
+                    )
+                  }
+                  className={theme.secondaryButton}
+                >
+                  {finalTripId
+                    ? "Print Trip Labels"
+                    : "Print Individual Waybill"}
+                </button>
 
                 <button
                   onClick={() => {

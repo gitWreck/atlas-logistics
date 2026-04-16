@@ -50,6 +50,7 @@ export default function ReceivePackageForm({
         weight: "",
         declaredValue: "",
         packagingType: "Box",
+        packagingGroup: "Single",
         isFragile: false,
         isPerishable: false,
       },
@@ -312,7 +313,12 @@ export default function ReceivePackageForm({
             onAdd={() =>
               setItems([
                 ...items,
-                { description: "", weight: "", packagingType: "Box" },
+                {
+                  description: "",
+                  weight: "",
+                  packagingType: "Box",
+                  packagingGroup: "Single",
+                },
               ])
             }
             onRemove={(idx) => setItems(items.filter((_, i) => i !== idx))}
@@ -340,9 +346,9 @@ export default function ReceivePackageForm({
                 Shipment Photos
               </h3>
               <span
-                className={`text-[10px] ${isDark ? "text-slate-500" : "text-slate-500"}`}
+                className={`text-xs ${isDark ? "text-slate-500" : "text-slate-500"}`}
               >
-                {imageFiles.length}/3
+                {imageFiles.length}/5
               </span>
             </div>
             <div className="flex gap-4 items-start overflow-x-auto pb-2 sm:pb-0 custom-scrollbar">

@@ -22,6 +22,10 @@ import {
 import { useAlert } from "@/app/context/AlertContext";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { storage } from "@/lib/firebase";
+import {
+  packageLabelUrl,
+  shipmentLabelUrl,
+} from "@/app/utility/constant/templates";
 
 export default function UnifiedShipmentModal({
   profile,
@@ -414,18 +418,20 @@ export default function UnifiedShipmentModal({
                 {/* PRINT BUTTON */}
                 <button
                   onClick={() =>
-                    window.open(
-                      finalTripId
-                        ? `/components/print/labels?tripId=${finalTripId}`
-                        : `/components/print/labels?id=${createdShipmentId}`,
-                      "_blank",
-                    )
+                    window.open(shipmentLabelUrl(createdShipmentId), "_blank")
                   }
                   className={`w-full py-3 rounded-xl font-bold border transition-colors ${isDark ? "bg-slate-800 text-white border-slate-700 hover:bg-slate-700" : "bg-slate-200 text-slate-800 border-slate-300 hover:bg-slate-300"}`}
                 >
-                  {finalTripId
-                    ? "Print Trip Labels"
-                    : "Print Individual Waybill"}
+                  Print Shipment Label
+                </button>
+
+                <button
+                  onClick={() =>
+                    window.open(packageLabelUrl(createdShipmentId), "_blank")
+                  }
+                  className={`w-full py-3 rounded-xl font-bold border transition-colors ${isDark ? "bg-slate-800 text-white border-slate-700 hover:bg-slate-700" : "bg-slate-200 text-slate-800 border-slate-300 hover:bg-slate-300"}`}
+                >
+                  Print Individual Packages
                 </button>
 
                 {/* ✅ NEW: CREATE ANOTHER BUTTON */}
