@@ -14,12 +14,12 @@ import {
 import { db } from "../../firebase";
 
 // Import Custom Components
-import { updateShipmentPackages } from "../../components/utilities/FirebaseFunctions";
 import PermissionRequest from "../../components/scanner/PermissionRequest";
 import ScannerOverlay from "../../components/scanner/ScannerOverlay";
 import ManualEntryModal from "../../components/scanner/ManualEntryModal";
 import PackageActionModal from "../../components/checker/shipment-details/PackageActionModal"; // ✅ New Import
 import ShipmentInfoModal from "../../components/checker/shipment-details/ShipmentInfoModal";
+import { updateShipmentPackages } from "../../components/utilities/FirebaseFunctions";
 import { getCurrentLocationSafe } from "../../components/utilities/helpers";
 
 export default function ScannerScreen() {
@@ -131,9 +131,7 @@ export default function ScannerScreen() {
 
       const shipmentDoc = querySnap.docs[0];
       const shipmentData = shipmentDoc.data();
-      const pkg = shipmentData.packages.find(
-        (p) => p.packageId === barcode,
-      );
+      const pkg = shipmentData.packages.find((p) => p.packageId === barcode);
       if (!pkg) throw new Error("Package not found.");
 
       // Info mode should only preview shipment details.

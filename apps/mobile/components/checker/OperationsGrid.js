@@ -19,7 +19,7 @@ export default function OperationsGrid({
         {/* ROW 1: Load & Offload */}
         <View style={styles.row}>
           {/* A. LOAD TRUCK */}
-          <TouchableOpacity
+          {/* <TouchableOpacity
             style={styles.gridBtnTouchable}
             onPress={onScanLoad}
             activeOpacity={0.9}
@@ -36,21 +36,26 @@ export default function OperationsGrid({
               <Text style={styles.btnTitle}>LOAD TRUCK</Text>
               <Text style={styles.btnSub}>Scan to vehicle</Text>
             </LinearGradient>
-          </TouchableOpacity>
+          </TouchableOpacity> */}
 
           {/* B. OFFLOAD */}
           <TouchableOpacity
-            style={[
-              styles.gridBtn,
-              {
-                backgroundColor: "#ffffff",
-                borderWidth: 1,
-                borderColor: "#cbd5e1",
-              },
-            ]}
+            style={styles.gridBtnTouchable}
             onPress={onScanOffload}
           >
-            <View style={[styles.iconCircle, { backgroundColor: "#f1f5f9" }]}>
+            <LinearGradient
+              colors={GRADIENT_COLORS}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={styles.gridBtn}
+            >
+              <View style={styles.iconCircle}>
+                <FontAwesome5 name="truck" size={24} color="#3b82f6" />
+              </View>
+              <Text style={styles.btnTitle}>OFFLOAD TRUCK</Text>
+              <Text style={styles.btnSub}>Scan shipment to vehicle</Text>
+            </LinearGradient>
+            {/* <View style={[styles.iconCircle, { backgroundColor: "#f1f5f9" }]}>
               <FontAwesome5 name="dolly" size={24} color="#64748b" />
             </View>
             <Text style={[styles.btnTitle, styles.btnTitleSecondary]}>
@@ -58,7 +63,7 @@ export default function OperationsGrid({
             </Text>
             <Text style={[styles.btnSub, styles.btnSubSecondary]}>
               Inbound scan
-            </Text>
+            </Text> */}
           </TouchableOpacity>
         </View>
 
