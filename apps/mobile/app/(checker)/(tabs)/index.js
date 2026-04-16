@@ -75,32 +75,33 @@ export default function CheckerIndex() {
         filter === "WEEK" ? subDays(startOfDay(now), 7) : startOfDay(now);
       const firestoreDate = Timestamp.fromDate(startDate);
 
-      const pendingQ = query(shipmentsRef, where("status", "==", "RECEIVED"));
-      const partiallyQ = query(
-        shipmentsRef,
-        where("status", "==", "PARTIALLY_PROCESSED"),
-      );
-
       const receivedQ = query(
         shipmentsRef,
-        where("createdAt", ">=", firestoreDate),
+        where("status", "==", "RECEIVED"),
+        where("updatedAt", ">=", firestoreDate),
       );
 
       const loadedQ = query(
         shipmentsRef,
-        where("status", "in", ["IN_TRANSIT", "COMPLETED"]),
+        where("status", "==", "LOADED"),
         where("updatedAt", ">=", firestoreDate),
       );
 
-      const [pSnap, rSnap, lSnap] = await Promise.all([
-        getCountFromServer(pendingQ),
+      const totalQ = query(
+        shipmentsRef,
+        where("status", "in", ["RECEIVED", "LOADED"]),
+        where("createdAt", ">=", firestoreDate),
+      );
+
+      const [rSnap, tSnap, lSnap] = await Promise.all([
         getCountFromServer(receivedQ),
+        getCountFromServer(totalQ),
         getCountFromServer(loadedQ),
       ]);
 
       setStats({
-        pending: pSnap.data().count,
         received: rSnap.data().count,
+        total: tSnap.data().count,
         loaded: lSnap.data().count,
       });
     } catch (err) {

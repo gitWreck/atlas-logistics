@@ -10,7 +10,7 @@ export default function StatusBoard({ stats, filterMode }) {
       {/* INBOUND */}
       <View style={styles.statCard}>
         <Text style={styles.statVal}>{stats.received}</Text>
-        <Text style={styles.statLabel}>Inbound</Text>
+        <Text style={styles.statLabel}>Received</Text>
         <Text style={styles.statSub}>{timeLabel}</Text>
         <View style={[styles.statBar, { backgroundColor: "#3b82f6" }]} />
       </View>
@@ -18,15 +18,15 @@ export default function StatusBoard({ stats, filterMode }) {
       {/* OUTBOUND */}
       <View style={styles.statCard}>
         <Text style={styles.statVal}>{stats.loaded}</Text>
-        <Text style={styles.statLabel}>Outbound</Text>
+        <Text style={styles.statLabel}>Loaded</Text>
         <Text style={styles.statSub}>{timeLabel}</Text>
         <View style={[styles.statBar, { backgroundColor: "#10b981" }]} />
       </View>
 
       {/* BACKLOG (Always Active) */}
       <View style={styles.statCard}>
-        <Text style={styles.statVal}>{stats.pending}</Text>
-        <Text style={styles.statLabel}>On Floor</Text>
+        <Text style={styles.statVal}>{stats.total}</Text>
+        <Text style={styles.statLabel}>Total</Text>
         <Text style={[styles.statSub, { color: "#f59e0b" }]}>Active</Text>
         <View style={[styles.statBar, { backgroundColor: "#f59e0b" }]} />
       </View>

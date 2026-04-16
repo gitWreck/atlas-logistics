@@ -102,8 +102,9 @@ export default function ShipmentDetailsScreen() {
   const renderListHeader = () => {
     const totals = shipment?.totals || {};
     const percent =
-      totals.totalItems > 0
-        ? (((totals.loaded || 0) + (totals.missing || 0)) / totals.totalItems) *
+      totals.totalContentQty > 0
+        ? (((totals.loaded || 0) + (totals.missing || 0)) /
+            totals.totalContentQty) *
           100
         : 0;
 
@@ -125,8 +126,10 @@ export default function ShipmentDetailsScreen() {
               <Text style={styles.statLabel}>MISSING</Text>
             </View>
             <View style={styles.statBox}>
-              <Text style={styles.statValue}>{totals.totalItems || 0}</Text>
-              <Text style={styles.statLabel}>TOTAL</Text>
+              <Text style={styles.statValue}>
+                {totals.totalContentQty || 0}
+              </Text>
+              <Text style={styles.statLabel}>COUNT</Text>
             </View>
           </View>
           <View style={styles.progressRow}>

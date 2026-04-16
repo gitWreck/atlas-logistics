@@ -73,7 +73,7 @@ export default function PackageListItem({
       <View style={styles.centerContainer}>
         <View style={styles.titleRow}>
           <Text style={[styles.itemTitle, selected && styles.selectedText]}>
-            {item.packageId || item.trackingNumber}
+            {item.packageId}
           </Text>
           {/* {item.isFragile && (
             <View style={styles.fragileBadge}>
