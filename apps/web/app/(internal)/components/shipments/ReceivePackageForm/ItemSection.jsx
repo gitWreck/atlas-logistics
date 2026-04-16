@@ -185,6 +185,24 @@ export default function ItemSection({
                       />
                     </div>
                   </div>
+                  <div className="w-full sm:w-1/3">
+                    <label
+                      className={`text-[10px] uppercase font-bold mb-1 block pl-1 ${isDark ? "text-slate-500" : "text-slate-600"}`}
+                    >
+                      Pack
+                    </label>
+                    <select
+                      className={inp}
+                      value={item.packagingGroup}
+                      onChange={(e) =>
+                        onChange(idx, "packagingGroup", e.target.value)
+                      }
+                    >
+                      {/* <option value="">Select Pack</option> */}
+                      <option value="SINGLE">Single</option>
+                      <option value="BULK">Pack</option>
+                    </select>
+                  </div>
 
                   {/* Tags */}
                   <div className="w-full sm:w-2/3 flex flex-wrap gap-2">
