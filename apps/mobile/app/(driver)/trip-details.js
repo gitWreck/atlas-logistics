@@ -14,7 +14,7 @@ import { FontAwesome5 } from "@expo/vector-icons";
 import { doc, onSnapshot } from "firebase/firestore"; // ADDED updateDoc
 import { db } from "../../firebase";
 import { StatusBar } from "expo-status-bar";
-import GetLocation from "react-native-get-location";
+import { getCurrentLocationSafe } from "../../components/utilities/helpers";
 
 import TripSummaryCard from "../../components/driver/trip/TripSummaryCard";
 import TripProgressStepper from "../../components/driver/trip/TripProgressStepper";
@@ -26,30 +26,13 @@ import {
   updateTripStatus,
 } from "../../components/utilities/FirebaseFunctions";
 
+// driver screen
 export default function TripDetailsScreen() {
   const { tripId } = useLocalSearchParams();
   const router = useRouter();
   const [trip, setTrip] = useState(null);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
-
-  const getCurrentLocationSafe = async () => {
-    try {
-      const loc = await GetLocation.getCurrentPosition({
-        enableHighAccuracy: true,
-        timeout: 15000,
-      });
-
-      if (!loc) return null;
-      return {
-        lat: loc.latitude,
-        lng: loc.longitude,
-      };
-    } catch (error) {
-      console.log("Location error (startTrip):", error);
-      return null;
-    }
-  };
 
   useEffect(() => {
     if (!tripId) return;
@@ -114,10 +97,6 @@ export default function TripDetailsScreen() {
       ],
     );
   };
-
-  // --- NEW: Clear Delay Function ---
-  // Make sure to add these imports at the top of your file if you haven't already:
-  // import { getFunctions, httpsCallable } from "firebase/functions";
 
   const handleClearDelay = async () => {
     Alert.alert(

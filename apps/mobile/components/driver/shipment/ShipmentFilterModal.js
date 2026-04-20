@@ -11,7 +11,7 @@ import { FontAwesome5 } from "@expo/vector-icons";
 import {
   DRIVER_SHIPMENT_FILTER,
   DriverShipmentFilter,
-} from "../../constants/tracking-constants";
+} from "../../constants/templates";
 
 export default function ShipmentFilterModal({
   visible,

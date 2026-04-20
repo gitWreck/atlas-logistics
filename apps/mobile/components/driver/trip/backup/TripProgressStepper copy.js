@@ -2,7 +2,7 @@ import React from "react";
 import { View, Text, StyleSheet } from "react-native";
 import { Image } from "expo-image";
 import { FontAwesome5 } from "@expo/vector-icons";
-import { DRIVER_STEPS } from "../../../constants/tracking-constants";
+import { DRIVER_STEPS } from "../../../constants/templates";
 
 const BLUE = "#155DFC";
 const GREY = "#94a3b8";

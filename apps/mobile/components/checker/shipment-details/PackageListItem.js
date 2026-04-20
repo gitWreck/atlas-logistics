@@ -8,221 +8,361 @@ export default function PackageListItem({
   onMenuPress,
   onLongPress,
   selected,
-  isSelectionMode, // ✅ NEW PROP: Pass 'selectedIds.size > 0' from parent
+  isSelectionMode,
 }) {
   const isLoaded = item.status === "LOADED";
   const isMissing = item.status === "MISSING";
 
   const handlePress = () => {
-    // ✅ FIX: If we are in selection mode (any item is selected),
-    // tapping should toggle selection, NOT open the menu.
     if (isSelectionMode || selected) {
-      onLongPress(item);
+      onLongPress?.(item);
     } else {
-      onMenuPress(item);
+      onMenuPress?.(item);
     }
   };
+
+  const packageIcon =
+    item.packagingType === "Box"
+      ? "box"
+      : item.packagingType === "Sack"
+        ? "shopping-bag"
+        : item.packagingType === "Bundle"
+          ? "boxes"
+          : "archive";
 
   return (
     <TouchableOpacity
       style={[
-        styles.listItem,
-        isLoaded && styles.loadedBorder,
-        isMissing && styles.missingBorder,
-        selected && styles.selectedBorder,
+        styles.card,
+        isLoaded && styles.loadedCard,
+        isMissing && styles.missingCard,
+        selected && styles.selectedCard,
       ]}
-      onLongPress={() => onLongPress(item)}
-      onPress={handlePress} // ✅ Use the new handler
-      activeOpacity={0.7}
+      onLongPress={() => onLongPress?.(item)}
+      onPress={handlePress}
+      activeOpacity={0.85}
       delayLongPress={300}
     >
-      {/* Left Container: Status/Selection Indicator + Sequence */}
-      <View style={styles.leftContainer}>
+      <View style={styles.left}>
         <View
           style={[
-            styles.iconCircle,
-            selected && styles.selectedIconBg,
-            isLoaded && styles.loadedIconBg,
-            isMissing && styles.missingIconBg,
+            styles.iconWrap,
+            selected && styles.selectedIconWrap,
+            isLoaded && styles.loadedIconWrap,
+            isMissing && styles.missingIconWrap,
           ]}
         >
           <FontAwesome5
-            name={
-              selected
-                ? "check"
-                : item.packagingType === "Box"
-                  ? "box"
-                  : "archive"
-            }
-            size={14}
+            name={selected ? "check" : packageIcon}
+            size={15}
             color={
               selected
-                ? "#fff"
+                ? "#ffffff"
                 : isLoaded
                   ? "#2563eb"
                   : isMissing
                     ? "#dc2626"
-                    : "#64748b"
+                    : "#475569"
             }
           />
         </View>
-        <Text style={styles.sequenceText}>#{item.sequence}</Text>
+
+        <Text style={styles.sequenceText}>#{item.sequence || "—"}</Text>
       </View>
 
-      {/* Center Container: Main Info */}
-      <View style={styles.centerContainer}>
-        <View style={styles.titleRow}>
-          <Text style={[styles.itemTitle, selected && styles.selectedText]}>
-            {item.packageId}
+      <View style={styles.center}>
+        <View style={styles.topRow}>
+          <Text style={[styles.packageId, selected && styles.selectedText]}>
+            {item.packageId || "No Package ID"}
           </Text>
-          {/* {item.isFragile && (
-            <View style={styles.fragileBadge}>
-              <FontAwesome5 name="wine-glass-alt" size={8} color="#991b1b" />
-              <Text style={styles.fragileText}>FRAGILE</Text>
-            </View>
-          )} */}
+
+          {/* {!selected && <StatusBadge status={item.status} />} */}
         </View>
 
-        <Text style={styles.itemDescription} numberOfLines={1}>
-          {item.description} • {item.packagingType}
+        <Text style={styles.description} numberOfLines={1}>
+          {item.description || "No description"}
+        </Text>
+
+        <View style={styles.metaRow}>
+          <View style={styles.metaPill}>
+            <FontAwesome5 name="box-open" size={10} color="#64748b" />
+            <Text style={styles.metaText}>
+              {item.packagingType || "Package"}
+            </Text>
+          </View>
+
+          <View style={styles.metaPill}>
+            <FontAwesome5 name="hashtag" size={10} color="#64748b" />
+            <Text style={styles.metaText}>{item.quantity || 0} pcs</Text>
+          </View>
+        </View>
+
+        <View style={styles.badgesRow}>
           {item.isFragile && (
-            <View style={styles.fragileBadge}>
-              <FontAwesome5 name="wine-glass-alt" size={8} color="#991b1b" />
-              <Text style={styles.fragileText}>FRAGILE</Text>
-            </View>
-          )}
-          {item.isPerishable && (
-            <View style={styles.fragileBadge}>
-              <FontAwesome5 name="calendar-alt" size={8} color="#065f46" />
-              <Text style={[styles.fragileText, { color: "#065f46" }]}>
-                PERISHABLE
+            <View style={[styles.tag, styles.fragileTag]}>
+              <FontAwesome5 name="wine-glass-alt" size={9} color="#991b1b" />
+              <Text style={[styles.tagText, styles.fragileTagText]}>
+                Fragile
               </Text>
             </View>
           )}
-        </Text>
+
+          {item.isPerishable && (
+            <View style={[styles.tag, styles.perishableTag]}>
+              <FontAwesome5 name="snowflake" size={9} color="#065f46" />
+              <Text style={[styles.tagText, styles.perishableTagText]}>
+                Perishable
+              </Text>
+            </View>
+          )}
+        </View>
 
         <View style={styles.locationRow}>
-          <FontAwesome5 name="map-marker-alt" size={10} color="#94a3b8" />
-          <Text style={styles.locationText}>
-            {item.currentLocation} • {item.quantity} pcs
+          <FontAwesome5 name="map-marker-alt" size={11} color="#94a3b8" />
+          <Text style={styles.locationText} numberOfLines={1}>
+            From: {item.currentLocation || "No location"}
           </Text>
         </View>
       </View>
 
-      {/* Right Container: Badge & Action */}
-      <View style={styles.rightContainer}>
-        {!selected && <StatusBadge status={item.status} />}
-
+      <View style={styles.right}>
         <TouchableOpacity
-          style={styles.menuBtn}
-          onPress={() => onMenuPress(item)}
-          hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
+          style={[styles.menuBtn, selected && styles.menuBtnSelected]}
+          onPress={() => onMenuPress?.(item)}
         >
           <FontAwesome5
             name="ellipsis-v"
             size={14}
-            color={selected ? "#3b82f6" : "#94a3b8"}
+            color={selected ? "#2563eb" : "#94a3b8"}
           />
         </TouchableOpacity>
+
+        {!selected && (
+          <View style={styles.statusWrap}>
+            <StatusBadge status={item.status} />
+          </View>
+        )}
       </View>
     </TouchableOpacity>
   );
 }
 
 const styles = StyleSheet.create({
-  listItem: {
+  card: {
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "flex-start",
     padding: 14,
     backgroundColor: "#ffffff",
-    borderRadius: 16,
-    marginHorizontal: 16,
-    marginVertical: 6,
-    borderWidth: 1.5,
-    borderColor: "#f1f5f9",
-    // Elevation for Android
+    borderRadius: 20,
+    // marginHorizontal: 16,
+    marginVertical: 7,
+    borderWidth: 1,
+    borderColor: "#e2e8f0",
+    // shadowColor: "#0f172a",
+    shadowOffset: { width: 0, height: 6 },
+    // shadowOpacity: 0.05,
+    // shadowRadius: 14,
     elevation: 2,
-    // Shadow for iOS
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
   },
-  leftContainer: {
+
+  loadedCard: {
+    borderColor: "#bfdbfe",
+    backgroundColor: "#f8fbff",
+  },
+
+  missingCard: {
+    borderColor: "#fecaca",
+    backgroundColor: "#fffafa",
+  },
+
+  selectedCard: {
+    borderColor: "#60a5fa",
+    backgroundColor: "#eff6ff",
+    shadowOpacity: 0.08,
+  },
+
+  left: {
     alignItems: "center",
     marginRight: 12,
+    paddingTop: 2,
   },
-  centerContainer: {
+
+  center: {
     flex: 1,
   },
-  rightContainer: {
+
+  right: {
+    marginLeft: 10,
+    justifyContent: "space-between", // key change
     alignItems: "flex-end",
-    gap: 8,
   },
-  iconCircle: {
-    width: 38,
-    height: 38,
-    borderRadius: 12,
+
+  iconWrap: {
+    width: 42,
+    height: 42,
+    borderRadius: 14,
     backgroundColor: "#f8fafc",
     alignItems: "center",
     justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "#e2e8f0",
   },
+
+  statusWrap: {
+    marginTop: 8,
+    alignItems: "flex-end",
+  },
+
+  right: {
+    marginLeft: 10,
+    justifyContent: "space-between", // key change
+    alignItems: "flex-end",
+  },
+
+  loadedIconWrap: {
+    backgroundColor: "#eff6ff",
+    borderColor: "#bfdbfe",
+  },
+
+  missingIconWrap: {
+    backgroundColor: "#fef2f2",
+    borderColor: "#fecaca",
+  },
+
+  selectedIconWrap: {
+    backgroundColor: "#2563eb",
+    borderColor: "#2563eb",
+  },
+
   sequenceText: {
     fontSize: 10,
     fontWeight: "800",
     color: "#94a3b8",
-    marginTop: 4,
+    marginTop: 6,
+    letterSpacing: 0.4,
   },
-  titleRow: {
+
+  topRow: {
     flexDirection: "row",
-    alignItems: "center",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    gap: 10,
     marginBottom: 4,
-    gap: 6,
   },
-  itemTitle: {
-    fontWeight: "700",
-    color: "#1e293b",
-    fontSize: 13,
+
+  packageId: {
+    flex: 1,
+    fontSize: 14,
+    fontWeight: "800",
+    color: "#0f172a",
+    marginRight: 8,
   },
-  fragileBadge: {
+
+  selectedText: {
+    color: "#1d4ed8",
+  },
+
+  description: {
+    fontSize: 12.5,
+    color: "#475569",
+    marginBottom: 8,
+    lineHeight: 18,
+  },
+
+  metaRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    marginBottom: 8,
+  },
+
+  metaPill: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#fee2e2",
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
-    gap: 4,
-    marginBottom: -20,
+    gap: 5,
+    backgroundColor: "#f8fafc",
+    borderWidth: 1,
+    borderColor: "#e2e8f0",
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    borderRadius: 999,
   },
-  fragileText: {
-    fontSize: 9,
-    fontWeight: "800",
+
+  metaText: {
+    fontSize: 11,
+    fontWeight: "600",
+    color: "#475569",
+  },
+
+  badgesRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 6,
+    marginBottom: 8,
+  },
+
+  tag: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 999,
+  },
+
+  fragileTag: {
+    backgroundColor: "#fef2f2",
+    borderWidth: 1,
+    borderColor: "#fecaca",
+  },
+
+  perishableTag: {
+    backgroundColor: "#ecfdf5",
+    borderWidth: 1,
+    borderColor: "#a7f3d0",
+  },
+
+  tagText: {
+    fontSize: 10,
+    fontWeight: "700",
+  },
+
+  fragileTagText: {
     color: "#991b1b",
   },
-  itemDescription: {
-    fontSize: 12,
-    color: "#475569",
-    marginBottom: 4,
+
+  perishableTagText: {
+    color: "#065f46",
   },
+
   locationRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 4,
+    gap: 6,
+    marginTop: 2,
   },
+
   locationText: {
-    fontSize: 10,
+    flex: 1,
+    fontSize: 11,
     color: "#94a3b8",
-    fontWeight: "500",
+    fontWeight: "600",
   },
+
   menuBtn: {
-    padding: 6,
+    width: 34,
+    height: 34,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#f8fafc",
+    borderWidth: 1,
+    borderColor: "#e2e8f0",
+    marginTop: 2,
   },
-  // Conditional Styles
-  loadedBorder: { borderColor: "#dbeafe" },
-  missingBorder: { borderColor: "#fee2e2" },
-  selectedBorder: { borderColor: "#3b82f6", backgroundColor: "#eff6ff" },
-  loadedIconBg: { backgroundColor: "#eff6ff" },
-  missingIconBg: { backgroundColor: "#fef2f2" },
-  selectedIconBg: { backgroundColor: "#3b82f6" },
-  selectedText: { color: "#1d4ed8" },
+
+  menuBtnSelected: {
+    backgroundColor: "#dbeafe",
+    borderColor: "#bfdbfe",
+  },
 });

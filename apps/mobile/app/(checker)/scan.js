@@ -3,14 +3,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { View, Alert, Vibration, StyleSheet, Text } from "react-native";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import {
-  doc,
-  getDoc,
-  collection,
-  query,
-  where,
-  getDocs,
-} from "firebase/firestore";
+import { collection, query, where, getDocs } from "firebase/firestore";
 import { db } from "../../firebase";
 
 // Import Custom Components

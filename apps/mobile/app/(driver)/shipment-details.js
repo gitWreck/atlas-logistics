@@ -12,8 +12,8 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { doc, getDoc } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import * as ImagePicker from "expo-image-picker";
-import GetLocation from "react-native-get-location";
 import { StatusBar } from "expo-status-bar";
+import { getCurrentLocationSafe } from "../../components/utilities/helpers";
 
 import { db, storage } from "../../firebase";
 import {
@@ -30,6 +30,7 @@ import ShipmentActionFooter from "../../components/driver/shipment/ShipmentActio
 import ReportIssueModal from "../../components/driver/shipment/ReportIssueModal";
 import ExistingProofsViewer from "../../components/tracking/ExistingProofsViewer";
 
+// drivers screen
 export default function ShipmentDetailsScreen() {
   const { shipmentId, tripId, tripType } = useLocalSearchParams();
   const router = useRouter();
@@ -62,20 +63,6 @@ export default function ShipmentDetailsScreen() {
     };
     fetchDetails();
   }, [shipmentId]);
-
-  // 2. Location Helper
-  const getCurrentLocationSafe = async () => {
-    try {
-      const loc = await GetLocation.getCurrentPosition({
-        enableHighAccuracy: true,
-        timeout: 15000,
-      });
-      return { lat: loc.latitude, lng: loc.longitude };
-    } catch (error) {
-      console.log("Location error:", error);
-      return null;
-    }
-  };
 
   // 3. Image Picker Logic
   const pickImage = async (useCamera) => {

@@ -7,7 +7,6 @@ import { useSearchParams } from "next/navigation";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faPrint,
-  faFileInvoiceDollar,
   faPhone,
   faLocationDot,
   faUser,

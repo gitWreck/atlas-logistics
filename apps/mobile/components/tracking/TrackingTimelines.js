@@ -1,6 +1,6 @@
 import React from "react";
 import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
-import { COLORS, STATUS_STEPS } from "../constants/tracking-constants";
+import { COLORS, STATUS_STEPS } from "../constants/templates";
 import { FontAwesome5 } from "@expo/vector-icons";
 
 export default function TrackingTimeline({
