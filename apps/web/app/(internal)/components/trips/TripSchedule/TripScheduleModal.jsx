@@ -31,7 +31,7 @@ export default function TripScheduleModal({
   const [tripQuery, setTripQuery] = useState("");
   const [showTripDropdown, setShowTripDropdown] = useState(false);
   const [error, setError] = useState("");
-  const [sendNotification, setsendNotification] = useState(false);
+  const [sendNotification, setsendNotification] = useState(true);
 
   const modalTheme = getModalThemeClasses(isDark);
   const actionTheme = getModalActionClasses();
@@ -52,7 +52,7 @@ export default function TripScheduleModal({
     );
     setError("");
     setShowTripDropdown(false);
-    setsendNotification(false);
+    setsendNotification(true);
   }, [isOpen, selectedTripSchedule]);
 
   const updateField = (key, value) => {
@@ -128,7 +128,7 @@ export default function TripScheduleModal({
       plannedDeparture: form.plannedDeparture || null,
       estimatedArrival: form.estimatedArrival || null,
       plannedLoadingStart: form.plannedLoadingStart || null,
-      sendNotification,
+      notify: sendNotification,
     });
   };
 
@@ -139,7 +139,7 @@ export default function TripScheduleModal({
       <div className="absolute inset-0 overflow-hidden">
         <div className="h-full w-full flex items-end sm:items-center justify-center p-0 sm:p-4">
           <div
-            className={`w-full h-full sm:h-auto sm:max-h-[92vh] sm:max-w-4xl border shadow-2xl rounded-none sm:rounded-2xl flex flex-col ${modalTheme.modal}`}
+            className={` h-full sm:h-auto sm:max-h-[92vh] sm:max-w-4xl border shadow-2xl rounded-none flex flex-col ${modalTheme.modal}`}
           >
             {/* Header */}
             <div
@@ -274,7 +274,7 @@ export default function TripScheduleModal({
                       )}
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
                       <TripScheduleInfoCard
                         label="Truck"
                         value={form.truckPlateNumber}
@@ -289,6 +289,13 @@ export default function TripScheduleModal({
                           `${form.origin || ""} → ${form.destination || ""}`
                         }
                         icon={faRoute}
+                        theme={modalTheme}
+                      />
+
+                      <TripScheduleInfoCard
+                        label="Type"
+                        value={form.tripType.replace("_", " ")}
+                        icon={faCalendarDays}
                         theme={modalTheme}
                       />
 
@@ -349,7 +356,6 @@ export default function TripScheduleModal({
                   </div>
                 </section>
 
-                {/* Notification */}
                 <section className="space-y-3">
                   <div>
                     <h3
@@ -357,10 +363,10 @@ export default function TripScheduleModal({
                     >
                       Customer Notification
                     </h3>
-                    <p className={`text-xs mt-1 ${modalTheme.helperText}`}>
+                    {/* <p className={`text-xs mt-1 ${modalTheme.helperText}`}>
                       Choose whether the Firebase Function should send schedule
                       updates to customers.
-                    </p>
+                    </p> */}
                   </div>
 
                   <label
@@ -369,7 +375,10 @@ export default function TripScheduleModal({
                     <input
                       type="checkbox"
                       checked={sendNotification}
-                      onChange={(e) => setsendNotification(e.target.checked)}
+                      onChange={(e) => {
+                        console.log(e.target.checked);
+                        setsendNotification(e.target.checked);
+                      }}
                       className="mt-1 h-4 w-4"
                     />
 
@@ -378,7 +387,7 @@ export default function TripScheduleModal({
                         className={`text-sm font-semibold flex items-center gap-2 ${modalTheme.title}`}
                       >
                         <FontAwesomeIcon icon={faBell} />
-                        Send notification to customers
+                        Notify customers
                       </div>
                       {/* <p className={`text-xs mt-1 ${modalTheme.helperText}`}>
                         When enabled, `sendNotification` will be passed

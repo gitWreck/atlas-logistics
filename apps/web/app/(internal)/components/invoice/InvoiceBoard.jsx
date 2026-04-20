@@ -20,6 +20,8 @@ import {
   updateInvoice,
   updateInvoiceStatus,
 } from "@/app/utility/FirebaseFunctions";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faBell } from "@fortawesome/free-solid-svg-icons";
 
 const InvoiceBoard = forwardRef(function InvoiceBoard(
   { user, isDark = false },
@@ -37,6 +39,11 @@ const InvoiceBoard = forwardRef(function InvoiceBoard(
   const [formMode, setFormMode] = useState("create");
 
   const theme = getBoardThemeClasses(isDark);
+
+  const [isConfirmOpen, setIsConfirmOpen] = useState(false);
+  const [confirmAction, setConfirmAction] = useState(null);
+  const [confirmInvoice, setConfirmInvoice] = useState(null);
+  const [sendNotification, setSendNotification] = useState(true);
 
   const fetchInvoicesAndShipments = async () => {
     try {
@@ -174,6 +181,20 @@ const InvoiceBoard = forwardRef(function InvoiceBoard(
     setSelectedShipment(null);
   };
 
+  const handleOpenConfirm = (invoice, action) => {
+    setConfirmInvoice(invoice);
+    setConfirmAction(action);
+    setSendNotification(true);
+    setIsConfirmOpen(true);
+  };
+
+  const handleCloseConfirm = () => {
+    setIsConfirmOpen(false);
+    setConfirmInvoice(null);
+    setConfirmAction(null);
+    setSendNotification(true);
+  };
+
   // change this to a firebase function and move to backend, then call it from here
   const handleSubmitInvoice = async (payload) => {
     setLoading(true);
@@ -201,13 +222,19 @@ const InvoiceBoard = forwardRef(function InvoiceBoard(
     }
   };
 
-  const handleInvoiceStatusUpdate = async (invoice, status) => {
+  // const handleInvoiceStatusUpdate = async (invoice, status) => {
+  const handleInvoiceStatusUpdate = async (
+    invoice,
+    status,
+    sendNotification = false,
+  ) => {
     try {
       if (!user || !invoice?.id) return;
 
       await updateInvoiceStatus({
         invoiceId: invoice.id,
         status,
+        sendNotification,
       });
 
       await fetchInvoicesAndShipments();
@@ -218,6 +245,18 @@ const InvoiceBoard = forwardRef(function InvoiceBoard(
     } catch (err) {
       console.error("Error updating invoice status:", err);
     }
+  };
+
+  const handleConfirmStatusUpdate = async () => {
+    if (!confirmInvoice || !confirmAction) return;
+
+    await handleInvoiceStatusUpdate(
+      confirmInvoice,
+      confirmAction,
+      sendNotification,
+    );
+
+    handleCloseConfirm();
   };
 
   useImperativeHandle(
@@ -250,13 +289,9 @@ const InvoiceBoard = forwardRef(function InvoiceBoard(
           onRefresh={fetchInvoicesAndShipments}
           onViewInvoice={handleOpenDetails}
           onEditInvoice={handleOpenEdit}
-          onIssueInvoice={(invoice) =>
-            handleInvoiceStatusUpdate(invoice, "ISSUED")
-          }
-          onMarkPaid={(invoice) => handleInvoiceStatusUpdate(invoice, "PAID")}
-          onCancelInvoice={(invoice) =>
-            handleInvoiceStatusUpdate(invoice, "CANCELLED")
-          }
+          onIssueInvoice={(invoice) => handleOpenConfirm(invoice, "ISSUED")}
+          onMarkPaid={(invoice) => handleOpenConfirm(invoice, "PAID")}
+          onCancelInvoice={(invoice) => handleOpenConfirm(invoice, "CANCELLED")}
           isDark={isDark}
         />
       </main>
@@ -283,19 +318,122 @@ const InvoiceBoard = forwardRef(function InvoiceBoard(
           handleCloseDetails();
           if (selectedInvoice) handleOpenEdit(selectedInvoice);
         }}
-        onIssue={() =>
-          selectedInvoice &&
-          handleInvoiceStatusUpdate(selectedInvoice, "ISSUED")
-        }
-        onMarkPaid={() =>
-          selectedInvoice && handleInvoiceStatusUpdate(selectedInvoice, "PAID")
-        }
-        onCancel={() =>
-          selectedInvoice &&
-          handleInvoiceStatusUpdate(selectedInvoice, "CANCELLED")
-        }
+        onIssueInvoice={(invoice) => handleOpenConfirm(invoice, "ISSUED")}
+        onMarkPaid={(invoice) => handleOpenConfirm(invoice, "PAID")}
+        onCancelInvoice={(invoice) => handleOpenConfirm(invoice, "CANCELLED")}
         isDark={isDark}
       />
+
+      {isConfirmOpen && (
+        <div
+          className={`fixed inset-0 z-[120] flex items-center justify-center p-4 ${isDark ? "bg-slate-950/70 backdrop-blur-sm" : "bg-black/40 backdrop-blur-sm"}`}
+        >
+          <div
+            className={`w-full max-w-md  border shadow-2xl ${isDark ? "bg-slate-900 border-slate-700 text-white" : "bg-white border-slate-200 text-slate-900"}`}
+          >
+            <div
+              className={`px-5 py-4 border-b ${isDark ? "border-slate-800 bg-slate-950/50" : "border-slate-200 bg-slate-50"}`}
+            >
+              <h3 className="text-base font-bold">
+                Confirm{" "}
+                {confirmAction === "ISSUED"
+                  ? "Issue"
+                  : confirmAction === "PAID"
+                    ? "Mark as Paid"
+                    : "Cancel"}{" "}
+                Invoice
+              </h3>
+              <p
+                className={`text-sm mt-1 ${isDark ? "text-slate-400" : "text-slate-600"}`}
+              >
+                {confirmInvoice?.invoiceNumber ||
+                  confirmInvoice?.id ||
+                  "Selected invoice"}
+              </p>
+            </div>
+
+            <div className="p-5 space-y-4">
+              <p className={` ${isDark ? "text-slate-300" : "text-slate-700"}`}>
+                Are you sure you want to{" "}
+                <span className="font-semibold">
+                  {confirmAction === "ISSUED"
+                    ? "issue"
+                    : confirmAction === "PAID"
+                      ? "mark this invoice as paid"
+                      : "cancel"}
+                </span>
+                ?
+              </p>
+
+              <section className="space-y-3">
+                <div>
+                  {/* <h3
+                    className={`text-xs sm:text-sm font-bold uppercase tracking-widest ${isDark ? "text-white" : "text-slate-900"}`}
+                  >
+                    Customer Notification
+                  </h3> */}
+                  {/* <p
+                    className={`text-xs mt-1 ${isDark ? "text-slate-500" : "text-slate-600"}`}
+                  >
+                    Choose whether the Firebase Function should send schedule
+                    updates to customers.
+                  </p> */}
+                </div>
+
+                <label
+                  className={`flex items-start gap-3 rounded-xl border p-4 cursor-pointer ${isDark ? "bg-slate-950 border-slate-800" : "bg-slate-50 border-slate-200"}`}
+                >
+                  <input
+                    type="checkbox"
+                    checked={sendNotification}
+                    onChange={(e) => setSendNotification(e.target.checked)}
+                    className="mt-1 h-4 w-4"
+                  />
+
+                  <div className="min-w-0">
+                    <div
+                      className={`text-sm font-semibold flex items-center gap-2 ${isDark ? "text-white" : "text-slate-900"}`}
+                    >
+                      <FontAwesomeIcon icon={faBell} />
+                      Notify customers
+                    </div>
+                  </div>
+                </label>
+              </section>
+            </div>
+
+            <div
+              className={`px-5 py-4 border-t flex justify-end gap-2 ${isDark ? "border-slate-800" : "border-slate-200"}`}
+            >
+              <button
+                type="button"
+                onClick={handleCloseConfirm}
+                className={
+                  isDark
+                    ? "px-4 py-2 rounded-lg border border-slate-700 text-slate-300 hover:bg-slate-800"
+                    : "px-4 py-2 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50"
+                }
+              >
+                Back
+              </button>
+
+              <button
+                type="button"
+                onClick={handleConfirmStatusUpdate}
+                className={
+                  confirmAction === "PAID"
+                    ? "px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-semibold"
+                    : confirmAction === "CANCELLED"
+                      ? "px-4 py-2 rounded-lg bg-red-600 hover:bg-red-500 text-white font-semibold"
+                      : "px-4 py-2 rounded-lg bg-amber-600 hover:bg-amber-500 text-white font-semibold"
+                }
+              >
+                Confirm
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 });

@@ -86,10 +86,6 @@ const TripBoard = forwardRef(function TripBoard(
     }
   };
 
-  useEffect(() => {
-    fetchTrips();
-  }, []);
-
   const fetchTripSchedules = () => {
     try {
       const cleaned = (trips || []).map((trip) => {
@@ -106,6 +102,7 @@ const TripBoard = forwardRef(function TripBoard(
   };
 
   useEffect(() => {
+    fetchTrips();
     fetchTripSchedules(); // filter the fetched trips to get only the ones needed for trip modal search input
   }, []);
 

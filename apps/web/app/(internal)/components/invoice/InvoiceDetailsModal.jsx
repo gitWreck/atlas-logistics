@@ -14,11 +14,13 @@ import {
   faUser,
   faPhone,
   faTruckFast,
+  faPrint,
 } from "@fortawesome/free-solid-svg-icons";
 import { getModalThemeClasses } from "@/app/utility/constant/theme";
 import { getModalActionClasses } from "@/app/utility/constant/action";
 import { formatAmount, StatusBadge, InfoBlock } from "./utils";
 import StatusButton from "../ui/StatusButton";
+import { invoiceUrl } from "@/app/utility/constant/templates";
 
 export default function InvoiceDetailsModal({
   isOpen = false,
@@ -143,6 +145,24 @@ export default function InvoiceDetailsModal({
                     className="w-auto px-4 py-2 text-sm"
                   />
                 )}
+
+                <StatusButton
+                  onClick={() =>
+                    window.open(
+                      invoiceUrl(
+                        invoice.id ||
+                          invoice.invoiceNumber ||
+                          invoice.invoiceId,
+                      ),
+                      "_blank",
+                    )
+                  }
+                  icon={faPrint}
+                  label="Print Invoice"
+                  variant="blue"
+                  isDark={isDark}
+                  className="w-auto px-4 py-2 text-sm"
+                />
               </section>
 
               <section className="grid grid-cols-1 lg:grid-cols-3 gap-4">
@@ -208,13 +228,13 @@ export default function InvoiceDetailsModal({
                       }
                       isDark={isDark}
                     />
-                    <InfoBlock
+                    {/* <InfoBlock
                       label="Shipment Status"
                       value={
                         invoice.shipmentStatus || connectedShipment?.status
                       }
                       isDark={isDark}
-                    />
+                    /> */}
                     <InfoBlock
                       label="Trip ID"
                       value={
@@ -329,7 +349,7 @@ export default function InvoiceDetailsModal({
                         key={pkg.packageId || `${pkg.description}-${index}`}
                         className={`rounded-lg border p-3 ${modalTheme.statsCard}`}
                       >
-                        <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
+                        <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
                           <InfoBlock
                             label="Package Tracking"
                             value={pkg.packageId}
@@ -350,11 +370,11 @@ export default function InvoiceDetailsModal({
                             value={pkg.quantity}
                             isDark={isDark}
                           />
-                          <InfoBlock
+                          {/* <InfoBlock
                             label="Status"
                             value={pkg.status}
                             isDark={isDark}
-                          />
+                          /> */}
                         </div>
                       </div>
                     ))}

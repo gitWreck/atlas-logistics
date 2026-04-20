@@ -10,7 +10,7 @@ import {
 } from "@fortawesome/free-solid-svg-icons";
 import { getModalThemeClasses } from "@/app/utility/constant/theme";
 import { getModalActionClasses } from "@/app/utility/constant/action";
-import { buildInitialForm, ReadOnlyField, DateTimeField } from "../utils";
+import { buildInitialForm, ReadOnlyField, DateTimeField } from "../../utils";
 
 export default function TripScheduleModal({
   isOpen = false,

@@ -35,6 +35,7 @@ function renderTimePair({
 function buildInitialForm(trip = null) {
   return {
     tripId: trip?.tripId || trip?.id || "",
+    tripType: trip?.tripType || "",
     // tripDocId: trip?.id || "",
     truckId: trip?.truckId || "",
     truckPlateNumber: trip?.truckPlateNumber || "",
@@ -84,4 +85,21 @@ function DateTimeField({ label, value, onChange, theme }) {
   );
 }
 
-export { renderTimePair, buildInitialForm, ReadOnlyField, DateTimeField };
+function getDayLabel(dateValue) {
+  if (!dateValue) return "—";
+
+  const date = new Date(dateValue);
+  if (Number.isNaN(date.getTime())) return "—";
+
+  return date.toLocaleDateString("en-PH", {
+    weekday: "long",
+  });
+}
+
+export {
+  renderTimePair,
+  buildInitialForm,
+  ReadOnlyField,
+  DateTimeField,
+  getDayLabel,
+};
