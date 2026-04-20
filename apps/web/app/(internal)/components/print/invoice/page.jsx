@@ -1,6 +1,8 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+export const dynamic = "force-dynamic"; // Keep this for safety
+
+import React, { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
@@ -16,7 +18,7 @@ import { doc, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { formatAmount, InfoRow } from "../../../components/invoice/utils";
 
-export default function InvoicePrintView() {
+function InvoicePrintView() {
   const searchParams = useSearchParams();
   const invoiceId = searchParams.get("id");
 
@@ -509,5 +511,19 @@ export default function InvoicePrintView() {
         }
       `}</style>
     </div>
+  );
+}
+
+export default function InvoicePrintPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center bg-slate-100 text-slate-800">
+          <div className="text-center p-10">Loading Invoice...</div>
+        </div>
+      }
+    >
+      <InvoicePrintView />
+    </Suspense>
   );
 }
