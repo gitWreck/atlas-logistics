@@ -241,37 +241,38 @@ export default function TripScheduleTable({
                       </button>
                     </div>
 
-                    <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      <InfoBlock
-                        label="Trip"
-                        value={getTripDisplayId(trip)}
-                        theme={theme}
-                      />
-                      <div>
+                    <div className="mt-4 flex items-center justify-between gap-3">
+                      <div className="min-w-0">
                         <p
                           className={`text-[10px] uppercase tracking-wide ${theme.cellSecondary}`}
                         >
-                          Status
+                          Trip
                         </p>
-                        <div className="flex flex-wrap items-center gap-2 mt-1">
-                          <StatusBadge status={statusLabel} isDark={isDark} />
-                          {hasConflict && (
-                            <span
-                              className={`inline-flex px-2 py-1 rounded-full text-[10px] border ${theme.statusInactive}`}
-                            >
-                              Conflict
-                            </span>
-                          )}
-                        </div>
+                        <p
+                          className={`text-sm font-semibold ${theme.cellPrimary}`}
+                        >
+                          {getTripDisplayId(trip) || "—"}
+                        </p>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <StatusBadge status={statusLabel} isDark={isDark} />
+                        {hasConflict && (
+                          <span
+                            className={`inline-flex px-2 py-1 rounded-full text-[10px] border ${theme.statusInactive}`}
+                          >
+                            Conflict
+                          </span>
+                        )}
                       </div>
                     </div>
 
-                    <div className="mt-4 grid grid-cols-1 gap-3">
-                      {/* Departure / ETA */}
+                    <div className="mt-4">
                       <div
                         className={`rounded-2xl border px-4 py-3 ${overviewTheme.overviewStatCard}`}
                       >
-                        <div className="grid grid-cols-2 gap-3">
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                          {/* Departure */}
                           <div>
                             <div
                               className={`text-[11px] uppercase font-semibold ${overviewTheme.overviewTinyMuted}`}
@@ -286,6 +287,7 @@ export default function TripScheduleTable({
                             </div>
                           </div>
 
+                          {/* ETA */}
                           <div>
                             <div
                               className={`text-[11px] uppercase font-semibold ${overviewTheme.overviewTinyMuted}`}
@@ -298,19 +300,13 @@ export default function TripScheduleTable({
                               {formatFirestoreDate(getTripEta(trip)) || "—"}
                             </div>
                           </div>
-                        </div>
-                      </div>
 
-                      {/* Loading Start / End */}
-                      <div
-                        className={`rounded-2xl border px-4 py-3 ${overviewTheme.overviewStatCard}`}
-                      >
-                        <div className="grid grid-cols-2 gap-3">
+                          {/* Loading Start */}
                           <div>
                             <div
                               className={`text-[11px] uppercase font-semibold ${overviewTheme.overviewTinyMuted}`}
                             >
-                              Loading Start
+                              Loading
                             </div>
                             <div
                               className={`mt-2 text-sm font-semibold ${overviewTheme.strongText}`}
@@ -321,7 +317,8 @@ export default function TripScheduleTable({
                             </div>
                           </div>
 
-                          <div>
+                          {/* Loading End */}
+                          {/* <div>
                             <div
                               className={`text-[11px] uppercase font-semibold ${overviewTheme.overviewTinyMuted}`}
                             >
@@ -334,7 +331,7 @@ export default function TripScheduleTable({
                                 getPlannedLoadingEnd(trip),
                               ) || "—"}
                             </div>
-                          </div>
+                          </div> */}
                         </div>
                       </div>
                     </div>
@@ -355,10 +352,13 @@ export default function TripScheduleTable({
                       Trip
                     </th>
                     <th className="text-left px-4 py-3 text-[11px] uppercase font-bold">
-                      Departure / ETA
+                      Departure
                     </th>
                     <th className="text-left px-4 py-3 text-[11px] uppercase font-bold">
-                      Loading Window
+                      Arrival
+                    </th>
+                    <th className="text-left px-4 py-3 text-[11px] uppercase font-bold">
+                      Loading
                     </th>
                     <th className="text-left px-4 py-3 text-[11px] uppercase font-bold">
                       Status
@@ -399,38 +399,41 @@ export default function TripScheduleTable({
                             >
                               {getTripDisplayId(trip)}
                             </div>
-                            <div className={`text-xs ${theme.cellSecondary}`}>
+                            {/* <div className={`text-xs ${theme.cellSecondary}`}>
                               {trip.status || "Scheduled"}
-                            </div>
+                            </div> */}
                           </div>
                         </td>
 
+                        {/* Departure */}
                         <td className="px-4 py-3 align-top">
-                          {renderTimePair({
-                            primaryLabel: "Departure",
-                            primaryValue: formatFirestoreDate(
-                              getTripDeparture(trip),
-                            ),
-                            secondaryLabel: "ETA",
-                            secondaryValue: formatFirestoreDate(
-                              getTripEta(trip),
-                            ),
-                            theme,
-                          })}
+                          <div className="text-sm font-medium">
+                            {formatFirestoreDate(getTripDeparture(trip)) || "—"}
+                          </div>
                         </td>
 
+                        {/* Arrival */}
                         <td className="px-4 py-3 align-top">
-                          {renderTimePair({
-                            primaryLabel: "Loading Start",
-                            primaryValue: formatFirestoreDate(
-                              getPlannedLoadingStart(trip),
-                            ),
-                            secondaryLabel: "Loading End",
-                            secondaryValue: formatFirestoreDate(
-                              getPlannedLoadingEnd(trip),
-                            ),
-                            theme,
-                          })}
+                          <div className="text-sm font-medium">
+                            {formatFirestoreDate(getTripEta(trip)) || "—"}
+                          </div>
+                        </td>
+
+                        {/* Loading */}
+                        <td className="px-4 py-3 align-top">
+                          <div className="text-xs leading-tight">
+                            <div>
+                              {formatFirestoreDate(
+                                getPlannedLoadingStart(trip),
+                              ) || "—"}
+                            </div>
+                            {/* <div>
+                              <span className="font-semibold">End:</span>{" "}
+                              {formatFirestoreDate(
+                                getPlannedLoadingEnd(trip),
+                              ) || "—"}
+                            </div> */}
+                          </div>
                         </td>
 
                         <td className="px-4 py-3 align-top">

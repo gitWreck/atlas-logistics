@@ -3,6 +3,7 @@
 import React from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
+  faBox,
   faEllipsisV,
   faTruck,
   faTruckPickup,
@@ -44,7 +45,11 @@ export default function TripRow({ trip, onClick, isDark = false }) {
   const loadedCount = trip.totalLoaded || 0;
   const totalCount = trip.totalItems || 0;
   const driverName = trip.driverName || "Unassigned";
-  const isLocal = trip.tripType === "LOCAL_PICKUP";
+
+  const tripType = String(trip.tripType || "HUB_TRANSFER").toUpperCase();
+  const isLocal = tripType === "LOCAL_PICKUP";
+  const isDelivery = tripType === "DELIVERY";
+  const isHubTransfer = tripType === "HUB_TRANSFER";
 
   const tripIdTextClass = isDelayed
     ? theme.tripIdTextDelayed
@@ -52,9 +57,11 @@ export default function TripRow({ trip, onClick, isDark = false }) {
 
   const rowStateClass = isDelayed ? theme.rowDelayed : theme.rowDefaultHover;
 
-  const typeBadgeClass = isLocal
-    ? theme.typeBadgeLocal
-    : theme.typeBadgeTransfer;
+  const typeBadgeClass = isDelivery
+    ? theme.typeBadgeDelivery || theme.typeBadgeTransfer
+    : isLocal
+      ? theme.typeBadgeLocal
+      : theme.typeBadgeTransfer;
 
   const progressBarClass =
     trip.status === "COMPLETED"
@@ -73,6 +80,30 @@ export default function TripRow({ trip, onClick, isDark = false }) {
     ? trip.delayReason?.replaceAll("_", " ") || "DELAYED"
     : trip.status?.replaceAll("_", " ");
 
+  const tripTypeLabel = isDelivery ? "DEL" : isLocal ? "PKP" : "HUB";
+
+  const tripTypeFullLabel = isDelivery
+    ? "DELIVERY"
+    : isLocal
+      ? "LOCAL PICKUP"
+      : "HUB TRANSFER";
+
+  const tripIcon = isDelivery ? faBox : isLocal ? faTruckPickup : faTruck;
+
+  const routeArrow = isLocal ? "↻" : "→";
+
+  const routeCodeText = isDelivery
+    ? trip.destinationCode || "DELIVERY"
+    : isLocal && trip.originCode === trip.destinationCode
+      ? "LOCAL"
+      : trip.destinationCode;
+
+  const routeText = isDelivery
+    ? trip.destination || "Delivery"
+    : isLocal
+      ? "LOCAL PICKUP"
+      : `${trip.origin} → ${trip.destination}`;
+
   return (
     <div
       className={`relative flex flex-col gap-3 p-4 border-b cursor-pointer transition-colors group md:grid md:grid-cols-12 md:gap-4 md:px-6 md:items-center ${theme.rowBorder} ${rowStateClass}`}
@@ -85,19 +116,16 @@ export default function TripRow({ trip, onClick, isDark = false }) {
           </div>
 
           <div className="flex flex-col items-start gap-0.5 mt-1">
-            <span
+            {/* <span
               className={`text-[8px] tracking-wider font-bold px-1.5 py-[1px] rounded border w-max ${typeBadgeClass}`}
             >
-              {isLocal ? "LOCAL PICKUP" : "HUB TRANSFER"}
-            </span>
+              {tripTypeLabel}
+            </span> */}
 
             <span
               className={`font-mono text-sm font-bold transition-colors flex items-center gap-2 ${tripIdTextClass}`}
             >
-              <FontAwesomeIcon
-                icon={isLocal ? faTruckPickup : faTruck}
-                className="text-[10px]"
-              />
+              <FontAwesomeIcon icon={tripIcon} className="text-[10px]" />
               {trip.tripId}
             </span>
 
@@ -128,13 +156,16 @@ export default function TripRow({ trip, onClick, isDark = false }) {
         <div className="w-full">
           <div className="hidden md:flex flex-col items-start gap-2 mt-1">
             <div className="flex items-center gap-2">
+              {/* <span
+                className={`text-[9px] tracking-wider font-bold px-1.5 py-0.5 rounded border ${typeBadgeClass}`}
+              >
+                {tripTypeLabel}
+              </span> */}
+
               <span
                 className={`font-mono text-sm font-bold transition-colors flex items-center gap-2 ${tripIdTextClass}`}
               >
-                <FontAwesomeIcon
-                  icon={isLocal ? faTruckPickup : faTruck}
-                  className="text-[10px]"
-                />
+                <FontAwesomeIcon icon={tripIcon} className="text-[10px]" />
                 {trip.tripId}
               </span>
             </div>
@@ -169,24 +200,22 @@ export default function TripRow({ trip, onClick, isDark = false }) {
         <div
           className={`text-sm font-medium flex items-center gap-2 ${theme.secondaryText}`}
         >
-          {trip.originCode}
-          <span className={theme.routeArrow}>{isLocal ? "↻" : "→"}</span>
-          {isLocal && trip.originCode === trip.destinationCode
-            ? "HUB TRANSFER"
-            : trip.destinationCode}
+          {trip.originCode || "—"}
+          <span className={theme.routeArrow}>{routeArrow}</span>
+          {routeCodeText || "—"}
         </div>
 
         <div
           className={`text-[10px] font-mono md:mt-0.5 truncate max-w-[150px] md:max-w-[120px] ${theme.mutedText}`}
-          title={trip.route}
+          title={trip.route || routeText}
         >
-          {isLocal ? "LOCAL PICKUP" : `${trip.origin} → ${trip.destination}`}
+          {routeText}
         </div>
 
         <span
           className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${typeBadgeClass}`}
         >
-          {isLocal ? "LOCAL PICKUP" : "HUB TRANSFER"}
+          {tripTypeFullLabel}
         </span>
       </div>
 
@@ -216,7 +245,7 @@ export default function TripRow({ trip, onClick, isDark = false }) {
           />
         </div>
 
-        <div className="mt-1.5 gap-2 flex">
+        <div className="mt-1.5 gap-2 flex flex-wrap">
           {isDelayed && (
             <span
               className={`text-[14px] px-1.5 rounded animate-pulse font-bold ${theme.delayedPill}`}
@@ -241,7 +270,7 @@ export default function TripRow({ trip, onClick, isDark = false }) {
           {formatFirestoreDate(trip.updatedAt)}
         </div>
 
-        {trip.status !== "COMPLETED" && trip.estimatedArrival && (
+        {/* {trip.status !== "COMPLETED" && trip.estimatedArrival && (
           <div className={`text-xs ${theme.subtleText}`}>
             ETA:{" "}
             {new Date(trip.estimatedArrival).toLocaleString("en-PH", {
@@ -252,7 +281,7 @@ export default function TripRow({ trip, onClick, isDark = false }) {
               minute: "2-digit",
             })}
           </div>
-        )}
+        )} */}
       </div>
 
       {/* Col 6 */}

@@ -5,6 +5,9 @@ export const shipmentLabelUrl = (data) =>
 export const packageLabelUrl = (data) =>
   `/components/print/labels?id=${encodeURIComponent(data)}&mode=individual`;
 
+export const invoiceUrl = (data) =>
+  `/components/print/invoice?id=${encodeURIComponent(data)}`;
+
 export const TEMPLATES = [
   {
     id: "SCHEDULED",
