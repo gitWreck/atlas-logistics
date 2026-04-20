@@ -1,12 +1,5 @@
 import React from "react";
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  StyleSheet,
-  Platform,
-  StatusBar,
-} from "react-native";
+import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 
 export default function TripDetailsHeader({ tripId, plate, onBack }) {
@@ -29,16 +22,24 @@ export default function TripDetailsHeader({ tripId, plate, onBack }) {
 const styles = StyleSheet.create({
   header: {
     paddingHorizontal: 20,
-    paddingTop:
-      Platform.OS === "android" ? (StatusBar.currentHeight || 0) + 12 : 24,
-    paddingBottom: 16,
+    paddingTop: 10,
+    paddingBottom: 15,
     flexDirection: "row",
     alignItems: "center",
     backgroundColor: "#ffffff",
     borderBottomWidth: 1,
     borderBottomColor: "#cbd5e1",
   },
-  backBtn: { padding: 8, marginRight: 8 },
+  backBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: "#f8fafc",
+    borderWidth: 1,
+    borderColor: "#e2e8f0",
+    alignItems: "center",
+    justifyContent: "center",
+  },
   textBlock: { flex: 1 },
   label: {
     fontSize: 11,

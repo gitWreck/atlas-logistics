@@ -1,6 +1,6 @@
 import React from "react";
 import { View, Text, StyleSheet } from "react-native";
-import { BADGE_COLORS } from "../../constants/tracking-constants";
+import { BADGE_COLORS } from "../../constants/templates";
 
 export default function StatusBadge({ status }) {
   // 1. Normalize Status

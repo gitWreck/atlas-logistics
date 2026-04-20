@@ -12,7 +12,7 @@ import { CameraView, useCameraPermissions } from "expo-camera";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { getFunctions, httpsCallable } from "firebase/functions";
 import { Ionicons } from "@expo/vector-icons";
-import GetLocation from "react-native-get-location";
+import { getCurrentLocationSafe } from "../../components/utilities/helpers";
 
 export default function DriverScannerScreen() {
   const router = useRouter();
@@ -46,24 +46,6 @@ export default function DriverScannerScreen() {
       </View>
     );
   }
-
-  const getCurrentLocationSafe = async () => {
-    try {
-      const loc = await GetLocation.getCurrentPosition({
-        enableHighAccuracy: true,
-        timeout: 15000,
-      });
-
-      if (!loc) return null;
-      return {
-        lat: loc.latitude,
-        lng: loc.longitude,
-      };
-    } catch (error) {
-      console.log("Location error (driver scan):", error);
-      return null;
-    }
-  };
 
   const handleScan = async ({ data }) => {
     if (scanned || processing) return;

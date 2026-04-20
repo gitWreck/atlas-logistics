@@ -297,3 +297,36 @@ export const CHECKER_SHIPMENT_ACTION = [
     color: "#ef4444",
   }, // Red
 ];
+
+// trip screen
+export const CHECKER_TAB_OPTIONS = [
+  { key: "ALL", label: "All" },
+  // { key: "CREATED", label: "Created" },
+  { key: "RECEIVED", label: "Received" },
+  { key: "LOADED", label: "Loaded" },
+  { key: "OUT_FOR_DELIVERY", label: "Out for Delivery" },
+  { key: "IN_TRANSIT", label: "Transit" },
+];
+
+export const DRIVER_TAB_OPTIONS = [
+  { key: "Upcoming", label: "Upcoming" },
+  { key: "Active", label: "Active" },
+  { key: "Completed", label: "Completed" },
+];
+
+export const CHECKER_VISIBLE_STATUSES = [
+  "CREATED",
+  "ASSIGNED",
+  "LOADING",
+  "LOADED",
+  "IN_TRANSIT",
+];
+
+export const DRIVER_VISIBLE_STATUSES = [
+  "CREATED",
+  "ASSIGNED",
+  "LOADED",
+  "IN_TRANSIT",
+  "ARRIVED",
+  "COMPLETED",
+];

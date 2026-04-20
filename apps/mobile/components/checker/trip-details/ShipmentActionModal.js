@@ -11,7 +11,7 @@ import {
   Platform,
 } from "react-native";
 import { FontAwesome5 } from "@expo/vector-icons";
-import { CHECKER_SHIPMENT_ACTION } from "../../constants/tracking-constants";
+import { CHECKER_SHIPMENT_ACTION } from "../../constants/templates";
 
 export default function ShipmentActionModal({
   visible,

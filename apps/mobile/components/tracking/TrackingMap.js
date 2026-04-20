@@ -1,7 +1,7 @@
 import React from "react";
 import { View, Text, StyleSheet } from "react-native";
 import MapView, { Marker, PROVIDER_DEFAULT } from "react-native-maps";
-import { COLORS } from "../constants/tracking-constants";
+import { COLORS } from "../constants/templates";
 
 export default function TrackingMap({
   mapRef,

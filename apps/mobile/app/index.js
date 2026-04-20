@@ -1,11 +1,19 @@
 import { Redirect } from "expo-router";
-import { View, ActivityIndicator, StyleSheet } from "react-native";
+import { View, ActivityIndicator } from "react-native";
 import { useAuth } from "../contexts/AuthContext";
 import { COLORS, GLOBAL_STYLES } from "../components/constants/theme";
 
 export default function Index() {
-  const { user, loading, isReady, isAllowedRole, isChecker, isDriver, isCustomer, signOut } =
-    useAuth();
+  const {
+    user,
+    loading,
+    isReady,
+    isAllowedRole,
+    isChecker,
+    isDriver,
+    isCustomer,
+    signOut,
+  } = useAuth();
 
   if (!isReady || loading) {
     return (

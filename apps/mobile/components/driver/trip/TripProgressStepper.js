@@ -1,7 +1,7 @@
 import React from "react";
 import { View, Text, StyleSheet } from "react-native";
 import { FontAwesome5 } from "@expo/vector-icons";
-import { TRACKING_WORKFLOWS } from "../../constants/tracking-constants";
+import { TRACKING_WORKFLOWS } from "../../constants/templates";
 
 const BLUE = "#155DFC";
 const GREY = "#94a3b8";
