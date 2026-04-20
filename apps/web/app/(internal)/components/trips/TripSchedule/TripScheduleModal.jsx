@@ -191,7 +191,7 @@ export default function TripScheduleModal({
                     <h3
                       className={`text-xs sm:text-sm font-bold uppercase tracking-widest ${modalTheme.title}`}
                     >
-                      Trip References
+                      Trip Reference
                     </h3>
                     <p className={`text-xs mt-1 ${modalTheme.helperText}`}>
                       Select a trip and update its planned schedule.
