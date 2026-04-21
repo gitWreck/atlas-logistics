@@ -19,9 +19,12 @@ export default function PackageActionModal({
   maxQty = 1, // Total pieces available in the selected item(s)
   onAction,
   noteRemarks,
+  packagingGroup,
+  defaultAction,
 }) {
   const [remarks, setRemarks] = useState("");
   const [manualQty, setManualQty] = useState("");
+  const isBulk = String(packagingGroup || "").toUpperCase() === "BULK";
 
   // Initialize/Reset values when modal opens
   useEffect(() => {
@@ -56,9 +59,13 @@ export default function PackageActionModal({
 
   const handlePress = (mode) => {
     // Pass the mode, remarks, and the specific quantity to the action handler
-    onAction(mode, remarks.trim(), Number(manualQty) || maxQty);
+    onAction(mode, remarks.trim(), isBulk ? Number(manualQty) || maxQty : null);
     onClose();
   };
+
+  const visibleActions = defaultAction
+    ? ACTIONS.filter((item) => item.mode === defaultAction)
+    : ACTIONS;
 
   return (
     <Modal
@@ -88,25 +95,25 @@ export default function PackageActionModal({
             </TouchableOpacity>
           </View>
 
-          {/* ✅ QUANTITY INPUT (Only relevant for single item processing or sacks) */}
-          <View style={styles.row}>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.label}>Quantity to Process</Text>
-              <View style={styles.qtyContainer}>
-                <TextInput
-                  style={styles.qtyInput}
-                  keyboardType="number-pad"
-                  value={manualQty}
-                  onChangeText={setManualQty}
-                  placeholder="Qty"
-                />
-                <Text style={styles.qtyMax}>/ {maxQty} Pcs</Text>
+          {isBulk && (
+            <View style={styles.row}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.label}>Quantity to Process</Text>
+                <View style={styles.qtyContainer}>
+                  <TextInput
+                    style={styles.qtyInput}
+                    keyboardType="number-pad"
+                    value={manualQty}
+                    onChangeText={setManualQty}
+                    placeholder="Qty"
+                  />
+                  <Text style={styles.qtyMax}>/ {maxQty} Pcs</Text>
+                </View>
               </View>
             </View>
-          </View>
-
+          )}
           <View style={styles.grid}>
-            {ACTIONS.map((btn) => (
+            {visibleActions.map((btn) => (
               <TouchableOpacity
                 key={btn.mode}
                 style={[styles.btn, { borderColor: btn.color }]}

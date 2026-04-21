@@ -17,26 +17,22 @@ import {
   getCountFromServer,
   Timestamp,
 } from "firebase/firestore";
-import { signOut } from "firebase/auth";
 import { startOfDay, subDays } from "date-fns";
 import { auth, db } from "../../../firebase";
 
 // ✅ IMPORT NEW COMPONENTS
-import CheckerHeader from "../../../components/checker/CheckerHeader";
 import StatusFilter from "../../../components/checker/StatusFilter";
 import StatusBoard from "../../../components/checker/StatusBoard";
 import OperationsGrid from "../../../components/checker/OperationsGrid";
+import { CHECKER_STATUS_BOARD_CARDS } from "../../../components/checker/StatusBoard";
 
 export default function CheckerIndex() {
   const router = useRouter();
-  // const auth = getAuth();
-  // const db = getFirestore();
 
   // STATE
   const [filter, setFilter] = useState("TODAY"); // 'TODAY' | 'WEEK'
   const [stats, setStats] = useState({ received: 0, loaded: 0, pending: 0 });
   const [refreshing, setRefreshing] = useState(false);
-  const [userName, setUserName] = useState("Checker");
 
   // 1. NAVIGATION HANDLER
   const goToScan = (mode, title) => {
@@ -46,27 +42,9 @@ export default function CheckerIndex() {
     });
   };
 
-  const handleLogout = () => {
-    Alert.alert("Sign Out", "Are you sure?", [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Sign Out",
-        style: "destructive",
-        onPress: () => {
-          signOut(auth);
-          router.replace("/(auth)/login");
-        },
-      },
-    ]);
-  };
-
   // 2. FETCH STATS (Facility View)
   const fetchStats = useCallback(async () => {
     try {
-      if (auth.currentUser?.displayName) {
-        setUserName(auth.currentUser.displayName);
-      }
-
       const shipmentsRef = collection(db, "shipments");
       const now = new Date();
 
@@ -137,7 +115,11 @@ export default function CheckerIndex() {
         <StatusFilter activeFilter={filter} onFilterChange={setFilter} />
 
         {/* 3. STATS BOARD */}
-        <StatusBoard stats={stats} filterMode={filter} />
+        <StatusBoard
+          stats={stats}
+          filterMode={filter}
+          cards={CHECKER_STATUS_BOARD_CARDS}
+        />
 
         {/* 4. OPERATIONS GRID */}
         <OperationsGrid

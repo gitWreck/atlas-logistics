@@ -301,25 +301,30 @@ export const CHECKER_SHIPMENT_ACTION = [
 // trip screen
 export const CHECKER_TAB_OPTIONS = [
   { key: "ALL", label: "All" },
-  // { key: "CREATED", label: "Created" },
-  { key: "RECEIVED", label: "Received" },
+  { key: "CREATED", label: "Created" },
+  // { key: "RECEIVED", label: "Received" },
   { key: "LOADED", label: "Loaded" },
+  // { key: "IN_TRANSIT", label: "Transit" },
+  { key: "RECEIVED", label: "Received" },
   { key: "OUT_FOR_DELIVERY", label: "Out for Delivery" },
-  { key: "IN_TRANSIT", label: "Transit" },
 ];
 
 export const DRIVER_TAB_OPTIONS = [
-  { key: "Upcoming", label: "Upcoming" },
+  // { key: "Upcoming", label: "Upcoming" },
   { key: "Active", label: "Active" },
-  { key: "Completed", label: "Completed" },
+  { key: "COMPLETED", label: "Completed" },
+  { key: "IN_TRANSIT", label: "Transit" },
 ];
 
 export const CHECKER_VISIBLE_STATUSES = [
   "CREATED",
   "ASSIGNED",
-  "LOADING",
+  // "LOADING",
   "LOADED",
-  "IN_TRANSIT",
+  "OUT_FOR_DELIVERY",
+  "DELIVERED",
+  // "COMPLETED",
+  // "IN_TRANSIT",
 ];
 
 export const DRIVER_VISIBLE_STATUSES = [

@@ -76,11 +76,23 @@ export default function TripScreen() {
           ? CHECKER_VISIBLE_STATUSES
           : DRIVER_VISIBLE_STATUSES;
 
-        const tripsQuery = query(
-          collection(db, "truck_trips"),
+        // const tripsQuery = query(
+        //   collection(db, "truck_trips"),
+        //   isChecker ? where("tripType" === "DEL") : "",
+        //   where("status", "in", statuses),
+        //   orderBy("updatedAt", "desc"),
+        // );
+
+        const constraints = [
           where("status", "in", statuses),
           orderBy("updatedAt", "desc"),
-        );
+        ];
+
+        // if (isChecker) {
+        //   constraints.unshift(where("tripType", "==", "DELIVERY"));
+        // }
+
+        const tripsQuery = query(collection(db, "truck_trips"), ...constraints);
 
         unsubscribe = onSnapshot(
           tripsQuery,
