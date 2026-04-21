@@ -43,7 +43,8 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
     paddingHorizontal: 20,
-    paddingTop: 40, // Kept at 50 for your safe area spacing
+    // paddingTop: 40, // Kept at 50 for your safe area spacing
+    paddingTop: 10,
     paddingBottom: 12,
     borderBottomWidth: 1,
     borderBottomColor: "#cbd5e1",

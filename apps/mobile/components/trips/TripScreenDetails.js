@@ -113,7 +113,7 @@ export default function TripDetailsScreen() {
   const handleViewShipments = () => {
     const basePath = isChecker
       ? "/(checker)/trip-shipments"
-      : "/(driver)/shipments";
+      : "/(driver)/trip-shipments";
 
     router.push({
       pathname: basePath,

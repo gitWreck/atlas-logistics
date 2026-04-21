@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import {
   Modal,
   View,
@@ -8,152 +8,123 @@ import {
   KeyboardAvoidingView,
   Platform,
   StyleSheet,
+  Pressable,
+  ActivityIndicator,
 } from "react-native";
-import { db } from "../../firebase";
-import { collection, query, where, getDocs } from "firebase/firestore";
+import { FontAwesome5 } from "@expo/vector-icons";
 
-export default function ManualEntryModal({ visible, onClose, onSubmit }) {
+export default function ManualEntryModal({
+  visible,
+  onClose,
+  onSubmit,
+  loading = false,
+  mode = "loading",
+}) {
   const [code, setCode] = useState("");
-  const [quantity, setQuantity] = useState("");
-  const [foundPackage, setFoundPackage] = useState(null);
-  const [loading, setLoading] = useState(false);
 
-  // Reset state when modal closes/opens
   useEffect(() => {
     if (!visible) {
       setCode("");
-      setQuantity("");
-      setFoundPackage(null);
-      setLoading(false);
     }
   }, [visible]);
 
-  const handleLookup = async () => {
-    console.log("Looking up code:", code);
-    if (!code.trim()) return;
-
-    setLoading(true);
-    try {
-      // Find the package to check if it's a Sack or Bundle
-      const q = query(
-        collection(db, "shipments"),
-        where("packageBarcodes", "array-contains", code.trim()),
-      );
-      const querySnap = await getDocs(q);
-
-      if (!querySnap.empty) {
-        const shipmentData = querySnap.docs[0].data();
-        const pkg = shipmentData.packages.find(
-          (p) => (p.packageId || p.trackingNumber) === code.trim(),
-        );
-
-        const isBulk = ["Sack", "Bundle", "Roll"].includes(pkg?.packagingType);
-
-        if (isBulk) {
-          // If bulk, stay in modal to ask for quantity
-          setFoundPackage(pkg);
-          setQuantity(pkg.quantity?.toString() || "1");
-        } else {
-          // If standard box, submit immediately
-          onSubmit(code.trim());
-        }
-      } else {
-        // Fallback: just submit and let the parent handle the "Not Found" error
-        onSubmit(code.trim());
-      }
-    } catch (err) {
-      console.error(err);
-      onSubmit(code.trim()); // Submit anyway so parent handles error logic
-    } finally {
-      setLoading(false);
-    }
+  const handleSubmit = () => {
+    const cleaned = code.trim().toUpperCase();
+    if (!cleaned || loading) return;
+    onSubmit(cleaned);
   };
 
-  const handleFinalSubmit = () => {
-    if (!quantity.trim()) return;
+  const modeLabel =
+    mode === "offloading"
+      ? "Receive Package"
+      : mode === "info"
+        ? "Find Package"
+        : "Load Package";
 
-    const numQty = Number(quantity);
-    const max = foundPackage?.quantity || 1;
-
-    // Validation to prevent over-loading
-    if (numQty > max) {
-      alert(`Cannot exceed maximum quantity of ${max}`);
-      return;
-    }
-
-    // Pass code and quantity back to handleProcessPackage in ScannerScreen
-    onSubmit(code.trim(), numQty);
-    onClose();
-  };
+  const helperText =
+    mode === "info"
+      ? "Enter the package barcode or tracking code to view shipment details."
+      : "Enter the package barcode or tracking code to process it manually.";
 
   return (
     <Modal
       animationType="slide"
-      transparent={true}
+      transparent
       visible={visible}
       onRequestClose={onClose}
     >
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : "height"}
-        style={styles.modalOverlay}
+        style={styles.overlay}
       >
-        <View style={styles.modalContent}>
-          <Text style={styles.modalTitle}>
-            {foundPackage ? "Enter Quantity" : "Manual Entry"}
-          </Text>
-          <Text style={styles.modalSubtitle}>
-            {foundPackage
-              ? `This ${foundPackage.packagingType} contains ${foundPackage.quantity} pcs.`
-              : "Type the tracking number exactly"}
-          </Text>
+        <Pressable style={styles.backdrop} onPress={onClose} />
 
-          {!foundPackage ? (
-            <TextInput
-              style={styles.input}
-              placeholder="AT-2026..."
-              placeholderTextColor="#94a3b8"
-              value={code}
-              onChangeText={setCode}
-              autoCapitalize="characters"
-              autoCorrect={false}
-            />
-          ) : (
-            <View style={styles.qtyContainer}>
-              <Text style={styles.qtyLabel}>Quantity to process:</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="1"
-                keyboardType="numeric"
-                value={quantity}
-                onChangeText={setQuantity}
-                autoFocus
-              />
-              <Text style={styles.maxText}>
-                Max: {foundPackage.quantity} pcs
-              </Text>
+        <View style={styles.sheet}>
+          <View style={styles.handle} />
+
+          <View style={styles.header}>
+            <View style={styles.iconWrap}>
+              <FontAwesome5 name="keyboard" size={18} color="#2563eb" />
             </View>
-          )}
 
-          <View style={styles.modalActions}>
+            <View style={styles.headerTextWrap}>
+              <Text style={styles.title}>Manual Entry</Text>
+              <Text style={styles.subtitle}>{helperText}</Text>
+            </View>
+          </View>
+
+          <View style={styles.modeBadge}>
+            <Text style={styles.modeBadgeText}>{modeLabel}</Text>
+          </View>
+
+          <Text style={styles.label}>Package Code</Text>
+
+          <TextInput
+            style={styles.input}
+            placeholder="AT-2026-..."
+            placeholderTextColor="#94a3b8"
+            value={code}
+            onChangeText={setCode}
+            autoCapitalize="characters"
+            autoCorrect={false}
+            autoFocus
+            editable={!loading}
+            returnKeyType="done"
+            onSubmitEditing={handleSubmit}
+          />
+
+          <Text style={styles.note}>
+            Bulk packages will ask for quantity in the next step.
+          </Text>
+
+          <View style={styles.actions}>
             <TouchableOpacity
-              style={[styles.actionBtn, styles.cancelBtn]}
+              style={[styles.button, styles.cancelButton]}
               onPress={onClose}
+              disabled={loading}
+              activeOpacity={0.8}
             >
-              <Text style={styles.cancelText}>CANCEL</Text>
+              <Text style={styles.cancelText}>Cancel</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
               style={[
-                styles.actionBtn,
-                styles.submitBtn,
-                loading && { opacity: 0.7 },
+                styles.button,
+                styles.submitButton,
+                (!code.trim() || loading) && styles.submitButtonDisabled,
               ]}
-              onPress={foundPackage ? handleFinalSubmit : handleLookup}
-              disabled={loading}
+              onPress={handleSubmit}
+              disabled={!code.trim() || loading}
+              activeOpacity={0.8}
             >
-              <Text style={styles.submitText}>
-                {loading ? "SEARCHING..." : foundPackage ? "CONFIRM" : "NEXT"}
-              </Text>
+              {loading ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <>
+                  <FontAwesome5 name="arrow-right" size={13} color="#fff" />
+                  <Text style={styles.submitText}>Continue</Text>
+                </>
+              )}
             </TouchableOpacity>
           </View>
         </View>
@@ -163,75 +134,132 @@ export default function ManualEntryModal({ visible, onClose, onSubmit }) {
 }
 
 const styles = StyleSheet.create({
-  modalOverlay: {
+  overlay: {
     flex: 1,
     justifyContent: "flex-end",
-    backgroundColor: "rgba(0,0,0,0.5)",
+    backgroundColor: "rgba(15, 23, 42, 0.5)",
   },
-  modalContent: {
-    backgroundColor: "white",
-    padding: 24,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    width: "100%",
-    paddingBottom: 40,
+  backdrop: {
+    ...StyleSheet.absoluteFillObject,
   },
-  modalTitle: {
+  sheet: {
+    backgroundColor: "#ffffff",
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    paddingHorizontal: 22,
+    paddingTop: 12,
+    paddingBottom: Platform.OS === "ios" ? 36 : 24,
+  },
+  handle: {
+    alignSelf: "center",
+    width: 42,
+    height: 5,
+    borderRadius: 999,
+    backgroundColor: "#cbd5e1",
+    marginBottom: 18,
+  },
+  header: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    marginBottom: 14,
+  },
+  iconWrap: {
+    width: 42,
+    height: 42,
+    borderRadius: 14,
+    backgroundColor: "#eff6ff",
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 12,
+  },
+  headerTextWrap: {
+    flex: 1,
+  },
+  title: {
     fontSize: 20,
     fontWeight: "800",
     color: "#0f172a",
-    marginBottom: 4,
-    textAlign: "center",
   },
-  modalSubtitle: {
+  subtitle: {
     color: "#64748b",
-    fontSize: 14,
-    textAlign: "center",
-    marginBottom: 20,
+    fontSize: 13,
+    marginTop: 4,
+    lineHeight: 18,
   },
-  input: {
-    backgroundColor: "#f1f5f9",
+  modeBadge: {
+    alignSelf: "flex-start",
+    backgroundColor: "#f8fafc",
     borderWidth: 1,
     borderColor: "#e2e8f0",
-    borderRadius: 12,
-    padding: 16,
-    fontSize: 18,
-    fontWeight: "600",
-    color: "#0f172a",
-    textAlign: "center",
-    marginBottom: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
+    marginBottom: 18,
   },
-  qtyContainer: {
-    marginBottom: 20,
+  modeBadgeText: {
+    fontSize: 11,
+    fontWeight: "800",
+    color: "#334155",
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
   },
-  qtyLabel: {
+  label: {
     fontSize: 12,
     fontWeight: "700",
     color: "#64748b",
-    textAlign: "center",
-    marginBottom: 8,
     textTransform: "uppercase",
+    marginBottom: 8,
   },
-  maxText: {
-    textAlign: "center",
+  input: {
+    backgroundColor: "#f8fafc",
+    borderWidth: 1,
+    borderColor: "#e2e8f0",
+    borderRadius: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    fontSize: 18,
+    fontWeight: "700",
+    color: "#0f172a",
+    marginBottom: 10,
+  },
+  note: {
     fontSize: 12,
     color: "#94a3b8",
-    fontWeight: "600",
+    lineHeight: 18,
+    marginBottom: 20,
   },
-  modalActions: { flexDirection: "row", gap: 12, width: "100%", marginTop: 10 },
-  actionBtn: {
+  actions: {
+    flexDirection: "row",
+    gap: 12,
+  },
+  button: {
     flex: 1,
-    height: 50,
-    borderRadius: 12,
-    justifyContent: "center",
+    height: 52,
+    borderRadius: 14,
     alignItems: "center",
+    justifyContent: "center",
+    flexDirection: "row",
+    gap: 8,
   },
-  cancelBtn: {
-    backgroundColor: "#fff",
+  cancelButton: {
+    backgroundColor: "#ffffff",
     borderWidth: 1,
     borderColor: "#cbd5e1",
   },
-  submitBtn: { backgroundColor: "#3b82f6" },
-  cancelText: { fontWeight: "700", color: "#64748b" },
-  submitText: { fontWeight: "700", color: "#fff" },
+  submitButton: {
+    backgroundColor: "#2563eb",
+  },
+  submitButtonDisabled: {
+    opacity: 0.55,
+  },
+  cancelText: {
+    fontWeight: "700",
+    color: "#64748b",
+    fontSize: 14,
+  },
+  submitText: {
+    fontWeight: "800",
+    color: "#ffffff",
+    fontSize: 14,
+  },
 });

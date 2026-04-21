@@ -6,7 +6,7 @@ export default function ShipmentPackagesStats({ shipment }) {
   const totals = shipment?.totals || {};
   const loaded = totals.loaded || 0;
   const missing = totals.missing || 0;
-  const totalItems = totals.totalItems || totals.totalContentQty || 0;
+  const totalItems = totals.totalContentQty || totals.totalItems || 0;
 
   const processed = loaded + missing;
   const percent = totalItems > 0 ? (processed / totalItems) * 100 : 0;
