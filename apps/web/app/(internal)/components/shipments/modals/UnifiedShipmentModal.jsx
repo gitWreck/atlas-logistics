@@ -15,6 +15,7 @@ import ReceivePackageForm from "../ReceivePackageForm/ReceivePackageForm";
 import TripStep from "../../manifests/CreateTripModal/TripStep";
 import {
   assignShipmentToTrip,
+  bulkAssignShipments,
   // createShipmentWithPackages,
   // createShipmentBundle,
   createShipment,
@@ -210,18 +211,18 @@ export default function UnifiedShipmentModal({
       // --- Assign to Trip if selected ---
       if (tripDecision && tripDecision.tripId) {
         const targetTripId = tripDecision.tripId;
-        await assignShipmentToTrip({
-          trackingShipmentId: finalDocId,
+        // await assignShipmentToTrip({
+        //   trackingShipmentId: finalDocId,
+        //   tripId: targetTripId,
+        // });
+
+        await bulkAssignShipments({
           tripId: targetTripId,
+          shipmentIds: [finalDocId],
         });
 
         setFinalTripId(targetTripId);
         setShipmentDraft(null);
-
-        // window.open(
-        //   `/components/print/labels?tripId=${targetTripId}`,
-        //   "_blank",
-        // );
       } else {
         setFinalTripId(null);
       }
