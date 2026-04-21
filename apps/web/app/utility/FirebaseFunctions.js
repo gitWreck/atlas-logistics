@@ -19,9 +19,9 @@ export const updateShipmentStatus = httpsCallable(
   functions,
   "updateShipmentStatus",
 );
-export const updatePackageStatus = httpsCallable(
+export const updateShipmentPackageStatus = httpsCallable(
   functions,
-  "updatePackageStatus",
+  "updateShipmentPackageStatus",
 );
 export const updateShipmentPackages = httpsCallable(
   functions,

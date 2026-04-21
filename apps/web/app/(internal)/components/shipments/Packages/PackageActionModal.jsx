@@ -1,169 +1,296 @@
-import { useState } from "react";
+"use client";
+
+import React, { useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faCircleNotch } from "@fortawesome/free-solid-svg-icons";
-import { updatePackageStatus } from "@/app/utility/FirebaseFunctions";
+import {
+  faTimes,
+  faBoxesStacked,
+  faCube,
+  faRotateLeft,
+  faCheckCircle,
+  faExclamationTriangle,
+} from "@fortawesome/free-solid-svg-icons";
+import { updateShipmentPackageStatus } from "@/app/utility/FirebaseFunctions";
+import { getModalThemeClasses } from "@/app/utility/constant/theme";
+import StatusButton from "../../ui/StatusButton";
 
 export default function PackageActionModal({
   pkg,
   shipmentId,
   onClose,
-  isDark,
+  isDark = false,
+  onRefresh,
 }) {
-  const [manualQty, setManualQty] = useState(pkg.quantity || 1);
-  const [loadingAction, setLoadingAction] = useState(null);
+  const theme = getModalThemeClasses(isDark);
 
-  const handleAction = async (actionType, updateAll = false) => {
-    const actionKey = `${actionType}-${updateAll}`;
-    setLoadingAction(actionKey);
+  const [manualQty, setManualQty] = useState(pkg?.quantity || 1);
+  const [actionStatus, setActionStatus] = useState({
+    loadAll: "IDLE",
+    partialLoad: "IDLE",
+    unload: "IDLE",
+  });
+  const [feedback, setFeedback] = useState({
+    type: "",
+    message: "",
+  });
+
+  const maxQty = Number(pkg?.quantity) || 1;
+
+  const isBusy = useMemo(() => {
+    return Object.values(actionStatus).some(
+      (status) => status === "LOADING" || status === "SUCCESS",
+    );
+  }, [actionStatus]);
+
+  const setButtonStatus = (key, value) => {
+    setActionStatus((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const clampQty = (value) => {
+    const parsed = Number(value);
+    if (!Number.isFinite(parsed)) return 1;
+    return Math.min(maxQty, Math.max(1, parsed));
+  };
+
+  const handleAction = async ({ buttonKey, newStatus, updateAll }) => {
+    setFeedback({ type: "", message: "" });
+    setButtonStatus(buttonKey, "LOADING");
 
     try {
-      await updatePackageStatus({
+      await updateShipmentPackageStatus({
         shipmentId,
         packageId: pkg.packageId,
-        newStatus: actionType,
-        manualQty: updateAll ? pkg.quantity : manualQty,
-        updateAll: updateAll,
+        newStatus,
+        manualQty: updateAll ? maxQty : manualQty,
+        updateAll,
       });
 
-      onClose();
+      setButtonStatus(buttonKey, "SUCCESS");
+      setFeedback({
+        type: "success",
+        message:
+          newStatus === "RECEIVED"
+            ? "Package status was updated back to Received."
+            : updateAll
+              ? "Full package was marked as loaded successfully."
+              : `Partial load was applied successfully for ${manualQty} piece(s).`,
+      });
+
+      setTimeout(() => {
+        setButtonStatus(buttonKey, "IDLE");
+      }, 1200);
+
+      onRefresh?.();
     } catch (err) {
-      alert(err.message);
-    } finally {
-      setLoadingAction(null);
+      setButtonStatus(buttonKey, "ERROR");
+      setFeedback({
+        type: "error",
+        message: err?.message || "Failed to update package status.",
+      });
+
+      setTimeout(() => {
+        setButtonStatus(buttonKey, "IDLE");
+      }, 1500);
     }
   };
 
-  const isLoading = (key) => loadingAction === key;
-  const isDisabled = loadingAction !== null;
+  if (!pkg) return null;
 
   return createPortal(
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+      <div className={`absolute inset-0 ${theme.overlay}`} onClick={onClose} />
+
       <div
-        className={`w-full max-w-sm rounded-2xl shadow-2xl border p-6 space-y-6 ${
-          isDark ? "bg-slate-900 border-slate-700" : "bg-white border-slate-200"
-        }`}
+        className={`relative w-full max-w-md rounded-2xl shadow-2xl border overflow-hidden animate-in fade-in zoom-in-95 duration-200 ${theme.modal}`}
       >
         {/* Header */}
-        <div className="flex justify-between items-center">
-          <h3
-            className={`font-bold ${isDark ? "text-white" : "text-slate-900"}`}
-          >
-            Manage Package
-          </h3>
-          <button
-            onClick={onClose}
-            className="text-slate-500 hover:text-red-500"
-          >
-            ✕
-          </button>
-        </div>
-
-        {/* Package Info */}
         <div
-          className={`p-3 rounded-lg border text-xs ${
-            isDark
-              ? "bg-slate-950 border-slate-800"
-              : "bg-slate-50 border-slate-200"
-          }`}
+          className={`px-5 py-4 border-b flex items-center justify-between ${theme.header}`}
         >
-          <div className="flex justify-between font-mono text-amber-500 mb-1">
-            <span>{pkg.packageId}</span>
-            <span className="text-slate-500">{pkg.packagingType}</span>
+          <div>
+            <h3 className={`font-bold text-base ${theme.title}`}>
+              Manage Package
+            </h3>
+            <p className={`text-xs mt-1 ${theme.bodyText}`}>
+              Update loading or unload this package item.
+            </p>
           </div>
-          <div className={isDark ? "text-slate-400" : "text-slate-600"}>
-            {pkg.description}
-          </div>
+
+          <button
+            type="button"
+            onClick={onClose}
+            className={`p-2 rounded-lg ${theme.closeButton}`}
+          >
+            <FontAwesomeIcon icon={faTimes} />
+          </button>
         </div>
 
-        {/* Quantity Input */}
-        <div className="space-y-2">
-          <label
-            className={`text-[10px] font-bold uppercase tracking-wider ${
-              isDark ? "text-slate-500" : "text-slate-400"
-            }`}
-          >
-            Manual Quantity (Max: {pkg.quantity})
-          </label>
+        <div className="p-5 space-y-5">
+          {/* Package Info */}
+          <div className={`p-4 rounded-xl border ${theme.panelSurface}`}>
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <div className="flex items-center gap-2 mb-2">
+                  <FontAwesomeIcon
+                    icon={faBoxesStacked}
+                    className={theme.accentText}
+                  />
+                  <span
+                    className={`text-xs font-bold uppercase ${theme.label}`}
+                  >
+                    Package Details
+                  </span>
+                </div>
 
-          <div className="flex gap-2">
-            <input
-              type="number"
-              min="1"
-              max={pkg.quantity}
-              value={manualQty}
-              onChange={(e) => {
-                const val = Number(e.target.value);
-                setManualQty(Math.min(pkg.quantity, Math.max(1, val)));
-              }}
-              className={`flex-1 px-3 py-2 rounded-lg border focus:ring-2 focus:ring-blue-500 outline-none ${
-                isDark
-                  ? "bg-slate-800 border-slate-700 text-white"
-                  : "bg-white border-slate-300"
-              }`}
-            />
+                <div className="font-mono text-sm text-amber-500 break-all">
+                  {pkg.packageId}
+                </div>
 
-            <button
-              onClick={() => setManualQty(pkg.quantity)}
-              className="px-3 py-2 bg-blue-600 text-white rounded-lg text-xs font-bold"
+                <div className={`mt-2 text-sm ${theme.spanText}`}>
+                  {pkg.description || "No description"}
+                </div>
+              </div>
+
+              <div className="text-right shrink-0">
+                <div
+                  className={`text-[10px] uppercase font-bold ${theme.label}`}
+                >
+                  Type
+                </div>
+                <div className={`text-xs mt-1 ${theme.bodyText}`}>
+                  {pkg.packagingType || "Package"}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Quantity Section */}
+          <div className={`p-4 rounded-xl border ${theme.statsCard}`}>
+            <div className="flex items-center gap-2 mb-3">
+              <FontAwesomeIcon icon={faCube} className={theme.accentText} />
+              <span className={`text-xs font-bold uppercase ${theme.label}`}>
+                Manual Quantity
+              </span>
+            </div>
+
+            <label className={`text-[11px] ${theme.bodyText}`}>
+              Set how many pieces to process for partial load. Max:{" "}
+              <span className={theme.spanText}>{maxQty}</span>
+            </label>
+
+            <div className="flex gap-2 mt-3">
+              <input
+                type="number"
+                min="1"
+                max={maxQty}
+                value={manualQty}
+                onChange={(e) => setManualQty(clampQty(e.target.value))}
+                className={`flex-1 px-3 py-2 rounded-lg border outline-none focus:border-blue-500 ${theme.input}`}
+                disabled={isBusy}
+              />
+
+              <button
+                type="button"
+                onClick={() => setManualQty(maxQty)}
+                disabled={isBusy}
+                className={theme.secondaryButton}
+              >
+                MAX
+              </button>
+            </div>
+          </div>
+
+          {/* Feedback */}
+          {feedback.message ? (
+            <div
+              className={
+                feedback.type === "error"
+                  ? theme.errorBox
+                  : `text-xs border rounded-lg p-3 flex items-start gap-2 ${
+                      isDark
+                        ? "text-emerald-400 bg-emerald-500/10 border-emerald-500/20"
+                        : "text-emerald-700 bg-emerald-50 border-emerald-200"
+                    }`
+              }
             >
-              MAX
-            </button>
+              <FontAwesomeIcon
+                icon={
+                  feedback.type === "error"
+                    ? faExclamationTriangle
+                    : faCheckCircle
+                }
+                className="mt-0.5"
+              />
+              <span>{feedback.message}</span>
+            </div>
+          ) : null}
+
+          {/* Actions */}
+          <div className="space-y-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <StatusButton
+                status={actionStatus.loadAll}
+                onClick={() =>
+                  handleAction({
+                    buttonKey: "loadAll",
+                    newStatus: "LOADED",
+                    updateAll: true,
+                  })
+                }
+                disabled={isBusy}
+                variant="emerald"
+                isDark={isDark}
+                icon={faBoxesStacked}
+                label="Load All"
+                loadingLabel="Loading All..."
+                successLabel="Loaded!"
+                errorLabel="Failed"
+                className="min-h-[52px]"
+              />
+
+              <StatusButton
+                status={actionStatus.partialLoad}
+                onClick={() =>
+                  handleAction({
+                    buttonKey: "partialLoad",
+                    newStatus: "LOADED",
+                    updateAll: false,
+                  })
+                }
+                disabled={isBusy || maxQty === 1}
+                variant="blue"
+                isDark={isDark}
+                icon={faCube}
+                label={`Partial Load (${manualQty})`}
+                loadingLabel="Processing..."
+                successLabel="Updated!"
+                errorLabel="Failed"
+                className="min-h-[52px]"
+              />
+            </div>
+
+            <StatusButton
+              status={actionStatus.unload}
+              onClick={() =>
+                handleAction({
+                  buttonKey: "unload",
+                  newStatus: "RECEIVED",
+                  updateAll: true,
+                })
+              }
+              disabled={isBusy}
+              variant="red"
+              isDark={isDark}
+              icon={faRotateLeft}
+              label="Unload Package"
+              loadingLabel="Unloading..."
+              successLabel="Unloaded!"
+              errorLabel="Failed"
+              className="min-h-[52px]"
+            />
           </div>
         </div>
-
-        {/* Action Buttons */}
-        <div className="grid grid-cols-2 gap-3">
-          {/* Load All */}
-          <button
-            disabled={isDisabled}
-            onClick={() => handleAction("LOADED", true)}
-            className="flex flex-col items-center justify-center p-3 rounded-xl border-2 border-emerald-500/20 bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20 transition-all disabled:opacity-50"
-          >
-            {isLoading("LOAD-true") ? (
-              <FontAwesomeIcon icon={faCircleNotch} spin className="text-xl" />
-            ) : (
-              <>
-                <span className="text-sm font-bold">Load All</span>
-                <span className="text-[9px] uppercase font-bold opacity-70">
-                  Full Package
-                </span>
-              </>
-            )}
-          </button>
-
-          {/* Partial Load */}
-          <button
-            disabled={isDisabled}
-            onClick={() => handleAction("LOADED", false)}
-            className="flex flex-col items-center justify-center p-3 rounded-xl border-2 border-blue-500/20 bg-blue-500/10 text-blue-500 hover:bg-blue-500/20 transition-all disabled:opacity-50"
-          >
-            {isLoading("LOAD-false") ? (
-              <FontAwesomeIcon icon={faCircleNotch} spin className="text-xl" />
-            ) : (
-              <>
-                <span className="text-sm font-bold">Partial Load</span>
-                <span className="text-[9px] uppercase font-bold opacity-70">
-                  {manualQty} Pieces
-                </span>
-              </>
-            )}
-          </button>
-        </div>
-
-        {/* Reset / Unload */}
-        <button
-          disabled={isDisabled}
-          onClick={() => handleAction("RECEIVED", true)}
-          className="w-full py-2.5 rounded-xl border border-red-500/30 text-red-500 text-xs font-bold hover:bg-red-500/10 flex items-center justify-center gap-2 disabled:opacity-50"
-        >
-          {isLoading("UNLOAD-true") && (
-            <FontAwesomeIcon icon={faCircleNotch} spin />
-          )}
-          <span>
-            {isLoading("UNLOAD-true") ? "Processing..." : "Unload Package"}
-          </span>
-        </button>
       </div>
     </div>,
     document.body,

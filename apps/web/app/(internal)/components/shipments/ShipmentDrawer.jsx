@@ -120,7 +120,7 @@ export default function ShipmentDrawer({
           )}
 
           {activeTab === "ITEMS" && (
-            <PackagesTable data={data} isDark={isDark} />
+            <PackagesTable onRefresh={onRefresh} data={data} isDark={isDark} />
           )}
 
           {activeTab === "TOOLS" && (
