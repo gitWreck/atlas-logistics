@@ -18,7 +18,7 @@ export default function PackageActionModal({
   count, // Number of selected items (barcodes)
   maxQty = 1, // Total pieces available in the selected item(s)
   onAction,
-  noteRemarks,
+  // noteRemarks,
   packagingGroup,
   defaultAction,
 }) {
@@ -29,7 +29,8 @@ export default function PackageActionModal({
   // Initialize/Reset values when modal opens
   useEffect(() => {
     if (visible) {
-      setRemarks(noteRemarks || "");
+      // setRemarks(noteRemarks || "");
+      setRemarks("");
       // Default manual quantity to the total available pieces
       setManualQty(maxQty.toString());
     }
@@ -95,23 +96,22 @@ export default function PackageActionModal({
             </TouchableOpacity>
           </View>
 
-          {isBulk && (
-            <View style={styles.row}>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.label}>Quantity to Process</Text>
-                <View style={styles.qtyContainer}>
-                  <TextInput
-                    style={styles.qtyInput}
-                    keyboardType="number-pad"
-                    value={manualQty}
-                    onChangeText={setManualQty}
-                    placeholder="Qty"
-                  />
-                  <Text style={styles.qtyMax}>/ {maxQty} Pcs</Text>
-                </View>
+          {isBulk && <></>}
+          <View style={styles.row}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.label}>Quantity to Process</Text>
+              <View style={styles.qtyContainer}>
+                <TextInput
+                  style={styles.qtyInput}
+                  keyboardType="number-pad"
+                  value={manualQty}
+                  onChangeText={setManualQty}
+                  placeholder="Qty"
+                />
+                <Text style={styles.qtyMax}>/ {maxQty} Pcs</Text>
               </View>
             </View>
-          )}
+          </View>
           <View style={styles.grid}>
             {visibleActions.map((btn) => (
               <TouchableOpacity

@@ -320,8 +320,6 @@ export default function ScannerScreen() {
         onClose={resetScanner}
         count={1}
         maxQty={targetPackage?.quantity || 1}
-        packagingGroup={targetPackage?.packagingGroup}
-        defaultAction={pendingActionStatus}
         onAction={(status, remarks, qty) => {
           executeStatusUpdate({
             shipmentId: parentShipmentId,
@@ -333,6 +331,8 @@ export default function ScannerScreen() {
           });
           setActionModalVisible(false);
         }}
+        packagingGroup={targetPackage?.packagingGroup}
+        defaultAction={pendingActionStatus}
       />
 
       <ManualEntryModal

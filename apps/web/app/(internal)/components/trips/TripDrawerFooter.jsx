@@ -25,6 +25,7 @@ export default function TripDrawerFooter({
   shipments,
   isDark = false,
   onSuccess,
+  user,
 }) {
   const [lockStatus, setLockStatus] = useState("IDLE");
   const [unlockStatus, setUnlockStatus] = useState("IDLE");
@@ -178,7 +179,7 @@ export default function TripDrawerFooter({
           Print Manifest
         </button>
 
-        <ExportTripButton trip={data} shipments={shipments} />
+        <ExportTripButton trip={data} user={user} />
       </div>
     </div>
   );

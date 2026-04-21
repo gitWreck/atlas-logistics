@@ -400,6 +400,7 @@ const TripBoard = forwardRef(function TripBoard(
         data={selectedTrip}
         onRefreshTrips={fetchTrips}
         isDark={isDark}
+        user={user}
       />
 
       <TripScheduleModal
