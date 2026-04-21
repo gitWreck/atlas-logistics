@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import * as XLSX from "xlsx";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faFileExcel } from "@fortawesome/free-solid-svg-icons";
@@ -22,8 +22,8 @@ function formatDate(value) {
 function getShipmentQuantity(shipment = {}) {
   return Number(
     shipment?.totals?.totalContentQty ??
-      shipment?.totalItems ??
       shipment?.totalContentQty ??
+      shipment?.totalItems ??
       0,
   );
 }
@@ -60,96 +60,134 @@ function getShipmentDisplayId(shipment = {}) {
   return shipment?.shipmentId || shipment?.id || "—";
 }
 
-export default function ExportTripButton({ trip, shipments = [] }) {
-  const handleExport = () => {
-    if (!trip || !Array.isArray(shipments) || shipments.length === 0) {
-      alert("No data to export.");
+export default function ExportTripButton({ trip, user }) {
+  const [exporting, setExporting] = useState(false);
+
+  const fetchManifest = async (tripId) => {
+    const token = await user?.getIdToken();
+    const res = await fetch(`/api/trips/${tripId}/shipments`, {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    if (!res.ok) {
+      const errorJson = await res.json().catch(() => ({}));
+      throw new Error(errorJson?.error || "Failed to fetch trip manifest.");
+    }
+
+    return res.json();
+  };
+
+  const handleExport = async () => {
+    if (!trip?.tripId) {
+      alert("Trip not found.");
       return;
     }
 
-    const tripLabel = trip.tripId || trip.id || "Trip";
+    setExporting(true);
 
-    const tripInfo = [
-      ["TRIP MANIFEST"],
-      [""],
-      ["Trip ID:", tripLabel],
-      ["Driver:", trip.driverName || trip.driver?.name || "Unassigned"],
-      ["Plate #:", trip.truckPlate || trip.truckPlateNumber || "—"],
-      [
-        "Route:",
-        trip.route ||
-          `${trip.originCode || trip.origin || "—"} -> ${trip.destinationCode || trip.destination || "—"}`,
-      ],
-      [
-        "Departure:",
-        formatDate(trip.plannedDeparture || trip.departure || trip.createdAt),
-      ],
-      ["Exported At:", new Date().toLocaleString()],
-      [""],
-    ];
+    try {
+      const targetTripId = trip.tripId;
+      const { trip: fullTrip, shipments } = await fetchManifest(targetTripId);
 
-    const tableHeaders = [
-      "Shipment ID",
-      "Sender",
-      "Recipient",
-      "Destination",
-      "Actual Qty",
-      "Status",
-      "Description",
-    ];
+      if (!fullTrip || !Array.isArray(shipments) || shipments.length === 0) {
+        alert("No shipments found for this trip.");
+        return;
+      }
 
-    const rows = shipments.map((shipment) => [
-      getShipmentDisplayId(shipment),
-      shipment?.sender?.name || "—",
-      shipment?.recipient?.name || "—",
-      getDestination(shipment),
-      getShipmentQuantity(shipment),
-      shipment?.status || "—",
-      getShipmentDescription(shipment),
-    ]);
+      const tripLabel = fullTrip.tripId || "Trip";
 
-    const totalsRow = [
-      "TOTAL",
-      "",
-      "",
-      "",
-      rows.reduce((sum, row) => sum + (Number(row[4]) || 0), 0),
-      rows.reduce((sum, row) => sum + (Number(row[5]) || 0), 0),
-      rows.reduce((sum, row) => sum + (Number(row[6]) || 0), 0),
-      "",
-      "",
-    ];
+      const tripInfo = [
+        ["TRIP MANIFEST"],
+        [""],
+        ["Trip ID:", tripLabel],
+        [
+          "Driver:",
+          fullTrip.driverName || fullTrip.driver?.name || "Unassigned",
+        ],
+        ["Plate #:", fullTrip.truckPlate || fullTrip.truckPlateNumber || "—"],
+        [
+          "Route:",
+          fullTrip.route ||
+            `${fullTrip.originCode || fullTrip.origin || "—"} -> ${fullTrip.destinationCode || fullTrip.destination || "—"}`,
+        ],
+        [
+          "Departure:",
+          formatDate(
+            fullTrip.plannedDeparture ||
+              fullTrip.departure ||
+              fullTrip.createdAt,
+          ),
+        ],
+        ["Exported At:", new Date().toLocaleString()],
+        [""],
+      ];
 
-    const finalData = [...tripInfo, tableHeaders, ...rows, totalsRow];
+      const tableHeaders = [
+        "Shipment ID",
+        "Sender",
+        "Recipient",
+        "Destination",
+        "Actual Qty",
+        "Status",
+        "Description",
+      ];
 
-    const worksheet = XLSX.utils.aoa_to_sheet(finalData);
+      const rows = shipments.map((shipment) => [
+        getShipmentDisplayId(shipment),
+        shipment?.sender?.name || "—",
+        shipment?.recipient?.name || "—",
+        getDestination(shipment),
+        getShipmentQuantity(shipment),
+        shipment?.status || "—",
+        getShipmentDescription(shipment),
+      ]);
 
-    worksheet["!cols"] = [
-      { wch: 22 }, // Shipment ID
-      { wch: 22 }, // Sender
-      { wch: 22 }, // Recipient
-      { wch: 18 }, // Destination
-      { wch: 14 }, // Package Rows
-      { wch: 12 }, // Actual Qty
-      { wch: 12 }, // Weight
-      { wch: 18 }, // Status
-      { wch: 45 }, // Description
-    ];
+      const totalQty = rows.reduce(
+        (sum, row) => sum + (Number(row[4]) || 0),
+        0,
+      );
 
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, "Manifest");
+      const totalsRow = ["TOTAL", "", "", "", totalQty, "", ""];
 
-    XLSX.writeFile(workbook, `Manifest_${tripLabel}.xlsx`);
+      const finalData = [...tripInfo, tableHeaders, ...rows, totalsRow];
+
+      const worksheet = XLSX.utils.aoa_to_sheet(finalData);
+
+      worksheet["!cols"] = [
+        { wch: 22 }, // Shipment ID
+        { wch: 22 }, // Sender
+        { wch: 22 }, // Recipient
+        { wch: 18 }, // Destination
+        { wch: 12 }, // Actual Qty
+        { wch: 18 }, // Status
+        { wch: 45 }, // Description
+      ];
+
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, "Manifest");
+
+      XLSX.writeFile(workbook, `Manifest_${tripLabel}.xlsx`);
+    } catch (err) {
+      console.error("Export error:", err);
+      alert(err.message || "Failed to export trip manifest.");
+    } finally {
+      setExporting(false);
+    }
   };
 
   return (
     <button
       onClick={handleExport}
-      className="bg-green-600 hover:bg-green-500 text-white px-4 py-2 rounded-lg font-bold text-sm flex items-center gap-2 transition-colors"
+      disabled={exporting}
+      className="bg-green-600 hover:bg-green-500 disabled:opacity-60 disabled:cursor-not-allowed text-white px-4 py-2 rounded-lg font-bold text-sm flex items-center gap-2 transition-colors"
       title="Download Excel"
     >
       <FontAwesomeIcon icon={faFileExcel} />
-      <span>Export Excel</span>
+      <span>{exporting ? "Exporting..." : "Export Excel"}</span>
     </button>
   );
 }

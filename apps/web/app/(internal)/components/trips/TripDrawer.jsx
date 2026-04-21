@@ -3,13 +3,10 @@
 import React, { useState, useEffect } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
-  faTimes,
   faTruck,
   faClipboardList,
   faWrench,
-  faUnlock,
 } from "@fortawesome/free-solid-svg-icons";
-import { auth } from "@/lib/firebase";
 
 import TripTimelineTab from "./TripTimelineTab";
 import TripManifestTab from "./TripManifestTab";
@@ -28,6 +25,7 @@ export default function TripDrawer({
   data,
   onRefreshTrips,
   isDark = false,
+  user,
 }) {
   const [activeTab, setActiveTab] = useState("TIMELINE");
   const [shipments, setShipments] = useState([]);
@@ -45,7 +43,7 @@ export default function TripDrawer({
     setLoadingShips(true);
 
     try {
-      const token = await auth.currentUser?.getIdToken();
+      const token = await user?.getIdToken();
 
       const res = await fetch(`/api/manifests/trips/${data.tripId}/shipments`, {
         headers: {
@@ -237,6 +235,7 @@ export default function TripDrawer({
           onSuccess={() => {
             onRefreshTrips?.();
           }}
+          user={user}
         />
       </aside>
 
