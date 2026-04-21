@@ -1,103 +1,145 @@
-import React, { useEffect, useState } from "react";
+import React from "react";
 import * as XLSX from "xlsx";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faFileExcel } from "@fortawesome/free-solid-svg-icons";
-import { auth } from "@/lib/firebase";
 
-export default function ExportTripButton({ trip, shipments }) {
-  const [packages, setPackages] = useState([]);
+function formatDate(value) {
+  if (!value) return "—";
 
-  useEffect(() => {
-    if (shipments?.length) {
-      fetchFullShipmentDetails(shipments[0].id);
-    } else {
-      setPackages([]);
+  try {
+    if (typeof value?.toDate === "function") {
+      return value.toDate().toLocaleDateString();
     }
-  }, [shipments]);
 
-  const fetchFullShipmentDetails = async (id) => {
-    try {
-      const token = await auth.currentUser?.getIdToken();
-      const res = await fetch(`/api/shipments/${id}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (!res.ok) throw new Error("Failed to load");
-      const json = await res.json();
-      setPackages(json.shipment?.packages || []);
-    } catch (err) {
-      console.error("Error fetching packages:", err);
-    }
-  };
+    const d = new Date(value);
+    if (Number.isNaN(d.getTime())) return "—";
+    return d.toLocaleDateString();
+  } catch {
+    return "—";
+  }
+}
 
-  // console.log("ExportTripButton received trip:", trip);
-  // console.log("ExportTripButton received shipments:", shipments);
+function getShipmentQuantity(shipment = {}) {
+  return Number(
+    shipment?.totals?.totalContentQty ??
+      shipment?.totalItems ??
+      shipment?.totalContentQty ??
+      0,
+  );
+}
 
+function getShipmentDescription(shipment = {}) {
+  if (Array.isArray(shipment?.packages) && shipment.packages.length > 0) {
+    return shipment.packages
+      .map((pkg) => {
+        const qty = Number(pkg.quantity) || 1;
+        const desc = pkg.description || "Package";
+        return qty > 1 ? `${desc} (${qty})` : desc;
+      })
+      .join(", ");
+  }
+
+  if (Array.isArray(shipment?.items) && shipment.items.length > 0) {
+    return shipment.items
+      .map((item) => {
+        const qty = Number(item.quantity) || 1;
+        const desc = item.description || "Item";
+        return qty > 1 ? `${desc} (${qty})` : desc;
+      })
+      .join(", ");
+  }
+
+  return "—";
+}
+
+function getDestination(shipment = {}) {
+  return shipment?.recipient?.address?.city || shipment?.destination || "—";
+}
+
+function getShipmentDisplayId(shipment = {}) {
+  return shipment?.shipmentId || shipment?.id || "—";
+}
+
+export default function ExportTripButton({ trip, shipments = [] }) {
   const handleExport = () => {
-    if (!trip || !shipments || shipments.length === 0) {
+    if (!trip || !Array.isArray(shipments) || shipments.length === 0) {
       alert("No data to export.");
       return;
     }
 
-    // 1. Prepare Header Info (Trip Details)
-    // We add these as the first few rows
+    const tripLabel = trip.tripId || trip.id || "Trip";
+
     const tripInfo = [
       ["TRIP MANIFEST"],
-      ["Trip ID:", trip.id],
-      ["Driver:", trip.driverName || "Unassigned"],
-      ["Plate #:", trip.truckPlate || trip.plateNumber || "—"],
-      ["Date:", new Date().toLocaleDateString()],
-      [""], // Empty row for spacing
+      [""],
+      ["Trip ID:", tripLabel],
+      ["Driver:", trip.driverName || trip.driver?.name || "Unassigned"],
+      ["Plate #:", trip.truckPlate || trip.truckPlateNumber || "—"],
+      [
+        "Route:",
+        trip.route ||
+          `${trip.originCode || trip.origin || "—"} -> ${trip.destinationCode || trip.destination || "—"}`,
+      ],
+      [
+        "Departure:",
+        formatDate(trip.plannedDeparture || trip.departure || trip.createdAt),
+      ],
+      ["Exported At:", new Date().toLocaleString()],
+      [""],
     ];
 
-    // 2. Prepare Table Headers
     const tableHeaders = [
       "Shipment ID",
       "Sender",
       "Recipient",
       "Destination",
-      "Package Count",
-      "Weight (KG)",
+      "Actual Qty",
       "Status",
       "Description",
     ];
 
-    // 3. Flatten Data (Map shipments to rows)
-    const rows = shipments.map((s) => [
-      s.shipmentId,
-      s.sender?.name || "—",
-      s.recipient?.name || "—",
-      s.recipient?.address?.city || "—",
-      packages?.length || 1, // Count
-      s.totalWeight ||
-        packages?.reduce((sum, p) => sum + (Number(p.weight) || 0), 0),
-      s.status,
-      packages?.map((p) => p.description).join(", "), // Combine descriptions
+    const rows = shipments.map((shipment) => [
+      getShipmentDisplayId(shipment),
+      shipment?.sender?.name || "—",
+      shipment?.recipient?.name || "—",
+      getDestination(shipment),
+      getShipmentQuantity(shipment),
+      shipment?.status || "—",
+      getShipmentDescription(shipment),
     ]);
 
-    // 4. Combine All Data
-    const finalData = [...tripInfo, tableHeaders, ...rows];
-
-    // 5. Create Worksheet
-    const worksheet = XLSX.utils.aoa_to_sheet(finalData);
-
-    // OPTIONAL: Basic Column Widths (Visually nicer)
-    worksheet["!cols"] = [
-      { wch: 20 }, // Tracking
-      { wch: 20 }, // Sender
-      { wch: 20 }, // Recipient
-      { wch: 15 }, // Dest
-      { wch: 10 }, // Count
-      { wch: 10 }, // Weight
-      { wch: 15 }, // Status
-      { wch: 30 }, // Desc
+    const totalsRow = [
+      "TOTAL",
+      "",
+      "",
+      "",
+      rows.reduce((sum, row) => sum + (Number(row[4]) || 0), 0),
+      rows.reduce((sum, row) => sum + (Number(row[5]) || 0), 0),
+      rows.reduce((sum, row) => sum + (Number(row[6]) || 0), 0),
+      "",
+      "",
     ];
 
-    // 6. Create Workbook & Append Sheet
+    const finalData = [...tripInfo, tableHeaders, ...rows, totalsRow];
+
+    const worksheet = XLSX.utils.aoa_to_sheet(finalData);
+
+    worksheet["!cols"] = [
+      { wch: 22 }, // Shipment ID
+      { wch: 22 }, // Sender
+      { wch: 22 }, // Recipient
+      { wch: 18 }, // Destination
+      { wch: 14 }, // Package Rows
+      { wch: 12 }, // Actual Qty
+      { wch: 12 }, // Weight
+      { wch: 18 }, // Status
+      { wch: 45 }, // Description
+    ];
+
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "Manifest");
 
-    // 7. Generate File Download
-    XLSX.writeFile(workbook, `Manifest_${trip.tripId || "Trip"}.xlsx`);
+    XLSX.writeFile(workbook, `Manifest_${tripLabel}.xlsx`);
   };
 
   return (
