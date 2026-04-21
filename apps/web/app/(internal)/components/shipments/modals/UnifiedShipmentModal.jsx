@@ -107,6 +107,7 @@ export default function UnifiedShipmentModal({
 
   // to update with new firebase function
   const handleMasterSubmit = async (tripDecision) => {
+    console.log("shipment draft: ", shipmentDraft);
     setLoading(true);
     try {
       const originCode = shipmentDraft.routeInfo.originCode || "GEN";
