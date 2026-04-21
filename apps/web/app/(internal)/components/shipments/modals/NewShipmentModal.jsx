@@ -194,10 +194,10 @@ export default function NewShipmentModal({
         setFinalTripId(targetTripId);
         setShipmentDraft(null);
 
-        window.open(
-          `/components/print/labels?tripId=${targetTripId}`,
-          "_blank",
-        );
+        // window.open(
+        //   `/components/print/labels?tripId=${targetTripId}`,
+        //   "_blank",
+        // );
       } else {
         setFinalTripId(null);
       }
