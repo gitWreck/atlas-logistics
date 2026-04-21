@@ -18,6 +18,7 @@ export default function PackageTableRow({
   idx,
   shipmentData,
   isDark = false,
+  onRefresh,
 }) {
   const [showQR, setShowQR] = useState(false);
   const [showActionModal, setShowActionModal] = useState(false);
@@ -131,6 +132,7 @@ export default function PackageTableRow({
           shipmentId={shipmentData.id}
           onClose={() => setShowActionModal(false)}
           isDark={isDark}
+          onRefresh={onRefresh}
         />
       )}
     </>
