@@ -107,6 +107,7 @@ export default function UnifiedShipmentModal({
 
   // to update with new firebase function
   const handleMasterSubmit = async (tripDecision) => {
+    console.log("shipment draft: ", shipmentDraft);
     setLoading(true);
     try {
       const originCode = shipmentDraft.routeInfo.originCode || "GEN";
@@ -217,10 +218,10 @@ export default function UnifiedShipmentModal({
         setFinalTripId(targetTripId);
         setShipmentDraft(null);
 
-        window.open(
-          `/components/print/labels?tripId=${targetTripId}`,
-          "_blank",
-        );
+        // window.open(
+        //   `/components/print/labels?tripId=${targetTripId}`,
+        //   "_blank",
+        // );
       } else {
         setFinalTripId(null);
       }
