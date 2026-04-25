@@ -18,6 +18,7 @@ const PACKAGING_TYPES = [
   "Drum",
   "Pail",
   "Bucket",
+  "Sheet",
 ];
 
 const inputClass = (isDark) =>
