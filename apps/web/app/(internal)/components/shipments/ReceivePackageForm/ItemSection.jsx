@@ -6,7 +6,17 @@ import {
   faSnowflake,
 } from "@fortawesome/free-solid-svg-icons";
 
-const PACKAGING_TYPES = ["Box", "Sack", "Crate", "Bundle", "Roll", "Envelope"];
+const PACKAGING_TYPES = [
+  "Box",
+  "Sack",
+  "Crate",
+  "Bundle",
+  "Roll",
+  "Envelope",
+  "Can",
+  "Pail Bucket",
+  "Drum",
+];
 
 const inputClass = (isDark) =>
   isDark
