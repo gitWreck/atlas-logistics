@@ -22,7 +22,7 @@
       }
     },
     "android": {
-      "package": "com.atlas.tracking",
+      "package": "com.atlas.atlastracking",
       "permissions": [
         "android.permission.ACCESS_FINE_LOCATION",
         "android.permission.ACCESS_COARSE_LOCATION",
@@ -53,6 +53,15 @@
     "plugins": [
       "expo-router",
       "expo-font",
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "compileSdkVersion": 35,
+            "targetSdkVersion": 35
+          }
+        }
+      ],
       [
         "expo-image-picker",
         {
