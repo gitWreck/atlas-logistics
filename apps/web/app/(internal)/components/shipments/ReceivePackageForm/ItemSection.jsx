@@ -16,6 +16,8 @@ const PACKAGING_TYPES = [
   "Can",
   "Pail Bucket",
   "Drum",
+  "Pail",
+  "Bucket",
 ];
 
 const inputClass = (isDark) =>
