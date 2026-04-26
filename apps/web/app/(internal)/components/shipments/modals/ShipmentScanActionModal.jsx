@@ -14,7 +14,10 @@ import {
 } from "@fortawesome/free-solid-svg-icons";
 import { getModalThemeClasses } from "@/app/utility/constant/theme";
 import { getModalActionClasses } from "@/app/utility/constant/action";
-import { bulkAssignShipments } from "@/app/utility/FirebaseFunctions";
+import {
+  bulkAssignShipments,
+  updateTripStatus,
+} from "@/app/utility/FirebaseFunctions";
 
 const ACTIONS = {
   LOAD: "LOAD",
@@ -42,6 +45,7 @@ export default function ShipmentScanActionModal({
   // Assignment Interception States
   const [needsAssignmentItem, setNeedsAssignmentItem] = useState(null);
   const [recentlyAssigned, setRecentlyAssigned] = useState(new Set());
+  const [needsArrival, setNeedsArrival] = useState(false);
 
   // UI States
   const [cameraOpen, setCameraOpen] = useState(false);
@@ -57,6 +61,7 @@ export default function ShipmentScanActionModal({
     setResolvedItem(null);
     setQuantities({});
     setNeedsAssignmentItem(null);
+    setNeedsArrival(false); // ADD THIS LINE
     setCameraOpen(false);
     setLoading(false);
     setError("");
@@ -135,6 +140,30 @@ export default function ShipmentScanActionModal({
     }
   };
 
+  const handleMarkArrived = async () => {
+    setLoading(true);
+    setError("");
+
+    try {
+      await updateTripStatus({
+        tripId: tripId,
+        status: "ARRIVED",
+        notify: false, // Change to true if you want SMS triggered
+      });
+
+      // Optimistic update: temporarily mutate the local prop so it bypasses the check next time
+      if (trip) trip.status = "ARRIVED";
+
+      // Dismiss the prompt and reveal the scanner!
+      setNeedsArrival(false);
+    } catch (err) {
+      console.error(err);
+      setError(err.message || "Failed to mark trip as arrived.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleConfirm = async () => {
     if (!resolvedItem) return;
 
@@ -198,44 +227,95 @@ export default function ShipmentScanActionModal({
 
         {/* Content */}
         <div className="flex-1 overflow-y-auto p-4 space-y-4">
-          <ActionSelector
+          {/* <ActionSelector
             action={action}
             onSelect={(a) => {
               resetFlow();
               setAction(a);
             }}
             theme={theme}
+          /> */}
+
+          <ActionSelector
+            action={action}
+            onSelect={(a) => {
+              resetFlow();
+              const currentTripStatus = trip?.status?.toUpperCase();
+
+              if (a === ACTIONS.UNLOAD) {
+                if (currentTripStatus === "IN_TRANSIT") {
+                  setNeedsArrival(true);
+                  setAction(a);
+                  return; // Trap them here
+                } else if (currentTripStatus !== "ARRIVED") {
+                  setError(
+                    `Cannot unload. Trip status is currently ${currentTripStatus || "UNKNOWN"}.`,
+                  );
+                  return; // Block completely
+                }
+              }
+              setAction(a);
+            }}
+            theme={theme}
           />
 
-          {action && !resolvedItem && !needsAssignmentItem && (
-            <div className="space-y-4">
-              {!cameraOpen ? (
-                <button
-                  onClick={() => {
-                    setError("");
-                    setCameraOpen(true);
-                  }}
-                  className={`w-full rounded-xl border p-6 flex flex-col items-center gap-2 font-bold ${theme.panelSurface}`}
-                >
-                  <FontAwesomeIcon icon={faCamera} size="lg" />
-                  <span>Open Phone Camera</span>
-                </button>
-              ) : (
-                <CameraScanner
-                  onDetected={handleResolveScan}
-                  onClose={() => setCameraOpen(false)}
-                  setError={setError}
-                />
-              )}
+          {needsArrival ? (
+            <div
+              className={`rounded-xl border p-6 text-center space-y-4 ${theme.panelSurface}`}
+            >
+              <div className="text-blue-500 mb-2">
+                <FontAwesomeIcon icon={faTruckRampBox} size="3x" />
+              </div>
+              <h3 className="font-bold text-lg">Mark Trip as Arrived</h3>
+              <p className="text-sm opacity-80">
+                This trip is currently <strong>IN_TRANSIT</strong>. You must
+                mark it as arrived at the destination before you can unload
+                packages.
+              </p>
 
-              <ManualInput
-                value={manualCode}
-                onChange={setManualCode}
-                onSubmit={() => handleResolveScan(manualCode)}
-                loading={loading}
-                theme={theme}
-              />
+              <button
+                onClick={handleMarkArrived}
+                disabled={loading}
+                className={`w-full py-3 rounded-lg font-bold text-white transition-colors ${
+                  loading ? "bg-gray-500" : "bg-blue-600 hover:bg-blue-500"
+                }`}
+              >
+                {loading ? "Updating..." : "Mark as Arrived"}
+              </button>
             </div>
+          ) : (
+            action &&
+            !resolvedItem &&
+            !needsAssignmentItem && (
+              <div className="space-y-4">
+                {!cameraOpen ? (
+                  <button
+                    onClick={() => {
+                      setError("");
+                      setCameraOpen(true);
+                    }}
+                    className={`w-full rounded-xl border p-6 flex flex-col items-center gap-2 font-bold ${theme.panelSurface}`}
+                  >
+                    <FontAwesomeIcon icon={faCamera} size="lg" />
+                    <span>Open Phone Camera</span>
+                  </button>
+                ) : (
+                  <CameraScanner
+                    onDetected={handleResolveScan}
+                    onClose={() => setCameraOpen(false)}
+                    setError={setError}
+                  />
+                )}
+
+                <ManualInput
+                  value={manualCode}
+                  onChange={setManualCode}
+                  onSubmit={() => handleResolveScan(manualCode)}
+                  loading={loading}
+                  theme={theme}
+                />
+              </div>
+            )
           )}
 
           {needsAssignmentItem ? (

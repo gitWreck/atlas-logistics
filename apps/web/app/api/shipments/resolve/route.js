@@ -17,6 +17,20 @@ export async function POST(req) {
     const { scanCode, tripId, action } = await req.json();
     const cleanCode = String(scanCode || "").trim();
 
+    // Server-side Trip Validation for Unloads
+    if (action === "UNLOAD" && tripId) {
+      const tripCheck = await adminDb
+        .collection("truck_trips")
+        .doc(tripId)
+        .get();
+      if (tripCheck.exists && tripCheck.data().status !== "ARRIVED") {
+        return NextResponse.json({
+          found: false,
+          message: "Trip must be marked as ARRIVED before unloading.",
+        });
+      }
+    }
+
     if (!cleanCode) {
       return NextResponse.json(
         { error: "No scan code provided" },
