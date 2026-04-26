@@ -6,6 +6,8 @@ import {
   faTruck,
   faClipboardList,
   faWrench,
+  faUnlock,
+  faTimes,
 } from "@fortawesome/free-solid-svg-icons";
 
 import TripTimelineTab from "./TripTimelineTab";
@@ -16,8 +18,12 @@ import StatusBadge from "../ui/StatusBadge";
 import UnassignShipmentModal from "../manifests/modals/UnassignShipmentModal";
 import BulkAssignmentModal from "../manifests/modals/BulkAssignmentModal";
 import ViewPackagesModal from "../manifests/ViewPackagesModal/ViewPackagesModal";
-import { unlockTripManifest } from "@/app/utility/FirebaseFunctions";
+import {
+  unlockTripManifest,
+  updateShipmentPackages,
+} from "@/app/utility/FirebaseFunctions";
 import { getDrawerThemeClasses } from "@/app/utility/constant/theme";
+import ShipmentScanActionModal from "../shipments/modals/ShipmentScanActionModal";
 
 export default function TripDrawer({
   isOpen,
@@ -34,6 +40,7 @@ export default function TripDrawer({
   const [selectedShipmentForModal, setSelectedShipmentForModal] =
     useState(null);
   const [isBulkModalOpen, setBulkModalOpen] = useState(false);
+  const [isScanModalOpen, setScanModalOpen] = useState(false);
 
   const theme = getDrawerThemeClasses(isDark);
 
@@ -70,25 +77,41 @@ export default function TripDrawer({
 
   if (!data) return null;
 
-  const handleUnlockManifest = async () => {
-    const reason = prompt(
-      "Why are you unlocking this manifest? (Required for audit)",
-    );
+  async function fetchScannerApi(endpoint, payload) {
+    const token = await user?.getIdToken();
 
-    if (!reason) return;
+    const res = await fetch(`/api/shipments/${endpoint}`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify(payload),
+    });
 
-    try {
-      await unlockTripManifest({
-        tripId: data?.id || data?.tripId,
-        reason,
-      });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || `Failed to ${endpoint} scan`);
 
-      fetchShipments();
-      onRefreshTrips?.();
-    } catch (error) {
-      console.error("Failed to unlock manifest:", error);
-      alert(error.message || "Failed to unlock manifest.");
-    }
+    return data;
+  }
+
+  const resolveScannedLabel = (payload) => fetchScannerApi("resolve", payload);
+  // const confirmScanAction = (payload) => fetchScannerApi("confirm", payload);
+
+  const confirmScanAction = async (payload) => {
+    // Convert the array of {packageId, quantity} into a map the backend can read easily
+    const quantityMap = {};
+    payload.itemsToProcess.forEach((item) => {
+      quantityMap[item.packageId] = item.quantity;
+    });
+
+    // Call your existing function
+    await updateShipmentPackages({
+      shipmentId: payload.shipmentId,
+      packageIds: Object.keys(quantityMap), // Array of strings: ["PKG-1", "PKG-2"]
+      newStatus: payload.action === "LOAD" ? "LOADED" : "RECEIVED", // UNLOAD reverts it to RECEIVED
+      manualQty: quantityMap, // We pass the object dictionary instead of a single number
+    });
   };
 
   return (
@@ -133,26 +156,25 @@ export default function TripDrawer({
             </div>
           </div>
 
-          {/* <div className="flex items-center gap-2 shrink-0">
-            {data?.isLocked && (
-              <button
-                type="button"
-                onClick={handleUnlockManifest}
-                className={theme.unlockButton}
-              >
-                <FontAwesomeIcon icon={faUnlock} className="mr-2" />
-                Unlock Manifest
-              </button>
-            )}
-
+          <div className="flex items-center gap-2 shrink-0">
+            {/* New Modal Button */}
+            <button
+              type="button"
+              onClick={() => setScanModalOpen(true)}
+              className="px-3 py-2 rounded-lg text-xs font-semibold bg-blue-500/10 text-blue-600 border border-blue-500/20 hover:bg-blue-500/20 transition-all"
+            >
+              Scan
+            </button>
+            {/* Close Button */}
             <button
               type="button"
               onClick={onClose}
-              className={`p-2 rounded-lg transition-colors ${theme.closeButton}`}
+              className={`p-2 rounded-lg transition-colors ${theme.mutedText} hover:bg-gray-500/10`}
+              aria-label="Close drawer"
             >
-              <FontAwesomeIcon icon={faTimes} size="lg" />
+              <FontAwesomeIcon icon={faTimes} className="w-4 h-4" />
             </button>
-          </div> */}
+          </div>
         </div>
 
         {/* Tabs */}
@@ -273,6 +295,15 @@ export default function TripDrawer({
           onRefreshTrips?.();
         }}
         isDark={isDark}
+      />
+
+      <ShipmentScanActionModal
+        isOpen={isScanModalOpen}
+        onClose={() => setScanModalOpen(false)}
+        trip={data}
+        isDark={isDark}
+        onResolveScan={resolveScannedLabel} // Just pass the function reference
+        onConfirmOperation={confirmScanAction} // No extra async wrapper needed here
       />
     </>
   );
