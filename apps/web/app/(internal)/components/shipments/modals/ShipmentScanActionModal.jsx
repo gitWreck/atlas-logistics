@@ -7,15 +7,20 @@ import {
   faCamera,
   faCheck,
   faCircleNotch,
-  faKeyboard,
+  faLock,
+  faUnlock,
   faTimes,
   faTruckRampBox,
   faUndo,
 } from "@fortawesome/free-solid-svg-icons";
 import { getModalThemeClasses } from "@/app/utility/constant/theme";
 import { getModalActionClasses } from "@/app/utility/constant/action";
+import { getFunctions, httpsCallable } from "firebase/functions";
+import StatusButton from "../../ui/StatusButton"; // Adjust path if necessary
 import {
   bulkAssignShipments,
+  generateTripManifest,
+  unlockTripManifest,
   updateTripStatus,
 } from "@/app/utility/FirebaseFunctions";
 
@@ -31,29 +36,35 @@ export default function ShipmentScanActionModal({
   isDark = false,
   onResolveScan,
   onConfirmOperation,
+  onRefresh,
 }) {
   const theme = getModalThemeClasses(isDark);
   const actionTheme = getModalActionClasses();
 
-  // Primary States
+  // --- 1. CORE STATES ---
   const [action, setAction] = useState(null);
   const [manualCode, setManualCode] = useState("");
   const [scanCode, setScanCode] = useState("");
   const [resolvedItem, setResolvedItem] = useState(null);
   const [quantities, setQuantities] = useState({});
 
-  // Assignment Interception States
+  // --- 2. INTERCEPTOR STATES ---
   const [needsAssignmentItem, setNeedsAssignmentItem] = useState(null);
   const [recentlyAssigned, setRecentlyAssigned] = useState(new Set());
   const [needsArrival, setNeedsArrival] = useState(false);
+  const [needsUnlock, setNeedsUnlock] = useState(false);
+  const [needsLoadedStatus, setNeedsLoadedStatus] = useState(false);
+  const [needsLock, setNeedsLock] = useState(false);
 
-  // UI States
+  // --- 3. UI STATES ---
   const [cameraOpen, setCameraOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [btnStatus, setBtnStatus] = useState("IDLE");
 
   const tripId = trip?.tripId || trip?.id || "";
 
+  // --- 4. FLOW MANAGEMENT ---
   const resetFlow = useCallback(() => {
     setAction(null);
     setManualCode("");
@@ -61,7 +72,11 @@ export default function ShipmentScanActionModal({
     setResolvedItem(null);
     setQuantities({});
     setNeedsAssignmentItem(null);
-    setNeedsArrival(false); // ADD THIS LINE
+    setNeedsArrival(false);
+    setNeedsUnlock(false);
+    setNeedsLoadedStatus(false);
+    setNeedsLock(false);
+    setBtnStatus("IDLE");
     setCameraOpen(false);
     setLoading(false);
     setError("");
@@ -71,6 +86,7 @@ export default function ShipmentScanActionModal({
     if (isOpen) resetFlow();
   }, [isOpen, resetFlow]);
 
+  // --- 5. RESOLVE SCAN LOGIC ---
   const handleResolveScan = async (code) => {
     const cleanCode = String(code || "").trim();
 
@@ -96,14 +112,14 @@ export default function ShipmentScanActionModal({
       setScanCode(cleanCode);
       setCameraOpen(false);
 
-      // Check if it requires assignment AND hasn't been assigned in this session yet
+      // ASSIGNMENT INTERCEPTOR
       if (
         result.requiresAssignment &&
         !recentlyAssigned.has(result.shipmentId)
       ) {
-        setNeedsAssignmentItem(result); // Trap the user on the Assignment Prompt
+        setNeedsAssignmentItem(result);
       } else {
-        setResolvedItem(result); // Safe to proceed directly to quantities
+        setResolvedItem(result);
       }
 
       setQuantities({});
@@ -111,63 +127,137 @@ export default function ShipmentScanActionModal({
       setError(err.message || "Failed to check scanned label.");
     } finally {
       setLoading(false);
+
+      onRefresh();
     }
   };
 
+  // --- 6. FIREBASE ACTION HANDLERS ---
   const handleAssignShipment = async () => {
     setLoading(true);
     setError("");
-
     try {
       await bulkAssignShipments({
         tripId: tripId,
         shipmentIds: [needsAssignmentItem.shipmentId],
       });
 
-      // 1. Add to local memory so other packages in this shipment skip the prompt
       setRecentlyAssigned((prev) =>
         new Set(prev).add(needsAssignmentItem.shipmentId),
       );
-
-      // 2. Move the item from the "Prompt" view to the "Manifest" view
       setResolvedItem(needsAssignmentItem);
       setNeedsAssignmentItem(null);
     } catch (err) {
-      console.error(err);
       setError(err.message || "Failed to assign shipment to trip.");
     } finally {
       setLoading(false);
+      onRefresh();
     }
   };
 
   const handleMarkArrived = async () => {
-    setLoading(true);
+    setBtnStatus("LOADING");
     setError("");
-
     try {
       await updateTripStatus({
         tripId: tripId,
         status: "ARRIVED",
-        notify: false, // Change to true if you want SMS triggered
+        notify: false,
       });
 
-      // Optimistic update: temporarily mutate the local prop so it bypasses the check next time
       if (trip) trip.status = "ARRIVED";
+      setBtnStatus("SUCCESS");
 
-      // Dismiss the prompt and reveal the scanner!
-      setNeedsArrival(false);
+      setTimeout(() => {
+        setNeedsArrival(false);
+        if (trip?.manifestLocked) setNeedsUnlock(true);
+        setBtnStatus("IDLE");
+      }, 1000);
+
+      onRefresh();
     } catch (err) {
-      console.error(err);
-      setError(err.message || "Failed to mark trip as arrived.");
-    } finally {
-      setLoading(false);
+      setError(err.message || "Failed to mark arrived.");
+      setBtnStatus("ERROR");
+    }
+  };
+
+  const handleUnlockManifest = async () => {
+    setBtnStatus("LOADING");
+    setError("");
+    try {
+      await unlockTripManifest({
+        tripId: tripId,
+        reason: "trip needs to be unloaded",
+      });
+
+      if (trip) trip.manifestLocked = false;
+      setBtnStatus("SUCCESS");
+
+      setTimeout(() => {
+        setNeedsUnlock(false);
+        setBtnStatus("IDLE");
+      }, 1000);
+
+      onRefresh();
+    } catch (err) {
+      setError(err.message || "Failed to unlock manifest.");
+      setBtnStatus("ERROR");
+    }
+  };
+
+  const handleSetTripLoaded = async () => {
+    setBtnStatus("LOADING");
+    setError("");
+    try {
+      await updateTripStatus({ tripId: tripId, status: "LOADED" });
+
+      if (trip) trip.status = "LOADED";
+      setBtnStatus("SUCCESS");
+
+      setTimeout(() => {
+        setNeedsLoadedStatus(false);
+        setNeedsLock(true);
+        setBtnStatus("IDLE");
+      }, 1000);
+
+      onRefresh();
+    } catch (err) {
+      setError("Failed to mark as loaded.");
+      setBtnStatus("ERROR");
+    }
+  };
+
+  const handleLockManifest = async () => {
+    setBtnStatus("LOADING");
+    setError("");
+    try {
+      // 1. Generate the Manifest
+      await generateTripManifest({ tripId: tripId });
+
+      // 2. Automatically set to IN_TRANSIT
+      await updateTripStatus({ tripId: tripId, status: "IN_TRANSIT" }); // NEW
+
+      // Optimistic local update
+      if (trip) {
+        trip.manifestLocked = true;
+        trip.status = "IN_TRANSIT"; // NEW
+      }
+
+      setBtnStatus("SUCCESS");
+
+      setTimeout(() => {
+        setNeedsLock(false);
+        setBtnStatus("IDLE");
+      }, 1000);
+    } catch (err) {
+      setError(err.message || "Failed to lock manifest.");
+      setBtnStatus("ERROR");
     }
   };
 
   const handleConfirm = async () => {
     if (!resolvedItem) return;
 
-    // Filter packages that actually have a quantity > 0
     const itemsToProcess = Object.entries(quantities)
       .filter(([_, qty]) => qty > 0)
       .map(([pkgId, qty]) => ({ packageId: pkgId, quantity: qty }));
@@ -197,6 +287,7 @@ export default function ShipmentScanActionModal({
       setError(err.message || "Failed to process scan action.");
     } finally {
       setLoading(false);
+      onRefresh();
     }
   };
 
@@ -227,36 +318,17 @@ export default function ShipmentScanActionModal({
 
         {/* Content */}
         <div className="flex-1 overflow-y-auto p-4 space-y-4">
-          {/* <ActionSelector
-            action={action}
-            onSelect={(a) => {
-              resetFlow();
-              setAction(a);
-            }}
-            theme={theme}
-          /> */}
-
           <ActionSelector
             action={action}
-            onSelect={(a) => {
-              resetFlow();
-              const currentTripStatus = trip?.status?.toUpperCase();
-
-              if (a === ACTIONS.UNLOAD) {
-                if (currentTripStatus === "IN_TRANSIT") {
-                  setNeedsArrival(true);
-                  setAction(a);
-                  return; // Trap them here
-                } else if (currentTripStatus !== "ARRIVED") {
-                  setError(
-                    `Cannot unload. Trip status is currently ${currentTripStatus || "UNKNOWN"}.`,
-                  );
-                  return; // Block completely
-                }
-              }
-              setAction(a);
-            }}
+            trip={trip}
             theme={theme}
+            resetFlow={resetFlow}
+            setAction={setAction}
+            setNeedsArrival={setNeedsArrival}
+            setNeedsUnlock={setNeedsUnlock}
+            setNeedsLoadedStatus={setNeedsLoadedStatus}
+            setNeedsLock={setNeedsLock}
+            setError={setError}
           />
 
           {needsArrival ? (
@@ -267,58 +339,102 @@ export default function ShipmentScanActionModal({
                 <FontAwesomeIcon icon={faTruckRampBox} size="3x" />
               </div>
               <h3 className="font-bold text-lg">Mark Trip as Arrived</h3>
-              <p className="text-sm opacity-80">
-                This trip is currently <strong>IN_TRANSIT</strong>. You must
-                mark it as arrived at the destination before you can unload
-                packages.
+              <p className="text-sm opacity-80 mb-4">
+                You must mark this trip as arrived before unloading.
               </p>
-
-              <button
+              <StatusButton
+                status={btnStatus}
+                label="Mark as Arrived"
+                icon={faCheck}
+                variant="blue"
                 onClick={handleMarkArrived}
-                disabled={loading}
-                className={`w-full py-3 rounded-lg font-bold text-white transition-colors ${
-                  loading ? "bg-gray-500" : "bg-blue-600 hover:bg-blue-500"
-                }`}
-              >
-                {loading ? "Updating..." : "Mark as Arrived"}
-              </button>
+              />
             </div>
-          ) : (
-            action &&
-            !resolvedItem &&
-            !needsAssignmentItem && (
-              <div className="space-y-4">
-                {!cameraOpen ? (
-                  <button
-                    onClick={() => {
-                      setError("");
-                      setCameraOpen(true);
-                    }}
-                    className={`w-full rounded-xl border p-6 flex flex-col items-center gap-2 font-bold ${theme.panelSurface}`}
-                  >
-                    <FontAwesomeIcon icon={faCamera} size="lg" />
-                    <span>Open Phone Camera</span>
-                  </button>
-                ) : (
-                  <CameraScanner
-                    onDetected={handleResolveScan}
-                    onClose={() => setCameraOpen(false)}
-                    setError={setError}
-                  />
-                )}
-
-                <ManualInput
-                  value={manualCode}
-                  onChange={setManualCode}
-                  onSubmit={() => handleResolveScan(manualCode)}
-                  loading={loading}
-                  theme={theme}
-                />
+          ) : needsUnlock ? (
+            <div
+              className={`rounded-xl border p-6 text-center space-y-4 ${theme.panelSurface}`}
+            >
+              <div className="text-amber-500 mb-2">
+                <FontAwesomeIcon icon={faLock} size="3x" />
               </div>
-            )
-          )}
-
-          {needsAssignmentItem ? (
+              <h3 className="font-bold text-lg">Manifest Locked</h3>
+              <p className="text-sm opacity-80 mb-4">
+                You must unlock the manifest before you can scan items out.
+              </p>
+              <StatusButton
+                status={btnStatus}
+                label="Unlock Manifest"
+                loadingLabel="Unlocking..."
+                successLabel="Unlocked!"
+                icon={faUnlock}
+                variant="amber"
+                onClick={handleUnlockManifest}
+              />
+            </div>
+          ) : needsLoadedStatus ? (
+            <div
+              className={`rounded-xl border p-6 text-center space-y-4 ${theme.panelSurface}`}
+            >
+              <div className="text-emerald-500 mb-2">
+                <FontAwesomeIcon icon={faCheck} size="3x" />
+              </div>
+              <h3 className="font-bold text-lg">Trip is Fully Loaded</h3>
+              <p className="text-sm opacity-80 mb-4">
+                All pending items are loaded. Change status to LOADED?
+              </p>
+              <div className="space-y-2">
+                <StatusButton
+                  status={btnStatus}
+                  label="Lock Manifest"
+                  loadingLabel="Locking..."
+                  successLabel="Locked!"
+                  icon={faLock}
+                  variant="emerald"
+                  onClick={handleLockManifest}
+                />
+                {/* ONLY show skip if the trip is NOT actually loaded yet */}
+                {trip?.status?.toUpperCase() !== "LOADED" ||
+                  (trip?.status?.toUpperCase() !== "IN_TRANSIT" && (
+                    <button
+                      onClick={() => setNeedsLock(false)}
+                      className="text-xs opacity-60 underline mt-2"
+                    >
+                      Skip & load extra items
+                    </button>
+                  ))}
+              </div>
+            </div>
+          ) : needsLock ? (
+            <div
+              className={`rounded-xl border p-6 text-center space-y-4 ${theme.panelSurface}`}
+            >
+              <div className="text-emerald-500 mb-2">
+                <FontAwesomeIcon icon={faLock} size="3x" />
+              </div>
+              <h3 className="font-bold text-lg">Ready for Dispatch</h3>
+              <p className="text-sm opacity-80 mb-4">
+                The trip is loaded. Lock the manifest to prevent further
+                changes.
+              </p>
+              <div className="space-y-2">
+                <StatusButton
+                  status={btnStatus}
+                  label="Lock Manifest"
+                  loadingLabel="Locking..."
+                  successLabel="Locked!"
+                  icon={faLock}
+                  variant="emerald"
+                  onClick={handleLockManifest}
+                />
+                <button
+                  onClick={() => setNeedsLock(false)}
+                  className="text-xs opacity-60 underline mt-2"
+                >
+                  Skip & load extra items
+                </button>
+              </div>
+            </div>
+          ) : needsAssignmentItem ? (
             <div
               className={`rounded-xl border p-6 text-center space-y-4 ${theme.panelSurface}`}
             >
@@ -331,7 +447,6 @@ export default function ShipmentScanActionModal({
                 not assigned to this trip. You must assign it before you can{" "}
                 {action?.toLowerCase()} its packages.
               </p>
-
               <button
                 onClick={handleAssignShipment}
                 disabled={loading}
@@ -350,6 +465,35 @@ export default function ShipmentScanActionModal({
               setQuantities={setQuantities}
               theme={theme}
             />
+          ) : action ? (
+            <div className="space-y-4">
+              {!cameraOpen ? (
+                <button
+                  onClick={() => {
+                    setError("");
+                    setCameraOpen(true);
+                  }}
+                  className={`w-full rounded-xl border p-6 flex flex-col items-center gap-2 font-bold ${theme.panelSurface}`}
+                >
+                  <FontAwesomeIcon icon={faCamera} size="lg" />
+                  <span>Open Phone Camera</span>
+                </button>
+              ) : (
+                <CameraScanner
+                  onDetected={handleResolveScan}
+                  onClose={() => setCameraOpen(false)}
+                  setError={setError}
+                />
+              )}
+
+              <ManualInput
+                value={manualCode}
+                onChange={setManualCode}
+                onSubmit={() => handleResolveScan(manualCode)}
+                loading={loading}
+                theme={theme}
+              />
+            </div>
           ) : null}
 
           {error && (
@@ -370,7 +514,6 @@ export default function ShipmentScanActionModal({
                 <FontAwesomeIcon icon={faUndo} className="mr-2" /> Reset
               </button>
 
-              {/* Only show the Confirm Action button if we are past the Assignment phase */}
               {resolvedItem && !needsAssignmentItem && (
                 <button
                   onClick={handleConfirm}
@@ -408,6 +551,124 @@ export default function ShipmentScanActionModal({
 // Sub-Components
 // -----------------------------------------------------------------------------
 
+function ActionSelector({
+  action,
+  trip,
+  theme,
+  resetFlow,
+  setAction,
+  setNeedsArrival,
+  setNeedsUnlock,
+  setNeedsLoadedStatus,
+  setNeedsLock,
+  setError,
+}) {
+  const currentTripStatus = trip?.status?.toUpperCase();
+  const isManifestLocked = !!trip?.manifestLocked;
+
+  // LOGIC: Disable LOAD if trip is moving or already locked down
+  const isLoadDisabled = currentTripStatus === "IN_TRANSIT" || isManifestLocked;
+
+  const options = [
+    {
+      id: ACTIONS.LOAD,
+      label: "Load",
+      icon: faTruckRampBox,
+      color: "text-blue-500",
+      bg: "bg-blue-500/10",
+      border: "border-blue-500/50",
+      disabled: isLoadDisabled, // <-- Add this property
+    },
+    {
+      id: ACTIONS.UNLOAD,
+      label: "Unload",
+      icon: faUndo,
+      color: "text-amber-500",
+      bg: "bg-amber-500/10",
+      border: "border-amber-500/50",
+      disabled: false, // Unload is never strictly disabled here (intercepted instead)
+    },
+  ];
+
+  return (
+    <div className="grid grid-cols-2 gap-3">
+      {options.map((opt) => (
+        <button
+          key={opt.id}
+          type="button"
+          disabled={opt.disabled} // <-- Apply the HTML disabled attribute
+          onClick={() => {
+            resetFlow();
+            const currentTripStatus = trip?.status?.toUpperCase();
+
+            // UNLOAD INTERCEPTOR
+            if (opt.id === ACTIONS.UNLOAD) {
+              if (currentTripStatus === "IN_TRANSIT") {
+                setNeedsArrival(true);
+                setAction(opt.id);
+                return;
+              } else if (
+                currentTripStatus === "ARRIVED" &&
+                trip?.manifestLocked
+              ) {
+                setNeedsUnlock(true);
+                setAction(opt.id);
+                return;
+              } else if (
+                currentTripStatus !== "ARRIVED" &&
+                currentTripStatus !== "COMPLETED"
+              ) {
+                setError(
+                  `Cannot unload. Trip status is currently ${currentTripStatus || "UNKNOWN"}.`,
+                );
+                return;
+              }
+            }
+
+            // LOAD INTERCEPTOR
+            if (opt.id === ACTIONS.LOAD) {
+              const isFull = trip?.itemPending === 0 && trip?.totalItems > 0;
+
+              if (currentTripStatus === "LOADED" && !trip?.manifestLocked) {
+                setNeedsLock(true);
+                setAction(opt.id);
+                return;
+              } else if (
+                isFull &&
+                currentTripStatus !== "LOADED" &&
+                currentTripStatus !== "ARRIVED"
+              ) {
+                setNeedsLoadedStatus(true);
+                setAction(opt.id);
+                return;
+              }
+            }
+
+            setAction(opt.id);
+          }}
+          className={`rounded-xl border p-4 text-left transition-all relative overflow-hidden ${
+            opt.disabled
+              ? "opacity-50 cursor-not-allowed bg-gray-500/5 border-gray-500/20 grayscale" // <-- Disabled styles
+              : action === opt.id
+                ? `${opt.bg} ${opt.color} ${opt.border}`
+                : theme.panelSurface
+          }`}
+        >
+          <FontAwesomeIcon icon={opt.icon} className="mb-2" />
+          <div className="font-bold">{opt.label}</div>
+
+          {/* Add a tiny reason text if it's disabled */}
+          {opt.disabled && opt.id === ACTIONS.LOAD && (
+            <div className="text-[9px] mt-1 text-red-500 font-bold uppercase">
+              {isManifestLocked ? "Manifest Locked" : "In Transit"}
+            </div>
+          )}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 function CameraScanner({ onDetected, onClose, setError }) {
   const videoRef = useRef(null);
   const streamRef = useRef(null);
@@ -429,7 +690,6 @@ function CameraScanner({ onDetected, onClose, setError }) {
         streamRef.current = stream;
         if (videoRef.current) videoRef.current.srcObject = stream;
 
-        // Native Phone Barcode API
         if ("BarcodeDetector" in window) {
           const detector = new window.BarcodeDetector({
             formats: ["qr_code", "code_128"],
@@ -444,7 +704,7 @@ function CameraScanner({ onDetected, onClose, setError }) {
                 return;
               }
             } catch (e) {
-              /* silent frame fail */
+              // silent frame fail
             }
             requestAnimationFrame(renderFrame);
           };
@@ -490,47 +750,6 @@ function CameraScanner({ onDetected, onClose, setError }) {
   );
 }
 
-function ActionSelector({ action, onSelect, theme }) {
-  const options = [
-    {
-      id: ACTIONS.LOAD,
-      label: "Load",
-      icon: faTruckRampBox,
-      color: "text-blue-500",
-      bg: "bg-blue-500/10",
-      border: "border-blue-500/50",
-    },
-    {
-      id: ACTIONS.UNLOAD,
-      label: "Unload",
-      icon: faUndo,
-      color: "text-amber-500",
-      bg: "bg-amber-500/10",
-      border: "border-amber-500/50",
-    },
-  ];
-
-  return (
-    <div className="grid grid-cols-2 gap-3">
-      {options.map((opt) => (
-        <button
-          key={opt.id}
-          type="button"
-          onClick={() => onSelect(opt.id)}
-          className={`rounded-xl border p-4 text-left transition-all ${
-            action === opt.id
-              ? `${opt.bg} ${opt.color} ${opt.border}`
-              : theme.panelSurface
-          }`}
-        >
-          <FontAwesomeIcon icon={opt.icon} className="mb-2" />
-          <div className="font-bold">{opt.label}</div>
-        </button>
-      ))}
-    </div>
-  );
-}
-
 function ManualInput({ value, onChange, onSubmit, loading, theme }) {
   return (
     <div className={`rounded-xl border p-4 ${theme.panelSurface}`}>
@@ -564,7 +783,6 @@ function ManualInput({ value, onChange, onSubmit, loading, theme }) {
 function ResolvedItemPanel({ item, action, quantities, setQuantities, theme }) {
   const isShipment = item.scanType === "SHIPMENT";
 
-  // If it's a Shipment, show all packages. If a Package, isolate just that one.
   const displayPackages = isShipment
     ? item.packages || []
     : item.packages?.filter((p) => p.packageId === item.packageId) || [];
