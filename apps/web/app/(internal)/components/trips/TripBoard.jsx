@@ -256,10 +256,15 @@ const TripBoard = forwardRef(function TripBoard(
                 />
               </div>
 
-              <div className="flex gap-2 w-full sm:w-auto">
+              {/* <div className="flex gap-2 w-full sm:w-auto"> */}
+              {/* <div className="grid grid-cols-1 gap-2 w-full sm:grid-cols-3 sm:w-auto"> */}
+              <div className="grid grid-cols-2 gap-2 w-full sm:flex sm:w-auto">
                 {/* Date Range */}
-                <div
+                {/* <div
                   className={`flex items-center gap-2 rounded-lg px-2 py-1 flex-1 sm:flex-none justify-center border ${theme.filterWrap}`}
+                > */}
+                <div
+                  className={`col-span-2 sm:col-span-1 flex items-center gap-2 rounded-lg px-2 py-1 w-full justify-center border ${theme.filterWrap}`}
                 >
                   <input
                     type="date"
@@ -290,6 +295,7 @@ const TripBoard = forwardRef(function TripBoard(
                     <option value="ALL">All Route Types</option>
                     <option value="HUB_TRANSFER">Hub Transfers</option>
                     <option value="LOCAL_PICKUP">Local Pickups</option>
+                    <option value="DELIVERY">Delivery</option>
                   </select>
                 </div>
 

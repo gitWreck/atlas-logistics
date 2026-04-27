@@ -1,0 +1,183 @@
+"use client";
+
+import React, { useRef, useEffect } from "react";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faTruckRampBox, faUndo } from "@fortawesome/free-solid-svg-icons";
+
+export function ActionSelector({ action, trip, theme, actions }) {
+  const currentTripStatus = trip?.status?.toUpperCase();
+  const isManifestLocked = !!trip?.manifestLocked;
+  const isLoadDisabled = currentTripStatus === "IN_TRANSIT" || isManifestLocked;
+
+  const options = [
+    {
+      id: "LOAD",
+      label: "Load",
+      icon: faTruckRampBox,
+      color: "text-blue-500",
+      bg: "bg-blue-500/10",
+      border: "border-blue-500/50",
+      disabled: isLoadDisabled,
+    },
+    {
+      id: "UNLOAD",
+      label: "Unload",
+      icon: faUndo,
+      color: "text-amber-500",
+      bg: "bg-amber-500/10",
+      border: "border-amber-500/50",
+      disabled: false,
+    },
+  ];
+
+  const handleSelect = (id) => {
+    actions.resetFlow();
+    if (id === "UNLOAD") {
+      if (currentTripStatus === "IN_TRANSIT")
+        return actions.setNeedsArrival(true) || actions.setAction(id);
+      if (currentTripStatus === "ARRIVED" && isManifestLocked)
+        return actions.setNeedsUnlock(true) || actions.setAction(id);
+      if (currentTripStatus !== "ARRIVED" && currentTripStatus !== "COMPLETED")
+        return actions.setError(
+          `Cannot unload. Trip status is currently ${currentTripStatus || "UNKNOWN"}.`,
+        );
+    }
+    if (id === "LOAD") {
+      const isFull = trip?.itemPending === 0 && trip?.totalItems > 0;
+      if (currentTripStatus === "LOADED" && !isManifestLocked)
+        return actions.setNeedsLock(true) || actions.setAction(id);
+      if (
+        isFull &&
+        currentTripStatus !== "LOADED" &&
+        currentTripStatus !== "ARRIVED"
+      )
+        return actions.setNeedsLoadedStatus(true) || actions.setAction(id);
+    }
+    actions.setAction(id);
+  };
+
+  return (
+    <div className="grid grid-cols-2 gap-3">
+      {options.map((opt) => (
+        <button
+          key={opt.id}
+          type="button"
+          disabled={opt.disabled}
+          onClick={() => handleSelect(opt.id)}
+          className={`rounded-xl border p-4 text-left transition-all relative overflow-hidden ${
+            opt.disabled
+              ? "opacity-50 cursor-not-allowed bg-gray-500/5 border-gray-500/20 grayscale"
+              : action === opt.id
+                ? `${opt.bg} ${opt.color} ${opt.border}`
+                : theme.panelSurface
+          }`}
+        >
+          <FontAwesomeIcon icon={opt.icon} className="mb-2" />
+          <div className="font-bold">{opt.label}</div>
+          {opt.disabled && opt.id === "LOAD" && (
+            <div className="text-[9px] mt-1 text-red-500 font-bold uppercase">
+              {isManifestLocked ? "Manifest Locked" : "In Transit"}
+            </div>
+          )}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+export function CameraScanner({ onDetected, onClose, setError }) {
+  const videoRef = useRef(null);
+  const streamRef = useRef(null);
+
+  useEffect(() => {
+    let stopScanning = false;
+    async function setupCamera() {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: "environment", focusMode: "continuous" },
+        });
+        if (stopScanning) return stream.getTracks().forEach((t) => t.stop());
+
+        streamRef.current = stream;
+        if (videoRef.current) videoRef.current.srcObject = stream;
+
+        if ("BarcodeDetector" in window) {
+          const detector = new window.BarcodeDetector({
+            formats: ["qr_code", "code_128"],
+          });
+          const renderFrame = async () => {
+            if (stopScanning || !videoRef.current) return;
+            try {
+              const barcodes = await detector.detect(videoRef.current);
+              if (barcodes.length > 0) return onDetected(barcodes[0].rawValue);
+            } catch (e) {
+              /* ignore */
+            }
+            requestAnimationFrame(renderFrame);
+          };
+          renderFrame();
+        } else {
+          setError("Native scanner not supported. Please use manual input.");
+          onClose();
+        }
+      } catch (err) {
+        setError("Camera access denied.");
+        onClose();
+      }
+    }
+    setupCamera();
+    return () => {
+      stopScanning = true;
+      if (streamRef.current)
+        streamRef.current.getTracks().forEach((t) => t.stop());
+    };
+  }, [onDetected, onClose, setError]);
+
+  return (
+    <div className="rounded-xl overflow-hidden bg-black relative aspect-square">
+      <video
+        ref={videoRef}
+        autoPlay
+        playsInline
+        className="w-full h-full object-cover"
+      />
+      <div className="absolute inset-0 border-2 border-blue-500 m-12 rounded-lg opacity-50 shadow-[0_0_0_999px_rgba(0,0,0,0.5)] pointer-events-none" />
+      <button
+        onClick={onClose}
+        className="absolute bottom-4 right-4 bg-black/50 text-white px-4 py-2 rounded-lg text-sm font-bold"
+      >
+        Close
+      </button>
+    </div>
+  );
+}
+
+export function ManualInput({ value, onChange, onSubmit, loading, theme }) {
+  return (
+    <div className={`rounded-xl border p-4 ${theme.panelSurface}`}>
+      <label className="text-[10px] font-bold uppercase opacity-60">
+        Manual Entry
+      </label>
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          onSubmit();
+        }}
+        className="mt-2 flex gap-2"
+      >
+        <input
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder="Enter ID or Label..."
+          className={`flex-1 rounded-lg border px-3 py-2 text-sm ${theme.input}`}
+        />
+        <button
+          disabled={loading}
+          className="px-4 bg-blue-600 text-white rounded-lg text-sm font-bold"
+        >
+          Check
+        </button>
+      </form>
+    </div>
+  );
+}

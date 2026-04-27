@@ -23,7 +23,7 @@ import {
   updateShipmentPackages,
 } from "@/app/utility/FirebaseFunctions";
 import { getDrawerThemeClasses } from "@/app/utility/constant/theme";
-import ShipmentScanActionModal from "../shipments/modals/ShipmentScanActionModal";
+import ShipmentScanActionModal from "../shipments/ShipmentScanner/ShipmentScanActionModal";
 
 export default function TripDrawer({
   isOpen,
@@ -304,6 +304,11 @@ export default function TripDrawer({
         isDark={isDark}
         onResolveScan={resolveScannedLabel} // Just pass the function reference
         onConfirmOperation={confirmScanAction} // No extra async wrapper needed here
+        onRefresh={() => {
+          fetchShipments();
+          onRefreshTrips?.();
+        }}
+        user={user}
       />
     </>
   );
