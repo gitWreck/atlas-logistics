@@ -249,6 +249,7 @@ export default function TripDrawer({
               onCreateInvoice={(shipment) => {
                 setSelectedShipmentForInvoice(shipment);
                 setIsInvoiceFormOpen(true);
+                console.log("data", shipment);
               }}
               onViewInvoice={(shipment) => {
                 setSelectedInvoiceForDetails({
