@@ -2,12 +2,11 @@ function buildInitialForm(shipment, invoice, mode) {
   if (mode === "edit" && invoice) {
     return {
       shipmentId:
-        invoice.shipmentId || shipment?.id || shipment.shipmentId || "",
+        shipment.shipmentId || invoice.shipmentId || shipment?.id || "",
       shipmentTrackingNumber:
-        invoice.shipmentTrackingNumber ||
-        shipment?.trackingNumber ||
         shipment.shipmentId ||
         shipment?.id ||
+        invoice.shipmentTrackingNumber ||
         "",
       invoiceNumber: invoice.invoiceNumber || "",
       invoiceDate: invoice.invoiceDate || "",
@@ -26,7 +25,7 @@ function buildInitialForm(shipment, invoice, mode) {
         invoice.routeLabel ||
         `${shipment?.origin || "Unknown"} → ${shipment?.destination || "Unknown"}`,
       shipmentStatus: invoice.shipmentStatus || shipment?.status || "",
-      truckTripId: invoice.truckTripId || shipment?.currentTruckTripId || "",
+      truckTripId: invoice.truckTripId || shipment?.currentTripId || "",
       totalPackages: invoice.totalPackages || shipment?.packages?.length || 0,
       totalItems: invoice.totalItems || shipment?.totals?.totalItems || 0,
       amount: invoice.amount ?? 0,
@@ -37,8 +36,8 @@ function buildInitialForm(shipment, invoice, mode) {
   }
 
   return {
-    shipmentId: shipment?.id || "",
-    shipmentTrackingNumber: shipment?.trackingNumber || shipment?.id || "",
+    shipmentId: shipment?.id || shipment?.shipmentId || "",
+    shipmentTrackingNumber: shipment?.shipmentId || shipment?.id || "",
     invoiceNumber: "",
     invoiceDate: "",
     dueDate: "",
@@ -52,7 +51,7 @@ function buildInitialForm(shipment, invoice, mode) {
     destination: shipment?.destination || "",
     routeLabel: `${shipment?.origin || "Unknown"} → ${shipment?.destination || "Unknown"}`,
     shipmentStatus: shipment?.status || "",
-    truckTripId: shipment?.currentTruckTripId || "",
+    truckTripId: shipment?.currentTripId || "",
     totalPackages: shipment?.packages?.length || 0,
     totalItems: shipment?.totals?.totalItems || 0,
     amount: 0,

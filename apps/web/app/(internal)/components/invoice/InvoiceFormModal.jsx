@@ -124,11 +124,11 @@ export default function InvoiceFormModal({
                       >
                         Shipment
                       </label>
-
+                      {/* {JSON.stringify(form, null, 2)} */}
                       <input
                         type="text"
                         value={
-                          mode === "edit"
+                          mode === "edit" || form.shipmentId !== ""
                             ? form.shipmentId || ""
                             : shipmentQuery
                         }

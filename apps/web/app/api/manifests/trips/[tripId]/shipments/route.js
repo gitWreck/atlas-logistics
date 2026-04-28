@@ -66,9 +66,55 @@ export async function GET(request, { params }) {
 
       return {
         id: doc.id,
+
+        // keep trip shipment data first
         ...data,
 
-        // 🔥 inject invoice fields
+        // normalize shipment identifiers
+        shipmentId: data.shipmentId || root.id || doc.id,
+        trackingShipmentId:
+          data.trackingShipmentId ||
+          root.trackingNumber ||
+          root.shipmentId ||
+          doc.id,
+
+        // use full root data when available
+        sender: root.sender || data.sender || null,
+        recipient: root.recipient || data.recipient || null,
+
+        origin: root.origin || data.origin || null,
+        originCode: root.originCode || data.originCode || null,
+        destination: root.destination || data.destination || null,
+        destinationCode: root.destinationCode || data.destinationCode || null,
+
+        route:
+          data.route ||
+          root.route ||
+          `${root.origin || data.origin || "Unknown"} -> ${
+            root.destination || data.destination || "Unknown"
+          }`,
+
+        status: root.status || data.status || null,
+        currentTripId: root.currentTripId || data.currentTripId || tripId,
+
+        packages: root.packages || data.packages || [],
+        packageBarcodes: root.packageBarcodes || data.packageBarcodes || [],
+
+        totals: root.totals || {
+          totalItems: data.totalItems || 0,
+          loaded: data.loadedCount || 0,
+          received: data.receivedCount || 0,
+          delivered: data.deliveredCount || 0,
+          pending: data.pendingCount || 0,
+        },
+
+        totalItems: root.totals?.totalItems || data.totalItems || 0,
+        loadedCount: data.loadedCount || root.totals?.loaded || 0,
+        receivedCount: data.receivedCount || root.totals?.received || 0,
+        deliveredCount: data.deliveredCount || root.totals?.delivered || 0,
+        pendingCount: data.pendingCount || root.totals?.pending || 0,
+
+        // invoice fields from root shipment
         hasInvoice: root.hasInvoice || false,
         invoiceId: root.invoiceId || null,
         invoiceNumber: root.invoiceNumber || null,
