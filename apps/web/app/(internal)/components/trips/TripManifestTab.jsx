@@ -14,6 +14,8 @@ import {
   faMinus,
   faTruckFast,
   faCheckDouble,
+  faFileInvoiceDollar,
+  faReceipt,
 } from "@fortawesome/free-solid-svg-icons";
 import { bulkShipmentAction } from "@/app/utility/FirebaseFunctions";
 import { getTableTheme } from "@/app/utility/constant/theme";
@@ -21,7 +23,7 @@ import { getTableActionClasses } from "@/app/utility/constant/action";
 import { packageLabelUrl } from "@/app/utility/constant/templates";
 
 export default function TripManifestTab({
-  shipments,
+  shipments = [],
   loading,
   isLocked,
   onAddShipment,
@@ -30,6 +32,10 @@ export default function TripManifestTab({
   tripId,
   onRefresh,
   isDark = false,
+
+  // add these
+  onCreateInvoice,
+  onViewInvoice,
 }) {
   const [search, setSearch] = useState("");
   const [selectedIds, setSelectedIds] = useState(new Set());
@@ -39,14 +45,16 @@ export default function TripManifestTab({
   const action = getTableActionClasses(isDark);
 
   const filteredData = useMemo(() => {
+    const keyword = search.toLowerCase().trim();
+
     return shipments.filter((shipment) => {
       return (
-        (shipment.shipmentId || "")
+        String(shipment.shipmentId || "")
           .toLowerCase()
-          .includes(search.toLowerCase()) ||
-        (shipment.recipient?.name || "")
+          .includes(keyword) ||
+        String(shipment.recipient?.name || "")
           .toLowerCase()
-          .includes(search.toLowerCase())
+          .includes(keyword)
       );
     });
   }, [shipments, search]);
@@ -55,8 +63,20 @@ export default function TripManifestTab({
     setSelectedIds(new Set());
   }, [search, shipments]);
 
+  const isAllSelected =
+    filteredData.length > 0 && selectedIds.size === filteredData.length;
+
+  const getShipmentInvoice = (shipment) => {
+    return {
+      hasInvoice: shipment.hasInvoice || Boolean(shipment.invoiceId),
+      invoiceId: shipment.invoiceId,
+      invoiceNumber: shipment.invoiceNumber,
+      invoiceStatus: shipment.invoiceStatus,
+    };
+  };
+
   const handleSelectAll = () => {
-    if (selectedIds.size === filteredData.length) {
+    if (isAllSelected) {
       setSelectedIds(new Set());
     } else {
       setSelectedIds(new Set(filteredData.map((shipment) => shipment.id)));
@@ -93,76 +113,133 @@ export default function TripManifestTab({
     }
   };
 
+  const renderBulkActions = () => (
+    <div className="grid grid-cols-2 sm:flex gap-2 w-full">
+      <button
+        type="button"
+        onClick={() => handleBulkAction("UNLOAD")}
+        disabled={isBulkProcessing || isLocked}
+        className={`px-3 py-2 border text-xs font-bold rounded-lg flex items-center justify-center gap-2 transition-colors disabled:opacity-50 whitespace-nowrap ${action.bulkNeutral}`}
+      >
+        <FontAwesomeIcon icon={faDolly} />
+        Unload
+      </button>
+
+      <button
+        type="button"
+        onClick={() => handleBulkAction("LOAD")}
+        disabled={isBulkProcessing || isLocked}
+        className={`px-3 py-2 text-xs font-bold rounded-lg flex items-center justify-center gap-2 transition-colors disabled:opacity-50 whitespace-nowrap ${action.bulkLoad}`}
+      >
+        {isBulkProcessing ? (
+          "Processing..."
+        ) : (
+          <>
+            <FontAwesomeIcon icon={faTruckLoading} />
+            Load
+          </>
+        )}
+      </button>
+
+      <button
+        type="button"
+        onClick={() => handleBulkAction("OUT_FOR_DELIVERY")}
+        disabled={isBulkProcessing || isLocked}
+        className={`px-3 py-2 text-xs font-bold rounded-lg flex items-center justify-center gap-2 transition-colors disabled:opacity-50 whitespace-nowrap ${action.bulkOut}`}
+      >
+        <FontAwesomeIcon icon={faTruckFast} />
+        Out
+      </button>
+
+      <button
+        type="button"
+        onClick={() => handleBulkAction("DELIVERED")}
+        disabled={isBulkProcessing || isLocked}
+        className={`px-3 py-2 text-xs font-bold rounded-lg flex items-center justify-center gap-2 transition-colors disabled:opacity-50 whitespace-nowrap ${action.bulkDelivered}`}
+      >
+        <FontAwesomeIcon icon={faCheckDouble} />
+        Delivered
+      </button>
+    </div>
+  );
+
   return (
     <div className="space-y-4 animate-in fade-in slide-in-from-right-4 duration-300">
       {/* Header */}
-      <div
-        className={`flex flex-col md:flex-row justify-between items-start md:items-center gap-4 p-3 rounded-lg border ${theme.statCard}`}
-      >
-        <div className="w-full md:w-auto flex justify-between md:block items-center">
-          <div>
-            <div
-              className={`text-xs font-bold uppercase ${theme.cellSecondary}`}
-            >
-              Total Cargo
+      <div className={`p-4 rounded-2xl border ${theme.statCard}`}>
+        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <div
+                className={`text-xs font-bold uppercase ${theme.cellSecondary}`}
+              >
+                Total Shipments
+              </div>
+
+              <div className={`text-2xl font-bold ${theme.headingText}`}>
+                {shipments.length}{" "}
+                {/* <span className={`text-sm font-normal ${theme.cellSecondary}`}>
+                  shipment{shipments.length > 1 ? "s" : ""}
+                </span> */}
+              </div>
             </div>
-            <div className={`text-xl font-bold ${theme.headingText}`}>
-              {shipments.length}{" "}
-              <span className={`text-sm font-normal ${theme.cellSecondary}`}>
-                shipment{shipments.length > 1 ? "s" : ""}
-              </span>
-            </div>
+
+            {selectedIds.size > 0 && (
+              <div
+                className={`lg:hidden text-xs font-bold px-3 py-1.5 rounded-full border ${theme.selectedInfo}`}
+              >
+                {selectedIds.size} selected
+              </div>
+            )}
           </div>
 
-          {selectedIds.size > 0 && (
-            <div
-              className={`md:hidden text-xs font-bold px-2 py-1 rounded border ${theme.selectedInfo}`}
-            >
-              {selectedIds.size} Selected
+          {/* <div className="flex flex-col sm:flex-row gap-2 w-full lg:w-auto"> */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-[1fr_auto_auto] gap-2 w-full">
+            {/* <div className="relative flex-1 lg:w-64"> */}
+            <div className="relative col-span-1 sm:col-span-2 lg:col-span-1">
+              <FontAwesomeIcon
+                icon={faSearch}
+                className={`absolute left-3 top-1/2 -translate-y-1/2 text-xs ${theme.inputIcon}`}
+              />
+
+              <input
+                type="text"
+                placeholder="Search tracking or recipient..."
+                // className={`w-full border rounded-xl pl-9 pr-3 py-2.5 text-sm focus:border-blue-500 outline-none ${theme.input}`}
+                className={`w-full border rounded-lg pl-9 pr-3 py-1.5 text-xs h-8 leading-none focus:border-blue-500 outline-none ${theme.input}`}
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
             </div>
-          )}
-        </div>
 
-        <div className="flex flex-col sm:flex-row gap-2 w-full md:w-auto">
-          <div className="relative flex-1 sm:w-48">
-            <FontAwesomeIcon
-              icon={faSearch}
-              className={`absolute left-3 top-2.5 text-xs ${theme.inputIcon}`}
-            />
-            <input
-              type="text"
-              placeholder="Search tracking..."
-              className={`w-full border rounded-lg pl-8 pr-3 py-1.5 text-xs focus:border-blue-500 outline-none ${theme.input}`}
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
-          </div>
+            <div className="grid grid-cols-2 sm:flex gap-2">
+              <button
+                type="button"
+                onClick={() =>
+                  window.open(
+                    `/components/print/labels?tripId=${tripId}`,
+                    "_blank",
+                  )
+                }
+                // className={`text-xs font-bold px-3 py-2.5 rounded-xl flex items-center justify-center gap-2 transition-colors border ${action.soft}`}
+                className={`text-xs font-bold px-3 py-1.5 h-8 rounded-lg flex items-center justify-center gap-2 transition-colors ${action.soft}`}
+                title="Print All Labels"
+              >
+                <FontAwesomeIcon icon={faPrint} />
+                Labels
+              </button>
 
-          <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={() =>
-                window.open(
-                  `/components/print/labels?tripId=${tripId}`,
-                  "_blank",
-                )
-              }
-              className={`text-xs font-bold px-3 py-1.5 rounded flex items-center justify-center gap-2 transition-colors flex-1 sm:flex-none border ${action.soft}`}
-              title="Print All Labels"
-            >
-              <FontAwesomeIcon icon={faPrint} />
-              <span className="inline sm:hidden xl:inline">Labels</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={onAddShipment}
-              disabled={isLocked}
-              className={`text-xs font-bold px-3 py-1.5 rounded flex items-center justify-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap flex-1 sm:flex-none ${action.solid}`}
-            >
-              <FontAwesomeIcon icon={faPlus} />
-              <span>Shipments</span>
-            </button>
+              <button
+                type="button"
+                onClick={onAddShipment}
+                disabled={isLocked}
+                // className={`text-xs font-bold px-3 py-2.5 rounded-xl flex items-center justify-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap ${action.solid}`}
+                className={`text-xs font-bold px-3 py-1.5 h-8 rounded-lg flex items-center justify-center gap-2 transition-colors ${action.solid}`}
+              >
+                <FontAwesomeIcon icon={faPlus} />
+                Shipments
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -170,76 +247,160 @@ export default function TripManifestTab({
       {/* Bulk Action Bar */}
       {selectedIds.size > 0 && (
         <div
-          className={`p-2 rounded-lg border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 animate-in slide-in-from-top-2 ${theme.bulkBar}`}
+          className={`p-3 rounded-2xl border flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3 animate-in slide-in-from-top-2 ${theme.bulkBar}`}
         >
-          <div
-            className={`hidden md:block text-xs font-bold px-2 whitespace-nowrap ${theme.bulkBarText}`}
-          >
-            {selectedIds.size} Selected
+          <div className={`text-xs font-bold ${theme.bulkBarText}`}>
+            {selectedIds.size} selected
           </div>
 
-          <div className="flex gap-2 w-full overflow-x-auto pb-1 sm:pb-0 no-scrollbar">
-            <button
-              type="button"
-              onClick={() => handleBulkAction("UNLOAD")}
-              disabled={isBulkProcessing || isLocked}
-              className={`px-3 py-1.5 border text-xs font-bold rounded flex items-center gap-2 transition-colors disabled:opacity-50 whitespace-nowrap ${action.bulkNeutral}`}
-            >
-              <FontAwesomeIcon icon={faDolly} />
-              Unload
-            </button>
-
-            <button
-              type="button"
-              onClick={() => handleBulkAction("LOAD")}
-              disabled={isBulkProcessing || isLocked}
-              className={`px-3 py-1.5 text-xs font-bold rounded flex items-center gap-2 transition-colors disabled:opacity-50 whitespace-nowrap ${action.bulkLoad}`}
-            >
-              {isBulkProcessing ? (
-                "Processing..."
-              ) : (
-                <>
-                  <FontAwesomeIcon icon={faTruckLoading} />
-                  Load
-                </>
-              )}
-            </button>
-
-            <button
-              type="button"
-              onClick={() => handleBulkAction("OUT_FOR_DELIVERY")}
-              disabled={isBulkProcessing || isLocked}
-              className={`px-3 py-1.5 text-xs font-bold rounded flex items-center gap-2 transition-colors disabled:opacity-50 whitespace-nowrap ${action.bulkOut}`}
-            >
-              <FontAwesomeIcon icon={faTruckFast} />
-              Out
-            </button>
-
-            <button
-              type="button"
-              onClick={() => handleBulkAction("DELIVERED")}
-              disabled={isBulkProcessing || isLocked}
-              className={`px-3 py-1.5 text-xs font-bold rounded flex items-center gap-2 transition-colors disabled:opacity-50 whitespace-nowrap ${action.bulkDelivered}`}
-            >
-              <FontAwesomeIcon icon={faCheckDouble} />
-              Delivered
-            </button>
-          </div>
+          {renderBulkActions()}
         </div>
       )}
 
-      {/* Table */}
-      <div className={`border rounded-lg overflow-hidden ${theme.container}`}>
-        <div className="overflow-x-auto">
-          <table
-            className={`w-full text-left text-sm min-w-[600px] md:min-w-0 ${theme.tableText}`}
+      {/* Mobile Cards */}
+      <div className="block lg:hidden space-y-3">
+        {loading ? (
+          <div
+            className={`rounded-2xl border px-4 py-8 text-center animate-pulse ${theme.container} ${theme.emptyText}`}
           >
+            Loading manifest...
+          </div>
+        ) : filteredData.length === 0 ? (
+          <div
+            className={`rounded-2xl border px-4 py-8 text-center italic ${theme.container} ${theme.emptyText}`}
+          >
+            No shipments found.
+          </div>
+        ) : (
+          filteredData.map((shipment, idx) => {
+            const isSelected = selectedIds.has(shipment.id);
+            const loadedCount = shipment.loadedCount || 0;
+            const totalItems = shipment.totalItems || 0;
+            const isFullyLoaded = loadedCount >= (totalItems || 1);
+
+            return (
+              <div
+                key={shipment.id || idx}
+                className={`rounded-2xl border p-4 transition-colors ${
+                  isSelected ? theme.selectedRow : theme.container
+                }`}
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <button
+                    type="button"
+                    onClick={() => handleSelectOne(shipment.id)}
+                    className="pt-1"
+                  >
+                    <FontAwesomeIcon
+                      icon={isSelected ? faCheckSquare : faSquare}
+                      className={
+                        isSelected ? theme.checkboxActive : theme.checkboxIdle
+                      }
+                    />
+                  </button>
+
+                  <div className="min-w-0 flex-1">
+                    <div
+                      className={`font-bold text-xs font-mono break-all ${theme.cellPrimary}`}
+                    >
+                      {shipment.shipmentId}
+                    </div>
+
+                    <div
+                      className={`text-xs mt-1 truncate ${theme.cellSecondary}`}
+                    >
+                      {shipment.recipient?.name || "Unknown"}
+                    </div>
+
+                    <div className={`text-[11px] mt-1 ${theme.cellSecondary}`}>
+                      {shipment.recipient?.address?.city || "—"}
+                    </div>
+                  </div>
+
+                  <span
+                    className={`shrink-0 text-[10px] font-bold px-2.5 py-1.5 rounded-lg border ${
+                      isFullyLoaded
+                        ? theme.countBadgeLoaded
+                        : theme.countBadgeDefault
+                    }`}
+                  >
+                    {loadedCount} / {totalItems}
+                  </span>
+                </div>
+
+                {/* <div className="mt-4 grid grid-cols-3 gap-2"> */}
+                <div className="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      window.open(
+                        packageLabelUrl(shipment.shipmentId),
+                        "_blank",
+                      )
+                    }
+                    className={`text-xs border px-3 py-2 rounded-xl transition-all flex items-center justify-center gap-2 ${action.soft}`}
+                  >
+                    <FontAwesomeIcon icon={faPrint} />
+                    Print
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => onViewPackages?.(shipment)}
+                    className={`text-xs border px-3 py-2 rounded-xl transition-all flex items-center justify-center gap-2 ${action.soft}`}
+                  >
+                    <FontAwesomeIcon icon={faBoxOpen} />
+                    View
+                  </button>
+
+                  {getShipmentInvoice(shipment).hasInvoice ? (
+                    <button
+                      type="button"
+                      onClick={() => onViewInvoice?.(shipment)}
+                      className={`text-xs border px-3 py-2 rounded-xl transition-all flex items-center justify-center gap-2 ${action.soft}`}
+                    >
+                      <FontAwesomeIcon icon={faReceipt} />
+                      Invoice
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => onCreateInvoice?.(shipment)}
+                      className={`text-xs border px-3 py-2 rounded-xl transition-all flex items-center justify-center gap-2 ${action.soft}`}
+                    >
+                      <FontAwesomeIcon icon={faFileInvoiceDollar} />
+                      Invoice
+                    </button>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={() => onUnassign(shipment)}
+                    className={`text-xs border px-3 py-2 rounded-xl transition-all flex items-center justify-center gap-2 disabled:opacity-50 ${action.soft}`}
+                    disabled={isLocked}
+                  >
+                    <FontAwesomeIcon icon={faMinus} />
+                    Remove
+                  </button>
+                </div>
+              </div>
+            );
+          })
+        )}
+      </div>
+
+      {/* Desktop Table */}
+      <div
+        className={`hidden lg:block border rounded-2xl overflow-hidden ${theme.container}`}
+      >
+        <div className="overflow-x-auto">
+          <table className={`w-full text-left text-sm ${theme.tableText}`}>
             <thead
               className={`uppercase font-bold text-[10px] tracking-wider ${theme.thead}`}
             >
               <tr>
                 <th
-                  className={`px-4 py-3 w-10 text-center sticky left-0 z-10 ${theme.stickyHead}`}
+                  className={`px-4 py-3 w-10 text-center ${theme.stickyHead}`}
                 >
                   <button
                     type="button"
@@ -252,12 +413,7 @@ export default function TripManifestTab({
                     }
                   >
                     <FontAwesomeIcon
-                      icon={
-                        selectedIds.size > 0 &&
-                        selectedIds.size === filteredData.length
-                          ? faCheckSquare
-                          : faSquare
-                      }
+                      icon={isAllSelected ? faCheckSquare : faSquare}
                       className={
                         selectedIds.size > 0
                           ? theme.checkboxActive
@@ -269,13 +425,9 @@ export default function TripManifestTab({
 
                 <th className="px-4 py-3 w-10 text-center">#</th>
                 <th className="px-4 py-3">Tracking / Customer</th>
-                <th className="hidden sm:table-cell px-4 py-3">Destination</th>
+                <th className="px-4 py-3">Destination</th>
                 <th className="px-4 py-3 text-center">Status</th>
-                <th
-                  className={`px-4 py-3 text-right sticky right-0 z-10 ${theme.stickyHead}`}
-                >
-                  Action
-                </th>
+                <th className="px-4 py-3 text-right">Action</th>
               </tr>
             </thead>
 
@@ -311,16 +463,8 @@ export default function TripManifestTab({
                       className={`transition-colors ${
                         isSelected ? theme.selectedRow : theme.rowHover
                       }`}
-                      // onClick={() => handleSelectOne(shipment.id)}
                     >
-                      <td
-                        className={`px-4 py-3 text-center sticky left-0 z-10 ${
-                          isSelected
-                            ? theme.stickyCellSelected
-                            : theme.stickyCell
-                        }`}
-                        onClick={(e) => e.stopPropagation()}
-                      >
+                      <td className="px-4 py-3 text-center">
                         <button
                           type="button"
                           onClick={() => handleSelectOne(shipment.id)}
@@ -348,18 +492,17 @@ export default function TripManifestTab({
                         >
                           {shipment.shipmentId}
                         </div>
-                        <div className="text-[11px] text-slate-500 truncate max-w-[150px]">
+                        <div
+                          className={`text-[11px] truncate max-w-[180px] ${theme.cellSecondary}`}
+                        >
                           {shipment.recipient?.name || "Unknown"}
-                        </div>
-                        <div className="sm:hidden text-[10px] text-slate-600 italic">
-                          {shipment.recipient?.address.city || "—"}
                         </div>
                       </td>
 
                       <td
-                        className={`hidden sm:table-cell px-4 py-3 text-xs ${theme.cellSecondary}`}
+                        className={`px-4 py-3 text-xs ${theme.cellSecondary}`}
                       >
-                        {shipment.recipient?.address.city || "—"}
+                        {shipment.recipient?.address?.city || "—"}
                       </td>
 
                       <td className="px-4 py-3 text-center">
@@ -374,14 +517,7 @@ export default function TripManifestTab({
                         </span>
                       </td>
 
-                      <td
-                        className={`px-4 py-3 text-right sticky right-0 z-10 ${
-                          isSelected
-                            ? theme.stickyCellSelected
-                            : theme.stickyCell
-                        }`}
-                        onClick={(e) => e.stopPropagation()}
-                      >
+                      <td className="px-4 py-3 text-right">
                         <div className="flex justify-end gap-2">
                           <button
                             type="button"
@@ -395,6 +531,7 @@ export default function TripManifestTab({
                           >
                             <FontAwesomeIcon icon={faPrint} />
                           </button>
+
                           <button
                             type="button"
                             onClick={() => onViewPackages?.(shipment)}
@@ -403,10 +540,30 @@ export default function TripManifestTab({
                             <FontAwesomeIcon icon={faBoxOpen} />
                           </button>
 
+                          {getShipmentInvoice(shipment).hasInvoice ? (
+                            <button
+                              type="button"
+                              onClick={() => onViewInvoice?.(shipment)}
+                              className={`text-xs border px-3 py-1.5 rounded transition-all flex items-center gap-1 ${action.soft}`}
+                              title={`View Invoice ${getShipmentInvoice(shipment).invoiceNumber || ""}`}
+                            >
+                              <FontAwesomeIcon icon={faReceipt} />
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => onCreateInvoice?.(shipment)}
+                              className={`text-xs border px-3 py-1.5 rounded transition-all flex items-center gap-1 ${action.soft}`}
+                              title="Create Invoice"
+                            >
+                              <FontAwesomeIcon icon={faFileInvoiceDollar} />
+                            </button>
+                          )}
+
                           <button
                             type="button"
                             onClick={() => onUnassign(shipment)}
-                            className={`w-8 h-8 text-xs border px-3 py-1.5 rounded transition-all flex items-center justify-center ${action.soft}`}
+                            className={`w-8 h-8 text-xs border px-3 py-1.5 rounded transition-all flex items-center justify-center disabled:opacity-50 ${action.soft}`}
                             disabled={isLocked}
                           >
                             <FontAwesomeIcon icon={faMinus} />

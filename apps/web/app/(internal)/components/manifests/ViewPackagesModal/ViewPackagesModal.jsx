@@ -55,18 +55,13 @@ export default function ViewPackagesModal({
   const [packages, setPackages] = useState([]);
   const [loading, setLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-
   const [selectedIndices, setSelectedIndices] = useState(new Set());
-
   const [editingId, setEditingId] = useState(null);
   const [editForm, setEditForm] = useState({});
-
   const [isAdding, setIsAdding] = useState(false);
   const [newPackage, setNewPackage] = useState(INITIAL_PACKAGE_STATE);
-
   const [isSplitModalOpen, setIsSplitModalOpen] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
-
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("ALL");
 
@@ -83,7 +78,6 @@ export default function ViewPackagesModal({
       setIsAdding(false);
       setSelectedIndices(new Set());
       setCurrentPage(1);
-
       setSearch("");
       setStatusFilter("ALL");
     }
@@ -110,11 +104,14 @@ export default function ViewPackagesModal({
   };
 
   const filteredPackages = useMemo(() => {
+    const keyword = search.toLowerCase().trim();
+
     return packages.filter((pkg) => {
       const matchesSearch =
-        (pkg.description || "").toLowerCase().includes(search.toLowerCase()) ||
-        (pkg.packageId || "").toLowerCase().includes(search.toLowerCase()) ||
-        (pkg.packagingType || "").toLowerCase().includes(search.toLowerCase());
+        !keyword ||
+        (pkg.description || "").toLowerCase().includes(keyword) ||
+        (pkg.packageId || "").toLowerCase().includes(keyword) ||
+        (pkg.packagingType || "").toLowerCase().includes(keyword);
 
       const matchesStatus =
         statusFilter === "ALL" ? true : pkg.status === statusFilter;
@@ -123,16 +120,17 @@ export default function ViewPackagesModal({
     });
   }, [packages, search, statusFilter]);
 
-  const paginatedPackages = useMemo(() => {
-    const start = (currentPage - 1) * ITEMS_PER_PAGE;
-    return filteredPackages.slice(start, start + ITEMS_PER_PAGE);
-  }, [filteredPackages, currentPage]);
-
   const totalPages = Math.max(
     1,
     Math.ceil(filteredPackages.length / ITEMS_PER_PAGE),
   );
-  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+
+  const currentSafePage = Math.min(currentPage, totalPages);
+  const startIndex = (currentSafePage - 1) * ITEMS_PER_PAGE;
+
+  const paginatedPackages = useMemo(() => {
+    return filteredPackages.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+  }, [filteredPackages, startIndex]);
 
   useEffect(() => {
     setCurrentPage(1);
@@ -140,20 +138,21 @@ export default function ViewPackagesModal({
   }, [search, statusFilter]);
 
   useEffect(() => {
-    if (currentPage > totalPages) {
-      setCurrentPage(totalPages);
-    }
+    if (currentPage > totalPages) setCurrentPage(totalPages);
   }, [currentPage, totalPages]);
 
+  const getActualIndex = (pkg) =>
+    packages.findIndex((p) => p.packageId === pkg.packageId);
+
+  const filteredIndexes = filteredPackages
+    .map((pkg) => getActualIndex(pkg))
+    .filter((idx) => idx !== -1);
+
+  const allFilteredSelected =
+    filteredIndexes.length > 0 &&
+    filteredIndexes.every((idx) => selectedIndices.has(idx));
+
   const handleSelectAll = () => {
-    const filteredIndexes = filteredPackages.map((pkg) =>
-      packages.findIndex((p) => p.packageId === pkg.packageId),
-    );
-
-    const allFilteredSelected =
-      filteredIndexes.length > 0 &&
-      filteredIndexes.every((idx) => selectedIndices.has(idx));
-
     if (allFilteredSelected) {
       const next = new Set(selectedIndices);
       filteredIndexes.forEach((idx) => next.delete(idx));
@@ -258,331 +257,312 @@ export default function ViewPackagesModal({
     );
   }, [selectedIndices, packages]);
 
-  const filteredIndexes = filteredPackages.map((pkg) =>
-    packages.findIndex((p) => p.packageId === pkg.packageId),
-  );
-
-  const allFilteredSelected =
-    filteredIndexes.length > 0 &&
-    filteredIndexes.every((idx) => selectedIndices.has(idx));
-
   if (!isOpen || !shipment) return null;
 
   return (
     <>
-      <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+      <div className="fixed inset-0 z-[60]">
         <div
           className={`absolute inset-0 ${modalTheme.overlay}`}
           onClick={onClose}
         />
 
-        <div
-          className={`relative w-full max-w-7xl rounded-xl shadow-2xl flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-200 border ${modalTheme.modal}`}
-        >
-          {/* HEADER */}
+        <div className="relative z-10 flex h-full w-full items-end sm:items-center justify-center p-0 sm:p-4">
           <div
-            className={`flex items-center justify-between p-6 border-b ${modalTheme.header}`}
+            className={`w-full h-full sm:h-auto sm:max-h-[92vh] sm:max-w-7xl rounded-none sm:rounded-2xl shadow-2xl flex flex-col border animate-in zoom-in-95 duration-200 ${modalTheme.modal}`}
           >
-            <div>
-              <div
-                className={`text-xs font-bold uppercase tracking-wider mb-1 ${modalTheme.accentText}`}
-              >
-                Shipment Contents
+            {/* HEADER */}
+            <div
+              className={`shrink-0 flex items-start sm:items-center justify-between gap-3 p-4 sm:p-6 border-b ${modalTheme.header}`}
+            >
+              <div className="min-w-0">
+                <div
+                  className={`text-[10px] sm:text-xs font-bold uppercase tracking-wider mb-1 ${modalTheme.accentText}`}
+                >
+                  Shipment Contents
+                </div>
+
+                <h2
+                  className={`text-base sm:text-xl font-bold flex items-center gap-2 sm:gap-3 min-w-0 ${modalTheme.title}`}
+                >
+                  <FontAwesomeIcon
+                    icon={faBoxOpen}
+                    className={`shrink-0 ${modalTheme.label}`}
+                  />
+                  <span className="truncate">{shipment.shipmentId}</span>
+                </h2>
               </div>
 
-              <h2
-                className={`text-xl font-bold flex items-center gap-3 ${modalTheme.title}`}
+              <button
+                type="button"
+                onClick={onClose}
+                className={`h-10 w-10 shrink-0 inline-flex items-center justify-center rounded-xl ${modalTheme.closeButton}`}
               >
-                <FontAwesomeIcon
-                  icon={faBoxOpen}
-                  className={modalTheme.label}
+                <FontAwesomeIcon icon={faTimes} size="lg" />
+              </button>
+            </div>
+
+            {/* BULK ACTION BAR */}
+            {selectedIndices.size > 0 && (
+              <div className="shrink-0 px-4 sm:px-6 pt-4">
+                <PackageBulkActionBar
+                  selectedCount={selectedIndices.size}
+                  canSplit={canSplit}
+                  handleSplitClick={() => setIsSplitModalOpen(true)}
+                  handleBulkStatusChange={handleBulkStatusChange}
+                  isLocked={isLocked}
+                  isSaving={isSaving}
+                  isDark={isDark}
                 />
-                {shipment.shipmentId}
-              </h2>
-            </div>
+              </div>
+            )}
 
-            <button
-              type="button"
-              onClick={onClose}
-              className={`p-2 rounded-lg ${modalTheme.closeButton}`}
-            >
-              <FontAwesomeIcon icon={faTimes} size="lg" />
-            </button>
-          </div>
+            {/* BODY */}
+            <div className="flex-1 min-h-0 overflow-y-auto p-4 sm:p-6 custom-scrollbar">
+              <div className="grid grid-cols-1 xl:grid-cols-12 gap-4 sm:gap-6">
+                {/* LEFT SIDE */}
+                <div className="xl:col-span-4 space-y-4">
+                  <div
+                    className={`border rounded-2xl p-4 ${modalTheme.statsCard}`}
+                  >
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="flex items-center gap-3">
+                        <FontAwesomeIcon
+                          icon={faCube}
+                          className={modalTheme.label}
+                        />
+                        <div>
+                          <div
+                            className={`text-[10px] font-bold uppercase ${modalTheme.label}`}
+                          >
+                            Items
+                          </div>
+                          <div
+                            className={`text-base font-bold ${modalTheme.title}`}
+                          >
+                            {packages.length}
+                          </div>
+                        </div>
+                      </div>
 
-          {/* BULK ACTION BAR */}
-          {selectedIndices.size > 0 && (
-            <div className="px-6 pt-4">
-              <PackageBulkActionBar
-                selectedCount={selectedIndices.size}
-                canSplit={canSplit}
-                handleSplitClick={() => setIsSplitModalOpen(true)}
-                handleBulkStatusChange={handleBulkStatusChange}
-                isLocked={isLocked}
-                isSaving={isSaving}
-                isDark={isDark}
-              />
-            </div>
-          )}
-
-          {/* BODY */}
-          <div className="flex-1 overflow-y-auto p-6 custom-scrollbar">
-            <div className="grid grid-cols-1 xl:grid-cols-12 gap-6">
-              {/* LEFT SIDE */}
-              <div className="xl:col-span-4 space-y-4">
-                {/* Details */}
-                <div
-                  className={`border rounded-xl p-4 ${modalTheme.statsCard}`}
-                >
-                  <div className="flex items-center gap-4">
-                    <FontAwesomeIcon
-                      icon={faCube}
-                      className={modalTheme.label}
-                    />
-                    <div>
-                      <div
-                        className={`text-[10px] font-bold uppercase ${modalTheme.label}`}
-                      >
-                        Items
-                      </div>
-                      <div
-                        className={`text-base font-bold ${modalTheme.title}`}
-                      >
-                        {packages.length} package/s
-                      </div>
-                    </div>
-                    <div>
-                      <div
-                        className={`text-[10px] font-bold uppercase ${modalTheme.label}`}
-                      >
-                        Quantity
-                      </div>
-                      <div
-                        className={`text-base font-bold ${modalTheme.title}`}
-                      >
-                        {packages
-                          .map((pkg) => pkg.quantity)
-                          .reduce((a, b) => a + b, 0)}{" "}
-                        count
+                      <div>
+                        <div
+                          className={`text-[10px] font-bold uppercase ${modalTheme.label}`}
+                        >
+                          Quantity
+                        </div>
+                        <div
+                          className={`text-base font-bold ${modalTheme.title}`}
+                        >
+                          {packages.reduce(
+                            (total, pkg) => total + (Number(pkg.quantity) || 0),
+                            0,
+                          )}
+                        </div>
                       </div>
                     </div>
                   </div>
-                </div>
 
-                {/* Add new item */}
-                <div
-                  className={`border rounded-xl p-4 ${modalTheme.panelSurface}`}
-                >
-                  <div className="flex items-center justify-between mb-4">
-                    <div>
-                      <div
-                        className={`text-[10px] font-bold uppercase ${modalTheme.label}`}
-                      >
-                        Package Form
-                      </div>
-                      <div className={`text-sm font-bold ${modalTheme.title}`}>
-                        Add New Item
+                  <div
+                    className={`border rounded-2xl p-4 ${modalTheme.panelSurface}`}
+                  >
+                    <div className="flex items-center justify-between mb-4">
+                      <div>
+                        <div
+                          className={`text-[10px] font-bold uppercase ${modalTheme.label}`}
+                        >
+                          Package Form
+                        </div>
+                        <div
+                          className={`text-sm font-bold ${modalTheme.title}`}
+                        >
+                          Add New Item
+                        </div>
                       </div>
                     </div>
 
-                    {/* {!isAdding && (
+                    {isAdding ? (
+                      <AddPackageForm
+                        newPackage={newPackage}
+                        setNewPackage={setNewPackage}
+                        setIsAdding={setIsAdding}
+                        handleAddSave={handleAddSave}
+                        isSaving={isSaving}
+                        isDark={isDark}
+                        packagingTypes={PACKAGING_TYPES}
+                      />
+                    ) : (
                       <button
                         type="button"
                         onClick={() => setIsAdding(true)}
-                        className={modalAction.primaryInlineCompact}
+                        className={`w-full py-6 border-2 border-dashed rounded-2xl text-xs font-bold uppercase flex flex-col items-center gap-2 ${modalTheme.label} ${modalTheme.panelSurface}`}
                       >
                         <FontAwesomeIcon icon={faPlus} />
+                        Add Item
                       </button>
-                    )} */}
+                    )}
                   </div>
-
-                  {isAdding ? (
-                    <AddPackageForm
-                      newPackage={newPackage}
-                      setNewPackage={setNewPackage}
-                      setIsAdding={setIsAdding}
-                      handleAddSave={handleAddSave}
-                      isSaving={isSaving}
-                      isDark={isDark}
-                      packagingTypes={PACKAGING_TYPES}
-                    />
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => setIsAdding(true)}
-                      className={`w-full py-6 border-2 border-dashed rounded-xl text-xs font-bold uppercase flex flex-col items-center gap-2 ${modalTheme.label} ${modalTheme.panelSurface}`}
-                    >
-                      <FontAwesomeIcon icon={faPlus} />
-                      Add Item
-                    </button>
-                  )}
                 </div>
-              </div>
 
-              {/* RIGHT SIDE */}
-              <div className="xl:col-span-8 space-y-4">
-                <div
-                  className={`border rounded-xl overflow-hidden ${tableTheme.container}`}
-                >
+                {/* RIGHT SIDE */}
+                <div className="xl:col-span-8 space-y-4">
                   <div
-                    className={`flex flex-col md:flex-row justify-between items-start md:items-center gap-4 p-4 border-b ${tableTheme.header}`}
+                    className={`border rounded-2xl overflow-hidden ${tableTheme.container}`}
                   >
-                    <div className="w-full md:w-auto flex justify-between md:block items-center">
-                      <div>
-                        <div
-                          className={`text-xs font-bold uppercase ${tableTheme.cellSecondary}`}
-                        >
-                          Package Items
-                        </div>
-                        <div
-                          className={`text-lg font-bold ${tableTheme.headingText}`}
-                        >
-                          {filteredPackages.length}{" "}
-                          <span
-                            className={`text-sm font-normal ${tableTheme.cellSecondary}`}
-                          >
-                            result{filteredPackages.length > 1 ? "s" : ""}
-                          </span>
-                        </div>
-                      </div>
-
-                      {selectedIndices.size > 0 && (
-                        <div
-                          className={`md:hidden text-xs font-bold px-2 py-1 rounded border ${tableTheme.selectedInfo || ""}`}
-                        >
-                          {selectedIndices.size} Selected
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="flex flex-col sm:flex-row gap-2 w-full md:w-auto">
-                      <div className="relative flex-1 sm:w-56">
-                        <FontAwesomeIcon
-                          icon={faSearch}
-                          className={`absolute left-3 top-2.5 text-xs ${tableTheme.inputIcon}`}
-                        />
-                        <input
-                          type="text"
-                          placeholder="Search packages..."
-                          className={`w-full border rounded-lg pl-8 pr-3 py-1.5 text-xs outline-none ${tableTheme.input}`}
-                          value={search}
-                          onChange={(e) => setSearch(e.target.value)}
-                        />
-                      </div>
-
-                      <select
-                        value={statusFilter}
-                        onChange={(e) => setStatusFilter(e.target.value)}
-                        className={`border rounded-lg px-3 py-1.5 text-xs font-medium ${tableTheme.input}`}
-                      >
-                        <option value="ALL">All Status</option>
-                        <option value="RECEIVED">Received</option>
-                        <option value="LOADED">Loaded</option>
-                        <option value="IN_TRANSIT">In Transit</option>
-                        <option value="DELIVERED">Delivered</option>
-                      </select>
-
-                      <button
-                        type="button"
-                        onClick={handleSelectAll}
-                        disabled={filteredPackages.length === 0}
-                        className={`flex items-center justify-center gap-2 px-3 py-1.5 rounded-lg  text-xs font-bold disabled:opacity-50 ${tableTheme.linkButton}`}
-                      >
-                        <FontAwesomeIcon
-                          icon={allFilteredSelected ? faCheckSquare : faSquare}
-                          className={
-                            allFilteredSelected
-                              ? tableTheme.checkboxActive || "text-blue-500"
-                              : tableTheme.checkboxIdle || "text-slate-400"
-                          }
-                        />
-                        Select All
-                      </button>
-                    </div>
-                  </div>
-                  {/* TABLE BODY */}
-                  <div className="overflow-x-auto">
-                    <table
-                      className={`w-full text-left text-sm ${tableTheme.tableText}`}
-                    >
-                      <thead
-                        className={`uppercase font-semibold text-xs ${tableTheme.thead}`}
-                      >
-                        <tr>
-                          <th className="px-4 py-3 w-12 text-center">#</th>
-                          <th className="px-4 py-3">Item Details</th>
-                          <th className="px-4 py-3">Tracking</th>
-                          <th className="px-4 py-3">Status</th>
-                          <th className="px-4 py-3 text-right">Actions</th>
-                        </tr>
-                      </thead>
-
-                      <tbody className={`divide-y ${tableTheme.tbodyDivide}`}>
-                        {loading ? (
-                          <tr>
-                            <td
-                              colSpan="5"
-                              className={`px-4 py-10 text-center ${tableTheme.emptyText}`}
+                    <div className={`p-4 border-b ${tableTheme.header}`}>
+                      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+                        <div className="flex items-center justify-between gap-3">
+                          <div>
+                            <div
+                              className={`text-xs font-bold uppercase ${tableTheme.cellSecondary}`}
                             >
-                              <div className="flex flex-col items-center gap-2">
-                                <FontAwesomeIcon
-                                  icon={faSpinner}
-                                  spin
-                                  size="2x"
-                                />
-                                <span>Loading packages...</span>
-                              </div>
-                            </td>
-                          </tr>
-                        ) : paginatedPackages.length === 0 ? (
-                          <tr>
-                            <td
-                              colSpan="5"
-                              className={`px-4 py-10 text-center italic ${tableTheme.emptyText}`}
-                            >
-                              No packages found.
-                            </td>
-                          </tr>
-                        ) : (
-                          paginatedPackages.map((pkg, pageIdx) => {
-                            const actualIdx = startIndex + pageIdx;
-                            const isSelected = selectedIndices.has(actualIdx);
-                            const locked =
-                              isLocked || isPackageLocked(pkg.status);
-                            const isEditing = editingId === actualIdx;
+                              Package Items
+                            </div>
 
-                            return (
-                              <tr
-                                key={actualIdx}
-                                className={`transition-all ${
-                                  isSelected
-                                    ? "bg-blue-50 dark:bg-blue-900/10 border-l-4 border-blue-500"
-                                    : tableTheme.rowHover
-                                }`}
+                            <div
+                              className={`text-lg font-bold ${tableTheme.headingText}`}
+                            >
+                              {filteredPackages.length}{" "}
+                              <span
+                                className={`text-sm font-normal ${tableTheme.cellSecondary}`}
                               >
-                                {/* SEQUENCE / SELECT */}
-                                <td className="px-4 py-3 text-center">
-                                  <div className="flex items-center justify-center gap-3">
-                                    <button
-                                      type="button"
-                                      onClick={() => handleSelectOne(actualIdx)}
-                                    >
-                                      <FontAwesomeIcon
-                                        icon={
-                                          isSelected ? faCheckSquare : faSquare
-                                        }
-                                        className={
-                                          isSelected
-                                            ? tableTheme.checkboxActive ||
-                                              "text-blue-500"
-                                            : tableTheme.checkboxIdle ||
-                                              "text-slate-400"
-                                        }
-                                      />
-                                    </button>
+                                result{filteredPackages.length > 1 ? "s" : ""}
+                              </span>
+                            </div>
+                          </div>
+
+                          {selectedIndices.size > 0 && (
+                            <div
+                              className={`lg:hidden text-xs font-bold px-2 py-1 rounded border ${tableTheme.selectedInfo || ""}`}
+                            >
+                              {selectedIndices.size} selected
+                            </div>
+                          )}
+                        </div>
+
+                        {/* <div className="grid grid-cols-1 sm:grid-cols-2 lg:flex gap-2 w-full lg:w-auto"> */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-[1fr_auto_auto] gap-2 w-full">
+                          {/* <div className="relative sm:col-span-2 lg:col-span-1 flex-1 lg:w-56"> */}
+                          <div className="relative col-span-1 sm:col-span-2 lg:col-span-1">
+                            <FontAwesomeIcon
+                              icon={faSearch}
+                              className={`absolute left-3 top-1/2 -translate-y-1/2 text-xs ${tableTheme.inputIcon}`}
+                            />
+                            <input
+                              type="text"
+                              placeholder="Search packages..."
+                              className={`w-full border rounded-xl pl-8 pr-3 py-2 text-xs outline-none ${tableTheme.input}`}
+                              value={search}
+                              onChange={(e) => setSearch(e.target.value)}
+                            />
+                          </div>
+
+                          <select
+                            value={statusFilter}
+                            onChange={(e) => setStatusFilter(e.target.value)}
+                            // className={`w-full border rounded-xl px-3 py-2 text-xs font-medium ${tableTheme.input}`}
+                            // className={`w-full border rounded-lg px-3 py-1.5 text-xs h-8 ${tableTheme.input}`}
+                            className={`w-full border rounded-lg px-3 py-1.5 text-xs h-8 leading-none ${tableTheme.input}`}
+                          >
+                            <option value="ALL">All Status</option>
+                            <option value="RECEIVED">Received</option>
+                            <option value="LOADED">Loaded</option>
+                            <option value="IN_TRANSIT">In Transit</option>
+                            <option value="DELIVERED">Delivered</option>
+                          </select>
+
+                          <button
+                            type="button"
+                            onClick={handleSelectAll}
+                            disabled={filteredPackages.length === 0}
+                            className={`flex items-center justify-center gap-2 px-3 py-2 rounded-xl text-xs font-bold disabled:opacity-50 ${tableTheme.linkButton}`}
+                          >
+                            <FontAwesomeIcon
+                              icon={
+                                allFilteredSelected ? faCheckSquare : faSquare
+                              }
+                              className={
+                                allFilteredSelected
+                                  ? tableTheme.checkboxActive || "text-blue-500"
+                                  : tableTheme.checkboxIdle || "text-slate-400"
+                              }
+                            />
+                            Select All
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* MOBILE CARDS */}
+                    <div className="block lg:hidden p-3 space-y-3">
+                      {loading ? (
+                        <div
+                          className={`rounded-2xl border px-4 py-10 text-center ${tableTheme.emptyText}`}
+                        >
+                          <div className="flex flex-col items-center gap-2">
+                            <FontAwesomeIcon icon={faSpinner} spin size="2x" />
+                            <span>Loading packages...</span>
+                          </div>
+                        </div>
+                      ) : paginatedPackages.length === 0 ? (
+                        <div
+                          className={`rounded-2xl border px-4 py-10 text-center italic ${tableTheme.emptyText}`}
+                        >
+                          No packages found.
+                        </div>
+                      ) : (
+                        paginatedPackages.map((pkg) => {
+                          const actualIdx = getActualIndex(pkg);
+                          const isSelected = selectedIndices.has(actualIdx);
+                          const locked =
+                            isLocked || isPackageLocked(pkg.status);
+                          const isEditing = editingId === actualIdx;
+
+                          return (
+                            <div
+                              key={pkg.packageId || actualIdx}
+                              className={`rounded-2xl border p-4 transition-all ${
+                                isSelected
+                                  ? "bg-blue-50 dark:bg-blue-900/10 border-blue-500"
+                                  : tableTheme.container
+                              }`}
+                            >
+                              <div className="flex items-start gap-3">
+                                <button
+                                  type="button"
+                                  onClick={() => handleSelectOne(actualIdx)}
+                                  className="pt-1"
+                                >
+                                  <FontAwesomeIcon
+                                    icon={isSelected ? faCheckSquare : faSquare}
+                                    className={
+                                      isSelected
+                                        ? tableTheme.checkboxActive ||
+                                          "text-blue-500"
+                                        : tableTheme.checkboxIdle ||
+                                          "text-slate-400"
+                                    }
+                                  />
+                                </button>
+
+                                <div className="min-w-0 flex-1">
+                                  <div className="flex items-start justify-between gap-2">
+                                    <div className="min-w-0">
+                                      <div
+                                        className={`font-bold text-sm break-words ${tableTheme.cellPrimary}`}
+                                      >
+                                        {pkg.description || "Item"}
+                                      </div>
+
+                                      <div className="mt-1">
+                                        <span className="font-mono text-[10px] text-amber-500 bg-amber-500/10 px-2 py-1 rounded border border-amber-500/20 break-all inline-block">
+                                          {pkg.packageId}
+                                        </span>
+                                      </div>
+                                    </div>
 
                                     <span
-                                      className={`inline-flex items-center justify-center w-6 h-6 rounded border text-xs font-mono font-bold ${
+                                      className={`inline-flex items-center justify-center w-7 h-7 rounded border text-xs font-mono font-bold shrink-0 ${
                                         isDark
                                           ? "bg-slate-900 border-slate-800 text-slate-500"
                                           : "bg-slate-100 border-slate-200 text-slate-600"
@@ -591,12 +571,42 @@ export default function ViewPackagesModal({
                                       {pkg.sequence || actualIdx + 1}
                                     </span>
                                   </div>
-                                </td>
 
-                                {/* DETAILS */}
-                                <td className="px-4 py-3">
+                                  <div
+                                    className={`flex flex-wrap gap-2 mt-3 text-[10px] ${tableTheme.cellSecondary}`}
+                                  >
+                                    <span
+                                      className={`px-2 py-0.5 rounded border ${tableTheme.roleBadge}`}
+                                    >
+                                      {pkg.packagingType || "Box"}
+                                    </span>
+
+                                    {pkg.isFragile && (
+                                      <span className="text-amber-500 font-bold bg-amber-500/10 border border-amber-500/20 px-1.5 py-0.5 rounded">
+                                        Fragile
+                                      </span>
+                                    )}
+
+                                    {pkg.isPerishable && (
+                                      <span className="text-cyan-500 font-bold bg-cyan-500/10 border border-cyan-500/20 px-1.5 py-0.5 rounded">
+                                        Perishable
+                                      </span>
+                                    )}
+
+                                    <span className="text-blue-500 font-bold">
+                                      {pkg.quantity || 1} pcs
+                                    </span>
+                                  </div>
+
+                                  <div className="mt-3">
+                                    <StatusBadge
+                                      status={pkg.status}
+                                      isDark={isDark}
+                                    />
+                                  </div>
+
                                   {isEditing ? (
-                                    <div className="space-y-2">
+                                    <div className="mt-4 space-y-2">
                                       <input
                                         type="text"
                                         value={editForm.description || ""}
@@ -606,7 +616,7 @@ export default function ViewPackagesModal({
                                             description: e.target.value,
                                           }))
                                         }
-                                        className={`w-full border rounded-lg px-3 py-2 text-sm ${modalTheme.input}`}
+                                        className={`w-full border rounded-xl px-3 py-2 text-sm ${modalTheme.input}`}
                                       />
 
                                       <div className="grid grid-cols-2 gap-2">
@@ -620,7 +630,7 @@ export default function ViewPackagesModal({
                                               packagingType: e.target.value,
                                             }))
                                           }
-                                          className={`w-full border rounded-lg px-3 py-2 text-sm ${modalTheme.input}`}
+                                          className={`w-full border rounded-xl px-3 py-2 text-sm ${modalTheme.input}`}
                                         >
                                           {PACKAGING_TYPES.map((type) => (
                                             <option key={type} value={type}>
@@ -639,72 +649,16 @@ export default function ViewPackagesModal({
                                             }))
                                           }
                                           placeholder="Qty"
-                                          className={`w-full border rounded-lg px-3 py-2 text-sm ${modalTheme.input}`}
+                                          className={`w-full border rounded-xl px-3 py-2 text-sm ${modalTheme.input}`}
                                         />
                                       </div>
-                                    </div>
-                                  ) : (
-                                    <div>
-                                      <div
-                                        className={`font-bold text-sm ${tableTheme.cellPrimary}`}
-                                      >
-                                        {pkg.description || "Item"}
-                                      </div>
 
-                                      <div
-                                        className={`flex flex-wrap gap-2 mt-1 text-[10px] ${tableTheme.cellSecondary}`}
-                                      >
-                                        <span
-                                          className={`px-2 py-0.5 rounded border ${tableTheme.roleBadge}`}
-                                        >
-                                          {pkg.packagingType || "Box"}
-                                        </span>
-
-                                        {pkg.isFragile && (
-                                          <span className="text-amber-500 font-bold bg-amber-500/10 border border-amber-500/20 px-1.5 py-0.5 rounded">
-                                            Fragile
-                                          </span>
-                                        )}
-
-                                        {pkg.isPerishable && (
-                                          <span className="text-cyan-500 font-bold bg-cyan-500/10 border border-cyan-500/20 px-1.5 py-0.5 rounded">
-                                            Perishable
-                                          </span>
-                                        )}
-
-                                        <span className="text-blue-500 font-bold ">
-                                          {pkg.quantity || 1} pcs
-                                        </span>
-                                      </div>
-                                    </div>
-                                  )}
-                                </td>
-
-                                {/* TRACKING */}
-                                <td className="px-4 py-3">
-                                  <span className="font-mono text-[11px] text-amber-500 bg-amber-500/10 px-2 py-1 rounded border border-amber-500/20">
-                                    {pkg.packageId}
-                                  </span>
-                                </td>
-
-                                {/* STATUS */}
-                                <td className="px-4 py-3">
-                                  <StatusBadge
-                                    status={pkg.status}
-                                    isDark={isDark}
-                                  />
-                                </td>
-
-                                {/* ACTIONS */}
-                                <td className="px-4 py-3 text-right">
-                                  <div className="flex justify-end gap-2">
-                                    {isEditing ? (
-                                      <>
+                                      <div className="grid grid-cols-2 gap-2 pt-2">
                                         <button
                                           type="button"
                                           onClick={handleEditSave}
                                           disabled={isSaving}
-                                          className={`${modalAction.primaryInline} flex-none px-4`}
+                                          className={`${modalAction.primaryInline} justify-center`}
                                         >
                                           Save
                                         </button>
@@ -712,121 +666,387 @@ export default function ViewPackagesModal({
                                         <button
                                           type="button"
                                           onClick={() => setEditingId(null)}
-                                          className={`${modalTheme.secondaryButton} flex-none px-4`}
+                                          className={`${modalTheme.secondaryButton} justify-center`}
                                         >
                                           Cancel
                                         </button>
-                                      </>
-                                    ) : (
-                                      <>
-                                        <button
-                                          type="button"
-                                          onClick={() =>
-                                            handleEditStart(pkg, actualIdx)
-                                          }
-                                          disabled={locked}
-                                          className={`h-8 w-8 rounded flex items-center justify-center ${
-                                            isDark
-                                              ? "bg-slate-800 hover:bg-slate-700 text-slate-400"
-                                              : "bg-slate-200 hover:bg-slate-300 text-slate-600"
-                                          } disabled:opacity-30`}
-                                        >
-                                          <FontAwesomeIcon
-                                            icon={faPen}
-                                            className="text-xs"
-                                          />
-                                        </button>
+                                      </div>
+                                    </div>
+                                  ) : (
+                                    <div className="mt-4 grid grid-cols-2 gap-2">
+                                      <button
+                                        type="button"
+                                        onClick={() =>
+                                          handleEditStart(pkg, actualIdx)
+                                        }
+                                        disabled={locked}
+                                        className={`h-10 rounded-xl flex items-center justify-center gap-2 text-xs font-bold ${
+                                          isDark
+                                            ? "bg-slate-800 hover:bg-slate-700 text-slate-400"
+                                            : "bg-slate-200 hover:bg-slate-300 text-slate-600"
+                                        } disabled:opacity-30`}
+                                      >
+                                        <FontAwesomeIcon
+                                          icon={faPen}
+                                          className="text-xs"
+                                        />
+                                        Edit
+                                      </button>
 
-                                        <button
-                                          type="button"
-                                          onClick={() =>
-                                            handleRemove(actualIdx)
-                                          }
-                                          disabled={locked}
-                                          className={`h-8 w-8 rounded flex items-center justify-center ${
-                                            isDark
-                                              ? "bg-slate-800 hover:bg-red-900/30 text-slate-400 hover:text-red-400"
-                                              : "bg-slate-200 hover:bg-red-50 text-slate-600 hover:text-red-600"
-                                          } disabled:opacity-30`}
-                                        >
-                                          <FontAwesomeIcon
-                                            icon={faTrash}
-                                            className="text-xs"
-                                          />
-                                        </button>
-                                      </>
-                                    )}
-                                  </div>
-                                </td>
-                              </tr>
-                            );
-                          })
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
-
-                  {/* PAGINATION */}
-                  {!loading && filteredPackages.length > 0 && (
-                    <div
-                      className={`px-4 sm:px-6 py-4 border-t flex flex-col sm:flex-row justify-between items-center gap-3 text-xs ${tableTheme.footer}`}
-                    >
-                      <span>
-                        Showing{" "}
-                        <span className={`font-bold ${tableTheme.footerBold}`}>
-                          {startIndex + 1}
-                        </span>
-                        -
-                        <span className={`font-bold ${tableTheme.footerBold}`}>
-                          {Math.min(
-                            startIndex + ITEMS_PER_PAGE,
-                            filteredPackages.length,
-                          )}
-                        </span>{" "}
-                        of {filteredPackages.length}
-                      </span>
-
-                      <div className="flex gap-2">
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setCurrentPage((prev) => Math.max(prev - 1, 1))
-                          }
-                          disabled={currentPage === 1}
-                          className={`px-3 py-1.5 rounded-lg border disabled:opacity-50 disabled:cursor-not-allowed ${tableTheme.paginationButton}`}
-                        >
-                          <FontAwesomeIcon icon={faChevronLeft} />
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setCurrentPage((prev) =>
-                              Math.min(prev + 1, totalPages),
-                            )
-                          }
-                          disabled={currentPage === totalPages}
-                          className={`px-3 py-1.5 rounded-lg border disabled:opacity-50 disabled:cursor-not-allowed ${tableTheme.paginationButton}`}
-                        >
-                          <FontAwesomeIcon icon={faChevronRight} />
-                        </button>
-                      </div>
+                                      <button
+                                        type="button"
+                                        onClick={() => handleRemove(actualIdx)}
+                                        disabled={locked}
+                                        className={`h-10 rounded-xl flex items-center justify-center gap-2 text-xs font-bold ${
+                                          isDark
+                                            ? "bg-slate-800 hover:bg-red-900/30 text-slate-400 hover:text-red-400"
+                                            : "bg-slate-200 hover:bg-red-50 text-slate-600 hover:text-red-600"
+                                        } disabled:opacity-30`}
+                                      >
+                                        <FontAwesomeIcon
+                                          icon={faTrash}
+                                          className="text-xs"
+                                        />
+                                        Remove
+                                      </button>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })
+                      )}
                     </div>
-                  )}
+
+                    {/* DESKTOP TABLE */}
+                    <div className="hidden lg:block overflow-x-auto">
+                      <table
+                        className={`w-full text-left text-sm ${tableTheme.tableText}`}
+                      >
+                        <thead
+                          className={`uppercase font-semibold text-xs ${tableTheme.thead}`}
+                        >
+                          <tr>
+                            <th className="px-4 py-3 w-12 text-center">#</th>
+                            <th className="px-4 py-3">Item Details</th>
+                            <th className="px-4 py-3">Tracking</th>
+                            <th className="px-4 py-3">Status</th>
+                            <th className="px-4 py-3 text-right">Actions</th>
+                          </tr>
+                        </thead>
+
+                        <tbody className={`divide-y ${tableTheme.tbodyDivide}`}>
+                          {loading ? (
+                            <tr>
+                              <td
+                                colSpan="5"
+                                className={`px-4 py-10 text-center ${tableTheme.emptyText}`}
+                              >
+                                <div className="flex flex-col items-center gap-2">
+                                  <FontAwesomeIcon
+                                    icon={faSpinner}
+                                    spin
+                                    size="2x"
+                                  />
+                                  <span>Loading packages...</span>
+                                </div>
+                              </td>
+                            </tr>
+                          ) : paginatedPackages.length === 0 ? (
+                            <tr>
+                              <td
+                                colSpan="5"
+                                className={`px-4 py-10 text-center italic ${tableTheme.emptyText}`}
+                              >
+                                No packages found.
+                              </td>
+                            </tr>
+                          ) : (
+                            paginatedPackages.map((pkg) => {
+                              const actualIdx = getActualIndex(pkg);
+                              const isSelected = selectedIndices.has(actualIdx);
+                              const locked =
+                                isLocked || isPackageLocked(pkg.status);
+                              const isEditing = editingId === actualIdx;
+
+                              return (
+                                <tr
+                                  key={pkg.packageId || actualIdx}
+                                  className={`transition-all ${
+                                    isSelected
+                                      ? "bg-blue-50 dark:bg-blue-900/10 border-l-4 border-blue-500"
+                                      : tableTheme.rowHover
+                                  }`}
+                                >
+                                  <td className="px-4 py-3 text-center">
+                                    <div className="flex items-center justify-center gap-3">
+                                      <button
+                                        type="button"
+                                        onClick={() =>
+                                          handleSelectOne(actualIdx)
+                                        }
+                                      >
+                                        <FontAwesomeIcon
+                                          icon={
+                                            isSelected
+                                              ? faCheckSquare
+                                              : faSquare
+                                          }
+                                          className={
+                                            isSelected
+                                              ? tableTheme.checkboxActive ||
+                                                "text-blue-500"
+                                              : tableTheme.checkboxIdle ||
+                                                "text-slate-400"
+                                          }
+                                        />
+                                      </button>
+
+                                      <span
+                                        className={`inline-flex items-center justify-center w-6 h-6 rounded border text-xs font-mono font-bold ${
+                                          isDark
+                                            ? "bg-slate-900 border-slate-800 text-slate-500"
+                                            : "bg-slate-100 border-slate-200 text-slate-600"
+                                        }`}
+                                      >
+                                        {pkg.sequence || actualIdx + 1}
+                                      </span>
+                                    </div>
+                                  </td>
+
+                                  <td className="px-4 py-3">
+                                    {isEditing ? (
+                                      <div className="space-y-2">
+                                        <input
+                                          type="text"
+                                          value={editForm.description || ""}
+                                          onChange={(e) =>
+                                            setEditForm((prev) => ({
+                                              ...prev,
+                                              description: e.target.value,
+                                            }))
+                                          }
+                                          className={`w-full border rounded-lg px-3 py-2 text-sm ${modalTheme.input}`}
+                                        />
+
+                                        <div className="grid grid-cols-2 gap-2">
+                                          <select
+                                            value={
+                                              editForm.packagingType || "Box"
+                                            }
+                                            onChange={(e) =>
+                                              setEditForm((prev) => ({
+                                                ...prev,
+                                                packagingType: e.target.value,
+                                              }))
+                                            }
+                                            className={`w-full border rounded-lg px-3 py-2 text-sm ${modalTheme.input}`}
+                                          >
+                                            {PACKAGING_TYPES.map((type) => (
+                                              <option key={type} value={type}>
+                                                {type}
+                                              </option>
+                                            ))}
+                                          </select>
+
+                                          <input
+                                            type="number"
+                                            value={editForm.quantity || ""}
+                                            onChange={(e) =>
+                                              setEditForm((prev) => ({
+                                                ...prev,
+                                                quantity: e.target.value,
+                                              }))
+                                            }
+                                            placeholder="Qty"
+                                            className={`w-full border rounded-lg px-3 py-2 text-sm ${modalTheme.input}`}
+                                          />
+                                        </div>
+                                      </div>
+                                    ) : (
+                                      <div>
+                                        <div
+                                          className={`font-bold text-sm ${tableTheme.cellPrimary}`}
+                                        >
+                                          {pkg.description || "Item"}
+                                        </div>
+
+                                        <div
+                                          className={`flex flex-wrap gap-2 mt-1 text-[10px] ${tableTheme.cellSecondary}`}
+                                        >
+                                          <span
+                                            className={`px-2 py-0.5 rounded border ${tableTheme.roleBadge}`}
+                                          >
+                                            {pkg.packagingType || "Box"}
+                                          </span>
+
+                                          {pkg.isFragile && (
+                                            <span className="text-amber-500 font-bold bg-amber-500/10 border border-amber-500/20 px-1.5 py-0.5 rounded">
+                                              Fragile
+                                            </span>
+                                          )}
+
+                                          {pkg.isPerishable && (
+                                            <span className="text-cyan-500 font-bold bg-cyan-500/10 border border-cyan-500/20 px-1.5 py-0.5 rounded">
+                                              Perishable
+                                            </span>
+                                          )}
+
+                                          <span className="text-blue-500 font-bold">
+                                            {pkg.quantity || 1} pcs
+                                          </span>
+                                        </div>
+                                      </div>
+                                    )}
+                                  </td>
+
+                                  <td className="px-4 py-3">
+                                    <span className="font-mono text-[11px] text-amber-500 bg-amber-500/10 px-2 py-1 rounded border border-amber-500/20">
+                                      {pkg.packageId}
+                                    </span>
+                                  </td>
+
+                                  <td className="px-4 py-3">
+                                    <StatusBadge
+                                      status={pkg.status}
+                                      isDark={isDark}
+                                    />
+                                  </td>
+
+                                  <td className="px-4 py-3 text-right">
+                                    <div className="flex justify-end gap-2">
+                                      {isEditing ? (
+                                        <>
+                                          <button
+                                            type="button"
+                                            onClick={handleEditSave}
+                                            disabled={isSaving}
+                                            className={`${modalAction.primaryInline} flex-none px-4`}
+                                          >
+                                            Save
+                                          </button>
+
+                                          <button
+                                            type="button"
+                                            onClick={() => setEditingId(null)}
+                                            className={`${modalTheme.secondaryButton} flex-none px-4`}
+                                          >
+                                            Cancel
+                                          </button>
+                                        </>
+                                      ) : (
+                                        <>
+                                          <button
+                                            type="button"
+                                            onClick={() =>
+                                              handleEditStart(pkg, actualIdx)
+                                            }
+                                            disabled={locked}
+                                            className={`h-8 w-8 rounded flex items-center justify-center ${
+                                              isDark
+                                                ? "bg-slate-800 hover:bg-slate-700 text-slate-400"
+                                                : "bg-slate-200 hover:bg-slate-300 text-slate-600"
+                                            } disabled:opacity-30`}
+                                          >
+                                            <FontAwesomeIcon
+                                              icon={faPen}
+                                              className="text-xs"
+                                            />
+                                          </button>
+
+                                          <button
+                                            type="button"
+                                            onClick={() =>
+                                              handleRemove(actualIdx)
+                                            }
+                                            disabled={locked}
+                                            className={`h-8 w-8 rounded flex items-center justify-center ${
+                                              isDark
+                                                ? "bg-slate-800 hover:bg-red-900/30 text-slate-400 hover:text-red-400"
+                                                : "bg-slate-200 hover:bg-red-50 text-slate-600 hover:text-red-600"
+                                            } disabled:opacity-30`}
+                                          >
+                                            <FontAwesomeIcon
+                                              icon={faTrash}
+                                              className="text-xs"
+                                            />
+                                          </button>
+                                        </>
+                                      )}
+                                    </div>
+                                  </td>
+                                </tr>
+                              );
+                            })
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+
+                    {/* PAGINATION */}
+                    {!loading && filteredPackages.length > 0 && (
+                      <div
+                        className={`px-4 sm:px-6 py-4 border-t flex flex-col sm:flex-row justify-between items-center gap-3 text-xs ${tableTheme.footer}`}
+                      >
+                        <span>
+                          Showing{" "}
+                          <span
+                            className={`font-bold ${tableTheme.footerBold}`}
+                          >
+                            {startIndex + 1}
+                          </span>
+                          -
+                          <span
+                            className={`font-bold ${tableTheme.footerBold}`}
+                          >
+                            {Math.min(
+                              startIndex + ITEMS_PER_PAGE,
+                              filteredPackages.length,
+                            )}
+                          </span>{" "}
+                          of {filteredPackages.length}
+                        </span>
+
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setCurrentPage((prev) => Math.max(prev - 1, 1))
+                            }
+                            disabled={currentSafePage === 1}
+                            className={`px-3 py-2 rounded-lg border disabled:opacity-50 disabled:cursor-not-allowed ${tableTheme.paginationButton}`}
+                          >
+                            <FontAwesomeIcon icon={faChevronLeft} />
+                          </button>
+
+                          <span
+                            className={`px-2 font-bold ${tableTheme.footerBold}`}
+                          >
+                            {currentSafePage} / {totalPages}
+                          </span>
+
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setCurrentPage((prev) =>
+                                Math.min(prev + 1, totalPages),
+                              )
+                            }
+                            disabled={currentSafePage === totalPages}
+                            className={`px-3 py-2 rounded-lg border disabled:opacity-50 disabled:cursor-not-allowed ${tableTheme.paginationButton}`}
+                          >
+                            <FontAwesomeIcon icon={faChevronRight} />
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
 
-          {/* FOOTER */}
-          <div className={`p-4 border-t flex justify-end ${modalTheme.header}`}>
-            {/* <button
-              type="button"
-              onClick={onClose}
-              className={modalTheme.secondaryButton}
-            >
-              Close
-            </button> */}
+            <div className={`shrink-0 p-4 border-t ${modalTheme.header}`} />
           </div>
         </div>
       </div>

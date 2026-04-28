@@ -222,7 +222,10 @@ export default function TripDrawer({
               shipments={shipments}
               loading={loadingShips}
               isLocked={data.manifestLocked}
-              onAddShipment={() => setBulkModalOpen(true)}
+              onAddShipment={() => {
+                console.log("testtt");
+                setBulkModalOpen(true);
+              }}
               onViewPackages={(shipment) =>
                 setSelectedShipmentForModal(shipment)
               }
@@ -233,6 +236,14 @@ export default function TripDrawer({
                 onRefreshTrips?.();
               }}
               isDark={isDark}
+              onCreateInvoice={(shipment) => {
+                // open InvoiceFormModal with this shipment selected
+                handleOpenCreateInvoice?.(shipment);
+              }}
+              onViewInvoice={(shipment) => {
+                // open existing invoice details by shipment.invoiceId
+                handleOpenInvoiceDetails?.(shipment);
+              }}
             />
           )}
 
