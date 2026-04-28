@@ -5,7 +5,7 @@ import { adminAuth, adminDb } from "@/lib/firebase-admin";
 
 const PICKUP_REQUEST_STATUSES = ["CREATED", "PENDING_PICKUP"];
 const ACTIVE_TRIP_STATUSES = [
-  "ASSIGNED",
+  // "ASSIGNED",
   "LOADED",
   "IN_TRANSIT",
   "OUT_FOR_DELIVERY",
@@ -54,9 +54,10 @@ export async function GET(request) {
 
     const startTimestamp = Timestamp.fromDate(startDate);
     const shipmentsRef = adminDb.collection("shipments");
+    const tripRef = adminDb.collection("truck_trips");
 
     const activeTripsPromises = ACTIVE_TRIP_STATUSES.map((status) =>
-      shipmentsRef
+      tripRef
         .where("updatedAt", ">=", startTimestamp)
         .where("status", "==", status)
         .count()
@@ -67,18 +68,18 @@ export async function GET(request) {
       shipmentsRef
         .where("updatedAt", ">=", startTimestamp)
         .where("status", "==", status)
-        // .where("isPickupRequest", "==", true)
+        .where("isPickupRequest", "==", true)
         .count()
         .get(),
     );
 
-    const delayedTripsPromise = shipmentsRef
+    const delayedTripsPromise = tripRef
       .where("updatedAt", ">=", startTimestamp)
       .where("delayCleared", "==", false)
       .count()
       .get();
 
-    const deliveredTripsPromise = shipmentsRef
+    const deliveredTripsPromise = tripRef
       .where("updatedAt", ">=", startTimestamp)
       .where("status", "==", "DELIVERED")
       .count()
