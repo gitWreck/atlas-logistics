@@ -311,7 +311,7 @@ export default function TripManifestTab({
                       className={`transition-colors ${
                         isSelected ? theme.selectedRow : theme.rowHover
                       }`}
-                      onClick={() => handleSelectOne(shipment.id)}
+                      // onClick={() => handleSelectOne(shipment.id)}
                     >
                       <td
                         className={`px-4 py-3 text-center sticky left-0 z-10 ${
