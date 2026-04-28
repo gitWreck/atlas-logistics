@@ -44,13 +44,36 @@ export async function GET(request, { params }) {
       .orderBy("createdAt", "desc") // Optional sorting
       .get();
 
+    const shipmentIds = snapshot.docs.map((doc) => doc.id);
+
+    const rootRefs = shipmentIds.map((id) =>
+      adminDb.collection("shipments").doc(id),
+    );
+
+    const rootSnaps = await adminDb.getAll(...rootRefs);
+
+    const rootMap = {};
+    rootSnaps.forEach((snap) => {
+      if (snap.exists) {
+        rootMap[snap.id] = snap.data();
+      }
+    });
+
     // 5. Transform Data
     const shipments = snapshot.docs.map((doc) => {
       const data = doc.data();
+      const root = rootMap[doc.id] || {};
+
       return {
         id: doc.id,
         ...data,
-        // Convert Timestamps to Strings
+
+        // 🔥 inject invoice fields
+        hasInvoice: root.hasInvoice || false,
+        invoiceId: root.invoiceId || null,
+        invoiceNumber: root.invoiceNumber || null,
+        invoiceStatus: root.invoiceStatus || null,
+
         createdAt: data.createdAt?.toDate
           ? data.createdAt.toDate().toISOString()
           : null,

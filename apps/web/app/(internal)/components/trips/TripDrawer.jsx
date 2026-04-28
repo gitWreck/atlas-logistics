@@ -24,6 +24,8 @@ import {
 } from "@/app/utility/FirebaseFunctions";
 import { getDrawerThemeClasses } from "@/app/utility/constant/theme";
 import ShipmentScanActionModal from "../shipments/ShipmentScanner/ShipmentScanActionModal";
+import InvoiceDetailsModal from "../invoice/InvoiceDetailsModal";
+import InvoiceFormModal from "../invoice/InvoiceFormModal";
 
 export default function TripDrawer({
   isOpen,
@@ -33,6 +35,14 @@ export default function TripDrawer({
   isDark = false,
   user,
 }) {
+  const [isInvoiceFormOpen, setIsInvoiceFormOpen] = useState(false);
+  const [isInvoiceDetailsOpen, setIsInvoiceDetailsOpen] = useState(false);
+
+  const [selectedShipmentForInvoice, setSelectedShipmentForInvoice] =
+    useState(null);
+  const [selectedInvoiceForDetails, setSelectedInvoiceForDetails] =
+    useState(null);
+
   const [activeTab, setActiveTab] = useState("TIMELINE");
   const [shipments, setShipments] = useState([]);
   const [loadingShips, setLoadingShips] = useState(false);
@@ -237,12 +247,16 @@ export default function TripDrawer({
               }}
               isDark={isDark}
               onCreateInvoice={(shipment) => {
-                // open InvoiceFormModal with this shipment selected
-                handleOpenCreateInvoice?.(shipment);
+                setSelectedShipmentForInvoice(shipment);
+                setIsInvoiceFormOpen(true);
               }}
               onViewInvoice={(shipment) => {
-                // open existing invoice details by shipment.invoiceId
-                handleOpenInvoiceDetails?.(shipment);
+                setSelectedInvoiceForDetails({
+                  id: shipment.invoiceId,
+                  invoiceNumber: shipment.invoiceNumber,
+                  shipmentId: shipment.shipmentId,
+                });
+                setIsInvoiceDetailsOpen(true);
               }}
             />
           )}
@@ -320,6 +334,32 @@ export default function TripDrawer({
           onRefreshTrips?.();
         }}
         user={user}
+      />
+
+      <InvoiceFormModal
+        isOpen={isInvoiceFormOpen}
+        shipment={selectedShipmentForInvoice}
+        onClose={() => {
+          setIsInvoiceFormOpen(false);
+          setSelectedShipmentForInvoice(null);
+        }}
+        onSuccess={() => {
+          setIsInvoiceFormOpen(false);
+          setSelectedShipmentForInvoice(null);
+          fetchShipments(); // refresh manifest
+          onRefreshTrips?.();
+        }}
+        isDark={isDark}
+      />
+
+      <InvoiceDetailsModal
+        isOpen={isInvoiceDetailsOpen}
+        invoiceId={selectedInvoiceForDetails?.id}
+        onClose={() => {
+          setIsInvoiceDetailsOpen(false);
+          setSelectedInvoiceForDetails(null);
+        }}
+        isDark={isDark}
       />
     </>
   );

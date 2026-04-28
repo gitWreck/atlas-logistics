@@ -1,10 +1,12 @@
 function buildInitialForm(shipment, invoice, mode) {
   if (mode === "edit" && invoice) {
     return {
-      shipmentId: invoice.shipmentId || shipment?.id || "",
+      shipmentId:
+        invoice.shipmentId || shipment?.id || shipment.shipmentId || "",
       shipmentTrackingNumber:
         invoice.shipmentTrackingNumber ||
         shipment?.trackingNumber ||
+        shipment.shipmentId ||
         shipment?.id ||
         "",
       invoiceNumber: invoice.invoiceNumber || "",
