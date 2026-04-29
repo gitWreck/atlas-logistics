@@ -67,8 +67,12 @@ export default function TripManifestTab({
     filteredData.length > 0 && selectedIds.size === filteredData.length;
 
   const getShipmentInvoice = (shipment) => {
+    const hasActiveInvoice =
+      shipment.invoiceStatus !== "CANCELLED" &&
+      (shipment.hasInvoice || Boolean(shipment.invoiceId));
+
     return {
-      hasInvoice: shipment.hasInvoice || Boolean(shipment.invoiceId),
+      hasInvoice: hasActiveInvoice,
       invoiceId: shipment.invoiceId,
       invoiceNumber: shipment.invoiceNumber,
       invoiceStatus: shipment.invoiceStatus,
@@ -217,7 +221,7 @@ export default function TripManifestTab({
                 type="button"
                 onClick={() =>
                   window.open(
-                    `/components/print/labels?tripId=${tripId}`,
+                    `/components/print/labels?tripId=${tripId}&mode=individual`,
                     "_blank",
                   )
                 }
@@ -273,9 +277,11 @@ export default function TripManifestTab({
           </div>
         ) : (
           filteredData.map((shipment, idx) => {
+            console.log("shipemnt data: ", shipment);
+
             const isSelected = selectedIds.has(shipment.id);
             const loadedCount = shipment.loadedCount || 0;
-            const totalItems = shipment.totalItems || 0;
+            const totalItems = shipment.totals.totalContentQty || 0;
             const isFullyLoaded = loadedCount >= (totalItems || 1);
 
             return (
@@ -454,7 +460,7 @@ export default function TripManifestTab({
                 filteredData.map((shipment, idx) => {
                   const isSelected = selectedIds.has(shipment.id);
                   const loadedCount = shipment.loadedCount || 0;
-                  const totalItems = shipment.totalItems || 0;
+                  const totalItems = shipment.totals.totalContentQty || 0;
                   const isFullyLoaded = loadedCount >= (totalItems || 1);
 
                   return (

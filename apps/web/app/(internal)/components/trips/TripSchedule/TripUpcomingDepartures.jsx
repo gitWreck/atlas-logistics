@@ -12,7 +12,6 @@ import {
   faBox,
 } from "@fortawesome/free-solid-svg-icons";
 import { getOverviewThemeClasses } from "@/app/utility/constant/theme";
-import { formatFirestoreDate } from "@/app/utility/utilities";
 import {
   getTripDeparture,
   getTripDisplayId,
@@ -22,6 +21,25 @@ import {
   getTripTruckLabel,
 } from "@/app/utility/tripScheduleHelpers";
 import { getDayLabel } from "../utils";
+
+function formatScheduleDate(value) {
+  if (!value) return "";
+
+  const date =
+    typeof value.toDate === "function"
+      ? value.toDate()
+      : value instanceof Date
+        ? value
+        : new Date(value);
+
+  if (Number.isNaN(date.getTime())) return "";
+
+  return date.toLocaleDateString("en-US", {
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  });
+}
 
 const TABS = [
   {
@@ -203,7 +221,7 @@ export default function TripUpcomingDepartures({ trips = [], isDark = false }) {
                         className={`mt-2 text-sm font-semibold ${theme.strongText}`}
                       >
                         <>
-                          {formatFirestoreDate(departure)}
+                          {formatScheduleDate(departure)}
                           <div
                             className={`mt-1 text-[11px] ${theme.mutedText}`}
                           >
@@ -229,7 +247,7 @@ export default function TripUpcomingDepartures({ trips = [], isDark = false }) {
                         className={`mt-2 text-sm font-semibold ${theme.strongText}`}
                       >
                         <>
-                          {formatFirestoreDate(arrival)}
+                          {formatScheduleDate(arrival)}
                           <div
                             className={`mt-1 text-[11px] ${theme.mutedText}`}
                           >

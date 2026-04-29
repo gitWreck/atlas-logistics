@@ -19,7 +19,7 @@ import {
   getTripShipmentCount,
   getTripTruckLabel,
 } from "@/app/utility/tripScheduleHelpers";
-import { getDayLabel } from "../utils";
+import { getDayLabel } from "../../utils";
 
 export default function TripUpcomingDepartures({ trips = [], isDark = false }) {
   const theme = getOverviewThemeClasses(isDark);

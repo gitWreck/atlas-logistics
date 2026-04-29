@@ -276,7 +276,14 @@ function StandardLabel({ shipment, pkg, index, total }) {
 
       {/* QR CODE - WITH SAFETY CHECK */}
       <div className="flex flex-col items-center justify-center border-4 border-black rounded-xl pt-3 pb-2 my-1">
-        <QRCode value={qrValue} size={180} level="M" />
+        <QRCode
+          value={qrValue}
+          size={180}
+          level="M"
+          bgColor="#ffffff"
+          fgColor="#000000"
+          className="bg-white p-2"
+        />
         <div className="text-xs font-mono font-bold mt-2 tracking-widest text-center">
           {pkg.packageId || "NO ID"}
         </div>

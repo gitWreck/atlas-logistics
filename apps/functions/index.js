@@ -107,6 +107,8 @@ exports.unlockTripManifest =
 
 // Invoices
 exports.createInvoice = require("./src/invoices/createInvoice").createInvoice;
+exports.updateInvoiceStatus =
+  require("./src/invoices/updateInvoiceStatus").updateInvoiceStatus;
 
 // Messaging
 exports.sendManualSms = require("./src/messaging/sendManualSms").sendManualSms;

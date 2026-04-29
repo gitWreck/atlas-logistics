@@ -47,8 +47,8 @@ if (!admin.apps.length) {
 // ------------------------------------------------------------
 
 // exports.createUser = require("./src/createUser").createUser; // test
-exports.createUserProfile = require("./src/users/createUserProfile");
-exports.toggleUserAccount = require("./src/users/toggleUserStatus");
+exports.createUserProfile = require("../src/users/createUserProfile");
+exports.toggleUserAccount = require("../src/users/toggleUserStatus");
 // src/index.js
 const { listUsers } = require("./src/users/backup/listUsers"); // Destructure if you used exports.listUsers
 exports.listUsers = listUsers;
@@ -57,13 +57,13 @@ exports.listUsers = listUsers;
 // 3) CALLABLE / HTTPS FUNCTIONS
 // ------------------------------------------------------------
 
-const { createTruckTrip } = require("./src/trips/createTruckTrip");
+const { createTruckTrip } = require("../src/trips/createTruckTrip");
 const {
   createShipmentWithSequence,
 } = require("./src/shipments/backup/createShipmentWithSequence-orig");
 const { loadItemsToTrip } = require("./src/trips/loadItemsToTrip");
 const { unloadItemsFromTrip } = require("./src/trips/unloadItemsFromTrip");
-const { completeTrip } = require("./src/trips/completeTrip");
+const { completeTrip } = require("../src/trips/completeTrip");
 
 exports.createTruckTrip = createTruckTrip;
 exports.createShipmentWithSequence = createShipmentWithSequence;
@@ -76,7 +76,7 @@ exports.recordPartial = require("./src/shipments/recordPartial").recordPartial;
 
 /* MANIFEST & CERTIFICATES (CALLABLES) */
 exports.generateTripManifest =
-  require("./src/trips/generateTripManifest").generateTripManifest;
+  require("../src/trips/generateTripManifest").generateTripManifest;
 exports.getTripPackages =
   require("./src/trips/getTripPackages").getTripPackages;
 exports.generateTripCertificate =
@@ -118,9 +118,9 @@ exports.unassignShipmentFromTruckTrip =
   require("./src/trips/unassignShipmentFromTruckTrip").unassignShipmentFromTruckTrip;
 
 // Truck controls
-exports.setTruckDelay = require("./src/trips/setTruckDelay").setTruckDelay;
+exports.setTruckDelay = require("../src/trips/setTruckDelay").setTruckDelay;
 exports.clearTruckDelay =
-  require("./src/trips/clearTruckDelay").clearTruckDelay;
+  require("../src/trips/clearTruckDelay").clearTruckDelay;
 exports.setTruckAutoSmsSettings =
   require("./src/trips/setTruckAutoSmsSettings").setTruckAutoSmsSettings;
 
@@ -134,7 +134,7 @@ exports.previewNextSms =
   require("./src/messaging/previewNextSms").previewNextSms;
 exports.previewManualSms =
   require("./src/messaging/previewManualSms").previewManualSms;
-exports.sendManualSms = require("./src/messaging/sendManualSms").sendManualSms;
+exports.sendManualSms = require("../src/messaging/sendManualSms").sendManualSms;
 exports.getTruckSmsUsage =
   require("./src/messaging/getTruckSmsUsage").getTruckSmsUsage;
 
@@ -195,21 +195,23 @@ const {
   syncTrackingPublic,
   syncTrackingPublicHttp,
   getPublicTracking,
-} = require("./src/tracking/syncTrackingPublic");
+} = require("../src/tracking/syncTrackingPublic");
 
 exports.syncTrackingPublic = syncTrackingPublic;
 exports.syncTrackingPublicHttp = syncTrackingPublicHttp;
 exports.getPublicTracking = getPublicTracking;
 
 const { onDocumentWritten } = require("firebase-functions/v2/firestore");
-const { syncTrackingPublicCore } = require("./src/tracking/syncTrackingPublic");
+const {
+  syncTrackingPublicCore,
+} = require("../src/tracking/syncTrackingPublic");
 
 exports.autoSyncPublicOnPackageChange = onDocumentWritten(
   "truck_trips/{tripId}/trip_packages/{pkgId}",
   async (event) => {
     console.log("📡 Package changed — syncing public tracking");
     await syncTrackingPublicCore();
-  }
+  },
 );
 
 exports.autoSyncPublicOnTrackingChange = onDocumentWritten(
@@ -217,7 +219,7 @@ exports.autoSyncPublicOnTrackingChange = onDocumentWritten(
   async (event) => {
     console.log("📡 Tracking changed — syncing public tracking");
     await syncTrackingPublicCore();
-  }
+  },
 );
 
 /**
@@ -258,9 +260,9 @@ exports.syncTripProgressFromPackages = onDocumentUpdated(
         deliveryProgress: progress,
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       },
-      { merge: true }
+      { merge: true },
     );
-  }
+  },
 );
 
 /**
@@ -287,7 +289,7 @@ exports.syncTripToTracking = onDocumentUpdated(
     }
 
     await trackingRef.set(update, { merge: true });
-  }
+  },
 );
 
 /**

@@ -153,7 +153,10 @@ export default function ShipmentScanActionModal({
                 </button>
               ) : (
                 <CameraScanner
-                  onDetected={actions.handleResolveScan}
+                  onDetected={async (code) => {
+                    setCameraOpen(false);
+                    await actions.handleResolveScan(code);
+                  }}
                   onClose={() => setCameraOpen(false)}
                   setError={actions.setError}
                 />
@@ -161,17 +164,10 @@ export default function ShipmentScanActionModal({
               <ManualInput
                 value={state.manualCode}
                 onChange={(val) => {
-                  actions.setError(
-                    "",
-                  ); /* manually handle manualCode state if preferred, or use refs */
+                  actions.setError("");
+                  actions.setManualCode(val);
                 }}
-                onSubmit={() =>
-                  actions.handleResolveScan(
-                    document.querySelector(
-                      'input[placeholder="Enter ID or Label..."]',
-                    ).value,
-                  )
-                }
+                onSubmit={() => actions.handleResolveScan(state.manualCode)}
                 loading={state.loading}
                 theme={theme}
               />

@@ -12,12 +12,30 @@ import {
   getOverviewThemeClasses,
   getStatCardTheme,
 } from "@/app/utility/constant/theme";
-import { formatFirestoreDate } from "@/app/utility/utilities";
 import {
   getTripDeparture,
   getTripRoute,
   getTripTruckLabel,
 } from "@/app/utility/tripScheduleHelpers";
+
+function formatScheduleDate(value) {
+  if (!value) return "";
+
+  const date =
+    typeof value.toDate === "function"
+      ? value.toDate()
+      : value instanceof Date
+        ? value
+        : new Date(value);
+
+  if (Number.isNaN(date.getTime())) return "";
+
+  return date.toLocaleDateString("en-US", {
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  });
+}
 
 export default function TripScheduleSummaryCards({ summary, isDark = false }) {
   const theme = getOverviewThemeClasses(isDark);
@@ -47,7 +65,7 @@ export default function TripScheduleSummaryCards({ summary, isDark = false }) {
         title="Next Departure"
         value={
           summary?.nextDepartureTrip
-            ? formatFirestoreDate(getTripDeparture(summary.nextDepartureTrip))
+            ? formatScheduleDate(getTripDeparture(summary.nextDepartureTrip))
             : "—"
         }
         subtitle={

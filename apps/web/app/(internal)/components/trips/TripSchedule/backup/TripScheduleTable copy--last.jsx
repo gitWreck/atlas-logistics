@@ -21,8 +21,8 @@ import {
   getTripEta,
   getTripTruckLabel,
 } from "@/app/utility/tripScheduleHelpers";
-import StatusBadge from "../../ui/StatusBadge";
-import { renderTimePair } from "../utils";
+import StatusBadge from "../../../ui/StatusBadge";
+import { renderTimePair } from "../../utils";
 
 function getPlannedLoadingStart(trip) {
   return trip?.plannedLoadingStart || null;

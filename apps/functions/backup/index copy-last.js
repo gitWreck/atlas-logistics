@@ -28,57 +28,58 @@ if (!admin.apps.length) {
 
 // admin actions
 exports.createUserProfile =
-  require("./src/users/createUserProfile").createUserProfile;
+  require("../src/users/createUserProfile").createUserProfile;
 exports.updateUserProfile =
-  require("./src/users/updateUserProfile").updateUserProfile;
+  require("../src/users/updateUserProfile").updateUserProfile;
 exports.toggleUserStatus =
-  require("./src/users/toggleUserStatus").toggleUserStatus;
+  require("../src/users/toggleUserStatus").toggleUserStatus;
 exports.addTrackedShipment =
-  require("./src/users/addTrackedShipment").addTrackedShipment;
+  require("../src/users/addTrackedShipment").addTrackedShipment;
 exports.requestShipmentPickup =
-  require("./src/users/requestShipmentPickup").requestShipmentPickup;
+  require("../src/users/requestShipmentPickup").requestShipmentPickup;
 exports.resolveDelayReport =
-  require("./src/trips/resolveDelayReport").resolveDelayReport;
+  require("../src/trips/resolveDelayReport").resolveDelayReport;
 
 // user actions
 exports.updateUserProfileMobile =
-  require("./src/users/updateUserProfileMobile").updateUserProfileMobile;
-exports.requestRecoveryOTP = require("./src/users/recovery").requestRecoveryOTP;
-exports.verifyRecoveryOTP = require("./src/users/recovery").verifyRecoveryOTP;
+  require("../src/users/updateUserProfileMobile").updateUserProfileMobile;
+exports.requestRecoveryOTP =
+  require("../src/users/recovery").requestRecoveryOTP;
+exports.verifyRecoveryOTP = require("../src/users/recovery").verifyRecoveryOTP;
 
 // ------------------------------------------
 
 // packages
 exports.createShipmentBundle =
-  require("./src/shipments/createShipmentBundle").createShipmentBundle;
+  require("../src/shipments/createShipmentBundle").createShipmentBundle;
 exports.createShipmentWithPackages =
-  require("./src/shipments/createShipmentWithPackages").createShipmentWithPackages;
+  require("../src/shipments/createShipmentWithPackages").createShipmentWithPackages;
 exports.updateShipmentStatus =
-  require("./src/shipments/updateShipmentStatus").updateShipmentStatus;
+  require("../src/shipments/updateShipmentStatus").updateShipmentStatus;
 exports.updatePackageStatus =
   require("./src/shipments/updatePackageStatus").updatePackageStatus;
 exports.updateShipmentPackages =
-  require("./src/packages/updateShipmentPackages").updateShipmentPackages;
-exports.scanPackages = require("./src/packages/scanPackages").scanPackages;
+  require("../src/packages/updateShipmentPackages").updateShipmentPackages;
+exports.scanPackages = require("../src/packages/scanPackages").scanPackages;
 
 // ------------------------------------------
 // Trips
 exports.createTruckTrip =
-  require("./src/trips/createTruckTrip").createTruckTrip;
+  require("../src/trips/createTruckTrip").createTruckTrip;
 exports.assignShipmentToTruckTrip =
   require("./src/trips/assignShipmentToTruckTrip").assignShipmentToTruckTrip;
 exports.unassignShipmentFromTruckTrip =
   require("./src/trips/unassignShipmentFromTruckTrip").unassignShipmentFromTruckTrip;
 
-exports.startTrip = require("./src/trips/startTrip").startTrip;
+exports.startTrip = require("../src/trips/startTrip").startTrip;
 exports.reportTripDelay =
-  require("./src/trips/reportTripDelay").reportTripDelay;
-exports.setTruckDelay = require("./src/trips/setTruckDelay").setTruckDelay;
+  require("../src/trips/reportTripDelay").reportTripDelay;
+exports.setTruckDelay = require("../src/trips/setTruckDelay").setTruckDelay;
 exports.clearTruckDelay =
-  require("./src/trips/clearTruckDelay").clearTruckDelay;
+  require("../src/trips/clearTruckDelay").clearTruckDelay;
 
 exports.reportCheckerTrip =
-  require("./src/trips/reportCheckerTrip").reportCheckerTrip;
+  require("../src/trips/reportCheckerTrip").reportCheckerTrip;
 
 exports.assignDriverToTruckTrip =
   require("./src/trips/assignDriverToTruckTrip").assignDriverToTruckTrip;
@@ -88,51 +89,51 @@ exports.setTruckAutoSmsSettings =
   require("./src/messaging/setTruckAutoSmsSettings").setTruckAutoSmsSettings;
 
 exports.disableTruckTrip =
-  require("./src/trips/disableTruckTrip").disableTruckTrip;
-exports.completeTrip = require("./src/trips/completeTrip").completeTrip;
+  require("../src/trips/disableTruckTrip").disableTruckTrip;
+exports.completeTrip = require("../src/trips/completeTrip").completeTrip;
 exports.unlockTripManifest =
-  require("./src/trips/unlockTripManifest").unlockTripManifest;
+  require("../src/trips/unlockTripManifest").unlockTripManifest;
 exports.updateTripStatus =
-  require("./src/trips/updateTripStatus").updateTripStatus;
+  require("../src/trips/updateTripStatus").updateTripStatus;
 
 // Shipments
 exports.bulkAssignShipments =
-  require("./src/shipments/bulkAssignShipments").bulkAssignShipments;
+  require("../src/shipments/bulkAssignShipments").bulkAssignShipments;
 exports.bulkUpdateShipmentStatus =
-  require("./src/shipments/bulkUpdateShipmentStatus").bulkUpdateShipmentStatus;
+  require("../src/shipments/bulkUpdateShipmentStatus").bulkUpdateShipmentStatus;
 exports.bulkShipmentAction =
-  require("./src/shipments/bulkShipmentAction").bulkShipmentAction;
+  require("../src/shipments/bulkShipmentAction").bulkShipmentAction;
 exports.splitShipments =
-  require("./src/shipments/splitShipments").splitShipments;
+  require("../src/shipments/splitShipments").splitShipments;
 exports.updateShipmentStatus =
-  require("./src/shipments/updateShipmentStatus").updateShipmentStatus;
+  require("../src/shipments/updateShipmentStatus").updateShipmentStatus;
 exports.updateShipmentStatusDriver =
-  require("./src/shipments/updateShipmentStatusDriver").updateShipmentStatusDriver;
+  require("../src/shipments/updateShipmentStatusDriver").updateShipmentStatusDriver;
 exports.updateShipmentStatusChecker =
-  require("./src/shipments/updateShipmentStatusChecker").updateShipmentStatusChecker;
+  require("../src/shipments/updateShipmentStatusChecker").updateShipmentStatusChecker;
 exports.finalizeHubProcessing =
-  require("./src/trips/finalizeHubProcessing").finalizeHubProcessing;
+  require("../src/trips/finalizeHubProcessing").finalizeHubProcessing;
 exports.updateShipmentDetails =
-  require("./src/shipments/updateShipmentDetails").updateShipmentDetails;
+  require("../src/shipments/updateShipmentDetails").updateShipmentDetails;
 
 // Manifests & Certificates
 exports.generateTripManifest =
-  require("./src/trips/generateTripManifest").generateTripManifest;
+  require("../src/trips/generateTripManifest").generateTripManifest;
 exports.verifyTripManifest =
-  require("./src/trips/verifyTripManifest").verifyTripManifest;
+  require("../src/trips/verifyTripManifest").verifyTripManifest;
 
 // Messaging
-exports.sendManualSms = require("./src/messaging/sendManualSms").sendManualSms;
+exports.sendManualSms = require("../src/messaging/sendManualSms").sendManualSms;
 exports.broadcastTripMessage =
-  require("./src/messaging/broadcastTripMessage").broadcastTripMessage;
+  require("../src/messaging/broadcastTripMessage").broadcastTripMessage;
 
 // Firestore Triggers
 const {
   mirrorShipmentToPublic,
   syncTrackingPublicHttp,
   propagateTripUpdates,
-} = require("./src/tracking/syncTrackingPublic");
-const { reportCheckerTrip } = require("./src/trips/reportCheckerTrip");
+} = require("../src/tracking/syncTrackingPublic");
+const { reportCheckerTrip } = require("../src/trips/reportCheckerTrip");
 exports.reportCheckerTrip = reportCheckerTrip;
 
 exports.mirrorShipmentToPublic = mirrorShipmentToPublic;
@@ -140,9 +141,9 @@ exports.syncTrackingPublicHttp = syncTrackingPublicHttp;
 exports.propagateTripUpdates = propagateTripUpdates;
 
 // Trucks
-exports.upsertTruck = require("./src/trucks/handleTruck").upsertTruck;
+exports.upsertTruck = require("../src/trucks/handleTruck").upsertTruck;
 exports.updateTruckStatus =
-  require("./src/trucks/handleTruck").updateTruckStatus;
+  require("../src/trucks/handleTruck").updateTruckStatus;
 
 // -------------------------------
 
