@@ -21,7 +21,12 @@ import {
   LockPrompt,
   AssignmentPrompt,
 } from "./Prompts";
-import { ActionSelector, CameraScanner, ManualInput } from "./ScannerControls";
+import {
+  ActionSelector,
+  CameraScanner,
+  ManualInput,
+  ScannerEngineSelect,
+} from "./ScannerControls";
 import ManifestPanel from "./ManifestPanel";
 
 export default function ShipmentScanActionModal({
@@ -36,6 +41,7 @@ export default function ShipmentScanActionModal({
   const theme = getModalThemeClasses(isDark);
   const actionTheme = getModalActionClasses();
   const [cameraOpen, setCameraOpen] = useState(false);
+  const [scannerEngine, setScannerEngine] = useState("barcode-detector");
 
   const { state, actions } = useScannerLogic({
     trip,
@@ -140,6 +146,15 @@ export default function ShipmentScanActionModal({
             />
           ) : state.action ? (
             <div className="space-y-4">
+              <ScannerEngineSelect
+                value={scannerEngine}
+                onChange={(value) => {
+                  actions.setError("");
+                  setScannerEngine(value);
+                }}
+                theme={theme}
+              />
+
               {!cameraOpen ? (
                 <button
                   onClick={() => {
@@ -153,6 +168,8 @@ export default function ShipmentScanActionModal({
                 </button>
               ) : (
                 <CameraScanner
+                  key={scannerEngine}
+                  scannerEngine={scannerEngine}
                   onDetected={async (code) => {
                     setCameraOpen(false);
                     await actions.handleResolveScan(code);
