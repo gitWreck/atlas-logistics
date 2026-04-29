@@ -22,6 +22,7 @@ export default function useScannerLogic({
   // Core State
   const [action, setAction] = useState(null);
   const [scanCode, setScanCode] = useState("");
+  const [manualCode, setManualCode] = useState("");
   const [resolvedItem, setResolvedItem] = useState(null);
   const [quantities, setQuantities] = useState({});
 
@@ -46,6 +47,7 @@ export default function useScannerLogic({
   const resetFlow = useCallback(() => {
     setAction(null);
     setScanCode("");
+    setManualCode("");
     setResolvedItem(null);
     setQuantities({});
     setNeedsAssignmentItem(null);
@@ -58,6 +60,60 @@ export default function useScannerLogic({
     setLoading(false);
     setError("");
   }, []);
+
+  const resetScanResult = useCallback(() => {
+    setScanCode("");
+    setManualCode("");
+    setResolvedItem(null);
+    setQuantities({});
+    setNeedsAssignmentItem(null);
+    setNeedsNextTrip(false);
+    setAvailableTrips([]);
+    setSelectedNextTrip("");
+    setBtnStatus("IDLE");
+    setLoading(false);
+    setError("");
+  }, []);
+
+  const getPackageAvailableQty = useCallback((pkg, scanAction) => {
+    if (!pkg) return 0;
+    if (scanAction === "LOAD") {
+      return Math.max(0, Number(pkg.quantity || 0) - Number(pkg.loadedQty || 0));
+    }
+    return Math.max(0, Number(pkg.loadedQty || 0));
+  }, []);
+
+  const processItems = useCallback(
+    async ({ item, code, itemsToProcess }) => {
+      await onConfirmOperation({
+        tripId,
+        action,
+        scanCode: code,
+        scanType: item.scanType,
+        shipmentId: item.shipmentId,
+        itemsToProcess,
+      });
+
+      if (action === "UNLOAD") {
+        const token = await user?.getIdToken();
+        const res = await fetch("/api/trips/delivery", {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const tripData = await res.json();
+
+        if (tripData.trips?.length > 0) {
+          setResolvedItem(item);
+          setAvailableTrips(tripData.trips);
+          setSelectedNextTrip(tripData.trips[0].id);
+          setNeedsNextTrip(true);
+          return;
+        }
+      }
+
+      resetScanResult();
+    },
+    [action, onConfirmOperation, resetScanResult, tripId, user],
+  );
 
   const handleResolveScan = async (code) => {
     const cleanCode = String(code || "").trim();
@@ -76,12 +132,39 @@ export default function useScannerLogic({
       if (!result?.found) return setError(result.message || "Label not found.");
 
       setScanCode(cleanCode);
+      setManualCode("");
       if (
         result.requiresAssignment &&
         !recentlyAssigned.has(result.shipmentId)
       ) {
         setNeedsAssignmentItem(result);
       } else {
+        if (result.scanType === "PACKAGE") {
+          const targetPackage = result.packages?.find(
+            (pkg) => pkg.packageId === result.packageId,
+          );
+          const totalQty = Number(targetPackage?.quantity || 0);
+          const availableQty = getPackageAvailableQty(targetPackage, action);
+
+          if (totalQty === 1 && availableQty === 1) {
+            await processItems({
+              item: result,
+              code: cleanCode,
+              itemsToProcess: [
+                {
+                  packageId: targetPackage.packageId,
+                  quantity: 1,
+                },
+              ],
+            });
+            return;
+          }
+
+          if (availableQty <= 0) {
+            return setError("No quantity is available for this package.");
+          }
+        }
+
         setResolvedItem(result);
       }
       setQuantities({});
@@ -149,7 +232,7 @@ export default function useScannerLogic({
   const handleUnlockManifest = async () => {
     const success = await executeFirebaseCall(
       unlockTripManifest,
-      { tripId },
+      { tripId, reason: "Shipment has arrived" },
       () => {
         if (trip) trip.manifestLocked = false;
       },
@@ -245,8 +328,7 @@ export default function useScannerLogic({
         }
       }
 
-      onClose?.();
-      resetFlow();
+      resetScanResult();
     } catch (err) {
       setError(err.message || "Failed to process scan action.");
     } finally {
@@ -259,6 +341,7 @@ export default function useScannerLogic({
       tripId,
       action,
       scanCode,
+      manualCode,
       resolvedItem,
       quantities,
       needsAssignmentItem,
@@ -276,6 +359,7 @@ export default function useScannerLogic({
     actions: {
       setAction,
       setQuantities,
+      setManualCode,
       setSelectedNextTrip,
       setError,
       setNeedsLoadedStatus,
@@ -283,6 +367,7 @@ export default function useScannerLogic({
       setNeedsUnlock,
       setNeedsArrival,
       resetFlow,
+      resetScanResult,
       handleResolveScan,
       handleAssignShipment,
       handleMarkArrived,

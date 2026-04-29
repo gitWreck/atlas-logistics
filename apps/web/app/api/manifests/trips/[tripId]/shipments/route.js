@@ -63,6 +63,9 @@ export async function GET(request, { params }) {
     const shipments = snapshot.docs.map((doc) => {
       const data = doc.data();
       const root = rootMap[doc.id] || {};
+      const hasActiveInvoice =
+        root.invoiceStatus !== "CANCELLED" &&
+        (root.hasInvoice || Boolean(root.invoiceId));
 
       return {
         id: doc.id,
@@ -115,9 +118,9 @@ export async function GET(request, { params }) {
         pendingCount: data.pendingCount || root.totals?.pending || 0,
 
         // invoice fields from root shipment
-        hasInvoice: root.hasInvoice || false,
-        invoiceId: root.invoiceId || null,
-        invoiceNumber: root.invoiceNumber || null,
+        hasInvoice: hasActiveInvoice,
+        invoiceId: hasActiveInvoice ? root.invoiceId || null : null,
+        invoiceNumber: hasActiveInvoice ? root.invoiceNumber || null : null,
         invoiceStatus: root.invoiceStatus || null,
 
         createdAt: data.createdAt?.toDate

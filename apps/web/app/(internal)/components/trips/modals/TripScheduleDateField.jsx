@@ -14,7 +14,7 @@ function getDayLabel(value) {
   });
 }
 
-function formatDisplayDateTime(value) {
+function formatDisplayDate(value) {
   if (!value) return "—";
 
   const date = new Date(value);
@@ -24,8 +24,6 @@ function formatDisplayDateTime(value) {
     year: "numeric",
     month: "long",
     day: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
   });
 }
 
@@ -62,9 +60,7 @@ export default function TripScheduleDateField({
           className={`rounded-xl border px-3 py-2 text-xs flex items-center justify-between gap-3 ${theme.input}`}
         >
           <span className={`font-semibold ${theme.title}`}>{dayLabel}</span>
-          <span className={theme.helperText}>
-            {formatDisplayDateTime(value)}
-          </span>
+          <span className={theme.helperText}>{formatDisplayDate(value)}</span>
         </div>
       </div>
     </div>

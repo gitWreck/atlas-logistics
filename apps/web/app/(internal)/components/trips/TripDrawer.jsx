@@ -18,14 +18,12 @@ import StatusBadge from "../ui/StatusBadge";
 import UnassignShipmentModal from "../manifests/modals/UnassignShipmentModal";
 import BulkAssignmentModal from "../manifests/modals/BulkAssignmentModal";
 import ViewPackagesModal from "../manifests/ViewPackagesModal/ViewPackagesModal";
-import {
-  unlockTripManifest,
-  updateShipmentPackages,
-} from "@/app/utility/FirebaseFunctions";
-import { getDrawerThemeClasses } from "@/app/utility/constant/theme";
 import ShipmentScanActionModal from "../shipments/ShipmentScanner/ShipmentScanActionModal";
 import InvoiceDetailsModal from "../invoice/InvoiceDetailsModal";
 import InvoiceFormModal from "../invoice/InvoiceFormModal";
+import useInvoiceWorkflow from "../invoice/useInvoiceWorkflow";
+import { updateShipmentPackages } from "@/app/utility/FirebaseFunctions";
+import { getDrawerThemeClasses } from "@/app/utility/constant/theme";
 
 export default function TripDrawer({
   isOpen,
@@ -35,14 +33,6 @@ export default function TripDrawer({
   isDark = false,
   user,
 }) {
-  const [isInvoiceFormOpen, setIsInvoiceFormOpen] = useState(false);
-  const [isInvoiceDetailsOpen, setIsInvoiceDetailsOpen] = useState(false);
-
-  const [selectedShipmentForInvoice, setSelectedShipmentForInvoice] =
-    useState(null);
-  const [selectedInvoiceForDetails, setSelectedInvoiceForDetails] =
-    useState(null);
-
   const [activeTab, setActiveTab] = useState("TIMELINE");
   const [shipments, setShipments] = useState([]);
   const [loadingShips, setLoadingShips] = useState(false);
@@ -77,6 +67,33 @@ export default function TripDrawer({
       setLoadingShips(false);
     }
   };
+
+  const invoiceWorkflow = useInvoiceWorkflow({
+    user,
+    onRefresh: async () => {
+      await fetchShipments();
+      onRefreshTrips?.();
+    },
+    onError: (message, error) => {
+      alert(`${message}: ${error.message}`);
+    },
+  });
+
+  const {
+    isFormOpen: isInvoiceFormOpen,
+    isDetailsOpen: isInvoiceDetailsOpen,
+    isSaving: isInvoiceSaving,
+    formMode: invoiceMode,
+    selectedShipment: selectedInvoiceShipment,
+    selectedInvoice,
+    openCreateInvoice,
+    openEditInvoice,
+    openInvoiceDetailsById,
+    closeForm: closeInvoiceForm,
+    closeDetails: closeInvoiceDetails,
+    submitInvoice,
+    changeInvoiceStatus,
+  } = invoiceWorkflow;
 
   useEffect(() => {
     if (isOpen && data?.tripId) {
@@ -122,6 +139,10 @@ export default function TripDrawer({
       newStatus: payload.action === "LOAD" ? "LOADED" : "RECEIVED", // UNLOAD reverts it to RECEIVED
       manualQty: quantityMap, // We pass the object dictionary instead of a single number
     });
+  };
+
+  const handleViewInvoice = async (shipment) => {
+    await openInvoiceDetailsById(shipment?.invoiceId, shipment);
   };
 
   return (
@@ -246,19 +267,8 @@ export default function TripDrawer({
                 onRefreshTrips?.();
               }}
               isDark={isDark}
-              onCreateInvoice={(shipment) => {
-                setSelectedShipmentForInvoice(shipment);
-                setIsInvoiceFormOpen(true);
-                console.log("data", shipment);
-              }}
-              onViewInvoice={(shipment) => {
-                setSelectedInvoiceForDetails({
-                  id: shipment.invoiceId,
-                  invoiceNumber: shipment.invoiceNumber,
-                  shipmentId: shipment.shipmentId,
-                });
-                setIsInvoiceDetailsOpen(true);
-              }}
+              onViewInvoice={handleViewInvoice}
+              onCreateInvoice={openCreateInvoice}
             />
           )}
 
@@ -339,27 +349,26 @@ export default function TripDrawer({
 
       <InvoiceFormModal
         isOpen={isInvoiceFormOpen}
-        shipment={selectedShipmentForInvoice}
-        onClose={() => {
-          setIsInvoiceFormOpen(false);
-          setSelectedShipmentForInvoice(null);
-        }}
-        onSuccess={() => {
-          setIsInvoiceFormOpen(false);
-          setSelectedShipmentForInvoice(null);
-          fetchShipments(); // refresh manifest
-          onRefreshTrips?.();
-        }}
+        loading={isInvoiceSaving}
+        mode={invoiceMode}
+        shipment={selectedInvoiceShipment}
+        invoice={selectedInvoice}
+        eligibleShipments={shipments}
+        user={user}
+        onClose={closeInvoiceForm}
+        onSubmit={submitInvoice}
         isDark={isDark}
       />
 
       <InvoiceDetailsModal
         isOpen={isInvoiceDetailsOpen}
-        invoiceId={selectedInvoiceForDetails?.id}
-        onClose={() => {
-          setIsInvoiceDetailsOpen(false);
-          setSelectedInvoiceForDetails(null);
-        }}
+        invoice={selectedInvoice}
+        shipment={selectedInvoiceShipment}
+        onClose={closeInvoiceDetails}
+        onEdit={() => openEditInvoice(selectedInvoice, selectedInvoiceShipment)}
+        onIssue={() => changeInvoiceStatus(selectedInvoice, "ISSUED")}
+        onMarkPaid={() => changeInvoiceStatus(selectedInvoice, "PAID")}
+        onCancel={() => changeInvoiceStatus(selectedInvoice, "CANCELLED")}
         isDark={isDark}
       />
     </>

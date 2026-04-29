@@ -234,7 +234,14 @@ function StandardLabel({ shipment, pkg, totalQuantity, allPackages = [] }) {
           </div>
 
           <div className="flex flex-col items-center justify-center border-2 rounded-xl border-black mt-5 p-3 mb-3">
-            <QRCode value={qrValue} size={170} level="M" />
+            <QRCode
+              value={qrValue}
+              size={170}
+              level="M"
+              bgColor="#ffffff"
+              fgColor="#000000"
+              className="bg-white p-2"
+            />
             <div className="text-[13px] font-mono font-bold mt-1 tracking-tighter text-center uppercase mt-3">
               {shipment.shipmentId}
             </div>

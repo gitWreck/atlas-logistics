@@ -14,7 +14,6 @@ import {
   getTableTheme,
   getOverviewThemeClasses,
 } from "@/app/utility/constant/theme";
-import { formatFirestoreDate } from "@/app/utility/utilities";
 import {
   getTripDeparture,
   getTripDisplayId,
@@ -22,7 +21,6 @@ import {
   getTripTruckLabel,
 } from "@/app/utility/tripScheduleHelpers";
 import StatusBadge from "../../ui/StatusBadge";
-import { renderTimePair } from "../utils";
 
 function getPlannedLoadingStart(trip) {
   return trip?.plannedLoadingStart || null;
@@ -30,6 +28,25 @@ function getPlannedLoadingStart(trip) {
 
 function getPlannedLoadingEnd(trip) {
   return trip?.plannedLoadingEnd || null;
+}
+
+function formatScheduleDate(value) {
+  if (!value) return "";
+
+  const date =
+    typeof value.toDate === "function"
+      ? value.toDate()
+      : value instanceof Date
+        ? value
+        : new Date(value);
+
+  if (Number.isNaN(date.getTime())) return "";
+
+  return date.toLocaleDateString("en-US", {
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  });
 }
 
 const ALLOWED_STATUSES = [
@@ -88,16 +105,16 @@ export default function TripScheduleTable({
       const truckLabel = String(getTripTruckLabel(trip) || "").toLowerCase();
       const tripId = String(getTripDisplayId(trip) || "").toLowerCase();
       const departure = String(
-        formatFirestoreDate(getTripDeparture(trip)) || "",
+        formatScheduleDate(getTripDeparture(trip)) || "",
       ).toLowerCase();
       const eta = String(
-        formatFirestoreDate(getTripEta(trip)) || "",
+        formatScheduleDate(getTripEta(trip)) || "",
       ).toLowerCase();
       const loadingStart = String(
-        formatFirestoreDate(getPlannedLoadingStart(trip)) || "",
+        formatScheduleDate(getPlannedLoadingStart(trip)) || "",
       ).toLowerCase();
       const loadingEnd = String(
-        formatFirestoreDate(getPlannedLoadingEnd(trip)) || "",
+        formatScheduleDate(getPlannedLoadingEnd(trip)) || "",
       ).toLowerCase();
 
       const statusValue = String(trip.status || "").toUpperCase();
@@ -171,7 +188,7 @@ export default function TripScheduleTable({
           />
           <input
             type="text"
-            placeholder="Search truck, trip, time, or status..."
+            placeholder="Search truck, trip, date, or status..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className={`w-full border rounded-xl pl-9 pr-3 py-2.5 text-sm outline-none transition-colors ${theme.input}`}
@@ -282,7 +299,7 @@ export default function TripScheduleTable({
                             <div
                               className={`mt-2 text-sm font-semibold ${overviewTheme.strongText}`}
                             >
-                              {formatFirestoreDate(getTripDeparture(trip)) ||
+                              {formatScheduleDate(getTripDeparture(trip)) ||
                                 "—"}
                             </div>
                           </div>
@@ -297,7 +314,7 @@ export default function TripScheduleTable({
                             <div
                               className={`mt-2 text-sm font-semibold ${overviewTheme.strongText}`}
                             >
-                              {formatFirestoreDate(getTripEta(trip)) || "—"}
+                              {formatScheduleDate(getTripEta(trip)) || "—"}
                             </div>
                           </div>
 
@@ -311,7 +328,7 @@ export default function TripScheduleTable({
                             <div
                               className={`mt-2 text-sm font-semibold ${overviewTheme.strongText}`}
                             >
-                              {formatFirestoreDate(
+                              {formatScheduleDate(
                                 getPlannedLoadingStart(trip),
                               ) || "—"}
                             </div>
@@ -327,7 +344,7 @@ export default function TripScheduleTable({
                             <div
                               className={`mt-2 text-sm font-semibold ${overviewTheme.strongText}`}
                             >
-                              {formatFirestoreDate(
+                              {formatScheduleDate(
                                 getPlannedLoadingEnd(trip),
                               ) || "—"}
                             </div>
@@ -408,14 +425,14 @@ export default function TripScheduleTable({
                         {/* Departure */}
                         <td className="px-4 py-3 align-top">
                           <div className="text-sm font-medium">
-                            {formatFirestoreDate(getTripDeparture(trip)) || "—"}
+                            {formatScheduleDate(getTripDeparture(trip)) || "—"}
                           </div>
                         </td>
 
                         {/* Arrival */}
                         <td className="px-4 py-3 align-top">
                           <div className="text-sm font-medium">
-                            {formatFirestoreDate(getTripEta(trip)) || "—"}
+                            {formatScheduleDate(getTripEta(trip)) || "—"}
                           </div>
                         </td>
 
@@ -423,13 +440,13 @@ export default function TripScheduleTable({
                         <td className="px-4 py-3 align-top">
                           <div className="text-xs leading-tight">
                             <div>
-                              {formatFirestoreDate(
+                              {formatScheduleDate(
                                 getPlannedLoadingStart(trip),
                               ) || "—"}
                             </div>
                             {/* <div>
                               <span className="font-semibold">End:</span>{" "}
-                              {formatFirestoreDate(
+                              {formatScheduleDate(
                                 getPlannedLoadingEnd(trip),
                               ) || "—"}
                             </div> */}

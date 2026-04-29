@@ -12,14 +12,8 @@ import InvoiceFormModal from "./InvoiceFormModal";
 import InvoiceDetailsModal from "./InvoiceDetailsModal";
 import InvoiceTable from "./InvoiceTable";
 import InvoiceStatistics from "./InvoiceStatistics";
+import useInvoiceWorkflow from "./useInvoiceWorkflow";
 import { getBoardThemeClasses } from "@/app/utility/constant/theme";
-import { INVOICE_STATUSES } from "@/app/utility/constant/templates";
-import {
-  createInvoice,
-  editInvoice,
-  updateInvoice,
-  updateInvoiceStatus,
-} from "@/app/utility/FirebaseFunctions";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faBell } from "@fortawesome/free-solid-svg-icons";
 
@@ -30,13 +24,6 @@ const InvoiceBoard = forwardRef(function InvoiceBoard(
   const [shipments, setShipments] = useState([]);
   const [invoices, setInvoices] = useState([]);
   const [loading, setLoading] = useState(false);
-
-  const [isFormOpen, setIsFormOpen] = useState(false);
-  const [isDetailsOpen, setIsDetailsOpen] = useState(false);
-
-  const [selectedShipment, setSelectedShipment] = useState(null);
-  const [selectedInvoice, setSelectedInvoice] = useState(null);
-  const [formMode, setFormMode] = useState("create");
 
   const theme = getBoardThemeClasses(isDark);
 
@@ -86,13 +73,34 @@ const InvoiceBoard = forwardRef(function InvoiceBoard(
     }
   };
 
+  const invoiceWorkflow = useInvoiceWorkflow({
+    user,
+    onRefresh: fetchInvoicesAndShipments,
+  });
+
+  const {
+    isFormOpen,
+    isDetailsOpen,
+    isSaving: isInvoiceSaving,
+    formMode,
+    selectedShipment,
+    selectedInvoice,
+    openCreateInvoice,
+    openEditInvoice,
+    openInvoiceDetails,
+    closeForm,
+    closeDetails,
+    submitInvoice,
+    changeInvoiceStatus,
+  } = invoiceWorkflow;
+
   useEffect(() => {
     fetchInvoicesAndShipments();
   }, []);
 
   const invoiceByShipmentId = useMemo(() => {
     return invoices.reduce((acc, invoice) => {
-      if (invoice?.shipmentId) {
+      if (invoice?.shipmentId && invoice.status !== "CANCELLED") {
         acc[invoice.shipmentId] = invoice;
       }
       return acc;
@@ -148,39 +156,6 @@ const InvoiceBoard = forwardRef(function InvoiceBoard(
     };
   }, [mappedInvoices]);
 
-  const handleOpenCreate = (shipment = null) => {
-    setFormMode("create");
-    setSelectedShipment(shipment);
-    setSelectedInvoice(null);
-    setIsFormOpen(true);
-  };
-
-  const handleOpenEdit = (invoice) => {
-    console.log("Opening edit form for invoice:", invoice);
-    setFormMode("edit");
-    setSelectedInvoice(invoice);
-    setSelectedShipment(invoice?.shipment || null);
-    setIsFormOpen(true);
-  };
-
-  const handleOpenDetails = (invoice) => {
-    setSelectedInvoice(invoice);
-    setSelectedShipment(invoice?.shipment || null);
-    setIsDetailsOpen(true);
-  };
-
-  const handleCloseForm = () => {
-    setIsFormOpen(false);
-    setSelectedShipment(null);
-    setSelectedInvoice(null);
-  };
-
-  const handleCloseDetails = () => {
-    setIsDetailsOpen(false);
-    setSelectedInvoice(null);
-    setSelectedShipment(null);
-  };
-
   const handleOpenConfirm = (invoice, action) => {
     setConfirmInvoice(invoice);
     setConfirmAction(action);
@@ -195,66 +170,12 @@ const InvoiceBoard = forwardRef(function InvoiceBoard(
     setSendNotification(true);
   };
 
-  // change this to a firebase function and move to backend, then call it from here
-  const handleSubmitInvoice = async (payload) => {
-    setLoading(true);
-    try {
-      if (!user) return;
-
-      const isEdit = formMode === "edit" && selectedInvoice?.id;
-
-      if (isEdit) {
-        // keep existing PUT/update logic for now
-        await editInvoice({
-          invoiceId: selectedInvoice.id,
-          ...payload,
-        });
-      } else {
-        await createInvoice(payload);
-      }
-
-      await fetchInvoicesAndShipments();
-      handleCloseForm();
-    } catch (err) {
-      console.error("Error saving invoice:", err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // const handleInvoiceStatusUpdate = async (invoice, status) => {
-  const handleInvoiceStatusUpdate = async (
-    invoice,
-    status,
-    sendNotification = false,
-  ) => {
-    try {
-      if (!user || !invoice?.id) return;
-
-      await updateInvoiceStatus({
-        invoiceId: invoice.id,
-        status,
-        sendNotification,
-      });
-
-      await fetchInvoicesAndShipments();
-
-      if (isDetailsOpen && selectedInvoice?.id === invoice.id) {
-        setSelectedInvoice((prev) => (prev ? { ...prev, status } : prev));
-      }
-    } catch (err) {
-      console.error("Error updating invoice status:", err);
-    }
-  };
-
   const handleConfirmStatusUpdate = async () => {
     if (!confirmInvoice || !confirmAction) return;
 
-    await handleInvoiceStatusUpdate(
-      confirmInvoice,
-      confirmAction,
+    await changeInvoiceStatus(confirmInvoice, confirmAction, {
       sendNotification,
-    );
+    });
 
     handleCloseConfirm();
   };
@@ -263,10 +184,10 @@ const InvoiceBoard = forwardRef(function InvoiceBoard(
     ref,
     () => ({
       openCreateInvoice: () => {
-        handleOpenCreate(null);
+        openCreateInvoice(null);
       },
     }),
-    [],
+    [openCreateInvoice],
   );
 
   return (
@@ -280,15 +201,15 @@ const InvoiceBoard = forwardRef(function InvoiceBoard(
           paidCount={counts.paid}
           cancelledCount={counts.cancelled}
           eligibleShipmentCount={eligibleShipments.length}
-          onOpenCreate={() => handleOpenCreate(null)}
+          onOpenCreate={() => openCreateInvoice(null)}
         />
 
         <InvoiceTable
           invoices={mappedInvoices}
           loading={loading}
           onRefresh={fetchInvoicesAndShipments}
-          onViewInvoice={handleOpenDetails}
-          onEditInvoice={handleOpenEdit}
+          onViewInvoice={openInvoiceDetails}
+          onEditInvoice={openEditInvoice}
           onIssueInvoice={(invoice) => handleOpenConfirm(invoice, "ISSUED")}
           onMarkPaid={(invoice) => handleOpenConfirm(invoice, "PAID")}
           onCancelInvoice={(invoice) => handleOpenConfirm(invoice, "CANCELLED")}
@@ -298,14 +219,14 @@ const InvoiceBoard = forwardRef(function InvoiceBoard(
 
       <InvoiceFormModal
         isOpen={isFormOpen}
-        loading={loading}
+        loading={loading || isInvoiceSaving}
         mode={formMode}
         shipment={selectedShipment}
         invoice={selectedInvoice}
         eligibleShipments={eligibleShipments}
         user={user}
-        onClose={handleCloseForm}
-        onSubmit={handleSubmitInvoice}
+        onClose={closeForm}
+        onSubmit={submitInvoice}
         isDark={isDark}
       />
 
@@ -313,14 +234,13 @@ const InvoiceBoard = forwardRef(function InvoiceBoard(
         isOpen={isDetailsOpen}
         invoice={selectedInvoice}
         shipment={selectedShipment}
-        onClose={handleCloseDetails}
+        onClose={closeDetails}
         onEdit={() => {
-          handleCloseDetails();
-          if (selectedInvoice) handleOpenEdit(selectedInvoice);
+          if (selectedInvoice) openEditInvoice(selectedInvoice, selectedShipment);
         }}
-        onIssueInvoice={(invoice) => handleOpenConfirm(invoice, "ISSUED")}
-        onMarkPaid={(invoice) => handleOpenConfirm(invoice, "PAID")}
-        onCancelInvoice={(invoice) => handleOpenConfirm(invoice, "CANCELLED")}
+        onIssue={() => handleOpenConfirm(selectedInvoice, "ISSUED")}
+        onMarkPaid={() => handleOpenConfirm(selectedInvoice, "PAID")}
+        onCancel={() => handleOpenConfirm(selectedInvoice, "CANCELLED")}
         isDark={isDark}
       />
 

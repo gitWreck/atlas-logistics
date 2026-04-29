@@ -4,6 +4,7 @@ const { Timestamp } = admin.firestore;
 
 if (!admin.apps.length) admin.initializeApp();
 const db = admin.firestore();
+const ALLOWED_STATUSES = new Set(["DRAFT", "ISSUED"]);
 
 exports.createInvoice = onCall(
   {
@@ -11,7 +12,6 @@ exports.createInvoice = onCall(
     maxInstances: 10,
   },
   async (request) => {
-    // 1. AUTH
     if (!request.auth) {
       throw new HttpsError("unauthenticated", "Login required.");
     }
@@ -20,30 +20,15 @@ exports.createInvoice = onCall(
 
     const {
       shipmentId,
-      shipmentTrackingNumber,
-      invoiceNumber: manualInvoiceNumber,
       invoiceDate,
       dueDate,
       billingName,
       billingAddress,
-      senderName,
-      senderPhone,
-      recipientName,
-      recipientPhone,
-      origin,
-      destination,
-      routeLabel,
-      shipmentStatus,
-      truckTripId,
-      totalPackages,
-      totalItems,
       amount,
       notes,
       status,
-      shipmentSnapshot,
     } = request.data || {};
 
-    // 2. VALIDATION
     if (!shipmentId) {
       throw new HttpsError("invalid-argument", "Missing shipmentId.");
     }
@@ -56,7 +41,6 @@ exports.createInvoice = onCall(
       throw new HttpsError("invalid-argument", "Invalid amount.");
     }
 
-    // 3. FETCH SHIPMENT
     const shipmentRef = db.collection("shipments").doc(shipmentId);
     const shipmentDoc = await shipmentRef.get();
 
@@ -66,75 +50,64 @@ exports.createInvoice = onCall(
 
     const shipmentData = shipmentDoc.data();
 
-    // Prevent duplicate invoice
-    const existingInvoice = await db
+    const existingInvoices = await db
       .collection("invoices")
       .where("shipmentId", "==", shipmentId)
-      .limit(1)
       .get();
 
-    if (!existingInvoice.empty) {
+    const hasActiveInvoice = existingInvoices.docs.some((doc) => {
+      const invoiceStatus = doc.data()?.status || "DRAFT";
+      return invoiceStatus !== "CANCELLED";
+    });
+
+    if (hasActiveInvoice) {
       throw new HttpsError(
         "already-exists",
-        "Invoice already exists for this shipment.",
+        "An active invoice already exists for this shipment.",
       );
     }
 
-    // 4. ID GENERATION
     const now = Timestamp.now();
     const nowAt = admin.firestore.FieldValue.serverTimestamp();
 
-    let invoiceNumber = manualInvoiceNumber;
-
-    if (!invoiceNumber) {
-      const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, "");
-      invoiceNumber = `INV-${dateStr}-${Date.now().toString().slice(-6)}`;
-    }
+    const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, "");
+    const invoiceNumber = `INV-${dateStr}-${Date.now().toString().slice(-6)}`;
 
     const invoiceRef = db.collection("invoices").doc(invoiceNumber);
-
     const collisionCheck = await invoiceRef.get();
+
     if (collisionCheck.exists) {
       throw new HttpsError("already-exists", "Invoice ID collision.");
     }
 
-    // 5. DERIVE FROM SHIPMENT (fallbacks)
-    const finalSenderName = senderName || shipmentData?.sender?.name || "";
-    const finalSenderPhone = senderPhone || shipmentData?.sender?.phone || "";
-    const finalRecipientName =
-      recipientName || shipmentData?.recipient?.name || "";
-    const finalRecipientPhone =
-      recipientPhone || shipmentData?.recipient?.phone || "";
+    const finalSenderName = shipmentData?.sender?.name || "";
+    const finalSenderPhone = shipmentData?.sender?.phone || "";
+    const finalRecipientName = shipmentData?.recipient?.name || "";
+    const finalRecipientPhone = shipmentData?.recipient?.phone || "";
 
-    const finalOrigin = origin || shipmentData?.origin || "";
-    const finalDestination = destination || shipmentData?.destination || "";
-
-    const finalRouteLabel =
-      routeLabel || `${finalOrigin} → ${finalDestination}`;
+    const finalOrigin = shipmentData?.origin || "";
+    const finalDestination = shipmentData?.destination || "";
+    const finalRouteLabel = `${finalOrigin || "Unknown"} → ${finalDestination || "Unknown"}`;
 
     const finalBillingName = billingName || shipmentData?.sender?.name || "";
     const finalBillingAddress =
       billingAddress || shipmentData?.sender?.formattedAddress || "";
 
     const finalTrackingNumber =
-      shipmentTrackingNumber || shipmentData?.trackingNumber || shipmentId;
+      shipmentData?.trackingNumber || shipmentData?.shipmentId || shipmentId;
 
-    const finalShipmentStatus = shipmentStatus || shipmentData?.status || "";
-    const finalTruckTripId =
-      truckTripId || shipmentData?.currentTruckTripId || null;
+    const finalShipmentStatus = shipmentData?.status || "";
+    const finalTripId = shipmentData?.currentTripId || null;
 
-    const finalTotalPackages =
-      Number(totalPackages) || shipmentData?.packages?.length || 0;
-
-    const finalTotalItems =
-      Number(totalItems) || shipmentData?.totals?.totalItems || 0;
+    const finalTotalPackages = shipmentData?.packages?.length || 0;
+    const finalTotalItems = shipmentData?.totals?.totalItems || 0;
 
     const finalAmount = Number(amount) || 0;
-    const finalStatus = status || "DRAFT";
+    const finalStatus = ALLOWED_STATUSES.has(status) ? status : "DRAFT";
 
-    // Snapshot fallback
-    const finalShipmentSnapshot = shipmentSnapshot || {
-      trackingNumber: shipmentData?.trackingNumber || shipmentId,
+    const finalShipmentSnapshot = {
+      id: shipmentId,
+      shipmentId: finalTrackingNumber,
       sender: shipmentData?.sender || null,
       recipient: shipmentData?.recipient || null,
       origin: shipmentData?.origin || null,
@@ -142,10 +115,9 @@ exports.createInvoice = onCall(
       totals: shipmentData?.totals || null,
       packages: shipmentData?.packages || [],
       status: shipmentData?.status || null,
-      currentTruckTripId: shipmentData?.currentTruckTripId || null,
+      currentTripId: finalTripId,
     };
 
-    // 6. BATCH WRITE
     const batch = db.batch();
 
     batch.set(invoiceRef, {
@@ -166,7 +138,7 @@ exports.createInvoice = onCall(
       routeLabel: finalRouteLabel,
 
       shipmentStatus: finalShipmentStatus,
-      truckTripId: finalTruckTripId,
+      tripId: finalTripId,
 
       totalPackages: finalTotalPackages,
       totalItems: finalTotalItems,
@@ -185,7 +157,6 @@ exports.createInvoice = onCall(
       updatedBy: uid,
     });
 
-    // OPTIONAL: Link back to shipment
     batch.set(
       shipmentRef,
       {
@@ -199,7 +170,6 @@ exports.createInvoice = onCall(
       { merge: true },
     );
 
-    // ADMIN LOG
     batch.set(db.collection("admin_logs").doc(), {
       action: "CREATE_INVOICE",
       invoiceId: invoiceRef.id,
@@ -210,9 +180,9 @@ exports.createInvoice = onCall(
       createdAt: nowAt,
     });
 
-    // EVENT LOG
     batch.set(db.collection("invoice_events").doc(), {
       invoiceId: invoiceRef.id,
+      invoiceNumber,
       type: "INVOICE_CREATED",
       status: finalStatus,
       actorId: uid,
@@ -220,7 +190,6 @@ exports.createInvoice = onCall(
       note: `Invoice ${invoiceNumber} created`,
     });
 
-    // 7. COMMIT
     try {
       await batch.commit();
 
