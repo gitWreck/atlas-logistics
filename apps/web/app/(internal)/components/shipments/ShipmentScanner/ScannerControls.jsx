@@ -1,8 +1,12 @@
 "use client";
 
-import React, { useRef, useEffect } from "react";
+import React, { useId, useRef, useEffect } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faTruckRampBox, faUndo } from "@fortawesome/free-solid-svg-icons";
+import {
+  faChevronDown,
+  faTruckRampBox,
+  faUndo,
+} from "@fortawesome/free-solid-svg-icons";
 
 export function ActionSelector({ action, trip, theme, actions }) {
   const currentTripStatus = trip?.status?.toUpperCase();
@@ -85,12 +89,125 @@ export function ActionSelector({ action, trip, theme, actions }) {
   );
 }
 
-export function CameraScanner({ onDetected, onClose, setError }) {
+export function ScannerEngineSelect({ value, onChange, theme }) {
+  return (
+    <div className={`rounded-xl border p-4 ${theme.panelSurface}`}>
+      <label
+        htmlFor="shipment-scanner-engine"
+        className="text-[10px] font-bold uppercase opacity-60"
+      >
+        Scanner
+      </label>
+      <div className="relative mt-2">
+        <select
+          id="shipment-scanner-engine"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          className={`w-full rounded-lg border px-3 py-2 pr-9 text-sm font-bold outline-none focus:border-blue-500 appearance-none cursor-pointer ${theme.input}`}
+        >
+          <option value="barcode-detector">BarcodeDetector</option>
+          <option value="html5-qrcode">HTML5 QR Code</option>
+        </select>
+        <FontAwesomeIcon
+          icon={faChevronDown}
+          className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs opacity-50"
+        />
+      </div>
+    </div>
+  );
+}
+
+export function CameraScanner({
+  scannerEngine = "barcode-detector",
+  onDetected,
+  onClose,
+  setError,
+}) {
   const videoRef = useRef(null);
   const streamRef = useRef(null);
+  const onDetectedRef = useRef(onDetected);
+  const onCloseRef = useRef(onClose);
+  const setErrorRef = useRef(setError);
+  const scannerId = `shipment-html5-scanner-${useId().replace(/:/g, "")}`;
+
+  useEffect(() => {
+    onDetectedRef.current = onDetected;
+    onCloseRef.current = onClose;
+    setErrorRef.current = setError;
+  }, [onDetected, onClose, setError]);
 
   useEffect(() => {
     let stopScanning = false;
+    let animationFrameId = null;
+    let html5Scanner = null;
+
+    const cleanupNativeScanner = () => {
+      if (animationFrameId) cancelAnimationFrame(animationFrameId);
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach((track) => track.stop());
+        streamRef.current = null;
+      }
+    };
+
+    const cleanupHtml5Scanner = () => {
+      if (!html5Scanner) return;
+      const scanner = html5Scanner;
+      Promise.resolve()
+        .then(() => (scanner.isScanning ? scanner.stop() : null))
+        .catch(() => {})
+        .finally(() => {
+          try {
+            scanner.clear();
+          } catch {
+            /* ignore cleanup failures */
+          }
+        });
+    };
+
+    async function setupHtml5Scanner() {
+      try {
+        const { Html5Qrcode, Html5QrcodeSupportedFormats } = await import(
+          "html5-qrcode"
+        );
+
+        if (stopScanning) return;
+
+        html5Scanner = new Html5Qrcode(scannerId, {
+          formatsToSupport: [
+            Html5QrcodeSupportedFormats.QR_CODE,
+            Html5QrcodeSupportedFormats.CODE_128,
+          ],
+          useBarCodeDetectorIfSupported: false,
+          verbose: false,
+        });
+
+        await html5Scanner.start(
+          { facingMode: "environment" },
+          {
+            fps: 10,
+            qrbox: (viewfinderWidth, viewfinderHeight) => {
+              const edge = Math.floor(
+                Math.min(viewfinderWidth, viewfinderHeight) * 0.7,
+              );
+              return { width: edge, height: edge };
+            },
+          },
+          (decodedText) => {
+            if (stopScanning) return;
+            stopScanning = true;
+            onDetectedRef.current(decodedText);
+          },
+          () => {},
+        );
+      } catch {
+        if (stopScanning) return;
+        setErrorRef.current(
+          "HTML5 scanner could not start. Try BarcodeDetector or manual input.",
+        );
+        onCloseRef.current();
+      }
+    }
+
     async function setupCamera() {
       try {
         const stream = await navigator.mediaDevices.getUserMedia({
@@ -109,38 +226,56 @@ export function CameraScanner({ onDetected, onClose, setError }) {
             if (stopScanning || !videoRef.current) return;
             try {
               const barcodes = await detector.detect(videoRef.current);
-              if (barcodes.length > 0) return onDetected(barcodes[0].rawValue);
-            } catch (e) {
+              if (barcodes.length > 0) {
+                stopScanning = true;
+                return onDetectedRef.current(barcodes[0].rawValue);
+              }
+            } catch {
               /* ignore */
             }
-            requestAnimationFrame(renderFrame);
+            animationFrameId = requestAnimationFrame(renderFrame);
           };
           renderFrame();
         } else {
-          setError("Native scanner not supported. Please use manual input.");
-          onClose();
+          setErrorRef.current(
+            "BarcodeDetector is not supported. Try HTML5 QR Code or manual input.",
+          );
+          onCloseRef.current();
         }
-      } catch (err) {
-        setError("Camera access denied.");
-        onClose();
+      } catch {
+        setErrorRef.current("Camera access denied.");
+        onCloseRef.current();
       }
     }
-    setupCamera();
+
+    if (scannerEngine === "html5-qrcode") {
+      setupHtml5Scanner();
+    } else {
+      setupCamera();
+    }
+
     return () => {
       stopScanning = true;
-      if (streamRef.current)
-        streamRef.current.getTracks().forEach((t) => t.stop());
+      cleanupNativeScanner();
+      cleanupHtml5Scanner();
     };
-  }, [onDetected, onClose, setError]);
+  }, [scannerEngine, scannerId]);
 
   return (
     <div className="rounded-xl overflow-hidden bg-black relative aspect-square">
-      <video
-        ref={videoRef}
-        autoPlay
-        playsInline
-        className="w-full h-full object-cover"
-      />
+      {scannerEngine === "html5-qrcode" ? (
+        <div
+          id={scannerId}
+          className="h-full w-full [&_video]:!h-full [&_video]:!w-full [&_video]:!object-cover"
+        />
+      ) : (
+        <video
+          ref={videoRef}
+          autoPlay
+          playsInline
+          className="w-full h-full object-cover"
+        />
+      )}
       <div className="absolute inset-0 border-2 border-blue-500 m-12 rounded-lg opacity-50 shadow-[0_0_0_999px_rgba(0,0,0,0.5)] pointer-events-none" />
       <button
         onClick={onClose}
