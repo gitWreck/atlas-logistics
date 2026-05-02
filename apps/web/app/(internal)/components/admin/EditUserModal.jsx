@@ -46,6 +46,7 @@ export default function EditUserModal({
     if (user && isOpen) {
       setFormData({
         uid: user.id,
+        publicId: user.publicId || user.userCode || user.driverCode || "",
         displayName: user.name || "",
         role: user.role || "driver",
         email: user.email || "",
@@ -157,6 +158,20 @@ export default function EditUserModal({
             className="p-6 space-y-4 max-h-[80vh] overflow-y-auto custom-scrollbar"
           >
             <div className="grid grid-cols-1 gap-4">
+              <div>
+                <label
+                  className={`block text-[10px] font-bold uppercase tracking-wider mb-1 ${theme.label}`}
+                >
+                  User ID
+                </label>
+                <input
+                  className={`w-full border rounded-lg px-4 py-2 opacity-60 cursor-not-allowed ${theme.input}`}
+                  value={formData.publicId || "N/A"}
+                  readOnly
+                  disabled
+                />
+              </div>
+
               <div>
                 <label
                   className={`block text-[10px] font-bold uppercase tracking-wider mb-1 ${theme.label}`}

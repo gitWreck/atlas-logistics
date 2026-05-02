@@ -1,5 +1,5 @@
 import {
-  View,
+  SafeAreaView,
   StyleSheet,
   Platform,
   StatusBar as RNStatusBar,
@@ -12,7 +12,7 @@ import { auth } from "../../../firebase";
 import DriverHeader from "../../../components/driver/DriverHeader";
 import { useAuth } from "../../../contexts/AuthContext"; // adjust path if needed
 
-export default function CheckerTabsLayout() {
+export default function DriverTabsLayout() {
   const router = useRouter();
   const { user } = useAuth();
 
@@ -26,7 +26,7 @@ export default function CheckerTabsLayout() {
   };
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container}>
       {/* ✅ SHARED HEADER FOR ALL TAB SCREENS */}
       <DriverHeader
         userName={user?.name || user?.fullName || "Driver"}
@@ -74,7 +74,7 @@ export default function CheckerTabsLayout() {
           }}
         />
       </Tabs>
-    </View>
+    </SafeAreaView>
   );
 }
 

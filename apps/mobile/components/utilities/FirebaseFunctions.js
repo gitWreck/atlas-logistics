@@ -46,6 +46,10 @@ export const updateUserProfileMobile = httpsCallable(
   functions,
   "updateUserProfileMobile",
 );
+export const ensureUserPublicId = httpsCallable(
+  functions,
+  "ensureUserPublicId",
+);
 export const requestRecoveryOTP = httpsCallable(
   functions,
   "requestRecoveryOTP",

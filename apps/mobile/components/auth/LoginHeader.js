@@ -1,12 +1,17 @@
 import { View, Text, StyleSheet } from "react-native";
 import { Image } from "expo-image";
 
-export default function LoginHeader({ title, subtitle }) {
+export default function LoginHeader({
+  title,
+  subtitle,
+  logoSize = 200,
+  marginBottom = 40,
+}) {
   return (
-    <View style={styles.header}>
+    <View style={[styles.header, { marginBottom }]}>
       <Image
         source={require("../../assets/atlas-login.svg")}
-        style={{ width: 200, height: 200 }}
+        style={[styles.logo, { width: logoSize, height: logoSize }]}
       />
       <Text style={styles.title}>{title}</Text>
       <Text style={styles.subtitle}>{subtitle}</Text>
@@ -17,8 +22,8 @@ export default function LoginHeader({ title, subtitle }) {
 const styles = StyleSheet.create({
   header: {
     alignItems: "center",
-    marginBottom: 40,
   },
+  logo: {},
   logoContainer: {
     width: 80,
     height: 80,

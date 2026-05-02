@@ -305,7 +305,8 @@ export const CHECKER_TAB_OPTIONS = [
   // { key: "RECEIVED", label: "Received" },
   { key: "LOADED", label: "Loaded" },
   // { key: "IN_TRANSIT", label: "Transit" },
-  { key: "RECEIVED", label: "Received" },
+  // { key: "RECEIVED", label: "Received" },
+  { key: "ARRIVED", label: "Arrived" },
   { key: "OUT_FOR_DELIVERY", label: "Out for Delivery" },
 ];
 

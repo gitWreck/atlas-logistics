@@ -30,9 +30,18 @@ export default function UserManagementTable({
     return users.filter((user) => {
       const name = (user.name || "").toLowerCase();
       const email = (user.email || "").toLowerCase();
+      const publicId = (
+        user.publicId ||
+        user.userCode ||
+        user.driverCode ||
+        ""
+      ).toLowerCase();
       const keyword = search.toLowerCase();
 
-      const matchesSearch = name.includes(keyword) || email.includes(keyword);
+      const matchesSearch =
+        name.includes(keyword) ||
+        email.includes(keyword) ||
+        publicId.includes(keyword);
 
       const matchesRole = roleFilter === "ALL" || user.role === roleFilter;
 
@@ -90,7 +99,7 @@ export default function UserManagementTable({
           />
           <input
             type="text"
-            placeholder="Search name or email..."
+            placeholder="Search name, email, or ID..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className={`w-full border rounded-lg pl-8 pr-3 py-1.5 focus:border-blue-500 outline-none transition-colors ${theme.input}`}
@@ -148,6 +157,14 @@ export default function UserManagementTable({
                         {user.name || "—"}
                       </div>
                       <div
+                        className={`text-[10px] font-mono mt-0.5 ${theme.cellSecondary}`}
+                      >
+                        {user.publicId ||
+                          user.userCode ||
+                          user.driverCode ||
+                          "—"}
+                      </div>
+                      <div
                         className={`text-xs truncate ${theme.cellSecondary}`}
                       >
                         {user.email}
@@ -201,6 +218,7 @@ export default function UserManagementTable({
           <table className={`w-full text-left text-sm ${theme.tableText}`}>
             <thead className={`uppercase font-semibold text-xs ${theme.thead}`}>
               <tr>
+                <th className="px-6 py-3">User ID</th>
                 <th className="px-6 py-3">Name / Email</th>
                 <th className="px-6 py-3">Role</th>
                 <th className="px-6 py-3">Status</th>
@@ -212,7 +230,7 @@ export default function UserManagementTable({
               {loading ? (
                 <tr>
                   <td
-                    colSpan="4"
+                    colSpan="5"
                     className={`px-6 py-8 text-center ${theme.emptyText}`}
                   >
                     <div className="animate-pulse">Loading users...</div>
@@ -221,7 +239,7 @@ export default function UserManagementTable({
               ) : paginatedUsers.length === 0 ? (
                 <tr>
                   <td
-                    colSpan="4"
+                    colSpan="5"
                     className={`px-6 py-8 text-center italic ${theme.emptyText}`}
                   >
                     {emptyMessage}
@@ -236,6 +254,17 @@ export default function UserManagementTable({
                       key={user.id}
                       className={`transition-colors ${theme.rowHover}`}
                     >
+                      <td className="px-6 py-4">
+                        <div
+                          className={`font-mono text-xs ${theme.cellPrimary}`}
+                        >
+                          {user.publicId ||
+                            user.userCode ||
+                            user.driverCode ||
+                            "—"}
+                        </div>
+                      </td>
+
                       <td className="px-6 py-4">
                         <div className={`font-medium ${theme.cellPrimary}`}>
                           {user.name || "—"}

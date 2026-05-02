@@ -4,16 +4,16 @@ import { View, Alert, Vibration, StyleSheet, Text } from "react-native";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { collection, query, where, getDocs } from "firebase/firestore";
-import { db } from "../../firebase";
+import { db } from "../firebase";
 
 // Import Custom Components
-import PermissionRequest from "../../components/scanner/PermissionRequest";
-import ScannerOverlay from "../../components/scanner/ScannerOverlay";
-import ManualEntryModal from "../../components/scanner/ManualEntryModal";
-import PackageActionModal from "../../components/checker/shipment-details/PackageActionModal"; // ✅ New Import
-import ShipmentInfoModal from "../../components/checker/shipment-details/ShipmentInfoModal";
-import { updateShipmentPackages } from "../../components/utilities/FirebaseFunctions";
-import { getCurrentLocationSafe } from "../../components/utilities/helpers";
+import PermissionRequest from "../components/scanner/PermissionRequest";
+import ScannerOverlay from "../components/scanner/ScannerOverlay";
+import ManualEntryModal from "../components/scanner/ManualEntryModal";
+import PackageActionModal from "../components/checker/shipment-details/PackageActionModal"; // ✅ New Import
+import ShipmentInfoModal from "../components/checker/shipment-details/ShipmentInfoModal";
+import { updateShipmentPackages } from "../components/utilities/FirebaseFunctions";
+import { getCurrentLocationSafe } from "../components/utilities/helpers";
 
 export default function ScannerScreen() {
   const router = useRouter();

@@ -79,9 +79,8 @@ export default function TripDetailsScreen() {
     return () => unsub();
   }, [tripId, router]);
 
-  const isReadyToStart =
-    trip?.status === "LOADED" || trip?.status === "ASSIGNED";
-
+  const isReadyToStart = trip?.status === "LOADED";
+  const hasLockedManifest = trip?.manifestLocked === true && !!trip?.manifestId;
   const isDriving = trip?.status === "IN_TRANSIT";
   const isArrived = trip?.status === "ARRIVED";
   const isCompleted = trip?.status === "COMPLETED";
@@ -95,7 +94,9 @@ export default function TripDetailsScreen() {
   }, [isChecker, isDriver, role]);
 
   const canViewShipments = !!trip && !isCompleted;
-  const canDriverStartTrip = isDriver && isReadyToStart;
+  const canDriverStartTrip = isDriver && isReadyToStart && hasLockedManifest;
+  const shouldShowManifestLockNotice =
+    isDriver && isReadyToStart && !hasLockedManifest;
   const canDriverReportDelay = isDriver && isDriving && !isDelayed;
   const canDriverClearDelay = isDriver && isDelayed;
   const canDriverMarkArrived = isDriver && isDriving;
@@ -137,6 +138,14 @@ export default function TripDetailsScreen() {
   };
 
   const handleStartTrip = async () => {
+    if (!hasLockedManifest) {
+      Alert.alert(
+        "Manifest Required",
+        "This trip can only be started after its manifest has been locked.",
+      );
+      return;
+    }
+
     Alert.alert(
       "Start Trip",
       "Are you sure you want to start the route? This will mark all shipment with packages as In Transit.",
@@ -341,11 +350,36 @@ export default function TripDetailsScreen() {
 
         <TripProgressStepper currentStatus={trip.status} />
 
+        {shouldShowManifestLockNotice && (
+          <View style={styles.manifestNoticeCard}>
+            <View style={styles.manifestNoticeIconWrap}>
+              <FontAwesome5 name="lock" size={14} color="#92400e" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.manifestNoticeTitle}>
+                Locked manifest required
+              </Text>
+              <Text style={styles.manifestNoticeText}>
+                Start Trip will be available after an admin or manager locks the
+                trip manifest.
+              </Text>
+            </View>
+          </View>
+        )}
+
         <TripStatusRow
           totalShipments={
-            trip.loadedCount ?? trip.totalShipments ?? trip.shipmentCount ?? 0
+            trip.totalItems ??
+            // trip.totalShipments ??
+            // trip.shipmentCount ??
+            // trip.shipmentsCount ??
+            0
           }
           totalPackages={trip.totalItems ?? 0}
+          loaded={trip.totalLoaded ?? trip.loadedCount ?? 0}
+          pending={trip.itemPending ?? trip.pendingCount ?? 0}
+          arrived={trip.totalArrived ?? 0}
+          delivered={trip.totalDelivered ?? 0}
         />
 
         {isChecker && (
@@ -603,6 +637,40 @@ const styles = StyleSheet.create({
   checkerInfoText: {
     marginTop: 3,
     color: "#0369a1",
+    fontSize: 12,
+    lineHeight: 18,
+  },
+
+  manifestNoticeCard: {
+    marginBottom: 16,
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 12,
+    padding: 14,
+    borderRadius: 12,
+    backgroundColor: "#fffbeb",
+    borderWidth: 1,
+    borderColor: "#fde68a",
+  },
+
+  manifestNoticeIconWrap: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: "#fef3c7",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  manifestNoticeTitle: {
+    color: "#92400e",
+    fontSize: 13,
+    fontWeight: "700",
+  },
+
+  manifestNoticeText: {
+    marginTop: 3,
+    color: "#a16207",
     fontSize: 12,
     lineHeight: 18,
   },

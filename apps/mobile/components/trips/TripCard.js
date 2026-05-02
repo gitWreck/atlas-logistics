@@ -7,9 +7,9 @@ import {
   Platform,
 } from "react-native";
 import { FontAwesome5 } from "@expo/vector-icons";
-import { COLORS } from "../../components/constants/theme"; // Adjust path
+import { COLORS } from "../constants/theme"; // Adjust path
 import { getFormattedTime } from "../utilities/helpers";
-import StatusBadge from "../../components/ui/figma/StatusBadge"; // Adjust path
+import StatusBadge from "../ui/figma/StatusBadge"; // Adjust path
 
 const TripCard = ({ trip, onPress }) => {
   console.log("trip details: ", trip);

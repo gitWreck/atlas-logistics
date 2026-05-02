@@ -43,6 +43,7 @@ export default function AddUserModal({
   const [formData, setFormData] = useState(INITIAL_FORM_STATE);
   const [cities, setCities] = useState([]);
   const [showPassword, setShowPassword] = useState(false);
+  const [createdUser, setCreatedUser] = useState(null);
 
   const theme = getModalThemeClasses(isDark);
   const action = getModalActionClasses();
@@ -116,10 +117,12 @@ export default function AddUserModal({
     setError("");
 
     try {
-      await createUserProfile(formData);
+      const result = await createUserProfile(formData);
+      setCreatedUser(result.data || null);
       setStep("SUCCESS");
       onSuccess?.();
     } catch (err) {
+      setCreatedUser(null);
       setError(err.message || "Failed to create user.");
       setStep("FORM");
     }
@@ -129,6 +132,7 @@ export default function AddUserModal({
     setStep("FORM");
     setError("");
     setShowPassword(false);
+    setCreatedUser(null);
     setFormData(INITIAL_FORM_STATE);
     onClose?.();
   };
@@ -389,6 +393,9 @@ export default function AddUserModal({
                 {formData.displayName}
               </p>
               <p>{formData.email}</p>
+              <p className={`mt-2 text-xs ${theme.helperText}`}>
+                A 9-digit system ID will be generated automatically.
+              </p>
 
               {formData.role === "customer" && (
                 <p className={`mt-2 text-xs italic ${theme.helperText}`}>
@@ -440,6 +447,21 @@ export default function AddUserModal({
             <h4 className={`text-xl font-bold mb-6 ${theme.title}`}>
               Success!
             </h4>
+
+            {createdUser?.publicId && (
+              <div
+                className={`mb-6 rounded-xl border px-4 py-3 ${theme.header}`}
+              >
+                <p
+                  className={`text-[10px] font-black uppercase tracking-widest ${theme.helperText}`}
+                >
+                  Assigned ID
+                </p>
+                <p className={`text-2xl font-black ${theme.title}`}>
+                  {createdUser.publicId}
+                </p>
+              </div>
+            )}
 
             <button
               type="button"

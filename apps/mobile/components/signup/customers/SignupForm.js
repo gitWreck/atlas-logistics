@@ -222,7 +222,7 @@ export default function SignupForm({
 }
 
 const styles = StyleSheet.create({
-  formContainer: { gap: 4 },
+  formContainer: { gap: 2 },
   sectionHeader: {
     marginTop: 16,
     marginBottom: 8,
@@ -230,7 +230,7 @@ const styles = StyleSheet.create({
     borderTopColor: "#e2e8f0",
     paddingTop: 16,
   },
-  sectionTitle: { fontSize: 16, fontWeight: "700", color: "#0f172a" },
+  sectionTitle: { fontSize: 16, fontWeight: "800", color: "#0f172a" },
 
   // Custom Dropdown Button Styles
   dropdownContainer: { marginBottom: 12 },
@@ -245,14 +245,19 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
     borderWidth: 1,
-    borderColor: "#cbd5e1",
-    borderRadius: 8,
-    backgroundColor: "#fff",
+    borderColor: "#e2e8f0",
+    borderRadius: 14,
+    backgroundColor: "#f8fafc",
     paddingHorizontal: 16,
     height: 50,
   },
-  dropdownDisabled: { backgroundColor: "#f1f5f9" },
-  dropdownButtonText: { fontSize: 15, color: "#0f172a", flex: 1 },
+  dropdownDisabled: { backgroundColor: "#f1f5f9", opacity: 0.75 },
+  dropdownButtonText: {
+    fontSize: 15,
+    color: "#0f172a",
+    flex: 1,
+    fontWeight: "600",
+  },
   placeholderText: { color: "#94a3b8" },
 
   // Modal Styles
@@ -263,7 +268,7 @@ const styles = StyleSheet.create({
   },
   backdrop: { ...StyleSheet.absoluteFillObject },
   modalContent: {
-    backgroundColor: "#fff",
+    backgroundColor: "#ffffff",
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     maxHeight: "80%", // Prevents list from taking up the entire screen

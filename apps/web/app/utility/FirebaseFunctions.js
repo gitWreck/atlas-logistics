@@ -114,6 +114,7 @@ export const updateInvoiceStatus = httpsCallable(
 
 // ADMIN
 export const createUserProfile = httpsCallable(functions, "createUserProfile");
+export const ensureUserPublicId = httpsCallable(functions, "ensureUserPublicId");
 export const toggleUserStatus = httpsCallable(functions, "toggleUserStatus");
 export const updateUserProfile = httpsCallable(functions, "updateUserProfile");
 

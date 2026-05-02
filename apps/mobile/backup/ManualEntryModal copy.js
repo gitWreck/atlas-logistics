@@ -9,7 +9,7 @@ import {
   Platform,
   StyleSheet,
 } from "react-native";
-import { db } from "../../firebase";
+import { db } from "../firebase";
 import { collection, query, where, getDocs } from "firebase/firestore";
 
 export default function ManualEntryModal({ visible, onClose, onSubmit }) {

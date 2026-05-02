@@ -1,17 +1,40 @@
 import React from "react";
 import { View, Text, StyleSheet, Platform } from "react-native";
 
-const TripStatusRow = ({ totalShipments, totalPackages }) => {
+const TripStatusRow = ({
+  totalShipments = 0,
+  totalPackages = 0,
+  loaded = 0,
+  pending = 0,
+  arrived = 0,
+  delivered = 0,
+}) => {
+  const stats = [
+    { label: "Packages", value: totalShipments },
+    // { label: "Packages", value: totalPackages },
+    { label: "Loaded", value: loaded, accent: "#10b981" },
+    {
+      label: delivered > 0 ? "Delivered" : arrived > 0 ? "Arrived" : "Pending",
+      value: delivered > 0 ? delivered : arrived > 0 ? arrived : pending,
+      accent: delivered > 0 || arrived > 0 ? "#3b82f6" : "#f59e0b",
+    },
+  ];
+
   return (
     <View style={styles.statsRow}>
-      {/* <View style={styles.statBox}>
-        <Text style={styles.statLabel}>Total Shipments</Text>
-        <Text style={styles.statNumber}>{totalShipments}</Text>
-      </View> */}
-      <View style={styles.statBox}>
-        <Text style={styles.statLabel}>Total Items</Text>
-        <Text style={styles.statNumber}>{totalPackages}</Text>
-      </View>
+      {stats.map((stat) => (
+        <View key={stat.label} style={styles.statBox}>
+          <Text style={styles.statLabel}>{stat.label}</Text>
+          <Text
+            style={[
+              styles.statNumber,
+              stat.accent ? { color: stat.accent } : null,
+            ]}
+          >
+            {stat.value}
+          </Text>
+        </View>
+      ))}
     </View>
   );
 };
@@ -21,11 +44,12 @@ export default TripStatusRow;
 const styles = StyleSheet.create({
   statsRow: {
     flexDirection: "row",
+    flexWrap: "wrap",
     gap: 12,
     marginBottom: 24,
   },
   statBox: {
-    flex: 1,
+    width: "48%",
     backgroundColor: "#ffffff",
     paddingHorizontal: 16,
     paddingVertical: 12,
@@ -44,10 +68,13 @@ const styles = StyleSheet.create({
   },
   statLabel: {
     fontSize: 12,
+    color: "#6b7280",
+    fontWeight: "600",
     marginBottom: 4,
   },
   statNumber: {
     fontSize: 18,
     color: "#111827",
+    fontWeight: "800",
   },
 });
