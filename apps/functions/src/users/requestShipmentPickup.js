@@ -10,6 +10,80 @@ const { Timestamp } = admin.firestore;
 if (!admin.apps.length) admin.initializeApp();
 const db = admin.firestore();
 
+function normalizePhone(value = "") {
+  const digits = String(value || "").replace(/[^\d]/g, "");
+  if (digits.length === 11 && digits.startsWith("0")) {
+    return `63${digits.slice(1)}`;
+  }
+  if (digits.length === 10 && digits.startsWith("9")) {
+    return `63${digits}`;
+  }
+  return digits;
+}
+
+function phoneVariants(value = "") {
+  const normalized = normalizePhone(value);
+  const variants = new Set();
+  if (normalized) variants.add(normalized);
+  if (normalized.startsWith("63") && normalized.length === 12) {
+    variants.add(`0${normalized.slice(2)}`);
+  }
+  return [...variants].slice(0, 10);
+}
+
+function normalizeAddress(address = {}) {
+  return {
+    unit: address.unit || "",
+    street: address.street || "",
+    barangay: address.barangay || "",
+    city: address.city || "",
+    province: address.province || "",
+  };
+}
+
+function formatAddress(address = {}) {
+  return [
+    address.unit,
+    address.street,
+    address.barangay,
+    address.city,
+    address.province,
+  ]
+    .map((value) => String(value || "").trim())
+    .filter(Boolean)
+    .join(", ");
+}
+
+function getPublicUserId(user = {}, fallback = null) {
+  return (
+    user.userId ||
+    user.publicId ||
+    user.userCode ||
+    user.driverCode ||
+    fallback ||
+    null
+  );
+}
+
+async function findCustomerByPhone(phone) {
+  const variants = phoneVariants(phone);
+  if (!variants.length) return null;
+
+  const snap = await db
+    .collection("users")
+    .where("phoneNumber", "in", variants)
+    .limit(1)
+    .get();
+
+  if (snap.empty) return null;
+
+  const userDoc = snap.docs[0];
+  const data = userDoc.data() || {};
+  if (data.role && data.role !== "customer") return null;
+
+  return { uid: userDoc.id, ...data };
+}
+
 exports.requestShipmentPickup = onCall(
   {
     region: "asia-southeast1",
@@ -58,10 +132,22 @@ exports.requestShipmentPickup = onCall(
     // 2. STATUS & CODES (Hardcoded for Customer Pickup Requests)
     const initialStatus = "PENDING_PICKUP";
     const initialNote = "Requested for Pickup by Customer";
+    const uid = request.auth.uid;
+    const userSnap = await db.collection("users").doc(uid).get();
+    const userData = userSnap.exists ? userSnap.data() || {} : {};
+    const senderAddress = normalizeAddress(sender);
+    const recipientAddress = normalizeAddress(recipient);
+    const senderPhone = normalizePhone(sender.phone || userData.phoneNumber);
+    const recipientPhone = normalizePhone(recipient.phone);
+    const recipientCustomer = await findCustomerByPhone(recipientPhone);
+    const recipientUid = recipient.uid || recipientCustomer?.uid || null;
+    const shipmentVisibilityUserIds = [
+      ...new Set([uid, recipientUid].filter(Boolean).map(String)),
+    ];
 
-    const originCity = sender.city || sender.details?.city || "Unknown";
-    const destCity = recipient.city || recipient.details?.city || "Unknown";
-    const originSummary = `${originCity}, ${sender.province || sender.details?.province || ""}`;
+    const originCity = senderAddress.city || "Unknown";
+    const destCity = recipientAddress.city || "Unknown";
+    const originSummary = `${originCity}, ${senderAddress.province || ""}`;
 
     // Default to GEN since customers don't know routing codes
     const finalOriginCode = "GEN";
@@ -95,10 +181,12 @@ exports.requestShipmentPickup = onCall(
         const pkgId = `${shipmentId}-${seqNum}`;
 
         packagesArray.push({
+          packageId: pkgId,
           trackingNumber: pkgId,
           sequence: globalSeq,
           description: item.description || "Bundled Cargo",
           quantity: qty, // Stores internal piece count
+          packagingGroup: "BULK",
           packagingType: pkgType,
           declaredValue: Number(item.declaredValue) || 0,
           isFragile: Boolean(item.isFragile),
@@ -107,6 +195,8 @@ exports.requestShipmentPickup = onCall(
           currentLocation: originSummary,
           loadedOnTrip: null,
           isDelayed: false,
+          updatedAt: new Date().toISOString(),
+          updatedBy: uid,
         });
 
         packageBarcodes.push(pkgId);
@@ -118,10 +208,12 @@ exports.requestShipmentPickup = onCall(
           const pkgId = `${shipmentId}-${seqNum}`;
 
           packagesArray.push({
+            packageId: pkgId,
             trackingNumber: pkgId,
             sequence: globalSeq,
             description: item.description || "Standard Package",
             quantity: 1, // 1 unit per physical box
+            packagingGroup: "SINGLE",
             packagingType: pkgType,
             declaredValue: (Number(item.declaredValue) || 0) / qty, // Split value evenly
             isFragile: Boolean(item.isFragile),
@@ -130,6 +222,8 @@ exports.requestShipmentPickup = onCall(
             currentLocation: originSummary,
             loadedOnTrip: null,
             isDelayed: false,
+            updatedAt: new Date().toISOString(),
+            updatedBy: uid,
           });
 
           packageBarcodes.push(pkgId);
@@ -144,22 +238,31 @@ exports.requestShipmentPickup = onCall(
 
     // 5. CREATE SHIPMENT (Parent Document)
     batch.set(shipmentRef, {
+      shipmentId,
       trackingNumber: shipmentId,
+      currentTripId: null,
       currentTruckTripId: null,
+      visibilityUserIds: shipmentVisibilityUserIds,
+      createdSource: "mobile_pickup",
 
       sender: {
-        name: sender.name,
-        phone: sender.phone,
-        address: sender,
-        formattedAddress:
-          `${sender.unit || ""} ${sender.street || ""}, ${sender.barangay || ""}, ${originCity}, ${sender.province || ""}`.trim(),
+        uid,
+        userId: getPublicUserId(sender, getPublicUserId(userData)),
+        name: sender.name || userData.name || "",
+        phone: senderPhone,
+        address: senderAddress,
+        formattedAddress: formatAddress(senderAddress),
       },
       recipient: {
-        name: recipient.name,
-        phone: recipient.phone,
-        address: recipient,
-        formattedAddress:
-          `${recipient.unit || ""} ${recipient.street || ""}, ${recipient.barangay || ""}, ${destCity}, ${recipient.province || ""}`.trim(),
+        uid: recipientUid,
+        userId: getPublicUserId(
+          recipient,
+          getPublicUserId(recipientCustomer),
+        ),
+        name: recipient.name || "",
+        phone: recipientPhone,
+        address: recipientAddress,
+        formattedAddress: formatAddress(recipientAddress),
       },
 
       origin: originCity,
@@ -169,7 +272,8 @@ exports.requestShipmentPickup = onCall(
 
       createdAt: nowAt,
       updatedAt: nowAt,
-      createdBy: request.auth.uid, // The customer's UID
+      createdBy: uid,
+      updatedBy: uid,
 
       status: initialStatus,
       statusHistory: [
@@ -200,25 +304,13 @@ exports.requestShipmentPickup = onCall(
       packageBarcodes: packageBarcodes,
     });
 
-    // 6. AUTO-TRACK FOR CUSTOMER
-    // Automatically link this shipment to the customer's tracked list so it shows up on their dashboard immediately
-    const userTrackingRef = db
-      .collection("users")
-      .doc(request.auth.uid)
-      .collection("tracked_shipments")
-      .doc(shipmentId);
-    batch.set(userTrackingRef, {
-      trackingNumber: shipmentId,
-      createdAt: nowAt,
-    });
-
     // 7. AUDIT LOGGING
     batch.set(db.collection("admin_logs").doc(), {
       action: "CUSTOMER_REQUESTED_PICKUP",
-      trackingDocId: shipmentRef.id,
-      trackingNumber: shipmentId,
+      trackingShipmentId: shipmentRef.id,
+      shipmentId: shipmentId,
       totalUnits: packagesArray.length,
-      actorId: request.auth.uid,
+      actorId: uid,
       createdAt: nowAt,
     });
 
@@ -229,9 +321,9 @@ exports.requestShipmentPickup = onCall(
       if (notifySms) {
         sendShipmentPickup({
           shipmentId,
-          senderPhone: sender.phone,
-          recipientPhone: recipient.phone,
-          actorUid: request.auth.uid,
+          senderPhone,
+          recipientPhone,
+          actorUid: uid,
         }).catch((err) => console.error("[SMS_ERROR]", err));
       }
 

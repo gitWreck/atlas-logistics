@@ -5,6 +5,7 @@ import {
   Platform,
   ScrollView,
   StyleSheet,
+  StatusBar as RNStatusBar,
   View,
 } from "react-native";
 import { useRouter } from "expo-router";
@@ -221,38 +222,40 @@ export default function CustomerSignupScreen() {
         <SignupHeader onBack={() => router.back()} />
 
         {/* Form Component */}
-        <SignupForm
-          fullName={formData.fullName}
-          email={formData.email}
-          password={formData.password}
-          confirmPassword={formData.confirmPassword}
-          phoneNumber={formData.phoneNumber}
-          onFullNameChange={(v) => handleChange("fullName", v)}
-          onEmailChange={(v) => handleChange("email", v)}
-          onPasswordChange={(v) => handleChange("password", v)}
-          onConfirmPasswordChange={(v) => handleChange("confirmPassword", v)}
-          onPhoneChange={(v) => handleChange("phoneNumber", v)}
+        <View style={styles.formCard}>
+          <SignupForm
+            fullName={formData.fullName}
+            email={formData.email}
+            password={formData.password}
+            confirmPassword={formData.confirmPassword}
+            phoneNumber={formData.phoneNumber}
+            onFullNameChange={(v) => handleChange("fullName", v)}
+            onEmailChange={(v) => handleChange("email", v)}
+            onPasswordChange={(v) => handleChange("password", v)}
+            onConfirmPasswordChange={(v) => handleChange("confirmPassword", v)}
+            onPhoneChange={(v) => handleChange("phoneNumber", v)}
           // ✅ NEW: Address Props
-          unit={formData.unit}
-          street={formData.street}
-          barangay={formData.barangay}
-          province={formData.province}
-          city={formData.city}
-          onUnitChange={(v) => handleChange("unit", v)}
-          onStreetChange={(v) => handleChange("street", v)}
-          onBarangayChange={(v) => handleChange("barangay", v)}
-          onProvinceChange={handleProvinceChange} // Uses the special handler to reset city
-          onCityChange={(v) => handleChange("city", v)}
-        />
+            unit={formData.unit}
+            street={formData.street}
+            barangay={formData.barangay}
+            province={formData.province}
+            city={formData.city}
+            onUnitChange={(v) => handleChange("unit", v)}
+            onStreetChange={(v) => handleChange("street", v)}
+            onBarangayChange={(v) => handleChange("barangay", v)}
+            onProvinceChange={handleProvinceChange} // Uses the special handler to reset city
+            onCityChange={(v) => handleChange("city", v)}
+          />
 
         {/* Action Button */}
-        <View style={styles.buttonWrapper}>
-          <GradientButton
-            title="Create Account"
-            onPress={handleSignup}
-            loading={loading}
-            disabled={isDisabled}
-          />
+          <View style={styles.buttonWrapper}>
+            <GradientButton
+              title="Create Account"
+              onPress={handleSignup}
+              loading={loading}
+              disabled={isDisabled}
+            />
+          </View>
         </View>
 
         {/* Footer Component */}
@@ -263,7 +266,23 @@ export default function CustomerSignupScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#FFFFFF" },
-  scrollContainer: { flexGrow: 1, padding: 20 },
-  buttonWrapper: { marginTop: 20 },
+  container: {
+    flex: 1,
+    backgroundColor: "#f8fafc",
+    paddingTop: Platform.OS === "android" ? RNStatusBar.currentHeight || 0 : 0,
+  },
+  scrollContainer: {
+    flexGrow: 1,
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 32,
+  },
+  formCard: {
+    backgroundColor: "#ffffff",
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: "#e2e8f0",
+    padding: 16,
+  },
+  buttonWrapper: { marginTop: 18 },
 });

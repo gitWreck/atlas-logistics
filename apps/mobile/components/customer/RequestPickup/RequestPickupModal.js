@@ -10,10 +10,10 @@ import {
   KeyboardAvoidingView,
   Platform,
   ActivityIndicator,
+  Alert,
 } from "react-native";
 import { FontAwesome5 } from "@expo/vector-icons";
 import { auth } from "../../../firebase";
-import { useRef } from "react";
 
 // We use the logic from your Web InputGroup but adapted for React Native
 import InputGroupMobile from "./InputGroupMobile";
@@ -21,6 +21,24 @@ import ItemSectionMobile from "./ItemSectionMobile";
 
 import { useAuth } from "../../../contexts/AuthContext";
 import MapPickupModal from "./MapPickupModal";
+
+const createEmptyParty = () => ({
+  uid: null,
+  userId: null,
+  name: "",
+  phone: "",
+  unit: "",
+  street: "",
+  barangay: "",
+  province: "",
+  city: "",
+});
+
+const createEmptyItem = () => ({
+  description: "",
+  quantity: "",
+  packagingType: "Box",
+});
 
 export default function RequestPickupModal({
   visible,
@@ -30,32 +48,29 @@ export default function RequestPickupModal({
   userData,
 }) {
   const { user } = useAuth();
-  const mapRef = useRef(null);
 
-  // Initialize Sender with logged-in user info if available
-  const [sender, setSender] = useState({
-    name: user.name,
-    phone: user.phoneNumber,
-    unit: user.address?.unit || "",
-    street: user.address?.street || "",
-    barangay: user.address?.barangay || "",
-    province: user.address?.province || "",
-    city: user.address?.city || "",
+  const getSenderFromProfile = (profile = userData || user || {}) => ({
+    uid: profile?.uid || profile?.id || auth.currentUser?.uid || null,
+    userId:
+      profile?.userId ||
+      profile?.publicId ||
+      profile?.userCode ||
+      profile?.driverCode ||
+      null,
+    name: profile?.name || profile?.displayName || "",
+    phone: profile?.phoneNumber || profile?.phone || "",
+    unit: profile?.address?.unit || "",
+    street: profile?.address?.street || "",
+    barangay: profile?.address?.barangay || "",
+    province: profile?.address?.province || "",
+    city: profile?.address?.city || "",
   });
 
-  const [recipient, setRecipient] = useState({
-    name: "",
-    phone: "",
-    unit: "",
-    street: "",
-    barangay: "",
-    province: "",
-    city: "",
-  });
+  const [sender, setSender] = useState(createEmptyParty);
 
-  const [items, setItems] = useState([
-    { description: "", quantity: "", packaging: "Box" },
-  ]);
+  const [recipient, setRecipient] = useState(createEmptyParty);
+
+  const [items, setItems] = useState(() => [createEmptyItem()]);
   const [remarks, setRemarks] = useState("");
 
   const [location, setLocation] = useState(null);
@@ -63,30 +78,61 @@ export default function RequestPickupModal({
 
   // Auto-fill Sender with User Data on open
   useEffect(() => {
-    if (visible && userData) {
-      setSender({
-        name: userData.name || "",
-        phone: userData.phoneNumber || "",
-        unit: userData.address?.unit || "",
-        street: userData.address?.street || "",
-        barangay: userData.address?.barangay || "",
-        province: userData.address?.province || "",
-        city: userData.address?.city || "",
-      });
+    if (visible) {
+      setSender(getSenderFromProfile());
+    } else {
+      setRecipient(createEmptyParty());
+      setItems([createEmptyItem()]);
+      setRemarks("");
+      setLocation(null);
     }
-  }, [visible, userData]);
+  }, [visible, userData, user]);
 
   const handleAddItem = () => {
-    setItems([...items, { description: "", quantity: "", packaging: "Box" }]);
+    setItems([...items, createEmptyItem()]);
   };
 
   const updateItem = (index, field, val) => {
-    const newItems = [...items];
-    newItems[index][field] = val;
-    setItems(newItems);
+    setItems((currentItems) =>
+      currentItems.map((item, itemIndex) =>
+        itemIndex === index ? { ...item, [field]: val } : item,
+      ),
+    );
   };
 
   const handleFormSubmit = () => {
+    const hasSender =
+      sender.name &&
+      sender.phone &&
+      sender.street &&
+      sender.province &&
+      sender.city;
+    const hasRecipient =
+      recipient.name &&
+      recipient.phone &&
+      recipient.street &&
+      recipient.province &&
+      recipient.city;
+    const hasValidItems = items.every(
+      (item) => item.description && Number(item.quantity) > 0,
+    );
+
+    if (!hasSender || !hasRecipient) {
+      Alert.alert(
+        "Missing Details",
+        "Please complete sender and recipient details before submitting.",
+      );
+      return;
+    }
+
+    if (!hasValidItems) {
+      Alert.alert(
+        "Invalid Items",
+        "Please add a description and quantity for each package item.",
+      );
+      return;
+    }
+
     onSubmit({
       sender,
       recipient,
@@ -149,9 +195,13 @@ export default function RequestPickupModal({
                 onRemove={(idx) => setItems(items.filter((_, i) => i !== idx))}
                 onChange={updateItem}
                 onToggleTag={(idx, tag) => {
-                  const newItems = [...items];
-                  newItems[idx][tag] = !newItems[idx][tag];
-                  setItems(newItems);
+                  setItems((currentItems) =>
+                    currentItems.map((item, itemIndex) =>
+                      itemIndex === idx
+                        ? { ...item, [tag]: !item[tag] }
+                        : item,
+                    ),
+                  );
                 }}
               />
 
@@ -190,7 +240,7 @@ export default function RequestPickupModal({
                     }}
                   >
                     {location
-                      ? "Location Pinned (Tap to Edit) ✓"
+                      ? "Location Pinned (Tap to Edit)"
                       : "Open Map to Pin Location"}
                   </Text>
                 </TouchableOpacity>

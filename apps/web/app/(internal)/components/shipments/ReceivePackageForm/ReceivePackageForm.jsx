@@ -8,6 +8,8 @@ import InputGroup from "./InputGroup";
 import { useAlert } from "@/app/context/AlertContext";
 
 const INITIAL_CONTACT = {
+  uid: null,
+  userId: null,
   name: "",
   phone: "",
   unit: "",
@@ -261,11 +263,24 @@ export default function ReceivePackageForm({
       );
     }
 
+    const normalizeContact = (contact) => ({
+      uid: contact.uid || contact.authUid || null,
+      userId: contact.userId || contact.publicId || null,
+      name: contact.name || "",
+      phone: contact.phone || "",
+      unit: contact.unit || "",
+      street: contact.street || "",
+      barangay: contact.barangay || "",
+      city: contact.city || "",
+      province: contact.province || "",
+      code: contact.code || "",
+    });
+
     // "Emit" the data to the Unified Modal state
     onNext({
       routeInfo,
-      sender,
-      recipient,
+      sender: normalizeContact(sender),
+      recipient: normalizeContact(recipient),
       items,
       remarks,
       imageFiles, // <--- PASS FILES TO PARENT

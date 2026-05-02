@@ -1,5 +1,5 @@
 import {
-  View,
+  SafeAreaView,
   StyleSheet,
   Platform,
   StatusBar as RNStatusBar,
@@ -26,7 +26,7 @@ export default function CheckerTabsLayout() {
   };
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container}>
       {/* ✅ SHARED HEADER FOR ALL TAB SCREENS */}
       <CheckerHeader
         userName={user?.name || user?.fullName || "Checker"}
@@ -74,7 +74,7 @@ export default function CheckerTabsLayout() {
           }}
         />
       </Tabs>
-    </View>
+    </SafeAreaView>
   );
 }
 

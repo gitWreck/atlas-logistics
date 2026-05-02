@@ -4,28 +4,27 @@ import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
 import { FontAwesome5 } from "@expo/vector-icons";
 
 export default function ProfileHeader({ user, onLogout }) {
-  // Config based on role
   const roleConfig = {
     customer: {
       icon: "user",
-      color: "#16a34a", // Green
+      color: "#16a34a",
       bg: "#f0fdf4",
-      subtitle: user?.address 
-        ? `${user.address.city}, ${user.address.province}` 
-        : "Customer Account"
+      subtitle: user?.address
+        ? `${user.address.city}, ${user.address.province}`
+        : "Customer Account",
     },
     driver: {
       icon: "truck",
-      color: "#9333ea", // Purple
+      color: "#9333ea",
       bg: "#faf5ff",
-      subtitle: "Active Driver"
+      subtitle: "Active Driver",
     },
     checker: {
       icon: "user-check",
-      color: "#3b82f6", // Blue
+      color: "#3b82f6",
       bg: "#eff6ff",
-      subtitle: user?.warehouseName || "Warehouse Checker"
-    }
+      subtitle: user?.warehouseName || "Warehouse Checker",
+    },
   };
 
   const config = roleConfig[user?.role] || roleConfig.checker;
@@ -34,14 +33,18 @@ export default function ProfileHeader({ user, onLogout }) {
     <View style={styles.header}>
       <View style={styles.profileInfo}>
         <View style={[styles.avatar, { backgroundColor: config.bg }]}>
-          <FontAwesome5 name={config.icon} size={18} color={config.color} />
+          <FontAwesome5 name={config.icon} size={15} color={config.color} />
         </View>
-        <View>
-          <Text style={styles.username}>{user?.name || "Guest User"}</Text>
-          <Text style={styles.subtitle}>{config.subtitle}</Text>
+        <View style={styles.textBlock}>
+          <Text style={styles.title} numberOfLines={1}>
+            {user?.name || "Guest User"}
+          </Text>
+          <Text style={styles.subtitle} numberOfLines={1}>
+            {config.subtitle}
+          </Text>
         </View>
       </View>
-      
+
       <TouchableOpacity style={styles.logoutBtn} onPress={onLogout}>
         <FontAwesome5 name="sign-out-alt" size={16} color="#ef4444" />
         <Text style={styles.logoutText}>Logout</Text>
@@ -56,30 +59,40 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
     paddingHorizontal: 20,
-    paddingVertical: 20,
+    paddingTop: 10,
+    paddingBottom: 15,
     backgroundColor: "#ffffff",
     borderBottomWidth: 1,
-    borderBottomColor: "#f1f5f9",
+    borderBottomColor: "#e2e8f0",
+    gap: 12,
   },
-  profileInfo: { flexDirection: "row", alignItems: "center", gap: 12 },
+  profileInfo: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+  },
   avatar: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: "#e2e8f0",
     alignItems: "center",
     justifyContent: "center",
   },
-  username: { 
-    color: "#0f172a", 
-    fontWeight: "700", 
-    fontSize: 18, 
-    letterSpacing: -0.5 
+  textBlock: {
+    flex: 1,
+    marginLeft: 12,
   },
-  subtitle: { 
-    color: "#64748b", 
-    fontSize: 12, 
-    fontWeight: "500", 
-    marginTop: 2 
+  title: {
+    color: "#0f172a",
+    fontWeight: "700",
+    fontSize: 16,
+  },
+  subtitle: {
+    color: "#64748b",
+    fontSize: 12,
+    marginTop: 2,
   },
   logoutBtn: {
     flexDirection: "row",

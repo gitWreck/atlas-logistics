@@ -6,6 +6,8 @@ import {
   ScrollView,
   ActivityIndicator,
   Alert,
+  Platform,
+  StatusBar as RNStatusBar,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { doc, getDoc } from "firebase/firestore";
@@ -22,13 +24,13 @@ import {
   sendManualSMS,
 } from "../utilities/FirebaseFunctions";
 
-import ShipmentDetailHeader from "../driver/shipment/ShipmentDetailHeader";
-import ShipmentHeaderCard from "../driver/shipment/ShipmentHeaderCard";
-import ShipmentActionFooter from "../driver/shipment/ShipmentActionFooter";
+import ShipmentDetailHeader from "./ShipmentDetailHeader";
+import ShipmentHeaderCard from "./ShipmentHeaderCard";
+import ShipmentActionFooter from "./ShipmentActionFooter";
 
-import ReportIssueModal from "../driver/shipment/ReportIssueModal";
+import ReportIssueModal from "./modals/ReportIssueModal";
 
-import PhotoUploadSection from "../driver/shipment/PhotoUploadSection";
+import PhotoUploadSection from "./PhotoUploadSection";
 import ExistingProofsViewer from "../tracking/ExistingProofsViewer";
 
 import ShipmentPackagesPanel from "./details/ShipmentPackagesPanel";
@@ -419,7 +421,11 @@ export default function ShipmentDetailsScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#f1f5f9" },
+  container: {
+    flex: 1,
+    backgroundColor: "#f1f5f9",
+    paddingTop: Platform.OS === "android" ? RNStatusBar.currentHeight || 0 : 0,
+  },
   center: { flex: 1, justifyContent: "center", alignItems: "center" },
   scrollContent: {
     paddingHorizontal: 20,

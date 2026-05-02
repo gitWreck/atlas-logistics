@@ -30,11 +30,11 @@ import { db } from "../../firebase";
 import { useAuth } from "../../contexts/AuthContext.js";
 
 import ShipmentCard from "../shipments/ShipmentCard";
-import ShipmentFilterModal from "../driver/shipment/ShipmentFilterModal";
+import ShipmentFilterModal from "../shipments/modals/ShipmentFilterModal";
 
-import TripDetailsHeader from "../checker/trip-details/TripDetailsHeader";
-import ShipmentActionModal from "../checker/trip-details/ShipmentActionModal";
-import ShipmentControlsModal from "../checker/trip-details/ShipmentControlsModal";
+import TripDetailsHeader from "../trips/TripDetailsHeader";
+import ShipmentActionModal from "../shipments/modals/ShipmentActionModal";
+import ShipmentControlsModal from "../shipments/modals/ShipmentControlsModal";
 
 import {
   bulkShipmentAction,

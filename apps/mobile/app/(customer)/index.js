@@ -1,5 +1,12 @@
 import React, { useEffect, useState } from "react";
-import { SafeAreaView, View, Alert, StyleSheet } from "react-native";
+import {
+  SafeAreaView,
+  View,
+  Alert,
+  StyleSheet,
+  Platform,
+  StatusBar as RNStatusBar,
+} from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { useRouter } from "expo-router";
 import { signOut } from "firebase/auth";
@@ -8,8 +15,8 @@ import {
   doc,
   getDoc,
   onSnapshot,
-  orderBy,
   query,
+  where,
 } from "firebase/firestore";
 
 // Firebase & Utils
@@ -24,8 +31,8 @@ import { requestShipmentPickup } from "../../components/utilities/FirebaseFuncti
 
 export default function CustomerDashboard() {
   const router = useRouter();
-  const [trackedShipments, setTrackedShipments] = useState([]);
-  // const [firstName, setFirstName] = useState("");
+  const [shipments, setShipments] = useState([]);
+  const [userData, setUserData] = useState(null);
   const [pickupModalVisible, setPickupModalVisible] = useState(false);
   const [requesting, setRequesting] = useState(false);
 
@@ -39,8 +46,10 @@ export default function CustomerDashboard() {
     getDoc(doc(db, "users", user.uid))
       .then((snap) => {
         if (snap.exists()) {
-          const name = (snap.data().name || "").trim();
-          setFirstName(name.split(/\s+/)[0] || "");
+          const data = snap.data();
+          const name = (data.name || "").trim();
+          setUserData({ id: snap.id, ...data });
+          setUserName(name || auth.currentUser?.displayName || "Customer");
         }
       })
       .catch(() => {});
@@ -55,17 +64,36 @@ export default function CustomerDashboard() {
       setUserName(auth.currentUser.displayName);
     }
 
-    const ref = collection(db, "users", user.uid, "tracked_shipments");
-    const q = query(ref, orderBy("createdAt", "desc"));
+    const ref = collection(db, "shipments");
+    const q = query(
+      ref,
+      where("visibilityUserIds", "array-contains", user.uid),
+    );
 
     const unsubscribe = onSnapshot(
       q,
       (snapshot) => {
-        const items = snapshot.docs.map((docSnap) => ({
-          id: docSnap.id,
-          ...docSnap.data(),
-        }));
-        setTrackedShipments(items);
+        const items = snapshot.docs
+          .map((docSnap) => {
+            const data = docSnap.data();
+            const updatedAt =
+              data.updatedAt?.toDate?.() || data.createdAt?.toDate?.() || null;
+
+            return {
+              id: docSnap.id,
+              ...data,
+              trackingNumber:
+                data.trackingNumber || data.shipmentId || docSnap.id,
+              rawUpdatedAt: data.updatedAt || data.createdAt || null,
+              updatedAt: updatedAt
+                ? updatedAt.toLocaleDateString()
+                : "Recently updated",
+              sortTime: updatedAt ? updatedAt.getTime() : 0,
+            };
+          })
+          .sort((a, b) => b.sortTime - a.sortTime);
+
+        setShipments(items);
       },
       (error) => console.error("Subscription error:", error),
     );
@@ -98,8 +126,6 @@ export default function CustomerDashboard() {
   const handleRequestPickup = async (pickupData) => {
     try {
       setRequesting(true);
-      // We will define this Firebase function later
-      // await createPickupRequest(pickupData);
       await requestShipmentPickup(pickupData);
       setPickupModalVisible(false);
       Alert.alert("Success", "Pickup request submitted successfully!");
@@ -123,12 +149,11 @@ export default function CustomerDashboard() {
 
       <View style={styles.body}>
         <TrackedShipmentList
-          shipments={trackedShipments}
+          shipments={shipments}
           onShipmentPress={handleShipmentPress}
         />
       </View>
 
-      {/* <FloatingAddButton onPress={() => setAddModalVisible(true)} /> */}
       <FloatingAddButton onPress={() => setPickupModalVisible(true)} />
 
       <RequestPickupModal
@@ -136,6 +161,7 @@ export default function CustomerDashboard() {
         onClose={() => setPickupModalVisible(false)}
         onSubmit={handleRequestPickup}
         isSubmitting={requesting}
+        userData={userData}
       />
     </SafeAreaView>
   );
@@ -145,6 +171,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#f1f5f9",
+    paddingTop: Platform.OS === "android" ? RNStatusBar.currentHeight || 0 : 0,
   },
   body: {
     flex: 1,

@@ -97,7 +97,7 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   statCard: {
-    width: "31%", // ✅ ~3 cards per row (with gap)
+    width: "48%",
     backgroundColor: "#ffffff",
     padding: 16,
     borderRadius: 16,

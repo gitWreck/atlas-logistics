@@ -1,12 +1,10 @@
 import React, { useState, useEffect, useCallback } from "react";
 import {
   View,
-  SafeAreaView,
   StyleSheet,
   RefreshControl,
   StatusBar,
   ScrollView,
-  Platform, // <--- ADD THIS
   Alert,
 } from "react-native";
 import { useRouter } from "expo-router";
@@ -97,7 +95,7 @@ export default function CheckerIndex() {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <View style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor="#f1f5f9" />
 
       <ScrollView
@@ -128,7 +126,7 @@ export default function CheckerIndex() {
           onScanInfo={() => goToScan("info", "Information")}
         />
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 }
 
@@ -136,7 +134,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#f1f5f9",
-    paddingTop: Platform.OS === "android" ? StatusBar.currentHeight : 0,
   },
   content: {
     paddingLeft: 20,

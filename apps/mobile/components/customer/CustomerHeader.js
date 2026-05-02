@@ -34,7 +34,7 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
     paddingHorizontal: 20,
-    paddingTop: 60, // Kept your original top padding for notch spacing
+    paddingTop: 16,
     paddingBottom: 12,
     borderBottomWidth: 1,
     borderBottomColor: "#cbd5e1",
@@ -55,7 +55,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   greeting: {
-    color: "#64748b",
+    color: "#475569",
     fontSize: 12,
   },
   username: {
@@ -72,5 +72,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#e2e8f0",
     backgroundColor: "#f8fafc",
+    gap: 6,
   },
 });

@@ -4,7 +4,6 @@ import {
   Text,
   StyleSheet,
   FlatList,
-  SafeAreaView,
   ActivityIndicator,
   TextInput,
   TouchableOpacity,
@@ -26,7 +25,7 @@ import { useAuth } from "../../contexts/AuthContext.js";
 import { COLORS, GLOBAL_STYLES } from "../constants/theme";
 
 import TripCard from "./TripCard.js";
-import TripFilterModal from "../driver/trip/TripFilterModal";
+import TripFilterModal from "./TripFilterModal";
 import {
   CHECKER_TAB_OPTIONS,
   CHECKER_VISIBLE_STATUSES,
@@ -88,9 +87,9 @@ export default function TripScreen() {
           orderBy("updatedAt", "desc"),
         ];
 
-        // if (isChecker) {
-        //   constraints.unshift(where("tripType", "==", "DELIVERY"));
-        // }
+        if (isChecker) {
+          constraints.unshift(where("tripType", "==", "DELIVERY"));
+        }
 
         const tripsQuery = query(collection(db, "truck_trips"), ...constraints);
 
@@ -275,7 +274,7 @@ export default function TripScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <View style={styles.container}>
       <StatusBar style="dark" backgroundColor="#f1f5f9" />
 
       {/* {renderHeader()} */}
@@ -352,7 +351,7 @@ export default function TripScreen() {
         activeFilter={activeStatusFilter}
         onApplyFilter={setActiveStatusFilter}
       />
-    </SafeAreaView>
+    </View>
   );
 }
 
@@ -360,7 +359,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#f1f5f9",
-    // paddingTop: Platform.OS === "android" ? RNStatusBar.currentHeight || 0 : 0,
   },
 
   tabsContainer: {

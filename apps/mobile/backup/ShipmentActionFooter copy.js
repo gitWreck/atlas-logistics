@@ -9,7 +9,7 @@ import {
   Dimensions,
 } from "react-native";
 import { FontAwesome5 } from "@expo/vector-icons";
-import GradientButton from "../../ui/figma/GradientButton";
+import GradientButton from "../components/ui/figma/GradientButton";
 
 const { height: SCREEN_HEIGHT } = Dimensions.get("window");
 

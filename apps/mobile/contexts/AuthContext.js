@@ -2,6 +2,7 @@ import React, { createContext, useContext, useEffect, useState } from "react";
 import { onAuthStateChanged, signOut as firebaseSignOut } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
 import { auth, db } from "../firebase";
+import { ensureUserPublicId } from "../components/utilities/FirebaseFunctions";
 
 const ALLOWED_ROLES = ["checker", "driver", "customer"];
 
@@ -26,6 +27,12 @@ export function AuthProvider({ children }) {
       }
 
       try {
+        try {
+          await ensureUserPublicId();
+        } catch (idError) {
+          console.warn("AuthContext: public ID sync skipped", idError);
+        }
+
         const userDocRef = doc(db, "users", firebaseUser.uid);
         const userDoc = await getDoc(userDocRef);
 
@@ -34,7 +41,6 @@ export function AuthProvider({ children }) {
           const r = (userData.role ?? "").toString().toLowerCase();
 
           setRole(r);
-          // ✅ MERGE: Combine Auth UID/Email with all Firestore details
           setUser({
             uid: firebaseUser.uid,
             email: firebaseUser.email,
@@ -92,7 +98,7 @@ export function AuthProvider({ children }) {
     isDriver,
     isCustomer,
     signOut,
-    refreshUser, // ✅ Exported so ProfileViewer can trigger a refresh
+    refreshUser,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

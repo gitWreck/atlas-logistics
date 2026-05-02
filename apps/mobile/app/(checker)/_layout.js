@@ -5,8 +5,6 @@ import AuthGuard from "../../components/auth/AuthGuard"; // Adjust path
 export default function CheckerStackLayout() {
   return (
     <AuthGuard role="checker" loaderColor="#3b82f6">
-      <StatusBar style="light" backgroundColor="#0f172a" />
-
       <Stack
         screenOptions={{
           headerShown: false,

@@ -21,6 +21,8 @@ if (!admin.apps.length) {
 // admin actions
 exports.createUserProfile =
   require("./src/users/createUserProfile").createUserProfile;
+exports.ensureUserPublicId =
+  require("./src/users/createUserProfile").ensureUserPublicId;
 exports.updateUserProfile =
   require("./src/users/updateUserProfile").updateUserProfile;
 exports.toggleUserStatus =
@@ -41,10 +43,12 @@ exports.verifyRecoveryOTP = require("./src/users/recovery").verifyRecoveryOTP;
 // ------------------------------------------
 
 // packages
-exports.createShipmentBundle =
-  require("./src/shipments/createShipmentBundle").createShipmentBundle;
-exports.createShipmentWithPackages =
-  require("./src/shipments/createShipmentWithPackages").createShipmentWithPackages;
+exports.createShipment =
+  require("./src/shipments/createShipment").createShipment;
+// exports.createShipmentBundle =
+//   require("./src/shipments/createShipmentBundle").createShipmentBundle;
+// exports.createShipmentWithPackages =
+//   require("./src/shipments/createShipmentWithPackages").createShipmentWithPackages;
 exports.updateShipmentStatus =
   require("./src/shipments/updateShipmentStatus").updateShipmentStatus;
 exports.updatePackageStatus =
