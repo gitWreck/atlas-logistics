@@ -2,7 +2,10 @@
 
 const { onRequest } = require("firebase-functions/v2/https");
 const admin = require("firebase-admin");
-const { stableStringify, sha256Hex } = require("../utilities/helpers");
+const {
+  stableStringify,
+  sha256Hex,
+} = require("../../../../../../atlas-trucking-platform/apps/functions/src/utilities/helpers");
 
 // 1. Initialize CORS Middleware
 // origin: true = Allow everyone (easiest for debugging)
@@ -76,7 +79,7 @@ exports.verifyTripManifest = onRequest(
 
         const payloadToHash = {
           manifestId: data.manifestId,
-          tripDocId: data.tripDocId,
+          tripId: data.tripId,
           // Status is NOT part of the hash usually, but if you included it in generation, include it here.
           // Based on previous code, we hashed the 'payload' object BEFORE adding 'hash' or 'createdAt'.
 
@@ -106,8 +109,8 @@ exports.verifyTripManifest = onRequest(
 
           // shipments: data.shipments, // This is the detailed array
           shipments: data.shipments.map((s) => ({
-            trackingDocId: s.trackingDocId,
-            trackingNumber: s.trackingNumber,
+            trackingShipmentId: s.trackingShipmentId,
+            shipmentId: s.shipmentId,
             route: s.route ?? null,
             senderName: s.senderName ?? null,
             receiverName: s.receiverName ?? null,
@@ -140,14 +143,14 @@ exports.verifyTripManifest = onRequest(
         // Check if the LIVE trip data still matches the SNAPSHOT
         let drift = { hasDrift: false, details: [] };
 
-        if (data.tripDocId) {
-          const tripRef = db.collection("truck_trips").doc(data.tripDocId);
+        if (data.tripId) {
+          const tripRef = db.collection("truck_trips").doc(data.tripId);
           const tripShipRef = tripRef.collection("trip_shipments");
           const currentSnaps = await tripShipRef.get();
 
           const currentIds = new Set(currentSnaps.docs.map((d) => d.id));
           const manifestIds = new Set(
-            data.shipments.map((s) => s.trackingDocId),
+            data.shipments.map((s) => s.trackingShipmentId),
           );
 
           // Check for Removed Items

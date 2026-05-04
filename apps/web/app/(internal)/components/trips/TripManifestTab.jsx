@@ -21,6 +21,7 @@ import { bulkShipmentAction } from "@/app/utility/FirebaseFunctions";
 import { getTableTheme } from "@/app/utility/constant/theme";
 import { getTableActionClasses } from "@/app/utility/constant/action";
 import { packageLabelUrl } from "@/app/utility/constant/templates";
+import { updatedBy } from "@/app/utility/utilities";
 
 export default function TripManifestTab({
   shipments = [],
@@ -36,6 +37,7 @@ export default function TripManifestTab({
   // add these
   onCreateInvoice,
   onViewInvoice,
+  profile,
 }) {
   const [search, setSearch] = useState("");
   const [selectedIds, setSelectedIds] = useState(new Set());
@@ -106,6 +108,7 @@ export default function TripManifestTab({
         tripId,
         shipmentIds: Array.from(selectedIds),
         action: bulkAction,
+        updatedBy: updatedBy(profile),
       });
 
       setSelectedIds(new Set());

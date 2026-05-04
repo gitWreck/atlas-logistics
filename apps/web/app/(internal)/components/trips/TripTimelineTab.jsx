@@ -8,7 +8,7 @@ import {
   faTimesCircle,
 } from "@fortawesome/free-solid-svg-icons";
 import { formatFirestoreDate } from "@/app/utility/utilities";
-import AssignDriverModal from "../manifests/modals/TripAssignmentModal";
+import TripAssignmentModal from "../manifests/modals/TripAssignmentModal";
 import {
   STEP_HUB_TRANSFER,
   STEP_LOCAL_PICKUP,
@@ -17,7 +17,13 @@ import { InfoCard } from "../ui/InfoCard";
 import { getTimelineThemeClasses } from "@/app/utility/constant/theme";
 import { getTimelineActionClasses } from "@/app/utility/constant/action";
 
-export default function TripTimelineTab({ data, onRefresh, isDark = false }) {
+export default function TripTimelineTab({
+  data,
+  onRefresh,
+  isDark = false,
+  user,
+  profile,
+}) {
   const [isDriverModalOpen, setIsDriverModalOpen] = useState(false);
 
   const theme = getTimelineThemeClasses(isDark);
@@ -162,12 +168,14 @@ export default function TripTimelineTab({ data, onRefresh, isDark = false }) {
         </div>
       </div>
 
-      <AssignDriverModal
+      <TripAssignmentModal
         isOpen={isDriverModalOpen}
         onClose={() => setIsDriverModalOpen(false)}
         trip={data}
         onSuccess={() => onRefresh?.()}
         isDark={isDark}
+        user={user}
+        profile={profile}
       />
     </div>
   );

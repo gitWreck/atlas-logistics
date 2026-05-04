@@ -1,5 +1,6 @@
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const admin = require("firebase-admin");
+const { writeTripActionLog } = require("../utilities/tripLogger");
 
 // Ensure app is initialized
 if (!admin.apps.length) admin.initializeApp();
@@ -46,11 +47,15 @@ exports.disableTruckTrip = onCall(
         cancelledBy: req.auth.uid,
       });
 
-      tx.set(db.collection("admin_logs").doc(), {
+      writeTripActionLog({
+        db,
+        tx,
         action: "DISABLE_TRIP",
         tripDocId,
         reason,
         actorId: req.auth.uid,
+        actorName: req.auth.token?.name || null,
+        actorRole: req.auth.token?.role || null,
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
       });
     });

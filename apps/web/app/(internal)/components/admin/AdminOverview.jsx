@@ -19,8 +19,9 @@ import AddUserModal from "./AddUserModal";
 import EditUserModal from "./EditUserModal";
 import StatusCard from "../ui/StatusCard";
 import UserManagementTable from "./UserManagementTable";
-import DelayApprovalWidget from "../delay/DelayWidget";
+import DelayWidget from "../delay/DelayWidget";
 import RecentAlertsLogs from "../logs/RecentAlertsLogs";
+import RecentAdminLogs from "../logs/RecentAdminLogs";
 import RecentSmsLogs from "../logs/RecentSmsLogs";
 import Statistics from "../statistics/Statistics";
 import { getOverviewThemeClasses } from "@/app/utility/constant/theme";
@@ -216,7 +217,7 @@ export default function AdminOverview({ user, isDark = false }) {
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
-      <DelayApprovalWidget isDark={isDark} />
+      <DelayWidget isDark={isDark} />
 
       <Statistics
         title="Statistics"
@@ -284,6 +285,8 @@ export default function AdminOverview({ user, isDark = false }) {
         <RecentAlertsLogs isDark={isDark} />
         <RecentSmsLogs isDark={isDark} />
       </div>
+
+      <RecentAdminLogs isDark={isDark} />
 
       <AddUserModal
         isOpen={isUserModalOpen}

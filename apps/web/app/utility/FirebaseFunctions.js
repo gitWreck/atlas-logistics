@@ -48,7 +48,14 @@ export const disableTruckTrip = httpsCallable(functions, "disableTruckTrip");
 export const setTruckDelay = httpsCallable(functions, "setTruckDelay");
 export const clearTruckDelay = httpsCallable(functions, "clearTruckDelay");
 export const updateTripStatus = httpsCallable(functions, "updateTripStatus");
-export const resolveDelay = httpsCallable(functions, "resolveDelayReport");
+export const finalizeTripUnloadHandoff = httpsCallable(
+  functions,
+  "finalizeTripUnloadHandoff",
+);
+export const resolveDelayReport = httpsCallable(
+  functions,
+  "resolveDelayReport",
+);
 
 // DRIVERS
 export const assignDriverToTrip = httpsCallable(
@@ -114,7 +121,10 @@ export const updateInvoiceStatus = httpsCallable(
 
 // ADMIN
 export const createUserProfile = httpsCallable(functions, "createUserProfile");
-export const ensureUserPublicId = httpsCallable(functions, "ensureUserPublicId");
+export const ensureUserPublicId = httpsCallable(
+  functions,
+  "ensureUserPublicId",
+);
 export const toggleUserStatus = httpsCallable(functions, "toggleUserStatus");
 export const updateUserProfile = httpsCallable(functions, "updateUserProfile");
 

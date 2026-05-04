@@ -2,6 +2,7 @@
 
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const admin = require("firebase-admin");
+const { writeTripActionLog } = require("../utilities/tripLogger");
 
 if (!admin.apps.length) admin.initializeApp();
 const db = admin.firestore();
@@ -166,10 +167,13 @@ exports.completeTrip = onCall(
         lastUpdatedRole: role,
       });
 
-      tx.set(db.collection("admin_logs").doc(), {
+      writeTripActionLog({
+        db,
+        tx,
         action: "COMPLETE_TRIP",
         tripDocId,
         actorId: uid,
+        actorName: req.auth.token?.name || null,
         actorRole: role,
         totalPackages,
         totalCount,

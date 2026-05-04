@@ -12,11 +12,11 @@ import { createTruckTrip } from "@/app/utility/FirebaseFunctions";
 import { WAREHOUSES } from "@/app/utility/WarehouseData";
 
 // import ScheduleSection from "../CreateTripModal/ScheduleSection";
-import RouteSelector from "./RouteSelector";
-import VehicleDetails from "./VehicleDetails";
+import RouteSelector from "../RouteSelector";
+import VehicleDetails from "../VehicleDetails";
 import { getModalThemeClasses } from "@/app/utility/constant/theme";
 import { getModalActionClasses } from "@/app/utility/constant/action";
-import TripScheduleFields from "./TripScheduleFields";
+import TripScheduleFields from "../TripScheduleFields";
 import { validateTripScheduleFields } from "@/app/utility/tripScheduleHelpers";
 
 const INITIAL_FORM_STATE = {

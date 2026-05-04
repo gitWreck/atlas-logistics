@@ -32,15 +32,44 @@ const INITIAL_FORM_STATE = {
   street: "",
 };
 
+const ROLE_OPTIONS = [
+  { value: "driver", label: "Driver" },
+  { value: "checker", label: "Checker" },
+  { value: "manager", label: "Manager" },
+  { value: "admin", label: "Admin" },
+  { value: "customer", label: "Customer" },
+];
+
+const DEFAULT_ALLOWED_ROLES = ROLE_OPTIONS.map((role) => role.value);
+
+function getInitialFormState(role = "driver") {
+  return {
+    ...INITIAL_FORM_STATE,
+    role,
+  };
+}
+
 export default function AddUserModal({
   isOpen,
   onClose,
   isDark = false,
   onSuccess,
+  initialRole = "driver",
+  allowedRoles = DEFAULT_ALLOWED_ROLES,
+  title = "Add New User",
 }) {
+  const roleOptions = ROLE_OPTIONS.filter((role) =>
+    allowedRoles.includes(role.value),
+  );
+  const defaultRole = roleOptions.some((role) => role.value === initialRole)
+    ? initialRole
+    : roleOptions[0]?.value || "driver";
+
   const [step, setStep] = useState("FORM");
   const [error, setError] = useState("");
-  const [formData, setFormData] = useState(INITIAL_FORM_STATE);
+  const [formData, setFormData] = useState(() =>
+    getInitialFormState(defaultRole),
+  );
   const [cities, setCities] = useState([]);
   const [showPassword, setShowPassword] = useState(false);
   const [createdUser, setCreatedUser] = useState(null);
@@ -133,7 +162,7 @@ export default function AddUserModal({
     setError("");
     setShowPassword(false);
     setCreatedUser(null);
-    setFormData(INITIAL_FORM_STATE);
+    setFormData(getInitialFormState(defaultRole));
     onClose?.();
   };
 
@@ -152,7 +181,7 @@ export default function AddUserModal({
         >
           <h3 className={`font-bold flex items-center gap-2 ${theme.title}`}>
             <FontAwesomeIcon icon={faUserPlus} className="text-blue-500" />
-            Add New User
+            {title}
           </h3>
 
           <button
@@ -250,25 +279,27 @@ export default function AddUserModal({
               </div>
             </div>
 
-            <div>
-              <label
-                className={`block text-xs font-bold uppercase tracking-wider mb-1 ${theme.label}`}
-              >
-                Role
-              </label>
-              <select
-                name="role"
-                className={`w-full border rounded-lg px-4 py-2.5 focus:border-blue-500 outline-none appearance-none cursor-pointer ${theme.input}`}
-                value={formData.role}
-                onChange={handleChange}
-              >
-                <option value="driver">Driver</option>
-                <option value="checker">Checker</option>
-                <option value="manager">Manager</option>
-                <option value="admin">Admin</option>
-                <option value="customer">Customer</option>
-              </select>
-            </div>
+            {roleOptions.length > 1 && (
+              <div>
+                <label
+                  className={`block text-xs font-bold uppercase tracking-wider mb-1 ${theme.label}`}
+                >
+                  Role
+                </label>
+                <select
+                  name="role"
+                  className={`w-full border rounded-lg px-4 py-2.5 focus:border-blue-500 outline-none appearance-none cursor-pointer ${theme.input}`}
+                  value={formData.role}
+                  onChange={handleChange}
+                >
+                  {roleOptions.map((role) => (
+                    <option key={role.value} value={role.value}>
+                      {role.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
 
             {formData.role === "customer" && (
               <div

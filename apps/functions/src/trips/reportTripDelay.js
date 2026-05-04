@@ -2,7 +2,9 @@
 
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const admin = require("firebase-admin");
-const { requireAuth } = require("../utilities/helpers");
+const {
+  requireAuth,
+} = require("../../../../../../atlas-trucking-platform/apps/functions/src/utilities/helpers");
 
 if (!admin.apps.length) admin.initializeApp();
 const db = admin.firestore();

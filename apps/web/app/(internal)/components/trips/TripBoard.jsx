@@ -18,7 +18,7 @@ import {
   faRoute,
 } from "@fortawesome/free-solid-svg-icons";
 import TripRow from "./TripRow";
-import { calculateProgress } from "@/app/utility/utilities";
+import { calculateProgress, updatedBy } from "@/app/utility/utilities";
 import { getBoardThemeClasses } from "@/app/utility/constant/theme";
 import TripDrawer from "./TripDrawer";
 // import CreateTripModal from "../manifests/modals/CreateTripModal";
@@ -184,7 +184,7 @@ const TripBoard = forwardRef(function TripBoard(
     try {
       setLoading(true);
 
-      await updateTripSchedule(payload);
+      await updateTripSchedule({ ...payload, updatedBy: updatedBy(profile) });
 
       await fetchTrips();
 
@@ -407,6 +407,7 @@ const TripBoard = forwardRef(function TripBoard(
         onRefreshTrips={fetchTrips}
         isDark={isDark}
         user={user}
+        profile={profile}
       />
 
       <TripScheduleModal
@@ -429,6 +430,7 @@ const TripBoard = forwardRef(function TripBoard(
         onClose={() => setIsNewTripModalOpen(false)}
         onSuccess={fetchTrips}
         isDark={isDark}
+        profile={profile}
       />
     </div>
   );

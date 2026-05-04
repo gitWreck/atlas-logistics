@@ -9,7 +9,7 @@ import {
 } from "@fortawesome/free-solid-svg-icons";
 import { formatFirestoreDate } from "@/app/utility/utilities";
 import { getUserManagementTableTheme } from "@/app/utility/constant/theme";
-import StatusBadge from "../../components/ui/StatusBadge";
+import StatusBadge from "../../ui/StatusBadge";
 
 export default function ManagerRecentTable({
   shipments = [],

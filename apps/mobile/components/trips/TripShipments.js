@@ -643,39 +643,3 @@ const styles = StyleSheet.create({
     fontSize: 13,
   },
 });
-
-// header: {
-//   paddingHorizontal: 20,
-//   paddingTop: 10,
-//   paddingBottom: 15,
-//   flexDirection: "row",
-//   alignItems: "center",
-//   justifyContent: "space-between",
-//   backgroundColor: "#ffffff",
-//   borderBottomWidth: 1,
-//   borderBottomColor: "#e2e8f0",
-// },
-
-// backBtn: {
-//   width: 36,
-//   height: 36,
-//   borderRadius: 18,
-//   backgroundColor: "#f8fafc",
-//   borderWidth: 1,
-//   borderColor: "#e2e8f0",
-//   alignItems: "center",
-//   justifyContent: "center",
-// },
-
-// headerTitle: {
-//   color: "#0f172a",
-//   fontSize: 16,
-//   fontWeight: "700",
-//   flex: 1,
-//   marginLeft: 12,
-// },
-
-// headerCount: {
-//   color: "#0f172a",
-//   fontSize: 14,
-// },

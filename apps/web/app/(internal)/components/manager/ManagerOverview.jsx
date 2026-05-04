@@ -2,10 +2,11 @@
 
 import React, { useState, useEffect } from "react";
 import ManagerRecentTable from "./ManagerRecentTable";
-import ManagerStatistics from "./ManagerStatistics";
 import DelayApprovalWidget from "../delay/DelayWidget";
 import RecentAlertsLogs from "../logs/RecentAlertsLogs";
 import RecentSmsLogs from "../logs/RecentSmsLogs";
+import AddUserModal from "../admin/AddUserModal";
+import UserManagementTable from "../admin/UserManagementTable";
 import { getOverviewThemeClasses } from "@/app/utility/constant/theme";
 import Statistics from "../statistics/Statistics";
 import {
@@ -23,7 +24,10 @@ export default function ManagerOverview({
   const [viewLimit, setViewLimit] = useState(5);
   const [stats, setStats] = useState({ total: 0, delayed: 0, inTransit: 0 });
   const [recentShipments, setRecentShipments] = useState([]);
+  const [customers, setCustomers] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [customersLoading, setCustomersLoading] = useState(true);
+  const [isCustomerModalOpen, setCustomerModalOpen] = useState(false);
 
   const theme = getOverviewThemeClasses(isDark);
 
@@ -62,9 +66,44 @@ export default function ManagerOverview({
     }
   };
 
+  const fetchCustomers = async () => {
+    if (!user) return;
+
+    setCustomersLoading(true);
+
+    try {
+      const token = await user.getIdToken();
+
+      const res = await fetch("/api/manager/customers", {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        cache: "no-store",
+      });
+
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.details || errorData.error || "Server Error");
+      }
+
+      const data = await res.json();
+      setCustomers(data.users || []);
+    } catch (error) {
+      console.error("Customer fetch error:", error);
+    } finally {
+      setCustomersLoading(false);
+    }
+  };
+
   useEffect(() => {
     fetchDashboardData();
   }, [dateRange, viewLimit, user]);
+
+  useEffect(() => {
+    fetchCustomers();
+  }, [user]);
 
   const rangeLabel =
     dateRange === "today"
@@ -123,10 +162,34 @@ export default function ManagerOverview({
         isDark={isDark}
       />
 
+      <UserManagementTable
+        title="Customer Management"
+        users={customers}
+        loading={customersLoading}
+        onAddUser={() => setCustomerModalOpen(true)}
+        addButtonLabel="Customer"
+        allowedRoles={["customer"]}
+        showRoleFilter={false}
+        loadingMessage="Loading customers..."
+        emptyUsersMessage="No customers found."
+        emptySearchMessage="No matching customers found."
+        isDark={isDark}
+      />
+
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
         <RecentAlertsLogs isDark={isDark} />
         <RecentSmsLogs isDark={isDark} />
       </div>
+
+      <AddUserModal
+        isOpen={isCustomerModalOpen}
+        onClose={() => setCustomerModalOpen(false)}
+        initialRole="customer"
+        allowedRoles={["customer"]}
+        title="Add Customer"
+        isDark={isDark}
+        onSuccess={fetchCustomers}
+      />
     </div>
   );
 }

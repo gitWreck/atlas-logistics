@@ -152,3 +152,14 @@ export const displayPhoneNumber = (e164Number) => {
   const cleaned = e164Number.replace("+63", "0");
   return cleaned.replace(/(\d{4})(\d{3})(\d{4})/, "$1 $2 $3");
 };
+
+// -----------------------------------------
+export function updatedBy(profile) {
+  const object = {
+    usercode: profile?.userCode || "Unknown User",
+    username: profile?.name || "Unknown Name",
+    role: profile?.role || "Unknown Role",
+  };
+
+  return object;
+}

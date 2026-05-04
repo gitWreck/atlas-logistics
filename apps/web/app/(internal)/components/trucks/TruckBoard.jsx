@@ -4,6 +4,7 @@ import React, {
   useState,
   useEffect,
   useMemo,
+  useCallback,
   forwardRef,
   useImperativeHandle,
 } from "react";
@@ -21,7 +22,6 @@ import TruckRow from "./TruckRow";
 import TruckStatus from "./TruckStatus";
 import TruckModal from "./TruckModal";
 import { getBoardThemeClasses } from "@/app/utility/constant/theme";
-import TruckScheduleOverview from "../trips/TripSchedule/TripScheduleOverview";
 
 const TruckBoard = forwardRef(function TruckBoard(
   { user, userRole, profile, isDark = false },
@@ -39,10 +39,13 @@ const TruckBoard = forwardRef(function TruckBoard(
 
   const theme = getBoardThemeClasses(isDark);
 
-  const fetchTrucks = async () => {
+  const fetchTrucks = useCallback(async () => {
     try {
       setLoading(true);
-      if (!user) return;
+      if (!user) {
+        setTrucks([]);
+        return;
+      }
 
       const token = await user.getIdToken();
 
@@ -64,11 +67,11 @@ const TruckBoard = forwardRef(function TruckBoard(
     } finally {
       setLoading(false);
     }
-  };
+  }, [user]);
 
   useEffect(() => {
     fetchTrucks();
-  }, []);
+  }, [fetchTrucks]);
 
   const filteredTrucks = useMemo(() => {
     return trucks.filter((truck) => {
@@ -78,15 +81,8 @@ const TruckBoard = forwardRef(function TruckBoard(
       if (!searchContent.includes(searchQuery.toLowerCase())) return false;
 
       if (activeFilter !== "ALL") {
-        if (activeFilter === "ACTIVE" && truck.status !== "ACTIVE")
-          return false;
-        if (activeFilter === "MAINTENANCE" && truck.status !== "MAINTENANCE")
-          return false;
-        if (
-          activeFilter === "OUT_OF_SERVICE" &&
-          truck.status !== "OUT_OF_SERVICE"
-        )
-          return false;
+        const truckStatus = String(truck.status || "").toUpperCase();
+        if (truckStatus !== activeFilter) return false;
       }
 
       return true;
@@ -98,6 +94,10 @@ const TruckBoard = forwardRef(function TruckBoard(
   }, [searchQuery, activeFilter]);
 
   const totalPages = Math.ceil(filteredTrucks.length / itemsPerPage) || 1;
+
+  useEffect(() => {
+    setCurrentPage((prev) => Math.min(prev, totalPages));
+  }, [totalPages]);
 
   const currentItems = useMemo(() => {
     const start = (currentPage - 1) * itemsPerPage;
@@ -176,10 +176,12 @@ const TruckBoard = forwardRef(function TruckBoard(
                   onChange={(e) => setActiveFilter(e.target.value)}
                 >
                   <option value="ALL">All Trucks</option>
+                  <option value="IDLE">Idle</option>
+                  <option value="ASSIGNED">Assigned</option>
+                  <option value="IN_TRANSIT">In Transit</option>
                   <option value="ACTIVE">Active</option>
                   <option value="MAINTENANCE">In Shop</option>
-                  {/* <option value="ASSIGNED">Assigned</option>
-                  <option value="IDLE">Idle</option> */}
+                  <option value="DISABLED">Disabled</option>
                   <option value="OUT_OF_SERVICE">Retired</option>
                 </select>
               </div>
@@ -230,7 +232,6 @@ const TruckBoard = forwardRef(function TruckBoard(
                         isDark ? "divide-slate-800/50" : "divide-slate-200"
                       }`}
                     >
-                      {console.log("Rendering trucks:", currentItems)}
                       {currentItems.map((truck) => (
                         <TruckRow
                           key={truck.id}

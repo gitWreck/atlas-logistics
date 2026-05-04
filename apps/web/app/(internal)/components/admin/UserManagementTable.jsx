@@ -18,6 +18,13 @@ export default function UserManagementTable({
   onAddUser,
   onEditUser,
   isDark = false,
+  title = "User Management",
+  addButtonLabel = "User",
+  allowedRoles = null,
+  showRoleFilter = true,
+  loadingMessage = "Loading users...",
+  emptyUsersMessage = "No users found.",
+  emptySearchMessage = "No matching users found.",
 }) {
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState("ALL");
@@ -25,9 +32,18 @@ export default function UserManagementTable({
 
   const itemsPerPage = 5;
   const theme = getTableTheme(isDark);
+  const allowedRoleSet = useMemo(
+    () => (allowedRoles?.length ? new Set(allowedRoles) : null),
+    [allowedRoles],
+  );
+  const hasRowActions = Boolean(onEditUser || onDeleteUser);
 
   const filteredUsers = useMemo(() => {
     return users.filter((user) => {
+      if (allowedRoleSet && !allowedRoleSet.has(user.role)) {
+        return false;
+      }
+
       const name = (user.name || "").toLowerCase();
       const email = (user.email || "").toLowerCase();
       const publicId = (
@@ -47,7 +63,7 @@ export default function UserManagementTable({
 
       return matchesSearch && matchesRole;
     });
-  }, [users, search, roleFilter]);
+  }, [users, search, roleFilter, allowedRoleSet]);
 
   useEffect(() => {
     setPage(1);
@@ -66,7 +82,7 @@ export default function UserManagementTable({
   );
 
   const emptyMessage =
-    users.length === 0 ? "No users found." : "No matching users found.";
+    users.length === 0 ? emptyUsersMessage : emptySearchMessage;
 
   return (
     <div
@@ -76,16 +92,18 @@ export default function UserManagementTable({
       <div
         className={`px-4 sm:px-6 py-4 border-b flex justify-between items-center ${theme.header}`}
       >
-        <h2 className={`font-bold ${theme.headingText}`}>User Management</h2>
+        <h2 className={`font-bold ${theme.headingText}`}>{title}</h2>
 
-        <button
-          type="button"
-          onClick={onAddUser}
-          className="bg-blue-600 hover:bg-blue-500 text-white px-3 py-1.5 rounded-lg transition-colors flex items-center gap-2 font-bold shadow-lg shadow-blue-900/20"
-        >
-          <FontAwesomeIcon icon={faPlus} className="hidden sm:inline-block" />
-          <span>User</span>
-        </button>
+        {onAddUser && (
+          <button
+            type="button"
+            onClick={onAddUser}
+            className="bg-blue-600 hover:bg-blue-500 text-white px-3 py-1.5 rounded-lg transition-colors flex items-center gap-2 font-bold shadow-lg shadow-blue-900/20"
+          >
+            <FontAwesomeIcon icon={faPlus} className="hidden sm:inline-block" />
+            <span>{addButtonLabel}</span>
+          </button>
+        )}
       </div>
 
       {/* Filters */}
@@ -106,24 +124,26 @@ export default function UserManagementTable({
           />
         </div>
 
-        <div className="relative w-full sm:w-40">
-          <FontAwesomeIcon
-            icon={faFilter}
-            className={`absolute left-3 top-2.5 ${theme.inputIcon}`}
-          />
-          <select
-            value={roleFilter}
-            onChange={(e) => setRoleFilter(e.target.value)}
-            className={`w-full border rounded-lg pl-8 pr-3 py-1.5 focus:border-blue-500 outline-none appearance-none cursor-pointer ${theme.input}`}
-          >
-            <option value="ALL">All Roles</option>
-            <option value="admin">Admin</option>
-            <option value="manager">Manager</option>
-            <option value="driver">Driver</option>
-            <option value="checker">Checker</option>
-            <option value="customer">Customer</option>
-          </select>
-        </div>
+        {showRoleFilter && (
+          <div className="relative w-full sm:w-40">
+            <FontAwesomeIcon
+              icon={faFilter}
+              className={`absolute left-3 top-2.5 ${theme.inputIcon}`}
+            />
+            <select
+              value={roleFilter}
+              onChange={(e) => setRoleFilter(e.target.value)}
+              className={`w-full border rounded-lg pl-8 pr-3 py-1.5 focus:border-blue-500 outline-none appearance-none cursor-pointer ${theme.input}`}
+            >
+              <option value="ALL">All Roles</option>
+              <option value="admin">Admin</option>
+              <option value="manager">Manager</option>
+              <option value="driver">Driver</option>
+              <option value="checker">Checker</option>
+              <option value="customer">Customer</option>
+            </select>
+          </div>
+        )}
       </div>
 
       {/* Content */}
@@ -134,7 +154,7 @@ export default function UserManagementTable({
         >
           {loading ? (
             <div className={`px-6 py-8 text-center ${theme.emptyText}`}>
-              <div className="animate-pulse">Loading users...</div>
+              <div className="animate-pulse">{loadingMessage}</div>
             </div>
           ) : paginatedUsers.length === 0 ? (
             <div className={`px-6 py-8 text-center italic ${theme.emptyText}`}>
@@ -187,25 +207,31 @@ export default function UserManagementTable({
                       {user.role || "USER"}
                     </span>
 
-                    <div className="flex gap-1">
-                      <button
-                        type="button"
-                        onClick={() => onEditUser(user)}
-                        className={`transition-colors p-2 rounded ${theme.editButton}`}
-                        title="Edit User"
-                      >
-                        <FontAwesomeIcon icon={faEdit} />
-                      </button>
+                    {hasRowActions && (
+                      <div className="flex gap-1">
+                        {onEditUser && (
+                          <button
+                            type="button"
+                            onClick={() => onEditUser(user)}
+                            className={`transition-colors p-2 rounded ${theme.editButton}`}
+                            title="Edit User"
+                          >
+                            <FontAwesomeIcon icon={faEdit} />
+                          </button>
+                        )}
 
-                      <button
-                        type="button"
-                        onClick={() => onDeleteUser(user)}
-                        className={`transition-colors p-2 rounded ${theme.deleteButton}`}
-                        title="Disable User"
-                      >
-                        <FontAwesomeIcon icon={faTrash} />
-                      </button>
-                    </div>
+                        {onDeleteUser && (
+                          <button
+                            type="button"
+                            onClick={() => onDeleteUser(user)}
+                            className={`transition-colors p-2 rounded ${theme.deleteButton}`}
+                            title="Disable User"
+                          >
+                            <FontAwesomeIcon icon={faTrash} />
+                          </button>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
               );
@@ -222,7 +248,9 @@ export default function UserManagementTable({
                 <th className="px-6 py-3">Name / Email</th>
                 <th className="px-6 py-3">Role</th>
                 <th className="px-6 py-3">Status</th>
-                <th className="px-6 py-3 text-right">Action</th>
+                {hasRowActions && (
+                  <th className="px-6 py-3 text-right">Action</th>
+                )}
               </tr>
             </thead>
 
@@ -230,16 +258,16 @@ export default function UserManagementTable({
               {loading ? (
                 <tr>
                   <td
-                    colSpan="5"
+                    colSpan={hasRowActions ? 5 : 4}
                     className={`px-6 py-8 text-center ${theme.emptyText}`}
                   >
-                    <div className="animate-pulse">Loading users...</div>
+                    <div className="animate-pulse">{loadingMessage}</div>
                   </td>
                 </tr>
               ) : paginatedUsers.length === 0 ? (
                 <tr>
                   <td
-                    colSpan="5"
+                    colSpan={hasRowActions ? 5 : 4}
                     className={`px-6 py-8 text-center italic ${theme.emptyText}`}
                   >
                     {emptyMessage}
@@ -292,25 +320,31 @@ export default function UserManagementTable({
                         </span>
                       </td>
 
-                      <td className="px-6 py-4 text-right">
-                        <button
-                          type="button"
-                          onClick={() => onEditUser(user)}
-                          className={`transition-colors p-2 rounded ${theme.editButton}`}
-                          title="Edit User"
-                        >
-                          <FontAwesomeIcon icon={faEdit} />
-                        </button>
+                      {hasRowActions && (
+                        <td className="px-6 py-4 text-right">
+                          {onEditUser && (
+                            <button
+                              type="button"
+                              onClick={() => onEditUser(user)}
+                              className={`transition-colors p-2 rounded ${theme.editButton}`}
+                              title="Edit User"
+                            >
+                              <FontAwesomeIcon icon={faEdit} />
+                            </button>
+                          )}
 
-                        <button
-                          type="button"
-                          onClick={() => onDeleteUser(user)}
-                          className={`transition-colors p-2 rounded ${theme.deleteButton}`}
-                          title="Disable User"
-                        >
-                          <FontAwesomeIcon icon={faTrash} />
-                        </button>
-                      </td>
+                          {onDeleteUser && (
+                            <button
+                              type="button"
+                              onClick={() => onDeleteUser(user)}
+                              className={`transition-colors p-2 rounded ${theme.deleteButton}`}
+                              title="Disable User"
+                            >
+                              <FontAwesomeIcon icon={faTrash} />
+                            </button>
+                          )}
+                        </td>
+                      )}
                     </tr>
                   );
                 })

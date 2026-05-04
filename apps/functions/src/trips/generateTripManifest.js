@@ -9,8 +9,8 @@
  * ✅ Fetches ROOT shipment docs to capture specific package details
  * ✅ Writes:
  * - manifests/{manifestId}
- * - truck_trips/{tripDocId}.manifestLocked = true
- * - truck_trips/{tripDocId}/manifest_events/{eventId}
+ * - truck_trips/{tripId}.manifestLocked = true
+ * - truck_trips/{tripId}/manifest_events/{eventId}
  * - admin_logs
  */
 
@@ -21,7 +21,8 @@ const {
   requireString,
   stableStringify,
   sha256Hex,
-} = require("../utilities/helpers");
+} = require("../../../../../../atlas-trucking-platform/apps/functions/src/utilities/helpers");
+const { writeTripActionLog } = require("../utilities/tripLogger");
 
 if (!admin.apps.length) admin.initializeApp();
 const db = admin.firestore();
@@ -32,7 +33,7 @@ exports.generateTripManifest = onCall(
     // 1. Role Guard
     await requireRole(db, req, ["admin", "manager"]);
 
-    const tripDocId = requireString(req.data?.tripDocId, "tripDocId");
+    const tripId = requireString(req.data?.tripId, "tripId");
     const uid = req.auth.uid;
 
     // Get User Name for logs
@@ -40,7 +41,7 @@ exports.generateTripManifest = onCall(
     const user = userSnap.exists ? userSnap.data() : {};
     const generatedByName = String(user.name || "").trim() || "Unknown User";
 
-    const tripRef = db.collection("truck_trips").doc(tripDocId);
+    const tripRef = db.collection("truck_trips").doc(tripId);
     const tripShipmentsRef = tripRef.collection("trip_shipments");
 
     return db.runTransaction(async (tx) => {
@@ -65,7 +66,7 @@ exports.generateTripManifest = onCall(
         return {
           ok: true,
           alreadyLocked: true,
-          tripDocId,
+          tripId,
           manifestId: trip.manifestId,
         };
       }
@@ -104,9 +105,9 @@ exports.generateTripManifest = onCall(
 
         totalShipments += 1;
 
-        const trackingDocId = doc.id;
-        const trackingNumber =
-          summary.trackingNumber || fullData.trackingNumber;
+        const trackingShipmentId = doc.id;
+        const shipmentId = summary.shipmentId;
+        // || fullData.trackingNumber;
 
         // Counters
         const loadedCount = Number(summary.loadedCount || 0);
@@ -136,8 +137,8 @@ exports.generateTripManifest = onCall(
         totalItems += actualLoadedCount;
 
         items.push({
-          trackingDocId,
-          trackingNumber,
+          trackingShipmentId,
+          shipmentId,
           route: summary.route || null,
           senderName: fullData.sender?.name || null,
           receiverName: fullData.recipient?.name || null,
@@ -179,11 +180,11 @@ exports.generateTripManifest = onCall(
       const generatedAtISO = new Date().toISOString();
       const generatedAtMs = Date.now();
 
-      const manifestId = `MANIFEST-${tripDocId}-${Date.now()}`;
+      const manifestId = `MANIFEST-${tripId}-${Date.now()}`;
 
       const payload = {
         manifestId,
-        tripDocId,
+        tripId,
         status: "LOCKED",
 
         trip: {
@@ -214,7 +215,6 @@ exports.generateTripManifest = onCall(
       // 7. Write Operations
       const manifestRef = db.collection("manifests").doc(manifestId);
       const manifestEventRef = tripRef.collection("manifest_events").doc();
-      const adminLogRef = db.collection("audit_logs").doc(); // Using your audit_log collection
 
       // A. Write Manifest
       tx.set(manifestRef, {
@@ -244,12 +244,18 @@ exports.generateTripManifest = onCall(
       });
 
       // D. Global Audit Log
-      tx.set(adminLogRef, {
+      writeTripActionLog({
+        db,
+        tx,
+        collection: "audit_logs",
         action: "GENERATE_TRIP_MANIFEST",
-        targetId: tripDocId,
+        tripId,
+        targetId: tripId,
         targetCollection: "truck_trips",
         at: nowTs,
-        by: uid,
+        actorId: uid,
+        actorName: generatedByName,
+        actorRole: req.auth.token?.role || null,
         note: `Manifest generated with ${totalShipments} shipments (${totalItems} items).`,
         details: {
           manifestId,
@@ -261,7 +267,7 @@ exports.generateTripManifest = onCall(
 
       return {
         ok: true,
-        tripDocId,
+        tripId,
         manifestId,
         generatedAt: generatedAtISO,
         hash,

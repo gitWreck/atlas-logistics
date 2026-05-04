@@ -1,6 +1,7 @@
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const admin = require("firebase-admin");
 const { requireRole } = require("../utilities/helpers"); // Assuming this exists as per your code
+const { writeShipmentActionLog } = require("../utilities/shipmentLogger");
 
 if (!admin.apps.length) admin.initializeApp();
 const db = admin.firestore();
@@ -73,19 +74,21 @@ exports.bulkAssignShipments = onCall(
         const ref = snap.ref;
 
         // 🔁 Idempotency: Skip if already on this trip
-        if (data.currentTruckTripId === tripId) {
+        if (data.currentTripId === tripId) {
           return;
         }
 
         // 🛑 Double Assignment Check
-        if (data.currentTruckTripId && data.currentTruckTripId !== tripId) {
+        if (data.currentTripId && data.currentTripId !== tripId) {
           errors.push(
-            `Shipment ${data.trackingNumber} is on another trip (${data.currentTruckTripId})`,
+            `Shipment ${data.shipmentId} is on another trip (${data.currentTripId})`,
           );
           return;
         }
 
-        const itemsToAdd = Number(data.totals?.totalItems || 0);
+        const itemsToAdd = Number(
+          data.totals?.totalContentQty || data.totals?.totalItems || 0,
+        );
         batchTotalItems += itemsToAdd;
         batchHasUpdates = true;
         successCount++;
@@ -98,8 +101,8 @@ exports.bulkAssignShipments = onCall(
         const manifestRef = tripRef.collection("trip_shipments").doc(snap.id);
 
         batch.set(manifestRef, {
-          trackingDocId: snap.id,
-          trackingNumber: data.trackingNumber || null,
+          trackingShipmentId: snap.id,
+          shipmentId: data.shipmentId || null,
 
           // Replicate route string logic
           route:
@@ -129,8 +132,8 @@ exports.bulkAssignShipments = onCall(
         // --- B. Update Shipment Root ---
         // Matches 'trackingRef' update
         batch.update(ref, {
-          currentTruckTripId: tripId,
-          assignedToTruckTripAt: now,
+          currentTripId: tripId,
+          assignedToTripAt: now,
           status: "ASSIGNED",
 
           updatedAt: now,
@@ -149,18 +152,19 @@ exports.bulkAssignShipments = onCall(
         const eventRef = ref.collection("status_events").doc();
         batch.set(eventRef, {
           type: "ASSIGN_TO_TRIP",
-          message: "Assigned to truck trip",
-          truckTripId: tripId,
+          message: "Assigned to trip",
+          tripId: tripId,
           createdAt: now,
           createdBy: uid,
         });
 
         // --- D. Admin Audit Log ---
-        const logRef = db.collection("admin_logs").doc();
-        batch.set(logRef, {
+        writeShipmentActionLog({
+          db,
+          batch,
           action: "ASSIGN_SHIPMENT_TO_TRIP",
-          trackingDocId: snap.id,
-          truckTripId: tripId,
+          trackingShipmentId: snap.id,
+          tripId: tripId,
           actorId: uid,
           actorRole: userRole,
           createdAt: now,
@@ -173,8 +177,8 @@ exports.bulkAssignShipments = onCall(
           totalItems: admin.firestore.FieldValue.increment(batchTotalItems),
           itemPending: admin.firestore.FieldValue.increment(batchTotalItems),
 
-          totalLoaded: 0,
-          totalDelivered: 0,
+          // totalLoaded: 0,
+          // totalDelivered: 0,
 
           updatedAt: admin.firestore.FieldValue.serverTimestamp(),
           updatedBy: uid,

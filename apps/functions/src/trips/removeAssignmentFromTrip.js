@@ -2,7 +2,10 @@
 
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const admin = require("firebase-admin");
-const { requireRole } = require("../utilities/helpers");
+const {
+  requireRole,
+} = require("../../../../../../atlas-trucking-platform/apps/functions/src/utilities/helpers");
+const { writeTripActionLog } = require("../utilities/tripLogger");
 
 if (!admin.apps.length) admin.initializeApp();
 const db = admin.firestore();
@@ -10,22 +13,21 @@ const db = admin.firestore();
 /* ======================================================
    REMOVE DRIVER/TRUCK ASSIGNMENT FROM TRUCK TRIP
 ====================================================== */
-exports.removeAssignmentFromTruckTrip = onCall(
+exports.removeAssignmentFromTrip = onCall(
   { region: "asia-southeast1", maxInstances: 10 },
   async (req) => {
     await requireRole(db, req, ["admin", "manager"]);
 
-    const { truckTripId } = req.data || {};
-    if (!truckTripId || typeof truckTripId !== "string") {
-      throw new HttpsError("invalid-argument", "truckTripId is required");
+    const { tripId } = req.data || {};
+    if (!tripId || typeof tripId !== "string") {
+      throw new HttpsError("invalid-argument", "tripId is required");
     }
 
     const uid = req.auth?.uid;
     const role = req.auth?.token?.role || "unknown";
 
-    const tripRef = db.collection("truck_trips").doc(truckTripId);
+    const tripRef = db.collection("truck_trips").doc(tripId);
     const eventsRef = tripRef.collection("status_events");
-    const adminLogRef = db.collection("admin_logs").doc();
 
     await db.runTransaction(async (tx) => {
       // =========================
@@ -93,7 +95,7 @@ exports.removeAssignmentFromTruckTrip = onCall(
       // Determine remaining active/non-terminal trips still using this truck
       const remainingTripsUsingTruck = assignedTruckId
         ? (otherTripsUsingTruckSnap?.docs || [])
-            .filter((doc) => doc.id !== truckTripId)
+            .filter((doc) => doc.id !== tripId)
             .map((doc) => ({ id: doc.id, ...doc.data() }))
             .filter((otherTrip) => {
               const status = String(otherTrip.status || "").toUpperCase();
@@ -180,9 +182,11 @@ exports.removeAssignmentFromTruckTrip = onCall(
       // =========================
       // 6. ADMIN LOG
       // =========================
-      tx.set(adminLogRef, {
+      writeTripActionLog({
+        db,
+        tx,
         action: "REMOVE_ASSIGNMENT_FROM_TRIP",
-        truckTripId,
+        tripId,
         previousDriverId: assignedDriverId,
         previousTruckId: assignedTruckId,
         truckMarkedIdle: assignedTruckId ? !stillAssignedElsewhere : false,
@@ -191,6 +195,7 @@ exports.removeAssignmentFromTruckTrip = onCall(
           : false,
         nextCurrentTripId: nextCurrentTripId,
         actorId: uid,
+        actorName: req.auth.token?.name || null,
         actorRole: role,
         createdAt: now,
       });
@@ -198,7 +203,7 @@ exports.removeAssignmentFromTruckTrip = onCall(
 
     return {
       success: true,
-      truckTripId,
+      tripId,
     };
   },
 );

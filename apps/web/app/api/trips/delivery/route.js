@@ -10,19 +10,20 @@ export async function GET(req) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     await adminAuth.verifyIdToken(token);
 
-    // Fetch up to 5 active trips (You can adjust this query based on how you tag Delivery trips)
     const tripsSnap = await adminDb
       .collection("truck_trips")
-      .where("tripType", "==", "DEL")
-      .where("status", "in", ["CREATED", "LOADED"]) // Only trips that haven't left yet
+      .where("tripType", "==", "DELIVERY")
+      .where("status", "in", ["CREATED", "ASSIGNED", "LOADING", "LOADED"])
       .orderBy("createdAt", "desc")
-      .limit(5)
+      .limit(20)
       .get();
 
     const trips = tripsSnap.docs.map((doc) => ({
       id: doc.id,
       driverName: doc.data().driverName || "Unassigned Driver",
       truckPlate: doc.data().truckPlateNumber || "No Plate",
+      route: doc.data().route || doc.data().destination || "Delivery route",
+      status: doc.data().status || "CREATED",
     }));
 
     return NextResponse.json({ trips });

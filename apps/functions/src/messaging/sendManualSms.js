@@ -20,6 +20,7 @@ const { calculateSmsCost } = require("../../shared/sms-cost");
 const { buildSmsSignature } = require("../../shared/sms-suppression");
 const { writeAuditEvent } = require("../../shared/audit");
 const { assertAdminOrManager } = require("../system/authGuards");
+const { writeMessagingActionLog } = require("./messagingLogger");
 const {
   sendSmsViaProvider,
   SEMAPHORE_API_KEY,
@@ -134,7 +135,8 @@ exports.sendManualSms = onCall(
         message,
       });
     } catch (err) {
-      await db.collection("sms_logs").add({
+      await writeMessagingActionLog({
+        db,
         phone: normalizedPhone,
         message,
         credits,
@@ -142,6 +144,8 @@ exports.sendManualSms = onCall(
         type: "MANUAL",
         trackingId,
         tripDocId,
+        actorId: uid,
+        actorRole: role,
         requestedBy: uid,
         requestedRole: role,
         error: String(err.message || err),
@@ -152,7 +156,8 @@ exports.sendManualSms = onCall(
     }
 
     // 🧾 Log success
-    const logRef = await db.collection("sms_logs").add({
+    const logRef = await writeMessagingActionLog({
+      db,
       phone: normalizedPhone,
       message,
       credits,
@@ -160,6 +165,8 @@ exports.sendManualSms = onCall(
       type: "MANUAL",
       trackingId,
       tripDocId,
+      actorId: uid,
+      actorRole: role,
       requestedBy: uid,
       requestedRole: role,
       reason,

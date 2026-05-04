@@ -7,6 +7,7 @@ const {
   SEMAPHORE_API_KEY,
   SEMAPHORE_SENDER_NAME,
 } = require("../../shared/sms-service");
+const { writeShipmentActionLog } = require("../utilities/shipmentLogger");
 
 const { Timestamp } = admin.firestore;
 
@@ -248,8 +249,7 @@ exports.createShipment = onCall(
 
     const senderUid = sender?.uid || senderCustomer?.uid || null;
     const recipientUid = recipient?.uid || recipientCustomer?.uid || null;
-    const primaryCustomerId =
-      customerId || senderUid || recipientUid || null;
+    const primaryCustomerId = customerId || senderUid || recipientUid || null;
     const requestedVisibilityUserIds = Array.isArray(visibilityUserIds)
       ? visibilityUserIds
       : [];
@@ -372,7 +372,9 @@ exports.createShipment = onCall(
       packageBarcodes,
     });
 
-    batch.set(db.collection("admin_logs").doc(), {
+    writeShipmentActionLog({
+      db,
+      batch,
       action: bundleMode ? "CREATE_SHIPMENT_BULK" : "CREATE_SHIPMENT",
       trackingShipmentId: shipmentRef.id,
       shipmentId: shipmentId,

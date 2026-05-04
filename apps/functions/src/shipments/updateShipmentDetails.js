@@ -1,5 +1,6 @@
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const admin = require("firebase-admin");
+const { writeShipmentActionLog } = require("../utilities/shipmentLogger");
 
 if (!admin.apps.length) admin.initializeApp();
 const db = admin.firestore();
@@ -36,10 +37,10 @@ exports.updateShipmentDetails = onCall(
     const updatePayload = {
       "sender.name": sender.name,
       "sender.phone": sender.phone,
-      "sender.address": sender.details,
+      "sender.address": sender.address,
       "recipient.name": recipient.name,
       "recipient.phone": recipient.phone,
-      "recipient.address": recipient.details,
+      "recipient.address": recipient.address,
       origin: origin,
       originCode: originCode,
       destination: destination,
@@ -62,9 +63,12 @@ exports.updateShipmentDetails = onCall(
       batch.update(shipmentRef, updatePayload);
 
       // Write an Audit Log
-      batch.set(db.collection("admin_logs").doc(), {
+      writeShipmentActionLog({
+        db,
+        batch,
         action: "UPDATE_SHIPMENT",
-        trackingDocId: shipmentId,
+        trackingShipmentId: shipmentId,
+        shipmentId,
         actorId: request.auth.uid,
         createdAt: nowAt,
       });

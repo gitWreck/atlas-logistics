@@ -17,6 +17,7 @@ import DriverSelectInput from "../DriverSelectInput";
 import TruckSelectInput from "../TruckSelectInput";
 import { getModalThemeClasses } from "@/app/utility/constant/theme";
 import { getModalActionClasses } from "@/app/utility/constant/action";
+import { updatedBy } from "@/app/utility/utilities";
 
 export default function TripAssignmentModal({
   isOpen,
@@ -24,7 +25,10 @@ export default function TripAssignmentModal({
   trip,
   onSuccess,
   isDark = false,
+  user,
+  profile,
 }) {
+  console.log("Rendering TripAssignmentModal with profile:", profile);
   const modalTheme = getModalThemeClasses(isDark);
   const actionClasses = getModalActionClasses();
 
@@ -75,6 +79,8 @@ export default function TripAssignmentModal({
         driverId: formData.driverId || null,
         truckId: formData.truckId || null,
         truckPlateNumber: formData.truckPlateNumber || null,
+
+        updatedBy: updatedBy(profile),
       });
 
       onSuccess?.();
@@ -98,6 +104,8 @@ export default function TripAssignmentModal({
       // await unassignDriverFromTruckTrip({
       await removeAssignmentFromTrip({
         tripId: trip.id,
+
+        updatedBy: updatedBy(profile),
       });
 
       onSuccess?.();

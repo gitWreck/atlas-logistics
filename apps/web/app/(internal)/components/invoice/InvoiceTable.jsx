@@ -18,7 +18,39 @@ import {
   getRowThemeClasses,
   getTableTheme,
 } from "@/app/utility/constant/theme";
+import ExportInvoiceList from "../exports/ExportInvoiceList";
 import { formatAmount, StatusBadge } from "./utils";
+
+function formatInvoiceDate(value) {
+  if (!value) return "";
+
+  let date;
+
+  if (typeof value?.toDate === "function") {
+    date = value.toDate();
+  } else if (value?.seconds || value?._seconds) {
+    date = new Date((value.seconds || value._seconds) * 1000);
+  } else if (value instanceof Date) {
+    date = value;
+  } else if (/^\d{4}-\d{2}-\d{2}$/.test(String(value))) {
+    const [year, month, day] = String(value).split("-").map(Number);
+    date = new Date(year, month - 1, day);
+  } else {
+    const stringValue = String(value).trim();
+    const hasYear = /\b\d{4}\b/.test(stringValue);
+    date = new Date(
+      hasYear ? stringValue : `${stringValue} ${new Date().getFullYear()}`,
+    );
+  }
+
+  if (Number.isNaN(date.getTime())) return "";
+
+  return date.toLocaleDateString("en-US", {
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  });
+}
 
 export default function InvoiceTable({
   invoices = [],
@@ -92,15 +124,23 @@ export default function InvoiceTable({
       >
         <h2 className={`font-bold ${theme.headingText}`}>Invoices</h2>
 
-        <button
-          type="button"
-          onClick={onRefresh}
-          disabled={loading}
-          className={`transition-colors p-2 rounded ${theme.editButton}`}
-          title="Refresh"
-        >
-          <FontAwesomeIcon icon={faSync} spin={loading} />
-        </button>
+        <div className="flex items-center gap-2">
+          <ExportInvoiceList
+            invoices={invoices}
+            loading={loading}
+            isDark={isDark}
+          />
+
+          <button
+            type="button"
+            onClick={onRefresh}
+            disabled={loading}
+            className={`transition-colors p-2 rounded ${theme.editButton}`}
+            title="Refresh"
+          >
+            <FontAwesomeIcon icon={faSync} spin={loading} />
+          </button>
+        </div>
       </div>
 
       {/* Filters */}
@@ -199,7 +239,7 @@ export default function InvoiceTable({
                       {formatAmount(invoice.amount)}
                     </div>
                     <div className={`text-xs ${theme.cellSecondary}`}>
-                      Due: {invoice.dueDate || "—"}
+                      Due: {formatInvoiceDate(invoice.dueDate) || "—"}
                     </div>
                   </div>
 
@@ -338,7 +378,7 @@ export default function InvoiceTable({
 
                     <td className="px-6 py-4">
                       <span className={theme.cellSecondary}>
-                        {invoice.dueDate || "—"}
+                        {formatInvoiceDate(invoice.dueDate) || "—"}
                       </span>
                     </td>
 

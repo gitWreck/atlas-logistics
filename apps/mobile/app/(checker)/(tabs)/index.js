@@ -6,6 +6,9 @@ import {
   StatusBar,
   ScrollView,
   Alert,
+  Text,
+  TouchableOpacity,
+  Platform,
 } from "react-native";
 import { useRouter } from "expo-router";
 import {
@@ -17,6 +20,7 @@ import {
 } from "firebase/firestore";
 import { startOfDay, subDays } from "date-fns";
 import { auth, db } from "../../../firebase";
+import { FontAwesome5 } from "@expo/vector-icons";
 
 // ✅ IMPORT NEW COMPONENTS
 import StatusFilter from "../../../components/checker/StatusFilter";
@@ -94,9 +98,37 @@ export default function CheckerIndex() {
     setRefreshing(false);
   };
 
+  const handleLogout = () => {
+    Alert.alert("Sign Out", "Are you sure you want to sign out?", [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Sign Out",
+        style: "destructive",
+        onPress: () => {
+          auth.signOut();
+          router.replace("/(auth)/login");
+        },
+      },
+    ]);
+  };
+
   return (
     <View style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor="#f1f5f9" />
+
+      <View style={styles.header}>
+        <View style={styles.textBlock}>
+          <Text style={styles.title} numberOfLines={1}>
+            Operations
+          </Text>
+          <Text style={styles.subtitle} numberOfLines={1}>
+            Checker Dashboard
+          </Text>
+        </View>
+        <TouchableOpacity onPress={handleLogout} style={styles.iconBtn}>
+          <FontAwesome5 name="sign-out-alt" size={15} color="#0f172a" />
+        </TouchableOpacity>
+      </View>
 
       <ScrollView
         contentContainerStyle={styles.content}
@@ -134,10 +166,45 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#f1f5f9",
+    paddingTop: Platform.OS === "android" ? StatusBar.currentHeight || 0 : 0,
   },
   content: {
     paddingLeft: 20,
     paddingRight: 20,
     // paddingBottom: 40,
+  },
+  header: {
+    paddingHorizontal: 20,
+    paddingTop: 10,
+    paddingBottom: 15,
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#ffffff",
+    borderBottomWidth: 1,
+    borderBottomColor: "#e2e8f0",
+  },
+  iconBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: "#f8fafc",
+    borderWidth: 1,
+    borderColor: "#e2e8f0",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  textBlock: {
+    flex: 1,
+    marginRight: 12,
+  },
+  title: {
+    color: "#0f172a",
+    fontSize: 16,
+    fontWeight: "700",
+  },
+  subtitle: {
+    color: "#64748b",
+    fontSize: 12,
+    marginTop: 2,
   },
 });

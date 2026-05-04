@@ -2,7 +2,11 @@
 
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const admin = require("firebase-admin");
-const { requireRole, requireString } = require("../utilities/helpers");
+const {
+  requireRole,
+  requireString,
+} = require("../../../../../../atlas-trucking-platform/apps/functions/src/utilities/helpers");
+const { writeTripActionLog } = require("../utilities/tripLogger");
 
 if (!admin.apps.length) admin.initializeApp();
 const db = admin.firestore();
@@ -21,10 +25,10 @@ exports.unlockTripManifest = onCall(
     await requireRole(db, req, ["admin", "manager"]);
     const uid = req.auth.uid;
 
-    const tripDocId = requireString(req.data?.tripDocId, "tripDocId");
+    const tripId = requireString(req.data?.tripId, "tripId");
     const reason = requireString(req.data?.reason, "reason"); // Reason is mandatory for audits
 
-    const tripRef = db.collection("truck_trips").doc(tripDocId);
+    const tripRef = db.collection("truck_trips").doc(tripId);
 
     // Get user details for the log
     const userSnap = await db.collection("users").doc(uid).get();
@@ -54,16 +58,20 @@ exports.unlockTripManifest = onCall(
 
       // 3. AUDIT LOG (Crucial for compliance)
       // Since Manifests are legal documents, unlocking them is a sensitive action.
-      const logRef = db.collection("audit_log").doc();
-      tx.set(logRef, {
+      writeTripActionLog({
+        db,
+        tx,
+        collection: "audit_logs",
         action: "UNLOCK_MANIFEST",
-        targetId: tripDocId,
+        tripId,
+        targetId: tripId,
         targetCollection: "truck_trips",
         previousManifestId: trip.manifestId || null,
         reason: reason,
         at: admin.firestore.FieldValue.serverTimestamp(),
-        by: uid,
+        actorId: uid,
         actorName: actorName,
+        actorRole: req.auth.token?.role || null,
         note: `Manifest unlocked by manager. Reason: ${reason}`,
       });
 

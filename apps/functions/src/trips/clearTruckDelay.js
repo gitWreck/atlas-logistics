@@ -4,9 +4,16 @@ const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const { defineSecret } = require("firebase-functions/params");
 
 const admin = require("firebase-admin");
-const { requireRole } = require("../utilities/helpers");
-const { broadcastTripLogic } = require("../messaging/broadcastTripMessage"); // Import if you want to call it directly
-const { STATUS_MESSAGES } = require("../utilities/dataDetails");
+const {
+  requireRole,
+} = require("../../../../../../atlas-trucking-platform/apps/functions/src/utilities/helpers");
+const {
+  broadcastTripLogic,
+} = require("../../../../../../atlas-trucking-platform/apps/functions/src/messaging/broadcastTripMessage"); // Import if you want to call it directly
+const {
+  STATUS_MESSAGES,
+} = require("../../../../../../atlas-trucking-platform/apps/functions/src/utilities/dataDetails");
+const { writeTripActionLog } = require("../utilities/tripLogger");
 
 const SEMAPHORE_API_KEY = defineSecret("SEMAPHORE_API_KEY");
 const SEMAPHORE_SENDER_NAME = defineSecret("SEMAPHORE_SENDER_NAME");
@@ -26,14 +33,14 @@ exports.clearTruckDelay = onCall(
   async (req) => {
     await requireRole(db, req, ["admin", "manager", "driver"]);
 
-    const { truckTripId } = req.data || {};
-    if (!truckTripId || typeof truckTripId !== "string") {
-      throw new HttpsError("invalid-argument", "truckTripId required");
+    const { tripId } = req.data || {};
+    if (!tripId || typeof tripId !== "string") {
+      throw new HttpsError("invalid-argument", "tripId required");
     }
 
     const uid = req.auth.uid;
     const role = req.auth.token?.role || "unknown";
-    const tripRef = db.collection("truck_trips").doc(truckTripId);
+    const tripRef = db.collection("truck_trips").doc(tripId);
     // ✅ NEW: Reference for the Admin Alert
     const alertRef = db.collection("admin_alerts").doc();
     const notify = !!req.data?.notify; // Optional: whether to send SMS notifications for this status change
@@ -72,10 +79,13 @@ exports.clearTruckDelay = onCall(
       });
 
       // 🧾 Audit log
-      tx.set(db.collection("admin_logs").doc(), {
+      writeTripActionLog({
+        db,
+        tx,
         action: "CLEAR_TRUCK_DELAY",
-        truckTripId,
+        tripId,
         actorId: uid,
+        actorName: req.auth.token?.name || null,
         actorRole: role,
         createdAt: now,
       });
@@ -86,7 +96,7 @@ exports.clearTruckDelay = onCall(
       tx.set(alertRef, {
         type: "DELAY_CLEARED",
         subType: trip.delayReason || "UNKNOWN_DELAY",
-        tripId: truckTripId,
+        tripId: tripId,
         details: {
           reason: `Driver has cleared the delay and resumed the trip.`,
           previousDelay: trip.delayReason || "Unknown",
@@ -105,12 +115,12 @@ exports.clearTruckDelay = onCall(
 
       if (messageText) {
         console.log(
-          `[Notify] Sending broadcast for trip ${truckTripId} with delay is cleared`,
+          `[Notify] Sending broadcast for trip ${tripId} with delay is cleared`,
         );
 
         try {
           broadcastTripLogic({
-            tripId: truckTripId,
+            tripId: tripId,
             message: messageText,
             actorUid: request.auth.uid || "SYSTEM",
           }).catch((err) => console.error("Broadcast failed:", err));
@@ -124,7 +134,7 @@ exports.clearTruckDelay = onCall(
 
     return {
       success: true,
-      truckTripId,
+      tripId,
       delayed: false,
     };
   },

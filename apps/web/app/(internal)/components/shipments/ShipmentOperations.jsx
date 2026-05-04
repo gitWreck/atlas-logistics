@@ -8,7 +8,7 @@ import {
 } from "@fortawesome/free-solid-svg-icons";
 import StatusButton from "../ui/StatusButton";
 import NotifyToggle from "../messaging/NotifyToggle";
-import { runAction } from "@/app/utility/utilities";
+import { runAction, updatedBy } from "@/app/utility/utilities";
 import { SHIPMENT_STATUS } from "@/app/utility/constant/templates";
 import { getWidgetThemeClasses } from "@/app/utility/constant/theme";
 import { updateShipmentStatus } from "@/app/utility/FirebaseFunctions";
@@ -18,6 +18,7 @@ export default function ShipmentOperations({
   currentStatus,
   isDark = false,
   onRefresh,
+  profile,
 }) {
   const [statusSelect, setStatusSelect] = useState("");
   const [remarks, setRemarks] = useState("");
@@ -106,6 +107,7 @@ export default function ShipmentOperations({
                   newStatus: statusSelect,
                   notify: notifySms,
                   remarks,
+                  updatedBy: updatedBy(profile),
                 }),
               () => {
                 setStatusSelect("");

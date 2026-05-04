@@ -3,6 +3,7 @@
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const admin = require("firebase-admin");
 const { requireAuth } = require("../utilities/helpers");
+const { writeShipmentActionLog } = require("../utilities/shipmentLogger");
 
 if (!admin.apps.length) admin.initializeApp();
 const db = admin.firestore();
@@ -201,12 +202,15 @@ exports.bulkUpdateShipmentStatus = onCall(
       });
 
       // 7. GLOBAL AUDIT LOG
-      const auditRef = db.collection("audit_logs").doc();
-      batch.set(auditRef, {
+      writeShipmentActionLog({
+        db,
+        batch,
+        collection: "audit_logs",
         action: "BULK_STATUS_UPDATE",
         tripId: tripId,
         newStatus: newStatus,
         count: updateCount,
+        actorId: uid,
         performedBy: uid,
         timestamp: timestamp,
       });

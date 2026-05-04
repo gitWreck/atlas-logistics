@@ -211,10 +211,16 @@ export default function ReceivePackageForm({
         onClick={handleClose}
       />
 
-      <div className={`relative w-full max-w-5xl rounded-2xl shadow-2xl flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-200 border ${isDark ? "bg-slate-900 border-slate-700" : "bg-white border-slate-200"}`}>
+      <div
+        className={`relative w-full max-w-5xl rounded-2xl shadow-2xl flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-200 border ${isDark ? "bg-slate-900 border-slate-700" : "bg-white border-slate-200"}`}
+      >
         {/* HEADER */}
-        <div className={`flex items-center justify-between p-6 border-b rounded-t-2xl ${isDark ? "border-slate-800 bg-slate-900/50" : "border-slate-200 bg-slate-50"}`}>
-          <h2 className={`text-xl font-bold flex items-center gap-3 ${isDark ? "text-white" : "text-slate-900"}`}>
+        <div
+          className={`flex items-center justify-between p-6 border-b rounded-t-2xl ${isDark ? "border-slate-800 bg-slate-900/50" : "border-slate-200 bg-slate-50"}`}
+        >
+          <h2
+            className={`text-xl font-bold flex items-center gap-3 ${isDark ? "text-white" : "text-slate-900"}`}
+          >
             <div className="p-2 bg-blue-500/10 rounded-lg">
               <FontAwesomeIcon icon={faBoxOpen} className="text-blue-500" />
             </div>
@@ -222,7 +228,11 @@ export default function ReceivePackageForm({
           </h2>
           <button
             onClick={handleClose}
-            className={isDark ? "text-slate-500 hover:text-white transition-colors" : "text-slate-500 hover:text-slate-900 transition-colors"}
+            className={
+              isDark
+                ? "text-slate-500 hover:text-white transition-colors"
+                : "text-slate-500 hover:text-slate-900 transition-colors"
+            }
           >
             ✕
           </button>
@@ -232,19 +242,27 @@ export default function ReceivePackageForm({
         <div className="flex-1 overflow-y-auto p-6 custom-scrollbar">
           <form id="receive-form" onSubmit={handleSubmit} className="space-y-8">
             {/* --- 4. NEW: ROUTE / WAREHOUSE SELECTION (ON TOP) --- */}
-            <div className={`p-4 rounded-xl border ${isDark ? "bg-slate-950/50 border-slate-800" : "bg-slate-50 border-slate-200"}`}>
-              <h3 className={`text-sm font-bold uppercase tracking-wider mb-4 flex items-center gap-2 ${isDark ? "text-slate-400" : "text-slate-600"}`}>
+            <div
+              className={`p-4 rounded-xl border ${isDark ? "bg-slate-950/50 border-slate-800" : "bg-slate-50 border-slate-200"}`}
+            >
+              <h3
+                className={`text-sm font-bold uppercase tracking-wider mb-4 flex items-center gap-2 ${isDark ? "text-slate-400" : "text-slate-600"}`}
+              >
                 <FontAwesomeIcon icon={faRoute} /> Shipment Route
               </h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {/* ORIGIN WAREHOUSE */}
                 <div className="space-y-1">
                   <div className="flex justify-between">
-                    <label className={`text-xs font-bold uppercase ${isDark ? "text-blue-400" : "text-blue-600"}`}>
+                    <label
+                      className={`text-xs font-bold uppercase ${isDark ? "text-blue-400" : "text-blue-600"}`}
+                    >
                       Origin Warehouse
                     </label>
                     {routeInfo.originCode && (
-                      <span className={`text-[10px] font-mono px-1.5 rounded ${isDark ? "bg-blue-500/20 text-blue-400" : "bg-blue-500/20 text-blue-600"}`}>
+                      <span
+                        className={`text-[10px] font-mono px-1.5 rounded ${isDark ? "bg-blue-500/20 text-blue-400" : "bg-blue-500/20 text-blue-600"}`}
+                      >
                         {routeInfo.originCode}
                       </span>
                     )}
@@ -276,11 +294,15 @@ export default function ReceivePackageForm({
                 {/* DESTINATION WAREHOUSE */}
                 <div className="space-y-1">
                   <div className="flex justify-between">
-                    <label className={`text-xs font-bold uppercase ${isDark ? "text-emerald-400" : "text-emerald-600"}`}>
+                    <label
+                      className={`text-xs font-bold uppercase ${isDark ? "text-emerald-400" : "text-emerald-600"}`}
+                    >
                       Destination Warehouse
                     </label>
                     {routeInfo.destinationCode && (
-                      <span className={`text-[10px] font-mono px-1.5 rounded ${isDark ? "bg-emerald-500/20 text-emerald-400" : "bg-emerald-500/20 text-emerald-600"}`}>
+                      <span
+                        className={`text-[10px] font-mono px-1.5 rounded ${isDark ? "bg-emerald-500/20 text-emerald-400" : "bg-emerald-500/20 text-emerald-600"}`}
+                      >
                         {routeInfo.destinationCode}
                       </span>
                     )}
@@ -333,7 +355,9 @@ export default function ReceivePackageForm({
             {/* ROW 3: ITEMS LIST (Unchanged) */}
             <div className="pt-2">
               <div className="flex justify-between items-center mb-4">
-                <h3 className={`text-sm font-bold uppercase tracking-wider ${isDark ? "text-slate-400" : "text-slate-600"}`}>
+                <h3
+                  className={`text-sm font-bold uppercase tracking-wider ${isDark ? "text-slate-400" : "text-slate-600"}`}
+                >
                   Package Items
                 </h3>
                 <button
@@ -354,13 +378,17 @@ export default function ReceivePackageForm({
                     {/* TOP ROW: PHYSICAL DETAILS */}
                     <div className="flex gap-4 items-start">
                       {/* Index Badge */}
-                      <div className={`flex items-center justify-center w-8 h-8 rounded-lg font-mono text-xs border mt-6 ${isDark ? "bg-slate-900 text-slate-500 border-slate-800" : "bg-white text-slate-600 border-slate-300"}`}>
+                      <div
+                        className={`flex items-center justify-center w-8 h-8 rounded-lg font-mono text-xs border mt-6 ${isDark ? "bg-slate-900 text-slate-500 border-slate-800" : "bg-white text-slate-600 border-slate-300"}`}
+                      >
                         {idx + 1}
                       </div>
 
                       {/* Packaging Type */}
                       <div className="w-32">
-                        <label className={`text-[10px] uppercase font-bold mb-1 block pl-1 ${isDark ? "text-slate-500" : "text-slate-600"}`}>
+                        <label
+                          className={`text-[10px] uppercase font-bold mb-1 block pl-1 ${isDark ? "text-slate-500" : "text-slate-600"}`}
+                        >
                           Type
                         </label>
                         <select
@@ -384,7 +412,9 @@ export default function ReceivePackageForm({
 
                       {/* Description */}
                       <div className="flex-1">
-                        <label className={`text-[10px] uppercase font-bold mb-1 block pl-1 ${isDark ? "text-slate-500" : "text-slate-600"}`}>
+                        <label
+                          className={`text-[10px] uppercase font-bold mb-1 block pl-1 ${isDark ? "text-slate-500" : "text-slate-600"}`}
+                        >
                           Description
                         </label>
                         <input
@@ -401,7 +431,9 @@ export default function ReceivePackageForm({
 
                       {/* Weight */}
                       <div className="w-24 relative">
-                        <label className={`text-[10px] uppercase font-bold mb-1 block pl-1 ${isDark ? "text-slate-500" : "text-slate-600"}`}>
+                        <label
+                          className={`text-[10px] uppercase font-bold mb-1 block pl-1 ${isDark ? "text-slate-500" : "text-slate-600"}`}
+                        >
                           Weight
                         </label>
                         <input
@@ -414,7 +446,9 @@ export default function ReceivePackageForm({
                           }
                           required
                         />
-                        <span className={`absolute right-3 top-[29px] text-xs font-bold pointer-events-none ${isDark ? "text-slate-500" : "text-slate-500"}`}>
+                        <span
+                          className={`absolute right-3 top-[29px] text-xs font-bold pointer-events-none ${isDark ? "text-slate-500" : "text-slate-500"}`}
+                        >
                           KG
                         </span>
                       </div>
@@ -441,11 +475,15 @@ export default function ReceivePackageForm({
                     <div className="flex gap-4 mt-3 pl-12 items-end">
                       {/* Declared Value */}
                       <div className="w-40 relative">
-                        <label className={`text-[10px] uppercase font-bold mb-1 block pl-1 ${isDark ? "text-slate-500" : "text-slate-600"}`}>
+                        <label
+                          className={`text-[10px] uppercase font-bold mb-1 block pl-1 ${isDark ? "text-slate-500" : "text-slate-600"}`}
+                        >
                           Declared Value
                         </label>
                         <div className="relative">
-                          <span className={`absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold ${isDark ? "text-slate-500" : "text-slate-600"}`}>
+                          <span
+                            className={`absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold ${isDark ? "text-slate-500" : "text-slate-600"}`}
+                          >
                             ₱
                           </span>
                           <input
@@ -472,7 +510,9 @@ export default function ReceivePackageForm({
                           className={`px-3 py-2 rounded-lg border text-xs font-bold flex items-center gap-2 transition-all ${
                             item.isFragile
                               ? "bg-amber-500/10 border-amber-500 text-amber-500"
-                              : isDark ? "bg-slate-900 border-slate-700 text-slate-500 hover:border-slate-500 hover:text-slate-300" : "bg-white border-slate-300 text-slate-600 hover:border-slate-400 hover:text-slate-800"
+                              : isDark
+                                ? "bg-slate-900 border-slate-700 text-slate-500 hover:border-slate-500 hover:text-slate-300"
+                                : "bg-white border-slate-300 text-slate-600 hover:border-slate-400 hover:text-slate-800"
                           }`}
                         >
                           <FontAwesomeIcon icon={faWineGlass} />
@@ -485,7 +525,9 @@ export default function ReceivePackageForm({
                           className={`px-3 py-2 rounded-lg border text-xs font-bold flex items-center gap-2 transition-all ${
                             item.isPerishable
                               ? "bg-cyan-500/10 border-cyan-500 text-cyan-500"
-                              : isDark ? "bg-slate-900 border-slate-700 text-slate-500 hover:border-slate-500 hover:text-slate-300" : "bg-white border-slate-300 text-slate-600 hover:border-slate-400 hover:text-slate-800"
+                              : isDark
+                                ? "bg-slate-900 border-slate-700 text-slate-500 hover:border-slate-500 hover:text-slate-300"
+                                : "bg-white border-slate-300 text-slate-600 hover:border-slate-400 hover:text-slate-800"
                           }`}
                         >
                           <FontAwesomeIcon icon={faSnowflake} />
@@ -511,7 +553,9 @@ export default function ReceivePackageForm({
         </div>
 
         {/* FOOTER */}
-        <div className={`p-6 border-t rounded-b-2xl ${isDark ? "border-slate-800 bg-slate-900/50" : "border-slate-200 bg-slate-50"}`}>
+        <div
+          className={`p-6 border-t rounded-b-2xl ${isDark ? "border-slate-800 bg-slate-900/50" : "border-slate-200 bg-slate-50"}`}
+        >
           <button
             type="submit"
             form="receive-form"

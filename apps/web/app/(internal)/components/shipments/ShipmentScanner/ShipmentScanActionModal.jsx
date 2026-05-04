@@ -20,6 +20,7 @@ import {
   LoadedStatusPrompt,
   LockPrompt,
   AssignmentPrompt,
+  HandoffPrompt,
 } from "./Prompts";
 import {
   ActionSelector,
@@ -36,7 +37,9 @@ export default function ShipmentScanActionModal({
   isDark = false,
   onResolveScan,
   onConfirmOperation,
+  onRefresh,
   user,
+  profile,
 }) {
   const theme = getModalThemeClasses(isDark);
   const actionTheme = getModalActionClasses();
@@ -48,7 +51,9 @@ export default function ShipmentScanActionModal({
     onResolveScan,
     onConfirmOperation,
     onClose,
+    onRefresh,
     user,
+    profile,
   });
 
   if (!isOpen) return null;
@@ -87,7 +92,45 @@ export default function ShipmentScanActionModal({
             actions={actions}
           />
 
-          {state.needsNextTrip ? (
+          {state.action === "UNLOAD" &&
+            !state.needsHandoff &&
+            !state.needsNextTrip &&
+            !state.needsArrival &&
+            !state.needsUnlock &&
+            !state.resolvedItem &&
+            !state.needsAssignmentItem && (
+              <button
+                type="button"
+                onClick={actions.handleReviewHandoff}
+                disabled={state.loading}
+                className={`w-full rounded-xl border px-4 py-3 text-sm font-bold text-left ${theme.panelSurface}`}
+              >
+                Review manifest handoff
+                <span className="block text-[11px] font-normal opacity-60">
+                  Manifest reconciliation
+                </span>
+              </button>
+            )}
+
+          {state.needsHandoff ? (
+            <HandoffPrompt
+              theme={theme}
+              summary={state.handoffSummary}
+              trips={state.availableTrips}
+              selectedTrip={state.selectedNextTrip}
+              onSelectTrip={actions.setSelectedNextTrip}
+              missingRemarks={state.missingRemarks}
+              onRemarkChange={(shipmentId, value) =>
+                actions.setMissingRemarks((prev) => ({
+                  ...prev,
+                  [shipmentId]: value,
+                }))
+              }
+              onAssign={actions.handleAssignNextTrip}
+              onRefresh={actions.handleReviewHandoff}
+              btnStatus={state.btnStatus}
+            />
+          ) : state.needsNextTrip ? (
             <NextTripPrompt
               theme={theme}
               item={state.resolvedItem}

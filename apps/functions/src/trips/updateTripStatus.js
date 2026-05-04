@@ -3,14 +3,24 @@
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 // const { defineSecret } = require("firebase-functions/params"); // 1. Import this
 const admin = require("firebase-admin");
-const { requireRole, requireString } = require("../utilities/helpers");
-const { VALID_TRIP_STATUSES } = require("../utilities/dataDetails");
+const {
+  requireRole,
+  requireString,
+} = require("../../../../../../atlas-trucking-platform/apps/functions/src/utilities/helpers");
+const {
+  VALID_TRIP_STATUSES,
+} = require("../../../../../../atlas-trucking-platform/apps/functions/src/utilities/dataDetails");
 const {
   SEMAPHORE_API_KEY,
   SEMAPHORE_SENDER_NAME,
-} = require("../../shared/sms-service");
-const { broadcastTripLogic } = require("../messaging/broadcastTripMessage"); // Import if you want to call it directly
-const { STATUS_MESSAGES } = require("../utilities/dataDetails");
+} = require("../../../../../../atlas-trucking-platform/apps/functions/shared/sms-service");
+const {
+  broadcastTripLogic,
+} = require("../../../../../../atlas-trucking-platform/apps/functions/src/messaging/broadcastTripMessage"); // Import if you want to call it directly
+const {
+  STATUS_MESSAGES,
+} = require("../../../../../../atlas-trucking-platform/apps/functions/src/utilities/dataDetails");
+const { writeTripActionLog } = require("../utilities/tripLogger");
 
 if (!admin.apps.length) admin.initializeApp();
 const db = admin.firestore();
@@ -91,9 +101,12 @@ exports.updateTripStatus = onCall(
       tx.update(tripRef, updates);
 
       // 4. Audit Log
-      const logRef = db.collection("audit_logs").doc();
-      tx.set(logRef, {
+      writeTripActionLog({
+        db,
+        tx,
+        collection: "audit_logs",
         action: "FORCE_UPDATE_TRIP_STATUS",
+        tripId,
         targetId: tripId,
         targetCollection: "truck_trips",
         details: {
@@ -101,7 +114,9 @@ exports.updateTripStatus = onCall(
           newStatus,
         },
         at: admin.firestore.FieldValue.serverTimestamp(),
-        by: uid,
+        actorId: uid,
+        actorName,
+        actorRole: req.auth.token?.role || userSnap.data()?.role || null,
         note: `Status forced from ${oldStatus} to ${newStatus} by ${actorName}`,
       });
 
@@ -188,7 +203,7 @@ exports.updateTripStatus = onCall(
         // Since this is "server-side to server-side", we can just call the logic directly.
 
         try {
-          broadcastTripLogic({
+          await broadcastTripLogic({
             tripId: tripId,
             message: messageText,
             actorUid: uid || "SYSTEM",

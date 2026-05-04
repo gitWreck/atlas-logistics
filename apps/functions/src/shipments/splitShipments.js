@@ -3,6 +3,7 @@
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const admin = require("firebase-admin");
 const { FieldValue } = admin.firestore;
+const { writeShipmentActionLog } = require("../utilities/shipmentLogger");
 
 if (!admin.apps.length) admin.initializeApp();
 const db = admin.firestore();
@@ -59,9 +60,9 @@ exports.splitShipments = onCall(
       const originData = originSnap.data();
       const allPackages = originData.packages || [];
 
-      // itemsToSplit expected: [{ trackingNumber: "AT-01", splitQty: 10 }]
+      // itemsToSplit expected: [{ packageId: "AT-01", splitQty: 10 }]
       const splitMap = new Map(
-        itemsToSplit.map((i) => [i.trackingNumber, i.splitQty]),
+        itemsToSplit.map((i) => [i.packageId, i.splitQty]),
       );
 
       const keepPackages = [];
@@ -69,8 +70,8 @@ exports.splitShipments = onCall(
 
       // --- PHASE 2: HYBRID SPLIT LOGIC ---
       allPackages.forEach((pkg) => {
-        if (splitMap.has(pkg.trackingNumber)) {
-          const splitQty = Number(splitMap.get(pkg.trackingNumber));
+        if (splitMap.has(pkg.packageId)) {
+          const splitQty = Number(splitMap.get(pkg.packageId));
           const originalQty = Number(pkg.quantity || 1);
 
           if (splitQty >= originalQty) {
@@ -85,7 +86,7 @@ exports.splitShipments = onCall(
             movePackages.push({
               ...pkg,
               quantity: splitQty,
-              trackingNumber: `${pkg.trackingNumber}-S`, // Suffix for traceability
+              packageId: `${pkg.packageId}-S`, // Suffix for traceability
               status: "RECEIVED",
               loadedQty: 0,
               loadedOnTrip: null,
@@ -109,11 +110,11 @@ exports.splitShipments = onCall(
       tx.set(newShipmentRef, {
         ...originData,
         id: newShipmentId,
-        trackingNumber: newShipmentId,
+        packageId: newShipmentId,
         packages: movePackages,
-        packageBarcodes: movePackages.map((p) => p.trackingNumber),
+        packageBarcodes: movePackages.map((p) => p.packageId),
         status: "RECEIVED",
-        currentTruckTripId: null,
+        currentTripId: null,
         totals: newShipmentTotals,
         parentShipmentId: originalShipmentId,
         createdAt: FieldValue.serverTimestamp(),
@@ -132,7 +133,7 @@ exports.splitShipments = onCall(
       // 2. Update Original Shipment
       tx.update(originRef, {
         packages: keepPackages,
-        packageBarcodes: keepPackages.map((p) => p.trackingNumber),
+        packageBarcodes: keepPackages.map((p) => p.packageId),
         totals: originShipmentTotals,
         updatedAt: FieldValue.serverTimestamp(),
         updatedBy: uid,
@@ -146,10 +147,10 @@ exports.splitShipments = onCall(
       });
 
       // 3. HANDSHAKE: Sync with Active Truck Trip
-      if (originData.currentTruckTripId) {
+      if (originData.currentTripId) {
         const tripRef = db
           .collection("truck_trips")
-          .doc(originData.currentTruckTripId);
+          .doc(originData.currentTripId);
         const tripShipmentRef = tripRef
           .collection("trip_shipments")
           .doc(originalShipmentId);
@@ -171,11 +172,16 @@ exports.splitShipments = onCall(
       }
 
       // 4. Global Audit Log
-      tx.set(db.collection("audit_logs").doc(), {
+      writeShipmentActionLog({
+        db,
+        tx,
+        collection: "audit_logs",
         action: "SPLIT_SHIPMENT",
+        shipmentId: originalShipmentId,
         originId: originalShipmentId,
         newId: newShipmentId,
         movedPieces: newShipmentTotals.totalContentQty,
+        actorId: uid,
         actor: uid,
         timestamp: FieldValue.serverTimestamp(),
         remarks: remarks || null,
