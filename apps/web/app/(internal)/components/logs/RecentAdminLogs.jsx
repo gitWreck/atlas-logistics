@@ -127,8 +127,7 @@ export default function RecentAdminLogs({ isDark = false }) {
   );
 
   const collectionOptions = useMemo(
-    () =>
-      Array.from(new Set(logs.map(getCollection).filter(Boolean))).sort(),
+    () => Array.from(new Set(logs.map(getCollection).filter(Boolean))).sort(),
     [logs],
   );
 
@@ -182,7 +181,7 @@ export default function RecentAdminLogs({ isDark = false }) {
             className={`${theme.logTitleIndigo} font-bold text-sm uppercase flex items-center gap-2`}
           >
             <FontAwesomeIcon icon={faShieldAlt} />
-            Recent Admin Logs
+            Recent Logs
           </h3>
           <span
             className={`text-[10px] px-2 py-1 rounded-full border ${theme.countBadge}`}
@@ -281,14 +280,18 @@ export default function RecentAdminLogs({ isDark = false }) {
                     </span>
                   </div>
 
-                  <p className={`mt-3 text-xs line-clamp-3 ${theme.logMessageText}`}>
+                  <p
+                    className={`mt-3 text-xs line-clamp-3 ${theme.logMessageText}`}
+                  >
                     {stringifyDetails(log)}
                   </p>
 
                   <div className="mt-3 grid grid-cols-2 gap-3 text-[11px]">
                     <div>
                       <div className={theme.mobileCardMuted}>Target</div>
-                      <div className={`font-mono truncate ${theme.cellPrimary}`}>
+                      <div
+                        className={`font-mono truncate ${theme.cellPrimary}`}
+                      >
                         {target}
                       </div>
                       <div className={theme.cellSecondary}>
@@ -315,7 +318,9 @@ export default function RecentAdminLogs({ isDark = false }) {
       </div>
 
       <div className="hidden md:block flex-1 overflow-auto custom-scrollbar max-h-[520px]">
-        <table className={`w-full min-w-[860px] text-left text-xs ${theme.tableText}`}>
+        <table
+          className={`w-full min-w-[860px] text-left text-xs ${theme.tableText}`}
+        >
           <thead className={`sticky top-0 z-[1] uppercase ${theme.thead}`}>
             <tr>
               <th className="px-4 py-3 font-semibold">Action</th>
@@ -379,7 +384,9 @@ export default function RecentAdminLogs({ isDark = false }) {
                         {formatLabel(targetCollection)}
                       </div>
                     </td>
-                    <td className={`px-4 py-3 align-top ${theme.logMessageText}`}>
+                    <td
+                      className={`px-4 py-3 align-top ${theme.logMessageText}`}
+                    >
                       <div
                         className="line-clamp-2 max-w-[360px]"
                         title={stringifyDetails(log)}
