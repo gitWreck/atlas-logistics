@@ -318,7 +318,7 @@ export default function RecentSmsLogs({ isDark = false }) {
               </tr>
             ) : (
               filteredLogs.map((log) => {
-                console.log("Rendering log:", log);
+                // console.log("Rendering log:", log);
                 const type = log.type || log.action || "MESSAGE";
                 const isBroadcast = type.includes("BROADCAST");
                 const deliveryState = getDeliveryState(log);
