@@ -5,17 +5,21 @@ import { useState, useCallback } from "react";
 // 1. Import your centralized Firebase functions
 import {
   bulkAssignShipments,
+  finalizeTripUnloadHandoff,
   updateTripStatus,
   unlockTripManifest,
   generateTripManifest,
 } from "@/app/utility/FirebaseFunctions"; // Adjust path if your file is located elsewhere
+import { updatedBy } from "@/app/utility/utilities";
 
 export default function useScannerLogic({
   trip,
   onResolveScan,
   onConfirmOperation,
   onClose,
+  onRefresh,
   user,
+  profile,
 }) {
   const tripId = trip?.tripId || trip?.id || "";
 
@@ -38,6 +42,9 @@ export default function useScannerLogic({
   const [needsNextTrip, setNeedsNextTrip] = useState(false);
   const [availableTrips, setAvailableTrips] = useState([]);
   const [selectedNextTrip, setSelectedNextTrip] = useState("");
+  const [needsHandoff, setNeedsHandoff] = useState(false);
+  const [handoffSummary, setHandoffSummary] = useState(null);
+  const [missingRemarks, setMissingRemarks] = useState({});
 
   // UI States
   const [loading, setLoading] = useState(false);
@@ -56,6 +63,9 @@ export default function useScannerLogic({
     setNeedsLoadedStatus(false);
     setNeedsLock(false);
     setNeedsNextTrip(false);
+    setNeedsHandoff(false);
+    setHandoffSummary(null);
+    setMissingRemarks({});
     setBtnStatus("IDLE");
     setLoading(false);
     setError("");
@@ -68,6 +78,9 @@ export default function useScannerLogic({
     setQuantities({});
     setNeedsAssignmentItem(null);
     setNeedsNextTrip(false);
+    setNeedsHandoff(false);
+    setHandoffSummary(null);
+    setMissingRemarks({});
     setAvailableTrips([]);
     setSelectedNextTrip("");
     setBtnStatus("IDLE");
@@ -78,10 +91,90 @@ export default function useScannerLogic({
   const getPackageAvailableQty = useCallback((pkg, scanAction) => {
     if (!pkg) return 0;
     if (scanAction === "LOAD") {
-      return Math.max(0, Number(pkg.quantity || 0) - Number(pkg.loadedQty || 0));
+      return Math.max(
+        0,
+        Number(pkg.quantity || 0) - Number(pkg.loadedQty || 0),
+      );
     }
     return Math.max(0, Number(pkg.loadedQty || 0));
   }, []);
+
+  const fetchJsonWithAuth = useCallback(
+    async (url) => {
+      const token = await user?.getIdToken();
+      const res = await fetch(url, {
+        headers: { Authorization: `Bearer ${token}` },
+        cache: "no-store",
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to load scanner data.");
+      }
+
+      return data;
+    },
+    [user],
+  );
+
+  const fetchDeliveryTrips = useCallback(async () => {
+    const tripData = await fetchJsonWithAuth("/api/trips/delivery");
+    const trips = tripData.trips || [];
+
+    setAvailableTrips(trips);
+    setSelectedNextTrip((current) => current || trips[0]?.id || "");
+
+    return trips;
+  }, [fetchJsonWithAuth]);
+
+  const loadHandoffReview = useCallback(
+    async ({ openWhenReadyOnly = false } = {}) => {
+      if (!tripId) return null;
+
+      setLoading(true);
+      setError("");
+
+      try {
+        const [summary, trips] = await Promise.all([
+          fetchJsonWithAuth(
+            `/api/trips/${encodeURIComponent(tripId)}/handoff-reconciliation`,
+          ),
+          fetchDeliveryTrips(),
+        ]);
+
+        const seededRemarks = {};
+        (summary.missingShipments || []).forEach((item) => {
+          seededRemarks[item.id] = missingRemarks[item.id] || "";
+        });
+
+        setHandoffSummary(summary);
+        setMissingRemarks(seededRemarks);
+
+        const shouldOpen =
+          !openWhenReadyOnly ||
+          (summary.ready && summary.totals?.manifestShipments > 0);
+
+        if (shouldOpen) {
+          setNeedsHandoff(true);
+          setResolvedItem(null);
+          setNeedsAssignmentItem(null);
+          setNeedsNextTrip(false);
+        }
+
+        if (!trips.length) {
+          setError("No available DELIVERY trips found.");
+        }
+
+        return summary;
+      } catch (err) {
+        setError(err.message || "Failed to reconcile manifest.");
+        return null;
+      } finally {
+        setLoading(false);
+      }
+    },
+    [fetchDeliveryTrips, fetchJsonWithAuth, missingRemarks, tripId],
+  );
 
   const processItems = useCallback(
     async ({ item, code, itemsToProcess }) => {
@@ -95,24 +188,16 @@ export default function useScannerLogic({
       });
 
       if (action === "UNLOAD") {
-        const token = await user?.getIdToken();
-        const res = await fetch("/api/trips/delivery", {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        const tripData = await res.json();
+        const summary = await loadHandoffReview({ openWhenReadyOnly: true });
 
-        if (tripData.trips?.length > 0) {
-          setResolvedItem(item);
-          setAvailableTrips(tripData.trips);
-          setSelectedNextTrip(tripData.trips[0].id);
-          setNeedsNextTrip(true);
+        if (summary?.ready) {
           return;
         }
       }
 
       resetScanResult();
     },
-    [action, onConfirmOperation, resetScanResult, tripId, user],
+    [action, loadHandoffReview, onConfirmOperation, resetScanResult, tripId],
   );
 
   const handleResolveScan = async (code) => {
@@ -202,6 +287,7 @@ export default function useScannerLogic({
     const success = await executeFirebaseCall(bulkAssignShipments, {
       tripId,
       shipmentIds: [needsAssignmentItem.shipmentId],
+      updatedBy: updatedBy(profile),
     });
     if (success) {
       setRecentlyAssigned((prev) =>
@@ -216,7 +302,12 @@ export default function useScannerLogic({
   const handleMarkArrived = async () => {
     const success = await executeFirebaseCall(
       updateTripStatus,
-      { tripId, status: "ARRIVED", notify: false },
+      {
+        tripId,
+        status: "ARRIVED",
+        notify: false,
+        updatedBy: updatedBy(profile),
+      },
       () => {
         if (trip) trip.status = "ARRIVED";
       },
@@ -232,7 +323,7 @@ export default function useScannerLogic({
   const handleUnlockManifest = async () => {
     const success = await executeFirebaseCall(
       unlockTripManifest,
-      { tripId, reason: "Shipment has arrived" },
+      { tripId, reason: "Shipment has arrived", updatedBy: updatedBy(profile) },
       () => {
         if (trip) trip.manifestLocked = false;
       },
@@ -247,7 +338,7 @@ export default function useScannerLogic({
   const handleSetTripLoaded = async () => {
     const success = await executeFirebaseCall(
       updateTripStatus,
-      { tripId, status: "LOADED" },
+      { tripId, status: "LOADED", updatedBy: updatedBy(profile) },
       () => {
         if (trip) trip.status = "LOADED";
       },
@@ -263,7 +354,7 @@ export default function useScannerLogic({
   const handleLockManifest = async () => {
     const success = await executeFirebaseCall(
       generateTripManifest,
-      { tripId },
+      { tripId, updatedBy: updatedBy(profile) },
       () => {
         if (trip) {
           trip.manifestLocked = true;
@@ -282,12 +373,26 @@ export default function useScannerLogic({
   };
 
   const handleAssignNextTrip = async () => {
-    const success = await executeFirebaseCall(bulkAssignShipments, {
-      tripId: selectedNextTrip,
-      shipmentIds: [resolvedItem.shipmentId],
+    if (!selectedNextTrip) return setError("Select a delivery trip first.");
+
+    const missing = handoffSummary?.missingShipments || [];
+    const incompleteRemark = missing.find(
+      (item) => !String(missingRemarks[item.id] || "").trim(),
+    );
+
+    if (incompleteRemark) {
+      return setError(`Add remarks for ${incompleteRemark.shipmentId}.`);
+    }
+
+    const success = await executeFirebaseCall(finalizeTripUnloadHandoff, {
+      sourceTripId: tripId,
+      deliveryTripId: selectedNextTrip,
+      missingRemarks,
+      updatedBy: updatedBy(profile),
     });
     if (success)
       setTimeout(() => {
+        onRefresh?.();
         onClose?.();
         resetFlow();
       }, 1000);
@@ -313,18 +418,10 @@ export default function useScannerLogic({
         itemsToProcess,
       });
 
-      // If UNLOAD, check for next trips
       if (action === "UNLOAD") {
-        const token = await user?.getIdToken();
-        const res = await fetch("/api/trips/delivery", {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        const tripData = await res.json();
-        if (tripData.trips?.length > 0) {
-          setAvailableTrips(tripData.trips);
-          setSelectedNextTrip(tripData.trips[0].id);
-          setNeedsNextTrip(true);
-          return; // Stop here, show next trip prompt
+        const summary = await loadHandoffReview({ openWhenReadyOnly: true });
+        if (summary?.ready) {
+          return;
         }
       }
 
@@ -352,6 +449,9 @@ export default function useScannerLogic({
       needsNextTrip,
       availableTrips,
       selectedNextTrip,
+      needsHandoff,
+      handoffSummary,
+      missingRemarks,
       loading,
       error,
       btnStatus,
@@ -361,6 +461,7 @@ export default function useScannerLogic({
       setQuantities,
       setManualCode,
       setSelectedNextTrip,
+      setMissingRemarks,
       setError,
       setNeedsLoadedStatus,
       setNeedsLock,
@@ -375,6 +476,7 @@ export default function useScannerLogic({
       handleSetTripLoaded,
       handleLockManifest,
       handleAssignNextTrip,
+      handleReviewHandoff: () => loadHandoffReview(),
       handleConfirm,
     },
   };

@@ -17,7 +17,7 @@ import {
 } from "@/app/utility/FirebaseFunctions";
 import StatusButton from "../ui/StatusButton";
 import NotifyToggle from "../messaging/NotifyToggle";
-import { runAction } from "@/app/utility/utilities";
+import { runAction, updatedBy } from "@/app/utility/utilities";
 import { getWidgetThemeClasses } from "@/app/utility/constant/theme";
 
 export default function TripOperations({
@@ -25,6 +25,7 @@ export default function TripOperations({
   isLocked,
   onSuccess,
   isDark = false,
+  profile,
 }) {
   const [assignId, setAssignId] = useState("");
   const [delaySelect, setDelaySelect] = useState("");
@@ -80,6 +81,7 @@ export default function TripOperations({
                     assignShipmentToTrip({
                       trackingShipmentId: assignId,
                       tripId: tripId,
+                      updatedBy: updatedBy(profile),
                     }),
                   () => {
                     setAssignId("");
@@ -163,6 +165,7 @@ export default function TripOperations({
                       tripId,
                       status: statusSelect,
                       notify: notifySms,
+                      updatedBy: updatedBy(profile),
                     }),
                   () => {
                     setStatusSelect("");
@@ -232,6 +235,7 @@ export default function TripOperations({
                         tripId: tripId,
                         reason: finalReason,
                         notify: notifyDelay,
+                        updatedBy: updatedBy(profile),
                       }),
                     () => {
                       setDelaySelect("");
@@ -263,6 +267,7 @@ export default function TripOperations({
                       clearTruckDelay({
                         tripId: tripId,
                         notify: notifyDelay,
+                        updatedBy: updatedBy(profile),
                       }),
                     () => {
                       setDelaySelect("");

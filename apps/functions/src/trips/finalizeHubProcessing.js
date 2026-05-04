@@ -1,6 +1,7 @@
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const admin = require("firebase-admin");
 const { FieldValue } = require("firebase-admin/firestore");
+const { writeTripActionLog } = require("../utilities/tripLogger");
 
 if (!admin.apps.length) admin.initializeApp();
 const db = admin.firestore();
@@ -71,13 +72,16 @@ exports.finalizeHubProcessing = onCall(
       updatedAt: FieldValue.serverTimestamp(),
     });
 
-    // B. AUDIT LOG
-    const auditRef = db.collection("audit_logs").doc();
-    batch.set(auditRef, {
+    writeTripActionLog({
+      db,
+      batch,
+      collection: "audit_logs",
       action: actionName,
       targetCollection: "truck_trips",
       targetId: tripId,
       actorId: uid,
+      actorName: req.auth.token?.name || null,
+      actorRole: req.auth.token?.role || null,
       details: {
         tripNumber: trip.tripId || tripId,
         plateNumber: trip.truckPlateNumber || trip.plateNumber || "N/A",

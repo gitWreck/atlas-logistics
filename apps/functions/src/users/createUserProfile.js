@@ -112,12 +112,8 @@ async function assignMissingPublicUserId(uid, role) {
 exports.createUserProfile = onCall(
   { region: "asia-southeast1", maxInstances: 10 },
   async (request) => {
-    // 1. Check Admin Permissions
-    if (!request.auth || !request.auth.token.admin) {
-      throw new HttpsError(
-        "permission-denied",
-        "Only admins can create users.",
-      );
+    if (!request.auth) {
+      throw new HttpsError("unauthenticated", "Login required.");
     }
 
     const {
@@ -147,9 +143,30 @@ exports.createUserProfile = onCall(
       throw new HttpsError("invalid-argument", "Invalid user role.");
     }
 
-    try {
-      const db = admin.firestore();
+    const db = admin.firestore();
+    const requesterSnap = await db
+      .collection("users")
+      .doc(request.auth.uid)
+      .get();
+    const requester = requesterSnap.data() || {};
+    const requesterRole = requester.role?.toLowerCase();
+    const requesterActive = requester.active === true;
+    const isAdmin =
+      request.auth.token.admin === true ||
+      (requesterActive && requesterRole === "admin");
+    const canManagerCreateCustomer =
+      requesterActive &&
+      requesterRole === "manager" &&
+      normalizedRole === "customer";
 
+    if (!isAdmin && !canManagerCreateCustomer) {
+      throw new HttpsError(
+        "permission-denied",
+        "Only admins can create staff; managers can create customers.",
+      );
+    }
+
+    try {
       // 3. Create Auth User
       const userProps = {
         email,
@@ -211,6 +228,10 @@ exports.createUserProfile = onCall(
           "invalid-argument",
           "Invalid phone number format.",
         );
+      }
+
+      if (err instanceof HttpsError) {
+        throw err;
       }
 
       throw new HttpsError("internal", "Failed to create user.");

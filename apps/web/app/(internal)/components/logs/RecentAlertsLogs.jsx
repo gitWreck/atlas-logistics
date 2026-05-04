@@ -1,5 +1,6 @@
 "use client";
-import React, { useEffect, useState } from "react";
+
+import React, { useEffect, useMemo, useState } from "react";
 import {
   collection,
   query,
@@ -7,148 +8,381 @@ import {
   limit,
   onSnapshot,
 } from "firebase/firestore";
-import { db } from "@/lib/firebase"; // Adjust path
+import { db } from "@/lib/firebase";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
-  faTriangleExclamation,
   faCheckCircle,
   faClock,
+  faFilter,
+  faSearch,
+  faTriangleExclamation,
 } from "@fortawesome/free-solid-svg-icons";
 import { formatDistanceToNow } from "date-fns";
+import { getTableTheme } from "@/app/utility/constant/theme";
+
+function toDate(value) {
+  if (!value) return new Date();
+  if (typeof value.toDate === "function") return value.toDate();
+  if (value instanceof Date) return value;
+
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? new Date() : parsed;
+}
+
+function formatLabel(value) {
+  return String(value || "PENDING")
+    .replace(/[_-]/g, " ")
+    .toLowerCase()
+    .replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
+function getDetails(alert) {
+  return alert.details && typeof alert.details === "object"
+    ? alert.details
+    : {};
+}
+
+function getStatus(alert) {
+  return String(alert.status || "PENDING").toUpperCase();
+}
+
+function getReason(alert) {
+  const details = getDetails(alert);
+  return details.reason || alert.reason || alert.type || "Delay Reported";
+}
+
+function getDriverName(alert) {
+  const details = getDetails(alert);
+  return details.driverName || alert.driverName || "Unknown Driver";
+}
+
+function getNotes(alert) {
+  const details = getDetails(alert);
+  return details.notes || alert.notes || "No additional notes";
+}
 
 export default function RecentAlertsLogs({ isDark = false }) {
   const [alerts, setAlerts] = useState([]);
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("ALL");
+  const [reasonFilter, setReasonFilter] = useState("ALL");
 
   useEffect(() => {
     const q = query(
       collection(db, "admin_alerts"),
-      orderBy("createdAt", "desc"), // Newest first
-      limit(10),
+      orderBy("createdAt", "desc"),
+      limit(50),
     );
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      const data = snapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-        // Convert Timestamp to Date object safely
-        createdAt: doc.data().createdAt?.toDate() || new Date(),
-      }));
+      const data = snapshot.docs.map((doc) => {
+        const alert = doc.data();
+
+        return {
+          id: doc.id,
+          ...alert,
+          createdDate: toDate(alert.createdAt || alert.timestamp || alert.at),
+        };
+      });
+
       setAlerts(data);
     });
 
     return () => unsubscribe();
   }, []);
 
-  const containerClasses = isDark
-    ? "bg-slate-900 border-slate-800"
-    : "bg-white border-slate-200 shadow-sm";
-  const headerClasses = isDark
-    ? "bg-slate-900/50 border-slate-800"
-    : "bg-slate-50 border-slate-200";
-  const titleClasses = isDark ? "text-amber-500" : "text-amber-600";
-  const liveBadgeClasses = isDark
-    ? "bg-slate-800 text-slate-400 border-slate-700"
-    : "bg-slate-200 text-slate-600 border-slate-200";
-  const emptyClasses = isDark ? "text-slate-600" : "text-slate-500";
-  const cardUnreadClasses = isDark
-    ? "bg-amber-500/5 border-amber-500/20 hover:bg-amber-500/10"
-    : "bg-amber-50 border-amber-200 hover:bg-amber-100";
-  const cardReadClasses = isDark
-    ? "bg-slate-800/40 border-slate-700 hover:bg-slate-800"
-    : "bg-slate-50 border-slate-200 hover:bg-slate-100";
-  const driverText = isDark ? "text-slate-200" : "text-slate-900";
-  const timeText = isDark ? "text-slate-500" : "text-slate-500";
-  const tripBadgeClasses = isDark
-    ? "bg-slate-700 text-slate-300 border-slate-600"
-    : "bg-slate-100 text-slate-700 border-slate-200";
-  const reasonClasses = isDark ? "text-amber-400" : "text-amber-700";
-  const footerBorder = isDark ? "border-slate-700/50" : "border-slate-200";
-  const notesClasses = isDark ? "text-slate-400" : "text-slate-500";
+  const statusOptions = useMemo(
+    () => Array.from(new Set(alerts.map(getStatus))).sort(),
+    [alerts],
+  );
+
+  const reasonOptions = useMemo(
+    () =>
+      Array.from(
+        new Set(alerts.map((alert) => String(getReason(alert))).filter(Boolean)),
+      ).sort(),
+    [alerts],
+  );
+
+  const filteredAlerts = useMemo(() => {
+    const keyword = search.trim().toLowerCase();
+
+    return alerts.filter((alert) => {
+      const status = getStatus(alert);
+      const reason = String(getReason(alert));
+      const searchable = [
+        status,
+        reason,
+        alert.tripId,
+        alert.targetId,
+        alert.actorId,
+        getDriverName(alert),
+        getNotes(alert),
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+
+      const matchesSearch = !keyword || searchable.includes(keyword);
+      const matchesStatus =
+        statusFilter === "ALL" || status === statusFilter;
+      const matchesReason =
+        reasonFilter === "ALL" || reason === reasonFilter;
+
+      return matchesSearch && matchesStatus && matchesReason;
+    });
+  }, [alerts, search, statusFilter, reasonFilter]);
+
+  const theme = getTableTheme(isDark);
+
+  const statusClasses = {
+    UNREAD: theme.statusWarning,
+    PENDING: theme.statusWarning,
+    APPROVED: theme.statusSuccess,
+    RESOLVED: theme.statusSuccess,
+    READ: theme.roleBadge,
+  };
 
   return (
     <div
-      className={`border rounded-xl overflow-hidden flex flex-col h-full shadow-lg ${containerClasses}`}
+      className={`border rounded-xl overflow-hidden flex flex-col h-full shadow-lg ${theme.container}`}
     >
       <div
-        className={`px-5 py-4 border-b flex justify-between items-center sticky top-0 z-10 backdrop-blur-md ${headerClasses}`}
+        className={`px-5 py-4 border-b flex flex-col gap-3 sticky top-0 z-10 backdrop-blur-md ${theme.header}`}
       >
-        <h3
-          className={`${titleClasses} font-bold text-sm uppercase flex items-center gap-2`}
-        >
-          <FontAwesomeIcon icon={faTriangleExclamation} />
-          Recent Delays & Alerts
-        </h3>
-        <span
-          className={`text-[10px] px-2 py-1 rounded-full border ${liveBadgeClasses}`}
-        >
-          Live Feed
-        </span>
+        <div className="flex items-center justify-between gap-3">
+          <h3
+            className={`${theme.logTitleAmber} font-bold text-sm uppercase flex items-center gap-2`}
+          >
+            <FontAwesomeIcon icon={faTriangleExclamation} />
+            Recent Delays & Alerts
+          </h3>
+          <span
+            className={`text-[10px] px-2 py-1 rounded-full border ${theme.countBadge}`}
+          >
+            {filteredAlerts.length}/{alerts.length}
+          </span>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-[1fr_140px_160px] gap-2">
+          <div className="relative">
+            <FontAwesomeIcon
+              icon={faSearch}
+              className={`absolute left-3 top-2.5 text-xs ${theme.inputIcon}`}
+            />
+            <input
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="Search trip, driver, reason..."
+              className={`w-full border rounded-lg pl-8 pr-3 py-2 text-xs outline-none focus:border-amber-500 ${theme.input}`}
+            />
+          </div>
+
+          <div className="relative">
+            <FontAwesomeIcon
+              icon={faFilter}
+              className={`absolute left-3 top-2.5 text-xs ${theme.inputIcon}`}
+            />
+            <select
+              value={statusFilter}
+              onChange={(event) => setStatusFilter(event.target.value)}
+              className={`w-full border rounded-lg pl-8 pr-3 py-2 text-xs outline-none appearance-none focus:border-amber-500 ${theme.input}`}
+            >
+              <option value="ALL">All Status</option>
+              {statusOptions.map((status) => (
+                <option key={status} value={status}>
+                  {formatLabel(status)}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <select
+            value={reasonFilter}
+            onChange={(event) => setReasonFilter(event.target.value)}
+            className={`w-full border rounded-lg px-3 py-2 text-xs outline-none appearance-none focus:border-amber-500 ${theme.input}`}
+          >
+            <option value="ALL">All Reasons</option>
+            {reasonOptions.map((reason) => (
+              <option key={reason} value={reason}>
+                {formatLabel(reason)}
+              </option>
+            ))}
+          </select>
+        </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-2 space-y-2 custom-scrollbar">
-        {alerts.length === 0 ? (
-          <div
-            className={`h-full flex items-center justify-center text-xs italic ${emptyClasses}`}
-          >
-            No alerts recorded.
-          </div>
-        ) : (
-          alerts.map((alert) => (
-            <div
-              key={alert.id}
-              className={`p-3 rounded-lg border flex flex-col gap-1 transition-all ${
-                alert.status === "UNREAD" ? cardUnreadClasses : cardReadClasses
-              }`}
-            >
-              {/* Header: Driver & Time */}
-              <div className="flex justify-between items-start">
-                <span className={`font-bold text-xs ${driverText}`}>
-                  {alert.details.driverName || "Unknown Driver"}
-                </span>
-                <span className={`text-[10px] whitespace-nowrap ${timeText}`}>
-                  {formatDistanceToNow(alert.createdAt, { addSuffix: true })}
-                </span>
-              </div>
-
-              {/* Body: Reason & Trip */}
-              <div className="flex items-center gap-2 mt-1">
-                <span
-                  className={`px-1.5 py-0.5 rounded text-[10px] font-mono border ${tripBadgeClasses}`}
-                >
-                  {alert.tripId || "No Trip"}
-                </span>
-                <span className={`text-xs font-bold ${reasonClasses}`}>
-                  {alert.details.reason?.replace(/_/g, " ") || "Delay Reported"}
-                </span>
-              </div>
-
-              {/* Status Footer */}
-              <div
-                className={`flex justify-between items-center mt-2 pt-2 border-t ${footerBorder}`}
-              >
-                <p
-                  className={`text-[10px] italic truncate max-w-[200px] ${notesClasses}`}
-                >
-                  {alert.details.notes || "No additional notes"}
-                </p>
-                {alert.status ? (
-                  <span className="text-[10px] text-emerald-600 flex items-center gap-1">
-                    <FontAwesomeIcon icon={faCheckCircle} />{" "}
-                    {alert.status === "RESOLVED"
-                      ? "Resolved"
-                      : alert.status === "APPROVED"
-                        ? "Approved"
-                        : alert.status}
-                  </span>
-                ) : (
-                  <span className="text-[10px] text-amber-600 flex items-center gap-1 animate-pulse">
-                    <FontAwesomeIcon icon={faClock} /> Pending
-                  </span>
-                )}
-              </div>
+      <div className="md:hidden flex-1 overflow-auto custom-scrollbar max-h-[520px]">
+        <div className="p-2 space-y-2">
+          {filteredAlerts.length === 0 ? (
+            <div className={`px-4 py-10 text-center italic ${theme.emptyText}`}>
+              {alerts.length === 0
+                ? "No alerts recorded."
+                : "No alerts match the current filters."}
             </div>
-          ))
-        )}
+          ) : (
+            filteredAlerts.map((alert) => {
+              const status = getStatus(alert);
+              const reason = getReason(alert);
+
+              return (
+                <article
+                  key={alert.id}
+                  className={`p-4 border rounded-lg transition-colors ${theme.mobileCard} ${theme.rowHover}`}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <span
+                      className={`inline-flex items-center gap-1.5 border rounded px-2 py-1 text-[10px] font-bold ${theme.statusWarning}`}
+                    >
+                      <FontAwesomeIcon icon={faTriangleExclamation} />
+                      {formatLabel(reason)}
+                    </span>
+                    <span
+                      className={`border rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                        statusClasses[status] || theme.roleBadge
+                      }`}
+                    >
+                      {formatLabel(status)}
+                    </span>
+                  </div>
+
+                  <div className="mt-3 grid grid-cols-2 gap-3 text-[11px]">
+                    <div>
+                      <div className={theme.mobileCardMuted}>Trip</div>
+                      <div className={`font-mono truncate ${theme.cellPrimary}`}>
+                        {alert.tripId || "No Trip"}
+                      </div>
+                    </div>
+                    <div>
+                      <div className={theme.mobileCardMuted}>Driver</div>
+                      <div className={`truncate ${theme.cellPrimary}`}>
+                        {getDriverName(alert)}
+                      </div>
+                    </div>
+                    <div className="col-span-2">
+                      <div className={theme.mobileCardMuted}>Notes</div>
+                      <p className={`line-clamp-2 ${theme.logMessageText}`}>
+                        {getNotes(alert)}
+                      </p>
+                    </div>
+                    <div className="col-span-2 flex items-center gap-1 text-[10px]">
+                      <FontAwesomeIcon
+                        icon={
+                          ["RESOLVED", "APPROVED"].includes(status)
+                            ? faCheckCircle
+                            : faClock
+                        }
+                        className={
+                          ["RESOLVED", "APPROVED"].includes(status)
+                            ? "text-emerald-500"
+                            : "text-amber-500"
+                        }
+                      />
+                      <span className={theme.cellSecondary}>
+                        {formatDistanceToNow(alert.createdDate, {
+                          addSuffix: true,
+                        })}
+                      </span>
+                    </div>
+                  </div>
+                </article>
+              );
+            })
+          )}
+        </div>
+      </div>
+
+      <div className="hidden md:block flex-1 overflow-auto custom-scrollbar max-h-[420px]">
+        <table className={`w-full min-w-[760px] text-left text-xs ${theme.tableText}`}>
+          <thead className={`sticky top-0 z-[1] uppercase ${theme.thead}`}>
+            <tr>
+              <th className="px-4 py-3 font-semibold">Trip</th>
+              <th className="px-4 py-3 font-semibold">Driver</th>
+              <th className="px-4 py-3 font-semibold">Reason</th>
+              <th className="px-4 py-3 font-semibold">Notes</th>
+              <th className="px-4 py-3 font-semibold">Status</th>
+              <th className="px-4 py-3 font-semibold text-right">Time</th>
+            </tr>
+          </thead>
+          <tbody className={`divide-y ${theme.tbodyDivide}`}>
+            {filteredAlerts.length === 0 ? (
+              <tr>
+                <td
+                  colSpan={6}
+                  className={`px-4 py-10 text-center italic ${theme.emptyText}`}
+                >
+                  {alerts.length === 0
+                    ? "No alerts recorded."
+                    : "No alerts match the current filters."}
+                </td>
+              </tr>
+            ) : (
+              filteredAlerts.map((alert) => {
+                const status = getStatus(alert);
+                const reason = getReason(alert);
+
+                return (
+                  <tr
+                    key={alert.id}
+                    className={`transition-colors ${theme.rowHover}`}
+                  >
+                    <td
+                      className={`px-4 py-3 align-top font-mono ${theme.cellPrimary}`}
+                    >
+                      {alert.tripId || "No Trip"}
+                    </td>
+                    <td className={`px-4 py-3 align-top ${theme.cellPrimary}`}>
+                      <div className="max-w-[180px] truncate">
+                        {getDriverName(alert)}
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 align-top">
+                      <span
+                        className={`inline-flex items-center gap-1.5 border rounded px-2 py-1 font-bold ${theme.statusWarning}`}
+                      >
+                        <FontAwesomeIcon
+                          icon={faTriangleExclamation}
+                          className="text-[10px]"
+                        />
+                        {formatLabel(reason)}
+                      </span>
+                    </td>
+                    <td
+                      className={`px-4 py-3 align-top ${theme.logMessageText}`}
+                    >
+                      <div className="line-clamp-2 max-w-[260px]">
+                        {getNotes(alert)}
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 align-top">
+                      <span
+                        className={`inline-flex items-center gap-1 border rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                          statusClasses[status] || theme.roleBadge
+                        }`}
+                      >
+                        <FontAwesomeIcon
+                          icon={
+                            ["RESOLVED", "APPROVED"].includes(status)
+                              ? faCheckCircle
+                              : faClock
+                          }
+                        />
+                        {formatLabel(status)}
+                      </span>
+                    </td>
+                    <td
+                      className={`px-4 py-3 align-top text-right whitespace-nowrap ${theme.cellSecondary}`}
+                    >
+                      {formatDistanceToNow(alert.createdDate, {
+                        addSuffix: true,
+                      })}
+                    </td>
+                  </tr>
+                );
+              })
+            )}
+          </tbody>
+        </table>
       </div>
     </div>
   );

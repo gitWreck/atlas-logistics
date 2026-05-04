@@ -2,9 +2,9 @@ const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const admin = require("firebase-admin");
 let sendInvoicesStatusSmsLogic = null;
 try {
-  ({ sendInvoicesStatusSmsLogic } = require(
-    "../messaging/sendInvoicesStatusSmsLogic",
-  ));
+  ({
+    sendInvoicesStatusSmsLogic,
+  } = require("../messaging/original/sendInvoicesStatusSmsLogic"));
 } catch (error) {
   console.warn(
     "[INVOICE_SMS] sendInvoicesStatusSmsLogic unavailable; invoice SMS notifications disabled.",

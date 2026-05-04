@@ -1,6 +1,7 @@
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const admin = require("firebase-admin");
 const { FieldValue } = require("firebase-admin/firestore");
+const { writeTripActionLog } = require("../utilities/tripLogger");
 
 if (!admin.apps.length) admin.initializeApp();
 const db = admin.firestore();
@@ -82,14 +83,16 @@ exports.startTrip = onCall({ region: "asia-southeast1" }, async (req) => {
     batch.update(realShipmentRef, shipmentUpdate);
   });
 
-  // C. AUDIT LOG (The New Part)
-  // We add this to the same batch so it's guaranteed to be written if the updates succeed
-  const auditRef = db.collection("audit_logs").doc();
-  batch.set(auditRef, {
+  writeTripActionLog({
+    db,
+    batch,
+    collection: "audit_logs",
     action: "START_TRIP",
     targetCollection: "truck_trips",
     targetId: tripId,
     actorId: uid,
+    actorName: req.auth.token?.name || null,
+    actorRole: req.auth.token?.role || null,
     details: {
       tripNumber: trip.tripId || tripId,
       plateNumber: trip.plateNumber || "N/A",

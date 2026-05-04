@@ -14,10 +14,11 @@ import { WAREHOUSES } from "@/app/utility/WarehouseData";
 
 import RouteSelector from "./RouteSelector";
 import VehicleDetails from "./VehicleDetails";
+import TripScheduleFields from "./TripScheduleFields";
 import { getModalThemeClasses } from "@/app/utility/constant/theme";
 import { getModalActionClasses } from "@/app/utility/constant/action";
-import TripScheduleFields from "./TripScheduleFields";
 import { validateTripScheduleFields } from "@/app/utility/tripScheduleHelpers";
+import { updatedBy } from "@/app/utility/utilities";
 
 const INITIAL_FORM_STATE = {
   origin: "",
@@ -39,6 +40,7 @@ export default function CreateTripModal({
   onClose,
   onSuccess,
   isDark = false,
+  profile,
 }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -124,6 +126,7 @@ export default function CreateTripModal({
         originCity: formData.origin,
         destinationCity: formData.destination || formData.origin,
         destinationCode: formData.destinationCode || formData.originCode,
+        updatedBy: updatedBy(profile),
       });
 
       onSuccess?.();

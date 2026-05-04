@@ -82,6 +82,8 @@ exports.disableTruckTrip =
 exports.completeTrip = require("./src/trips/completeTrip").completeTrip;
 exports.updateTripStatus =
   require("./src/trips/updateTripStatus").updateTripStatus;
+exports.finalizeTripUnloadHandoff =
+  require("./src/trips/finalizeTripUnloadHandoff").finalizeTripUnloadHandoff;
 
 // Shipments
 exports.bulkShipmentAction =
@@ -111,6 +113,7 @@ exports.unlockTripManifest =
 
 // Invoices
 exports.createInvoice = require("./src/invoices/createInvoice").createInvoice;
+exports.editInvoice = require("./src/invoices/editInvoice").editInvoice;
 exports.updateInvoiceStatus =
   require("./src/invoices/updateInvoiceStatus").updateInvoiceStatus;
 

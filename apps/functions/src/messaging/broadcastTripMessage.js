@@ -3,6 +3,7 @@
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const admin = require("firebase-admin");
 const { assertAdminOrManager } = require("../system/authGuards");
+const { writeMessagingActionLog } = require("./messagingLogger");
 
 // 1. IMPORT EVERYTHING FROM SHARED SERVICE
 // We get the function AND the Secret definitions from one place.
@@ -34,7 +35,7 @@ async function broadcastTripLogic({
   // 1. Fetch Shipments to find recipients
   const shipmentsSnap = await db
     .collection("shipments")
-    .where("currentTruckTripId", "==", tripId)
+    .where("currentTripId", "==", tripId)
     .get();
 
   if (shipmentsSnap.empty) {
@@ -98,10 +99,12 @@ async function broadcastTripLogic({
 
   // 5. Audit / Logging
   try {
-    await db.collection("sms_logs").add({
+    await writeMessagingActionLog({
+      db,
       type: type,
       tripId,
       message,
+      actorId: actorUid || "SYSTEM",
       requestedBy: actorUid || "SYSTEM",
       totalTargets: totalRecipients,
       successCount,
@@ -130,6 +133,7 @@ async function broadcastTripLogic({
 exports.broadcastTripMessage = onCall(
   {
     region: "asia-southeast1",
+    maxInstances: 10,
     // 2. PASS THE IMPORTED SECRETS HERE
     // This allows this function to access the keys needed by sendSmsViaProvider
     secrets: [SEMAPHORE_API_KEY, SEMAPHORE_SENDER_NAME],

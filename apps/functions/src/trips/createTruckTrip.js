@@ -3,29 +3,32 @@
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const admin = require("firebase-admin");
 
-// 1. IMPORT YOUR HELPERS
 const {
   optionalString,
   yyyymmddFromDate,
   pad4,
   assertAdminOrManager,
-} = require("../utilities/helpers");
+} = require("../../../../../../atlas-trucking-platform/apps/functions/src/utilities/helpers");
+const { writeTripActionLog } = require("../utilities/tripLogger");
 
 if (!admin.apps.length) admin.initializeApp();
 const db = admin.firestore();
 
-/* =========================
-   FUNCTION
-========================= */
-/**
- * createTruckTrip (Callable)
- * -------------------------
- * Creates a trip doc in /truck_trips
- * - Client never writes to Firestore directly (Option B)
- * - Admin/Manager only
- * - Generates a human tripId like: TRIP-YYYYMMDD-ORIG-DEST-0001
- * - Supports idempotencyKey to prevent duplicates
- */
+function getTripTypePrefix(tripType) {
+  const normalized = String(tripType || "HUB_TRANSFER").toUpperCase();
+
+  switch (normalized) {
+    case "HUB_TRANSFER":
+      return "HUB";
+    case "LOCAL_PICKUP":
+      return "PKP";
+    case "DELIVERY":
+      return "DEL";
+    default:
+      return "TRP";
+  }
+}
+
 exports.createTruckTrip = onCall(
   { region: "asia-southeast1", maxInstances: 10 },
   async (req) => {
@@ -33,19 +36,20 @@ exports.createTruckTrip = onCall(
       throw new HttpsError("unauthenticated", "Login required");
     }
 
-    // Required route
-    const originCode = req.data?.originCode;
-    const destinationCode = req.data?.destinationCode;
+    const tripType = req.data?.tripType || "HUB_TRANSFER";
+    const tripPrefix = getTripTypePrefix(tripType);
 
-    // Optional fields
+    const originCode = optionalString(req.data?.originCode);
+    const destinationCode = optionalString(req.data?.destinationCode);
+
     const truckPlateNumber = optionalString(req.data?.truckPlateNumber);
     const truckInternalCode = optionalString(req.data?.truckInternalCode);
     const driverName = optionalString(req.data?.driverName);
     const driverId = optionalString(req.data?.driverId);
-    const helperName = req.data?.helperName;
+    const helperName = optionalString(req.data?.helperName);
 
-    const plannedDeparture = req.data?.plannedDeparture; // ISO string from frontend
-    const estimatedArrival = req.data?.estimatedArrival; // ISO string from frontend
+    const plannedDeparture = req.data?.plannedDeparture;
+    const estimatedArrival = req.data?.estimatedArrival;
 
     if (!plannedDeparture) {
       throw new HttpsError(
@@ -79,14 +83,34 @@ exports.createTruckTrip = onCall(
       );
     }
 
-    const tripType = req.data?.tripType || "HUB_TRANSFER";
-    const truckDocId = req.data?.truckId; // Ensure you pass 'truckId' from the frontend
+    if (tripType === "HUB_TRANSFER") {
+      if (!originCode) {
+        throw new HttpsError(
+          "invalid-argument",
+          "Origin is required for Warehouse Transfers.",
+        );
+      }
+
+      if (!destinationCode) {
+        throw new HttpsError(
+          "invalid-argument",
+          "Destination is required for Warehouse Transfers.",
+        );
+      }
+
+      if (originCode === destinationCode) {
+        throw new HttpsError(
+          "invalid-argument",
+          "Origin and Destination cannot be the same.",
+        );
+      }
+    }
+
+    const truckDocId = req.data?.truckId || null;
     const truckRef = truckDocId
       ? db.collection("trucks").doc(truckDocId)
       : null;
 
-    // const snap = await db.collection("users").doc(driverId).get();
-    // const driver = snap.data() || null;
     let driver = null;
 
     if (driverId) {
@@ -97,91 +121,71 @@ exports.createTruckTrip = onCall(
       driver = snap.data() || null;
     }
 
-    // We store a trip counter per day+route to generate a nice tripId
     const today = yyyymmddFromDate(new Date());
-    const counterKey = `${today}_${originCode}_${destinationCode}`;
-
+    const counterKey = `${today}_${tripPrefix}`;
     const counterRef = db.collection("counters").doc(`trip_${counterKey}`);
 
     return db.runTransaction(async (tx) => {
       const { role } = await assertAdminOrManager(db, tx, req.auth.uid);
 
-      // Allocate the next trip number for the day+route
       const counterSnap = await tx.get(counterRef);
       const last = counterSnap.exists
         ? Number(counterSnap.data()?.value || 0)
         : 0;
       const next = last + 1;
 
-      // Human ID you can show in UI
-      const tripId = `TRIP-${today}-${originCode}-${destinationCode}-${pad4(
-        next,
-      )}`;
-
-      // 3. NEW LOCATION: Set the Document ID to match tripId
+      const tripId = `TRIP-${tripPrefix}-${today}-${pad4(next)}`;
       const tripRef = db.collection("truck_trips").doc(tripId);
-      // Optional: Safety check to ensure we don't overwrite (unlikely with atomic counter)
+
       const checkSnap = await tx.get(tripRef);
       if (checkSnap.exists) {
         throw new HttpsError("aborted", "Trip ID collision. Please retry.");
       }
 
-      // Core trip record
       const tripData = {
-        // identity
         tripId,
-        origin: req.data?.origin,
-        originCode,
-        destination: req.data?.destination,
-        destinationCode,
+        tripType,
+
+        origin: optionalString(req.data?.origin),
+        originCode: originCode || null,
+        destination: optionalString(req.data?.destination),
+        destinationCode: destinationCode || null,
         route:
           originCode && destinationCode
             ? `${originCode} -> ${destinationCode}`
             : null,
-        // route: originCode + " -> " + destinationCode || null,
 
-        tripType: tripType || "HUB_TRANSFER", // default to HUB_TRANSFER if not provided
-        truckId: truckDocId || null,
+        truckId: truckDocId,
         truckPlateNumber: truckPlateNumber || null,
 
         driverName: driverName || null,
         driverId: driverId || null,
-        driverPhone: driver?.phoneNumber || null, // set when assigned
+        driverPhone: driver?.phoneNumber || null,
 
         helperName: helperName || null,
-        plannedDeparture: plannedDeparture || null,
-        estimatedArrival: estimatedArrival || null,
+        plannedDeparture,
+        estimatedArrival,
 
-        // operational state
         status: "CREATED",
         statusIndex: 0,
         active: true,
 
-        // counters used by your load/unload pipeline
-        // lastSequence: 0, // used by createShipmentWithSequence
-        // totalPackages: 0, // optional (you can maintain in functions)
-        // totalItemsLoaded: 0, // optional
-        totalLoaded: 0, // aggregate across packages (optional)
-        totalItems: 0, // optional
+        totalLoaded: 0,
+        totalItems: 0,
 
-        // delay system (optional)
-        // delayCleared: false,
         delayReason: null,
         delayStartedAt: null,
         delayClearedAt: null,
 
-        // audit (immutable)
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
         createdBy: req.auth.uid,
         createdRole: role,
 
-        // last update (mutable but server-set)
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
         updatedBy: req.auth.uid,
         updatedRole: role,
       };
 
-      // --- TRUCK STATUS UPDATE ---
       if (truckRef) {
         const truckSnap = await tx.get(truckRef);
         if (!truckSnap.exists) {
@@ -191,10 +195,8 @@ exports.createTruckTrip = onCall(
           );
         }
 
-        // Logic: Change status from IDLE to ASSIGNED
         tx.update(truckRef, {
           status: "ASSIGNED",
-          // currentTripId: tripId,
           updatedAt: admin.firestore.FieldValue.serverTimestamp(),
           updatedBy: req.auth.uid,
         });
@@ -202,7 +204,6 @@ exports.createTruckTrip = onCall(
 
       tx.set(tripRef, tripData);
 
-      // Update counter (server-owned)
       tx.set(
         counterRef,
         {
@@ -213,15 +214,18 @@ exports.createTruckTrip = onCall(
         { merge: true },
       );
 
-      // Admin audit log (append-only collection; rules allow read admin only)
-      const logRef = db.collection("admin_logs").doc();
-      tx.set(logRef, {
+      writeTripActionLog({
+        db,
+        tx,
         action: "CREATE_TRIP",
         tripDocId: tripRef.id,
         tripId,
-        originCode,
-        destinationCode,
-        actorUid: req.auth.uid,
+        tripType,
+        tripPrefix,
+        originCode: originCode || null,
+        destinationCode: destinationCode || null,
+        actorId: req.auth.uid,
+        actorName: req.auth.token?.name || null,
         actorRole: role,
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
         meta: {
@@ -229,7 +233,7 @@ exports.createTruckTrip = onCall(
           truckInternalCode: truckInternalCode || null,
           driverName: driverName || null,
           driverId: driverId || null,
-          driverPhone: driver?.phoneNumber || null, // set when assigned
+          driverPhone: driver?.phoneNumber || null,
         },
       });
 
@@ -237,8 +241,10 @@ exports.createTruckTrip = onCall(
         success: true,
         tripDocId: tripRef.id,
         tripId,
-        originCode,
-        destinationCode,
+        tripType,
+        tripPrefix,
+        originCode: originCode || null,
+        destinationCode: destinationCode || null,
         sequence: next,
       };
     });

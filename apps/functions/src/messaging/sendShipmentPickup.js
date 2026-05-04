@@ -3,6 +3,7 @@
 const admin = require("firebase-admin");
 const { sendSmsViaProvider } = require("../../shared/sms-service");
 const { calculateSmsCost } = require("../../shared/sms-cost");
+const { writeMessagingActionLog } = require("./messagingLogger");
 
 async function sendShipmentPickup({
   shipmentId,
@@ -16,7 +17,7 @@ async function sendShipmentPickup({
   if (phones.size === 0) return { success: false, reason: "No valid phones" };
 
   const message = `ATLAS: Shipment ${shipmentId} has been CREATED. Waiting for pickup. 
-  Tracking link: https://atlas-trucking-platform.vercel.app/track/${shipmentId}`;
+  Tracking link: https://atlastransport.ph/track/${shipmentId}`;
 
   const { credits } = calculateSmsCost(message);
 
@@ -31,10 +32,12 @@ async function sendShipmentPickup({
   // 3. Log the Batch
   const successCount = results.filter((r) => r.status === "fulfilled").length;
 
-  await db.collection("sms_logs").add({
+  await writeMessagingActionLog({
+    db,
     type: "SHIPMENT_CREATED",
     shipmentId,
     message,
+    actorId: actorUid || "SYSTEM",
     requestedBy: actorUid || "SYSTEM",
     totalTargets: phones.size,
     successCount,

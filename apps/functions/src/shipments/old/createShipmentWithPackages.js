@@ -2,11 +2,11 @@ const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const admin = require("firebase-admin");
 const {
   sendShipmentCreatedSmsLogic,
-} = require("../messaging/sendShipmentCreatedSmsLogic");
+} = require("../../messaging/sendShipmentCreatedSmsLogic");
 const {
   SEMAPHORE_API_KEY,
   SEMAPHORE_SENDER_NAME,
-} = require("../../shared/sms-service");
+} = require("../../../shared/sms-service");
 // const { shortCode } = require("../utilities/helpers");
 const { Timestamp } = admin.firestore;
 

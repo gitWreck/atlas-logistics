@@ -23,6 +23,7 @@ import {
   unlockTripManifest,
   updateTripStatus,
 } from "@/app/utility/FirebaseFunctions";
+import { updatedBy } from "@/app/utility/utilities";
 
 const ACTIONS = {
   LOAD: "LOAD",
@@ -37,6 +38,7 @@ export default function ShipmentScanActionModal({
   onResolveScan,
   onConfirmOperation,
   onRefresh,
+  profile,
 }) {
   const theme = getModalThemeClasses(isDark);
   const actionTheme = getModalActionClasses();
@@ -140,6 +142,7 @@ export default function ShipmentScanActionModal({
       await bulkAssignShipments({
         tripId: tripId,
         shipmentIds: [needsAssignmentItem.shipmentId],
+        updatedBy: updatedBy(profile),
       });
 
       setRecentlyAssigned((prev) =>
@@ -163,6 +166,7 @@ export default function ShipmentScanActionModal({
         tripId: tripId,
         status: "ARRIVED",
         notify: false,
+        updatedBy: updatedBy(profile),
       });
 
       if (trip) trip.status = "ARRIVED";
@@ -188,6 +192,7 @@ export default function ShipmentScanActionModal({
       await unlockTripManifest({
         tripId: tripId,
         reason: "trip needs to be unloaded",
+        updatedBy: updatedBy(profile),
       });
 
       if (trip) trip.manifestLocked = false;
@@ -232,10 +237,17 @@ export default function ShipmentScanActionModal({
     setError("");
     try {
       // 1. Generate the Manifest
-      await generateTripManifest({ tripId: tripId });
+      await generateTripManifest({
+        tripId: tripId,
+        updatedBy: updatedBy(profile),
+      });
 
       // 2. Automatically set to IN_TRANSIT
-      await updateTripStatus({ tripId: tripId, status: "IN_TRANSIT" }); // NEW
+      await updateTripStatus({
+        tripId: tripId,
+        status: "IN_TRANSIT",
+        updatedBy: updatedBy(profile),
+      }); // NEW
 
       // Optimistic local update
       if (trip) {

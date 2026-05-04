@@ -24,6 +24,7 @@ import InvoiceFormModal from "../invoice/InvoiceFormModal";
 import useInvoiceWorkflow from "../invoice/useInvoiceWorkflow";
 import { updateShipmentPackages } from "@/app/utility/FirebaseFunctions";
 import { getDrawerThemeClasses } from "@/app/utility/constant/theme";
+import { updatedBy } from "@/app/utility/utilities";
 
 export default function TripDrawer({
   isOpen,
@@ -32,6 +33,7 @@ export default function TripDrawer({
   onRefreshTrips,
   isDark = false,
   user,
+  profile,
 }) {
   const [activeTab, setActiveTab] = useState("TIMELINE");
   const [shipments, setShipments] = useState([]);
@@ -138,6 +140,7 @@ export default function TripDrawer({
       packageIds: Object.keys(quantityMap), // Array of strings: ["PKG-1", "PKG-2"]
       newStatus: payload.action === "LOAD" ? "LOADED" : "RECEIVED", // UNLOAD reverts it to RECEIVED
       manualQty: quantityMap, // We pass the object dictionary instead of a single number
+      updatedBy: updatedBy(profile),
     });
   };
 
@@ -245,6 +248,8 @@ export default function TripDrawer({
               data={data}
               onRefresh={() => onRefreshTrips?.()}
               isDark={isDark}
+              user={user}
+              profile={profile}
             />
           )}
 
@@ -269,6 +274,7 @@ export default function TripDrawer({
               isDark={isDark}
               onViewInvoice={handleViewInvoice}
               onCreateInvoice={openCreateInvoice}
+              profile={profile}
             />
           )}
 
@@ -280,6 +286,7 @@ export default function TripDrawer({
                 onRefreshTrips?.();
               }}
               isDark={isDark}
+              profile={profile}
             />
           )}
         </div>
@@ -294,6 +301,7 @@ export default function TripDrawer({
             onRefreshTrips?.();
           }}
           user={user}
+          profile={profile}
         />
       </aside>
 
@@ -345,6 +353,7 @@ export default function TripDrawer({
           onRefreshTrips?.();
         }}
         user={user}
+        profile={profile}
       />
 
       <InvoiceFormModal

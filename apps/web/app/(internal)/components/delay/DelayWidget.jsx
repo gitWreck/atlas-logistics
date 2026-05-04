@@ -9,10 +9,10 @@ import {
   faClock,
 } from "@fortawesome/free-solid-svg-icons";
 import { formatFirestoreDate } from "@/app/utility/utilities";
-import { resolveDelay } from "@/app/utility/FirebaseFunctions";
+import { resolveDelayReport } from "@/app/utility/FirebaseFunctions";
 import StatusBadge from "../ui/StatusBadge";
 
-export default function DelayApprovalWidget({ isDark = false }) {
+export default function DelayWidget({ isDark = false }) {
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
   const [processingId, setProcessingId] = useState(null); // To show loading on button
@@ -45,7 +45,7 @@ export default function DelayApprovalWidget({ isDark = false }) {
 
       // const resolveDelay = httpsCallable(functions, "resolveDelayReport");
 
-      await resolveDelay({
+      await resolveDelayReport({
         alertId: req.id,
         decision: decision, // "APPROVED" or "REJECTED"
         managerNotes: "", // Add a prompt input if you want notes

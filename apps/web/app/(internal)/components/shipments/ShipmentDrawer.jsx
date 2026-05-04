@@ -23,6 +23,7 @@ export default function ShipmentDrawer({
   data,
   isDark = false,
   onRefresh,
+  profile,
 }) {
   const [activeTab, setActiveTab] = useState("TIMELINE");
   const theme = getDrawerThemeClasses(isDark);
@@ -132,6 +133,7 @@ export default function ShipmentDrawer({
                 onRefresh={() => {
                   onRefresh?.();
                 }}
+                profile={profile}
               />
 
               <CustomerMessageWidget shipment={data} isDark={isDark} />

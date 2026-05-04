@@ -10,6 +10,13 @@ import StatusBadge from "../ui/StatusBadge";
 import { getRowThemeClasses } from "@/app/utility/constant/theme";
 import { formatFirestoreDate } from "@/app/utility/utilities";
 
+function getOptionalOdometer(value) {
+  if (value === null || value === undefined || value === "") return null;
+
+  const numericValue = Number(value);
+  return Number.isFinite(numericValue) ? numericValue : null;
+}
+
 function StatusDot({ status }) {
   let color = "bg-emerald-500";
 
@@ -66,23 +73,23 @@ export default function TruckRow({ truck: t, onEdit, isDark = false }) {
 
   const isLtoDue = daysUntilExpiry !== null && daysUntilExpiry <= 30;
 
-  const lastOilChange = Number(t.lastOilChange);
-  const lastTireChange = Number(t.lastTireChange);
+  const lastOilChange = getOptionalOdometer(t.lastOilChange);
+  const lastTireChange = getOptionalOdometer(t.lastTireChange);
 
   const isOilDue =
-    Number.isFinite(lastOilChange) &&
+    lastOilChange !== null &&
     currentOdo > 0 &&
     currentOdo - lastOilChange >= 10000;
 
   const isTireDue =
-    Number.isFinite(lastTireChange) &&
+    lastTireChange !== null &&
     currentOdo > 0 &&
     currentOdo - lastTireChange >= 50000;
 
   const hasComplianceAlerts = isLtoDue || isOilDue || isTireDue;
 
-  const payloadValue = t.payloadCapacity || t.payload || "—";
-  const updatedAt = t.updatedAt ? formatFirestoreDate(t.updatedAt) : null;
+  const payloadValue = t.payloadCapacity || t.payload || "-";
+  const updatedAt = t.updatedAt ? formatFirestoreDate(t.updatedAt) : "-";
 
   return (
     <div
@@ -246,7 +253,7 @@ export default function TruckRow({ truck: t, onEdit, isDark = false }) {
                     month: "long",
                     day: "numeric",
                   })
-                : "—"}
+                : "-"}
             </span>
           </span>
         </div>

@@ -3,9 +3,16 @@
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const { defineSecret } = require("firebase-functions/params");
 const admin = require("firebase-admin");
-const { requireRole } = require("../utilities/helpers");
-const { broadcastTripLogic } = require("../messaging/broadcastTripMessage"); // Import if you want to call it directly
-const { STATUS_MESSAGES } = require("../utilities/dataDetails");
+const {
+  requireRole,
+} = require("../../../../../../atlas-trucking-platform/apps/functions/src/utilities/helpers");
+const {
+  broadcastTripLogic,
+} = require("../../../../../../atlas-trucking-platform/apps/functions/src/messaging/broadcastTripMessage"); // Import if you want to call it directly
+const {
+  STATUS_MESSAGES,
+} = require("../../../../../../atlas-trucking-platform/apps/functions/src/utilities/dataDetails");
+const { writeTripActionLog } = require("../utilities/tripLogger");
 
 const SEMAPHORE_API_KEY = defineSecret("SEMAPHORE_API_KEY");
 const SEMAPHORE_SENDER_NAME = defineSecret("SEMAPHORE_SENDER_NAME");
@@ -25,10 +32,10 @@ exports.setTruckDelay = onCall(
   async (req) => {
     await requireRole(db, req, ["admin", "manager"]);
 
-    const { truckTripId, reason } = req.data || {};
+    const { tripId, reason } = req.data || {};
 
-    if (!truckTripId || typeof truckTripId !== "string") {
-      throw new HttpsError("invalid-argument", "truckTripId required");
+    if (!tripId || typeof tripId !== "string") {
+      throw new HttpsError("invalid-argument", "tripId required");
     }
 
     if (!reason || typeof reason !== "string") {
@@ -37,7 +44,7 @@ exports.setTruckDelay = onCall(
 
     const uid = req.auth.uid;
     const role = req.auth.token?.role || "unknown";
-    const tripRef = db.collection("truck_trips").doc(truckTripId);
+    const tripRef = db.collection("truck_trips").doc(tripId);
     const notify = !!req.data?.notify; // Optional: whether to send SMS notifications for this status change
 
     await db.runTransaction(async (tx) => {
@@ -75,11 +82,14 @@ exports.setTruckDelay = onCall(
       });
 
       // 🧾 Audit log
-      tx.set(db.collection("admin_logs").doc(), {
+      writeTripActionLog({
+        db,
+        tx,
         action: "SET_TRUCK_DELAY",
-        truckTripId,
+        tripId,
         delayReason: reason,
         actorId: uid,
+        actorName: req.auth.token?.name || null,
         actorRole: role,
         createdAt: now,
       });
@@ -99,12 +109,12 @@ exports.setTruckDelay = onCall(
 
       if (messageText) {
         console.log(
-          `[Notify] Sending broadcast for trip ${truckTripId} with status ${delayStatus}`,
+          `[Notify] Sending broadcast for trip ${tripId} with status ${delayStatus}`,
         );
 
         try {
           broadcastTripLogic({
-            tripId: truckTripId,
+            tripId: tripId,
             message: messageText,
             actorUid: request.auth.uid || "SYSTEM",
           }).catch((err) => console.error("Broadcast failed:", err));
@@ -118,7 +128,7 @@ exports.setTruckDelay = onCall(
 
     return {
       success: true,
-      truckTripId,
+      tripId,
       delayReason: reason,
       delayed: true,
     };

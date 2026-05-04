@@ -3,7 +3,7 @@
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const admin = require("firebase-admin");
 const { FieldValue } = require("firebase-admin/firestore");
-const { ALLOWED_SHIPMENT_STATUSES } = require("../utilities/dataDetails");
+const { ALLOWED_SHIPMENT_STATUSES } = require("../../utilities/dataDetails");
 
 if (!admin.apps.length) admin.initializeApp();
 const db = admin.firestore();

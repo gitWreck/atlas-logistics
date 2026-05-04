@@ -4,6 +4,7 @@ const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const admin = require("firebase-admin");
 const { FieldValue } = admin.firestore;
 const { requireRole } = require("../utilities/helpers");
+const { writeShipmentActionLog } = require("../utilities/shipmentLogger");
 
 if (!admin.apps.length) admin.initializeApp();
 const db = admin.firestore();
@@ -11,27 +12,66 @@ const db = admin.firestore();
 exports.bulkShipmentAction = onCall(
   { region: "asia-southeast1", maxInstances: 10 },
   async (request) => {
-    // 1. AUTH & ROLE CHECK
-    if (!request.auth) throw new HttpsError("unauthenticated", "Auth required");
-    await requireRole(db, request, ["admin", "manager", "checker"]);
-
-    const { tripId, shipmentIds, action, location, remarks } = request.data;
-    const userId = request.auth.uid;
-
-    if (!tripId || !shipmentIds || shipmentIds.length === 0) {
-      throw new HttpsError("invalid-argument", "Missing tripId or shipmentIds");
+    if (!request.auth) {
+      throw new HttpsError("unauthenticated", "Auth required");
     }
 
-    // 2. NORMALIZE TARGET STATUS
-    // We map frontend actions to strict database statuses
+    await requireRole(db, request, ["admin", "manager", "checker"]);
+
+    const { tripId, shipmentIds, action, location, remarks } =
+      request.data || {};
+    const userId = request.auth.uid;
+
+    if (!tripId || typeof tripId !== "string") {
+      throw new HttpsError("invalid-argument", "Missing tripId");
+    }
+
+    if (!Array.isArray(shipmentIds) || shipmentIds.length === 0) {
+      throw new HttpsError("invalid-argument", "Missing shipmentIds");
+    }
+
+    if (!action || typeof action !== "string") {
+      throw new HttpsError("invalid-argument", "Missing action");
+    }
+
     let targetStatus = action;
     if (action === "LOAD") targetStatus = "LOADED";
     if (action === "UNLOAD") targetStatus = "RECEIVED";
+    if (action === "DELIVER") targetStatus = "DELIVERED";
+    if (action === "MARK_MISSING") targetStatus = "MISSING";
+
+    const allowedStatuses = ["LOADED", "RECEIVED", "DELIVERED", "MISSING"];
+    if (!allowedStatuses.includes(targetStatus)) {
+      throw new HttpsError(
+        "invalid-argument",
+        `Unsupported action/status: ${action}`,
+      );
+    }
 
     try {
       await db.runTransaction(async (t) => {
-        // --- PHASE 1: READS ---
         const tripRef = db.collection("truck_trips").doc(tripId);
+        const tripSnap = await t.get(tripRef);
+
+        if (!tripSnap.exists) {
+          throw new HttpsError("not-found", "Trip not found");
+        }
+
+        const tripData = tripSnap.data() || {};
+
+        if (tripData.active === false || tripData.status === "COMPLETED") {
+          throw new HttpsError(
+            "failed-precondition",
+            "Cannot modify a completed/inactive trip",
+          );
+        }
+
+        if (tripData.manifestLocked === true) {
+          throw new HttpsError(
+            "failed-precondition",
+            "Trip Manifest is LOCKED. Unlock it first.",
+          );
+        }
 
         const shipmentRefs = shipmentIds.map((id) =>
           db.collection("shipments").doc(id),
@@ -45,10 +85,84 @@ exports.bulkShipmentAction = onCall(
           Promise.all(tripShipmentRefs.map((ref) => t.get(ref))),
         ]);
 
-        // --- PHASE 2: LOGIC & WRITES ---
+        const nowServer = FieldValue.serverTimestamp();
+
+        const normalizeQty = (value, fallback = 0) => {
+          const num = Number(value);
+          return Number.isFinite(num) && num >= 0 ? num : fallback;
+        };
+
+        const normalizePackage = (pkg = {}) => {
+          const quantity = normalizeQty(pkg.quantity, 1) || 1;
+          const loadedQty = Math.min(normalizeQty(pkg.loadedQty, 0), quantity);
+          const receivedQty = Math.min(
+            normalizeQty(pkg.receivedQty, 0),
+            quantity,
+          );
+
+          return {
+            ...pkg,
+            quantity,
+            loadedQty,
+            receivedQty,
+          };
+        };
+
+        const sumTotalQty = (pkgs) =>
+          pkgs.reduce((sum, pkg) => sum + normalizeQty(pkg.quantity, 1), 0);
+
+        const sumLoadedQty = (pkgs) =>
+          pkgs.reduce((sum, pkg) => {
+            const quantity = normalizeQty(pkg.quantity, 1);
+            if (pkg.status === "LOADED") return sum + quantity;
+            if (pkg.status === "PARTIALLY_LOADED") {
+              return sum + Math.min(normalizeQty(pkg.loadedQty, 0), quantity);
+            }
+            return sum;
+          }, 0);
+
+        const sumReceivedQty = (pkgs) =>
+          pkgs.reduce((sum, pkg) => {
+            const quantity = normalizeQty(pkg.quantity, 1);
+            if (pkg.status === "DELIVERED") return sum + quantity;
+            if (pkg.status === "PARTIALLY_RECEIVED") {
+              return sum + Math.min(normalizeQty(pkg.receivedQty, 0), quantity);
+            }
+            return sum;
+          }, 0);
+
+        const deriveShipmentStatus = (pkgs) => {
+          const totalRows = pkgs.length;
+          if (totalRows === 0) return "RECEIVED";
+
+          const deliveredRows = pkgs.filter(
+            (p) => p.status === "DELIVERED",
+          ).length;
+          const partialReceivedRows = pkgs.filter(
+            (p) => p.status === "PARTIALLY_RECEIVED",
+          ).length;
+          const loadedRows = pkgs.filter((p) => p.status === "LOADED").length;
+          const partialLoadedRows = pkgs.filter(
+            (p) => p.status === "PARTIALLY_LOADED",
+          ).length;
+          const missingRows = pkgs.filter((p) => p.status === "MISSING").length;
+
+          if (deliveredRows === totalRows) return "DELIVERED";
+          if (deliveredRows > 0 || partialReceivedRows > 0) {
+            return "PARTIALLY_RECEIVED";
+          }
+          if (loadedRows === totalRows) return "LOADED";
+          if (loadedRows > 0 || partialLoadedRows > 0) {
+            return "PARTIALLY_LOADED";
+          }
+          if (missingRows === totalRows) return "MISSING";
+          return "RECEIVED";
+        };
+
         let tripDeltaLoaded = 0;
         let tripDeltaPending = 0;
         let tripDeltaDelivered = 0;
+        let tripDeltaArrived = 0;
 
         for (let i = 0; i < shipmentIds.length; i++) {
           const shipDoc = shipmentDocs[i];
@@ -56,100 +170,160 @@ exports.bulkShipmentAction = onCall(
           const shipRef = shipmentRefs[i];
           const tripShipRef = tripShipmentRefs[i];
 
-          if (!shipDoc.exists) continue;
+          if (!shipDoc.exists) {
+            continue;
+          }
 
-          const shipData = shipDoc.data();
-          const currentStatus = shipData.status;
-          const packages = shipData.packages || [];
+          const shipData = shipDoc.data() || {};
 
-          // Counters for this specific shipment
-          let localLoadedChange = 0;
-          let localPendingChange = 0;
-          let localDeliveredChange = 0;
+          if (shipData.currentTripId && shipData.currentTripId !== tripId) {
+            throw new HttpsError(
+              "failed-precondition",
+              `Shipment ${shipDoc.id} belongs to another trip (${shipData.currentTripId})`,
+            );
+          }
 
-          // Process individual packages inside the shipment
-          const updatedPackages = packages.map((pkg) => {
-            if (pkg.status === targetStatus) return pkg;
+          const oldPackagesRaw = Array.isArray(shipData.packages)
+            ? shipData.packages
+            : [];
+          const oldPackages = oldPackagesRaw.map(normalizePackage);
 
-            // Business Logic Matrix: Update counters based on state transition
-            if (targetStatus === "LOADED" && pkg.status !== "LOADED") {
-              localPendingChange--;
-              localLoadedChange++;
-            } else if (
-              (targetStatus === "RECEIVED" || targetStatus === "MISSING") &&
-              pkg.status === "LOADED"
-            ) {
-              localLoadedChange--;
-              localPendingChange++;
-            } else if (
-              targetStatus === "DELIVERED" &&
-              pkg.status === "LOADED"
-            ) {
-              localLoadedChange--;
-              localDeliveredChange++;
+          const updatedPackages = oldPackages.map((pkg) => {
+            const quantity = normalizeQty(pkg.quantity, 1);
+
+            if (targetStatus === "LOADED") {
+              return {
+                ...pkg,
+                status: "LOADED",
+                loadedQty: quantity,
+                updatedAt: new Date().toISOString(),
+              };
             }
 
-            return { ...pkg, status: targetStatus };
+            if (targetStatus === "RECEIVED") {
+              return {
+                ...pkg,
+                status: "RECEIVED",
+                loadedQty: 0,
+                updatedAt: new Date().toISOString(),
+              };
+            }
+
+            if (targetStatus === "DELIVERED") {
+              return {
+                ...pkg,
+                status: "DELIVERED",
+                loadedQty: quantity,
+                receivedQty: quantity,
+                updatedAt: new Date().toISOString(),
+              };
+            }
+
+            if (targetStatus === "MISSING") {
+              return {
+                ...pkg,
+                status: "MISSING",
+                updatedAt: new Date().toISOString(),
+              };
+            }
+
+            return pkg;
           });
 
-          // Update Transaction-wide Deltas for the Trip doc
-          tripDeltaLoaded += localLoadedChange;
-          tripDeltaPending += localPendingChange;
-          tripDeltaDelivered += localDeliveredChange;
+          const oldTotalQty = sumTotalQty(oldPackages);
+          const newTotalQty = sumTotalQty(updatedPackages);
 
-          // Write 1: Update Main Shipment Document
+          const oldLoadedQty = sumLoadedQty(oldPackages);
+          const newLoadedQty = sumLoadedQty(updatedPackages);
+
+          const oldReceivedQty = sumReceivedQty(oldPackages);
+          const newReceivedQty = sumReceivedQty(updatedPackages);
+
+          const newPendingQty = Math.max(newTotalQty - newLoadedQty, 0);
+          const oldPendingQty = Math.max(oldTotalQty - oldLoadedQty, 0);
+
+          const deltaLoaded = newLoadedQty - oldLoadedQty;
+          const deltaPending = newPendingQty - oldPendingQty;
+          const deltaDelivered = newReceivedQty - oldReceivedQty;
+
+          tripDeltaLoaded += deltaLoaded;
+          tripDeltaPending += deltaPending;
+          tripDeltaDelivered += deltaDelivered;
+          tripDeltaArrived += deltaDelivered;
+
+          const shipmentStatus = deriveShipmentStatus(updatedPackages);
+
           t.update(shipRef, {
-            status: targetStatus,
+            status: shipmentStatus,
             packages: updatedPackages,
-            "totals.loaded": FieldValue.increment(localLoadedChange),
-            "totals.pending": FieldValue.increment(localPendingChange),
-            "totals.delivered": FieldValue.increment(localDeliveredChange),
-            updatedAt: FieldValue.serverTimestamp(),
+
+            "totals.totalItems": updatedPackages.length,
+            "totals.totalContentQty": newTotalQty,
+            "totals.loaded": newLoadedQty,
+            "totals.pending": newPendingQty,
+            "totals.received": newReceivedQty,
+            "totals.delivered": newReceivedQty,
+
+            updatedAt: nowServer,
             updatedBy: userId,
-            // Track the reason/remarks
+            updatedRole: "bulk-action",
             remarks: remarks || null,
+
             statusHistory: FieldValue.arrayUnion({
-              status: targetStatus,
+              status: shipmentStatus,
               at: new Date(),
               by: userId,
-              note: remarks ? `Remarks: ${remarks}` : `Bulk ${action} applied.`,
+              note: remarks || `Bulk ${action} applied.`,
               location: location || null,
             }),
+
             ...(location ? { lastLocation: location } : {}),
           });
 
-          // Write 2: Update Trip-Shipment Sub-collection
           if (tripShipDoc.exists) {
             t.update(tripShipRef, {
-              status: targetStatus,
-              loadedCount: FieldValue.increment(localLoadedChange),
-              pendingCount: FieldValue.increment(localPendingChange),
-              deliveredCount: FieldValue.increment(localDeliveredChange),
-              updatedAt: FieldValue.serverTimestamp(),
+              status: shipmentStatus,
+              totalItems: newTotalQty,
+              loadedCount: newLoadedQty,
+              pendingCount: newPendingQty,
+              deliveredCount: newReceivedQty,
+              receivedCount: newReceivedQty,
+              updatedAt: nowServer,
+              updatedBy: userId,
             });
           }
         }
 
-        // Write 3: Update Parent Trip Document Counters
         t.update(tripRef, {
           totalLoaded: FieldValue.increment(tripDeltaLoaded),
           itemPending: FieldValue.increment(tripDeltaPending),
           totalDelivered: FieldValue.increment(tripDeltaDelivered),
-          updatedAt: FieldValue.serverTimestamp(),
+          totalArrived: FieldValue.increment(tripDeltaArrived),
+          updatedAt: nowServer,
+          updatedBy: userId,
         });
 
-        // Write 4: Audit Logging
-        const logRef = db.collection("audit_logs").doc();
-        t.set(logRef, {
+        writeShipmentActionLog({
+          db,
+          tx: t,
+          collection: "audit_logs",
           action: `BULK_${targetStatus}`,
           targetId: tripId,
           targetCollection: "truck_trips",
+          tripId,
+          actorId: userId,
           by: userId,
-          at: FieldValue.serverTimestamp(),
+          at: nowServer,
           details: {
             shipmentCount: shipmentIds.length,
             remarks: remarks || "N/A",
-            deltas: { loaded: tripDeltaLoaded, pending: tripDeltaPending },
+            location: location || null,
+            deltas: {
+              loaded: tripDeltaLoaded,
+              pending: tripDeltaPending,
+              delivered: tripDeltaDelivered,
+              arrived: tripDeltaArrived,
+            },
           },
         });
       });
@@ -157,7 +331,7 @@ exports.bulkShipmentAction = onCall(
       return { success: true };
     } catch (error) {
       console.error("Bulk Action Error:", error);
-      throw new HttpsError("internal", error.message);
+      throw new HttpsError("internal", error.message || "Bulk action failed");
     }
   },
 );

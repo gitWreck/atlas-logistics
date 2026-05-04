@@ -21,6 +21,7 @@ import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { storage } from "@/lib/firebase";
 import { getModalThemeClasses } from "@/app/utility/constant/theme";
 import { getModalActionClasses } from "@/app/utility/constant/action";
+import { updatedBy } from "@/app/utility/utilities";
 
 export default function NewShipmentModal({
   profile,
@@ -189,6 +190,7 @@ export default function NewShipmentModal({
         await assignShipmentToTrip({
           trackingShipmentId: finalDocId,
           tripId: targetTripId,
+          updatedBy: updatedBy(profile),
         });
 
         setFinalTripId(targetTripId);

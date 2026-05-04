@@ -15,7 +15,7 @@ import {
   reopenTrip,
   unlockTripManifest,
 } from "@/app/utility/FirebaseFunctions";
-import { runAction } from "@/app/utility/utilities";
+import { runAction, updatedBy } from "@/app/utility/utilities";
 import { getDrawerThemeClasses } from "@/app/utility/constant/theme";
 import ExportTripButton from "../exports/ExportTripManifest";
 
@@ -26,6 +26,7 @@ export default function TripDrawerFooter({
   isDark = false,
   onSuccess,
   user,
+  profile,
 }) {
   const [lockStatus, setLockStatus] = useState("IDLE");
   const [unlockStatus, setUnlockStatus] = useState("IDLE");
@@ -93,7 +94,11 @@ export default function TripDrawerFooter({
           onClick={() =>
             runAction(
               setLockStatus,
-              () => generateTripManifest({ tripId: data.tripId }),
+              () =>
+                generateTripManifest({
+                  tripId: data.tripId,
+                  updatedBy: updatedBy(profile),
+                }),
               () => onSuccess?.(),
             )
           }
@@ -126,6 +131,7 @@ export default function TripDrawerFooter({
                   unlockTripManifest({
                     tripId: data.tripId,
                     reason: unlockReason,
+                    updatedBy: updatedBy(profile),
                   }),
                 () => {
                   onSuccess?.();

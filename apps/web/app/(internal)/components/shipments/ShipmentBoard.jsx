@@ -19,9 +19,9 @@ import {
 import ShipmentRow from "./ShipmentRow";
 import ShipmentDrawer from "./ShipmentDrawer";
 import { calculateProgress } from "@/app/utility/utilities";
-// import UnifiedShipmentModal from "./modals/UnifiedShipmentModal";
-import NewShipmentModal from "./modals/NewShipmentModal";
 import { getBoardThemeClasses } from "@/app/utility/constant/theme";
+import NewShipmentModal from "./modals/NewShipmentModal";
+// import UnifiedShipmentModal from "./modals/UnifiedShipmentModal";
 
 const ShipmentBoard = forwardRef(function ShipmentBoard(
   { user, profile, isDark = false },

@@ -3,6 +3,7 @@
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const admin = require("firebase-admin");
 const { FieldValue } = require("firebase-admin/firestore");
+const { writeShipmentActionLog } = require("../utilities/shipmentLogger");
 
 if (!admin.apps.length) admin.initializeApp();
 const db = admin.firestore();
@@ -63,14 +64,17 @@ exports.updateShipmentImages = onCall(
       tx.update(shipmentRef, updateData);
 
       // WRITE 2: Audit Log
-      const auditRef = db.collection("audit_logs").doc();
-      tx.set(auditRef, {
+      writeShipmentActionLog({
+        db,
+        tx,
+        collection: "audit_logs",
         action:
           type === "receipt"
             ? "UPDATE_RECEIPT_IMAGES"
             : "UPDATE_DELIVERY_IMAGES",
         targetCollection: "shipments",
         targetId: shipmentId,
+        shipmentId,
         actorId: uid,
         details: {
           imageCount: images.length,

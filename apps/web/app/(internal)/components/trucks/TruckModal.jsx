@@ -6,7 +6,6 @@ import {
   faTimes,
   faTruck,
   faSave,
-  faBan,
   faCheck,
   faCircleNotch,
   faWeightHanging,
@@ -14,10 +13,7 @@ import {
   faCalendarCheck,
   faWrench,
 } from "@fortawesome/free-solid-svg-icons";
-import {
-  upsertTruck,
-  updateTruckStatus,
-} from "@/app/utility/FirebaseFunctions";
+import { upsertTruck } from "@/app/utility/FirebaseFunctions";
 import { getModalThemeClasses } from "@/app/utility/constant/theme";
 import { getModalActionClasses } from "@/app/utility/constant/action";
 import { TRUCK_STATUSES } from "@/app/utility/constant/templates";

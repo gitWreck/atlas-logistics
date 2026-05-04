@@ -27,6 +27,7 @@ import {
   packageLabelUrl,
   shipmentLabelUrl,
 } from "@/app/utility/constant/templates";
+import { updatedBy } from "@/app/utility/utilities";
 
 export default function UnifiedShipmentModal({
   profile,
@@ -219,6 +220,7 @@ export default function UnifiedShipmentModal({
         await bulkAssignShipments({
           tripId: targetTripId,
           shipmentIds: [finalDocId],
+          updatedBy: updatedBy(profile),
         });
 
         setFinalTripId(targetTripId);
