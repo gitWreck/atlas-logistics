@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "612887248700",
+    "project_id": "atlas-tracking",
+    "storage_bucket": "atlas-tracking.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:612887248700:android:34f2f6a329831493f92839",
+        "android_client_info": {
+          "package_name": "com.atlas.tracking"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCovHeMXkmDoVPIpX7djupcLb0Z20bET_c"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

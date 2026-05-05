@@ -253,6 +253,14 @@ async function requireRole(db, context, allowedRoles = []) {
   };
 }
 
+const updatedBy = (req) => {
+  const updatedBy = req.data?.updatedBy || {};
+  const uid = updatedBy.usercode || req.auth.uid || "unknown";
+  const name = updatedBy.username || req.auth.token?.name || null;
+  const role = updatedBy.role || req.auth.token?.role || null;
+  return { uid, name, role };
+};
+
 async function assertAdminOrManager(db, tx, uid) {
   const userRef = db.collection("users").doc(uid);
   const userSnap = await tx.get(userRef);
@@ -353,4 +361,6 @@ module.exports = {
   toLocal,
 
   normalizePlateNumber,
+
+  updatedBy,
 };

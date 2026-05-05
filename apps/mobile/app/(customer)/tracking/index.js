@@ -1,41 +1,26 @@
-import React, {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
+  Platform,
   SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
+  StatusBar as RNStatusBar,
 } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { doc, getDoc } from "firebase/firestore";
-import { Image } from "expo-image";
+import { FontAwesome5 } from "@expo/vector-icons";
+
 import { db } from "../../../firebase";
-
-// Import our new components
-import StatusRouteCard from "../../../components/tracking/StatusRouteCard";
-import TrackingMap from "../../../components/tracking/TrackingMap";
-import TrackingTimeline from "../../../components/tracking/TrackingTimelines";
-import ProofOfDelivery from "../../../components/tracking/ProofOfDelivery";
-import ShipmentStats from "../../../components/tracking/ShipmentStats";
+import TripProgressStepper from "../../../components/trips/TripProgressStepper";
+import ShipmentDetailHeader from "../../../components/shipments/ShipmentDetailHeader";
+import ShipmentHeaderCard from "../../../components/shipments/ShipmentHeaderCard";
+import ShipmentPackagesPanel from "../../../components/shipments/details/ShipmentPackagesPanel";
 import ExistingProofsViewer from "../../../components/tracking/ExistingProofsViewer";
-
-// Hardcoded package location for Divisoria
-const PACKAGE_LOCATION = {
-  latitude: 14.605683302722035,
-  longitude: 120.96347820295834,
-  latitudeDelta: 0.02,
-  longitudeDelta: 0.02,
-};
 
 export default function CustomerTrackingDetailsScreen() {
   const { trackingId } = useLocalSearchParams();
@@ -43,11 +28,7 @@ export default function CustomerTrackingDetailsScreen() {
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [data, setData] = useState(null);
-  const [photos, setPhotos] = useState([]);
-  const [selectedStepIndex, setSelectedStepIndex] = useState(null);
-  // const [pickupLoading, setPickupLoading] = useState(false);
-  const mapRef = useRef(null);
+  const [shipment, setShipment] = useState(null);
 
   const normalizedTracking = useMemo(
     () =>
@@ -56,44 +37,6 @@ export default function CustomerTrackingDetailsScreen() {
         .toUpperCase(),
     [trackingId],
   );
-
-  // --- LOGIC: Dynamic Status Steps ---
-  // --- LOGIC: Dynamic Status Steps ---
-  const dynamicStatusSteps = useMemo(() => {
-    // Determine if it's a pickup order based on your Firebase data flag
-    const isPickupOrder = data?.isPickupRequested === true;
-
-    return isPickupOrder
-      ? [
-          {
-            code: "PENDING_PICKUP",
-            label: "Pending Pickup",
-            iconName: "clock",
-          },
-          { code: "PICKED_UP", label: "Picked Up", iconName: "box-open" },
-          { code: "RECEIVED", label: "Received at Hub", iconName: "warehouse" },
-          { code: "LOADED", label: "Loaded", iconName: "pallet" },
-          { code: "IN_TRANSIT", label: "In Transit", iconName: "truck" },
-          {
-            code: "OUT_FOR_DELIVERY",
-            label: "Out for Delivery",
-            iconName: "route",
-          },
-          { code: "DELIVERED", label: "Delivered", iconName: "check-circle" },
-        ]
-      : [
-          { code: "CREATED", label: "Created", iconName: "file-signature" },
-          { code: "RECEIVED", label: "Received at Hub", iconName: "warehouse" },
-          { code: "LOADED", label: "Loaded", iconName: "pallet" },
-          { code: "IN_TRANSIT", label: "In Transit", iconName: "truck" },
-          {
-            code: "OUT_FOR_DELIVERY",
-            label: "Out for Delivery",
-            iconName: "route",
-          },
-          { code: "DELIVERED", label: "Delivered", iconName: "check-circle" },
-        ];
-  }, [data?.isPickupRequested]);
 
   const fetchData = useCallback(async () => {
     if (!normalizedTracking) {
@@ -106,302 +49,217 @@ export default function CustomerTrackingDetailsScreen() {
       setLoading(true);
       setError("");
 
-      const publicRef = doc(db, "shipments", normalizedTracking);
-      const snap = await getDoc(publicRef);
+      const snap = await getDoc(doc(db, "shipments", normalizedTracking));
 
       if (!snap.exists()) {
+        setShipment(null);
         setError("Shipment not found. Please check your tracking ID.");
-        setLoading(false);
         return;
       }
 
-      setData({ id: snap.id, ...snap.data() });
-      // NOTE: Add Photos fetching here if needed later
+      setShipment({ id: snap.id, ...snap.data() });
     } catch (err) {
       console.error("Failed to load tracking details:", err);
+      setShipment(null);
       setError("System offline. Please try again later.");
     } finally {
       setLoading(false);
     }
   }, [normalizedTracking]);
 
-  // --- DATA FETCHING ---
   useEffect(() => {
     fetchData();
   }, [fetchData]);
 
-  const activeStepIndex = useMemo(() => {
-    if (!data?.status) return 0;
-    const current = String(data.status).toUpperCase();
-    const idx = dynamicStatusSteps.findIndex((s) => {
-      if (Array.isArray(s.code)) return s.code.includes(current);
-      return s.code === current;
-    });
-    return idx === -1 ? 0 : idx;
-  }, [data?.status]);
+  const packages = shipment?.packages || [];
 
-  // --- LOGIC: Stats ---
-  const totalItems = data?.totalPackages ?? 0;
-  const loaded = data?.itemsDelivered ?? 0;
-  const pending = Math.max(totalItems - loaded, 0);
+  const displayShipment = useMemo(() => {
+    if (!shipment) return null;
 
-  // --- LOGIC: Location Parsing ---
-  // (Kept in parent because it requires heavy processing of raw data)
-  const statusHistoryLocations = useMemo(() => {
-    if (!data?.statusHistory || !Array.isArray(data.statusHistory)) return [];
+    const hasTotals =
+      shipment?.totals?.totalContentQty != null ||
+      shipment?.totals?.totalItems != null;
 
-    return data.statusHistory
-      .map((entry) => {
-        const rawStatus = entry?.status || entry?.code || "";
-        const status = String(rawStatus).toUpperCase().trim();
+    if (hasTotals) return shipment;
 
-        // Only include if status is in our known steps
-        const stepIndex = dynamicStatusSteps.findIndex((step) => {
-          const codes = Array.isArray(step.code) ? step.code : [step.code];
-          return codes.some((c) => String(c).toUpperCase() === status);
-        });
+    const derivedTotals = packages.reduce(
+      (acc, pkg) => {
+        const quantity = Number(pkg?.quantity) || 1;
+        const status = String(pkg?.status || "").toUpperCase();
 
-        if (stepIndex === -1) return null;
+        acc.totalContentQty += quantity;
+        if (status === "LOADED") acc.loaded += quantity;
+        if (status === "MISSING") acc.missing += quantity;
 
-        const lat = entry?.location?.lat || entry?.location?.latitude;
-        const lng = entry?.location?.lng || entry?.location?.longitude;
-
-        if (!lat || !lng) return null;
-        return { latitude: lat, longitude: lng };
-      })
-      .filter(Boolean);
-  }, [data?.statusHistory]);
-
-  const statusLocationsPerStep = useMemo(() => {
-    const buckets = dynamicStatusSteps.map(() => []);
-    if (!data?.statusHistory) return buckets;
-
-    data.statusHistory.forEach((entry) => {
-      const rawStatus = entry?.status || entry?.code || "";
-      const status = String(rawStatus).toUpperCase().trim();
-      const lat = entry?.location?.lat || entry?.location?.latitude;
-      const lng = entry?.location?.lng || entry?.location?.longitude;
-
-      if (!lat || !lng) return;
-
-      const coordinate = { latitude: lat, longitude: lng };
-      const stepIndex = dynamicStatusSteps.findIndex((step) => {
-        const codes = Array.isArray(step.code) ? step.code : [step.code];
-        return codes.some((c) => String(c).toUpperCase() === status);
-      });
-
-      if (stepIndex >= 0) {
-        buckets[stepIndex].push({ coordinate, raw: entry });
-      }
-    });
-    return buckets;
-  }, [data?.statusHistory]);
-
-  // --- LOGIC: Map Animation ---
-  const latestLocation =
-    statusHistoryLocations.length > 0
-      ? statusHistoryLocations[statusHistoryLocations.length - 1]
-      : null;
-
-  const initialRegion = useMemo(() => {
-    if (latestLocation) {
-      return {
-        latitude: latestLocation.latitude,
-        longitude: latestLocation.longitude,
-        latitudeDelta: 0.02,
-        longitudeDelta: 0.02,
-      };
-    }
-    return PACKAGE_LOCATION;
-  }, [latestLocation]);
-
-  const selectedLocation = useMemo(() => {
-    if (selectedStepIndex == null) return latestLocation;
-    const bucket = statusLocationsPerStep[selectedStepIndex];
-    if (!bucket || bucket.length === 0) return latestLocation;
-    return bucket[bucket.length - 1].coordinate;
-  }, [latestLocation, selectedStepIndex, statusLocationsPerStep]);
-
-  useEffect(() => {
-    if (!mapRef.current || !selectedLocation) return;
-    mapRef.current.animateToRegion(
-      { ...selectedLocation, latitudeDelta: 0.02, longitudeDelta: 0.02 },
-      350,
+        return acc;
+      },
+      { loaded: 0, missing: 0, totalContentQty: 0 },
     );
-  }, [selectedLocation]);
 
-  // --- RENDER STATES ---
+    return {
+      ...shipment,
+      totals: {
+        ...(shipment.totals || {}),
+        ...derivedTotals,
+      },
+    };
+  }, [packages, shipment]);
+
+  const progressType = useMemo(() => {
+    const status = String(shipment?.status || "").toUpperCase();
+    const rawType = String(shipment?.tripType || shipment?.routeType || "")
+      .trim()
+      .toUpperCase();
+
+    if (rawType === "LOCAL_PICKUP" || shipment?.isPickupRequested === true) {
+      return "SHIPMENT_PICKUP";
+    }
+
+    if (status === "PENDING_PICKUP" || status === "PICKED_UP") {
+      return "SHIPMENT_PICKUP";
+    }
+
+    return "SHIPMENT_DELIVERY";
+  }, [
+    shipment?.isPickupRequested,
+    shipment?.routeType,
+    shipment?.status,
+    shipment?.tripType,
+  ]);
 
   if (loading) {
     return (
-      <View style={styles.centerContainer}>
+      <View style={styles.center}>
         <StatusBar style="dark" />
         <ActivityIndicator size="large" color="#042C83" />
       </View>
     );
   }
 
-  if (error) {
+  if (error || !shipment) {
     return (
       <SafeAreaView style={styles.container}>
         <StatusBar style="dark" />
-        <View style={styles.header}>
-          <TouchableOpacity
-            onPress={() => router.back()}
-            style={styles.backBtn}
-          >
-            <Image
-              source={require("../../../assets/icons/back.svg")}
-              style={{ width: 20, height: 20 }}
-            />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Tracking Details</Text>
-        </View>
-        <View style={[styles.scroll, styles.centerScroll]}>
-          <View style={styles.errorBox}>
-            <Text style={styles.errorTitle}>Oops</Text>
-            <Text style={styles.errorText}>{error}</Text>
-            <TouchableOpacity
-              onPress={() => router.back()}
-              style={styles.errorButton}
-            >
-              <Text style={styles.errorButtonText}>Go back</Text>
-            </TouchableOpacity>
+        <ShipmentDetailHeader
+          title="Tracking Details"
+          subtitle="Shipment lookup"
+          onBack={() => router.back()}
+        />
+
+        <View style={styles.emptyState}>
+          <View style={styles.emptyIconWrap}>
+            <FontAwesome5 name="box-open" size={22} color="#94a3b8" />
           </View>
+          <Text style={styles.emptyTitle}>Shipment unavailable</Text>
+          <Text style={styles.emptyText}>
+            {error || "The selected shipment could not be loaded."}
+          </Text>
+
+          <TouchableOpacity
+            style={styles.backGhostBtn}
+            onPress={() => router.back()}
+          >
+            <Text style={styles.backGhostBtnText}>Go Back</Text>
+          </TouchableOpacity>
         </View>
       </SafeAreaView>
     );
   }
 
-  // --- MAIN RENDER ---
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar style="dark" />
+      <StatusBar style="dark" backgroundColor="#f1f5f9" />
 
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-          <Image
-            source={require("../../../assets/icons/back.svg")}
-            style={{ width: 20, height: 20 }}
-          />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Tracking Details</Text>
-      </View>
+      <ShipmentDetailHeader
+        title="Tracking Details"
+        subtitle={shipment.id || normalizedTracking}
+        onBack={() => router.back()}
+      />
 
       <ScrollView
-        contentContainerStyle={styles.scroll}
+        contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* 1. Status & Route */}
-        <StatusRouteCard
-          status={data?.status}
-          originCode={data?.originCode}
-          origin={data?.origin}
-          destCode={data?.destinationCode}
-          destination={data?.destination}
+        <ShipmentHeaderCard shipment={shipment} showActions={false} />
+
+        <TripProgressStepper
+          currentStatus={shipment.status}
+          tripType={progressType}
         />
 
-        {/* 2. Map */}
-        <TrackingMap
-          mapRef={mapRef}
-          initialRegion={initialRegion}
-          historyLocations={statusHistoryLocations}
-          packageLocation={PACKAGE_LOCATION}
-        />
-
-        {/* 3. Timeline */}
-        <TrackingTimeline
-          steps={dynamicStatusSteps}
-          activeIndex={activeStepIndex}
-          selectedIndex={selectedStepIndex}
-          onSelectStep={(idx) =>
-            setSelectedStepIndex((prev) => (prev === idx ? null : idx))
-          }
-          locationsPerStep={statusLocationsPerStep}
-        />
-
-        {/* 4. Photos */}
-        {/* <ProofOfDelivery photos={photos} /> */}
         <ExistingProofsViewer
-          proofOfReceipt={data?.proofOfReceipt}
-          proofOfDelivery={data?.proofOfDelivery}
+          proofOfReceipt={shipment.proofOfReceipt}
+          proofOfDelivery={shipment.proofOfDelivery}
         />
 
-        {/* 5. Footer Stats */}
-        <ShipmentStats total={totalItems} loaded={loaded} pending={pending} />
+        <ShipmentPackagesPanel
+          shipment={displayShipment}
+          packages={packages}
+          editable={false}
+          showOverview={false}
+        />
       </ScrollView>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#f1f5f9" },
-  centerContainer: {
+  container: {
+    flex: 1,
+    backgroundColor: "#f1f5f9",
+    paddingTop: Platform.OS === "android" ? RNStatusBar.currentHeight || 0 : 0,
+  },
+  center: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
     backgroundColor: "#f1f5f9",
   },
-  scroll: { paddingHorizontal: 20, paddingTop: 16, paddingBottom: 32 },
-  centerScroll: { flex: 1, justifyContent: "center" },
-  header: {
+  scrollContent: {
     paddingHorizontal: 20,
-    paddingTop: 50,
-    paddingBottom: 15,
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#ffffff",
-    borderBottomWidth: 1,
-    borderBottomColor: "#e2e8f0",
+    paddingTop: 16,
+    paddingBottom: 32,
   },
-  backBtn: { padding: 0 },
-  headerTitle: {
-    color: "#0f172a",
-    fontSize: 16,
-    fontWeight: "bold",
+  emptyState: {
     flex: 1,
-    marginLeft: 12,
-  },
-  // Error styles
-  errorBox: {
-    padding: 24,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: "#fecaca",
-    backgroundColor: "#fef2f2",
-    marginHorizontal: 20,
-  },
-  errorTitle: {
-    color: "#991b1b",
-    fontSize: 16,
-    fontWeight: "700",
-    marginBottom: 6,
-  },
-  errorText: { color: "#b91c1c", fontSize: 13, marginBottom: 12 },
-  errorButton: {
-    alignSelf: "flex-start",
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 999,
-    backgroundColor: "#fee2e2",
-  },
-  errorButtonText: { color: "#991b1b", fontSize: 13, fontWeight: "600" },
-  requestPickupButton: {
-    marginTop: 14,
-    marginBottom: 12,
-    backgroundColor: "#042C83",
-    borderRadius: 10,
-    paddingVertical: 14,
     alignItems: "center",
     justifyContent: "center",
+    paddingHorizontal: 24,
   },
-  requestPickupButtonDisabled: {
-    opacity: 0.7,
+  emptyIconWrap: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#ffffff",
+    borderWidth: 1,
+    borderColor: "#e2e8f0",
+    marginBottom: 12,
   },
-  requestPickupButtonText: {
-    color: "#ffffff",
-    fontSize: 15,
+  emptyTitle: {
+    fontSize: 16,
     fontWeight: "700",
+    color: "#0f172a",
+    marginBottom: 6,
+  },
+  emptyText: {
+    fontSize: 13,
+    color: "#64748b",
+    textAlign: "center",
+    lineHeight: 19,
+  },
+  backGhostBtn: {
+    marginTop: 16,
+    paddingHorizontal: 18,
+    paddingVertical: 10,
+    borderRadius: 10,
+    backgroundColor: "#ffffff",
+    borderWidth: 1,
+    borderColor: "#e2e8f0",
+  },
+  backGhostBtnText: {
+    color: "#0f172a",
+    fontWeight: "600",
   },
 });

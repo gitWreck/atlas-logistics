@@ -121,6 +121,8 @@ exports.updateInvoiceStatus =
 exports.sendManualSms = require("./src/messaging/sendManualSms").sendManualSms;
 exports.broadcastTripMessage =
   require("./src/messaging/broadcastTripMessage").broadcastTripMessage;
+exports.processNotificationEvent =
+  require("./src/notifications/processNotificationEvent").processNotificationEvent;
 
 // Firestore Triggers
 const {

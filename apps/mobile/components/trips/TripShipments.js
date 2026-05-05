@@ -41,7 +41,7 @@ import {
   finalizeHubProcessing,
   updateShipmentStatus,
 } from "../utilities/FirebaseFunctions";
-import { getCurrentLocationSafe } from "../utilities/helpers";
+import { getCurrentLocationSafe, updatedBy } from "../utilities/helpers";
 
 export default function ShipmentListScreen({
   filterOptions,
@@ -56,7 +56,7 @@ export default function ShipmentListScreen({
     UIManager.setLayoutAnimationEnabledExperimental(true);
   }
 
-  const { isChecker } = useAuth();
+  const { isChecker, profile } = useAuth();
   const router = useRouter();
 
   const { tripId, tripType, plate } = useLocalSearchParams();
@@ -222,6 +222,7 @@ export default function ShipmentListScreen({
           newStatus,
           remarks,
           ...(location ? { location } : {}),
+          updatedBy: updatedBy(profile),
         });
       } else {
         await bulkShipmentAction({
@@ -230,6 +231,7 @@ export default function ShipmentListScreen({
           action: newStatus,
           remarks,
           ...(location ? { location } : {}),
+          updatedBy: updatedBy(profile),
         });
       }
 
@@ -292,6 +294,7 @@ export default function ShipmentListScreen({
             await finalizeHubProcessing({
               tripId: String(tripId),
               remarks: remarksText,
+              updatedBy: updatedBy(profile),
             });
 
             Alert.alert("Success", "Trip processing finalized.");

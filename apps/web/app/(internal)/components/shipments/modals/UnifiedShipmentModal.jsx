@@ -5,7 +5,7 @@ import {
   faCheckCircle,
   faCircleNotch,
   faBoxOpen,
-  faCommentSms,
+  faBell,
   faArrowRight,
   faStore,
   faTruckPickup,
@@ -28,6 +28,10 @@ import {
   shipmentLabelUrl,
 } from "@/app/utility/constant/templates";
 import { updatedBy } from "@/app/utility/utilities";
+import { getModalThemeClasses } from "@/app/utility/constant/theme";
+import CustomerNotificationChannels, {
+  DEFAULT_CUSTOMER_NOTIFICATION_CHANNELS,
+} from "../../notifications/CustomerNotificationChannels";
 
 export default function UnifiedShipmentModal({
   profile,
@@ -41,6 +45,7 @@ export default function UnifiedShipmentModal({
 }) {
   const { showAlert, showConfirm } = useAlert();
   console.log("UnifiedShipmentModal Rendered with editData:", editData);
+  const modalTheme = getModalThemeClasses(isDark);
 
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
@@ -49,7 +54,9 @@ export default function UnifiedShipmentModal({
   const [createdShipmentId, setCreatedShipmentId] = useState(null);
 
   // States controlled by the Modal Header/Footer, passed down to forms
-  const [sendSms, setSendSms] = useState(true);
+  const [notificationChannels, setNotificationChannels] = useState(
+    DEFAULT_CUSTOMER_NOTIFICATION_CHANNELS,
+  );
   const [isPickup, setIsPickup] = useState(false);
 
   const generateShipmentId = (originCode, destCode) => {
@@ -102,7 +109,7 @@ export default function UnifiedShipmentModal({
       setShipmentDraft(null);
       setFinalTripId(null);
       setCreatedShipmentId(null);
-      setSendSms(true);
+      setNotificationChannels(DEFAULT_CUSTOMER_NOTIFICATION_CHANNELS);
       setIsPickup(false);
     }
   }, [resetTrigger, editData]);
@@ -187,7 +194,11 @@ export default function UnifiedShipmentModal({
         destinationCode: shipmentDraft.routeInfo.destinationCode,
         items: shipmentDraft.items,
         remarks: shipmentDraft.remarks,
-        notifySms: sendSms,
+        notify: Object.values(notificationChannels).some(Boolean),
+        notifySms: notificationChannels.sms,
+        notifyEmail: notificationChannels.email,
+        notifyPush: notificationChannels.push,
+        notificationChannels,
         proofOfReceipt: uploadedUrls,
       };
 
@@ -243,30 +254,22 @@ export default function UnifiedShipmentModal({
 
   return (
     <div
-      className={`fixed inset-0 z-50 flex items-center justify-center backdrop-blur-md sm:p-4 ${
-        isDark ? "bg-slate-950/90" : "bg-black/40"
-      }`}
+      className={`fixed inset-0 z-50 flex items-center justify-center sm:p-4 ${modalTheme.overlay}`}
     >
       {/* Modal Container */}
       <div
-        className={`relative w-full max-w-4xl sm:rounded-xl shadow-xl overflow-hidden flex flex-col h-full sm:h-auto sm:min-h-[600px] sm:max-h-[90vh] border ${
-          isDark ? "bg-slate-900 border-slate-700" : "bg-white border-slate-200"
-        }`}
+        className={`relative w-full max-w-4xl sm:rounded-xl overflow-hidden flex flex-col h-full sm:h-auto sm:min-h-[600px] sm:max-h-[90vh] border ${modalTheme.modal}`}
       >
         {loading && (
           <div
-            className={`absolute inset-0 z-[100] backdrop-blur-sm flex flex-col items-center justify-center ${
-              isDark ? "bg-slate-900/80" : "bg-white/90"
-            }`}
+            className={`absolute inset-0 z-[100] backdrop-blur-sm flex flex-col items-center justify-center ${modalTheme.processLoading}`}
           >
             <FontAwesomeIcon
               icon={faCircleNotch}
               spin
               className="text-4xl text-blue-500 mb-4"
             />
-            <p
-              className={`font-bold ${isDark ? "text-white" : "text-slate-900"}`}
-            >
+            <p className={`font-bold ${modalTheme.title}`}>
               Processing Shipment...
             </p>
           </div>
@@ -274,15 +277,11 @@ export default function UnifiedShipmentModal({
 
         {/* --- GLOBAL HEADER --- */}
         <div
-          className={`p-4 sm:p-6 border-b flex justify-between items-center shrink-0 ${
-            isDark
-              ? "border-slate-800 bg-slate-950"
-              : "border-slate-200 bg-slate-50"
-          }`}
+          className={`p-4 sm:p-6 border-b flex justify-between items-center shrink-0 ${modalTheme.header}`}
         >
           <div className="flex flex-col">
             <h2
-              className={`text-lg sm:text-xl font-bold ${isDark ? "text-white" : "text-slate-900"}`}
+              className={`text-lg sm:text-xl font-bold ${modalTheme.title}`}
             >
               {step === 1
                 ? "1. Shipment Details"
@@ -292,7 +291,7 @@ export default function UnifiedShipmentModal({
             </h2>
             {step === 1 && (
               <p
-                className={`text-xs mt-1 ${isDark ? "text-slate-500" : "text-slate-600"}`}
+                className={`text-xs mt-1 ${modalTheme.bodyText}`}
               >
                 Fill in the package and routing info.
               </p>
@@ -300,11 +299,8 @@ export default function UnifiedShipmentModal({
           </div>
           <button
             onClick={onClose}
-            className={`p-2 rounded-lg transition-colors ${
-              isDark
-                ? "text-slate-500 hover:text-white"
-                : "text-slate-500 hover:text-slate-900 hover:bg-slate-300"
-            }`}
+            className={`p-2 rounded-lg ${modalTheme.closeButton}`}
+            aria-label="Close modal"
           >
             ✕
           </button>
@@ -316,27 +312,17 @@ export default function UnifiedShipmentModal({
             <div className="flex flex-col h-full overflow-hidden">
               {/* Pickup / Drop-off Toggle Bar */}
               <div
-                className={`p-4 border-b flex justify-center shrink-0 ${
-                  isDark
-                    ? "bg-slate-950 border-slate-800"
-                    : "bg-slate-50 border-slate-200"
-                }`}
+                className={`p-4 border-b flex justify-center shrink-0 ${modalTheme.header}`}
               >
                 <div
-                  className={`p-1 rounded-xl border flex w-full max-w-md ${
-                    isDark
-                      ? "bg-slate-900 border-slate-700"
-                      : "bg-white border-slate-300"
-                  }`}
+                  className={`p-1 rounded-xl border flex w-full max-w-md ${modalTheme.panelSurface}`}
                 >
                   <button
                     onClick={() => setIsPickup(false)}
                     className={`flex-1 py-2.5 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-2 ${
                       !isPickup
                         ? "bg-blue-600 text-white shadow"
-                        : isDark
-                          ? "text-slate-400 hover:text-slate-200"
-                          : "text-slate-500 hover:text-slate-900"
+                        : modalTheme.toggleIdle
                     }`}
                   >
                     <FontAwesomeIcon icon={faStore} /> Warehouse Drop-off
@@ -346,9 +332,7 @@ export default function UnifiedShipmentModal({
                     className={`flex-1 py-2.5 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-2 ${
                       isPickup
                         ? "bg-amber-600 text-white shadow"
-                        : isDark
-                          ? "text-slate-400 hover:text-slate-200"
-                          : "text-slate-500 hover:text-slate-900"
+                        : modalTheme.toggleIdle
                     }`}
                   >
                     <FontAwesomeIcon icon={faTruckPickup} /> Pickup
@@ -399,7 +383,7 @@ export default function UnifiedShipmentModal({
               />
               <div>
                 <h2
-                  className={`text-xl sm:text-2xl font-bold ${isDark ? "text-white" : "text-slate-900"}`}
+                  className={`text-xl sm:text-2xl font-bold ${modalTheme.title}`}
                 >
                   {finalTripId
                     ? `Shipment Assigned to ${finalTripId}`
@@ -407,14 +391,14 @@ export default function UnifiedShipmentModal({
                       ? "Shipment Updated Successfully" // ✅ New text for updates
                       : `Shipment Created (${isPickup ? "Pending Pickup" : "Pending"})`}
                 </h2>
-                {sendSms && (
+                {Object.values(notificationChannels).some(Boolean) && (
                   <p
                     className={`text-xs font-bold mt-2 uppercase tracking-widest flex justify-center items-center gap-2 ${
                       isDark ? "text-emerald-400" : "text-emerald-600"
                     }`}
                   >
-                    <FontAwesomeIcon icon={faCommentSms} />
-                    <span>SMS Notifications Queued</span>
+                    <FontAwesomeIcon icon={faBell} />
+                    <span>Customer Notifications Queued</span>
                   </p>
                 )}
               </div>
@@ -424,7 +408,7 @@ export default function UnifiedShipmentModal({
                   onClick={() =>
                     window.open(shipmentLabelUrl(createdShipmentId), "_blank")
                   }
-                  className={`w-full py-3 rounded-xl font-bold border transition-colors ${isDark ? "bg-slate-800 text-white border-slate-700 hover:bg-slate-700" : "bg-slate-200 text-slate-800 border-slate-300 hover:bg-slate-300"}`}
+                  className={`${modalTheme.secondaryButton} w-full rounded-xl py-3 font-bold`}
                 >
                   Print Shipment Label
                 </button>
@@ -433,7 +417,7 @@ export default function UnifiedShipmentModal({
                   onClick={() =>
                     window.open(packageLabelUrl(createdShipmentId), "_blank")
                   }
-                  className={`w-full py-3 rounded-xl font-bold border transition-colors ${isDark ? "bg-slate-800 text-white border-slate-700 hover:bg-slate-700" : "bg-slate-200 text-slate-800 border-slate-300 hover:bg-slate-300"}`}
+                  className={`${modalTheme.secondaryButton} w-full rounded-xl py-3 font-bold`}
                 >
                   Print Individual Packages
                 </button>
@@ -445,6 +429,9 @@ export default function UnifiedShipmentModal({
                     setFinalTripId(null);
                     setCreatedShipmentId(null);
                     setShipmentDraft(null); // This triggers the 'key' reset we set up
+                    setNotificationChannels(
+                      DEFAULT_CUSTOMER_NOTIFICATION_CHANNELS,
+                    );
                   }}
                   className="w-full py-3 rounded-xl font-bold bg-blue-600 hover:bg-blue-500 text-white shadow-lg transition-all flex items-center justify-center gap-2"
                 >
@@ -458,11 +445,7 @@ export default function UnifiedShipmentModal({
 
         {/* --- UNIFIED FOOTER --- */}
         <div
-          className={`p-4 sm:p-6 border-t flex flex-col sm:flex-row items-center gap-4 shrink-0 ${
-            isDark
-              ? "border-slate-800 bg-slate-950"
-              : "border-slate-200 bg-slate-50"
-          }`}
+          className={`p-4 sm:p-6 border-t flex flex-col sm:flex-row items-center gap-4 shrink-0 ${modalTheme.header}`}
         >
           {step === 1 && (
             <button
@@ -480,43 +463,17 @@ export default function UnifiedShipmentModal({
           )}
 
           {step === 2 && (
-            <>
-              {/* Left Side: SMS Toggle */}
-              <label className="flex items-center gap-2 cursor-pointer group w-full sm:w-auto mb-2 sm:mb-0">
-                <input
-                  type="checkbox"
-                  className={`w-4 h-4 rounded text-blue-600 focus:ring-blue-500 ${
-                    isDark
-                      ? "border-slate-700 bg-slate-800 focus:ring-offset-slate-900"
-                      : "border-slate-300 bg-white focus:ring-offset-white"
-                  }`}
-                  checked={sendSms}
-                  onChange={(e) => setSendSms(e.target.checked)}
-                />
-                <span
-                  className={`text-xs font-bold uppercase tracking-tight ${
-                    sendSms
-                      ? isDark
-                        ? "text-slate-200"
-                        : "text-slate-800"
-                      : isDark
-                        ? "text-slate-500"
-                        : "text-slate-500"
-                  }`}
-                >
-                  Notify Sender/Recipient via SMS
-                </span>
-              </label>
+            <div className="w-full space-y-4">
+              <CustomerNotificationChannels
+                value={notificationChannels}
+                onChange={setNotificationChannels}
+                theme={modalTheme}
+              />
 
-              {/* Right Side: Actions */}
-              <div className="flex w-full sm:w-auto sm:ml-auto gap-2">
+              <div className="flex w-full justify-end gap-2">
                 <button
                   onClick={() => setStep(1)}
-                  className={`px-6 py-3 rounded-xl border font-bold transition-colors ${
-                    isDark
-                      ? "border-slate-700 text-slate-400 hover:bg-slate-800"
-                      : "border-slate-300 text-slate-600 hover:bg-slate-200"
-                  }`}
+                  className={`${modalTheme.secondaryButton} flex-none rounded-xl px-6 py-3 font-bold`}
                 >
                   Back
                 </button>
@@ -527,7 +484,7 @@ export default function UnifiedShipmentModal({
                   Skip & Save
                 </button>
               </div>
-            </>
+            </div>
           )}
 
           {step === 3 && (
@@ -537,6 +494,7 @@ export default function UnifiedShipmentModal({
                 setStep(1);
                 setFinalTripId(null); // ✅ Clear success state
                 setCreatedShipmentId(null); // ✅ Clear success state
+                setNotificationChannels(DEFAULT_CUSTOMER_NOTIFICATION_CHANNELS);
               }}
               className="w-full bg-blue-600 hover:bg-blue-500 py-3.5 rounded-xl font-bold text-white transition-colors"
             >

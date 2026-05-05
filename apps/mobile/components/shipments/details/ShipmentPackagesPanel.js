@@ -10,8 +10,8 @@ import {
 
 import ShipmentPackagesStats from "./ShipmentPackagesStats";
 import ShipmentPackagesToolbar from "./ShipmentPackagesToolbar";
-import PackageListItem from "../../checker/shipment-details/PackageListItem";
-import PackageActionModal from "../../checker/shipment-details/PackageActionModal";
+import PackageListItem from "./PackageListItem";
+import PackageActionModal from "./PackageActionModal";
 
 export default function ShipmentPackagesPanel({
   shipment,
@@ -19,6 +19,7 @@ export default function ShipmentPackagesPanel({
   editable = false,
   onSubmitAction,
   loading = false,
+  showOverview = true,
 }) {
   const [search, setSearch] = useState("");
   const [selectedIds, setSelectedIds] = useState(new Set());
@@ -88,7 +89,7 @@ export default function ShipmentPackagesPanel({
     <View style={styles.container}>
       <Text style={styles.sectionTitle}>Packages ({packages.length})</Text>
 
-      <ShipmentPackagesStats shipment={shipment} />
+      {showOverview && <ShipmentPackagesStats shipment={shipment} />}
 
       <ShipmentPackagesToolbar
         search={search}
@@ -114,6 +115,7 @@ export default function ShipmentPackagesPanel({
             item={item}
             selected={selectedIds.has(getPackageKey(item))}
             isSelectionMode={editable && selectedIds.size > 0}
+            showMenu={editable}
             onLongPress={
               editable
                 ? () => {

@@ -9,13 +9,16 @@ import {
   faFloppyDisk,
   faTruck,
   faRoute,
-  faBell,
 } from "@fortawesome/free-solid-svg-icons";
 import { getModalThemeClasses } from "@/app/utility/constant/theme";
 import { getModalActionClasses } from "@/app/utility/constant/action";
+import { auth } from "@/lib/firebase";
 import { buildInitialForm } from "../utils";
 import TripScheduleInfoCard from "../modals/TripScheduleInfoCard";
 import TripScheduleDateField from "../modals/TripScheduleDateField";
+import CustomerNotificationChannels, {
+  DEFAULT_CUSTOMER_NOTIFICATION_CHANNELS,
+} from "../../notifications/CustomerNotificationChannels";
 
 export default function TripScheduleModal({
   isOpen = false,
@@ -31,7 +34,10 @@ export default function TripScheduleModal({
   const [tripQuery, setTripQuery] = useState("");
   const [showTripDropdown, setShowTripDropdown] = useState(false);
   const [error, setError] = useState("");
-  const [sendNotification, setsendNotification] = useState(true);
+  const [notificationChannels, setNotificationChannels] = useState(
+    DEFAULT_CUSTOMER_NOTIFICATION_CHANNELS,
+  );
+  const [drivers, setDrivers] = useState([]);
 
   const modalTheme = getModalThemeClasses(isDark);
   const actionTheme = getModalActionClasses();
@@ -52,19 +58,62 @@ export default function TripScheduleModal({
     );
     setError("");
     setShowTripDropdown(false);
-    setsendNotification(true);
+    setNotificationChannels(DEFAULT_CUSTOMER_NOTIFICATION_CHANNELS);
   }, [isOpen, selectedTripSchedule]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const loadDrivers = async () => {
+      try {
+        const token = await auth.currentUser?.getIdToken();
+        const res = await fetch("/api/drivers/active", {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const data = await res.json();
+
+        if (data?.drivers) {
+          setDrivers(data.drivers);
+        }
+      } catch (err) {
+        console.error("Failed to load drivers for trip schedule:", err);
+      }
+    };
+
+    loadDrivers();
+  }, [isOpen]);
 
   const updateField = (key, value) => {
     setForm((prev) => ({ ...prev, [key]: value }));
   };
 
+  const driverById = useMemo(() => {
+    return new Map(drivers.map((driver) => [driver.id, driver]));
+  }, [drivers]);
+
+  const scheduleTrips = useMemo(() => {
+    const allowedStatuses = new Set(["CREATED", "LOADED"]);
+
+    return (trips || [])
+      .filter((item) =>
+        allowedStatuses.has(String(item.status || "").toUpperCase()),
+      )
+      .map((item) => {
+        const driver = item.driverId ? driverById.get(item.driverId) : null;
+
+        return {
+          ...item,
+          driverName: item.driverName || driver?.name || "",
+        };
+      });
+  }, [driverById, trips]);
+
   const filteredTrips = useMemo(() => {
     const keyword = tripQuery.toLowerCase().trim();
 
-    if (!keyword) return trips;
+    if (!keyword) return scheduleTrips;
 
-    return trips.filter((item) => {
+    return scheduleTrips.filter((item) => {
       return `
         ${item.id || ""}
         ${item.tripId || ""}
@@ -80,7 +129,7 @@ export default function TripScheduleModal({
         .toLowerCase()
         .includes(keyword);
     });
-  }, [trips, tripQuery]);
+  }, [scheduleTrips, tripQuery]);
 
   const handleSelectTrip = (trip) => {
     setTripQuery(
@@ -123,12 +172,18 @@ export default function TripScheduleModal({
 
     setError("");
 
+    const notify = Object.values(notificationChannels).some(Boolean);
+
     onSubmit?.({
       tripId: form.tripId,
       plannedDeparture: form.plannedDeparture || null,
       estimatedArrival: form.estimatedArrival || null,
       plannedLoadingStart: form.plannedLoadingStart || null,
-      notify: sendNotification,
+      notify,
+      notificationChannels,
+      notifySms: notificationChannels.sms,
+      notifyEmail: notificationChannels.email,
+      notifyPush: notificationChannels.push,
     });
   };
 
@@ -260,6 +315,21 @@ export default function TripScheduleModal({
                           </div>
                         )}
 
+                      {mode !== "edit" &&
+                        showTripDropdown &&
+                        !loading &&
+                        filteredTrips.length === 0 && (
+                          <div
+                            className={`absolute z-50 left-0 right-0 mt-1 rounded-xl border shadow-xl px-3 py-3 text-xs ${
+                              isDark
+                                ? "bg-slate-900 border-slate-700 text-slate-400"
+                                : "bg-white border-slate-200 text-slate-500"
+                            }`}
+                          >
+                            No created or loaded trips found.
+                          </div>
+                        )}
+
                       {mode !== "edit" && loading && (
                         <div
                           className={`text-xs mt-2 ${modalTheme.helperText}`}
@@ -369,32 +439,11 @@ export default function TripScheduleModal({
                     </p> */}
                   </div>
 
-                  <label
-                    className={`flex items-start gap-3 rounded-xl border p-4 cursor-pointer ${modalTheme.panelSurface}`}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={sendNotification}
-                      onChange={(e) => {
-                        console.log(e.target.checked);
-                        setsendNotification(e.target.checked);
-                      }}
-                      className="mt-1 h-4 w-4"
-                    />
-
-                    <div className="min-w-0">
-                      <div
-                        className={`text-sm font-semibold flex items-center gap-2 ${modalTheme.title}`}
-                      >
-                        <FontAwesomeIcon icon={faBell} />
-                        Notify customers
-                      </div>
-                      {/* <p className={`text-xs mt-1 ${modalTheme.helperText}`}>
-                        When enabled, `sendNotification` will be passed
-                        to your `onSubmit` payload.
-                      </p> */}
-                    </div>
-                  </label>
+                  <CustomerNotificationChannels
+                    value={notificationChannels}
+                    onChange={setNotificationChannels}
+                    theme={modalTheme}
+                  />
                 </section>
 
                 {error ? (

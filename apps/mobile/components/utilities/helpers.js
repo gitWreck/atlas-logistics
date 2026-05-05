@@ -59,3 +59,13 @@ export const normalizePhoneNumber = (input) => {
   // 4. Return E.164 Standard (with +)
   return `${cleaned}`;
 };
+
+export function updatedBy(profile) {
+  const object = {
+    usercode: profile?.userCode || "Unknown User",
+    username: profile?.name || "Unknown Name",
+    role: profile?.role || "Unknown Role",
+  };
+
+  return object;
+}

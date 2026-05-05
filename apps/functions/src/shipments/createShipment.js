@@ -1,13 +1,7 @@
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const admin = require("firebase-admin");
-const {
-  sendShipmentCreatedSmsLogic,
-} = require("../messaging/sendShipmentCreatedSmsLogic");
-const {
-  SEMAPHORE_API_KEY,
-  SEMAPHORE_SENDER_NAME,
-} = require("../../shared/sms-service");
 const { writeShipmentActionLog } = require("../utilities/shipmentLogger");
+const { updatedBy } = require("../utilities/helpers");
 
 const { Timestamp } = admin.firestore;
 
@@ -62,10 +56,10 @@ function phoneVariants(value = "") {
 
 function getPublicUserId(user = {}, fallback = null) {
   return (
-    user.userId ||
-    user.publicId ||
-    user.userCode ||
-    user.driverCode ||
+    user?.userId ||
+    user?.publicId ||
+    user?.userCode ||
+    user?.driverCode ||
     fallback ||
     null
   );
@@ -109,6 +103,7 @@ function buildPackages({
   originSummary,
   actorUid,
   bundleMode,
+  name,
 }) {
   const packagesArray = [];
   const packageBarcodes = [];
@@ -141,7 +136,7 @@ function buildPackages({
         loadedAt: null,
         isDelayed: false,
         updatedAt: new Date().toISOString(),
-        updatedBy: actorUid,
+        updatedBy: name,
       });
 
       packageBarcodes.push(pkgId);
@@ -169,7 +164,7 @@ function buildPackages({
         loadedAt: null,
         isDelayed: false,
         updatedAt: new Date().toISOString(),
-        updatedBy: actorUid,
+        updatedBy: name,
       });
 
       packageBarcodes.push(pkgId);
@@ -187,7 +182,6 @@ function buildPackages({
 exports.createShipment = onCall(
   {
     region: "asia-southeast1",
-    secrets: [SEMAPHORE_API_KEY, SEMAPHORE_SENDER_NAME],
     maxInstances: 10,
   },
   async (request) => {
@@ -206,6 +200,9 @@ exports.createShipment = onCall(
       remarks,
       location,
       notifySms,
+      notifyEmail,
+      notifyPush,
+      notificationChannels = null,
       manualShipmentId,
       proofOfReceipt = [],
       status,
@@ -213,6 +210,8 @@ exports.createShipment = onCall(
       customerId = null,
       visibilityUserIds = [],
     } = request.data || {};
+
+    const { uid, role, name } = updatedBy(request);
 
     if (!origin || !destination) {
       throw new HttpsError(
@@ -297,12 +296,25 @@ exports.createShipment = onCall(
         originSummary,
         actorUid: request.auth.uid,
         bundleMode,
+        name,
       });
 
     const shipmentRef = db.collection("shipments").doc(shipmentId);
     const now = Timestamp.now();
     const nowAt = admin.firestore.FieldValue.serverTimestamp();
     const batch = db.batch();
+    const requestedChannels =
+      notificationChannels && typeof notificationChannels === "object"
+        ? notificationChannels
+        : {};
+    const notificationChannelsToSend = {
+      sms: requestedChannels.sms === true || notifySms === true,
+      email: requestedChannels.email === true || notifyEmail === true,
+      push: requestedChannels.push === true || notifyPush === true,
+    };
+    const shouldCreateNotificationEvent = Object.values(
+      notificationChannelsToSend,
+    ).some(Boolean);
 
     batch.set(shipmentRef, {
       shipmentId: shipmentId,
@@ -337,8 +349,8 @@ exports.createShipment = onCall(
 
       createdAt: nowAt,
       updatedAt: nowAt,
-      createdBy: request.auth.uid,
-      updatedBy: request.auth.uid,
+      createdBy: name,
+      updatedBy: name,
 
       status: initialStatus,
       statusHistory: [
@@ -383,26 +395,64 @@ exports.createShipment = onCall(
       originCode: finalOriginCode,
       destinationCode: finalDestCode,
       shipmentMode: bundleMode ? "BULK" : "SINGLE",
-      actorId: request.auth.uid,
+      actorId: uid,
+      actorName: name,
+      actorRole: role,
       createdAt: nowAt,
     });
 
-    try {
-      await batch.commit();
+    if (shouldCreateNotificationEvent) {
+      const notificationRef = db.collection("notification_events").doc();
+      const targetUserIds = [
+        ...new Set([senderUid, recipientUid].filter(Boolean).map(String)),
+      ];
 
-      if (notifySms === true) {
-        sendShipmentCreatedSmsLogic({
-          shipmentId,
-          senderPhone,
-          recipientPhone,
-          status,
+      batch.set(notificationRef, {
+        type: "SHIPMENT_CREATED",
+        status: "pending",
+        channels: {
+          ...notificationChannelsToSend,
+          inApp: targetUserIds.length > 0,
+        },
+        entityType: "shipment",
+        entityId: shipmentId,
+        shipmentId,
+        targetUserIds,
+        targets: {
+          sender: {
+            uid: senderUid,
+            name: sender?.name || "",
+            phone: senderPhone,
+            email: sender?.email || senderCustomer?.email || null,
+          },
+          recipient: {
+            uid: recipientUid,
+            name: recipient?.name || "",
+            phone: recipientPhone,
+            email: recipient?.email || recipientCustomer?.email || null,
+          },
+        },
+        title: "Shipment created",
+        body: `Your shipment ${shipmentId} has been created.`,
+        data: {
+          screen: "tracking",
+          trackingId: shipmentId,
+          status: initialStatus,
           origin,
           destination,
-          actorUid: request.auth.uid,
-        }).catch((err) =>
-          console.error("[SMS_ERROR] Initial notification failed:", err),
-        );
-      }
+        },
+        actor: {
+          uid,
+          name,
+          role,
+        },
+        createdAt: nowAt,
+        updatedAt: nowAt,
+      });
+    }
+
+    try {
+      await batch.commit();
 
       return {
         success: true,

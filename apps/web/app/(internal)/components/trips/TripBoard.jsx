@@ -39,7 +39,6 @@ const TripBoard = forwardRef(function TripBoard(
   const [selectedTripSchedule, setSelectedTripSchedule] = useState(null);
 
   const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
-  const [tripsSchedules, setTripsSchedules] = useState([]);
 
   const [activeFilter, setActiveFilter] = useState("ALL");
   const [typeFilter, setTypeFilter] = useState("ALL");
@@ -86,25 +85,23 @@ const TripBoard = forwardRef(function TripBoard(
     }
   };
 
-  const fetchTripSchedules = () => {
-    try {
-      const cleaned = (trips || []).map((trip) => {
-        // remove heavy shipment data
-        const { shipments, ...rest } = trip;
-
-        return rest;
-      });
-
-      setTripsSchedules(cleaned);
-    } catch (err) {
-      console.error("Error filtering trip schedules:", err);
-    }
-  };
-
   useEffect(() => {
     fetchTrips();
-    fetchTripSchedules(); // filter the fetched trips to get only the ones needed for trip modal search input
   }, []);
+
+  const tripScheduleCandidates = useMemo(() => {
+    const allowedStatuses = new Set(["CREATED", "LOADED"]);
+
+    return (trips || [])
+      .filter((trip) =>
+        allowedStatuses.has(String(trip.status || "").toUpperCase()),
+      )
+      .map((trip) => {
+        // remove heavy shipment data from the schedule picker
+        const { shipments, ...rest } = trip;
+        return rest;
+      });
+  }, [trips]);
 
   const filteredTrips = useMemo(() => {
     return trips.filter((trip) => {
@@ -419,7 +416,7 @@ const TripBoard = forwardRef(function TripBoard(
         onSubmit={handleSaveTripSchedule}
         // selectedTrip={selectedTrip || null}
         selectedTripSchedule={selectedTripSchedule}
-        trips={tripsSchedules}
+        trips={tripScheduleCandidates}
         // fetchingTrips={loading}
         loading={loading}
         isDark={isDark}

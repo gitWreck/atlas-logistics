@@ -102,6 +102,88 @@ export const BADGE_COLORS = {
 
 // 1. Define the 3 Workflows with their triggering statuses built-in
 export const TRACKING_WORKFLOWS = {
+  SHIPMENT_PICKUP: [
+    {
+      key: "pending_pickup",
+      label: "Pending Pickup",
+      icon: "clock",
+      statuses: ["CREATED", "PENDING_PICKUP"],
+    },
+    {
+      key: "picked_up",
+      label: "Picked Up",
+      icon: "box-open",
+      statuses: ["PICKED_UP"],
+    },
+    {
+      key: "received",
+      label: "Received at Hub",
+      icon: "warehouse",
+      statuses: ["RECEIVED"],
+    },
+    {
+      key: "loaded",
+      label: "Loaded",
+      icon: "dolly",
+      statuses: ["LOADING", "LOADED"],
+    },
+    {
+      key: "transit",
+      label: "In Transit",
+      icon: "truck-moving",
+      statuses: ["IN_TRANSIT"],
+    },
+    {
+      key: "out_for_delivery",
+      label: "Out for Delivery",
+      icon: "shipping-fast",
+      statuses: ["OUT_FOR_DELIVERY"],
+    },
+    {
+      key: "delivered",
+      label: "Delivered",
+      icon: "check-circle",
+      statuses: ["DELIVERED"],
+    },
+  ],
+  SHIPMENT_DELIVERY: [
+    {
+      key: "created",
+      label: "Created",
+      icon: "file-signature",
+      statuses: ["CREATED", "ASSIGNED"],
+    },
+    {
+      key: "received",
+      label: "Received at Hub",
+      icon: "warehouse",
+      statuses: ["RECEIVED"],
+    },
+    {
+      key: "loaded",
+      label: "Loaded",
+      icon: "dolly",
+      statuses: ["LOADING", "LOADED"],
+    },
+    {
+      key: "transit",
+      label: "In Transit",
+      icon: "truck-moving",
+      statuses: ["IN_TRANSIT"],
+    },
+    {
+      key: "out_for_delivery",
+      label: "Out for Delivery",
+      icon: "shipping-fast",
+      statuses: ["OUT_FOR_DELIVERY"],
+    },
+    {
+      key: "delivered",
+      label: "Delivered",
+      icon: "check-circle",
+      statuses: ["DELIVERED"],
+    },
+  ],
   HUB_TRANSFER: [
     {
       key: "assigned",
@@ -134,7 +216,7 @@ export const TRACKING_WORKFLOWS = {
       statuses: ["COMPLETED"],
     },
   ],
-  LOCAL_DELIVERY: [
+  DELIVERY: [
     {
       key: "assigned",
       label: "Route Assigned",
@@ -143,7 +225,7 @@ export const TRACKING_WORKFLOWS = {
     },
     {
       key: "loaded",
-      label: "Van Loaded",
+      label: "Loaded",
       icon: "box",
       statuses: ["LOADING", "LOADED"],
     },
@@ -302,12 +384,12 @@ export const CHECKER_SHIPMENT_ACTION = [
 export const CHECKER_TAB_OPTIONS = [
   { key: "ALL", label: "All" },
   { key: "CREATED", label: "Created" },
-  // { key: "RECEIVED", label: "Received" },
   { key: "LOADED", label: "Loaded" },
+  { key: "OUT_FOR_DELIVERY", label: "Out for Delivery" },
+  // { key: "RECEIVED", label: "Received" },
   // { key: "IN_TRANSIT", label: "Transit" },
   // { key: "RECEIVED", label: "Received" },
-  { key: "ARRIVED", label: "Arrived" },
-  { key: "OUT_FOR_DELIVERY", label: "Out for Delivery" },
+  // { key: "ARRIVED", label: "Arrived" },
 ];
 
 export const DRIVER_TAB_OPTIONS = [

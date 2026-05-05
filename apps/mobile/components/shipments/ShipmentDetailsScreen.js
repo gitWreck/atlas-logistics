@@ -17,7 +17,7 @@ import { StatusBar } from "expo-status-bar";
 
 import { db, storage } from "../../firebase";
 import { useAuth } from "../../contexts/AuthContext.js";
-import { getCurrentLocationSafe } from "../utilities/helpers";
+import { getCurrentLocationSafe, updatedBy } from "../utilities/helpers";
 import {
   updateShipmentStatus,
   updateShipmentPackages,
@@ -38,7 +38,7 @@ import ShipmentPackagesPanel from "./details/ShipmentPackagesPanel";
 export default function ShipmentDetailsScreen() {
   const { shipmentId, tripId, tripType, parentTripId } = useLocalSearchParams();
   const router = useRouter();
-  const { isChecker, isDriver } = useAuth();
+  const { isChecker, isDriver, profile } = useAuth();
 
   const resolvedTripId = parentTripId || tripId;
 
@@ -152,6 +152,8 @@ export default function ShipmentDetailsScreen() {
           location,
           remarks: `Proof of Receipt: ${photoUrls.length} images uploaded.`,
           proofOfReceipt: photoUrls,
+          sourceUI: isChecker ? "CHECKER_MOBILE" : "DRIVER_MOBILE",
+          updatedBy: updatedBy(profile),
         });
 
         Alert.alert("Success", "Package collected successfully.");
@@ -165,6 +167,8 @@ export default function ShipmentDetailsScreen() {
           tripId: resolvedTripId,
           newStatus: "OUT_FOR_DELIVERY",
           location,
+          sourceUI: isChecker ? "CHECKER_MOBILE" : "DRIVER_MOBILE",
+          updatedBy: updatedBy(profile),
         });
 
         Alert.alert("Success", "Shipment is now Out for Delivery.");
@@ -205,7 +209,9 @@ export default function ShipmentDetailsScreen() {
               location,
               remarks: `Proof of Delivery: ${photoUrls.length} images uploaded.`,
               proofOfDelivery: photoUrls,
-              paymentStatus: shipment.isCOD ? "COLLECTED_BY_DRIVER" : "PAID",
+              paymentStatus: shipment.isCOD ? "COLLECTED_BY_CHECKER" : "PAID",
+              sourceUI: isChecker ? "CHECKER_MOBILE" : "DRIVER_MOBILE",
+              updatedBy: updatedBy(profile),
             });
 
             Alert.alert("Success", "Delivery completed.");
@@ -264,6 +270,8 @@ export default function ShipmentDetailsScreen() {
         newStatus,
         location,
         remarks: `Exception: ${reasonText} (${reasonId})`,
+        sourceUI: isChecker ? "CHECKER_MOBILE" : "DRIVER_MOBILE",
+        updatedBy: updatedBy(profile),
       });
 
       Alert.alert(
@@ -291,7 +299,7 @@ export default function ShipmentDetailsScreen() {
         message: actionMessage,
         shipmentId,
         tripId: resolvedTripId,
-        reason: "driver_update",
+        reason: isChecker ? "checker_update" : "driver_update",
       });
 
       Alert.alert("Success", "SMS sent to customer.");
@@ -320,6 +328,7 @@ export default function ShipmentDetailsScreen() {
         remarks,
         location,
         manualQty,
+        updatedBy: updatedBy(profile),
       });
 
       const snap = await getDoc(doc(db, "shipments", String(shipmentId)));
@@ -352,11 +361,21 @@ export default function ShipmentDetailsScreen() {
   }
 
   const packages = shipment?.packages || [];
+  const canDriverHandlePickup =
+    isDriver &&
+    tripType !== "HUB_TRANSFER" &&
+    shipment?.status === "PENDING_PICKUP";
+  const canCheckerHandleDelivery =
+    isChecker &&
+    tripType !== "HUB_TRANSFER" &&
+    ["ARRIVED", "OUT_FOR_DELIVERY", "FAILED_DELIVERY"].includes(
+      shipment?.status,
+    );
+  const showFooter = canDriverHandlePickup || canCheckerHandleDelivery;
   const needsPhotoUpload =
-    shipment?.status === "PENDING_PICKUP" ||
-    shipment?.status === "OUT_FOR_DELIVERY";
+    canDriverHandlePickup ||
+    (canCheckerHandleDelivery && shipment?.status === "OUT_FOR_DELIVERY");
 
-  const showFooter = isDriver && tripType !== "HUB_TRANSFER";
   const packagePanelEditable = isChecker;
 
   return (

@@ -3,13 +3,135 @@
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const admin = require("firebase-admin");
 const { FieldValue } = require("firebase-admin/firestore");
-const { requireRole } = require("../utilities/helpers");
+const { requireRole, updatedBy } = require("../utilities/helpers");
 const { ALLOWED_SHIPMENT_STATUSES } = require("../utilities/dataDetails");
 const { writeShipmentActionLog } = require("../utilities/shipmentLogger");
 
 if (!admin.apps.length) admin.initializeApp();
 
 const db = admin.firestore();
+
+function unique(values = []) {
+  return [...new Set(values.filter(Boolean).map(String))];
+}
+
+function formatStatusLabel(status = "") {
+  return String(status || "")
+    .replace(/_/g, " ")
+    .toLowerCase()
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function getShipmentTargetUserIds(shipment = {}) {
+  return unique([
+    ...(Array.isArray(shipment.visibilityUserIds)
+      ? shipment.visibilityUserIds
+      : []),
+    shipment.customerId,
+    shipment.senderUid,
+    shipment.recipientUid,
+    shipment.sender?.uid,
+    shipment.recipient?.uid,
+  ]);
+}
+
+function buildStatusNotificationEvent({
+  shipment,
+  shipmentId,
+  oldStatus,
+  newStatus,
+  actor,
+  notificationChannels,
+  notifySms,
+  notifyPush,
+  notify,
+}) {
+  if (notify === false) return null;
+
+  const requestedChannels =
+    notificationChannels && typeof notificationChannels === "object"
+      ? notificationChannels
+      : null;
+
+  const channels = requestedChannels
+    ? {
+        sms: requestedChannels.sms === true,
+        push: requestedChannels.push === true,
+        inApp:
+          requestedChannels.inApp === true || requestedChannels.push === true,
+      }
+    : {
+        sms: notifySms !== false,
+        push: notifyPush !== false,
+        inApp: true,
+      };
+
+  const targetUserIds = getShipmentTargetUserIds(shipment);
+  const statusLabel = formatStatusLabel(newStatus);
+  const title = "Shipment status updated";
+  const body = `Shipment ${shipmentId} is now ${statusLabel}.`;
+  const smsBody = `ATLAS: Shipment ${shipmentId} is now ${statusLabel}. Track: https://atlastransport.ph/track/${shipmentId}`;
+
+  if (
+    !channels.sms &&
+    !channels.push &&
+    (!channels.inApp || targetUserIds.length === 0)
+  ) {
+    return null;
+  }
+
+  return {
+    type: "SHIPMENT_STATUS_UPDATED",
+    status: "pending",
+    channels: {
+      sms: channels.sms,
+      push: channels.push,
+      inApp: channels.inApp && targetUserIds.length > 0,
+    },
+    entityType: "shipment",
+    entityId: shipmentId,
+    shipmentId,
+    targetUserIds,
+    targets: {
+      sender: {
+        uid: shipment.sender?.uid || shipment.senderUid || null,
+        name: shipment.sender?.name || shipment.senderName || "",
+        phone: shipment.sender?.phone || shipment.senderPhone || null,
+        email: shipment.sender?.email || shipment.senderEmail || null,
+      },
+      recipient: {
+        uid: shipment.recipient?.uid || shipment.recipientUid || null,
+        name: shipment.recipient?.name || shipment.recipientName || "",
+        phone:
+          shipment.recipient?.phone ||
+          shipment.recipientPhone ||
+          shipment.consigneePhone ||
+          shipment.customerPhone ||
+          null,
+        email: shipment.recipient?.email || shipment.recipientEmail || null,
+      },
+    },
+    title,
+    body,
+    smsBody,
+    data: {
+      screen: "tracking",
+      trackingId: shipmentId,
+      status: newStatus,
+      oldStatus,
+      origin: shipment.origin || shipment.sender?.address?.city || null,
+      destination:
+        shipment.destination || shipment.recipient?.address?.city || null,
+    },
+    actor: {
+      uid: actor.uid,
+      name: actor.name,
+      role: actor.role,
+    },
+    createdAt: FieldValue.serverTimestamp(),
+    updatedAt: FieldValue.serverTimestamp(),
+  };
+}
 
 exports.updateShipmentStatus = onCall(
   { region: "asia-southeast1", maxInstances: 10 },
@@ -18,9 +140,14 @@ exports.updateShipmentStatus = onCall(
       throw new HttpsError("unauthenticated", "Auth required.");
     }
 
-    const uid = req.auth.uid;
+    const actor = await requireRole(db, req, [
+      "admin",
+      "manager",
+      "checker",
+      "driver",
+    ]);
 
-    await requireRole(db, req, ["admin", "manager", "checker", "driver"]);
+    const { uid, role, name } = updatedBy(req);
 
     const {
       shipmentId,
@@ -31,6 +158,10 @@ exports.updateShipmentStatus = onCall(
       proofOfDelivery,
       proofOfReceipt,
       paymentStatus,
+      notify = true,
+      notifySms,
+      notifyPush,
+      notificationChannels = null,
       sourceUI = "SYSTEM",
     } = req.data || {};
 
@@ -42,13 +173,23 @@ exports.updateShipmentStatus = onCall(
       throw new HttpsError("invalid-argument", `Invalid status: ${newStatus}`);
     }
 
+    if (
+      actor.role === "driver" &&
+      (newStatus === "DELIVERED" || proofOfDelivery)
+    ) {
+      throw new HttpsError(
+        "permission-denied",
+        "Drivers cannot complete delivery or upload proof of delivery.",
+      );
+    }
+
     const shipmentRef = db.collection("shipments").doc(shipmentId);
     const tripRef = tripId ? db.collection("truck_trips").doc(tripId) : null;
     const tripShipmentRef = tripRef
       ? tripRef.collection("trip_shipments").doc(shipmentId)
       : null;
 
-    await db.runTransaction(async (tx) => {
+    const notificationEvent = await db.runTransaction(async (tx) => {
       const shipmentSnap = await tx.get(shipmentRef);
 
       if (!shipmentSnap.exists) {
@@ -67,7 +208,7 @@ exports.updateShipmentStatus = onCall(
         : [];
 
       if (oldStatus === newStatus) {
-        return;
+        return null;
       }
 
       const normalizeQty = (value, fallback = 0) => {
@@ -180,7 +321,7 @@ exports.updateShipmentStatus = onCall(
         status: newStatus,
         packages: updatedPackages,
         updatedAt: FieldValue.serverTimestamp(),
-        updatedBy: uid,
+        updatedBy: name,
         remarks: remarks || null,
 
         ...(location && { lastLocation: location }),
@@ -198,7 +339,7 @@ exports.updateShipmentStatus = onCall(
         statusHistory: FieldValue.arrayUnion({
           status: newStatus,
           at: new Date(),
-          by: uid,
+          by: name,
           note: remarks || `Status updated via ${sourceUI}`,
           location: location || null,
         }),
@@ -209,7 +350,7 @@ exports.updateShipmentStatus = onCall(
       if (tripRef && tripShipmentRef && tripShipSnap && tripShipSnap.exists) {
         const tripUpdate = {
           updatedAt: FieldValue.serverTimestamp(),
-          updatedBy: uid,
+          updatedBy: name,
         };
 
         const oldLoadedDelta = oldLoadedQty;
@@ -250,7 +391,7 @@ exports.updateShipmentStatus = onCall(
           deliveredCount: newReceivedQty,
           receivedCount: newReceivedQty,
           updatedAt: FieldValue.serverTimestamp(),
-          updatedBy: uid,
+          updatedBy: name,
         });
       }
 
@@ -262,6 +403,8 @@ exports.updateShipmentStatus = onCall(
         targetId: shipmentId,
         shipmentId,
         actorId: uid,
+        actorName: name,
+        actorRole: role,
         details: {
           oldStatus,
           newStatus,
@@ -271,8 +414,28 @@ exports.updateShipmentStatus = onCall(
         },
         timestamp: FieldValue.serverTimestamp(),
       });
+
+      return buildStatusNotificationEvent({
+        shipment: currentData,
+        shipmentId,
+        oldStatus,
+        newStatus,
+        actor: { uid, role, name },
+        notificationChannels,
+        notifySms,
+        notifyPush,
+        notify,
+      });
     });
 
-    return { success: true, status: newStatus };
+    if (notificationEvent) {
+      await db.collection("notification_events").doc().set(notificationEvent);
+    }
+
+    return {
+      success: true,
+      status: newStatus,
+      notificationQueued: Boolean(notificationEvent),
+    };
   },
 );
