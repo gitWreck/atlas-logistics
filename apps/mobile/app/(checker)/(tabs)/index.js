@@ -19,8 +19,7 @@ import {
   Timestamp,
 } from "firebase/firestore";
 import { startOfDay, subDays } from "date-fns";
-import { auth, db } from "../../../firebase";
-import { FontAwesome5 } from "@expo/vector-icons";
+import { db } from "../../../firebase";
 
 // ✅ IMPORT NEW COMPONENTS
 import StatusFilter from "../../../components/checker/StatusFilter";
@@ -98,38 +97,8 @@ export default function CheckerIndex() {
     setRefreshing(false);
   };
 
-  const handleLogout = () => {
-    Alert.alert("Sign Out", "Are you sure you want to sign out?", [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Sign Out",
-        style: "destructive",
-        onPress: () => {
-          auth.signOut();
-          router.replace("/(auth)/login");
-        },
-      },
-    ]);
-  };
-
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor="#f1f5f9" />
-
-      <View style={styles.header}>
-        <View style={styles.textBlock}>
-          <Text style={styles.title} numberOfLines={1}>
-            Operations
-          </Text>
-          <Text style={styles.subtitle} numberOfLines={1}>
-            Checker Dashboard
-          </Text>
-        </View>
-        <TouchableOpacity onPress={handleLogout} style={styles.iconBtn}>
-          <FontAwesome5 name="sign-out-alt" size={15} color="#0f172a" />
-        </TouchableOpacity>
-      </View>
-
       <ScrollView
         contentContainerStyle={styles.content}
         refreshControl={

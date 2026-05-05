@@ -20,6 +20,7 @@ const TripSummaryCard = ({ trip }) => {
       : "—";
 
   const isLocalPickup = trip.tripType === "LOCAL_PICKUP";
+  const isDelivery = trip.tripType === "DELIVERY";
 
   return (
     <View style={styles.card}>
@@ -65,9 +66,10 @@ const TripSummaryCard = ({ trip }) => {
           </Text>
         </View>
       </View>
-      <View style={styles.separator} />
+      {!isDelivery && <View style={styles.separator} />}
 
-      <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+      {!isDelivery && (
+        <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
         {/* From */}
         <View
           style={[styles.locationBlock, { flex: 1 }]}
@@ -108,7 +110,8 @@ const TripSummaryCard = ({ trip }) => {
             </Text>
           </View>
         </View>
-      </View>
+        </View>
+      )}
 
       <View style={styles.separator} />
 

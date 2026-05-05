@@ -10,6 +10,7 @@ const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
+  const [profile, setProfile] = useState(null);
   const [role, setRole] = useState(null);
   const [loading, setLoading] = useState(true);
   const [isReady, setIsReady] = useState(false);
@@ -18,6 +19,7 @@ export function AuthProvider({ children }) {
     const unsub = onAuthStateChanged(auth, async (firebaseUser) => {
       setLoading(true);
       setUser(firebaseUser ?? null);
+      setProfile(null);
       setRole(null);
 
       if (!firebaseUser) {
@@ -39,20 +41,25 @@ export function AuthProvider({ children }) {
         if (userDoc.exists()) {
           const userData = userDoc.data();
           const r = (userData.role ?? "").toString().toLowerCase();
-
-          setRole(r);
-          setUser({
+          const fullProfile = {
+            id: userDoc.id,
             uid: firebaseUser.uid,
             email: firebaseUser.email,
             ...userData,
-          });
+          };
+
+          setRole(r);
+          setProfile(fullProfile);
+          setUser(fullProfile);
         } else {
           // Fallback if Auth exists but Firestore doc doesn't
           setUser({ uid: firebaseUser.uid, email: firebaseUser.email });
+          setProfile(null);
           setRole(null);
         }
       } catch (err) {
         console.error("AuthContext: fetch role error", err);
+        setProfile(null);
         setRole(null);
       } finally {
         setLoading(false);
@@ -67,11 +74,17 @@ export function AuthProvider({ children }) {
     if (!auth.currentUser) return;
     const userDoc = await getDoc(doc(db, "users", auth.currentUser.uid));
     if (userDoc.exists()) {
-      setUser({
+      const userData = userDoc.data();
+      const fullProfile = {
+        id: userDoc.id,
         uid: auth.currentUser.uid,
         email: auth.currentUser.email,
-        ...userDoc.data(),
-      });
+        ...userData,
+      };
+
+      setUser(fullProfile);
+      setProfile(fullProfile);
+      setRole((userData.role ?? "").toString().toLowerCase());
     }
   };
 
@@ -90,6 +103,7 @@ export function AuthProvider({ children }) {
 
   const value = {
     user,
+    profile,
     role,
     loading,
     isReady,

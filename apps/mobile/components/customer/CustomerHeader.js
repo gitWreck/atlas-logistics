@@ -2,7 +2,15 @@ import React from "react";
 import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
 import { FontAwesome5 } from "@expo/vector-icons";
 
-export default function CustomerHeader({ userName, onLogout, onProfilePress }) {
+export default function CustomerHeader({
+  userName,
+  onLogout,
+  onProfilePress,
+  onNotificationsPress,
+  unreadCount = 0,
+}) {
+  const displayCount = unreadCount > 9 ? "9+" : String(unreadCount);
+
   return (
     <View style={styles.header}>
       {/* Profile Info wrapped in TouchableOpacity to match Checker style */}
@@ -21,9 +29,24 @@ export default function CustomerHeader({ userName, onLogout, onProfilePress }) {
         </View>
       </TouchableOpacity>
 
-      <TouchableOpacity style={styles.logoutBtn} onPress={onLogout}>
-        <FontAwesome5 name="sign-out-alt" size={16} color="#475569" />
-      </TouchableOpacity>
+      <View style={styles.actions}>
+        <TouchableOpacity
+          style={styles.iconBtn}
+          onPress={onNotificationsPress}
+          activeOpacity={0.75}
+        >
+          <FontAwesome5 name="bell" size={15} color="#475569" />
+          {unreadCount > 0 && (
+            <View style={styles.badge}>
+              <Text style={styles.badgeText}>{displayCount}</Text>
+            </View>
+          )}
+        </TouchableOpacity>
+
+        <TouchableOpacity style={styles.iconBtn} onPress={onLogout}>
+          <FontAwesome5 name="sign-out-alt" size={16} color="#475569" />
+        </TouchableOpacity>
+      </View>
     </View>
   );
 }
@@ -63,15 +86,38 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     fontSize: 16,
   },
-  logoutBtn: {
+  actions: {
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 999,
+    gap: 8,
+  },
+  iconBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
     borderWidth: 1,
     borderColor: "#e2e8f0",
     backgroundColor: "#f8fafc",
-    gap: 6,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  badge: {
+    position: "absolute",
+    top: -4,
+    right: -3,
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    paddingHorizontal: 4,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#ef4444",
+    borderWidth: 2,
+    borderColor: "#ffffff",
+  },
+  badgeText: {
+    color: "#ffffff",
+    fontSize: 9,
+    fontWeight: "800",
   },
 });

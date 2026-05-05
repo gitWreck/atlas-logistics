@@ -21,7 +21,7 @@ import ShipmentDrawer from "./ShipmentDrawer";
 import { calculateProgress } from "@/app/utility/utilities";
 import { getBoardThemeClasses } from "@/app/utility/constant/theme";
 import NewShipmentModal from "./modals/NewShipmentModal";
-// import UnifiedShipmentModal from "./modals/UnifiedShipmentModal";
+import UnifiedShipmentModal from "./modals/UnifiedShipmentModal";
 
 const ShipmentBoard = forwardRef(function ShipmentBoard(
   { user, profile, isDark = false },
@@ -409,19 +409,7 @@ const ShipmentBoard = forwardRef(function ShipmentBoard(
         onRefresh={fetchShipments}
       />
 
-      <NewShipmentModal
-        profile={profile}
-        isOpen={isNewOrderModalOpen}
-        onClose={() => setIsNewOrderModalOpen(false)}
-        isDark={isDark}
-        user={user}
-        onSuccess={() => {
-          fetchShipments();
-        }}
-        resetTrigger={isNewOrderModalOpen}
-      />
-
-      {/* <UnifiedShipmentModal
+      {/* <NewShipmentModal
         profile={profile}
         isOpen={isNewOrderModalOpen}
         onClose={() => setIsNewOrderModalOpen(false)}
@@ -432,6 +420,18 @@ const ShipmentBoard = forwardRef(function ShipmentBoard(
         }}
         resetTrigger={isNewOrderModalOpen}
       /> */}
+
+      <UnifiedShipmentModal
+        profile={profile}
+        isOpen={isNewOrderModalOpen}
+        onClose={() => setIsNewOrderModalOpen(false)}
+        isDark={isDark}
+        user={user}
+        onSuccess={() => {
+          fetchShipments();
+        }}
+        resetTrigger={isNewOrderModalOpen}
+      />
     </div>
   );
 });

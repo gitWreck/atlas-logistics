@@ -20,7 +20,7 @@ import { StatusBar } from "expo-status-bar";
 import { db } from "../../firebase";
 
 import { useAuth } from "../../contexts/AuthContext.js";
-import { getCurrentLocationSafe } from "../utilities/helpers";
+import { getCurrentLocationSafe, updatedBy } from "../utilities/helpers";
 
 import TripSummaryCard from "./TripSummaryCard";
 import TripProgressStepper from "./TripProgressStepper";
@@ -40,6 +40,8 @@ export default function TripDetailsScreen() {
   ) {
     UIManager.setLayoutAnimationEnabledExperimental(true);
   }
+
+  const { profile } = useAuth();
 
   const { tripId } = useLocalSearchParams();
   const router = useRouter();
@@ -160,6 +162,7 @@ export default function TripDetailsScreen() {
               await startTrip({
                 tripId: trip.id,
                 ...(location ? { location } : {}),
+                updatedBy: updatedBy(profile),
               });
               Alert.alert("Success", "Trip started. Drive safely.");
             } catch (error) {
@@ -220,6 +223,7 @@ export default function TripDetailsScreen() {
               tripId: trip.id,
               status: "ARRIVED",
               notify: true,
+              updatedBy: updatedBy(profile),
             });
 
             Alert.alert("Success", "You have arrived at the hub.");
@@ -250,6 +254,7 @@ export default function TripDetailsScreen() {
               tripId: trip.id,
               status: "COMPLETED",
               notify: true,
+              updatedBy: updatedBy(profile),
             });
 
             Alert.alert("Success", "You have completed the trip.");
@@ -348,7 +353,10 @@ export default function TripDetailsScreen() {
           </View>
         )}
 
-        <TripProgressStepper currentStatus={trip.status} />
+        <TripProgressStepper
+          currentStatus={trip.status}
+          tripType={trip.tripType}
+        />
 
         {shouldShowManifestLockNotice && (
           <View style={styles.manifestNoticeCard}>

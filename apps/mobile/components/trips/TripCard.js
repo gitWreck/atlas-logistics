@@ -30,8 +30,7 @@ const TripCard = ({ trip, onPress }) => {
 
   // Format the Trip Type nicely
   let tripTypeLabel = "Hub Transfer";
-  if (trip.tripType === "LOCAL_DELIVERY")
-    tripTypeLabel = "Local Delivery Route";
+  if (trip.tripType === "DELIVERY") tripTypeLabel = "Local Delivery Route";
   if (trip.tripType === "LOCAL_PICKUP") tripTypeLabel = "Local Pickup Route";
 
   return (
@@ -57,7 +56,7 @@ const TripCard = ({ trip, onPress }) => {
         {/* Right Side: Route, Driver, & Updated At */}
         <View style={styles.rightContent}>
           <Text style={styles.routeText} numberOfLines={1}>
-            {trip.route || "No Route Info"}
+            {trip.route || trip.tripType === "DELIVERY" ? "" : "No Route Info"}
           </Text>
           <Text style={styles.driverText} numberOfLines={1}>
             {driverName}

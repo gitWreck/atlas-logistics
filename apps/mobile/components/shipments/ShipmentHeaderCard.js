@@ -13,7 +13,7 @@ import { COLORS } from "../constants/theme"; // Adjust path
 import StatusBadge from "../ui/figma/StatusBadge"; // Reuse your badge
 import * as Clipboard from "expo-clipboard"; // ✅ Add this
 
-const ShipmentHeaderCard = ({ shipment }) => {
+const ShipmentHeaderCard = ({ shipment, showActions = true }) => {
   // Safely extract the address object to avoid crashes
   const address = shipment?.recipient?.address;
 
@@ -103,12 +103,14 @@ const ShipmentHeaderCard = ({ shipment }) => {
           </View>
 
           {/* ✅ NEW: Navigate Button */}
-          <TouchableOpacity
-            style={[styles.actionBtn, { backgroundColor: "#e0f2fe" }]}
-            onPress={openMaps}
-          >
-            <FontAwesome5 name="directions" size={16} color="#0284c7" />
-          </TouchableOpacity>
+          {showActions && (
+            <TouchableOpacity
+              style={[styles.actionBtn, { backgroundColor: "#e0f2fe" }]}
+              onPress={openMaps}
+            >
+              <FontAwesome5 name="directions" size={16} color="#0284c7" />
+            </TouchableOpacity>
+          )}
         </View>
       </View>
 
@@ -143,7 +145,8 @@ const ShipmentHeaderCard = ({ shipment }) => {
           </View>
 
           {/* --- RIGHT SIDE: Phone & Quick Actions --- */}
-          <View style={{ flexDirection: "row", alignItems: "center" }}>
+          {showActions && (
+            <View style={{ flexDirection: "row", alignItems: "center" }}>
             {receiverPhone !== "No Phone" && (
               <View style={{ flexDirection: "row", gap: 8 }}>
                 {/* ✅ NEW: Call Button */}
@@ -163,7 +166,8 @@ const ShipmentHeaderCard = ({ shipment }) => {
                 </TouchableOpacity>
               </View>
             )}
-          </View>
+            </View>
+          )}
         </View>
       </View>
     </View>

@@ -35,6 +35,7 @@ export default function CustomerDashboard() {
   const [userData, setUserData] = useState(null);
   const [pickupModalVisible, setPickupModalVisible] = useState(false);
   const [requesting, setRequesting] = useState(false);
+  const [unreadNotifications, setUnreadNotifications] = useState(0);
 
   const [userName, setUserName] = useState("Customer");
 
@@ -101,6 +102,25 @@ export default function CustomerDashboard() {
     return unsubscribe;
   }, []);
 
+  useEffect(() => {
+    const user = auth.currentUser;
+    if (!user) return undefined;
+
+    const q = query(
+      collection(db, "users", user.uid, "notifications"),
+      where("read", "==", false),
+    );
+
+    const unsubscribe = onSnapshot(
+      q,
+      (snapshot) => setUnreadNotifications(snapshot.size),
+      (error) =>
+        console.error("Unread notifications subscription error:", error),
+    );
+
+    return unsubscribe;
+  }, []);
+
   // 3. Actions
   const handleLogout = () => {
     Alert.alert("Sign Out", "Are you sure?", [
@@ -145,6 +165,8 @@ export default function CustomerDashboard() {
         // firstName={firstName}
         onLogout={handleLogout}
         onProfilePress={() => router.push("/(customer)/profile")}
+        onNotificationsPress={() => router.push("/(customer)/notifications")}
+        unreadCount={unreadNotifications}
       />
 
       <View style={styles.body}>

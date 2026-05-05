@@ -26,8 +26,11 @@ const TripProgressStepper = ({ currentStatus, tripType = "HUB_TRANSFER" }) => {
   if (activeIndex === -1) activeIndex = 0;
 
   const getTitle = () => {
+    if (tripType === "SHIPMENT_PICKUP" || tripType === "SHIPMENT_DELIVERY") {
+      return "Shipment Progress";
+    }
     if (tripType === "LOCAL_PICKUP") return "Pickup Route Progress";
-    if (tripType === "LOCAL_DELIVERY") return "Delivery Route Progress";
+    if (tripType === "DELIVERY") return "Delivery Route Progress";
     return "Hub Transfer Progress";
   };
 
