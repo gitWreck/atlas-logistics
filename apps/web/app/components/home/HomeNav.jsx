@@ -23,7 +23,7 @@ export default function HomeNav() {
           />
           <div className="min-w-0">
             <p className="truncate text-sm font-extrabold text-slate-950 sm:text-base">
-              Atlas Transport Corporation
+              Atlas Transport
             </p>
             <p className="text-xs font-semibold text-slate-500">
               Fast & Easy Shipping
