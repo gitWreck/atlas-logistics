@@ -29,7 +29,6 @@ import { useAuth } from "@/app/context/AuthContext";
 import { handleLogout } from "@/app/utility/utilities";
 import NotificationBell from "../../components/notifications/NotificationBell";
 import TruckBoard from "../../components/trucks/TruckBoard";
-import PickupBoard from "../../components/shipments/PickupBoard";
 import InvoiceBoard from "../../components/invoice/InvoiceBoard";
 
 import {
@@ -175,41 +174,40 @@ export default function AdminDashboardPage() {
     <div
       className={`h-screen flex font-sans overflow-hidden ${theme.rootBackground}`}
     >
-      {isMobileSidebarOpen && (
-        <div
-          className={`fixed inset-0 z-40 md:hidden transition-opacity duration-300 ${
-            isMobileSidebarOpen
-              ? "opacity-100 pointer-events-auto"
-              : "opacity-0 pointer-events-none"
-          }`}
-        >
-          <button
-            type="button"
-            aria-label="Close navigation"
-            className="absolute inset-0 bg-black/40 backdrop-blur-sm"
-            onClick={() => setIsMobileSidebarOpen(false)}
-          />
+      <div
+        className={`fixed inset-0 z-40 md:hidden transition-opacity duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] ${
+          isMobileSidebarOpen
+            ? "opacity-100 pointer-events-auto"
+            : "opacity-0 pointer-events-none"
+        }`}
+        aria-hidden={!isMobileSidebarOpen}
+      >
+        <button
+          type="button"
+          aria-label="Close navigation"
+          className="absolute inset-0 bg-black/40 backdrop-blur-sm transition-opacity duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]"
+          onClick={() => setIsMobileSidebarOpen(false)}
+        />
 
-          <aside
-            className={`relative h-full w-64 max-w-[80vw] shrink-0 border-r px-4 py-6 overflow-y-auto transform transition-transform duration-300 ease-in-out ${
-              isMobileSidebarOpen ? "translate-x-0" : "-translate-x-full"
-            } ${theme.sidebar}`}
-          >
-            <SidebarContent
-              isDark={isDark}
-              theme={theme}
-              isSidebarCollapsed={false}
-              activeTab={activeTab}
-              setActiveTab={setActiveTab}
-              onNavigate={() => setIsMobileSidebarOpen(false)}
-              router={router}
-            />
-          </aside>
-        </div>
-      )}
+        <aside
+          className={`relative h-full w-64 max-w-[80vw] shrink-0 border-r px-4 py-6 overflow-y-auto overflow-x-hidden transform transition-transform duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] will-change-transform ${
+            isMobileSidebarOpen ? "translate-x-0" : "-translate-x-full"
+          } ${theme.sidebar}`}
+        >
+          <SidebarContent
+            isDark={isDark}
+            theme={theme}
+            isSidebarCollapsed={false}
+            activeTab={activeTab}
+            setActiveTab={setActiveTab}
+            onNavigate={() => setIsMobileSidebarOpen(false)}
+            router={router}
+          />
+        </aside>
+      </div>
 
       <aside
-        className={`hidden md:flex flex-col shrink-0 border-r px-4 py-6 overflow-y-auto transition-all duration-300 ease-in-out ${
+        className={`hidden md:flex flex-col shrink-0 border-r px-4 py-6 overflow-y-auto overflow-x-hidden [transition-property:width] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] will-change-[width] ${
           isSidebarCollapsed ? "w-20" : "w-64"
         } ${theme.sidebar}`}
       >
@@ -231,7 +229,7 @@ export default function AdminDashboardPage() {
             <button
               type="button"
               onClick={() => setIsMobileSidebarOpen(true)}
-              className={`md:hidden h-9 w-9 shrink-0 flex items-center justify-center rounded-full border text-sm ${theme.mobileMenuButton}`}
+              className={`md:hidden h-9 w-9 shrink-0 flex items-center justify-center rounded-full border text-sm transition-colors duration-200 ${theme.mobileMenuButton}`}
               aria-label="Open navigation"
               aria-expanded={isMobileSidebarOpen}
             >
@@ -245,12 +243,19 @@ export default function AdminDashboardPage() {
             <button
               type="button"
               onClick={() => setIsSidebarCollapsed((prev) => !prev)}
-              className={`hidden md:flex h-7 w-7 shrink-0 items-center justify-center rounded-full shadow-sm border ${theme.sidebarToggle}`}
+              className={`hidden md:flex h-7 w-7 shrink-0 items-center justify-center rounded-full shadow-sm border transition-colors duration-200 ${theme.sidebarToggle}`}
               title={isSidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+              aria-label={
+                isSidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"
+              }
+              aria-expanded={!isSidebarCollapsed}
             >
               <FontAwesomeIcon
-                icon={isSidebarCollapsed ? faChevronRight : faChevronLeft}
+                icon={faChevronLeft}
                 size="sm"
+                className={`transition-transform duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] ${
+                  isSidebarCollapsed ? "rotate-180" : "rotate-0"
+                }`}
               />
             </button>
           </div>
@@ -346,22 +351,13 @@ export default function AdminDashboardPage() {
               )}
 
               {activeTab === "shipments" && (
-                <>
-                  <ShipmentBoard
-                    ref={shipmentBoardRef}
-                    user={user}
-                    userRole="admin"
-                    profile={profile}
-                    isDark={isDark}
-                  />
-                  <PickupBoard
-                    ref={shipmentBoardRef}
-                    user={user}
-                    userRole="admin"
-                    profile={profile}
-                    isDark={isDark}
-                  />
-                </>
+                <ShipmentBoard
+                  ref={shipmentBoardRef}
+                  user={user}
+                  userRole="admin"
+                  profile={profile}
+                  isDark={isDark}
+                />
               )}
 
               {activeTab === "trucks" && (
@@ -401,8 +397,8 @@ function SidebarContent({
   return (
     <>
       <div
-        className={`flex items-center ${
-          isSidebarCollapsed ? "justify-center" : "gap-3"
+        className={`flex items-center transition-[gap] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] ${
+          isSidebarCollapsed ? "justify-center gap-0" : "gap-3"
         }`}
       >
         <img
@@ -411,28 +407,36 @@ function SidebarContent({
           className="w-10 h-10 rounded-2xl object-contain shrink-0"
         />
 
-        {!isSidebarCollapsed && (
-          <div className="ml-3">
-            <div
-              className={`text-xs font-semibold tracking-[0.2em] uppercase ${theme.brandLabel}`}
-            >
-              Atlas
-            </div>
-            <div className={`text-sm font-semibold ${theme.brandTitle}`}>
-              Fast &amp; Easy Shipping
-            </div>
+        <div
+          className={`min-w-0 overflow-hidden transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] ${
+            isSidebarCollapsed
+              ? "max-w-0 opacity-0 -translate-x-2"
+              : "max-w-40 opacity-100 translate-x-0"
+          }`}
+        >
+          <div
+            className={`whitespace-nowrap text-xs font-semibold tracking-[0.2em] uppercase ${theme.brandLabel}`}
+          >
+            Atlas
           </div>
-        )}
+          <div
+            className={`whitespace-nowrap text-sm font-semibold ${theme.brandTitle}`}
+          >
+            Fast &amp; Easy Shipping
+          </div>
+        </div>
       </div>
 
       <div className="mt-8">
-        {!isSidebarCollapsed && (
-          <div
-            className={`text-[11px] font-semibold uppercase tracking-wide ${theme.secondaryLabel}`}
-          >
-            Main
-          </div>
-        )}
+        <div
+          className={`overflow-hidden whitespace-nowrap text-[11px] font-semibold uppercase tracking-wide transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] ${theme.secondaryLabel} ${
+            isSidebarCollapsed
+              ? "max-w-0 opacity-0 -translate-x-2"
+              : "max-w-20 opacity-100 translate-x-0"
+          }`}
+        >
+          Main
+        </div>
 
         <div className="mt-3 space-y-1">
           {mainNavItems.map((item) => {
@@ -446,9 +450,9 @@ function SidebarContent({
                   setActiveTab(item.id);
                   onNavigate?.();
                 }}
-                className={`w-full flex items-center ${
-                  isSidebarCollapsed ? "justify-center" : "gap-3"
-                } rounded-xl px-3 py-2 text-sm font-medium transition-colors ${
+                className={`w-full flex items-center rounded-xl px-3 py-2 text-sm font-medium transition-[background-color,color,gap] duration-300 ${
+                  isSidebarCollapsed ? "justify-center gap-0" : "gap-3"
+                } ${
                   isActive
                     ? "bg-gradient-to-br from-indigo-600 to-purple-600 text-white shadow-md shadow-indigo-500/25"
                     : theme.navIdle
@@ -463,10 +467,10 @@ function SidebarContent({
                 </span>
 
                 <span
-                  className={`whitespace-nowrap transition-opacity duration-200 ${
+                  className={`whitespace-nowrap overflow-hidden transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] ${
                     isSidebarCollapsed
-                      ? "opacity-0 w-0 overflow-hidden"
-                      : "opacity-100"
+                      ? "max-w-0 opacity-0 -translate-x-2"
+                      : "max-w-32 opacity-100 translate-x-0"
                   }`}
                 >
                   {item.label}
@@ -513,9 +517,9 @@ function SidebarContent({
         <button
           type="button"
           onClick={() => handleLogout(auth, router)}
-          className={`w-full flex items-center ${
-            isSidebarCollapsed ? "justify-center" : "gap-3"
-          } rounded-xl px-3 py-2 text-sm font-medium transition-colors ${theme.logoutButton}`}
+          className={`w-full flex items-center rounded-xl px-3 py-2 text-sm font-medium transition-[background-color,color,gap] duration-300 ${
+            isSidebarCollapsed ? "justify-center gap-0" : "gap-3"
+          } ${theme.logoutButton}`}
         >
           <span
             className={`inline-flex h-8 w-8 items-center justify-center rounded-xl ${theme.logoutIcon}`}
@@ -523,7 +527,15 @@ function SidebarContent({
             <FontAwesomeIcon icon={faSignOutAlt} size="sm" />
           </span>
 
-          {!isSidebarCollapsed && <span>Logout</span>}
+          <span
+            className={`whitespace-nowrap overflow-hidden transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] ${
+              isSidebarCollapsed
+                ? "max-w-0 opacity-0 -translate-x-2"
+                : "max-w-24 opacity-100 translate-x-0"
+            }`}
+          >
+            Logout
+          </span>
         </button>
       </div>
     </>

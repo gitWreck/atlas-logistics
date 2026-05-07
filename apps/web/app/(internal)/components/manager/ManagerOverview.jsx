@@ -176,10 +176,10 @@ export default function ManagerOverview({
         isDark={isDark}
       />
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-        <RecentAlertsLogs isDark={isDark} />
-        <RecentSmsLogs isDark={isDark} />
-      </div>
+      {/* <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+      </div> */}
+      <RecentAlertsLogs isDark={isDark} />
+      <RecentSmsLogs isDark={isDark} />
 
       <AddUserModal
         isOpen={isCustomerModalOpen}

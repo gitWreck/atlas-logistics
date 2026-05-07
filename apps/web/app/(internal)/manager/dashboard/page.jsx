@@ -26,7 +26,6 @@ import ShipmentBoard from "../../components/shipments/ShipmentBoard";
 import TripBoard from "../../components/trips/TripBoard";
 import NotificationBell from "../../components/notifications/NotificationBell";
 import TruckBoard from "../../components/trucks/TruckBoard";
-import PickupBoard from "../../components/shipments/PickupBoard";
 
 import { getDashboardThemeClasses } from "@/app/utility/constant/theme";
 import InvoiceBoard from "../../components/invoice/InvoiceBoard";
@@ -335,22 +334,13 @@ export default function ManagerDashboardPage() {
             )}
 
             {activeTab === "shipments" && (
-              <>
-                <ShipmentBoard
-                  ref={shipmentBoardRef}
-                  user={user}
-                  userRole="manager"
-                  profile={profile}
-                  isDark={isDark}
-                />
-                <PickupBoard
-                  ref={shipmentBoardRef}
-                  user={user}
-                  userRole="manager"
-                  profile={profile}
-                  isDark={isDark}
-                />
-              </>
+              <ShipmentBoard
+                ref={shipmentBoardRef}
+                user={user}
+                userRole="manager"
+                profile={profile}
+                isDark={isDark}
+              />
             )}
 
             {activeTab === "trucks" && (

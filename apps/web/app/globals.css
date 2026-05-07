@@ -109,6 +109,98 @@ html {
   animation: fadeSlideIn 0.3s ease-out;
 }
 
+@keyframes atlasSectionIn {
+  from {
+    opacity: 0;
+    transform: translateY(22px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes atlasNavIn {
+  from {
+    opacity: 0;
+    transform: translateY(-12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes atlasHeroLogo {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.atlas-nav-enter {
+  animation: atlasNavIn 0.55s ease-out both;
+}
+
+.atlas-section-enter {
+  animation: atlasSectionIn 0.72s ease-out both;
+  animation-timeline: view();
+  animation-range: entry 0% cover 26%;
+}
+
+.atlas-section-1 {
+  animation-delay: 0.04s;
+}
+
+.atlas-section-2 {
+  animation-delay: 0.1s;
+}
+
+.atlas-section-3 {
+  animation-delay: 0.16s;
+}
+
+.atlas-section-4 {
+  animation-delay: 0.22s;
+}
+
+.atlas-logo-enter {
+  animation: atlasHeroLogo 0.65s ease-out both;
+}
+
+.atlas-motion-card {
+  transition:
+    transform 0.22s ease,
+    box-shadow 0.22s ease,
+    border-color 0.22s ease,
+    background-color 0.22s ease;
+}
+
+.atlas-motion-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 14px 30px rgba(15, 23, 42, 0.08);
+  border-color: #bfdbfe;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .atlas-nav-enter,
+  .atlas-section-enter,
+  .atlas-logo-enter {
+    animation: none;
+  }
+
+  .atlas-motion-card,
+  .atlas-motion-card:hover {
+    transition: none;
+    transform: none;
+    box-shadow: none;
+  }
+}
+
 /* ---------------- */
 /* Hide the default eye icon in Edge/Chrome */
 input::-ms-reveal,

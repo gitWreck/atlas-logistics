@@ -14,10 +14,13 @@ import { getRowThemeClasses } from "@/app/utility/constant/theme";
 function StatusDot({ status, isDelayed }) {
   let color = "bg-blue-500";
   let animate = false;
+  const normalizedStatus = String(status || "").toUpperCase();
 
-  if (status === "COMPLETED") color = "bg-emerald-500";
-  if (status === "CREATED") color = "bg-slate-600";
-  if (status === "IN_TRANSIT") {
+  if (["COMPLETED", "DELIVERED"].includes(normalizedStatus)) {
+    color = "bg-emerald-500";
+  }
+  if (normalizedStatus === "CREATED") color = "bg-slate-600";
+  if (normalizedStatus === "IN_TRANSIT") {
     color = "bg-blue-500";
     animate = true;
   }
@@ -41,6 +44,8 @@ function StatusDot({ status, isDelayed }) {
 export default function TripRow({ trip, onClick, isDark = false }) {
   const theme = getRowThemeClasses(isDark);
 
+  const normalizedStatus = String(trip.status || "").toUpperCase();
+  const isCompleted = ["COMPLETED", "DELIVERED"].includes(normalizedStatus);
   const isDelayed = !!trip.delayReason && !trip.delayCleared;
   const loadedCount = trip.totalLoaded || 0;
   const totalCount = trip.totalItems || 0;
@@ -64,7 +69,7 @@ export default function TripRow({ trip, onClick, isDark = false }) {
       : theme.typeBadgeTransfer;
 
   const progressBarClass =
-    trip.status === "COMPLETED"
+    isCompleted
       ? theme.progressEmerald
       : isDelayed
         ? theme.progressAmber
@@ -72,7 +77,7 @@ export default function TripRow({ trip, onClick, isDark = false }) {
 
   const statusTextClass = isDelayed
     ? theme.statusTextDelayed
-    : trip.status === "COMPLETED"
+    : isCompleted
       ? theme.statusTextCompleted
       : theme.statusTextDefault;
 

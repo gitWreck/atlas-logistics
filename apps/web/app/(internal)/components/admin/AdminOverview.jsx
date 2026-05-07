@@ -104,14 +104,15 @@ export default function AdminOverview({ user, isDark = false }) {
 
       const data = await res.json();
 
-      setStats(
-        data.stats || {
+      setStats((prev) => ({
+        ...prev,
+        ...(data.stats || {
           activeTrips: 0,
           delayedTrips: 0,
           pickupRequests: 0,
           deliveredTrips: 0,
-        },
-      );
+        }),
+      }));
     } catch (error) {
       console.error("Admin overview fetch error:", error);
     } finally {
@@ -121,8 +122,11 @@ export default function AdminOverview({ user, isDark = false }) {
 
   useEffect(() => {
     fetchUsers();
-    fetchTripStats();
   }, []);
+
+  useEffect(() => {
+    fetchTripStats();
+  }, [dateRange, user]);
 
   const handleEditClick = (userData) => {
     setSelectedUser(userData);
@@ -232,7 +236,7 @@ export default function AdminOverview({ user, isDark = false }) {
         gridClassName="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4"
       />
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
         {summaryCards.map((card) => (
           <StatusCard
             key={card.title}
@@ -246,7 +250,7 @@ export default function AdminOverview({ user, isDark = false }) {
         ))}
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="grid grid-cols-2 gap-3 sm:gap-4">
         {analyticsCards.map((card) => (
           <div
             key={card.title}
@@ -281,12 +285,10 @@ export default function AdminOverview({ user, isDark = false }) {
         isDark={isDark}
       />
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-        <RecentAlertsLogs isDark={isDark} />
-        <RecentSmsLogs isDark={isDark} />
-      </div>
-
+      {/* <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8"></div> */}
       <RecentAdminLogs isDark={isDark} />
+      <RecentSmsLogs isDark={isDark} />
+      <RecentAlertsLogs isDark={isDark} />
 
       <AddUserModal
         isOpen={isUserModalOpen}

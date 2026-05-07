@@ -169,51 +169,55 @@ export default function TripScheduleTable({
     <div
       className={`rounded-2xl overflow-hidden border shadow-xl backdrop-blur-sm mb-10 ${theme.container}`}
     >
-      <div className={`px-4 sm:px-5 py-4 border-b ${theme.header}`}>
-        <h3 className={`font-bold text-base sm:text-lg ${theme.headingText}`}>
-          Schedule List
-        </h3>
-        <p className={`text-xs mt-1 ${theme.tableText}`}>
-          Planned trip movement and loading schedule
-        </p>
-      </div>
-
       <div
-        className={`px-4 sm:px-5 py-3 border-b flex flex-col lg:flex-row gap-3 ${theme.filters}`}
+        className={`px-4 sm:px-5 py-4 border-b flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4 ${theme.header}`}
       >
-        <div className="relative flex-1">
-          <FontAwesomeIcon
-            icon={faMagnifyingGlass}
-            className={`absolute left-3 top-1/2 -translate-y-1/2 text-sm ${theme.inputIcon}`}
-          />
-          <input
-            type="text"
-            placeholder="Search truck, trip, date, or status..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className={`w-full border rounded-xl pl-9 pr-3 py-2.5 text-sm outline-none transition-colors ${theme.input}`}
-          />
+        <div className="min-w-0">
+          <h3
+            className={`font-bold whitespace-nowrap flex items-center gap-2 ${theme.headingText}`}
+          >
+            Schedule List
+          </h3>
+          <p className={`text-xs mt-1 ${theme.tableText}`}>
+            Planned trip movement and loading schedule
+          </p>
         </div>
 
-        <div className="relative w-full lg:w-52">
-          <FontAwesomeIcon
-            icon={faFilter}
-            className={`absolute left-3 top-1/2 -translate-y-1/2 text-sm ${theme.inputIcon}`}
-          />
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className={`w-full border rounded-xl pl-9 pr-3 py-2.5 text-sm outline-none appearance-none cursor-pointer ${theme.input}`}
-          >
-            <option value="ALL">All Status</option>
-            <option value="CONFLICT">Conflict</option>
-            <option value="CREATED">Created</option>
-            <option value="IN_TRANSIT">In Transit</option>
-            <option value="LOADED">Loaded</option>
-            <option value="ARRIVED">Arrived</option>
-            <option value="COMPLETED">Completed</option>
-            <option value="CANCELLED">Cancelled</option>
-          </select>
+        <div className="flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center gap-2 w-full xl:w-auto">
+          <div className="relative flex-1 min-w-[220px]">
+            <FontAwesomeIcon
+              icon={faMagnifyingGlass}
+              className={`absolute left-3 top-1/2 -translate-y-1/2 text-sm ${theme.inputIcon}`}
+            />
+            <input
+              type="text"
+              placeholder="Search truck, trip, date, or status..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className={`w-full border rounded-lg pl-9 pr-4 py-2 text-sm outline-none transition-colors ${theme.input}`}
+            />
+          </div>
+
+          <div className="relative w-full sm:w-52">
+            <FontAwesomeIcon
+              icon={faFilter}
+              className={`absolute left-3 top-1/2 -translate-y-1/2 text-sm ${theme.inputIcon}`}
+            />
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className={`w-full border rounded-lg pl-9 pr-4 py-2 text-sm outline-none appearance-none cursor-pointer ${theme.input}`}
+            >
+              <option value="ALL">All Status</option>
+              <option value="CONFLICT">Conflict</option>
+              <option value="CREATED">Created</option>
+              <option value="IN_TRANSIT">In Transit</option>
+              <option value="LOADED">Loaded</option>
+              <option value="ARRIVED">Arrived</option>
+              <option value="COMPLETED">Completed</option>
+              <option value="CANCELLED">Cancelled</option>
+            </select>
+          </div>
         </div>
       </div>
 

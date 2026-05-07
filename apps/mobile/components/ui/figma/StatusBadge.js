@@ -12,8 +12,6 @@ export default function StatusBadge({ status }) {
   // 3. Format Text (Remove underscores)
   const label = currentStatus.replace(/_/g, " ");
 
-  console.log("status: ", status);
-
   return (
     <View
       style={[

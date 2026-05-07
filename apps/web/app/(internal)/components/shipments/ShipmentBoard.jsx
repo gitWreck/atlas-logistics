@@ -20,18 +20,20 @@ import ShipmentRow from "./ShipmentRow";
 import ShipmentDrawer from "./ShipmentDrawer";
 import { calculateProgress } from "@/app/utility/utilities";
 import { getBoardThemeClasses } from "@/app/utility/constant/theme";
-import NewShipmentModal from "./modals/NewShipmentModal";
 import UnifiedShipmentModal from "./modals/UnifiedShipmentModal";
+import PickupRequestsTable from "./PickupRequestsTable";
 
 const ShipmentBoard = forwardRef(function ShipmentBoard(
   { user, profile, isDark = false },
   ref,
 ) {
   const [shipments, setShipments] = useState([]);
+  const [pickups, setPickups] = useState([]);
   const [loading, setLoading] = useState(true);
 
   const [isNewOrderModalOpen, setIsNewOrderModalOpen] = useState(false);
   const [selectedShipmentId, setSelectedShipmentId] = useState(null);
+  const [editingPickup, setEditingPickup] = useState(null);
 
   const [activeFilter, setActiveFilter] = useState("ALL");
   const [searchQuery, setSearchQuery] = useState("");
@@ -57,28 +59,49 @@ const ShipmentBoard = forwardRef(function ShipmentBoard(
 
       const token = await user.getIdToken();
 
-      const res = await fetch("/api/shipments", {
+      const requestOptions = {
         method: "GET",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
         cache: "no-store",
-      });
+      };
 
-      if (!res.ok) {
-        const errorData = await res.json();
+      const [shipmentsRes, pickupsRes] = await Promise.all([
+        fetch("/api/shipments", requestOptions),
+        fetch("/api/shipments/pickups", requestOptions),
+      ]);
+
+      if (!shipmentsRes.ok) {
+        const errorData = await shipmentsRes.json();
         throw new Error(errorData.details || errorData.error || "Server Error");
       }
 
-      const data = await res.json();
+      if (!pickupsRes.ok) {
+        const errorData = await pickupsRes.json();
+        throw new Error(errorData.details || errorData.error || "Server Error");
+      }
 
-      const formatted = (data.shipments || []).map((shipment) => ({
-        ...shipment,
-        progress: calculateProgress(shipment.status),
+      const [shipmentsData, pickupsData] = await Promise.all([
+        shipmentsRes.json(),
+        pickupsRes.json(),
+      ]);
+
+      const formattedShipments = (shipmentsData.shipments || []).map(
+        (shipment) => ({
+          ...shipment,
+          progress: calculateProgress(shipment.status),
+        }),
+      );
+
+      const formattedPickups = (pickupsData.pickups || []).map((pickup) => ({
+        ...pickup,
+        progress: calculateProgress(pickup.status),
       }));
 
-      setShipments(formatted);
+      setShipments(formattedShipments);
+      setPickups(formattedPickups);
     } catch (err) {
       console.error("FULL ERROR:", err);
       alert(`Error: ${err.message}`);
@@ -186,7 +209,7 @@ const ShipmentBoard = forwardRef(function ShipmentBoard(
     return Array.from(reasons);
   }, [shipments]);
 
-  const selectedShipment = shipments.find(
+  const selectedShipment = [...shipments, ...pickups].find(
     (shipment) => shipment.id === selectedShipmentId,
   );
 
@@ -399,6 +422,19 @@ const ShipmentBoard = forwardRef(function ShipmentBoard(
             </div>
           )}
         </div>
+
+        <div className="mt-6">
+          <PickupRequestsTable
+            pickups={pickups}
+            loading={loading}
+            isDark={isDark}
+            onSelectPickup={setSelectedShipmentId}
+            onEditPickup={(pickup) => {
+              setEditingPickup(pickup);
+              setIsNewOrderModalOpen(true);
+            }}
+          />
+        </div>
       </main>
 
       <ShipmentDrawer
@@ -424,13 +460,18 @@ const ShipmentBoard = forwardRef(function ShipmentBoard(
       <UnifiedShipmentModal
         profile={profile}
         isOpen={isNewOrderModalOpen}
-        onClose={() => setIsNewOrderModalOpen(false)}
+        onClose={() => {
+          setIsNewOrderModalOpen(false);
+          setEditingPickup(null);
+        }}
         isDark={isDark}
         user={user}
         onSuccess={() => {
           fetchShipments();
+          setEditingPickup(null);
         }}
         resetTrigger={isNewOrderModalOpen}
+        editData={editingPickup}
       />
     </div>
   );

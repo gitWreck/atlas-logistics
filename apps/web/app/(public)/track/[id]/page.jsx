@@ -57,10 +57,10 @@ export default function TrackingPage() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-200 font-sans flex items-center justify-center p-4">
-      <div className="w-full max-w-xl bg-slate-900 border border-slate-800 rounded-3xl shadow-2xl overflow-hidden relative">
+    <div className="min-h-screen bg-slate-100 text-slate-900 font-sans flex items-center justify-center p-4">
+      <div className="w-full max-w-xl bg-white border border-slate-200 rounded-3xl shadow-2xl shadow-slate-200/70 overflow-hidden relative">
         {/* HEADER */}
-        <div className="p-8 text-center bg-slate-950/50 border-b border-slate-800">
+        <div className="p-8 text-center bg-slate-50 border-b border-slate-200">
           <div className="w-20 h-20 mx-auto mb-3">
             <img
               src="/atlas-logo1.png"
@@ -68,7 +68,7 @@ export default function TrackingPage() {
               className="w-full h-full object-cover rounded-xl"
             />
           </div>
-          <h1 className="text-xl font-bold text-white tracking-wide uppercase">
+          <h1 className="text-xl font-bold text-slate-950 tracking-wide uppercase">
             Atlas Tracking
           </h1>
         </div>

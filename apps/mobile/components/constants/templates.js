@@ -16,19 +16,19 @@ export const BADGE_COLORS = {
     border: "#94a3b8",
   },
   ASSIGNED: {
-    bg: "rgba(59, 130, 246, 0.2)", // Blue
-    text: "#60a5fa",
-    border: "#60a5fa",
+    bg: "#EFF6FF",
+    text: "#1D4ED8",
+    border: "#BFDBFE",
   },
   LOADING: {
-    bg: "rgba(251, 191, 36, 0.15)", // Amber
-    text: "#fbbf24",
-    border: "rgba(251, 191, 36, 0.5)",
+    bg: "#FFFBEB",
+    text: "#B45309",
+    border: "#FDE68A",
   },
   LOADED: {
-    bg: "rgba(251, 191, 36, 0.15)", // Amber
-    text: "#fbbf24",
-    border: "rgba(251, 191, 36, 0.5)",
+    bg: "#FFFBEB",
+    text: "#B45309",
+    border: "#FDE68A",
   },
   IN_TRANSIT: {
     bg: "#EFF6FF",
@@ -36,14 +36,14 @@ export const BADGE_COLORS = {
     border: "#BEDBFF",
   },
   ARRIVED: {
-    bg: "rgba(14, 165, 233, 0.15)", // Sky Blue (Intermediate Success)
-    text: "#0ea5e9",
-    border: "rgba(14, 165, 233, 0.5)",
+    bg: "#F0F9FF",
+    text: "#0369A1",
+    border: "#BAE6FD",
   },
   COMPLETED: {
-    bg: "rgba(34, 197, 94, 0.15)", // Green
-    text: "#4ade80",
-    border: "rgba(34, 197, 94, 0.5)",
+    bg: "#F0FDF4",
+    text: "#15803D",
+    border: "#BBF7D0",
   },
 
   // --- LOCAL PICKUP WORKFLOW ---
@@ -53,26 +53,26 @@ export const BADGE_COLORS = {
     border: "rgba(249, 115, 22, 0.5)",
   },
   PICKED_UP: {
-    bg: "rgba(20, 184, 166, 0.15)", // Teal
-    text: "#14b8a6",
-    border: "rgba(20, 184, 166, 0.5)",
+    bg: "#F0FDFA",
+    text: "#0F766E",
+    border: "#99F6E4",
   },
 
   // --- DELIVERY WORKFLOW ---
   RECEIVED: {
-    bg: "rgba(251, 146, 60, 0.15)",
-    text: "#fb923c",
-    border: "rgba(251, 146, 60, 0.5)",
+    bg: "#FFF7ED",
+    text: "#C2410C",
+    border: "#FED7AA",
   },
   OUT_FOR_DELIVERY: {
-    bg: "rgba(192, 132, 252, 0.15)", // Purple
-    text: "#e879f9",
-    border: "rgba(192, 132, 252, 0.5)",
+    bg: "#FAF5FF",
+    text: "#7E22CE",
+    border: "#E9D5FF",
   },
   DELIVERED: {
-    bg: "rgba(34, 197, 94, 0.15)", // Green
-    text: "#4ade80",
-    border: "rgba(34, 197, 94, 0.5)",
+    bg: "#F0FDF4",
+    text: "#15803D",
+    border: "#BBF7D0",
   },
 
   // --- EXCEPTIONS & FAILURES (NEW) ---
