@@ -18,6 +18,7 @@ import {
   faRoute,
 } from "@fortawesome/free-solid-svg-icons";
 import TripRow from "./TripRow";
+import CompletedTripsTable from "./CompletedTripsTable";
 import { calculateProgress, updatedBy } from "@/app/utility/utilities";
 import { getBoardThemeClasses } from "@/app/utility/constant/theme";
 import TripDrawer from "./TripDrawer";
@@ -26,6 +27,16 @@ import CreateTripModal from "./modals/CreateTripModal";
 import TripScheduleOverview from "./TripSchedule/TripScheduleOverview";
 import TripScheduleModal from "./TripSchedule/TripScheduleModal";
 import { updateTripSchedule } from "@/app/utility/FirebaseFunctions";
+
+const COMPLETED_TRIP_STATUSES = new Set(["COMPLETED", "DELIVERED"]);
+
+function getTripStatus(trip) {
+  return String(trip?.status || "").toUpperCase();
+}
+
+function isCompletedTrip(trip) {
+  return COMPLETED_TRIP_STATUSES.has(getTripStatus(trip));
+}
 
 const TripBoard = forwardRef(function TripBoard(
   { user, userRole, profile, isDark = false },
@@ -136,27 +147,34 @@ const TripBoard = forwardRef(function TripBoard(
         }
       }
 
-      if (activeFilter !== "ALL") {
-        if (activeFilter === "ACTIVE") {
-          return ["IN_TRANSIT", "LOADED"].includes(trip.status);
-        }
-
-        if (activeFilter === "DELAYED") {
-          return trip.delayCleared === false;
-        }
-
-        if (activeFilter === "COMPLETED") {
-          return trip.status === "COMPLETED";
-        }
-      }
-
       if (typeFilter !== "ALL" && trip.tripType !== typeFilter) {
         return false;
       }
 
       return true;
     });
-  }, [searchQuery, activeFilter, typeFilter, trips, startDate, endDate]);
+  }, [searchQuery, typeFilter, trips, startDate, endDate]);
+
+  const activeTrips = useMemo(() => {
+    return filteredTrips.filter((trip) => {
+      if (isCompletedTrip(trip)) return false;
+
+      if (activeFilter === "ACTIVE") {
+        return ["IN_TRANSIT", "LOADED"].includes(getTripStatus(trip));
+      }
+
+      if (activeFilter === "DELAYED") {
+        return trip.delayCleared === false;
+      }
+
+      return true;
+    });
+  }, [activeFilter, filteredTrips]);
+
+  const completedTrips = useMemo(
+    () => filteredTrips.filter(isCompletedTrip),
+    [filteredTrips],
+  );
 
   useEffect(() => {
     setCurrentPage(1);
@@ -164,8 +182,8 @@ const TripBoard = forwardRef(function TripBoard(
 
   const indexOfLastItem = currentPage * itemsPerPage;
   const indexOfFirstItem = indexOfLastItem - itemsPerPage;
-  const currentItems = filteredTrips.slice(indexOfFirstItem, indexOfLastItem);
-  const totalPages = Math.ceil(filteredTrips.length / itemsPerPage);
+  const currentItems = activeTrips.slice(indexOfFirstItem, indexOfLastItem);
+  const totalPages = Math.ceil(activeTrips.length / itemsPerPage);
 
   const selectedTrip = trips.find((trip) => trip.id === selectedTripId);
 
@@ -310,7 +328,6 @@ const TripBoard = forwardRef(function TripBoard(
                     <option value="ALL">All Trips</option>
                     <option value="ACTIVE">In Transit</option>
                     <option value="DELAYED">Delayed</option>
-                    <option value="COMPLETED">Completed</option>
                   </select>
                 </div>
               </div>
@@ -357,7 +374,7 @@ const TripBoard = forwardRef(function TripBoard(
           </div>
 
           {/* Pagination */}
-          {filteredTrips.length > 0 && (
+          {activeTrips.length > 0 && (
             <div
               className={`px-4 sm:px-6 py-4 border-t flex flex-col sm:flex-row justify-between items-center gap-3 text-xs ${theme.footer}`}
             >
@@ -394,6 +411,15 @@ const TripBoard = forwardRef(function TripBoard(
               </div>
             </div>
           )}
+        </div>
+
+        <div className="mt-6">
+          <CompletedTripsTable
+            trips={completedTrips}
+            loading={loading}
+            isDark={isDark}
+            onSelectTrip={setSelectedTripId}
+          />
         </div>
       </main>
 

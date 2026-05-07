@@ -91,7 +91,7 @@ export default function InvoiceDetailsModal({
             </div>
 
             <div className="p-5 sm:p-6 space-y-6 max-h-[75vh] overflow-y-auto">
-              <section className="flex flex-wrap gap-2">
+              <section className="grid grid-cols-2 lg:flex lg:flex-wrap gap-2">
                 <StatusButton
                   onClick={onEdit}
                   icon={faPenToSquare}
@@ -101,7 +101,7 @@ export default function InvoiceDetailsModal({
                   label="Edit"
                   variant="blue"
                   isDark={isDark}
-                  className="w-auto px-4 py-2 text-sm"
+                  className="w-full lg:w-auto px-3 sm:px-4 py-2 text-sm"
                 />
 
                 {status === "DRAFT" && (
@@ -114,7 +114,7 @@ export default function InvoiceDetailsModal({
                     label="Issue Invoice"
                     variant="amber"
                     isDark={isDark}
-                    className="w-auto px-4 py-2 text-sm"
+                    className="w-full lg:w-auto px-3 sm:px-4 py-2 text-sm"
                   />
                 )}
 
@@ -128,7 +128,7 @@ export default function InvoiceDetailsModal({
                     label="Mark as Paid"
                     variant="emerald"
                     isDark={isDark}
-                    className="w-auto px-4 py-2 text-sm"
+                    className="w-full lg:w-auto px-3 sm:px-4 py-2 text-sm"
                   />
                 )}
 
@@ -142,7 +142,7 @@ export default function InvoiceDetailsModal({
                     label="Cancel Invoice"
                     variant="red"
                     isDark={isDark}
-                    className="w-auto px-4 py-2 text-sm"
+                    className="w-full lg:w-auto px-3 sm:px-4 py-2 text-sm"
                   />
                 )}
 
@@ -161,7 +161,7 @@ export default function InvoiceDetailsModal({
                   label="Print Invoice"
                   variant="blue"
                   isDark={isDark}
-                  className="w-auto px-4 py-2 text-sm"
+                  className="w-full lg:w-auto px-3 sm:px-4 py-2 text-sm"
                 />
               </section>
 

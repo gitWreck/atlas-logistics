@@ -77,7 +77,7 @@ export default function CreateTripModal({
         tripType,
       };
 
-      if (tripType === "DELIVERY") {
+      if (tripType === "DELIVERY" || tripType === "LOCAL_PICKUP") {
         nextData.origin = "";
         nextData.originCode = "";
         nextData.destination = "";
@@ -140,8 +140,7 @@ export default function CreateTripModal({
 
   if (!isOpen) return null;
 
-  const isLocalRoute = formData.tripType === "LOCAL_PICKUP";
-  const isDelivery = formData.tripType === "DELIVERY";
+  const isWarehouseTransfer = formData.tripType === "HUB_TRANSFER";
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center sm:p-4">
@@ -218,11 +217,10 @@ export default function CreateTripModal({
               </button>
             </div>
 
-            {!isDelivery && (
+            {isWarehouseTransfer && (
               <RouteSelector
                 formData={formData}
                 onWarehouseChange={handleWarehouseChange}
-                isLocalRoute={isLocalRoute}
                 isDark={isDark}
               />
             )}

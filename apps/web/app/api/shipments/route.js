@@ -98,7 +98,7 @@ export async function GET() {
     // ---------------------------------------------------------
     // 5. TRANSFORM & MERGE DATA
     // ---------------------------------------------------------
-    const shipments = snapshot.docs.map((doc) => {
+    const shipments = standardDocs.map((doc) => {
       const data = doc.data();
       const assignedTrip = data.currentTripId
         ? tripMap[data.currentTripId]

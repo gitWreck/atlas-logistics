@@ -24,7 +24,7 @@ export default function TrackingSearch({ onSearch, loading, initialValue }) {
         <input
           type="text"
           placeholder="Enter Tracking Number"
-          className="w-full bg-slate-950 border border-slate-700 rounded-xl py-4 pl-4 pr-12 text-center font-mono text-lg text-white focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all placeholder:text-slate-600 uppercase"
+          className="w-full bg-white border border-slate-300 rounded-xl py-4 pl-4 pr-12 text-center font-mono text-lg text-slate-950 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all placeholder:text-slate-400 uppercase"
           value={inputVal}
           onChange={(e) => setInputVal(e.target.value)}
         />
