@@ -49,6 +49,7 @@ export default function useScannerLogic({
   // UI States
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [successNotice, setSuccessNotice] = useState(null);
   const [btnStatus, setBtnStatus] = useState("IDLE");
 
   const resetFlow = useCallback(() => {
@@ -69,6 +70,7 @@ export default function useScannerLogic({
     setBtnStatus("IDLE");
     setLoading(false);
     setError("");
+    setSuccessNotice(null);
   }, []);
 
   const resetScanResult = useCallback(() => {
@@ -90,14 +92,46 @@ export default function useScannerLogic({
 
   const getPackageAvailableQty = useCallback((pkg, scanAction) => {
     if (!pkg) return 0;
+    const totalQty = Math.max(Number(pkg.quantity) || 1, 1);
+    const rawLoadedQty = Number(pkg.loadedQty);
+    const hasLoadedQty = Number.isFinite(rawLoadedQty) && rawLoadedQty >= 0;
+    const status = String(pkg.status || "").toUpperCase();
+    const loadedQty = Math.min(
+      hasLoadedQty
+        ? rawLoadedQty
+        : status === "LOADED" || status === "DELIVERED"
+          ? totalQty
+          : 0,
+      totalQty,
+    );
+
     if (scanAction === "LOAD") {
-      return Math.max(
-        0,
-        Number(pkg.quantity || 0) - Number(pkg.loadedQty || 0),
-      );
+      return Math.max(0, totalQty - loadedQty);
     }
-    return Math.max(0, Number(pkg.loadedQty || 0));
+    return Math.max(0, loadedQty);
   }, []);
+
+  const getPackageIdentity = useCallback(
+    (pkg) => pkg?.packageId || pkg?.trackingNumber || "",
+    [],
+  );
+
+  const findPackageByScan = useCallback(
+    (packages = [], code, packageId = null) => {
+      const candidates = [packageId, code]
+        .map((value) => String(value || "").trim())
+        .filter(Boolean);
+
+      return packages.find((pkg) => {
+        const ids = [pkg?.packageId, pkg?.trackingNumber]
+          .map((value) => String(value || "").trim())
+          .filter(Boolean);
+
+        return ids.some((id) => candidates.includes(id));
+      });
+    },
+    [],
+  );
 
   const fetchJsonWithAuth = useCallback(
     async (url) => {
@@ -187,6 +221,20 @@ export default function useScannerLogic({
         itemsToProcess,
       });
 
+      const totalQuantity = itemsToProcess.reduce(
+        (sum, processItem) => sum + Number(processItem.quantity || 0),
+        0,
+      );
+
+      setSuccessNotice({
+        action,
+        code,
+        shipmentId: item.shipmentId,
+        scanType: item.scanType,
+        totalQuantity,
+      });
+      onRefresh?.();
+
       if (action === "UNLOAD") {
         const summary = await loadHandoffReview({ openWhenReadyOnly: true });
 
@@ -197,7 +245,14 @@ export default function useScannerLogic({
 
       resetScanResult();
     },
-    [action, loadHandoffReview, onConfirmOperation, resetScanResult, tripId],
+    [
+      action,
+      loadHandoffReview,
+      onConfirmOperation,
+      onRefresh,
+      resetScanResult,
+      tripId,
+    ],
   );
 
   const handleResolveScan = async (code) => {
@@ -208,6 +263,7 @@ export default function useScannerLogic({
 
     setLoading(true);
     setError("");
+    setSuccessNotice(null);
     try {
       const result = await onResolveScan({
         tripId,
@@ -224,20 +280,35 @@ export default function useScannerLogic({
       ) {
         setNeedsAssignmentItem(result);
       } else {
+        let nextResolvedItem = result;
+
         if (result.scanType === "PACKAGE") {
-          const targetPackage = result.packages?.find(
-            (pkg) => pkg.packageId === result.packageId,
+          const targetPackage = findPackageByScan(
+            result.packages,
+            cleanCode,
+            result.packageId,
           );
-          const totalQty = Number(targetPackage?.quantity || 0);
+          const packageIdentity = getPackageIdentity(targetPackage);
+
+          if (!targetPackage || !packageIdentity) {
+            return setError("Package data is missing for this label.");
+          }
+
+          const totalQty = Math.max(Number(targetPackage.quantity) || 1, 1);
           const availableQty = getPackageAvailableQty(targetPackage, action);
+          nextResolvedItem = {
+            ...result,
+            packageId: packageIdentity,
+            trackingNumber: targetPackage.trackingNumber || null,
+          };
 
           if (totalQty === 1 && availableQty === 1) {
             await processItems({
-              item: result,
+              item: nextResolvedItem,
               code: cleanCode,
               itemsToProcess: [
                 {
-                  packageId: targetPackage.packageId,
+                  packageId: packageIdentity,
                   quantity: 1,
                 },
               ],
@@ -246,11 +317,15 @@ export default function useScannerLogic({
           }
 
           if (availableQty <= 0) {
+            if (action === "LOAD") {
+              return setError("Item is loaded.");
+            }
+
             return setError("No quantity is available for this package.");
           }
         }
 
-        setResolvedItem(result);
+        setResolvedItem(nextResolvedItem);
       }
       setQuantities({});
     } catch (err) {
@@ -418,6 +493,20 @@ export default function useScannerLogic({
         itemsToProcess,
       });
 
+      const totalQuantity = itemsToProcess.reduce(
+        (sum, processItem) => sum + Number(processItem.quantity || 0),
+        0,
+      );
+
+      setSuccessNotice({
+        action,
+        code: scanCode,
+        shipmentId: resolvedItem.shipmentId,
+        scanType: resolvedItem.scanType,
+        totalQuantity,
+      });
+      onRefresh?.();
+
       if (action === "UNLOAD") {
         const summary = await loadHandoffReview({ openWhenReadyOnly: true });
         if (summary?.ready) {
@@ -454,6 +543,7 @@ export default function useScannerLogic({
       missingRemarks,
       loading,
       error,
+      successNotice,
       btnStatus,
     },
     actions: {
@@ -463,6 +553,7 @@ export default function useScannerLogic({
       setSelectedNextTrip,
       setMissingRemarks,
       setError,
+      setSuccessNotice,
       setNeedsLoadedStatus,
       setNeedsLock,
       setNeedsUnlock,

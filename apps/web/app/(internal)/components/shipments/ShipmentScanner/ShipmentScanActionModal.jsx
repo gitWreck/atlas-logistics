@@ -92,6 +92,30 @@ export default function ShipmentScanActionModal({
             actions={actions}
           />
 
+          {state.successNotice && !state.error && (
+            <div
+              className={`rounded-xl border p-4 flex items-start gap-3 ${theme.panelSurface}`}
+            >
+              <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-white">
+                <FontAwesomeIcon icon={faCheck} />
+              </div>
+              <div className="min-w-0">
+                <div className="text-sm font-bold text-emerald-500">
+                  Successfully scanned
+                </div>
+                <div className="mt-1 text-xs opacity-70">
+                  {state.successNotice.action} completed for{" "}
+                  <span className="font-mono font-bold">
+                    {state.successNotice.code}
+                  </span>
+                  {state.successNotice.totalQuantity > 0
+                    ? ` (${state.successNotice.totalQuantity} item${state.successNotice.totalQuantity === 1 ? "" : "s"})`
+                    : ""}
+                </div>
+              </div>
+            </div>
+          )}
+
           {state.action === "UNLOAD" &&
             !state.needsHandoff &&
             !state.needsNextTrip &&

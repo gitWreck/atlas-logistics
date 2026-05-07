@@ -12,13 +12,37 @@ export default function ManifestPanel({
   theme,
 }) {
   const isShipment = item.scanType === "SHIPMENT";
+  const getPackageKey = (pkg) => pkg?.packageId || pkg?.trackingNumber || "";
+  const isScannedPackage = (pkg) => {
+    const target = String(item.packageId || item.trackingNumber || "").trim();
+    return (
+      target &&
+      [pkg?.packageId, pkg?.trackingNumber]
+        .map((value) => String(value || "").trim())
+        .includes(target)
+    );
+  };
+
   const displayPackages = isShipment
     ? item.packages || []
-    : item.packages?.filter((p) => p.packageId === item.packageId) || [];
+    : item.packages?.filter(isScannedPackage) || [];
 
   const getAvailableForPkg = (pkg) => {
-    if (action === "LOAD") return (pkg.quantity || 0) - (pkg.loadedQty || 0);
-    return pkg.loadedQty || 0;
+    const totalQty = Math.max(Number(pkg?.quantity) || 1, 1);
+    const rawLoadedQty = Number(pkg?.loadedQty);
+    const hasLoadedQty = Number.isFinite(rawLoadedQty) && rawLoadedQty >= 0;
+    const status = String(pkg?.status || "").toUpperCase();
+    const loadedQty = Math.min(
+      hasLoadedQty
+        ? rawLoadedQty
+        : status === "LOADED" || status === "DELIVERED"
+          ? totalQty
+          : 0,
+      totalQty,
+    );
+
+    if (action === "LOAD") return Math.max(0, totalQty - loadedQty);
+    return Math.max(0, loadedQty);
   };
 
   const handleQtyChange = (pkgId, value, maxAllowed) => {
@@ -31,7 +55,8 @@ export default function ManifestPanel({
   const handleAddAll = () => {
     const maxedOut = {};
     displayPackages.forEach((pkg) => {
-      maxedOut[pkg.packageId] = getAvailableForPkg(pkg);
+      const packageKey = getPackageKey(pkg);
+      if (packageKey) maxedOut[packageKey] = getAvailableForPkg(pkg);
     });
     setQuantities(maxedOut);
   };
@@ -68,21 +93,23 @@ export default function ManifestPanel({
         </div>
         <div className="divide-y divide-white/5 max-h-[300px] overflow-y-auto">
           {displayPackages.map((pkg) => {
+            const packageKey = getPackageKey(pkg);
             const available = getAvailableForPkg(pkg);
-            const currentVal = quantities[pkg.packageId] || "";
+            const currentVal = quantities[packageKey] || "";
             const isFullyProcessed = available <= 0;
+            const totalQty = Math.max(Number(pkg.quantity) || 1, 1);
 
             return (
               <div
-                key={pkg.packageId}
+                key={packageKey}
                 className="p-3 flex justify-between items-center gap-4"
               >
                 <div className="min-w-0 flex-1">
                   <div className="text-xs font-mono font-bold truncate">
-                    {pkg.packageId}
+                    {packageKey}
                   </div>
                   <div className="flex gap-2 text-[10px] opacity-60 mt-0.5">
-                    <span>Tot: {pkg.quantity}</span> •{" "}
+                    <span>Tot: {totalQty}</span> •{" "}
                     <span
                       className={
                         isFullyProcessed ? "text-amber-500" : "text-green-500"
@@ -100,7 +127,7 @@ export default function ManifestPanel({
                     disabled={isFullyProcessed}
                     value={currentVal}
                     onChange={(e) =>
-                      handleQtyChange(pkg.packageId, e.target.value, available)
+                      handleQtyChange(packageKey, e.target.value, available)
                     }
                     placeholder="0"
                     className={`w-full rounded-lg border px-2 py-2 text-center font-bold text-sm transition-colors ${isFullyProcessed ? "opacity-30 bg-gray-500/10" : theme.input}`}

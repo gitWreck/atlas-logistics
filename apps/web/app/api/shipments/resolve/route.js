@@ -56,7 +56,9 @@ export async function POST(req) {
       if (!pkgQuery.empty) {
         shipmentDoc = pkgQuery.docs[0];
         const data = shipmentDoc.data();
-        targetPackage = data.packages?.find((p) => p.packageId === cleanCode);
+        targetPackage = data.packages?.find(
+          (p) => p.packageId === cleanCode || p.trackingNumber === cleanCode,
+        );
       }
     }
 
@@ -76,6 +78,7 @@ export async function POST(req) {
       scanType: isShipmentScan ? "SHIPMENT" : "PACKAGE",
       shipmentId: data.shipmentId,
       packageId: targetPackage ? targetPackage.packageId : null,
+      trackingNumber: targetPackage ? targetPackage.trackingNumber : null,
       status: targetPackage ? targetPackage.status : data.status,
       destination: data.recipient?.city || data.destination || "Unknown",
       recipientName: data.recipient?.name || "N/A",
