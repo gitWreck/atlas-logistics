@@ -14,6 +14,31 @@ import {
 } from "firebase/firestore"; // Direct Firestore import for speed
 import { db } from "@/lib/firebase";
 
+const PACKAGES_PER_LABEL_PAGE = 15;
+
+function chunkPackages(packages = []) {
+  if (packages.length === 0) return [[]];
+
+  const chunks = [];
+  for (let i = 0; i < packages.length; i += PACKAGES_PER_LABEL_PAGE) {
+    chunks.push(packages.slice(i, i + PACKAGES_PER_LABEL_PAGE));
+  }
+  return chunks;
+}
+
+function formatAddress(address = {}) {
+  return [
+    address.unit,
+    address.street,
+    address.barangay,
+    address.city,
+    address.province,
+  ]
+    .map((part) => String(part || "").trim())
+    .filter(Boolean)
+    .join(", ");
+}
+
 export default function PrintLabelsBundle() {
   const searchParams = useSearchParams();
   const shipmentId = searchParams.get("id"); // Single Shipment Mode
@@ -53,9 +78,12 @@ export default function PrintLabelsBundle() {
 
         const flatList = [];
         let totalShipments = shipmentsToPrint.length;
+        let totalLabels = 0;
 
         shipmentsToPrint.forEach((shipment) => {
           const packages = shipment.packages || [];
+          const packagePages = chunkPackages(packages);
+          totalLabels += packagePages.length;
 
           // ✅ 1. Calculate the TRUE Total (Sum of all internal 'quantity' fields)
           const trueTotalQuantity = packages.reduce(
@@ -86,13 +114,14 @@ export default function PrintLabelsBundle() {
               isFragile: packages.some((p) => p.isFragile),
               isPerishable: packages.some((p) => p.isPerishable),
             },
+            packagePages,
             totalQuantity: trueTotalQuantity, // ✅ True Piece Count
             allPackages: packages, // ✅ Pass the full array for detailed listing on label
           });
         });
 
         setPrintItems(flatList);
-        setStats({ shipments: totalShipments, labels: totalShipments }); // Stats updated for Shipment Mode
+        setStats({ shipments: totalShipments, packages: totalLabels }); // Stats updated for Shipment Mode
       } catch (err) {
         console.error("Error fetching labels:", err);
       } finally {
@@ -153,17 +182,24 @@ export default function PrintLabelsBundle() {
 
       {/* LABEL LIST */}
       <div className="flex flex-col items-center print:block">
-        {printItems.map((item) => (
-          <div key={item.uniqueKey} className="label-container mb-8 print:mb-0">
-            <StandardLabel
-              shipment={item.shipment}
-              pkg={item.pkg}
-              totalQuantity={item.totalQuantity} // The calculated Sum (100 PCS)
-              allPackages={item.allPackages} // ✅ Pass the full array for the list
-            />
-            <div className="page-break" />
-          </div>
-        ))}
+        {printItems.map((item) =>
+          item.packagePages.map((packagePage, pageIndex) => (
+            <div
+              key={`${item.uniqueKey}-page-${pageIndex}`}
+              className="label-container mb-8 print:mb-0"
+            >
+              <StandardLabel
+                shipment={item.shipment}
+                pkg={item.pkg}
+                packagePage={packagePage}
+                packagePageIndex={pageIndex}
+                packagePageCount={item.packagePages.length}
+                totalQuantity={item.totalQuantity} // The calculated Sum (100 PCS)
+              />
+              <div className="page-break" />
+            </div>
+          )),
+        )}
       </div>
 
       <style jsx global>{`
@@ -192,9 +228,17 @@ export default function PrintLabelsBundle() {
   );
 }
 
-function StandardLabel({ shipment, pkg, totalQuantity, allPackages = [] }) {
+function StandardLabel({
+  shipment,
+  pkg,
+  totalQuantity,
+  packagePage = [],
+  packagePageIndex = 0,
+  packagePageCount = 1,
+}) {
   const recipient = shipment.recipient || {};
   const address = recipient.address || {};
+  const addressText = formatAddress(address);
   const qrValue = shipment.shipmentId || "NO_ID";
 
   return (
@@ -218,9 +262,9 @@ function StandardLabel({ shipment, pkg, totalQuantity, allPackages = [] }) {
         </div>
       </div>
 
-      <div className="my-1 flex-1 flex justify-between gap-3">
+      <div className="my-1 flex-1 flex justify-between gap-2">
         {/* LEFT: RECIPIENT & DETAILED PACKAGE LIST (Moved here) */}
-        <div className="flex-1 flex flex-col justify-start">
+        <div className="w-[1.75in] shrink-0 flex flex-col justify-start">
           <div className="text-[10px] font-bold text-gray-500 uppercase mb-0.5">
             Ship To:
           </div>
@@ -229,30 +273,29 @@ function StandardLabel({ shipment, pkg, totalQuantity, allPackages = [] }) {
           </div>
           <div className="text-sm font-mono mt-0.5">{recipient.phone}</div>
           <div className="text-[10px] leading-tight mt-1 font-medium uppercase text-gray-800">
-            {address.street}, {address.barangay}, {address.city},{" "}
-            {address.province}
+            {addressText || "No address provided"}
           </div>
 
-          <div className="flex flex-col items-center justify-center border-2 rounded-xl border-black mt-5 p-3 mb-3">
+          <div className="self-center w-[1.7in] flex flex-col items-center justify-center border-2 rounded-lg border-black mt-3 px-2 py-2 mb-2">
             <QRCode
               value={qrValue}
-              size={170}
+              size={150}
               level="M"
               bgColor="#ffffff"
               fgColor="#000000"
-              className="bg-white p-2"
+              className="bg-white p-1"
             />
-            <div className="text-[13px] font-mono font-bold mt-1 tracking-tighter text-center uppercase mt-3">
+            <div className="w-full text-[11px] font-mono font-bold mt-2 tracking-tighter text-center uppercase break-all">
               {shipment.shipmentId}
             </div>
-            <div className="text-xs font-mono  mt-2 tracking-widest text-center">
+            <div className="text-[10px] font-mono mt-1 tracking-widest text-center">
               ATLAS TRACKING NUMBER
             </div>
           </div>
         </div>
 
         {/* RIGHT: QR CODE & ATTEMPTS (Moved here) */}
-        <div className="w-[1.4in] flex flex-col items-center justify-start border-l pl-2">
+        <div className="flex-1 min-w-0 flex flex-col items-stretch justify-start border-l pl-2">
           {/* QR CODE */}
           {/* <div className="flex flex-col items-center justify-center border-2 border-black p-1 mb-3">
             <QRCode value={qrValue} size={100} level="M" />
@@ -291,27 +334,30 @@ function StandardLabel({ shipment, pkg, totalQuantity, allPackages = [] }) {
             </div> */}
           </div>
           {/* ✅ DETAILED PACKAGE BREAKDOWN */}
-          <div className="mt-3 border-t pt-2">
-            <div className="font-bold uppercase text-gray-500 text-[10px] mb-1">
-              Package Breakdown
+          <div className="mt-3 border-t pt-2 w-full">
+            <div className="flex items-center justify-between gap-2 font-bold uppercase text-gray-500 text-[10px] mb-1">
+              <span>Package Breakdown</span>
+              {packagePageCount > 1 && (
+                <span className="shrink-0 text-[9px] text-gray-400">
+                  {packagePageIndex + 1}/{packagePageCount}
+                </span>
+              )}
             </div>
             <div className="space-y-1">
-              {allPackages.slice(0, 15).map((p, i) => (
+              {packagePage.map((p, i) => (
                 <div
                   key={i}
-                  className="flex justify-between text-[10px] border-b border-gray-100 pb-0.5"
+                  className="grid grid-cols-[minmax(0,1fr)_0.45in] gap-1 text-[10px] leading-tight border-b border-gray-100 pb-0.5"
                 >
-                  <span className="uppercase truncate flex-1 pr-2">
-                    {p.packagingType}: {p.description}
+                  <span className="min-w-0 uppercase whitespace-normal break-words line-clamp-2">
+                    {p.packagingType || "Package"}:{" "}
+                    {p.description || "No Description"}
                   </span>
-                  <span className="font-bold">{p.quantity} PCS</span>
+                  <span className="font-bold text-right whitespace-nowrap">
+                    {p.quantity || 1} PCS
+                  </span>
                 </div>
               ))}
-              {allPackages.length > 15 && (
-                <div className="text-[9px] text-gray-400 italic">
-                  + {allPackages.length - 15} more units...
-                </div>
-              )}
             </div>
           </div>
         </div>

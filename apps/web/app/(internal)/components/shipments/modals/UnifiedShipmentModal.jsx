@@ -52,6 +52,7 @@ export default function UnifiedShipmentModal({
   const [shipmentDraft, setShipmentDraft] = useState(null);
   const [finalTripId, setFinalTripId] = useState(null);
   const [createdShipmentId, setCreatedShipmentId] = useState(null);
+  const [wantsTripAssignment, setWantsTripAssignment] = useState(false);
 
   // States controlled by the Modal Header/Footer, passed down to forms
   const [notificationChannels, setNotificationChannels] = useState(
@@ -109,6 +110,7 @@ export default function UnifiedShipmentModal({
       setShipmentDraft(null);
       setFinalTripId(null);
       setCreatedShipmentId(null);
+      setWantsTripAssignment(false);
       setNotificationChannels(DEFAULT_CUSTOMER_NOTIFICATION_CHANNELS);
       setIsPickup(false);
     }
@@ -286,7 +288,9 @@ export default function UnifiedShipmentModal({
               {step === 1
                 ? "1. Shipment Details"
                 : step === 2
-                  ? "2. Select Trip"
+                  ? wantsTripAssignment
+                    ? "2. Select Trip"
+                    : "2. Save Shipment"
                   : "3. Complete"}
             </h2>
             {step === 1 && (
@@ -346,6 +350,7 @@ export default function UnifiedShipmentModal({
                 profile={profile}
                 onNext={(data) => {
                   setShipmentDraft(data);
+                  setWantsTripAssignment(false);
                   setStep(2);
                 }}
                 initialData={shipmentDraft}
@@ -358,20 +363,80 @@ export default function UnifiedShipmentModal({
 
           {step === 2 && (
             <div className="flex flex-col h-full overflow-hidden">
-              <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
-                <TripStep
-                  key={
-                    shipmentDraft
-                      ? `trip-${shipmentDraft.routeInfo.destinationCode}`
-                      : "trip-reset"
-                  }
-                  shipmentDraft={shipmentDraft}
-                  onBack={() => setStep(1)}
-                  onComplete={handleMasterSubmit}
-                  isDark={isDark}
-                  isPickupMode={isPickup}
-                />
-              </div>
+              {wantsTripAssignment ? (
+                <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
+                  <TripStep
+                    key={
+                      shipmentDraft
+                        ? `trip-${shipmentDraft.routeInfo.destinationCode}`
+                        : "trip-reset"
+                    }
+                    shipmentDraft={shipmentDraft}
+                    onBack={() => setWantsTripAssignment(false)}
+                    onComplete={handleMasterSubmit}
+                    isDark={isDark}
+                    isPickupMode={isPickup}
+                  />
+                </div>
+              ) : (
+                <div className="flex-1 overflow-y-auto p-4 sm:p-6 flex items-center justify-center">
+                  <div
+                    className={`w-full max-w-xl rounded-xl border p-5 sm:p-6 space-y-5 ${modalTheme.panelSurface}`}
+                  >
+                    <div className="text-center space-y-2">
+                      <h3 className={`text-lg font-bold ${modalTheme.title}`}>
+                        Ready to Save Shipment
+                      </h3>
+                      <p className={`text-sm ${modalTheme.bodyText}`}>
+                        Trip assignment is optional. Save now to keep the
+                        shipment unassigned, or assign it to a trip before
+                        saving.
+                      </p>
+                    </div>
+
+                    <div
+                      className={`rounded-xl border p-4 text-sm ${
+                        isDark
+                          ? "border-slate-800 bg-slate-950 text-slate-300"
+                          : "border-slate-200 bg-slate-50 text-slate-700"
+                      }`}
+                    >
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                          <div className="text-[10px] font-bold uppercase tracking-widest text-slate-500">
+                            Route
+                          </div>
+                          <div className="mt-1 font-bold">
+                            {shipmentDraft?.routeInfo?.originCode || "ORG"}{" "}
+                            {"->"}{" "}
+                            {shipmentDraft?.routeInfo?.destinationCode ||
+                              "DEST"}
+                          </div>
+                        </div>
+                        <div>
+                          <div className="text-[10px] font-bold uppercase tracking-widest text-slate-500">
+                            Items
+                          </div>
+                          <div className="mt-1 font-bold">
+                            {shipmentDraft?.items?.length || 0} package type(s)
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => setWantsTripAssignment(true)}
+                      className="w-full rounded-xl py-3 font-bold flex items-center justify-center gap-2 bg-amber-500 hover:bg-amber-400 text-white transition-colors shadow-sm"
+                    >
+                      <FontAwesomeIcon icon={faTruckPickup} />
+                      <span>
+                        {isPickup ? "Assign to Pickup Route" : "Assign to Trip"}
+                      </span>
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
@@ -428,6 +493,7 @@ export default function UnifiedShipmentModal({
                     setStep(1);
                     setFinalTripId(null);
                     setCreatedShipmentId(null);
+                    setWantsTripAssignment(false);
                     setShipmentDraft(null); // This triggers the 'key' reset we set up
                     setNotificationChannels(
                       DEFAULT_CUSTOMER_NOTIFICATION_CHANNELS,
@@ -455,8 +521,8 @@ export default function UnifiedShipmentModal({
             >
               <span>
                 {isPickup
-                  ? "Continue to Pickup Dispatch"
-                  : "Continue to Trip Selection"}
+                  ? "Continue to Save Pickup"
+                  : "Continue to Save"}
               </span>
               <FontAwesomeIcon icon={faArrowRight} />
             </button>
@@ -472,16 +538,22 @@ export default function UnifiedShipmentModal({
 
               <div className="flex w-full justify-end gap-2">
                 <button
-                  onClick={() => setStep(1)}
+                  onClick={() => {
+                    if (wantsTripAssignment) {
+                      setWantsTripAssignment(false);
+                    } else {
+                      setStep(1);
+                    }
+                  }}
                   className={`${modalTheme.secondaryButton} flex-none rounded-xl px-6 py-3 font-bold`}
                 >
-                  Back
+                  {wantsTripAssignment ? "Hide Trip Assignment" : "Back"}
                 </button>
                 <button
                   onClick={() => handleMasterSubmit(null)}
-                  className="flex-1 sm:flex-none bg-amber-600/10 border border-amber-600/30 text-amber-500 hover:bg-amber-600/20 font-bold py-3 px-6 rounded-xl transition-colors whitespace-nowrap"
+                  className="flex-1 sm:flex-none bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 px-6 rounded-xl transition-colors whitespace-nowrap"
                 >
-                  Skip & Save
+                  Save Shipment
                 </button>
               </div>
             </div>
@@ -494,6 +566,7 @@ export default function UnifiedShipmentModal({
                 setStep(1);
                 setFinalTripId(null); // ✅ Clear success state
                 setCreatedShipmentId(null); // ✅ Clear success state
+                setWantsTripAssignment(false);
                 setNotificationChannels(DEFAULT_CUSTOMER_NOTIFICATION_CHANNELS);
               }}
               className="w-full bg-blue-600 hover:bg-blue-500 py-3.5 rounded-xl font-bold text-white transition-colors"
