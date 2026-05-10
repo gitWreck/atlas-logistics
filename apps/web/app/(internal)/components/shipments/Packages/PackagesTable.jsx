@@ -13,6 +13,7 @@ import PackageTableRow from "./PackagesTableRow";
 import PackageMobileCard from "./PackageMobileCard";
 import { getBoardThemeClasses } from "@/app/utility/constant/theme";
 import {
+  manifestUrl,
   packageLabelUrl,
   shipmentLabelUrl,
 } from "@/app/utility/constant/templates";
@@ -98,7 +99,11 @@ export default function PackagesTable({ data, onRefresh, isDark = false }) {
         <div className="flex flex-col sm:flex-row gap-2">
           <button
             type="button"
-            onClick={() => window.open(shipmentLabelUrl(data.id), "_blank")}
+            // onClick={() => window.open(shipmentLabelUrl(data.id), "_blank")}
+            onClick={() => {
+              const url = manifestUrl(data.id);
+              window.open(url, "_blank");
+            }}
             className={`flex justify-center items-center gap-2 px-4 py-2 rounded-lg transition-colors text-xs font-bold whitespace-nowrap ${theme.actionButton}`}
           >
             <FontAwesomeIcon icon={faPrint} />
