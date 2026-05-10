@@ -7,6 +7,8 @@ import {
   ActivityIndicator,
   Alert,
   Platform,
+  Text,
+  TouchableOpacity,
   StatusBar as RNStatusBar,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
@@ -14,6 +16,7 @@ import { doc, getDoc } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import * as ImagePicker from "expo-image-picker";
 import { StatusBar } from "expo-status-bar";
+import { FontAwesome5 } from "@expo/vector-icons";
 
 import { db, storage } from "../../firebase";
 import { useAuth } from "../../contexts/AuthContext.js";
@@ -35,6 +38,18 @@ import ExistingProofsViewer from "../tracking/ExistingProofsViewer";
 
 import ShipmentPackagesPanel from "./details/ShipmentPackagesPanel";
 
+const DEFAULT_NOTIFICATION_CHANNELS = {
+  sms: true,
+  email: true,
+  push: true,
+};
+
+const NOTIFICATION_CHANNEL_OPTIONS = [
+  { key: "sms", label: "SMS", icon: "comment-dots" },
+  { key: "email", label: "Email", icon: "envelope" },
+  { key: "push", label: "Push", icon: "bell" },
+];
+
 export default function ShipmentDetailsScreen() {
   const { shipmentId, tripId, tripType, parentTripId } = useLocalSearchParams();
   const router = useRouter();
@@ -49,6 +64,8 @@ export default function ShipmentDetailsScreen() {
   const [photos, setPhotos] = useState([]);
   const [isIssueModalVisible, setIsIssueModalVisible] = useState(false);
   const [actionMessage, setActionMessage] = useState("");
+  const [deliveryNotificationChannels, setDeliveryNotificationChannels] =
+    useState(DEFAULT_NOTIFICATION_CHANNELS);
 
   useEffect(() => {
     if (!shipmentId) return;
@@ -106,6 +123,13 @@ export default function ShipmentDetailsScreen() {
     setPhotos((prev) => prev.filter((_, i) => i !== index));
   };
 
+  const toggleDeliveryNotificationChannel = (key) => {
+    setDeliveryNotificationChannels((current) => ({
+      ...current,
+      [key]: current[key] !== true,
+    }));
+  };
+
   const uploadPhotos = async () => {
     const urls = [];
 
@@ -161,22 +185,6 @@ export default function ShipmentDetailsScreen() {
         return;
       }
 
-      if (shipment.status === "ARRIVED") {
-        await updateShipmentStatus({
-          shipmentId,
-          tripId: resolvedTripId,
-          newStatus: "OUT_FOR_DELIVERY",
-          location,
-          sourceUI: isChecker ? "CHECKER_MOBILE" : "DRIVER_MOBILE",
-          updatedBy: updatedBy(profile),
-        });
-
-        Alert.alert("Success", "Shipment is now Out for Delivery.");
-        setShipment((prev) => ({ ...prev, status: "OUT_FOR_DELIVERY" }));
-        setActionLoading(false);
-        return;
-      }
-
       if (shipment.status === "LOADED" || shipment.status === "IN_TRANSIT") {
         Alert.alert(
           "Action Blocked",
@@ -201,6 +209,9 @@ export default function ShipmentDetailsScreen() {
 
           try {
             const photoUrls = await uploadPhotos();
+            const notify = Object.values(deliveryNotificationChannels).some(
+              Boolean,
+            );
 
             await updateShipmentStatus({
               shipmentId,
@@ -211,6 +222,11 @@ export default function ShipmentDetailsScreen() {
               proofOfDelivery: photoUrls,
               paymentStatus: shipment.isCOD ? "COLLECTED_BY_CHECKER" : "PAID",
               sourceUI: isChecker ? "CHECKER_MOBILE" : "DRIVER_MOBILE",
+              notify,
+              notificationChannels: deliveryNotificationChannels,
+              notifySms: deliveryNotificationChannels.sms,
+              notifyEmail: deliveryNotificationChannels.email,
+              notifyPush: deliveryNotificationChannels.push,
               updatedBy: updatedBy(profile),
             });
 
@@ -368,9 +384,7 @@ export default function ShipmentDetailsScreen() {
   const canCheckerHandleDelivery =
     isChecker &&
     tripType !== "HUB_TRANSFER" &&
-    ["ARRIVED", "OUT_FOR_DELIVERY", "FAILED_DELIVERY"].includes(
-      shipment?.status,
-    );
+    ["OUT_FOR_DELIVERY", "FAILED_DELIVERY"].includes(shipment?.status);
   const showFooter = canDriverHandlePickup || canCheckerHandleDelivery;
   const needsPhotoUpload =
     canDriverHandlePickup ||
@@ -403,6 +417,56 @@ export default function ShipmentDetailsScreen() {
             onPickImage={pickImage}
             onRemovePhoto={removePhoto}
           />
+        )}
+
+        {canCheckerHandleDelivery && shipment?.status === "OUT_FOR_DELIVERY" && (
+          <View style={styles.notificationCard}>
+            <Text style={styles.notificationTitle}>
+              Customer notifications
+            </Text>
+            <Text style={styles.notificationSubtitle}>
+              Send an update when this delivery is completed.
+            </Text>
+
+            <View style={styles.notificationGrid}>
+              {NOTIFICATION_CHANNEL_OPTIONS.map((channel) => {
+                const selected =
+                  deliveryNotificationChannels[channel.key] === true;
+
+                return (
+                  <TouchableOpacity
+                    key={channel.key}
+                    style={[
+                      styles.notificationOption,
+                      selected && styles.notificationOptionActive,
+                    ]}
+                    onPress={() =>
+                      toggleDeliveryNotificationChannel(channel.key)
+                    }
+                    disabled={actionLoading}
+                    activeOpacity={0.78}
+                  >
+                    <FontAwesome5
+                      name={channel.icon}
+                      size={13}
+                      color={selected ? "#047857" : "#64748b"}
+                    />
+                    <Text
+                      style={[
+                        styles.notificationOptionText,
+                        selected && styles.notificationOptionTextActive,
+                      ]}
+                    >
+                      {channel.label}
+                    </Text>
+                    {selected && (
+                      <FontAwesome5 name="check" size={11} color="#047857" />
+                    )}
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </View>
         )}
 
         <ShipmentPackagesPanel
@@ -450,5 +514,61 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 16,
     paddingBottom: 120,
+  },
+
+  notificationCard: {
+    backgroundColor: "#ffffff",
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "#d1fae5",
+    padding: 14,
+    marginTop: 16,
+  },
+
+  notificationTitle: {
+    color: "#0f172a",
+    fontSize: 14,
+    fontWeight: "800",
+  },
+
+  notificationSubtitle: {
+    color: "#64748b",
+    fontSize: 12,
+    marginTop: 4,
+    marginBottom: 12,
+  },
+
+  notificationGrid: {
+    flexDirection: "row",
+    gap: 8,
+  },
+
+  notificationOption: {
+    flex: 1,
+    minHeight: 42,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "#e2e8f0",
+    backgroundColor: "#f8fafc",
+    alignItems: "center",
+    justifyContent: "center",
+    flexDirection: "row",
+    gap: 6,
+    paddingHorizontal: 8,
+  },
+
+  notificationOptionActive: {
+    borderColor: "#34d399",
+    backgroundColor: "#ecfdf5",
+  },
+
+  notificationOptionText: {
+    color: "#64748b",
+    fontSize: 12,
+    fontWeight: "800",
+  },
+
+  notificationOptionTextActive: {
+    color: "#047857",
   },
 });

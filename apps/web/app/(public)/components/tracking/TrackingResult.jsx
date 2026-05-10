@@ -110,6 +110,8 @@ export default function TrackingResult({ data }) {
   let activeLineColor = "bg-blue-600";
   if (isDelayed) activeLineColor = "bg-amber-500";
   else if (safeStatus === "DELIVERED") activeLineColor = "bg-emerald-500";
+  else if (safeStatus === "READY_FOR_DELIVERY")
+    activeLineColor = "bg-sky-500";
   else if (safeStatus === "OUT_FOR_DELIVERY") activeLineColor = "bg-purple-500";
   else if (safeStatus === "RECEIVED") activeLineColor = "bg-cyan-500";
 

@@ -2,9 +2,7 @@
 
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const admin = require("firebase-admin");
-const {
-  requireAuth,
-} = require("../../../../../../atlas-trucking-platform/apps/functions/src/utilities/helpers");
+const { requireAuth } = require("../utilities/helpers");
 
 if (!admin.apps.length) admin.initializeApp();
 const db = admin.firestore();
@@ -14,7 +12,7 @@ exports.reportTripDelay = onCall(
   async (req) => {
     // 1. AUTHENTICATION
     const uid = await requireAuth(req);
-    const { tripId, type, notes } = req.data;
+    const { tripId, type, notes, updatedBy } = req.data;
 
     // 2. VALIDATION
     if (!tripId)

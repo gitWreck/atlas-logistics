@@ -3,7 +3,7 @@
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const admin = require("firebase-admin");
 const { assertAdminOrManager } = require("../system/authGuards");
-const { writeMessagingActionLog } = require("./messagingLogger");
+const { writeMessagingActionLog } = require("../utilities/messagingLogger");
 
 // 1. IMPORT EVERYTHING FROM SHARED SERVICE
 // We get the function AND the Secret definitions from one place.
@@ -27,6 +27,8 @@ async function broadcastTripLogic({
   message,
   actorUid,
   type = "BROADCAST",
+  actorName = null,
+  actorRole = null,
 }) {
   if (!tripId || !message) {
     throw new Error("Missing tripId or message for broadcast.");
@@ -105,7 +107,9 @@ async function broadcastTripLogic({
       tripId,
       message,
       actorId: actorUid || "SYSTEM",
-      requestedBy: actorUid || "SYSTEM",
+      actorName: actorName || null,
+      actorRole: actorRole || null,
+      requestedBy: actorName || "SYSTEM",
       totalTargets: totalRecipients,
       successCount,
       failCount,
@@ -149,6 +153,8 @@ exports.broadcastTripMessage = onCall(
         tripId,
         message,
         actorUid: actor.uid,
+        actorName: actor.name,
+        actorRole: actor.role,
         type: "MANUAL_BROADCAST",
       });
 

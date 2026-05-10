@@ -23,7 +23,11 @@ function unique(values = []) {
 }
 
 function getTargetEmails(targets = {}) {
-  return unique([targets.sender?.email, targets.recipient?.email]);
+  return unique([
+    ...(Array.isArray(targets.emails) ? targets.emails : []),
+    targets.sender?.email,
+    targets.recipient?.email,
+  ]);
 }
 
 function getTargetPhones(targets = {}) {
@@ -79,11 +83,22 @@ async function sendShipmentCreatedEmail({ event }) {
     emails.map((to) =>
       transporter.sendMail({
         to,
-        subject: event.title || "Shipment created",
-        text: `${event.body || "Your shipment has been created."}\n\nTracking ID: ${event.shipmentId}`,
+        subject: event.title || "Atlas Transport update",
+        text: [
+          event.body || "Your shipment has been updated.",
+          event.shipmentId ? `Tracking ID: ${event.shipmentId}` : null,
+          event.tripId ? `Trip ID: ${event.tripId}` : null,
+        ]
+          .filter(Boolean)
+          .join("\n\n"),
         html: `
-          <p>${event.body || "Your shipment has been created."}</p>
-          <p><strong>Tracking ID:</strong> ${event.shipmentId}</p>
+          <p>${event.body || "Your shipment has been updated."}</p>
+          ${
+            event.shipmentId
+              ? `<p><strong>Tracking ID:</strong> ${event.shipmentId}</p>`
+              : ""
+          }
+          ${event.tripId ? `<p><strong>Trip ID:</strong> ${event.tripId}</p>` : ""}
         `,
       }),
     ),
@@ -121,7 +136,11 @@ async function getExpoPushTokens(userIds = []) {
     }),
   );
 
-  return [...tokenSet].filter((token) => token.startsWith("ExponentPushToken"));
+  return [...tokenSet].filter(
+    (token) =>
+      token.startsWith("ExponentPushToken") ||
+      token.startsWith("ExpoPushToken"),
+  );
 }
 
 async function sendExpoPushNotifications({ event }) {
@@ -207,6 +226,29 @@ async function processShipmentStatusUpdatedEvent({ eventId, event }) {
     result.push = await sendExpoPushNotifications({ event });
   }
 
+  if (channels.email === true) {
+    result.email = await sendShipmentCreatedEmail({ event });
+  }
+
+  return result;
+}
+
+async function processTripDelayEvent({ eventId, event }) {
+  const channels = event.channels || {};
+  const result = {};
+
+  if (channels.inApp === true) {
+    result.inApp = await writeInAppNotifications({ eventId, event });
+  }
+
+  if (channels.email === true) {
+    result.email = await sendShipmentCreatedEmail({ event });
+  }
+
+  if (channels.push === true) {
+    result.push = await sendExpoPushNotifications({ event });
+  }
+
   return result;
 }
 
@@ -248,6 +290,14 @@ exports.processNotificationEvent = onDocumentCreated(
         });
       } else if (notificationEvent.type === "SHIPMENT_STATUS_UPDATED") {
         result = await processShipmentStatusUpdatedEvent({
+          eventId,
+          event: notificationEvent,
+        });
+      } else if (
+        notificationEvent.type === "TRIP_DELAY_APPROVED" ||
+        notificationEvent.type === "TRIP_DELAY_CLEARED"
+      ) {
+        result = await processTripDelayEvent({
           eventId,
           event: notificationEvent,
         });

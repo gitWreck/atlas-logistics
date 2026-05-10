@@ -19,6 +19,7 @@ export default function ManualEntryModal({
   onSubmit,
   loading = false,
   mode = "loading",
+  actionLabel = "",
 }) {
   const [code, setCode] = useState("");
 
@@ -36,7 +37,7 @@ export default function ManualEntryModal({
 
   const modeLabel =
     mode === "offloading"
-      ? "Receive Package"
+      ? actionLabel || "Receive Package"
       : mode === "info"
         ? "Find Package"
         : "Load Package";

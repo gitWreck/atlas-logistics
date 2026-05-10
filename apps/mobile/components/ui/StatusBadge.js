@@ -42,6 +42,11 @@ const COLORS = {
     text: "#e879f9",
     border: "rgba(192, 132, 252, 0.5)",
   },
+  READY_FOR_DELIVERY: {
+    bg: "rgba(59, 130, 246, 0.15)",
+    text: "#60a5fa",
+    border: "rgba(59, 130, 246, 0.5)",
+  },
   LOADED: {
     bg: "rgba(251, 191, 36, 0.15)", // Changed to Amber/Orange for visibility
     text: "#fbbf24",

@@ -15,11 +15,45 @@ function unique(values = []) {
   return [...new Set(values.filter(Boolean).map(String))];
 }
 
+function chunk(values, size = 30) {
+  const chunks = [];
+  for (let index = 0; index < values.length; index += size) {
+    chunks.push(values.slice(index, index + size));
+  }
+  return chunks;
+}
+
 function formatStatusLabel(status = "") {
   return String(status || "")
     .replace(/_/g, " ")
     .toLowerCase()
     .replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+async function getTrackedShipmentUserIds(shipmentId) {
+  const trackingNumber = String(shipmentId || "")
+    .trim()
+    .toUpperCase();
+
+  if (!trackingNumber) return [];
+
+  const trackedUserIds = [];
+
+  await Promise.all(
+    chunk([trackingNumber]).map(async (trackingChunk) => {
+      const trackedSnap = await db
+        .collectionGroup("tracked_shipments")
+        .where("trackingNumber", "in", trackingChunk)
+        .get();
+
+      trackedSnap.docs.forEach((doc) => {
+        const userRef = doc.ref.parent.parent;
+        if (userRef?.id) trackedUserIds.push(userRef.id);
+      });
+    }),
+  );
+
+  return unique(trackedUserIds);
 }
 
 function getShipmentTargetUserIds(shipment = {}) {
@@ -43,6 +77,7 @@ function buildStatusNotificationEvent({
   actor,
   notificationChannels,
   notifySms,
+  notifyEmail,
   notifyPush,
   notify,
 }) {
@@ -56,12 +91,14 @@ function buildStatusNotificationEvent({
   const channels = requestedChannels
     ? {
         sms: requestedChannels.sms === true,
+        email: requestedChannels.email === true,
         push: requestedChannels.push === true,
         inApp:
           requestedChannels.inApp === true || requestedChannels.push === true,
       }
     : {
         sms: notifySms !== false,
+        email: notifyEmail === true,
         push: notifyPush !== false,
         inApp: true,
       };
@@ -74,6 +111,7 @@ function buildStatusNotificationEvent({
 
   if (
     !channels.sms &&
+    !channels.email &&
     !channels.push &&
     (!channels.inApp || targetUserIds.length === 0)
   ) {
@@ -85,6 +123,7 @@ function buildStatusNotificationEvent({
     status: "pending",
     channels: {
       sms: channels.sms,
+      email: channels.email,
       push: channels.push,
       inApp: channels.inApp && targetUserIds.length > 0,
     },
@@ -160,6 +199,7 @@ exports.updateShipmentStatus = onCall(
       paymentStatus,
       notify = true,
       notifySms,
+      notifyEmail,
       notifyPush,
       notificationChannels = null,
       sourceUI = "SYSTEM",
@@ -423,12 +463,23 @@ exports.updateShipmentStatus = onCall(
         actor: { uid, role, name },
         notificationChannels,
         notifySms,
+        notifyEmail,
         notifyPush,
         notify,
       });
     });
 
     if (notificationEvent) {
+      const trackedUserIds = await getTrackedShipmentUserIds(shipmentId);
+      notificationEvent.targetUserIds = unique([
+        ...(notificationEvent.targetUserIds || []),
+        ...trackedUserIds,
+      ]);
+      if (notificationEvent.channels?.push === true) {
+        notificationEvent.channels.inApp =
+          notificationEvent.targetUserIds.length > 0;
+      }
+
       await db.collection("notification_events").doc().set(notificationEvent);
     }
 

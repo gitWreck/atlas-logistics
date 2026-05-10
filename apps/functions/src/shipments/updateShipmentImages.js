@@ -4,6 +4,7 @@ const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const admin = require("firebase-admin");
 const { FieldValue } = require("firebase-admin/firestore");
 const { writeShipmentActionLog } = require("../utilities/shipmentLogger");
+const { updatedBy } = require("../utilities/helpers");
 
 if (!admin.apps.length) admin.initializeApp();
 const db = admin.firestore();
@@ -15,10 +16,12 @@ exports.updateShipmentImages = onCall(
     if (!req.auth) {
       throw new HttpsError("unauthenticated", "You must be logged in.");
     }
-    const uid = req.auth.uid;
+    // const uid = req.auth.uid;
 
     // 2. INPUT VALIDATION
     const { shipmentId, type, images } = req.data;
+
+    const { uid, role, name } = updatedBy(req);
 
     if (!shipmentId) {
       throw new HttpsError("invalid-argument", "Missing shipmentId.");
@@ -57,7 +60,7 @@ exports.updateShipmentImages = onCall(
       const updateData = {
         [targetField]: images,
         updatedAt: FieldValue.serverTimestamp(),
-        updatedBy: uid,
+        updatedBy: name,
       };
 
       // WRITE 1: Update Main Shipment
@@ -76,6 +79,8 @@ exports.updateShipmentImages = onCall(
         targetId: shipmentId,
         shipmentId,
         actorId: uid,
+        actorName: name,
+        actorRole: role,
         details: {
           imageCount: images.length,
           type: type,

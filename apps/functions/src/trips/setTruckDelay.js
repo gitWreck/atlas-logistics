@@ -3,15 +3,9 @@
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const { defineSecret } = require("firebase-functions/params");
 const admin = require("firebase-admin");
-const {
-  requireRole,
-} = require("../../../../../../atlas-trucking-platform/apps/functions/src/utilities/helpers");
-const {
-  broadcastTripLogic,
-} = require("../../../../../../atlas-trucking-platform/apps/functions/src/messaging/broadcastTripMessage"); // Import if you want to call it directly
-const {
-  STATUS_MESSAGES,
-} = require("../../../../../../atlas-trucking-platform/apps/functions/src/utilities/dataDetails");
+const { requireRole, updatedBy } = require("../utilities/helpers");
+const { broadcastTripLogic } = require("../messaging/broadcastTripMessage"); // Import if you want to call it directly
+const { STATUS_MESSAGES } = require("../utilities/dataDetails");
 const { writeTripActionLog } = require("../utilities/tripLogger");
 
 const SEMAPHORE_API_KEY = defineSecret("SEMAPHORE_API_KEY");
@@ -32,7 +26,12 @@ exports.setTruckDelay = onCall(
   async (req) => {
     await requireRole(db, req, ["admin", "manager"]);
 
-    const { tripId, reason } = req.data || {};
+    const {
+      tripId,
+      reason,
+      notify,
+      // updatedBy
+    } = req.data || {};
 
     if (!tripId || typeof tripId !== "string") {
       throw new HttpsError("invalid-argument", "tripId required");
@@ -42,10 +41,12 @@ exports.setTruckDelay = onCall(
       throw new HttpsError("invalid-argument", "delay reason required");
     }
 
-    const uid = req.auth.uid;
-    const role = req.auth.token?.role || "unknown";
+    const { uid, role, name } = updatedBy(req);
+
+    // const uid = req.auth.uid;
+    // const role = req.auth.token?.role || "unknown";
     const tripRef = db.collection("truck_trips").doc(tripId);
-    const notify = !!req.data?.notify; // Optional: whether to send SMS notifications for this status change
+    // const notify = !!req.data?.notify; // Optional: whether to send SMS notifications for this status change
 
     await db.runTransaction(async (tx) => {
       const snap = await tx.get(tripRef);
@@ -77,7 +78,7 @@ exports.setTruckDelay = onCall(
         delayCleared: false,
 
         updatedAt: now,
-        updatedBy: uid,
+        updatedBy: name,
         updatedRole: role,
       });
 
@@ -89,7 +90,7 @@ exports.setTruckDelay = onCall(
         tripId,
         delayReason: reason,
         actorId: uid,
-        actorName: req.auth.token?.name || null,
+        actorName: name,
         actorRole: role,
         createdAt: now,
       });
@@ -116,7 +117,9 @@ exports.setTruckDelay = onCall(
           broadcastTripLogic({
             tripId: tripId,
             message: messageText,
-            actorUid: request.auth.uid || "SYSTEM",
+            actorUid: uid || "SYSTEM",
+            actorName: name || "SYSTEM",
+            actorRole: role || "SYSTEM",
           }).catch((err) => console.error("Broadcast failed:", err));
         } catch (err) {
           console.error("[Notify] Failed to queue SMS:", err);

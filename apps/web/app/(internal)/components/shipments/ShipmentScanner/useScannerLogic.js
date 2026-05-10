@@ -12,6 +12,43 @@ import {
 } from "@/app/utility/FirebaseFunctions"; // Adjust path if your file is located elsewhere
 import { updatedBy } from "@/app/utility/utilities";
 
+const SCAN_STATUS_OPTIONS = {
+  LOAD: [
+    {
+      label: "Loaded",
+      value: "LOADED",
+      tone: "blue",
+    },
+    {
+      label: "Missing",
+      value: "MISSING",
+      tone: "red",
+    },
+    {
+      label: "Damaged",
+      value: "DAMAGED",
+      tone: "amber",
+    },
+  ],
+  UNLOAD: [
+    {
+      label: "Received",
+      value: "RECEIVED",
+      tone: "emerald",
+    },
+    {
+      label: "Missing",
+      value: "MISSING",
+      tone: "red",
+    },
+    {
+      label: "Damaged",
+      value: "DAMAGED",
+      tone: "amber",
+    },
+  ],
+};
+
 export default function useScannerLogic({
   trip,
   onResolveScan,
@@ -25,6 +62,7 @@ export default function useScannerLogic({
 
   // Core State
   const [action, setAction] = useState(null);
+  const [scanStatus, setScanStatus] = useState(null);
   const [scanCode, setScanCode] = useState("");
   const [manualCode, setManualCode] = useState("");
   const [resolvedItem, setResolvedItem] = useState(null);
@@ -54,6 +92,7 @@ export default function useScannerLogic({
 
   const resetFlow = useCallback(() => {
     setAction(null);
+    setScanStatus(null);
     setScanCode("");
     setManualCode("");
     setResolvedItem(null);
@@ -90,7 +129,20 @@ export default function useScannerLogic({
     setError("");
   }, []);
 
-  const getPackageAvailableQty = useCallback((pkg, scanAction) => {
+  const getDefaultScanStatus = useCallback(
+    (scanAction) => SCAN_STATUS_OPTIONS[scanAction]?.[0]?.value || null,
+    [],
+  );
+
+  const setScannerAction = useCallback(
+    (nextAction) => {
+      setAction(nextAction);
+      setScanStatus(getDefaultScanStatus(nextAction));
+    },
+    [getDefaultScanStatus],
+  );
+
+  const getPackageAvailableQty = useCallback((pkg, scanAction, targetStatus) => {
     if (!pkg) return 0;
     const totalQty = Math.max(Number(pkg.quantity) || 1, 1);
     const rawLoadedQty = Number(pkg.loadedQty);
@@ -104,6 +156,12 @@ export default function useScannerLogic({
           : 0,
       totalQty,
     );
+
+    if (targetStatus === "MISSING" || targetStatus === "DAMAGED") {
+      return scanAction === "LOAD"
+        ? Math.max(0, totalQty - loadedQty)
+        : Math.max(0, loadedQty);
+    }
 
     if (scanAction === "LOAD") {
       return Math.max(0, totalQty - loadedQty);
@@ -219,6 +277,8 @@ export default function useScannerLogic({
         scanType: item.scanType,
         shipmentId: item.shipmentId,
         itemsToProcess,
+        newStatus: scanStatus,
+        updatedBy: updatedBy(profile),
       });
 
       const totalQuantity = itemsToProcess.reduce(
@@ -228,6 +288,10 @@ export default function useScannerLogic({
 
       setSuccessNotice({
         action,
+        scanStatus,
+        scanStatusLabel:
+          SCAN_STATUS_OPTIONS[action]?.find((opt) => opt.value === scanStatus)
+            ?.label || scanStatus,
         code,
         shipmentId: item.shipmentId,
         scanType: item.scanType,
@@ -250,7 +314,9 @@ export default function useScannerLogic({
       loadHandoffReview,
       onConfirmOperation,
       onRefresh,
+      profile,
       resetScanResult,
+      scanStatus,
       tripId,
     ],
   );
@@ -295,7 +361,11 @@ export default function useScannerLogic({
           }
 
           const totalQty = Math.max(Number(targetPackage.quantity) || 1, 1);
-          const availableQty = getPackageAvailableQty(targetPackage, action);
+          const availableQty = getPackageAvailableQty(
+            targetPackage,
+            action,
+            scanStatus,
+          );
           nextResolvedItem = {
             ...result,
             packageId: packageIdentity,
@@ -491,6 +561,8 @@ export default function useScannerLogic({
         scanType: resolvedItem.scanType,
         shipmentId: resolvedItem.shipmentId,
         itemsToProcess,
+        newStatus: scanStatus,
+        updatedBy: updatedBy(profile),
       });
 
       const totalQuantity = itemsToProcess.reduce(
@@ -500,6 +572,10 @@ export default function useScannerLogic({
 
       setSuccessNotice({
         action,
+        scanStatus,
+        scanStatusLabel:
+          SCAN_STATUS_OPTIONS[action]?.find((opt) => opt.value === scanStatus)
+            ?.label || scanStatus,
         code: scanCode,
         shipmentId: resolvedItem.shipmentId,
         scanType: resolvedItem.scanType,
@@ -526,6 +602,8 @@ export default function useScannerLogic({
     state: {
       tripId,
       action,
+      scanStatus,
+      scanStatusOptions: SCAN_STATUS_OPTIONS[action] || [],
       scanCode,
       manualCode,
       resolvedItem,
@@ -547,7 +625,8 @@ export default function useScannerLogic({
       btnStatus,
     },
     actions: {
-      setAction,
+      setAction: setScannerAction,
+      setScanStatus,
       setQuantities,
       setManualCode,
       setSelectedNextTrip,

@@ -69,6 +69,11 @@ export const BADGE_COLORS = {
     text: "#7E22CE",
     border: "#E9D5FF",
   },
+  READY_FOR_DELIVERY: {
+    bg: "#EFF6FF",
+    text: "#2563EB",
+    border: "#BFDBFE",
+  },
   DELIVERED: {
     bg: "#F0FDF4",
     text: "#15803D",
@@ -134,6 +139,12 @@ export const TRACKING_WORKFLOWS = {
       statuses: ["IN_TRANSIT"],
     },
     {
+      key: "ready_for_delivery",
+      label: "Ready for Delivery",
+      icon: "clipboard-check",
+      statuses: ["READY_FOR_DELIVERY"],
+    },
+    {
       key: "out_for_delivery",
       label: "Out for Delivery",
       icon: "shipping-fast",
@@ -170,6 +181,12 @@ export const TRACKING_WORKFLOWS = {
       label: "In Transit",
       icon: "truck-moving",
       statuses: ["IN_TRANSIT"],
+    },
+    {
+      key: "ready_for_delivery",
+      label: "Ready for Delivery",
+      icon: "clipboard-check",
+      statuses: ["READY_FOR_DELIVERY"],
     },
     {
       key: "out_for_delivery",
@@ -228,6 +245,12 @@ export const TRACKING_WORKFLOWS = {
       label: "Loaded",
       icon: "box",
       statuses: ["LOADING", "LOADED"],
+    },
+    {
+      key: "ready",
+      label: "Ready for Delivery",
+      icon: "clipboard-check",
+      statuses: ["READY_FOR_DELIVERY"],
     },
     {
       key: "out",
@@ -301,6 +324,12 @@ export const DRIVER_SHIPMENT_FILTER = [
     value: "truck",
     icon: "truck-moving",
     color: "#3b82f6",
+  },
+  {
+    label: "Ready for Delivery",
+    value: "READY_FOR_DELIVERY",
+    icon: "clipboard-check",
+    color: "#2563eb",
   },
   {
     label: "Delivering",
@@ -394,7 +423,7 @@ export const CHECKER_TAB_OPTIONS = [
 
 export const DRIVER_TAB_OPTIONS = [
   // { key: "Upcoming", label: "Upcoming" },
-  { key: "Active", label: "Active" },
+  { key: "ALL", label: "All" },
   { key: "COMPLETED", label: "Completed" },
   { key: "IN_TRANSIT", label: "Transit" },
 ];
@@ -404,6 +433,7 @@ export const CHECKER_VISIBLE_STATUSES = [
   "ASSIGNED",
   // "LOADING",
   "LOADED",
+  "READY_FOR_DELIVERY",
   "OUT_FOR_DELIVERY",
   "DELIVERED",
   // "COMPLETED",
@@ -416,5 +446,6 @@ export const DRIVER_VISIBLE_STATUSES = [
   "LOADED",
   "IN_TRANSIT",
   "ARRIVED",
+  "READY_FOR_DELIVERY",
   "COMPLETED",
 ];

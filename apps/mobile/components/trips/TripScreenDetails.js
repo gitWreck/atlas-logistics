@@ -33,6 +33,18 @@ import {
   updateTripStatus,
 } from "../utilities/FirebaseFunctions";
 
+const DEFAULT_NOTIFICATION_CHANNELS = {
+  sms: true,
+  email: true,
+  push: true,
+};
+
+const NOTIFICATION_CHANNEL_OPTIONS = [
+  { key: "sms", label: "SMS", icon: "comment-dots" },
+  { key: "email", label: "Email", icon: "envelope" },
+  { key: "push", label: "Push", icon: "bell" },
+];
+
 export default function TripDetailsScreen() {
   if (
     Platform.OS === "android" &&
@@ -50,6 +62,9 @@ export default function TripDetailsScreen() {
   const [trip, setTrip] = useState(null);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
+  const [delayClearChannels, setDelayClearChannels] = useState(
+    DEFAULT_NOTIFICATION_CHANNELS,
+  );
 
   useEffect(() => {
     if (!tripId) {
@@ -139,6 +154,13 @@ export default function TripDetailsScreen() {
     });
   };
 
+  const toggleDelayClearChannel = (key) => {
+    setDelayClearChannels((current) => ({
+      ...current,
+      [key]: current[key] !== true,
+    }));
+  };
+
   const handleStartTrip = async () => {
     if (!hasLockedManifest) {
       Alert.alert(
@@ -178,6 +200,8 @@ export default function TripDetailsScreen() {
   };
 
   const handleClearDelay = async () => {
+    const notify = Object.values(delayClearChannels).some(Boolean);
+
     Alert.alert(
       "Resume Trip",
       "Are you ready to clear the delay and resume driving?",
@@ -191,7 +215,12 @@ export default function TripDetailsScreen() {
 
               await clearTruckDelay({
                 tripId: trip.id,
-                notify: true,
+                notify,
+                notificationChannels: delayClearChannels,
+                notifySms: delayClearChannels.sms,
+                notifyEmail: delayClearChannels.email,
+                notifyPush: delayClearChannels.push,
+                updatedBy: updatedBy(profile),
               });
 
               Alert.alert("Success", "Delay cleared. Drive safely.");
@@ -340,15 +369,60 @@ export default function TripDetailsScreen() {
             </View>
 
             {canDriverClearDelay && (
-              <TouchableOpacity
-                style={styles.clearDelayButton}
-                onPress={handleClearDelay}
-                disabled={actionLoading}
-              >
-                <Text style={styles.clearDelayButtonText}>
-                  {actionLoading ? "Clearing..." : "CLEAR DELAY"}
+              <View style={styles.delayClearControls}>
+                <Text style={styles.delayNotifyTitle}>
+                  Customer notifications
                 </Text>
-              </TouchableOpacity>
+                <View style={styles.delayNotifyGrid}>
+                  {NOTIFICATION_CHANNEL_OPTIONS.map((channel) => {
+                    const selected = delayClearChannels[channel.key] === true;
+
+                    return (
+                      <TouchableOpacity
+                        key={channel.key}
+                        style={[
+                          styles.delayNotifyCard,
+                          selected && styles.delayNotifyCardActive,
+                        ]}
+                        onPress={() => toggleDelayClearChannel(channel.key)}
+                        disabled={actionLoading}
+                        activeOpacity={0.78}
+                      >
+                        <FontAwesome5
+                          name={channel.icon}
+                          size={13}
+                          color={selected ? "#047857" : "#64748b"}
+                        />
+                        <Text
+                          style={[
+                            styles.delayNotifyLabel,
+                            selected && styles.delayNotifyLabelActive,
+                          ]}
+                        >
+                          {channel.label}
+                        </Text>
+                        {selected && (
+                          <FontAwesome5
+                            name="check"
+                            size={11}
+                            color="#047857"
+                          />
+                        )}
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+
+                <TouchableOpacity
+                  style={styles.clearDelayButton}
+                  onPress={handleClearDelay}
+                  disabled={actionLoading}
+                >
+                  <Text style={styles.clearDelayButtonText}>
+                    {actionLoading ? "Clearing..." : "CLEAR DELAY"}
+                  </Text>
+                </TouchableOpacity>
+              </View>
             )}
           </View>
         )}
@@ -613,6 +687,52 @@ const styles = StyleSheet.create({
     color: "#991b1b",
     fontWeight: "700",
     fontSize: 13,
+  },
+
+  delayClearControls: {
+    marginTop: 12,
+  },
+
+  delayNotifyTitle: {
+    color: "#991b1b",
+    fontSize: 11,
+    fontWeight: "700",
+    textTransform: "uppercase",
+    marginBottom: 8,
+  },
+
+  delayNotifyGrid: {
+    flexDirection: "row",
+    gap: 8,
+  },
+
+  delayNotifyCard: {
+    flex: 1,
+    minHeight: 42,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "#fecaca",
+    backgroundColor: "#ffffff",
+    alignItems: "center",
+    justifyContent: "center",
+    flexDirection: "row",
+    gap: 6,
+    paddingHorizontal: 8,
+  },
+
+  delayNotifyCardActive: {
+    borderColor: "#34d399",
+    backgroundColor: "#ecfdf5",
+  },
+
+  delayNotifyLabel: {
+    color: "#64748b",
+    fontSize: 12,
+    fontWeight: "700",
+  },
+
+  delayNotifyLabelActive: {
+    color: "#047857",
   },
 
   checkerInfoCard: {

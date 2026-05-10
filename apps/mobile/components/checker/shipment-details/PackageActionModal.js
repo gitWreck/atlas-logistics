@@ -61,7 +61,6 @@ export default function PackageActionModal({
   const handlePress = (mode) => {
     // Pass the mode, remarks, and the specific quantity to the action handler
     onAction(mode, remarks.trim(), isBulk ? Number(manualQty) || maxQty : null);
-    onClose();
   };
 
   const visibleActions = defaultAction
