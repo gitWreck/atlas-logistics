@@ -3,6 +3,7 @@ import React, { Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import PrintLabelsBundle from "./PrintLabelsBundle";
 import PrintLabelsClient from "./PrintLabelsClient";
+import PrintManifest from "./PrintLabelsManifest";
 
 // ❌ REMOVED: export const dynamic = "force-dynamic";
 // (Move the above line to a separate layout.js or page.js that is a Server Component)
@@ -10,6 +11,10 @@ import PrintLabelsClient from "./PrintLabelsClient";
 function PrintSwitcher() {
   const searchParams = useSearchParams();
   const mode = searchParams.get("mode") || "shipment";
+
+  if (mode === "manifest") {
+    return <PrintManifest />;
+  }
 
   // ✅ This is fine, but ensure both components handle the "id" param correctly
   if (mode === "shipment") {

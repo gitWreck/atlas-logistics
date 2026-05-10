@@ -2,6 +2,8 @@
 
 export const shipmentLabelUrl = (data) =>
   `/components/print/labels?id=${encodeURIComponent(data)}&mode=shipment`;
+export const manifestUrl = (data) =>
+  `/components/print/labels?id=${encodeURIComponent(data)}&mode=manifest`;
 export const packageLabelUrl = (data) =>
   `/components/print/labels?id=${encodeURIComponent(data)}&mode=individual`;
 
