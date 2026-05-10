@@ -26,6 +26,7 @@ import {
   ActionSelector,
   CameraScanner,
   ManualInput,
+  ScanStatusSelector,
   ScannerEngineSelect,
 } from "./ScannerControls";
 import ManifestPanel from "./ManifestPanel";
@@ -45,6 +46,7 @@ export default function ShipmentScanActionModal({
   const actionTheme = getModalActionClasses();
   const [cameraOpen, setCameraOpen] = useState(false);
   const [scannerEngine, setScannerEngine] = useState("barcode-detector");
+  const [scannerSession, setScannerSession] = useState(0);
 
   const { state, actions } = useScannerLogic({
     trip,
@@ -108,6 +110,9 @@ export default function ShipmentScanActionModal({
                   <span className="font-mono font-bold">
                     {state.successNotice.code}
                   </span>
+                  {state.successNotice.scanStatusLabel
+                    ? ` as ${state.successNotice.scanStatusLabel}`
+                    : ""}
                   {state.successNotice.totalQuantity > 0
                     ? ` (${state.successNotice.totalQuantity} item${state.successNotice.totalQuantity === 1 ? "" : "s"})`
                     : ""}
@@ -207,12 +212,21 @@ export default function ShipmentScanActionModal({
             <ManifestPanel
               item={state.resolvedItem}
               action={state.action}
+              scanStatus={state.scanStatus}
               quantities={state.quantities}
               setQuantities={actions.setQuantities}
               theme={theme}
             />
           ) : state.action ? (
             <div className="space-y-4">
+              <ScanStatusSelector
+                action={state.action}
+                value={state.scanStatus}
+                options={state.scanStatusOptions}
+                onChange={actions.setScanStatus}
+                theme={theme}
+              />
+
               <ScannerEngineSelect
                 value={scannerEngine}
                 onChange={(value) => {
@@ -235,11 +249,11 @@ export default function ShipmentScanActionModal({
                 </button>
               ) : (
                 <CameraScanner
-                  key={scannerEngine}
+                  key={`${scannerEngine}-${scannerSession}`}
                   scannerEngine={scannerEngine}
                   onDetected={async (code) => {
-                    setCameraOpen(false);
                     await actions.handleResolveScan(code);
+                    setScannerSession((current) => current + 1);
                   }}
                   onClose={() => setCameraOpen(false)}
                   setError={actions.setError}
@@ -290,7 +304,10 @@ export default function ShipmentScanActionModal({
                   ) : (
                     <FontAwesomeIcon icon={faCheck} className="mr-2" />
                   )}
-                  Confirm {state.action}
+                  Confirm{" "}
+                  {state.scanStatusOptions.find(
+                    (opt) => opt.value === state.scanStatus,
+                  )?.label || state.action}
                 </button>
               )}
             </>

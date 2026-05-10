@@ -4,8 +4,12 @@ import React, { useId, useRef, useEffect } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faChevronDown,
+  faCheckCircle,
+  faExclamationTriangle,
+  faTools,
   faTruckRampBox,
   faUndo,
+  faWarehouse,
 } from "@fortawesome/free-solid-svg-icons";
 
 export function ActionSelector({ action, trip, theme, actions }) {
@@ -85,6 +89,62 @@ export function ActionSelector({ action, trip, theme, actions }) {
           )}
         </button>
       ))}
+    </div>
+  );
+}
+
+export function ScanStatusSelector({
+  action,
+  value,
+  options = [],
+  onChange,
+  theme,
+}) {
+  if (!action || !options.length) return null;
+
+  const iconByStatus = {
+    LOADED: faTruckRampBox,
+    RECEIVED: faWarehouse,
+    MISSING: faExclamationTriangle,
+    DAMAGED: faTools,
+    DELIVERED: faCheckCircle,
+  };
+
+  const toneClasses = {
+    blue: "border-blue-500/60 bg-blue-500/10 text-blue-500",
+    emerald: "border-emerald-500/60 bg-emerald-500/10 text-emerald-500",
+    red: "border-red-500/60 bg-red-500/10 text-red-500",
+    amber: "border-amber-500/60 bg-amber-500/10 text-amber-500",
+  };
+
+  return (
+    <div className={`rounded-xl border p-4 ${theme.panelSurface}`}>
+      <div className="text-[10px] font-bold uppercase opacity-60">
+        Scan will mark as
+      </div>
+      <div className="mt-3 grid grid-cols-3 gap-2">
+        {options.map((option) => {
+          const active = value === option.value;
+          const activeClass = toneClasses[option.tone] || toneClasses.blue;
+
+          return (
+            <button
+              key={option.value}
+              type="button"
+              onClick={() => onChange(option.value)}
+              className={`rounded-lg border px-3 py-2 text-xs font-bold transition-colors ${
+                active ? activeClass : theme.panelSurface
+              }`}
+            >
+              <FontAwesomeIcon
+                icon={iconByStatus[option.value] || faCheckCircle}
+                className="mr-2"
+              />
+              {option.label}
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 }

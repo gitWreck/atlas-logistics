@@ -47,7 +47,7 @@ export default function TripScreen() {
   const [filterModalVisible, setFilterModalVisible] = useState(false);
   const [activeStatusFilter, setActiveStatusFilter] = useState("ALL");
 
-  const [activeTab, setActiveTab] = useState(isChecker ? "ALL" : "Active");
+  const [activeTab, setActiveTab] = useState("ALL");
 
   useEffect(() => {
     let unsubscribe = null;
@@ -89,6 +89,10 @@ export default function TripScreen() {
 
         if (isChecker) {
           constraints.unshift(where("tripType", "==", "DELIVERY"));
+        }
+
+        if (isDriver) {
+          constraints.unshift(where("tripType", "==", "HUB_TRANSFER"));
         }
 
         const tripsQuery = query(collection(db, "truck_trips"), ...constraints);
@@ -157,8 +161,12 @@ export default function TripScreen() {
         );
       }
 
-      if (activeTab === "Completed") {
-        filtered = filtered.filter((trip) => trip.status === "COMPLETED");
+      if (
+        activeTab !== "ALL" &&
+        activeTab !== "Upcoming" &&
+        activeTab !== "Active"
+      ) {
+        filtered = filtered.filter((trip) => trip.status === activeTab);
       }
     }
 
@@ -259,11 +267,13 @@ export default function TripScreen() {
     ? "No trips match your search."
     : isChecker
       ? "No active loads found."
-      : activeTab === "Completed"
+      : activeTab === "COMPLETED"
         ? "No completed trips."
-        : activeTab === "Upcoming"
-          ? "No upcoming trips."
-          : "No active trips.";
+      : activeTab === "Upcoming"
+        ? "No upcoming trips."
+      : activeTab === "ALL"
+        ? "No trips found."
+        : "No active trips.";
 
   if (loading) {
     return (

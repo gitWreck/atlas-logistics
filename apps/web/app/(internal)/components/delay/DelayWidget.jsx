@@ -11,11 +11,17 @@ import {
 import { formatFirestoreDate } from "@/app/utility/utilities";
 import { resolveDelayReport } from "@/app/utility/FirebaseFunctions";
 import StatusBadge from "../ui/StatusBadge";
+import CustomerNotificationChannels, {
+  DEFAULT_CUSTOMER_NOTIFICATION_CHANNELS,
+} from "../notifications/CustomerNotificationChannels";
 
 export default function DelayWidget({ isDark = false }) {
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
   const [processingId, setProcessingId] = useState(null); // To show loading on button
+  const [notificationChannels, setNotificationChannels] = useState(
+    DEFAULT_CUSTOMER_NOTIFICATION_CHANNELS,
+  );
 
   // 1. Listen for PENDING delay reports
   useEffect(() => {
@@ -44,11 +50,17 @@ export default function DelayWidget({ isDark = false }) {
       setProcessingId(req.id); // Disable buttons while processing
 
       // const resolveDelay = httpsCallable(functions, "resolveDelayReport");
+      const notify = Object.values(notificationChannels).some(Boolean);
 
       await resolveDelayReport({
         alertId: req.id,
         decision: decision, // "APPROVED" or "REJECTED"
         managerNotes: "", // Add a prompt input if you want notes
+        notify,
+        notificationChannels,
+        notifySms: notificationChannels.sms,
+        notifyEmail: notificationChannels.email,
+        notifyPush: notificationChannels.push,
       });
 
       // No need to manually update state, the snapshot listener will
@@ -90,6 +102,13 @@ export default function DelayWidget({ isDark = false }) {
   const rejectBtnClasses = isDark
     ? "border-slate-700 hover:bg-slate-800 text-slate-400"
     : "border-slate-300 hover:bg-slate-100 text-slate-600";
+  const toggleTheme = {
+    panelSurface: isDark
+      ? "bg-slate-950/30 border-amber-500/20"
+      : "bg-white/70 border-amber-200",
+    title: isDark ? "text-amber-200" : "text-amber-800",
+    helperText: isDark ? "text-slate-400" : "text-slate-600",
+  };
 
   return (
     <div
@@ -111,6 +130,19 @@ export default function DelayWidget({ isDark = false }) {
         </span>
       </div>
 
+      <div className="p-4 pb-0">
+        <div className={`text-xs font-semibold mb-2 ${toggleTheme.title}`}>
+          Customer notification channels
+        </div>
+        <CustomerNotificationChannels
+          value={notificationChannels}
+          onChange={setNotificationChannels}
+          theme={toggleTheme}
+          disabled={processingId !== null}
+          columns="grid-cols-1 sm:grid-cols-3"
+        />
+      </div>
+
       <div className={`divide-y ${divideClasses}`}>
         {requests.map((req) => (
           <div
@@ -123,9 +155,9 @@ export default function DelayWidget({ isDark = false }) {
                 <span className={`font-mono font-bold text-sm ${tripText}`}>
                   {req.tripId || "Unknown Trip"}
                 </span>
-                <span className={`text-xs ${timeText}`}>•</span>
+                <span className={`text-xs ${timeText}`}>&bull;</span>
                 <span className={`text-xs font-bold ${metaText}`}>
-                  {req.details.driverName || "Driver"}
+                  {req.details?.driverName || "Driver"}
                 </span>
               </div>
               <div
@@ -154,16 +186,18 @@ export default function DelayWidget({ isDark = false }) {
             <div className="flex items-center gap-2 w-full sm:w-auto">
               <button
                 onClick={() => handleResolution(req, "REJECTED")}
-                className={`flex-1 sm:flex-none px-3 py-1.5 rounded-lg border text-xs font-bold transition-colors ${rejectBtnClasses}`}
+                disabled={processingId === req.id}
+                className={`flex-1 sm:flex-none px-3 py-1.5 rounded-lg border text-xs font-bold transition-colors disabled:opacity-60 disabled:cursor-not-allowed ${rejectBtnClasses}`}
               >
                 <FontAwesomeIcon icon={faXmark} className="mr-1" /> Reject
               </button>
               <button
                 onClick={() => handleResolution(req, "APPROVED")}
-                className="flex-1 sm:flex-none px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold shadow-lg shadow-amber-900/20 transition-colors"
+                disabled={processingId === req.id}
+                className="flex-1 sm:flex-none px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold shadow-lg shadow-amber-900/20 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
               >
-                <FontAwesomeIcon icon={faCheck} className="mr-1" /> Approve
-                Delay
+                <FontAwesomeIcon icon={faCheck} className="mr-1" />
+                {processingId === req.id ? "Resolving..." : "Approve Delay"}
               </button>
             </div>
           </div>

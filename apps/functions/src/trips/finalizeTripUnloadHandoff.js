@@ -3,7 +3,11 @@
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const admin = require("firebase-admin");
 const { FieldValue } = admin.firestore;
-const { requireRole, requireString } = require("../utilities/helpers");
+const {
+  requireRole,
+  requireString,
+  updatedBy,
+} = require("../utilities/helpers");
 const { writeShipmentActionLog } = require("../utilities/shipmentLogger");
 const { writeTripActionLog } = require("../utilities/tripLogger");
 
@@ -15,7 +19,11 @@ const normalizeQty = (value, fallback = 0) => {
   return Number.isFinite(num) && num >= 0 ? num : fallback;
 };
 
-const shipmentTotalQty = (shipment = {}, tripShipment = {}, manifestItem = {}) =>
+const shipmentTotalQty = (
+  shipment = {},
+  tripShipment = {},
+  manifestItem = {},
+) =>
   normalizeQty(
     shipment.totals?.totalContentQty ??
       shipment.totals?.totalItems ??
@@ -25,14 +33,14 @@ const shipmentTotalQty = (shipment = {}, tripShipment = {}, manifestItem = {}) =
     0,
   );
 
-const stampPackagesOutForDelivery = (packages = []) =>
+const stampPackagesReadyForDelivery = (packages = []) =>
   packages.map((pkg) => {
     const quantity = Math.max(normalizeQty(pkg.quantity, 1), 1);
 
     return {
       ...pkg,
-      status: "OUT_FOR_DELIVERY",
-      loadedQty: quantity,
+      status: "READY_FOR_DELIVERY",
+      loadedQty: 0,
       updatedAt: new Date().toISOString(),
     };
   });
@@ -40,8 +48,10 @@ const stampPackagesOutForDelivery = (packages = []) =>
 exports.finalizeTripUnloadHandoff = onCall(
   { region: "asia-southeast1", maxInstances: 10 },
   async (req) => {
-    const actor = await requireRole(db, req, ["admin", "manager"]);
-    const uid = req.auth.uid;
+    // const actor = await requireRole(db, req, ["admin", "manager"]);
+    // const uid = req.auth.uid;
+
+    const { uid, role, name } = updatedBy(req);
 
     const sourceTripId = requireString(req.data?.sourceTripId, "sourceTripId");
     const deliveryTripId = requireString(
@@ -80,7 +90,9 @@ exports.finalizeTripUnloadHandoff = onCall(
 
       const sourceTrip = sourceTripSnap.data() || {};
       const deliveryTrip = deliveryTripSnap.data() || {};
-      const deliveryTripType = String(deliveryTrip.tripType || "").toUpperCase();
+      const deliveryTripType = String(
+        deliveryTrip.tripType || "",
+      ).toUpperCase();
 
       if (deliveryTripType !== "DELIVERY") {
         throw new HttpsError(
@@ -176,7 +188,6 @@ exports.finalizeTripUnloadHandoff = onCall(
       const blockers = [];
       let assigned = 0;
       let aggregateTotalItems = 0;
-      let aggregateLoadedItems = 0;
 
       handoffItems.forEach((manifestItem, index) => {
         const shipmentId = manifestItem.trackingShipmentId;
@@ -204,7 +215,9 @@ exports.finalizeTripUnloadHandoff = onCall(
           });
 
           if (!remark) {
-            blockers.push(`Remarks are required for missing shipment ${shipmentId}.`);
+            blockers.push(
+              `Remarks are required for missing shipment ${shipmentId}.`,
+            );
             return;
           }
         }
@@ -225,8 +238,9 @@ exports.finalizeTripUnloadHandoff = onCall(
           sourceTripShipment,
           manifestItem,
         );
-        const packages = stampPackagesOutForDelivery(shipment.packages || []);
-        const publicShipmentId = shipment.shipmentId || manifestItem.shipmentId || shipmentId;
+        const packages = stampPackagesReadyForDelivery(shipment.packages || []);
+        const publicShipmentId =
+          shipment.shipmentId || manifestItem.shipmentId || shipmentId;
         const route =
           sourceTripShipment.route ||
           `${shipment.originCode || "?"} -> ${shipment.destinationCode || "?"}`;
@@ -239,27 +253,30 @@ exports.finalizeTripUnloadHandoff = onCall(
             shipmentId: publicShipmentId,
             route,
             totalItems,
-            pendingCount: 0,
-            loadedCount: totalItems,
+            pendingCount: totalItems,
+            loadedCount: 0,
             deliveredCount: 0,
             receivedCount: 0,
             sender: shipment.sender || sourceTripShipment.sender || null,
-            recipient: shipment.recipient || sourceTripShipment.recipient || null,
+            recipient:
+              shipment.recipient || sourceTripShipment.recipient || null,
             packageBarcodes:
-              shipment.packageBarcodes || sourceTripShipment.packageBarcodes || [],
+              shipment.packageBarcodes ||
+              sourceTripShipment.packageBarcodes ||
+              [],
             sourceTripId,
             missingOnSourceTrip: remainingLoaded > 0,
             missingRemarks: remainingLoaded > 0 ? remark : null,
-            status: "OUT_FOR_DELIVERY",
+            status: "READY_FOR_DELIVERY",
             createdAt: deliveryTripShipmentSnap.exists
               ? deliveryTripShipmentSnap.data()?.createdAt || now
               : now,
             createdBy: deliveryTripShipmentSnap.exists
-              ? deliveryTripShipmentSnap.data()?.createdBy || uid
-              : uid,
+              ? deliveryTripShipmentSnap.data()?.createdBy || name
+              : name,
             updatedAt: now,
-            updatedBy: uid,
-            updatedRole: actor.role,
+            updatedBy: name,
+            updatedRole: role,
           },
           { merge: true },
         );
@@ -271,18 +288,18 @@ exports.finalizeTripUnloadHandoff = onCall(
             missingRemarks: remainingLoaded > 0 ? remark : null,
             status: "COMPLETED",
             updatedAt: now,
-            updatedBy: uid,
+            updatedBy: name,
           });
         }
 
         const shipmentUpdate = {
           currentTripId: deliveryTripId,
           assignedToTripAt: now,
-          status: "OUT_FOR_DELIVERY",
+          status: "READY_FOR_DELIVERY",
           packages,
           updatedAt: now,
-          updatedBy: uid,
-          updatedRole: actor.role,
+          updatedBy: name,
+          updatedRole: role,
           handoff: {
             sourceTripId,
             deliveryTripId,
@@ -291,13 +308,13 @@ exports.finalizeTripUnloadHandoff = onCall(
             missingRemarks: remainingLoaded > 0 ? remark : null,
           },
           statusHistory: FieldValue.arrayUnion({
-            status: "OUT_FOR_DELIVERY",
+            status: "READY_FOR_DELIVERY",
             at: nowTs,
-            by: uid,
+            by: name,
             note:
               remainingLoaded > 0
-                ? `Assigned to delivery trip ${deliveryTripId}. Missing remark: ${remark}`
-                : `Assigned to delivery trip ${deliveryTripId}`,
+                ? `Ready for delivery trip ${deliveryTripId}. Missing remark: ${remark}`
+                : `Ready for delivery trip ${deliveryTripId}`,
             location: deliveryTrip.destination || null,
           }),
         };
@@ -317,7 +334,8 @@ exports.finalizeTripUnloadHandoff = onCall(
           shipmentDocId: shipmentId,
           tripId: deliveryTripId,
           actorId: uid,
-          actorRole: actor.role,
+          actorName: name,
+          actorRole: role,
           details: {
             sourceTripId,
             deliveryTripId,
@@ -329,7 +347,6 @@ exports.finalizeTripUnloadHandoff = onCall(
 
         if (!deliveryTripShipmentSnap.exists) {
           aggregateTotalItems += totalItems;
-          aggregateLoadedItems += totalItems;
         }
 
         assigned += 1;
@@ -341,14 +358,16 @@ exports.finalizeTripUnloadHandoff = onCall(
 
       const deliveryTripUpdate = {
         updatedAt: now,
-        updatedBy: uid,
+        updatedBy: name,
       };
 
       if (aggregateTotalItems > 0) {
-        deliveryTripUpdate.totalItems = FieldValue.increment(aggregateTotalItems);
+        deliveryTripUpdate.totalItems =
+          FieldValue.increment(aggregateTotalItems);
       }
-      if (aggregateLoadedItems > 0) {
-        deliveryTripUpdate.totalLoaded = FieldValue.increment(aggregateLoadedItems);
+      if (aggregateTotalItems > 0) {
+        deliveryTripUpdate.itemPending =
+          FieldValue.increment(aggregateTotalItems);
       }
 
       tx.update(deliveryTripRef, deliveryTripUpdate);
@@ -361,7 +380,7 @@ exports.finalizeTripUnloadHandoff = onCall(
         handoffCompletedAt: now,
         handoffMissingCount: missing.length,
         updatedAt: now,
-        updatedBy: uid,
+        updatedBy: name,
       });
 
       const sourceTripEventRef = sourceTripRef.collection("trip_events").doc();
@@ -384,7 +403,8 @@ exports.finalizeTripUnloadHandoff = onCall(
         targetCollection: "truck_trips",
         at: now,
         actorId: uid,
-        actorRole: actor.role,
+        actorName: name,
+        actorRole: role,
         note: `Finalized unload handoff to ${deliveryTripId}.`,
         details: {
           deliveryTripId,

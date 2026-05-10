@@ -138,9 +138,11 @@ export default function TripDrawer({
     await updateShipmentPackages({
       shipmentId: payload.shipmentId,
       packageIds: Object.keys(quantityMap), // Array of strings: ["PKG-1", "PKG-2"]
-      newStatus: payload.action === "LOAD" ? "LOADED" : "RECEIVED", // UNLOAD reverts it to RECEIVED
+      newStatus:
+        payload.newStatus || (payload.action === "LOAD" ? "LOADED" : "RECEIVED"),
       manualQty: quantityMap, // We pass the object dictionary instead of a single number
-      updatedBy: updatedBy(profile),
+      scanAction: payload.action,
+      updatedBy: payload.updatedBy || updatedBy(profile),
     });
   };
 

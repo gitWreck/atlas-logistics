@@ -20,7 +20,8 @@ const { calculateSmsCost } = require("../../shared/sms-cost");
 const { buildSmsSignature } = require("../../shared/sms-suppression");
 const { writeAuditEvent } = require("../../shared/audit");
 const { assertAdminOrManager } = require("../system/authGuards");
-const { writeMessagingActionLog } = require("./messagingLogger");
+const { writeMessagingActionLog } = require("../utilities/messagingLogger");
+
 const {
   sendSmsViaProvider,
   SEMAPHORE_API_KEY,

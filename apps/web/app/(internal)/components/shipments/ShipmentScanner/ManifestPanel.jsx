@@ -7,6 +7,7 @@ import { faBarcode } from "@fortawesome/free-solid-svg-icons";
 export default function ManifestPanel({
   item,
   action,
+  scanStatus,
   quantities,
   setQuantities,
   theme,
@@ -40,6 +41,12 @@ export default function ManifestPanel({
           : 0,
       totalQty,
     );
+
+    if (scanStatus === "MISSING" || scanStatus === "DAMAGED") {
+      return action === "LOAD"
+        ? Math.max(0, totalQty - loadedQty)
+        : Math.max(0, loadedQty);
+    }
 
     if (action === "LOAD") return Math.max(0, totalQty - loadedQty);
     return Math.max(0, loadedQty);

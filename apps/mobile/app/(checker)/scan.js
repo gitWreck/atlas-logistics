@@ -29,9 +29,67 @@ import ManualEntryModal from "../../components/scanner/ManualEntryModal";
 import PackageActionModal from "../../components/checker/shipment-details/PackageActionModal";
 import ShipmentInfoModal from "../../components/checker/shipment-details/ShipmentInfoModal";
 import { updateShipmentPackages } from "../../components/utilities/FirebaseFunctions";
-import { getCurrentLocationSafe } from "../../components/utilities/helpers";
+import {
+  getCurrentLocationSafe,
+  updatedBy,
+} from "../../components/utilities/helpers";
+import { useAuth } from "../../contexts/AuthContext";
 
 const SUCCESS_MODAL_SECONDS = 5;
+
+const MODE_SCAN_ACTIONS = {
+  loading: [
+    {
+      label: "Loaded",
+      status: "LOADED",
+      icon: "truck",
+      color: "#2563eb",
+    },
+  ],
+  offloading: [
+    {
+      label: "Received",
+      status: "RECEIVED",
+      icon: "warehouse",
+      color: "#10b981",
+    },
+    {
+      label: "Delivered",
+      status: "DELIVERED",
+      icon: "check-circle",
+      color: "#2563eb",
+    },
+  ],
+  info: [
+    {
+      label: "Information",
+      status: null,
+      icon: "info-circle",
+      color: "#6366f1",
+    },
+  ],
+};
+
+const ISSUE_SCAN_ACTIONS = [
+  {
+    label: "Mark Missing",
+    status: "MISSING",
+    icon: "exclamation-triangle",
+    color: "#dc2626",
+  },
+  {
+    label: "Mark Damaged",
+    status: "DAMAGED",
+    icon: "tools",
+    color: "#f59e0b",
+  },
+];
+
+const OFFLOAD_COMPLETION_SOURCE_STATUSES = [
+  "LOADED",
+  "READY_FOR_DELIVERY",
+  "OUT_FOR_DELIVERY",
+];
 
 const EMPTY_TRIP_SUMMARY = {
   tripId: "",
@@ -57,6 +115,7 @@ const EMPTY_SCAN_DETAILS = {
 
 export default function ScannerScreen() {
   const router = useRouter();
+  const { profile } = useAuth();
   const [permission, requestPermission] = useCameraPermissions();
 
   const [scanned, setScanned] = useState(false);
@@ -67,6 +126,7 @@ export default function ScannerScreen() {
   const [targetPackage, setTargetPackage] = useState(null);
   const [parentShipmentId, setParentShipmentId] = useState(null);
   const [pendingActionStatus, setPendingActionStatus] = useState(null);
+  const [pendingActionSource, setPendingActionSource] = useState("scan");
 
   const [infoModalVisible, setInfoModalVisible] = useState(false);
   const [scannedData, setScannedData] = useState(null);
@@ -77,6 +137,7 @@ export default function ScannerScreen() {
   const [tripSummary, setTripSummary] = useState(EMPTY_TRIP_SUMMARY);
   const [summaryLoading, setSummaryLoading] = useState(false);
   const [latestScan, setLatestScan] = useState(EMPTY_SCAN_DETAILS);
+  const [scanActionStatus, setScanActionStatus] = useState(null);
 
   const successTimerRef = useRef(null);
   const countdownTimerRef = useRef(null);
@@ -84,6 +145,17 @@ export default function ScannerScreen() {
   const { mode, tripId } = useLocalSearchParams();
   const resolvedMode = Array.isArray(mode) ? mode[0] : mode;
   const resolvedTripId = Array.isArray(tripId) ? tripId[0] : tripId;
+
+  const getDefaultScanStatus = (targetMode = resolvedMode) =>
+    MODE_SCAN_ACTIONS[targetMode]?.[0]?.status ?? null;
+
+  const isIssueStatus = (status) =>
+    ISSUE_SCAN_ACTIONS.some((action) => action.status === status);
+
+  const canApplyOffloadCompletion = (status) =>
+    OFFLOAD_COMPLETION_SOURCE_STATUSES.includes(
+      String(status || "").toUpperCase(),
+    );
 
   const clampProgress = (value, total) => {
     if (!total) return 0;
@@ -106,6 +178,12 @@ export default function ScannerScreen() {
   const getShipmentScannedCount = (shipment = {}) => {
     const total = getShipmentTotal(shipment);
     const loaded = Number(shipment.loadedCount ?? shipment.totals?.loaded ?? 0);
+    const missing = Number(
+      shipment.missingCount ?? shipment.totals?.missing ?? 0,
+    );
+    const damaged = Number(
+      shipment.damagedCount ?? shipment.totals?.damaged ?? 0,
+    );
     const received = Number(
       shipment.receivedCount ??
         shipment.deliveredCount ??
@@ -119,10 +197,10 @@ export default function ScannerScreen() {
     }
 
     if (resolvedMode === "loading") {
-      return clampProgress(loaded, total);
+      return clampProgress(loaded + missing + damaged, total);
     }
 
-    return clampProgress(Math.max(loaded, received), total);
+    return clampProgress(Math.max(loaded, received) + missing + damaged, total);
   };
 
   const fetchTripScanSummary = async (targetTripId = resolvedTripId) => {
@@ -228,6 +306,10 @@ export default function ScannerScreen() {
     fetchTripScanSummary(resolvedTripId);
   }, [resolvedTripId, resolvedMode]);
 
+  useEffect(() => {
+    setScanActionStatus(getDefaultScanStatus(resolvedMode));
+  }, [resolvedMode]);
+
   const clearSuccessTimers = () => {
     if (successTimerRef.current) clearTimeout(successTimerRef.current);
     if (countdownTimerRef.current) clearInterval(countdownTimerRef.current);
@@ -241,6 +323,7 @@ export default function ScannerScreen() {
     setTargetPackage(null);
     setParentShipmentId(null);
     setPendingActionStatus(null);
+    setPendingActionSource("scan");
     setActionModalVisible(false);
     setInfoModalVisible(false);
     setScannedData(null);
@@ -299,8 +382,15 @@ export default function ScannerScreen() {
   }
 
   const getStatusToApply = () => {
-    if (resolvedMode === "loading") return "LOADED";
-    if (resolvedMode === "offloading") return "RECEIVED";
+    if (resolvedMode === "loading") {
+      return scanActionStatus || "LOADED";
+    }
+    if (resolvedMode === "offloading") {
+      return scanActionStatus || "RECEIVED";
+    }
+    if (resolvedMode === "info" && isIssueStatus(scanActionStatus)) {
+      return scanActionStatus;
+    }
     return null;
   };
 
@@ -324,6 +414,8 @@ export default function ScannerScreen() {
         tripId: resolvedTripId,
         manualQty: qty,
         remarks,
+        scanAction: resolvedMode,
+        updatedBy: updatedBy(profile),
       });
 
       await fetchTripScanSummary(
@@ -363,6 +455,32 @@ export default function ScannerScreen() {
     setProcessing(false);
   };
 
+  const promptDeliveryProof = (shipmentDoc, shipmentData) => {
+    setProcessing(false);
+
+    Alert.alert(
+      "Proof Required",
+      "Upload delivery photos before confirming this shipment as delivered.",
+      [
+        { text: "Scan Next", style: "cancel", onPress: resetScanner },
+        {
+          text: "Upload Proof",
+          onPress: () =>
+            router.push({
+              pathname: "/(checker)/shipment-details",
+              params: {
+                shipmentId: shipmentDoc.id,
+                parentTripId:
+                  getShipmentTripId(shipmentData) ||
+                  tripSummary.tripId ||
+                  resolvedTripId,
+              },
+            }),
+        },
+      ],
+    );
+  };
+
   const handleResolvedPackage = async ({
     shipmentDoc,
     pkg,
@@ -383,13 +501,35 @@ export default function ScannerScreen() {
 
     await fetchTripScanSummary(currentTripId);
 
-    if (resolvedMode === "info") {
+    if (resolvedMode === "info" && !statusToApply) {
       openInfoPreview(shipmentDoc, pkg, barcode);
       return;
     }
 
     if (!statusToApply) {
       throw new Error("Unsupported scan mode.");
+    }
+
+    if (
+      resolvedMode === "offloading" &&
+      ["RECEIVED", "DELIVERED"].includes(statusToApply)
+    ) {
+      const packageStatus = String(pkg?.status || "").toUpperCase();
+      const shipmentStatus = String(shipmentData?.status || "").toUpperCase();
+
+      if (
+        !canApplyOffloadCompletion(packageStatus) &&
+        !canApplyOffloadCompletion(shipmentStatus)
+      ) {
+        throw new Error(
+          "This item must be Loaded, Ready for Delivery, or Out for Delivery before it can be received or delivered.",
+        );
+      }
+    }
+
+    if (statusToApply === "DELIVERED") {
+      promptDeliveryProof(shipmentDoc, shipmentData);
+      return;
     }
 
     const packagingGroup = String(pkg?.packagingGroup || "").toUpperCase();
@@ -399,6 +539,7 @@ export default function ScannerScreen() {
       setTargetPackage(pkg);
       setParentShipmentId(shipmentDoc.id);
       setPendingActionStatus(statusToApply);
+      setPendingActionSource(source);
       setActionModalVisible(true);
       setProcessing(false);
       return;
@@ -557,6 +698,14 @@ export default function ScannerScreen() {
       : resolvedMode === "info"
         ? "Scanned"
         : "Loaded";
+  const primaryScanActions = MODE_SCAN_ACTIONS[resolvedMode] || [];
+  const selectedScanAction = [
+    ...primaryScanActions,
+    ...ISSUE_SCAN_ACTIONS,
+  ].find((action) => action.status === scanActionStatus);
+  const scanActionHeading = selectedScanAction?.status
+    ? "Scan will mark as"
+    : "Scan mode";
 
   return (
     <View style={styles.container}>
@@ -634,6 +783,55 @@ export default function ScannerScreen() {
           />
         </View>
 
+        {!!primaryScanActions.length && (
+          <View style={styles.offloadActionCard}>
+            <View>
+              <Text style={styles.offloadActionLabel}>
+                {scanActionHeading}
+              </Text>
+              <Text style={styles.offloadActionTitle}>
+                {selectedScanAction?.label || primaryScanActions[0]?.label}
+              </Text>
+            </View>
+
+            <View style={styles.offloadToggleRow}>
+              {primaryScanActions.map((action) => {
+                const isActive = scanActionStatus === action.status;
+
+                return (
+                  <TouchableOpacity
+                    key={action.status || action.label}
+                    style={[
+                      styles.offloadToggleButton,
+                      isActive && {
+                        backgroundColor: action.color,
+                        borderColor: action.color,
+                      },
+                    ]}
+                    onPress={() => setScanActionStatus(action.status)}
+                    disabled={processing}
+                    activeOpacity={0.82}
+                  >
+                    <FontAwesome5
+                      name={action.icon}
+                      size={13}
+                      color={isActive ? "#ffffff" : action.color}
+                    />
+                    <Text
+                      style={[
+                        styles.offloadToggleText,
+                        isActive && styles.offloadToggleTextActive,
+                      ]}
+                    >
+                      {action.label}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </View>
+        )}
+
         <View style={styles.progressCard}>
           <View style={styles.progressHeader}>
             <View>
@@ -699,6 +897,43 @@ export default function ScannerScreen() {
           </TouchableOpacity>
         </View>
 
+        {!!primaryScanActions.length && (
+          <View style={styles.issueActionsRow}>
+            {ISSUE_SCAN_ACTIONS.map((action) => {
+              const isActive = scanActionStatus === action.status;
+
+              return (
+                <TouchableOpacity
+                  key={action.status}
+                  style={[
+                    styles.issueButton,
+                    { borderColor: action.color },
+                    isActive && { backgroundColor: action.color },
+                  ]}
+                  onPress={() => setScanActionStatus(action.status)}
+                  disabled={processing}
+                  activeOpacity={0.82}
+                >
+                  <FontAwesome5
+                    name={action.icon}
+                    size={13}
+                    color={isActive ? "#ffffff" : action.color}
+                  />
+                  <Text
+                    style={[
+                      styles.issueButtonText,
+                      { color: action.color },
+                      isActive && styles.issueButtonTextActive,
+                    ]}
+                  >
+                    {action.label}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        )}
+
         {!!latestScan.shipmentId && (
           <TouchableOpacity
             style={styles.detailsButton}
@@ -734,7 +969,7 @@ export default function ScannerScreen() {
             status,
             qty,
             remarks,
-            source: "scan",
+            source: pendingActionSource,
           });
           setActionModalVisible(false);
         }}
@@ -748,6 +983,7 @@ export default function ScannerScreen() {
         onSubmit={onManualSubmit}
         loading={processing}
         mode={resolvedMode}
+        actionLabel={selectedScanAction?.label}
       />
 
       <ShipmentInfoModal
@@ -947,6 +1183,51 @@ const styles = StyleSheet.create({
     padding: 14,
     gap: 10,
   },
+  offloadActionCard: {
+    backgroundColor: "#ffffff",
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "#e2e8f0",
+    padding: 14,
+    gap: 12,
+  },
+  offloadActionLabel: {
+    color: "#64748b",
+    fontSize: 11,
+    fontWeight: "800",
+    textTransform: "uppercase",
+  },
+  offloadActionTitle: {
+    marginTop: 3,
+    color: "#0f172a",
+    fontSize: 16,
+    fontWeight: "900",
+  },
+  offloadToggleRow: {
+    flexDirection: "row",
+    gap: 10,
+  },
+  offloadToggleButton: {
+    flex: 1,
+    minHeight: 44,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "#cbd5e1",
+    backgroundColor: "#f8fafc",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    paddingHorizontal: 10,
+  },
+  offloadToggleText: {
+    color: "#334155",
+    fontSize: 12,
+    fontWeight: "800",
+  },
+  offloadToggleTextActive: {
+    color: "#ffffff",
+  },
   detailRow: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -1041,6 +1322,10 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: 10,
   },
+  issueActionsRow: {
+    flexDirection: "row",
+    gap: 10,
+  },
   actionButton: {
     flex: 1,
     height: 48,
@@ -1070,6 +1355,25 @@ const styles = StyleSheet.create({
     color: "#2563eb",
     fontSize: 13,
     fontWeight: "800",
+  },
+  issueButton: {
+    flex: 1,
+    minHeight: 46,
+    borderRadius: 14,
+    borderWidth: 1,
+    backgroundColor: "#ffffff",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    paddingHorizontal: 10,
+  },
+  issueButtonText: {
+    fontSize: 12,
+    fontWeight: "800",
+  },
+  issueButtonTextActive: {
+    color: "#ffffff",
   },
   detailsButton: {
     height: 46,

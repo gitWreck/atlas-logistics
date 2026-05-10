@@ -3,7 +3,7 @@
 const admin = require("firebase-admin");
 const { sendSmsViaProvider } = require("../../shared/sms-service");
 const { calculateSmsCost } = require("../../shared/sms-cost");
-const { writeMessagingActionLog } = require("./messagingLogger");
+const { writeMessagingActionLog } = require("../utilities/messagingLogger");
 
 function normalizePhone(phone) {
   if (!phone) return null;
@@ -62,6 +62,8 @@ async function sendInvoicesStatusSmsLogic({
   origin,
   destination,
   actorUid,
+  actorName,
+  actorRole,
   customMessage = "",
 }) {
   const db = admin.firestore();
@@ -106,7 +108,9 @@ async function sendInvoicesStatusSmsLogic({
     status,
     message,
     actorId: actorUid || "SYSTEM",
-    requestedBy: actorUid || "SYSTEM",
+    actorName: actorName || null,
+    actorRole: actorRole || null,
+    requestedBy: actorName || "SYSTEM",
     totalTargets: phones.size,
     successCount,
     failedCount,
