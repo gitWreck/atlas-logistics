@@ -17,13 +17,15 @@ import { auth, db } from "../../firebase";
 import { addTrackedShipment } from "../../components/utilities/FirebaseFunctions";
 
 // Imported Components
-import DashboardHeader from "./components/DashboardHeader";
-import TrackedShipmentList from "./components/TrackedShipmentList";
-import AddTrackingModal from "./components/AddTrackingModal";
-import FloatingAddButton from "./components/FloatingAddButton";
+import CustomerHeader from "./CustomerHeader";
+import TrackedShipmentList from "./TrackedShipmentList";
+import AddTrackingModal from "./AddTrackingModal";
+import FloatingAddButton from "./FloatingAddButton";
+import { useTheme } from "../../contexts/ThemeContext";
 
 export default function CustomerDashboard() {
   const router = useRouter();
+  const { colors, resolvedScheme } = useTheme();
   const [addModalVisible, setAddModalVisible] = useState(false);
   const [trackedShipments, setTrackedShipments] = useState([]);
   const [adding, setAdding] = useState(false);
@@ -125,10 +127,15 @@ export default function CustomerDashboard() {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar style="dark" />
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.bg }]}>
+      <StatusBar style={resolvedScheme === "dark" ? "light" : "dark"} />
 
-      <DashboardHeader firstName={firstName} onLogout={handleLogout} />
+      <CustomerHeader
+        userName={firstName || "Customer"}
+        onLogout={handleLogout}
+        onProfilePress={() => router.push("/(customer)/profile")}
+        onNotificationsPress={() => router.push("/(customer)/notifications")}
+      />
 
       <View style={styles.body}>
         <TrackedShipmentList

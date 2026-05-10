@@ -14,6 +14,7 @@ import {
 } from "../../../components/utilities/PhilippinesData";
 import { normalizePhoneNumber } from "../../../components/utilities/helpers";
 import DropdownModal from "./DropdownModal";
+import { useTheme } from "../../../contexts/ThemeContext";
 
 export default function InputGroupMobile({
   label,
@@ -22,6 +23,7 @@ export default function InputGroupMobile({
   color = "blue",
   user,
 }) {
+  const { colors } = useTheme();
   const [cities, setCities] = useState([]);
   const [showProvinceModal, setShowProvinceModal] = useState(false);
   const [showCityModal, setShowCityModal] = useState(false);
@@ -40,14 +42,27 @@ export default function InputGroupMobile({
   // console.log("input group:  ", values);
 
   return (
-    <View style={styles.card}>
+    <View
+      style={[
+        styles.card,
+        { backgroundColor: colors.surface, borderColor: colors.border },
+      ]}
+    >
       <Text style={[styles.title, { color: themeColor }]}>{label} Details</Text>
 
       <View style={styles.row}>
         <View style={{ flex: 1, zIndex: 10 }}>
           <TextInput
-            style={styles.input}
+            style={[
+              styles.input,
+              {
+                backgroundColor: colors.inputBg,
+                borderColor: colors.border,
+                color: colors.text,
+              },
+            ]}
             placeholder="Name"
+            placeholderTextColor={colors.textMuted}
             value={values.name}
             onChangeText={(val) => {
               onChange({ ...values, name: val });
@@ -56,8 +71,18 @@ export default function InputGroupMobile({
         </View>
 
         <TextInput
-          style={[styles.input, { flex: 1, marginLeft: 10 }]}
+          style={[
+            styles.input,
+            {
+              flex: 1,
+              marginLeft: 10,
+              backgroundColor: colors.inputBg,
+              borderColor: colors.border,
+              color: colors.text,
+            },
+          ]}
           placeholder="Phone"
+          placeholderTextColor={colors.textMuted}
           keyboardType="phone-pad"
           value={values.phone}
           onBlur={() =>
@@ -70,22 +95,50 @@ export default function InputGroupMobile({
       {/* Address Rows */}
       <View style={styles.row}>
         <TextInput
-          style={[styles.input, { flex: 1 }]}
+          style={[
+            styles.input,
+            {
+              flex: 1,
+              backgroundColor: colors.inputBg,
+              borderColor: colors.border,
+              color: colors.text,
+            },
+          ]}
           placeholder="Unit"
+          placeholderTextColor={colors.textMuted}
           value={values.unit}
           onChangeText={(val) => onChange({ ...values, unit: val })}
         />
         <TextInput
-          style={[styles.input, { flex: 2, marginLeft: 10 }]}
+          style={[
+            styles.input,
+            {
+              flex: 2,
+              marginLeft: 10,
+              backgroundColor: colors.inputBg,
+              borderColor: colors.border,
+              color: colors.text,
+            },
+          ]}
           placeholder="Street"
+          placeholderTextColor={colors.textMuted}
           value={values.street}
           onChangeText={(val) => onChange({ ...values, street: val })}
         />
       </View>
 
       <TextInput
-        style={[styles.input, { marginBottom: 10 }]}
+        style={[
+          styles.input,
+          {
+            marginBottom: 10,
+            backgroundColor: colors.inputBg,
+            borderColor: colors.border,
+            color: colors.text,
+          },
+        ]}
         placeholder="Barangay"
+        placeholderTextColor={colors.textMuted}
         value={values.barangay}
         onChangeText={(val) => onChange({ ...values, barangay: val })}
       />
@@ -94,10 +147,18 @@ export default function InputGroupMobile({
       <View style={styles.row}>
         {/* Province Selector Button */}
         <TouchableOpacity
-          style={[styles.input, { flex: 1, justifyContent: "center" }]}
+          style={[
+            styles.input,
+            {
+              flex: 1,
+              justifyContent: "center",
+              backgroundColor: colors.inputBg,
+              borderColor: colors.border,
+            },
+          ]}
           onPress={() => setShowProvinceModal(true)}
         >
-          <Text style={{ color: values.province ? "#0f172a" : "#94a3b8" }}>
+          <Text style={{ color: values.province ? colors.text : colors.textMuted }}>
             {values.province || "Province"}
           </Text>
         </TouchableOpacity>
@@ -106,13 +167,19 @@ export default function InputGroupMobile({
         <TouchableOpacity
           style={[
             styles.input,
-            { flex: 1, marginLeft: 10, justifyContent: "center" },
+            {
+              flex: 1,
+              marginLeft: 10,
+              justifyContent: "center",
+              backgroundColor: colors.inputBg,
+              borderColor: colors.border,
+            },
             !values.province && { opacity: 0.5 }, // Dim if disabled
           ]}
           onPress={() => setShowCityModal(true)}
           disabled={!values.province}
         >
-          <Text style={{ color: values.city ? "#0f172a" : "#94a3b8" }}>
+          <Text style={{ color: values.city ? colors.text : colors.textMuted }}>
             {values.city || "City"}
           </Text>
         </TouchableOpacity>

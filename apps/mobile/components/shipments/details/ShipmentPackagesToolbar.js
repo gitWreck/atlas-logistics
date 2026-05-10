@@ -1,6 +1,7 @@
 import React from "react";
 import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
 import ShipmentSearch from "../../checker/shipment-details/ShipmentSearch";
+import { useTheme } from "../../../contexts/ThemeContext";
 
 export default function ShipmentPackagesToolbar({
   search,
@@ -10,8 +11,10 @@ export default function ShipmentPackagesToolbar({
   totalFiltered,
   onToggleSelectAll,
 }) {
+  const { colors } = useTheme();
+
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.bg }]}>
       <ShipmentSearch value={search} onChange={onChangeSearch} />
 
       {editable && (
@@ -24,7 +27,9 @@ export default function ShipmentPackagesToolbar({
             </Text>
           </TouchableOpacity>
 
-          <Text style={styles.selectionCount}>{selectedCount} Selected</Text>
+          <Text style={[styles.selectionCount, { color: colors.textMuted }]}>
+            {selectedCount} Selected
+          </Text>
         </View>
       )}
     </View>

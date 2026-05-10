@@ -11,10 +11,12 @@ import { auth } from "../../../firebase";
 
 import CheckerHeader from "../../../components/checker/CheckerHeader";
 import { useAuth } from "../../../contexts/AuthContext"; // adjust path if needed
+import { useTheme } from "../../../contexts/ThemeContext";
 
 export default function CheckerTabsLayout() {
   const router = useRouter();
   const { user } = useAuth();
+  const { colors } = useTheme();
 
   const handleLogout = async () => {
     try {
@@ -26,7 +28,7 @@ export default function CheckerTabsLayout() {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.bg }]}>
       {/* ✅ SHARED HEADER FOR ALL TAB SCREENS */}
       <CheckerHeader
         userName={user?.name || user?.fullName || "Checker"}
@@ -39,14 +41,14 @@ export default function CheckerTabsLayout() {
         screenOptions={{
           headerShown: false, // still false because we use custom header
           tabBarStyle: {
-            backgroundColor: "#ffffff",
-            borderTopColor: "#cbd5e1",
+            backgroundColor: colors.surface,
+            borderTopColor: colors.border,
             height: 60,
             paddingBottom: 8,
             paddingTop: 8,
           },
           tabBarActiveTintColor: "#07B9F4",
-          tabBarInactiveTintColor: "#475569",
+          tabBarInactiveTintColor: colors.textMuted,
           tabBarLabelStyle: {
             fontSize: 10,
             fontWeight: "600",

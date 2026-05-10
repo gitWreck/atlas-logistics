@@ -21,6 +21,7 @@ import { StatusBar } from "expo-status-bar";
 import { Image } from "expo-image";
 import GradientButton from "../../components/ui/figma/GradientButton";
 import { reportTripDelay } from "../../components/utilities/FirebaseFunctions";
+import { useTheme } from "../../contexts/ThemeContext";
 
 const DELAY_TYPES = [
   {
@@ -47,6 +48,7 @@ const DELAY_TYPES = [
 
 export default function ReportDelayScreen() {
   const router = useRouter();
+  const { colors, resolvedScheme } = useTheme();
   const [tripId, setTripId] = useState(null);
   const [selectedType, setSelectedType] = useState(null);
   const [notes, setNotes] = useState("");
@@ -113,33 +115,44 @@ export default function ReportDelayScreen() {
 
   if (fetching) {
     return (
-      <View style={[styles.center, { backgroundColor: "#f1f5f9" }]}>
+      <View style={[styles.center, { backgroundColor: colors.bg }]}>
         <ActivityIndicator size="large" color="#042C83" />
       </View>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar style="dark" />
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.bg }]}>
+      <StatusBar style={resolvedScheme === "dark" ? "light" : "dark"} />
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : "height"}
         style={{ flex: 1 }}
       >
         {/* Header: back | title - aligned with Trip Details */}
-        <View style={styles.header}>
+        <View
+          style={[
+            styles.header,
+            { backgroundColor: colors.surface, borderBottomColor: colors.border },
+          ]}
+        >
           <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
             <Image
               source={require("../../assets/icons/back.svg")}
               style={{ width: 20, height: 20 }}
             />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Report Delay</Text>
+          <Text style={[styles.headerTitle, { color: colors.text }]}>
+            Report Delay
+          </Text>
         </View>
 
         <ScrollView contentContainerStyle={styles.scrollContent}>
-          <Text style={styles.sectionTitle}>Report Delay</Text>
-        <Text style={styles.subtitle}>Select the reason for the delay</Text>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>
+            Report Delay
+          </Text>
+        <Text style={[styles.subtitle, { color: colors.textMuted }]}>
+          Select the reason for the delay
+        </Text>
 
         <View style={styles.grid}>
           {DELAY_TYPES.map((type) => (
@@ -147,6 +160,10 @@ export default function ReportDelayScreen() {
               key={type.id}
               style={[
                 styles.card,
+                {
+                  backgroundColor: colors.surface,
+                  borderColor: colors.border,
+                },
                 selectedType === type.id && {
                   borderColor: type.color,
                   backgroundColor: `${type.color}20`, // 20% opacity
@@ -157,16 +174,27 @@ export default function ReportDelayScreen() {
               <View style={[styles.iconBox, { backgroundColor: type.color }]}>
                 <FontAwesome5 name={type.icon} size={20} color="#fff" />
               </View>
-              <Text style={styles.cardLabel}>{type.label}</Text>
+              <Text style={[styles.cardLabel, { color: colors.text }]}>
+                {type.label}
+              </Text>
             </TouchableOpacity>
           ))}
         </View>
 
-          <Text style={styles.label}>Additional Notes (Optional)</Text>
+          <Text style={[styles.label, { color: colors.textMuted }]}>
+            Additional Notes (Optional)
+          </Text>
           <TextInput
-            style={styles.input}
+            style={[
+              styles.input,
+              {
+                backgroundColor: colors.inputBg,
+                borderColor: colors.border,
+                color: colors.text,
+              },
+            ]}
             placeholder="e.g., Flat tire at KM 45..."
-            placeholderTextColor="#94a3b8"
+            placeholderTextColor={colors.textMuted}
             multiline
             numberOfLines={3}
             value={notes}
@@ -176,7 +204,12 @@ export default function ReportDelayScreen() {
       </KeyboardAvoidingView>
 
       {/* Bottom CTA: GradientButton */}
-      <View style={styles.footer}>
+      <View
+        style={[
+          styles.footer,
+          { backgroundColor: colors.surface, borderTopColor: colors.border },
+        ]}
+      >
         <GradientButton
           title={submitting ? "Submitting..." : "Submit Report"}
           onPress={handleSubmit}

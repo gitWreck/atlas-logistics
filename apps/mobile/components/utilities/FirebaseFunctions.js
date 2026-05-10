@@ -46,6 +46,7 @@ export const updateUserProfileMobile = httpsCallable(
   functions,
   "updateUserProfileMobile",
 );
+export const deleteMyAccount = httpsCallable(functions, "deleteMyAccount");
 export const ensureUserPublicId = httpsCallable(
   functions,
   "ensureUserPublicId",

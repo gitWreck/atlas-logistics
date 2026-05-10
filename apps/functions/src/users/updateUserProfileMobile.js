@@ -55,7 +55,15 @@ exports.updateUserProfileMobile = onCall(
     // 2. HANDLE PHONE & ADDRESS (Only for Customers or by Admins)
     if (isAdmin || targetData.role === "customer") {
       if (phoneNumber) {
-        firestoreUpdates.phoneNumber = toE164(phoneNumber);
+        const e164 = toE164(phoneNumber);
+        const digits = String(e164).replace(/\D/g, "");
+        if (!/^63[89]\d{9}$/.test(digits)) {
+          throw new HttpsError(
+            "invalid-argument",
+            "Invalid Philippine mobile number.",
+          );
+        }
+        firestoreUpdates.phoneNumber = e164;
       }
 
       if (address && typeof address === "object") {

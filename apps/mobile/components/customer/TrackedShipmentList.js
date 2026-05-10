@@ -10,6 +10,7 @@ import {
 import { FontAwesome5 } from "@expo/vector-icons";
 import StatusBadge from "../ui/StatusBadge";
 import { getFormattedTime } from "../utilities/helpers";
+import { useTheme } from "../../contexts/ThemeContext";
 
 const FILTER_OPTIONS = [
   { label: "All", value: "ALL" },
@@ -18,6 +19,7 @@ const FILTER_OPTIONS = [
 ];
 
 export default function TrackedShipmentList({ shipments, onShipmentPress }) {
+  const { colors } = useTheme();
   const [searchText, setSearchText] = useState("");
   const [activeFilter, setActiveFilter] = useState("ALL");
 
@@ -62,23 +64,34 @@ export default function TrackedShipmentList({ shipments, onShipmentPress }) {
   return (
     <View style={styles.container}>
       <View style={styles.sectionHeaderRow}>
-        <Text style={styles.sectionTitle}>My Shipments</Text>
+        <Text style={[styles.sectionTitle, { color: colors.text }]}>
+          My Shipments
+        </Text>
       </View>
 
       {/* Search Bar */}
       <View style={styles.searchRow}>
-        <View style={styles.searchContainer}>
-          <FontAwesome5 name="search" size={14} color="#94a3b8" />
+        <View
+          style={[
+            styles.searchContainer,
+            { backgroundColor: colors.surface, borderColor: colors.border },
+          ]}
+        >
+          <FontAwesome5 name="search" size={14} color={colors.textMuted} />
           <TextInput
-            style={styles.searchInput}
+            style={[styles.searchInput, { color: colors.text }]}
             placeholder="Search tracking, city, name..."
-            placeholderTextColor="#94a3b8"
+            placeholderTextColor={colors.textMuted}
             value={searchText}
             onChangeText={setSearchText}
           />
           {searchText.length > 0 && (
             <TouchableOpacity onPress={() => setSearchText("")}>
-              <FontAwesome5 name="times-circle" size={14} color="#94a3b8" />
+              <FontAwesome5
+                name="times-circle"
+                size={14}
+                color={colors.textMuted}
+              />
             </TouchableOpacity>
           )}
         </View>
@@ -96,12 +109,20 @@ export default function TrackedShipmentList({ shipments, onShipmentPress }) {
             return (
               <TouchableOpacity
                 key={opt.value}
-                style={[styles.tabChip, isActive && styles.tabChipActive]}
+                style={[
+                  styles.tabChip,
+                  {
+                    backgroundColor: colors.surface,
+                    borderColor: colors.border,
+                  },
+                  isActive && styles.tabChipActive,
+                ]}
                 onPress={() => setActiveFilter(opt.value)}
               >
                 <Text
                   style={[
                     styles.tabChipText,
+                    { color: colors.textMuted },
                     isActive && styles.tabChipTextActive,
                   ]}
                 >
@@ -119,16 +140,16 @@ export default function TrackedShipmentList({ shipments, onShipmentPress }) {
             <FontAwesome5
               name="box-open"
               size={40}
-              color="#cbd5e1"
+              color={colors.textMuted}
               style={{ marginBottom: 12 }}
             />
-            <Text style={styles.emptyText}>
+            <Text style={[styles.emptyText, { color: colors.textMuted }]}>
               You haven’t added any shipments yet.
             </Text>
           </View>
         ) : filteredShipments.length === 0 ? (
           <View style={styles.emptyState}>
-            <Text style={styles.emptyText}>
+            <Text style={[styles.emptyText, { color: colors.textMuted }]}>
               No shipments match your search.
             </Text>
           </View>
@@ -136,13 +157,18 @@ export default function TrackedShipmentList({ shipments, onShipmentPress }) {
           filteredShipments.map((item) => (
             <TouchableOpacity
               key={item.id}
-              style={styles.shipmentCard}
+              style={[
+                styles.shipmentCard,
+                { backgroundColor: colors.surface, borderColor: colors.border },
+              ]}
               activeOpacity={0.85}
               onPress={() => onShipmentPress(item)}
             >
               {/* Header: Tracking Badge */}
               <View style={styles.cardHeader}>
-                <View style={styles.idBox}>
+                <View
+                  style={[styles.idBox, { backgroundColor: colors.cardMuted }]}
+                >
                   <FontAwesome5 name="box" size={12} color="#067FC6" />
                   <Text style={styles.trackingValue}>
                     {item.trackingNumber || item.shipmentId || item.id}
@@ -157,10 +183,13 @@ export default function TrackedShipmentList({ shipments, onShipmentPress }) {
                   <FontAwesome5
                     name="map-marker-alt"
                     size={12}
-                    color="#94a3b8"
+                    color={colors.textMuted}
                     style={styles.infoIcon}
                   />
-                  <Text style={styles.infoText} numberOfLines={1}>
+                  <Text
+                    style={[styles.infoText, { color: colors.text }]}
+                    numberOfLines={1}
+                  >
                     {item.origin || item.sender?.address?.city || "Origin"}
                     {" ➔ "}
                     {item.destination ||
@@ -172,10 +201,13 @@ export default function TrackedShipmentList({ shipments, onShipmentPress }) {
                   <FontAwesome5
                     name="user"
                     size={12}
-                    color="#94a3b8"
+                    color={colors.textMuted}
                     style={styles.infoIcon}
                   />
-                  <Text style={styles.infoText} numberOfLines={1}>
+                  <Text
+                    style={[styles.infoText, { color: colors.text }]}
+                    numberOfLines={1}
+                  >
                     To: {item.recipient?.name || item.receiverName || "Unknown"}
                   </Text>
                 </View>
@@ -184,10 +216,13 @@ export default function TrackedShipmentList({ shipments, onShipmentPress }) {
                     <FontAwesome5
                       name="cube"
                       size={12}
-                      color="#94a3b8"
+                      color={colors.textMuted}
                       style={styles.infoIcon}
                     />
-                    <Text style={styles.infoText} numberOfLines={1}>
+                    <Text
+                      style={[styles.infoText, { color: colors.text }]}
+                      numberOfLines={1}
+                    >
                       {item.totalItems || item.packageCount} Items
                     </Text>
                   </View>
@@ -195,11 +230,16 @@ export default function TrackedShipmentList({ shipments, onShipmentPress }) {
               </View>
 
               {/* Bottom Row: Hint & Time */}
-              <View style={styles.cardBottomRow}>
-                <Text style={styles.trackingHint}>
+              <View
+                style={[
+                  styles.cardBottomRow,
+                  { borderTopColor: colors.border },
+                ]}
+              >
+                <Text style={[styles.trackingHint, { color: colors.textMuted }]}>
                   Tap to view live status...
                 </Text>
-                <Text style={styles.timeText}>
+                <Text style={[styles.timeText, { color: colors.textMuted }]}>
                   {getFormattedTime(item.rawUpdatedAt || item.updatedAt)}
                 </Text>
               </View>

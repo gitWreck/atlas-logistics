@@ -22,6 +22,7 @@ import {
 
 import { db, auth } from "../../firebase";
 import { useAuth } from "../../contexts/AuthContext.js";
+import { useTheme } from "../../contexts/ThemeContext";
 import { COLORS, GLOBAL_STYLES } from "../constants/theme";
 
 import TripCard from "./TripCard.js";
@@ -34,6 +35,7 @@ import {
 } from "../constants/templates.js";
 
 export default function TripScreen() {
+  const { colors, resolvedScheme } = useTheme();
   const { role, isChecker, isDriver } = useAuth();
   const router = useRouter();
   const uid = auth.currentUser?.uid;
@@ -240,12 +242,17 @@ export default function TripScreen() {
             const isActive = activeTab === item.key;
             return (
               <TouchableOpacity
-                style={[styles.tabChip, isActive && styles.tabChipActive]}
+                style={[
+                  styles.tabChip,
+                  { backgroundColor: colors.surface, borderColor: colors.border },
+                  isActive && styles.tabChipActive,
+                ]}
                 onPress={() => setActiveTab(item.key)}
               >
                 <Text
                   style={[
                     styles.tabChipText,
+                    { color: colors.textMuted },
                     isActive && styles.tabChipTextActive,
                   ]}
                 >
@@ -277,36 +284,48 @@ export default function TripScreen() {
 
   if (loading) {
     return (
-      <View style={[GLOBAL_STYLES.center, { backgroundColor: "#f1f5f9" }]}>
+      <View style={[GLOBAL_STYLES.center, { backgroundColor: colors.bg }]}>
         <ActivityIndicator size="large" color={COLORS.primary || "#042C83"} />
       </View>
     );
   }
 
   return (
-    <View style={styles.container}>
-      <StatusBar style="dark" backgroundColor="#f1f5f9" />
+    <View style={[styles.container, { backgroundColor: colors.bg }]}>
+      <StatusBar
+        style={resolvedScheme === "dark" ? "light" : "dark"}
+        backgroundColor={colors.bg}
+      />
 
       {/* {renderHeader()} */}
       {renderTabs()}
 
-      <View style={styles.searchRow}>
-        <View style={styles.searchContainer}>
-          <FontAwesome5 name="search" size={16} color="#94a3b8" />
+      <View style={[styles.searchRow, { backgroundColor: colors.bg }]}>
+        <View
+          style={[
+            styles.searchContainer,
+            { backgroundColor: colors.surface, borderColor: colors.border },
+          ]}
+        >
+          <FontAwesome5 name="search" size={16} color={colors.textMuted} />
           <TextInput
-            style={styles.searchInput}
+            style={[styles.searchInput, { color: colors.text }]}
             placeholder={
               isChecker
                 ? "Search plate, route, driver..."
                 : "Search trips, route..."
             }
-            placeholderTextColor="#94a3b8"
+            placeholderTextColor={colors.textMuted}
             value={searchText}
             onChangeText={setSearchText}
           />
           {searchText.length > 0 && (
             <TouchableOpacity onPress={() => setSearchText("")}>
-              <FontAwesome5 name="times-circle" size={16} color="#94a3b8" />
+              <FontAwesome5
+                name="times-circle"
+                size={16}
+                color={colors.textMuted}
+              />
             </TouchableOpacity>
           )}
         </View>
@@ -314,6 +333,7 @@ export default function TripScreen() {
         <TouchableOpacity
           style={[
             styles.filterBtn,
+            { backgroundColor: colors.surface, borderColor: colors.border },
             activeStatusFilter !== "ALL" && styles.filterBtnActive,
           ]}
           onPress={() => setFilterModalVisible(true)}
@@ -321,7 +341,7 @@ export default function TripScreen() {
           <FontAwesome5
             name="sliders-h"
             size={16}
-            color={activeStatusFilter !== "ALL" ? "#0284c7" : "#0f172a"}
+            color={activeStatusFilter !== "ALL" ? "#0284c7" : colors.text}
           />
         </TouchableOpacity>
       </View>
@@ -347,10 +367,12 @@ export default function TripScreen() {
             <FontAwesome5
               name={isChecker ? "truck-loading" : "clipboard-list"}
               size={40}
-              color="#94a3b8"
+              color={colors.textMuted}
               style={{ marginBottom: 12 }}
             />
-            <Text style={styles.emptyText}>{emptyText}</Text>
+            <Text style={[styles.emptyText, { color: colors.textMuted }]}>
+              {emptyText}
+            </Text>
           </View>
         }
       />

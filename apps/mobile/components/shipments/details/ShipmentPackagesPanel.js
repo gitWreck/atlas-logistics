@@ -12,6 +12,7 @@ import ShipmentPackagesStats from "./ShipmentPackagesStats";
 import ShipmentPackagesToolbar from "./ShipmentPackagesToolbar";
 import PackageListItem from "./PackageListItem";
 import PackageActionModal from "./PackageActionModal";
+import { useTheme } from "../../../contexts/ThemeContext";
 
 export default function ShipmentPackagesPanel({
   shipment,
@@ -21,6 +22,7 @@ export default function ShipmentPackagesPanel({
   loading = false,
   showOverview = true,
 }) {
+  const { colors } = useTheme();
   const [search, setSearch] = useState("");
   const [selectedIds, setSelectedIds] = useState(new Set());
   const [modalVisible, setModalVisible] = useState(false);
@@ -87,7 +89,9 @@ export default function ShipmentPackagesPanel({
 
   return (
     <View style={styles.container}>
-      <Text style={styles.sectionTitle}>Packages ({packages.length})</Text>
+      <Text style={[styles.sectionTitle, { color: colors.text }]}>
+        Packages ({packages.length})
+      </Text>
 
       {showOverview && <ShipmentPackagesStats shipment={shipment} />}
 
@@ -106,7 +110,7 @@ export default function ShipmentPackagesPanel({
         scrollEnabled={false}
         contentContainerStyle={styles.listContent}
         ListEmptyComponent={
-          <Text style={styles.emptyText}>
+          <Text style={[styles.emptyText, { color: colors.textMuted }]}>
             {search ? "No packages match your search." : "No packages found."}
           </Text>
         }

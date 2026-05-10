@@ -6,9 +6,10 @@ import {
   Pressable,
   TouchableOpacity,
   StyleSheet,
+  TextInput,
 } from "react-native";
-import AtlasInput from "../../components/ui/AtlasInput"; // Adjust path
 import GradientButton from "../../components/ui/figma/GradientButton"; // Adjust path
+import { useTheme } from "../../contexts/ThemeContext";
 
 export default function AddTrackingModal({
   visible,
@@ -16,6 +17,7 @@ export default function AddTrackingModal({
   onAdd,
   isAdding,
 }) {
+  const { colors } = useTheme();
   const [trackingNumber, setTrackingNumber] = useState("");
 
   // Clear input when modal opens/closes
@@ -36,25 +38,41 @@ export default function AddTrackingModal({
     >
       <View style={styles.modalBackdrop}>
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
-        <View style={styles.modalCard}>
-          <Text style={styles.modalTitle}>Add a tracking number</Text>
-          <Text style={styles.modalSubtitle}>
+        <View style={[styles.modalCard, { backgroundColor: colors.surface }]}>
+          <Text style={[styles.modalTitle, { color: colors.text }]}>
+            Add a tracking number
+          </Text>
+          <Text style={[styles.modalSubtitle, { color: colors.textMuted }]}>
             Enter a tracking number to link an existing shipment to your
             account.
           </Text>
 
           <View style={styles.modalInputWrapper}>
-            <AtlasInput
-              label="Tracking Number"
+            <Text style={[styles.inputLabel, { color: colors.textMuted }]}>
+              Tracking Number
+            </Text>
+            <TextInput
+              style={[
+                styles.input,
+                {
+                  backgroundColor: colors.inputBg,
+                  borderColor: colors.border,
+                  color: colors.text,
+                },
+              ]}
               placeholder="e.g. AT-20260203-DIV-ODI-123456"
+              placeholderTextColor={colors.textMuted}
               value={trackingNumber}
               onChangeText={setTrackingNumber}
+              autoCapitalize="characters"
             />
           </View>
 
           <View style={styles.modalActionsRow}>
             <TouchableOpacity style={styles.modalCancelBtn} onPress={onClose}>
-              <Text style={styles.modalCancelText}>Cancel</Text>
+              <Text style={[styles.modalCancelText, { color: colors.textMuted }]}>
+                Cancel
+              </Text>
             </TouchableOpacity>
 
             <View style={styles.modalPrimaryBtnWrapper}>
@@ -98,6 +116,20 @@ const styles = StyleSheet.create({
   },
   modalInputWrapper: {
     marginBottom: 16,
+  },
+  inputLabel: {
+    fontSize: 11,
+    fontWeight: "800",
+    marginBottom: 8,
+    textTransform: "uppercase",
+  },
+  input: {
+    borderRadius: 12,
+    borderWidth: 1,
+    height: 48,
+    paddingHorizontal: 14,
+    fontSize: 14,
+    fontWeight: "600",
   },
   modalActionsRow: {
     flexDirection: "row",

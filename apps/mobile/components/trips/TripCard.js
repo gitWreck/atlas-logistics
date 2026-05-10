@@ -10,8 +10,10 @@ import { FontAwesome5 } from "@expo/vector-icons";
 import { COLORS } from "../constants/theme"; // Adjust path
 import { getFormattedTime } from "../utilities/helpers";
 import StatusBadge from "../ui/figma/StatusBadge"; // Adjust path
+import { useTheme } from "../../contexts/ThemeContext";
 
 const TripCard = ({ trip, onPress }) => {
+  const { colors } = useTheme();
   console.log("trip details: ", trip);
 
   // Calculate Progress
@@ -34,13 +36,18 @@ const TripCard = ({ trip, onPress }) => {
   if (trip.tripType === "LOCAL_PICKUP") tripTypeLabel = "Local Pickup Route";
 
   return (
-    <View style={styles.card}>
+    <View
+      style={[
+        styles.card,
+        { backgroundColor: colors.surface, borderColor: colors.border },
+      ]}
+    >
       {/* HEADER: ID + Status */}
       <View style={styles.cardHeader}>
-        <View style={styles.idBox}>
-          <FontAwesome5 name="hashtag" size={10} color="#94a3b8" />
+        <View style={[styles.idBox, { backgroundColor: colors.cardMuted }]}>
+          <FontAwesome5 name="hashtag" size={10} color={colors.textMuted} />
           {/* Sliced the ID so it doesn't overflow the screen */}
-          <Text style={styles.idText}>{trip.id}</Text>
+          <Text style={[styles.idText, { color: colors.text }]}>{trip.id}</Text>
         </View>
         <StatusBadge status={trip.status} />
       </View>
@@ -49,19 +56,27 @@ const TripCard = ({ trip, onPress }) => {
       <View style={styles.body}>
         {/* Left Side: Plate & Trip Type */}
         <View style={styles.leftContent}>
-          <Text style={styles.plateText}>{trip.plate || "NO PLATE"}</Text>
+          <Text style={[styles.plateText, { color: colors.text }]}>
+            {trip.plate || "NO PLATE"}
+          </Text>
           <Text style={styles.typeText}>{tripTypeLabel}</Text>
         </View>
 
         {/* Right Side: Route, Driver, & Updated At */}
         <View style={styles.rightContent}>
-          <Text style={styles.routeText} numberOfLines={1}>
+          <Text
+            style={[styles.routeText, { color: colors.text }]}
+            numberOfLines={1}
+          >
             {trip.route || trip.tripType === "DELIVERY" ? "" : "No Route Info"}
           </Text>
-          <Text style={styles.driverText} numberOfLines={1}>
+          <Text
+            style={[styles.driverText, { color: colors.textMuted }]}
+            numberOfLines={1}
+          >
             {driverName}
           </Text>
-          <Text style={styles.dateText}>
+          <Text style={[styles.dateText, { color: colors.textMuted }]}>
             Last Update: {getFormattedTime(trip.updatedAt)}
           </Text>
         </View>
@@ -70,14 +85,21 @@ const TripCard = ({ trip, onPress }) => {
       {/* PROGRESS SECTION */}
       <View style={styles.progressContainer}>
         <View style={styles.progressRow}>
-          <Text style={styles.progressLabel}>Loading Progress</Text>
-          <Text style={styles.progressValue}>
+          <Text style={[styles.progressLabel, { color: colors.textMuted }]}>
+            Loading Progress
+          </Text>
+          <Text style={[styles.progressValue, { color: colors.text }]}>
             {/* ✅ NEW: Added percentage to text */}
             {loaded} / {total} Items ({progressPercent}%)
           </Text>
         </View>
 
-        <View style={styles.progressBarBg}>
+        <View
+          style={[
+            styles.progressBarBg,
+            { backgroundColor: colors.border, borderColor: colors.border },
+          ]}
+        >
           <View
             style={[
               styles.progressBarFill,

@@ -2,6 +2,7 @@ import React from "react";
 import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
 import { FontAwesome5 } from "@expo/vector-icons";
 import StatusBadge from "../../ui/StatusBadge";
+import { useTheme } from "../../../contexts/ThemeContext";
 
 export default function PackageListItem({
   item,
@@ -11,6 +12,8 @@ export default function PackageListItem({
   isSelectionMode,
   showMenu = true,
 }) {
+  const { colors, resolvedScheme } = useTheme();
+  const isDark = resolvedScheme === "dark";
   const isLoaded = item.status === "LOADED";
   const isMissing = item.status === "MISSING";
 
@@ -35,9 +38,19 @@ export default function PackageListItem({
     <TouchableOpacity
       style={[
         styles.card,
-        isLoaded && styles.loadedCard,
-        isMissing && styles.missingCard,
-        selected && styles.selectedCard,
+        { backgroundColor: colors.surface, borderColor: colors.border },
+        isLoaded && {
+          backgroundColor: isDark ? "#172554" : "#f8fbff",
+          borderColor: isDark ? "#1d4ed8" : "#bfdbfe",
+        },
+        isMissing && {
+          backgroundColor: isDark ? "#450a0a" : "#fffafa",
+          borderColor: isDark ? "#991b1b" : "#fecaca",
+        },
+        selected && {
+          backgroundColor: isDark ? "#1e3a8a" : "#eff6ff",
+          borderColor: "#60a5fa",
+        },
       ]}
       onLongPress={() => onLongPress?.(item)}
       onPress={handlePress}
@@ -48,9 +61,16 @@ export default function PackageListItem({
         <View
           style={[
             styles.iconWrap,
+            { backgroundColor: colors.cardMuted, borderColor: colors.border },
             selected && styles.selectedIconWrap,
-            isLoaded && styles.loadedIconWrap,
-            isMissing && styles.missingIconWrap,
+            isLoaded && {
+              backgroundColor: isDark ? "#1e3a8a" : "#eff6ff",
+              borderColor: isDark ? "#3b82f6" : "#bfdbfe",
+            },
+            isMissing && {
+              backgroundColor: isDark ? "#7f1d1d" : "#fef2f2",
+              borderColor: isDark ? "#dc2626" : "#fecaca",
+            },
           ]}
         >
           <FontAwesome5
@@ -63,38 +83,61 @@ export default function PackageListItem({
                   ? "#2563eb"
                   : isMissing
                     ? "#dc2626"
-                    : "#475569"
+                    : colors.textMuted
             }
           />
         </View>
 
-        <Text style={styles.sequenceText}>#{item.sequence || "—"}</Text>
+        <Text style={[styles.sequenceText, { color: colors.textMuted }]}>
+          #{item.sequence || "—"}
+        </Text>
       </View>
 
       <View style={styles.center}>
         <View style={styles.topRow}>
-          <Text style={[styles.packageId, selected && styles.selectedText]}>
+          <Text
+            style={[
+              styles.packageId,
+              { color: colors.text },
+              selected && styles.selectedText,
+            ]}
+          >
             {item.packageId || "No Package ID"}
           </Text>
 
           {/* {!selected && <StatusBadge status={item.status} />} */}
         </View>
 
-        <Text style={styles.description} numberOfLines={1}>
+        <Text
+          style={[styles.description, { color: colors.textMuted }]}
+          numberOfLines={1}
+        >
           {item.description || "No description"}
         </Text>
 
         <View style={styles.metaRow}>
-          <View style={styles.metaPill}>
-            <FontAwesome5 name="box-open" size={10} color="#64748b" />
-            <Text style={styles.metaText}>
+          <View
+            style={[
+              styles.metaPill,
+              { backgroundColor: colors.cardMuted, borderColor: colors.border },
+            ]}
+          >
+            <FontAwesome5 name="box-open" size={10} color={colors.textMuted} />
+            <Text style={[styles.metaText, { color: colors.textMuted }]}>
               {item.packagingType || "Package"}
             </Text>
           </View>
 
-          <View style={styles.metaPill}>
-            <FontAwesome5 name="hashtag" size={10} color="#64748b" />
-            <Text style={styles.metaText}>{item.quantity || 0} pcs</Text>
+          <View
+            style={[
+              styles.metaPill,
+              { backgroundColor: colors.cardMuted, borderColor: colors.border },
+            ]}
+          >
+            <FontAwesome5 name="hashtag" size={10} color={colors.textMuted} />
+            <Text style={[styles.metaText, { color: colors.textMuted }]}>
+              {item.quantity || 0} pcs
+            </Text>
           </View>
         </View>
 
@@ -119,8 +162,15 @@ export default function PackageListItem({
         </View>
 
         <View style={styles.locationRow}>
-          <FontAwesome5 name="map-marker-alt" size={11} color="#94a3b8" />
-          <Text style={styles.locationText} numberOfLines={1}>
+          <FontAwesome5
+            name="map-marker-alt"
+            size={11}
+            color={colors.textMuted}
+          />
+          <Text
+            style={[styles.locationText, { color: colors.textMuted }]}
+            numberOfLines={1}
+          >
             From: {item.currentLocation || "No location"}
           </Text>
         </View>
@@ -129,13 +179,17 @@ export default function PackageListItem({
       <View style={styles.right}>
         {showMenu && (
           <TouchableOpacity
-            style={[styles.menuBtn, selected && styles.menuBtnSelected]}
+            style={[
+              styles.menuBtn,
+              { backgroundColor: colors.cardMuted, borderColor: colors.border },
+              selected && styles.menuBtnSelected,
+            ]}
             onPress={() => onMenuPress?.(item)}
           >
             <FontAwesome5
               name="ellipsis-v"
               size={14}
-              color={selected ? "#2563eb" : "#94a3b8"}
+              color={selected ? "#2563eb" : colors.textMuted}
             />
           </TouchableOpacity>
         )}

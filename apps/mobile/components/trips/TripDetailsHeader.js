@@ -1,18 +1,35 @@
 import React from "react";
 import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
 import { FontAwesome5 } from "@expo/vector-icons";
+import { useTheme } from "../../contexts/ThemeContext";
 
 export default function TripDetailsHeader({ tripId, plate, onBack }) {
+  const { colors } = useTheme();
+
   return (
-    <View style={styles.header}>
-      <TouchableOpacity onPress={onBack} style={styles.backBtn}>
-        <FontAwesome5 name="arrow-left" size={15} color="#0f172a" />
+    <View
+      style={[
+        styles.header,
+        { backgroundColor: colors.surface, borderBottomColor: colors.border },
+      ]}
+    >
+      <TouchableOpacity
+        onPress={onBack}
+        style={[
+          styles.backBtn,
+          { backgroundColor: colors.cardMuted, borderColor: colors.border },
+        ]}
+      >
+        <FontAwesome5 name="arrow-left" size={15} color={colors.text} />
       </TouchableOpacity>
       <View style={styles.textBlock}>
-        <Text style={styles.title} numberOfLines={1}>
+        <Text style={[styles.title, { color: colors.text }]} numberOfLines={1}>
           {tripId || "Trip Details"}
         </Text>
-        <Text style={styles.subtitle} numberOfLines={1}>
+        <Text
+          style={[styles.subtitle, { color: colors.textMuted }]}
+          numberOfLines={1}
+        >
           {plate || "No Plate"}
         </Text>
       </View>

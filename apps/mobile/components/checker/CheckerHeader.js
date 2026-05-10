@@ -1,28 +1,51 @@
 import React from "react";
 import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
 import { FontAwesome5 } from "@expo/vector-icons";
+import { useTheme } from "../../contexts/ThemeContext";
 
 // Added onProfilePress prop
 export default function CheckerHeader({ userName, onLogout, onProfilePress }) {
+  const { colors, resolvedScheme } = useTheme();
+
   return (
-    <View style={styles.header}>
+    <View
+      style={[
+        styles.header,
+        { backgroundColor: colors.surface, borderBottomColor: colors.border },
+      ]}
+    >
       {/* Wrapped profileInfo in TouchableOpacity */}
       <TouchableOpacity
         style={styles.profileInfo}
         onPress={onProfilePress}
         activeOpacity={0.7}
       >
-        <View style={styles.avatar}>
+        <View
+          style={[
+            styles.avatar,
+            { backgroundColor: resolvedScheme === "dark" ? "#1e3a8a" : "#eff6ff" },
+          ]}
+        >
           <FontAwesome5 name="user-check" size={18} color="#3b82f6" />
         </View>
         <View>
-          <Text style={styles.greeting}>Hello,</Text>
-          <Text style={styles.username}>{userName}</Text>
+          <Text style={[styles.greeting, { color: colors.textMuted }]}>
+            Hello,
+          </Text>
+          <Text style={[styles.username, { color: colors.text }]}>
+            {userName}
+          </Text>
         </View>
       </TouchableOpacity>
 
-      <TouchableOpacity style={styles.logoutBtn} onPress={onLogout}>
-        <FontAwesome5 name="sign-out-alt" size={16} color="#475569" />
+      <TouchableOpacity
+        style={[
+          styles.logoutBtn,
+          { backgroundColor: colors.cardMuted, borderColor: colors.border },
+        ]}
+        onPress={onLogout}
+      >
+        <FontAwesome5 name="sign-out-alt" size={16} color={colors.textMuted} />
       </TouchableOpacity>
     </View>
   );

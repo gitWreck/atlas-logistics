@@ -1,8 +1,11 @@
 import React from "react";
 import { View, Text, StyleSheet } from "react-native";
 import { FontAwesome5 } from "@expo/vector-icons";
+import { useTheme } from "../../../contexts/ThemeContext";
 
 export default function ShipmentPackagesStats({ shipment }) {
+  const { colors, resolvedScheme } = useTheme();
+  const isDark = resolvedScheme === "dark";
   const totals = shipment?.totals || {};
   const loaded = totals.loaded || 0;
   const missing = totals.missing || 0;
@@ -12,55 +15,105 @@ export default function ShipmentPackagesStats({ shipment }) {
   const percent = totalItems > 0 ? (processed / totalItems) * 100 : 0;
 
   return (
-    <View style={styles.card}>
+    <View
+      style={[
+        styles.card,
+        { backgroundColor: colors.surface, borderColor: colors.border },
+      ]}
+    >
       <View style={styles.topRow}>
         <View>
-          <Text style={styles.eyebrow}>Package Overview</Text>
-          <Text style={styles.title}>Shipment Progress</Text>
+          <Text style={[styles.eyebrow, { color: colors.textMuted }]}>
+            Package Overview
+          </Text>
+          <Text style={[styles.title, { color: colors.text }]}>
+            Shipment Progress
+          </Text>
         </View>
 
-        <View style={styles.percentBadge}>
+        <View
+          style={[
+            styles.percentBadge,
+            { backgroundColor: isDark ? "#1e3a8a" : "#eff6ff" },
+          ]}
+        >
           <Text style={styles.percentBadgeText}>{Math.round(percent)}%</Text>
         </View>
       </View>
 
       <View style={styles.statsRow}>
-        <View style={[styles.statCard, styles.loadedCard]}>
-          <View style={[styles.iconWrap, styles.loadedIconWrap]}>
+        <View
+          style={[
+            styles.statCard,
+            { backgroundColor: isDark ? "#172554" : "#eff6ff" },
+          ]}
+        >
+          <View
+            style={[
+              styles.iconWrap,
+              {
+                backgroundColor: isDark ? "#1e3a8a" : "#dbeafe",
+              },
+            ]}
+          >
             <FontAwesome5 name="check-circle" size={14} color="#2563eb" />
           </View>
           <Text style={[styles.statValue, { color: "#2563eb" }]}>{loaded}</Text>
-          <Text style={styles.statLabel}>Loaded</Text>
+          <Text style={[styles.statLabel, { color: colors.textMuted }]}>
+            Loaded
+          </Text>
         </View>
 
-        <View style={[styles.statCard, styles.missingCard]}>
-          <View style={[styles.iconWrap, styles.missingIconWrap]}>
+        <View
+          style={[
+            styles.statCard,
+            { backgroundColor: isDark ? "#450a0a" : "#fef2f2" },
+          ]}
+        >
+          <View
+            style={[
+              styles.iconWrap,
+              {
+                backgroundColor: isDark ? "#7f1d1d" : "#fee2e2",
+              },
+            ]}
+          >
             <FontAwesome5 name="exclamation-circle" size={14} color="#dc2626" />
           </View>
           <Text style={[styles.statValue, { color: "#dc2626" }]}>
             {missing}
           </Text>
-          <Text style={styles.statLabel}>Missing</Text>
+          <Text style={[styles.statLabel, { color: colors.textMuted }]}>
+            Missing
+          </Text>
         </View>
 
-        <View style={[styles.statCard, styles.totalCard]}>
-          <View style={[styles.iconWrap, styles.totalIconWrap]}>
-            <FontAwesome5 name="boxes" size={14} color="#0f172a" />
+        <View style={[styles.statCard, { backgroundColor: colors.cardMuted }]}>
+          <View
+            style={[styles.iconWrap, { backgroundColor: colors.border }]}
+          >
+            <FontAwesome5 name="boxes" size={14} color={colors.text} />
           </View>
-          <Text style={styles.statValue}>{totalItems}</Text>
-          <Text style={styles.statLabel}>Total</Text>
+          <Text style={[styles.statValue, { color: colors.text }]}>
+            {totalItems}
+          </Text>
+          <Text style={[styles.statLabel, { color: colors.textMuted }]}>
+            Total
+          </Text>
         </View>
       </View>
 
-      <View style={styles.progressCard}>
+      <View style={[styles.progressCard, { backgroundColor: colors.cardMuted }]}>
         <View style={styles.progressHeader}>
-          <Text style={styles.progressTitle}>Processed Items</Text>
-          <Text style={styles.progressMeta}>
+          <Text style={[styles.progressTitle, { color: colors.text }]}>
+            Processed Items
+          </Text>
+          <Text style={[styles.progressMeta, { color: colors.textMuted }]}>
             {processed} / {totalItems}
           </Text>
         </View>
 
-        <View style={styles.barBg}>
+        <View style={[styles.barBg, { backgroundColor: colors.border }]}>
           <View style={[styles.barFill, { width: `${percent}%` }]} />
         </View>
       </View>

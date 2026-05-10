@@ -8,6 +8,7 @@ import {
   Pressable,
 } from "react-native";
 import { FontAwesome5 } from "@expo/vector-icons";
+import { useTheme } from "../../contexts/ThemeContext";
 
 // ✅ 1. Add `options` to your props
 export default function TripFilterModal({
@@ -17,6 +18,8 @@ export default function TripFilterModal({
   onApplyFilter,
   options,
 }) {
+  const { colors } = useTheme();
+
   // ✅ 2. Setup a default fallback (so the Driver app doesn't break)
   const defaultOptions = [
     { label: "Show All", value: "ALL", icon: "list", color: "#64748b" },
@@ -47,15 +50,22 @@ export default function TripFilterModal({
     >
       <View style={styles.modalOverlay}>
         <Pressable style={styles.backdrop} onPress={onClose} />
-        <View style={styles.modalContent}>
+        <View style={[styles.modalContent, { backgroundColor: colors.surface }]}>
           {/* Header */}
           <View style={styles.header}>
             <View>
-              <Text style={styles.title}>Filter Trips</Text>
-              <Text style={styles.subtitle}>Select a specific trip status</Text>
+              <Text style={[styles.title, { color: colors.text }]}>
+                Filter Trips
+              </Text>
+              <Text style={[styles.subtitle, { color: colors.textMuted }]}>
+                Select a specific trip status
+              </Text>
             </View>
-            <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
-              <FontAwesome5 name="times" size={20} color="#64748b" />
+            <TouchableOpacity
+              onPress={onClose}
+              style={[styles.closeBtn, { backgroundColor: colors.cardMuted }]}
+            >
+              <FontAwesome5 name="times" size={20} color={colors.textMuted} />
             </TouchableOpacity>
           </View>
 
@@ -70,8 +80,10 @@ export default function TripFilterModal({
                   style={[
                     styles.btn,
                     {
-                      borderColor: isActive ? btn.color : "#e2e8f0",
-                      backgroundColor: isActive ? `${btn.color}10` : "#fff",
+                      borderColor: isActive ? btn.color : colors.border,
+                      backgroundColor: isActive
+                        ? `${btn.color}10`
+                        : colors.surface,
                     },
                   ]}
                   onPress={() => {
@@ -82,7 +94,11 @@ export default function TripFilterModal({
                   <View
                     style={[
                       styles.iconCircle,
-                      { backgroundColor: isActive ? btn.color : "#94a3b8" },
+                      {
+                        backgroundColor: isActive
+                          ? btn.color
+                          : colors.textMuted,
+                      },
                     ]}
                   >
                     <FontAwesome5 name={btn.icon} size={16} color="#fff" />
@@ -90,7 +106,7 @@ export default function TripFilterModal({
                   <Text
                     style={[
                       styles.btnText,
-                      { color: isActive ? btn.color : "#64748b" },
+                      { color: isActive ? btn.color : colors.textMuted },
                     ]}
                   >
                     {btn.label}

@@ -28,6 +28,7 @@ import {
 
 import { db } from "../../firebase";
 import { useAuth } from "../../contexts/AuthContext.js";
+import { useTheme } from "../../contexts/ThemeContext";
 
 import ShipmentCard from "../shipments/ShipmentCard";
 import ShipmentFilterModal from "../shipments/modals/ShipmentFilterModal";
@@ -49,6 +50,8 @@ export default function ShipmentListScreen({
   enableScanActions = false,
   enableShipmentMenu = false,
 }) {
+  const { colors, resolvedScheme } = useTheme();
+
   if (
     Platform.OS === "android" &&
     UIManager.setLayoutAnimationEnabledExperimental
@@ -311,8 +314,11 @@ export default function ShipmentListScreen({
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar style="dark" backgroundColor="#f1f5f9" />
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.bg }]}>
+      <StatusBar
+        style={resolvedScheme === "dark" ? "light" : "dark"}
+        backgroundColor={colors.bg}
+      />
 
       <TripDetailsHeader
         tripId={tripId}
@@ -323,23 +329,34 @@ export default function ShipmentListScreen({
       {updating && (
         <View style={styles.loaderOverlay}>
           <ActivityIndicator size="large" color="#042C83" />
-          <Text style={styles.loaderText}>Updating...</Text>
+          <Text style={[styles.loaderText, { color: colors.text }]}>
+            Updating...
+          </Text>
         </View>
       )}
 
-      <View style={styles.searchRow}>
-        <View style={styles.searchContainer}>
-          <FontAwesome5 name="search" size={16} color="#94a3b8" />
+      <View style={[styles.searchRow, { backgroundColor: colors.bg }]}>
+        <View
+          style={[
+            styles.searchContainer,
+            { backgroundColor: colors.surface, borderColor: colors.border },
+          ]}
+        >
+          <FontAwesome5 name="search" size={16} color={colors.textMuted} />
           <TextInput
-            style={styles.searchInput}
+            style={[styles.searchInput, { color: colors.text }]}
             placeholder="Search address, ID, or name..."
-            placeholderTextColor="#94a3b8"
+            placeholderTextColor={colors.textMuted}
             value={searchText}
             onChangeText={setSearchText}
           />
           {searchText.length > 0 && (
             <TouchableOpacity onPress={() => setSearchText("")}>
-              <FontAwesome5 name="times-circle" size={16} color="#94a3b8" />
+              <FontAwesome5
+                name="times-circle"
+                size={16}
+                color={colors.textMuted}
+              />
             </TouchableOpacity>
           )}
         </View>
@@ -347,6 +364,7 @@ export default function ShipmentListScreen({
         <TouchableOpacity
           style={[
             styles.actionSquareBtn,
+            { backgroundColor: colors.surface, borderColor: colors.border },
             activeFilter !== "ALL" && styles.actionSquareBtnActive,
           ]}
           onPress={() => setFilterModalVisible(true)}
@@ -354,23 +372,26 @@ export default function ShipmentListScreen({
           <FontAwesome5
             name="sliders-h"
             size={16}
-            color={activeFilter !== "ALL" ? "#0284c7" : "#0f172a"}
+            color={activeFilter !== "ALL" ? "#0284c7" : colors.text}
           />
         </TouchableOpacity>
 
         {enableBulkActions && (
           <TouchableOpacity
-            style={styles.actionSquareBtn}
+            style={[
+              styles.actionSquareBtn,
+              { backgroundColor: colors.surface, borderColor: colors.border },
+            ]}
             onPress={() => setBulkModalVisible(true)}
           >
-            <FontAwesome5 name="layer-group" size={16} color="#0f172a" />
+            <FontAwesome5 name="layer-group" size={16} color={colors.text} />
           </TouchableOpacity>
         )}
       </View>
 
       <View style={{ flex: 1 }}>
         {loading ? (
-          <View style={styles.center}>
+          <View style={[styles.center, { backgroundColor: colors.bg }]}>
             <ActivityIndicator size="large" color="#042C83" />
           </View>
         ) : (
@@ -408,8 +429,12 @@ export default function ShipmentListScreen({
             )}
             ListEmptyComponent={
               <View style={styles.emptyBox}>
-                <FontAwesome5 name="box-open" size={40} color="#94a3b8" />
-                <Text style={styles.emptyText}>
+                <FontAwesome5
+                  name="box-open"
+                  size={40}
+                  color={colors.textMuted}
+                />
+                <Text style={[styles.emptyText, { color: colors.textMuted }]}>
                   {searchText || activeFilter !== "ALL"
                     ? "No shipments match your filters."
                     : "No shipments found."}

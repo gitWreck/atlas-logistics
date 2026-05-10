@@ -37,6 +37,7 @@ exports.resolveDelayReport =
 // user actions
 exports.updateUserProfileMobile =
   require("./src/users/updateUserProfileMobile").updateUserProfileMobile;
+exports.deleteMyAccount = require("./src/users/deleteMyAccount").deleteMyAccount;
 exports.requestRecoveryOTP = require("./src/users/recovery").requestRecoveryOTP;
 exports.verifyRecoveryOTP = require("./src/users/recovery").verifyRecoveryOTP;
 
