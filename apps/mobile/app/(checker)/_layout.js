@@ -1,14 +1,21 @@
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import AuthGuard from "../../components/auth/AuthGuard"; // Adjust path
+import { useTheme } from "../../contexts/ThemeContext";
 
 export default function CheckerStackLayout() {
+  const { colors, resolvedScheme } = useTheme();
+
   return (
     <AuthGuard role="checker" loaderColor="#3b82f6">
+      <StatusBar
+        style={resolvedScheme === "dark" ? "light" : "dark"}
+        backgroundColor={colors.bg}
+      />
       <Stack
         screenOptions={{
           headerShown: false,
-          contentStyle: { backgroundColor: "#0f172a" },
+          contentStyle: { backgroundColor: colors.bg },
           animation: "slide_from_right",
         }}
       >

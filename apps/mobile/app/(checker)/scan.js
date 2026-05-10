@@ -34,6 +34,7 @@ import {
   updatedBy,
 } from "../../components/utilities/helpers";
 import { useAuth } from "../../contexts/AuthContext";
+import { useTheme } from "../../contexts/ThemeContext";
 
 const SUCCESS_MODAL_SECONDS = 5;
 
@@ -115,11 +116,13 @@ const EMPTY_SCAN_DETAILS = {
 
 export default function ScannerScreen() {
   const router = useRouter();
+  const { colors } = useTheme();
   const { profile } = useAuth();
   const [permission, requestPermission] = useCameraPermissions();
 
   const [scanned, setScanned] = useState(false);
   const [processing, setProcessing] = useState(false);
+  const [flashEnabled, setFlashEnabled] = useState(false);
   const [showManual, setShowManual] = useState(false);
 
   const [actionModalVisible, setActionModalVisible] = useState(false);
@@ -708,11 +711,12 @@ export default function ScannerScreen() {
     : "Scan mode";
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.bg }]}>
       <View style={styles.cameraPane}>
         <CameraView
           style={styles.camera}
           facing="back"
+          enableTorch={flashEnabled}
           onBarcodeScanned={scanned ? undefined : onCameraScan}
           barcodeScannerSettings={{
             barcodeTypes: ["qr", "code128", "code39", "pdf417"],
@@ -722,6 +726,29 @@ export default function ScannerScreen() {
             <View style={styles.modeBadge}>
               <Text style={styles.modeBadgeText}>{modeLabel}</Text>
             </View>
+
+            <TouchableOpacity
+              style={[
+                styles.flashButton,
+                flashEnabled && styles.flashButtonActive,
+              ]}
+              onPress={() => setFlashEnabled((current) => !current)}
+              activeOpacity={0.82}
+            >
+              <FontAwesome5
+                name={flashEnabled ? "bolt" : "lightbulb"}
+                size={16}
+                color={flashEnabled ? "#0f172a" : "#ffffff"}
+              />
+              <Text
+                style={[
+                  styles.flashButtonText,
+                  flashEnabled && styles.flashButtonTextActive,
+                ]}
+              >
+                {flashEnabled ? "Flash On" : "Flash"}
+              </Text>
+            </TouchableOpacity>
 
             {processing && (
               <ActivityIndicator
@@ -745,51 +772,78 @@ export default function ScannerScreen() {
       </View>
 
       <ScrollView
-        style={styles.detailsPane}
+        style={[styles.detailsPane, { backgroundColor: colors.bg }]}
         contentContainerStyle={styles.detailsContent}
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.panelHeader}>
           <View>
-            <Text style={styles.panelEyebrow}>Scanner</Text>
-            <Text style={styles.panelTitle}>Scan Details</Text>
+            <Text style={[styles.panelEyebrow, { color: colors.textMuted }]}>
+              Scanner
+            </Text>
+            <Text style={[styles.panelTitle, { color: colors.text }]}>
+              Scan Details
+            </Text>
           </View>
-          <View style={styles.latestBadge}>
-            <Text style={styles.latestBadgeText}>{latestTypeLabel}</Text>
+          <View style={[styles.latestBadge, { backgroundColor: colors.cardMuted }]}>
+            <Text style={[styles.latestBadgeText, { color: colors.text }]}>
+              {latestTypeLabel}
+            </Text>
           </View>
         </View>
 
-        <View style={styles.scanDetailCard}>
-          <DetailRow label="Code" value={latestScan.code || "No scan yet"} />
+        <View
+          style={[
+            styles.scanDetailCard,
+            { backgroundColor: colors.surface, borderColor: colors.border },
+          ]}
+        >
+          <DetailRow
+            label="Code"
+            value={latestScan.code || "No scan yet"}
+            colors={colors}
+          />
           <DetailRow
             label="Tracking"
             value={latestScan.trackingNumber || "Waiting for barcode"}
+            colors={colors}
           />
           <DetailRow
             label="Shipment"
             value={latestScan.shipmentId || "Not resolved"}
+            colors={colors}
           />
           <DetailRow
             label="Customer"
             value={latestScan.customerName || "Pending scan"}
+            colors={colors}
           />
           <DetailRow
             label="Package Status"
             value={latestScan.packageStatus || "Pending scan"}
+            colors={colors}
           />
           <DetailRow
             label="Shipment Status"
             value={latestScan.shipmentStatus || "Pending scan"}
+            colors={colors}
           />
         </View>
 
         {!!primaryScanActions.length && (
-          <View style={styles.offloadActionCard}>
+          <View
+            style={[
+              styles.offloadActionCard,
+              { backgroundColor: colors.surface, borderColor: colors.border },
+            ]}
+          >
             <View>
-              <Text style={styles.offloadActionLabel}>
+              <Text
+                style={[styles.offloadActionLabel, { color: colors.textMuted }]}
+              >
                 {scanActionHeading}
               </Text>
-              <Text style={styles.offloadActionTitle}>
+              <Text style={[styles.offloadActionTitle, { color: colors.text }]}>
                 {selectedScanAction?.label || primaryScanActions[0]?.label}
               </Text>
             </View>
@@ -832,14 +886,21 @@ export default function ScannerScreen() {
           </View>
         )}
 
-        <View style={styles.progressCard}>
+        <View
+          style={[
+            styles.progressCard,
+            { backgroundColor: colors.surface, borderColor: colors.border },
+          ]}
+        >
           <View style={styles.progressHeader}>
             <View>
-              <Text style={styles.progressLabel}>Current Trip</Text>
-              <Text style={styles.progressTrip}>
+              <Text style={[styles.progressLabel, { color: colors.textMuted }]}>
+                Current Trip
+              </Text>
+              <Text style={[styles.progressTrip, { color: colors.text }]}>
                 {tripSummary.tripId || latestScan.currentTripId || "No trip"}
               </Text>
-              <Text style={styles.progressStatus}>
+              <Text style={[styles.progressStatus, { color: colors.textMuted }]}>
                 {tripSummary.status || "Status unavailable"}
               </Text>
             </View>
@@ -852,7 +913,7 @@ export default function ScannerScreen() {
             )}
           </View>
 
-          <View style={styles.progressTrack}>
+          <View style={[styles.progressTrack, { backgroundColor: colors.border }]}>
             <View
               style={[
                 styles.progressFill,
@@ -862,11 +923,20 @@ export default function ScannerScreen() {
           </View>
 
           <View style={styles.statsRow}>
-            <StatCell label="Shipments" value={tripSummary.shipmentCount} />
-            <StatCell label="Packages" value={tripSummary.totalPackages} />
+            <StatCell
+              label="Shipments"
+              value={tripSummary.shipmentCount}
+              colors={colors}
+            />
+            <StatCell
+              label="Packages"
+              value={tripSummary.totalPackages}
+              colors={colors}
+            />
             <StatCell
               label={progressLabel}
               value={`${tripSummary.scannedPackages}/${tripSummary.totalPackages}`}
+              colors={colors}
             />
           </View>
         </View>
@@ -936,7 +1006,10 @@ export default function ScannerScreen() {
 
         {!!latestScan.shipmentId && (
           <TouchableOpacity
-            style={styles.detailsButton}
+            style={[
+              styles.detailsButton,
+              { backgroundColor: colors.surface, borderColor: colors.border },
+            ]}
             onPress={() =>
               router.push({
                 pathname: "/(checker)/shipment-details",
@@ -951,8 +1024,10 @@ export default function ScannerScreen() {
             }
             activeOpacity={0.8}
           >
-            <Text style={styles.detailsButtonText}>View Shipment Details</Text>
-            <FontAwesome5 name="chevron-right" size={12} color="#0f172a" />
+            <Text style={[styles.detailsButtonText, { color: colors.text }]}>
+              View Shipment Details
+            </Text>
+            <FontAwesome5 name="chevron-right" size={12} color={colors.text} />
           </TouchableOpacity>
         )}
       </ScrollView>
@@ -1069,19 +1144,21 @@ export default function ScannerScreen() {
   );
 }
 
-const DetailRow = ({ label, value }) => (
-  <View style={styles.detailRow}>
-    <Text style={styles.detailLabel}>{label}</Text>
-    <Text style={styles.detailValue} numberOfLines={1}>
+const DetailRow = ({ label, value, colors }) => (
+  <View style={[styles.detailRow, { borderBottomColor: colors.border }]}>
+    <Text style={[styles.detailLabel, { color: colors.textMuted }]}>
+      {label}
+    </Text>
+    <Text style={[styles.detailValue, { color: colors.text }]} numberOfLines={1}>
       {value}
     </Text>
   </View>
 );
 
-const StatCell = ({ label, value }) => (
+const StatCell = ({ label, value, colors }) => (
   <View style={styles.statCell}>
-    <Text style={styles.statValue}>{value}</Text>
-    <Text style={styles.statLabel}>{label}</Text>
+    <Text style={[styles.statValue, { color: colors.text }]}>{value}</Text>
+    <Text style={[styles.statLabel, { color: colors.textMuted }]}>{label}</Text>
   </View>
 );
 
@@ -1115,6 +1192,32 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "800",
     textTransform: "uppercase",
+  },
+  flashButton: {
+    position: "absolute",
+    top: 18,
+    right: 18,
+    minHeight: 36,
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 7,
+    backgroundColor: "rgba(15, 23, 42, 0.78)",
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.18)",
+  },
+  flashButtonActive: {
+    backgroundColor: "#fbbf24",
+    borderColor: "#fde68a",
+  },
+  flashButtonText: {
+    color: "#ffffff",
+    fontSize: 12,
+    fontWeight: "800",
+  },
+  flashButtonTextActive: {
+    color: "#0f172a",
   },
   processingIndicator: {
     marginBottom: 14,

@@ -9,11 +9,13 @@ import {
 } from "react-native";
 import { Image } from "expo-image";
 import { FontAwesome5 } from "@expo/vector-icons";
+import { useTheme } from "../../contexts/ThemeContext";
 
 export default function ExistingProofsViewer({
   proofOfReceipt,
   proofOfDelivery,
 }) {
+  const { colors } = useTheme();
   const [selectedImage, setSelectedImage] = useState(null);
   const [isModalVisible, setIsModalVisible] = useState(false);
 
@@ -29,7 +31,9 @@ export default function ExistingProofsViewer({
 
   const renderImageRow = (urls, title) => (
     <View style={{ marginBottom: 16 }}>
-      <Text style={styles.subLabel}>{title}</Text>
+      <Text style={[styles.subLabel, { color: colors.textMuted }]}>
+        {title}
+      </Text>
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
@@ -38,7 +42,13 @@ export default function ExistingProofsViewer({
         {urls.map((url, index) => (
           <TouchableOpacity
             key={`${title}-${index}`}
-            style={styles.thumbnailWrapper}
+            style={[
+              styles.thumbnailWrapper,
+              {
+                backgroundColor: colors.cardMuted,
+                borderColor: colors.border,
+              },
+            ]}
             activeOpacity={0.8}
             onPress={() => openImage(url)}
           >
@@ -62,7 +72,9 @@ export default function ExistingProofsViewer({
 
   return (
     <View style={styles.container}>
-      <Text style={styles.sectionTitle}>Documented Proofs</Text>
+      <Text style={[styles.sectionTitle, { color: colors.text }]}>
+        Documented Proofs
+      </Text>
 
       {hasReceipts && renderImageRow(proofOfReceipt, "Pickup / Receipt")}
       {hasDeliveries && renderImageRow(proofOfDelivery, "Final Delivery")}

@@ -1,13 +1,23 @@
 import React from "react";
 import { View, TextInput, StyleSheet } from "react-native";
+import { useTheme } from "../../../contexts/ThemeContext";
 
 export default function ShipmentSearch({ value, onChange }) {
+  const { colors } = useTheme();
+
   return (
-    <View style={styles.controls}>
+    <View style={[styles.controls, { backgroundColor: colors.bg }]}>
       <TextInput
-        style={styles.searchInput}
+        style={[
+          styles.searchInput,
+          {
+            backgroundColor: colors.surface,
+            borderColor: colors.border,
+            color: colors.text,
+          },
+        ]}
         placeholder="Search Tracking Number..."
-        placeholderTextColor="#94a3b8"
+        placeholderTextColor={colors.textMuted}
         value={value}
         onChangeText={onChange}
       />

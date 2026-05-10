@@ -1,6 +1,7 @@
 import React from "react";
 import { View, Text, StyleSheet, Platform } from "react-native";
 import { FontAwesome5 } from "@expo/vector-icons";
+import { useTheme } from "../../contexts/ThemeContext";
 
 const CARD_BG = "#ffffff";
 const LABEL_GREY = "#6b7280";
@@ -8,6 +9,8 @@ const VALUE_DARK = "#111827";
 const SEPARATOR = "#e5e7eb";
 
 const TripSummaryCard = ({ trip }) => {
+  const { colors } = useTheme();
+
   if (!trip) return null;
 
   const tripDisplayId = trip.tripId?.startsWith("TRIP")
@@ -23,10 +26,17 @@ const TripSummaryCard = ({ trip }) => {
   const isDelivery = trip.tripType === "DELIVERY";
 
   return (
-    <View style={styles.card}>
-      <Text style={styles.sectionTitle}>Trip Summary</Text>
+    <View
+      style={[
+        styles.card,
+        { backgroundColor: colors.surface, borderColor: colors.border },
+      ]}
+    >
+      <Text style={[styles.sectionTitle, { color: colors.text }]}>
+        Trip Summary
+      </Text>
 
-      <View style={styles.separator} />
+      <View style={[styles.separator, { backgroundColor: colors.border }]} />
 
       {/* Row 1: Trip Number & Type */}
       <View style={styles.twoColRow}>
@@ -38,7 +48,16 @@ const TripSummaryCard = ({ trip }) => {
               marginBottom: 2,
             }}
           >
-            <Text style={[styles.label, { marginBottom: 0, marginRight: 8 }]}>
+            <Text
+              style={[
+                styles.label,
+                {
+                  color: colors.textMuted,
+                  marginBottom: 0,
+                  marginRight: 8,
+                },
+              ]}
+            >
               Trip Number
             </Text>
 
@@ -61,12 +80,16 @@ const TripSummaryCard = ({ trip }) => {
               </Text>
             </View>
           </View>
-          <Text style={[styles.value, { fontWeight: "600" }]}>
+          <Text
+            style={[styles.value, { color: colors.text, fontWeight: "600" }]}
+          >
             {tripDisplayId}
           </Text>
         </View>
       </View>
-      {!isDelivery && <View style={styles.separator} />}
+      {!isDelivery && (
+        <View style={[styles.separator, { backgroundColor: colors.border }]} />
+      )}
 
       {!isDelivery && (
         <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
@@ -80,13 +103,24 @@ const TripSummaryCard = ({ trip }) => {
               <FontAwesome5
                 name="map-marker-alt"
                 size={14}
-                color={LABEL_GREY}
+                color={colors.textMuted}
               />
             </View>
-            <Text style={[styles.label, styles.labelInRow]}>From</Text>
+            <Text
+              style={[
+                styles.label,
+                styles.labelInRow,
+                { color: colors.textMuted },
+              ]}
+            >
+              From
+            </Text>
           </View>
           <View style={styles.locationRow2}>
-            <Text style={styles.locationValue} numberOfLines={1}>
+            <Text
+              style={[styles.locationValue, { color: colors.text }]}
+              numberOfLines={1}
+            >
               {trip.origin || "—"}
             </Text>
           </View>
@@ -99,13 +133,24 @@ const TripSummaryCard = ({ trip }) => {
               <FontAwesome5
                 name="map-marker-alt"
                 size={14}
-                color={LABEL_GREY}
+                color={colors.textMuted}
               />
             </View>
-            <Text style={[styles.label, styles.labelInRow]}>To</Text>
+            <Text
+              style={[
+                styles.label,
+                styles.labelInRow,
+                { color: colors.textMuted },
+              ]}
+            >
+              To
+            </Text>
           </View>
           <View style={styles.locationRow2}>
-            <Text style={styles.locationValue} numberOfLines={1}>
+            <Text
+              style={[styles.locationValue, { color: colors.text }]}
+              numberOfLines={1}
+            >
               {trip.destination || "—"}
             </Text>
           </View>
@@ -113,17 +158,25 @@ const TripSummaryCard = ({ trip }) => {
         </View>
       )}
 
-      <View style={styles.separator} />
+      <View style={[styles.separator, { backgroundColor: colors.border }]} />
 
       {/* Row: Driver | Vehicle */}
       <View style={styles.twoColRow}>
         <View style={styles.half}>
-          <Text style={styles.label}>Driver</Text>
-          <Text style={styles.value}>{trip.driverName || "—"}</Text>
+          <Text style={[styles.label, { color: colors.textMuted }]}>
+            Driver
+          </Text>
+          <Text style={[styles.value, { color: colors.text }]}>
+            {trip.driverName || "—"}
+          </Text>
         </View>
         <View style={styles.half}>
-          <Text style={styles.label}>Vehicle</Text>
-          <Text style={styles.value}>{truckDisplay}</Text>
+          <Text style={[styles.label, { color: colors.textMuted }]}>
+            Vehicle
+          </Text>
+          <Text style={[styles.value, { color: colors.text }]}>
+            {truckDisplay}
+          </Text>
         </View>
       </View>
     </View>
@@ -138,6 +191,7 @@ const styles = StyleSheet.create({
     borderRadius: 15,
     padding: 16,
     marginBottom: 16,
+    borderWidth: 1,
     ...Platform.select({
       ios: {
         shadowColor: "#000",

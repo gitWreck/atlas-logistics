@@ -10,17 +10,26 @@ import {
   SafeAreaView,
   Platform,
   StatusBar as RNStatusBar,
+  Linking,
+  TextInput,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { FontAwesome5 } from "@expo/vector-icons";
 import { normalizePhoneNumber } from "../utilities/helpers";
 import { useAuth } from "../../contexts/AuthContext";
-import { updateUserProfileMobile } from "../utilities/FirebaseFunctions";
-import AtlasInput from "../ui/AtlasInput";
+import {
+  deleteMyAccount,
+  updateUserProfileMobile,
+} from "../utilities/FirebaseFunctions";
+import { useTheme } from "../../contexts/ThemeContext";
 import DropdownModal from "../customer/RequestPickup/DropdownModal";
 import { PROVINCES, getCities } from "../utilities/PhilippinesData";
 
 const EMPTY_VALUE = "Not provided";
+const ACCOUNT_DELETION_POLICY_URL =
+  "https://atlastransport.ph/account-deletion";
+const PRIMARY = "#2563eb";
+const DANGER = "#dc2626";
 
 const getInitialFormData = (user = {}) => ({
   name: user?.name || "",
@@ -63,9 +72,11 @@ const roleConfig = {
 export default function ProfileViewer() {
   const router = useRouter();
   const { user, refreshUser, signOut } = useAuth();
+  const { preference, setPreference, resolvedScheme, colors } = useTheme();
 
   const [isEditing, setIsEditing] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [deleteLoading, setDeleteLoading] = useState(false);
   const [formData, setFormData] = useState(() => getInitialFormData(user));
   const [cities, setCities] = useState([]);
   const [showProvinceModal, setShowProvinceModal] = useState(false);
@@ -100,6 +111,7 @@ export default function ProfileViewer() {
     const cleaned = String(value ?? "").trim();
     return cleaned || fallback;
   };
+  const isDark = resolvedScheme === "dark";
 
   const addressSummary = [user?.address?.city, user?.address?.province]
     .filter(Boolean)
@@ -180,6 +192,39 @@ export default function ProfileViewer() {
     }
   };
 
+  const handleDeleteAccount = () => {
+    Alert.alert(
+      "Delete account",
+      "This permanently deletes your customer profile and removes your access to Atlas Transport. This cannot be undone.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: async () => {
+            setDeleteLoading(true);
+            try {
+              await deleteMyAccount();
+              try {
+                await signOut();
+              } catch (err) {
+                console.log("Sign out after account deletion failed:", err);
+              }
+              router.replace("/(auth)/login");
+            } catch (error) {
+              Alert.alert(
+                "Account deletion failed",
+                error?.message || "Please try again later.",
+              );
+            } finally {
+              setDeleteLoading(false);
+            }
+          },
+        },
+      ],
+    );
+  };
+
   const renderField = ({
     label,
     value,
@@ -196,9 +241,17 @@ export default function ProfileViewer() {
       if (type === "dropdown") {
         return (
           <View style={styles.fieldGroup} key={stateKey}>
-            <Text style={styles.label}>{label}</Text>
+            <Text style={[styles.label, { color: colors.textMuted }]}>
+              {label}
+            </Text>
             <TouchableOpacity
-              style={styles.dropdownInput}
+              style={[
+                styles.dropdownInput,
+                {
+                  backgroundColor: colors.inputBg,
+                  borderColor: colors.border,
+                },
+              ]}
               onPress={() => {
                 if (stateKey === "province") setShowProvinceModal(true);
                 if (stateKey === "city") {
@@ -212,52 +265,77 @@ export default function ProfileViewer() {
               activeOpacity={0.8}
             >
               <Text
-                style={
+                style={[
                   value
                     ? styles.dropdownTextValue
-                    : styles.dropdownTextPlaceholder
-                }
+                    : styles.dropdownTextPlaceholder,
+                  { color: value ? colors.text : colors.textMuted },
+                ]}
                 numberOfLines={1}
               >
                 {value || `Select ${label}`}
               </Text>
-              <FontAwesome5 name="chevron-down" color="#94a3b8" size={12} />
+              <FontAwesome5
+                name="chevron-down"
+                color={colors.textMuted}
+                size={12}
+              />
             </TouchableOpacity>
           </View>
         );
       }
 
       return (
-        <AtlasInput
-          key={stateKey}
-          label={label}
-          value={isAddress ? formData.address[stateKey] : formData[stateKey]}
-          placeholder={`Enter ${label}`}
-          secureTextEntry={isSecure}
-          onChangeText={(text) => {
-            if (isAddress) {
-              setFormData({
-                ...formData,
-                address: { ...formData.address, [stateKey]: text },
-              });
-            } else {
-              setFormData({ ...formData, [stateKey]: text });
-            }
-          }}
-        />
+        <View style={styles.fieldGroup} key={stateKey}>
+          <Text style={[styles.label, { color: colors.textMuted }]}>
+            {label}
+          </Text>
+          <TextInput
+            style={[
+              styles.textInput,
+              {
+                backgroundColor: colors.inputBg,
+                borderColor: colors.border,
+                color: colors.text,
+              },
+            ]}
+            value={isAddress ? formData.address[stateKey] : formData[stateKey]}
+            placeholder={`Enter ${label}`}
+            placeholderTextColor={colors.textMuted}
+            secureTextEntry={isSecure}
+            onChangeText={(text) => {
+              if (isAddress) {
+                setFormData({
+                  ...formData,
+                  address: { ...formData.address, [stateKey]: text },
+                });
+              } else {
+                setFormData({ ...formData, [stateKey]: text });
+              }
+            }}
+          />
+        </View>
       );
     }
 
     return (
-      <View style={styles.detailRow} key={stateKey}>
-        <View style={styles.fieldIconWrap}>
-          <FontAwesome5 name={icon} size={13} color="#64748b" />
+      <View
+        style={[styles.detailRow, { borderTopColor: colors.border }]}
+        key={stateKey}
+      >
+        <View
+          style={[styles.fieldIconWrap, { backgroundColor: colors.cardMuted }]}
+        >
+          <FontAwesome5 name={icon} size={13} color={colors.textMuted} />
         </View>
         <View style={styles.detailTextBlock}>
-          <Text style={styles.label}>{label}</Text>
+          <Text style={[styles.label, { color: colors.textMuted }]}>
+            {label}
+          </Text>
           <Text
             style={[
               styles.valueText,
+              { color: colors.text },
               !String(value ?? "").trim() && styles.fallbackText,
             ]}
             numberOfLines={2}
@@ -270,12 +348,17 @@ export default function ProfileViewer() {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.bg }]}>
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
       >
-        <View style={styles.heroCard}>
+        <View
+          style={[
+            styles.heroCard,
+            { backgroundColor: colors.surface, borderColor: colors.border },
+          ]}
+        >
           <View
             style={[
               styles.avatar,
@@ -286,37 +369,71 @@ export default function ProfileViewer() {
           </View>
 
           <View style={styles.heroTextBlock}>
-            <View style={styles.rolePill}>
+            <View
+              style={[
+                styles.rolePill,
+                {
+                  backgroundColor: colors.cardMuted,
+                  borderColor: colors.border,
+                },
+              ]}
+            >
               <Text style={[styles.roleText, { color: config.color }]}>
                 {config.label}
               </Text>
             </View>
-            <Text style={styles.profileName} numberOfLines={1}>
+            <Text
+              style={[styles.profileName, { color: colors.text }]}
+              numberOfLines={1}
+            >
               {displayValue(user?.name, "Guest User")}
             </Text>
-            <Text style={styles.profileSubtitle} numberOfLines={2}>
+            <Text
+              style={[styles.profileSubtitle, { color: colors.textMuted }]}
+              numberOfLines={2}
+            >
               {profileSubtitle}
             </Text>
           </View>
         </View>
 
-        <View style={styles.card}>
+        <View
+          style={[
+            styles.card,
+            { backgroundColor: colors.surface, borderColor: colors.border },
+          ]}
+        >
           <View style={styles.cardHeader}>
             <View>
-              <Text style={styles.cardEyebrow}>Profile</Text>
-              <Text style={styles.cardTitle}>Account Details</Text>
+              <Text style={[styles.cardEyebrow, { color: colors.textMuted }]}>
+                Profile
+              </Text>
+              <Text style={[styles.cardTitle, { color: colors.text }]}>
+                Account Details
+              </Text>
             </View>
             <TouchableOpacity
-              style={styles.editButton}
+              style={[
+                styles.editButton,
+                {
+                  backgroundColor: isDark ? "#1d4ed8" : "#eff6ff",
+                  borderColor: isDark ? "#3b82f6" : "#bfdbfe",
+                },
+              ]}
               onPress={() => setIsEditing(!isEditing)}
               activeOpacity={0.8}
             >
               <FontAwesome5
                 name={isEditing ? "times" : "pen"}
                 size={12}
-                color="#2563eb"
+                color={isDark ? "#eff6ff" : PRIMARY}
               />
-              <Text style={styles.editToggle}>
+              <Text
+                style={[
+                  styles.editToggle,
+                  { color: isDark ? "#fff" : PRIMARY },
+                ]}
+              >
                 {isEditing
                   ? "Cancel"
                   : isStaff
@@ -361,11 +478,18 @@ export default function ProfileViewer() {
         </View>
 
         {isCustomer && (
-          <View style={styles.card}>
+          <View
+            style={[
+              styles.card,
+              { backgroundColor: colors.surface, borderColor: colors.border },
+            ]}
+          >
             <SectionHeader
               icon="map-marker-alt"
               eyebrow="Customer"
               title="Address Details"
+              colors={colors}
+              isDark={isDark}
             />
 
             {renderField({
@@ -409,11 +533,18 @@ export default function ProfileViewer() {
         )}
 
         {isStaff && (
-          <View style={styles.card}>
+          <View
+            style={[
+              styles.card,
+              { backgroundColor: colors.surface, borderColor: colors.border },
+            ]}
+          >
             <SectionHeader
               icon="warehouse"
               eyebrow="Operations"
               title="Assignment"
+              colors={colors}
+              isDark={isDark}
             />
 
             {renderField({
@@ -434,11 +565,18 @@ export default function ProfileViewer() {
         )}
 
         {isEditing && (
-          <View style={styles.card}>
+          <View
+            style={[
+              styles.card,
+              { backgroundColor: colors.surface, borderColor: colors.border },
+            ]}
+          >
             <SectionHeader
               icon="shield-alt"
               eyebrow="Security"
               title="Password"
+              colors={colors}
+              isDark={isDark}
             />
 
             {renderField({
@@ -468,6 +606,125 @@ export default function ProfileViewer() {
                 <>
                   <FontAwesome5 name="check" size={13} color="#fff" />
                   <Text style={styles.saveBtnText}>Save Changes</Text>
+                </>
+              )}
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {!isEditing && (
+          <View
+            style={[
+              styles.card,
+              { backgroundColor: colors.surface, borderColor: colors.border },
+            ]}
+          >
+            <SectionHeader
+              icon="adjust"
+              eyebrow="Appearance"
+              title="Theme"
+              colors={colors}
+              isDark={isDark}
+            />
+            <Text style={[styles.hintMuted, { color: colors.textMuted }]}>
+              Choose light, dark, or match this device.
+            </Text>
+            <View style={styles.themeRow}>
+              {[
+                { value: "light", label: "Light", icon: "sun" },
+                { value: "dark", label: "Dark", icon: "moon" },
+                { value: "system", label: "System", icon: "mobile-alt" },
+              ].map((opt) => {
+                const active = preference === opt.value;
+                return (
+                  <TouchableOpacity
+                    key={opt.value}
+                    style={[
+                      styles.themeChip,
+                      {
+                        borderColor: active ? PRIMARY : colors.border,
+                        backgroundColor: active ? PRIMARY : colors.cardMuted,
+                      },
+                    ]}
+                    onPress={() => setPreference(opt.value)}
+                    activeOpacity={0.85}
+                  >
+                    <FontAwesome5
+                      name={opt.icon}
+                      size={12}
+                      color={active ? "#ffffff" : colors.textMuted}
+                    />
+                    <Text
+                      style={[
+                        styles.themeChipText,
+                        { color: active ? "#ffffff" : colors.text },
+                      ]}
+                    >
+                      {opt.label}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </View>
+        )}
+
+        {isCustomer && !isEditing && (
+          <View
+            style={[
+              styles.dangerCard,
+              {
+                backgroundColor: isDark ? "#2a1518" : "#fff7f7",
+                borderColor: isDark ? "#7f1d1d" : "#fecaca",
+              },
+            ]}
+          >
+            <SectionHeader
+              icon="exclamation-triangle"
+              eyebrow="Account"
+              title="Delete Account"
+              colors={{
+                ...colors,
+                cardMuted: isDark ? "#451a1a" : "#fee2e2",
+                textMuted: isDark ? "#fca5a5" : "#991b1b",
+              }}
+              isDark={isDark}
+              accent={DANGER}
+            />
+            <Text style={[styles.hintMuted, { color: colors.textMuted }]}>
+              Permanently delete your account and profile from Atlas Transport.
+            </Text>
+            <TouchableOpacity
+              style={styles.linkRow}
+              onPress={() => Linking.openURL(ACCOUNT_DELETION_POLICY_URL)}
+              activeOpacity={0.8}
+            >
+              <Text style={[styles.linkText, { color: PRIMARY }]}>
+                Data deletion details
+              </Text>
+              <FontAwesome5
+                name="external-link-alt"
+                size={12}
+                color={PRIMARY}
+              />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[
+                styles.deleteAccountBtn,
+                deleteLoading && styles.saveBtnDisabled,
+              ]}
+              onPress={handleDeleteAccount}
+              disabled={deleteLoading || loading}
+              activeOpacity={0.85}
+            >
+              {deleteLoading ? (
+                <ActivityIndicator color="#fef2f2" />
+              ) : (
+                <>
+                  <FontAwesome5 name="trash-alt" size={14} color="#fef2f2" />
+                  <Text style={styles.deleteAccountBtnText}>
+                    Delete account
+                  </Text>
                 </>
               )}
             </TouchableOpacity>
@@ -513,14 +770,18 @@ export default function ProfileViewer() {
   );
 }
 
-const SectionHeader = ({ icon, eyebrow, title }) => (
+const SectionHeader = ({ icon, eyebrow, title, colors, accent }) => (
   <View style={styles.sectionHeader}>
-    <View style={styles.sectionIconWrap}>
-      <FontAwesome5 name={icon} size={13} color="#2563eb" />
+    <View
+      style={[styles.sectionIconWrap, { backgroundColor: colors.cardMuted }]}
+    >
+      <FontAwesome5 name={icon} size={13} color={accent || PRIMARY} />
     </View>
     <View>
-      <Text style={styles.cardEyebrow}>{eyebrow}</Text>
-      <Text style={styles.cardTitle}>{title}</Text>
+      <Text style={[styles.cardEyebrow, { color: colors.textMuted }]}>
+        {eyebrow}
+      </Text>
+      <Text style={[styles.cardTitle, { color: colors.text }]}>{title}</Text>
     </View>
   </View>
 );
@@ -662,6 +923,14 @@ const styles = StyleSheet.create({
   fieldGroup: {
     marginBottom: 14,
   },
+  textInput: {
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+    borderWidth: 1,
+    fontSize: 15,
+    fontWeight: "600",
+  },
   label: {
     fontSize: 11,
     fontWeight: "800",
@@ -720,5 +989,60 @@ const styles = StyleSheet.create({
     color: "#ffffff",
     fontWeight: "800",
     fontSize: 15,
+  },
+  hintMuted: {
+    fontSize: 13,
+    lineHeight: 19,
+    marginBottom: 14,
+  },
+  themeRow: {
+    flexDirection: "row",
+    gap: 8,
+  },
+  themeChip: {
+    flex: 1,
+    minHeight: 42,
+    borderRadius: 12,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    flexDirection: "row",
+    gap: 6,
+    paddingHorizontal: 8,
+  },
+  themeChipText: {
+    fontSize: 12,
+    fontWeight: "800",
+  },
+  dangerCard: {
+    borderRadius: 18,
+    padding: 16,
+    borderWidth: 1,
+  },
+  linkRow: {
+    alignSelf: "flex-start",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingVertical: 8,
+    marginBottom: 8,
+  },
+  linkText: {
+    fontSize: 13,
+    fontWeight: "800",
+  },
+  deleteAccountBtn: {
+    backgroundColor: "#dc2626",
+    borderRadius: 14,
+    padding: 15,
+    alignItems: "center",
+    justifyContent: "center",
+    flexDirection: "row",
+    gap: 8,
+  },
+  deleteAccountBtnText: {
+    color: "#fef2f2",
+    fontSize: 15,
+    fontWeight: "900",
   },
 });

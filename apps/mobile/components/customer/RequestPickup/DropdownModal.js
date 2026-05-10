@@ -7,6 +7,7 @@ import {
   FlatList,
   StyleSheet,
 } from "react-native";
+import { useTheme } from "../../../contexts/ThemeContext";
 
 export default function DropdownModal({
   visible,
@@ -15,11 +16,17 @@ export default function DropdownModal({
   onSelect,
   onClose,
 }) {
+  const { colors } = useTheme();
+
   return (
     <Modal visible={visible} transparent animationType="slide">
       <View style={styles.modalBg}>
-        <View style={styles.modalContainer}>
-          {title && <Text style={styles.modalTitle}>{title}</Text>}
+        <View style={[styles.modalContainer, { backgroundColor: colors.surface }]}>
+          {title && (
+            <Text style={[styles.modalTitle, { color: colors.text }]}>
+              {title}
+            </Text>
+          )}
 
           <FlatList
             data={options}
@@ -33,17 +40,27 @@ export default function DropdownModal({
 
               return (
                 <TouchableOpacity
-                  style={styles.modalItem}
+                  style={[styles.modalItem, { borderBottomColor: colors.border }]}
                   onPress={() => onSelect(item)}
                 >
-                  <Text style={styles.modalItemText}>{displayLabel}</Text>
+                  <Text style={[styles.modalItemText, { color: colors.text }]}>
+                    {displayLabel}
+                  </Text>
                 </TouchableOpacity>
               );
             }}
           />
 
-          <TouchableOpacity style={styles.modalCloseBtn} onPress={onClose}>
-            <Text style={styles.modalCloseText}>Cancel</Text>
+          <TouchableOpacity
+            style={[
+              styles.modalCloseBtn,
+              { backgroundColor: colors.cardMuted },
+            ]}
+            onPress={onClose}
+          >
+            <Text style={[styles.modalCloseText, { color: colors.textMuted }]}>
+              Cancel
+            </Text>
           </TouchableOpacity>
         </View>
       </View>

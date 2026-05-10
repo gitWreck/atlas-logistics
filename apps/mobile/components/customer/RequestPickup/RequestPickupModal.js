@@ -20,6 +20,7 @@ import InputGroupMobile from "./InputGroupMobile";
 import ItemSectionMobile from "./ItemSectionMobile";
 
 import { useAuth } from "../../../contexts/AuthContext";
+import { useTheme } from "../../../contexts/ThemeContext";
 import MapPickupModal from "./MapPickupModal";
 
 const createEmptyParty = () => ({
@@ -48,6 +49,8 @@ export default function RequestPickupModal({
   userData,
 }) {
   const { user } = useAuth();
+  const { colors, resolvedScheme } = useTheme();
+  const isDark = resolvedScheme === "dark";
 
   const getSenderFromProfile = (profile = userData || user || {}) => ({
     uid: profile?.uid || profile?.id || auth.currentUser?.uid || null,
@@ -150,18 +153,20 @@ export default function RequestPickupModal({
       <View style={styles.modalOverlay}>
         <KeyboardAvoidingView
           behavior={Platform.OS === "ios" ? "padding" : "height"}
-          style={styles.modalContent}
+          style={[styles.modalContent, { backgroundColor: colors.surface }]}
         >
           {/* Header */}
-          <View style={styles.header}>
+          <View style={[styles.header, { borderBottomColor: colors.border }]}>
             <View>
-              <Text style={styles.title}>Shipment Request</Text>
-              <Text style={styles.subtitle}>
+              <Text style={[styles.title, { color: colors.text }]}>
+                Shipment Request
+              </Text>
+              <Text style={[styles.subtitle, { color: colors.textMuted }]}>
                 Fill in details to request a pickup
               </Text>
             </View>
             <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
-              <FontAwesome5 name="times" size={20} color="#64748b" />
+              <FontAwesome5 name="times" size={20} color={colors.textMuted} />
             </TouchableOpacity>
           </View>
 
@@ -205,8 +210,13 @@ export default function RequestPickupModal({
                 }}
               />
 
-              <View style={styles.sectionCard}>
-                <Text style={styles.sectionLabel}>
+              <View
+                style={[
+                  styles.sectionCard,
+                  { backgroundColor: colors.cardMuted, borderColor: colors.border },
+                ]}
+              >
+                <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>
                   Exact Pickup Coordinates
                 </Text>
 
@@ -218,8 +228,12 @@ export default function RequestPickupModal({
                       flexDirection: "row",
                       alignItems: "center",
                       justifyContent: "center",
-                      backgroundColor: location ? "#ecfeff" : "#f8fafc",
-                      borderColor: location ? "#06b6d4" : "#e2e8f0",
+                      backgroundColor: location
+                        ? isDark
+                          ? "#164e63"
+                          : "#ecfeff"
+                        : colors.inputBg,
+                      borderColor: location ? "#06b6d4" : colors.border,
                       marginTop: 10,
                       marginBottom: 0,
                       paddingVertical: 16,
@@ -250,8 +264,16 @@ export default function RequestPickupModal({
 
               {/* REMARKS */}
               <TextInput
-                style={styles.textArea}
+                style={[
+                  styles.textArea,
+                  {
+                    backgroundColor: colors.inputBg,
+                    borderColor: colors.border,
+                    color: colors.text,
+                  },
+                ]}
                 placeholder="Additional Instructions (e.g., Gate code, fragile items...)"
+                placeholderTextColor={colors.textMuted}
                 multiline
                 numberOfLines={3}
                 value={remarks}
@@ -261,7 +283,7 @@ export default function RequestPickupModal({
           </ScrollView>
 
           {/* FOOTER ACTION */}
-          <View style={styles.footer}>
+          <View style={[styles.footer, { borderTopColor: colors.border }]}>
             <TouchableOpacity
               style={[
                 styles.submitBtn,

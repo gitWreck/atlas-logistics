@@ -19,9 +19,11 @@ import {
 import { auth, db } from "../../firebase";
 import ShipmentDetailHeader from "../../components/shipments/ShipmentDetailHeader";
 import CustomerNotificationsList from "../../components/notifications/CustomerNotificationsList";
+import { useTheme } from "../../contexts/ThemeContext";
 
 export default function CustomerNotificationsScreen() {
   const router = useRouter();
+  const { colors, resolvedScheme } = useTheme();
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -82,8 +84,11 @@ export default function CustomerNotificationsScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar style="dark" backgroundColor="#f1f5f9" />
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.bg }]}>
+      <StatusBar
+        style={resolvedScheme === "dark" ? "light" : "dark"}
+        backgroundColor={colors.bg}
+      />
 
       <ShipmentDetailHeader
         title="Notifications"

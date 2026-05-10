@@ -21,10 +21,13 @@ import ShipmentDetailHeader from "../../../components/shipments/ShipmentDetailHe
 import ShipmentHeaderCard from "../../../components/shipments/ShipmentHeaderCard";
 import ShipmentPackagesPanel from "../../../components/shipments/details/ShipmentPackagesPanel";
 import ExistingProofsViewer from "../../../components/tracking/ExistingProofsViewer";
+import { useTheme } from "../../../contexts/ThemeContext";
 
 export default function CustomerTrackingDetailsScreen() {
   const { trackingId } = useLocalSearchParams();
   const router = useRouter();
+  const { colors, resolvedScheme } = useTheme();
+  const statusStyle = resolvedScheme === "dark" ? "light" : "dark";
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -129,17 +132,17 @@ export default function CustomerTrackingDetailsScreen() {
 
   if (loading) {
     return (
-      <View style={styles.center}>
-        <StatusBar style="dark" />
-        <ActivityIndicator size="large" color="#042C83" />
+      <View style={[styles.center, { backgroundColor: colors.bg }]}>
+        <StatusBar style={statusStyle} />
+        <ActivityIndicator size="large" color="#2563eb" />
       </View>
     );
   }
 
   if (error || !shipment) {
     return (
-      <SafeAreaView style={styles.container}>
-        <StatusBar style="dark" />
+      <SafeAreaView style={[styles.container, { backgroundColor: colors.bg }]}>
+        <StatusBar style={statusStyle} />
         <ShipmentDetailHeader
           title="Tracking Details"
           subtitle="Shipment lookup"
@@ -147,19 +150,31 @@ export default function CustomerTrackingDetailsScreen() {
         />
 
         <View style={styles.emptyState}>
-          <View style={styles.emptyIconWrap}>
-            <FontAwesome5 name="box-open" size={22} color="#94a3b8" />
+          <View
+            style={[
+              styles.emptyIconWrap,
+              { backgroundColor: colors.surface, borderColor: colors.border },
+            ]}
+          >
+            <FontAwesome5 name="box-open" size={22} color={colors.textMuted} />
           </View>
-          <Text style={styles.emptyTitle}>Shipment unavailable</Text>
-          <Text style={styles.emptyText}>
+          <Text style={[styles.emptyTitle, { color: colors.text }]}>
+            Shipment unavailable
+          </Text>
+          <Text style={[styles.emptyText, { color: colors.textMuted }]}>
             {error || "The selected shipment could not be loaded."}
           </Text>
 
           <TouchableOpacity
-            style={styles.backGhostBtn}
+            style={[
+              styles.backGhostBtn,
+              { backgroundColor: colors.surface, borderColor: colors.border },
+            ]}
             onPress={() => router.back()}
           >
-            <Text style={styles.backGhostBtnText}>Go Back</Text>
+            <Text style={[styles.backGhostBtnText, { color: colors.text }]}>
+              Go Back
+            </Text>
           </TouchableOpacity>
         </View>
       </SafeAreaView>
@@ -167,8 +182,8 @@ export default function CustomerTrackingDetailsScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar style="dark" backgroundColor="#f1f5f9" />
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.bg }]}>
+      <StatusBar style={statusStyle} backgroundColor={colors.bg} />
 
       <ShipmentDetailHeader
         title="Tracking Details"

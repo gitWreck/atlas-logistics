@@ -28,9 +28,11 @@ import TrackedShipmentList from "../../components/customer/TrackedShipmentList";
 import FloatingAddButton from "../../components/customer/FloatingAddButton";
 import RequestPickupModal from "../../components/customer/RequestPickup/RequestPickupModal";
 import { requestShipmentPickup } from "../../components/utilities/FirebaseFunctions";
+import { useTheme } from "../../contexts/ThemeContext";
 
 export default function CustomerDashboard() {
   const router = useRouter();
+  const { colors, resolvedScheme } = useTheme();
   const [shipments, setShipments] = useState([]);
   const [userData, setUserData] = useState(null);
   const [pickupModalVisible, setPickupModalVisible] = useState(false);
@@ -157,8 +159,8 @@ export default function CustomerDashboard() {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar style="dark" />
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.bg }]}>
+      <StatusBar style={resolvedScheme === "dark" ? "light" : "dark"} />
 
       <CustomerHeader
         userName={userName}

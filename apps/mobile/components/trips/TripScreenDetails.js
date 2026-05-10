@@ -20,6 +20,7 @@ import { StatusBar } from "expo-status-bar";
 import { db } from "../../firebase";
 
 import { useAuth } from "../../contexts/AuthContext.js";
+import { useTheme } from "../../contexts/ThemeContext";
 import { getCurrentLocationSafe, updatedBy } from "../utilities/helpers";
 
 import TripSummaryCard from "./TripSummaryCard";
@@ -46,6 +47,8 @@ const NOTIFICATION_CHANNEL_OPTIONS = [
 ];
 
 export default function TripDetailsScreen() {
+  const { colors, resolvedScheme } = useTheme();
+
   if (
     Platform.OS === "android" &&
     UIManager.setLayoutAnimationEnabledExperimental
@@ -303,7 +306,7 @@ export default function TripDetailsScreen() {
 
   if (loading) {
     return (
-      <View style={[styles.center, { backgroundColor: "#f1f5f9" }]}>
+      <View style={[styles.center, { backgroundColor: colors.bg }]}>
         <ActivityIndicator size="large" color="#042C83" />
       </View>
     );
@@ -311,20 +314,27 @@ export default function TripDetailsScreen() {
 
   if (!trip) {
     return (
-      <SafeAreaView style={styles.container}>
-        <StatusBar style="dark" />
+      <SafeAreaView style={[styles.container, { backgroundColor: colors.bg }]}>
+        <StatusBar style={resolvedScheme === "dark" ? "light" : "dark"} />
         <View style={styles.center}>
-          <FontAwesome5 name="truck" size={28} color="#94a3b8" />
-          <Text style={styles.emptyTitle}>Trip unavailable</Text>
-          <Text style={styles.emptyText}>
+          <FontAwesome5 name="truck" size={28} color={colors.textMuted} />
+          <Text style={[styles.emptyTitle, { color: colors.text }]}>
+            Trip unavailable
+          </Text>
+          <Text style={[styles.emptyText, { color: colors.textMuted }]}>
             The selected trip could not be loaded.
           </Text>
 
           <TouchableOpacity
-            style={styles.backGhostBtn}
+            style={[
+              styles.backGhostBtn,
+              { backgroundColor: colors.surface, borderColor: colors.border },
+            ]}
             onPress={() => router.back()}
           >
-            <Text style={styles.backGhostBtnText}>Go Back</Text>
+            <Text style={[styles.backGhostBtnText, { color: colors.text }]}>
+              Go Back
+            </Text>
           </TouchableOpacity>
         </View>
       </SafeAreaView>
@@ -332,17 +342,35 @@ export default function TripDetailsScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar style="dark" backgroundColor="#f1f5f9" />
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.bg }]}>
+      <StatusBar
+        style={resolvedScheme === "dark" ? "light" : "dark"}
+        backgroundColor={colors.bg}
+      />
 
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-          <FontAwesome5 name="arrow-left" size={15} color="#0f172a" />
+      <View
+        style={[
+          styles.header,
+          { backgroundColor: colors.surface, borderBottomColor: colors.border },
+        ]}
+      >
+        <TouchableOpacity
+          onPress={() => router.back()}
+          style={[
+            styles.backBtn,
+            { backgroundColor: colors.cardMuted, borderColor: colors.border },
+          ]}
+        >
+          <FontAwesome5 name="arrow-left" size={15} color={colors.text} />
         </TouchableOpacity>
 
         <View style={styles.headerTextWrap}>
-          <Text style={styles.headerTitle}>Trip Details</Text>
-          <Text style={styles.headerSubtitle}>{roleLabel} view</Text>
+          <Text style={[styles.headerTitle, { color: colors.text }]}>
+            Trip Details
+          </Text>
+          <Text style={[styles.headerSubtitle, { color: colors.textMuted }]}>
+            {roleLabel} view
+          </Text>
         </View>
       </View>
 
@@ -350,7 +378,16 @@ export default function TripDetailsScreen() {
         <TripSummaryCard trip={trip} />
 
         {isDelayed && (
-          <View style={styles.delayBanner}>
+          <View
+            style={[
+              styles.delayBanner,
+              {
+                backgroundColor:
+                  resolvedScheme === "dark" ? "#450a0a" : "#fef2f2",
+                borderColor: resolvedScheme === "dark" ? "#991b1b" : "#f87171",
+              },
+            ]}
+          >
             <View style={styles.delayTopRow}>
               <FontAwesome5
                 name="exclamation-triangle"
@@ -360,7 +397,15 @@ export default function TripDetailsScreen() {
 
               <View style={styles.delayTextContainer}>
                 <Text style={styles.delayTitle}>Delay Approved</Text>
-                <Text style={styles.delaySubtitle}>
+                <Text
+                  style={[
+                    styles.delaySubtitle,
+                    {
+                      color:
+                        resolvedScheme === "dark" ? "#fca5a5" : "#b91c1c",
+                    },
+                  ]}
+                >
                   {trip.delayReason
                     ? String(trip.delayReason).replace(/_/g, " ")
                     : "Admin has approved your delay."}
@@ -433,15 +478,40 @@ export default function TripDetailsScreen() {
         />
 
         {shouldShowManifestLockNotice && (
-          <View style={styles.manifestNoticeCard}>
-            <View style={styles.manifestNoticeIconWrap}>
+          <View
+            style={[
+              styles.manifestNoticeCard,
+              {
+                backgroundColor:
+                  resolvedScheme === "dark" ? "#451a03" : "#fffbeb",
+                borderColor: resolvedScheme === "dark" ? "#92400e" : "#fde68a",
+              },
+            ]}
+          >
+            <View
+              style={[
+                styles.manifestNoticeIconWrap,
+                {
+                  backgroundColor:
+                    resolvedScheme === "dark" ? "#78350f" : "#fef3c7",
+                },
+              ]}
+            >
               <FontAwesome5 name="lock" size={14} color="#92400e" />
             </View>
             <View style={{ flex: 1 }}>
               <Text style={styles.manifestNoticeTitle}>
                 Locked manifest required
               </Text>
-              <Text style={styles.manifestNoticeText}>
+              <Text
+                style={[
+                  styles.manifestNoticeText,
+                  {
+                    color:
+                      resolvedScheme === "dark" ? "#fbbf24" : "#a16207",
+                  },
+                ]}
+              >
                 Start Trip will be available after an admin or manager locks the
                 trip manifest.
               </Text>
@@ -465,13 +535,32 @@ export default function TripDetailsScreen() {
         />
 
         {isChecker && (
-          <View style={styles.checkerInfoCard}>
-            <View style={styles.checkerInfoIconWrap}>
+          <View
+            style={[
+              styles.checkerInfoCard,
+              {
+                backgroundColor:
+                  resolvedScheme === "dark" ? "#172554" : "#eff6ff",
+                borderColor: resolvedScheme === "dark" ? "#1d4ed8" : "#bfdbfe",
+              },
+            ]}
+          >
+            <View
+              style={[
+                styles.checkerInfoIconWrap,
+                {
+                  backgroundColor:
+                    resolvedScheme === "dark" ? "#1e3a8a" : "#dbeafe",
+                },
+              ]}
+            >
               <FontAwesome5 name="clipboard-check" size={15} color="#0369a1" />
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={styles.checkerInfoTitle}>Checker view</Text>
-              <Text style={styles.checkerInfoText}>
+              <Text style={[styles.checkerInfoTitle, { color: "#38bdf8" }]}>
+                Checker view
+              </Text>
+              <Text style={[styles.checkerInfoText, { color: colors.textMuted }]}>
                 This screen shows the trip summary and shipment access.
                 Driver-only controls like Start Trip, Delay, Arrived, and
                 Complete are hidden.
@@ -482,7 +571,12 @@ export default function TripDetailsScreen() {
       </ScrollView>
 
       {hasAnyBottomAction && (
-        <View style={styles.bottomActions}>
+        <View
+          style={[
+            styles.bottomActions,
+            { backgroundColor: colors.surface, borderTopColor: colors.border },
+          ]}
+        >
           <View style={styles.primaryActionsRow}>
             {canDriverReportDelay && (
               <TouchableOpacity

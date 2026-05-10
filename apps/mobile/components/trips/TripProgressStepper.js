@@ -2,6 +2,7 @@ import React from "react";
 import { View, Text, StyleSheet } from "react-native";
 import { FontAwesome5 } from "@expo/vector-icons";
 import { TRACKING_WORKFLOWS } from "../../components/constants/templates";
+import { useTheme } from "../../contexts/ThemeContext";
 
 const BLUE = "#155DFC";
 const GREY = "#94a3b8";
@@ -10,6 +11,7 @@ const SEPARATOR = "#e5e7eb";
 
 // Pass `tripType` instead of `isPickup` (Defaults to HUB_TRANSFER)
 const TripProgressStepper = ({ currentStatus, tripType = "HUB_TRANSFER" }) => {
+  const { colors } = useTheme();
   const s = (currentStatus || "CREATED").toUpperCase();
 
   // 2. Select the correct workflow array based on the prop
@@ -35,10 +37,17 @@ const TripProgressStepper = ({ currentStatus, tripType = "HUB_TRANSFER" }) => {
   };
 
   return (
-    <View style={styles.card}>
-      <Text style={styles.sectionTitle}>{getTitle()}</Text>
+    <View
+      style={[
+        styles.card,
+        { backgroundColor: colors.surface, borderColor: colors.border },
+      ]}
+    >
+      <Text style={[styles.sectionTitle, { color: colors.text }]}>
+        {getTitle()}
+      </Text>
 
-      <View style={styles.separator} />
+      <View style={[styles.separator, { backgroundColor: colors.border }]} />
 
       <View style={styles.verticalTimeline}>
         {activeSteps.map((step, index) => {
@@ -52,9 +61,17 @@ const TripProgressStepper = ({ currentStatus, tripType = "HUB_TRANSFER" }) => {
                 <View
                   style={[
                     styles.circle,
+                    {
+                      backgroundColor: colors.surface,
+                      borderColor: colors.border,
+                    },
                     isCompletedOrCurrent
                       ? styles.circleActive
-                      : styles.circleInactive,
+                      : {
+                          ...styles.circleInactive,
+                          backgroundColor: colors.surface,
+                          borderColor: colors.border,
+                        },
                   ]}
                 >
                   <FontAwesome5
@@ -69,7 +86,10 @@ const TripProgressStepper = ({ currentStatus, tripType = "HUB_TRANSFER" }) => {
                       styles.connector,
                       lineActive
                         ? styles.connectorActive
-                        : styles.connectorInactive,
+                        : {
+                            ...styles.connectorInactive,
+                            backgroundColor: colors.border,
+                          },
                     ]}
                   />
                 )}
@@ -79,8 +99,8 @@ const TripProgressStepper = ({ currentStatus, tripType = "HUB_TRANSFER" }) => {
                   style={[
                     styles.stepLabel,
                     isCompletedOrCurrent
-                      ? styles.stepLabelActive
-                      : styles.stepLabelInactive,
+                      ? { ...styles.stepLabelActive, color: colors.text }
+                      : { ...styles.stepLabelInactive, color: colors.textMuted },
                   ]}
                 >
                   {step.label}
@@ -102,6 +122,7 @@ const styles = StyleSheet.create({
     borderRadius: 15,
     padding: 16,
     marginBottom: 16,
+    borderWidth: 1,
     elevation: 3,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },

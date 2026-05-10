@@ -1,5 +1,6 @@
 import React from "react";
 import { View, Text, StyleSheet, Platform } from "react-native";
+import { useTheme } from "../../contexts/ThemeContext";
 
 const TripStatusRow = ({
   totalShipments = 0,
@@ -9,6 +10,7 @@ const TripStatusRow = ({
   arrived = 0,
   delivered = 0,
 }) => {
+  const { colors } = useTheme();
   const stats = [
     { label: "Packages", value: totalShipments },
     // { label: "Packages", value: totalPackages },
@@ -23,11 +25,20 @@ const TripStatusRow = ({
   return (
     <View style={styles.statsRow}>
       {stats.map((stat) => (
-        <View key={stat.label} style={styles.statBox}>
-          <Text style={styles.statLabel}>{stat.label}</Text>
+        <View
+          key={stat.label}
+          style={[
+            styles.statBox,
+            { backgroundColor: colors.surface, borderColor: colors.border },
+          ]}
+        >
+          <Text style={[styles.statLabel, { color: colors.textMuted }]}>
+            {stat.label}
+          </Text>
           <Text
             style={[
               styles.statNumber,
+              { color: colors.text },
               stat.accent ? { color: stat.accent } : null,
             ]}
           >

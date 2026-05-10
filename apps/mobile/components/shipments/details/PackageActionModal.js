@@ -11,6 +11,7 @@ import {
   Platform,
 } from "react-native";
 import { FontAwesome5 } from "@expo/vector-icons";
+import { useTheme } from "../../../contexts/ThemeContext";
 
 export default function PackageActionModal({
   visible,
@@ -22,6 +23,7 @@ export default function PackageActionModal({
   packagingGroup,
   defaultAction,
 }) {
+  const { colors } = useTheme();
   const [remarks, setRemarks] = useState("");
   const [manualQty, setManualQty] = useState("");
   const isBulk = String(packagingGroup || "").toUpperCase() === "BULK";
@@ -81,34 +83,49 @@ export default function PackageActionModal({
       >
         <Pressable style={styles.backdrop} onPress={onClose} />
 
-        <View style={styles.modalContent}>
+        <View style={[styles.modalContent, { backgroundColor: colors.surface }]}>
           <View style={styles.header}>
             <View>
-              <Text style={styles.title}>Update Status</Text>
-              <Text style={styles.subtitle}>
+              <Text style={[styles.title, { color: colors.text }]}>
+                Update Status
+              </Text>
+              <Text style={[styles.subtitle, { color: colors.textMuted }]}>
                 {count > 1
                   ? `Updating ${count} items`
                   : "Select an action for this item"}
               </Text>
             </View>
             <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
-              <FontAwesome5 name="times" size={18} color="#94a3b8" />
+              <FontAwesome5 name="times" size={18} color={colors.textMuted} />
             </TouchableOpacity>
           </View>
 
           {isBulk && <></>}
           <View style={styles.row}>
             <View style={{ flex: 1 }}>
-              <Text style={styles.label}>Quantity to Process</Text>
-              <View style={styles.qtyContainer}>
+              <Text style={[styles.label, { color: colors.textMuted }]}>
+                Quantity to Process
+              </Text>
+              <View
+                style={[
+                  styles.qtyContainer,
+                  {
+                    backgroundColor: colors.inputBg,
+                    borderColor: colors.border,
+                  },
+                ]}
+              >
                 <TextInput
-                  style={styles.qtyInput}
+                  style={[styles.qtyInput, { color: colors.text }]}
                   keyboardType="number-pad"
                   value={manualQty}
                   onChangeText={setManualQty}
                   placeholder="Qty"
+                  placeholderTextColor={colors.textMuted}
                 />
-                <Text style={styles.qtyMax}>/ {maxQty} Pcs</Text>
+                <Text style={[styles.qtyMax, { color: colors.textMuted }]}>
+                  / {maxQty} Pcs
+                </Text>
               </View>
             </View>
           </View>
@@ -116,7 +133,10 @@ export default function PackageActionModal({
             {visibleActions.map((btn) => (
               <TouchableOpacity
                 key={btn.mode}
-                style={[styles.btn, { borderColor: btn.color }]}
+                style={[
+                  styles.btn,
+                  { backgroundColor: colors.surface, borderColor: btn.color },
+                ]}
                 onPress={() => handlePress(btn.mode)}
               >
                 <View
@@ -132,11 +152,25 @@ export default function PackageActionModal({
           </View>
 
           {/* Remarks Input */}
-          <Text style={[styles.label, { marginTop: 12 }]}>Notes / Remarks</Text>
+          <Text
+            style={[
+              styles.label,
+              { color: colors.textMuted, marginTop: 12 },
+            ]}
+          >
+            Notes / Remarks
+          </Text>
           <TextInput
-            style={styles.remarksInput}
+            style={[
+              styles.remarksInput,
+              {
+                backgroundColor: colors.inputBg,
+                borderColor: colors.border,
+                color: colors.text,
+              },
+            ]}
             placeholder="Add an optional note..."
-            placeholderTextColor="#94a3b8"
+            placeholderTextColor={colors.textMuted}
             value={remarks}
             onChangeText={setRemarks}
             multiline

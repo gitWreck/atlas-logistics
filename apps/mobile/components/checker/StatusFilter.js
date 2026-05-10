@@ -2,14 +2,24 @@
 import React from "react";
 import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
+import { useTheme } from "../../contexts/ThemeContext";
 
 const GRADIENT_COLORS = ["#042C83", "#07B9F4"];
 
 export default function StatusFilter({ activeFilter, onFilterChange }) {
+  const { colors } = useTheme();
+
   return (
     <View style={styles.controlsRow}>
-      <Text style={styles.sectionTitle}>Facility Overview</Text>
-      <View style={styles.filterContainer}>
+      <Text style={[styles.sectionTitle, { color: colors.text }]}>
+        Facility Overview
+      </Text>
+      <View
+        style={[
+          styles.filterContainer,
+          { backgroundColor: colors.surface, borderColor: colors.border },
+        ]}
+      >
         {["TODAY", "WEEK"].map((tab) => {
           const isActive = activeFilter === tab;
           return (
@@ -32,7 +42,7 @@ export default function StatusFilter({ activeFilter, onFilterChange }) {
                 </LinearGradient>
               ) : (
                 <View style={styles.filterTab}>
-                  <Text style={styles.filterText}>
+                  <Text style={[styles.filterText, { color: colors.textMuted }]}>
                     {tab === "TODAY" ? "Today" : "Week"}
                   </Text>
                 </View>

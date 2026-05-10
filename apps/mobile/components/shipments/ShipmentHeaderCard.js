@@ -12,8 +12,12 @@ import { FontAwesome5 } from "@expo/vector-icons";
 import { COLORS } from "../constants/theme"; // Adjust path
 import StatusBadge from "../ui/figma/StatusBadge"; // Reuse your badge
 import * as Clipboard from "expo-clipboard"; // ✅ Add this
+import { useTheme } from "../../contexts/ThemeContext";
 
 const ShipmentHeaderCard = ({ shipment, showActions = true }) => {
+  const { colors, resolvedScheme } = useTheme();
+  const isDark = resolvedScheme === "dark";
+
   // Safely extract the address object to avoid crashes
   const address = shipment?.recipient?.address;
 
@@ -81,15 +85,22 @@ const ShipmentHeaderCard = ({ shipment, showActions = true }) => {
   };
 
   return (
-    <View style={styles.card}>
+    <View
+      style={[
+        styles.card,
+        { backgroundColor: colors.surface, borderColor: colors.border },
+      ]}
+    >
       {/* Top Row: ID & Status */}
-      <View style={styles.header}>
-        <Text style={styles.idText}>{shipment.id || "ID: --"}</Text>
+      <View style={[styles.header, { borderBottomColor: colors.border }]}>
+        <Text style={[styles.idText, { color: colors.textMuted }]}>
+          {shipment.id || "ID: --"}
+        </Text>
         <StatusBadge status={shipment.status} />
       </View>
 
       {/* Destination (Big) */}
-      <View style={styles.section}>
+      <View style={[styles.section, { borderBottomColor: colors.border }]}>
         <View style={[styles.row, { alignItems: "center" }]}>
           <FontAwesome5
             name="map-marker-alt"
@@ -98,14 +109,21 @@ const ShipmentHeaderCard = ({ shipment, showActions = true }) => {
             style={{ width: 24 }}
           />
           <View style={{ flex: 1, paddingRight: 10 }}>
-            <Text style={styles.addressText}>{streetText}</Text>
-            <Text style={styles.subText}>{cityProvinceText}</Text>
+            <Text style={[styles.addressText, { color: colors.text }]}>
+              {streetText}
+            </Text>
+            <Text style={[styles.subText, { color: colors.textMuted }]}>
+              {cityProvinceText}
+            </Text>
           </View>
 
           {/* ✅ NEW: Navigate Button */}
           {showActions && (
             <TouchableOpacity
-              style={[styles.actionBtn, { backgroundColor: "#e0f2fe" }]}
+              style={[
+                styles.actionBtn,
+                { backgroundColor: isDark ? "#164e63" : "#e0f2fe" },
+              ]}
               onPress={openMaps}
             >
               <FontAwesome5 name="directions" size={16} color="#0284c7" />
@@ -115,7 +133,12 @@ const ShipmentHeaderCard = ({ shipment, showActions = true }) => {
       </View>
 
       {/* Receiver Info */}
-      <View style={[styles.section, { borderBottomWidth: 0 }]}>
+      <View
+        style={[
+          styles.section,
+          { borderBottomWidth: 0, borderBottomColor: colors.border },
+        ]}
+      >
         {/* We add justifyContent: 'space-between' to push items to opposite ends */}
         <View
           style={[
@@ -132,12 +155,24 @@ const ShipmentHeaderCard = ({ shipment, showActions = true }) => {
               style={{ width: 24 }}
             />
             <View>
-              <Text style={styles.label}>Receiver</Text>
-              <Text style={styles.valueText} numberOfLines={1}>
+              <Text style={[styles.label, { color: colors.textMuted }]}>
+                Receiver
+              </Text>
+              <Text
+                style={[styles.valueText, { color: colors.text }]}
+                numberOfLines={1}
+              >
                 {receiverName}
               </Text>
               <Text
-                style={[styles.phoneText, { marginRight: 12, marginTop: 2 }]}
+                style={[
+                  styles.phoneText,
+                  {
+                    color: colors.textMuted,
+                    marginRight: 12,
+                    marginTop: 2,
+                  },
+                ]}
               >
                 {receiverPhone}
               </Text>
@@ -152,7 +187,10 @@ const ShipmentHeaderCard = ({ shipment, showActions = true }) => {
                 {/* ✅ NEW: Call Button */}
                 <TouchableOpacity
                   onPress={callCustomer}
-                  style={[styles.actionBtn, { backgroundColor: "#dcfce7" }]}
+                  style={[
+                    styles.actionBtn,
+                    { backgroundColor: isDark ? "#14532d" : "#dcfce7" },
+                  ]}
                 >
                   <FontAwesome5 name="phone-alt" size={14} color="#16a34a" />
                 </TouchableOpacity>
@@ -160,7 +198,10 @@ const ShipmentHeaderCard = ({ shipment, showActions = true }) => {
                 {/* Existing Copy Button */}
                 <TouchableOpacity
                   onPress={copyPhoneToClipboard}
-                  style={[styles.actionBtn, { backgroundColor: "#f1f5f9" }]}
+                  style={[
+                    styles.actionBtn,
+                    { backgroundColor: colors.cardMuted },
+                  ]}
                 >
                   <FontAwesome5 name="copy" size={14} color="#3b82f6" />
                 </TouchableOpacity>

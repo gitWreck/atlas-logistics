@@ -1,17 +1,22 @@
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { COLORS } from "../../components/constants/theme";
 import AuthGuard from "../../components/auth/AuthGuard";
+import { useTheme } from "../../contexts/ThemeContext";
 
 export default function DriverLayout() {
+  const { colors, resolvedScheme } = useTheme();
+
   return (
     <AuthGuard role="driver">
-      <StatusBar style="light" backgroundColor={COLORS.bg} />
+      <StatusBar
+        style={resolvedScheme === "dark" ? "light" : "dark"}
+        backgroundColor={colors.bg}
+      />
 
       <Stack
         screenOptions={{
           headerShown: false, // We use custom headers in our screens
-          contentStyle: { backgroundColor: "#f1f5f9" }, // Light background (Figma)
+          contentStyle: { backgroundColor: colors.bg },
           animation: "slide_from_right", // Smooth transitions
         }}
       >

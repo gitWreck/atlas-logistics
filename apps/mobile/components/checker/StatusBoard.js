@@ -1,11 +1,13 @@
 import React from "react";
 import { View, Text, StyleSheet } from "react-native";
+import { useTheme } from "../../contexts/ThemeContext";
 
 export default function StatusBoard({
   stats = {},
   filterMode = "TODAY",
   cards = [],
 }) {
+  const { colors } = useTheme();
   const defaultTimeLabel = filterMode === "TODAY" ? "Today" : "7 Days";
 
   const resolvedCards = cards.map((card) => ({
@@ -23,12 +25,23 @@ export default function StatusBoard({
   return (
     <View style={styles.statsRow}>
       {resolvedCards.map((card) => (
-        <View key={card.key || card.label} style={styles.statCard}>
-          <Text style={styles.statVal}>{card.value}</Text>
-          <Text style={styles.statLabel}>{card.label}</Text>
+        <View
+          key={card.key || card.label}
+          style={[
+            styles.statCard,
+            { backgroundColor: colors.surface, borderColor: colors.border },
+          ]}
+        >
+          <Text style={[styles.statVal, { color: colors.text }]}>
+            {card.value}
+          </Text>
+          <Text style={[styles.statLabel, { color: colors.textMuted }]}>
+            {card.label}
+          </Text>
           <Text
             style={[
               styles.statSub,
+              { color: colors.textMuted },
               card.subLabelColor ? { color: card.subLabelColor } : null,
             ]}
           >

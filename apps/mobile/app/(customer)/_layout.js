@@ -1,16 +1,20 @@
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import AuthGuard from "../../components/auth/AuthGuard";
+import { useTheme } from "../../contexts/ThemeContext";
 
 export default function CustomerLayout() {
+  const { colors, resolvedScheme } = useTheme();
+  const statusStyle = resolvedScheme === "dark" ? "light" : "dark";
+
   return (
     <AuthGuard role="customer">
-      <StatusBar style="dark" backgroundColor="#f1f5f9" />
+      <StatusBar style={statusStyle} backgroundColor={colors.bg} />
 
       <Stack
         screenOptions={{
           headerShown: false,
-          contentStyle: { backgroundColor: "#f1f5f9" },
+          contentStyle: { backgroundColor: colors.bg },
           animation: "slide_from_right",
         }}
       >

@@ -26,9 +26,11 @@ import StatusFilter from "../../../components/checker/StatusFilter";
 import StatusBoard from "../../../components/checker/StatusBoard";
 import OperationsGrid from "../../../components/checker/OperationsGrid";
 import { CHECKER_STATUS_BOARD_CARDS } from "../../../components/checker/StatusBoard";
+import { useTheme } from "../../../contexts/ThemeContext";
 
 export default function CheckerIndex() {
   const router = useRouter();
+  const { colors } = useTheme();
 
   // STATE
   const [filter, setFilter] = useState("TODAY"); // 'TODAY' | 'WEEK'
@@ -98,15 +100,15 @@ export default function CheckerIndex() {
   };
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.bg }]}>
       <ScrollView
         contentContainerStyle={styles.content}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
             onRefresh={onRefresh}
-            tintColor="#0f172a"
-            colors={["#0f172a"]}
+            tintColor={colors.text}
+            colors={[colors.text]}
           />
         }
       >

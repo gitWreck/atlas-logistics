@@ -11,10 +11,12 @@ import { auth } from "../../../firebase";
 
 import DriverHeader from "../../../components/driver/DriverHeader";
 import { useAuth } from "../../../contexts/AuthContext"; // adjust path if needed
+import { useTheme } from "../../../contexts/ThemeContext";
 
 export default function DriverTabsLayout() {
   const router = useRouter();
   const { user } = useAuth();
+  const { colors } = useTheme();
 
   const handleLogout = async () => {
     try {
@@ -26,7 +28,7 @@ export default function DriverTabsLayout() {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.bg }]}>
       {/* ✅ SHARED HEADER FOR ALL TAB SCREENS */}
       <DriverHeader
         userName={user?.name || user?.fullName || "Driver"}
@@ -39,14 +41,14 @@ export default function DriverTabsLayout() {
         screenOptions={{
           headerShown: false, // still false because we use custom header
           tabBarStyle: {
-            backgroundColor: "#ffffff",
-            borderTopColor: "#cbd5e1",
+            backgroundColor: colors.surface,
+            borderTopColor: colors.border,
             height: 60,
             paddingBottom: 8,
             paddingTop: 8,
           },
           tabBarActiveTintColor: "#07B9F4",
-          tabBarInactiveTintColor: "#475569",
+          tabBarInactiveTintColor: colors.textMuted,
           tabBarLabelStyle: {
             fontSize: 10,
             fontWeight: "600",

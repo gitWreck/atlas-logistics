@@ -9,6 +9,9 @@ import {
 } from "react-native";
 import MapView, { Marker, PROVIDER_DEFAULT } from "react-native-maps";
 import { FontAwesome5 } from "@expo/vector-icons";
+import { useTheme } from "../../../contexts/ThemeContext";
+
+const DEFAULT_LOCATION = { lat: 14.5995, lng: 120.9842 };
 
 export default function MapPickupModal({
   visible,
@@ -16,10 +19,9 @@ export default function MapPickupModal({
   onClose,
   onConfirm,
 }) {
+  const { colors } = useTheme();
   // Default to Manila if no initial location is provided
-  const [tempLoc, setTempLoc] = useState(
-    initialLocation || { lat: "", lng: "" },
-  );
+  const [tempLoc, setTempLoc] = useState(initialLocation || DEFAULT_LOCATION);
 
   // Sync temp location if the user opens the modal again after already picking a spot
   useEffect(() => {
@@ -30,13 +32,20 @@ export default function MapPickupModal({
 
   return (
     <Modal visible={visible} animationType="slide" transparent={false}>
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={[styles.container, { backgroundColor: colors.bg }]}>
         {/* Header */}
-        <View style={styles.header}>
+        <View
+          style={[
+            styles.header,
+            { backgroundColor: colors.surface, borderBottomColor: colors.border },
+          ]}
+        >
           <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
-            <FontAwesome5 name="arrow-left" size={20} color="#0f172a" />
+            <FontAwesome5 name="arrow-left" size={20} color={colors.text} />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Pin Pickup Location</Text>
+          <Text style={[styles.headerTitle, { color: colors.text }]}>
+            Pin Pickup Location
+          </Text>
           <View style={{ width: 40 }} />
         </View>
 
@@ -65,10 +74,15 @@ export default function MapPickupModal({
         </MapView>
 
         {/* Footer Action */}
-        <View style={styles.footer}>
+        <View
+          style={[
+            styles.footer,
+            { backgroundColor: colors.surface, borderTopColor: colors.border },
+          ]}
+        >
           <View style={styles.infoBox}>
-            <FontAwesome5 name="info-circle" size={14} color="#64748b" />
-            <Text style={styles.infoText}>
+            <FontAwesome5 name="info-circle" size={14} color={colors.textMuted} />
+            <Text style={[styles.infoText, { color: colors.textMuted }]}>
               Tap anywhere on the map to move the pin.
             </Text>
           </View>

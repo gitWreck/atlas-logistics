@@ -3,6 +3,7 @@ import React from "react";
 import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
 import { FontAwesome5 } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
+import { useTheme } from "../../contexts/ThemeContext";
 
 const LOAD_GRADIENT_COLORS = ["#042C83", "#07B9F4"];
 const OFFLOAD_GRADIENT_COLORS = ["#042C83", "#10b981"];
@@ -13,9 +14,13 @@ export default function OperationsGrid({
   onScanOffload,
   onScanInfo, // <--- New Prop
 }) {
+  const { colors } = useTheme();
+
   return (
     <View style={styles.container}>
-      <Text style={styles.sectionTitle}>Operations</Text>
+      <Text style={[styles.sectionTitle, { color: colors.text }]}>
+        Operations
+      </Text>
 
       <View style={styles.gridContainer}>
         {/* ROW 1: Load & Offload */}
