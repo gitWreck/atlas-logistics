@@ -4,6 +4,7 @@ import React, {
   useState,
   useMemo,
   useEffect,
+  useCallback,
   forwardRef,
   useImperativeHandle,
 } from "react";
@@ -15,6 +16,7 @@ import {
   faChevronLeft,
   faChevronRight,
   faExclamationCircle,
+  faListOl,
 } from "@fortawesome/free-solid-svg-icons";
 import ShipmentRow from "./ShipmentRow";
 import ShipmentDrawer from "./ShipmentDrawer";
@@ -38,6 +40,8 @@ const ShipmentBoard = forwardRef(function ShipmentBoard(
   const [activeFilter, setActiveFilter] = useState("ALL");
   const [searchQuery, setSearchQuery] = useState("");
   const [modeFilter, setModeFilter] = useState("ALL");
+  const [shipmentLimit, setShipmentLimit] = useState("50");
+  const [pickupLimit, setPickupLimit] = useState("50");
 
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
@@ -48,7 +52,7 @@ const ShipmentBoard = forwardRef(function ShipmentBoard(
 
   const theme = getBoardThemeClasses(isDark);
 
-  const fetchShipments = async () => {
+  const fetchShipments = useCallback(async () => {
     try {
       setLoading(true);
 
@@ -68,9 +72,18 @@ const ShipmentBoard = forwardRef(function ShipmentBoard(
         cache: "no-store",
       };
 
+      const shipmentsUrl =
+        shipmentLimit === "50"
+          ? "/api/shipments"
+          : `/api/shipments?limit=${shipmentLimit}`;
+      const pickupsUrl =
+        pickupLimit === "50"
+          ? "/api/shipments/pickups"
+          : `/api/shipments/pickups?limit=${pickupLimit}`;
+
       const [shipmentsRes, pickupsRes] = await Promise.all([
-        fetch("/api/shipments", requestOptions),
-        fetch("/api/shipments/pickups", requestOptions),
+        fetch(shipmentsUrl, requestOptions),
+        fetch(pickupsUrl, requestOptions),
       ]);
 
       if (!shipmentsRes.ok) {
@@ -108,11 +121,11 @@ const ShipmentBoard = forwardRef(function ShipmentBoard(
     } finally {
       setLoading(false);
     }
-  };
+  }, [pickupLimit, shipmentLimit, user]);
 
   useEffect(() => {
     fetchShipments();
-  }, []);
+  }, [fetchShipments]);
 
   const filteredShipments = useMemo(() => {
     return shipments.filter((shipment) => {
@@ -187,7 +200,15 @@ const ShipmentBoard = forwardRef(function ShipmentBoard(
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchQuery, startDate, endDate, activeFilter, modeFilter, delayType]);
+  }, [
+    searchQuery,
+    startDate,
+    endDate,
+    activeFilter,
+    modeFilter,
+    delayType,
+    shipmentLimit,
+  ]);
 
   const indexOfLastItem = currentPage * itemsPerPage;
   const indexOfFirstItem = indexOfLastItem - itemsPerPage;
@@ -388,13 +409,33 @@ const ShipmentBoard = forwardRef(function ShipmentBoard(
             <div
               className={`px-4 sm:px-6 py-4 border-t flex flex-col sm:flex-row justify-between items-center gap-3 text-xs ${theme.footer}`}
             >
-              <span className={theme.footerText}>
-                Showing{" "}
-                <span className={`font-bold ${theme.footerStrong}`}>
-                  {indexOfFirstItem + 1}
-                </span>{" "}
-                of {filteredShipments.length}
-              </span>
+              <div className="flex flex-col sm:flex-row items-center gap-3">
+                <span className={theme.footerText}>
+                  Showing{" "}
+                  <span className={`font-bold ${theme.footerStrong}`}>
+                    {indexOfFirstItem + 1}
+                  </span>{" "}
+                  of {filteredShipments.length}
+                </span>
+
+                <div className="relative w-32">
+                  <FontAwesomeIcon
+                    icon={faListOl}
+                    className={`absolute left-3 top-1/2 -translate-y-1/2 text-sm ${theme.iconMuted}`}
+                  />
+                  <select
+                    className={`w-full border rounded-lg pl-9 pr-4 py-1.5 text-xs focus:border-blue-500 focus:outline-none appearance-none cursor-pointer ${theme.input}`}
+                    value={shipmentLimit}
+                    onChange={(e) => setShipmentLimit(e.target.value)}
+                    title="Limit orders"
+                  >
+                    <option value="50">50 items</option>
+                    <option value="100">100 items</option>
+                    <option value="200">200 items</option>
+                    <option value="all">All items</option>
+                  </select>
+                </div>
+              </div>
 
               <div className="flex gap-2">
                 <button
@@ -428,6 +469,8 @@ const ShipmentBoard = forwardRef(function ShipmentBoard(
             pickups={pickups}
             loading={loading}
             isDark={isDark}
+            pickupLimit={pickupLimit}
+            onPickupLimitChange={setPickupLimit}
             onSelectPickup={setSelectedShipmentId}
             onEditPickup={(pickup) => {
               setEditingPickup(pickup);

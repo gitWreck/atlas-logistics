@@ -6,6 +6,7 @@ import {
   faCheckCircle,
   faChevronLeft,
   faChevronRight,
+  faListOl,
   faSearch,
 } from "@fortawesome/free-solid-svg-icons";
 import TripRow from "./TripRow";
@@ -15,6 +16,8 @@ export default function CompletedTripsTable({
   trips = [],
   loading = false,
   isDark = false,
+  completedTripLimit = "50",
+  onCompletedTripLimitChange,
   onSelectTrip,
 }) {
   const [currentPage, setCurrentPage] = useState(1);
@@ -59,7 +62,7 @@ export default function CompletedTripsTable({
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [filteredTrips]);
+  }, [completedTripLimit, filteredTrips]);
 
   return (
     <div
@@ -143,13 +146,33 @@ export default function CompletedTripsTable({
         <div
           className={`px-4 sm:px-6 py-4 border-t flex flex-col sm:flex-row justify-between items-center gap-3 text-xs ${theme.footer}`}
         >
-          <span className={theme.footerText}>
-            Page{" "}
-            <span className={`font-bold ${theme.footerStrong}`}>
-              {currentPage}
-            </span>{" "}
-            of {totalPages}
-          </span>
+          <div className="flex flex-col sm:flex-row items-center gap-3">
+            <span className={theme.footerText}>
+              Page{" "}
+              <span className={`font-bold ${theme.footerStrong}`}>
+                {currentPage}
+              </span>{" "}
+              of {totalPages}
+            </span>
+
+            <div className="relative w-32">
+              <FontAwesomeIcon
+                icon={faListOl}
+                className={`absolute left-3 top-1/2 -translate-y-1/2 text-sm ${theme.iconMuted}`}
+              />
+              <select
+                className={`w-full rounded-lg pl-9 pr-4 py-1.5 text-xs focus:border-emerald-500 focus:outline-none appearance-none cursor-pointer border ${theme.input}`}
+                value={completedTripLimit}
+                onChange={(e) => onCompletedTripLimitChange?.(e.target.value)}
+                title="Limit completed trips"
+              >
+                <option value="50">50 items</option>
+                <option value="100">100 items</option>
+                <option value="200">200 items</option>
+                <option value="all">All items</option>
+              </select>
+            </div>
+          </div>
 
           <div className="flex gap-2">
             <button

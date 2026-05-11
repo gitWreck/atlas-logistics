@@ -5,7 +5,7 @@ import { formatFirestoreDate } from "@/app/utility/utilities";
 
 export const dynamic = "force-dynamic";
 
-export async function GET() {
+export async function GET(request) {
   try {
     // 1. AUTHENTICATION
     const headersList = await headers();
@@ -34,13 +34,28 @@ export async function GET() {
       );
     }
 
+    const { searchParams } = new URL(request.url);
+    const limitParam = searchParams.get("limit") || "50";
+    const allowedLimits = ["all", "50", "100", "200"];
+
+    if (!allowedLimits.includes(limitParam)) {
+      return NextResponse.json(
+        { error: "Invalid limit. Use all, 50, 100, or 200." },
+        { status: 400 },
+      );
+    }
+
     // 3. FETCH SHIPMENTS (The Base Data)
-    const snapshot = await adminDb
+    let pickupsQuery = adminDb
       .collection("shipments")
       .where("isPickupRequested", "==", true) // ✅ ONLY fetch pickup requests
-      .orderBy("updatedAt", "desc")
-      .limit(50)
-      .get();
+      .orderBy("updatedAt", "desc");
+
+    if (limitParam !== "all") {
+      pickupsQuery = pickupsQuery.limit(Number(limitParam));
+    }
+
+    const snapshot = await pickupsQuery.get();
 
     // ---------------------------------------------------------
     // 4. NEW LOGIC: PRE-FETCH TRUCK DATA
