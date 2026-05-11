@@ -282,9 +282,7 @@ export default function UnifiedShipmentModal({
           className={`p-4 sm:p-6 border-b flex justify-between items-center shrink-0 ${modalTheme.header}`}
         >
           <div className="flex flex-col">
-            <h2
-              className={`text-lg sm:text-xl font-bold ${modalTheme.title}`}
-            >
+            <h2 className={`text-lg sm:text-xl font-bold ${modalTheme.title}`}>
               {step === 1
                 ? "1. Shipment Details"
                 : step === 2
@@ -294,9 +292,7 @@ export default function UnifiedShipmentModal({
                   : "3. Complete"}
             </h2>
             {step === 1 && (
-              <p
-                className={`text-xs mt-1 ${modalTheme.bodyText}`}
-              >
+              <p className={`text-xs mt-1 ${modalTheme.bodyText}`}>
                 Fill in the package and routing info.
               </p>
             )}
@@ -469,14 +465,14 @@ export default function UnifiedShipmentModal({
               </div>
               <div className="w-full max-w-xs space-y-3 mt-4">
                 {/* PRINT BUTTON */}
-                <button
+                {/* <button
                   onClick={() =>
                     window.open(shipmentLabelUrl(createdShipmentId), "_blank")
                   }
                   className={`${modalTheme.secondaryButton} w-full rounded-xl py-3 font-bold`}
                 >
                   Print Shipment Label
-                </button>
+                </button> */}
 
                 <button
                   onClick={() =>
@@ -520,9 +516,7 @@ export default function UnifiedShipmentModal({
               className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-3.5 rounded-xl flex justify-center items-center gap-2 transition-colors"
             >
               <span>
-                {isPickup
-                  ? "Continue to Save Pickup"
-                  : "Continue to Save"}
+                {isPickup ? "Continue to Save Pickup" : "Continue to Save"}
               </span>
               <FontAwesomeIcon icon={faArrowRight} />
             </button>
