@@ -37,7 +37,7 @@ function getShipmentQuantity(shipment = {}) {
   );
 }
 
-function getShipmentDescription(shipment = {}) {
+function getShipmentDescriptionLines(shipment = {}) {
   if (Array.isArray(shipment?.packages) && shipment.packages.length > 0) {
     return shipment.packages
       .map((pkg) => {
@@ -45,7 +45,7 @@ function getShipmentDescription(shipment = {}) {
         const desc = pkg.description || "Package";
         return qty > 1 ? `${desc} (${qty})` : desc;
       })
-      .join(", ");
+      .filter(Boolean);
   }
 
   if (Array.isArray(shipment?.items) && shipment.items.length > 0) {
@@ -55,10 +55,10 @@ function getShipmentDescription(shipment = {}) {
         const desc = item.description || "Item";
         return qty > 1 ? `${desc} (${qty})` : desc;
       })
-      .join(", ");
+      .filter(Boolean);
   }
 
-  return "—";
+  return [];
 }
 
 function getDestination(shipment = {}) {
@@ -276,7 +276,11 @@ export default function PrintManifest() {
                   </tr>
                 </thead>
                 <tbody>
-                  {pageShipments.map((shipment, index) => (
+                  {pageShipments.map((shipment, index) => {
+                    const descriptionLines =
+                      getShipmentDescriptionLines(shipment);
+
+                    return (
                     <tr
                       key={shipment.id || index}
                       className="border-b border-gray-200 align-top"
@@ -299,11 +303,22 @@ export default function PrintManifest() {
                       <td className="py-1 px-1 break-words">
                         {shipment?.status || "—"}
                       </td>
-                      <td className="py-1 px-1 text-gray-700 break-words">
-                        {getShipmentDescription(shipment)}
+                        <td className="py-1 px-1 text-gray-700 break-words">
+                          {descriptionLines.length > 0 ? (
+                          <div className="space-y-0.5">
+                            {descriptionLines.map((description, i) => (
+                              <div key={`${shipment.id || index}-${i}`}>
+                                {description}
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          "No description"
+                        )}
                       </td>
                     </tr>
-                  ))}
+                    );
+                  })}
                 </tbody>
               </table>
 
