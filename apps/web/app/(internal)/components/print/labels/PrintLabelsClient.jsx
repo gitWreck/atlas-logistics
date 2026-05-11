@@ -14,6 +14,19 @@ import { db } from "@/lib/firebase";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faSnowflake, faWineGlass } from "@fortawesome/free-solid-svg-icons";
 
+function formatAddress(address = {}) {
+  return [
+    address.unit,
+    address.street,
+    address.barangay,
+    address.city,
+    address.province,
+  ]
+    .map((part) => String(part || "").trim())
+    .filter(Boolean)
+    .join(", ");
+}
+
 export default function PrintLabelsClient() {
   const searchParams = useSearchParams();
   const shipmentId = searchParams.get("id"); // Single Shipment Mode
@@ -176,6 +189,7 @@ export default function PrintLabelsClient() {
 function StandardLabel({ shipment, pkg, index, total }) {
   const recipient = shipment.recipient || {};
   const address = recipient.address || {};
+  const addressText = formatAddress(address);
   const qrValue = pkg.packageId || "NO_ID";
 
   console.log("Rendering label for pkg:", pkg);
@@ -232,12 +246,7 @@ function StandardLabel({ shipment, pkg, index, total }) {
           <div className="text-sm font-mono mt-0.5">{recipient.phone}</div>
 
           <div className="text-[10px] leading-tight mt-2 font-medium uppercase text-gray-800">
-            {address.unit ? `${address.unit}, ` : ""}
-            {address.street}
-            <br />
-            {address.barangay}, {address.city}
-            <br />
-            {address.province}
+            {addressText || "No address provided"}
           </div>
 
           {/* PACKAGE INFO */}
