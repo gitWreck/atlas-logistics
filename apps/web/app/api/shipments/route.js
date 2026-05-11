@@ -5,7 +5,7 @@ import { formatFirestoreDate } from "@/app/utility/utilities";
 
 export const dynamic = "force-dynamic";
 
-export async function GET() {
+export async function GET(request) {
   try {
     // 1. AUTHENTICATION
     const headersList = await headers();
@@ -34,6 +34,17 @@ export async function GET() {
       );
     }
 
+    const { searchParams } = new URL(request.url);
+    const limitParam = searchParams.get("limit") || "50";
+    const allowedLimits = ["all", "50", "100", "200"];
+
+    if (!allowedLimits.includes(limitParam)) {
+      return NextResponse.json(
+        { error: "Invalid limit. Use all, 50, 100, or 200." },
+        { status: 400 },
+      );
+    }
+
     // 3. FETCH SHIPMENTS (The Base Data)
     // const snapshot = await adminDb
     //   .collection("shipments")
@@ -43,11 +54,15 @@ export async function GET() {
     //   .limit(50)
     //   .get();
 
-    const snapshot = await adminDb
+    let shipmentsQuery = adminDb
       .collection("shipments")
-      .orderBy("updatedAt", "desc")
-      .limit(50)
-      .get();
+      .orderBy("updatedAt", "desc");
+
+    if (limitParam !== "all") {
+      shipmentsQuery = shipmentsQuery.limit(Number(limitParam));
+    }
+
+    const snapshot = await shipmentsQuery.get();
 
     // THE 1-LINE FIX: Drop any document where it explicitly equals true.
     // This perfectly allows false, null, and missing fields to pass through.

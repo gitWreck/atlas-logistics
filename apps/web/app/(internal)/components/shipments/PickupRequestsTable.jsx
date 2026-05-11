@@ -7,6 +7,7 @@ import {
   faChevronRight,
   faExclamationCircle,
   faFilter,
+  faListOl,
   faSearch,
   faTruckPickup,
 } from "@fortawesome/free-solid-svg-icons";
@@ -17,6 +18,8 @@ export default function PickupRequestsTable({
   pickups = [],
   loading = false,
   isDark = false,
+  pickupLimit = "50",
+  onPickupLimitChange,
   onSelectPickup,
   onEditPickup,
 }) {
@@ -96,7 +99,7 @@ export default function PickupRequestsTable({
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [activeFilter, delayType, endDate, searchQuery, startDate]);
+  }, [activeFilter, delayType, endDate, pickupLimit, searchQuery, startDate]);
 
   const totalPages = Math.max(1, Math.ceil(filteredPickups.length / itemsPerPage));
   const indexOfLastItem = currentPage * itemsPerPage;
@@ -239,17 +242,37 @@ export default function PickupRequestsTable({
         <div
           className={`px-4 sm:px-6 py-4 border-t flex flex-col sm:flex-row justify-between items-center gap-3 text-xs ${theme.footer}`}
         >
-          <span className={theme.footerText}>
-            Showing{" "}
-            <span className={`font-bold ${theme.footerStrong}`}>
-              {indexOfFirstItem + 1}
-            </span>{" "}
-            to{" "}
-            <span className={`font-bold ${theme.footerStrong}`}>
-              {Math.min(indexOfLastItem, filteredPickups.length)}
-            </span>{" "}
-            of {filteredPickups.length}
-          </span>
+          <div className="flex flex-col sm:flex-row items-center gap-3">
+            <span className={theme.footerText}>
+              Showing{" "}
+              <span className={`font-bold ${theme.footerStrong}`}>
+                {indexOfFirstItem + 1}
+              </span>{" "}
+              to{" "}
+              <span className={`font-bold ${theme.footerStrong}`}>
+                {Math.min(indexOfLastItem, filteredPickups.length)}
+              </span>{" "}
+              of {filteredPickups.length}
+            </span>
+
+            <div className="relative w-32">
+              <FontAwesomeIcon
+                icon={faListOl}
+                className={`absolute left-3 top-1/2 -translate-y-1/2 text-sm ${theme.iconMuted}`}
+              />
+              <select
+                className={`w-full border rounded-lg pl-9 pr-4 py-1.5 text-xs focus:border-blue-500 focus:outline-none appearance-none cursor-pointer ${theme.input}`}
+                value={pickupLimit}
+                onChange={(e) => onPickupLimitChange?.(e.target.value)}
+                title="Limit pickup requests"
+              >
+                <option value="50">50 items</option>
+                <option value="100">100 items</option>
+                <option value="200">200 items</option>
+                <option value="all">All items</option>
+              </select>
+            </div>
+          </div>
 
           <div className="flex gap-2">
             <button

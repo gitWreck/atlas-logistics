@@ -5,6 +5,20 @@ import { headers } from "next/headers";
 
 export const dynamic = "force-dynamic"; // Prevent caching
 
+const COMPLETED_TRIP_STATUSES = ["COMPLETED", "DELIVERED"];
+const COMPLETED_TRIP_STATUS_SET = new Set(COMPLETED_TRIP_STATUSES);
+
+function parseLimit(searchParams, key) {
+  const limitParam = searchParams.get(key) || searchParams.get("limit") || "50";
+  const allowedLimits = ["all", "50", "100", "200"];
+
+  if (!allowedLimits.includes(limitParam)) {
+    throw new Error(`Invalid ${key}. Use all, 50, 100, or 200.`);
+  }
+
+  return limitParam;
+}
+
 export async function GET(request) {
   try {
     const headersList = await headers();
@@ -28,17 +42,43 @@ export async function GET(request) {
       );
     }
 
+    const { searchParams } = new URL(request.url);
+    const activeLimit = parseLimit(searchParams, "activeLimit");
+    const completedLimit = parseLimit(searchParams, "completedLimit");
+
     // 3. FETCH TRIPS PARENT DOCS
     const snapshot = await adminDb
       .collection("truck_trips")
       .orderBy("updatedAt", "desc")
-      .limit(50)
       .get();
+
+    const activeDocs = snapshot.docs.filter(
+      (doc) =>
+        !COMPLETED_TRIP_STATUS_SET.has(
+          String(doc.data().status || "").toUpperCase(),
+        ),
+    );
+    const completedDocs = snapshot.docs.filter((doc) =>
+      COMPLETED_TRIP_STATUS_SET.has(
+        String(doc.data().status || "").toUpperCase(),
+      ),
+    );
+    const limitedActiveDocs =
+      activeLimit === "all" ? activeDocs : activeDocs.slice(0, Number(activeLimit));
+    const limitedCompletedDocs =
+      completedLimit === "all"
+        ? completedDocs
+        : completedDocs.slice(0, Number(completedLimit));
+
+    const tripDocs = new Map();
+    [...limitedActiveDocs, ...limitedCompletedDocs].forEach((doc) => {
+      tripDocs.set(doc.id, doc);
+    });
 
     // 4. TRANSFORM DATA & FETCH SUBCOLLECTIONS
     // We use Promise.all to fetch subcollections in parallel
     const trips = await Promise.all(
-      snapshot.docs.map(async (doc) => {
+      Array.from(tripDocs.values()).map(async (doc) => {
         const data = doc.data();
 
         // A. Fetch the 'trip_shipments' subcollection for THIS trip
@@ -82,7 +122,7 @@ export async function GET(request) {
     console.error("API Error fetching trips:", error);
     return NextResponse.json(
       { error: "Failed to fetch trips", details: error.message },
-      { status: 500 },
+      { status: error.message?.startsWith("Invalid ") ? 400 : 500 },
     );
   }
 }

@@ -4,6 +4,7 @@ import React, {
   useState,
   useMemo,
   useEffect,
+  useCallback,
   forwardRef,
   useImperativeHandle,
   use,
@@ -15,6 +16,7 @@ import {
   faFilter,
   faChevronLeft,
   faChevronRight,
+  faListOl,
   faRoute,
 } from "@fortawesome/free-solid-svg-icons";
 import TripRow from "./TripRow";
@@ -58,19 +60,25 @@ const TripBoard = forwardRef(function TripBoard(
   const [endDate, setEndDate] = useState("");
 
   const [currentPage, setCurrentPage] = useState(1);
+  const [activeTripLimit, setActiveTripLimit] = useState("50");
+  const [completedTripLimit, setCompletedTripLimit] = useState("50");
   const itemsPerPage = 10;
 
   const theme = getBoardThemeClasses(isDark);
 
-  const fetchTrips = async () => {
+  const fetchTrips = useCallback(async () => {
     try {
       setLoading(true);
 
       if (!user) return;
 
       const token = await user.getIdToken();
+      const tripsUrl =
+        activeTripLimit === "50" && completedTripLimit === "50"
+          ? "/api/trips"
+          : `/api/trips?activeLimit=${activeTripLimit}&completedLimit=${completedTripLimit}`;
 
-      const res = await fetch("/api/trips", {
+      const res = await fetch(tripsUrl, {
         method: "GET",
         headers: {
           "Content-Type": "application/json",
@@ -94,11 +102,11 @@ const TripBoard = forwardRef(function TripBoard(
     } finally {
       setLoading(false);
     }
-  };
+  }, [activeTripLimit, completedTripLimit, user]);
 
   useEffect(() => {
     fetchTrips();
-  }, []);
+  }, [fetchTrips]);
 
   const tripScheduleCandidates = useMemo(() => {
     const allowedStatuses = new Set(["CREATED", "LOADED"]);
@@ -178,7 +186,14 @@ const TripBoard = forwardRef(function TripBoard(
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchQuery, activeFilter, typeFilter, startDate, endDate]);
+  }, [
+    searchQuery,
+    activeFilter,
+    typeFilter,
+    startDate,
+    endDate,
+    activeTripLimit,
+  ]);
 
   const indexOfLastItem = currentPage * itemsPerPage;
   const indexOfFirstItem = indexOfLastItem - itemsPerPage;
@@ -378,13 +393,33 @@ const TripBoard = forwardRef(function TripBoard(
             <div
               className={`px-4 sm:px-6 py-4 border-t flex flex-col sm:flex-row justify-between items-center gap-3 text-xs ${theme.footer}`}
             >
-              <span className={theme.footerText}>
-                Page{" "}
-                <span className={`font-bold ${theme.footerStrong}`}>
-                  {currentPage}
-                </span>{" "}
-                of {totalPages}
-              </span>
+              <div className="flex flex-col sm:flex-row items-center gap-3">
+                <span className={theme.footerText}>
+                  Page{" "}
+                  <span className={`font-bold ${theme.footerStrong}`}>
+                    {currentPage}
+                  </span>{" "}
+                  of {totalPages}
+                </span>
+
+                <div className="relative w-32">
+                  <FontAwesomeIcon
+                    icon={faListOl}
+                    className={`absolute left-3 top-1/2 -translate-y-1/2 text-sm ${theme.iconMuted}`}
+                  />
+                  <select
+                    className={`w-full rounded-lg pl-9 pr-4 py-1.5 text-xs focus:border-emerald-500 focus:outline-none appearance-none cursor-pointer border ${theme.input}`}
+                    value={activeTripLimit}
+                    onChange={(e) => setActiveTripLimit(e.target.value)}
+                    title="Limit active manifests"
+                  >
+                    <option value="50">50 items</option>
+                    <option value="100">100 items</option>
+                    <option value="200">200 items</option>
+                    <option value="all">All items</option>
+                  </select>
+                </div>
+              </div>
 
               <div className="flex gap-2">
                 <button
@@ -418,6 +453,8 @@ const TripBoard = forwardRef(function TripBoard(
             trips={completedTrips}
             loading={loading}
             isDark={isDark}
+            completedTripLimit={completedTripLimit}
+            onCompletedTripLimitChange={setCompletedTripLimit}
             onSelectTrip={setSelectedTripId}
           />
         </div>
