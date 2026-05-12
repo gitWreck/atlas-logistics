@@ -10,8 +10,6 @@ import {
   faPlus,
   faCheckSquare,
   faSquare,
-  faChevronLeft,
-  faChevronRight,
   faPen,
   faTrash,
   faSearch,
@@ -27,6 +25,7 @@ import {
 } from "@/app/utility/constant/theme";
 import { getModalActionClasses } from "@/app/utility/constant/action";
 import StatusBadge from "../../ui/StatusBadge";
+import TablePaginationFooter from "../../ui/TablePaginationFooter";
 
 const PACKAGING_TYPES = ["Box", "Sack", "Crate", "Bundle", "Roll", "Envelope"];
 const ITEMS_PER_PAGE = 6;
@@ -986,60 +985,21 @@ export default function ViewPackagesModal({
 
                     {/* PAGINATION */}
                     {!loading && filteredPackages.length > 0 && (
-                      <div
-                        className={`px-4 sm:px-6 py-4 border-t flex flex-col sm:flex-row justify-between items-center gap-3 text-xs ${tableTheme.footer}`}
-                      >
-                        <span>
-                          Showing{" "}
-                          <span
-                            className={`font-bold ${tableTheme.footerBold}`}
-                          >
-                            {startIndex + 1}
-                          </span>
-                          -
-                          <span
-                            className={`font-bold ${tableTheme.footerBold}`}
-                          >
-                            {Math.min(
-                              startIndex + ITEMS_PER_PAGE,
-                              filteredPackages.length,
-                            )}
-                          </span>{" "}
-                          of {filteredPackages.length}
-                        </span>
-
-                        <div className="flex items-center gap-2">
-                          <button
-                            type="button"
-                            onClick={() =>
-                              setCurrentPage((prev) => Math.max(prev - 1, 1))
-                            }
-                            disabled={currentSafePage === 1}
-                            className={`px-3 py-2 rounded-lg border disabled:opacity-50 disabled:cursor-not-allowed ${tableTheme.paginationButton}`}
-                          >
-                            <FontAwesomeIcon icon={faChevronLeft} />
-                          </button>
-
-                          <span
-                            className={`px-2 font-bold ${tableTheme.footerBold}`}
-                          >
-                            {currentSafePage} / {totalPages}
-                          </span>
-
-                          <button
-                            type="button"
-                            onClick={() =>
-                              setCurrentPage((prev) =>
-                                Math.min(prev + 1, totalPages),
-                              )
-                            }
-                            disabled={currentSafePage === totalPages}
-                            className={`px-3 py-2 rounded-lg border disabled:opacity-50 disabled:cursor-not-allowed ${tableTheme.paginationButton}`}
-                          >
-                            <FontAwesomeIcon icon={faChevronRight} />
-                          </button>
-                        </div>
-                      </div>
+                      <TablePaginationFooter
+                        totalItems={filteredPackages.length}
+                        currentPage={currentSafePage}
+                        itemsPerPage={ITEMS_PER_PAGE}
+                        totalPages={totalPages}
+                        onPrevious={() =>
+                          setCurrentPage((prev) => Math.max(prev - 1, 1))
+                        }
+                        onNext={() =>
+                          setCurrentPage((prev) =>
+                            Math.min(prev + 1, totalPages),
+                          )
+                        }
+                        theme={tableTheme}
+                      />
                     )}
                   </div>
                 </div>

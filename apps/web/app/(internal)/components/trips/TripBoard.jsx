@@ -14,9 +14,6 @@ import {
   faSearch,
   faSync,
   faFilter,
-  faChevronLeft,
-  faChevronRight,
-  faListOl,
   faRoute,
 } from "@fortawesome/free-solid-svg-icons";
 import TripRow from "./TripRow";
@@ -29,6 +26,7 @@ import CreateTripModal from "./modals/CreateTripModal";
 import TripScheduleOverview from "./TripSchedule/TripScheduleOverview";
 import TripScheduleModal from "./TripSchedule/TripScheduleModal";
 import { updateTripSchedule } from "@/app/utility/FirebaseFunctions";
+import TablePaginationFooter from "../ui/TablePaginationFooter";
 
 const COMPLETED_TRIP_STATUSES = new Set(["COMPLETED", "DELIVERED"]);
 
@@ -198,7 +196,7 @@ const TripBoard = forwardRef(function TripBoard(
   const indexOfLastItem = currentPage * itemsPerPage;
   const indexOfFirstItem = indexOfLastItem - itemsPerPage;
   const currentItems = activeTrips.slice(indexOfFirstItem, indexOfLastItem);
-  const totalPages = Math.ceil(activeTrips.length / itemsPerPage);
+  const totalPages = Math.max(1, Math.ceil(activeTrips.length / itemsPerPage));
 
   const selectedTrip = trips.find((trip) => trip.id === selectedTripId);
 
@@ -390,61 +388,22 @@ const TripBoard = forwardRef(function TripBoard(
 
           {/* Pagination */}
           {activeTrips.length > 0 && (
-            <div
-              className={`px-4 sm:px-6 py-4 border-t flex flex-col sm:flex-row justify-between items-center gap-3 text-xs ${theme.footer}`}
-            >
-              <div className="flex flex-col sm:flex-row items-center gap-3">
-                <span className={theme.footerText}>
-                  Page{" "}
-                  <span className={`font-bold ${theme.footerStrong}`}>
-                    {currentPage}
-                  </span>{" "}
-                  of {totalPages}
-                </span>
-
-                <div className="relative w-32">
-                  <FontAwesomeIcon
-                    icon={faListOl}
-                    className={`absolute left-3 top-1/2 -translate-y-1/2 text-sm ${theme.iconMuted}`}
-                  />
-                  <select
-                    className={`w-full rounded-lg pl-9 pr-4 py-1.5 text-xs focus:border-emerald-500 focus:outline-none appearance-none cursor-pointer border ${theme.input}`}
-                    value={activeTripLimit}
-                    onChange={(e) => setActiveTripLimit(e.target.value)}
-                    title="Limit active manifests"
-                  >
-                    <option value="50">50 items</option>
-                    <option value="100">100 items</option>
-                    <option value="200">200 items</option>
-                    <option value="all">All items</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={() =>
-                    setCurrentPage((page) => Math.max(1, page - 1))
-                  }
-                  disabled={currentPage === 1}
-                  className={`px-3 py-1.5 rounded-lg border disabled:opacity-50 disabled:cursor-not-allowed transition-all ${theme.paginationButton}`}
-                >
-                  <FontAwesomeIcon icon={faChevronLeft} />
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() =>
-                    setCurrentPage((page) => Math.min(totalPages, page + 1))
-                  }
-                  disabled={currentPage === totalPages}
-                  className={`px-3 py-1.5 rounded-lg border disabled:opacity-50 disabled:cursor-not-allowed transition-all ${theme.paginationButton}`}
-                >
-                  <FontAwesomeIcon icon={faChevronRight} />
-                </button>
-              </div>
-            </div>
+            <TablePaginationFooter
+              totalItems={activeTrips.length}
+              currentPage={currentPage}
+              itemsPerPage={itemsPerPage}
+              totalPages={totalPages}
+              limitValue={activeTripLimit}
+              limitTitle="Limit active manifests"
+              onLimitChange={setActiveTripLimit}
+              onPrevious={() =>
+                setCurrentPage((page) => Math.max(1, page - 1))
+              }
+              onNext={() =>
+                setCurrentPage((page) => Math.min(totalPages, page + 1))
+              }
+              theme={theme}
+            />
           )}
         </div>
 

@@ -375,6 +375,7 @@ export default function AdminDashboardPage() {
                   ref={invoiceBoardRef}
                   user={user}
                   isDark={isDark}
+                  profile={profile}
                 />
               )}
             </div>

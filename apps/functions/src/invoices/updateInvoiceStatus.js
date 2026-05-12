@@ -1,10 +1,14 @@
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const admin = require("firebase-admin");
+const {
+  getActorFromRequest,
+  writeInvoiceActionLog,
+} = require("../utilities/invoiceLogger");
 let sendInvoicesStatusSmsLogic = null;
 try {
   ({
     sendInvoicesStatusSmsLogic,
-  } = require("../messaging/original/sendInvoicesStatusSmsLogic"));
+  } = require("../messaging/sendInvoicesStatusSmsLogic"));
 } catch (error) {
   console.warn(
     "[INVOICE_SMS] sendInvoicesStatusSmsLogic unavailable; invoice SMS notifications disabled.",
@@ -52,6 +56,7 @@ exports.updateInvoiceStatus = onCall(
 
     const userDoc = await db.collection("users").doc(uid).get();
     const userData = userDoc.data();
+    const actor = getActorFromRequest(request, userData || {});
 
     if (
       !userData ||
@@ -151,15 +156,22 @@ exports.updateInvoiceStatus = onCall(
       note: `Invoice ${invoiceData.invoiceNumber || invoiceId} updated from ${currentStatus} to ${status}`,
     });
 
-    batch.set(db.collection("admin_logs").doc(), {
+    writeInvoiceActionLog({
+      db,
+      batch,
       action: "UPDATE_INVOICE_STATUS",
       invoiceId,
+      invoiceDocId: invoiceRef.id,
       invoiceNumber: invoiceData.invoiceNumber || invoiceId,
       shipmentId: shipmentId || null,
-      previousStatus: currentStatus,
-      status,
-      sendNotification: Boolean(sendNotification),
-      actorId: uid,
+      actorId: actor.actorId,
+      actorName: actor.actorName,
+      actorRole: actor.actorRole,
+      details: {
+        previousStatus: currentStatus,
+        status,
+        sendNotification: Boolean(sendNotification),
+      },
       createdAt: nowAt,
     });
 

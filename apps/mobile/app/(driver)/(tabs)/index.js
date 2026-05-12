@@ -16,12 +16,12 @@ import {
   Timestamp,
 } from "firebase/firestore";
 import { startOfDay, subDays } from "date-fns";
-import { auth, db } from "../../../firebase";
+import { db } from "../../../firebase";
 
 // ✅ IMPORT NEW COMPONENTS
 import StatusFilter from "../../../components/checker/StatusFilter";
 import StatusBoard from "../../../components/checker/StatusBoard";
-import OperationsGrid from "../../../components/checker/OperationsGrid";
+// import OperationsGrid from "../../../components/checker/OperationsGrid";
 import { DRIVER_STATUS_BOARD_CARDS } from "../../../components/checker/StatusBoard";
 import { useTheme } from "../../../contexts/ThemeContext";
 

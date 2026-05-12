@@ -3,16 +3,14 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
-  faChevronLeft,
-  faChevronRight,
   faExclamationCircle,
   faFilter,
-  faListOl,
   faSearch,
   faTruckPickup,
 } from "@fortawesome/free-solid-svg-icons";
 import ShipmentRow from "./ShipmentRow";
 import { getBoardThemeClasses } from "@/app/utility/constant/theme";
+import TablePaginationFooter from "../ui/TablePaginationFooter";
 
 export default function PickupRequestsTable({
   pickups = [],
@@ -239,63 +237,22 @@ export default function PickupRequestsTable({
       </div>
 
       {filteredPickups.length > 0 && (
-        <div
-          className={`px-4 sm:px-6 py-4 border-t flex flex-col sm:flex-row justify-between items-center gap-3 text-xs ${theme.footer}`}
-        >
-          <div className="flex flex-col sm:flex-row items-center gap-3">
-            <span className={theme.footerText}>
-              Showing{" "}
-              <span className={`font-bold ${theme.footerStrong}`}>
-                {indexOfFirstItem + 1}
-              </span>{" "}
-              to{" "}
-              <span className={`font-bold ${theme.footerStrong}`}>
-                {Math.min(indexOfLastItem, filteredPickups.length)}
-              </span>{" "}
-              of {filteredPickups.length}
-            </span>
-
-            <div className="relative w-32">
-              <FontAwesomeIcon
-                icon={faListOl}
-                className={`absolute left-3 top-1/2 -translate-y-1/2 text-sm ${theme.iconMuted}`}
-              />
-              <select
-                className={`w-full border rounded-lg pl-9 pr-4 py-1.5 text-xs focus:border-blue-500 focus:outline-none appearance-none cursor-pointer ${theme.input}`}
-                value={pickupLimit}
-                onChange={(e) => onPickupLimitChange?.(e.target.value)}
-                title="Limit pickup requests"
-              >
-                <option value="50">50 items</option>
-                <option value="100">100 items</option>
-                <option value="200">200 items</option>
-                <option value="all">All items</option>
-              </select>
-            </div>
-          </div>
-
-          <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
-              disabled={currentPage === 1}
-              className={`px-3 py-1.5 rounded-lg border text-xs disabled:opacity-50 disabled:cursor-not-allowed transition-all ${theme.paginationButton}`}
-            >
-              <FontAwesomeIcon icon={faChevronLeft} />
-            </button>
-
-            <button
-              type="button"
-              onClick={() =>
-                setCurrentPage((prev) => Math.min(prev + 1, totalPages))
-              }
-              disabled={currentPage === totalPages}
-              className={`px-3 py-1.5 rounded-lg border text-xs disabled:opacity-50 disabled:cursor-not-allowed transition-all ${theme.paginationButton}`}
-            >
-              <FontAwesomeIcon icon={faChevronRight} />
-            </button>
-          </div>
-        </div>
+        <TablePaginationFooter
+          totalItems={filteredPickups.length}
+          currentPage={currentPage}
+          itemsPerPage={itemsPerPage}
+          totalPages={totalPages}
+          limitValue={pickupLimit}
+          limitTitle="Limit pickup requests"
+          onLimitChange={onPickupLimitChange}
+          onPrevious={() =>
+            setCurrentPage((prev) => Math.max(prev - 1, 1))
+          }
+          onNext={() =>
+            setCurrentPage((prev) => Math.min(prev + 1, totalPages))
+          }
+          theme={theme}
+        />
       )}
     </div>
   );

@@ -4,13 +4,11 @@ import React, { useEffect, useMemo, useState } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faCheckCircle,
-  faChevronLeft,
-  faChevronRight,
-  faListOl,
   faSearch,
 } from "@fortawesome/free-solid-svg-icons";
 import TripRow from "./TripRow";
 import { getBoardThemeClasses } from "@/app/utility/constant/theme";
+import TablePaginationFooter from "../ui/TablePaginationFooter";
 
 export default function CompletedTripsTable({
   trips = [],
@@ -143,59 +141,22 @@ export default function CompletedTripsTable({
       </div>
 
       {filteredTrips.length > 0 && (
-        <div
-          className={`px-4 sm:px-6 py-4 border-t flex flex-col sm:flex-row justify-between items-center gap-3 text-xs ${theme.footer}`}
-        >
-          <div className="flex flex-col sm:flex-row items-center gap-3">
-            <span className={theme.footerText}>
-              Page{" "}
-              <span className={`font-bold ${theme.footerStrong}`}>
-                {currentPage}
-              </span>{" "}
-              of {totalPages}
-            </span>
-
-            <div className="relative w-32">
-              <FontAwesomeIcon
-                icon={faListOl}
-                className={`absolute left-3 top-1/2 -translate-y-1/2 text-sm ${theme.iconMuted}`}
-              />
-              <select
-                className={`w-full rounded-lg pl-9 pr-4 py-1.5 text-xs focus:border-emerald-500 focus:outline-none appearance-none cursor-pointer border ${theme.input}`}
-                value={completedTripLimit}
-                onChange={(e) => onCompletedTripLimitChange?.(e.target.value)}
-                title="Limit completed trips"
-              >
-                <option value="50">50 items</option>
-                <option value="100">100 items</option>
-                <option value="200">200 items</option>
-                <option value="all">All items</option>
-              </select>
-            </div>
-          </div>
-
-          <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
-              disabled={currentPage === 1}
-              className={`px-3 py-1.5 rounded-lg border disabled:opacity-50 disabled:cursor-not-allowed transition-all ${theme.paginationButton}`}
-            >
-              <FontAwesomeIcon icon={faChevronLeft} />
-            </button>
-
-            <button
-              type="button"
-              onClick={() =>
-                setCurrentPage((page) => Math.min(totalPages, page + 1))
-              }
-              disabled={currentPage === totalPages}
-              className={`px-3 py-1.5 rounded-lg border disabled:opacity-50 disabled:cursor-not-allowed transition-all ${theme.paginationButton}`}
-            >
-              <FontAwesomeIcon icon={faChevronRight} />
-            </button>
-          </div>
-        </div>
+        <TablePaginationFooter
+          totalItems={filteredTrips.length}
+          currentPage={currentPage}
+          itemsPerPage={itemsPerPage}
+          totalPages={totalPages}
+          limitValue={completedTripLimit}
+          limitTitle="Limit completed trips"
+          onLimitChange={onCompletedTripLimitChange}
+          onPrevious={() =>
+            setCurrentPage((page) => Math.max(1, page - 1))
+          }
+          onNext={() =>
+            setCurrentPage((page) => Math.min(totalPages, page + 1))
+          }
+          theme={theme}
+        />
       )}
     </div>
   );
