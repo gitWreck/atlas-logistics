@@ -13,10 +13,7 @@ import {
   faSearch,
   faSync,
   faFilter,
-  faChevronLeft,
-  faChevronRight,
   faExclamationCircle,
-  faListOl,
 } from "@fortawesome/free-solid-svg-icons";
 import ShipmentRow from "./ShipmentRow";
 import ShipmentDrawer from "./ShipmentDrawer";
@@ -24,6 +21,7 @@ import { calculateProgress } from "@/app/utility/utilities";
 import { getBoardThemeClasses } from "@/app/utility/constant/theme";
 import UnifiedShipmentModal from "./modals/UnifiedShipmentModal";
 import PickupRequestsTable from "./PickupRequestsTable";
+import TablePaginationFooter from "../ui/TablePaginationFooter";
 
 const ShipmentBoard = forwardRef(function ShipmentBoard(
   { user, profile, isDark = false },
@@ -216,7 +214,10 @@ const ShipmentBoard = forwardRef(function ShipmentBoard(
     indexOfFirstItem,
     indexOfLastItem,
   );
-  const totalPages = Math.ceil(filteredShipments.length / itemsPerPage);
+  const totalPages = Math.max(
+    1,
+    Math.ceil(filteredShipments.length / itemsPerPage),
+  );
 
   const uniqueDelayReasons = useMemo(() => {
     const reasons = new Set(
@@ -406,61 +407,22 @@ const ShipmentBoard = forwardRef(function ShipmentBoard(
 
           {/* Pagination */}
           {filteredShipments.length > 0 && (
-            <div
-              className={`px-4 sm:px-6 py-4 border-t flex flex-col sm:flex-row justify-between items-center gap-3 text-xs ${theme.footer}`}
-            >
-              <div className="flex flex-col sm:flex-row items-center gap-3">
-                <span className={theme.footerText}>
-                  Showing{" "}
-                  <span className={`font-bold ${theme.footerStrong}`}>
-                    {indexOfFirstItem + 1}
-                  </span>{" "}
-                  of {filteredShipments.length}
-                </span>
-
-                <div className="relative w-32">
-                  <FontAwesomeIcon
-                    icon={faListOl}
-                    className={`absolute left-3 top-1/2 -translate-y-1/2 text-sm ${theme.iconMuted}`}
-                  />
-                  <select
-                    className={`w-full border rounded-lg pl-9 pr-4 py-1.5 text-xs focus:border-blue-500 focus:outline-none appearance-none cursor-pointer ${theme.input}`}
-                    value={shipmentLimit}
-                    onChange={(e) => setShipmentLimit(e.target.value)}
-                    title="Limit orders"
-                  >
-                    <option value="50">50 items</option>
-                    <option value="100">100 items</option>
-                    <option value="200">200 items</option>
-                    <option value="all">All items</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={() =>
-                    setCurrentPage((prev) => Math.max(prev - 1, 1))
-                  }
-                  disabled={currentPage === 1}
-                  className={`px-3 py-1.5 rounded-lg border text-xs disabled:opacity-50 disabled:cursor-not-allowed transition-all ${theme.paginationButton}`}
-                >
-                  <FontAwesomeIcon icon={faChevronLeft} />
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() =>
-                    setCurrentPage((prev) => Math.min(prev + 1, totalPages))
-                  }
-                  disabled={currentPage === totalPages}
-                  className={`px-3 py-1.5 rounded-lg border text-xs disabled:opacity-50 disabled:cursor-not-allowed transition-all ${theme.paginationButton}`}
-                >
-                  <FontAwesomeIcon icon={faChevronRight} />
-                </button>
-              </div>
-            </div>
+            <TablePaginationFooter
+              totalItems={filteredShipments.length}
+              currentPage={currentPage}
+              itemsPerPage={itemsPerPage}
+              totalPages={totalPages}
+              limitValue={shipmentLimit}
+              limitTitle="Limit orders"
+              onLimitChange={setShipmentLimit}
+              onPrevious={() =>
+                setCurrentPage((prev) => Math.max(prev - 1, 1))
+              }
+              onNext={() =>
+                setCurrentPage((prev) => Math.min(prev + 1, totalPages))
+              }
+              theme={theme}
+            />
           )}
         </div>
 

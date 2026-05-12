@@ -209,10 +209,11 @@ export default function UnifiedShipmentModal({
 
       if (isEditMode) {
         // ✅ UPDATE MODE
-        // await updateShipmentDetails({
-        //   shipmentId: finalDocId,
-        //   ...payload,
-        // });
+        await updateShipmentDetails({
+          shipmentId: finalDocId,
+          ...payload,
+          updatedBy: updatedBy(profile),
+        });
       } else {
         // ❌ CREATE MODE
         payload.manualShipmentId = finalDocId; // Only pass manual ID on creation

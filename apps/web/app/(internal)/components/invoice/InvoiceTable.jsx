@@ -5,8 +5,6 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faSearch,
   faFilter,
-  faChevronLeft,
-  faChevronRight,
   faSync,
   faEye,
   faEdit,
@@ -20,6 +18,7 @@ import {
 } from "@/app/utility/constant/theme";
 import ExportInvoiceList from "../exports/ExportInvoiceList";
 import { formatAmount, StatusBadge } from "./utils";
+import TablePaginationFooter from "../ui/TablePaginationFooter";
 
 function formatInvoiceDate(value) {
   if (!value) return "";
@@ -66,6 +65,7 @@ export default function InvoiceTable({
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("ALL");
   const [page, setPage] = useState(1);
+  const [invoiceLimit, setInvoiceLimit] = useState("50");
 
   const itemsPerPage = 10;
   const theme = getTableTheme(isDark);
@@ -93,18 +93,27 @@ export default function InvoiceTable({
     });
   }, [invoices, search, statusFilter]);
 
+  const visibleInvoices = useMemo(() => {
+    if (invoiceLimit === "all") return filteredInvoices;
+
+    const parsedLimit = Number(invoiceLimit);
+    if (!Number.isFinite(parsedLimit)) return filteredInvoices;
+
+    return filteredInvoices.slice(0, parsedLimit);
+  }, [filteredInvoices, invoiceLimit]);
+
   useEffect(() => {
     setPage(1);
-  }, [search, statusFilter]);
+  }, [invoiceLimit, search, statusFilter]);
 
   const totalPages = Math.max(
     1,
-    Math.ceil(filteredInvoices.length / itemsPerPage),
+    Math.ceil(visibleInvoices.length / itemsPerPage),
   );
 
   const currentPage = Math.min(page, totalPages);
 
-  const paginatedInvoices = filteredInvoices.slice(
+  const paginatedInvoices = visibleInvoices.slice(
     (currentPage - 1) * itemsPerPage,
     currentPage * itemsPerPage,
   );
@@ -456,37 +465,18 @@ export default function InvoiceTable({
 
       {/* Pagination */}
       {!loading && filteredInvoices.length > 0 && (
-        <div
-          className={`px-4 sm:px-6 py-4 border-t flex flex-col sm:flex-row justify-between items-center gap-3 text-xs ${theme.footer}`}
-        >
-          <span>
-            Showing{" "}
-            <span className={`font-bold ${theme.footerBold}`}>
-              {Math.min(currentPage * itemsPerPage, filteredInvoices.length)}
-            </span>{" "}
-            of {filteredInvoices.length}
-          </span>
-
-          <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={() => setPage((prev) => Math.max(1, prev - 1))}
-              disabled={currentPage === 1}
-              className={`px-3 py-1.5 rounded-lg border disabled:opacity-50 disabled:cursor-not-allowed transition-all ${theme.paginationButton}`}
-            >
-              <FontAwesomeIcon icon={faChevronLeft} className="mr-1" />
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setPage((prev) => Math.min(totalPages, prev + 1))}
-              disabled={currentPage === totalPages}
-              className={`px-3 py-1.5 rounded-lg border disabled:opacity-50 disabled:cursor-not-allowed transition-all ${theme.paginationButton}`}
-            >
-              <FontAwesomeIcon icon={faChevronRight} className="ml-1" />
-            </button>
-          </div>
-        </div>
+        <TablePaginationFooter
+          totalItems={visibleInvoices.length}
+          currentPage={currentPage}
+          itemsPerPage={itemsPerPage}
+          totalPages={totalPages}
+          limitValue={invoiceLimit}
+          limitTitle="Limit invoices"
+          onLimitChange={setInvoiceLimit}
+          onPrevious={() => setPage((prev) => Math.max(1, prev - 1))}
+          onNext={() => setPage((prev) => Math.min(totalPages, prev + 1))}
+          theme={theme}
+        />
       )}
     </div>
   );

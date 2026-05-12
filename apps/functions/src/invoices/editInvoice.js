@@ -1,5 +1,9 @@
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const admin = require("firebase-admin");
+const {
+  getActorFromRequest,
+  writeInvoiceActionLog,
+} = require("../utilities/invoiceLogger");
 
 if (!admin.apps.length) admin.initializeApp();
 const db = admin.firestore();
@@ -16,6 +20,7 @@ exports.editInvoice = onCall(
     }
 
     const uid = request.auth.uid;
+    const actor = getActorFromRequest(request);
 
     const {
       invoiceId,
@@ -67,16 +72,41 @@ exports.editInvoice = onCall(
     if (status !== undefined) updateData.status = status;
 
     // 4. WRITE
-    await invoiceRef.update(updateData);
+    const nowAt = admin.firestore.FieldValue.serverTimestamp();
+    const batch = db.batch();
+    const changedFields = Object.keys(updateData).filter(
+      (field) => field !== "updatedAt" && field !== "updatedBy",
+    );
 
-    // 5. LOG
-    await db.collection("invoice_events").add({
+    batch.update(invoiceRef, updateData);
+
+    batch.set(db.collection("invoice_events").doc(), {
       invoiceId,
       type: "INVOICE_UPDATED",
       actorId: uid,
       at: admin.firestore.Timestamp.now(),
       note: "Invoice updated",
     });
+
+    writeInvoiceActionLog({
+      db,
+      batch,
+      action: "UPDATE_INVOICE",
+      invoiceId,
+      invoiceDocId: invoiceRef.id,
+      invoiceNumber: invoiceData.invoiceNumber || invoiceId,
+      shipmentId: invoiceData.shipmentId || null,
+      actorId: actor.actorId,
+      actorName: actor.actorName,
+      actorRole: actor.actorRole,
+      details: {
+        changedFields,
+        status: updateData.status,
+      },
+      createdAt: nowAt,
+    });
+
+    await batch.commit();
 
     return {
       success: true,

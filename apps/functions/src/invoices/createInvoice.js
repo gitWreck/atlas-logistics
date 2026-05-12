@@ -1,5 +1,9 @@
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const admin = require("firebase-admin");
+const {
+  getActorFromRequest,
+  writeInvoiceActionLog,
+} = require("../utilities/invoiceLogger");
 const { Timestamp } = admin.firestore;
 
 if (!admin.apps.length) admin.initializeApp();
@@ -17,6 +21,7 @@ exports.createInvoice = onCall(
     }
 
     const uid = request.auth.uid;
+    const actor = getActorFromRequest(request);
 
     const {
       shipmentId,
@@ -170,13 +175,21 @@ exports.createInvoice = onCall(
       { merge: true },
     );
 
-    batch.set(db.collection("admin_logs").doc(), {
+    writeInvoiceActionLog({
+      db,
+      batch,
       action: "CREATE_INVOICE",
       invoiceId: invoiceRef.id,
+      invoiceDocId: invoiceRef.id,
       invoiceNumber,
       shipmentId,
-      amount: finalAmount,
-      actorId: uid,
+      actorId: actor.actorId,
+      actorName: actor.actorName,
+      actorRole: actor.actorRole,
+      details: {
+        amount: finalAmount,
+        status: finalStatus,
+      },
       createdAt: nowAt,
     });
 

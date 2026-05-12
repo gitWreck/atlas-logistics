@@ -12,7 +12,7 @@ import { CameraView, useCameraPermissions } from "expo-camera";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { getFunctions, httpsCallable } from "firebase/functions";
 import { Ionicons } from "@expo/vector-icons";
-import { getCurrentLocationSafe } from "../../components/utilities/helpers";
+import { getCurrentLocationSafe } from "../components/utilities/helpers";
 
 export default function DriverScannerScreen() {
   const router = useRouter();

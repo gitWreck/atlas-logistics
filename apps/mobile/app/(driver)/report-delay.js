@@ -15,13 +15,13 @@ import {
 import { useRouter } from "expo-router";
 import { FontAwesome5 } from "@expo/vector-icons";
 import { collection, query, where, getDocs, limit } from "firebase/firestore";
-import { getFunctions, httpsCallable } from "firebase/functions";
 import { db, auth } from "../../firebase";
 import { StatusBar } from "expo-status-bar";
 import { Image } from "expo-image";
-import GradientButton from "../../components/ui/figma/GradientButton";
 import { reportTripDelay } from "../../components/utilities/FirebaseFunctions";
 import { useTheme } from "../../contexts/ThemeContext";
+import { useAuth } from "../../contexts/AuthContext";
+import GradientButton from "../../components/ui/figma/GradientButton";
 
 const DELAY_TYPES = [
   {
@@ -47,6 +47,7 @@ const DELAY_TYPES = [
 ];
 
 export default function ReportDelayScreen() {
+  const { profile } = useAuth();
   const router = useRouter();
   const { colors, resolvedScheme } = useTheme();
   const [tripId, setTripId] = useState(null);
@@ -100,6 +101,7 @@ export default function ReportDelayScreen() {
         tripId: tripId,
         type: selectedType,
         notes: notes,
+        updatedBy: updatedBy(profile),
       });
 
       Alert.alert("Reported", "Dispatch has been notified immediately.", [
@@ -132,10 +134,16 @@ export default function ReportDelayScreen() {
         <View
           style={[
             styles.header,
-            { backgroundColor: colors.surface, borderBottomColor: colors.border },
+            {
+              backgroundColor: colors.surface,
+              borderBottomColor: colors.border,
+            },
           ]}
         >
-          <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
+          <TouchableOpacity
+            onPress={() => router.back()}
+            style={styles.backBtn}
+          >
             <Image
               source={require("../../assets/icons/back.svg")}
               style={{ width: 20, height: 20 }}
@@ -150,36 +158,36 @@ export default function ReportDelayScreen() {
           <Text style={[styles.sectionTitle, { color: colors.text }]}>
             Report Delay
           </Text>
-        <Text style={[styles.subtitle, { color: colors.textMuted }]}>
-          Select the reason for the delay
-        </Text>
+          <Text style={[styles.subtitle, { color: colors.textMuted }]}>
+            Select the reason for the delay
+          </Text>
 
-        <View style={styles.grid}>
-          {DELAY_TYPES.map((type) => (
-            <TouchableOpacity
-              key={type.id}
-              style={[
-                styles.card,
-                {
-                  backgroundColor: colors.surface,
-                  borderColor: colors.border,
-                },
-                selectedType === type.id && {
-                  borderColor: type.color,
-                  backgroundColor: `${type.color}20`, // 20% opacity
-                },
-              ]}
-              onPress={() => setSelectedType(type.id)}
-            >
-              <View style={[styles.iconBox, { backgroundColor: type.color }]}>
-                <FontAwesome5 name={type.icon} size={20} color="#fff" />
-              </View>
-              <Text style={[styles.cardLabel, { color: colors.text }]}>
-                {type.label}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
+          <View style={styles.grid}>
+            {DELAY_TYPES.map((type) => (
+              <TouchableOpacity
+                key={type.id}
+                style={[
+                  styles.card,
+                  {
+                    backgroundColor: colors.surface,
+                    borderColor: colors.border,
+                  },
+                  selectedType === type.id && {
+                    borderColor: type.color,
+                    backgroundColor: `${type.color}20`, // 20% opacity
+                  },
+                ]}
+                onPress={() => setSelectedType(type.id)}
+              >
+                <View style={[styles.iconBox, { backgroundColor: type.color }]}>
+                  <FontAwesome5 name={type.icon} size={20} color="#fff" />
+                </View>
+                <Text style={[styles.cardLabel, { color: colors.text }]}>
+                  {type.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
 
           <Text style={[styles.label, { color: colors.textMuted }]}>
             Additional Notes (Optional)

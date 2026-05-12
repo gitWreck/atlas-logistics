@@ -14,6 +14,7 @@ import {
   updateTripStatus,
   clearTruckDelay,
   setTruckDelay,
+  bulkAssignShipments,
 } from "@/app/utility/FirebaseFunctions";
 import StatusButton from "../ui/StatusButton";
 import NotifyToggle from "../messaging/NotifyToggle";
@@ -78,9 +79,15 @@ export default function TripOperations({
                 runAction(
                   setAssignStatus,
                   () =>
-                    assignShipmentToTrip({
-                      trackingShipmentId: assignId,
+                    // assignShipmentToTrip({
+                    //   trackingShipmentId: assignId,
+                    //   tripId: tripId,
+                    //   updatedBy: updatedBy(profile),
+                    // }),
+
+                    bulkAssignShipments({
                       tripId: tripId,
+                      shipmentIds: [assignId],
                       updatedBy: updatedBy(profile),
                     }),
                   () => {

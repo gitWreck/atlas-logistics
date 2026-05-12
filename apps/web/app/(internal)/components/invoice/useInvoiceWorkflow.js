@@ -6,8 +6,14 @@ import {
   editInvoice,
   updateInvoiceStatus,
 } from "@/app/utility/FirebaseFunctions";
+import { updatedBy } from "@/app/utility/utilities";
 
-export default function useInvoiceWorkflow({ user, onRefresh, onError } = {}) {
+export default function useInvoiceWorkflow({
+  user,
+  onRefresh,
+  onError,
+  profile,
+} = {}) {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -100,12 +106,15 @@ export default function useInvoiceWorkflow({ user, onRefresh, onError } = {}) {
       try {
         const token = await user?.getIdToken();
 
-        const res = await fetch(`/api/invoices/${encodeURIComponent(invoiceId)}`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
+        const res = await fetch(
+          `/api/invoices/${encodeURIComponent(invoiceId)}`,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+            cache: "no-store",
           },
-          cache: "no-store",
-        });
+        );
 
         const json = await res.json();
         if (!res.ok) throw new Error(json.error || "Failed to fetch invoice");
@@ -142,9 +151,10 @@ export default function useInvoiceWorkflow({ user, onRefresh, onError } = {}) {
           await editInvoice({
             invoiceId: selectedInvoice.id,
             ...payload,
+            updatedBy: updatedBy(profile),
           });
         } else {
-          await createInvoice(payload);
+          await createInvoice({ ...payload, updatedBy: updatedBy(profile) });
         }
 
         await refresh();
@@ -169,6 +179,7 @@ export default function useInvoiceWorkflow({ user, onRefresh, onError } = {}) {
           invoiceId: invoice.id,
           status,
           sendNotification,
+          updatedBy: updatedBy(profile),
         });
 
         setSelectedInvoice((prev) =>

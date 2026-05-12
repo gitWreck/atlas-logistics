@@ -354,7 +354,12 @@ export default function ManagerDashboardPage() {
             )}
 
             {activeTab === "invoice" && (
-              <InvoiceBoard ref={invoiceBoardRef} user={user} isDark={isDark} />
+              <InvoiceBoard
+                ref={invoiceBoardRef}
+                user={user}
+                isDark={isDark}
+                profile={profile}
+              />
             )}
           </div>
         </main>

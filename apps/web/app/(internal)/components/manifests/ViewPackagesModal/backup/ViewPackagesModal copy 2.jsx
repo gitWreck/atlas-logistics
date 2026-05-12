@@ -18,15 +18,15 @@ import {
 } from "@fortawesome/free-solid-svg-icons";
 import { auth } from "@/lib/firebase";
 import { updateShipmentPackages } from "@/app/utility/FirebaseFunctions";
-import SplitShipmentModal from "./SplitShipmentModal";
-import PackageBulkActionBar from "./PackageBulkActionBar";
-import AddPackageForm from "./AddPackageForm";
+import SplitShipmentModal from "../SplitShipmentModal";
+import PackageBulkActionBar from "../PackageBulkActionBar";
+import AddPackageForm from "../AddPackageForm";
 import {
   getModalThemeClasses,
   getTableTheme,
 } from "@/app/utility/constant/theme";
 import { getModalActionClasses } from "@/app/utility/constant/action";
-import StatusBadge from "../../ui/StatusBadge";
+import StatusBadge from "../../../ui/StatusBadge";
 
 const PACKAGING_TYPES = ["Box", "Sack", "Crate", "Bundle", "Roll", "Envelope"];
 const ITEMS_PER_PAGE = 6;

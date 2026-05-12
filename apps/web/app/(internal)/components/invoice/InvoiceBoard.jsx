@@ -18,7 +18,7 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faBell } from "@fortawesome/free-solid-svg-icons";
 
 const InvoiceBoard = forwardRef(function InvoiceBoard(
-  { user, isDark = false },
+  { user, isDark = false, profile },
   ref,
 ) {
   const [shipments, setShipments] = useState([]);
@@ -76,6 +76,7 @@ const InvoiceBoard = forwardRef(function InvoiceBoard(
   const invoiceWorkflow = useInvoiceWorkflow({
     user,
     onRefresh: fetchInvoicesAndShipments,
+    profile,
   });
 
   const {
@@ -236,7 +237,8 @@ const InvoiceBoard = forwardRef(function InvoiceBoard(
         shipment={selectedShipment}
         onClose={closeDetails}
         onEdit={() => {
-          if (selectedInvoice) openEditInvoice(selectedInvoice, selectedShipment);
+          if (selectedInvoice)
+            openEditInvoice(selectedInvoice, selectedShipment);
         }}
         onIssue={() => handleOpenConfirm(selectedInvoice, "ISSUED")}
         onMarkPaid={() => handleOpenConfirm(selectedInvoice, "PAID")}
