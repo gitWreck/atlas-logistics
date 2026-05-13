@@ -241,7 +241,6 @@ exports.requestShipmentPickup = onCall(
       shipmentId,
       trackingNumber: shipmentId,
       currentTripId: null,
-      currentTruckTripId: null,
       visibilityUserIds: shipmentVisibilityUserIds,
       createdSource: "mobile_pickup",
 
@@ -255,10 +254,7 @@ exports.requestShipmentPickup = onCall(
       },
       recipient: {
         uid: recipientUid,
-        userId: getPublicUserId(
-          recipient,
-          getPublicUserId(recipientCustomer),
-        ),
+        userId: getPublicUserId(recipient, getPublicUserId(recipientCustomer)),
         name: recipient.name || "",
         phone: recipientPhone,
         address: recipientAddress,
