@@ -139,7 +139,7 @@ exports.updateTripStatus = onCall(
       // A. Get all shipments on this trip
       const shipmentsSnap = await db
         .collection("shipments")
-        .where("currentTruckTripId", "==", tripId)
+        .where("currentTripId", "==", tripId)
         .get();
 
       // B. Get all truck_shipments (if using a separate collection)

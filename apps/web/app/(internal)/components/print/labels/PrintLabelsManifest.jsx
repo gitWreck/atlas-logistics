@@ -122,11 +122,11 @@ export default function PrintManifest() {
             shipmentsData.push({ id: docSnap.id, ...docSnap.data() });
           });
 
-          // Fallback query matching currentTruckTripId if empty
+          // Fallback query matching currentTripId if empty
           if (shipmentsData.length === 0) {
             const qAlternate = query(
               collection(db, "shipments"),
-              where("currentTruckTripId", "==", tripData?.tripId || tripId),
+              where("currentTripId", "==", tripData?.tripId || tripId),
             );
             const alternateSnap = await getDocs(qAlternate);
             alternateSnap.forEach((docSnap) => {
@@ -281,42 +281,42 @@ export default function PrintManifest() {
                       getShipmentDescriptionLines(shipment);
 
                     return (
-                    <tr
-                      key={shipment.id || index}
-                      className="border-b border-gray-200 align-top"
-                    >
-                      <td className="py-1 pr-1 font-mono tracking-tighter break-all">
-                        {getShipmentDisplayId(shipment)}
-                      </td>
-                      <td className="py-1 px-1 break-words">
-                        {shipment?.sender?.name || "—"}
-                      </td>
-                      <td className="py-1 px-1 break-words">
-                        {shipment?.recipient?.name || "—"}
-                      </td>
-                      <td className="py-1 px-1 break-words">
-                        {getDestination(shipment)}
-                      </td>
-                      <td className="py-1 px-1 text-center font-bold">
-                        {getShipmentQuantity(shipment)}
-                      </td>
-                      <td className="py-1 px-1 break-words">
-                        {shipment?.status || "—"}
-                      </td>
+                      <tr
+                        key={shipment.id || index}
+                        className="border-b border-gray-200 align-top"
+                      >
+                        <td className="py-1 pr-1 font-mono tracking-tighter break-all">
+                          {getShipmentDisplayId(shipment)}
+                        </td>
+                        <td className="py-1 px-1 break-words">
+                          {shipment?.sender?.name || "—"}
+                        </td>
+                        <td className="py-1 px-1 break-words">
+                          {shipment?.recipient?.name || "—"}
+                        </td>
+                        <td className="py-1 px-1 break-words">
+                          {getDestination(shipment)}
+                        </td>
+                        <td className="py-1 px-1 text-center font-bold">
+                          {getShipmentQuantity(shipment)}
+                        </td>
+                        <td className="py-1 px-1 break-words">
+                          {shipment?.status || "—"}
+                        </td>
                         <td className="py-1 px-1 text-gray-700 break-words">
                           {descriptionLines.length > 0 ? (
-                          <div className="space-y-0.5">
-                            {descriptionLines.map((description, i) => (
-                              <div key={`${shipment.id || index}-${i}`}>
-                                {description}
-                              </div>
-                            ))}
-                          </div>
-                        ) : (
-                          "No description"
-                        )}
-                      </td>
-                    </tr>
+                            <div className="space-y-0.5">
+                              {descriptionLines.map((description, i) => (
+                                <div key={`${shipment.id || index}-${i}`}>
+                                  {description}
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            "No description"
+                          )}
+                        </td>
+                      </tr>
                     );
                   })}
                 </tbody>
