@@ -12,6 +12,7 @@ import {
   ActivityIndicator,
 } from "react-native";
 import { FontAwesome5 } from "@expo/vector-icons";
+import { useTheme } from "../../contexts/ThemeContext";
 
 export default function ManualEntryModal({
   visible,
@@ -21,6 +22,7 @@ export default function ManualEntryModal({
   mode = "loading",
   actionLabel = "",
 }) {
+  const { colors } = useTheme();
   const [code, setCode] = useState("");
 
   useEffect(() => {
@@ -60,30 +62,66 @@ export default function ManualEntryModal({
       >
         <Pressable style={styles.backdrop} onPress={onClose} />
 
-        <View style={styles.sheet}>
-          <View style={styles.handle} />
+        <View
+          style={[
+            styles.sheet,
+            { backgroundColor: colors.surface, borderColor: colors.border },
+          ]}
+        >
+          <View style={[styles.handle, { backgroundColor: colors.border }]} />
 
           <View style={styles.header}>
-            <View style={styles.iconWrap}>
+            <View
+              style={[
+                styles.iconWrap,
+                {
+                  backgroundColor: colors.cardMuted,
+                  borderColor: colors.border,
+                },
+              ]}
+            >
               <FontAwesome5 name="keyboard" size={18} color="#2563eb" />
             </View>
 
             <View style={styles.headerTextWrap}>
-              <Text style={styles.title}>Manual Entry</Text>
-              <Text style={styles.subtitle}>{helperText}</Text>
+              <Text style={[styles.title, { color: colors.text }]}>
+                Manual Entry
+              </Text>
+              <Text style={[styles.subtitle, { color: colors.textMuted }]}>
+                {helperText}
+              </Text>
             </View>
           </View>
 
-          <View style={styles.modeBadge}>
-            <Text style={styles.modeBadgeText}>{modeLabel}</Text>
+          <View
+            style={[
+              styles.modeBadge,
+              {
+                backgroundColor: colors.cardMuted,
+                borderColor: colors.border,
+              },
+            ]}
+          >
+            <Text style={[styles.modeBadgeText, { color: colors.text }]}>
+              {modeLabel}
+            </Text>
           </View>
 
-          <Text style={styles.label}>Package Code</Text>
+          <Text style={[styles.label, { color: colors.textMuted }]}>
+            Package Code
+          </Text>
 
           <TextInput
-            style={styles.input}
+            style={[
+              styles.input,
+              {
+                backgroundColor: colors.inputBg,
+                borderColor: colors.border,
+                color: colors.text,
+              },
+            ]}
             placeholder="AT-2026-..."
-            placeholderTextColor="#94a3b8"
+            placeholderTextColor={colors.textMuted}
             value={code}
             onChangeText={setCode}
             autoCapitalize="characters"
@@ -94,18 +132,27 @@ export default function ManualEntryModal({
             onSubmitEditing={handleSubmit}
           />
 
-          <Text style={styles.note}>
+          <Text style={[styles.note, { color: colors.textMuted }]}>
             Bulk packages will ask for quantity in the next step.
           </Text>
 
           <View style={styles.actions}>
             <TouchableOpacity
-              style={[styles.button, styles.cancelButton]}
+              style={[
+                styles.button,
+                styles.cancelButton,
+                {
+                  backgroundColor: colors.cardMuted,
+                  borderColor: colors.border,
+                },
+              ]}
               onPress={onClose}
               disabled={loading}
               activeOpacity={0.8}
             >
-              <Text style={styles.cancelText}>Cancel</Text>
+              <Text style={[styles.cancelText, { color: colors.textMuted }]}>
+                Cancel
+              </Text>
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -147,6 +194,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#ffffff",
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
+    borderTopWidth: 1,
     paddingHorizontal: 22,
     paddingTop: 12,
     paddingBottom: Platform.OS === "ios" ? 36 : 24,
@@ -169,6 +217,7 @@ const styles = StyleSheet.create({
     height: 42,
     borderRadius: 14,
     backgroundColor: "#eff6ff",
+    borderWidth: 1,
     alignItems: "center",
     justifyContent: "center",
     marginRight: 12,
@@ -202,7 +251,7 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     color: "#334155",
     textTransform: "uppercase",
-    letterSpacing: 0.5,
+    letterSpacing: 0,
   },
   label: {
     fontSize: 12,

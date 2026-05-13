@@ -2,16 +2,22 @@ import React from "react";
 import { View, Text, TouchableOpacity, Alert, StyleSheet } from "react-native";
 import { FontAwesome5 } from "@expo/vector-icons";
 import { Image } from "expo-image";
+import { useTheme } from "../../contexts/ThemeContext";
 
 export default function PhotoUploadSection({
+  title = "Proof of Delivery",
   photos,
   onPickImage,
   onRemovePhoto,
 }) {
+  const { colors } = useTheme();
+
   return (
     <View style={styles.proofContainer}>
-      <Text style={styles.sectionTitle}>Proof of Delivery</Text>
-      <Text style={styles.helperText}>
+      <Text style={[styles.sectionTitle, { color: colors.text }]}>
+        {title}
+      </Text>
+      <Text style={[styles.helperText, { color: colors.textMuted }]}>
         Take up to 3 photos of the delivered items.
       </Text>
 
@@ -32,7 +38,13 @@ export default function PhotoUploadSection({
         {/* Add Button (Hide if 3 photos) */}
         {photos.length < 3 && (
           <TouchableOpacity
-            style={styles.addPhotoBtn}
+            style={[
+              styles.addPhotoBtn,
+              {
+                backgroundColor: colors.surface,
+                borderColor: colors.border,
+              },
+            ]}
             onPress={() => {
               Alert.alert("Add Photo", "Choose a source", [
                 { text: "Camera", onPress: () => onPickImage(true) },

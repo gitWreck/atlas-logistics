@@ -10,6 +10,8 @@ import {
   Modal,
   ScrollView,
   TouchableOpacity,
+  Dimensions,
+  PanResponder,
 } from "react-native";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import { useLocalSearchParams, useRouter } from "expo-router";
@@ -28,7 +30,10 @@ import PermissionRequest from "../../components/scanner/PermissionRequest";
 import ManualEntryModal from "../../components/scanner/ManualEntryModal";
 import PackageActionModal from "../../components/checker/shipment-details/PackageActionModal";
 import ShipmentInfoModal from "../../components/checker/shipment-details/ShipmentInfoModal";
-import { updateShipmentPackages } from "../../components/utilities/FirebaseFunctions";
+import {
+  updateShipmentPackages,
+  updateTripStatus,
+} from "../../components/utilities/FirebaseFunctions";
 import {
   getCurrentLocationSafe,
   updatedBy,
@@ -37,6 +42,16 @@ import { useAuth } from "../../contexts/AuthContext";
 import { useTheme } from "../../contexts/ThemeContext";
 
 const SUCCESS_MODAL_SECONDS = 5;
+const WINDOW_HEIGHT = Dimensions.get("window").height;
+const MIN_DETAILS_SHEET_HEIGHT = Math.round(WINDOW_HEIGHT * 0.2);
+const MAX_DETAILS_SHEET_HEIGHT = Math.round(WINDOW_HEIGHT * 0.8);
+const DEFAULT_DETAILS_SHEET_HEIGHT = Math.round(WINDOW_HEIGHT * 0.5);
+
+const clampSheetHeight = (height) =>
+  Math.max(
+    MIN_DETAILS_SHEET_HEIGHT,
+    Math.min(height, MAX_DETAILS_SHEET_HEIGHT),
+  );
 
 const MODE_SCAN_ACTIONS = {
   loading: [
@@ -98,6 +113,7 @@ const EMPTY_TRIP_SUMMARY = {
   shipmentCount: 0,
   totalPackages: 0,
   scannedPackages: 0,
+  loadedPackages: 0,
   progress: 0,
 };
 
@@ -139,11 +155,41 @@ export default function ScannerScreen() {
   const [countdown, setCountdown] = useState(SUCCESS_MODAL_SECONDS);
   const [tripSummary, setTripSummary] = useState(EMPTY_TRIP_SUMMARY);
   const [summaryLoading, setSummaryLoading] = useState(false);
+  const [tripStatusUpdating, setTripStatusUpdating] = useState(false);
   const [latestScan, setLatestScan] = useState(EMPTY_SCAN_DETAILS);
   const [scanActionStatus, setScanActionStatus] = useState(null);
+  const [detailsSheetHeight, setDetailsSheetHeight] = useState(
+    DEFAULT_DETAILS_SHEET_HEIGHT,
+  );
 
   const successTimerRef = useRef(null);
   const countdownTimerRef = useRef(null);
+  const detailsSheetHeightRef = useRef(DEFAULT_DETAILS_SHEET_HEIGHT);
+  const dragStartHeightRef = useRef(DEFAULT_DETAILS_SHEET_HEIGHT);
+  const detailsSheetPanResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: (_, gestureState) =>
+        Math.abs(gestureState.dy) > 2,
+      onPanResponderGrant: () => {
+        dragStartHeightRef.current = detailsSheetHeightRef.current;
+      },
+      onPanResponderMove: (_, gestureState) => {
+        const nextHeight = clampSheetHeight(
+          dragStartHeightRef.current - gestureState.dy,
+        );
+        detailsSheetHeightRef.current = nextHeight;
+        setDetailsSheetHeight(nextHeight);
+      },
+      onPanResponderRelease: (_, gestureState) => {
+        const nextHeight = clampSheetHeight(
+          dragStartHeightRef.current - gestureState.dy,
+        );
+        detailsSheetHeightRef.current = nextHeight;
+        setDetailsSheetHeight(nextHeight);
+      },
+    }),
+  ).current;
 
   const { mode, tripId } = useLocalSearchParams();
   const resolvedMode = Array.isArray(mode) ? mode[0] : mode;
@@ -206,6 +252,13 @@ export default function ScannerScreen() {
     return clampProgress(Math.max(loaded, received) + missing + damaged, total);
   };
 
+  const getShipmentLoadedCount = (shipment = {}) => {
+    const total = getShipmentTotal(shipment);
+    const loaded = Number(shipment.loadedCount ?? shipment.totals?.loaded ?? 0);
+
+    return clampProgress(loaded, total);
+  };
+
   const fetchTripScanSummary = async (targetTripId = resolvedTripId) => {
     if (!targetTripId) {
       setTripSummary(EMPTY_TRIP_SUMMARY);
@@ -235,6 +288,10 @@ export default function ScannerScreen() {
         (sum, shipment) => sum + getShipmentScannedCount(shipment),
         0,
       );
+      const loadedPackages = shipments.reduce(
+        (sum, shipment) => sum + getShipmentLoadedCount(shipment),
+        0,
+      );
       const progress =
         totalPackages > 0
           ? Math.round((scannedPackages / totalPackages) * 100)
@@ -246,6 +303,7 @@ export default function ScannerScreen() {
         shipmentCount: shipments.length,
         totalPackages,
         scannedPackages,
+        loadedPackages,
         progress,
       };
 
@@ -308,6 +366,10 @@ export default function ScannerScreen() {
   useEffect(() => {
     fetchTripScanSummary(resolvedTripId);
   }, [resolvedTripId, resolvedMode]);
+
+  useEffect(() => {
+    detailsSheetHeightRef.current = detailsSheetHeight;
+  }, [detailsSheetHeight]);
 
   useEffect(() => {
     setScanActionStatus(getDefaultScanStatus(resolvedMode));
@@ -683,6 +745,80 @@ export default function ScannerScreen() {
     await handleProcessPackage(code, null, "manual");
   };
 
+  const handleMarkOutForDelivery = () => {
+    const targetTripId = tripSummary.tripId || resolvedTripId;
+
+    if (!targetTripId || tripStatusUpdating) return;
+
+    Alert.alert(
+      "Mark Out for Delivery",
+      "All packages are loaded. Mark this trip as out for delivery?",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Mark",
+          onPress: async () => {
+            setTripStatusUpdating(true);
+
+            try {
+              await updateTripStatus({
+                tripId: targetTripId,
+                status: "OUT_FOR_DELIVERY",
+              });
+              await fetchTripScanSummary(targetTripId);
+              Alert.alert("Trip Updated", "Trip marked as out for delivery.");
+            } catch (error) {
+              console.error("Trip status update failed:", error);
+              Alert.alert(
+                "Action Failed",
+                error.message || "Failed to update trip status.",
+              );
+            } finally {
+              setTripStatusUpdating(false);
+            }
+          },
+        },
+      ],
+    );
+  };
+
+  const handleMarkCompleted = () => {
+    const targetTripId = tripSummary.tripId || resolvedTripId;
+
+    if (!targetTripId || tripStatusUpdating) return;
+
+    Alert.alert(
+      "Complete Trip",
+      "All loaded packages are offloaded. Mark this trip as completed?",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Complete",
+          onPress: async () => {
+            setTripStatusUpdating(true);
+
+            try {
+              await updateTripStatus({
+                tripId: targetTripId,
+                status: "COMPLETED",
+              });
+              await fetchTripScanSummary(targetTripId);
+              Alert.alert("Trip Updated", "Trip marked as completed.");
+            } catch (error) {
+              console.error("Trip status update failed:", error);
+              Alert.alert(
+                "Action Failed",
+                error.message || "Failed to update trip status.",
+              );
+            } finally {
+              setTripStatusUpdating(false);
+            }
+          },
+        },
+      ],
+    );
+  };
+
   const modeLabel =
     resolvedMode === "offloading"
       ? "Offloading"
@@ -709,6 +845,19 @@ export default function ScannerScreen() {
   const scanActionHeading = selectedScanAction?.status
     ? "Scan will mark as"
     : "Scan mode";
+  const tripStatus = String(tripSummary.status || "").toUpperCase();
+  const canMarkTripOutForDelivery =
+    resolvedMode === "loading" &&
+    !!(tripSummary.tripId || resolvedTripId) &&
+    tripSummary.totalPackages > 0 &&
+    tripSummary.loadedPackages >= tripSummary.totalPackages &&
+    !["OUT_FOR_DELIVERY", "COMPLETED", "CANCELLED"].includes(tripStatus);
+  const canMarkTripCompleted =
+    resolvedMode === "offloading" &&
+    !!(tripSummary.tripId || resolvedTripId) &&
+    tripSummary.totalPackages > 0 &&
+    tripSummary.loadedPackages <= 0 &&
+    !["COMPLETED", "CANCELLED"].includes(tripStatus);
 
   return (
     <View style={[styles.container, { backgroundColor: colors.bg }]}>
@@ -722,7 +871,12 @@ export default function ScannerScreen() {
             barcodeTypes: ["qr", "code128", "code39", "pdf417"],
           }}
         >
-          <View style={styles.cameraOverlay}>
+          <View
+            style={[
+              styles.cameraOverlay,
+              { paddingBottom: detailsSheetHeight },
+            ]}
+          >
             <View style={styles.modeBadge}>
               <Text style={styles.modeBadgeText}>{modeLabel}</Text>
             </View>
@@ -764,18 +918,34 @@ export default function ScannerScreen() {
                 processing && styles.scanFrameProcessing,
               ]}
             />
-            <Text style={styles.scanInstruction}>
-              Package or shipment code
-            </Text>
+            <Text style={styles.scanInstruction}>Package or shipment code</Text>
           </View>
         </CameraView>
       </View>
 
       <ScrollView
-        style={[styles.detailsPane, { backgroundColor: colors.bg }]}
+        style={[
+          styles.detailsPane,
+          {
+            height: detailsSheetHeight,
+            backgroundColor: colors.bg,
+            borderColor: colors.border,
+          },
+        ]}
         contentContainerStyle={styles.detailsContent}
         showsVerticalScrollIndicator={false}
+        stickyHeaderIndices={[0]}
       >
+        <View
+          style={[styles.sheetHandleArea, { backgroundColor: colors.bg }]}
+          {...detailsSheetPanResponder.panHandlers}
+        >
+          <View style={styles.sheetHandle} />
+          <Text style={[styles.sheetHandleText, { color: colors.textMuted }]}>
+            Details
+          </Text>
+        </View>
+
         <View style={styles.panelHeader}>
           <View>
             <Text style={[styles.panelEyebrow, { color: colors.textMuted }]}>
@@ -785,7 +955,9 @@ export default function ScannerScreen() {
               Scan Details
             </Text>
           </View>
-          <View style={[styles.latestBadge, { backgroundColor: colors.cardMuted }]}>
+          <View
+            style={[styles.latestBadge, { backgroundColor: colors.cardMuted }]}
+          >
             <Text style={[styles.latestBadgeText, { color: colors.text }]}>
               {latestTypeLabel}
             </Text>
@@ -803,11 +975,11 @@ export default function ScannerScreen() {
             value={latestScan.code || "No scan yet"}
             colors={colors}
           />
-          <DetailRow
+          {/* <DetailRow
             label="Tracking"
             value={latestScan.trackingNumber || "Waiting for barcode"}
             colors={colors}
-          />
+          /> */}
           <DetailRow
             label="Shipment"
             value={latestScan.shipmentId || "Not resolved"}
@@ -900,7 +1072,9 @@ export default function ScannerScreen() {
               <Text style={[styles.progressTrip, { color: colors.text }]}>
                 {tripSummary.tripId || latestScan.currentTripId || "No trip"}
               </Text>
-              <Text style={[styles.progressStatus, { color: colors.textMuted }]}>
+              <Text
+                style={[styles.progressStatus, { color: colors.textMuted }]}
+              >
                 {tripSummary.status || "Status unavailable"}
               </Text>
             </View>
@@ -913,7 +1087,9 @@ export default function ScannerScreen() {
             )}
           </View>
 
-          <View style={[styles.progressTrack, { backgroundColor: colors.border }]}>
+          <View
+            style={[styles.progressTrack, { backgroundColor: colors.border }]}
+          >
             <View
               style={[
                 styles.progressFill,
@@ -966,6 +1142,50 @@ export default function ScannerScreen() {
             <Text style={styles.secondaryButtonText}>Scan Next</Text>
           </TouchableOpacity>
         </View>
+
+        {canMarkTripOutForDelivery && (
+          <TouchableOpacity
+            style={[
+              styles.releaseButton,
+              (processing || tripStatusUpdating) && styles.disabledButton,
+            ]}
+            onPress={handleMarkOutForDelivery}
+            disabled={processing || tripStatusUpdating}
+            activeOpacity={0.82}
+          >
+            {tripStatusUpdating ? (
+              <ActivityIndicator color="#ffffff" />
+            ) : (
+              <FontAwesome5 name="route" size={14} color="#ffffff" />
+            )}
+            <Text style={styles.releaseButtonText}>
+              {tripStatusUpdating
+                ? "Updating Trip..."
+                : "Mark Out for Delivery"}
+            </Text>
+          </TouchableOpacity>
+        )}
+
+        {canMarkTripCompleted && (
+          <TouchableOpacity
+            style={[
+              styles.completeButton,
+              (processing || tripStatusUpdating) && styles.disabledButton,
+            ]}
+            onPress={handleMarkCompleted}
+            disabled={processing || tripStatusUpdating}
+            activeOpacity={0.82}
+          >
+            {tripStatusUpdating ? (
+              <ActivityIndicator color="#ffffff" />
+            ) : (
+              <FontAwesome5 name="flag-checkered" size={14} color="#ffffff" />
+            )}
+            <Text style={styles.releaseButtonText}>
+              {tripStatusUpdating ? "Updating Trip..." : "Mark Completed"}
+            </Text>
+          </TouchableOpacity>
+        )}
 
         {!!primaryScanActions.length && (
           <View style={styles.issueActionsRow}>
@@ -1149,14 +1369,22 @@ const DetailRow = ({ label, value, colors }) => (
     <Text style={[styles.detailLabel, { color: colors.textMuted }]}>
       {label}
     </Text>
-    <Text style={[styles.detailValue, { color: colors.text }]} numberOfLines={1}>
+    <Text
+      style={[styles.detailValue, { color: colors.text }]}
+      numberOfLines={1}
+    >
       {value}
     </Text>
   </View>
 );
 
 const StatCell = ({ label, value, colors }) => (
-  <View style={styles.statCell}>
+  <View
+    style={[
+      styles.statCell,
+      { backgroundColor: colors.cardMuted, borderColor: colors.border },
+    ]}
+  >
     <Text style={[styles.statValue, { color: colors.text }]}>{value}</Text>
     <Text style={[styles.statLabel, { color: colors.textMuted }]}>{label}</Text>
   </View>
@@ -1241,13 +1469,42 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
   detailsPane: {
-    flex: 1,
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 0,
     backgroundColor: "#f8fafc",
+    borderTopLeftRadius: 18,
+    borderTopRightRadius: 18,
+    borderTopWidth: 1,
+    shadowColor: "#0f172a",
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.14,
+    shadowRadius: 14,
+    elevation: 12,
   },
   detailsContent: {
     padding: 16,
     paddingBottom: 28,
     gap: 12,
+  },
+  sheetHandleArea: {
+    alignItems: "center",
+    paddingTop: 2,
+    paddingBottom: 6,
+  },
+  sheetHandle: {
+    width: 46,
+    height: 5,
+    borderRadius: 999,
+    backgroundColor: "#94a3b8",
+  },
+  sheetHandleText: {
+    marginTop: 6,
+    color: "#64748b",
+    fontSize: 10,
+    fontWeight: "800",
+    textTransform: "uppercase",
   },
   panelHeader: {
     flexDirection: "row",
@@ -1404,6 +1661,8 @@ const styles = StyleSheet.create({
   statCell: {
     flex: 1,
     backgroundColor: "#f8fafc",
+    borderWidth: 1,
+    borderColor: "#e2e8f0",
     borderRadius: 12,
     paddingVertical: 10,
     paddingHorizontal: 8,
@@ -1458,6 +1717,31 @@ const styles = StyleSheet.create({
     color: "#2563eb",
     fontSize: 13,
     fontWeight: "800",
+  },
+  releaseButton: {
+    minHeight: 48,
+    borderRadius: 14,
+    backgroundColor: "#0f766e",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    paddingHorizontal: 14,
+  },
+  releaseButtonText: {
+    color: "#ffffff",
+    fontSize: 13,
+    fontWeight: "800",
+  },
+  completeButton: {
+    minHeight: 48,
+    borderRadius: 14,
+    backgroundColor: "#16a34a",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    paddingHorizontal: 14,
   },
   issueButton: {
     flex: 1,

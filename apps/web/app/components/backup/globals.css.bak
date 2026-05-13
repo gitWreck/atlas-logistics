@@ -1,0 +1,217 @@
+@import "tailwindcss";
+
+/* 🎨 Light Mode & Brand Colors */
+:root {
+  /* Layout Colors */
+  --background: #f9fafb;
+  --foreground: #111827;
+  --card-bg: #ffffff;
+  --muted: #4b5563;
+
+  /* YOUR BRAND COLORS defined here */
+  --brand-blue: #1d4ed8; /* Main Primary */
+  --brand-navy: #0f172a; /* Headings */
+  --brand-cyan: #06b6d4; /* Accents */
+  --brand-lime: #a3e635; /* Highlights */
+  --brand-yellow: #facc15; /* Pops */
+}
+
+/* 🌙 Dark Mode Colors */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0a0a0a;
+    --foreground: #ededed;
+    --card-bg: #171717;
+    --muted: #9ca3af;
+
+    /* Optional: Adjust brand colors for dark mode if needed */
+    /* For now, they will stay the same as light mode */
+  }
+}
+
+/* Tailwind Theme Setup */
+@theme inline {
+  /* 1. Map Layout Colors */
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card-bg);
+  --color-muted: var(--muted);
+
+  /* 2. Map YOUR Brand Colors so 'bg-brand-blue' works */
+  --color-brand-blue: var(--brand-blue);
+  --color-brand-navy: var(--brand-navy);
+  --color-brand-cyan: var(--brand-cyan);
+  --color-brand-lime: var(--brand-lime);
+  --color-brand-yellow: var(--brand-yellow);
+
+  /* 3. Map Semantic names (Optional: makes 'bg-primary' use your blue) */
+  --color-primary: var(--brand-blue);
+  --color-accent: var(--brand-cyan);
+
+  /* Fonts */
+  --font-sans: var(--font-geist-sans, "Inter", "system-ui", sans-serif);
+  --font-mono: var(--font-geist-mono, monospace);
+}
+
+/* Base Body Styles */
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+  transition:
+    background 0.3s ease,
+    color 0.3s ease;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+/* ------------------------------------ */
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.animate-fadeIn {
+  animation: fadeIn 0.2s ease-out forwards;
+}
+
+/* ---------------------------------------*/
+.no-scrollbar {
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE 10+ */
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none; /* Chrome, Safari */
+}
+
+@keyframes fadeSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.fade-slide-in {
+  animation: fadeSlideIn 0.3s ease-out;
+}
+
+@keyframes atlasSectionIn {
+  from {
+    opacity: 0;
+    transform: translateY(22px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes atlasNavIn {
+  from {
+    opacity: 0;
+    transform: translateY(-12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes atlasHeroLogo {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.atlas-nav-enter {
+  animation: atlasNavIn 0.55s ease-out both;
+}
+
+.atlas-section-enter {
+  animation: atlasSectionIn 0.72s ease-out both;
+  animation-timeline: view();
+  animation-range: entry 0% cover 26%;
+}
+
+.atlas-section-1 {
+  animation-delay: 0.04s;
+}
+
+.atlas-section-2 {
+  animation-delay: 0.1s;
+}
+
+.atlas-section-3 {
+  animation-delay: 0.16s;
+}
+
+.atlas-section-4 {
+  animation-delay: 0.22s;
+}
+
+.atlas-logo-enter {
+  animation: atlasHeroLogo 0.65s ease-out both;
+}
+
+.atlas-motion-card {
+  transition:
+    transform 0.22s ease,
+    box-shadow 0.22s ease,
+    border-color 0.22s ease,
+    background-color 0.22s ease;
+}
+
+.atlas-motion-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 14px 30px rgba(15, 23, 42, 0.08);
+  border-color: #bfdbfe;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .atlas-nav-enter,
+  .atlas-section-enter,
+  .atlas-logo-enter {
+    animation: none;
+  }
+
+  .atlas-motion-card,
+  .atlas-motion-card:hover {
+    transition: none;
+    transform: none;
+    box-shadow: none;
+  }
+}
+
+/* ---------------- */
+/* Hide the default eye icon in Edge/Chrome */
+input::-ms-reveal,
+input::-ms-clear {
+  display: none;
+}
+
+/* Hide the default password toggle in some Webkit browsers */
+input::-webkit-contacts-auto-fill-button,
+input::-webkit-credentials-auto-fill-button {
+  visibility: hidden;
+  display: none !important;
+  pointer-events: none;
+}

@@ -1,15 +1,16 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
-  faCalendarAlt,
   faArrowRight,
+  faCalendarAlt,
   faSearch,
 } from "@fortawesome/free-solid-svg-icons";
 import { formatFirestoreDate } from "@/app/utility/utilities";
 import { getTableTheme } from "@/app/utility/constant/theme";
 import StatusBadge from "../../components/ui/StatusBadge";
+import TablePaginationFooter from "../ui/TablePaginationFooter";
 
 export default function ManagerRecentTable({
   shipments = [],
@@ -20,7 +21,9 @@ export default function ManagerRecentTable({
   isDark = false,
 }) {
   const [searchTerm, setSearchTerm] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
   const theme = getTableTheme(isDark);
+  const itemsPerPage = Number(viewLimit) || 5;
 
   const filteredShipments = useMemo(() => {
     if (!searchTerm) return shipments;
@@ -37,6 +40,20 @@ export default function ManagerRecentTable({
       );
     });
   }, [shipments, searchTerm]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, viewLimit]);
+
+  const totalPages = Math.max(
+    1,
+    Math.ceil(filteredShipments.length / itemsPerPage),
+  );
+  const safeCurrentPage = Math.min(currentPage, totalPages);
+  const paginatedShipments = filteredShipments.slice(
+    (safeCurrentPage - 1) * itemsPerPage,
+    safeCurrentPage * itemsPerPage,
+  );
 
   const emptyMessage = searchTerm
     ? `No results for "${searchTerm}"`
@@ -88,6 +105,16 @@ export default function ManagerRecentTable({
               <option value={20}>20</option>
             </select>
           </div>
+
+          {onViewAll && (
+            <button
+              type="button"
+              onClick={onViewAll}
+              className={`px-3 py-1.5 rounded-lg border text-sm transition-all ${theme.paginationButton}`}
+            >
+              All <FontAwesomeIcon icon={faArrowRight} className="ml-1" />
+            </button>
+          )}
         </div>
       </div>
 
@@ -106,7 +133,7 @@ export default function ManagerRecentTable({
               {emptyMessage}
             </div>
           ) : (
-            filteredShipments.map((shipment) => (
+            paginatedShipments.map((shipment) => (
               <div
                 key={shipment.id}
                 className={`p-4 flex flex-col gap-3 transition-colors ${theme.rowHover}`}
@@ -176,7 +203,7 @@ export default function ManagerRecentTable({
                   </td>
                 </tr>
               ) : (
-                filteredShipments.map((shipment) => (
+                paginatedShipments.map((shipment) => (
                   <tr
                     key={shipment.id}
                     className={`transition-colors ${theme.rowHover}`}
@@ -218,26 +245,16 @@ export default function ManagerRecentTable({
       </div>
 
       {/* Footer */}
-      {!loading && shipments.length > 0 && (
-        <div
-          className={`px-4 sm:px-6 py-4 border-t flex flex-col sm:flex-row justify-between items-center gap-3 text-xs ${theme.footer}`}
-        >
-          <span>
-            Showing{" "}
-            <span className={`font-bold ${theme.footerBold}`}>
-              {filteredShipments.length}
-            </span>{" "}
-            of {shipments.length} fetched
-          </span>
-
-          <button
-            type="button"
-            onClick={onViewAll}
-            className={`px-3 py-1.5 rounded-lg border transition-all ${theme.paginationButton}`}
-          >
-            All <FontAwesomeIcon icon={faArrowRight} className="ml-1" />
-          </button>
-        </div>
+      {!loading && filteredShipments.length > 0 && (
+        <TablePaginationFooter
+          totalItems={filteredShipments.length}
+          currentPage={safeCurrentPage}
+          itemsPerPage={itemsPerPage}
+          totalPages={totalPages}
+          onPrevious={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+          onNext={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
+          theme={theme}
+        />
       )}
     </div>
   );

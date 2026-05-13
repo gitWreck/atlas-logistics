@@ -6,20 +6,15 @@ const admin = require("firebase-admin");
 const {
   requireRole,
   requireString,
-} = require("../../../../../../atlas-trucking-platform/apps/functions/src/utilities/helpers");
-const {
-  VALID_TRIP_STATUSES,
-} = require("../../../../../../atlas-trucking-platform/apps/functions/src/utilities/dataDetails");
+  updatedBy,
+} = require("../utilities/helpers");
+const { VALID_TRIP_STATUSES } = require("../utilities/dataDetails");
 const {
   SEMAPHORE_API_KEY,
   SEMAPHORE_SENDER_NAME,
-} = require("../../../../../../atlas-trucking-platform/apps/functions/shared/sms-service");
-const {
-  broadcastTripLogic,
-} = require("../../../../../../atlas-trucking-platform/apps/functions/src/messaging/broadcastTripMessage"); // Import if you want to call it directly
-const {
-  STATUS_MESSAGES,
-} = require("../../../../../../atlas-trucking-platform/apps/functions/src/utilities/dataDetails");
+} = require("../../shared/sms-service");
+const { broadcastTripLogic } = require("../messaging/broadcastTripMessage"); // Import if you want to call it directly
+const { STATUS_MESSAGES } = require("../utilities/dataDetails");
 const { writeTripActionLog } = require("../utilities/tripLogger");
 
 if (!admin.apps.length) admin.initializeApp();
@@ -40,14 +35,16 @@ exports.updateTripStatus = onCall(
   },
   async (req) => {
     // 1. Auth & Role Check
-    await requireRole(db, req, ["admin", "manager", "driver"]);
-    const uid = req.auth.uid;
+    await requireRole(db, req, ["admin", "manager", "driver", "checker"]);
+    // const uid = req.auth.uid;
 
     const tripId = requireString(req.data?.tripId, "tripId");
     const newStatus = requireString(req.data?.status, "status").toUpperCase();
     const notify = !!req.data?.notify; // Optional: whether to send SMS notifications for this status change
 
     // Validate Status Enum
+
+    const { uid, role, name } = updatedBy(req);
 
     if (!VALID_TRIP_STATUSES.includes(newStatus)) {
       throw new HttpsError(
@@ -57,7 +54,7 @@ exports.updateTripStatus = onCall(
     }
 
     const tripRef = db.collection("truck_trips").doc(tripId);
-    const userSnap = await db.collection("users").doc(uid).get();
+    const userSnap = await db.collection("users").doc(req.auth.uid).get();
     const actorName = userSnap.data()?.name || "Unknown Admin";
 
     await db.runTransaction(async (tx) => {
@@ -70,7 +67,7 @@ exports.updateTripStatus = onCall(
       const updates = {
         status: newStatus,
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-        updatedBy: uid,
+        updatedBy: name,
       };
 
       // --- STATUS SPECIFIC LOGIC ---
@@ -116,7 +113,7 @@ exports.updateTripStatus = onCall(
         at: admin.firestore.FieldValue.serverTimestamp(),
         actorId: uid,
         actorName,
-        actorRole: req.auth.token?.role || userSnap.data()?.role || null,
+        actorRole: role || userSnap.data()?.role || null,
         note: `Status forced from ${oldStatus} to ${newStatus} by ${actorName}`,
       });
 
@@ -207,6 +204,8 @@ exports.updateTripStatus = onCall(
             tripId: tripId,
             message: messageText,
             actorUid: uid || "SYSTEM",
+            actorName: actorName || "SYSTEM",
+            actorRole: role || "SYSTEM",
           }).catch((err) => console.error("Broadcast failed:", err));
         } catch (err) {
           console.error("[Notify] Failed to queue SMS:", err);

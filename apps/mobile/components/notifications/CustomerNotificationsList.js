@@ -8,6 +8,7 @@ import {
   View,
 } from "react-native";
 import { FontAwesome5 } from "@expo/vector-icons";
+import { useTheme } from "../../contexts/ThemeContext";
 
 function formatCreatedAt(value) {
   const date = value?.toDate?.() || null;
@@ -26,10 +27,13 @@ export default function CustomerNotificationsList({
   loading = false,
   onPressNotification,
 }) {
+  const { colors, resolvedScheme } = useTheme();
+  const isDark = resolvedScheme === "dark";
+
   if (loading) {
     return (
       <View style={styles.centerState}>
-        <ActivityIndicator size="large" color="#042C83" />
+        <ActivityIndicator size="large" color={isDark ? "#60a5fa" : "#042C83"} />
       </View>
     );
   }
@@ -42,11 +46,25 @@ export default function CustomerNotificationsList({
       showsVerticalScrollIndicator={false}
       ListEmptyComponent={
         <View style={styles.emptyState}>
-          <View style={styles.emptyIconWrap}>
-            <FontAwesome5 name="bell-slash" size={22} color="#94a3b8" />
+          <View
+            style={[
+              styles.emptyIconWrap,
+              {
+                backgroundColor: colors.surface,
+                borderColor: colors.border,
+              },
+            ]}
+          >
+            <FontAwesome5
+              name="bell-slash"
+              size={22}
+              color={colors.textMuted}
+            />
           </View>
-          <Text style={styles.emptyTitle}>No notifications yet</Text>
-          <Text style={styles.emptyText}>
+          <Text style={[styles.emptyTitle, { color: colors.text }]}>
+            No notifications yet
+          </Text>
+          <Text style={[styles.emptyText, { color: colors.textMuted }]}>
             Shipment updates and delivery alerts will appear here.
           </Text>
         </View>
@@ -56,34 +74,65 @@ export default function CustomerNotificationsList({
 
         return (
           <TouchableOpacity
-            style={[styles.card, unread && styles.unreadCard]}
+            style={[
+              styles.card,
+              { backgroundColor: colors.surface, borderColor: colors.border },
+              unread && {
+                backgroundColor: isDark ? "#172554" : "#f8fbff",
+                borderColor: isDark ? "#1d4ed8" : "#bfdbfe",
+              },
+            ]}
             activeOpacity={0.85}
             onPress={() => onPressNotification?.(item)}
           >
-            <View style={[styles.iconWrap, unread && styles.iconWrapUnread]}>
+            <View
+              style={[
+                styles.iconWrap,
+                {
+                  backgroundColor: colors.cardMuted,
+                  borderColor: colors.border,
+                },
+                unread && {
+                  backgroundColor: isDark ? "#1e3a8a" : "#eff6ff",
+                  borderColor: isDark ? "#3b82f6" : "#bfdbfe",
+                },
+              ]}
+            >
               <FontAwesome5
                 name={unread ? "bell" : "check"}
                 size={14}
-                color={unread ? "#2563eb" : "#64748b"}
+                color={unread ? "#60a5fa" : colors.textMuted}
               />
             </View>
 
             <View style={styles.content}>
               <View style={styles.topRow}>
-                <Text style={styles.title} numberOfLines={1}>
+                <Text
+                  style={[styles.title, { color: colors.text }]}
+                  numberOfLines={1}
+                >
                   {item.title || "Notification"}
                 </Text>
                 {unread && <View style={styles.unreadDot} />}
               </View>
 
-              <Text style={styles.body} numberOfLines={2}>
+              <Text
+                style={[styles.body, { color: colors.textMuted }]}
+                numberOfLines={2}
+              >
                 {item.body || "You have a new update."}
               </Text>
 
-              <Text style={styles.time}>{formatCreatedAt(item.createdAt)}</Text>
+              <Text style={[styles.time, { color: colors.textMuted }]}>
+                {formatCreatedAt(item.createdAt)}
+              </Text>
             </View>
 
-            <FontAwesome5 name="chevron-right" size={12} color="#cbd5e1" />
+            <FontAwesome5
+              name="chevron-right"
+              size={12}
+              color={colors.border}
+            />
           </TouchableOpacity>
         );
       }}
@@ -152,6 +201,7 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     alignItems: "center",
     justifyContent: "center",
+    borderWidth: 1,
     backgroundColor: "#f8fafc",
   },
   iconWrapUnread: {

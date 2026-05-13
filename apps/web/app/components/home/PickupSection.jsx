@@ -1,188 +1,191 @@
-"use client";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import {
+  faArrowRight,
+  faBoxOpen,
+  faClipboardCheck,
+  faExclamationTriangle,
+  faLocationDot,
+  faTruckPickup,
+} from "@fortawesome/free-solid-svg-icons";
 
-import { useState } from "react";
+const pickupSteps = [
+  {
+    title: "Book a pickup",
+    detail: "Share your preferred collection window and shipment route.",
+    icon: faClipboardCheck,
+  },
+  {
+    title: "Prepare your shipment",
+    detail: "Pack, label, and keep items ready for driver verification.",
+    icon: faBoxOpen,
+  },
+  {
+    title: "Driver collects the package",
+    detail: "Atlas coordinates pickup and moves the cargo into the hub flow.",
+    icon: faTruckPickup,
+  },
+];
 
-const emptyPickupForm = {
-  fullName: "",
-  phone: "",
-  email: "",
-  pickupAddress: "",
-  deliveryAddress: "",
-  packageDetails: "",
-};
+const pickupWindows = ["Morning", "Afternoon", "Next available"];
+const checklist = ["Pickup address", "Package count", "Special handling notes"];
 
 export default function PickupSection() {
-  const [pickupForm, setPickupForm] = useState(emptyPickupForm);
-  const [submitState, setSubmitState] = useState({
-    isSubmitting: false,
-    message: "",
-    type: "",
-  });
-
-  const handleChange = (event) => {
-    const { name, value } = event.target;
-    setPickupForm((previous) => ({ ...previous, [name]: value }));
-  };
-
-  const handleSubmit = async (event) => {
-    event.preventDefault();
-    setSubmitState({ isSubmitting: true, message: "", type: "" });
-
-    try {
-      const response = await fetch("/api/public/pickup-request", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(pickupForm),
-      });
-
-      const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data?.error || "Unable to submit pickup request.");
-      }
-
-      setPickupForm(emptyPickupForm);
-      setSubmitState({
-        isSubmitting: false,
-        message: "Pickup request submitted. We will contact you shortly.",
-        type: "success",
-      });
-    } catch (error) {
-      setSubmitState({
-        isSubmitting: false,
-        message:
-          error?.message ||
-          "Something went wrong while submitting the request.",
-        type: "error",
-      });
-    }
-  };
-
   return (
     <section
       id="pickup"
-      className="atlas-section-enter atlas-section-2 rounded-2xl border border-slate-200 bg-white p-5 sm:p-7 lg:p-8"
+      className="atlas-section-enter atlas-section-2 scroll-mt-24 overflow-hidden rounded-[2rem] border border-slate-200 bg-white shadow-sm"
     >
-      <div className="mb-6">
-        <p className="text-sm font-extrabold uppercase tracking-widest text-blue-700">
-          Pickup Request
-        </p>
-        <h2 className="mt-2 text-3xl font-black text-slate-950 sm:text-4xl">
-          Request a pickup
-        </h2>
-        <p className="mt-3 max-w-3xl text-base leading-7 text-slate-600">
-          Send your contact details, pickup address, delivery address, and
-          package notes. Atlas will coordinate the next steps with you.
-        </p>
-      </div>
-
-      <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 p-4">
-        <p className="text-sm font-bold text-amber-800">⚠️ Under Maintenance</p>
-        <p className="mt-1 text-sm text-amber-700">
-          Our pickup request form is currently under maintenance. We apologize
-          for the inconvenience.
-        </p>
-      </div>
-
-      <form onSubmit={handleSubmit} className="grid gap-4 lg:grid-cols-2">
-        <TextInput
-          name="fullName"
-          label="Full name"
-          value={pickupForm.fullName}
-          onChange={handleChange}
-          disabled={true}
-        />
-        <TextInput
-          name="phone"
-          label="Phone number"
-          type="tel"
-          value={pickupForm.phone}
-          onChange={handleChange}
-          disabled={true}
-        />
-        <TextInput
-          name="email"
-          label="Email address"
-          type="email"
-          value={pickupForm.email}
-          onChange={handleChange}
-          disabled={true}
-        />
-        <TextInput
-          name="deliveryAddress"
-          label="Delivery address"
-          value={pickupForm.deliveryAddress}
-          onChange={handleChange}
-          disabled={true}
-        />
-        <TextInput
-          name="pickupAddress"
-          label="Pickup address"
-          value={pickupForm.pickupAddress}
-          onChange={handleChange}
-          className="lg:col-span-2"
-          disabled={true}
-        />
-        <label className="grid gap-2 lg:col-span-2">
-          <span className="text-sm font-extrabold text-slate-700">
-            Package details
-          </span>
-          <textarea
-            name="packageDetails"
-            value={pickupForm.packageDetails}
-            onChange={handleChange}
-            rows={5}
-            required
-            disabled={true}
-            className="w-full resize-y rounded-xl border border-slate-300 bg-white px-4 py-3 text-base text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500"
-            placeholder="Describe the item count, size, weight, or special handling notes."
-          />
-        </label>
-
-        <div className="lg:col-span-2">
-          <button
-            type="submit"
-            disabled={true}
-            className="w-full rounded-xl bg-blue-700 px-6 py-4 text-sm font-extrabold text-white transition hover:bg-blue-600 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-500 sm:w-auto"
-          >
-            Submit Pickup Request
-          </button>
-
-          {submitState.message ? (
-            <p
-              className={`mt-3 text-sm font-bold ${
-                submitState.type === "error" ? "text-red-700" : "text-green-700"
-              }`}
-            >
-              {submitState.message}
+      <div className="grid lg:grid-cols-[0.9fr_1.1fr]">
+        <div className="relative bg-slate-950 p-5 text-white sm:p-7 lg:p-8">
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_18%,rgba(59,130,246,0.22),transparent_30%),linear-gradient(135deg,rgba(15,23,42,1),rgba(30,41,59,1))]" />
+          <div className="relative">
+            <p className="text-sm font-black uppercase tracking-[0.22em] text-blue-200">
+              Pickup Request
             </p>
-          ) : null}
+            <h2 className="mt-3 text-3xl font-black leading-tight sm:text-4xl">
+              Schedule pickup in three clear steps.
+            </h2>
+            <p className="mt-4 text-base leading-8 text-slate-300">
+              Request collection, prepare your cargo, and let Atlas coordinate
+              the movement into the right warehouse and route schedule.
+            </p>
+
+            <div className="mt-7 grid gap-4">
+              {pickupSteps.map((step, index) => (
+                <PickupStep key={step.title} step={step} index={index} />
+              ))}
+            </div>
+          </div>
         </div>
-      </form>
+
+        <div className="p-5 sm:p-7 lg:p-8">
+          <div className="atlas-motion-card rounded-[1.75rem] border border-slate-200 bg-slate-50 p-5 sm:p-6">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <p className="text-xs font-black uppercase tracking-[0.2em] text-blue-700">
+                    Pickup Planner
+                  </p>
+                  <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-[10px] font-black uppercase tracking-widest text-amber-700">
+                    <FontAwesomeIcon icon={faExclamationTriangle} />
+                    Maintenance
+                  </span>
+                </div>
+                <h3 className="mt-2 text-2xl font-black text-slate-950">
+                  Pickup requests are temporarily paused.
+                </h3>
+                <p className="mt-3 max-w-xl text-sm leading-7 text-slate-600">
+                  The planner is being updated. Customers can still contact
+                  Atlas support for manual pickup coordination.
+                </p>
+              </div>
+              <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-amber-50 text-amber-700 shadow-sm">
+                <FontAwesomeIcon icon={faExclamationTriangle} />
+              </span>
+            </div>
+
+            <div className="mt-6 rounded-2xl border border-amber-200 bg-amber-50 p-4">
+              <p className="text-sm font-black text-amber-800">
+                Under maintenance
+              </p>
+              <p className="mt-1 text-sm leading-6 text-amber-700">
+                Online pickup booking is unavailable while we improve the
+                request flow. Please use support for urgent pickup needs.
+              </p>
+            </div>
+
+            <div className="mt-6 grid gap-4 md:grid-cols-2">
+              <InfoPanel
+                icon={faLocationDot}
+                label="Preferred lanes"
+                value="Metro Manila pickup to Romblon release"
+              />
+              <InfoPanel
+                icon={faTruckPickup}
+                label="Collection status"
+                value="Coordinated by dispatch support"
+              />
+            </div>
+
+            <div className="mt-6 rounded-2xl border border-slate-200 bg-white p-4">
+              <p className="text-xs font-bold uppercase tracking-widest text-slate-500">
+                Pickup windows
+              </p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {pickupWindows.map((window) => (
+                  <span
+                    key={window}
+                    className="rounded-full border border-blue-100 bg-blue-50 px-3 py-1 text-xs font-black text-blue-700"
+                  >
+                    {window}
+                  </span>
+                ))}
+              </div>
+            </div>
+
+            <div className="mt-4 grid gap-3">
+              {checklist.map((item, index) => (
+                <ChecklistItem key={item} item={item} index={index} />
+              ))}
+            </div>
+
+            <button
+              type="button"
+              disabled
+              className="mt-6 inline-flex w-full cursor-not-allowed items-center justify-center gap-2 rounded-2xl bg-slate-300 px-6 py-4 text-sm font-black text-slate-500 sm:w-auto"
+            >
+              Request Pickup Unavailable
+              <FontAwesomeIcon icon={faArrowRight} className="text-xs" />
+            </button>
+          </div>
+        </div>
+      </div>
     </section>
   );
 }
 
-function TextInput({
-  name,
-  label,
-  value,
-  onChange,
-  type = "text",
-  className = "",
-  disabled = false,
-}) {
+function PickupStep({ step, index }) {
   return (
-    <label className={`grid gap-2 ${className}`}>
-      <span className="text-sm font-extrabold text-slate-700">{label}</span>
-      <input
-        name={name}
-        type={type}
-        value={value}
-        onChange={onChange}
-        required
-        disabled={disabled}
-        className="h-12 w-full rounded-xl border border-slate-300 bg-white px-4 text-base text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500"
-      />
-    </label>
+    <div
+      className="atlas-stagger flex gap-4 rounded-2xl border border-white/10 bg-white/5 p-4 backdrop-blur"
+      style={{ "--atlas-delay": `${index * 80}ms` }}
+    >
+      <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-white text-slate-950">
+        <FontAwesomeIcon icon={step.icon} />
+      </span>
+      <div>
+        <p className="text-xs font-black uppercase tracking-widest text-blue-200">
+          Step {index + 1}
+        </p>
+        <h3 className="mt-1 font-black text-white">{step.title}</h3>
+        <p className="mt-1 text-sm leading-6 text-slate-300">{step.detail}</p>
+      </div>
+    </div>
+  );
+}
+
+function InfoPanel({ icon, label, value }) {
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-white p-4">
+      <FontAwesomeIcon icon={icon} className="text-blue-700" />
+      <p className="mt-3 text-xs font-bold uppercase tracking-widest text-slate-500">
+        {label}
+      </p>
+      <p className="mt-1 text-sm font-black leading-6 text-slate-950">{value}</p>
+    </div>
+  );
+}
+
+function ChecklistItem({ item, index }) {
+  return (
+    <div
+      className="atlas-stagger flex items-center gap-3 rounded-2xl border border-slate-200 bg-white p-4"
+      style={{ "--atlas-delay": `${index * 70}ms` }}
+    >
+      <span className="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-50 text-xs text-emerald-700">
+        <FontAwesomeIcon icon={faClipboardCheck} />
+      </span>
+      <span className="text-sm font-black text-slate-950">{item}</span>
+    </div>
   );
 }

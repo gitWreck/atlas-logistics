@@ -1,6 +1,6 @@
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const admin = require("firebase-admin");
-const { requireRole } = require("../utilities/helpers"); // Assuming this exists as per your code
+const { requireRole, updatedBy } = require("../utilities/helpers"); // Assuming this exists as per your code
 const { writeShipmentActionLog } = require("../utilities/shipmentLogger");
 
 if (!admin.apps.length) admin.initializeApp();
@@ -11,13 +11,15 @@ exports.bulkAssignShipments = onCall(
   async (req) => {
     // 1. Auth & Role Guard
     await requireRole(db, req, ["admin", "manager"]);
-    const uid = req.auth.uid;
+    // const uid = req.auth.uid;
 
     // Fetch user details for role logging (matching your canonical code)
-    const userSnap = await db.collection("users").doc(uid).get();
+    const userSnap = await db.collection("users").doc(req.auth.uid).get();
     const userRole = userSnap.exists ? userSnap.data().role : "unknown";
 
     const { tripId, shipmentIds } = req.data;
+
+    const { uid, role, name } = updatedBy(req);
 
     // 2. Input Validation
     if (!tripId) throw new HttpsError("invalid-argument", "Missing Trip ID");
@@ -120,11 +122,11 @@ exports.bulkAssignShipments = onCall(
           packageBarcodes: data.packageBarcodes || [],
 
           createdAt: now,
-          createdBy: uid,
+          createdBy: name,
 
           updatedAt: now,
-          updatedBy: uid,
-          updatedRole: userRole,
+          updatedBy: name,
+          updatedRole: role,
 
           status: "ASSIGNED",
         });
@@ -137,8 +139,8 @@ exports.bulkAssignShipments = onCall(
           status: "ASSIGNED",
 
           updatedAt: now,
-          updatedBy: uid,
-          updatedRole: userRole,
+          updatedBy: name,
+          updatedRole: role,
 
           // Append to History
           statusHistory: admin.firestore.FieldValue.arrayUnion({
@@ -155,7 +157,7 @@ exports.bulkAssignShipments = onCall(
           message: "Assigned to trip",
           tripId: tripId,
           createdAt: now,
-          createdBy: uid,
+          createdBy: name,
         });
 
         // --- D. Admin Audit Log ---
@@ -166,7 +168,8 @@ exports.bulkAssignShipments = onCall(
           trackingShipmentId: snap.id,
           tripId: tripId,
           actorId: uid,
-          actorRole: userRole,
+          actorName: name,
+          actorRole: role,
           createdAt: now,
         });
       });
@@ -181,7 +184,7 @@ exports.bulkAssignShipments = onCall(
           // totalDelivered: 0,
 
           updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-          updatedBy: uid,
+          updatedBy: name,
         });
 
         await batch.commit();

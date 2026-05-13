@@ -9,6 +9,7 @@ import {
   ScrollView,
 } from "react-native";
 import { FontAwesome5 } from "@expo/vector-icons";
+import { useTheme } from "../../../contexts/ThemeContext";
 
 export default function ReportIssueModal({
   visible,
@@ -16,6 +17,8 @@ export default function ReportIssueModal({
   onSubmit,
   isPickup,
 }) {
+  const { colors, resolvedScheme } = useTheme();
+  const isDark = resolvedScheme === "dark";
   const [selectedReason, setSelectedReason] = useState(null);
 
   // Dynamically change reasons based on whether they are picking up or dropping off
@@ -77,14 +80,32 @@ export default function ReportIssueModal({
     >
       <View style={styles.modalOverlay}>
         <Pressable style={styles.backdrop} onPress={onClose} />
-        <View style={styles.modalContent}>
+        <View
+          style={[
+            styles.modalContent,
+            { backgroundColor: colors.surface, borderColor: colors.border },
+          ]}
+        >
           <View style={styles.header}>
             <View>
-              <Text style={styles.title}>Report Issue</Text>
-              <Text style={styles.subtitle}>Why is this shipment failing?</Text>
+              <Text style={[styles.title, { color: colors.text }]}>
+                Report Issue
+              </Text>
+              <Text style={[styles.subtitle, { color: colors.textMuted }]}>
+                Why is this shipment failing?
+              </Text>
             </View>
-            <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
-              <FontAwesome5 name="times" size={20} color="#64748b" />
+            <TouchableOpacity
+              onPress={onClose}
+              style={[
+                styles.closeBtn,
+                {
+                  backgroundColor: colors.cardMuted,
+                  borderColor: colors.border,
+                },
+              ]}
+            >
+              <FontAwesome5 name="times" size={20} color={colors.textMuted} />
             </TouchableOpacity>
           </View>
 
@@ -94,26 +115,44 @@ export default function ReportIssueModal({
               return (
                 <TouchableOpacity
                   key={reason.id}
-                  style={[styles.reasonRow, isActive && styles.reasonRowActive]}
+                  style={[
+                    styles.reasonRow,
+                    {
+                      backgroundColor: colors.cardMuted,
+                      borderColor: colors.border,
+                    },
+                    isActive && {
+                      backgroundColor: isDark ? "#450a0a" : "#fef2f2",
+                      borderColor: "#ef4444",
+                    },
+                  ]}
                   onPress={() => setSelectedReason(reason.id)}
                   activeOpacity={0.7}
                 >
                   <View
                     style={[
                       styles.iconCircle,
-                      isActive && styles.iconCircleActive,
+                      {
+                        backgroundColor: colors.surface,
+                        borderColor: colors.border,
+                      },
+                      isActive && {
+                        backgroundColor: isDark ? "#7f1d1d" : "#fee2e2",
+                        borderColor: "#ef4444",
+                      },
                     ]}
                   >
                     <FontAwesome5
                       name={reason.icon}
                       size={14}
-                      color={isActive ? "#ef4444" : "#64748b"}
+                      color={isActive ? "#ef4444" : colors.textMuted}
                     />
                   </View>
                   <Text
                     style={[
                       styles.reasonText,
-                      isActive && styles.reasonTextActive,
+                      { color: colors.text },
+                      isActive && { color: isDark ? "#fecaca" : "#991b1b" },
                     ]}
                   >
                     {reason.label}
@@ -157,6 +196,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#fff",
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
+    borderTopWidth: 1,
     padding: 24,
     paddingBottom: 40,
     maxHeight: "80%",
@@ -169,7 +209,12 @@ const styles = StyleSheet.create({
   },
   title: { fontSize: 20, fontWeight: "800", color: "#0f172a" },
   subtitle: { fontSize: 14, color: "#64748b", marginTop: 4 },
-  closeBtn: { padding: 8, backgroundColor: "#f1f5f9", borderRadius: 20 },
+  closeBtn: {
+    padding: 8,
+    backgroundColor: "#f1f5f9",
+    borderRadius: 20,
+    borderWidth: 1,
+  },
   listContainer: { marginBottom: 20 },
   reasonRow: {
     flexDirection: "row",
@@ -188,6 +233,8 @@ const styles = StyleSheet.create({
     height: 32,
     borderRadius: 16,
     backgroundColor: "#f1f5f9",
+    borderWidth: 1,
+    borderColor: "#e2e8f0",
     alignItems: "center",
     justifyContent: "center",
     marginRight: 12,
