@@ -3,8 +3,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
-  faChevronLeft,
-  faChevronRight,
   faEdit,
   faFilter,
   faMagnifyingGlass,
@@ -21,6 +19,7 @@ import {
   getTripTruckLabel,
 } from "@/app/utility/tripScheduleHelpers";
 import StatusBadge from "../../ui/StatusBadge";
+import TablePaginationFooter from "../../ui/TablePaginationFooter";
 
 function getPlannedLoadingStart(trip) {
   return trip?.plannedLoadingStart || null;
@@ -495,41 +494,15 @@ export default function TripScheduleTable({
       </div>
 
       {filteredTrips.length > 0 && (
-        <div
-          className={`px-4 sm:px-5 py-4 border-t flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 text-xs ${theme.footer}`}
-        >
-          <span className="text-center sm:text-left">
-            Showing{" "}
-            <span className={`font-bold ${theme.footerBold}`}>
-              {Math.min(currentPage * itemsPerPage, filteredTrips.length)}
-            </span>{" "}
-            of {filteredTrips.length}
-          </span>
-
-          <div className="flex items-center justify-center sm:justify-end gap-2">
-            <button
-              type="button"
-              onClick={() => setPage((prev) => Math.max(1, prev - 1))}
-              disabled={currentPage === 1}
-              className={`px-3 py-2 rounded-xl border disabled:opacity-50 disabled:cursor-not-allowed transition-all ${theme.paginationButton}`}
-            >
-              <FontAwesomeIcon icon={faChevronLeft} />
-            </button>
-
-            <span className={`text-xs font-medium px-2 ${theme.footerBold}`}>
-              {currentPage} / {totalPages}
-            </span>
-
-            <button
-              type="button"
-              onClick={() => setPage((prev) => Math.min(totalPages, prev + 1))}
-              disabled={currentPage === totalPages}
-              className={`px-3 py-2 rounded-xl border disabled:opacity-50 disabled:cursor-not-allowed transition-all ${theme.paginationButton}`}
-            >
-              <FontAwesomeIcon icon={faChevronRight} />
-            </button>
-          </div>
-        </div>
+        <TablePaginationFooter
+          totalItems={filteredTrips.length}
+          currentPage={currentPage}
+          itemsPerPage={itemsPerPage}
+          totalPages={totalPages}
+          onPrevious={() => setPage((prev) => Math.max(1, prev - 1))}
+          onNext={() => setPage((prev) => Math.min(totalPages, prev + 1))}
+          theme={theme}
+        />
       )}
     </div>
   );

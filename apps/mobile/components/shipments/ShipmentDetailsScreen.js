@@ -20,6 +20,7 @@ import { FontAwesome5 } from "@expo/vector-icons";
 
 import { db, storage } from "../../firebase";
 import { useAuth } from "../../contexts/AuthContext.js";
+import { useTheme } from "../../contexts/ThemeContext";
 import { getCurrentLocationSafe, updatedBy } from "../utilities/helpers";
 import {
   updateShipmentStatus,
@@ -54,6 +55,8 @@ export default function ShipmentDetailsScreen() {
   const { shipmentId, tripId, tripType, parentTripId } = useLocalSearchParams();
   const router = useRouter();
   const { isChecker, isDriver, profile } = useAuth();
+  const { colors, resolvedScheme } = useTheme();
+  const isDark = resolvedScheme === "dark";
 
   const resolvedTripId = parentTripId || tripId;
 
@@ -361,7 +364,7 @@ export default function ShipmentDetailsScreen() {
 
   if (loading) {
     return (
-      <View style={[styles.center, { backgroundColor: "#f1f5f9" }]}>
+      <View style={[styles.center, { backgroundColor: colors.bg }]}>
         <ActivityIndicator size="large" color="#042C83" />
       </View>
     );
@@ -369,8 +372,8 @@ export default function ShipmentDetailsScreen() {
 
   if (!shipment) {
     return (
-      <SafeAreaView style={styles.container}>
-        <StatusBar style="dark" />
+      <SafeAreaView style={[styles.container, { backgroundColor: colors.bg }]}>
+        <StatusBar style={isDark ? "light" : "dark"} />
         <ShipmentDetailHeader onBack={() => router.back()} />
       </SafeAreaView>
     );
@@ -393,8 +396,8 @@ export default function ShipmentDetailsScreen() {
   const packagePanelEditable = isChecker;
 
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar style="dark" />
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.bg }]}>
+      <StatusBar style={isDark ? "light" : "dark"} />
 
       <ShipmentDetailHeader onBack={() => router.back()} />
 
@@ -420,11 +423,24 @@ export default function ShipmentDetailsScreen() {
         )}
 
         {canCheckerHandleDelivery && shipment?.status === "OUT_FOR_DELIVERY" && (
-          <View style={styles.notificationCard}>
-            <Text style={styles.notificationTitle}>
+          <View
+            style={[
+              styles.notificationCard,
+              {
+                backgroundColor: colors.surface,
+                borderColor: isDark ? "#065f46" : "#d1fae5",
+              },
+            ]}
+          >
+            <Text style={[styles.notificationTitle, { color: colors.text }]}>
               Customer notifications
             </Text>
-            <Text style={styles.notificationSubtitle}>
+            <Text
+              style={[
+                styles.notificationSubtitle,
+                { color: colors.textMuted },
+              ]}
+            >
               Send an update when this delivery is completed.
             </Text>
 
@@ -438,7 +454,14 @@ export default function ShipmentDetailsScreen() {
                     key={channel.key}
                     style={[
                       styles.notificationOption,
-                      selected && styles.notificationOptionActive,
+                      {
+                        backgroundColor: colors.cardMuted,
+                        borderColor: colors.border,
+                      },
+                      selected && {
+                        backgroundColor: isDark ? "#064e3b" : "#ecfdf5",
+                        borderColor: "#34d399",
+                      },
                     ]}
                     onPress={() =>
                       toggleDeliveryNotificationChannel(channel.key)
@@ -449,18 +472,19 @@ export default function ShipmentDetailsScreen() {
                     <FontAwesome5
                       name={channel.icon}
                       size={13}
-                      color={selected ? "#047857" : "#64748b"}
+                      color={selected ? "#34d399" : colors.textMuted}
                     />
                     <Text
                       style={[
                         styles.notificationOptionText,
-                        selected && styles.notificationOptionTextActive,
+                        { color: colors.textMuted },
+                        selected && { color: isDark ? "#a7f3d0" : "#047857" },
                       ]}
                     >
                       {channel.label}
                     </Text>
                     {selected && (
-                      <FontAwesome5 name="check" size={11} color="#047857" />
+                      <FontAwesome5 name="check" size={11} color="#34d399" />
                     )}
                   </TouchableOpacity>
                 );

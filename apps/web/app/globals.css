@@ -142,6 +142,38 @@ html {
   }
 }
 
+@keyframes atlasFloat {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0);
+  }
+  50% {
+    transform: translate3d(0, -10px, 0);
+  }
+}
+
+@keyframes atlasFloatSlow {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0);
+  }
+  50% {
+    transform: translate3d(0, 8px, 0);
+  }
+}
+
+@keyframes atlasGlow {
+  0%,
+  100% {
+    opacity: 0.5;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.9;
+    transform: scale(1.18);
+  }
+}
+
 .atlas-nav-enter {
   animation: atlasNavIn 0.55s ease-out both;
 }
@@ -186,10 +218,35 @@ html {
   border-color: #bfdbfe;
 }
 
+.atlas-stagger {
+  animation: atlasSectionIn 0.6s ease-out both;
+  animation-delay: var(--atlas-delay, 0ms);
+}
+
+.atlas-float {
+  animation: atlasFloat 7s ease-in-out infinite;
+}
+
+.atlas-float-slow {
+  animation: atlasFloatSlow 8s ease-in-out infinite;
+}
+
+.atlas-hero-glow {
+  animation: atlasGlow 6s ease-in-out infinite;
+}
+
+.atlas-button-rise {
+  will-change: transform;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .atlas-nav-enter,
   .atlas-section-enter,
-  .atlas-logo-enter {
+  .atlas-logo-enter,
+  .atlas-stagger,
+  .atlas-float,
+  .atlas-float-slow,
+  .atlas-hero-glow {
     animation: none;
   }
 

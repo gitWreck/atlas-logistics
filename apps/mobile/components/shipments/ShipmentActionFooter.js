@@ -11,6 +11,7 @@ import {
 } from "react-native";
 import { FontAwesome5 } from "@expo/vector-icons";
 import GradientButton from "../ui/figma/GradientButton";
+import { useTheme } from "../../contexts/ThemeContext";
 
 const { height: SCREEN_HEIGHT } = Dimensions.get("window");
 const MIN_HEIGHT = 160; // Base height when collapsed
@@ -49,6 +50,7 @@ export default function ShipmentActionFooter({
   tripType = "",
   onSendSMS, // Your separate sendmanualsms function
 }) {
+  const { colors } = useTheme();
   const [isExpanded, setIsExpanded] = useState(false);
   const [syncSms, setSyncSms] = useState(false);
   const animatedHeight = useRef(new Animated.Value(MIN_HEIGHT)).current;
@@ -116,12 +118,21 @@ export default function ShipmentActionFooter({
   };
 
   return (
-    <Animated.View style={[styles.footer, { height: animatedHeight }]}>
+    <Animated.View
+      style={[
+        styles.footer,
+        {
+          height: animatedHeight,
+          backgroundColor: colors.surface,
+          borderTopColor: colors.border,
+        },
+      ]}
+    >
       {/* 1. HANDLE / SWIPE TRIGGER */}
       <View {...panResponder.panHandlers} style={styles.handleContainer}>
-        <View style={styles.handleBar} />
+        <View style={[styles.handleBar, { backgroundColor: colors.border }]} />
         <TouchableOpacity onPress={() => toggleDrawer(!isExpanded)}>
-          <Text style={styles.handleText}>
+          <Text style={[styles.handleText, { color: colors.textMuted }]}>
             {isExpanded ? "SWIPE DOWN TO HIDE" : "SWIPE UP FOR MESSAGING"}
           </Text>
         </TouchableOpacity>
@@ -144,12 +155,22 @@ export default function ShipmentActionFooter({
 
       {/* 3. MESSAGING SECTION (Hidden below, appears on swipe) */}
       <View style={styles.messagingSection}>
-        <View style={styles.divider} />
+        <View style={[styles.divider, { backgroundColor: colors.border }]} />
 
-        <Text style={styles.label}>Message / SMS Content</Text>
+        <Text style={[styles.label, { color: colors.textMuted }]}>
+          Message / SMS Content
+        </Text>
         <TextInput
-          style={styles.messageInput}
+          style={[
+            styles.messageInput,
+            {
+              backgroundColor: colors.inputBg,
+              borderColor: colors.border,
+              color: colors.text,
+            },
+          ]}
           placeholder="e.g. Your package is arriving in 5 mins..."
+          placeholderTextColor={colors.textMuted}
           multiline
           value={message}
           onChangeText={onMessageChange}
@@ -163,7 +184,7 @@ export default function ShipmentActionFooter({
           <View style={[styles.checkbox, syncSms && styles.checkboxActive]}>
             {syncSms && <FontAwesome5 name="check" size={10} color="#fff" />}
           </View>
-          <Text style={styles.checkboxLabel}>
+          <Text style={[styles.checkboxLabel, { color: colors.textMuted }]}>
             Send SMS automatically on status update
           </Text>
         </TouchableOpacity>
@@ -211,7 +232,7 @@ const styles = StyleSheet.create({
     fontSize: 10,
     color: "#94a3b8",
     fontWeight: "800",
-    letterSpacing: 1,
+    letterSpacing: 0,
   },
 
   mainActionRow: { paddingBottom: 10 },

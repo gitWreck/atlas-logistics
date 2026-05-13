@@ -4,12 +4,11 @@ import {
   faTrash,
   faSearch,
   faFilter,
-  faChevronLeft,
-  faChevronRight,
   faEdit,
   faPlus,
 } from "@fortawesome/free-solid-svg-icons";
 import { getTableTheme } from "@/app/utility/constant/theme";
+import TablePaginationFooter from "../ui/TablePaginationFooter";
 
 export default function UserManagementTable({
   users = [],
@@ -356,37 +355,15 @@ export default function UserManagementTable({
 
       {/* Pagination */}
       {!loading && filteredUsers.length > 0 && (
-        <div
-          className={`px-4 sm:px-6 py-4 border-t flex flex-col sm:flex-row justify-between items-center gap-3 text-xs ${theme.footer}`}
-        >
-          <span>
-            Showing{" "}
-            <span className={`font-bold ${theme.footerBold}`}>
-              {Math.min(currentPage * itemsPerPage, filteredUsers.length)}
-            </span>{" "}
-            of {filteredUsers.length}
-          </span>
-
-          <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={() => setPage((prev) => Math.max(1, prev - 1))}
-              disabled={currentPage === 1}
-              className={`px-3 py-1.5 rounded-lg border disabled:opacity-50 disabled:cursor-not-allowed transition-all ${theme.paginationButton}`}
-            >
-              <FontAwesomeIcon icon={faChevronLeft} className="mr-1" />
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setPage((prev) => Math.min(totalPages, prev + 1))}
-              disabled={currentPage === totalPages}
-              className={`px-3 py-1.5 rounded-lg border disabled:opacity-50 disabled:cursor-not-allowed transition-all ${theme.paginationButton}`}
-            >
-              <FontAwesomeIcon icon={faChevronRight} className="ml-1" />
-            </button>
-          </div>
-        </div>
+        <TablePaginationFooter
+          totalItems={filteredUsers.length}
+          currentPage={currentPage}
+          itemsPerPage={itemsPerPage}
+          totalPages={totalPages}
+          onPrevious={() => setPage((prev) => Math.max(1, prev - 1))}
+          onNext={() => setPage((prev) => Math.min(totalPages, prev + 1))}
+          theme={theme}
+        />
       )}
     </div>
   );
