@@ -320,7 +320,6 @@ exports.createShipment = onCall(
       shipmentId: shipmentId,
       trackingNumber: shipmentId,
       currentTripId: null,
-      currentTruckTripId: null,
       visibilityUserIds: shipmentVisibilityUserIds,
       createdSource: "web",
 

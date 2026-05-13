@@ -232,7 +232,7 @@ function InvoicePrintView() {
                   value={
                     invoice.tripId ||
                     invoice.truckTripId ||
-                    connectedShipment?.currentTripId || 
+                    connectedShipment?.currentTripId ||
                     connectedShipment?.currentTruckTripId
                   }
                 />
