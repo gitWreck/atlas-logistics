@@ -122,11 +122,11 @@ export default function PrintManifest() {
             shipmentsData.push({ id: docSnap.id, ...docSnap.data() });
           });
 
-          // Fallback query matching currentTripId if empty
+          // Fallback query matching currentTruckTripId if empty
           if (shipmentsData.length === 0) {
             const qAlternate = query(
               collection(db, "shipments"),
-              where("currentTripId", "==", tripData?.tripId || tripId),
+              where("currentTruckTripId", "==", tripData?.tripId || tripId),
             );
             const alternateSnap = await getDocs(qAlternate);
             alternateSnap.forEach((docSnap) => {
