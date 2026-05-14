@@ -174,6 +174,31 @@ export default function useScannerLogic({
     [],
   );
 
+  const shouldPromptLoadedStatusAfterLoad = useCallback(
+    (processedQuantity) => {
+      if (action !== "LOAD" || scanStatus !== "LOADED") return false;
+
+      const currentTripStatus = String(trip?.status || "").toUpperCase();
+      if (
+        currentTripStatus === "LOADED" ||
+        currentTripStatus === "ARRIVED" ||
+        trip?.manifestLocked
+      ) {
+        return false;
+      }
+
+      const itemPending = Number(trip?.itemPending);
+      const totalItems = Number(trip?.totalItems) || 0;
+      const totalLoaded = Number(trip?.totalLoaded) || 0;
+      const currentPending = Number.isFinite(itemPending)
+        ? itemPending
+        : Math.max(totalItems - totalLoaded, 0);
+
+      return totalItems > 0 && currentPending - processedQuantity <= 0;
+    },
+    [action, scanStatus, trip],
+  );
+
   const findPackageByScan = useCallback(
     (packages = [], code, packageId = null) => {
       const candidates = [packageId, code]
@@ -299,6 +324,14 @@ export default function useScannerLogic({
       });
       onRefresh?.();
 
+      if (shouldPromptLoadedStatusAfterLoad(totalQuantity)) {
+        if (trip) {
+          trip.itemPending = 0;
+          trip.totalLoaded = trip.totalItems || trip.totalLoaded || 0;
+        }
+        setNeedsLoadedStatus(true);
+      }
+
       if (action === "UNLOAD") {
         const summary = await loadHandoffReview({ openWhenReadyOnly: true });
 
@@ -317,6 +350,8 @@ export default function useScannerLogic({
       profile,
       resetScanResult,
       scanStatus,
+      shouldPromptLoadedStatusAfterLoad,
+      trip,
       tripId,
     ],
   );
@@ -586,6 +621,14 @@ export default function useScannerLogic({
         totalQuantity,
       });
       onRefresh?.();
+
+      if (shouldPromptLoadedStatusAfterLoad(totalQuantity)) {
+        if (trip) {
+          trip.itemPending = 0;
+          trip.totalLoaded = trip.totalItems || trip.totalLoaded || 0;
+        }
+        setNeedsLoadedStatus(true);
+      }
 
       if (action === "UNLOAD") {
         const summary = await loadHandoffReview({ openWhenReadyOnly: true });
