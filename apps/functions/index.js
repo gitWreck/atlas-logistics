@@ -83,6 +83,8 @@ exports.disableTruckTrip =
 exports.completeTrip = require("./src/trips/completeTrip").completeTrip;
 exports.updateTripStatus =
   require("./src/trips/updateTripStatus").updateTripStatus;
+exports.updateTripDetails =
+  require("./src/trips/updateTripDetails").updateTripDetails;
 exports.finalizeTripUnloadHandoff =
   require("./src/trips/finalizeTripUnloadHandoff").finalizeTripUnloadHandoff;
 

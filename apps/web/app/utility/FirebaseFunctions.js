@@ -43,6 +43,7 @@ export const updateTripSchedule = httpsCallable(
   functions,
   "updateTripSchedule",
 );
+export const updateTripDetails = httpsCallable(functions, "updateTripDetails");
 
 export const disableTruckTrip = httpsCallable(functions, "disableTruckTrip");
 export const setTruckDelay = httpsCallable(functions, "setTruckDelay");
