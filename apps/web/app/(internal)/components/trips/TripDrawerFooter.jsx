@@ -40,7 +40,11 @@ export default function TripDrawerFooter({
   if (!data) return null;
 
   const isLocked = data.manifestLocked;
-  const isAdmin = profile?.role?.toLowerCase() === "admin";
+  const role = String(profile?.role || "").toLowerCase();
+  const isAdmin = role === "admin";
+  const isManager = role === "manager";
+  const canViewManifestControls = isAdmin || isManager;
+  const canEditManifestControls = isAdmin;
 
   const handleUnlockSuccess = () => {
     setTimeout(() => {
@@ -51,7 +55,7 @@ export default function TripDrawerFooter({
 
   return (
     <div className={`p-4 border-t flex flex-col gap-3 ${theme.footerPanel}`}>
-      {isAdmin && showUnlockReason && (
+      {canEditManifestControls && showUnlockReason && (
         <div
           className={`p-3 rounded-xl border animate-in slide-in-from-bottom-2 duration-200 ${theme.reasonBox}`}
         >
@@ -82,7 +86,7 @@ export default function TripDrawerFooter({
         </div>
       )}
 
-      {isAdmin && (
+      {canViewManifestControls && (
         <div className="flex gap-3">
           <StatusButton
             status={lockStatus}
@@ -92,7 +96,7 @@ export default function TripDrawerFooter({
             icon={faLock}
             // idleColor="bg-emerald-600/20 hover:bg-emerald-600/40 text-emerald-400 border border-emerald-500/30"
             variant="emerald"
-            disabled={isLocked || showUnlockReason}
+            disabled={!canEditManifestControls || isLocked || showUnlockReason}
             onClick={() =>
               runAction(
                 setLockStatus,
@@ -109,7 +113,7 @@ export default function TripDrawerFooter({
           {!showUnlockReason ? (
             <button
               type="button"
-              disabled={!isLocked}
+              disabled={!canEditManifestControls || !isLocked}
               onClick={() => setShowUnlockReason(true)}
               className={theme.warningOutlineButton}
             >

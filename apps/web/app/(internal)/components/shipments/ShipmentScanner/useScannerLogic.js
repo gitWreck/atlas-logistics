@@ -459,6 +459,7 @@ export default function useScannerLogic({
     );
     if (success)
       setTimeout(() => {
+        onRefresh?.();
         setNeedsArrival(false);
         if (trip?.manifestLocked) setNeedsUnlock(true);
         setBtnStatus("IDLE");
@@ -475,6 +476,7 @@ export default function useScannerLogic({
     );
     if (success)
       setTimeout(() => {
+        onRefresh?.();
         setNeedsUnlock(false);
         setBtnStatus("IDLE");
       }, 1000);
@@ -490,6 +492,7 @@ export default function useScannerLogic({
     );
     if (success)
       setTimeout(() => {
+        onRefresh?.();
         setNeedsLoadedStatus(false);
         setNeedsLock(true);
         setBtnStatus("IDLE");
@@ -511,6 +514,7 @@ export default function useScannerLogic({
       // Safely ensure backend status aligns with local optimistic IN_TRANSIT
       executeFirebaseCall(updateTripStatus, { tripId, status: "IN_TRANSIT" });
       setTimeout(() => {
+        onRefresh?.();
         setNeedsLock(false);
         setBtnStatus("IDLE");
       }, 1000);

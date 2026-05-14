@@ -5,6 +5,7 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faBox,
   faEllipsisV,
+  faLock,
   faTruck,
   faTruckPickup,
 } from "@fortawesome/free-solid-svg-icons";
@@ -47,6 +48,7 @@ export default function TripRow({ trip, onClick, isDark = false }) {
   const normalizedStatus = String(trip.status || "").toUpperCase();
   const isCompleted = ["COMPLETED", "DELIVERED"].includes(normalizedStatus);
   const isDelayed = !!trip.delayReason && !trip.delayCleared;
+  const isManifestLocked = !!trip.manifestLocked;
   const loadedCount = trip.totalLoaded || 0;
   const totalCount = trip.totalItems || 0;
   const driverName = trip.driverName || "Unassigned";
@@ -67,13 +69,14 @@ export default function TripRow({ trip, onClick, isDark = false }) {
     : isLocal
       ? theme.typeBadgeLocal
       : theme.typeBadgeTransfer;
+  const lockedBadgeClass =
+    "bg-emerald-600/20 text-emerald-400 border-emerald-500/30";
 
-  const progressBarClass =
-    isCompleted
-      ? theme.progressEmerald
-      : isDelayed
-        ? theme.progressAmber
-        : theme.progressBlue;
+  const progressBarClass = isCompleted
+    ? theme.progressEmerald
+    : isDelayed
+      ? theme.progressAmber
+      : theme.progressBlue;
 
   const statusTextClass = isDelayed
     ? theme.statusTextDelayed
@@ -217,11 +220,25 @@ export default function TripRow({ trip, onClick, isDark = false }) {
           {routeText}
         </div>
 
-        <span
-          className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${typeBadgeClass}`}
-        >
-          {tripTypeFullLabel}
-        </span>
+        <div className="md:mt-1 flex flex-wrap items-center gap-1.5">
+          <span
+            className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${typeBadgeClass}`}
+          >
+            {tripTypeFullLabel}
+          </span>
+
+          {isManifestLocked && (
+            <span
+              className={`text-[9px] font-bold px-1.5 py-0.5 rounded border inline-flex items-center gap-1 ${lockedBadgeClass}`}
+            >
+              <FontAwesomeIcon
+                icon={faLock}
+                className="text-[8px] text-current"
+              />
+              LOCKED
+            </span>
+          )}
+        </div>
       </div>
 
       {/* Col 3 */}
