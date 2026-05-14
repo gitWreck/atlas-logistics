@@ -4,11 +4,13 @@ import React, { useState } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faCheckCircle,
-  faPen,
+  faPenToSquare,
   faTimesCircle,
+  faTruck,
 } from "@fortawesome/free-solid-svg-icons";
 import { formatFirestoreDate } from "@/app/utility/utilities";
 import TripAssignmentModal from "../manifests/modals/TripAssignmentModal";
+import EditTripDetailsModal from "./modals/EditTripDetailsModal";
 import {
   STEP_HUB_TRANSFER,
   STEP_LOCAL_PICKUP,
@@ -25,12 +27,14 @@ export default function TripTimelineTab({
   profile,
 }) {
   const [isDriverModalOpen, setIsDriverModalOpen] = useState(false);
+  const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
 
   const theme = getTimelineThemeClasses(isDark);
   const action = getTimelineActionClasses(isDark);
 
   const isLocal = data.tripType === "LOCAL_PICKUP";
   const steps = isLocal ? STEP_LOCAL_PICKUP : STEP_HUB_TRANSFER;
+  const isAdmin = String(profile?.role || "").toLowerCase() === "admin";
 
   const isCancelled = data.status === "CANCELLED";
   const currentStepIndex = isCancelled ? -1 : steps.indexOf(data.status);
@@ -55,14 +59,27 @@ export default function TripTimelineTab({
           </span>
         </div>
 
-        <button
-          type="button"
-          onClick={() => setIsDriverModalOpen(true)}
-          className={`text-xs px-3 py-1.5 rounded transition-colors flex items-center gap-2 border ${action.editButton}`}
-        >
-          <FontAwesomeIcon icon={faPen} size="sm" />
-          <span>Edit</span>
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setIsDriverModalOpen(true)}
+            className={`text-xs px-3 py-1.5 rounded transition-colors flex items-center gap-2 border ${action.editButton}`}
+          >
+            <FontAwesomeIcon icon={faTruck} size="sm" />
+            <span>Edit</span>
+          </button>
+
+          {isAdmin && (
+            <button
+              type="button"
+              onClick={() => setIsDetailsModalOpen(true)}
+              className={`text-xs px-3 py-1.5 rounded transition-colors flex items-center gap-2 border ${action.editButton}`}
+            >
+              <FontAwesomeIcon icon={faPenToSquare} size="sm" />
+              <span>Details</span>
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Info Grid */}
@@ -175,6 +192,15 @@ export default function TripTimelineTab({
         onSuccess={() => onRefresh?.()}
         isDark={isDark}
         user={user}
+        profile={profile}
+      />
+
+      <EditTripDetailsModal
+        isOpen={isDetailsModalOpen}
+        onClose={() => setIsDetailsModalOpen(false)}
+        trip={data}
+        onSuccess={() => onRefresh?.()}
+        isDark={isDark}
         profile={profile}
       />
     </div>
