@@ -40,6 +40,7 @@ export default function TripDrawerFooter({
   if (!data) return null;
 
   const isLocked = data.manifestLocked;
+  const isAdmin = profile?.role?.toLowerCase() === "admin";
 
   const handleUnlockSuccess = () => {
     setTimeout(() => {
@@ -50,7 +51,7 @@ export default function TripDrawerFooter({
 
   return (
     <div className={`p-4 border-t flex flex-col gap-3 ${theme.footerPanel}`}>
-      {showUnlockReason && (
+      {isAdmin && showUnlockReason && (
         <div
           className={`p-3 rounded-xl border animate-in slide-in-from-bottom-2 duration-200 ${theme.reasonBox}`}
         >
@@ -81,68 +82,69 @@ export default function TripDrawerFooter({
         </div>
       )}
 
-      <div className="flex gap-3">
-        <StatusButton
-          status={lockStatus}
-          label="Lock Manifest"
-          loadingLabel="Locking..."
-          successLabel="Locked!"
-          icon={faLock}
-          // idleColor="bg-emerald-600/20 hover:bg-emerald-600/40 text-emerald-400 border border-emerald-500/30"
-          variant="emerald"
-          disabled={isLocked || showUnlockReason}
-          onClick={() =>
-            runAction(
-              setLockStatus,
-              () =>
-                generateTripManifest({
-                  tripId: data.tripId,
-                  updatedBy: updatedBy(profile),
-                }),
-              () => onSuccess?.(),
-            )
-          }
-        />
-
-        {!showUnlockReason ? (
-          <button
-            type="button"
-            disabled={!isLocked}
-            onClick={() => setShowUnlockReason(true)}
-            className={theme.warningOutlineButton}
-          >
-            <FontAwesomeIcon icon={faUnlock} />
-            Unlock Manifest
-          </button>
-        ) : (
+      {isAdmin && (
+        <div className="flex gap-3">
           <StatusButton
-            status={unlockStatus}
-            label="Confirm Unlock"
-            loadingLabel="Unlocking..."
-            successLabel="Unlocked!"
-            icon={faUnlock}
-            // idleColor="bg-amber-600 text-white shadow-lg shadow-amber-600/20"
-            variant="amber"
-            disabled={!unlockReason.trim()}
+            status={lockStatus}
+            label="Lock Manifest"
+            loadingLabel="Locking..."
+            successLabel="Locked!"
+            icon={faLock}
+            // idleColor="bg-emerald-600/20 hover:bg-emerald-600/40 text-emerald-400 border border-emerald-500/30"
+            variant="emerald"
+            disabled={isLocked || showUnlockReason}
             onClick={() =>
               runAction(
-                setUnlockStatus,
+                setLockStatus,
                 () =>
-                  unlockTripManifest({
+                  generateTripManifest({
                     tripId: data.tripId,
-                    reason: unlockReason,
                     updatedBy: updatedBy(profile),
                   }),
-                () => {
-                  onSuccess?.();
-                  handleUnlockSuccess();
-                },
+                () => onSuccess?.(),
               )
             }
           />
-        )}
 
-        {/* <StatusButton
+          {!showUnlockReason ? (
+            <button
+              type="button"
+              disabled={!isLocked}
+              onClick={() => setShowUnlockReason(true)}
+              className={theme.warningOutlineButton}
+            >
+              <FontAwesomeIcon icon={faUnlock} />
+              Unlock Manifest
+            </button>
+          ) : (
+            <StatusButton
+              status={unlockStatus}
+              label="Confirm Unlock"
+              loadingLabel="Unlocking..."
+              successLabel="Unlocked!"
+              icon={faUnlock}
+              // idleColor="bg-amber-600 text-white shadow-lg shadow-amber-600/20"
+              variant="amber"
+              disabled={!unlockReason.trim()}
+              onClick={() =>
+                runAction(
+                  setUnlockStatus,
+                  () =>
+                    unlockTripManifest({
+                      tripId: data.tripId,
+                      reason: unlockReason,
+                      updatedBy: updatedBy(profile),
+                    }),
+                  () => {
+                    onSuccess?.();
+                    handleUnlockSuccess();
+                  },
+                )
+              }
+            />
+          )}
+
+          {/* <StatusButton
           status={reopenStatus}
           label="Reopen"
           loadingLabel="..."
@@ -165,7 +167,8 @@ export default function TripDrawerFooter({
             }
           }}
         /> */}
-      </div>
+        </div>
+      )}
 
       <div className="flex gap-3 pt-1">
         <button
