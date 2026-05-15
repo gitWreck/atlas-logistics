@@ -8,6 +8,8 @@ import {
   faCircleNotch,
   faCheck,
   faCamera,
+  faClipboardCheck,
+  faArrowRight,
 } from "@fortawesome/free-solid-svg-icons";
 import { getModalThemeClasses } from "@/app/utility/constant/theme";
 import { getModalActionClasses } from "@/app/utility/constant/action";
@@ -132,12 +134,45 @@ export default function ShipmentScanActionModal({
                 type="button"
                 onClick={actions.handleReviewHandoff}
                 disabled={state.loading}
-                className={`w-full rounded-xl border px-4 py-3 text-sm font-bold text-left ${theme.panelSurface}`}
+                className={`group w-full rounded-xl border px-4 py-4 text-left transition-all disabled:opacity-70 ${
+                  isDark
+                    ? "border-emerald-400/40 bg-emerald-500/10 hover:bg-emerald-500/15"
+                    : "border-emerald-300 bg-emerald-50 hover:bg-emerald-100"
+                }`}
               >
-                Review manifest handoff
-                <span className="block text-[11px] font-normal opacity-60">
-                  Manifest reconciliation
-                </span>
+                <div className="flex items-center gap-3">
+                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-emerald-500 text-white shadow-sm">
+                    {state.loading ? (
+                      <FontAwesomeIcon icon={faCircleNotch} spin />
+                    ) : (
+                      <FontAwesomeIcon icon={faClipboardCheck} />
+                    )}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-bold text-emerald-600">
+                        Review manifest handoff
+                      </span>
+                      <span
+                        className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${
+                          isDark
+                            ? "bg-emerald-400/15 text-emerald-300"
+                            : "bg-white text-emerald-700"
+                        }`}
+                      >
+                        Reconcile
+                      </span>
+                    </div>
+                    <span className={`mt-0.5 block text-xs ${theme.helperText}`}>
+                      Check unloaded, missing, and ready shipments before assigning
+                      to delivery.
+                    </span>
+                  </div>
+                  <FontAwesomeIcon
+                    icon={faArrowRight}
+                    className="shrink-0 text-emerald-500 transition-transform group-hover:translate-x-0.5"
+                  />
+                </div>
               </button>
             )}
 

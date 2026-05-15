@@ -10,6 +10,7 @@ import {
   faTruckRampBox,
   faUndo,
   faWarehouse,
+  faCircleNotch,
 } from "@fortawesome/free-solid-svg-icons";
 
 export function ActionSelector({ action, trip, theme, actions }) {
@@ -183,6 +184,7 @@ export function CameraScanner({
   onClose,
   setError,
 }) {
+  const [isResolvingScan, setIsResolvingScan] = React.useState(false);
   const videoRef = useRef(null);
   const streamRef = useRef(null);
   const onDetectedRef = useRef(onDetected);
@@ -200,6 +202,18 @@ export function CameraScanner({
     let stopScanning = false;
     let animationFrameId = null;
     let html5Scanner = null;
+
+    const handleDetected = async (decodedText) => {
+      if (stopScanning) return;
+      stopScanning = true;
+      setIsResolvingScan(true);
+
+      try {
+        await onDetectedRef.current(decodedText);
+      } catch {
+        setErrorRef.current("Failed to process scanned code.");
+      }
+    };
 
     const cleanupNativeScanner = () => {
       if (animationFrameId) cancelAnimationFrame(animationFrameId);
@@ -253,9 +267,7 @@ export function CameraScanner({
             },
           },
           (decodedText) => {
-            if (stopScanning) return;
-            stopScanning = true;
-            onDetectedRef.current(decodedText);
+            handleDetected(decodedText);
           },
           () => {},
         );
@@ -287,8 +299,7 @@ export function CameraScanner({
             try {
               const barcodes = await detector.detect(videoRef.current);
               if (barcodes.length > 0) {
-                stopScanning = true;
-                return onDetectedRef.current(barcodes[0].rawValue);
+                return handleDetected(barcodes[0].rawValue);
               }
             } catch {
               /* ignore */
@@ -337,9 +348,16 @@ export function CameraScanner({
         />
       )}
       <div className="absolute inset-0 border-2 border-blue-500 m-12 rounded-lg opacity-50 shadow-[0_0_0_999px_rgba(0,0,0,0.5)] pointer-events-none" />
+      {isResolvingScan && (
+        <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 bg-black/70 text-white">
+          <FontAwesomeIcon icon={faCircleNotch} spin size="2x" />
+          <div className="text-sm font-bold">Processing scan...</div>
+        </div>
+      )}
       <button
         onClick={onClose}
-        className="absolute bottom-4 right-4 bg-black/50 text-white px-4 py-2 rounded-lg text-sm font-bold"
+        disabled={isResolvingScan}
+        className="absolute bottom-4 right-4 z-20 bg-black/50 text-white px-4 py-2 rounded-lg text-sm font-bold disabled:opacity-60"
       >
         Close
       </button>

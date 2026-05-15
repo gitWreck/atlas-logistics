@@ -1,0 +1,19 @@
+Short Flow: Shipment Scan Modal
+
+1. User opens the Scan Package modal.
+2. User chooses Load or Unload.
+3. User selects the scan status:
+   - Load: Loaded, Missing, Damaged
+   - Unload: Received, Missing, Damaged
+4. User scans with the camera or enters the label manually.
+5. System checks if the package exists and belongs to the trip.
+6. If needed, user assigns the shipment to the trip first.
+7. User confirms the quantity/status.
+8. System updates the shipment and shows a success message.
+9. Extra prompts may appear:
+   - Mark trip as arrived
+   - Unlock manifest
+   - Set trip as loaded
+   - Lock manifest
+   - Review/assign handoff after unloading
+10. User can reset, scan another package, or close the modal.
