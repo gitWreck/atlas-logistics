@@ -208,8 +208,12 @@ export function CameraScanner({
       stopScanning = true;
       setIsResolvingScan(true);
 
+      const minimumSpinnerDelay = new Promise((resolve) =>
+        setTimeout(resolve, 2000),
+      );
+
       try {
-        await onDetectedRef.current(decodedText);
+        await Promise.all([onDetectedRef.current(decodedText), minimumSpinnerDelay]);
       } catch {
         setErrorRef.current("Failed to process scanned code.");
       }
