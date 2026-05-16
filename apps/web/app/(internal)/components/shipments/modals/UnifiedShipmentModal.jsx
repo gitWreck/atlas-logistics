@@ -211,8 +211,8 @@ export default function UnifiedShipmentModal({
         // ✅ UPDATE MODE
         await updateShipmentDetails({
           shipmentId: finalDocId,
-          ...payload,
           updatedBy: updatedBy(profile),
+          ...payload,
         });
       } else {
         // ❌ CREATE MODE
