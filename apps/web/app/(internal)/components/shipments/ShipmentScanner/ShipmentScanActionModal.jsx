@@ -62,6 +62,13 @@ export default function ShipmentScanActionModal({
 
   if (!isOpen) return null;
 
+  const selectedScanStatusLabel =
+    state.scanStatusOptions.find((opt) => opt.value === state.scanStatus)
+      ?.label || state.scanStatus;
+  const scannerStatusMessage = selectedScanStatusLabel
+    ? `Scan will mark as ${selectedScanStatusLabel}`
+    : "";
+
   return (
     <div className="fixed inset-0 z-[120] flex items-center justify-center sm:p-4">
       <div className={`absolute inset-0 ${theme.overlay}`} onClick={onClose} />
@@ -254,23 +261,6 @@ export default function ShipmentScanActionModal({
             />
           ) : state.action ? (
             <div className="space-y-4">
-              <ScanStatusSelector
-                action={state.action}
-                value={state.scanStatus}
-                options={state.scanStatusOptions}
-                onChange={actions.setScanStatus}
-                theme={theme}
-              />
-
-              <ScannerEngineSelect
-                value={scannerEngine}
-                onChange={(value) => {
-                  actions.setError("");
-                  setScannerEngine(value);
-                }}
-                theme={theme}
-              />
-
               {!cameraOpen ? (
                 <button
                   onClick={() => {
@@ -292,8 +282,27 @@ export default function ShipmentScanActionModal({
                   }}
                   onClose={() => setCameraOpen(false)}
                   setError={actions.setError}
+                  statusMessage={scannerStatusMessage}
                 />
               )}
+
+              <ScanStatusSelector
+                action={state.action}
+                value={state.scanStatus}
+                options={state.scanStatusOptions}
+                onChange={actions.setScanStatus}
+                theme={theme}
+              />
+
+              <ScannerEngineSelect
+                value={scannerEngine}
+                onChange={(value) => {
+                  actions.setError("");
+                  setScannerEngine(value);
+                }}
+                theme={theme}
+              />
+
               <ManualInput
                 value={state.manualCode}
                 onChange={(val) => {

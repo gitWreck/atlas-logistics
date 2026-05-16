@@ -183,6 +183,7 @@ export function CameraScanner({
   onDetected,
   onClose,
   setError,
+  statusMessage = "",
 }) {
   const [isResolvingScan, setIsResolvingScan] = React.useState(false);
   const videoRef = useRef(null);
@@ -352,10 +353,20 @@ export function CameraScanner({
         />
       )}
       <div className="absolute inset-0 border-2 border-blue-500 m-12 rounded-lg opacity-50 shadow-[0_0_0_999px_rgba(0,0,0,0.5)] pointer-events-none" />
+      {!isResolvingScan && statusMessage && (
+        <div className="absolute left-4 top-4 z-10 rounded-full bg-black/65 px-3 py-1.5 text-xs font-bold text-white shadow-sm">
+          {statusMessage}
+        </div>
+      )}
       {isResolvingScan && (
         <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 bg-black/70 text-white">
           <FontAwesomeIcon icon={faCircleNotch} spin size="2x" />
           <div className="text-sm font-bold">Processing scan...</div>
+          {statusMessage && (
+            <div className="rounded-full bg-white/15 px-3 py-1 text-xs font-bold">
+              {statusMessage}
+            </div>
+          )}
         </div>
       )}
       <button
