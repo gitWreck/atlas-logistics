@@ -1,19 +1,50 @@
 Short Flow: Shipment Scan Modal
 
-1. User opens the Scan Package modal.
+1. User opens the Scan Package modal from a trip.
+   - Condition: a trip must be selected and the modal needs a valid tripId.
+
 2. User chooses Load or Unload.
-3. User selects the scan status:
-   - Load: Loaded, Missing, Damaged
-   - Unload: Received, Missing, Damaged
+   - Load condition: trip must not be IN_TRANSIT and manifest must not be locked.
+   - Load warning: if the trip is already LOADED and manifest is unlocked, user is prompted to lock the manifest before continuing.
+   - Load warning: if all items are loaded but the trip is not LOADED or ARRIVED, user is prompted to set the trip to LOADED.
+   - Unload condition: trip must be ARRIVED or COMPLETED in the modal.
+   - Unload warning: if trip is IN_TRANSIT, user is prompted to mark the trip as ARRIVED first.
+   - Unload warning: if trip is ARRIVED but manifest is locked, user is prompted to unlock the manifest first.
+   - Unload error: if trip is not ARRIVED, COMPLETED, or IN_TRANSIT, unload is blocked. Example: CREATED trips should be marked LOADED, moved to IN_TRANSIT, then marked ARRIVED before unloading.
+
+3. User selects the scan status.
+   - Load statuses: Loaded, Missing, Damaged.
+   - Unload statuses: Received, Missing, Damaged.
+   - Condition: a Load or Unload action must be selected before statuses are shown.
+
 4. User scans with the camera or enters the label manually.
+   - Condition: a label/package/shipment code is required.
+   - Camera warning: if one scanner engine fails, user should switch scanner engine or use Manual Entry.
+   - Camera warning: if camera access is denied, user should allow camera access or use Manual Entry.
+
 5. System checks if the package exists and belongs to the trip.
+   - Condition: scanned label must match a shipment ID, package ID, or tracking number.
+   - Condition: unload scans must pass server validation that the trip is ARRIVED.
+   - Condition: if the shipment belongs to a different trip, it must be assigned to this trip before packages can be loaded or unloaded.
+
 6. If needed, user assigns the shipment to the trip first.
+   - Condition: target trip must be active and not completed/inactive.
+   - Condition: target trip manifest must be unlocked.
+
 7. User confirms the quantity/status.
+   - Condition: quantity must be greater than zero.
+   - Load condition: package must still have pending quantity available to load, mark missing, or mark damaged.
+   - Unload condition: package must have loaded quantity available to receive, mark missing, or mark damaged.
+
 8. System updates the shipment and shows a success message.
+   - Condition: updateShipmentPackages must accept the selected shipment, package IDs, scan action, status, and quantity.
+
 9. Extra prompts may appear:
-   - Mark trip as arrived
-   - Unlock manifest
-   - Set trip as loaded
-   - Lock manifest
-   - Review/assign handoff after unloading
+   - Mark trip as arrived: shown when unloading an IN_TRANSIT trip.
+   - Unlock manifest: shown when unloading an ARRIVED trip with a locked manifest.
+   - Set trip as loaded: shown after a load scan finishes all pending items, while the trip is not yet LOADED/ARRIVED and manifest is unlocked.
+   - Lock manifest: shown after setting a trip to LOADED or when Load is chosen on a LOADED trip with an unlocked manifest.
+   - Review/assign handoff after unloading: shown when manifest reconciliation is ready after unload.
+
 10. User can reset, scan another package, or close the modal.
+   - Condition: reset clears current action, scan status, scan result, quantities, prompts, and errors.

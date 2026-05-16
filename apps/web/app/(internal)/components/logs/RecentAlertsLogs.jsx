@@ -14,11 +14,14 @@ import {
   faCheckCircle,
   faClock,
   faFilter,
+  faListOl,
   faSearch,
   faTriangleExclamation,
 } from "@fortawesome/free-solid-svg-icons";
 import { formatDistanceToNow } from "date-fns";
 import { getTableTheme } from "@/app/utility/constant/theme";
+
+const LIMIT_OPTIONS = ["50", "100", "200", "all"];
 
 function toDate(value) {
   if (!value) return new Date();
@@ -66,13 +69,16 @@ export default function RecentAlertsLogs({ isDark = false }) {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("ALL");
   const [reasonFilter, setReasonFilter] = useState("ALL");
+  const [limitValue, setLimitValue] = useState("50");
 
   useEffect(() => {
-    const q = query(
-      collection(db, "admin_alerts"),
-      orderBy("createdAt", "desc"),
-      limit(50),
-    );
+    const queryConstraints = [orderBy("createdAt", "desc")];
+
+    if (limitValue !== "all") {
+      queryConstraints.push(limit(Number(limitValue)));
+    }
+
+    const q = query(collection(db, "admin_alerts"), ...queryConstraints);
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const data = snapshot.docs.map((doc) => {
@@ -89,7 +95,7 @@ export default function RecentAlertsLogs({ isDark = false }) {
     });
 
     return () => unsubscribe();
-  }, []);
+  }, [limitValue]);
 
   const statusOptions = useMemo(
     () => Array.from(new Set(alerts.map(getStatus))).sort(),
@@ -164,7 +170,7 @@ export default function RecentAlertsLogs({ isDark = false }) {
           </span>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-[1fr_140px_160px] gap-2">
+        <div className="grid grid-cols-1 sm:grid-cols-[1fr_140px_160px_132px] gap-2">
           <div className="relative">
             <FontAwesomeIcon
               icon={faSearch}
@@ -209,6 +215,25 @@ export default function RecentAlertsLogs({ isDark = false }) {
               </option>
             ))}
           </select>
+
+          <div className="relative">
+            <FontAwesomeIcon
+              icon={faListOl}
+              className={`absolute left-3 top-2.5 text-xs ${theme.inputIcon}`}
+            />
+            <select
+              value={limitValue}
+              onChange={(event) => setLimitValue(event.target.value)}
+              title="Alert log fetch limit"
+              className={`w-full border rounded-lg pl-8 pr-3 py-2 text-xs outline-none appearance-none focus:border-amber-500 ${theme.input}`}
+            >
+              {LIMIT_OPTIONS.map((option) => (
+                <option key={option} value={option}>
+                  {option === "all" ? "All Logs" : `Latest ${option}`}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
       </div>
 

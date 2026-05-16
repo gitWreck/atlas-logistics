@@ -13,11 +13,14 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faFilter,
   faHistory,
+  faListOl,
   faSearch,
   faShieldAlt,
 } from "@fortawesome/free-solid-svg-icons";
 import { formatDistanceToNow } from "date-fns";
 import { getTableTheme } from "@/app/utility/constant/theme";
+
+const LIMIT_OPTIONS = ["50", "100", "200", "all"];
 
 function toDate(value) {
   if (!value) return new Date();
@@ -38,6 +41,9 @@ function formatLabel(value) {
 function getTarget(log) {
   return (
     log.targetId ||
+    log.packageId ||
+    log.trackingPackageId ||
+    log.trackingNumber ||
     log.shipmentId ||
     log.trackingShipmentId ||
     log.tripId ||
@@ -52,6 +58,9 @@ function getTarget(log) {
 function getCollection(log) {
   return (
     log.targetCollection ||
+    (log.packageId || log.trackingPackageId || log.trackingNumber
+      ? "packages"
+      : null) ||
     (log.shipmentId || log.trackingShipmentId ? "shipments" : null) ||
     (log.tripId || log.tripDocId ? "truck_trips" : null) ||
     (log.invoiceId ? "invoices" : null) ||
@@ -91,13 +100,16 @@ export default function RecentAdminLogs({ isDark = false }) {
   const [search, setSearch] = useState("");
   const [actionFilter, setActionFilter] = useState("ALL");
   const [collectionFilter, setCollectionFilter] = useState("ALL");
+  const [limitValue, setLimitValue] = useState("50");
 
   useEffect(() => {
-    const q = query(
-      collection(db, "admin_logs"),
-      orderBy("createdAt", "desc"),
-      limit(50),
-    );
+    const queryConstraints = [orderBy("createdAt", "desc")];
+
+    if (limitValue !== "all") {
+      queryConstraints.push(limit(Number(limitValue)));
+    }
+
+    const q = query(collection(db, "admin_logs"), ...queryConstraints);
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const data = snapshot.docs.map((doc) => {
@@ -114,7 +126,7 @@ export default function RecentAdminLogs({ isDark = false }) {
     });
 
     return () => unsubscribe();
-  }, []);
+  }, [limitValue]);
 
   const actionOptions = useMemo(
     () =>
@@ -144,6 +156,9 @@ export default function RecentAdminLogs({ isDark = false }) {
         targetCollection,
         target,
         details,
+        log.packageId,
+        log.trackingPackageId,
+        log.trackingNumber,
         log.actorId,
         log.actorUid,
         log.actorName,
@@ -190,7 +205,7 @@ export default function RecentAdminLogs({ isDark = false }) {
           </span>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-[1fr_180px_160px] gap-2">
+        <div className="grid grid-cols-1 sm:grid-cols-[1fr_180px_160px_132px] gap-2">
           <div className="relative">
             <FontAwesomeIcon
               icon={faSearch}
@@ -235,6 +250,25 @@ export default function RecentAdminLogs({ isDark = false }) {
               </option>
             ))}
           </select>
+
+          <div className="relative">
+            <FontAwesomeIcon
+              icon={faListOl}
+              className={`absolute left-3 top-2.5 text-xs ${theme.inputIcon}`}
+            />
+            <select
+              value={limitValue}
+              onChange={(event) => setLimitValue(event.target.value)}
+              title="Log fetch limit"
+              className={`w-full border rounded-lg pl-8 pr-3 py-2 text-xs outline-none appearance-none focus:border-indigo-500 ${theme.input}`}
+            >
+              {LIMIT_OPTIONS.map((option) => (
+                <option key={option} value={option}>
+                  {option === "all" ? "All Logs" : `Latest ${option}`}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
       </div>
 

@@ -4,6 +4,7 @@ const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const admin = require("firebase-admin");
 const { FieldValue } = admin.firestore;
 const { requireRole, updatedBy } = require("../utilities/helpers");
+const { writePackageActionLog } = require("../utilities/packageLogger");
 
 if (!admin.apps.length) admin.initializeApp();
 const db = admin.firestore();
@@ -17,8 +18,8 @@ exports.updateShipmentPackages = onCall(
     if (!authUid) {
       throw new HttpsError("unauthenticated", "Authentication required.");
     }
-    const actor = updatedBy(req);
-    const { name, uid, role } = actor;
+    // const actor = updatedBy(req);
+    const { name, uid, role } = updatedBy(req);
 
     const {
       shipmentId,
@@ -551,14 +552,25 @@ exports.updateShipmentPackages = onCall(
             .map((p) => p.packageId || p.trackingNumber || null)
             .filter(Boolean);
 
-      tx.set(db.collection("admin_logs").doc(), {
+      writePackageActionLog({
+        db,
+        tx,
+        collection: "admin_logs",
         action: "UPDATE_SHIPMENT_PACKAGES",
-        actorId: actor.uid || authUid,
-        actorName: actor.name || null,
-        actorRole: actor.role || null,
+        actorId: uid || authUid,
+        actorName: name || null,
+        actorRole: role || null,
+        packageId:
+          targetedTrackingNumbers.length === 1
+            ? targetedTrackingNumbers[0]
+            : null,
+        trackingNumber:
+          targetedTrackingNumbers.length === 1
+            ? targetedTrackingNumbers[0]
+            : null,
         shipmentId,
         tripId,
-        timestamp: nowServer,
+        createdAt: nowServer,
         details: {
           status: shipmentStatus,
           affectedPackages: targetedTrackingNumbers,

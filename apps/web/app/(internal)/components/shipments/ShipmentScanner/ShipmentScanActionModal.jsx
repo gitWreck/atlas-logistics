@@ -13,6 +13,7 @@ import {
 } from "@fortawesome/free-solid-svg-icons";
 import { getModalThemeClasses } from "@/app/utility/constant/theme";
 import { getModalActionClasses } from "@/app/utility/constant/action";
+import { getScannerErrorGuidance } from "@/app/utility/shipmentScannerGuidance";
 
 import useScannerLogic from "./useScannerLogic";
 import {
@@ -68,6 +69,7 @@ export default function ShipmentScanActionModal({
   const scannerStatusMessage = selectedScanStatusLabel
     ? `Scan will mark as ${selectedScanStatusLabel}`
     : "";
+  const errorGuidance = getScannerErrorGuidance(state.error, state, trip);
 
   return (
     <div className="fixed inset-0 z-[120] flex items-center justify-center sm:p-4">
@@ -318,7 +320,13 @@ export default function ShipmentScanActionModal({
 
           {state.error && (
             <div className={`${theme.errorBox} p-3 rounded-lg text-sm`}>
-              {state.error}
+              <div>{state.error}</div>
+              {errorGuidance && (
+                <div className="mt-2 text-xs opacity-80">
+                  <span className="font-semibold">Try this:</span>{" "}
+                  {errorGuidance}
+                </div>
+              )}
             </div>
           )}
         </div>
