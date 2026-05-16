@@ -342,7 +342,7 @@ export function ArrivalPrompt({ theme, btnStatus, onMarkArrived }) {
       icon={faTruckRampBox}
       iconColor="text-blue-500"
       title="Mark Trip as Arrived"
-      description="You must mark this trip as arrived before unloading."
+      description="This trip is still in transit. Mark it as arrived, then continue unloading."
     >
       <StatusButton
         status={btnStatus}
@@ -362,7 +362,7 @@ export function UnlockPrompt({ theme, btnStatus, onUnlock }) {
       icon={faLock}
       iconColor="text-amber-500"
       title="Manifest Locked"
-      description="You must unlock the manifest before you can scan items out."
+      description="The manifest is locked. Unlock it before scanning items out."
     >
       <StatusButton
         status={btnStatus}
@@ -384,7 +384,7 @@ export function LoadedStatusPrompt({ theme, btnStatus, onSetLoaded, onSkip }) {
       icon={faCheck}
       iconColor="text-emerald-500"
       title="Trip is Fully Loaded"
-      description="All pending items are loaded. Change status to LOADED?"
+      description="All pending items are loaded. Set the trip to LOADED before locking the manifest or dispatching."
     >
       <div className="space-y-2">
         <StatusButton
@@ -409,7 +409,7 @@ export function LockPrompt({ theme, trip, btnStatus, onLock, onSkip }) {
       icon={faLock}
       iconColor="text-emerald-500"
       title="Ready for Dispatch"
-      description="The trip is loaded. Lock the manifest to prevent further changes."
+      description="The trip is loaded. Lock the manifest to prevent further changes before dispatch."
     >
       <div className="space-y-2">
         <StatusButton

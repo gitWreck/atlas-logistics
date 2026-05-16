@@ -14,11 +14,14 @@ import {
   faBullhorn,
   faEnvelope,
   faFilter,
+  faListOl,
   faPaperPlane,
   faSearch,
 } from "@fortawesome/free-solid-svg-icons";
 import { formatDistanceToNow } from "date-fns";
 import { getTableTheme } from "@/app/utility/constant/theme";
+
+const LIMIT_OPTIONS = ["50", "100", "200", "all"];
 
 function toDate(value) {
   if (!value) return new Date();
@@ -65,13 +68,16 @@ export default function RecentSmsLogs({ isDark = false }) {
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState("ALL");
   const [statusFilter, setStatusFilter] = useState("ALL");
+  const [limitValue, setLimitValue] = useState("50");
 
   useEffect(() => {
-    const q = query(
-      collection(db, "sms_logs"),
-      orderBy("at", "desc"),
-      limit(50),
-    );
+    const queryConstraints = [orderBy("at", "desc")];
+
+    if (limitValue !== "all") {
+      queryConstraints.push(limit(Number(limitValue)));
+    }
+
+    const q = query(collection(db, "sms_logs"), ...queryConstraints);
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const data = snapshot.docs.map((doc) => {
@@ -88,7 +94,7 @@ export default function RecentSmsLogs({ isDark = false }) {
     });
 
     return () => unsubscribe();
-  }, []);
+  }, [limitValue]);
 
   const typeOptions = useMemo(
     () =>
@@ -163,7 +169,7 @@ export default function RecentSmsLogs({ isDark = false }) {
           </span>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-[1fr_150px_130px] gap-2">
+        <div className="grid grid-cols-1 sm:grid-cols-[1fr_150px_130px_132px] gap-2">
           <div className="relative">
             <FontAwesomeIcon
               icon={faSearch}
@@ -206,6 +212,25 @@ export default function RecentSmsLogs({ isDark = false }) {
             <option value="PARTIAL">Partial</option>
             <option value="FAILED">Failed</option>
           </select>
+
+          <div className="relative">
+            <FontAwesomeIcon
+              icon={faListOl}
+              className={`absolute left-3 top-2.5 text-xs ${theme.inputIcon}`}
+            />
+            <select
+              value={limitValue}
+              onChange={(event) => setLimitValue(event.target.value)}
+              title="SMS log fetch limit"
+              className={`w-full border rounded-lg pl-8 pr-3 py-2 text-xs outline-none appearance-none focus:border-blue-500 ${theme.input}`}
+            >
+              {LIMIT_OPTIONS.map((option) => (
+                <option key={option} value={option}>
+                  {option === "all" ? "All Logs" : `Latest ${option}`}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
       </div>
 
