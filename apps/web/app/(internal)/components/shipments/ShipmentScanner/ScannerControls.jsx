@@ -209,12 +209,17 @@ export function CameraScanner({
       stopScanning = true;
       setIsResolvingScan(true);
 
-      const minimumSpinnerDelay = new Promise((resolve) =>
-        setTimeout(resolve, 2000),
-      );
+      // const minimumSpinnerDelay = new Promise((resolve) =>
+      //   setTimeout(resolve, 2000),
+      // );
+
+      const minimumSpinnerDelay = Promise.resolve();
 
       try {
-        await Promise.all([onDetectedRef.current(decodedText), minimumSpinnerDelay]);
+        await Promise.all([
+          onDetectedRef.current(decodedText),
+          minimumSpinnerDelay,
+        ]);
       } catch {
         setErrorRef.current("Failed to process scanned code.");
       }
@@ -245,9 +250,8 @@ export function CameraScanner({
 
     async function setupHtml5Scanner() {
       try {
-        const { Html5Qrcode, Html5QrcodeSupportedFormats } = await import(
-          "html5-qrcode"
-        );
+        const { Html5Qrcode, Html5QrcodeSupportedFormats } =
+          await import("html5-qrcode");
 
         if (stopScanning) return;
 
