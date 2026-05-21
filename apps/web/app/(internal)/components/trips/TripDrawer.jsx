@@ -323,7 +323,7 @@ export default function TripDrawer({
       <UnassignShipmentModal
         isOpen={!!shipmentToUnassign}
         shipment={shipmentToUnassign}
-        tripId={data?.tripId}
+        tripId={data?.id || data?.tripId}
         onClose={() => setShipmentToUnassign(null)}
         onSuccess={() => {
           fetchShipments();

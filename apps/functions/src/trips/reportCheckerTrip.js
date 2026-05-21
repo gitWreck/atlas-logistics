@@ -7,7 +7,7 @@ const { FieldValue } = require("firebase-admin/firestore");
 // Import your existing auth helper
 const {
   requireAuth,
-} = require("../../../../../../atlas-trucking-platform/apps/functions/src/utilities/helpers");
+} = require("../utilities/helpers");
 
 if (!admin.apps.length) admin.initializeApp();
 const db = admin.firestore();

@@ -5,7 +5,7 @@ const admin = require("firebase-admin");
 const {
   stableStringify,
   sha256Hex,
-} = require("../../../../../../atlas-trucking-platform/apps/functions/src/utilities/helpers");
+} = require("../utilities/helpers");
 
 // 1. Initialize CORS Middleware
 // origin: true = Allow everyone (easiest for debugging)

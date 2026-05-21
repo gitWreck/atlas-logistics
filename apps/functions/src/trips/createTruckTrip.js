@@ -8,7 +8,7 @@ const {
   yyyymmddFromDate,
   pad4,
   assertAdminOrManager,
-} = require("../../../../../../atlas-trucking-platform/apps/functions/src/utilities/helpers");
+} = require("../utilities/helpers");
 const { writeTripActionLog } = require("../utilities/tripLogger");
 
 if (!admin.apps.length) admin.initializeApp();

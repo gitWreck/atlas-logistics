@@ -2,9 +2,7 @@
 
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const admin = require("firebase-admin");
-const {
-  requireRole,
-} = require("../../../../../../atlas-trucking-platform/apps/functions/src/utilities/helpers");
+const { requireRole } = require("../utilities/helpers");
 const { writeTripActionLog } = require("../utilities/tripLogger");
 
 if (!admin.apps.length) admin.initializeApp();

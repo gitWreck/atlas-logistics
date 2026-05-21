@@ -158,6 +158,31 @@ export const displayPhoneNumber = (e164Number) => {
 };
 
 // -----------------------------------------
+export function formatCallableError(err, fallback = "Operation failed.") {
+  const code = err?.code || "";
+  const message = err?.message || "";
+
+  switch (code) {
+    case "functions/not-found":
+      return "This service is unavailable. Contact an admin or retry after functions are deployed.";
+    case "functions/internal":
+      return "Something went wrong on the server. Check Functions logs or try again.";
+    case "functions/unauthenticated":
+      return "You must be logged in to perform this action.";
+    case "functions/permission-denied":
+      return "You do not have permission to perform this action.";
+    case "functions/failed-precondition":
+      return message || "This action cannot be completed in the current state.";
+    case "functions/invalid-argument":
+      return message || "Invalid request. Please refresh and try again.";
+    default:
+      if (message && message.toLowerCase() !== "internal") {
+        return message;
+      }
+      return fallback;
+  }
+}
+
 export function updatedBy(profile) {
   const object = {
     usercode: profile?.userCode || "Unknown User",

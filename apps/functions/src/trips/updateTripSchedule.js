@@ -4,14 +4,14 @@ const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const admin = require("firebase-admin");
 const {
   assertAdminOrManager,
-} = require("../../../../../../atlas-trucking-platform/apps/functions/src/utilities/helpers");
+} = require("../utilities/helpers");
 const {
   SEMAPHORE_API_KEY,
   SEMAPHORE_SENDER_NAME,
-} = require("../../../../../../atlas-trucking-platform/apps/functions/shared/sms-service");
+} = require("../../shared/sms-service");
 const {
   broadcastTripLogic,
-} = require("../../../../../../atlas-trucking-platform/apps/functions/src/messaging/broadcastTripMessage");
+} = require("../messaging/broadcastTripMessage");
 const { writeTripActionLog } = require("../utilities/tripLogger");
 
 if (!admin.apps.length) admin.initializeApp();

@@ -18,6 +18,7 @@ import {
   getModalThemeClasses,
   getModalActionClasses,
 } from "@/app/utility/constant/theme";
+import { formatCallableError } from "@/app/utility/utilities";
 
 export default function SplitShipmentModal({
   isOpen,
@@ -89,7 +90,7 @@ export default function SplitShipmentModal({
       onClose?.();
     } catch (err) {
       console.error(err);
-      setError(err.message || "Failed to split shipment.");
+      setError(formatCallableError(err, "Failed to split shipment."));
     } finally {
       setLoading(false);
       setStep("");

@@ -8,6 +8,7 @@ import {
   faMinusCircle,
 } from "@fortawesome/free-solid-svg-icons";
 import { unassignShipmentFromTrip } from "@/app/utility/FirebaseFunctions";
+import { formatCallableError } from "@/app/utility/utilities";
 import { getModalThemeClasses } from "@/app/utility/constant/theme";
 import { getModalActionClasses } from "@/app/utility/constant/action";
 
@@ -41,7 +42,9 @@ export default function UnassignShipmentModal({
       onClose?.();
     } catch (err) {
       console.error(err);
-      setError(err.message || "Failed to unassign shipment.");
+      setError(
+        formatCallableError(err, "Failed to unassign shipment."),
+      );
     } finally {
       setLoading(false);
     }

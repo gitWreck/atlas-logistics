@@ -17,7 +17,7 @@ export default function TripModals({
         isOpen={state.splitModalOpen}
         shipment={state.selectedShipment}
         onClose={() => actions.setSplitModalOpen(false)}
-        tripId={trip?.tripId}
+        tripId={trip?.id || trip?.tripId}
         onSuccess={() => {
           actions.fetchShipments();
           actions.setSplitModalOpen(false);
@@ -41,7 +41,7 @@ export default function TripModals({
       <UnassignShipmentModal
         isOpen={!!state.shipmentToUnassign}
         shipment={state.shipmentToUnassign}
-        tripId={trip?.tripId} // Ensure tripId is passed if needed
+        tripId={trip?.id || trip?.tripId}
         onClose={() => actions.setShipmentToUnassign(null)}
         onSuccess={() => {
           actions.fetchShipments();
