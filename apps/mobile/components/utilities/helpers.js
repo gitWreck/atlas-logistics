@@ -1,4 +1,4 @@
-import GetLocation from "react-native-get-location";
+import * as Location from "expo-location";
 
 // Safe time formatter for Firebase timestamps
 export const getFormattedTime = (timestamp) => {
@@ -20,12 +20,13 @@ export const getFormattedTime = (timestamp) => {
 
 export const getCurrentLocationSafe = async () => {
   try {
-    const loc = await GetLocation.getCurrentPosition({
-      enableHighAccuracy: true,
-      timeout: 15000,
+    const { status } = await Location.requestForegroundPermissionsAsync();
+    if (status !== "granted") return null;
+    const loc = await Location.getCurrentPositionAsync({
+      accuracy: Location.Accuracy.High,
     });
     if (!loc) return null;
-    return { lat: loc.latitude, lng: loc.longitude };
+    return { lat: loc.coords.latitude, lng: loc.coords.longitude };
   } catch (error) {
     console.log("Location error:", error);
     return null;
