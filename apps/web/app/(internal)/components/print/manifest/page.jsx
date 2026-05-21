@@ -24,6 +24,32 @@ import { db } from "@/lib/firebase";
 import QRCode from "react-qr-code";
 import Image from "next/image";
 
+function getPackageLoadedQty(pkg) {
+  const qty = Math.max(Number(pkg?.quantity) || 1, 1);
+  const status = String(pkg?.status || "").toUpperCase();
+  const rawLoaded = Number(pkg?.loadedQty);
+
+  if (["LOADED", "OUT_FOR_DELIVERY", "DELIVERED"].includes(status)) {
+    return qty;
+  }
+  if (status === "PARTIALLY_LOADED") {
+    const loaded =
+      Number.isFinite(rawLoaded) && rawLoaded >= 0 ? rawLoaded : 0;
+    return Math.min(loaded, qty);
+  }
+  if (Number.isFinite(rawLoaded) && rawLoaded > 0) {
+    return Math.min(rawLoaded, qty);
+  }
+  return 0;
+}
+
+function getShipmentLoadedCount(ship) {
+  if (ship.packages?.length) {
+    return ship.packages.reduce((acc, p) => acc + getPackageLoadedQty(p), 0);
+  }
+  return Number(ship.loadedCount ?? ship.totals?.loaded ?? 0);
+}
+
 // --- 1. HELPER COMPONENTS ---
 
 const PrintSheet = ({ children }) => (
@@ -191,22 +217,16 @@ function ManifestContent() {
 
       shipments.forEach((ship) => {
         const destCode = ship.destinationCode || "UNKNOWN";
-        const itemsCount =
-          ship.packages?.reduce(
-            (acc, p) => acc + (Number(p.quantity) || 1),
-            0,
-          ) ||
-          ship.totals?.totalContentQty ||
-          0;
+        const itemsCount = getShipmentLoadedCount(ship);
         totalPackages += itemsCount;
 
-        // --- NEW: Calculate Description Breakdown ---
         const descCounts = {};
         if (ship.packages && Array.isArray(ship.packages)) {
           ship.packages.forEach((p) => {
+            const loadedQty = getPackageLoadedQty(p);
+            if (loadedQty <= 0) return;
             const d = p.description ? p.description.trim() : "Standard Pkg";
-            const qty = Number(p.quantity) || 1; // Use the actual quantity
-            descCounts[d] = (descCounts[d] || 0) + qty; // Increment by quantity, not 1
+            descCounts[d] = (descCounts[d] || 0) + loadedQty;
           });
         }
 
@@ -230,7 +250,7 @@ function ManifestContent() {
 
         groupedDestinations[destCode].items.push({
           shipmentId: ship.shipmentId,
-          packageCount: itemsCount, // Now correctly reflects total pieces (e.g., 50 for a sack)
+          packageCount: itemsCount,
           note: ship.packages?.some((p) => p.isFragile) ? "Fragile" : "",
           descriptionBreakdown: descriptionBreakdown,
         });
