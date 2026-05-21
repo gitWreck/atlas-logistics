@@ -3,7 +3,7 @@
 const admin = require("firebase-admin");
 const { sendSmsViaProvider } = require("../../shared/sms-service");
 const { calculateSmsCost } = require("../../shared/sms-cost");
-const { writeMessagingActionLog } = require("./messagingLogger");
+const { writeMessagingActionLog } = require("../utilities/messagingLogger");
 
 async function sendShipmentPickup({
   shipmentId,

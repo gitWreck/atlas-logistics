@@ -2,7 +2,7 @@
 
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const admin = require("firebase-admin");
-const { requireRole } = require("../../utilities/helpers");
+const { requireRole } = require("../utilities/helpers");
 const {
   getActorFromRequest,
   writeTripActionLog,

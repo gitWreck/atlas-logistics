@@ -73,10 +73,18 @@ exports.clearTruckDelay =
 exports.reportCheckerTrip =
   require("./src/trips/reportCheckerTrip").reportCheckerTrip;
 
-exports.removeAssignmentFromTruckTrip =
-  require("./src/trips/removeAssignmentFromTruckTrip").removeAssignmentFromTruckTrip;
-exports.assignmentToTruckTrip =
-  require("./src/trips/assignmentToTruckTrip").assignmentToTruckTrip;
+exports.assignShipmentToTrip =
+  require("./src/trips/assignShipmentToTrip").assignShipmentToTrip;
+exports.unassignShipmentFromTrip =
+  require("./src/trips/unassignShipmentFromTrip").unassignShipmentFromTrip;
+exports.assignDriverToTrip =
+  require("./src/trips/assignDriverToTrip").assignDriverToTrip;
+exports.unassignDriverFromTrip =
+  require("./src/trips/unassignDriverFromTrip").unassignDriverFromTrip;
+exports.assignmentToTrip =
+  require("./src/trips/assignmentToTrip").assignmentToTrip;
+exports.removeAssignmentFromTrip =
+  require("./src/trips/removeAssignmentFromTrip").removeAssignmentFromTrip;
 
 exports.disableTruckTrip =
   require("./src/trips/disableTruckTrip").disableTruckTrip;
@@ -98,9 +106,9 @@ exports.bulkUpdateShipmentStatus =
 exports.splitShipments =
   require("./src/shipments/splitShipments").splitShipments;
 exports.updateShipmentStatusDriver =
-  require("./src/shipments/updateShipmentStatusDriver").updateShipmentStatusDriver;
+  require("./src/shipments/old/updateShipmentStatusDriver").updateShipmentStatusDriver;
 exports.updateShipmentStatusChecker =
-  require("./src/shipments/updateShipmentStatusChecker").updateShipmentStatusChecker;
+  require("./src/shipments/old/updateShipmentStatusChecker").updateShipmentStatusChecker;
 exports.finalizeHubProcessing =
   require("./src/trips/finalizeHubProcessing").finalizeHubProcessing;
 exports.updateShipmentDetails =

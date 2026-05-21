@@ -5,7 +5,7 @@ const admin = require("firebase-admin");
 const {
   requireRole,
   requireString,
-} = require("../../../../../../atlas-trucking-platform/apps/functions/src/utilities/helpers");
+} = require("../utilities/helpers");
 const { writeTripActionLog } = require("../utilities/tripLogger");
 
 if (!admin.apps.length) admin.initializeApp();
