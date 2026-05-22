@@ -144,6 +144,7 @@ export default function ScannerScreen() {
   const [actionModalVisible, setActionModalVisible] = useState(false);
   const [targetPackage, setTargetPackage] = useState(null);
   const [parentShipmentId, setParentShipmentId] = useState(null);
+  const [parentShipmentData, setParentShipmentData] = useState(null);
   const [pendingActionStatus, setPendingActionStatus] = useState(null);
   const [pendingActionSource, setPendingActionSource] = useState("scan");
 
@@ -317,12 +318,16 @@ export default function ScannerScreen() {
     }
   };
 
-  const getShipmentTripId = (shipmentData = {}) =>
-    shipmentData.currentTripId ||
-    shipmentData.currentTruckTripId ||
-    shipmentData.tripId ||
-    resolvedTripId ||
-    "";
+  const getShipmentTripId = (shipmentData) => {
+    const data = shipmentData ?? {};
+    return (
+      data.currentTripId ||
+      data.currentTruckTripId ||
+      data.tripId ||
+      resolvedTripId ||
+      ""
+    );
+  };
 
   const setLatestScanDetails = ({
     shipmentDoc,
@@ -387,6 +392,7 @@ export default function ScannerScreen() {
     setProcessing(false);
     setTargetPackage(null);
     setParentShipmentId(null);
+    setParentShipmentData(null);
     setPendingActionStatus(null);
     setPendingActionSource("scan");
     setActionModalVisible(false);
@@ -603,6 +609,7 @@ export default function ScannerScreen() {
     if (isBulk && manualQtyOverride == null) {
       setTargetPackage(pkg);
       setParentShipmentId(shipmentDoc.id);
+      setParentShipmentData(shipmentData);
       setPendingActionStatus(statusToApply);
       setPendingActionSource(source);
       setActionModalVisible(true);
@@ -1265,6 +1272,7 @@ export default function ScannerScreen() {
             qty,
             remarks,
             source: pendingActionSource,
+            shipmentDocData: parentShipmentData,
           });
           setActionModalVisible(false);
         }}
