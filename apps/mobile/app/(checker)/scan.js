@@ -8,12 +8,14 @@ import {
   StyleSheet,
   Text,
   Modal,
+  Image,
   ScrollView,
   TouchableOpacity,
   Dimensions,
   PanResponder,
 } from "react-native";
 import { CameraView, useCameraPermissions } from "expo-camera";
+import * as ImagePicker from "expo-image-picker";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import {
   collection,
@@ -23,16 +25,19 @@ import {
   doc,
   getDoc,
 } from "firebase/firestore";
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { FontAwesome5 } from "@expo/vector-icons";
-import { db } from "../../firebase";
+import { db, storage } from "../../firebase";
 
 import PermissionRequest from "../../components/scanner/PermissionRequest";
 import ManualEntryModal from "../../components/scanner/ManualEntryModal";
 import PackageActionModal from "../../components/checker/shipment-details/PackageActionModal";
 import ShipmentInfoModal from "../../components/checker/shipment-details/ShipmentInfoModal";
 import {
+  updateShipmentImages,
   updateShipmentPackages,
   updateTripStatus,
+  updateShipmentStatus,
 } from "../../components/utilities/FirebaseFunctions";
 import {
   getCurrentLocationSafe,
@@ -64,16 +69,16 @@ const MODE_SCAN_ACTIONS = {
   ],
   offloading: [
     {
-      label: "Received",
-      status: "RECEIVED",
-      icon: "warehouse",
-      color: "#10b981",
-    },
-    {
       label: "Delivered",
       status: "DELIVERED",
       icon: "check-circle",
       color: "#2563eb",
+    },
+    {
+      label: "Received",
+      status: "RECEIVED",
+      icon: "warehouse",
+      color: "#10b981",
     },
   ],
   info: [
@@ -114,6 +119,7 @@ const EMPTY_TRIP_SUMMARY = {
   totalPackages: 0,
   scannedPackages: 0,
   loadedPackages: 0,
+  deliveredPackages: 0,
   progress: 0,
 };
 
@@ -154,6 +160,10 @@ export default function ScannerScreen() {
   const [successModalVisible, setSuccessModalVisible] = useState(false);
   const [successPayload, setSuccessPayload] = useState(null);
   const [countdown, setCountdown] = useState(SUCCESS_MODAL_SECONDS);
+  const [deliveryProofVisible, setDeliveryProofVisible] = useState(false);
+  const [deliveryProofPhotos, setDeliveryProofPhotos] = useState([]);
+  const [deliveryProofUploading, setDeliveryProofUploading] = useState(false);
+  const [pendingDelivery, setPendingDelivery] = useState(null);
   const [tripSummary, setTripSummary] = useState(EMPTY_TRIP_SUMMARY);
   const [summaryLoading, setSummaryLoading] = useState(false);
   const [tripStatusUpdating, setTripStatusUpdating] = useState(false);
@@ -243,7 +253,7 @@ export default function ScannerScreen() {
     );
 
     if (resolvedMode === "offloading") {
-      return clampProgress(total - loaded, total);
+      return clampProgress(received + missing + damaged, total);
     }
 
     if (resolvedMode === "loading") {
@@ -258,6 +268,25 @@ export default function ScannerScreen() {
     const loaded = Number(shipment.loadedCount ?? shipment.totals?.loaded ?? 0);
 
     return clampProgress(loaded, total);
+  };
+
+  const getPackageIdentity = (pkg = {}) =>
+    String(pkg.packageId || pkg.trackingNumber || "").trim();
+
+  const getShipmentPackageIds = (shipment = {}) =>
+    (Array.isArray(shipment.packages) ? shipment.packages : [])
+      .map(getPackageIdentity)
+      .filter(Boolean);
+
+  const getShipmentDeliveredCount = (shipment = {}) => {
+    const total = getShipmentTotal(shipment);
+    const delivered = Number(
+      shipment.deliveredCount ??
+        shipment.totals?.delivered ??
+        0,
+    );
+
+    return clampProgress(delivered, total);
   };
 
   const fetchTripScanSummary = async (targetTripId = resolvedTripId) => {
@@ -293,6 +322,10 @@ export default function ScannerScreen() {
         (sum, shipment) => sum + getShipmentLoadedCount(shipment),
         0,
       );
+      const deliveredPackages = shipments.reduce(
+        (sum, shipment) => sum + getShipmentDeliveredCount(shipment),
+        0,
+      );
       const progress =
         totalPackages > 0
           ? Math.round((scannedPackages / totalPackages) * 100)
@@ -305,6 +338,7 @@ export default function ScannerScreen() {
         totalPackages,
         scannedPackages,
         loadedPackages,
+        deliveredPackages,
         progress,
       };
 
@@ -400,10 +434,23 @@ export default function ScannerScreen() {
     setScannedData(null);
   };
 
+  const resetDeliveryProof = () => {
+    setDeliveryProofVisible(false);
+    setDeliveryProofPhotos([]);
+    setDeliveryProofUploading(false);
+    setPendingDelivery(null);
+  };
+
+  const cancelDeliveryProof = () => {
+    resetDeliveryProof();
+    resetScanner();
+  };
+
   const closeSuccessModal = () => {
     clearSuccessTimers();
     setSuccessModalVisible(false);
     setSuccessPayload(null);
+    resetDeliveryProof();
     resetScanner();
   };
 
@@ -457,7 +504,7 @@ export default function ScannerScreen() {
       return scanActionStatus || "LOADED";
     }
     if (resolvedMode === "offloading") {
-      return scanActionStatus || "RECEIVED";
+      return scanActionStatus || "DELIVERED";
     }
     if (resolvedMode === "info" && isIssueStatus(scanActionStatus)) {
       return scanActionStatus;
@@ -473,13 +520,20 @@ export default function ScannerScreen() {
     remarks = "",
     source = "scan",
     shipmentDocData = null,
+    proofImages = null,
+    throwOnError = false,
+    packageIds = null,
   }) => {
     try {
       const location = await getCurrentLocationSafe();
+      const targetPackageIds =
+        Array.isArray(packageIds) && packageIds.length > 0
+          ? packageIds
+          : [barcode];
 
       await updateShipmentPackages({
         shipmentId,
-        packageIds: [barcode],
+        packageIds: targetPackageIds,
         newStatus: status,
         location,
         tripId: resolvedTripId,
@@ -488,6 +542,15 @@ export default function ScannerScreen() {
         scanAction: resolvedMode,
         updatedBy: updatedBy(profile),
       });
+
+      if (Array.isArray(proofImages) && proofImages.length > 0) {
+        await updateShipmentImages({
+          shipmentId,
+          type: "delivery",
+          images: proofImages,
+          updatedBy: updatedBy(profile),
+        });
+      }
 
       await fetchTripScanSummary(
         getShipmentTripId(shipmentDocData) || resolvedTripId,
@@ -513,6 +576,157 @@ export default function ScannerScreen() {
         [{ text: "Retry", onPress: resetScanner }],
       );
       setProcessing(false);
+      if (throwOnError) throw error;
+    }
+  };
+
+  const uploadDeliveryProofPhotos = async (shipmentId, photos) => {
+    const urls = [];
+
+    for (let i = 0; i < photos.length; i += 1) {
+      const uri = photos[i];
+      const filename = `proof_${shipmentId}_${Date.now()}_${i}.jpg`;
+      const storageRef = ref(storage, `shipments/${shipmentId}/${filename}`);
+      const response = await fetch(uri);
+      const blob = await response.blob();
+
+      await uploadBytes(storageRef, blob);
+      urls.push(await getDownloadURL(storageRef));
+    }
+
+    return urls;
+  };
+
+  const openDeliveryProofModal = (delivery) => {
+    clearSuccessTimers();
+    setSuccessModalVisible(false);
+    setSuccessPayload(null);
+    setPendingDelivery({
+      ...delivery,
+      existingProofs: Array.isArray(delivery.shipmentDocData?.proofOfDelivery)
+        ? delivery.shipmentDocData.proofOfDelivery
+        : [],
+    });
+    setDeliveryProofPhotos([]);
+    setDeliveryProofVisible(true);
+    setProcessing(false);
+  };
+
+  const pickDeliveryProofImage = async (useCamera) => {
+    const existingCount = pendingDelivery?.existingProofs?.length || 0;
+    if (existingCount + deliveryProofPhotos.length >= 3) {
+      Alert.alert("Limit Reached", "This delivery already has 3 proof images.");
+      return;
+    }
+
+    const options = {
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      quality: 0.5,
+    };
+
+    let result;
+
+    if (useCamera) {
+      const perm = await ImagePicker.requestCameraPermissionsAsync();
+      if (!perm.granted) {
+        Alert.alert("Permission Needed", "Camera access is required.");
+        return;
+      }
+      result = await ImagePicker.launchCameraAsync(options);
+    } else {
+      const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!perm.granted) {
+        Alert.alert("Permission Needed", "Photo library access is required.");
+        return;
+      }
+      result = await ImagePicker.launchImageLibraryAsync(options);
+    }
+
+    if (!result.canceled) {
+      setDeliveryProofPhotos((current) => [...current, result.assets[0].uri]);
+    }
+  };
+
+  const removeDeliveryProofPhoto = (index) => {
+    setDeliveryProofPhotos((current) =>
+      current.filter((_, photoIndex) => photoIndex !== index),
+    );
+  };
+
+  const completePendingDelivery = async () => {
+    if (!pendingDelivery || deliveryProofUploading) return;
+
+    const existingProofs = pendingDelivery.existingProofs || [];
+    const totalProofCount = existingProofs.length + deliveryProofPhotos.length;
+
+    if (totalProofCount < 3) {
+      Alert.alert(
+        "Proof Required",
+        "Add at least 3 delivery photos before marking this shipment completed.",
+      );
+      return;
+    }
+
+    setDeliveryProofUploading(true);
+    setProcessing(true);
+
+    try {
+      const uploadedUrls = await uploadDeliveryProofPhotos(
+        pendingDelivery.shipmentId,
+        deliveryProofPhotos,
+      );
+      const proofImages = [...existingProofs, ...uploadedUrls];
+
+      if (pendingDelivery.scanType === "shipment") {
+        const location = await getCurrentLocationSafe();
+
+        await updateShipmentStatus({
+          shipmentId: pendingDelivery.shipmentId,
+          tripId: pendingDelivery.tripId || resolvedTripId,
+          newStatus: "DELIVERED",
+          location,
+          remarks: `Proof of Delivery: ${proofImages.length} images uploaded.`,
+          proofOfDelivery: proofImages,
+          sourceUI: "CHECKER_MOBILE",
+          updatedBy: updatedBy(profile),
+        });
+
+        await fetchTripScanSummary(pendingDelivery.tripId || resolvedTripId);
+
+        showSuccessModal({
+          barcode: pendingDelivery.barcode,
+          shipmentId: pendingDelivery.shipmentId,
+          shipmentStatus: "DELIVERED",
+          packageStatus: "DELIVERED",
+          quantity: pendingDelivery.qty,
+          message: "Shipment completed with proof of delivery.",
+          source: pendingDelivery.source,
+        });
+      } else {
+        await executeStatusUpdate({
+          shipmentId: pendingDelivery.shipmentId,
+          barcode: pendingDelivery.barcode,
+          status: "DELIVERED",
+          qty: pendingDelivery.qty,
+          remarks: `Proof of Delivery: ${proofImages.length} images uploaded.`,
+          source: pendingDelivery.source,
+          shipmentDocData: pendingDelivery.shipmentDocData,
+          proofImages,
+          throwOnError: true,
+        });
+      }
+
+      setProcessing(false);
+      resetDeliveryProof();
+    } catch (error) {
+      console.error("Delivery proof completion failed:", error);
+      Alert.alert(
+        "Action Failed",
+        error.message || "Failed to complete delivery proof.",
+      );
+      setProcessing(false);
+      setDeliveryProofUploading(false);
     }
   };
 
@@ -524,32 +738,6 @@ export default function ScannerScreen() {
     });
     setInfoModalVisible(true);
     setProcessing(false);
-  };
-
-  const promptDeliveryProof = (shipmentDoc, shipmentData) => {
-    setProcessing(false);
-
-    Alert.alert(
-      "Proof Required",
-      "Upload delivery photos before confirming this shipment as delivered.",
-      [
-        { text: "Scan Next", style: "cancel", onPress: resetScanner },
-        {
-          text: "Upload Proof",
-          onPress: () =>
-            router.push({
-              pathname: "/(checker)/shipment-details",
-              params: {
-                shipmentId: shipmentDoc.id,
-                parentTripId:
-                  getShipmentTripId(shipmentData) ||
-                  tripSummary.tripId ||
-                  resolvedTripId,
-              },
-            }),
-        },
-      ],
-    );
   };
 
   const handleResolvedPackage = async ({
@@ -598,11 +786,6 @@ export default function ScannerScreen() {
       }
     }
 
-    if (statusToApply === "DELIVERED") {
-      promptDeliveryProof(shipmentDoc, shipmentData);
-      return;
-    }
-
     const packagingGroup = String(pkg?.packagingGroup || "").toUpperCase();
     const isBulk = packagingGroup === "BULK";
 
@@ -614,6 +797,19 @@ export default function ScannerScreen() {
       setPendingActionSource(source);
       setActionModalVisible(true);
       setProcessing(false);
+      return;
+    }
+
+    if (statusToApply === "DELIVERED") {
+      openDeliveryProofModal({
+        scanType: "package",
+        shipmentId: shipmentDoc.id,
+        tripId: currentTripId,
+        barcode,
+        qty: isBulk ? manualQtyOverride : null,
+        source,
+        shipmentDocData: shipmentData,
+      });
       return;
     }
 
@@ -706,20 +902,68 @@ export default function ScannerScreen() {
         await lookupScannedCode(barcode);
 
       if (scanType === "shipment") {
+        const statusToApply = getStatusToApply();
         const currentTripId = setLatestScanDetails({
           shipmentDoc,
           shipmentData,
           barcode,
           source,
+          appliedStatus: statusToApply,
         });
 
         await fetchTripScanSummary(currentTripId);
 
         if (resolvedMode === "info") {
           openInfoPreview(shipmentDoc, null, barcode);
+          return;
         }
 
-        setProcessing(false);
+        if (!statusToApply) {
+          throw new Error("Unsupported scan mode.");
+        }
+
+        if (
+          resolvedMode === "offloading" &&
+          ["RECEIVED", "DELIVERED"].includes(statusToApply)
+        ) {
+          const shipmentStatus = String(shipmentData?.status || "").toUpperCase();
+
+          if (!canApplyOffloadCompletion(shipmentStatus)) {
+            throw new Error(
+              "This shipment must be Loaded, Ready for Delivery, or Out for Delivery before it can be received or delivered.",
+            );
+          }
+        }
+
+        if (statusToApply === "DELIVERED") {
+          openDeliveryProofModal({
+            scanType: "shipment",
+            shipmentId: shipmentDoc.id,
+            tripId: currentTripId,
+            barcode,
+            qty: getShipmentTotal(shipmentData),
+            source,
+            shipmentDocData: shipmentData,
+          });
+          return;
+        }
+
+        const shipmentPackageIds = getShipmentPackageIds(shipmentData);
+
+        if (!shipmentPackageIds.length) {
+          throw new Error("No package labels found for this shipment.");
+        }
+
+        await executeStatusUpdate({
+          shipmentId: shipmentDoc.id,
+          barcode,
+          packageIds: shipmentPackageIds,
+          status: statusToApply,
+          qty: null,
+          remarks: "",
+          source,
+          shipmentDocData: shipmentData,
+        });
         return;
       }
 
@@ -796,7 +1040,7 @@ export default function ScannerScreen() {
 
     Alert.alert(
       "Complete Trip",
-      "All loaded packages are offloaded. Mark this trip as completed?",
+      "All packages are delivered. Mark this trip as completed?",
       [
         { text: "Cancel", style: "cancel" },
         {
@@ -863,8 +1107,13 @@ export default function ScannerScreen() {
     resolvedMode === "offloading" &&
     !!(tripSummary.tripId || resolvedTripId) &&
     tripSummary.totalPackages > 0 &&
-    tripSummary.loadedPackages <= 0 &&
+    tripSummary.deliveredPackages >= tripSummary.totalPackages &&
     !["COMPLETED", "CANCELLED"].includes(tripStatus);
+  const deliveryProofExistingCount = pendingDelivery?.existingProofs?.length || 0;
+  const deliveryProofTotalCount =
+    deliveryProofExistingCount + deliveryProofPhotos.length;
+  const canCompletePendingDelivery =
+    !!pendingDelivery && deliveryProofTotalCount >= 3 && !deliveryProofUploading;
 
   return (
     <View style={[styles.container, { backgroundColor: colors.bg }]}>
@@ -1124,6 +1373,27 @@ export default function ScannerScreen() {
           </View>
         </View>
 
+        {canMarkTripCompleted && (
+          <TouchableOpacity
+            style={[
+              styles.completeButton,
+              (processing || tripStatusUpdating) && styles.disabledButton,
+            ]}
+            onPress={handleMarkCompleted}
+            disabled={processing || tripStatusUpdating}
+            activeOpacity={0.82}
+          >
+            {tripStatusUpdating ? (
+              <ActivityIndicator color="#ffffff" />
+            ) : (
+              <FontAwesome5 name="flag-checkered" size={14} color="#ffffff" />
+            )}
+            <Text style={styles.releaseButtonText}>
+              {tripStatusUpdating ? "Updating Trip..." : "Complete Trip"}
+            </Text>
+          </TouchableOpacity>
+        )}
+
         <View style={styles.actionsRow}>
           <TouchableOpacity
             style={[styles.actionButton, styles.manualButton]}
@@ -1169,27 +1439,6 @@ export default function ScannerScreen() {
               {tripStatusUpdating
                 ? "Updating Trip..."
                 : "Mark Out for Delivery"}
-            </Text>
-          </TouchableOpacity>
-        )}
-
-        {canMarkTripCompleted && (
-          <TouchableOpacity
-            style={[
-              styles.completeButton,
-              (processing || tripStatusUpdating) && styles.disabledButton,
-            ]}
-            onPress={handleMarkCompleted}
-            disabled={processing || tripStatusUpdating}
-            activeOpacity={0.82}
-          >
-            {tripStatusUpdating ? (
-              <ActivityIndicator color="#ffffff" />
-            ) : (
-              <FontAwesome5 name="flag-checkered" size={14} color="#ffffff" />
-            )}
-            <Text style={styles.releaseButtonText}>
-              {tripStatusUpdating ? "Updating Trip..." : "Mark Completed"}
             </Text>
           </TouchableOpacity>
         )}
@@ -1265,6 +1514,23 @@ export default function ScannerScreen() {
         count={1}
         maxQty={targetPackage?.quantity || 1}
         onAction={(status, remarks, qty) => {
+          if (status === "DELIVERED") {
+            openDeliveryProofModal({
+              scanType: "package",
+              shipmentId: parentShipmentId,
+              tripId:
+                getShipmentTripId(parentShipmentData) ||
+                tripSummary.tripId ||
+                resolvedTripId,
+              barcode: targetPackage?.packageId,
+              qty,
+              source: pendingActionSource,
+              shipmentDocData: parentShipmentData,
+            });
+            setActionModalVisible(false);
+            return;
+          }
+
           executeStatusUpdate({
             shipmentId: parentShipmentId,
             barcode: targetPackage?.packageId,
@@ -1304,6 +1570,106 @@ export default function ScannerScreen() {
           });
         }}
       />
+
+      <Modal
+        visible={deliveryProofVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={cancelDeliveryProof}
+      >
+        <View style={styles.proofOverlay}>
+          <View style={styles.proofCard}>
+            <View style={styles.proofHeader}>
+              <View>
+                <Text style={styles.proofEyebrow}>Proof of Delivery</Text>
+                <Text style={styles.proofTitle}>Complete Shipment</Text>
+              </View>
+              <TouchableOpacity
+                onPress={cancelDeliveryProof}
+                disabled={deliveryProofUploading}
+                style={styles.proofCloseButton}
+                activeOpacity={0.8}
+              >
+                <FontAwesome5 name="times" size={14} color="#64748b" />
+              </TouchableOpacity>
+            </View>
+
+            <Text style={styles.proofMessage}>
+              Add 3 delivery photos before marking this shipment completed.
+            </Text>
+
+            <View style={styles.proofCountPill}>
+              <Text style={styles.proofCountText}>
+                {deliveryProofTotalCount}/3 images ready
+              </Text>
+            </View>
+
+            <View style={styles.proofActionsRow}>
+              <TouchableOpacity
+                style={[
+                  styles.proofActionButton,
+                  deliveryProofTotalCount >= 3 && styles.disabledButton,
+                ]}
+                onPress={() => pickDeliveryProofImage(false)}
+                disabled={deliveryProofUploading || deliveryProofTotalCount >= 3}
+                activeOpacity={0.82}
+              >
+                <FontAwesome5 name="image" size={14} color="#2563eb" />
+                <Text style={styles.proofActionText}>Upload Image</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[
+                  styles.proofActionButton,
+                  deliveryProofTotalCount >= 3 && styles.disabledButton,
+                ]}
+                onPress={() => pickDeliveryProofImage(true)}
+                disabled={deliveryProofUploading || deliveryProofTotalCount >= 3}
+                activeOpacity={0.82}
+              >
+                <FontAwesome5 name="camera" size={14} color="#2563eb" />
+                <Text style={styles.proofActionText}>Open Camera</Text>
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.proofGrid}>
+              {deliveryProofPhotos.map((uri, index) => (
+                <View key={`${uri}-${index}`} style={styles.proofThumbWrap}>
+                  <Image source={{ uri }} style={styles.proofThumb} />
+                  <TouchableOpacity
+                    style={styles.proofRemoveButton}
+                    onPress={() => removeDeliveryProofPhoto(index)}
+                    disabled={deliveryProofUploading}
+                  >
+                    <FontAwesome5 name="times" size={10} color="#ffffff" />
+                  </TouchableOpacity>
+                </View>
+              ))}
+            </View>
+
+            <TouchableOpacity
+              style={[
+                styles.completeDeliveryButton,
+                !canCompletePendingDelivery && styles.disabledButton,
+              ]}
+              onPress={completePendingDelivery}
+              disabled={!canCompletePendingDelivery}
+              activeOpacity={0.86}
+            >
+              {deliveryProofUploading ? (
+                <ActivityIndicator color="#ffffff" />
+              ) : (
+                <FontAwesome5 name="check-circle" size={15} color="#ffffff" />
+              )}
+              <Text style={styles.completeDeliveryButtonText}>
+                {deliveryProofUploading
+                  ? "Uploading Proof..."
+                  : "Mark Shipment Completed"}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
 
       <Modal
         visible={successModalVisible}
@@ -1784,6 +2150,125 @@ const styles = StyleSheet.create({
     color: "#0f172a",
     fontSize: 13,
     fontWeight: "800",
+  },
+
+  proofOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(15, 23, 42, 0.58)",
+    justifyContent: "flex-end",
+  },
+  proofCard: {
+    backgroundColor: "#ffffff",
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    padding: 20,
+    gap: 14,
+  },
+  proofHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    gap: 12,
+  },
+  proofEyebrow: {
+    color: "#64748b",
+    fontSize: 11,
+    fontWeight: "800",
+    textTransform: "uppercase",
+  },
+  proofTitle: {
+    marginTop: 2,
+    color: "#0f172a",
+    fontSize: 20,
+    fontWeight: "900",
+  },
+  proofCloseButton: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: "#f1f5f9",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  proofMessage: {
+    color: "#64748b",
+    fontSize: 13,
+    fontWeight: "700",
+    lineHeight: 19,
+  },
+  proofCountPill: {
+    alignSelf: "flex-start",
+    borderRadius: 999,
+    backgroundColor: "#ecfdf5",
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+  },
+  proofCountText: {
+    color: "#047857",
+    fontSize: 12,
+    fontWeight: "900",
+  },
+  proofActionsRow: {
+    flexDirection: "row",
+    gap: 10,
+  },
+  proofActionButton: {
+    flex: 1,
+    minHeight: 46,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "#bfdbfe",
+    backgroundColor: "#eff6ff",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+  },
+  proofActionText: {
+    color: "#2563eb",
+    fontSize: 12,
+    fontWeight: "900",
+  },
+  proofGrid: {
+    flexDirection: "row",
+    gap: 10,
+    minHeight: 74,
+  },
+  proofThumbWrap: {
+    width: 74,
+    height: 74,
+    borderRadius: 14,
+    overflow: "hidden",
+    backgroundColor: "#e2e8f0",
+  },
+  proofThumb: {
+    width: "100%",
+    height: "100%",
+  },
+  proofRemoveButton: {
+    position: "absolute",
+    top: 5,
+    right: 5,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: "rgba(15, 23, 42, 0.78)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  completeDeliveryButton: {
+    minHeight: 50,
+    borderRadius: 15,
+    backgroundColor: "#16a34a",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 9,
+  },
+  completeDeliveryButtonText: {
+    color: "#ffffff",
+    fontSize: 14,
+    fontWeight: "900",
   },
 
   successOverlay: {

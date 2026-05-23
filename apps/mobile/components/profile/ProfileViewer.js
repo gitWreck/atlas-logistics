@@ -19,6 +19,7 @@ import { normalizePhoneNumber } from "../utilities/helpers";
 import { useAuth } from "../../contexts/AuthContext";
 import {
   deleteMyAccount,
+  updateUserThemePreference,
   updateUserProfileMobile,
 } from "../utilities/FirebaseFunctions";
 import { useTheme } from "../../contexts/ThemeContext";
@@ -77,6 +78,7 @@ export default function ProfileViewer() {
   const [isEditing, setIsEditing] = useState(false);
   const [loading, setLoading] = useState(false);
   const [deleteLoading, setDeleteLoading] = useState(false);
+  const [themeLoading, setThemeLoading] = useState(false);
   const [formData, setFormData] = useState(() => getInitialFormData(user));
   const [cities, setCities] = useState([]);
   const [showProvinceModal, setShowProvinceModal] = useState(false);
@@ -223,6 +225,53 @@ export default function ProfileViewer() {
         },
       ],
     );
+  };
+
+  const handleThemePreferenceChange = async (nextPreference) => {
+    if (
+      nextPreference === preference ||
+      !["light", "dark", "system"].includes(nextPreference)
+    ) {
+      return;
+    }
+
+    try {
+      await setPreference(nextPreference);
+    } catch (error) {
+      Alert.alert(
+        "Theme not saved locally",
+        error?.message || "Please try changing your theme again.",
+      );
+    }
+  };
+
+  const handleSyncThemePreference = async () => {
+    if (themeLoading) return;
+
+    if (!user?.uid) {
+      Alert.alert("Error", "User profile is not available.");
+      return;
+    }
+
+    setThemeLoading(true);
+
+    try {
+      await updateUserThemePreference({ themePreference: preference });
+      refreshUser().catch((err) => {
+        console.log("Theme preference refresh skipped:", err);
+      });
+      Alert.alert(
+        "Theme synced",
+        "Your theme preference was saved to your account.",
+      );
+    } catch (error) {
+      Alert.alert(
+        "Theme not synced",
+        error?.message || "Please try syncing your theme again.",
+      );
+    } finally {
+      setThemeLoading(false);
+    }
   };
 
   const renderField = ({
@@ -646,7 +695,7 @@ export default function ProfileViewer() {
                         backgroundColor: active ? PRIMARY : colors.cardMuted,
                       },
                     ]}
-                    onPress={() => setPreference(opt.value)}
+                    onPress={() => handleThemePreferenceChange(opt.value)}
                     activeOpacity={0.85}
                   >
                     <FontAwesome5
@@ -666,6 +715,32 @@ export default function ProfileViewer() {
                 );
               })}
             </View>
+            <TouchableOpacity
+              style={[
+                styles.themeSyncButton,
+                {
+                  backgroundColor: colors.cardMuted,
+                  borderColor: colors.border,
+                },
+                themeLoading && styles.saveBtnDisabled,
+              ]}
+              onPress={handleSyncThemePreference}
+              disabled={themeLoading}
+              activeOpacity={0.85}
+            >
+              {themeLoading ? (
+                <ActivityIndicator size="small" color={PRIMARY} />
+              ) : (
+                <FontAwesome5
+                  name="cloud-upload-alt"
+                  size={13}
+                  color={PRIMARY}
+                />
+              )}
+              <Text style={[styles.themeSyncText, { color: colors.text }]}>
+                Save theme to account
+              </Text>
+            </TouchableOpacity>
           </View>
         )}
 
@@ -1012,6 +1087,21 @@ const styles = StyleSheet.create({
   },
   themeChipText: {
     fontSize: 12,
+    fontWeight: "800",
+  },
+  themeSyncButton: {
+    minHeight: 44,
+    borderRadius: 12,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    flexDirection: "row",
+    gap: 8,
+    marginTop: 10,
+    paddingHorizontal: 12,
+  },
+  themeSyncText: {
+    fontSize: 13,
     fontWeight: "800",
   },
   dangerCard: {

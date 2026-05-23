@@ -23,10 +23,17 @@ export async function POST(req) {
         .collection("truck_trips")
         .doc(tripId)
         .get();
-      if (tripCheck.exists && tripCheck.data().status !== "ARRIVED") {
+      const tripStatus = String(tripCheck.data()?.status || "")
+        .trim()
+        .toUpperCase();
+      const canUnload = ["ARRIVED", "LOADED", "IN_TRANSIT"].includes(
+        tripStatus,
+      );
+
+      if (tripCheck.exists && !canUnload) {
         return NextResponse.json({
           found: false,
-          message: "Trip must be marked as ARRIVED before unloading.",
+          message: "Trip must be ARRIVED, LOADED, or IN_TRANSIT before unloading.",
         });
       }
     }

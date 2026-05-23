@@ -37,6 +37,8 @@ exports.resolveDelayReport =
 // user actions
 exports.updateUserProfileMobile =
   require("./src/users/updateUserProfileMobile").updateUserProfileMobile;
+exports.updateUserThemePreference =
+  require("./src/users/updateUserThemePreference").updateUserThemePreference;
 exports.deleteMyAccount = require("./src/users/deleteMyAccount").deleteMyAccount;
 exports.requestRecoveryOTP = require("./src/users/recovery").requestRecoveryOTP;
 exports.verifyRecoveryOTP = require("./src/users/recovery").verifyRecoveryOTP;
@@ -113,6 +115,8 @@ exports.finalizeHubProcessing =
   require("./src/trips/finalizeHubProcessing").finalizeHubProcessing;
 exports.updateShipmentDetails =
   require("./src/shipments/updateShipmentDetails").updateShipmentDetails;
+exports.updateShipmentImages =
+  require("./src/shipments/updateShipmentImages").updateShipmentImages;
 
 // Manifests & Certificates
 exports.generateTripManifest =

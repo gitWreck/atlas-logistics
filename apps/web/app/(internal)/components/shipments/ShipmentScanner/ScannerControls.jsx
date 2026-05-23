@@ -14,9 +14,12 @@ import {
 } from "@fortawesome/free-solid-svg-icons";
 
 export function ActionSelector({ action, trip, theme, actions }) {
-  const currentTripStatus = trip?.status?.toUpperCase();
+  const currentTripStatus = String(trip?.status || "").trim().toUpperCase();
   const isManifestLocked = !!trip?.manifestLocked;
   const isLoadDisabled = currentTripStatus === "IN_TRANSIT" || isManifestLocked;
+  const canUnloadFromStatus = ["ARRIVED", "LOADED", "IN_TRANSIT", "COMPLETED"].includes(
+    currentTripStatus,
+  );
 
   const options = [
     {
@@ -42,11 +45,9 @@ export function ActionSelector({ action, trip, theme, actions }) {
   const handleSelect = (id) => {
     actions.resetFlow();
     if (id === "UNLOAD") {
-      if (currentTripStatus === "IN_TRANSIT")
-        return actions.setNeedsArrival(true) || actions.setAction(id);
       if (currentTripStatus === "ARRIVED" && isManifestLocked)
         return actions.setNeedsUnlock(true) || actions.setAction(id);
-      if (currentTripStatus !== "ARRIVED" && currentTripStatus !== "COMPLETED")
+      if (!canUnloadFromStatus)
         return actions.setError(
           `Cannot unload. Trip status is currently ${currentTripStatus || "UNKNOWN"}.`,
         );
@@ -405,9 +406,10 @@ export function ManualInput({ value, onChange, onSubmit, loading, theme }) {
         />
         <button
           disabled={loading}
-          className="px-4 bg-blue-600 text-white rounded-lg text-sm font-bold"
+          className="inline-flex min-w-20 items-center justify-center gap-2 px-4 bg-blue-600 text-white rounded-lg text-sm font-bold disabled:opacity-70"
         >
-          Check
+          {loading && <FontAwesomeIcon icon={faCircleNotch} spin />}
+          {loading ? "Checking" : "Check"}
         </button>
       </form>
     </div>
