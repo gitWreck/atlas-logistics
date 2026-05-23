@@ -70,6 +70,17 @@ export default function ShipmentScanActionModal({
     ? `Scan will mark as ${selectedScanStatusLabel}`
     : "";
   const errorGuidance = getScannerErrorGuidance(state.error, state, trip);
+  const canShowLoadedStatusPromptButton =
+    state.successNotice?.needsLoadedStatusPrompt &&
+    !state.error &&
+    !state.needsHandoff &&
+    !state.needsNextTrip &&
+    !state.needsArrival &&
+    !state.needsUnlock &&
+    !state.needsLoadedStatus &&
+    !state.needsLock &&
+    !state.resolvedItem &&
+    !state.needsAssignmentItem;
 
   return (
     <div className="fixed inset-0 z-[120] flex items-center justify-center sm:p-4">
@@ -130,6 +141,36 @@ export default function ShipmentScanActionModal({
                 </div>
               </div>
             </div>
+          )}
+
+          {canShowLoadedStatusPromptButton && (
+            <button
+              type="button"
+              onClick={() => actions.setNeedsLoadedStatus(true)}
+              className={`group w-full rounded-xl border px-4 py-4 text-left transition-all ${
+                isDark
+                  ? "border-emerald-400/40 bg-emerald-500/10 hover:bg-emerald-500/15"
+                  : "border-emerald-300 bg-emerald-50 hover:bg-emerald-100"
+              }`}
+            >
+              <div className="flex items-center gap-3">
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-emerald-500 text-white shadow-sm">
+                  <FontAwesomeIcon icon={faCheck} />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="text-sm font-bold text-emerald-600">
+                    Trip is Fully Loaded
+                  </div>
+                  <span className={`mt-0.5 block text-xs ${theme.helperText}`}>
+                    Set the trip to LOADED before locking or dispatching.
+                  </span>
+                </div>
+                <FontAwesomeIcon
+                  icon={faArrowRight}
+                  className="shrink-0 text-emerald-500 transition-transform group-hover:translate-x-0.5"
+                />
+              </div>
+            </button>
           )}
 
           {state.action === "UNLOAD" &&
@@ -201,6 +242,7 @@ export default function ShipmentScanActionModal({
               }
               onAssign={actions.handleAssignNextTrip}
               onRefresh={actions.handleReviewHandoff}
+              onBack={actions.resetScanResult}
               btnStatus={state.btnStatus}
             />
           ) : state.needsNextTrip ? (

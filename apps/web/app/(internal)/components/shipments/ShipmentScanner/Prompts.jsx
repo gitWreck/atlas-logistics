@@ -90,6 +90,7 @@ export function HandoffPrompt({
   onRemarkChange,
   onAssign,
   onRefresh,
+  onBack,
   btnStatus,
 }) {
   const totals = summary?.totals || {};
@@ -208,9 +209,14 @@ export function HandoffPrompt({
           disabled={!canAssign}
           onClick={onAssign}
         />
-        <button onClick={onRefresh} className="text-xs opacity-60 underline">
-          Refresh reconciliation
-        </button>
+        <div className="flex items-center justify-center gap-4">
+          <button onClick={onBack} className="text-xs opacity-60 underline">
+            Back to scanning
+          </button>
+          <button onClick={onRefresh} className="text-xs opacity-60 underline">
+            Refresh reconciliation
+          </button>
+        </div>
       </div>
     </InterceptorPrompt>
   );
@@ -421,14 +427,9 @@ export function LockPrompt({ theme, trip, btnStatus, onLock, onSkip }) {
           variant="emerald"
           onClick={onLock}
         />
-        {trip?.status?.toUpperCase() !== "LOADED" && (
-          <button
-            onClick={onSkip}
-            className="text-xs opacity-60 underline mt-2"
-          >
-            Skip & load extra items
-          </button>
-        )}
+        <button onClick={onSkip} className="text-xs opacity-60 underline mt-2">
+          Skip & load extra items
+        </button>
       </div>
     </InterceptorPrompt>
   );

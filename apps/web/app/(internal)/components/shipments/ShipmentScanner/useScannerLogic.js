@@ -216,6 +216,32 @@ export default function useScannerLogic({
     [],
   );
 
+  const getProcessableItems = useCallback(
+    (item, code) => {
+      const packages = Array.isArray(item?.packages) ? item.packages : [];
+      const targetPackages =
+        item?.scanType === "PACKAGE"
+          ? [findPackageByScan(packages, code, item.packageId)].filter(Boolean)
+          : packages;
+
+      return targetPackages
+        .map((pkg) => {
+          const packageId = getPackageIdentity(pkg);
+          const quantity = getPackageAvailableQty(pkg, action, scanStatus);
+
+          return packageId && quantity > 0 ? { packageId, quantity } : null;
+        })
+        .filter(Boolean);
+    },
+    [
+      action,
+      findPackageByScan,
+      getPackageAvailableQty,
+      getPackageIdentity,
+      scanStatus,
+    ],
+  );
+
   const fetchJsonWithAuth = useCallback(
     async (url) => {
       const token = await user?.getIdToken();
@@ -310,6 +336,8 @@ export default function useScannerLogic({
         (sum, processItem) => sum + Number(processItem.quantity || 0),
         0,
       );
+      const shouldOfferLoadedStatus =
+        shouldPromptLoadedStatusAfterLoad(totalQuantity);
 
       setSuccessNotice({
         action,
@@ -321,15 +349,15 @@ export default function useScannerLogic({
         shipmentId: item.shipmentId,
         scanType: item.scanType,
         totalQuantity,
+        needsLoadedStatusPrompt: shouldOfferLoadedStatus,
       });
       onRefresh?.();
 
-      if (shouldPromptLoadedStatusAfterLoad(totalQuantity)) {
+      if (shouldOfferLoadedStatus) {
         if (trip) {
           trip.itemPending = 0;
           trip.totalLoaded = trip.totalItems || trip.totalLoaded || 0;
         }
-        setNeedsLoadedStatus(true);
       }
 
       if (action === "UNLOAD") {
@@ -375,63 +403,69 @@ export default function useScannerLogic({
 
       setScanCode(cleanCode);
       setManualCode("");
+
       if (
         result.requiresAssignment &&
         !recentlyAssigned.has(result.shipmentId)
       ) {
-        setNeedsAssignmentItem(result);
-      } else {
-        let nextResolvedItem = result;
+        const assignmentResult = await bulkAssignShipments({
+          tripId,
+          shipmentIds: [result.shipmentId],
+          updatedBy: updatedBy(profile),
+        });
+        const assignmentData = assignmentResult?.data || assignmentResult || {};
+        const assignmentErrors = Array.isArray(assignmentData.errors)
+          ? assignmentData.errors
+          : [];
 
-        if (result.scanType === "PACKAGE") {
-          const targetPackage = findPackageByScan(
-            result.packages,
-            cleanCode,
-            result.packageId,
-          );
-          const packageIdentity = getPackageIdentity(targetPackage);
-
-          if (!targetPackage || !packageIdentity) {
-            return setError("Package data is missing for this label.");
-          }
-
-          const totalQty = Math.max(Number(targetPackage.quantity) || 1, 1);
-          const availableQty = getPackageAvailableQty(
-            targetPackage,
-            action,
-            scanStatus,
-          );
-          nextResolvedItem = {
-            ...result,
-            packageId: packageIdentity,
-            trackingNumber: targetPackage.trackingNumber || null,
-          };
-
-          if (totalQty === 1 && availableQty === 1) {
-            await processItems({
-              item: nextResolvedItem,
-              code: cleanCode,
-              itemsToProcess: [
-                {
-                  packageId: packageIdentity,
-                  quantity: 1,
-                },
-              ],
-            });
-            return;
-          }
-
-          if (availableQty <= 0) {
-            if (action === "LOAD") {
-              return setError("Item is loaded.");
-            }
-
-            return setError("No quantity is available for this package.");
-          }
+        if (assignmentErrors.length) {
+          throw new Error(assignmentErrors.join(" "));
         }
 
-        setResolvedItem(nextResolvedItem);
+        if (!assignmentData.assigned) {
+          throw new Error("Shipment could not be assigned to this trip.");
+        }
+
+        setRecentlyAssigned((prev) => new Set(prev).add(result.shipmentId));
       }
+
+      let nextResolvedItem = result;
+
+      if (result.scanType === "PACKAGE") {
+        const targetPackage = findPackageByScan(
+          result.packages,
+          cleanCode,
+          result.packageId,
+        );
+        const packageIdentity = getPackageIdentity(targetPackage);
+
+        if (!targetPackage || !packageIdentity) {
+          return setError("Package data is missing for this label.");
+        }
+
+        nextResolvedItem = {
+          ...result,
+          packageId: packageIdentity,
+          trackingNumber: targetPackage.trackingNumber || null,
+        };
+      }
+
+      const itemsToProcess = getProcessableItems(nextResolvedItem, cleanCode);
+
+      if (!itemsToProcess.length) {
+        if (action === "LOAD") {
+          return setError("No quantity is available to load for this scan.");
+        }
+
+        return setError("No quantity is available to unload for this scan.");
+      }
+
+      await processItems({
+        item: nextResolvedItem,
+        code: cleanCode,
+        itemsToProcess,
+      });
+
       setQuantities({});
     } catch (err) {
       setError(err.message || "Failed to check scanned label.");
@@ -608,6 +642,8 @@ export default function useScannerLogic({
         (sum, processItem) => sum + Number(processItem.quantity || 0),
         0,
       );
+      const shouldOfferLoadedStatus =
+        shouldPromptLoadedStatusAfterLoad(totalQuantity);
 
       setSuccessNotice({
         action,
@@ -619,15 +655,15 @@ export default function useScannerLogic({
         shipmentId: resolvedItem.shipmentId,
         scanType: resolvedItem.scanType,
         totalQuantity,
+        needsLoadedStatusPrompt: shouldOfferLoadedStatus,
       });
       onRefresh?.();
 
-      if (shouldPromptLoadedStatusAfterLoad(totalQuantity)) {
+      if (shouldOfferLoadedStatus) {
         if (trip) {
           trip.itemPending = 0;
           trip.totalLoaded = trip.totalItems || trip.totalLoaded || 0;
         }
-        setNeedsLoadedStatus(true);
       }
 
       if (action === "UNLOAD") {

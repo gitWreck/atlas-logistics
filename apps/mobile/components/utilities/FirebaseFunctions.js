@@ -17,6 +17,10 @@ export const updateShipmentStatus = httpsCallable(
   functions,
   "updateShipmentStatus",
 );
+export const updateShipmentImages = httpsCallable(
+  functions,
+  "updateShipmentImages",
+);
 export const updateTripStatus = httpsCallable(functions, "updateTripStatus");
 
 export const startTrip = httpsCallable(functions, "startTrip");
@@ -45,6 +49,10 @@ export const sendManualSMS = httpsCallable(functions, "sendManualSMS");
 export const updateUserProfileMobile = httpsCallable(
   functions,
   "updateUserProfileMobile",
+);
+export const updateUserThemePreference = httpsCallable(
+  functions,
+  "updateUserThemePreference",
 );
 export const deleteMyAccount = httpsCallable(functions, "deleteMyAccount");
 export const ensureUserPublicId = httpsCallable(

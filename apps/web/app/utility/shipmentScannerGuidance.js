@@ -2,27 +2,25 @@ export function getScannerErrorGuidance(message, state, trip) {
   if (!message) return "";
 
   const text = String(message).toLowerCase();
-  const currentTripStatus = String(trip?.status || "").toUpperCase();
+  const currentTripStatus = String(trip?.status || "").trim().toUpperCase();
 
   if (
     text.includes("cannot unload") ||
-    text.includes("marked as arrived before unloading")
+    text.includes("marked as arrived before unloading") ||
+    text.includes("arrived or loaded before unloading")
   ) {
     if (currentTripStatus === "CREATED") {
-      return "Try marking the trip as LOADED, then move it to IN_TRANSIT and ARRIVED before unloading.";
-    }
-    if (currentTripStatus === "LOADED") {
-      return "Try dispatching the trip to IN_TRANSIT, then mark it ARRIVED when it reaches the warehouse.";
+      return "Mark the trip as LOADED first, then scan again.";
     }
     if (currentTripStatus === "IN_TRANSIT") {
-      return "Use Mark as Arrived in this modal, then continue unloading.";
+      return "Unload scanning is allowed from IN_TRANSIT. Try refreshing the trip and scanning again.";
     }
 
-    return "Unload scans are only available after the trip has arrived. Update the trip status, then try again.";
+    return "Unload scans are available when the trip is LOADED, IN_TRANSIT, or ARRIVED. Update the trip status, then try again.";
   }
 
   if (text.includes("manifest") && text.includes("locked")) {
-    return "Unlock the manifest first, then scan again. If the trip is still moving, mark it ARRIVED before unloading.";
+    return "Unlock the manifest first, then scan again.";
   }
 
   if (text.includes("trip already closed") || text.includes("completed/inactive")) {
@@ -146,7 +144,7 @@ export function getScannerErrorGuidance(message, state, trip) {
   }
 
   if (state?.action === "UNLOAD") {
-    return "Check that the trip is ARRIVED, the manifest is unlocked, and the package has loaded quantity.";
+    return "Check that the trip is LOADED, IN_TRANSIT, or ARRIVED, the manifest is unlocked, and the package has loaded quantity.";
   }
 
   if (state?.action === "LOAD") {

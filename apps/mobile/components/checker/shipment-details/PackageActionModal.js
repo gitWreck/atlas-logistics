@@ -50,6 +50,12 @@ export default function PackageActionModal({
       color: "#10b981",
     },
     {
+      label: "Delivered",
+      mode: "DELIVERED",
+      icon: "check-circle",
+      color: "#2563eb",
+    },
+    {
       label: "Mark Missing",
       mode: "MISSING",
       icon: "exclamation-triangle",

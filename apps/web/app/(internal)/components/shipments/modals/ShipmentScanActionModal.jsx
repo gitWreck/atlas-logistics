@@ -575,8 +575,11 @@ function ActionSelector({
   setNeedsLock,
   setError,
 }) {
-  const currentTripStatus = trip?.status?.toUpperCase();
+  const currentTripStatus = String(trip?.status || "").trim().toUpperCase();
   const isManifestLocked = !!trip?.manifestLocked;
+  const canUnloadFromStatus = ["ARRIVED", "LOADED", "IN_TRANSIT", "COMPLETED"].includes(
+    currentTripStatus,
+  );
 
   // LOGIC: Disable LOAD if trip is moving or already locked down
   const isLoadDisabled = currentTripStatus === "IN_TRANSIT" || isManifestLocked;
@@ -611,25 +614,20 @@ function ActionSelector({
           disabled={opt.disabled} // <-- Apply the HTML disabled attribute
           onClick={() => {
             resetFlow();
-            const currentTripStatus = trip?.status?.toUpperCase();
+            const currentTripStatus = String(trip?.status || "")
+              .trim()
+              .toUpperCase();
 
             // UNLOAD INTERCEPTOR
             if (opt.id === ACTIONS.UNLOAD) {
-              if (currentTripStatus === "IN_TRANSIT") {
-                setNeedsArrival(true);
-                setAction(opt.id);
-                return;
-              } else if (
+              if (
                 currentTripStatus === "ARRIVED" &&
                 trip?.manifestLocked
               ) {
                 setNeedsUnlock(true);
                 setAction(opt.id);
                 return;
-              } else if (
-                currentTripStatus !== "ARRIVED" &&
-                currentTripStatus !== "COMPLETED"
-              ) {
+              } else if (!canUnloadFromStatus) {
                 setError(
                   `Cannot unload. Trip status is currently ${currentTripStatus || "UNKNOWN"}.`,
                 );
@@ -783,9 +781,10 @@ function ManualInput({ value, onChange, onSubmit, loading, theme }) {
         />
         <button
           disabled={loading}
-          className="px-4 bg-blue-600 text-white rounded-lg text-sm font-bold"
+          className="inline-flex min-w-20 items-center justify-center gap-2 px-4 bg-blue-600 text-white rounded-lg text-sm font-bold disabled:opacity-70"
         >
-          Check
+          {loading && <FontAwesomeIcon icon={faCircleNotch} spin />}
+          {loading ? "Checking" : "Check"}
         </button>
       </form>
     </div>
