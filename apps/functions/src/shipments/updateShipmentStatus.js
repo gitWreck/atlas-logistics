@@ -39,19 +39,31 @@ async function getTrackedShipmentUserIds(shipmentId) {
 
   const trackedUserIds = [];
 
-  await Promise.all(
-    chunk([trackingNumber]).map(async (trackingChunk) => {
-      const trackedSnap = await db
-        .collectionGroup("tracked_shipments")
-        .where("trackingNumber", "in", trackingChunk)
-        .get();
+  try {
+    await Promise.all(
+      chunk([trackingNumber]).map(async (trackingChunk) => {
+        const trackedSnap = await db
+          .collectionGroup("tracked_shipments")
+          .where("trackingNumber", "in", trackingChunk)
+          .get();
 
-      trackedSnap.docs.forEach((doc) => {
-        const userRef = doc.ref.parent.parent;
-        if (userRef?.id) trackedUserIds.push(userRef.id);
-      });
-    }),
-  );
+        trackedSnap.docs.forEach((doc) => {
+          const userRef = doc.ref.parent.parent;
+          if (userRef?.id) trackedUserIds.push(userRef.id);
+        });
+      }),
+    );
+  } catch (error) {
+    if (error?.code === 9 || error?.code === "failed-precondition") {
+      console.warn(
+        "[updateShipmentStatus] Skipping tracked shipment notification lookup. Firestore collection-group index may still be missing/building.",
+        error?.message || error,
+      );
+      return [];
+    }
+
+    throw error;
+  }
 
   return unique(trackedUserIds);
 }
@@ -213,10 +225,10 @@ exports.updateShipmentStatus = onCall(
       throw new HttpsError("invalid-argument", `Invalid status: ${newStatus}`);
     }
 
-    if (
-      actor.role === "driver" &&
-      (newStatus === "DELIVERED" || proofOfDelivery)
-    ) {
+    const isFinalDeliveryStatus =
+      newStatus === "DELIVERED" || newStatus === "COMPLETED";
+
+    if (actor.role === "driver" && (isFinalDeliveryStatus || proofOfDelivery)) {
       throw new HttpsError(
         "permission-denied",
         "Drivers cannot complete delivery or upload proof of delivery.",
@@ -290,7 +302,9 @@ exports.updateShipmentStatus = onCall(
       const sumReceivedQty = (pkgs) =>
         pkgs.reduce((sum, pkg) => {
           const quantity = normalizeQty(pkg.quantity, 1);
-          if (pkg.status === "DELIVERED") return sum + quantity;
+          if (pkg.status === "DELIVERED" || pkg.status === "COMPLETED") {
+            return sum + quantity;
+          }
           if (pkg.status === "PARTIALLY_RECEIVED") {
             return sum + Math.min(normalizeQty(pkg.receivedQty, 0), quantity);
           }
@@ -314,10 +328,11 @@ exports.updateShipmentStatus = onCall(
 
       const updatedPackages = oldPackages.map((pkg) => {
         const quantity = normalizeQty(pkg.quantity, 1);
+        const nextStatus = isFinalDeliveryStatus ? "DELIVERED" : newStatus;
 
         const nextPkg = {
           ...pkg,
-          status: newStatus,
+          status: nextStatus,
           updatedAt: new Date().toISOString(),
         };
 
@@ -326,7 +341,7 @@ exports.updateShipmentStatus = onCall(
         } else if (newStatus === "RECEIVED") {
           nextPkg.loadedQty = 0;
           nextPkg.receivedQty = 0;
-        } else if (newStatus === "DELIVERED") {
+        } else if (isFinalDeliveryStatus) {
           nextPkg.loadedQty = quantity;
           nextPkg.receivedQty = quantity;
           nextPkg.deliveredAt = new Date().toISOString();
@@ -348,7 +363,7 @@ exports.updateShipmentStatus = onCall(
       } else if (newStatus === "RECEIVED") {
         newLoadedQty = 0;
         newReceivedQty = 0;
-      } else if (newStatus === "DELIVERED") {
+      } else if (isFinalDeliveryStatus) {
         newLoadedQty = newTotalQty;
         newReceivedQty = newTotalQty;
       } else if (newStatus === "MISSING") {

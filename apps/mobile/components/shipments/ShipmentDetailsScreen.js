@@ -51,6 +51,8 @@ const NOTIFICATION_CHANNEL_OPTIONS = [
   { key: "push", label: "Push", icon: "bell" },
 ];
 
+const FINAL_SHIPMENT_STATUSES = new Set(["COMPLETED", "DELIVERED"]);
+
 export default function ShipmentDetailsScreen() {
   const { shipmentId, tripId, tripType, parentTripId } = useLocalSearchParams();
   const router = useRouter();
@@ -335,6 +337,16 @@ export default function ShipmentDetailsScreen() {
     remarks = "",
     manualQty = null,
   }) => {
+    if (
+      FINAL_SHIPMENT_STATUSES.has(String(shipment?.status || "").toUpperCase())
+    ) {
+      Alert.alert(
+        "Shipment Completed",
+        "Package actions are disabled for completed shipments.",
+      );
+      return;
+    }
+
     try {
       setActionLoading(true);
       const location = await getCurrentLocationSafe();
@@ -380,6 +392,9 @@ export default function ShipmentDetailsScreen() {
   }
 
   const packages = shipment?.packages || [];
+  const isShipmentFinal = FINAL_SHIPMENT_STATUSES.has(
+    String(shipment?.status || "").toUpperCase(),
+  );
   const canDriverHandlePickup =
     isDriver &&
     tripType !== "HUB_TRANSFER" &&
@@ -393,7 +408,7 @@ export default function ShipmentDetailsScreen() {
     canDriverHandlePickup ||
     (canCheckerHandleDelivery && shipment?.status === "OUT_FOR_DELIVERY");
 
-  const packagePanelEditable = isChecker;
+  const packagePanelEditable = isChecker && !isShipmentFinal;
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.bg }]}>

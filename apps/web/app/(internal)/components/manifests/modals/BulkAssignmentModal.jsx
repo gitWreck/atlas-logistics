@@ -7,14 +7,16 @@ import {
   faTruck,
   faTimes,
   faCheckCircle,
-  faArrowDown,
 } from "@fortawesome/free-solid-svg-icons";
 import { bulkAssignShipments } from "@/app/utility/FirebaseFunctions";
+import TablePaginationFooter from "../../ui/TablePaginationFooter";
 import {
   getModalThemeClasses,
   getTableTheme,
 } from "@/app/utility/constant/theme";
 import { getModalActionClasses } from "@/app/utility/constant/action";
+
+const ITEMS_PER_PAGE = 25;
 
 export default function BulkAssignmentModal({
   isOpen,
@@ -29,6 +31,7 @@ export default function BulkAssignmentModal({
   const [candidates, setCandidates] = useState([]);
   const [selectedIds, setSelectedIds] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
 
   const [nextCursor, setNextCursor] = useState(null);
   const [hasMore, setHasMore] = useState(false);
@@ -43,6 +46,7 @@ export default function BulkAssignmentModal({
       setNextCursor(null);
       setSelectedIds([]);
       setSearchTerm("");
+      setCurrentPage(1);
       fetchCandidates(null);
     }
   }, [isOpen, trip]);
@@ -74,10 +78,6 @@ export default function BulkAssignmentModal({
     }
   };
 
-  const handleLoadMore = () => {
-    if (nextCursor) fetchCandidates(nextCursor);
-  };
-
   const filteredList = useMemo(() => {
     return candidates.filter((item) => {
       const search = searchTerm.toLowerCase();
@@ -89,6 +89,24 @@ export default function BulkAssignmentModal({
     });
   }, [candidates, searchTerm]);
 
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm]);
+
+  const totalPages = Math.max(
+    1,
+    Math.ceil(filteredList.length / ITEMS_PER_PAGE),
+  );
+  const currentSafePage = Math.min(currentPage, totalPages);
+  const startIndex = (currentSafePage - 1) * ITEMS_PER_PAGE;
+  const paginatedList = filteredList.slice(
+    startIndex,
+    startIndex + ITEMS_PER_PAGE,
+  );
+  const paginatedIds = paginatedList.map((item) => item.id);
+  const hasNextLoadedPage = currentSafePage < totalPages;
+  const footerTotalPages = hasMore ? totalPages + 1 : totalPages;
+
   const toggleSelect = (id) => {
     setSelectedIds((prev) =>
       prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
@@ -96,10 +114,30 @@ export default function BulkAssignmentModal({
   };
 
   const selectAll = () => {
-    if (selectedIds.length === filteredList.length) {
-      setSelectedIds([]);
+    const allPageItemsSelected =
+      paginatedIds.length > 0 &&
+      paginatedIds.every((id) => selectedIds.includes(id));
+
+    if (allPageItemsSelected) {
+      setSelectedIds((prev) => prev.filter((id) => !paginatedIds.includes(id)));
     } else {
-      setSelectedIds(filteredList.map((item) => item.id));
+      setSelectedIds((prev) => [...new Set([...prev, ...paginatedIds])]);
+    }
+  };
+
+  const handlePreviousPage = () => {
+    setCurrentPage((page) => Math.max(1, page - 1));
+  };
+
+  const handleNextPage = async () => {
+    if (hasNextLoadedPage) {
+      setCurrentPage((page) => Math.min(totalPages, page + 1));
+      return;
+    }
+
+    if (hasMore && nextCursor && !loading) {
+      await fetchCandidates(nextCursor);
+      setCurrentPage((page) => page + 1);
     }
   };
 
@@ -196,8 +234,8 @@ export default function BulkAssignmentModal({
               type="checkbox"
               onChange={selectAll}
               checked={
-                filteredList.length > 0 &&
-                selectedIds.length === filteredList.length
+                paginatedIds.length > 0 &&
+                paginatedIds.every((id) => selectedIds.includes(id))
               }
               className="rounded accent-blue-500"
             />
@@ -216,7 +254,7 @@ export default function BulkAssignmentModal({
             </div>
           ) : (
             <>
-              {filteredList.map((item) => {
+              {paginatedList.map((item) => {
                 const isSelected = selectedIds.includes(item.id);
 
                 return (
@@ -269,26 +307,16 @@ export default function BulkAssignmentModal({
                 );
               })}
 
-              {/* LOAD MORE */}
               {loading ? (
                 <div
                   className={`p-4 text-center text-xs animate-pulse ${tableTheme.emptyText}`}
                 >
                   Loading more shipments...
                 </div>
-              ) : hasMore ? (
-                <div className="p-4 text-center">
-                  <button
-                    type="button"
-                    onClick={handleLoadMore}
-                    className={`text-xs font-bold flex items-center justify-center gap-2 mx-auto px-4 py-2 rounded border transition-all ${tableTheme.paginationButton}`}
-                  >
-                    <FontAwesomeIcon icon={faArrowDown} />
-                    Load More Shipments
-                  </button>
-                </div>
               ) : (
-                candidates.length > 0 && (
+                candidates.length > 0 &&
+                currentSafePage === totalPages &&
+                !hasMore && (
                   <div
                     className={`p-6 text-center text-xs border-t ${tableTheme.footer}`}
                   >
@@ -299,6 +327,18 @@ export default function BulkAssignmentModal({
             </>
           )}
         </div>
+
+        {!loading && filteredList.length > 0 && (
+          <TablePaginationFooter
+            totalItems={filteredList.length}
+            currentPage={currentSafePage}
+            itemsPerPage={ITEMS_PER_PAGE}
+            totalPages={footerTotalPages}
+            onPrevious={handlePreviousPage}
+            onNext={handleNextPage}
+            theme={tableTheme}
+          />
+        )}
 
         {/* FOOTER */}
         <div
