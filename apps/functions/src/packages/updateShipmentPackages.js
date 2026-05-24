@@ -30,6 +30,7 @@ exports.updateShipmentPackages = onCall(
       remarks,
       location,
       scanAction,
+      tripId: scannerTripId,
     } = req.data || {};
 
     if (!shipmentId || typeof shipmentId !== "string") {
@@ -82,27 +83,105 @@ exports.updateShipmentPackages = onCall(
       const oldPackages = Array.isArray(oldData.packages)
         ? oldData.packages
         : [];
-      const tripId = oldData.currentTripId || null;
 
-      let tripRef = null;
-      let tripShipmentRef = null;
-      let tripShipmentSnap = null;
-      let tripSnap = null;
+      const normalizedScannerTripId =
+        typeof scannerTripId === "string" && scannerTripId.trim()
+          ? scannerTripId.trim()
+          : null;
+      const shipmentTripId = oldData.currentTripId || null;
 
-      if (tripId) {
-        tripRef = db.collection("truck_trips").doc(tripId);
-        tripShipmentRef = tripRef.collection("trip_shipments").doc(shipmentId);
-        [tripSnap, tripShipmentSnap] = await Promise.all([
-          tx.get(tripRef),
-          tx.get(tripShipmentRef),
+      const resolveTripContext = async (candidateTripId) => {
+        if (!candidateTripId) return null;
+
+        const candidateTripRef = db.collection("truck_trips").doc(candidateTripId);
+        const candidateTripShipmentRef = candidateTripRef
+          .collection("trip_shipments")
+          .doc(shipmentId);
+        const [candidateTripSnap, candidateTripShipmentSnap] = await Promise.all([
+          tx.get(candidateTripRef),
+          tx.get(candidateTripShipmentRef),
         ]);
 
-        if (!tripShipmentSnap.exists) {
+        if (!candidateTripSnap.exists) return null;
+
+        return {
+          tripId: candidateTripId,
+          tripRef: candidateTripRef,
+          tripShipmentRef: candidateTripShipmentRef,
+          tripSnap: candidateTripSnap,
+          tripShipmentSnap: candidateTripShipmentSnap,
+        };
+      };
+
+      let tripContext =
+        (await resolveTripContext(normalizedScannerTripId)) ||
+        (await resolveTripContext(shipmentTripId));
+
+      if (
+        normalizedScannerTripId &&
+        shipmentTripId &&
+        normalizedScannerTripId !== shipmentTripId &&
+        tripContext?.tripId === normalizedScannerTripId &&
+        !tripContext.tripShipmentSnap.exists
+      ) {
+        const onShipmentTripRef = db
+          .collection("truck_trips")
+          .doc(shipmentTripId)
+          .collection("trip_shipments")
+          .doc(shipmentId);
+        const onShipmentTripSnap = await tx.get(onShipmentTripRef);
+
+        if (onShipmentTripSnap.exists) {
           throw new HttpsError(
-            "not-found",
-            "Trip shipment record not found for this shipment.",
+            "failed-precondition",
+            "This shipment belongs to a different trip. Open the correct trip before scanning.",
           );
         }
+      }
+
+      let tripId = tripContext?.tripId || null;
+      let tripRef = tripContext?.tripRef || null;
+      let tripShipmentRef = tripContext?.tripShipmentRef || null;
+      let tripShipmentSnap = tripContext?.tripShipmentSnap || null;
+      let tripSnap = tripContext?.tripSnap || null;
+
+      if (tripId && tripRef && tripShipmentRef && !tripShipmentSnap?.exists) {
+          const itemsToAdd = Number(
+            oldData.totals?.totalContentQty || oldData.totals?.totalItems || 0,
+          );
+
+          tx.set(tripShipmentRef, {
+            trackingShipmentId: shipmentId,
+            shipmentId: oldData.shipmentId || null,
+            route:
+              (oldData.originCode || "?") +
+              " -> " +
+              (oldData.destinationCode || "?"),
+            totalItems: itemsToAdd,
+            pendingCount: itemsToAdd,
+            loadedCount: Number(oldData.totals?.loaded || 0),
+            deliveredCount: Number(
+              oldData.totals?.delivered || oldData.totals?.received || 0,
+            ),
+            receivedCount: Number(
+              oldData.totals?.received || oldData.totals?.delivered || 0,
+            ),
+            missingCount: Number(oldData.totals?.missing || 0),
+            damagedCount: Number(oldData.totals?.damaged || 0),
+            sender: oldData.sender || null,
+            recipient: oldData.recipient || null,
+            packageBarcodes: oldData.packageBarcodes || [],
+            createdAt: FieldValue.serverTimestamp(),
+            createdBy: uid,
+            updatedAt: FieldValue.serverTimestamp(),
+            updatedBy: name,
+            updatedRole: role,
+            status: oldData.status || "ASSIGNED",
+          });
+          tripShipmentSnap = {
+            exists: true,
+            data: () => ({ status: oldData.status || "ASSIGNED" }),
+          };
       }
 
       const tripData = tripSnap?.exists ? tripSnap.data() || {} : {};
