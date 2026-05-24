@@ -24,6 +24,7 @@ import {
   getTableTheme,
 } from "@/app/utility/constant/theme";
 import { getModalActionClasses } from "@/app/utility/constant/action";
+import { formatFirestoreDate } from "@/app/utility/utilities";
 import StatusBadge from "../../ui/StatusBadge";
 import TablePaginationFooter from "../../ui/TablePaginationFooter";
 
@@ -32,6 +33,61 @@ const ITEMS_PER_PAGE = 6;
 
 const isPackageLocked = (status) =>
   ["IN_TRANSIT", "DELIVERED"].includes(status);
+
+const displayValue = (value) => {
+  if (value === 0) return "0";
+  return value || "-";
+};
+
+const contactLabel = (contact) => {
+  if (!contact) return "-";
+
+  return [contact.name, contact.phone].filter(Boolean).join(" / ") || "-";
+};
+
+const routeLabel = (shipment) => {
+  if (shipment?.route) return shipment.route;
+
+  const origin =
+    shipment?.originCode && shipment?.origin
+      ? `${shipment.originCode} - ${shipment.origin}`
+      : shipment?.originCode || shipment?.origin;
+
+  const destination =
+    shipment?.destinationCode && shipment?.destination
+      ? `${shipment.destinationCode} - ${shipment.destination}`
+      : shipment?.destinationCode || shipment?.destination;
+
+  if (origin && destination) return `${origin} to ${destination}`;
+  return origin || destination || "-";
+};
+
+const shipmentTripId = (shipment) =>
+  shipment?.assignedTrip?.tripId ||
+  shipment?.tripId ||
+  shipment?.currentTripId ||
+  shipment?.currentTruckTripId ||
+  shipment?.truckTripId;
+
+const shipmentDisplayId = (shipment) =>
+  shipment?.shipmentId || shipment?.trackingNumber || shipment?.id;
+
+function ShipmentDetailRow({ label, value, isDark }) {
+  return (
+    <div className="grid grid-cols-[92px_1fr] gap-3 text-xs">
+      <div className="font-bold uppercase tracking-wide text-slate-500">
+        {label}
+      </div>
+      <div
+        className={`min-w-0 break-words font-medium ${
+          isDark ? "text-slate-200" : "text-slate-800"
+        }`}
+      >
+        {value}
+      </div>
+    </div>
+  );
+}
 
 const INITIAL_PACKAGE_STATE = {
   description: "",
@@ -52,6 +108,7 @@ export default function ViewPackagesModal({
   isDark = false,
 }) {
   const [packages, setPackages] = useState([]);
+  const [fullShipment, setFullShipment] = useState(null);
   const [loading, setLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [selectedIndices, setSelectedIndices] = useState(new Set());
@@ -70,9 +127,11 @@ export default function ViewPackagesModal({
 
   useEffect(() => {
     if (isOpen && shipment?.id) {
+      setFullShipment(null);
       fetchFullShipmentDetails(shipment.id);
     } else {
       setPackages([]);
+      setFullShipment(null);
       setEditingId(null);
       setIsAdding(false);
       setSelectedIndices(new Set());
@@ -80,7 +139,7 @@ export default function ViewPackagesModal({
       setSearch("");
       setStatusFilter("ALL");
     }
-  }, [isOpen, shipment]);
+  }, [isOpen, shipment?.id]);
 
   const fetchFullShipmentDetails = async (id) => {
     try {
@@ -94,6 +153,7 @@ export default function ViewPackagesModal({
       if (!res.ok) throw new Error("Failed to load");
 
       const json = await res.json();
+      setFullShipment(json.shipment || null);
       setPackages(json.shipment?.packages || []);
     } catch (err) {
       console.error(err);
@@ -180,6 +240,9 @@ export default function ViewPackagesModal({
       });
 
       setPackages(updatedPackages);
+      setFullShipment((prev) =>
+        prev ? { ...prev, packages: updatedPackages } : prev,
+      );
       setEditingId(null);
       setIsAdding(false);
       setSelectedIndices(new Set());
@@ -258,6 +321,17 @@ export default function ViewPackagesModal({
 
   if (!isOpen || !shipment) return null;
 
+  const shipmentDetails =
+    fullShipment?.id === shipment.id ? fullShipment : shipment;
+  const totalQuantity = packages.reduce(
+    (total, pkg) => total + (Number(pkg.quantity) || 0),
+    0,
+  );
+  const updatedAt = formatFirestoreDate(
+    shipmentDetails.updatedAt || shipmentDetails.createdAt,
+  );
+  const trackingNumber = displayValue(shipmentDisplayId(shipmentDetails));
+
   return (
     <>
       <div className="fixed inset-0 z-[60]">
@@ -288,7 +362,7 @@ export default function ViewPackagesModal({
                     icon={faBoxOpen}
                     className={`shrink-0 ${modalTheme.label}`}
                   />
-                  <span className="truncate">{shipment.shipmentId}</span>
+                  <span className="truncate">{trackingNumber}</span>
                 </h2>
               </div>
 
@@ -353,12 +427,66 @@ export default function ViewPackagesModal({
                         <div
                           className={`text-base font-bold ${modalTheme.title}`}
                         >
-                          {packages.reduce(
-                            (total, pkg) => total + (Number(pkg.quantity) || 0),
-                            0,
-                          )}
+                          {totalQuantity}
                         </div>
                       </div>
+                    </div>
+                  </div>
+
+                  <div
+                    className={`border rounded-2xl p-4 ${modalTheme.panelSurface}`}
+                  >
+                    <div className="flex items-start justify-between gap-3 mb-4">
+                      <div>
+                        <div
+                          className={`text-[10px] font-bold uppercase ${modalTheme.label}`}
+                        >
+                          Shipment Details
+                        </div>
+                        <div
+                          className={`text-sm font-bold ${modalTheme.title}`}
+                        >
+                          {trackingNumber}
+                        </div>
+                      </div>
+
+                      <StatusBadge
+                        status={shipmentDetails.status || "UNASSIGNED"}
+                        isDark={isDark}
+                      />
+                    </div>
+
+                    <div className="space-y-3">
+                      <ShipmentDetailRow
+                        label="Trip ID"
+                        value={displayValue(shipmentTripId(shipmentDetails))}
+                        isDark={isDark}
+                      />
+                      <ShipmentDetailRow
+                        label="Route"
+                        value={routeLabel(shipmentDetails)}
+                        isDark={isDark}
+                      />
+                      <ShipmentDetailRow
+                        label="Sender"
+                        value={contactLabel(shipmentDetails.sender)}
+                        isDark={isDark}
+                      />
+                      <ShipmentDetailRow
+                        label="Recipient"
+                        value={contactLabel(shipmentDetails.recipient)}
+                        isDark={isDark}
+                      />
+                      <ShipmentDetailRow
+                        label="Location"
+                        value={displayValue(shipmentDetails.currentLocation)}
+                        isDark={isDark}
+                      />
+                      <ShipmentDetailRow
+                        label="Updated"
+                        value={updatedAt || "-"}
+                        isDark={isDark}
+                      />
                     </div>
                   </div>
 
