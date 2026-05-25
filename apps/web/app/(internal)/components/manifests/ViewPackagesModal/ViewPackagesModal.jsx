@@ -315,7 +315,9 @@ export default function ViewPackagesModal({
     if (selectedIndices.size === 0) return false;
 
     return Array.from(selectedIndices).every(
-      (idx) => packages[idx]?.status === "RECEIVED",
+      (idx) =>
+        packages[idx]?.status === "RECEIVED" &&
+        Number(packages[idx]?.quantity || 1) > 1,
     );
   }, [selectedIndices, packages]);
 
@@ -1144,6 +1146,8 @@ export default function ViewPackagesModal({
           isOpen={isSplitModalOpen}
           onClose={() => setIsSplitModalOpen(false)}
           originalShipmentId={shipment.id}
+          shipmentCode={shipmentDetails.shipmentId || shipment.id}
+          allPackages={packages}
           isDark={isDark}
           onSuccess={() => {
             setIsSplitModalOpen(false);

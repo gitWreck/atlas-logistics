@@ -63,6 +63,52 @@ export async function GET(request, { params }) {
     const shipments = snapshot.docs.map((doc) => {
       const data = doc.data();
       const root = rootMap[doc.id] || {};
+      const rootPackages = Array.isArray(root.packages) ? root.packages : [];
+      const tripBarcodeSet = new Set(
+        (data.packageBarcodes || []).filter(Boolean).map(String),
+      );
+      const tripPackages = rootPackages.filter((pkg) => {
+        const packageTripId = pkg.currentTripId || pkg.loadedOnTrip || null;
+        const packageId = pkg.packageId || pkg.trackingNumber || null;
+
+        if (packageTripId) return packageTripId === tripId;
+        return packageId ? tripBarcodeSet.has(String(packageId)) : false;
+      });
+      const hasPackageScopedManifest = tripPackages.length || tripBarcodeSet.size;
+      const visiblePackages = hasPackageScopedManifest
+        ? tripPackages
+        : rootPackages;
+      const packageQty = (pkg) => Math.max(Number(pkg.quantity) || 1, 1);
+      const sumQty = (field) =>
+        visiblePackages.reduce(
+          (sum, pkg) => sum + Math.min(Number(pkg[field]) || 0, packageQty(pkg)),
+          0,
+        );
+      const visibleTotalQty =
+        hasPackageScopedManifest
+          ? visiblePackages.reduce((sum, pkg) => sum + packageQty(pkg), 0)
+          : data.totalItems || root.totals?.totalContentQty || 0;
+      const visibleLoadedQty =
+        data.loadedCount ?? sumQty("loadedQty") ?? root.totals?.loaded ?? 0;
+      const visibleReceivedQty =
+        data.receivedCount ??
+        data.deliveredCount ??
+        sumQty("receivedQty") ??
+        root.totals?.received ??
+        0;
+      const visibleMissingQty =
+        data.missingCount ?? sumQty("missingQty") ?? root.totals?.missing ?? 0;
+      const visibleDamagedQty =
+        data.damagedCount ?? sumQty("damagedQty") ?? root.totals?.damaged ?? 0;
+      const visiblePendingQty =
+        data.pendingCount ??
+        Math.max(
+          visibleTotalQty -
+            visibleLoadedQty -
+            visibleMissingQty -
+            visibleDamagedQty,
+          0,
+        );
       const hasActiveInvoice =
         root.invoiceStatus !== "CANCELLED" &&
         (root.hasInvoice || Boolean(root.invoiceId));
@@ -100,22 +146,29 @@ export async function GET(request, { params }) {
         status: root.status || data.status || null,
         currentTripId: root.currentTripId || data.currentTripId || tripId,
 
-        packages: root.packages || data.packages || [],
-        packageBarcodes: root.packageBarcodes || data.packageBarcodes || [],
+        packages: visiblePackages,
+        packageBarcodes:
+          data.packageBarcodes || visiblePackages.map((pkg) => pkg.packageId),
 
-        totals: root.totals || {
-          totalItems: data.totalItems || 0,
-          loaded: data.loadedCount || 0,
-          received: data.receivedCount || 0,
-          delivered: data.deliveredCount || 0,
-          pending: data.pendingCount || 0,
+        totals: {
+          ...(root.totals || {}),
+          totalItems: hasPackageScopedManifest
+            ? visiblePackages.length
+            : data.totalItems || 0,
+          totalContentQty: visibleTotalQty,
+          loaded: visibleLoadedQty,
+          received: visibleReceivedQty,
+          delivered: visibleReceivedQty,
+          pending: visiblePendingQty,
+          missing: visibleMissingQty,
+          damaged: visibleDamagedQty,
         },
 
-        totalItems: root.totals?.totalItems || data.totalItems || 0,
-        loadedCount: data.loadedCount || root.totals?.loaded || 0,
-        receivedCount: data.receivedCount || root.totals?.received || 0,
-        deliveredCount: data.deliveredCount || root.totals?.delivered || 0,
-        pendingCount: data.pendingCount || root.totals?.pending || 0,
+        totalItems: visibleTotalQty,
+        loadedCount: visibleLoadedQty,
+        receivedCount: visibleReceivedQty,
+        deliveredCount: visibleReceivedQty,
+        pendingCount: visiblePendingQty,
 
         // invoice fields from root shipment
         hasInvoice: hasActiveInvoice,

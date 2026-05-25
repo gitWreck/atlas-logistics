@@ -16,6 +16,7 @@ import {
   faPlus,
   faFileCirclePlus,
   faFileInvoice,
+  faUsers,
 } from "@fortawesome/free-solid-svg-icons";
 import { auth } from "@/lib/firebase";
 import { useAuth } from "@/app/context/AuthContext";
@@ -26,6 +27,7 @@ import ShipmentBoard from "../../components/shipments/ShipmentBoard";
 import TripBoard from "../../components/trips/TripBoard";
 import NotificationBell from "../../components/notifications/NotificationBell";
 import TruckBoard from "../../components/trucks/TruckBoard";
+import CustomerBoard from "../../components/customers/CustomerBoard";
 
 import { getDashboardThemeClasses } from "@/app/utility/constant/theme";
 import InvoiceBoard from "../../components/invoice/InvoiceBoard";
@@ -58,6 +60,13 @@ const mainNavItems = [
     icon: faTruckLoading,
     title: "Truck Board",
     description: "Manage fleet health and availability.",
+  },
+  {
+    id: "customers",
+    label: "Customers",
+    icon: faUsers,
+    title: "Customer Board",
+    description: "View customer accounts and contact details.",
   },
   {
     id: "invoice",
@@ -346,6 +355,15 @@ export default function ManagerDashboardPage() {
             {activeTab === "trucks" && (
               <TruckBoard
                 ref={truckBoardRef}
+                user={user}
+                userRole="manager"
+                profile={profile}
+                isDark={isDark}
+              />
+            )}
+
+            {activeTab === "customers" && (
+              <CustomerBoard
                 user={user}
                 userRole="manager"
                 profile={profile}

@@ -82,13 +82,25 @@ export function ActionSelector({ action, trip, theme, actions }) {
                 : theme.panelSurface
           }`}
         >
-          <FontAwesomeIcon icon={opt.icon} className="mb-2" />
-          <div className="font-bold">{opt.label}</div>
-          {opt.disabled && opt.id === "LOAD" && (
-            <div className="text-[9px] mt-1 text-red-500 font-bold uppercase">
-              {isManifestLocked ? "Manifest Locked" : "In Transit"}
+          <div className="flex items-center gap-3">
+            <div
+              className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${
+                opt.disabled
+                  ? "bg-gray-500/10 text-gray-400"
+                  : `${opt.bg} ${opt.color}`
+              }`}
+            >
+              <FontAwesomeIcon icon={opt.icon} />
             </div>
-          )}
+            <div className="min-w-0">
+              <div className="font-bold leading-tight">{opt.label}</div>
+              {opt.disabled && opt.id === "LOAD" && (
+                <div className="mt-1 text-[9px] font-bold uppercase text-red-500">
+                  {isManifestLocked ? "Manifest Locked" : "In Transit"}
+                </div>
+              )}
+            </div>
+          </div>
         </button>
       ))}
     </div>

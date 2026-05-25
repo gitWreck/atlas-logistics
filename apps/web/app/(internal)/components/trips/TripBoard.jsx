@@ -7,7 +7,6 @@ import React, {
   useCallback,
   forwardRef,
   useImperativeHandle,
-  use,
 } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
@@ -15,6 +14,9 @@ import {
   faSync,
   faFilter,
   faRoute,
+  faCalendarDays,
+  faTruckFast,
+  faWarehouse,
 } from "@fortawesome/free-solid-svg-icons";
 import TripRow from "./TripRow";
 import CompletedTripsTable from "./CompletedTripsTable";
@@ -27,8 +29,18 @@ import TripScheduleOverview from "./TripSchedule/TripScheduleOverview";
 import TripScheduleModal from "./TripSchedule/TripScheduleModal";
 import { updateTripSchedule } from "@/app/utility/FirebaseFunctions";
 import TablePaginationFooter from "../ui/TablePaginationFooter";
+import BoardTabs from "../ui/BoardTabs";
 
 const COMPLETED_TRIP_STATUSES = new Set(["COMPLETED", "DELIVERED"]);
+const TRIP_BOARD_TABS = {
+  SCHEDULED: "scheduled",
+  ACTIVE: "active",
+};
+const ORIGIN_FILTERS = [
+  { key: "ALL", label: "All" },
+  { key: "DIV", label: "Divisoria" },
+  { key: "ODI", label: "Odiongan" },
+];
 
 function getTripStatus(trip) {
   return String(trip?.status || "").toUpperCase();
@@ -38,12 +50,54 @@ function isCompletedTrip(trip) {
   return COMPLETED_TRIP_STATUSES.has(getTripStatus(trip));
 }
 
+function getWarehouseOriginFilter(profile) {
+  const warehouseCode = String(profile?.warehouseCode || "").toUpperCase();
+  const warehouseName = String(profile?.warehouseName || "").toLowerCase();
+
+  if (warehouseCode === "DIV" || warehouseName.includes("divisoria")) {
+    return "DIV";
+  }
+
+  if (warehouseCode === "ODI" || warehouseName.includes("odiongan")) {
+    return "ODI";
+  }
+
+  return "ALL";
+}
+
+function matchesOriginFilter(trip, originFilter) {
+  if (originFilter === "ALL") return true;
+
+  const originCode = String(trip?.originCode || "").toUpperCase();
+  const origin = String(trip?.origin || trip?.originName || "").toLowerCase();
+  const route = String(trip?.route || "").toLowerCase();
+
+  if (originFilter === "DIV") {
+    return (
+      originCode === "DIV" ||
+      origin.includes("divisoria") ||
+      route.startsWith("divisoria")
+    );
+  }
+
+  if (originFilter === "ODI") {
+    return (
+      originCode === "ODI" ||
+      origin.includes("odiongan") ||
+      route.startsWith("odiongan")
+    );
+  }
+
+  return true;
+}
+
 const TripBoard = forwardRef(function TripBoard(
   { user, userRole, profile, isDark = false },
   ref,
 ) {
   const [trips, setTrips] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [activeBoardTab, setActiveBoardTab] = useState(TRIP_BOARD_TABS.ACTIVE);
 
   const [isNewTripModalOpen, setIsNewTripModalOpen] = useState(false);
   const [selectedTripId, setSelectedTripId] = useState(null);
@@ -52,6 +106,9 @@ const TripBoard = forwardRef(function TripBoard(
   const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
 
   const [activeFilter, setActiveFilter] = useState("ALL");
+  const [originFilter, setOriginFilter] = useState(() =>
+    getWarehouseOriginFilter(profile),
+  );
   const [typeFilter, setTypeFilter] = useState("ALL");
   const [searchQuery, setSearchQuery] = useState("");
   const [startDate, setStartDate] = useState("");
@@ -161,8 +218,14 @@ const TripBoard = forwardRef(function TripBoard(
     });
   }, [searchQuery, typeFilter, trips, startDate, endDate]);
 
+  const originFilteredTrips = useMemo(
+    () =>
+      filteredTrips.filter((trip) => matchesOriginFilter(trip, originFilter)),
+    [filteredTrips, originFilter],
+  );
+
   const activeTrips = useMemo(() => {
-    return filteredTrips.filter((trip) => {
+    return originFilteredTrips.filter((trip) => {
       if (isCompletedTrip(trip)) return false;
 
       if (activeFilter === "ACTIVE") {
@@ -175,11 +238,39 @@ const TripBoard = forwardRef(function TripBoard(
 
       return true;
     });
-  }, [activeFilter, filteredTrips]);
+  }, [activeFilter, originFilteredTrips]);
 
   const completedTrips = useMemo(
-    () => filteredTrips.filter(isCompletedTrip),
+    () => originFilteredTrips.filter(isCompletedTrip),
+    [originFilteredTrips],
+  );
+  const originTabs = useMemo(
+    () =>
+      ORIGIN_FILTERS.map((origin) => ({
+        ...origin,
+        icon: faWarehouse,
+        count: filteredTrips.filter((trip) =>
+          matchesOriginFilter(trip, origin.key),
+        ).length,
+      })),
     [filteredTrips],
+  );
+  const boardTabs = useMemo(
+    () => [
+      {
+        key: TRIP_BOARD_TABS.ACTIVE,
+        label: "Active Trips",
+        icon: faTruckFast,
+        count: activeTrips.length + completedTrips.length,
+      },
+      {
+        key: TRIP_BOARD_TABS.SCHEDULED,
+        label: "Scheduled Trips",
+        icon: faCalendarDays,
+        count: tripScheduleCandidates.length,
+      },
+    ],
+    [activeTrips.length, completedTrips.length, tripScheduleCandidates.length],
   );
 
   useEffect(() => {
@@ -187,11 +278,16 @@ const TripBoard = forwardRef(function TripBoard(
   }, [
     searchQuery,
     activeFilter,
+    originFilter,
     typeFilter,
     startDate,
     endDate,
     activeTripLimit,
   ]);
+
+  useEffect(() => {
+    setOriginFilter(getWarehouseOriginFilter(profile));
+  }, [profile?.warehouseCode, profile?.warehouseName]);
 
   const indexOfLastItem = currentPage * itemsPerPage;
   const indexOfFirstItem = indexOfLastItem - itemsPerPage;
@@ -229,194 +325,213 @@ const TripBoard = forwardRef(function TripBoard(
   return (
     <div className={`min-h-screen font-sans ${theme.page}`}>
       <main className="max-w-7xl mx-auto p-4 sm:p-6">
-        <TripScheduleOverview
-          trips={trips}
+        <BoardTabs
+          tabs={boardTabs}
+          activeTab={activeBoardTab}
+          onChange={setActiveBoardTab}
           isDark={isDark}
-          onOpenScheduleModal={() => {
-            setSelectedTripSchedule(null);
-            setIsScheduleModalOpen(true);
-          }}
-          onOpenTripSchedule={(trip) => {
-            // setSelectedTripId(trip.id);
-            setSelectedTripSchedule(trip);
-            setIsScheduleModalOpen(true);
-          }}
+          className="sticky top-0 z-30"
         />
-        <div
-          className={`rounded-xl overflow-hidden shadow-xl backdrop-blur-sm border ${theme.board}`}
-        >
-          {/* Controls */}
-          <div
-            className={`px-4 sm:px-6 py-4 border-b flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4 ${theme.header}`}
-          >
-            <h3
-              className={`font-bold whitespace-nowrap hidden xl:flex items-center gap-2 ${theme.title}`}
+
+        {activeBoardTab === TRIP_BOARD_TABS.SCHEDULED ? (
+          <div className="mt-6">
+            <TripScheduleOverview
+              trips={trips}
+              isDark={isDark}
+              onOpenScheduleModal={() => {
+                setSelectedTripSchedule(null);
+                setIsScheduleModalOpen(true);
+              }}
+              onOpenTripSchedule={(trip) => {
+                setSelectedTripSchedule(trip);
+                setIsScheduleModalOpen(true);
+              }}
+            />
+          </div>
+        ) : (
+          <div className="mt-3 space-y-6">
+            <BoardTabs
+              tabs={originTabs}
+              activeTab={originFilter}
+              onChange={setOriginFilter}
+              isDark={isDark}
+            />
+
+            <div
+              className={`rounded-xl overflow-hidden shadow-xl backdrop-blur-sm border ${theme.board}`}
             >
-              Active Manifests
-              <button
-                type="button"
-                onClick={fetchTrips}
-                disabled={loading}
-                className={`transition-colors p-1 rounded ${theme.refreshButton}`}
-                title="Refresh"
+              {/* Controls */}
+              <div
+                className={`px-4 sm:px-6 py-4 border-b flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4 ${theme.header}`}
               >
-                <FontAwesomeIcon
-                  icon={faSync}
-                  spin={loading}
-                  className="text-xs"
-                />
-              </button>
-            </h3>
+                <h3
+                  className={`font-bold whitespace-nowrap hidden xl:flex items-center gap-2 ${theme.title}`}
+                >
+                  Active Manifests
+                  <button
+                    type="button"
+                    onClick={fetchTrips}
+                    disabled={loading}
+                    className={`transition-colors p-1 rounded ${theme.refreshButton}`}
+                    title="Refresh"
+                  >
+                    <FontAwesomeIcon
+                      icon={faSync}
+                      spin={loading}
+                      className="text-xs"
+                    />
+                  </button>
+                </h3>
 
-            <div className="flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center gap-2 w-full xl:w-auto">
-              {/* Search */}
-              <div className="relative flex-1 min-w-[200px]">
-                <FontAwesomeIcon
-                  icon={faSearch}
-                  className={`absolute left-3 top-1/2 -translate-y-1/2 text-sm ${theme.iconMuted}`}
-                />
-                <input
-                  type="text"
-                  placeholder="Search Trip ID..."
-                  className={`w-full rounded-lg pl-9 pr-4 py-2 text-sm focus:border-emerald-500 focus:outline-none border ${theme.input}`}
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                />
-              </div>
+                <div className="flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center gap-2 w-full xl:w-auto">
+                  {/* Search */}
+                  <div className="relative flex-1 min-w-[200px]">
+                    <FontAwesomeIcon
+                      icon={faSearch}
+                      className={`absolute left-3 top-1/2 -translate-y-1/2 text-sm ${theme.iconMuted}`}
+                    />
+                    <input
+                      type="text"
+                      placeholder="Search Trip ID..."
+                      className={`w-full rounded-lg pl-9 pr-4 py-2 text-sm focus:border-emerald-500 focus:outline-none border ${theme.input}`}
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                    />
+                  </div>
 
-              {/* <div className="flex gap-2 w-full sm:w-auto"> */}
-              {/* <div className="grid grid-cols-1 gap-2 w-full sm:grid-cols-3 sm:w-auto"> */}
-              <div className="grid grid-cols-2 gap-2 w-full sm:flex sm:w-auto">
-                {/* Date Range */}
-                {/* <div
+                  {/* <div className="flex gap-2 w-full sm:w-auto"> */}
+                  {/* <div className="grid grid-cols-1 gap-2 w-full sm:grid-cols-3 sm:w-auto"> */}
+                  <div className="grid grid-cols-2 gap-2 w-full sm:flex sm:w-auto">
+                    {/* Date Range */}
+                    {/* <div
                   className={`flex items-center gap-2 rounded-lg px-2 py-1 flex-1 sm:flex-none justify-center border ${theme.filterWrap}`}
                 > */}
-                <div
-                  className={`col-span-2 sm:col-span-1 flex items-center gap-2 rounded-lg px-2 py-1 w-full justify-center border ${theme.filterWrap}`}
-                >
-                  <input
-                    type="date"
-                    className={`bg-transparent text-xs outline-none w-24 ${theme.dateInput}`}
-                    value={startDate}
-                    onChange={(e) => setStartDate(e.target.value)}
-                  />
-                  <span className={theme.iconMuted}>-</span>
-                  <input
-                    type="date"
-                    className={`bg-transparent text-xs outline-none w-24 ${theme.dateInput}`}
-                    value={endDate}
-                    onChange={(e) => setEndDate(e.target.value)}
-                  />
-                </div>
+                    <div
+                      className={`col-span-2 sm:col-span-1 flex items-center gap-2 rounded-lg px-2 py-1 w-full justify-center border ${theme.filterWrap}`}
+                    >
+                      <input
+                        type="date"
+                        className={`bg-transparent text-xs outline-none w-24 ${theme.dateInput}`}
+                        value={startDate}
+                        onChange={(e) => setStartDate(e.target.value)}
+                      />
+                      <span className={theme.iconMuted}>-</span>
+                      <input
+                        type="date"
+                        className={`bg-transparent text-xs outline-none w-24 ${theme.dateInput}`}
+                        value={endDate}
+                        onChange={(e) => setEndDate(e.target.value)}
+                      />
+                    </div>
 
-                {/* Type Filter */}
-                <div className="relative w-full sm:w-40">
-                  <FontAwesomeIcon
-                    icon={faRoute}
-                    className={`absolute left-3 top-1/2 -translate-y-1/2 text-sm ${theme.iconMuted}`}
-                  />
-                  <select
-                    className={`w-full rounded-lg pl-9 pr-4 py-2 text-sm focus:border-blue-500 focus:outline-none appearance-none cursor-pointer border ${theme.input}`}
-                    value={typeFilter}
-                    onChange={(e) => setTypeFilter(e.target.value)}
-                  >
-                    <option value="ALL">All Route Types</option>
-                    <option value="HUB_TRANSFER">Hub Transfers</option>
-                    <option value="LOCAL_PICKUP">Local Pickups</option>
-                    <option value="DELIVERY">Delivery</option>
-                  </select>
-                </div>
+                    {/* Type Filter */}
+                    <div className="relative w-full sm:w-40">
+                      <FontAwesomeIcon
+                        icon={faRoute}
+                        className={`absolute left-3 top-1/2 -translate-y-1/2 text-sm ${theme.iconMuted}`}
+                      />
+                      <select
+                        className={`w-full rounded-lg pl-9 pr-4 py-2 text-sm focus:border-blue-500 focus:outline-none appearance-none cursor-pointer border ${theme.input}`}
+                        value={typeFilter}
+                        onChange={(e) => setTypeFilter(e.target.value)}
+                      >
+                        <option value="ALL">All Route Types</option>
+                        <option value="HUB_TRANSFER">Hub Transfers</option>
+                        <option value="LOCAL_PICKUP">Local Pickups</option>
+                        <option value="DELIVERY">Delivery</option>
+                      </select>
+                    </div>
 
-                {/* Status Filter */}
-                <div className="relative w-full sm:w-40">
-                  <FontAwesomeIcon
-                    icon={faFilter}
-                    className={`absolute left-3 top-1/2 -translate-y-1/2 text-sm ${theme.iconMuted}`}
-                  />
-                  <select
-                    className={`w-full rounded-lg pl-9 pr-4 py-2 text-sm focus:border-emerald-500 focus:outline-none appearance-none cursor-pointer border ${theme.input}`}
-                    value={activeFilter}
-                    onChange={(e) => setActiveFilter(e.target.value)}
-                  >
-                    <option value="ALL">All Trips</option>
-                    <option value="ACTIVE">In Transit</option>
-                    <option value="DELAYED">Delayed</option>
-                  </select>
+                    {/* Status Filter */}
+                    <div className="relative w-full sm:w-40">
+                      <FontAwesomeIcon
+                        icon={faFilter}
+                        className={`absolute left-3 top-1/2 -translate-y-1/2 text-sm ${theme.iconMuted}`}
+                      />
+                      <select
+                        className={`w-full rounded-lg pl-9 pr-4 py-2 text-sm focus:border-emerald-500 focus:outline-none appearance-none cursor-pointer border ${theme.input}`}
+                        value={activeFilter}
+                        onChange={(e) => setActiveFilter(e.target.value)}
+                      >
+                        <option value="ALL">All Trips</option>
+                        <option value="ACTIVE">In Transit</option>
+                        <option value="DELAYED">Delayed</option>
+                      </select>
+                    </div>
+                  </div>
                 </div>
               </div>
-            </div>
-          </div>
 
-          {/* Table */}
-          <div className="md:overflow-x-auto">
-            <div className="md:min-w-[900px]">
-              <div
-                className={`hidden md:grid grid-cols-12 gap-4 px-6 py-3 border-b text-xs font-semibold uppercase tracking-wider ${theme.tableHead}`}
-              >
-                <div className="col-span-3">Trip Info / Driver</div>
-                <div className="col-span-2">Route</div>
-                <div className="col-span-1">Stats</div>
-                <div className="col-span-3">Progress</div>
-                <div className="col-span-2">Update</div>
-                <div className="col-span-1 text-right">Action</div>
-              </div>
-
-              <div className="min-h-[300px]">
-                {loading ? (
+              {/* Table */}
+              <div className="md:overflow-x-auto">
+                <div className="md:min-w-[900px]">
                   <div
-                    className={`p-10 text-center animate-pulse ${theme.emptyText}`}
+                    className={`hidden md:grid grid-cols-12 gap-4 px-6 py-3 border-b text-xs font-semibold uppercase tracking-wider ${theme.tableHead}`}
                   >
-                    Loading trips...
+                    <div className="col-span-3">Trip Info / Driver</div>
+                    <div className="col-span-2">Route</div>
+                    <div className="col-span-1">Stats</div>
+                    <div className="col-span-3">Progress</div>
+                    <div className="col-span-2">Update</div>
+                    <div className="col-span-1 text-right">Action</div>
                   </div>
-                ) : currentItems.length === 0 ? (
-                  <div className={`p-10 text-center ${theme.emptyText}`}>
-                    No trips found.
+
+                  <div className="min-h-[300px]">
+                    {loading ? (
+                      <div
+                        className={`p-10 text-center animate-pulse ${theme.emptyText}`}
+                      >
+                        Loading trips...
+                      </div>
+                    ) : currentItems.length === 0 ? (
+                      <div className={`p-10 text-center ${theme.emptyText}`}>
+                        No trips found.
+                      </div>
+                    ) : (
+                      currentItems.map((trip) => (
+                        <TripRow
+                          key={trip.id}
+                          trip={trip}
+                          onClick={setSelectedTripId}
+                          isDark={isDark}
+                        />
+                      ))
+                    )}
                   </div>
-                ) : (
-                  currentItems.map((trip) => (
-                    <TripRow
-                      key={trip.id}
-                      trip={trip}
-                      onClick={setSelectedTripId}
-                      isDark={isDark}
-                    />
-                  ))
-                )}
+                </div>
               </div>
+
+              {/* Pagination */}
+              {activeTrips.length > 0 && (
+                <TablePaginationFooter
+                  totalItems={activeTrips.length}
+                  currentPage={currentPage}
+                  itemsPerPage={itemsPerPage}
+                  totalPages={totalPages}
+                  limitValue={activeTripLimit}
+                  limitTitle="Limit active manifests"
+                  onLimitChange={setActiveTripLimit}
+                  onPrevious={() =>
+                    setCurrentPage((page) => Math.max(1, page - 1))
+                  }
+                  onNext={() =>
+                    setCurrentPage((page) => Math.min(totalPages, page + 1))
+                  }
+                  theme={theme}
+                />
+              )}
             </div>
-          </div>
 
-          {/* Pagination */}
-          {activeTrips.length > 0 && (
-            <TablePaginationFooter
-              totalItems={activeTrips.length}
-              currentPage={currentPage}
-              itemsPerPage={itemsPerPage}
-              totalPages={totalPages}
-              limitValue={activeTripLimit}
-              limitTitle="Limit active manifests"
-              onLimitChange={setActiveTripLimit}
-              onPrevious={() =>
-                setCurrentPage((page) => Math.max(1, page - 1))
-              }
-              onNext={() =>
-                setCurrentPage((page) => Math.min(totalPages, page + 1))
-              }
-              theme={theme}
+            <CompletedTripsTable
+              trips={completedTrips}
+              loading={loading}
+              isDark={isDark}
+              completedTripLimit={completedTripLimit}
+              onCompletedTripLimitChange={setCompletedTripLimit}
+              onSelectTrip={setSelectedTripId}
             />
-          )}
-        </div>
-
-        <div className="mt-6">
-          <CompletedTripsTable
-            trips={completedTrips}
-            loading={loading}
-            isDark={isDark}
-            completedTripLimit={completedTripLimit}
-            onCompletedTripLimitChange={setCompletedTripLimit}
-            onSelectTrip={setSelectedTripId}
-          />
-        </div>
+          </div>
+        )}
       </main>
 
       <TripDrawer

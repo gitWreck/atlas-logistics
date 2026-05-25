@@ -288,6 +288,42 @@ export function getBoardThemeClasses(isDark) {
   };
 }
 
+export function getBoardTabThemeClasses(isDark) {
+  return {
+    wrap: isDark
+      ? "border-transparent bg-slate-900/70 shadow-slate-950/20"
+      : "border-transparent bg-white shadow-blue-100/70",
+
+    list: isDark
+      ? "sm:bg-slate-950/70"
+      : "sm:bg-blue-50/70",
+
+    tabActive: isDark
+      ? "bg-slate-800 text-white ring-1 ring-blue-500/40 sm:shadow-lg sm:shadow-blue-950/30"
+      : "bg-white text-slate-950 ring-1 ring-blue-200 sm:shadow-md sm:shadow-blue-100/80",
+
+    tabIdle: isDark
+      ? "bg-slate-800/60 text-slate-400 hover:text-slate-200 hover:bg-slate-800 sm:bg-transparent sm:text-slate-500 sm:hover:bg-slate-800/50"
+      : "bg-blue-50/80 text-slate-600 ring-1 ring-blue-100 hover:text-slate-900 hover:bg-blue-100/80 sm:bg-transparent sm:text-slate-500 sm:ring-0 sm:hover:bg-white/70",
+
+    iconActive: isDark
+      ? "bg-blue-500 text-white"
+      : "bg-blue-600 text-white",
+
+    iconIdle: isDark
+      ? "bg-blue-500/10 text-blue-300"
+      : "bg-white text-blue-500",
+
+    countActive: isDark
+      ? "bg-blue-500/15 text-blue-300 ring-1 ring-blue-400/20"
+      : "bg-blue-50 text-blue-700 ring-1 ring-blue-100",
+
+    countIdle: isDark
+      ? "bg-blue-500/10 text-blue-300 ring-1 ring-blue-500/20"
+      : "bg-blue-100/80 text-blue-700 ring-1 ring-blue-200",
+  };
+}
+
 export function getRowThemeClasses(isDark) {
   return {
     rowBorder: isDark ? "border-slate-800/50" : "border-slate-200",

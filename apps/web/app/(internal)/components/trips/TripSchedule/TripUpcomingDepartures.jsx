@@ -10,6 +10,7 @@ import {
   faArrowRight,
   faTruckPickup,
   faBox,
+  faTruckFast,
 } from "@fortawesome/free-solid-svg-icons";
 import { getOverviewThemeClasses } from "@/app/utility/constant/theme";
 import {
@@ -72,13 +73,17 @@ export default function TripUpcomingDepartures({ trips = [], isDark = false }) {
   const shownTrips = filteredTrips.slice(0, 3);
 
   return (
-    <div className={`rounded-3xl border p-4 sm:p-5 ${theme.sectionCard}`}>
+    // <div className={`rounded-3xl border p-4 sm:p-5 ${theme.sectionCard}`}>
+    <>
       <div className="flex items-center justify-between mb-4 gap-3">
         <div className="min-w-0 flex-1">
-          <h3 className={`font-bold text-base ${theme.strongText}`}>
+          <h3
+            className={`font-bold sm:text-xl flex items-center gap-2 text-base ${theme.strongText}`}
+          >
+            <FontAwesomeIcon icon={faTruckFast} className="text-blue-500" />
             Upcoming Departures
           </h3>
-          <p className={`text-xs mt-1 ${theme.mutedText}`}>
+          <p className={`text-sm mt-1 ${theme.mutedText}`}>
             Earliest scheduled trips lined up for dispatch
           </p>
 
@@ -294,6 +299,7 @@ export default function TripUpcomingDepartures({ trips = [], isDark = false }) {
           </div>
         )}
       </div>
-    </div>
+    </>
+    /* </div> */
   );
 }

@@ -1,6 +1,7 @@
 import React from "react";
 import {
   ActivityIndicator,
+  Animated,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -29,7 +30,7 @@ export default function ScannerCameraPane({
           barcodeTypes: ["qr", "code128", "code39", "pdf417"],
         }}
       >
-        <View
+        <Animated.View
           style={[
             styles.cameraOverlay,
             { paddingBottom: detailsSheetHeight },
@@ -74,7 +75,7 @@ export default function ScannerCameraPane({
             style={[styles.scanFrame, processing && styles.scanFrameProcessing]}
           />
           <Text style={styles.scanInstruction}>Package or shipment code</Text>
-        </View>
+        </Animated.View>
       </CameraView>
     </View>
   );

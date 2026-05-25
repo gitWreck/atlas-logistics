@@ -1,7 +1,7 @@
 import React from "react";
 import {
   ActivityIndicator,
-  ScrollView,
+  Animated,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -36,7 +36,7 @@ export default function ScanDetailsSheet({
   onViewShipmentDetails,
 }) {
   return (
-    <ScrollView
+    <Animated.ScrollView
       style={[
         styles.detailsPane,
         {
@@ -339,7 +339,7 @@ export default function ScanDetailsSheet({
           <FontAwesome5 name="chevron-right" size={12} color={colors.text} />
         </TouchableOpacity>
       )}
-    </ScrollView>
+    </Animated.ScrollView>
   );
 }
 

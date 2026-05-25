@@ -95,7 +95,7 @@ export default function LoginPage() {
             Atlas Login
           </h1>
           <p className="text-xs sm:text-sm mt-1.5 sm:mt-2 text-slate-500 px-2">
-            Secure access for admins, Managers, Drivers and Checkers
+            Secure access for Admins, and Managers
           </p>
         </div>
 

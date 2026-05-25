@@ -144,6 +144,14 @@ export default function useScannerLogic({
 
   const getPackageAvailableQty = useCallback((pkg, scanAction, targetStatus) => {
     if (!pkg) return 0;
+    const packageTripId = pkg.currentTripId || pkg.loadedOnTrip || null;
+    if (scanAction === "LOAD" && packageTripId && packageTripId !== tripId) {
+      return 0;
+    }
+    if (scanAction === "UNLOAD" && packageTripId !== tripId) {
+      return 0;
+    }
+
     const totalQty = Math.max(Number(pkg.quantity) || 1, 1);
     const rawLoadedQty = Number(pkg.loadedQty);
     const hasLoadedQty = Number.isFinite(rawLoadedQty) && rawLoadedQty >= 0;
@@ -167,7 +175,7 @@ export default function useScannerLogic({
       return Math.max(0, totalQty - loadedQty);
     }
     return Math.max(0, loadedQty);
-  }, []);
+  }, [tripId]);
 
   const getPackageIdentity = useCallback(
     (pkg) => pkg?.packageId || pkg?.trackingNumber || "",
@@ -401,10 +409,17 @@ export default function useScannerLogic({
       });
       if (!result?.found) return setError(result.message || "Label not found.");
 
+      if (result.packageAssignmentState === "ON_OTHER_TRIP") {
+        return setError(
+          `Package ${result.packageId || cleanCode} is already assigned to trip ${result.packageCurrentTripId}. Transfer it before scanning on this trip.`,
+        );
+      }
+
       setScanCode(cleanCode);
       setManualCode("");
 
       if (
+        result.scanType !== "PACKAGE" &&
         result.requiresAssignment &&
         !recentlyAssigned.has(result.shipmentId)
       ) {
@@ -458,6 +473,18 @@ export default function useScannerLogic({
         }
 
         return setError("No quantity is available to unload for this scan.");
+      }
+
+      if (
+        action === "LOAD" &&
+        result.scanType === "PACKAGE" &&
+        ["UNASSIGNED_PACKAGE", "UNASSIGNED_PACKAGE_FROM_ASSIGNED_SHIPMENT"].includes(
+          result.packageAssignmentState,
+        )
+      ) {
+        setResolvedItem(nextResolvedItem);
+        setQuantities({});
+        return;
       }
 
       await processItems({

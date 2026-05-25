@@ -137,6 +137,7 @@ export default function TripDrawer({
     // Call your existing function
     await updateShipmentPackages({
       shipmentId: payload.shipmentId,
+      tripId: payload.tripId || data?.tripId || data?.id,
       packageIds: Object.keys(quantityMap), // Array of strings: ["PKG-1", "PKG-2"]
       newStatus:
         payload.newStatus ||
@@ -161,7 +162,7 @@ export default function TripDrawer({
       />
 
       <aside
-        style={{ width: "min(100%, 780px)" }}
+        style={{ width: "min(100%, 1000px)" }}
         className={`fixed top-0 right-0 h-full z-50 shadow-2xl transform transition-transform duration-300 flex flex-col ${theme.drawer} ${
           isOpen ? "translate-x-0" : "translate-x-full"
         }`}

@@ -22,6 +22,8 @@ import { getTableTheme } from "@/app/utility/constant/theme";
 import { getTableActionClasses } from "@/app/utility/constant/action";
 import { packageLabelUrl } from "@/app/utility/constant/templates";
 import { updatedBy } from "@/app/utility/utilities";
+import StatusBadge from "../ui/StatusBadge";
+import TablePaginationFooter from "../ui/TablePaginationFooter";
 
 export default function TripManifestTab({
   shipments = [],
@@ -42,9 +44,29 @@ export default function TripManifestTab({
   const [search, setSearch] = useState("");
   const [selectedIds, setSelectedIds] = useState(new Set());
   const [isBulkProcessing, setIsBulkProcessing] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [manifestLimit, setManifestLimit] = useState("50");
 
   const theme = getTableTheme(isDark);
   const action = getTableActionClasses(isDark);
+
+  const rowAction = {
+    print: isDark
+      ? "bg-blue-500/10 hover:bg-blue-500/20 text-blue-300 border-blue-500/30"
+      : "bg-blue-50 hover:bg-blue-100 text-blue-700 border-blue-200",
+    view: isDark
+      ? "bg-sky-500/10 hover:bg-sky-500/20 text-sky-300 border-sky-500/30"
+      : "bg-sky-50 hover:bg-sky-100 text-sky-700 border-sky-200",
+    invoice: isDark
+      ? "bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border-emerald-500/30"
+      : "bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border-emerald-200",
+    createInvoice: isDark
+      ? "bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border-amber-500/30"
+      : "bg-amber-50 hover:bg-amber-100 text-amber-700 border-amber-200",
+    remove: isDark
+      ? "bg-red-500/10 hover:bg-red-500/20 text-red-300 border-red-500/30"
+      : "bg-red-50 hover:bg-red-100 text-red-700 border-red-200",
+  };
 
   const filteredData = useMemo(() => {
     const keyword = search.toLowerCase().trim();
@@ -63,7 +85,23 @@ export default function TripManifestTab({
 
   useEffect(() => {
     setSelectedIds(new Set());
+    setCurrentPage(1);
   }, [search, shipments]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [manifestLimit]);
+
+  const itemsPerPage =
+    manifestLimit === "all"
+      ? Math.max(filteredData.length, 1)
+      : Number(manifestLimit) || 50;
+  const totalPages = Math.max(1, Math.ceil(filteredData.length / itemsPerPage));
+  const safeCurrentPage = Math.min(currentPage, totalPages);
+  const pageStartIndex = (safeCurrentPage - 1) * itemsPerPage;
+  const paginatedData = useMemo(() => {
+    return filteredData.slice(pageStartIndex, pageStartIndex + itemsPerPage);
+  }, [filteredData, itemsPerPage, pageStartIndex]);
 
   const isAllSelected =
     filteredData.length > 0 && selectedIds.size === filteredData.length;
@@ -279,13 +317,14 @@ export default function TripManifestTab({
             No shipments found.
           </div>
         ) : (
-          filteredData.map((shipment, idx) => {
+          paginatedData.map((shipment, idx) => {
             console.log("shipemnt data: ", shipment);
 
             const isSelected = selectedIds.has(shipment.id);
             const loadedCount = shipment.loadedCount || 0;
             const totalItems = shipment.totals.totalContentQty || 0;
             const isFullyLoaded = loadedCount >= (totalItems || 1);
+            const shipmentStatus = shipment.status || "UNKNOWN";
 
             return (
               <div
@@ -324,6 +363,10 @@ export default function TripManifestTab({
                     <div className={`text-[11px] mt-1 ${theme.cellSecondary}`}>
                       {shipment.recipient?.address?.city || "—"}
                     </div>
+
+                    <div className="mt-2">
+                      <StatusBadge status={shipmentStatus} isDark={isDark} />
+                    </div>
                   </div>
 
                   <span
@@ -347,7 +390,7 @@ export default function TripManifestTab({
                         "_blank",
                       )
                     }
-                    className={`text-xs border px-3 py-2 rounded-xl transition-all flex items-center justify-center gap-2 ${action.soft}`}
+                    className={`text-xs border px-3 py-2 rounded-xl transition-all flex items-center justify-center gap-2 ${rowAction.print}`}
                   >
                     <FontAwesomeIcon icon={faPrint} />
                     Print
@@ -356,7 +399,7 @@ export default function TripManifestTab({
                   <button
                     type="button"
                     onClick={() => onViewPackages?.(shipment)}
-                    className={`text-xs border px-3 py-2 rounded-xl transition-all flex items-center justify-center gap-2 ${action.soft}`}
+                    className={`text-xs border px-3 py-2 rounded-xl transition-all flex items-center justify-center gap-2 ${rowAction.view}`}
                   >
                     <FontAwesomeIcon icon={faBoxOpen} />
                     View
@@ -366,7 +409,7 @@ export default function TripManifestTab({
                     <button
                       type="button"
                       onClick={() => onViewInvoice?.(shipment)}
-                      className={`text-xs border px-3 py-2 rounded-xl transition-all flex items-center justify-center gap-2 ${action.soft}`}
+                      className={`text-xs border px-3 py-2 rounded-xl transition-all flex items-center justify-center gap-2 ${rowAction.invoice}`}
                     >
                       <FontAwesomeIcon icon={faReceipt} />
                       Invoice
@@ -375,7 +418,7 @@ export default function TripManifestTab({
                     <button
                       type="button"
                       onClick={() => onCreateInvoice?.(shipment)}
-                      className={`text-xs border px-3 py-2 rounded-xl transition-all flex items-center justify-center gap-2 ${action.soft}`}
+                      className={`text-xs border px-3 py-2 rounded-xl transition-all flex items-center justify-center gap-2 ${rowAction.createInvoice}`}
                     >
                       <FontAwesomeIcon icon={faFileInvoiceDollar} />
                       Invoice
@@ -385,7 +428,7 @@ export default function TripManifestTab({
                   <button
                     type="button"
                     onClick={() => onUnassign(shipment)}
-                    className={`text-xs border px-3 py-2 rounded-xl transition-all flex items-center justify-center gap-2 disabled:opacity-50 ${action.soft}`}
+                    className={`text-xs border px-3 py-2 rounded-xl transition-all flex items-center justify-center gap-2 disabled:opacity-50 ${rowAction.remove}`}
                     disabled={isLocked}
                   >
                     <FontAwesomeIcon icon={faMinus} />
@@ -397,6 +440,27 @@ export default function TripManifestTab({
           })
         )}
       </div>
+
+      {!loading && filteredData.length > 0 && (
+        <div
+          className={`block lg:hidden border rounded-2xl overflow-hidden ${theme.container}`}
+        >
+          <TablePaginationFooter
+            totalItems={filteredData.length}
+            currentPage={safeCurrentPage}
+            itemsPerPage={itemsPerPage}
+            totalPages={totalPages}
+            limitValue={manifestLimit}
+            limitTitle="Manifest rows per page"
+            onLimitChange={setManifestLimit}
+            onPrevious={() => setCurrentPage((page) => Math.max(1, page - 1))}
+            onNext={() =>
+              setCurrentPage((page) => Math.min(totalPages, page + 1))
+            }
+            theme={theme}
+          />
+        </div>
+      )}
 
       {/* Desktop Table */}
       <div
@@ -435,7 +499,8 @@ export default function TripManifestTab({
                 <th className="px-4 py-3 w-10 text-center">#</th>
                 <th className="px-4 py-3">Tracking / Customer</th>
                 <th className="px-4 py-3">Destination</th>
-                <th className="px-4 py-3 text-center">Status</th>
+                <th className="px-4 py-3 text-center">Shipment Status</th>
+                <th className="px-4 py-3 text-center">Loaded Qty</th>
                 <th className="px-4 py-3 text-right">Action</th>
               </tr>
             </thead>
@@ -444,7 +509,7 @@ export default function TripManifestTab({
               {loading ? (
                 <tr>
                   <td
-                    colSpan="6"
+                    colSpan="7"
                     className={`px-4 py-8 text-center animate-pulse ${theme.emptyText}`}
                   >
                     Loading manifest...
@@ -453,18 +518,19 @@ export default function TripManifestTab({
               ) : filteredData.length === 0 ? (
                 <tr>
                   <td
-                    colSpan="6"
+                    colSpan="7"
                     className={`px-4 py-8 text-center italic ${theme.emptyText}`}
                   >
                     No shipments found.
                   </td>
                 </tr>
               ) : (
-                filteredData.map((shipment, idx) => {
+                paginatedData.map((shipment, idx) => {
                   const isSelected = selectedIds.has(shipment.id);
                   const loadedCount = shipment.loadedCount || 0;
                   const totalItems = shipment.totals.totalContentQty || 0;
                   const isFullyLoaded = loadedCount >= (totalItems || 1);
+                  const shipmentStatus = shipment.status || "UNKNOWN";
 
                   return (
                     <tr
@@ -492,7 +558,7 @@ export default function TripManifestTab({
                       <td
                         className={`px-4 py-3 text-center font-mono text-xs ${theme.cellSecondary}`}
                       >
-                        {idx + 1}
+                        {pageStartIndex + idx + 1}
                       </td>
 
                       <td className="px-4 py-3">
@@ -512,6 +578,10 @@ export default function TripManifestTab({
                         className={`px-4 py-3 text-xs ${theme.cellSecondary}`}
                       >
                         {shipment.recipient?.address?.city || "—"}
+                      </td>
+
+                      <td className="px-4 py-3 text-center">
+                        <StatusBadge status={shipmentStatus} isDark={isDark} />
                       </td>
 
                       <td className="px-4 py-3 text-center">
@@ -536,7 +606,8 @@ export default function TripManifestTab({
                                 "_blank",
                               )
                             }
-                            className={`text-xs border px-3 py-1.5 rounded transition-all flex items-center gap-1 ${action.soft}`}
+                            className={`text-xs border px-3 py-1.5 rounded transition-all flex items-center gap-1 ${rowAction.print}`}
+                            title="Print Label"
                           >
                             <FontAwesomeIcon icon={faPrint} />
                           </button>
@@ -544,7 +615,8 @@ export default function TripManifestTab({
                           <button
                             type="button"
                             onClick={() => onViewPackages?.(shipment)}
-                            className={`text-xs border px-3 py-1.5 rounded transition-all flex items-center gap-1 ${action.soft}`}
+                            className={`text-xs border px-3 py-1.5 rounded transition-all flex items-center gap-1 ${rowAction.view}`}
+                            title="View Packages"
                           >
                             <FontAwesomeIcon icon={faBoxOpen} />
                           </button>
@@ -553,7 +625,7 @@ export default function TripManifestTab({
                             <button
                               type="button"
                               onClick={() => onViewInvoice?.(shipment)}
-                              className={`text-xs border px-3 py-1.5 rounded transition-all flex items-center gap-1 ${action.soft}`}
+                              className={`text-xs border px-3 py-1.5 rounded transition-all flex items-center gap-1 ${rowAction.invoice}`}
                               title={`View Invoice ${getShipmentInvoice(shipment).invoiceNumber || ""}`}
                             >
                               <FontAwesomeIcon icon={faReceipt} />
@@ -562,7 +634,7 @@ export default function TripManifestTab({
                             <button
                               type="button"
                               onClick={() => onCreateInvoice?.(shipment)}
-                              className={`text-xs border px-3 py-1.5 rounded transition-all flex items-center gap-1 ${action.soft}`}
+                              className={`text-xs border px-3 py-1.5 rounded transition-all flex items-center gap-1 ${rowAction.createInvoice}`}
                               title="Create Invoice"
                             >
                               <FontAwesomeIcon icon={faFileInvoiceDollar} />
@@ -572,8 +644,9 @@ export default function TripManifestTab({
                           <button
                             type="button"
                             onClick={() => onUnassign(shipment)}
-                            className={`w-8 h-8 text-xs border px-3 py-1.5 rounded transition-all flex items-center justify-center disabled:opacity-50 ${action.soft}`}
+                            className={`w-8 h-8 text-xs border px-3 py-1.5 rounded transition-all flex items-center justify-center disabled:opacity-50 ${rowAction.remove}`}
                             disabled={isLocked}
+                            title="Remove Shipment"
                           >
                             <FontAwesomeIcon icon={faMinus} />
                           </button>
@@ -586,6 +659,23 @@ export default function TripManifestTab({
             </tbody>
           </table>
         </div>
+
+        {!loading && filteredData.length > 0 && (
+          <TablePaginationFooter
+            totalItems={filteredData.length}
+            currentPage={safeCurrentPage}
+            itemsPerPage={itemsPerPage}
+            totalPages={totalPages}
+            limitValue={manifestLimit}
+            limitTitle="Manifest rows per page"
+            onLimitChange={setManifestLimit}
+            onPrevious={() => setCurrentPage((page) => Math.max(1, page - 1))}
+            onNext={() =>
+              setCurrentPage((page) => Math.min(totalPages, page + 1))
+            }
+            theme={theme}
+          />
+        )}
       </div>
     </div>
   );
