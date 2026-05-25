@@ -118,6 +118,7 @@ exports.updateShipmentPackages = onCall(
         (await resolveTripContext(shipmentTripId));
 
       if (
+        !isScannerUpdate &&
         normalizedScannerTripId &&
         shipmentTripId &&
         normalizedScannerTripId !== shipmentTripId &&
@@ -146,10 +147,6 @@ exports.updateShipmentPackages = onCall(
       let tripSnap = tripContext?.tripSnap || null;
 
       if (tripId && tripRef && tripShipmentRef && !tripShipmentSnap?.exists) {
-          const itemsToAdd = Number(
-            oldData.totals?.totalContentQty || oldData.totals?.totalItems || 0,
-          );
-
           tx.set(tripShipmentRef, {
             trackingShipmentId: shipmentId,
             shipmentId: oldData.shipmentId || null,
@@ -157,20 +154,16 @@ exports.updateShipmentPackages = onCall(
               (oldData.originCode || "?") +
               " -> " +
               (oldData.destinationCode || "?"),
-            totalItems: itemsToAdd,
-            pendingCount: itemsToAdd,
-            loadedCount: Number(oldData.totals?.loaded || 0),
-            deliveredCount: Number(
-              oldData.totals?.delivered || oldData.totals?.received || 0,
-            ),
-            receivedCount: Number(
-              oldData.totals?.received || oldData.totals?.delivered || 0,
-            ),
-            missingCount: Number(oldData.totals?.missing || 0),
-            damagedCount: Number(oldData.totals?.damaged || 0),
+            totalItems: 0,
+            pendingCount: 0,
+            loadedCount: 0,
+            deliveredCount: 0,
+            receivedCount: 0,
+            missingCount: 0,
+            damagedCount: 0,
             sender: oldData.sender || null,
             recipient: oldData.recipient || null,
-            packageBarcodes: oldData.packageBarcodes || [],
+            packageBarcodes: [],
             createdAt: FieldValue.serverTimestamp(),
             createdBy: uid,
             updatedAt: FieldValue.serverTimestamp(),
@@ -180,7 +173,16 @@ exports.updateShipmentPackages = onCall(
           });
           tripShipmentSnap = {
             exists: true,
-            data: () => ({ status: oldData.status || "ASSIGNED" }),
+            data: () => ({
+              status: oldData.status || "ASSIGNED",
+              totalItems: 0,
+              pendingCount: 0,
+              loadedCount: 0,
+              deliveredCount: 0,
+              receivedCount: 0,
+              missingCount: 0,
+              damagedCount: 0,
+            }),
           };
       }
 
@@ -219,6 +221,8 @@ exports.updateShipmentPackages = onCall(
       };
 
       const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
+      const getPackageIdentity = (pkg = {}) =>
+        String(pkg.packageId || pkg.trackingNumber || "").trim();
       const normalizePackage = (pkg = {}) => {
         const quantity = Math.max(normalizeQty(pkg.quantity, 1), 1);
         const defaultLoadedQty =
@@ -346,6 +350,35 @@ exports.updateShipmentPackages = onCall(
         };
       });
 
+      const nextPackageId = (sourcePkg = {}, existingPackages = []) => {
+        const shipmentCode = oldData.shipmentId || shipmentId;
+        const usedIds = new Set(
+          existingPackages
+            .map((pkg) => getPackageIdentity(pkg))
+            .filter(Boolean),
+        );
+
+        let nextSequence =
+          existingPackages.reduce((max, pkg) => {
+            const seq = Number(pkg.sequence);
+            return Number.isFinite(seq) ? Math.max(max, seq) : max;
+          }, 0) + 1;
+
+        let candidate = `${shipmentCode}-${String(nextSequence).padStart(2, "0")}`;
+        while (usedIds.has(candidate)) {
+          nextSequence += 1;
+          candidate = `${shipmentCode}-${String(nextSequence).padStart(2, "0")}`;
+        }
+
+        return {
+          packageId: candidate,
+          trackingNumber: candidate,
+          sequence: nextSequence,
+          parentPackageId:
+            sourcePkg.parentPackageId || sourcePkg.packageId || null,
+        };
+      };
+
       // -----------------------------
       // 3. BUILD FINAL PACKAGE ARRAY
       // -----------------------------
@@ -364,14 +397,17 @@ exports.updateShipmentPackages = onCall(
           );
         }
 
-        finalPackages = oldNormalizedPackages.map((pkg) => {
+        finalPackages = [];
+
+        oldNormalizedPackages.forEach((pkg) => {
           const identities = [pkg.packageId, pkg.trackingNumber]
             .filter((value) => typeof value === "string" && value.trim())
             .map((value) => value.trim());
           const isTargeted = identities.some((id) => targetedIdSet.has(id));
 
           if (!isTargeted) {
-            return pkg;
+            finalPackages.push(pkg);
+            return;
           }
 
           const quantity = Math.max(normalizeQty(pkg.quantity, 1), 1);
@@ -406,6 +442,25 @@ exports.updateShipmentPackages = onCall(
             }
             missingQty = 0;
             damagedQty = 0;
+
+            const updatedPkg = {
+              ...pkg,
+              loadedQty,
+              receivedQty,
+              missingQty,
+              damagedQty,
+              currentTripId: loadedQty > 0 ? pkg.currentTripId || tripId : null,
+              loadedOnTrip: loadedQty > 0 ? pkg.loadedOnTrip || tripId : null,
+              updatedAt: nowIso,
+              updatedBy: name,
+              remarks: remarks || pkg.remarks || null,
+            };
+
+            finalPackages.push({
+              ...updatedPkg,
+              status: derivePackageStatus(updatedPkg),
+            });
+            return;
           } else if (newStatus === "LOADED") {
             const remainingQty = Math.max(quantity - loadedQty, 0);
             const requestedQty =
@@ -414,6 +469,68 @@ exports.updateShipmentPackages = onCall(
               specificQty !== ""
                 ? clamp(normalizeQty(specificQty, 0), 0, remainingQty)
                 : remainingQty;
+
+            const packageTripId = pkg.currentTripId || pkg.loadedOnTrip || null;
+            if (
+              tripId &&
+              packageTripId &&
+              packageTripId !== tripId &&
+              requestedQty > 0
+            ) {
+              throw new HttpsError(
+                "failed-precondition",
+                `Package ${getPackageIdentity(pkg)} is already assigned to trip ${packageTripId}.`,
+              );
+            }
+
+            if (
+              tripId &&
+              requestedQty > 0 &&
+              loadedQty === 0 &&
+              requestedQty < quantity
+            ) {
+              const remainingPkg = {
+                ...pkg,
+                quantity: quantity - requestedQty,
+                loadedQty: 0,
+                receivedQty: 0,
+                missingQty: 0,
+                damagedQty: 0,
+                currentTripId: null,
+                loadedOnTrip: null,
+                status: "RECEIVED",
+                updatedAt: nowIso,
+                updatedBy: name,
+                remarks: remarks || pkg.remarks || null,
+              };
+              const splitIdentity = nextPackageId(pkg, [
+                ...oldNormalizedPackages,
+                ...finalPackages,
+              ]);
+              const loadedPkg = {
+                ...pkg,
+                ...splitIdentity,
+                quantity: requestedQty,
+                loadedQty: requestedQty,
+                receivedQty: 0,
+                missingQty: 0,
+                damagedQty: 0,
+                currentTripId: tripId,
+                loadedOnTrip: tripId,
+                loadedAt: nowIso,
+                loadedBy: name,
+                splitFromPackageId: getPackageIdentity(pkg),
+                status: shouldPromoteReadyForDelivery
+                  ? "OUT_FOR_DELIVERY"
+                  : "LOADED",
+                updatedAt: nowIso,
+                updatedBy: name,
+                remarks: remarks || pkg.remarks || null,
+              };
+
+              finalPackages.push(remainingPkg, loadedPkg);
+              return;
+            }
 
             loadedQty = clamp(loadedQty + requestedQty, 0, quantity);
             missingQty = 0;
@@ -466,6 +583,18 @@ exports.updateShipmentPackages = onCall(
             receivedQty,
             missingQty,
             damagedQty,
+            currentTripId:
+              tripId && loadedQty > 0
+                ? tripId
+                : loadedQty > 0
+                  ? pkg.currentTripId || null
+                  : null,
+            loadedOnTrip:
+              tripId && loadedQty > 0
+                ? tripId
+                : loadedQty > 0
+                  ? pkg.loadedOnTrip || null
+                  : null,
             updatedAt: nowIso,
             updatedBy: name,
             remarks: remarks || pkg.remarks || null,
@@ -475,10 +604,10 @@ exports.updateShipmentPackages = onCall(
             ? "OUT_FOR_DELIVERY"
             : derivePackageStatus(updatedPkg);
 
-          return {
+          finalPackages.push({
             ...updatedPkg,
             status: derivedStatus,
-          };
+          });
         });
       } else {
         finalPackages = newPackagesArray.map((pkg) => {
@@ -546,11 +675,67 @@ exports.updateShipmentPackages = onCall(
         shipmentStatus = "READY_FOR_DELIVERY";
       }
 
+      const packageBarcodes = finalPackages
+        .map((pkg) => getPackageIdentity(pkg))
+        .filter(Boolean);
+      const activeTripIds = [
+        ...new Set(
+          finalPackages
+            .map((pkg) => pkg.currentTripId || pkg.loadedOnTrip || null)
+            .filter(Boolean)
+            .map(String),
+        ),
+      ];
+      const existingTripBarcodeSet = new Set(
+        (
+          (tripShipmentSnap?.exists
+            ? tripShipmentSnap.data()?.packageBarcodes
+            : []) || []
+        )
+          .filter(Boolean)
+          .map(String),
+      );
+      if (
+        tripId &&
+        existingTripBarcodeSet.size > 0 &&
+        !activeTripIds.includes(tripId)
+      ) {
+        activeTripIds.push(tripId);
+      }
+      const singleCurrentTripId =
+        activeTripIds.length === 1 ? activeTripIds[0] : null;
+      const tripPackages = tripId
+        ? finalPackages.filter(
+            (pkg) => {
+              const packageTripId = pkg.currentTripId || pkg.loadedOnTrip || null;
+              const packageId = getPackageIdentity(pkg);
+
+              if (packageTripId) return packageTripId === tripId;
+              return packageId ? existingTripBarcodeSet.has(packageId) : false;
+            },
+          )
+        : finalPackages;
+      const tripPackageBarcodes = tripPackages
+        .map((pkg) => getPackageIdentity(pkg))
+        .filter(Boolean);
+      const tripTotalQty = sumTotalQty(tripPackages);
+      const tripLoadedQty = sumLoadedQty(tripPackages);
+      const tripReceivedQty = sumReceivedQty(tripPackages);
+      const tripMissingQty = sumMissingQty(tripPackages);
+      const tripDamagedQty = sumDamagedQty(tripPackages);
+      const tripPendingQty = Math.max(
+        tripTotalQty - tripLoadedQty - tripMissingQty - tripDamagedQty,
+        0,
+      );
+
       // -----------------------------
       // 5. WRITES
       // -----------------------------
       tx.update(shipmentRef, {
         packages: finalPackages,
+        packageBarcodes,
+        currentTripIds: activeTripIds,
+        currentTripId: singleCurrentTripId,
         status: shipmentStatus,
 
         "totals.totalItems": totalRows, // row count only
@@ -577,15 +762,35 @@ exports.updateShipmentPackages = onCall(
       });
 
       if (tripId && tripRef && tripShipmentRef) {
+        const oldTripShipment = tripShipmentSnap?.exists
+          ? tripShipmentSnap.data() || {}
+          : {};
+        const oldTripTotalQty = normalizeQty(oldTripShipment.totalItems, 0);
+        const oldTripLoadedQty = normalizeQty(oldTripShipment.loadedCount, 0);
+        const oldTripReceivedQty = normalizeQty(
+          oldTripShipment.receivedCount || oldTripShipment.deliveredCount,
+          0,
+        );
+        const oldTripMissingQty = normalizeQty(oldTripShipment.missingCount, 0);
+        const oldTripDamagedQty = normalizeQty(oldTripShipment.damagedCount, 0);
+        const oldTripPendingQty = normalizeQty(oldTripShipment.pendingCount, 0);
+        const deltaTripTotalQty = tripTotalQty - oldTripTotalQty;
+        const deltaTripLoadedQty = tripLoadedQty - oldTripLoadedQty;
+        const deltaTripReceivedQty = tripReceivedQty - oldTripReceivedQty;
+        const deltaTripMissingQty = tripMissingQty - oldTripMissingQty;
+        const deltaTripDamagedQty = tripDamagedQty - oldTripDamagedQty;
+        const deltaTripPendingQty = tripPendingQty - oldTripPendingQty;
+
         tx.update(tripShipmentRef, {
           status: shipmentStatus,
-          totalItems: newTotalQty, // trip-side quantity
-          pendingCount: pendingQty,
-          loadedCount: newLoadedQty,
-          deliveredCount: newReceivedQty,
-          receivedCount: newReceivedQty,
-          missingCount: newMissingQty,
-          damagedCount: newDamagedQty,
+          totalItems: tripTotalQty,
+          pendingCount: tripPendingQty,
+          loadedCount: tripLoadedQty,
+          deliveredCount: tripReceivedQty,
+          receivedCount: tripReceivedQty,
+          missingCount: tripMissingQty,
+          damagedCount: tripDamagedQty,
+          packageBarcodes: tripPackageBarcodes,
           updatedAt: nowServer,
           updatedBy: name,
         });
@@ -595,29 +800,29 @@ exports.updateShipmentPackages = onCall(
           updatedBy: name,
         };
 
-        if (deltaTotalQty !== 0) {
-          tripUpdate.totalItems = FieldValue.increment(deltaTotalQty);
+        if (deltaTripTotalQty !== 0) {
+          tripUpdate.totalItems = FieldValue.increment(deltaTripTotalQty);
         }
 
-        if (deltaLoadedQty !== 0) {
-          tripUpdate.totalLoaded = FieldValue.increment(deltaLoadedQty);
+        if (deltaTripLoadedQty !== 0) {
+          tripUpdate.totalLoaded = FieldValue.increment(deltaTripLoadedQty);
         }
 
-        if (deltaReceivedQty !== 0) {
-          tripUpdate.totalArrived = FieldValue.increment(deltaReceivedQty);
-          tripUpdate.totalDelivered = FieldValue.increment(deltaReceivedQty);
+        if (deltaTripReceivedQty !== 0) {
+          tripUpdate.totalArrived = FieldValue.increment(deltaTripReceivedQty);
+          tripUpdate.totalDelivered = FieldValue.increment(deltaTripReceivedQty);
         }
 
-        if (deltaMissingQty !== 0) {
-          tripUpdate.totalMissing = FieldValue.increment(deltaMissingQty);
+        if (deltaTripMissingQty !== 0) {
+          tripUpdate.totalMissing = FieldValue.increment(deltaTripMissingQty);
         }
 
-        if (deltaDamagedQty !== 0) {
-          tripUpdate.totalDamaged = FieldValue.increment(deltaDamagedQty);
+        if (deltaTripDamagedQty !== 0) {
+          tripUpdate.totalDamaged = FieldValue.increment(deltaTripDamagedQty);
         }
 
-        if (deltaPendingQty !== 0) {
-          tripUpdate.itemPending = FieldValue.increment(deltaPendingQty);
+        if (deltaTripPendingQty !== 0) {
+          tripUpdate.itemPending = FieldValue.increment(deltaTripPendingQty);
         }
 
         tx.update(tripRef, tripUpdate);
