@@ -312,9 +312,9 @@ export default function AddUserModal({
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label
-                      className={`block text-[10px] font-bold mb-1 ${theme.label}`}
+                      className={`block text-xs font-bold mb-1 ${theme.label}`}
                     >
-                      Province
+                      PROVINCE
                     </label>
                     <select
                       name="province"
@@ -333,9 +333,9 @@ export default function AddUserModal({
 
                   <div>
                     <label
-                      className={`block text-[10px] font-bold mb-1 ${theme.label}`}
+                      className={`block text-xs font-bold mb-1 ${theme.label}`}
                     >
-                      City / Municipality
+                      CITY / MUNICIPALITY
                     </label>
                     <select
                       name="city"

@@ -1,6 +1,13 @@
 "use client";
 
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, {
+  forwardRef,
+  useCallback,
+  useEffect,
+  useImperativeHandle,
+  useMemo,
+  useState,
+} from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faFilter,
@@ -8,6 +15,7 @@ import {
   faSync,
   faUsers,
 } from "@fortawesome/free-solid-svg-icons";
+import CustomerAddModal from "./CustomerAddModal";
 import CustomerDrawer from "./CustomerDrawer";
 import CustomerRow from "./CustomerRow";
 import TablePaginationFooter from "../ui/TablePaginationFooter";
@@ -39,18 +47,17 @@ function getEndpointForRole(userRole) {
     : "/api/customers";
 }
 
-export default function CustomerBoard({
-  user,
-  userRole,
-  isDark = false,
-  endpoint,
-}) {
+const CustomerBoard = forwardRef(function CustomerBoard(
+  { user, userRole, isDark = false, endpoint },
+  ref,
+) {
   const [customers, setCustomers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("ALL");
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedCustomerId, setSelectedCustomerId] = useState(null);
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
 
   const theme = getBoardThemeClasses(isDark);
 
@@ -144,6 +151,14 @@ export default function CustomerBoard({
   );
   const selectedCustomer = customers.find(
     (customer) => customer.id === selectedCustomerId,
+  );
+
+  useImperativeHandle(
+    ref,
+    () => ({
+      openAddCustomerModal: () => setIsAddModalOpen(true),
+    }),
+    [],
   );
 
   return (
@@ -262,8 +277,20 @@ export default function CustomerBoard({
         isOpen={!!selectedCustomer}
         onClose={() => setSelectedCustomerId(null)}
         customer={selectedCustomer}
+        user={user}
+        userRole={userRole}
+        onCustomerUpdated={fetchCustomers}
+        isDark={isDark}
+      />
+
+      <CustomerAddModal
+        isOpen={isAddModalOpen}
+        onClose={() => setIsAddModalOpen(false)}
+        onSuccess={fetchCustomers}
         isDark={isDark}
       />
     </div>
   );
-}
+});
+
+export default CustomerBoard;

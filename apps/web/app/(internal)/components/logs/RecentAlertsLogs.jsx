@@ -170,8 +170,8 @@ export default function RecentAlertsLogs({ isDark = false }) {
           </span>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-[1fr_140px_160px_132px] gap-2">
-          <div className="relative">
+        <div className="grid grid-cols-2 sm:grid-cols-[1fr_140px_160px_132px] gap-2">
+          <div className="relative col-span-2 sm:col-span-1">
             <FontAwesomeIcon
               icon={faSearch}
               className={`absolute left-3 top-2.5 text-xs ${theme.inputIcon}`}
@@ -184,7 +184,7 @@ export default function RecentAlertsLogs({ isDark = false }) {
             />
           </div>
 
-          <div className="relative">
+          <div className="relative min-w-0">
             <FontAwesomeIcon
               icon={faFilter}
               className={`absolute left-3 top-2.5 text-xs ${theme.inputIcon}`}
@@ -206,7 +206,7 @@ export default function RecentAlertsLogs({ isDark = false }) {
           <select
             value={reasonFilter}
             onChange={(event) => setReasonFilter(event.target.value)}
-            className={`w-full border rounded-lg px-3 py-2 text-xs outline-none appearance-none focus:border-amber-500 ${theme.input}`}
+            className={`w-full min-w-0 border rounded-lg px-3 py-2 text-xs outline-none appearance-none focus:border-amber-500 ${theme.input}`}
           >
             <option value="ALL">All Reasons</option>
             {reasonOptions.map((reason) => (
@@ -216,7 +216,7 @@ export default function RecentAlertsLogs({ isDark = false }) {
             ))}
           </select>
 
-          <div className="relative">
+          <div className="relative col-span-2 sm:col-span-1">
             <FontAwesomeIcon
               icon={faListOl}
               className={`absolute left-3 top-2.5 text-xs ${theme.inputIcon}`}

@@ -169,8 +169,8 @@ export default function RecentSmsLogs({ isDark = false }) {
           </span>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-[1fr_150px_130px_132px] gap-2">
-          <div className="relative">
+        <div className="grid grid-cols-2 sm:grid-cols-[1fr_150px_130px_132px] gap-2">
+          <div className="relative col-span-2 sm:col-span-1">
             <FontAwesomeIcon
               icon={faSearch}
               className={`absolute left-3 top-2.5 text-xs ${theme.inputIcon}`}
@@ -183,7 +183,7 @@ export default function RecentSmsLogs({ isDark = false }) {
             />
           </div>
 
-          <div className="relative">
+          <div className="relative min-w-0">
             <FontAwesomeIcon
               icon={faFilter}
               className={`absolute left-3 top-2.5 text-xs ${theme.inputIcon}`}
@@ -205,7 +205,7 @@ export default function RecentSmsLogs({ isDark = false }) {
           <select
             value={statusFilter}
             onChange={(event) => setStatusFilter(event.target.value)}
-            className={`w-full border rounded-lg px-3 py-2 text-xs outline-none appearance-none focus:border-blue-500 ${theme.input}`}
+            className={`w-full min-w-0 border rounded-lg px-3 py-2 text-xs outline-none appearance-none focus:border-blue-500 ${theme.input}`}
           >
             <option value="ALL">All Results</option>
             <option value="SUCCESS">Success</option>
@@ -213,7 +213,7 @@ export default function RecentSmsLogs({ isDark = false }) {
             <option value="FAILED">Failed</option>
           </select>
 
-          <div className="relative">
+          <div className="relative col-span-2 sm:col-span-1">
             <FontAwesomeIcon
               icon={faListOl}
               className={`absolute left-3 top-2.5 text-xs ${theme.inputIcon}`}
