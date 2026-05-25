@@ -188,6 +188,9 @@ async function processShipmentCreatedEvent({ eventId, event }) {
       origin: event.data?.origin,
       destination: event.data?.destination,
       actorUid: event.actor?.uid,
+      actorName: event.actor?.name,
+      actorRole: event.actor?.role,
+      actorId: event.actor?.id,
     });
   }
 
@@ -218,6 +221,9 @@ async function processShipmentStatusUpdatedEvent({ eventId, event }) {
       origin: event.data?.origin,
       destination: event.data?.destination,
       actorUid: event.actor?.uid,
+      actorName: event.actor?.name,
+      actorRole: event.actor?.role,
+      actorId: event.actor?.id,
       customMessage: event.smsBody || event.body,
     });
   }

@@ -189,6 +189,7 @@ exports.sendManualSms = onCall(
     await writeAuditEvent(db, {
       actorUid: uid,
       actorRole: role,
+      // actorName: actor.name || null,
       action: "sms_manual_sent",
       entityType: trackingId ? "tracking_record" : "manual",
       entityId: trackingId || normalizedPhone,

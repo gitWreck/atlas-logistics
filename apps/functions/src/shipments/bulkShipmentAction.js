@@ -3,7 +3,7 @@
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const admin = require("firebase-admin");
 const { FieldValue } = admin.firestore;
-const { requireRole } = require("../utilities/helpers");
+const { requireRole, updatedBy } = require("../utilities/helpers");
 const { writeShipmentActionLog } = require("../utilities/shipmentLogger");
 
 if (!admin.apps.length) admin.initializeApp();
@@ -21,6 +21,8 @@ exports.bulkShipmentAction = onCall(
     const { tripId, shipmentIds, action, location, remarks } =
       request.data || {};
     const userId = request.auth.uid;
+
+    const { uid, role, name } = updatedBy(req);
 
     if (!tripId || typeof tripId !== "string") {
       throw new HttpsError("invalid-argument", "Missing tripId");
@@ -265,14 +267,14 @@ exports.bulkShipmentAction = onCall(
             "totals.delivered": newReceivedQty,
 
             updatedAt: nowServer,
-            updatedBy: userId,
+            updatedBy: name,
             updatedRole: "bulk-action",
             remarks: remarks || null,
 
             statusHistory: FieldValue.arrayUnion({
               status: shipmentStatus,
               at: new Date(),
-              by: userId,
+              by: name,
               note: remarks || `Bulk ${action} applied.`,
               location: location || null,
             }),
@@ -289,7 +291,7 @@ exports.bulkShipmentAction = onCall(
               deliveredCount: newReceivedQty,
               receivedCount: newReceivedQty,
               updatedAt: nowServer,
-              updatedBy: userId,
+              updatedBy: name,
             });
           }
         }
@@ -300,7 +302,7 @@ exports.bulkShipmentAction = onCall(
           totalDelivered: FieldValue.increment(tripDeltaDelivered),
           totalArrived: FieldValue.increment(tripDeltaArrived),
           updatedAt: nowServer,
-          updatedBy: userId,
+          updatedBy: name,
         });
 
         writeShipmentActionLog({
@@ -311,8 +313,9 @@ exports.bulkShipmentAction = onCall(
           targetId: tripId,
           targetCollection: "truck_trips",
           tripId,
-          actorId: userId,
-          by: userId,
+          actorId: uid,
+          actorName: name,
+          actorRole: role,
           at: nowServer,
           details: {
             shipmentCount: shipmentIds.length,

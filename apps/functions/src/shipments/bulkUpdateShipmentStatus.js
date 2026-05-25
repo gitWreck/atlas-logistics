@@ -2,7 +2,7 @@
 
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const admin = require("firebase-admin");
-const { requireAuth } = require("../utilities/helpers");
+const { requireAuth, updatedBy } = require("../utilities/helpers");
 const { writeShipmentActionLog } = require("../utilities/shipmentLogger");
 
 if (!admin.apps.length) admin.initializeApp();
@@ -12,13 +12,15 @@ exports.bulkUpdateShipmentStatus = onCall(
   { region: "asia-southeast1", maxInstances: 10 },
   async (req) => {
     // 1. AUTHENTICATION
-    const uid = await requireAuth(req);
+    // const uid = await requireAuth(req);
     const { tripId, shipmentIds, newStatus, location } = req.data || {};
 
     // 2. VALIDATION
     if (!tripId || !shipmentIds || !Array.isArray(shipmentIds) || !newStatus) {
       throw new HttpsError("invalid-argument", "Missing required fields.");
     }
+
+    const { uid, role, name } = updatedBy(req);
 
     // Firestore Batch Limit is 500 operations.
     // Each shipment uses ~3 ops (Shipment + TripShipment + Event).
@@ -96,14 +98,14 @@ exports.bulkUpdateShipmentStatus = onCall(
           ...p,
           status: "DELIVERED",
           deliveredAt: p.deliveredAt || isoDate,
-          deliveredBy: p.deliveredBy || uid,
+          deliveredBy: p.deliveredBy || name,
         }));
 
         // 4. Update Shipment Doc
         const historyEntry = {
           status: "COMPLETED",
           at: new Date(),
-          by: uid,
+          by: name,
           note: "Bulk status update to COMPLETED",
           location: location || null,
         };
@@ -116,7 +118,7 @@ exports.bulkUpdateShipmentStatus = onCall(
           "totals.delivered": totalItems,
           packages: updatedPackages,
           updatedAt: timestamp,
-          updatedBy: uid,
+          updatedBy: name,
           statusHistory: admin.firestore.FieldValue.arrayUnion(historyEntry),
           ...(location ? { lastLocation: location } : {}),
         });
@@ -138,7 +140,7 @@ exports.bulkUpdateShipmentStatus = onCall(
         const historyEntry = {
           status: newStatus,
           at: new Date(),
-          by: uid,
+          by: name,
           note: `Bulk status update to ${newStatus}`,
           location: location || null,
         };
@@ -146,7 +148,7 @@ exports.bulkUpdateShipmentStatus = onCall(
         batch.update(shipmentRef, {
           status: newStatus,
           updatedAt: timestamp,
-          updatedBy: uid,
+          updatedBy: name,
           statusHistory: admin.firestore.FieldValue.arrayUnion(historyEntry),
           ...(location ? { lastLocation: location } : {}),
         });
@@ -167,7 +169,7 @@ exports.bulkUpdateShipmentStatus = onCall(
         type: "BULK_UPDATE",
         status: newStatus,
         message: `Bulk updated to ${newStatus}`,
-        updatedBy: uid,
+        updatedBy: name,
         createdAt: timestamp,
       });
     });
@@ -197,7 +199,7 @@ exports.bulkUpdateShipmentStatus = onCall(
         message: `Bulk updated ${updateCount} shipments to ${newStatus}`,
         newStatus: newStatus,
         affectedCount: updateCount,
-        performedBy: uid,
+        performedBy: name,
         createdAt: timestamp,
       });
 
@@ -211,7 +213,8 @@ exports.bulkUpdateShipmentStatus = onCall(
         newStatus: newStatus,
         count: updateCount,
         actorId: uid,
-        performedBy: uid,
+        actorRole: role,
+        actorName: name,
         timestamp: timestamp,
       });
     }

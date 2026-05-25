@@ -1,6 +1,7 @@
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const admin = require("firebase-admin");
 const { writeShipmentActionLog } = require("../utilities/shipmentLogger");
+const { updatedBy } = require("../utilities/helpers");
 
 if (!admin.apps.length) admin.initializeApp();
 const db = admin.firestore();
@@ -30,6 +31,8 @@ exports.updateShipmentDetails = onCall(
       throw new HttpsError("invalid-argument", "Shipment ID is required.");
     }
 
+    const { uid, role, name } = updatedBy(request);
+
     const shipmentRef = db.collection("shipments").doc(shipmentId);
     const nowAt = admin.firestore.FieldValue.serverTimestamp();
 
@@ -48,7 +51,7 @@ exports.updateShipmentDetails = onCall(
       status: status,
       currentLocation: currentLocation,
       updatedAt: nowAt,
-      updatedBy: request.auth.uid,
+      updatedBy: name,
     };
 
     // Only update images if new ones were provided
@@ -69,7 +72,9 @@ exports.updateShipmentDetails = onCall(
         action: "UPDATE_SHIPMENT",
         trackingShipmentId: shipmentId,
         shipmentId,
-        actorId: request.auth.uid,
+        actorId: uid,
+        actorName: name,
+        actorRole: role,
         createdAt: nowAt,
       });
 

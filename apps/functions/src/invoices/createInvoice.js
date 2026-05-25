@@ -1,9 +1,7 @@
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const admin = require("firebase-admin");
-const {
-  getActorFromRequest,
-  writeInvoiceActionLog,
-} = require("../utilities/invoiceLogger");
+const { writeInvoiceActionLog } = require("../utilities/invoiceLogger");
+const { updatedBy } = require("../utilities/helpers");
 const { Timestamp } = admin.firestore;
 
 if (!admin.apps.length) admin.initializeApp();
@@ -14,14 +12,12 @@ exports.createInvoice = onCall(
   {
     region: "asia-southeast1",
     maxInstances: 10,
+    memory: "512MiB",
   },
   async (request) => {
     if (!request.auth) {
       throw new HttpsError("unauthenticated", "Login required.");
     }
-
-    const uid = request.auth.uid;
-    const actor = getActorFromRequest(request);
 
     const {
       shipmentId,
@@ -33,6 +29,8 @@ exports.createInvoice = onCall(
       notes,
       status,
     } = request.data || {};
+
+    const { uid, role, name } = updatedBy(request);
 
     if (!shipmentId) {
       throw new HttpsError("invalid-argument", "Missing shipmentId.");
@@ -158,8 +156,8 @@ exports.createInvoice = onCall(
 
       createdAt: nowAt,
       updatedAt: nowAt,
-      createdBy: uid,
-      updatedBy: uid,
+      createdBy: name,
+      updatedBy: name,
     });
 
     batch.set(
@@ -170,7 +168,7 @@ exports.createInvoice = onCall(
         invoiceStatus: finalStatus,
         hasInvoice: true,
         updatedAt: nowAt,
-        updatedBy: uid,
+        updatedBy: name,
       },
       { merge: true },
     );
@@ -183,9 +181,9 @@ exports.createInvoice = onCall(
       invoiceDocId: invoiceRef.id,
       invoiceNumber,
       shipmentId,
-      actorId: actor.actorId,
-      actorName: actor.actorName,
-      actorRole: actor.actorRole,
+      actorId: uid,
+      actorName: name,
+      actorRole: role,
       details: {
         amount: finalAmount,
         status: finalStatus,

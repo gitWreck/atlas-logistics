@@ -4,6 +4,8 @@ const {
   getActorFromRequest,
   writeInvoiceActionLog,
 } = require("../utilities/invoiceLogger");
+
+const { updatedBy } = require("../utilities/helpers");
 let sendInvoicesStatusSmsLogic = null;
 try {
   ({
@@ -38,13 +40,15 @@ exports.updateInvoiceStatus = onCall(
       throw new HttpsError("unauthenticated", "Login required.");
     }
 
-    const uid = request.auth.uid;
+    // const uid = request.auth.uid;
     const {
       invoiceId,
       status,
       sendNotification = false,
       customMessage = "",
     } = request.data || {};
+
+    const { uid, role, name } = updatedBy(request);
 
     if (!invoiceId || !status) {
       throw new HttpsError("invalid-argument", "Missing invoiceId or status.");
@@ -54,9 +58,9 @@ exports.updateInvoiceStatus = onCall(
       throw new HttpsError("invalid-argument", "Invalid invoice status.");
     }
 
-    const userDoc = await db.collection("users").doc(uid).get();
+    const userDoc = await db.collection("users").doc(request.auth.uid).get();
     const userData = userDoc.data();
-    const actor = getActorFromRequest(request, userData || {});
+    // const actor = getActorFromRequest(request, userData || {});
 
     if (
       !userData ||
@@ -107,7 +111,7 @@ exports.updateInvoiceStatus = onCall(
     batch.update(invoiceRef, {
       status,
       updatedAt: nowAt,
-      updatedBy: uid,
+      updatedBy: name,
     });
 
     if (shipmentRef) {
@@ -123,7 +127,7 @@ exports.updateInvoiceStatus = onCall(
               invoiceStatus: "CANCELLED",
               hasInvoice: false,
               updatedAt: nowAt,
-              updatedBy: uid,
+              updatedBy: name,
             },
             { merge: true },
           );
@@ -137,7 +141,7 @@ exports.updateInvoiceStatus = onCall(
             invoiceStatus: status,
             hasInvoice: true,
             updatedAt: nowAt,
-            updatedBy: uid,
+            updatedBy: name,
           },
           { merge: true },
         );
@@ -164,9 +168,9 @@ exports.updateInvoiceStatus = onCall(
       invoiceDocId: invoiceRef.id,
       invoiceNumber: invoiceData.invoiceNumber || invoiceId,
       shipmentId: shipmentId || null,
-      actorId: actor.actorId,
-      actorName: actor.actorName,
-      actorRole: actor.actorRole,
+      actorId: uid,
+      actorName: name,
+      actorRole: role,
       details: {
         previousStatus: currentStatus,
         status,

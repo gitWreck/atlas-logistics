@@ -3,7 +3,7 @@
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const admin = require("firebase-admin");
 const { FieldValue } = admin.firestore;
-const { requireRole } = require("../utilities/helpers");
+const { requireRole, updatedBy } = require("../utilities/helpers");
 const {
   getActorFromRequest,
   writePackageActionLog,
@@ -17,11 +17,11 @@ exports.updateShipmentPackageStatus = onCall(
   async (req) => {
     await requireRole(db, req, ["admin", "manager", "checker"]);
 
-    const uid = req.auth?.uid;
-    if (!uid) {
+    // const uid = req.auth?.uid;
+    if (!req.auth?.uid) {
       throw new HttpsError("unauthenticated", "Authentication required.");
     }
-    const actor = getActorFromRequest(req);
+    // const actor = getActorFromRequest(req);
 
     const {
       shipmentId,
@@ -32,6 +32,8 @@ exports.updateShipmentPackageStatus = onCall(
       remarks,
       location,
     } = req.data || {};
+
+    const { name, uid, role } = updatedBy(req);
 
     if (!shipmentId || !packageId || !newStatus) {
       throw new HttpsError("invalid-argument", "Missing required fields.");
@@ -168,7 +170,7 @@ exports.updateShipmentPackageStatus = onCall(
         loadedQty: nextLoadedQty,
         missingQty: nextMissingQty,
         updatedAt: new Date().toISOString(),
-        updatedBy: uid,
+        updatedBy: name,
         remarks: remarks || targetPkg.remarks || null,
       };
 
@@ -220,12 +222,12 @@ exports.updateShipmentPackageStatus = onCall(
         "totals.pending": pendingQty,
         "totals.missing": missingQty,
         updatedAt: FieldValue.serverTimestamp(),
-        updatedBy: uid,
+        updatedBy: name,
         ...(location ? { lastLocation: location } : {}),
         statusHistory: FieldValue.arrayUnion({
           status: finalShipmentStatus,
           at: new Date(),
-          by: uid,
+          by: name,
           note:
             remarks || `Package ${packageId} updated to ${nextPackageStatus}`,
           location: location || null,
@@ -240,7 +242,7 @@ exports.updateShipmentPackageStatus = onCall(
           pendingCount: pendingQty,
           missingCount: missingQty,
           updatedAt: FieldValue.serverTimestamp(),
-          updatedBy: uid,
+          updatedBy: name,
         });
 
         const tripUpdate = {
@@ -272,9 +274,9 @@ exports.updateShipmentPackageStatus = onCall(
         trackingNumber: targetPkg.trackingNumber || packageId,
         shipmentId,
         tripId: currentTripId,
-        actorId: actor.actorId || uid,
-        actorName: actor.actorName,
-        actorRole: actor.actorRole,
+        actorId: uid,
+        actorName: name,
+        actorRole: role,
         details: {
           requestedStatus: newStatus,
           packageStatus: nextPackageStatus,
