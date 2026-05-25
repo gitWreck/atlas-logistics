@@ -11,7 +11,7 @@ import {
   faCheckCircle,
   faExclamationTriangle,
 } from "@fortawesome/free-solid-svg-icons";
-import { updateShipmentPackageStatus } from "@/app/utility/FirebaseFunctions";
+import { updateShipmentPackages } from "@/app/utility/FirebaseFunctions";
 import { getModalThemeClasses } from "@/app/utility/constant/theme";
 import StatusButton from "../../ui/StatusButton";
 
@@ -58,12 +58,14 @@ export default function PackageActionModal({
     setButtonStatus(buttonKey, "LOADING");
 
     try {
-      await updateShipmentPackageStatus({
+      const actionQty = updateAll ? maxQty : clampQty(manualQty);
+
+      await updateShipmentPackages({
         shipmentId,
-        packageId: pkg.packageId,
+        packageIds: [pkg.packageId || pkg.trackingNumber],
         newStatus,
-        manualQty: updateAll ? maxQty : manualQty,
-        updateAll,
+        manualQty: actionQty,
+        scanAction: newStatus === "LOADED" ? "LOAD" : "UNLOAD",
       });
 
       setButtonStatus(buttonKey, "SUCCESS");
@@ -74,7 +76,7 @@ export default function PackageActionModal({
             ? "Package status was updated back to Received."
             : updateAll
               ? "Full package was marked as loaded successfully."
-              : `Partial load was applied successfully for ${manualQty} piece(s).`,
+              : `Partial load was applied successfully for ${actionQty} piece(s).`,
       });
 
       setTimeout(() => {
