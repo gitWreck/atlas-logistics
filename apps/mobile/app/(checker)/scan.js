@@ -214,6 +214,69 @@ export default function ScannerScreen() {
     );
   };
 
+  const getEffectiveTripId = (shipmentData) => {
+    if (resolvedTripId) return resolvedTripId;
+    const data = shipmentData ?? {};
+    return data.currentTripId || data.currentTruckTripId || data.tripId || "";
+  };
+
+  const getActionErrorMessage = (error, fallback) => {
+    const code = String(error?.code || "");
+    const message = String(error?.message || "").trim();
+    const details = error?.details;
+
+    if (code.includes("not-found")) {
+      if (/trip shipment record/i.test(message)) {
+        return "This shipment is not linked to the current trip manifest. Re-open the trip and scan again.";
+      }
+      if (/trip not found/i.test(message)) {
+        return "The selected trip was not found. Go back and open the trip again.";
+      }
+      if (/shipment not found/i.test(message)) {
+        return "Shipment not found. Check the QR code and try again.";
+      }
+      if (!message || message === "not-found") {
+        return "The shipment or trip record could not be found. Re-open the trip from the trip list and try again.";
+      }
+      return message;
+    }
+
+    if (code.includes("failed-precondition") && message) {
+      return message;
+    }
+
+    if (typeof details === "string" && details.trim()) {
+      return details.trim();
+    }
+
+    return message || fallback;
+  };
+
+  const assertShipmentOnTrip = async (shipmentDocId, shipmentData) => {
+    if (!resolvedTripId) return;
+
+    const onCurrentTrip =
+      String(shipmentData?.currentTripId || "") === String(resolvedTripId);
+
+    if (onCurrentTrip) return;
+
+    const tripShipmentSnap = await getDoc(
+      doc(
+        db,
+        "truck_trips",
+        String(resolvedTripId),
+        "trip_shipments",
+        shipmentDocId,
+      ),
+    );
+
+    if (!tripShipmentSnap.exists()) {
+      throw new Error(
+        "This shipment is not on the current trip manifest. Open the correct trip before scanning.",
+      );
+    }
+  };
+
   const setLatestScanDetails = ({
     shipmentDoc,
     shipmentData,
@@ -371,36 +434,12 @@ export default function ScannerScreen() {
   }) => {
     try {
       const location = await getCurrentLocationSafe();
-      const targetPackageIds =
-        Array.isArray(packageIds) && packageIds.length > 0
-          ? packageIds
-          : [barcode];
-
-      await updateShipmentPackages({
-        shipmentId,
-        packageIds: targetPackageIds,
-        newStatus: status,
-        location,
-        tripId: resolvedTripId,
-        manualQty: qty,
-        remarks,
-        scanAction: resolvedMode,
-        updatedBy: updatedBy(profile),
-      });
-
-      if (Array.isArray(proofImages) && proofImages.length > 0) {
-        await updateShipmentImages({
-          shipmentId,
-          type: "delivery",
-          images: proofImages,
-          updatedBy: updatedBy(profile),
-        });
-      }
+      const effectiveTripId = getEffectiveTripId(shipmentDocData);
 
       if (completeShipment) {
         await updateShipmentStatus({
           shipmentId,
-          tripId: getShipmentTripId(shipmentDocData) || resolvedTripId,
+          tripId: effectiveTripId,
           newStatus: "COMPLETED",
           location,
           remarks,
@@ -408,11 +447,35 @@ export default function ScannerScreen() {
           sourceUI: "CHECKER_MOBILE",
           updatedBy: updatedBy(profile),
         });
+      } else {
+        const targetPackageIds =
+          Array.isArray(packageIds) && packageIds.length > 0
+            ? packageIds
+            : [barcode];
+
+        await updateShipmentPackages({
+          shipmentId,
+          packageIds: targetPackageIds,
+          newStatus: status,
+          location,
+          tripId: effectiveTripId,
+          manualQty: qty,
+          remarks,
+          scanAction: resolvedMode,
+          updatedBy: updatedBy(profile),
+        });
+
+        if (Array.isArray(proofImages) && proofImages.length > 0) {
+          await updateShipmentImages({
+            shipmentId,
+            type: "delivery",
+            images: proofImages,
+            updatedBy: updatedBy(profile),
+          });
+        }
       }
 
-      await fetchTripScanSummary(
-        getShipmentTripId(shipmentDocData) || resolvedTripId,
-      );
+      await fetchTripScanSummary(effectiveTripId);
 
       showSuccessModal({
         barcode,
@@ -431,10 +494,10 @@ export default function ScannerScreen() {
         source,
       });
     } catch (error) {
-      console.error("Package update failed:", error);
+      console.error("Package update failed:", error?.code, error?.message, error);
       Alert.alert(
         "Action Failed",
-        error.message || "Failed to update package.",
+        getActionErrorMessage(error, "Failed to update package."),
         [{ text: "Retry", onPress: resetScanner }],
       );
       setProcessing(false);
@@ -552,53 +615,55 @@ export default function ScannerScreen() {
           proofImages.length === 1 ? "" : "s"
         } uploaded.`;
 
-      if (pendingDelivery.scanType === "shipment") {
-        const location = await getCurrentLocationSafe();
+      let shipmentDocData = pendingDelivery.shipmentDocData;
+      let canonicalShipmentId = pendingDelivery.shipmentId;
 
-        await updateShipmentStatus({
-          shipmentId: pendingDelivery.shipmentId,
-          tripId: pendingDelivery.tripId || resolvedTripId,
-          newStatus: "COMPLETED",
-          location,
-          remarks: proofRemarks,
-          proofOfDelivery: proofImages,
-          sourceUI: "CHECKER_MOBILE",
-          updatedBy: updatedBy(profile),
-        });
+      const directShipmentSnap = await getDoc(
+        doc(db, "shipments", String(canonicalShipmentId)),
+      );
 
-        await fetchTripScanSummary(pendingDelivery.tripId || resolvedTripId);
+      if (!directShipmentSnap.exists()) {
+        const resolvedShipmentDoc = await getShipmentDocByCode(
+          pendingDelivery.barcode,
+        );
 
-        showSuccessModal({
-          barcode: pendingDelivery.barcode,
-          shipmentId: pendingDelivery.shipmentId,
-          shipmentStatus: "COMPLETED",
-          packageStatus: "DELIVERED",
-          quantity: pendingDelivery.qty,
-          message: "Shipment completed with proof of delivery.",
-          source: pendingDelivery.source,
-        });
-      } else {
-        await executeStatusUpdate({
-          shipmentId: pendingDelivery.shipmentId,
-          barcode: pendingDelivery.barcode,
-          status: "DELIVERED",
-          qty: pendingDelivery.qty,
-          remarks: proofRemarks,
-          source: pendingDelivery.source,
-          shipmentDocData: pendingDelivery.shipmentDocData,
-          proofImages,
-          completeShipment: true,
-          throwOnError: true,
-        });
+        if (!resolvedShipmentDoc) {
+          throw new Error(
+            "Shipment not found. Scan the label again from the trip offload screen.",
+          );
+        }
+
+        canonicalShipmentId = resolvedShipmentDoc.id;
+        shipmentDocData = resolvedShipmentDoc.data();
+      } else if (!shipmentDocData) {
+        shipmentDocData = directShipmentSnap.data();
       }
+
+      await executeStatusUpdate({
+        shipmentId: canonicalShipmentId,
+        barcode: pendingDelivery.barcode,
+        status: "DELIVERED",
+        qty: pendingDelivery.qty,
+        remarks: proofRemarks,
+        source: pendingDelivery.source,
+        shipmentDocData,
+        proofImages,
+        completeShipment: true,
+        throwOnError: false,
+      });
 
       setProcessing(false);
       resetDeliveryProof();
     } catch (error) {
-      console.error("Delivery proof completion failed:", error);
+      console.error(
+        "Delivery proof completion failed:",
+        error?.code,
+        error?.message,
+        error,
+      );
       Alert.alert(
         "Action Failed",
-        error.message || "Failed to complete delivery proof.",
+        getActionErrorMessage(error, "Failed to complete delivery proof."),
       );
       setProcessing(false);
       setDeliveryProofUploading(false);
@@ -676,10 +741,11 @@ export default function ScannerScreen() {
     }
 
     if (statusToApply === "DELIVERED") {
+      await assertShipmentOnTrip(shipmentDoc.id, shipmentData);
       openDeliveryProofModal({
         scanType: "package",
         shipmentId: shipmentDoc.id,
-        tripId: currentTripId,
+        tripId: getEffectiveTripId(shipmentData),
         barcode,
         qty: isBulk ? manualQtyOverride : null,
         source,
@@ -813,10 +879,11 @@ export default function ScannerScreen() {
         }
 
         if (statusToApply === "DELIVERED") {
+          await assertShipmentOnTrip(shipmentDoc.id, shipmentData);
           openDeliveryProofModal({
             scanType: "shipment",
             shipmentId: shipmentDoc.id,
-            tripId: currentTripId,
+            tripId: getEffectiveTripId(shipmentData),
             barcode,
             qty: getShipmentTotal(shipmentData),
             source,
@@ -853,9 +920,11 @@ export default function ScannerScreen() {
       });
     } catch (error) {
       console.error("Process package error:", error);
-      Alert.alert("Error", error.message || "Failed to process package.", [
-        { text: "Retry", onPress: resetScanner },
-      ]);
+      Alert.alert(
+        "Error",
+        getActionErrorMessage(error, "Failed to process package."),
+        [{ text: "Retry", onPress: resetScanner }],
+      );
       setProcessing(false);
     }
   };
@@ -899,7 +968,10 @@ export default function ScannerScreen() {
               console.error("Trip status update failed:", error);
               Alert.alert(
                 "Action Failed",
-                error.message || "Failed to update trip status.",
+                getActionErrorMessage(
+                  error,
+                  "Failed to update trip status.",
+                ),
               );
             } finally {
               setTripStatusUpdating(false);
@@ -936,7 +1008,10 @@ export default function ScannerScreen() {
               console.error("Trip status update failed:", error);
               Alert.alert(
                 "Action Failed",
-                error.message || "Failed to update trip status.",
+                getActionErrorMessage(
+                  error,
+                  "Failed to update trip status.",
+                ),
               );
             } finally {
               setTripStatusUpdating(false);
@@ -1033,22 +1108,28 @@ export default function ScannerScreen() {
         onClose={resetScanner}
         count={1}
         maxQty={targetPackage?.quantity || 1}
-        onAction={(status, remarks, qty) => {
+        onAction={async (status, remarks, qty) => {
           if (status === "DELIVERED") {
-            openDeliveryProofModal({
-              scanType: "package",
-              shipmentId: parentShipmentId,
-              tripId:
-                getShipmentTripId(parentShipmentData) ||
-                tripSummary.tripId ||
-                resolvedTripId,
-              barcode: targetPackage?.packageId,
-              qty,
-              source: pendingActionSource,
-              shipmentDocData: parentShipmentData,
-              remarks,
-            });
-            setActionModalVisible(false);
+            try {
+              await assertShipmentOnTrip(parentShipmentId, parentShipmentData);
+              openDeliveryProofModal({
+                scanType: "package",
+                shipmentId: parentShipmentId,
+                tripId: getEffectiveTripId(parentShipmentData),
+                barcode: targetPackage?.packageId,
+                qty,
+                source: pendingActionSource,
+                shipmentDocData: parentShipmentData,
+                remarks,
+              });
+              setActionModalVisible(false);
+            } catch (error) {
+              Alert.alert(
+                "Error",
+                getActionErrorMessage(error, "Failed to open delivery proof."),
+              );
+              setProcessing(false);
+            }
             return;
           }
 
