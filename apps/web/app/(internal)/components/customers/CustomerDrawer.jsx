@@ -4,7 +4,10 @@ import React, { useEffect, useState } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faBoxOpen,
+  faCircleNotch,
+  faEdit,
   faEnvelope,
+  faExclamationTriangle,
   faFileInvoice,
   faIdBadge,
   faLocationDot,
@@ -14,6 +17,7 @@ import {
 } from "@fortawesome/free-solid-svg-icons";
 import { formatFirestoreDate } from "@/app/utility/utilities";
 import { getDrawerThemeClasses } from "@/app/utility/constant/theme";
+import CustomerEditModal from "./CustomerEditModal";
 
 function getCustomerStatus(customer) {
   return String(
@@ -58,11 +62,16 @@ function DetailItem({ icon, label, value, theme }) {
   );
 }
 
-function EmptyPanel({ message, theme }) {
+const currencyFormatter = new Intl.NumberFormat("en-PH", {
+  style: "currency",
+  currency: "PHP",
+});
+
+function EmptyPanel({ message, theme, icon = faBoxOpen }) {
   return (
     <div className={`border rounded-lg p-10 text-center ${theme.reasonBox}`}>
       <FontAwesomeIcon
-        icon={faBoxOpen}
+        icon={icon}
         className={`text-3xl mb-3 ${theme.mutedText}`}
       />
       <p className={`text-sm italic ${theme.mutedText}`}>{message}</p>
@@ -77,9 +86,24 @@ function CustomerDetailsTab({
   updatedAt,
   lastAuthAt,
   theme,
+  canEdit,
+  onEdit,
 }) {
   return (
     <>
+      <div className="mb-4 flex justify-end">
+        {canEdit && (
+          <button
+            type="button"
+            onClick={onEdit}
+            className="inline-flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-3 py-2 text-xs font-bold text-white shadow-lg shadow-blue-500/20 transition-colors hover:bg-blue-500"
+          >
+            <FontAwesomeIcon icon={faEdit} />
+            Edit
+          </button>
+        )}
+      </div>
+
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <DetailItem
           icon={faIdBadge}
@@ -145,7 +169,38 @@ function CustomerDetailsTab({
   );
 }
 
-function CustomerShipmentsTab({ shipments = [], theme }) {
+function LoadingPanel({ message, theme }) {
+  return (
+    <div className={`border rounded-lg p-10 text-center ${theme.reasonBox}`}>
+      <FontAwesomeIcon
+        icon={faCircleNotch}
+        spin
+        className="text-3xl mb-3 text-blue-500"
+      />
+      <p className={`text-sm ${theme.mutedText}`}>{message}</p>
+    </div>
+  );
+}
+
+function ErrorPanel({ message, theme }) {
+  return (
+    <EmptyPanel
+      message={message}
+      theme={theme}
+      icon={faExclamationTriangle}
+    />
+  );
+}
+
+function CustomerShipmentsTab({ shipments = [], loading, error, theme }) {
+  if (loading) {
+    return <LoadingPanel message="Loading shipments..." theme={theme} />;
+  }
+
+  if (error) {
+    return <ErrorPanel message={error} theme={theme} />;
+  }
+
   if (!shipments.length) {
     return <EmptyPanel message="No shipments found." theme={theme} />;
   }
@@ -163,7 +218,13 @@ function CustomerShipmentsTab({ shipments = [], theme }) {
                 {shipment.trackingNumber || shipment.shipmentId || "Shipment"}
               </div>
               <div className={`text-xs mt-1 truncate ${theme.mutedText}`}>
-                {shipment.route || shipment.destination || "No route"}
+                {shipment.route ||
+                  `${shipment.origin || "Unknown"} to ${
+                    shipment.destination || "Unknown"
+                  }`}
+              </div>
+              <div className={`text-[10px] mt-1 ${theme.mutedText}`}>
+                Updated {shipment.updatedAt || "N/A"}
               </div>
             </div>
             <span className="shrink-0 rounded-full border border-blue-500/20 bg-blue-500/10 px-2 py-0.5 text-[10px] font-bold uppercase text-blue-500">
@@ -176,9 +237,23 @@ function CustomerShipmentsTab({ shipments = [], theme }) {
   );
 }
 
-function CustomerInvoicesTab({ invoices = [], theme }) {
+function CustomerInvoicesTab({ invoices = [], loading, error, theme }) {
+  if (loading) {
+    return <LoadingPanel message="Loading invoices..." theme={theme} />;
+  }
+
+  if (error) {
+    return <ErrorPanel message={error} theme={theme} />;
+  }
+
   if (!invoices.length) {
-    return <EmptyPanel message="No invoices found." theme={theme} />;
+    return (
+      <EmptyPanel
+        message="No invoices found."
+        theme={theme}
+        icon={faFileInvoice}
+      />
+    );
   }
 
   return (
@@ -194,14 +269,19 @@ function CustomerInvoicesTab({ invoices = [], theme }) {
                 {invoice.invoiceNumber || invoice.invoiceId || "Invoice"}
               </div>
               <div className={`text-xs mt-1 ${theme.mutedText}`}>
-                {invoice.dueDate
-                  ? `Due ${formatFirestoreDate(invoice.dueDate)}`
-                  : "No due date"}
+                {invoice.shipmentTrackingNumber ||
+                  invoice.shipmentId ||
+                  "No linked shipment"}
+              </div>
+              <div className={`text-[10px] mt-1 ${theme.mutedText}`}>
+                {invoice.dueDate ? `Due ${invoice.dueDate}` : "No due date"}
               </div>
             </div>
             <div className="shrink-0 text-right">
               <div className={`text-sm font-bold ${theme.title}`}>
-                {invoice.amount || invoice.totalAmount || "N/A"}
+                {typeof invoice.amount === "number"
+                  ? currencyFormatter.format(invoice.amount)
+                  : invoice.totalAmount || "N/A"}
               </div>
               <div className="mt-1 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-bold uppercase text-emerald-500">
                 {invoice.status || "N/A"}
@@ -233,14 +313,97 @@ export default function CustomerDrawer({
   isOpen,
   onClose,
   customer,
+  user,
+  userRole,
+  onCustomerUpdated,
   isDark = false,
 }) {
   const [activeTab, setActiveTab] = useState("DETAILS");
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [shipments, setShipments] = useState([]);
+  const [invoices, setInvoices] = useState([]);
+  const [shipmentsLoading, setShipmentsLoading] = useState(false);
+  const [invoicesLoading, setInvoicesLoading] = useState(false);
+  const [shipmentsError, setShipmentsError] = useState("");
+  const [invoicesError, setInvoicesError] = useState("");
   const theme = getDrawerThemeClasses(isDark);
 
   useEffect(() => {
     if (isOpen) setActiveTab("DETAILS");
   }, [customer?.id, customer?.uid, isOpen]);
+
+  useEffect(() => {
+    if (!isOpen || !customer?.id || !user) {
+      setShipments([]);
+      setInvoices([]);
+      return;
+    }
+
+    let isMounted = true;
+
+    const fetchCustomerRecords = async () => {
+      setShipmentsLoading(true);
+      setInvoicesLoading(true);
+      setShipmentsError("");
+      setInvoicesError("");
+
+      try {
+        const token = await user.getIdToken();
+        const customerId = encodeURIComponent(customer.id);
+        const [shipmentsRes, invoicesRes] = await Promise.all([
+          fetch(`/api/customers/${customerId}/shipments`, {
+            headers: { Authorization: `Bearer ${token}` },
+            cache: "no-store",
+          }),
+          fetch(`/api/customers/${customerId}/invoices`, {
+            headers: { Authorization: `Bearer ${token}` },
+            cache: "no-store",
+          }),
+        ]);
+
+        const [shipmentsData, invoicesData] = await Promise.all([
+          shipmentsRes.json(),
+          invoicesRes.json(),
+        ]);
+
+        if (!isMounted) return;
+
+        if (!shipmentsRes.ok) {
+          setShipments([]);
+          setShipmentsError(
+            shipmentsData.error || "Failed to load customer shipments.",
+          );
+        } else {
+          setShipments(shipmentsData.shipments || []);
+        }
+
+        if (!invoicesRes.ok) {
+          setInvoices([]);
+          setInvoicesError(
+            invoicesData.error || "Failed to load customer invoices.",
+          );
+        } else {
+          setInvoices(invoicesData.invoices || []);
+        }
+      } catch (error) {
+        if (!isMounted) return;
+        setShipments([]);
+        setInvoices([]);
+        setShipmentsError(error.message || "Failed to load shipments.");
+        setInvoicesError(error.message || "Failed to load invoices.");
+      } finally {
+        if (!isMounted) return;
+        setShipmentsLoading(false);
+        setInvoicesLoading(false);
+      }
+    };
+
+    fetchCustomerRecords();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [customer?.id, isOpen, user]);
 
   if (!customer) return null;
 
@@ -342,24 +505,38 @@ export default function CustomerDrawer({
               updatedAt={updatedAt}
               lastAuthAt={lastAuthAt}
               theme={theme}
+              canEdit={String(userRole || "").toLowerCase() === "admin"}
+              onEdit={() => setIsEditModalOpen(true)}
             />
           )}
 
           {activeTab === "SHIPMENTS" && (
             <CustomerShipmentsTab
-              shipments={customer.shipments || []}
+              shipments={shipments}
+              loading={shipmentsLoading}
+              error={shipmentsError}
               theme={theme}
             />
           )}
 
           {activeTab === "INVOICES" && (
             <CustomerInvoicesTab
-              invoices={customer.invoices || []}
+              invoices={invoices}
+              loading={invoicesLoading}
+              error={invoicesError}
               theme={theme}
             />
           )}
         </div>
       </aside>
+
+      <CustomerEditModal
+        isOpen={isEditModalOpen}
+        onClose={() => setIsEditModalOpen(false)}
+        onSuccess={onCustomerUpdated}
+        customer={customer}
+        isDark={isDark}
+      />
     </>
   );
 }

@@ -6,11 +6,7 @@ import TripBoard from "../../components/trips/TripBoard";
 import AdminOverview from "../../components/admin/AdminOverview";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
-  faChartPie,
-  faTruck,
   faSignOutAlt,
-  faMapSigns,
-  faTruckLoading,
   faRoute,
   faClipboardList,
   faCog,
@@ -20,9 +16,7 @@ import {
   faChevronLeft,
   faChevronRight,
   faPlus,
-  faFileInvoice,
   faFileCirclePlus,
-  faUsers,
 } from "@fortawesome/free-solid-svg-icons";
 import { useRouter } from "next/navigation";
 import { auth } from "@/lib/firebase";
@@ -32,56 +26,12 @@ import NotificationBell from "../../components/notifications/NotificationBell";
 import TruckBoard from "../../components/trucks/TruckBoard";
 import InvoiceBoard from "../../components/invoice/InvoiceBoard";
 import CustomerBoard from "../../components/customers/CustomerBoard";
+import { mainNavItems } from "@/app/utility/constant/templates";
 
 import {
   getDashboardThemeClasses,
   // getStatCardColors,
 } from "@/app/utility/constant/theme";
-
-const mainNavItems = [
-  {
-    id: "overview",
-    label: "Dashboard",
-    icon: faChartPie,
-    title: "Overview",
-    description: "Operations dashboard",
-  },
-  {
-    id: "trips",
-    label: "Trips",
-    icon: faMapSigns,
-    title: "Trip Board",
-    description: "Manage truck assignments and routes.",
-  },
-  {
-    id: "shipments",
-    label: "Shipments",
-    icon: faTruck,
-    title: "Shipments",
-    description: "Manage shipments and orders.",
-  },
-  {
-    id: "trucks",
-    label: "Trucks",
-    icon: faTruckLoading,
-    title: "Truck Board",
-    description: "Manage fleet health and availability.",
-  },
-  {
-    id: "customers",
-    label: "Customers",
-    icon: faUsers,
-    title: "Customer Board",
-    description: "View customer accounts and contact details.",
-  },
-  {
-    id: "invoice",
-    label: "Invoices",
-    icon: faFileInvoice,
-    title: "Invoice Board",
-    description: "Manage invoices and payments.",
-  },
-];
 
 const secondaryNavItems = [
   { id: "tracking", label: "Tracking", icon: faRoute, disabled: true },
@@ -104,6 +54,7 @@ export default function AdminDashboardPage() {
   const shipmentBoardRef = useRef(null);
   const truckBoardRef = useRef(null);
   const invoiceBoardRef = useRef(null);
+  const customerBoardRef = useRef(null);
   const mainScrollRef = useRef(null);
 
   const currentTabConfig = useMemo(
@@ -155,6 +106,15 @@ export default function AdminDashboardPage() {
         icon: faFileCirclePlus,
         accent: "emerald",
         onClick: () => invoiceBoardRef.current?.openCreateInvoice?.(),
+      };
+    }
+
+    if (activeTab === "customers") {
+      return {
+        label: "Customer",
+        icon: faPlus,
+        accent: "blue",
+        onClick: () => customerBoardRef.current?.openAddCustomerModal?.(),
       };
     }
 
@@ -381,6 +341,7 @@ export default function AdminDashboardPage() {
 
               {activeTab === "customers" && (
                 <CustomerBoard
+                  ref={customerBoardRef}
                   user={user}
                   userRole="admin"
                   profile={profile}

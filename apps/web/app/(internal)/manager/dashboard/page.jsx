@@ -4,19 +4,13 @@ import React, { useEffect, useRef, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
-  faChartPie,
-  faTruck,
   faSignOutAlt,
-  faTruckLoading,
-  faMapSigns,
   faSun,
   faMoon,
   faChevronLeft,
   faChevronRight,
   faPlus,
   faFileCirclePlus,
-  faFileInvoice,
-  faUsers,
 } from "@fortawesome/free-solid-svg-icons";
 import { auth } from "@/lib/firebase";
 import { useAuth } from "@/app/context/AuthContext";
@@ -30,52 +24,8 @@ import TruckBoard from "../../components/trucks/TruckBoard";
 import CustomerBoard from "../../components/customers/CustomerBoard";
 
 import { getDashboardThemeClasses } from "@/app/utility/constant/theme";
+import { mainNavItems } from "@/app/utility/constant/templates";
 import InvoiceBoard from "../../components/invoice/InvoiceBoard";
-
-const mainNavItems = [
-  {
-    id: "overview",
-    label: "Dashboard",
-    icon: faChartPie,
-    title: "Overview",
-    description: "Operations dashboard",
-  },
-  {
-    id: "trips",
-    label: "Trips",
-    icon: faMapSigns,
-    title: "Trip Board",
-    description: "Manage truck assignments and routes.",
-  },
-  {
-    id: "shipments",
-    label: "Shipments",
-    icon: faTruck,
-    title: "Shipments",
-    description: "Manage shipments and orders.",
-  },
-  {
-    id: "trucks",
-    label: "Trucks",
-    icon: faTruckLoading,
-    title: "Truck Board",
-    description: "Manage fleet health and availability.",
-  },
-  {
-    id: "customers",
-    label: "Customers",
-    icon: faUsers,
-    title: "Customer Board",
-    description: "View customer accounts and contact details.",
-  },
-  {
-    id: "invoice",
-    label: "Invoices",
-    icon: faFileInvoice,
-    title: "Invoice Board",
-    description: "Manage invoices and payments.",
-  },
-];
 
 export default function ManagerDashboardPage() {
   const router = useRouter();
@@ -90,6 +40,7 @@ export default function ManagerDashboardPage() {
   const shipmentBoardRef = useRef(null);
   const truckBoardRef = useRef(null);
   const invoiceBoardRef = useRef(null);
+  const customerBoardRef = useRef(null);
   const mainScrollRef = useRef(null);
 
   const theme = getDashboardThemeClasses(isDark);
@@ -133,6 +84,15 @@ export default function ManagerDashboardPage() {
         icon: faFileCirclePlus,
         accent: "emerald",
         onClick: () => invoiceBoardRef.current?.openCreateInvoice?.(),
+      };
+    }
+
+    if (activeTab === "customers") {
+      return {
+        label: "Customer",
+        icon: faPlus,
+        accent: "blue",
+        onClick: () => customerBoardRef.current?.openAddCustomerModal?.(),
       };
     }
 
@@ -364,6 +324,7 @@ export default function ManagerDashboardPage() {
 
             {activeTab === "customers" && (
               <CustomerBoard
+                ref={customerBoardRef}
                 user={user}
                 userRole="manager"
                 profile={profile}

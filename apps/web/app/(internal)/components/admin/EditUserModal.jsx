@@ -23,6 +23,8 @@ export default function EditUserModal({
   onSuccess,
   user,
   isDark = false,
+  title = "Edit User",
+  allowedRoles = null,
 }) {
   const [formData, setFormData] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -33,6 +35,13 @@ export default function EditUserModal({
 
   const theme = getModalThemeClasses(isDark);
   const action = getModalActionClasses();
+  const roleOptions = [
+    { value: "driver", label: "Driver" },
+    { value: "checker", label: "Checker" },
+    { value: "manager", label: "Manager" },
+    { value: "admin", label: "Admin" },
+    { value: "customer", label: "Customer" },
+  ].filter((role) => !allowedRoles || allowedRoles.includes(role.value));
 
   useEffect(() => {
     if (formData?.province) {
@@ -126,7 +135,7 @@ export default function EditUserModal({
         >
           <h3 className={`font-bold flex items-center gap-2 ${theme.title}`}>
             <FontAwesomeIcon icon={faEdit} className="text-blue-500" />
-            Edit User
+            {title}
           </h3>
 
           <button type="button" onClick={onClose} className={theme.closeButton}>
@@ -225,26 +234,30 @@ export default function EditUserModal({
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label
-                  className={`block text-[10px] font-bold uppercase tracking-wider mb-1 ${theme.label}`}
-                >
-                  Role
-                </label>
-                <select
-                  name="role"
-                  className={`w-full border rounded-lg px-4 py-2 appearance-none ${theme.input}`}
-                  value={formData.role}
-                  onChange={handleChange}
-                >
-                  <option value="driver">Driver</option>
-                  <option value="checker">Checker</option>
-                  <option value="manager">Manager</option>
-                  <option value="admin">Admin</option>
-                  <option value="customer">Customer</option>
-                </select>
-              </div>
+            <div
+              className={roleOptions.length > 1 ? "grid grid-cols-2 gap-4" : ""}
+            >
+              {roleOptions.length > 1 && (
+                <div>
+                  <label
+                    className={`block text-[10px] font-bold uppercase tracking-wider mb-1 ${theme.label}`}
+                  >
+                    Role
+                  </label>
+                  <select
+                    name="role"
+                    className={`w-full border rounded-lg px-4 py-2 appearance-none ${theme.input}`}
+                    value={formData.role}
+                    onChange={handleChange}
+                  >
+                    {roleOptions.map((role) => (
+                      <option key={role.value} value={role.value}>
+                        {role.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
 
               <div>
                 <label

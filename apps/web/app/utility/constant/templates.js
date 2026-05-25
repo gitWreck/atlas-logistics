@@ -1,5 +1,14 @@
 // 1. UPDATED TEMPLATES (Added 'requiresDate' flag)
 
+import {
+  faChartPie,
+  faFileInvoice,
+  faMapSigns,
+  faTruck,
+  faTruckLoading,
+  faUsers,
+} from "@fortawesome/free-solid-svg-icons";
+
 export const shipmentLabelUrl = (data) =>
   `/components/print/labels?id=${encodeURIComponent(data)}&mode=shipment`;
 export const manifestUrl = (data) =>
@@ -51,6 +60,51 @@ export const TEMPLATES = [
     id: "COMPLETED",
     label: "Trip Completed",
     text: "Atlas Logistics: Our delivery run is complete. If you haven't received your package, please contact support immediately.",
+  },
+];
+
+export const mainNavItems = [
+  {
+    id: "overview",
+    label: "Dashboard",
+    icon: faChartPie,
+    title: "Overview",
+    description: "Operations dashboard",
+  },
+  {
+    id: "trips",
+    label: "Trips",
+    icon: faMapSigns,
+    title: "Trip Board",
+    description: "Manage truck assignments and routes.",
+  },
+  {
+    id: "shipments",
+    label: "Shipments",
+    icon: faTruck,
+    title: "Shipments",
+    description: "Manage shipments and orders.",
+  },
+  {
+    id: "trucks",
+    label: "Trucks",
+    icon: faTruckLoading,
+    title: "Truck Board",
+    description: "Manage fleet health and availability.",
+  },
+  {
+    id: "customers",
+    label: "Customers",
+    icon: faUsers,
+    title: "Customer Board",
+    description: "View customer accounts and contact details.",
+  },
+  {
+    id: "invoice",
+    label: "Invoices",
+    icon: faFileInvoice,
+    title: "Invoice Board",
+    description: "Manage invoices and payments.",
   },
 ];
 
