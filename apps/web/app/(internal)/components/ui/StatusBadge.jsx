@@ -20,7 +20,7 @@ const delayIcons = {
 export default function StatusBadge({ status, reason, isDark = true }) {
   if (!status) return null;
 
-  let normalizedStatus = status.toUpperCase();
+  let normalizedStatus = status.toUpperCase().replace(/\s+/g, "_");
 
   // 1. SMART OVERRIDE:
   // If a reason is provided, treat the badge visually as "DELAYED"
@@ -39,6 +39,8 @@ export default function StatusBadge({ status, reason, isDark = true }) {
 
     RECEIVED: "bg-cyan-500/10 text-cyan-400 border-cyan-500/20",
     ASSIGNED: "bg-yellow-500/10 text-yellow-400 border-yellow-500/20",
+    PARTIALLY_LOADED:
+      "bg-lime-500/10 text-lime-400 border-lime-500/20",
     LOADED: "bg-orange-500/10 text-orange-400 border-orange-500/20",
 
     IN_TRANSIT: "bg-blue-500/10 text-blue-400 border-blue-500/20",
@@ -72,6 +74,8 @@ export default function StatusBadge({ status, reason, isDark = true }) {
 
     RECEIVED: "bg-cyan-500/15 text-cyan-600 border-cyan-400/40",
     ASSIGNED: "bg-yellow-500/15 text-yellow-700 border-yellow-400/40",
+    PARTIALLY_LOADED:
+      "bg-lime-500/15 text-lime-700 border-lime-400/40",
     LOADED: "bg-orange-500/15 text-orange-600 border-orange-400/40",
 
     IN_TRANSIT: "bg-blue-500/15 text-blue-600 border-blue-400/40",

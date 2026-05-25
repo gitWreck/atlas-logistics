@@ -77,6 +77,28 @@ export async function POST(req) {
     }
 
     const data = shipmentDoc.data();
+    const packageTripId =
+      targetPackage?.currentTripId || targetPackage?.loadedOnTrip || null;
+    const shipmentTripIds = Array.isArray(data.currentTripIds)
+      ? data.currentTripIds
+      : data.currentTripId
+        ? [data.currentTripId]
+        : [];
+    const shipmentAssignedToTrip =
+      data.currentTripId === tripId || shipmentTripIds.includes(tripId);
+    let packageAssignmentState = "SHIPMENT_SCAN";
+
+    if (targetPackage) {
+      if (packageTripId === tripId) {
+        packageAssignmentState = "ON_THIS_TRIP";
+      } else if (!packageTripId) {
+        packageAssignmentState = shipmentTripIds.length
+          ? "UNASSIGNED_PACKAGE_FROM_ASSIGNED_SHIPMENT"
+          : "UNASSIGNED_PACKAGE";
+      } else {
+        packageAssignmentState = "ON_OTHER_TRIP";
+      }
+    }
 
     // 3. Construct Response
     return NextResponse.json({
@@ -86,6 +108,9 @@ export async function POST(req) {
       shipmentId: data.shipmentId,
       packageId: targetPackage ? targetPackage.packageId : null,
       trackingNumber: targetPackage ? targetPackage.trackingNumber : null,
+      packageCurrentTripId: packageTripId,
+      shipmentCurrentTripIds: shipmentTripIds,
+      packageAssignmentState,
       status: targetPackage ? targetPackage.status : data.status,
       destination: data.recipient?.city || data.destination || "Unknown",
       recipientName: data.recipient?.name || "N/A",
@@ -94,7 +119,9 @@ export async function POST(req) {
       packages: data.packages || [],
 
       // If the current assigned trip doesn't match the active scanner trip, flag it
-      requiresAssignment: data.currentTripId !== tripId,
+      requiresAssignment: targetPackage
+        ? packageAssignmentState === "ON_OTHER_TRIP"
+        : !shipmentAssignedToTrip,
     });
   } catch (error) {
     console.error("Resolve API Error:", error);

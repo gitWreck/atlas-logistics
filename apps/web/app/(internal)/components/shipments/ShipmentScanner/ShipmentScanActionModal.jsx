@@ -33,6 +33,48 @@ import {
   ScannerEngineSelect,
 } from "./ScannerControls";
 import ManifestPanel from "./ManifestPanel";
+import StatusBadge from "../../ui/StatusBadge";
+
+const getLoadedPackageCount = (trip) => {
+  const explicitLoaded = Number(trip?.totalLoaded ?? trip?.loadedCount);
+  if (Number.isFinite(explicitLoaded)) return Math.max(explicitLoaded, 0);
+
+  const totalItems = Number(trip?.totalItems) || 0;
+  const itemPending = Number(trip?.itemPending);
+  if (Number.isFinite(itemPending)) {
+    return Math.max(totalItems - itemPending, 0);
+  }
+
+  return 0;
+};
+
+function TripScanDetailsCard({ trip, theme, isDark }) {
+  const totalItems = Math.max(Number(trip?.totalItems) || 0, 0);
+  const loadedPackages = getLoadedPackageCount(trip);
+  const loadedLabel =
+    totalItems > 0 ? `${loadedPackages}/${totalItems}` : `${loadedPackages}`;
+
+  return (
+    <div className={`rounded-xl border p-4 ${theme.panelSurface}`}>
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <div className="text-[10px] font-bold uppercase opacity-60">
+            Trip Status
+          </div>
+          <div className="mt-1">
+            <StatusBadge status={trip?.status || "UNKNOWN"} isDark={isDark} />
+          </div>
+        </div>
+        <div>
+          <div className="text-[10px] font-bold uppercase opacity-60">
+            Loaded Packages
+          </div>
+          <div className="mt-1 text-sm font-bold">{loadedLabel}</div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default function ShipmentScanActionModal({
   isOpen = false,
@@ -71,8 +113,7 @@ export default function ShipmentScanActionModal({
     : "";
   const errorGuidance = getScannerErrorGuidance(state.error, state, trip);
   const canShowLoadedStatusPromptButton =
-    state.successNotice?.needsLoadedStatusPrompt &&
-    !state.error &&
+    state.action === "LOAD" &&
     !state.needsHandoff &&
     !state.needsNextTrip &&
     !state.needsArrival &&
@@ -154,7 +195,7 @@ export default function ShipmentScanActionModal({
               }`}
             >
               <div className="flex items-center gap-3">
-                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-emerald-500 text-white shadow-sm">
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-white">
                   <FontAwesomeIcon icon={faCheck} />
                 </div>
                 <div className="min-w-0 flex-1">
@@ -337,6 +378,8 @@ export default function ShipmentScanActionModal({
                 onChange={actions.setScanStatus}
                 theme={theme}
               />
+
+              <TripScanDetailsCard trip={trip} theme={theme} isDark={isDark} />
 
               <ScannerEngineSelect
                 value={scannerEngine}

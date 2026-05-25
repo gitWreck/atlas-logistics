@@ -3,34 +3,40 @@ import { createPortal } from "react-dom";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faArrowsSplitUpAndLeft,
-  faBox,
-  faBoxesStacked,
   faCircleNotch,
 } from "@fortawesome/free-solid-svg-icons";
-import { splitShipments } from "@/app/utility/FirebaseFunctions";
+import { updateShipmentPackages } from "@/app/utility/FirebaseFunctions";
 
 export default function SplitShipmentModal({
   isOpen,
   onClose,
   selectedItems, // The actual package objects selected
+  allPackages,
   originalShipmentId,
+  shipmentCode,
   onSuccess,
   isDark,
 }) {
   const [splitData, setSplitData] = useState(
-    selectedItems.map((pkg) => ({
-      trackingNumber: pkg.trackingNumber,
-      description: pkg.description,
-      maxQty: pkg.quantity || 1,
-      splitQty: pkg.quantity || 1, // Default to moving the whole thing
-      packagingType: pkg.packagingType,
-    })),
+    selectedItems
+      .filter((pkg) => Number(pkg.quantity || 1) > 1)
+      .map((pkg) => ({
+        packageId: pkg.packageId,
+        trackingNumber: pkg.trackingNumber,
+        description: pkg.description,
+        maxQty: pkg.quantity || 1,
+        splitQty: Math.max(
+          1,
+          Math.min((pkg.quantity || 1) - 1, pkg.quantity || 1),
+        ),
+        packagingType: pkg.packagingType,
+      })),
   );
   const [isSaving, setIsSaving] = useState(false);
 
   const handleQtyChange = (index, val) => {
     const updated = [...splitData];
-    const num = Math.min(updated[index].maxQty, Math.max(1, Number(val)));
+    const num = Math.min(updated[index].maxQty - 1, Math.max(1, Number(val)));
     updated[index].splitQty = num;
     setSplitData(updated);
   };
@@ -38,19 +44,78 @@ export default function SplitShipmentModal({
   const handleConfirmSplit = async () => {
     try {
       setIsSaving(true);
-      // Format data for the Firebase Function we just wrote
-      const itemsToSplit = splitData.map((d) => ({
-        trackingNumber: d.trackingNumber,
-        splitQty: d.splitQty,
-      }));
+      const splitMap = new Map(
+        splitData.map((item) => [item.packageId || item.trackingNumber, item]),
+      );
+      const usedIds = new Set(
+        allPackages
+          .map((pkg) => pkg.packageId || pkg.trackingNumber)
+          .filter(Boolean),
+      );
+      let nextSequence =
+        allPackages.reduce((max, pkg) => {
+          const seq = Number(pkg.sequence);
+          return Number.isFinite(seq) ? Math.max(max, seq) : max;
+        }, 0) + 1;
 
-      const result = await splitShipments({
-        originalShipmentId,
-        itemsToSplit,
-        remarks: "Manual split from View Packages UI",
+      const nextPackageIdentity = () => {
+        let packageId = `${shipmentCode}-${String(nextSequence).padStart(2, "0")}`;
+        while (usedIds.has(packageId)) {
+          nextSequence += 1;
+          packageId = `${shipmentCode}-${String(nextSequence).padStart(2, "0")}`;
+        }
+        usedIds.add(packageId);
+        nextSequence += 1;
+        return {
+          packageId,
+          trackingNumber: packageId,
+          sequence: nextSequence - 1,
+        };
+      };
+
+      const updatedPackages = allPackages.flatMap((pkg) => {
+        const split = splitMap.get(pkg.packageId || pkg.trackingNumber);
+        if (!split) return [pkg];
+
+        const originalQty = Math.max(Number(pkg.quantity) || 1, 1);
+        const splitQty = Math.min(
+          originalQty - 1,
+          Math.max(1, Number(split.splitQty) || 1),
+        );
+        const remainingQty = originalQty - splitQty;
+        const identity = nextPackageIdentity();
+
+        return [
+          {
+            ...pkg,
+            quantity: remainingQty,
+            updatedAt: new Date().toISOString(),
+          },
+          {
+            ...pkg,
+            ...identity,
+            quantity: splitQty,
+            loadedQty: 0,
+            receivedQty: 0,
+            missingQty: 0,
+            damagedQty: 0,
+            currentTripId: null,
+            loadedOnTrip: null,
+            parentPackageId: pkg.parentPackageId || pkg.packageId || null,
+            splitFromPackageId: pkg.packageId || pkg.trackingNumber || null,
+            status: "RECEIVED",
+            updatedAt: new Date().toISOString(),
+          },
+        ];
       });
 
-      alert(`Success! New Shipment Created: ${result.data.newShipmentId}`);
+      await updateShipmentPackages({
+        shipmentId: originalShipmentId,
+        packages: updatedPackages,
+        remarks: "Manual package quantity split from View Packages UI",
+      });
+
+      alert("Package quantity split successfully.");
       onSuccess(); // Triggers refresh and closes both modals
     } catch (err) {
       alert("Split failed: " + err.message);
@@ -76,10 +141,10 @@ export default function SplitShipmentModal({
             <h3
               className={`font-bold ${isDark ? "text-white" : "text-slate-900"}`}
             >
-              Split Shipment
+              Split Package Quantity
             </h3>
             <p className="text-[10px] text-slate-500 uppercase font-bold tracking-wider">
-              Move items to new ID
+              Keep the same shipment ID
             </p>
           </div>
         </div>
@@ -87,7 +152,7 @@ export default function SplitShipmentModal({
         <div className="p-6 space-y-4 max-h-[50vh] overflow-y-auto custom-scrollbar">
           {splitData.map((item, idx) => (
             <div
-              key={item.trackingNumber}
+              key={item.packageId || item.trackingNumber || idx}
               className={`p-3 rounded-xl border ${
                 isDark
                   ? "bg-slate-950/50 border-slate-800"
@@ -96,7 +161,7 @@ export default function SplitShipmentModal({
             >
               <div className="flex justify-between items-start mb-2">
                 <span className="text-[10px] font-mono text-amber-500">
-                  {item.trackingNumber}
+                  {item.trackingNumber || item.packageId}
                 </span>
                 <span
                   className={`text-[10px] font-bold px-2 py-0.5 rounded ${
@@ -129,7 +194,7 @@ export default function SplitShipmentModal({
                   }`}
                 />
                 <span className="text-[10px] text-slate-500">
-                  / {item.maxQty}
+                  / {item.maxQty - 1} max
                 </span>
               </div>
             </div>

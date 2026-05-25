@@ -6,6 +6,7 @@ import {
   Vibration,
   StyleSheet,
   PanResponder,
+  Animated,
 } from "react-native";
 import { useCameraPermissions } from "expo-camera";
 import * as ImagePicker from "expo-image-picker";
@@ -102,12 +103,11 @@ export default function ScannerScreen() {
   const [tripStatusUpdating, setTripStatusUpdating] = useState(false);
   const [latestScan, setLatestScan] = useState(EMPTY_SCAN_DETAILS);
   const [scanActionStatus, setScanActionStatus] = useState(null);
-  const [detailsSheetHeight, setDetailsSheetHeight] = useState(
-    DEFAULT_DETAILS_SHEET_HEIGHT,
-  );
-
   const successTimerRef = useRef(null);
   const countdownTimerRef = useRef(null);
+  const detailsSheetHeight = useRef(
+    new Animated.Value(DEFAULT_DETAILS_SHEET_HEIGHT),
+  ).current;
   const detailsSheetHeightRef = useRef(DEFAULT_DETAILS_SHEET_HEIGHT);
   const dragStartHeightRef = useRef(DEFAULT_DETAILS_SHEET_HEIGHT);
   const detailsSheetPanResponder = useRef(
@@ -123,14 +123,19 @@ export default function ScannerScreen() {
           dragStartHeightRef.current - gestureState.dy,
         );
         detailsSheetHeightRef.current = nextHeight;
-        setDetailsSheetHeight(nextHeight);
+        detailsSheetHeight.setValue(nextHeight);
       },
       onPanResponderRelease: (_, gestureState) => {
         const nextHeight = clampSheetHeight(
           dragStartHeightRef.current - gestureState.dy,
         );
         detailsSheetHeightRef.current = nextHeight;
-        setDetailsSheetHeight(nextHeight);
+        Animated.spring(detailsSheetHeight, {
+          toValue: nextHeight,
+          useNativeDriver: false,
+          tension: 120,
+          friction: 18,
+        }).start();
       },
     }),
   ).current;
@@ -311,10 +316,6 @@ export default function ScannerScreen() {
   useEffect(() => {
     fetchTripScanSummary(resolvedTripId);
   }, [resolvedTripId, resolvedMode]);
-
-  useEffect(() => {
-    detailsSheetHeightRef.current = detailsSheetHeight;
-  }, [detailsSheetHeight]);
 
   useEffect(() => {
     setScanActionStatus(getDefaultScanStatus(resolvedMode));
