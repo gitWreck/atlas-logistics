@@ -2,7 +2,7 @@
 
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const admin = require("firebase-admin");
-const { requireRole } = require("../utilities/helpers");
+const { requireRole, updatedBy } = require("../utilities/helpers");
 const { writeTripActionLog } = require("../utilities/tripLogger");
 
 if (!admin.apps.length) admin.initializeApp();
@@ -16,13 +16,15 @@ exports.removeAssignmentFromTrip = onCall(
   async (req) => {
     await requireRole(db, req, ["admin", "manager"]);
 
-    const { tripId } = req.data || {};
+    const {
+      tripId,
+      // updatedBy = null
+    } = req.data || {};
     if (!tripId || typeof tripId !== "string") {
       throw new HttpsError("invalid-argument", "tripId is required");
     }
 
-    const uid = req.auth?.uid;
-    const role = req.auth?.token?.role || "unknown";
+    const { uid, role, name } = updatedBy(req);
 
     const tripRef = db.collection("truck_trips").doc(tripId);
     const eventsRef = tripRef.collection("status_events");
@@ -134,7 +136,7 @@ exports.removeAssignmentFromTrip = onCall(
         truckId: null,
         truckPlateNumber: null,
         updatedAt: now,
-        updatedBy: uid,
+        updatedBy: name,
         updatedRole: role,
       });
 
@@ -144,7 +146,7 @@ exports.removeAssignmentFromTrip = onCall(
       if (assignedTruckId && truckSnap?.exists) {
         const truckUpdate = {
           updatedAt: now,
-          updatedBy: uid,
+          updatedBy: name,
         };
 
         if (stillAssignedElsewhere) {
@@ -169,7 +171,7 @@ exports.removeAssignmentFromTrip = onCall(
           ? "Driver and truck assignment removed from trip. Truck remains assigned to another active trip."
           : "Driver and truck assignment removed from trip. Truck is now idle.",
         createdAt: now,
-        createdBy: uid,
+        createdBy: name,
         createdRole: role,
         previousDriverId: assignedDriverId,
         previousTruckId: assignedTruckId,
@@ -193,7 +195,7 @@ exports.removeAssignmentFromTrip = onCall(
           : false,
         nextCurrentTripId: nextCurrentTripId,
         actorId: uid,
-        actorName: req.auth.token?.name || null,
+        actorName: name || null,
         actorRole: role,
         createdAt: now,
       });

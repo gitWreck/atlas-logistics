@@ -4,6 +4,7 @@ const {
   getActorFromRequest,
   writeInvoiceActionLog,
 } = require("../utilities/invoiceLogger");
+const { updatedBy } = require("../utilities/helpers");
 
 if (!admin.apps.length) admin.initializeApp();
 const db = admin.firestore();
@@ -19,8 +20,8 @@ exports.editInvoice = onCall(
       throw new HttpsError("unauthenticated", "Login required.");
     }
 
-    const uid = request.auth.uid;
-    const actor = getActorFromRequest(request);
+    // const uid = request.auth.uid;
+    // const actor = getActorFromRequest(request);
 
     const {
       invoiceId,
@@ -32,6 +33,8 @@ exports.editInvoice = onCall(
       notes,
       status,
     } = request.data || {};
+
+    const { uid, role, name } = updatedBy(request);
 
     // 2. VALIDATION
     if (!invoiceId) {
@@ -58,7 +61,7 @@ exports.editInvoice = onCall(
     // 3. BUILD UPDATE OBJECT
     const updateData = {
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-      updatedBy: uid,
+      updatedBy: name,
     };
 
     if (invoiceDate !== undefined) updateData.invoiceDate = invoiceDate;
@@ -96,9 +99,9 @@ exports.editInvoice = onCall(
       invoiceDocId: invoiceRef.id,
       invoiceNumber: invoiceData.invoiceNumber || invoiceId,
       shipmentId: invoiceData.shipmentId || null,
-      actorId: actor.actorId,
-      actorName: actor.actorName,
-      actorRole: actor.actorRole,
+      actorId: uid,
+      actorName: name,
+      actorRole: role,
       details: {
         changedFields,
         status: updateData.status,

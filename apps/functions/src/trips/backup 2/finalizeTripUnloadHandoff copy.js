@@ -3,9 +3,9 @@
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const admin = require("firebase-admin");
 const { FieldValue } = admin.firestore;
-const { requireRole, requireString } = require("../utilities/helpers");
-const { writeShipmentActionLog } = require("../utilities/shipmentLogger");
-const { writeTripActionLog } = require("../utilities/tripLogger");
+const { requireRole, requireString } = require("../../utilities/helpers");
+const { writeShipmentActionLog } = require("../../utilities/shipmentLogger");
+const { writeTripActionLog } = require("../../utilities/tripLogger");
 
 if (!admin.apps.length) admin.initializeApp();
 const db = admin.firestore();
@@ -15,7 +15,11 @@ const normalizeQty = (value, fallback = 0) => {
   return Number.isFinite(num) && num >= 0 ? num : fallback;
 };
 
-const shipmentTotalQty = (shipment = {}, tripShipment = {}, manifestItem = {}) =>
+const shipmentTotalQty = (
+  shipment = {},
+  tripShipment = {},
+  manifestItem = {},
+) =>
   normalizeQty(
     shipment.totals?.totalContentQty ??
       shipment.totals?.totalItems ??
@@ -80,7 +84,9 @@ exports.finalizeTripUnloadHandoff = onCall(
 
       const sourceTrip = sourceTripSnap.data() || {};
       const deliveryTrip = deliveryTripSnap.data() || {};
-      const deliveryTripType = String(deliveryTrip.tripType || "").toUpperCase();
+      const deliveryTripType = String(
+        deliveryTrip.tripType || "",
+      ).toUpperCase();
 
       if (deliveryTripType !== "DELIVERY") {
         throw new HttpsError(
@@ -204,7 +210,9 @@ exports.finalizeTripUnloadHandoff = onCall(
           });
 
           if (!remark) {
-            blockers.push(`Remarks are required for missing shipment ${shipmentId}.`);
+            blockers.push(
+              `Remarks are required for missing shipment ${shipmentId}.`,
+            );
             return;
           }
         }
@@ -226,7 +234,8 @@ exports.finalizeTripUnloadHandoff = onCall(
           manifestItem,
         );
         const packages = stampPackagesOutForDelivery(shipment.packages || []);
-        const publicShipmentId = shipment.shipmentId || manifestItem.shipmentId || shipmentId;
+        const publicShipmentId =
+          shipment.shipmentId || manifestItem.shipmentId || shipmentId;
         const route =
           sourceTripShipment.route ||
           `${shipment.originCode || "?"} -> ${shipment.destinationCode || "?"}`;
@@ -244,9 +253,12 @@ exports.finalizeTripUnloadHandoff = onCall(
             deliveredCount: 0,
             receivedCount: 0,
             sender: shipment.sender || sourceTripShipment.sender || null,
-            recipient: shipment.recipient || sourceTripShipment.recipient || null,
+            recipient:
+              shipment.recipient || sourceTripShipment.recipient || null,
             packageBarcodes:
-              shipment.packageBarcodes || sourceTripShipment.packageBarcodes || [],
+              shipment.packageBarcodes ||
+              sourceTripShipment.packageBarcodes ||
+              [],
             sourceTripId,
             missingOnSourceTrip: remainingLoaded > 0,
             missingRemarks: remainingLoaded > 0 ? remark : null,
@@ -345,10 +357,12 @@ exports.finalizeTripUnloadHandoff = onCall(
       };
 
       if (aggregateTotalItems > 0) {
-        deliveryTripUpdate.totalItems = FieldValue.increment(aggregateTotalItems);
+        deliveryTripUpdate.totalItems =
+          FieldValue.increment(aggregateTotalItems);
       }
       if (aggregateLoadedItems > 0) {
-        deliveryTripUpdate.totalLoaded = FieldValue.increment(aggregateLoadedItems);
+        deliveryTripUpdate.totalLoaded =
+          FieldValue.increment(aggregateLoadedItems);
       }
 
       tx.update(deliveryTripRef, deliveryTripUpdate);

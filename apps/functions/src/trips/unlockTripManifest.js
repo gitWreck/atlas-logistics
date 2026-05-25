@@ -5,6 +5,7 @@ const admin = require("firebase-admin");
 const {
   requireRole,
   requireString,
+  updatedBy,
 } = require("../utilities/helpers");
 const { writeTripActionLog } = require("../utilities/tripLogger");
 
@@ -23,7 +24,10 @@ exports.unlockTripManifest = onCall(
   async (req) => {
     // 1. Auth & Role Check
     await requireRole(db, req, ["admin", "manager"]);
-    const uid = req.auth.uid;
+
+    // const updatedBy = req.data?.updatedBy || {};
+
+    const { uid, role, name } = updatedBy(req);
 
     const tripId = requireString(req.data?.tripId, "tripId");
     const reason = requireString(req.data?.reason, "reason"); // Reason is mandatory for audits
@@ -31,7 +35,7 @@ exports.unlockTripManifest = onCall(
     const tripRef = db.collection("truck_trips").doc(tripId);
 
     // Get user details for the log
-    const userSnap = await db.collection("users").doc(uid).get();
+    const userSnap = await db.collection("users").doc(req.auth.uid).get();
     const actorName = userSnap.data()?.name || "Unknown Manager";
 
     await db.runTransaction(async (tx) => {
@@ -53,7 +57,7 @@ exports.unlockTripManifest = onCall(
         manifestStatus: "OPEN_FOR_EDIT",
 
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-        updatedBy: uid,
+        updatedBy: name,
       });
 
       // 3. AUDIT LOG (Crucial for compliance)
@@ -71,7 +75,7 @@ exports.unlockTripManifest = onCall(
         at: admin.firestore.FieldValue.serverTimestamp(),
         actorId: uid,
         actorName: actorName,
-        actorRole: req.auth.token?.role || null,
+        actorRole: role || null,
         note: `Manifest unlocked by manager. Reason: ${reason}`,
       });
 
@@ -80,7 +84,7 @@ exports.unlockTripManifest = onCall(
       tx.set(eventRef, {
         type: "MANIFEST_UNLOCKED",
         reason,
-        unlockedBy: uid,
+        unlockedBy: name,
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
       });
     });
