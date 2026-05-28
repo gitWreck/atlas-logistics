@@ -21,6 +21,7 @@ export default function PackageActionModal({
   // noteRemarks,
   packagingGroup,
   defaultAction,
+  initialRemarks = "",
 }) {
   const [remarks, setRemarks] = useState("");
   const [manualQty, setManualQty] = useState("");
@@ -29,12 +30,11 @@ export default function PackageActionModal({
   // Initialize/Reset values when modal opens
   useEffect(() => {
     if (visible) {
-      // setRemarks(noteRemarks || "");
-      setRemarks("");
+      setRemarks(initialRemarks || "");
       // Default manual quantity to the total available pieces
       setManualQty(maxQty.toString());
     }
-  }, [visible, maxQty]);
+  }, [visible, initialRemarks, maxQty]);
 
   const ACTIONS = [
     {
@@ -48,6 +48,12 @@ export default function PackageActionModal({
       mode: "RECEIVED",
       icon: "warehouse",
       color: "#10b981",
+    },
+    {
+      label: "Out for Delivery",
+      mode: "OUT_FOR_DELIVERY",
+      icon: "route",
+      color: "#7c3aed",
     },
     {
       label: "Delivered",

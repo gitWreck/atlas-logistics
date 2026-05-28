@@ -1,15 +1,48 @@
 "use client";
 
-import React from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faCheckCircle } from "@fortawesome/free-solid-svg-icons";
+import {
+  faCheckCircle,
+  faChevronLeft,
+  faChevronRight,
+} from "@fortawesome/free-solid-svg-icons";
 import { InfoCard } from "../ui/InfoCard";
 import {
   SHIPMENT_STEPS_HUB_TRANSFER,
   SHIPMENT_STEPS_LOCAL_PICKUP,
 } from "@/app/utility/constant/templates";
 
+const ACTIVITY_LOGS_PER_PAGE = 5;
+
 export default function ShipmentTimelineTab({ data, isDark = false }) {
+  const [activityPage, setActivityPage] = useState(1);
+
+  const activityLogs = useMemo(
+    () => [...(data?.statusHistory || [])].reverse(),
+    [data?.statusHistory],
+  );
+
+  const totalActivityPages = Math.max(
+    1,
+    Math.ceil(activityLogs.length / ACTIVITY_LOGS_PER_PAGE),
+  );
+  const safeActivityPage = Math.min(activityPage, totalActivityPages);
+  const activityStartIndex =
+    (safeActivityPage - 1) * ACTIVITY_LOGS_PER_PAGE;
+  const visibleActivityLogs = activityLogs.slice(
+    activityStartIndex,
+    activityStartIndex + ACTIVITY_LOGS_PER_PAGE,
+  );
+
+  useEffect(() => {
+    setActivityPage(1);
+  }, [data?.id, activityLogs.length]);
+
+  useEffect(() => {
+    setActivityPage((page) => Math.min(page, totalActivityPages));
+  }, [totalActivityPages]);
+
   if (!data) return null;
 
   const isPickupOrder =
@@ -139,9 +172,9 @@ export default function ShipmentTimelineTab({ data, isDark = false }) {
         </h3>
 
         <div className="space-y-4">
-          {data.statusHistory && data.statusHistory.length > 0 ? (
-            [...data.statusHistory].reverse().map((log, idx) => (
-              <div key={idx} className="flex gap-4 group">
+          {activityLogs.length > 0 ? (
+            visibleActivityLogs.map((log, idx) => (
+              <div key={activityStartIndex + idx} className="flex gap-4 group">
                 <div className="w-24 shrink-0 pt-1">
                   <p
                     className={`text-[12px] font-mono font-bold leading-none ${
@@ -218,6 +251,85 @@ export default function ShipmentTimelineTab({ data, isDark = false }) {
             </div>
           )}
         </div>
+
+        {totalActivityPages > 1 && (
+          <div
+            className={`mt-5 px-4 py-3 border rounded-xl flex flex-col sm:flex-row justify-between items-center gap-3 text-xs ${
+              isDark
+                ? "bg-slate-900/40 border-slate-800 text-slate-500"
+                : "bg-slate-50 border-slate-200 text-slate-500"
+            }`}
+          >
+            <span>
+              Showing{" "}
+              <span
+                className={`font-bold ${
+                  isDark ? "text-slate-300" : "text-slate-700"
+                }`}
+              >
+                {activityStartIndex + 1}
+              </span>
+              -
+              <span
+                className={`font-bold ${
+                  isDark ? "text-slate-300" : "text-slate-700"
+                }`}
+              >
+                {Math.min(
+                  activityStartIndex + ACTIVITY_LOGS_PER_PAGE,
+                  activityLogs.length,
+                )}
+              </span>{" "}
+              of {activityLogs.length}
+            </span>
+
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() =>
+                  setActivityPage((page) => Math.max(1, page - 1))
+                }
+                disabled={safeActivityPage === 1}
+                className={`w-8 h-8 flex items-center justify-center rounded-lg border disabled:opacity-50 disabled:cursor-not-allowed transition-colors ${
+                  isDark
+                    ? "border-slate-700 text-slate-300 hover:bg-slate-800"
+                    : "border-slate-200 text-slate-600 hover:bg-white"
+                }`}
+                aria-label="Previous activity log page"
+              >
+                <FontAwesomeIcon icon={faChevronLeft} size="xs" />
+              </button>
+
+              <div
+                className={`flex items-center px-3 h-8 border rounded-lg text-xs font-bold ${
+                  isDark
+                    ? "bg-slate-950 border-slate-700 text-slate-300"
+                    : "bg-white border-slate-200 text-slate-700"
+                }`}
+              >
+                Page {safeActivityPage} of {totalActivityPages}
+              </div>
+
+              <button
+                type="button"
+                onClick={() =>
+                  setActivityPage((page) =>
+                    Math.min(totalActivityPages, page + 1),
+                  )
+                }
+                disabled={safeActivityPage === totalActivityPages}
+                className={`w-8 h-8 flex items-center justify-center rounded-lg border disabled:opacity-50 disabled:cursor-not-allowed transition-colors ${
+                  isDark
+                    ? "border-slate-700 text-slate-300 hover:bg-slate-800"
+                    : "border-slate-200 text-slate-600 hover:bg-white"
+                }`}
+                aria-label="Next activity log page"
+              >
+                <FontAwesomeIcon icon={faChevronRight} size="xs" />
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

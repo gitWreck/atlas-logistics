@@ -6,6 +6,7 @@ import { useState, useCallback } from "react";
 import {
   bulkAssignShipments,
   finalizeTripUnloadHandoff,
+  finalizeTripUnloadReadyForDelivery,
   updateTripStatus,
   unlockTripManifest,
   generateTripManifest,
@@ -310,10 +311,6 @@ export default function useScannerLogic({
           setResolvedItem(null);
           setNeedsAssignmentItem(null);
           setNeedsNextTrip(false);
-        }
-
-        if (!trips.length) {
-          setError("No available DELIVERY trips found.");
         }
 
         return summary;
@@ -643,6 +640,32 @@ export default function useScannerLogic({
       }, 1000);
   };
 
+  const handleMarkReadyForDelivery = async () => {
+    const missing = handoffSummary?.missingShipments || [];
+    const incompleteRemark = missing.find(
+      (item) => !String(missingRemarks[item.id] || "").trim(),
+    );
+
+    if (incompleteRemark) {
+      return setError(`Add remarks for ${incompleteRemark.shipmentId}.`);
+    }
+
+    const success = await executeFirebaseCall(
+      finalizeTripUnloadReadyForDelivery,
+      {
+        sourceTripId: tripId,
+        missingRemarks,
+        updatedBy: updatedBy(profile),
+      },
+    );
+    if (success)
+      setTimeout(() => {
+        onRefresh?.();
+        onClose?.();
+        resetFlow();
+      }, 1000);
+  };
+
   const handleConfirm = async () => {
     const itemsToProcess = Object.entries(quantities)
       .filter(([_, qty]) => qty > 0)
@@ -756,6 +779,7 @@ export default function useScannerLogic({
       handleSetTripLoaded,
       handleLockManifest,
       handleAssignNextTrip,
+      handleMarkReadyForDelivery,
       handleReviewHandoff: () => loadHandoffReview(),
       handleConfirm,
     },

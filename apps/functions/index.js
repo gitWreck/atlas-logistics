@@ -97,6 +97,8 @@ exports.updateTripDetails =
   require("./src/trips/updateTripDetails").updateTripDetails;
 exports.finalizeTripUnloadHandoff =
   require("./src/trips/finalizeTripUnloadHandoff").finalizeTripUnloadHandoff;
+exports.finalizeTripUnloadReadyForDelivery =
+  require("./src/trips/finalizeTripUnloadHandoff").finalizeTripUnloadReadyForDelivery;
 
 // Shipments
 exports.bulkShipmentAction =

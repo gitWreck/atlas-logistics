@@ -89,6 +89,7 @@ export function HandoffPrompt({
   missingRemarks,
   onRemarkChange,
   onAssign,
+  onMarkReadyForDelivery,
   onRefresh,
   onBack,
   btnStatus,
@@ -102,6 +103,7 @@ export function HandoffPrompt({
   );
   const canAssign =
     trips.length > 0 && selectedTrip && (!hasMissing || remarksComplete);
+  const canMarkReady = !hasMissing || remarksComplete;
 
   return (
     <InterceptorPrompt
@@ -201,6 +203,16 @@ export function HandoffPrompt({
       <div className="space-y-2">
         <StatusButton
           status={btnStatus}
+          label="Mark Ready for Delivery"
+          loadingLabel="Marking ready..."
+          successLabel="Ready for Delivery"
+          icon={faCheck}
+          variant="emerald"
+          disabled={!canMarkReady}
+          onClick={onMarkReadyForDelivery}
+        />
+        <StatusButton
+          status={btnStatus}
           label="Assign to Delivery Trip"
           loadingLabel="Assigning..."
           successLabel="Handoff Complete"
@@ -209,6 +221,12 @@ export function HandoffPrompt({
           disabled={!canAssign}
           onClick={onAssign}
         />
+        {trips.length === 0 && (
+          <div className="text-[11px] opacity-60">
+            No delivery trips available. You can still mark these shipments ready
+            for delivery.
+          </div>
+        )}
         <div className="flex items-center justify-center gap-4">
           <button onClick={onBack} className="text-xs opacity-60 underline">
             Back to scanning

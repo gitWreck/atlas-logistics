@@ -53,6 +53,10 @@ export const finalizeTripUnloadHandoff = httpsCallable(
   functions,
   "finalizeTripUnloadHandoff",
 );
+export const finalizeTripUnloadReadyForDelivery = httpsCallable(
+  functions,
+  "finalizeTripUnloadReadyForDelivery",
+);
 export const resolveDelayReport = httpsCallable(
   functions,
   "resolveDelayReport",

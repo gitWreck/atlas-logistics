@@ -24,7 +24,8 @@ export default function ScanDetailsSheet({
   processing,
   tripStatusUpdating,
   summaryLoading,
-  tripSummary,
+  progressSummary,
+  hasTripContext,
   progressLabel,
   canMarkTripCompleted,
   canMarkTripOutForDelivery,
@@ -35,6 +36,19 @@ export default function ScanDetailsSheet({
   onMarkOutForDelivery,
   onViewShipmentDetails,
 }) {
+  const summary = progressSummary || {};
+  const progressTitle = hasTripContext
+    ? summary.tripId || latestScan.currentTripId || "No trip"
+    : summary.shipmentId || latestScan.shipmentId || "No shipment";
+  const progressScopeLabel = hasTripContext
+    ? "Current Trip"
+    : "Shipment Progress";
+  const progressStatus = summary.status || "Status unavailable";
+  const progressPercent = Math.max(
+    0,
+    Math.min(Number(summary.progress) || 0, 100),
+  );
+
   return (
     <Animated.ScrollView
       style={[
@@ -108,6 +122,17 @@ export default function ScanDetailsSheet({
           value={latestScan.shipmentStatus || "Pending scan"}
           colors={colors}
         />
+        <DetailRow
+          label="Assignment"
+          value={
+            latestScan.currentTripId
+              ? `Trip ${latestScan.currentTripId}`
+              : latestScan.shipmentId
+                ? "No trip assigned"
+                : "Pending scan"
+          }
+          colors={colors}
+        />
       </View>
 
       {!!primaryScanActions.length && (
@@ -157,7 +182,7 @@ export default function ScanDetailsSheet({
                       isActive && styles.offloadToggleTextActive,
                     ]}
                   >
-                    {action.label}
+                    {action.shortLabel || action.label}
                   </Text>
                 </TouchableOpacity>
               );
@@ -175,19 +200,19 @@ export default function ScanDetailsSheet({
         <View style={styles.progressHeader}>
           <View>
             <Text style={[styles.progressLabel, { color: colors.textMuted }]}>
-              Current Trip
+              {progressScopeLabel}
             </Text>
             <Text style={[styles.progressTrip, { color: colors.text }]}>
-              {tripSummary.tripId || latestScan.currentTripId || "No trip"}
+              {progressTitle}
             </Text>
             <Text style={[styles.progressStatus, { color: colors.textMuted }]}>
-              {tripSummary.status || "Status unavailable"}
+              {progressStatus}
             </Text>
           </View>
           {summaryLoading ? (
             <ActivityIndicator color="#2563eb" />
           ) : (
-            <Text style={styles.progressPercent}>{tripSummary.progress}%</Text>
+            <Text style={styles.progressPercent}>{progressPercent}%</Text>
           )}
         </View>
 
@@ -195,7 +220,7 @@ export default function ScanDetailsSheet({
           <View
             style={[
               styles.progressFill,
-              { width: `${tripSummary.progress}%` },
+              { width: `${progressPercent}%` },
             ]}
           />
         </View>
@@ -203,17 +228,17 @@ export default function ScanDetailsSheet({
         <View style={styles.statsRow}>
           <StatCell
             label="Shipments"
-            value={tripSummary.shipmentCount}
+            value={summary.shipmentCount || 0}
             colors={colors}
           />
           <StatCell
             label="Packages"
-            value={tripSummary.totalPackages}
+            value={summary.totalPackages || 0}
             colors={colors}
           />
           <StatCell
             label={progressLabel}
-            value={`${tripSummary.scannedPackages}/${tripSummary.totalPackages}`}
+            value={`${summary.scannedPackages || 0}/${summary.totalPackages || 0}`}
             colors={colors}
           />
         </View>

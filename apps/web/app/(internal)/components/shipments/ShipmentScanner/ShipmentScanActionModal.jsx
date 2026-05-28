@@ -282,6 +282,7 @@ export default function ShipmentScanActionModal({
                 }))
               }
               onAssign={actions.handleAssignNextTrip}
+              onMarkReadyForDelivery={actions.handleMarkReadyForDelivery}
               onRefresh={actions.handleReviewHandoff}
               onBack={actions.resetScanResult}
               btnStatus={state.btnStatus}
