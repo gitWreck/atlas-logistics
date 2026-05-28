@@ -27,6 +27,10 @@ export const updateShipmentPackages = httpsCallable(
   functions,
   "updateShipmentPackages",
 );
+export const releasePackagesToChecker = httpsCallable(
+  functions,
+  "releasePackagesToChecker",
+);
 
 // TRIPS
 export const createTruckTrip = httpsCallable(functions, "createTruckTrip");

@@ -22,6 +22,7 @@ import { getBoardThemeClasses } from "@/app/utility/constant/theme";
 import UnifiedShipmentModal from "./modals/UnifiedShipmentModal";
 import PickupRequestsTable from "./PickupRequestsTable";
 import TablePaginationFooter from "../ui/TablePaginationFooter";
+import ReleaseToCheckerModal from "./modals/ReleaseToCheckerModal";
 
 const ShipmentBoard = forwardRef(function ShipmentBoard(
   { user, profile, isDark = false },
@@ -32,6 +33,7 @@ const ShipmentBoard = forwardRef(function ShipmentBoard(
   const [loading, setLoading] = useState(true);
 
   const [isNewOrderModalOpen, setIsNewOrderModalOpen] = useState(false);
+  const [isReleaseModalOpen, setIsReleaseModalOpen] = useState(false);
   const [selectedShipmentId, setSelectedShipmentId] = useState(null);
   const [editingPickup, setEditingPickup] = useState(null);
 
@@ -234,6 +236,9 @@ const ShipmentBoard = forwardRef(function ShipmentBoard(
   const selectedShipment = [...shipments, ...pickups].find(
     (shipment) => shipment.id === selectedShipmentId,
   );
+  const canReleaseToChecker = ["manager", "admin"].includes(
+    String(profile?.role || "").toLowerCase(),
+  );
 
   const handleMessageCustomer = (shipment) => {
     const phone = shipment.sender?.phone || shipment.recipient?.phone;
@@ -362,6 +367,16 @@ const ShipmentBoard = forwardRef(function ShipmentBoard(
                 </div>
               )}
             </div>
+
+            {canReleaseToChecker && (
+              <button
+                type="button"
+                onClick={() => setIsReleaseModalOpen(true)}
+                className="w-full sm:w-auto rounded-lg bg-indigo-600 px-3 py-2 text-sm font-semibold text-white hover:bg-indigo-500 transition-colors"
+              >
+                Release to Checker
+              </button>
+            )}
           </div>
 
           {/* Table */}
@@ -477,6 +492,15 @@ const ShipmentBoard = forwardRef(function ShipmentBoard(
         }}
         resetTrigger={isNewOrderModalOpen}
         editData={editingPickup}
+      />
+
+      <ReleaseToCheckerModal
+        isOpen={isReleaseModalOpen}
+        onClose={() => setIsReleaseModalOpen(false)}
+        onSuccess={fetchShipments}
+        user={user}
+        isDark={isDark}
+        defaultShipmentIds={selectedShipment ? [selectedShipment.id] : []}
       />
     </div>
   );

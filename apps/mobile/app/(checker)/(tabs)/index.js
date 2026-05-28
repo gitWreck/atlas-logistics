@@ -44,6 +44,19 @@ export default function CheckerIndex() {
       params: { mode, title },
     });
   };
+  const goToTripsForLoad = () => {
+    Alert.alert(
+      "Trip Required",
+      "Select a trip first before loading. Open Active Loads, then scan from the trip manifest.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Open Active Loads",
+          onPress: () => router.push("/(checker)/(tabs)/trips"),
+        },
+      ],
+    );
+  };
 
   // 2. FETCH STATS (Facility View)
   const fetchStats = useCallback(async () => {
@@ -124,7 +137,7 @@ export default function CheckerIndex() {
 
         {/* 4. OPERATIONS GRID */}
         <OperationsGrid
-          onScanLoad={() => goToScan("loading", "Load Truck")}
+          onScanLoad={goToTripsForLoad}
           onScanOffload={() => goToScan("offloading", "Offload Items")}
           onScanInfo={() => goToScan("info", "Information")}
         />

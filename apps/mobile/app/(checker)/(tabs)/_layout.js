@@ -66,7 +66,7 @@ export default function CheckerTabsLayout() {
           }}
         />
 
-        {/* <Tabs.Screen
+        <Tabs.Screen
           name="trips"
           options={{
             title: "Active Loads",
@@ -74,7 +74,16 @@ export default function CheckerTabsLayout() {
               <FontAwesome5 name="truck-loading" size={20} color={color} />
             ),
           }}
-        /> */}
+        />
+        <Tabs.Screen
+          name="deliveries"
+          options={{
+            title: "Assigned",
+            tabBarIcon: ({ color }) => (
+              <FontAwesome5 name="clipboard-list" size={20} color={color} />
+            ),
+          }}
+        />
       </Tabs>
     </SafeAreaView>
   );

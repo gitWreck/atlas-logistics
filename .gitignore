@@ -52,3 +52,5 @@ Thumbs.db
 .turbo/
 .vercel
 .env*.local
+
+docs
