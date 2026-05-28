@@ -1,10 +1,14 @@
-"use strict";
+ "use strict";
 
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const admin = require("firebase-admin");
 const { FieldValue } = admin.firestore;
 const { requireRole, updatedBy } = require("../utilities/helpers");
 const { writePackageActionLog } = require("../utilities/packageLogger");
+const { writeShipmentEvent } = require("../tracking/writeShipmentEvent");
+const {
+  resolveEventTypeForScannerStatus,
+} = require("../tracking/eventTypes");
 
 if (!admin.apps.length) admin.initializeApp();
 const db = admin.firestore();
@@ -67,8 +71,20 @@ exports.updateShipmentPackages = onCall(
         `Invalid newStatus: ${newStatus}`,
       );
     }
+    if (
+      isScannerUpdate &&
+      String(newStatus).toUpperCase() === "LOADED" &&
+      !(typeof scannerTripId === "string" && scannerTripId.trim())
+    ) {
+      throw new HttpsError(
+        "failed-precondition",
+        "Trip is required before loading. Open a trip manifest, then scan packages.",
+      );
+    }
 
     const shipmentRef = db.collection("shipments").doc(shipmentId);
+
+    let pendingEvent = null;
 
     await db.runTransaction(async (tx) => {
       // -----------------------------
@@ -871,7 +887,49 @@ exports.updateShipmentPackages = onCall(
           location: location || null,
         },
       });
+
+      if (isScannerUpdate) {
+        const eventType = resolveEventTypeForScannerStatus(newStatus, { tripId });
+        if (eventType) {
+          pendingEvent = {
+            shipmentId,
+            eventType,
+            tripId: tripId || null,
+            truckId: tripData?.truckId || null,
+            truckName:
+              tripData?.truckName ||
+              tripData?.truckLabel ||
+              tripData?.vehicleName ||
+              null,
+            truckPlate:
+              tripData?.truckPlate ||
+              tripData?.plateNumber ||
+              tripData?.vehiclePlate ||
+              null,
+            driverId: tripData?.driverId || null,
+            driverName: tripData?.driverName || null,
+            checkerId: uid || authUid || null,
+            checkerName: name || null,
+            location: location || null,
+            createdBy: uid || authUid || null,
+            createdByRole: role || null,
+            remarks: remarks || null,
+            source: isScannerUpdate ? "SCANNER" : "WEB_MODAL",
+          };
+        }
+      }
     });
+
+    if (pendingEvent) {
+      try {
+        await writeShipmentEvent({
+          db,
+          event: pendingEvent,
+        });
+      } catch (eventError) {
+        console.error("Shipment event write failed:", eventError);
+      }
+    }
 
     return { success: true };
   },
