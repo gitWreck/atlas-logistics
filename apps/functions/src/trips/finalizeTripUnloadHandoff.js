@@ -424,3 +424,257 @@ exports.finalizeTripUnloadHandoff = onCall(
     return result;
   },
 );
+
+exports.finalizeTripUnloadReadyForDelivery = onCall(
+  { region: "asia-southeast1", maxInstances: 10 },
+  async (req) => {
+    const { uid, role, name } = updatedBy(req);
+
+    const sourceTripId = requireString(req.data?.sourceTripId, "sourceTripId");
+    const missingRemarks =
+      req.data?.missingRemarks && typeof req.data.missingRemarks === "object"
+        ? req.data.missingRemarks
+        : {};
+
+    const sourceTripRef = db.collection("truck_trips").doc(sourceTripId);
+    const now = FieldValue.serverTimestamp();
+    const nowTs = admin.firestore.Timestamp.now();
+
+    const result = await db.runTransaction(async (tx) => {
+      const sourceTripSnap = await tx.get(sourceTripRef);
+
+      if (!sourceTripSnap.exists) {
+        throw new HttpsError("not-found", "Source trip not found.");
+      }
+
+      const sourceTrip = sourceTripSnap.data() || {};
+      const manifestId = sourceTrip.manifestId;
+
+      if (!manifestId) {
+        throw new HttpsError(
+          "failed-precondition",
+          "Source trip has no manifest to reconcile.",
+        );
+      }
+
+      const manifestRef = db.collection("manifests").doc(manifestId);
+      const manifestSnap = await tx.get(manifestRef);
+      if (!manifestSnap.exists) {
+        throw new HttpsError("not-found", "Source manifest not found.");
+      }
+
+      const manifest = manifestSnap.data() || {};
+      const manifestItems = Array.isArray(manifest.shipments)
+        ? manifest.shipments
+        : [];
+
+      if (!manifestItems.length) {
+        throw new HttpsError(
+          "failed-precondition",
+          "Source manifest has no shipments to mark ready.",
+        );
+      }
+
+      const handoffItems = manifestItems
+        .map((item) => ({
+          ...item,
+          trackingShipmentId:
+            item.trackingShipmentId || item.shipmentId || item.id || null,
+        }))
+        .filter((item) => item.trackingShipmentId);
+
+      const manifestShipmentIds = handoffItems.map(
+        (item) => item.trackingShipmentId,
+      );
+
+      if (!manifestShipmentIds.length) {
+        throw new HttpsError(
+          "failed-precondition",
+          "Source manifest has no valid shipment IDs to mark ready.",
+        );
+      }
+
+      const sourceTripShipmentRefs = manifestShipmentIds.map((id) =>
+        sourceTripRef.collection("trip_shipments").doc(id),
+      );
+      const shipmentRefs = manifestShipmentIds.map((id) =>
+        db.collection("shipments").doc(id),
+      );
+
+      const [sourceTripShipmentSnaps, shipmentSnaps] = await Promise.all([
+        tx.getAll(...sourceTripShipmentRefs),
+        tx.getAll(...shipmentRefs),
+      ]);
+
+      const missing = [];
+      const blockers = [];
+      let markedReady = 0;
+
+      handoffItems.forEach((manifestItem, index) => {
+        const shipmentDocId = manifestItem.trackingShipmentId;
+        const sourceTripShipmentSnap = sourceTripShipmentSnaps[index];
+        const shipmentSnap = shipmentSnaps[index];
+
+        if (!shipmentSnap.exists) {
+          blockers.push(`Shipment ${shipmentDocId} was not found.`);
+          return;
+        }
+
+        const shipment = shipmentSnap.data() || {};
+        const sourceTripShipment = sourceTripShipmentSnap.exists
+          ? sourceTripShipmentSnap.data() || {}
+          : {};
+        const remainingLoaded = normalizeQty(sourceTripShipment.loadedCount, 0);
+        const remark = String(missingRemarks[shipmentDocId] || "").trim();
+
+        if (remainingLoaded > 0) {
+          missing.push({
+            shipmentId: shipmentDocId,
+            remainingLoaded,
+          });
+
+          if (!remark) {
+            blockers.push(
+              `Remarks are required for missing shipment ${shipmentDocId}.`,
+            );
+            return;
+          }
+        }
+
+        if (shipment.currentTripId && shipment.currentTripId !== sourceTripId) {
+          blockers.push(
+            `Shipment ${shipmentDocId} belongs to another trip (${shipment.currentTripId}).`,
+          );
+          return;
+        }
+
+        const publicShipmentId =
+          shipment.shipmentId || manifestItem.shipmentId || shipmentDocId;
+        const packages = stampPackagesReadyForDelivery(
+          shipment.packages || [],
+        ).map((pkg) => ({
+          ...pkg,
+          currentTripId: null,
+          loadedOnTrip: null,
+        }));
+
+        if (sourceTripShipmentSnap.exists) {
+          tx.update(sourceTripShipmentRefs[index], {
+            missingOnHandoff: remainingLoaded > 0,
+            missingRemarks: remainingLoaded > 0 ? remark : null,
+            status: "COMPLETED",
+            updatedAt: now,
+            updatedBy: name,
+          });
+        }
+
+        const shipmentUpdate = {
+          currentTripId: null,
+          assignedToTripAt: null,
+          status: "READY_FOR_DELIVERY",
+          packages,
+          updatedAt: now,
+          updatedBy: name,
+          updatedRole: role,
+          handoff: {
+            sourceTripId,
+            deliveryTripId: null,
+            completedAt: now,
+            readyForDeliveryOnly: true,
+            missingOnSourceTrip: remainingLoaded > 0,
+            missingRemarks: remainingLoaded > 0 ? remark : null,
+          },
+          statusHistory: FieldValue.arrayUnion({
+            status: "READY_FOR_DELIVERY",
+            at: nowTs,
+            by: name,
+            note:
+              remainingLoaded > 0
+                ? `Marked ready for delivery. Missing remark: ${remark}`
+                : "Marked ready for delivery",
+            location: sourceTrip.destination || null,
+          }),
+        };
+
+        if (remainingLoaded > 0) {
+          shipmentUpdate.remarks = remark;
+          shipmentUpdate.handoffRemarks = remark;
+        }
+
+        tx.update(shipmentRefs[index], shipmentUpdate);
+
+        writeShipmentActionLog({
+          db,
+          tx,
+          action: "MARK_READY_FOR_DELIVERY",
+          shipmentId: publicShipmentId,
+          shipmentDocId,
+          tripId: sourceTripId,
+          actorId: uid,
+          actorName: name,
+          actorRole: role,
+          details: {
+            sourceTripId,
+            missingOnSourceTrip: remainingLoaded > 0,
+            missingRemarks: remainingLoaded > 0 ? remark : null,
+          },
+          createdAt: now,
+        });
+
+        markedReady += 1;
+      });
+
+      if (blockers.length) {
+        throw new HttpsError("failed-precondition", blockers.join(" "));
+      }
+
+      tx.update(sourceTripRef, {
+        status: "COMPLETED",
+        active: false,
+        completedAt: now,
+        readyForDeliveryAt: now,
+        handoffTripId: null,
+        handoffCompletedAt: now,
+        handoffMissingCount: missing.length,
+        updatedAt: now,
+        updatedBy: name,
+      });
+
+      const sourceTripEventRef = sourceTripRef.collection("trip_events").doc();
+      tx.set(sourceTripEventRef, {
+        type: "UNLOAD_READY_FOR_DELIVERY",
+        markedReady,
+        missingCount: missing.length,
+        by: uid,
+        at: now,
+      });
+
+      writeTripActionLog({
+        db,
+        tx,
+        collection: "audit_logs",
+        action: "MARK_READY_FOR_DELIVERY",
+        tripId: sourceTripId,
+        targetId: sourceTripId,
+        targetCollection: "truck_trips",
+        at: now,
+        actorId: uid,
+        actorName: name,
+        actorRole: role,
+        note: "Finalized unload and marked shipments ready for delivery.",
+        details: {
+          markedReady,
+          missingCount: missing.length,
+        },
+      });
+
+      return {
+        success: true,
+        markedReady,
+        missingCount: missing.length,
+      };
+    });
+
+    return result;
+  },
+);

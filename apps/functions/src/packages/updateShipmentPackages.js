@@ -57,6 +57,7 @@ exports.updateShipmentPackages = onCall(
     const allowedStatuses = [
       "RECEIVED",
       "LOADED",
+      "OUT_FOR_DELIVERY",
       "DELIVERED",
       "MISSING",
       "DAMAGED",
@@ -93,14 +94,17 @@ exports.updateShipmentPackages = onCall(
       const resolveTripContext = async (candidateTripId) => {
         if (!candidateTripId) return null;
 
-        const candidateTripRef = db.collection("truck_trips").doc(candidateTripId);
+        const candidateTripRef = db
+          .collection("truck_trips")
+          .doc(candidateTripId);
         const candidateTripShipmentRef = candidateTripRef
           .collection("trip_shipments")
           .doc(shipmentId);
-        const [candidateTripSnap, candidateTripShipmentSnap] = await Promise.all([
-          tx.get(candidateTripRef),
-          tx.get(candidateTripShipmentRef),
-        ]);
+        const [candidateTripSnap, candidateTripShipmentSnap] =
+          await Promise.all([
+            tx.get(candidateTripRef),
+            tx.get(candidateTripShipmentRef),
+          ]);
 
         if (!candidateTripSnap.exists) return null;
 
@@ -147,13 +151,34 @@ exports.updateShipmentPackages = onCall(
       let tripSnap = tripContext?.tripSnap || null;
 
       if (tripId && tripRef && tripShipmentRef && !tripShipmentSnap?.exists) {
-          tx.set(tripShipmentRef, {
-            trackingShipmentId: shipmentId,
-            shipmentId: oldData.shipmentId || null,
-            route:
-              (oldData.originCode || "?") +
-              " -> " +
-              (oldData.destinationCode || "?"),
+        tx.set(tripShipmentRef, {
+          trackingShipmentId: shipmentId,
+          shipmentId: oldData.shipmentId || null,
+          route:
+            (oldData.originCode || "?") +
+            " -> " +
+            (oldData.destinationCode || "?"),
+          totalItems: 0,
+          pendingCount: 0,
+          loadedCount: 0,
+          deliveredCount: 0,
+          receivedCount: 0,
+          missingCount: 0,
+          damagedCount: 0,
+          sender: oldData.sender || null,
+          recipient: oldData.recipient || null,
+          packageBarcodes: [],
+          createdAt: FieldValue.serverTimestamp(),
+          createdBy: uid,
+          updatedAt: FieldValue.serverTimestamp(),
+          updatedBy: name,
+          updatedRole: role,
+          status: oldData.status || "ASSIGNED",
+        });
+        tripShipmentSnap = {
+          exists: true,
+          data: () => ({
+            status: oldData.status || "ASSIGNED",
             totalItems: 0,
             pendingCount: 0,
             loadedCount: 0,
@@ -161,29 +186,8 @@ exports.updateShipmentPackages = onCall(
             receivedCount: 0,
             missingCount: 0,
             damagedCount: 0,
-            sender: oldData.sender || null,
-            recipient: oldData.recipient || null,
-            packageBarcodes: [],
-            createdAt: FieldValue.serverTimestamp(),
-            createdBy: uid,
-            updatedAt: FieldValue.serverTimestamp(),
-            updatedBy: name,
-            updatedRole: role,
-            status: oldData.status || "ASSIGNED",
-          });
-          tripShipmentSnap = {
-            exists: true,
-            data: () => ({
-              status: oldData.status || "ASSIGNED",
-              totalItems: 0,
-              pendingCount: 0,
-              loadedCount: 0,
-              deliveredCount: 0,
-              receivedCount: 0,
-              missingCount: 0,
-              damagedCount: 0,
-            }),
-          };
+          }),
+        };
       }
 
       const tripData = tripSnap?.exists ? tripSnap.data() || {} : {};
@@ -279,7 +283,7 @@ exports.updateShipmentPackages = onCall(
         if (damagedQty > 0) return "DAMAGED";
         if (missingQty > 0) return "MISSING";
         if (receivedQty >= quantity) return "DELIVERED";
-        if (pkg.status === "OUT_FOR_DELIVERY" && loadedQty >= quantity) {
+        if (pkg.status === "OUT_FOR_DELIVERY") {
           return "OUT_FOR_DELIVERY";
         }
         if (loadedQty >= quantity) return "LOADED";
@@ -535,6 +539,18 @@ exports.updateShipmentPackages = onCall(
             loadedQty = clamp(loadedQty + requestedQty, 0, quantity);
             missingQty = 0;
             damagedQty = 0;
+          } else if (newStatus === "OUT_FOR_DELIVERY") {
+            const remainingQty = Math.max(quantity - loadedQty, 0);
+            const requestedQty =
+              specificQty !== undefined &&
+              specificQty !== null &&
+              specificQty !== ""
+                ? clamp(normalizeQty(specificQty, 0), 0, remainingQty)
+                : remainingQty;
+
+            loadedQty = clamp(loadedQty + requestedQty, 0, quantity);
+            missingQty = 0;
+            damagedQty = 0;
           } else if (newStatus === "DELIVERED") {
             const remainingQty = Math.max(quantity - receivedQty, 0);
             const deliverableQty =
@@ -600,9 +616,12 @@ exports.updateShipmentPackages = onCall(
             remarks: remarks || pkg.remarks || null,
           };
 
-          const derivedStatus = shouldPromoteReadyForDelivery
-            ? "OUT_FOR_DELIVERY"
-            : derivePackageStatus(updatedPkg);
+          const derivedStatus =
+            newStatus === "OUT_FOR_DELIVERY"
+              ? "OUT_FOR_DELIVERY"
+              : shouldPromoteReadyForDelivery
+                ? "OUT_FOR_DELIVERY"
+                : derivePackageStatus(updatedPkg);
 
           finalPackages.push({
             ...updatedPkg,
@@ -662,7 +681,9 @@ exports.updateShipmentPackages = onCall(
       } else if (newMissingQty >= newTotalQty && newTotalQty > 0) {
         shipmentStatus = "MISSING";
       } else if (
-        (shouldPromoteReadyForDelivery || wasOutForDelivery) &&
+        (newStatus === "OUT_FOR_DELIVERY" ||
+          shouldPromoteReadyForDelivery ||
+          wasOutForDelivery) &&
         newLoadedQty >= newTotalQty &&
         newTotalQty > 0
       ) {
@@ -705,15 +726,13 @@ exports.updateShipmentPackages = onCall(
       const singleCurrentTripId =
         activeTripIds.length === 1 ? activeTripIds[0] : null;
       const tripPackages = tripId
-        ? finalPackages.filter(
-            (pkg) => {
-              const packageTripId = pkg.currentTripId || pkg.loadedOnTrip || null;
-              const packageId = getPackageIdentity(pkg);
+        ? finalPackages.filter((pkg) => {
+            const packageTripId = pkg.currentTripId || pkg.loadedOnTrip || null;
+            const packageId = getPackageIdentity(pkg);
 
-              if (packageTripId) return packageTripId === tripId;
-              return packageId ? existingTripBarcodeSet.has(packageId) : false;
-            },
-          )
+            if (packageTripId) return packageTripId === tripId;
+            return packageId ? existingTripBarcodeSet.has(packageId) : false;
+          })
         : finalPackages;
       const tripPackageBarcodes = tripPackages
         .map((pkg) => getPackageIdentity(pkg))
@@ -810,7 +829,8 @@ exports.updateShipmentPackages = onCall(
 
         if (deltaTripReceivedQty !== 0) {
           tripUpdate.totalArrived = FieldValue.increment(deltaTripReceivedQty);
-          tripUpdate.totalDelivered = FieldValue.increment(deltaTripReceivedQty);
+          tripUpdate.totalDelivered =
+            FieldValue.increment(deltaTripReceivedQty);
         }
 
         if (deltaTripMissingQty !== 0) {

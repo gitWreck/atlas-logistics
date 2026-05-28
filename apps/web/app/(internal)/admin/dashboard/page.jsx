@@ -14,7 +14,6 @@ import {
   faSun,
   faMoon,
   faChevronLeft,
-  faChevronRight,
   faPlus,
   faFileCirclePlus,
 } from "@fortawesome/free-solid-svg-icons";
