@@ -23,15 +23,19 @@ import CompletedTripsTable from "./CompletedTripsTable";
 import { calculateProgress, updatedBy } from "@/app/utility/utilities";
 import { getBoardThemeClasses } from "@/app/utility/constant/theme";
 import TripDrawer from "./TripDrawer";
-// import CreateTripModal from "../manifests/modals/CreateTripModal";
 import CreateTripModal from "./modals/CreateTripModal";
 import TripScheduleOverview from "./TripSchedule/TripScheduleOverview";
 import TripScheduleModal from "./TripSchedule/TripScheduleModal";
 import { updateTripSchedule } from "@/app/utility/FirebaseFunctions";
 import TablePaginationFooter from "../ui/TablePaginationFooter";
 import BoardTabs from "../ui/BoardTabs";
+import {
+  getTripStatus,
+  getWarehouseOriginFilter,
+  isCompletedTrip,
+  matchesOriginFilter,
+} from "./tripHelpers";
 
-const COMPLETED_TRIP_STATUSES = new Set(["COMPLETED", "DELIVERED"]);
 const TRIP_BOARD_TABS = {
   SCHEDULED: "scheduled",
   ACTIVE: "active",
@@ -41,55 +45,6 @@ const ORIGIN_FILTERS = [
   { key: "DIV", label: "Divisoria" },
   { key: "ODI", label: "Odiongan" },
 ];
-
-function getTripStatus(trip) {
-  return String(trip?.status || "").toUpperCase();
-}
-
-function isCompletedTrip(trip) {
-  return COMPLETED_TRIP_STATUSES.has(getTripStatus(trip));
-}
-
-function getWarehouseOriginFilter(profile) {
-  const warehouseCode = String(profile?.warehouseCode || "").toUpperCase();
-  const warehouseName = String(profile?.warehouseName || "").toLowerCase();
-
-  if (warehouseCode === "DIV" || warehouseName.includes("divisoria")) {
-    return "DIV";
-  }
-
-  if (warehouseCode === "ODI" || warehouseName.includes("odiongan")) {
-    return "ODI";
-  }
-
-  return "ALL";
-}
-
-function matchesOriginFilter(trip, originFilter) {
-  if (originFilter === "ALL") return true;
-
-  const originCode = String(trip?.originCode || "").toUpperCase();
-  const origin = String(trip?.origin || trip?.originName || "").toLowerCase();
-  const route = String(trip?.route || "").toLowerCase();
-
-  if (originFilter === "DIV") {
-    return (
-      originCode === "DIV" ||
-      origin.includes("divisoria") ||
-      route.startsWith("divisoria")
-    );
-  }
-
-  if (originFilter === "ODI") {
-    return (
-      originCode === "ODI" ||
-      origin.includes("odiongan") ||
-      route.startsWith("odiongan")
-    );
-  }
-
-  return true;
-}
 
 const TripBoard = forwardRef(function TripBoard(
   { user, userRole, profile, isDark = false },

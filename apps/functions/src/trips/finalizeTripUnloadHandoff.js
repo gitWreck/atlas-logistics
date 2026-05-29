@@ -10,14 +10,10 @@ const {
 } = require("../utilities/helpers");
 const { writeShipmentActionLog } = require("../utilities/shipmentLogger");
 const { writeTripActionLog } = require("../utilities/tripLogger");
+const { normalizeQty } = require("../utilities/packageHelpers");
 
 if (!admin.apps.length) admin.initializeApp();
 const db = admin.firestore();
-
-const normalizeQty = (value, fallback = 0) => {
-  const num = Number(value);
-  return Number.isFinite(num) && num >= 0 ? num : fallback;
-};
 
 const shipmentTotalQty = (
   shipment = {},

@@ -4,6 +4,7 @@ import {
   faChartPie,
   faFileInvoice,
   faMapSigns,
+  faComments,
   faTruck,
   faTruckLoading,
   faUsers,
@@ -98,6 +99,13 @@ export const mainNavItems = [
     icon: faUsers,
     title: "Customer Board",
     description: "View customer accounts and contact details.",
+  },
+  {
+    id: "chat",
+    label: "Messages",
+    icon: faComments,
+    title: "Customer Messages",
+    description: "Reply to customer support and shipment conversations.",
   },
   {
     id: "invoice",

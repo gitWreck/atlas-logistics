@@ -14,20 +14,13 @@
 const { onDocumentUpdated } = require("firebase-functions/v2/firestore");
 const { defineSecret } = require("firebase-functions/params");
 const admin = require("firebase-admin");
+const { requireNormalizedPhone } = require("../../utilities/phoneHelpers");
 
 if (!admin.apps.length) admin.initializeApp();
 const db = admin.firestore();
 const FieldValue = admin.firestore.FieldValue;
 
 const FB_PAGE_ACCESS_TOKEN = defineSecret("FB_PAGE_ACCESS_TOKEN");
-
-function normPhonePH(phone) {
-  if (!phone) return null;
-  let p = String(phone).replace(/[^\d]/g, "");
-  if (p.startsWith("09")) p = "63" + p.slice(1);
-  if (p.startsWith("63") && p.length === 12) return p;
-  return null;
-}
 
 async function sendMessengerText(psid, text, accessToken) {
   const res = await fetch(`https://graph.facebook.com/v19.0/me/messages?access_token=${accessToken}`, {
@@ -75,7 +68,7 @@ exports.autoMessenger = onDocumentUpdated(
 
       if (!changed) return;
 
-      const phone = normPhonePH(after.phone || after.customerPhone || "");
+      const phone = requireNormalizedPhone(after.phone || after.customerPhone || "");
       if (!phone) return; // cannot lookup psid
 
       // lookup active messenger link

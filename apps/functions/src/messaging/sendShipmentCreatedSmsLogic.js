@@ -4,15 +4,7 @@ const admin = require("firebase-admin");
 const { sendSmsViaProvider } = require("../../shared/sms-service");
 const { calculateSmsCost } = require("../../shared/sms-cost");
 const { writeMessagingActionLog } = require("../utilities/messagingLogger");
-
-function normalizePhone(phone) {
-  if (!phone) return null;
-
-  let p = String(phone).replace(/[^\d]/g, "");
-  if (p.startsWith("09")) p = "63" + p.slice(1);
-
-  return p.startsWith("63") && p.length === 12 ? p : null;
-}
+const { requireNormalizedPhone } = require("../utilities/phoneHelpers");
 
 function buildShipmentCreatedMessage({
   shipmentId,
@@ -51,9 +43,10 @@ async function sendShipmentCreatedSmsLogic({
   const db = admin.firestore();
 
   const phones = new Set(
-    [normalizePhone(senderPhone), normalizePhone(recipientPhone)].filter(
-      Boolean,
-    ),
+    [
+      requireNormalizedPhone(senderPhone),
+      requireNormalizedPhone(recipientPhone),
+    ].filter(Boolean),
   );
 
   if (phones.size === 0) {
@@ -107,4 +100,4 @@ async function sendShipmentCreatedSmsLogic({
 
 exports.sendShipmentCreatedSmsLogic = sendShipmentCreatedSmsLogic;
 exports.buildShipmentCreatedMessage = buildShipmentCreatedMessage;
-exports.normalizePhone = normalizePhone;
+exports.normalizePhone = requireNormalizedPhone;

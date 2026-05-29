@@ -8,10 +8,13 @@ export default function CustomerHeader({
   onLogout,
   onProfilePress,
   onNotificationsPress,
+  onMessagesPress,
   unreadCount = 0,
+  unreadMessages = 0,
 }) {
   const { colors, resolvedScheme } = useTheme();
   const displayCount = unreadCount > 9 ? "9+" : String(unreadCount);
+  const displayMessages = unreadMessages > 9 ? "9+" : String(unreadMessages);
   const isDark = resolvedScheme === "dark";
 
   return (
@@ -47,6 +50,24 @@ export default function CustomerHeader({
       </TouchableOpacity>
 
       <View style={styles.actions}>
+        {onMessagesPress && (
+          <TouchableOpacity
+            style={[
+              styles.iconBtn,
+              { backgroundColor: colors.cardMuted, borderColor: colors.border },
+            ]}
+            onPress={onMessagesPress}
+            activeOpacity={0.75}
+          >
+            <FontAwesome5 name="comments" size={15} color={colors.textMuted} />
+            {unreadMessages > 0 && (
+              <View style={styles.badge}>
+                <Text style={styles.badgeText}>{displayMessages}</Text>
+              </View>
+            )}
+          </TouchableOpacity>
+        )}
+
         <TouchableOpacity
           style={[
             styles.iconBtn,

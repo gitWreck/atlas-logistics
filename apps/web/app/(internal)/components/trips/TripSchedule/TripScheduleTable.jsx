@@ -20,33 +20,11 @@ import {
 } from "@/app/utility/tripScheduleHelpers";
 import StatusBadge from "../../ui/StatusBadge";
 import TablePaginationFooter from "../../ui/TablePaginationFooter";
-
-function getPlannedLoadingStart(trip) {
-  return trip?.plannedLoadingStart || null;
-}
-
-function getPlannedLoadingEnd(trip) {
-  return trip?.plannedLoadingEnd || null;
-}
-
-function formatScheduleDate(value) {
-  if (!value) return "";
-
-  const date =
-    typeof value.toDate === "function"
-      ? value.toDate()
-      : value instanceof Date
-        ? value
-        : new Date(value);
-
-  if (Number.isNaN(date.getTime())) return "";
-
-  return date.toLocaleDateString("en-US", {
-    month: "long",
-    day: "numeric",
-    year: "numeric",
-  });
-}
+import {
+  formatScheduleDate,
+  getPlannedLoadingEnd,
+  getPlannedLoadingStart,
+} from "../tripHelpers";
 
 const ALLOWED_STATUSES = [
   "CREATED",

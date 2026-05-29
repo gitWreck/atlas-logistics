@@ -115,6 +115,23 @@ export const broadcastTripMessage = httpsCallable(
   functions,
   "broadcastTripMessage",
 );
+export const createConversation = httpsCallable(
+  functions,
+  "createConversation",
+);
+export const sendChatMessage = httpsCallable(functions, "sendChatMessage");
+export const markConversationRead = httpsCallable(
+  functions,
+  "markConversationRead",
+);
+export const updateConversationStatus = httpsCallable(
+  functions,
+  "updateConversationStatus",
+);
+export const assignConversation = httpsCallable(
+  functions,
+  "assignConversation",
+);
 
 // INVOICES
 export const createInvoice = httpsCallable(functions, "createInvoice");

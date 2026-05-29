@@ -220,7 +220,7 @@ export default function AdminOverview({ user, isDark = false }) {
   ];
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-500">
+    <div className="space-y-6 animate-in fade-in duration-500 py-4 sm:py-6">
       <DelayWidget isDark={isDark} />
 
       <Statistics

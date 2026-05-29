@@ -22,6 +22,7 @@ import TripBoard from "../../components/trips/TripBoard";
 import NotificationBell from "../../components/notifications/NotificationBell";
 import TruckBoard from "../../components/trucks/TruckBoard";
 import CustomerBoard from "../../components/customers/CustomerBoard";
+import ChatInbox from "../../components/chat/ChatInbox";
 
 import { getDashboardThemeClasses } from "@/app/utility/constant/theme";
 import { mainNavItems } from "@/app/utility/constant/templates";
@@ -339,6 +340,10 @@ export default function ManagerDashboardPage() {
                 isDark={isDark}
                 profile={profile}
               />
+            )}
+
+            {activeTab === "chat" && (
+              <ChatInbox user={user} isDark={isDark} />
             )}
           </div>
         </main>

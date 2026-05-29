@@ -174,6 +174,8 @@ export default function NotificationBell({ isDark = false }) {
                       {/* Construct message since 'message' field is missing in data */}
                       {alert.details?.driverName
                         ? `${alert.details.driverName}: `
+                        : alert.type === "CHAT_MESSAGE"
+                          ? `${alert.details?.customerName || "Customer"}: `
                         : `${alert.tripId || "Unknown Trip"} `}
 
                       {/* Badge aligns nicely beside text */}
@@ -182,6 +184,8 @@ export default function NotificationBell({ isDark = false }) {
                           status="delayed"
                           reason={alert.details.reason}
                         />
+                      ) : alert.type === "CHAT_MESSAGE" ? (
+                        alert.message || "New chat message"
                       ) : (
                         "New System Alert"
                       )}

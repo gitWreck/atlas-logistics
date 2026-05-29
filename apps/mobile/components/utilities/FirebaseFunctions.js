@@ -44,6 +44,15 @@ export const bulkShipmentAction = httpsCallable(
 
 // Messaging
 export const sendManualSMS = httpsCallable(functions, "sendManualSMS");
+export const createConversation = httpsCallable(
+  functions,
+  "createConversation",
+);
+export const sendChatMessage = httpsCallable(functions, "sendChatMessage");
+export const markConversationRead = httpsCallable(
+  functions,
+  "markConversationRead",
+);
 
 // user actions
 export const updateUserProfileMobile = httpsCallable(

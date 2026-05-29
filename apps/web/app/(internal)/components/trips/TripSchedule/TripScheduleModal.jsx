@@ -13,7 +13,7 @@ import {
 import { getModalThemeClasses } from "@/app/utility/constant/theme";
 import { getModalActionClasses } from "@/app/utility/constant/action";
 import { auth } from "@/lib/firebase";
-import { buildInitialForm } from "../utils";
+import { buildInitialForm } from "../tripHelpers";
 import TripScheduleInfoCard from "../modals/TripScheduleInfoCard";
 import TripScheduleDateField from "../modals/TripScheduleDateField";
 import CustomerNotificationChannels, {

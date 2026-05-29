@@ -1,16 +1,7 @@
 "use strict";
 
 const admin = require("firebase-admin");
-
-function cleanObject(value) {
-  if (!value || typeof value !== "object" || Array.isArray(value)) {
-    return value;
-  }
-
-  return Object.fromEntries(
-    Object.entries(value).filter(([, entryValue]) => entryValue !== undefined),
-  );
-}
+const { cleanObject } = require("./helpers");
 
 function buildShipmentActionLog({
   action,

@@ -236,6 +236,7 @@ export default function CreateTripModal({
               formData={formData}
               setFormData={setFormData}
               isDark={isDark}
+              required
             />
 
             {error && <div className={theme.errorBox}>{error}</div>}

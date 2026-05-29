@@ -70,6 +70,18 @@ import {
 import { useAuth } from "../../contexts/AuthContext";
 import { useTheme } from "../../contexts/ThemeContext";
 
+const DEFAULT_NOTIFICATION_CHANNELS = {
+  sms: true,
+  email: true,
+  push: true,
+};
+
+const NOTIFICATION_CHANNEL_OPTIONS = [
+  { key: "sms", label: "SMS", icon: "comment-dots" },
+  { key: "email", label: "Email", icon: "envelope" },
+  { key: "push", label: "Push", icon: "bell" },
+];
+
 export default function ScannerScreen() {
   const router = useRouter();
   const { colors } = useTheme();
@@ -109,6 +121,9 @@ export default function ScannerScreen() {
   const [tripStatusUpdating, setTripStatusUpdating] = useState(false);
   const [latestScan, setLatestScan] = useState(EMPTY_SCAN_DETAILS);
   const [scanActionStatus, setScanActionStatus] = useState(null);
+  const [notificationChannels, setNotificationChannels] = useState(
+    DEFAULT_NOTIFICATION_CHANNELS,
+  );
   const successTimerRef = useRef(null);
   const countdownTimerRef = useRef(null);
   const detailsSheetHeight = useRef(
@@ -425,6 +440,13 @@ export default function ScannerScreen() {
     setShipmentSummary(EMPTY_SHIPMENT_SUMMARY);
   };
 
+  const toggleNotificationChannel = (key) => {
+    setNotificationChannels((current) => ({
+      ...current,
+      [key]: current[key] !== true,
+    }));
+  };
+
   const resetDeliveryProof = () => {
     setDeliveryProofVisible(false);
     setDeliveryProofPhotos([]);
@@ -530,6 +552,11 @@ export default function ScannerScreen() {
           remarks,
           proofOfDelivery: proofImages,
           sourceUI: "CHECKER_MOBILE",
+          notify: Object.values(notificationChannels).some(Boolean),
+          notificationChannels,
+          notifySms: notificationChannels.sms,
+          notifyEmail: notificationChannels.email,
+          notifyPush: notificationChannels.push,
           updatedBy: updatedBy(profile),
         });
       } else {
@@ -547,6 +574,11 @@ export default function ScannerScreen() {
           manualQty: qty,
           remarks,
           scanAction: resolvedMode,
+          notify: Object.values(notificationChannels).some(Boolean),
+          notificationChannels,
+          notifySms: notificationChannels.sms,
+          notifyEmail: notificationChannels.email,
+          notifyPush: notificationChannels.push,
           updatedBy: updatedBy(profile),
         });
 
@@ -1207,6 +1239,9 @@ export default function ScannerScreen() {
         onResetScanner={resetScanner}
         onMarkCompleted={handleMarkCompleted}
         onMarkOutForDelivery={handleMarkOutForDelivery}
+        notificationChannels={notificationChannels}
+        notificationOptions={NOTIFICATION_CHANNEL_OPTIONS}
+        onToggleNotificationChannel={toggleNotificationChannel}
         onViewShipmentDetails={() =>
           router.push({
             pathname: "/(checker)/shipment-details",
