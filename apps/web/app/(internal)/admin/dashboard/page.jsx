@@ -25,6 +25,7 @@ import NotificationBell from "../../components/notifications/NotificationBell";
 import TruckBoard from "../../components/trucks/TruckBoard";
 import InvoiceBoard from "../../components/invoice/InvoiceBoard";
 import CustomerBoard from "../../components/customers/CustomerBoard";
+import ChatInbox from "../../components/chat/ChatInbox";
 import { mainNavItems } from "@/app/utility/constant/templates";
 
 import {
@@ -294,7 +295,7 @@ export default function AdminDashboardPage() {
 
         <main ref={mainScrollRef} className="flex-1 overflow-y-auto">
           <div className="w-full">
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 sm:py-6">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 ">
               {activeTab === "overview" && (
                 <div className="space-y-4 sm:space-y-6">
                   <AdminOverview
@@ -355,6 +356,10 @@ export default function AdminDashboardPage() {
                   isDark={isDark}
                   profile={profile}
                 />
+              )}
+
+              {activeTab === "chat" && (
+                <ChatInbox user={user} isDark={isDark} />
               )}
             </div>
           </div>

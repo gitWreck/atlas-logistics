@@ -11,16 +11,13 @@ const {
   SEMAPHORE_API_KEY,
   SEMAPHORE_SENDER_NAME,
 } = require("../../shared/sms-service");
+const { unique } = require("../utilities/helpers");
 
 if (!admin.apps.length) admin.initializeApp();
 
 const db = admin.firestore();
 const SMTP_EMAIL = defineSecret("SMTP_EMAIL");
 const SMTP_PASSWORD = defineSecret("SMTP_PASSWORD");
-
-function unique(values = []) {
-  return [...new Set(values.filter(Boolean).map(String))];
-}
 
 function getTargetEmails(targets = {}) {
   return unique([

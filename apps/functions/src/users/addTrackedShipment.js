@@ -4,9 +4,11 @@ const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const admin = require("firebase-admin");
 const { FieldValue } = require("firebase-admin/firestore");
 const { requireRole } = require("../utilities/helpers");
+const { normalizePhone } = require("../utilities/phoneHelpers");
 
 if (!admin.apps.length) admin.initializeApp();
 const db = admin.firestore();
+
 /**
  * Customer helper: add a tracked shipment for the current user.
  *
@@ -17,13 +19,11 @@ exports.addTrackedShipment = onCall(
   async (req) => {
     await requireRole(db, req, ["customer"]);
 
-    // 1. AUTH CHECK
     if (!req.auth) {
       throw new HttpsError("unauthenticated", "User must be logged in.");
     }
 
     const uid = req.auth.uid;
-
     const { trackingNumber, label } = req.data || {};
     const normalizedTracking = String(trackingNumber || "")
       .trim()
@@ -35,7 +35,7 @@ exports.addTrackedShipment = onCall(
         "A valid tracking number is required.",
       );
     }
-    // Basic account guard: ensure the profile exists and is active
+
     const userSnap = await db.collection("users").doc(uid).get();
     if (!userSnap.exists || userSnap.data().active === false) {
       throw new HttpsError(
@@ -58,14 +58,9 @@ exports.addTrackedShipment = onCall(
 
     const shipment = shipmentSnap.data() || {};
     const user = userSnap.data() || {};
-
     const recipient = shipment.recipient || {};
     const sender = shipment.sender || {};
 
-    // const userName = String(user.name || "").trim();
-    // const userPhone = String(user.phoneNumber || user.phone || "").trim();
-
-    // Require shipment to have complete contact details
     if (!recipient.phone || !sender.phone) {
       throw new HttpsError(
         "permission-denied",
@@ -73,27 +68,10 @@ exports.addTrackedShipment = onCall(
       );
     }
 
-    const normalizeName = (value) =>
-      String(value || "")
-        .trim()
-        .toLowerCase();
-
-    // Normalize so +63, 63, 09... all match (Philippine numbers)
-    const normalizePhone = (value) => {
-      let d = String(value || "").replace(/[^\d]/g, "");
-      if (d.length === 11 && d.startsWith("0")) {
-        d = "63" + d.slice(1); // 09xxxxxxxxx → 639xxxxxxxxx
-      } else if (d.length === 10 && d.startsWith("9")) {
-        d = "63" + d; // 9xxxxxxxxx → 639xxxxxxxxx
-      }
-      return d;
-    };
-
     const userPhone = normalizePhone(user.phoneNumber || user.phone);
-    const senderPhone = normalizePhone(shipment.sender?.phone);
-    const recipientPhone = normalizePhone(shipment.recipient?.phone);
+    const senderPhone = normalizePhone(sender.phone);
+    const recipientPhone = normalizePhone(recipient.phone);
 
-    // If user has no phone in profile, they can't track anything strictly.
     if (!userPhone) {
       throw new HttpsError(
         "failed-precondition",
@@ -111,7 +89,6 @@ exports.addTrackedShipment = onCall(
       );
     }
 
-    // Validate that the tracking number exists in the public projection
     const publicSnap = await db
       .collection("tracking_public")
       .doc(normalizedTracking)
@@ -130,7 +107,6 @@ exports.addTrackedShipment = onCall(
       .collection("tracked_shipments")
       .doc(normalizedTracking);
 
-    // Prevent duplicates: do not allow the same trackingNumber to be added twice
     const existingTracked = await trackedRef.get();
     if (existingTracked.exists) {
       throw new HttpsError(

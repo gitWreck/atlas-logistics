@@ -34,6 +34,9 @@ export default function ScanDetailsSheet({
   onResetScanner,
   onMarkCompleted,
   onMarkOutForDelivery,
+  notificationChannels,
+  notificationOptions,
+  onToggleNotificationChannel,
   onViewShipmentDetails,
 }) {
   const summary = progressSummary || {};
@@ -310,6 +313,70 @@ export default function ScanDetailsSheet({
             {tripStatusUpdating ? "Updating Trip..." : "Mark Out for Delivery"}
           </Text>
         </TouchableOpacity>
+      )}
+
+      {!!notificationOptions?.length && (
+        <View
+          style={[
+            styles.notificationCard,
+            { backgroundColor: colors.surface, borderColor: colors.border },
+          ]}
+        >
+          <View>
+            <Text style={[styles.notificationTitle, { color: colors.text }]}>
+              Customer Notifications
+            </Text>
+            <Text
+              style={[
+                styles.notificationSubtitle,
+                { color: colors.textMuted },
+              ]}
+            >
+              Send an update when scanner status changes.
+            </Text>
+          </View>
+
+          <View style={styles.notificationGrid}>
+            {notificationOptions.map((channel) => {
+              const selected = notificationChannels?.[channel.key] === true;
+
+              return (
+                <TouchableOpacity
+                  key={channel.key}
+                  style={[
+                    styles.notificationOption,
+                    {
+                      backgroundColor: colors.cardMuted,
+                      borderColor: colors.border,
+                    },
+                    selected && styles.notificationOptionActive,
+                  ]}
+                  onPress={() => onToggleNotificationChannel(channel.key)}
+                  disabled={processing}
+                  activeOpacity={0.78}
+                >
+                  <FontAwesome5
+                    name={channel.icon}
+                    size={13}
+                    color={selected ? "#10b981" : colors.textMuted}
+                  />
+                  <Text
+                    style={[
+                      styles.notificationOptionText,
+                      { color: colors.textMuted },
+                      selected && styles.notificationOptionTextActive,
+                    ]}
+                  >
+                    {channel.label}
+                  </Text>
+                  {selected && (
+                    <FontAwesome5 name="check" size={11} color="#10b981" />
+                  )}
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </View>
       )}
 
       {!!primaryScanActions.length && (
@@ -669,6 +736,53 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     gap: 8,
     paddingHorizontal: 14,
+  },
+  notificationCard: {
+    backgroundColor: "#ffffff",
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "#e2e8f0",
+    padding: 14,
+    gap: 12,
+  },
+  notificationTitle: {
+    color: "#0f172a",
+    fontSize: 14,
+    fontWeight: "900",
+  },
+  notificationSubtitle: {
+    color: "#64748b",
+    fontSize: 12,
+    marginTop: 4,
+    fontWeight: "700",
+  },
+  notificationGrid: {
+    flexDirection: "row",
+    gap: 8,
+  },
+  notificationOption: {
+    flex: 1,
+    minHeight: 42,
+    borderRadius: 12,
+    borderWidth: 1,
+    backgroundColor: "#f8fafc",
+    alignItems: "center",
+    justifyContent: "center",
+    flexDirection: "row",
+    gap: 6,
+    paddingHorizontal: 8,
+  },
+  notificationOptionActive: {
+    backgroundColor: "#ecfdf5",
+    borderColor: "#10b981",
+  },
+  notificationOptionText: {
+    color: "#64748b",
+    fontSize: 12,
+    fontWeight: "900",
+  },
+  notificationOptionTextActive: {
+    color: "#047857",
   },
   issueButton: {
     flex: 1,

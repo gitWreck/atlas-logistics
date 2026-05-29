@@ -21,26 +21,7 @@ import {
   getTripShipmentCount,
   getTripTruckLabel,
 } from "@/app/utility/tripScheduleHelpers";
-import { getDayLabel } from "../utils";
-
-function formatScheduleDate(value) {
-  if (!value) return "";
-
-  const date =
-    typeof value.toDate === "function"
-      ? value.toDate()
-      : value instanceof Date
-        ? value
-        : new Date(value);
-
-  if (Number.isNaN(date.getTime())) return "";
-
-  return date.toLocaleDateString("en-US", {
-    month: "long",
-    day: "numeric",
-    year: "numeric",
-  });
-}
+import { formatScheduleDate, getDayLabel } from "../tripHelpers";
 
 const TABS = [
   {

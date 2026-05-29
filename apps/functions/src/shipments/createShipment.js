@@ -2,182 +2,25 @@ const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const admin = require("firebase-admin");
 const { writeShipmentActionLog } = require("../utilities/shipmentLogger");
 const { updatedBy } = require("../utilities/helpers");
+const {
+  normalizeAddress,
+  formatAddress,
+} = require("../utilities/addressHelpers");
+const {
+  findCustomerByPhone,
+  getPublicUserId,
+} = require("../utilities/customerHelpers");
+const { normalizePhone } = require("../utilities/phoneHelpers");
+const {
+  buildPackages,
+  shouldUseBundleMode,
+} = require("../utilities/packageHelpers");
 
 const { Timestamp } = admin.firestore;
 
 if (!admin.apps.length) admin.initializeApp();
 
 const db = admin.firestore();
-
-function normalizeAddress(address = {}) {
-  return {
-    unit: address.unit || "",
-    street: address.street || "",
-    barangay: address.barangay || "",
-    city: address.city || "",
-    province: address.province || "",
-  };
-}
-
-function formatAddress(address = {}) {
-  const parts = [
-    address.unit,
-    address.street,
-    address.barangay,
-    address.city,
-    address.province,
-  ]
-    .map((v) => String(v || "").trim())
-    .filter(Boolean);
-
-  return parts.join(", ");
-}
-
-function normalizePhone(value = "") {
-  const digits = String(value || "").replace(/[^\d]/g, "");
-  if (digits.length === 11 && digits.startsWith("0")) {
-    return `63${digits.slice(1)}`;
-  }
-  if (digits.length === 10 && digits.startsWith("9")) {
-    return `63${digits}`;
-  }
-  return digits;
-}
-
-function phoneVariants(value = "") {
-  const normalized = normalizePhone(value);
-  const variants = new Set();
-  if (normalized) variants.add(normalized);
-  if (normalized.startsWith("63") && normalized.length === 12) {
-    variants.add(`0${normalized.slice(2)}`);
-  }
-  return [...variants].slice(0, 10);
-}
-
-function getPublicUserId(user = {}, fallback = null) {
-  return (
-    user?.userId ||
-    user?.publicId ||
-    user?.userCode ||
-    user?.driverCode ||
-    fallback ||
-    null
-  );
-}
-
-async function findCustomerByPhone(phone) {
-  const variants = phoneVariants(phone);
-  if (!variants.length) return null;
-
-  const snap = await db
-    .collection("users")
-    .where("phoneNumber", "in", variants)
-    .limit(1)
-    .get();
-
-  if (snap.empty) return null;
-
-  const userDoc = snap.docs[0];
-  const data = userDoc.data() || {};
-  if (data.role && data.role !== "customer") return null;
-
-  return { uid: userDoc.id, ...data };
-}
-
-function isBundlePackaging(packagingGroup) {
-  const value = String(packagingGroup || "")
-    .trim()
-    .toUpperCase();
-  return value === "BULK";
-}
-
-function shouldUseBundleMode(items = []) {
-  return items.some((item) => isBundlePackaging(item?.packagingGroup));
-}
-
-function buildPackages({
-  items,
-  shipmentId,
-  initialStatus,
-  currentLocation,
-  originSummary,
-  actorUid,
-  bundleMode,
-  name,
-}) {
-  const packagesArray = [];
-  const packageBarcodes = [];
-
-  let totalContentQuantity = 0;
-  let globalSeq = 1;
-
-  items.forEach((item, itemIndex) => {
-    const qty = Number(item.quantity) || 1;
-    totalContentQuantity += qty;
-
-    if (bundleMode) {
-      const seqNum = String(itemIndex + 1).padStart(2, "0");
-      const pkgId = `${shipmentId}-${seqNum}`;
-
-      packagesArray.push({
-        packageId: pkgId,
-        trackingNumber: pkgId,
-        sequence: itemIndex + 1,
-        description: item.description || "Bundled Cargo",
-        quantity: qty,
-        packagingGroup: item.packagingGroup || "BULK",
-        packagingType: item.packagingType || "Sack",
-        declaredValue: Number(item.declaredValue) || 0,
-        isFragile: Boolean(item.isFragile),
-        isPerishable: Boolean(item.isPerishable),
-        status: initialStatus,
-        currentLocation: currentLocation || originSummary,
-        loadedOnTrip: null,
-        loadedAt: null,
-        isDelayed: false,
-        updatedAt: new Date().toISOString(),
-        updatedBy: name,
-      });
-
-      packageBarcodes.push(pkgId);
-      return;
-    }
-
-    for (let i = 0; i < qty; i++) {
-      const seqNum = String(globalSeq).padStart(2, "0");
-      const pkgId = `${shipmentId}-${seqNum}`;
-
-      packagesArray.push({
-        packageId: pkgId,
-        trackingNumber: pkgId,
-        sequence: globalSeq,
-        description: item.description || "Standard Package",
-        quantity: 1,
-        packagingGroup: item.packagingGroup || "SINGLE",
-        packagingType: item.packagingType || "Box",
-        declaredValue: (Number(item.declaredValue) || 0) / qty,
-        isFragile: Boolean(item.isFragile),
-        isPerishable: Boolean(item.isPerishable),
-        status: initialStatus,
-        currentLocation: currentLocation || originSummary,
-        loadedOnTrip: null,
-        loadedAt: null,
-        isDelayed: false,
-        updatedAt: new Date().toISOString(),
-        updatedBy: name,
-      });
-
-      packageBarcodes.push(pkgId);
-      globalSeq += 1;
-    }
-  });
-
-  return {
-    packagesArray,
-    packageBarcodes,
-    totalContentQuantity,
-  };
-}
 
 exports.createShipment = onCall(
   {
@@ -242,8 +85,8 @@ exports.createShipment = onCall(
     const senderPhone = normalizePhone(sender?.phone);
     const recipientPhone = normalizePhone(recipient?.phone);
     const [senderCustomer, recipientCustomer] = await Promise.all([
-      findCustomerByPhone(senderPhone),
-      findCustomerByPhone(recipientPhone),
+      findCustomerByPhone(db, senderPhone),
+      findCustomerByPhone(db, recipientPhone),
     ]);
 
     const senderUid = sender?.uid || senderCustomer?.uid || null;
@@ -294,9 +137,8 @@ exports.createShipment = onCall(
         initialStatus,
         currentLocation,
         originSummary,
-        actorUid: request.auth.uid,
         bundleMode,
-        name,
+        updatedBy: name,
       });
 
     const shipmentRef = db.collection("shipments").doc(shipmentId);

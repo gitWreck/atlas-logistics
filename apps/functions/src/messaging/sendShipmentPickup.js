@@ -4,6 +4,7 @@ const admin = require("firebase-admin");
 const { sendSmsViaProvider } = require("../../shared/sms-service");
 const { calculateSmsCost } = require("../../shared/sms-cost");
 const { writeMessagingActionLog } = require("../utilities/messagingLogger");
+const { requireNormalizedPhone } = require("../utilities/phoneHelpers");
 
 async function sendShipmentPickup({
   shipmentId,
@@ -13,7 +14,12 @@ async function sendShipmentPickup({
 }) {
   const db = admin.firestore();
 
-  const phones = new Set([senderPhone, recipientPhone].filter(Boolean));
+  const phones = new Set(
+    [
+      requireNormalizedPhone(senderPhone),
+      requireNormalizedPhone(recipientPhone),
+    ].filter(Boolean),
+  );
   if (phones.size === 0) return { success: false, reason: "No valid phones" };
 
   const message = `ATLAS: Shipment ${shipmentId} has been CREATED. Waiting for pickup. 

@@ -3,25 +3,15 @@
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const admin = require("firebase-admin");
 const { FieldValue } = require("firebase-admin/firestore");
-const { requireRole, updatedBy } = require("../utilities/helpers");
+const { chunk, requireRole, unique, updatedBy } = require("../utilities/helpers");
 const { ALLOWED_SHIPMENT_STATUSES } = require("../utilities/dataDetails");
 const { writeShipmentActionLog } = require("../utilities/shipmentLogger");
+const { getShipmentTargetUserIds } = require("../utilities/notificationHelpers");
+const { normalizeQty } = require("../utilities/packageHelpers");
 
 if (!admin.apps.length) admin.initializeApp();
 
 const db = admin.firestore();
-
-function unique(values = []) {
-  return [...new Set(values.filter(Boolean).map(String))];
-}
-
-function chunk(values, size = 30) {
-  const chunks = [];
-  for (let index = 0; index < values.length; index += size) {
-    chunks.push(values.slice(index, index + size));
-  }
-  return chunks;
-}
 
 function formatStatusLabel(status = "") {
   return String(status || "")
@@ -66,19 +56,6 @@ async function getTrackedShipmentUserIds(shipmentId) {
   }
 
   return unique(trackedUserIds);
-}
-
-function getShipmentTargetUserIds(shipment = {}) {
-  return unique([
-    ...(Array.isArray(shipment.visibilityUserIds)
-      ? shipment.visibilityUserIds
-      : []),
-    shipment.customerId,
-    shipment.senderUid,
-    shipment.recipientUid,
-    shipment.sender?.uid,
-    shipment.recipient?.uid,
-  ]);
 }
 
 function buildStatusNotificationEvent({
@@ -262,11 +239,6 @@ exports.updateShipmentStatus = onCall(
       if (oldStatus === newStatus) {
         return null;
       }
-
-      const normalizeQty = (value, fallback = 0) => {
-        const num = Number(value);
-        return Number.isFinite(num) && num >= 0 ? num : fallback;
-      };
 
       const normalizePackage = (pkg = {}) => {
         const quantity = normalizeQty(pkg.quantity, 1) || 1;

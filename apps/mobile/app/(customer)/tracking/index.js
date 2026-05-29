@@ -16,6 +16,7 @@ import { doc, getDoc } from "firebase/firestore";
 import { FontAwesome5 } from "@expo/vector-icons";
 
 import { db } from "../../../firebase";
+import { createConversation } from "../../../components/utilities/FirebaseFunctions";
 import TripProgressStepper from "../../../components/trips/TripProgressStepper";
 import ShipmentDetailHeader from "../../../components/shipments/ShipmentDetailHeader";
 import ShipmentHeaderCard from "../../../components/shipments/ShipmentHeaderCard";
@@ -32,6 +33,7 @@ export default function CustomerTrackingDetailsScreen() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [shipment, setShipment] = useState(null);
+  const [startingChat, setStartingChat] = useState(false);
 
   const normalizedTracking = useMemo(
     () =>
@@ -130,6 +132,26 @@ export default function CustomerTrackingDetailsScreen() {
     shipment?.tripType,
   ]);
 
+  const handleMessageSupport = async () => {
+    try {
+      setStartingChat(true);
+      const result = await createConversation({
+        trackingNumber: shipment?.trackingNumber || shipment?.id || normalizedTracking,
+      });
+      const conversationId = result?.data?.conversationId;
+      if (conversationId) {
+        router.push({
+          pathname: "/(customer)/chat/[conversationId]",
+          params: { conversationId },
+        });
+      }
+    } catch (err) {
+      console.error("Failed to open support chat:", err);
+    } finally {
+      setStartingChat(false);
+    }
+  };
+
   if (loading) {
     return (
       <View style={[styles.center, { backgroundColor: colors.bg }]}>
@@ -197,6 +219,37 @@ export default function CustomerTrackingDetailsScreen() {
       >
         <ShipmentHeaderCard shipment={shipment} showActions={false} />
 
+        <TouchableOpacity
+          style={[
+            styles.supportButton,
+            { backgroundColor: colors.surface, borderColor: colors.border },
+          ]}
+          onPress={handleMessageSupport}
+          disabled={startingChat}
+          activeOpacity={0.85}
+        >
+          <View style={styles.supportIcon}>
+            <FontAwesome5 name="comments" size={15} color="#2563eb" />
+          </View>
+          <View style={styles.supportTextWrap}>
+            <Text style={[styles.supportTitle, { color: colors.text }]}>
+              Message Support
+            </Text>
+            <Text style={[styles.supportSubtitle, { color: colors.textMuted }]}>
+              Ask about this shipment
+            </Text>
+          </View>
+          {startingChat ? (
+            <ActivityIndicator size="small" color="#2563eb" />
+          ) : (
+            <FontAwesome5
+              name="chevron-right"
+              size={13}
+              color={colors.textMuted}
+            />
+          )}
+        </TouchableOpacity>
+
         <TripProgressStepper
           currentStatus={shipment.status}
           tripType={progressType}
@@ -234,6 +287,35 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 16,
     paddingBottom: 32,
+  },
+  supportButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 14,
+    marginTop: 12,
+    marginBottom: 12,
+  },
+  supportIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#eff6ff",
+  },
+  supportTextWrap: {
+    flex: 1,
+  },
+  supportTitle: {
+    fontSize: 14,
+    fontWeight: "800",
+  },
+  supportSubtitle: {
+    marginTop: 2,
+    fontSize: 12,
   },
   emptyState: {
     flex: 1,

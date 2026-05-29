@@ -15,6 +15,7 @@
 
 const { defineSecret } = require("firebase-functions/params");
 const admin = require("firebase-admin");
+const { requireNormalizedPhone } = require("../../utilities/phoneHelpers");
 
 if (!admin.apps.length) admin.initializeApp();
 const db = admin.firestore();
@@ -22,14 +23,6 @@ const db = admin.firestore();
 const FB_PAGE_ACCESS_TOKEN = defineSecret("FB_PAGE_ACCESS_TOKEN");
 
 /* -------------------- Helpers -------------------- */
-
-function normalizePhone(phone) {
-  if (!phone) return null;
-  let p = String(phone).replace(/[^\d]/g, "");
-  if (p.startsWith("09")) p = "63" + p.slice(1);
-  if (p.startsWith("63") && p.length === 12) return p;
-  return null;
-}
 
 function normalizeTracking(s) {
   return String(s || "").trim().toUpperCase();
@@ -129,7 +122,7 @@ async function resolvePsidByTracking(trackingNumber) {
   if (snap.empty) return null;
 
   const tr = snap.docs[0].data() || {};
-  const phone = normalizePhone(tr.phone || tr.customerPhone || "");
+  const phone = requireNormalizedPhone(tr.phone || tr.customerPhone || "");
   if (!phone) return null;
 
   const linkSnap = await db

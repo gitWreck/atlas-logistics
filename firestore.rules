@@ -16,6 +16,11 @@ service cloud.firestore {
         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == role;
     }
 
+    function hasAnyRole(roles) {
+      return isSignedIn() &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in roles;
+    }
+
     // Check if the user is the specific driver assigned to the trip
     function isAssignedDriver() {
       return resource.data.driverId == request.auth.uid;
@@ -50,6 +55,39 @@ service cloud.firestore {
       match /pushTokens/{tokenId} {
         allow read, create, update, delete: if request.auth != null && request.auth.uid == userId;
       }
+    }
+
+    // 1b. CUSTOMER SUPPORT CHAT
+    match /conversations/{conversationId} {
+      allow read: if hasAnyRole(['admin', 'manager'])
+        || (isSignedIn() && resource.data.customerId == request.auth.uid)
+        || (isSignedIn() && request.auth.uid in resource.data.participantIds);
+
+      // Conversation mutations go through Cloud Functions so unread counts,
+      // assignment, notifications, and audit context stay consistent.
+      allow create, update, delete: if false;
+
+      match /messages/{messageId} {
+        allow read: if hasAnyRole(['admin', 'manager'])
+          || (
+            isSignedIn()
+            && get(/databases/$(database)/documents/conversations/$(conversationId)).data.customerId == request.auth.uid
+          )
+          || (
+            isSignedIn()
+            && request.auth.uid in get(/databases/$(database)/documents/conversations/$(conversationId)).data.participantIds
+          );
+
+        allow create, update, delete: if false;
+      }
+    }
+
+    match /admin_alerts/{alertId} {
+      allow read: if hasAnyRole(['admin', 'manager']);
+      allow update: if hasAnyRole(['admin', 'manager'])
+        && request.resource.data.diff(resource.data).changedKeys().hasOnly(['status', 'readAt'])
+        && request.resource.data.status in ['UNREAD', 'READ'];
+      allow create, delete: if false;
     }
 
     // 2. INTERNAL TRUTH: TRACKING RECORDS

@@ -38,6 +38,7 @@ export default function CustomerDashboard() {
   const [pickupModalVisible, setPickupModalVisible] = useState(false);
   const [requesting, setRequesting] = useState(false);
   const [unreadNotifications, setUnreadNotifications] = useState(0);
+  const [unreadMessages, setUnreadMessages] = useState(0);
 
   const [userName, setUserName] = useState("Customer");
 
@@ -123,6 +124,30 @@ export default function CustomerDashboard() {
     return unsubscribe;
   }, []);
 
+  useEffect(() => {
+    const user = auth.currentUser;
+    if (!user) return undefined;
+
+    const q = query(
+      collection(db, "conversations"),
+      where("customerId", "==", user.uid),
+    );
+
+    const unsubscribe = onSnapshot(
+      q,
+      (snapshot) => {
+        const total = snapshot.docs.reduce((sum, docSnap) => {
+          const data = docSnap.data() || {};
+          return sum + Number(data.unreadCounts?.[user.uid] || 0);
+        }, 0);
+        setUnreadMessages(total);
+      },
+      (error) => console.error("Unread messages subscription error:", error),
+    );
+
+    return unsubscribe;
+  }, []);
+
   // 3. Actions
   const handleLogout = () => {
     Alert.alert("Sign Out", "Are you sure?", [
@@ -168,7 +193,9 @@ export default function CustomerDashboard() {
         onLogout={handleLogout}
         onProfilePress={() => router.push("/(customer)/profile")}
         onNotificationsPress={() => router.push("/(customer)/notifications")}
+        onMessagesPress={() => router.push("/(customer)/chat")}
         unreadCount={unreadNotifications}
+        unreadMessages={unreadMessages}
       />
 
       <View style={styles.body}>

@@ -6,6 +6,7 @@ const { FieldValue } = admin.firestore;
 const { requireRole, updatedBy } = require("../utilities/helpers");
 const { writeShipmentActionLog } = require("../utilities/shipmentLogger");
 const { writeTripActionLog } = require("../utilities/tripLogger");
+const { normalizeQty } = require("../utilities/packageHelpers");
 
 if (!admin.apps.length) admin.initializeApp();
 const db = admin.firestore();
@@ -93,10 +94,6 @@ exports.unassignShipmentFromTrip = onCall(
         );
       }
 
-      const normalizeQty = (value, fallback = 0) => {
-        const num = Number(value);
-        return Number.isFinite(num) && num >= 0 ? num : fallback;
-      };
       const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
       const packageQty = (pkg = {}) =>
         Math.max(normalizeQty(pkg.quantity, 1), 1);
