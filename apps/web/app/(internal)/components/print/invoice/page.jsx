@@ -15,8 +15,8 @@ import {
 } from "@fortawesome/free-solid-svg-icons";
 import { doc, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { formatAmount, InfoRow } from "../../invoice/invoiceHelpers";
-// import { formatAmount, InfoRow } from "../../../components/invoice/utils";
+import { formatAmount } from "../../invoice/invoiceHelpers";
+import InfoRow from "../../ui/InfoRow";
 
 function InvoicePrintView() {
   const searchParams = useSearchParams();
