@@ -34,6 +34,9 @@ export default function TripRow({ trip, onClick, isDark = false }) {
     : theme.tripIdTextDefault;
 
   const rowStateClass = isDelayed ? theme.rowDelayed : theme.rowDefaultHover;
+  const mobileDividerClass = isDark
+    ? "border-b-4 border-b-slate-700/80 md:border-b md:border-b-slate-800/50"
+    : "border-b-4 border-b-slate-300 md:border-b md:border-b-slate-200";
 
   const typeBadgeClass = isDelivery
     ? theme.typeBadgeDelivery || theme.typeBadgeTransfer
@@ -85,7 +88,7 @@ export default function TripRow({ trip, onClick, isDark = false }) {
 
   return (
     <div
-      className={`relative flex flex-col gap-3 p-4 border-b cursor-pointer transition-colors group md:grid md:grid-cols-12 md:gap-4 md:px-6 md:items-center ${theme.rowBorder} ${rowStateClass}`}
+      className={`relative flex flex-col gap-3 p-4 cursor-pointer transition-colors group md:grid md:grid-cols-12 md:gap-4 md:px-6 md:items-center ${mobileDividerClass} ${rowStateClass}`}
     >
       {/* Mobile Header */}
       <div className="flex md:hidden justify-between items-start mb-2">
@@ -106,13 +109,16 @@ export default function TripRow({ trip, onClick, isDark = false }) {
             </span> */}
 
             <span
-              className={`font-mono text-sm font-bold transition-colors flex items-center gap-2 ${tripIdTextClass}`}
+              className={`font-mono text-base md:text-sm font-bold transition-colors flex items-center gap-2 ${tripIdTextClass}`}
             >
-              <FontAwesomeIcon icon={tripIcon} className="text-[10px]" />
+              <FontAwesomeIcon
+                icon={tripIcon}
+                className="text-xs md:text-[10px]"
+              />
               {trip.tripId}
             </span>
 
-            <div className={`text-[10px] ${theme.mutedText}`}>
+            <div className={`text-xs md:text-[10px] ${theme.mutedText}`}>
               {formatFirestoreDate(trip.updatedAt)}
             </div>
           </div>
@@ -159,7 +165,7 @@ export default function TripRow({ trip, onClick, isDark = false }) {
           </div>
 
           <div
-            className={`text-xs md:mt-1 flex items-center justify-between md:justify-start gap-2 w-full ${theme.mutedText}`}
+            className={`text-sm md:text-xs md:mt-1 flex items-center justify-between md:justify-start gap-2 w-full ${theme.mutedText}`}
           >
             <div className="flex items-center gap-2">
               <span className={`font-medium ${theme.secondaryText}`}>
@@ -172,7 +178,7 @@ export default function TripRow({ trip, onClick, isDark = false }) {
             </div>
 
             <span
-              className={`md:hidden font-mono text-[10px] ${theme.mutedText}`}
+              className={`md:hidden font-mono text-xs ${theme.mutedText}`}
             >
               {loadedCount}/{totalCount} Items
             </span>
@@ -185,7 +191,7 @@ export default function TripRow({ trip, onClick, isDark = false }) {
         className={`md:col-span-2 flex justify-between md:block items-center border-t md:border-0 pt-2 md:pt-0 ${theme.rowBorder}`}
       >
         <div
-          className={`text-sm font-medium flex items-center gap-2 ${theme.secondaryText}`}
+          className={`text-base md:text-sm font-medium flex items-center gap-2 ${theme.secondaryText}`}
         >
           {trip.originCode || "—"}
           <span className={theme.routeArrow}>{routeArrow}</span>
@@ -193,7 +199,7 @@ export default function TripRow({ trip, onClick, isDark = false }) {
         </div>
 
         <div
-          className={`text-[10px] font-mono md:mt-0.5 truncate max-w-[150px] md:max-w-[120px] ${theme.mutedText}`}
+          className={`text-sm md:text-[10px] font-mono md:mt-0.5 truncate max-w-[150px] md:max-w-[120px] ${theme.mutedText}`}
           title={trip.route || routeText}
         >
           {routeText}
@@ -201,18 +207,18 @@ export default function TripRow({ trip, onClick, isDark = false }) {
 
         <div className="md:mt-1 flex flex-wrap items-center gap-1.5">
           <span
-            className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${typeBadgeClass}`}
+            className={`text-[10px] md:text-[9px] font-bold px-1.5 py-0.5 rounded border ${typeBadgeClass}`}
           >
             {tripTypeFullLabel}
           </span>
 
           {isManifestLocked && (
             <span
-              className={`text-[9px] font-bold px-1.5 py-0.5 rounded border inline-flex items-center gap-1 ${lockedBadgeClass}`}
+              className={`text-[10px] md:text-[9px] font-bold px-1.5 py-0.5 rounded border inline-flex items-center gap-1 ${lockedBadgeClass}`}
             >
               <FontAwesomeIcon
                 icon={faLock}
-                className="text-[8px] text-current"
+                className="text-[9px] md:text-[8px] text-current"
               />
               LOCKED
             </span>
@@ -256,7 +262,7 @@ export default function TripRow({ trip, onClick, isDark = false }) {
           )}
 
           <span
-            className={`text-[12px] font-bold uppercase tracking-wide ${statusTextClass}`}
+            className={`text-sm md:text-[12px] font-bold uppercase tracking-wide ${statusTextClass}`}
           >
             {statusLabel}
           </span>

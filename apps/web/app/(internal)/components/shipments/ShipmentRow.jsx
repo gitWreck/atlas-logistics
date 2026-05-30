@@ -36,6 +36,9 @@ export default function ShipmentRow({
   const updatedLabel = s.updatedAt || "Just now";
 
   const rowStateClass = isDelayed ? theme.rowDelayed : theme.rowDefaultHover;
+  const mobileDividerClass = isDark
+    ? "border-b-4 border-b-slate-700/80 md:border-b md:border-b-slate-800/50"
+    : "border-b-4 border-b-slate-300 md:border-b md:border-b-slate-200";
 
   const progressBarClass =
     s.status === "DELIVERED"
@@ -52,7 +55,7 @@ export default function ShipmentRow({
 
   return (
     <div
-      className={`relative flex flex-col gap-3 p-4 border-b cursor-pointer transition-colors group md:grid md:grid-cols-13 md:gap-4 md:px-6 md:items-center ${theme.rowBorder} ${rowStateClass}`}
+      className={`relative flex flex-col gap-3 p-4 cursor-pointer transition-colors group md:grid md:grid-cols-13 md:gap-4 md:px-6 md:items-center ${mobileDividerClass} ${rowStateClass}`}
     >
       {/* Mobile Header */}
       <div className="flex md:hidden justify-between items-start mb-1">
@@ -61,11 +64,11 @@ export default function ShipmentRow({
 
           <div>
             <div
-              className={`font-mono text-sm font-bold ${theme.tripIdTextShipment}`}
+              className={`font-mono text-base md:text-sm font-bold ${theme.tripIdTextShipment}`}
             >
               {trackingNumber}
             </div>
-            <div className={`text-[10px] ${theme.mutedText}`}>
+            <div className={`text-xs md:text-[10px] ${theme.mutedText}`}>
               {updatedLabel}
             </div>
           </div>
@@ -116,13 +119,13 @@ export default function ShipmentRow({
             <StatusBadge status={s.status} size="xs" isDark={isDark} />
 
             <span
-              className={`text-[11px] md:text-xs font-mono border-l pl-2 shrink-0 ${theme.statsDivider}`}
+              className={`text-xs md:text-xs font-mono border-l pl-2 shrink-0 ${theme.statsDivider}`}
             >
               {loadedCount}/{totalCount} Loaded
             </span>
 
             <span
-              className={`text-[11px] md:text-xs border-l pl-2 truncate min-w-0 ${theme.mutedText} ${theme.rowBorder.replace("border-", "border-l ")}`}
+              className={`text-xs md:text-xs border-l pl-2 truncate min-w-0 ${theme.mutedText} ${theme.rowBorder.replace("border-", "border-l ")}`}
               title={driverName}
             >
               Driver: {driverName}
@@ -135,10 +138,10 @@ export default function ShipmentRow({
       <div
         className={`md:col-span-2 flex justify-between md:block items-center border-t md:border-0 pt-2 md:pt-0 ${theme.rowBorder}`}
       >
-        <div className={`text-sm font-medium ${theme.secondaryText}`}>
+        <div className={`text-base md:text-sm font-medium ${theme.secondaryText}`}>
           {routeCode}
         </div>
-        <div className={`text-xs font-mono mt-0.5 ${theme.subtleText}`}>
+        <div className={`text-sm md:text-xs font-mono mt-0.5 ${theme.subtleText}`}>
           {routeLabel}
         </div>
       </div>
@@ -149,12 +152,12 @@ export default function ShipmentRow({
       >
         <div className="flex items-center gap-1.5 md:gap-2 min-w-0">
           <span
-            className={`text-[9px] font-bold uppercase shrink-0 md:w-8 ${theme.subtleText}`}
+            className={`text-[10px] md:text-[9px] font-bold uppercase shrink-0 md:w-8 ${theme.subtleText}`}
           >
             From
           </span>
           <span
-            className={`text-sm font-medium truncate ${theme.secondaryText}`}
+            className={`text-base md:text-sm font-medium truncate ${theme.secondaryText}`}
           >
             {s.sender?.name || "Unknown"}
           </span>
@@ -162,12 +165,12 @@ export default function ShipmentRow({
 
         <div className="flex items-center gap-1.5 md:gap-2 min-w-0">
           <span
-            className={`text-[9px] font-bold uppercase shrink-0 md:w-8 ${theme.subtleText}`}
+            className={`text-[10px] md:text-[9px] font-bold uppercase shrink-0 md:w-8 ${theme.subtleText}`}
           >
             To
           </span>
           <span
-            className={`text-sm font-medium truncate ${theme.secondaryText}`}
+            className={`text-base md:text-sm font-medium truncate ${theme.secondaryText}`}
           >
             {s.recipient?.name || "Unknown"}
           </span>
@@ -187,11 +190,11 @@ export default function ShipmentRow({
 
         <div className="flex justify-between mt-1.5">
           <span
-            className={`text-[10px] font-medium uppercase ${statusTextClass}`}
+            className={`text-xs md:text-[10px] font-medium uppercase ${statusTextClass}`}
           >
             {s.status?.replaceAll("_", " ") || "UNKNOWN"}
           </span>
-          <span className={`text-[10px] ${theme.subtleText}`}>
+          <span className={`text-xs md:text-[10px] ${theme.subtleText}`}>
             {s.progress || 0}%
           </span>
         </div>

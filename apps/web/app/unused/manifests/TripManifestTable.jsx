@@ -109,8 +109,88 @@ export default function TripManifestTable({
         </div>
       </div>
 
+      {/* --- MOBILE LIST --- */}
+      <div className="md:hidden flex-1 divide-y divide-slate-800">
+        {loading ? (
+          <div className="p-6 text-center text-sm text-slate-500">
+            Loading Cargo...
+          </div>
+        ) : filteredShipments.length === 0 ? (
+          <div className="p-6 text-center text-sm text-slate-500 italic">
+            {shipments?.length === 0
+              ? "Truck is empty."
+              : "No matching shipments found."}
+          </div>
+        ) : (
+          filteredShipments.map((p) => (
+            <div key={p.id} className="p-4 text-slate-300">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="truncate text-base font-bold text-white">
+                    {p.packageId}
+                  </div>
+                  <div className="mt-0.5 truncate font-mono text-xs text-slate-500">
+                    {p.id}
+                  </div>
+                </div>
+
+                <div className="flex shrink-0 justify-end gap-1">
+                  <button
+                    onClick={() => onSplit(p)}
+                    className="p-2 text-slate-500 hover:text-amber-400"
+                    disabled={isLocked || (p.totalItems || 0) <= 1}
+                  >
+                    <FontAwesomeIcon icon={faCut} />
+                  </button>
+                  <button
+                    onClick={() => onUnassign(p)}
+                    className="p-2 text-slate-500 hover:text-red-400"
+                    disabled={isLocked}
+                  >
+                    <FontAwesomeIcon icon={faMinus} />
+                  </button>
+                </div>
+              </div>
+
+              <div className="mt-3 flex min-w-0 items-center gap-2">
+                <span className="min-w-0 truncate rounded bg-slate-800 px-2 py-1 text-sm font-semibold text-slate-200">
+                  {p.route}
+                </span>
+                <StatusBadge status={p.status} />
+              </div>
+
+              <div className="mt-3 grid grid-cols-2 gap-3 text-sm">
+                <div>
+                  <div className="text-xs font-bold uppercase text-slate-500">
+                    Loaded
+                  </div>
+                  <div className="font-mono text-slate-200">
+                    {p.loadedCount}/{p.totalItems}
+                  </div>
+                </div>
+
+                <div>
+                  <div className="text-xs font-bold uppercase text-slate-500">
+                    Updated
+                  </div>
+                  <div className="truncate font-mono text-xs text-slate-400">
+                    {formatFirestoreDate(p.updatedAt)}
+                  </div>
+                </div>
+              </div>
+
+              {p.pendingCount > 0 && (
+                <div className="mt-2 text-sm font-bold text-red-400">
+                  Pending: {p.pendingCount}
+                </div>
+              )}
+            </div>
+          ))
+        )}
+      </div>
+
       {/* --- TABLE SECTION --- */}
-      <div className="overflow-x-auto flex-1">
+      <div className="hidden md:block overflow-x-auto flex-1">
         <table className="w-full text-left text-xs">
           <thead className="bg-slate-900 text-slate-500 font-bold uppercase border-b border-slate-800">
             <tr>
