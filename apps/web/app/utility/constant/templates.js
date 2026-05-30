@@ -2,6 +2,7 @@
 
 import {
   faChartPie,
+  faCog,
   faFileInvoice,
   faMapSigns,
   faComments,
@@ -113,6 +114,13 @@ export const mainNavItems = [
     icon: faFileInvoice,
     title: "Invoice Board",
     description: "Manage invoices and payments.",
+  },
+  {
+    id: "settings",
+    label: "Settings",
+    icon: faCog,
+    title: "Settings",
+    description: "Manage app data downloaded by staff devices.",
   },
 ];
 

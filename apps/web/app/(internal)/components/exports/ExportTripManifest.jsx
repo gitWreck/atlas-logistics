@@ -2,63 +2,14 @@ import React, { useState } from "react";
 import * as XLSX from "xlsx";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faFileExcel } from "@fortawesome/free-solid-svg-icons";
-
-function formatDate(value) {
-  if (!value) return "—";
-
-  try {
-    if (typeof value?.toDate === "function") {
-      return value.toDate().toLocaleDateString();
-    }
-
-    const d = new Date(value);
-    if (Number.isNaN(d.getTime())) return "—";
-    return d.toLocaleDateString();
-  } catch {
-    return "—";
-  }
-}
-
-function getShipmentQuantity(shipment = {}) {
-  return Number(
-    shipment?.totals?.totalContentQty ??
-      shipment?.totalContentQty ??
-      shipment?.totalItems ??
-      0,
-  );
-}
-
-function getShipmentDescription(shipment = {}) {
-  if (Array.isArray(shipment?.packages) && shipment.packages.length > 0) {
-    return shipment.packages
-      .map((pkg) => {
-        const qty = Number(pkg.quantity) || 1;
-        const desc = pkg.description || "Package";
-        return qty > 1 ? `${desc} (${qty})` : desc;
-      })
-      .join(", ");
-  }
-
-  if (Array.isArray(shipment?.items) && shipment.items.length > 0) {
-    return shipment.items
-      .map((item) => {
-        const qty = Number(item.quantity) || 1;
-        const desc = item.description || "Item";
-        return qty > 1 ? `${desc} (${qty})` : desc;
-      })
-      .join(", ");
-  }
-
-  return "—";
-}
-
-function getDestination(shipment = {}) {
-  return shipment?.recipient?.address?.city || shipment?.destination || "—";
-}
-
-function getShipmentDisplayId(shipment = {}) {
-  return shipment?.shipmentId || shipment?.id || "—";
-}
+import {
+  EMPTY_EXPORT_VALUE,
+  formatExportDate,
+  getDestination,
+  getShipmentDescription,
+  getShipmentDisplayId,
+  getShipmentQuantity,
+} from "./exportHelpers";
 
 export default function ExportTripButton({ trip, user }) {
   const [exporting, setExporting] = useState(false);
@@ -108,15 +59,24 @@ export default function ExportTripButton({ trip, user }) {
           "Driver:",
           fullTrip.driverName || fullTrip.driver?.name || "Unassigned",
         ],
-        ["Plate #:", fullTrip.truckPlate || fullTrip.truckPlateNumber || "—"],
+        [
+          "Plate #:",
+          fullTrip.truckPlate ||
+            fullTrip.truckPlateNumber ||
+            EMPTY_EXPORT_VALUE,
+        ],
         [
           "Route:",
           fullTrip.route ||
-            `${fullTrip.originCode || fullTrip.origin || "—"} -> ${fullTrip.destinationCode || fullTrip.destination || "—"}`,
+            `${fullTrip.originCode || fullTrip.origin || EMPTY_EXPORT_VALUE} -> ${
+              fullTrip.destinationCode ||
+              fullTrip.destination ||
+              EMPTY_EXPORT_VALUE
+            }`,
         ],
         [
           "Departure:",
-          formatDate(
+          formatExportDate(
             fullTrip.plannedDeparture ||
               fullTrip.departure ||
               fullTrip.createdAt,
@@ -138,11 +98,11 @@ export default function ExportTripButton({ trip, user }) {
 
       const rows = shipments.map((shipment) => [
         getShipmentDisplayId(shipment),
-        shipment?.sender?.name || "—",
-        shipment?.recipient?.name || "—",
+        shipment?.sender?.name || EMPTY_EXPORT_VALUE,
+        shipment?.recipient?.name || EMPTY_EXPORT_VALUE,
         getDestination(shipment),
         getShipmentQuantity(shipment),
-        shipment?.status || "—",
+        shipment?.status || EMPTY_EXPORT_VALUE,
         getShipmentDescription(shipment),
       ]);
 
@@ -154,17 +114,16 @@ export default function ExportTripButton({ trip, user }) {
       const totalsRow = ["TOTAL", "", "", "", totalQty, "", ""];
 
       const finalData = [...tripInfo, tableHeaders, ...rows, totalsRow];
-
       const worksheet = XLSX.utils.aoa_to_sheet(finalData);
 
       worksheet["!cols"] = [
-        { wch: 22 }, // Shipment ID
-        { wch: 22 }, // Sender
-        { wch: 22 }, // Recipient
-        { wch: 18 }, // Destination
-        { wch: 12 }, // Actual Qty
-        { wch: 18 }, // Status
-        { wch: 45 }, // Description
+        { wch: 22 },
+        { wch: 22 },
+        { wch: 22 },
+        { wch: 18 },
+        { wch: 12 },
+        { wch: 18 },
+        { wch: 45 },
       ];
 
       const workbook = XLSX.utils.book_new();

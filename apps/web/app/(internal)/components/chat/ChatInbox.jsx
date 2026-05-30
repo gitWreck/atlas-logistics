@@ -10,6 +10,7 @@ import {
 } from "firebase/firestore";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
+  faChevronLeft,
   faCircle,
   faPaperPlane,
   faSearch,
@@ -22,17 +23,7 @@ import {
   sendChatMessage,
   updateConversationStatus,
 } from "@/app/utility/FirebaseFunctions";
-
-function formatTime(value) {
-  const date = value?.toDate?.() || null;
-  if (!date) return "Recently";
-  return new Intl.DateTimeFormat("en-US", {
-    month: "short",
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  }).format(date);
-}
+import { formatFirestoreDate } from "@/app/utility/utilities";
 
 function getInitials(name = "C") {
   return String(name)
@@ -51,6 +42,7 @@ export default function ChatInbox({ user, isDark = false }) {
   const [statusFilter, setStatusFilter] = useState("open");
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
+  const [mobileThreadOpen, setMobileThreadOpen] = useState(false);
   const listEndRef = useRef(null);
 
   useEffect(() => {
@@ -149,7 +141,10 @@ export default function ChatInbox({ user, isDark = false }) {
 
   const handleAssignToMe = async () => {
     if (!selectedId || !user?.uid) return;
-    await assignConversation({ conversationId: selectedId, assigneeId: user.uid });
+    await assignConversation({
+      conversationId: selectedId,
+      assigneeId: user.uid,
+    });
   };
 
   const surface = isDark
@@ -161,9 +156,13 @@ export default function ChatInbox({ user, isDark = false }) {
   const muted = isDark ? "text-slate-400" : "text-slate-500";
 
   return (
-    <div className={`h-[calc(100vh-57px)] min-h-[640px] ${surface}`}>
+    <div className={`h-full min-h-0 ${surface}`}>
       <div className="grid h-full grid-cols-1 lg:grid-cols-[360px_minmax(0,1fr)]">
-        <aside className={`border-r ${panel} flex min-h-0 flex-col`}>
+        <aside
+          className={`min-h-0 flex-col border-r ${panel} ${
+            mobileThreadOpen ? "hidden lg:flex" : "flex"
+          }`}
+        >
           <div className="border-b border-inherit p-4">
             <div className="flex items-center justify-between gap-3">
               <div>
@@ -195,7 +194,7 @@ export default function ChatInbox({ user, isDark = false }) {
               />
             </div>
 
-            <div className="mt-3 grid grid-cols-4 gap-1">
+            <div className="mt-3 grid grid-cols-2 gap-1 sm:grid-cols-4">
               {["open", "pending", "resolved", "all"].map((status) => (
                 <button
                   key={status}
@@ -229,7 +228,10 @@ export default function ChatInbox({ user, isDark = false }) {
                   <button
                     key={item.id}
                     type="button"
-                    onClick={() => setSelectedId(item.id)}
+                    onClick={() => {
+                      setSelectedId(item.id);
+                      setMobileThreadOpen(true);
+                    }}
                     className={`w-full border-b border-inherit p-4 text-left transition ${
                       isSelected
                         ? isDark
@@ -250,7 +252,8 @@ export default function ChatInbox({ user, isDark = false }) {
                             {item.customerName || "Customer"}
                           </p>
                           <span className={`shrink-0 text-[11px] ${muted}`}>
-                            {formatTime(item.lastMessageAt)}
+                            {formatFirestoreDate(item.lastMessageAt) ||
+                              "Recently"}
                           </span>
                         </div>
                         <p className={`mt-1 truncate text-xs ${muted}`}>
@@ -283,37 +286,56 @@ export default function ChatInbox({ user, isDark = false }) {
           </div>
         </aside>
 
-        <section className="flex min-h-0 flex-col">
+        <section
+          className={`min-h-0 flex-col ${
+            mobileThreadOpen ? "flex" : "hidden lg:flex"
+          }`}
+        >
           {selected ? (
             <>
               <div className={`border-b ${panel} p-4`}>
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2">
-                      <h2 className="truncate text-lg font-bold">
-                        {selected.customerName || "Customer"}
-                      </h2>
-                      <FontAwesomeIcon
-                        icon={faCircle}
-                        className={
-                          selected.status === "open"
-                            ? "text-emerald-500"
-                            : "text-slate-400"
-                        }
-                        size="2xs"
-                      />
+                  <div className="flex min-w-0 items-start gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setMobileThreadOpen(false)}
+                      className={`mt-0.5 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border lg:hidden ${
+                        isDark
+                          ? "border-slate-700 bg-slate-950 text-slate-200"
+                          : "border-slate-200 bg-white text-slate-700"
+                      }`}
+                      aria-label="Back to conversations"
+                    >
+                      <FontAwesomeIcon icon={faChevronLeft} size="sm" />
+                    </button>
+
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <h2 className="truncate text-base font-bold sm:text-lg">
+                          {selected.customerName || "Customer"}
+                        </h2>
+                        <FontAwesomeIcon
+                          icon={faCircle}
+                          className={
+                            selected.status === "open"
+                              ? "text-emerald-500"
+                              : "text-slate-400"
+                          }
+                          size="2xs"
+                        />
+                      </div>
+                      <p className={`mt-1 truncate text-xs sm:text-sm ${muted}`}>
+                        {selected.customerPhone || "No phone"} ·{" "}
+                        {selected.trackingNumber || "General support"}
+                      </p>
                     </div>
-                    <p className={`mt-1 text-sm ${muted}`}>
-                      {selected.customerPhone || "No phone"} ·{" "}
-                      {selected.trackingNumber || "General support"}
-                    </p>
                   </div>
 
-                  <div className="flex flex-wrap items-center gap-2">
+                  <div className="flex flex-nowrap items-center gap-2 overflow-x-auto pb-1 sm:flex-wrap sm:overflow-visible sm:pb-0">
                     <button
                       type="button"
                       onClick={handleAssignToMe}
-                      className="inline-flex h-9 items-center gap-2 rounded-lg border border-slate-300 px-3 text-xs font-semibold"
+                      className="inline-flex h-9 shrink-0 items-center gap-2 rounded-lg border border-slate-300 px-3 text-xs font-semibold"
                     >
                       <FontAwesomeIcon icon={faUserCheck} />
                       {selected.assignedTo === user?.uid
@@ -325,7 +347,7 @@ export default function ChatInbox({ user, isDark = false }) {
                         key={status}
                         type="button"
                         onClick={() => handleStatus(status)}
-                        className={`h-9 rounded-lg px-3 text-xs font-semibold capitalize ${
+                        className={`h-9 shrink-0 rounded-lg px-3 text-xs font-semibold capitalize ${
                           selected.status === status
                             ? "bg-blue-600 text-white"
                             : isDark
@@ -340,7 +362,7 @@ export default function ChatInbox({ user, isDark = false }) {
                 </div>
               </div>
 
-              <div className="min-h-0 flex-1 overflow-y-auto px-4 py-5">
+              <div className="min-h-0 flex-1 overflow-y-auto px-3 py-4 sm:px-4 sm:py-5">
                 <div className="mx-auto flex max-w-4xl flex-col gap-3">
                   {messages.map((message) => {
                     const mine = message.senderId === user?.uid;
@@ -350,7 +372,7 @@ export default function ChatInbox({ user, isDark = false }) {
                         className={`flex ${mine ? "justify-end" : "justify-start"}`}
                       >
                         <div
-                          className={`max-w-[78%] rounded-2xl px-4 py-3 text-sm shadow-sm ${
+                          className={`max-w-[88%] rounded-2xl px-4 py-3 text-sm shadow-sm sm:max-w-[78%] ${
                             mine
                               ? "rounded-br-md bg-blue-600 text-white"
                               : isDark
@@ -364,7 +386,8 @@ export default function ChatInbox({ user, isDark = false }) {
                             }`}
                           >
                             {message.senderName || "User"} ·{" "}
-                            {formatTime(message.createdAt)}
+                            {formatFirestoreDate(message.createdAt) ||
+                              "Recently"}
                           </div>
                           <p className="whitespace-pre-wrap leading-relaxed">
                             {message.text}
@@ -377,11 +400,8 @@ export default function ChatInbox({ user, isDark = false }) {
                 </div>
               </div>
 
-              <form
-                onSubmit={handleSend}
-                className={`border-t ${panel} p-4`}
-              >
-                <div className="mx-auto flex max-w-4xl items-end gap-3">
+              <form onSubmit={handleSend} className={`border-t ${panel} p-4`}>
+                <div className="mx-auto flex max-w-4xl items-end gap-2 sm:gap-3">
                   <textarea
                     value={draft}
                     onChange={(event) => setDraft(event.target.value)}

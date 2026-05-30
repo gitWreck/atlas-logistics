@@ -15,6 +15,7 @@ import TripManifestTab from "./TripManifestTab";
 import TripToolsTab from "./TripToolsTab";
 import TripDrawerFooter from "./TripDrawerFooter";
 import StatusBadge from "../ui/StatusBadge";
+import DrawerTabButton from "../ui/DrawerTabButton";
 import UnassignShipmentModal from "./modals/UnassignShipmentModal";
 import BulkAssignmentModal from "./modals/BulkAssignmentModal";
 import ViewPackagesModal from "../shipments/Packages/ViewPackagesModal";
@@ -217,7 +218,7 @@ export default function TripDrawer({
 
         {/* Tabs */}
         <div className={`flex border-b ${theme.tabsWrap}`}>
-          <TabButton
+          <DrawerTabButton
             isDark={isDark}
             theme={theme}
             isActive={activeTab === "TIMELINE"}
@@ -226,7 +227,7 @@ export default function TripDrawer({
             label="Status"
           />
 
-          <TabButton
+          <DrawerTabButton
             isDark={isDark}
             theme={theme}
             isActive={activeTab === "MANIFEST"}
@@ -235,7 +236,7 @@ export default function TripDrawer({
             label={`Manifest (${shipments.length})`}
           />
 
-          <TabButton
+          <DrawerTabButton
             isDark={isDark}
             theme={theme}
             isActive={activeTab === "TOOLS"}
@@ -385,20 +386,5 @@ export default function TripDrawer({
         isDark={isDark}
       />
     </>
-  );
-}
-
-function TabButton({ isActive, onClick, icon, label, theme }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`flex-1 py-3 text-xs font-bold border-b-2 transition-colors flex items-center justify-center gap-2 uppercase tracking-wide ${
-        isActive ? theme.tabActive : theme.tabIdle
-      }`}
-    >
-      <FontAwesomeIcon icon={icon} />
-      {label}
-    </button>
   );
 }

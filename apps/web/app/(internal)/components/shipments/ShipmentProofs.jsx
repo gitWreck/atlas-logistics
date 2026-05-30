@@ -1,63 +1,6 @@
 import React from "react";
 import { formatFirestoreDate } from "@/app/utility/utilities";
-
-const normalizeImages = (source) => {
-  if (!source) return [];
-
-  const values = Array.isArray(source) ? source : [source];
-
-  return values
-    .map((item) => {
-      if (!item) return null;
-      if (typeof item === "string") return item;
-
-      return item.url || item.src || item.downloadURL || item.imageUrl || null;
-    })
-    .filter(Boolean);
-};
-
-const uniqueImages = (...sources) => {
-  const seen = new Set();
-
-  return sources.flatMap(normalizeImages).filter((url) => {
-    if (seen.has(url)) return false;
-    seen.add(url);
-    return true;
-  });
-};
-
-const normalizeRemark = (value) => {
-  if (typeof value !== "string") return "";
-  return value.trim();
-};
-
-const getShipmentRemarks = (shipment) => {
-  const remarks = [];
-  const seen = new Set();
-
-  const addRemark = (label, value, meta = "") => {
-    const text = normalizeRemark(value);
-    if (!text || seen.has(text)) return;
-
-    remarks.push({ label, text, meta });
-    seen.add(text);
-  };
-
-  addRemark("Shipment remarks", shipment?.remarks);
-  addRemark("Handoff remarks", shipment?.handoffRemarks);
-  addRemark("Missing remarks", shipment?.missingRemarks);
-
-  (shipment?.statusHistory || []).forEach((event) => {
-    const metaParts = [
-      event.status?.replace(/_/g, " "),
-      formatFirestoreDate(event.at),
-    ].filter(Boolean);
-
-    addRemark("Status note", event.note, metaParts.join(" / "));
-  });
-
-  return remarks;
-};
+import { getShipmentRemarks, uniqueImages } from "./shipmentHelpers";
 
 export default function ShipmentProofs({ shipment, isDark = false }) {
   const proofGroups = [
@@ -79,7 +22,7 @@ export default function ShipmentProofs({ shipment, isDark = false }) {
     },
   ].filter((group) => group.images.length > 0);
 
-  const remarks = getShipmentRemarks(shipment);
+  const remarks = getShipmentRemarks(shipment, formatFirestoreDate);
   const hasProofs = proofGroups.length > 0;
   const hasRemarks = remarks.length > 0;
 

@@ -9,101 +9,20 @@ import {
   faTimes,
 } from "@fortawesome/free-solid-svg-icons";
 import { getModalThemeClasses } from "@/app/utility/constant/theme";
-
-const FILTER_DEFAULTS = {
-  tripId: "ALL",
-  startDate: "",
-  endDate: "",
-  status: "ALL",
-  minAmount: "",
-  maxAmount: "",
-};
-
-const INVOICE_STATUSES = ["DRAFT", "ISSUED", "PAID", "CANCELLED"];
-
-function getInvoiceTripId(invoice = {}) {
-  return (
-    invoice.tripId ||
-    invoice.truckTripId ||
-    invoice.currentTripId ||
-    invoice.shipment?.currentTripId ||
-    invoice.shipmentSnapshot?.currentTripId ||
-    ""
-  );
-}
-
-function parseDateValue(value) {
-  if (!value) return null;
-
-  if (value instanceof Date) {
-    return Number.isNaN(value.getTime()) ? null : value;
-  }
-
-  if (typeof value?.toDate === "function") {
-    const date = value.toDate();
-    return Number.isNaN(date.getTime()) ? null : date;
-  }
-
-  if (value?.seconds || value?._seconds) {
-    const seconds = value.seconds || value._seconds;
-    const date = new Date(seconds * 1000);
-    return Number.isNaN(date.getTime()) ? null : date;
-  }
-
-  const stringValue = String(value).trim();
-  if (!stringValue) return null;
-
-  if (!/\b\d{4}\b/.test(stringValue)) {
-    const assumedYearDate = new Date(
-      `${stringValue} ${new Date().getFullYear()}`,
-    );
-    if (!Number.isNaN(assumedYearDate.getTime())) return assumedYearDate;
-  }
-
-  const date = new Date(stringValue);
-  return Number.isNaN(date.getTime()) ? null : date;
-}
-
-function getInvoiceDate(invoice = {}) {
-  return parseDateValue(invoice.invoiceDate || invoice.createdAt);
-}
-
-function formatDate(value) {
-  const date = parseDateValue(value);
-  if (!date) return value || "-";
-  return date.toLocaleDateString();
-}
-
-function getShipmentDisplayId(invoice = {}) {
-  return invoice.shipmentTrackingNumber || invoice.shipmentId || "-";
-}
-
-function getRouteLabel(invoice = {}) {
-  return (
-    invoice.routeLabel ||
-    `${invoice.origin || invoice.shipment?.origin || "-"} -> ${
-      invoice.destination || invoice.shipment?.destination || "-"
-    }`
-  );
-}
-
-function getTripFilterLabel(filters, tripQuery = "") {
-  if (filters.tripId === "ALL" && tripQuery.trim()) {
-    return `Matching "${tripQuery.trim()}"`;
-  }
-
-  return filters.tripId === "ALL" ? "All Trips" : filters.tripId;
-}
-
-function getDateRangeLabel(filters) {
-  if (!filters.startDate && !filters.endDate) return "All Dates";
-  return `${filters.startDate || "Start"} to ${filters.endDate || "End"}`;
-}
-
-function getAmountRangeLabel(filters) {
-  if (!filters.minAmount && !filters.maxAmount) return "All Amounts";
-  return `${filters.minAmount || "0"} to ${filters.maxAmount || "No limit"}`;
-}
+import {
+  FILTER_DEFAULTS,
+  getAmountRangeLabel,
+  getDateRangeLabel,
+  getTripFilterLabel,
+} from "./exportHelpers";
+import {
+  INVOICE_STATUSES,
+  formatInvoiceExportDate,
+  getInvoiceDate,
+  getInvoiceRouteLabel,
+  getInvoiceShipmentDisplayId,
+  getInvoiceTripId,
+} from "../invoice/invoiceHelpers";
 
 export default function ExportInvoiceList({
   invoices = [],
@@ -306,14 +225,14 @@ export default function ExportInvoiceList({
 
       const rows = filteredInvoices.map((invoice) => [
         invoice.invoiceNumber || invoice.id || "-",
-        getShipmentDisplayId(invoice),
+        getInvoiceShipmentDisplayId(invoice),
         getInvoiceTripId(invoice) || "-",
         invoice.senderName || "-",
         invoice.recipientName || "-",
-        getRouteLabel(invoice),
+        getInvoiceRouteLabel(invoice),
         invoice.status || "DRAFT",
-        formatDate(invoice.invoiceDate || invoice.createdAt),
-        formatDate(invoice.dueDate),
+        formatInvoiceExportDate(invoice.invoiceDate || invoice.createdAt),
+        formatInvoiceExportDate(invoice.dueDate),
         Number(invoice.amount || 0),
         Number(invoice.totalPackages || 0),
         Number(invoice.totalItems || 0),

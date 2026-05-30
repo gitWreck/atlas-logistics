@@ -27,50 +27,18 @@ import { getModalActionClasses } from "@/app/utility/constant/action";
 import { formatFirestoreDate } from "@/app/utility/utilities";
 import StatusBadge from "../../ui/StatusBadge";
 import TablePaginationFooter from "../../ui/TablePaginationFooter";
+import {
+  BASIC_PACKAGING_TYPES,
+  INITIAL_PACKAGE_STATE,
+  contactLabel,
+  displayValue,
+  getShipmentDisplayId,
+  getShipmentRouteLabel,
+  getShipmentTripId,
+  isPackageLocked,
+} from "../shipmentHelpers";
 
-const PACKAGING_TYPES = ["Box", "Sack", "Crate", "Bundle", "Roll", "Envelope"];
 const ITEMS_PER_PAGE = 6;
-
-const isPackageLocked = (status) =>
-  ["IN_TRANSIT", "DELIVERED"].includes(status);
-
-const displayValue = (value) => {
-  if (value === 0) return "0";
-  return value || "-";
-};
-
-const contactLabel = (contact) => {
-  if (!contact) return "-";
-
-  return [contact.name, contact.phone].filter(Boolean).join(" / ") || "-";
-};
-
-const routeLabel = (shipment) => {
-  if (shipment?.route) return shipment.route;
-
-  const origin =
-    shipment?.originCode && shipment?.origin
-      ? `${shipment.originCode} - ${shipment.origin}`
-      : shipment?.originCode || shipment?.origin;
-
-  const destination =
-    shipment?.destinationCode && shipment?.destination
-      ? `${shipment.destinationCode} - ${shipment.destination}`
-      : shipment?.destinationCode || shipment?.destination;
-
-  if (origin && destination) return `${origin} to ${destination}`;
-  return origin || destination || "-";
-};
-
-const shipmentTripId = (shipment) =>
-  shipment?.assignedTrip?.tripId ||
-  shipment?.tripId ||
-  shipment?.currentTripId ||
-  shipment?.currentTruckTripId ||
-  shipment?.truckTripId;
-
-const shipmentDisplayId = (shipment) =>
-  shipment?.shipmentId || shipment?.trackingNumber || shipment?.id;
 
 function ShipmentDetailRow({ label, value, isDark }) {
   return (
@@ -88,16 +56,6 @@ function ShipmentDetailRow({ label, value, isDark }) {
     </div>
   );
 }
-
-const INITIAL_PACKAGE_STATE = {
-  description: "",
-  weight: "",
-  declaredValue: "",
-  packagingType: "Box",
-  isFragile: false,
-  isPerishable: false,
-  status: "RECEIVED",
-};
 
 export default function ViewPackagesModal({
   isOpen,
@@ -332,7 +290,7 @@ export default function ViewPackagesModal({
   const updatedAt = formatFirestoreDate(
     shipmentDetails.updatedAt || shipmentDetails.createdAt,
   );
-  const trackingNumber = displayValue(shipmentDisplayId(shipmentDetails));
+  const trackingNumber = displayValue(getShipmentDisplayId(shipmentDetails));
 
   return (
     <>
@@ -461,12 +419,12 @@ export default function ViewPackagesModal({
                     <div className="space-y-3">
                       <ShipmentDetailRow
                         label="Trip ID"
-                        value={displayValue(shipmentTripId(shipmentDetails))}
+                        value={displayValue(getShipmentTripId(shipmentDetails))}
                         isDark={isDark}
                       />
                       <ShipmentDetailRow
                         label="Route"
-                        value={routeLabel(shipmentDetails)}
+                        value={getShipmentRouteLabel(shipmentDetails)}
                         isDark={isDark}
                       />
                       <ShipmentDetailRow
@@ -518,7 +476,7 @@ export default function ViewPackagesModal({
                         handleAddSave={handleAddSave}
                         isSaving={isSaving}
                         isDark={isDark}
-                        packagingTypes={PACKAGING_TYPES}
+                        packagingTypes={BASIC_PACKAGING_TYPES}
                       />
                     ) : (
                       <button
@@ -761,7 +719,7 @@ export default function ViewPackagesModal({
                                           }
                                           className={`w-full border rounded-xl px-3 py-2 text-sm ${modalTheme.input}`}
                                         >
-                                          {PACKAGING_TYPES.map((type) => (
+                                          {BASIC_PACKAGING_TYPES.map((type) => (
                                             <option key={type} value={type}>
                                               {type}
                                             </option>
@@ -972,7 +930,7 @@ export default function ViewPackagesModal({
                                             }
                                             className={`w-full border rounded-lg px-3 py-2 text-sm ${modalTheme.input}`}
                                           >
-                                            {PACKAGING_TYPES.map((type) => (
+                                            {BASIC_PACKAGING_TYPES.map((type) => (
                                               <option key={type} value={type}>
                                                 {type}
                                               </option>

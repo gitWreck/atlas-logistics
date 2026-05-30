@@ -4,6 +4,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import {
   collection,
   query,
+  where,
   orderBy,
   limit,
   onSnapshot,
@@ -72,7 +73,10 @@ export default function RecentAlertsLogs({ isDark = false }) {
   const [limitValue, setLimitValue] = useState("50");
 
   useEffect(() => {
-    const queryConstraints = [orderBy("createdAt", "desc")];
+    const queryConstraints = [
+      where("type", "==", "DELAY_REPORT"),
+      orderBy("createdAt", "desc"),
+    ];
 
     if (limitValue !== "all") {
       queryConstraints.push(limit(Number(limitValue)));

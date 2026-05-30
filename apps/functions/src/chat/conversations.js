@@ -264,6 +264,14 @@ exports.createConversation = onCall(
       }
     }
 
+    if (!initialMessage) {
+      return {
+        success: false,
+        requiresMessage: true,
+        message: "Send a message to start a new conversation.",
+      };
+    }
+
     const conversationRef = db.collection("conversations").doc();
     const customerName = displayName(user, "Customer");
     const now = FieldValue.serverTimestamp();

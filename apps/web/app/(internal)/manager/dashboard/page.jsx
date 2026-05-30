@@ -279,10 +279,15 @@ export default function ManagerDashboardPage() {
           </div>
         </header>
 
-        <main ref={mainScrollRef} className="flex-1 overflow-y-auto">
-          <div className="w-full">
-            <div className="max-w-7xl mx-auto w-full px-4 sm:px-6 py-6 space-y-6">
-              {activeTab === "overview" && (
+        <main
+          ref={mainScrollRef}
+          className={`flex-1 min-h-0 ${
+            activeTab === "chat" ? "overflow-hidden" : "overflow-y-auto"
+          }`}
+        >
+          <div className={`w-full ${activeTab === "chat" ? "h-full" : ""}`}>
+            {activeTab === "overview" && (
+              <div className="max-w-7xl mx-auto w-full px-4 sm:px-6 py-6 space-y-6">
                 <ManagerOverview
                   user={user}
                   userRole="manager"
@@ -290,61 +295,63 @@ export default function ManagerDashboardPage() {
                   onNavigateToShipments={() => setActiveTab("shipments")}
                   isDark={isDark}
                 />
+              </div>
+            )}
+
+            <div className={activeTab === "chat" ? "h-full" : ""}>
+              {activeTab === "trips" && (
+                <TripBoard
+                  ref={tripBoardRef}
+                  user={user}
+                  userRole="manager"
+                  profile={profile}
+                  isDark={isDark}
+                />
+              )}
+
+              {activeTab === "shipments" && (
+                <ShipmentBoard
+                  ref={shipmentBoardRef}
+                  user={user}
+                  userRole="manager"
+                  profile={profile}
+                  isDark={isDark}
+                />
+              )}
+
+              {activeTab === "trucks" && (
+                <TruckBoard
+                  ref={truckBoardRef}
+                  user={user}
+                  userRole="manager"
+                  profile={profile}
+                  isDark={isDark}
+                />
+              )}
+
+              {activeTab === "customers" && (
+                <CustomerBoard
+                  ref={customerBoardRef}
+                  user={user}
+                  userRole="manager"
+                  profile={profile}
+                  isDark={isDark}
+                />
+              )}
+
+              {activeTab === "invoice" && (
+                <InvoiceBoard
+                  ref={invoiceBoardRef}
+                  user={user}
+                  isDark={isDark}
+                  profile={profile}
+                />
+              )}
+
+              {activeTab === "chat" && (
+                <ChatInbox user={user} isDark={isDark} />
               )}
             </div>
-
-            {activeTab === "trips" && (
-              <TripBoard
-                ref={tripBoardRef}
-                user={user}
-                userRole="manager"
-                profile={profile}
-                isDark={isDark}
-              />
-            )}
-
-            {activeTab === "shipments" && (
-              <ShipmentBoard
-                ref={shipmentBoardRef}
-                user={user}
-                userRole="manager"
-                profile={profile}
-                isDark={isDark}
-              />
-            )}
-
-            {activeTab === "trucks" && (
-              <TruckBoard
-                ref={truckBoardRef}
-                user={user}
-                userRole="manager"
-                profile={profile}
-                isDark={isDark}
-              />
-            )}
-
-            {activeTab === "customers" && (
-              <CustomerBoard
-                ref={customerBoardRef}
-                user={user}
-                userRole="manager"
-                profile={profile}
-                isDark={isDark}
-              />
-            )}
-
-            {activeTab === "invoice" && (
-              <InvoiceBoard
-                ref={invoiceBoardRef}
-                user={user}
-                isDark={isDark}
-                profile={profile}
-              />
-            )}
-
-            {activeTab === "chat" && (
-              <ChatInbox user={user} isDark={isDark} />
-            )}
           </div>
         </main>
       </section>

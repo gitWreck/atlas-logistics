@@ -11,36 +11,7 @@ import {
 } from "@fortawesome/free-solid-svg-icons";
 import { formatFirestoreDate } from "@/app/utility/utilities";
 import { getRowThemeClasses } from "@/app/utility/constant/theme";
-
-function StatusDot({ status, isDelayed }) {
-  let color = "bg-blue-500";
-  let animate = false;
-  const normalizedStatus = String(status || "").toUpperCase();
-
-  if (["COMPLETED", "DELIVERED"].includes(normalizedStatus)) {
-    color = "bg-emerald-500";
-  }
-  if (normalizedStatus === "CREATED") color = "bg-slate-600";
-  if (normalizedStatus === "IN_TRANSIT") {
-    color = "bg-blue-500";
-    animate = true;
-  }
-  if (isDelayed) {
-    color = "bg-amber-500";
-    animate = true;
-  }
-
-  return (
-    <div className="relative flex items-center justify-center w-3 h-3 flex-shrink-0">
-      {animate && (
-        <span
-          className={`absolute inline-flex h-full w-full rounded-full opacity-75 animate-ping ${color}`}
-        />
-      )}
-      <span className={`relative inline-flex rounded-full h-2 w-2 ${color}`} />
-    </div>
-  );
-}
+import StatusDot from "../ui/StatusDot";
 
 export default function TripRow({ trip, onClick, isDark = false }) {
   const theme = getRowThemeClasses(isDark);
@@ -120,7 +91,11 @@ export default function TripRow({ trip, onClick, isDark = false }) {
       <div className="flex md:hidden justify-between items-start mb-2">
         <div className="flex items-start gap-3">
           <div className="mt-1">
-            <StatusDot status={trip.status} isDelayed={isDelayed} />
+            <StatusDot
+              status={trip.status}
+              isDelayed={isDelayed}
+              animateActive={false}
+            />
           </div>
 
           <div className="flex flex-col items-start gap-0.5 mt-1">
@@ -158,7 +133,11 @@ export default function TripRow({ trip, onClick, isDark = false }) {
       {/* Col 1 */}
       <div className="md:col-span-3 flex items-center gap-4">
         <div className="hidden md:block">
-          <StatusDot status={trip.status} isDelayed={isDelayed} />
+          <StatusDot
+            status={trip.status}
+            isDelayed={isDelayed}
+            animateActive={false}
+          />
         </div>
 
         <div className="w-full">
