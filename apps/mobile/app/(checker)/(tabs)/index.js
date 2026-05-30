@@ -140,6 +140,9 @@ export default function CheckerIndex() {
           onScanLoad={goToTripsForLoad}
           onScanOffload={() => goToScan("offloading", "Offload Items")}
           onScanInfo={() => goToScan("info", "Information")}
+          onScanDelivery={() =>
+            goToScan("delivery", "Last-Mile Delivery")
+          }
         />
       </ScrollView>
     </View>

@@ -19,6 +19,14 @@ const MAX_HEIGHT = 420; // Expanded height to fit text area + extra buttons
 
 // --- STATUS BUTTON LOGIC ---
 const statusConfig = {
+  ASSIGNED: {
+    title: "Load to Vehicle",
+    final: false,
+  },
+  READY_FOR_DELIVERY: {
+    title: "Mark Out for Delivery",
+    final: false,
+  },
   ARRIVED: {
     title: "Mark Out for Delivery",
     final: false,
@@ -48,7 +56,8 @@ export default function ShipmentActionFooter({
   isPickup = false,
   photoCount = 0,
   tripType = "",
-  onSendSMS, // Your separate sendmanualsms function
+  onSendSMS,
+  checkerReturnMode = false,
 }) {
   const { colors } = useTheme();
   const [isExpanded, setIsExpanded] = useState(false);
@@ -91,6 +100,9 @@ export default function ShipmentActionFooter({
     buttonTitle = "Complete Pickup";
     isFinalAction = true;
     if (photoCount === 0) isDisabled = true;
+  } else if (checkerReturnMode) {
+    buttonTitle = "Return to Warehouse";
+    isFinalAction = false;
   } else {
     const config = statusConfig[status];
 

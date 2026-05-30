@@ -2,14 +2,20 @@
 
 import React, { useEffect, useMemo, useState } from "react";
 import { releasePackagesToChecker } from "@/app/utility/FirebaseFunctions";
+import {
+  getCheckerReleaseBlockReason,
+  isEligibleForCheckerRelease,
+} from "@/app/utility/checkerRelease";
 
 function parseShipmentIds(value) {
-  return [...new Set(
-    String(value || "")
-      .split(/[\n,]/g)
-      .map((v) => v.trim())
-      .filter(Boolean),
-  )];
+  return [
+    ...new Set(
+      String(value || "")
+        .split(/[\n,]/g)
+        .map((v) => v.trim())
+        .filter(Boolean),
+    ),
+  ];
 }
 
 export default function ReleaseToCheckerModal({
@@ -19,6 +25,7 @@ export default function ReleaseToCheckerModal({
   user,
   isDark = false,
   defaultShipmentIds = [],
+  defaultShipments = [],
 }) {
   const [checkerId, setCheckerId] = useState("");
   const [vehicleId, setVehicleId] = useState("");
@@ -72,8 +79,40 @@ export default function ReleaseToCheckerModal({
     [shipmentIdsInput],
   );
 
+  const statusByShipmentId = useMemo(() => {
+    const map = new Map();
+    (defaultShipments || []).forEach((shipment) => {
+      if (!shipment?.id) return;
+      map.set(String(shipment.id), shipment.status);
+    });
+    return map;
+  }, [defaultShipments]);
+
+  const releaseValidation = useMemo(() => {
+    const blocked = [];
+    const eligible = [];
+
+    parsedIds.forEach((id) => {
+      const status = statusByShipmentId.get(id);
+      if (status != null && !isEligibleForCheckerRelease(status)) {
+        blocked.push({
+          id,
+          status,
+          reason: getCheckerReleaseBlockReason(status),
+        });
+        return;
+      }
+      eligible.push(id);
+    });
+
+    return { blocked, eligible };
+  }, [parsedIds, statusByShipmentId]);
+
   const canSubmit =
-    !submitting && checkerId && parsedIds.length > 0 && !loadingCheckers;
+    !submitting &&
+    checkerId &&
+    releaseValidation.eligible.length > 0 &&
+    !loadingCheckers;
 
   if (!isOpen) return null;
 
@@ -86,21 +125,30 @@ export default function ReleaseToCheckerModal({
   const inputClass = isDark
     ? "w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-white outline-none focus:border-blue-500"
     : "w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-blue-500";
-  const labelClass = isDark ? "text-xs text-slate-400 mb-1" : "text-xs text-slate-600 mb-1";
+  const labelClass = isDark
+    ? "text-xs text-slate-400 mb-1"
+    : "text-xs text-slate-600 mb-1";
 
   return (
     <div className={overlayClass}>
       <div className={modalClass}>
-        <div className={`px-5 py-4 border-b ${isDark ? "border-slate-800" : "border-slate-200"}`}>
+        <div
+          className={`px-5 py-4 border-b ${isDark ? "border-slate-800" : "border-slate-200"}`}
+        >
           <h3 className="text-lg font-bold">Release Shipments to Checker</h3>
-          <p className={`text-xs mt-1 ${isDark ? "text-slate-400" : "text-slate-600"}`}>
-            Assign custody and create a delivery manifest for selected shipments.
+          <p
+            className={`text-xs mt-1 ${isDark ? "text-slate-400" : "text-slate-600"}`}
+          >
+            Assign custody and create a delivery manifest for selected
+            shipments.
           </p>
         </div>
 
         <div className="p-5 space-y-4">
           <div>
-            <div className={labelClass}>Shipment IDs (one per line or comma-separated)</div>
+            <div className={labelClass}>
+              Shipment IDs (one per line or comma-separated)
+            </div>
             <textarea
               rows={4}
               className={inputClass}
@@ -108,9 +156,26 @@ export default function ReleaseToCheckerModal({
               value={shipmentIdsInput}
               onChange={(e) => setShipmentIdsInput(e.target.value)}
             />
-            <p className={`mt-1 text-[11px] ${isDark ? "text-slate-500" : "text-slate-500"}`}>
-              {parsedIds.length} shipment(s) ready to release
+            <p
+              className={`mt-1 text-[11px] ${isDark ? "text-slate-500" : "text-slate-500"}`}
+            >
+              {releaseValidation.eligible.length} eligible
+              {parsedIds.length !== releaseValidation.eligible.length
+                ? ` of ${parsedIds.length}`
+                : ""}{" "}
+              shipment(s) ready to release. Delivered, completed, and cancelled
+              shipments cannot be assigned.
             </p>
+            {releaseValidation.blocked.length > 0 && (
+              <div
+                className={`mt-2 text-[11px] rounded-lg px-3 py-2 ${isDark ? "bg-amber-900/20 text-amber-200 border border-amber-800" : "bg-amber-50 text-amber-800 border border-amber-200"}`}
+              >
+                Skipped {releaseValidation.blocked.length} ineligible:{" "}
+                {releaseValidation.blocked
+                  .map((item) => `${item.id} (${item.status})`)
+                  .join(", ")}
+              </div>
+            )}
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -175,13 +240,17 @@ export default function ReleaseToCheckerModal({
           </div>
 
           {!!error && (
-            <div className={`text-sm rounded-lg px-3 py-2 ${isDark ? "bg-red-900/30 text-red-300 border border-red-800" : "bg-red-50 text-red-700 border border-red-200"}`}>
+            <div
+              className={`text-sm rounded-lg px-3 py-2 ${isDark ? "bg-red-900/30 text-red-300 border border-red-800" : "bg-red-50 text-red-700 border border-red-200"}`}
+            >
               {error}
             </div>
           )}
         </div>
 
-        <div className={`px-5 py-4 border-t flex justify-end gap-2 ${isDark ? "border-slate-800" : "border-slate-200"}`}>
+        <div
+          className={`px-5 py-4 border-t flex justify-end gap-2 ${isDark ? "border-slate-800" : "border-slate-200"}`}
+        >
           <button
             type="button"
             className={`px-4 py-2 rounded-lg text-sm font-semibold ${isDark ? "bg-slate-800 text-slate-200 hover:bg-slate-700" : "bg-slate-100 text-slate-700 hover:bg-slate-200"}`}
@@ -200,7 +269,7 @@ export default function ReleaseToCheckerModal({
                 setError("");
                 await releasePackagesToChecker({
                   checkerId,
-                  shipmentIds: parsedIds,
+                  shipmentIds: releaseValidation.eligible,
                   deliveryVehicleId: vehicleId || null,
                   deliveryVehicleName: vehicleName || null,
                   warehouseCode: warehouseCode || null,

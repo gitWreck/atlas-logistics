@@ -6,6 +6,7 @@ const { FieldValue } = require("firebase-admin/firestore");
 const { requireRole, updatedBy } = require("../utilities/helpers");
 const { writeShipmentEvent } = require("../tracking/writeShipmentEvent");
 const { EVENT_TYPES } = require("../tracking/eventTypes");
+const { assertEligibleForCheckerRelease } = require("./releaseEligibility");
 
 if (!admin.apps.length) admin.initializeApp();
 const db = admin.firestore();
@@ -84,7 +85,10 @@ exports.releasePackagesToChecker = onCall(
       throw new HttpsError("invalid-argument", "checkerId is required.");
     }
 
-    const resolvedShipmentIds = await resolveShipmentIds({ shipmentIds, packageIds });
+    const resolvedShipmentIds = await resolveShipmentIds({
+      shipmentIds,
+      packageIds,
+    });
     const now = FieldValue.serverTimestamp();
     const nowIso = new Date().toISOString();
 
@@ -111,10 +115,16 @@ exports.releasePackagesToChecker = onCall(
         );
       }
       if (checkerData.active !== true) {
-        throw new HttpsError("failed-precondition", "Checker account is inactive.");
+        throw new HttpsError(
+          "failed-precondition",
+          "Checker account is inactive.",
+        );
       }
       checkerName =
-        checkerData.fullName || checkerData.name || checkerData.displayName || null;
+        checkerData.fullName ||
+        checkerData.name ||
+        checkerData.displayName ||
+        null;
 
       const shipmentRefs = resolvedShipmentIds.map((id) =>
         db.collection("shipments").doc(id),
@@ -131,13 +141,17 @@ exports.releasePackagesToChecker = onCall(
         const shipmentRef = shipmentRefs[index];
         const shipmentData = shipmentSnap.data() || {};
 
+        assertEligibleForCheckerRelease(
+          shipmentRef.id,
+          shipmentData.status,
+        );
+
         const shipmentPackageIds = Array.isArray(shipmentData.packageBarcodes)
-          ? shipmentData.packageBarcodes.filter((value) => typeof value === "string")
+          ? shipmentData.packageBarcodes.filter(
+              (value) => typeof value === "string",
+            )
           : [];
         shipmentPackageIds.forEach((value) => effectivePackageIds.add(value));
-
-        const nextStatus =
-          shipmentData.status === "DELIVERED" ? "DELIVERED" : "ASSIGNED";
 
         tx.update(shipmentRef, {
           assignedCheckerId: normalizedCheckerId,
@@ -153,7 +167,7 @@ exports.releasePackagesToChecker = onCall(
           releasedAt: now,
           updatedAt: now,
           updatedBy: actorName || actorUid || null,
-          status: nextStatus,
+          status: "ASSIGNED",
           statusHistory: FieldValue.arrayUnion({
             status: "ASSIGNED_TO_CHECKER",
             at: admin.firestore.Timestamp.now(),

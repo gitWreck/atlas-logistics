@@ -40,6 +40,26 @@ export const MODE_SCAN_ACTIONS = {
       color: "#6366f1",
     },
   ],
+  delivery: [
+    {
+      label: "Load to van",
+      status: "LOAD_TO_VEHICLE",
+      icon: "truck",
+      color: "#2563eb",
+    },
+    {
+      label: "Out for delivery",
+      status: "OUT_FOR_DELIVERY",
+      icon: "shipping-fast",
+      color: "#f59e0b",
+    },
+    {
+      label: "Delivered",
+      status: "DELIVERED",
+      icon: "check-circle",
+      color: "#10b981",
+    },
+  ],
 };
 
 export const ISSUE_SCAN_ACTIONS = [

@@ -12,7 +12,8 @@ const INFO_GRADIENT_COLORS = ["#042C83", "#6366f1"];
 export default function OperationsGrid({
   onScanLoad,
   onScanOffload,
-  onScanInfo, // <--- New Prop
+  onScanInfo,
+  onScanDelivery,
 }) {
   const { colors } = useTheme();
 
@@ -63,9 +64,26 @@ export default function OperationsGrid({
           </TouchableOpacity>
         </View>
 
-        {/* ROW 2: Scan Info */}
+        {/* ROW 2: Last mile + Scan Info */}
         <View style={styles.row}>
-          {/* C. SCAN INFO (New Button) */}
+          <TouchableOpacity
+            style={styles.gridBtnTouchable}
+            onPress={onScanDelivery}
+            activeOpacity={0.85}
+          >
+            <LinearGradient
+              colors={["#042C83", "#f59e0b"]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={styles.gridBtn}
+            >
+              <View style={styles.iconCircle}>
+                <FontAwesome5 name="shipping-fast" size={22} color="#f59e0b" />
+              </View>
+              <Text style={styles.btnTitle}>LAST-MILE DELIVERY</Text>
+            </LinearGradient>
+          </TouchableOpacity>
+
           <TouchableOpacity
             style={styles.gridBtnTouchable}
             onPress={onScanInfo}

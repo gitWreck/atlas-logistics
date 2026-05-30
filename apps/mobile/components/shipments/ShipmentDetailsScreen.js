@@ -27,6 +27,16 @@ import {
   updateShipmentPackages,
   sendManualSMS,
 } from "../utilities/FirebaseFunctions";
+import {
+  assertAssignedToChecker,
+  completeCheckerDelivery,
+  getCallableErrorMessage,
+  isAssignedToChecker,
+  loadAssignedShipmentsToVehicle,
+  markShipmentOutForDelivery,
+  reportCheckerFailedDelivery,
+  returnCheckerShipmentsToWarehouse,
+} from "../utilities/checkerDelivery";
 
 import ShipmentDetailHeader from "./ShipmentDetailHeader";
 import ShipmentHeaderCard from "./ShipmentHeaderCard";
@@ -154,6 +164,13 @@ export default function ShipmentDetailsScreen() {
     return urls;
   };
 
+  const refreshShipment = async () => {
+    const snap = await getDoc(doc(db, "shipments", String(shipmentId)));
+    if (snap.exists()) {
+      setShipment({ id: snap.id, ...snap.data() });
+    }
+  };
+
   const handleAction = async () => {
     if (!shipment) return;
 
@@ -161,6 +178,50 @@ export default function ShipmentDetailsScreen() {
 
     try {
       const location = await getCurrentLocationSafe();
+      const isCheckerLastMile =
+        isChecker &&
+        tripType !== "HUB_TRANSFER" &&
+        isAssignedToChecker(shipment, profile?.uid);
+
+      if (isCheckerLastMile && shipment.status === "ASSIGNED") {
+        await loadAssignedShipmentsToVehicle({
+          shipmentIds: [String(shipmentId)],
+          profile,
+        });
+        await refreshShipment();
+        Alert.alert(
+          "Loaded",
+          "Shipment is loaded on your delivery vehicle and ready for route start.",
+        );
+        setActionLoading(false);
+        return;
+      }
+
+      if (isCheckerLastMile && shipment.status === "READY_FOR_DELIVERY") {
+        await markShipmentOutForDelivery({
+          shipmentId: String(shipmentId),
+          profile,
+          tripId: resolvedTripId || null,
+        });
+        await refreshShipment();
+        Alert.alert("Success", "Shipment marked out for delivery.");
+        setActionLoading(false);
+        return;
+      }
+
+      if (isCheckerLastMile && shipment.status === "FAILED_DELIVERY") {
+        await returnCheckerShipmentsToWarehouse({
+          shipmentIds: [String(shipmentId)],
+          profile,
+        });
+        Alert.alert(
+          "Returned",
+          "Shipment returned to Odiongan warehouse. It is no longer on your route.",
+        );
+        router.back();
+        setActionLoading(false);
+        return;
+      }
 
       if (shipment.status === "PENDING_PICKUP") {
         if (photos.length === 0) {
@@ -199,6 +260,13 @@ export default function ShipmentDetailsScreen() {
         return;
       }
 
+      if (
+        shipment.status === "OUT_FOR_DELIVERY" &&
+        isCheckerLastMile
+      ) {
+        assertAssignedToChecker(shipment, profile?.uid);
+      }
+
       if (shipment.status === "OUT_FOR_DELIVERY") {
         if (photos.length === 0) {
           Alert.alert(
@@ -218,22 +286,34 @@ export default function ShipmentDetailsScreen() {
               Boolean,
             );
 
-            await updateShipmentStatus({
-              shipmentId,
-              tripId: resolvedTripId,
-              newStatus: "DELIVERED",
-              location,
-              remarks: `Proof of Delivery: ${photoUrls.length} images uploaded.`,
-              proofOfDelivery: photoUrls,
-              paymentStatus: shipment.isCOD ? "COLLECTED_BY_CHECKER" : "PAID",
-              sourceUI: isChecker ? "CHECKER_MOBILE" : "DRIVER_MOBILE",
-              notify,
-              notificationChannels: deliveryNotificationChannels,
-              notifySms: deliveryNotificationChannels.sms,
-              notifyEmail: deliveryNotificationChannels.email,
-              notifyPush: deliveryNotificationChannels.push,
-              updatedBy: updatedBy(profile),
-            });
+            if (isChecker && tripType !== "HUB_TRANSFER") {
+              await completeCheckerDelivery({
+                shipmentId: String(shipmentId),
+                profile,
+                tripId: resolvedTripId || null,
+                location,
+                photoUrls,
+                shipment,
+                notificationChannels: deliveryNotificationChannels,
+              });
+            } else {
+              await updateShipmentStatus({
+                shipmentId,
+                tripId: resolvedTripId,
+                newStatus: "DELIVERED",
+                location,
+                remarks: `Proof of Delivery: ${photoUrls.length} images uploaded.`,
+                proofOfDelivery: photoUrls,
+                paymentStatus: shipment.isCOD ? "COLLECTED_BY_CHECKER" : "PAID",
+                sourceUI: isChecker ? "CHECKER_MOBILE" : "DRIVER_MOBILE",
+                notify,
+                notificationChannels: deliveryNotificationChannels,
+                notifySms: deliveryNotificationChannels.sms,
+                notifyEmail: deliveryNotificationChannels.email,
+                notifyPush: deliveryNotificationChannels.push,
+                updatedBy: updatedBy(profile),
+              });
+            }
 
             Alert.alert("Success", "Delivery completed.");
             router.back();
@@ -269,7 +349,10 @@ export default function ShipmentDetailsScreen() {
       }
     } catch (error) {
       console.error("Shipment action error:", error);
-      Alert.alert("Error", error.message || "Action failed.");
+      Alert.alert(
+        "Error",
+        getCallableErrorMessage(error, error.message || "Action failed."),
+      );
       setActionLoading(false);
     }
   };
@@ -279,26 +362,51 @@ export default function ShipmentDetailsScreen() {
     setActionLoading(true);
 
     try {
+      if (
+        isChecker &&
+        tripType !== "HUB_TRANSFER" &&
+        !["PENDING_PICKUP"].includes(shipment?.status)
+      ) {
+        assertAssignedToChecker(shipment, profile?.uid);
+      }
+
       const location = await getCurrentLocationSafe();
       const newStatus =
         shipment.status === "PENDING_PICKUP"
           ? "FAILED_PICKUP"
           : "FAILED_DELIVERY";
 
-      await updateShipmentStatus({
-        shipmentId,
-        tripId: resolvedTripId,
-        newStatus,
-        location,
-        remarks: `Exception: ${reasonText} (${reasonId})`,
-        sourceUI: isChecker ? "CHECKER_MOBILE" : "DRIVER_MOBILE",
-        updatedBy: updatedBy(profile),
-      });
+      if (
+        isChecker &&
+        tripType !== "HUB_TRANSFER" &&
+        newStatus === "FAILED_DELIVERY"
+      ) {
+        await reportCheckerFailedDelivery({
+          shipmentIds: [String(shipmentId)],
+          profile,
+          reasonCode: reasonId,
+          remarks: `Exception: ${reasonText} (${reasonId})`,
+        });
+        Alert.alert(
+          "Failed Delivery",
+          "Delivery marked as failed. Return the package to the warehouse when you are back at Odiongan.",
+        );
+      } else {
+        await updateShipmentStatus({
+          shipmentId,
+          tripId: resolvedTripId,
+          newStatus,
+          location,
+          remarks: `Exception: ${reasonText} (${reasonId})`,
+          sourceUI: isChecker ? "CHECKER_MOBILE" : "DRIVER_MOBILE",
+          updatedBy: updatedBy(profile),
+        });
+        Alert.alert(
+          "Issue Reported",
+          `The shipment was marked as ${newStatus.replace(/_/g, " ")}.`,
+        );
+      }
 
-      Alert.alert(
-        "Issue Reported",
-        `The shipment was marked as ${newStatus.replace(/_/g, " ")}.`,
-      );
       router.back();
     } catch (error) {
       console.error("Report issue error:", error);
@@ -399,16 +507,31 @@ export default function ShipmentDetailsScreen() {
     isDriver &&
     tripType !== "HUB_TRANSFER" &&
     shipment?.status === "PENDING_PICKUP";
-  const canCheckerHandleDelivery =
+  const isCheckerLastMile =
     isChecker &&
     tripType !== "HUB_TRANSFER" &&
-    ["OUT_FOR_DELIVERY", "FAILED_DELIVERY"].includes(shipment?.status);
-  const showFooter = canDriverHandlePickup || canCheckerHandleDelivery;
-  const needsPhotoUpload =
+    isAssignedToChecker(shipment, profile?.uid);
+  const canCheckerLoadVehicle =
+    isCheckerLastMile && shipment?.status === "ASSIGNED";
+  const canCheckerStartRoute =
+    isCheckerLastMile && shipment?.status === "READY_FOR_DELIVERY";
+  const canCheckerCompleteDelivery =
+    isCheckerLastMile && shipment?.status === "OUT_FOR_DELIVERY";
+  const canCheckerReturnToWarehouse =
+    isCheckerLastMile && shipment?.status === "FAILED_DELIVERY";
+  const showFooter =
     canDriverHandlePickup ||
-    (canCheckerHandleDelivery && shipment?.status === "OUT_FOR_DELIVERY");
+    canCheckerLoadVehicle ||
+    canCheckerStartRoute ||
+    canCheckerCompleteDelivery ||
+    canCheckerReturnToWarehouse;
+  const needsPhotoUpload =
+    canDriverHandlePickup || canCheckerCompleteDelivery;
 
-  const packagePanelEditable = isChecker && !isShipmentFinal;
+  const packagePanelEditable =
+    isCheckerLastMile &&
+    !isShipmentFinal &&
+    ["OUT_FOR_DELIVERY", "READY_FOR_DELIVERY"].includes(shipment?.status);
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.bg }]}>
@@ -437,7 +560,7 @@ export default function ShipmentDetailsScreen() {
           />
         )}
 
-        {canCheckerHandleDelivery && shipment?.status === "OUT_FOR_DELIVERY" && (
+        {canCheckerCompleteDelivery && (
           <View
             style={[
               styles.notificationCard,
@@ -529,6 +652,7 @@ export default function ShipmentDetailsScreen() {
           photoCount={photos.length}
           tripType={tripType}
           onSendSMS={handleManualSMS}
+          checkerReturnMode={canCheckerReturnToWarehouse}
         />
       )}
 

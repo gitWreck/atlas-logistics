@@ -37,6 +37,13 @@ import {
   updateShipmentStatus,
 } from "../../components/utilities/FirebaseFunctions";
 import {
+  assertAssignedToChecker,
+  completeCheckerDelivery,
+  getCallableErrorMessage,
+  loadAssignedShipmentsToVehicle,
+  markShipmentOutForDelivery,
+} from "../../components/utilities/checkerDelivery";
+import {
   getCurrentLocationSafe,
   updatedBy,
 } from "../../components/utilities/helpers";
@@ -414,11 +421,16 @@ export default function ScannerScreen() {
     if (resolvedMode === "offloading") {
       return scanActionStatus || "DELIVERED";
     }
+    if (resolvedMode === "delivery") {
+      return scanActionStatus || null;
+    }
     if (resolvedMode === "info" && isIssueStatus(scanActionStatus)) {
       return scanActionStatus;
     }
     return null;
   };
+
+  const isDeliveryScanMode = resolvedMode === "delivery";
 
   const executeStatusUpdate = async ({
     shipmentId,
@@ -436,6 +448,47 @@ export default function ScannerScreen() {
     try {
       const location = await getCurrentLocationSafe();
       const effectiveTripId = getEffectiveTripId(shipmentDocData);
+
+      if (status === "LOAD_TO_VEHICLE") {
+        assertAssignedToChecker(shipmentDocData, profile?.uid);
+        await loadAssignedShipmentsToVehicle({
+          shipmentIds: [shipmentId],
+          profile,
+          remarks: remarks || "Loaded via delivery scan.",
+        });
+
+        showSuccessModal({
+          barcode,
+          shipmentId,
+          shipmentStatus: "READY_FOR_DELIVERY",
+          packageStatus: "LOAD_TO_VEHICLE",
+          quantity: qty,
+          message: "Shipment loaded onto your delivery vehicle.",
+          source,
+        });
+        return;
+      }
+
+      if (isDeliveryScanMode && status === "OUT_FOR_DELIVERY") {
+        assertAssignedToChecker(shipmentDocData, profile?.uid);
+        await markShipmentOutForDelivery({
+          shipmentId,
+          profile,
+          tripId: effectiveTripId || null,
+          remarks: remarks || "Marked out for delivery via scan.",
+        });
+
+        showSuccessModal({
+          barcode,
+          shipmentId,
+          shipmentStatus: "OUT_FOR_DELIVERY",
+          packageStatus: status,
+          quantity: qty,
+          message: "Shipment marked out for delivery.",
+          source,
+        });
+        return;
+      }
 
       if (completeShipment) {
         await updateShipmentStatus({
@@ -498,7 +551,9 @@ export default function ScannerScreen() {
       console.error("Package update failed:", error?.code, error?.message, error);
       Alert.alert(
         "Action Failed",
-        getActionErrorMessage(error, "Failed to update package."),
+        isDeliveryScanMode
+          ? getCallableErrorMessage(error, "Failed to update package.")
+          : getActionErrorMessage(error, "Failed to update package."),
         [{ text: "Retry", onPress: resetScanner }],
       );
       setProcessing(false);
@@ -640,18 +695,42 @@ export default function ScannerScreen() {
         shipmentDocData = directShipmentSnap.data();
       }
 
-      await executeStatusUpdate({
-        shipmentId: canonicalShipmentId,
-        barcode: pendingDelivery.barcode,
-        status: "DELIVERED",
-        qty: pendingDelivery.qty,
-        remarks: proofRemarks,
-        source: pendingDelivery.source,
-        shipmentDocData,
-        proofImages,
-        completeShipment: true,
-        throwOnError: false,
-      });
+      if (isDeliveryScanMode) {
+        assertAssignedToChecker(shipmentDocData, profile?.uid);
+        const location = await getCurrentLocationSafe();
+
+        await completeCheckerDelivery({
+          shipmentId: canonicalShipmentId,
+          profile,
+          tripId: pendingDelivery.tripId || null,
+          location,
+          photoUrls: proofImages,
+          shipment: shipmentDocData,
+        });
+
+        showSuccessModal({
+          barcode: pendingDelivery.barcode,
+          shipmentId: canonicalShipmentId,
+          shipmentStatus: "DELIVERED",
+          packageStatus: "DELIVERED",
+          quantity: pendingDelivery.qty,
+          message: "Delivery completed with proof of delivery.",
+          source: pendingDelivery.source,
+        });
+      } else {
+        await executeStatusUpdate({
+          shipmentId: canonicalShipmentId,
+          barcode: pendingDelivery.barcode,
+          status: "DELIVERED",
+          qty: pendingDelivery.qty,
+          remarks: proofRemarks,
+          source: pendingDelivery.source,
+          shipmentDocData,
+          proofImages,
+          completeShipment: true,
+          throwOnError: false,
+        });
+      }
 
       setProcessing(false);
       resetDeliveryProof();
@@ -742,7 +821,11 @@ export default function ScannerScreen() {
     }
 
     if (statusToApply === "DELIVERED") {
-      await assertShipmentOnTrip(shipmentDoc.id, shipmentData);
+      if (isDeliveryScanMode) {
+        assertAssignedToChecker(shipmentData, profile?.uid);
+      } else {
+        await assertShipmentOnTrip(shipmentDoc.id, shipmentData);
+      }
       openDeliveryProofModal({
         scanType: "package",
         shipmentId: shipmentDoc.id,
@@ -843,6 +926,10 @@ export default function ScannerScreen() {
       const { shipmentDoc, shipmentData, pkg, scanType } =
         await lookupScannedCode(barcode);
 
+      if (isDeliveryScanMode) {
+        assertAssignedToChecker(shipmentData, profile?.uid);
+      }
+
       if (scanType === "shipment") {
         const statusToApply = getStatusToApply();
         const currentTripId = setLatestScanDetails({
@@ -880,13 +967,39 @@ export default function ScannerScreen() {
         }
 
         if (statusToApply === "DELIVERED") {
-          await assertShipmentOnTrip(shipmentDoc.id, shipmentData);
+          if (!isDeliveryScanMode) {
+            await assertShipmentOnTrip(shipmentDoc.id, shipmentData);
+          }
           openDeliveryProofModal({
             scanType: "shipment",
             shipmentId: shipmentDoc.id,
             tripId: getEffectiveTripId(shipmentData),
             barcode,
             qty: getShipmentTotal(shipmentData),
+            source,
+            shipmentDocData: shipmentData,
+          });
+          return;
+        }
+
+        if (statusToApply === "LOAD_TO_VEHICLE") {
+          await executeStatusUpdate({
+            shipmentId: shipmentDoc.id,
+            barcode,
+            status: statusToApply,
+            remarks: "",
+            source,
+            shipmentDocData: shipmentData,
+          });
+          return;
+        }
+
+        if (isDeliveryScanMode && statusToApply === "OUT_FOR_DELIVERY") {
+          await executeStatusUpdate({
+            shipmentId: shipmentDoc.id,
+            barcode,
+            status: statusToApply,
+            remarks: "",
             source,
             shipmentDocData: shipmentData,
           });
