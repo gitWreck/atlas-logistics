@@ -10,7 +10,6 @@ import {
   faBox,
 } from "@fortawesome/free-solid-svg-icons";
 import { createTruckTrip } from "@/app/utility/FirebaseFunctions";
-import { WAREHOUSES } from "@/app/utility/WarehouseData";
 
 import RouteSelector from "./RouteSelector";
 import VehicleDetails from "./VehicleDetails";
@@ -19,6 +18,7 @@ import { getModalThemeClasses } from "@/app/utility/constant/theme";
 import { getModalActionClasses } from "@/app/utility/constant/action";
 import { validateTripScheduleFields } from "@/app/utility/tripScheduleHelpers";
 import { updatedBy } from "@/app/utility/utilities";
+import { useOperationalSettings } from "@/app/utility/useOperationalSettings";
 
 const INITIAL_FORM_STATE = {
   origin: "",
@@ -46,6 +46,8 @@ export default function CreateTripModal({
   const [error, setError] = useState("");
   const [scheduleErrors, setScheduleErrors] = useState({});
   const [formData, setFormData] = useState(INITIAL_FORM_STATE);
+  const { settings } = useOperationalSettings();
+  const warehouses = settings.warehouses;
 
   const theme = getModalThemeClasses(isDark);
   const action = getModalActionClasses();
@@ -60,7 +62,7 @@ export default function CreateTripModal({
   }, [isOpen]);
 
   const handleWarehouseChange = (type, value) => {
-    const selected = WAREHOUSES.find((warehouse) => warehouse.name === value);
+    const selected = warehouses.find((warehouse) => warehouse.name === value);
     const code = selected ? selected.code : "";
 
     setFormData((prev) => ({
@@ -221,6 +223,7 @@ export default function CreateTripModal({
               <RouteSelector
                 formData={formData}
                 onWarehouseChange={handleWarehouseChange}
+                warehouses={warehouses}
                 isDark={isDark}
               />
             )}

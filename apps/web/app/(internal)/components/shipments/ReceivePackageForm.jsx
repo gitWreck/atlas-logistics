@@ -12,21 +12,9 @@ import {
   faRoute, // Added
 } from "@fortawesome/free-solid-svg-icons";
 import { createShipmentWithPackages } from "@/app/utility/FirebaseFunctions";
-import { WAREHOUSES } from "@/app/utility/WarehouseData"; // <--- IMPORT THIS
 import InputGroup from "./ReceivePackageForm/InputGroup";
-
-const INITIAL_CONTACT = {
-  name: "",
-  phone: "",
-  unit: "",
-  street: "",
-  barangay: "",
-  city: "",
-  province: "",
-  // Code removed from here, now handled by Warehouse Selector
-};
-
-const PACKAGING_TYPES = ["Box", "Sack", "Crate", "Bundle", "Roll", "Envelope"];
+import { BASIC_PACKAGING_TYPES, INITIAL_CONTACT } from "./shipmentHelpers";
+import { useOperationalSettings } from "@/app/utility/useOperationalSettings";
 
 export default function ReceivePackageForm({
   profile,
@@ -36,6 +24,9 @@ export default function ReceivePackageForm({
   isDark = false,
 }) {
   const [loading, setLoading] = useState(false);
+  const { settings } = useOperationalSettings();
+  const warehouses = settings.warehouses;
+  const phLocations = settings.phLocations;
   console.log("ReceivePackageForm profile:", profile); // Debugging line
 
   // --- 1. NEW STATE FOR ROUTE/WAREHOUSE ---
@@ -66,7 +57,7 @@ export default function ReceivePackageForm({
 
   // --- 2. WAREHOUSE HANDLER ---
   const handleWarehouseChange = (type, value) => {
-    const selected = WAREHOUSES.find((w) => w.name === value);
+    const selected = warehouses.find((w) => w.name === value);
     const code = selected ? selected.code : "";
 
     if (type === "origin") {
@@ -282,7 +273,7 @@ export default function ReceivePackageForm({
                       required
                     >
                       <option value="">Select Origin...</option>
-                      {WAREHOUSES.map((w) => (
+                      {warehouses.map((w) => (
                         <option key={w.code} value={w.name}>
                           {w.name}
                         </option>
@@ -321,7 +312,7 @@ export default function ReceivePackageForm({
                       required
                     >
                       <option value="">Select Destination...</option>
-                      {WAREHOUSES.filter(
+                      {warehouses.filter(
                         (w) => w.code !== routeInfo.originCode,
                       ).map((w) => (
                         <option key={w.code} value={w.name}>
@@ -342,6 +333,7 @@ export default function ReceivePackageForm({
                 onChange={setSender}
                 color="blue"
                 isDark={isDark}
+                phLocations={phLocations}
               />
               <InputGroup
                 label="Recipient Contact"
@@ -349,6 +341,7 @@ export default function ReceivePackageForm({
                 onChange={setRecipient}
                 color="emerald"
                 isDark={isDark}
+                phLocations={phLocations}
               />
             </div>
 
@@ -402,7 +395,7 @@ export default function ReceivePackageForm({
                             )
                           }
                         >
-                          {PACKAGING_TYPES.map((t) => (
+                          {BASIC_PACKAGING_TYPES.map((t) => (
                             <option key={t} value={t}>
                               {t}
                             </option>

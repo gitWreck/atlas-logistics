@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import {
   View,
   Text,
@@ -10,7 +10,7 @@ import {
 } from "react-native";
 import { FontAwesome5 } from "@expo/vector-icons";
 import AtlasInput from "../../../components/ui/AtlasInput"; // Adjust path
-import { PROVINCES, getCities } from "../../utilities/PhilippinesData"; // Adjust path
+import { useOperationalSettings } from "../../utilities/operationalSettings";
 
 // --- HELPER COMPONENT: The Bottom Sheet List ---
 const SelectorModal = ({ visible, onClose, title, data, onSelect }) => {
@@ -82,18 +82,29 @@ export default function SignupForm({
   // Modal States
   const [provinceModalVisible, setProvinceModalVisible] = useState(false);
   const [cityModalVisible, setCityModalVisible] = useState(false);
+  const { settings } = useOperationalSettings();
+  const phLocations = settings.phLocations || {};
 
   // Format data for the lists
-  const provinceOptions = PROVINCES.map((prov) => ({
-    label: prov,
-    value: prov,
-  }));
+  const provinceOptions = useMemo(
+    () =>
+      Object.keys(phLocations)
+        .sort()
+        .map((prov) => ({
+          label: prov,
+          value: prov,
+        })),
+    [phLocations],
+  );
 
-  const availableCities = province ? getCities(province) : [];
-  const cityOptions = availableCities.map((c) => ({
-    label: c.name,
-    value: c.name,
-  }));
+  const cityOptions = useMemo(
+    () =>
+      (province ? phLocations[province] || [] : []).map((c) => ({
+        label: c.name,
+        value: c.name,
+      })),
+    [phLocations, province],
+  );
 
   return (
     <View style={styles.formContainer}>

@@ -1,5 +1,9 @@
 import { useState, useEffect } from "react";
-import { PROVINCES, getCities } from "@/app/utility/PhilippinesData";
+import {
+  PH_LOCATIONS,
+  PROVINCES,
+  getCities,
+} from "@/app/utility/PhilippinesData";
 import { normalizePhoneNumber } from "@/app/utility/utilities";
 
 export default function InputGroup({
@@ -9,19 +13,21 @@ export default function InputGroup({
   color = "blue",
   isDark = false,
   user,
+  phLocations = PH_LOCATIONS,
 }) {
   const [cities, setCities] = useState([]);
+  const provinces = Object.keys(phLocations || {}).sort();
   // ✅ New States for Search
   const [suggestions, setSuggestions] = useState([]);
   const [showDropdown, setShowDropdown] = useState(false);
 
   useEffect(() => {
     if (values.province) {
-      setCities(getCities(values.province));
+      setCities(phLocations?.[values.province] || getCities(values.province));
     } else {
       setCities([]);
     }
-  }, [values.province]);
+  }, [values.province, phLocations]);
 
   // ✅ New Function to Search Customers
   const searchCustomers = async (namePart) => {
@@ -189,7 +195,7 @@ export default function InputGroup({
           onChange={(e) => handleChange("province", e.target.value)}
         >
           <option value="">Select Province</option>
-          {PROVINCES.map((p) => (
+          {(provinces.length ? provinces : PROVINCES).map((p) => (
             <option key={p} value={p}>
               {p}
             </option>

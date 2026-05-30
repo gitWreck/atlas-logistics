@@ -5,6 +5,7 @@ import { WAREHOUSES } from "@/app/utility/WarehouseData";
 export default function RouteSelector({
   formData,
   onWarehouseChange,
+  warehouses = WAREHOUSES,
   isDark = false,
 }) {
   return (
@@ -48,7 +49,7 @@ export default function RouteSelector({
           required
         >
           <option value="">Select Origin...</option>
-          {WAREHOUSES.map((w) => (
+          {warehouses.map((w) => (
             <option key={w.code} value={w.name}>
               {w.name}
             </option>
@@ -95,7 +96,7 @@ export default function RouteSelector({
           required
         >
           <option value="">Select Destination...</option>
-          {WAREHOUSES.filter((w) => w.code !== formData.originCode).map((w) => (
+          {warehouses.filter((w) => w.code !== formData.originCode).map((w) => (
             <option key={w.code} value={w.name}>
               {w.name}
             </option>

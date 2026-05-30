@@ -10,7 +10,7 @@ import {
 } from "@fortawesome/free-solid-svg-icons";
 import { getModalThemeClasses } from "@/app/utility/constant/theme";
 import { getModalActionClasses } from "@/app/utility/constant/action";
-import { buildInitialForm } from "./utils";
+import { buildInitialForm } from "./invoiceHelpers";
 
 export default function InvoiceFormModal({
   isOpen = false,

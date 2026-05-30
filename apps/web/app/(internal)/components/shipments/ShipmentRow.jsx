@@ -8,8 +8,9 @@ import {
   faTruck,
 } from "@fortawesome/free-solid-svg-icons";
 import StatusBadge from "../ui/StatusBadge";
+import StatusDot from "../ui/StatusDot";
 import { getRowThemeClasses } from "@/app/utility/constant/theme";
-import { StatusDot } from "./utils";
+import { getShipmentRouteLabel } from "./shipmentHelpers";
 
 export default function ShipmentRow({
   shipmentBoard,
@@ -31,7 +32,7 @@ export default function ShipmentRow({
 
   const trackingNumber = s.shipmentId || "—";
   const routeCode = `${s.originCode || "N/A"} -> ${s.destinationCode || "N/A"}`;
-  const routeLabel = `${s.origin || "—"} -> ${s.destination || "—"}`;
+  const routeLabel = getShipmentRouteLabel(s);
   const updatedLabel = s.updatedAt || "Just now";
 
   const rowStateClass = isDelayed ? theme.rowDelayed : theme.rowDefaultHover;
@@ -111,25 +112,21 @@ export default function ShipmentRow({
             <span>{trackingNumber}</span>
           </div>
 
-          <div className="flex flex-wrap md:flex-nowrap items-center gap-3 mt-1">
+          <div className="flex items-center gap-2 mt-1 min-w-0">
             <StatusBadge status={s.status} size="xs" isDark={isDark} />
 
             <span
-              className={`text-xs font-mono border-l pl-2 ${theme.statsDivider}`}
+              className={`text-[11px] md:text-xs font-mono border-l pl-2 shrink-0 ${theme.statsDivider}`}
             >
               {loadedCount}/{totalCount} Loaded
             </span>
 
             <span
-              className={`hidden md:block text-xs border-l pl-2 truncate max-w-[120px] ${theme.mutedText} ${theme.rowBorder.replace("border-", "border-l ")}`}
+              className={`text-[11px] md:text-xs border-l pl-2 truncate min-w-0 ${theme.mutedText} ${theme.rowBorder.replace("border-", "border-l ")}`}
               title={driverName}
             >
               Driver: {driverName}
             </span>
-          </div>
-
-          <div className={`md:hidden text-xs mt-1 ${theme.mutedText}`}>
-            Driver: {driverName}
           </div>
         </div>
       </div>
@@ -148,11 +145,11 @@ export default function ShipmentRow({
 
       {/* Col 3: Sender / Recipient */}
       <div
-        className={`md:col-span-2 flex flex-col justify-center gap-1.5 md:border-0 pt-2 md:pt-0 ${theme.rowBorder}`}
+        className={`md:col-span-2 grid grid-cols-2 md:flex md:flex-col justify-center gap-2 md:gap-1.5 md:border-0 pt-2 md:pt-0 ${theme.rowBorder}`}
       >
-        <div className="flex items-center gap-2 truncate">
+        <div className="flex items-center gap-1.5 md:gap-2 min-w-0">
           <span
-            className={`text-[9px] font-bold uppercase w-8 shrink-0 ${theme.subtleText}`}
+            className={`text-[9px] font-bold uppercase shrink-0 md:w-8 ${theme.subtleText}`}
           >
             From
           </span>
@@ -163,9 +160,9 @@ export default function ShipmentRow({
           </span>
         </div>
 
-        <div className="flex items-center gap-2 truncate">
+        <div className="flex items-center gap-1.5 md:gap-2 min-w-0">
           <span
-            className={`text-[9px] font-bold uppercase w-8 shrink-0 ${theme.subtleText}`}
+            className={`text-[9px] font-bold uppercase shrink-0 md:w-8 ${theme.subtleText}`}
           >
             To
           </span>

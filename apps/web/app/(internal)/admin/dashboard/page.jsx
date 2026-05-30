@@ -4,6 +4,7 @@ import React, { useEffect, useState, useRef, useMemo } from "react";
 import ShipmentBoard from "../../components/shipments/ShipmentBoard";
 import TripBoard from "../../components/trips/TripBoard";
 import AdminOverview from "../../components/admin/AdminOverview";
+import AdminSettingsBoard from "../../components/admin/AdminSettingsBoard";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faSignOutAlt,
@@ -293,10 +294,15 @@ export default function AdminDashboardPage() {
           </div>
         </header>
 
-        <main ref={mainScrollRef} className="flex-1 overflow-y-auto">
-          <div className="w-full">
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 ">
-              {activeTab === "overview" && (
+        <main
+          ref={mainScrollRef}
+          className={`flex-1 min-h-0 ${
+            activeTab === "chat" ? "overflow-hidden" : "overflow-y-auto"
+          }`}
+        >
+          <div className={`w-full ${activeTab === "chat" ? "h-full" : ""}`}>
+            {activeTab === "overview" && (
+              <div className="max-w-7xl mx-auto px-4 sm:px-6 ">
                 <div className="space-y-4 sm:space-y-6">
                   <AdminOverview
                     user={user}
@@ -305,10 +311,10 @@ export default function AdminDashboardPage() {
                     isDark={isDark}
                   />
                 </div>
-              )}
-            </div>
+              </div>
+            )}
 
-            <div>
+            <div className={activeTab === "chat" ? "h-full" : ""}>
               {activeTab === "trips" && (
                 <TripBoard
                   ref={tripBoardRef}
@@ -360,6 +366,10 @@ export default function AdminDashboardPage() {
 
               {activeTab === "chat" && (
                 <ChatInbox user={user} isDark={isDark} />
+              )}
+
+              {activeTab === "settings" && (
+                <AdminSettingsBoard user={user} isDark={isDark} />
               )}
             </div>
           </div>
@@ -464,36 +474,6 @@ function SidebarContent({
           })}
         </div>
       </div>
-
-      {/* {!isSidebarCollapsed && secondaryNavItems?.length > 0 && (
-        <div className="mt-8">
-          <div
-            className={`text-[11px] font-semibold uppercase tracking-wide ${theme.secondaryLabel}`}
-          >
-            More
-          </div>
-
-          <div className="mt-3 space-y-1">
-            {secondaryNavItems.map((item) => (
-              <button
-                key={item.id}
-                type="button"
-                disabled={item.disabled}
-                className={`w-full flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium opacity-60 cursor-not-allowed ${
-                  theme.navIdle
-                }`}
-              >
-                <span
-                  className={`inline-flex h-8 w-8 items-center justify-center rounded-xl ${theme.navIconIdle}`}
-                >
-                  <FontAwesomeIcon icon={item.icon} size="sm" />
-                </span>
-                <span>{item.label}</span>
-              </button>
-            ))}
-          </div>
-        </div>
-      )} */}
 
       <div className="flex-1" />
 

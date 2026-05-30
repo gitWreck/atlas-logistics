@@ -17,6 +17,8 @@ import { upsertTruck } from "@/app/utility/FirebaseFunctions";
 import { getModalThemeClasses } from "@/app/utility/constant/theme";
 import { getModalActionClasses } from "@/app/utility/constant/action";
 import { TRUCK_STATUSES } from "@/app/utility/constant/templates";
+import { DEFAULT_TRUCK_TYPES } from "@/app/utility/settingsDefaults";
+import { useOperationalSettings } from "@/app/utility/useOperationalSettings";
 
 export default function TruckModal({
   isOpen,
@@ -26,6 +28,10 @@ export default function TruckModal({
   isDark = false,
 }) {
   const [loading, setLoading] = useState(false);
+  const { settings } = useOperationalSettings();
+  const truckTypes = settings.truckTypes?.length
+    ? settings.truckTypes
+    : DEFAULT_TRUCK_TYPES;
   const [formData, setFormData] = useState({
     plateNumber: "",
     model: "",
@@ -42,6 +48,9 @@ export default function TruckModal({
   const theme = getModalThemeClasses(isDark);
   const action = getModalActionClasses();
   const isEdit = !!initialData;
+  const truckTypeOptions = formData.type
+    ? Array.from(new Set([...truckTypes, formData.type]))
+    : truckTypes;
 
   useEffect(() => {
     if (isOpen) {
@@ -173,15 +182,11 @@ export default function TruckModal({
                 onChange={(e) => handleChange("type", e.target.value)}
                 className={`w-full border rounded-lg p-2 text-xs outline-none focus:border-blue-500 appearance-none cursor-pointer ${theme.input}`}
               >
-                <option>12-Wheeler Wing Van</option>
-                <option>12-Wheeler Closed Van</option>
-                <option>10-Wheeler Wing Van</option>
-                <option>10-Wheeler Dropside</option>
-                <option>8-Wheeler Wing Van</option>
-                <option>6-Wheeler Closed Van</option>
-                <option>6-Wheeler Boom Truck</option>
-                <option>6-Wheeler Wing Van</option>
-                <option>4-Wheeler Reefer</option>
+                {truckTypeOptions.map((type) => (
+                  <option key={type} value={type}>
+                    {type}
+                  </option>
+                ))}
               </select>
             </div>
 
