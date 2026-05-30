@@ -23,6 +23,7 @@ import UnifiedShipmentModal from "./modals/UnifiedShipmentModal";
 import PickupRequestsTable from "./PickupRequestsTable";
 import TablePaginationFooter from "../ui/TablePaginationFooter";
 import ReleaseToCheckerModal from "./modals/ReleaseToCheckerModal";
+import { isEligibleForCheckerRelease } from "@/app/utility/checkerRelease";
 
 const ShipmentBoard = forwardRef(function ShipmentBoard(
   { user, profile, isDark = false },
@@ -239,6 +240,9 @@ const ShipmentBoard = forwardRef(function ShipmentBoard(
   const canReleaseToChecker = ["manager", "admin"].includes(
     String(profile?.role || "").toLowerCase(),
   );
+  const selectedShipmentEligibleForRelease =
+    !selectedShipment ||
+    isEligibleForCheckerRelease(selectedShipment.status);
 
   const handleMessageCustomer = (shipment) => {
     const phone = shipment.sender?.phone || shipment.recipient?.phone;
@@ -371,8 +375,27 @@ const ShipmentBoard = forwardRef(function ShipmentBoard(
             {canReleaseToChecker && (
               <button
                 type="button"
-                onClick={() => setIsReleaseModalOpen(true)}
-                className="w-full sm:w-auto rounded-lg bg-indigo-600 px-3 py-2 text-sm font-semibold text-white hover:bg-indigo-500 transition-colors"
+                onClick={() => {
+                  if (
+                    selectedShipment &&
+                    !isEligibleForCheckerRelease(selectedShipment.status)
+                  ) {
+                    alert(
+                      `Cannot release shipment ${selectedShipment.id}: status is ${selectedShipment.status}. Delivered and completed shipments cannot be assigned to a checker.`,
+                    );
+                    return;
+                  }
+                  setIsReleaseModalOpen(true);
+                }}
+                title={
+                  selectedShipment && !selectedShipmentEligibleForRelease
+                    ? "Selected shipment cannot be released (delivered/completed/cancelled)"
+                    : "Release shipments to checker for last-mile delivery"
+                }
+                className="w-full sm:w-auto rounded-lg bg-indigo-600 px-3 py-2 text-sm font-semibold text-white hover:bg-indigo-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                disabled={
+                  !!selectedShipment && !selectedShipmentEligibleForRelease
+                }
               >
                 Release to Checker
               </button>
@@ -430,9 +453,7 @@ const ShipmentBoard = forwardRef(function ShipmentBoard(
               limitValue={shipmentLimit}
               limitTitle="Limit orders"
               onLimitChange={setShipmentLimit}
-              onPrevious={() =>
-                setCurrentPage((prev) => Math.max(prev - 1, 1))
-              }
+              onPrevious={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
               onNext={() =>
                 setCurrentPage((prev) => Math.min(prev + 1, totalPages))
               }
@@ -501,6 +522,7 @@ const ShipmentBoard = forwardRef(function ShipmentBoard(
         user={user}
         isDark={isDark}
         defaultShipmentIds={selectedShipment ? [selectedShipment.id] : []}
+        defaultShipments={selectedShipment ? [selectedShipment] : []}
       />
     </div>
   );

@@ -119,6 +119,12 @@ exports.updateShipmentImages =
   require("./src/shipments/updateShipmentImages").updateShipmentImages;
 exports.releasePackagesToChecker =
   require("./src/checker/releasePackagesToChecker").releasePackagesToChecker;
+exports.loadPackagesToDeliveryManifest =
+  require("./src/checker/loadPackagesToDeliveryManifest").loadPackagesToDeliveryManifest;
+exports.reportFailedDelivery =
+  require("./src/checker/reportFailedDelivery").reportFailedDelivery;
+exports.returnPackagesToWarehouse =
+  require("./src/checker/returnPackagesToWarehouse").returnPackagesToWarehouse;
 
 // Manifests & Certificates
 exports.generateTripManifest =

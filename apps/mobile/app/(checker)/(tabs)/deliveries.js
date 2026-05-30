@@ -8,6 +8,8 @@ import {
   TouchableOpacity,
   Platform,
   StatusBar,
+  Alert,
+  ActivityIndicator,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { FontAwesome5 } from "@expo/vector-icons";
@@ -16,13 +18,20 @@ import { db } from "../../../firebase";
 import { useAuth } from "../../../contexts/AuthContext";
 import { useTheme } from "../../../contexts/ThemeContext";
 import StatusBadge from "../../../components/ui/StatusBadge";
+import {
+  getCallableErrorMessage,
+  loadAssignedShipmentsToVehicle,
+  markShipmentOutForDelivery,
+  reportCheckerFailedDelivery,
+  returnCheckerShipmentsToWarehouse,
+} from "../../../components/utilities/checkerDelivery";
 
 const ACTIVE_ASSIGNED_STATUSES = new Set([
   "ASSIGNED",
   "READY_FOR_DELIVERY",
   "OUT_FOR_DELIVERY",
+  "FAILED_DELIVERY",
   "LOADED",
-  "RECEIVED",
   "IN_TRANSIT",
   "PARTIALLY_LOADED",
   "PARTIALLY_DELIVERED",
@@ -48,6 +57,7 @@ export default function CheckerDeliveriesTab() {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [actionShipmentId, setActionShipmentId] = useState(null);
 
   useEffect(() => {
     const checkerId = profile?.uid;
@@ -109,6 +119,63 @@ export default function CheckerDeliveriesTab() {
     setRefreshing(true);
   };
 
+  const runShipmentAction = async (shipmentId, action) => {
+    if (actionShipmentId) return;
+
+    setActionShipmentId(shipmentId);
+
+    try {
+      if (action === "load") {
+        await loadAssignedShipmentsToVehicle({
+          shipmentIds: [shipmentId],
+          profile,
+        });
+        Alert.alert("Loaded", "Shipment loaded onto your delivery vehicle.");
+      } else if (action === "out_for_delivery") {
+        await markShipmentOutForDelivery({
+          shipmentId,
+          profile,
+        });
+        Alert.alert("Success", "Shipment marked out for delivery.");
+      } else if (action === "failed") {
+        await reportCheckerFailedDelivery({
+          shipmentIds: [shipmentId],
+          profile,
+          reasonCode: "DELIVERY_FAILED",
+          remarks: "Failed delivery reported from assigned list.",
+        });
+        Alert.alert(
+          "Failed Delivery",
+          "Marked as failed. Return the package to Odiongan warehouse.",
+        );
+      } else if (action === "return") {
+        await returnCheckerShipmentsToWarehouse({
+          shipmentIds: [shipmentId],
+          profile,
+        });
+        Alert.alert(
+          "Returned",
+          "Shipment returned to warehouse and removed from your route.",
+        );
+      }
+    } catch (error) {
+      console.error("Assigned delivery action failed:", error);
+      Alert.alert(
+        "Action Failed",
+        getCallableErrorMessage(error, "Could not update shipment."),
+      );
+    } finally {
+      setActionShipmentId(null);
+    }
+  };
+
+  const goToDeliveryScan = () => {
+    router.push({
+      pathname: "/(checker)/scan",
+      params: { mode: "delivery", title: "Last-Mile Delivery" },
+    });
+  };
+
   return (
     <View style={[styles.container, { backgroundColor: colors.bg }]}>
       <ScrollView
@@ -122,14 +189,29 @@ export default function CheckerDeliveriesTab() {
           />
         }
       >
-        <View style={[styles.summaryCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+        <View
+          style={[
+            styles.summaryCard,
+            { backgroundColor: colors.surface, borderColor: colors.border },
+          ]}
+        >
           <Text style={[styles.summaryTitle, { color: colors.text }]}>
             My Assigned Deliveries
           </Text>
           <Text style={[styles.summaryText, { color: colors.textMuted }]}>
-            {summary.total} assigned • {summary.outForDelivery} out for delivery •{" "}
-            {summary.delivered} delivered
+            {summary.total} assigned • {summary.outForDelivery} out for delivery
+            • {summary.delivered} delivered
           </Text>
+          <TouchableOpacity
+            style={[styles.scanBtn, { borderColor: colors.border }]}
+            onPress={goToDeliveryScan}
+            activeOpacity={0.85}
+          >
+            <FontAwesome5 name="qrcode" size={12} color={colors.text} />
+            <Text style={[styles.scanBtnText, { color: colors.text }]}>
+              Scan last-mile delivery
+            </Text>
+          </TouchableOpacity>
         </View>
 
         {loading ? (
@@ -144,25 +226,28 @@ export default function CheckerDeliveriesTab() {
               No assigned deliveries yet
             </Text>
             <Text style={[styles.emptySub, { color: colors.textMuted }]}>
-              Once your warehouse manager releases packages to you, they will appear here in real time.
+              Once your warehouse manager releases packages to you, they will
+              appear here in real time.
             </Text>
           </View>
         ) : (
           items.map((shipment) => (
-            <TouchableOpacity
+            <View
               key={shipment.id}
               style={[
                 styles.card,
                 { backgroundColor: colors.surface, borderColor: colors.border },
               ]}
-              activeOpacity={0.8}
-              onPress={() =>
-                router.push({
-                  pathname: "/(checker)/shipment-details",
-                  params: { shipmentId: shipment.id },
-                })
-              }
             >
+              <TouchableOpacity
+                activeOpacity={0.8}
+                onPress={() =>
+                  router.push({
+                    pathname: "/(checker)/shipment-details",
+                    params: { shipmentId: shipment.id },
+                  })
+                }
+              >
               <View style={styles.cardHeader}>
                 <View style={styles.idWrap}>
                   <FontAwesome5 name="box" size={12} color={colors.textMuted} />
@@ -192,7 +277,82 @@ export default function CheckerDeliveriesTab() {
               <Text style={[styles.timeText, { color: colors.textMuted }]}>
                 Updated: {getTimeLabel(shipment.updatedAt)}
               </Text>
-            </TouchableOpacity>
+              </TouchableOpacity>
+
+              {String(shipment.status || "").toUpperCase() === "ASSIGNED" && (
+                <TouchableOpacity
+                  style={[styles.actionBtn, { backgroundColor: "#042C83" }]}
+                  onPress={() => runShipmentAction(shipment.id, "load")}
+                  disabled={actionShipmentId === shipment.id}
+                >
+                  {actionShipmentId === shipment.id ? (
+                    <ActivityIndicator color="#fff" size="small" />
+                  ) : (
+                    <Text style={styles.actionBtnText}>Load to vehicle</Text>
+                  )}
+                </TouchableOpacity>
+              )}
+
+              {String(shipment.status || "").toUpperCase() ===
+                "READY_FOR_DELIVERY" && (
+                <TouchableOpacity
+                  style={[styles.actionBtn, { backgroundColor: "#f59e0b" }]}
+                  onPress={() =>
+                    runShipmentAction(shipment.id, "out_for_delivery")
+                  }
+                  disabled={actionShipmentId === shipment.id}
+                >
+                  {actionShipmentId === shipment.id ? (
+                    <ActivityIndicator color="#fff" size="small" />
+                  ) : (
+                    <Text style={styles.actionBtnText}>
+                      Mark out for delivery
+                    </Text>
+                  )}
+                </TouchableOpacity>
+              )}
+
+              {String(shipment.status || "").toUpperCase() ===
+                "OUT_FOR_DELIVERY" && (
+                <>
+                  <TouchableOpacity
+                    style={[styles.actionBtn, { backgroundColor: "#16a34a" }]}
+                    onPress={() =>
+                      router.push({
+                        pathname: "/(checker)/shipment-details",
+                        params: { shipmentId: shipment.id },
+                      })
+                    }
+                  >
+                    <Text style={styles.actionBtnText}>Complete delivery</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.actionBtn, styles.actionBtnSecondary]}
+                    onPress={() => runShipmentAction(shipment.id, "failed")}
+                    disabled={actionShipmentId === shipment.id}
+                  >
+                    <Text style={styles.actionBtnText}>Report failed</Text>
+                  </TouchableOpacity>
+                </>
+              )}
+
+              {String(shipment.status || "").toUpperCase() ===
+                "FAILED_DELIVERY" && (
+                <TouchableOpacity
+                  style={[styles.actionBtn, { backgroundColor: "#dc2626" }]}
+                  onPress={() => runShipmentAction(shipment.id, "return")}
+                  disabled={actionShipmentId === shipment.id}
+                >
+                  {actionShipmentId === shipment.id ? (
+                    <ActivityIndicator color="#fff" size="small" />
+                  ) : (
+                    <Text style={styles.actionBtnText}>
+                      Return to warehouse
+                    </Text>
+                  )}
+                </TouchableOpacity>
+              )}
+            </View>
           ))
         )}
       </ScrollView>
@@ -224,6 +384,38 @@ const styles = StyleSheet.create({
     marginTop: 4,
     fontSize: 12,
     fontWeight: "500",
+  },
+  scanBtn: {
+    marginTop: 12,
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+  },
+  scanBtnText: {
+    fontSize: 13,
+    fontWeight: "700",
+  },
+  actionBtn: {
+    marginTop: 12,
+    borderRadius: 10,
+    paddingVertical: 11,
+    alignItems: "center",
+    justifyContent: "center",
+    minHeight: 42,
+  },
+  actionBtnText: {
+    color: "#fff",
+    fontSize: 13,
+    fontWeight: "800",
+  },
+  actionBtnSecondary: {
+    marginTop: 8,
+    backgroundColor: "#b45309",
   },
   card: {
     borderWidth: 1,

@@ -23,6 +23,19 @@ export const updateShipmentImages = httpsCallable(
 );
 export const updateTripStatus = httpsCallable(functions, "updateTripStatus");
 
+export const loadPackagesToDeliveryManifest = httpsCallable(
+  functions,
+  "loadPackagesToDeliveryManifest",
+);
+export const reportFailedDelivery = httpsCallable(
+  functions,
+  "reportFailedDelivery",
+);
+export const returnPackagesToWarehouse = httpsCallable(
+  functions,
+  "returnPackagesToWarehouse",
+);
+
 export const startTrip = httpsCallable(functions, "startTrip");
 export const reportTripDelay = httpsCallable(functions, "reportTripDelay");
 export const reportCheckerTrip = httpsCallable(functions, "reportCheckerTrip");

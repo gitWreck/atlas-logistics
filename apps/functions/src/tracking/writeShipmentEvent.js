@@ -29,6 +29,7 @@ async function writeShipmentEvent({ db, event }) {
     pieceId: payload.pieceId || null,
 
     tripId: payload.tripId || null,
+    manifestId: payload.manifestId || null,
     truckId: payload.truckId || null,
     truckName: payload.truckName || null,
     truckPlate: payload.truckPlate || null,
