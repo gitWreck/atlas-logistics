@@ -47,26 +47,95 @@ function getDetails(alert) {
 }
 
 function getStatus(alert) {
-  return String(alert.status || "PENDING").toUpperCase();
+  return String(alert.status || alert.newStatus || "PENDING").toUpperCase();
 }
 
 function getReason(alert) {
+  if (alert.logKind === "staff_action") {
+    return alert.action || alert.actionType || "Staff Action";
+  }
+
   const details = getDetails(alert);
   return details.reason || alert.reason || alert.type || "Delay Reported";
 }
 
 function getDriverName(alert) {
+  if (alert.logKind === "staff_action") {
+    return (
+      alert.actorName ||
+      alert.actorId ||
+      alert.actorUid ||
+      alert.createdBy ||
+      alert.updatedBy ||
+      "Staff"
+    );
+  }
+
   const details = getDetails(alert);
   return details.driverName || alert.driverName || "Unknown Driver";
 }
 
 function getNotes(alert) {
+  if (alert.logKind === "staff_action") {
+    const details = alert.details || alert.meta || null;
+
+    if (details && typeof details === "object") {
+      const entries = Object.entries(details)
+        .filter(([, value]) => value !== undefined && value !== null)
+        .slice(0, 4)
+        .map(([key, value]) => {
+          const safeValue =
+            typeof value === "object" ? JSON.stringify(value) : String(value);
+          return `${formatLabel(key)}: ${safeValue}`;
+        });
+
+      if (entries.length > 0) return entries.join(" | ");
+    }
+
+    return (
+      alert.note ||
+      alert.reason ||
+      alert.status ||
+      alert.newStatus ||
+      alert.actorRole ||
+      "No details"
+    );
+  }
+
   const details = getDetails(alert);
   return details.notes || alert.notes || "No additional notes";
 }
 
+function getTarget(alert) {
+  return (
+    alert.tripId ||
+    alert.targetId ||
+    alert.packageId ||
+    alert.trackingPackageId ||
+    alert.trackingNumber ||
+    alert.shipmentId ||
+    alert.trackingShipmentId ||
+    alert.tripDocId ||
+    alert.invoiceId ||
+    alert.userId ||
+    alert.truckId ||
+    "System"
+  );
+}
+
+function getActorRole(alert) {
+  return String(
+    alert.actorRole || alert.createdRole || alert.updatedRole || "",
+  ).toLowerCase();
+}
+
+function isStaffAction(log) {
+  return ["admin", "manager"].includes(getActorRole(log));
+}
+
 export default function RecentAlertsLogs({ isDark = false }) {
-  const [alerts, setAlerts] = useState([]);
+  const [delayAlerts, setDelayAlerts] = useState([]);
+  const [staffLogs, setStaffLogs] = useState([]);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("ALL");
   const [reasonFilter, setReasonFilter] = useState("ALL");
@@ -90,16 +159,55 @@ export default function RecentAlertsLogs({ isDark = false }) {
 
         return {
           id: doc.id,
+          logKind: "delay_alert",
           ...alert,
           createdDate: toDate(alert.createdAt || alert.timestamp || alert.at),
         };
       });
 
-      setAlerts(data);
+      setDelayAlerts(data);
     });
 
     return () => unsubscribe();
   }, [limitValue]);
+
+  useEffect(() => {
+    const queryConstraints = [orderBy("createdAt", "desc")];
+
+    if (limitValue !== "all") {
+      queryConstraints.push(limit(Number(limitValue)));
+    }
+
+    const q = query(collection(db, "admin_logs"), ...queryConstraints);
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const data = snapshot.docs
+        .map((doc) => {
+          const log = doc.data();
+
+          return {
+            id: doc.id,
+            logKind: "staff_action",
+            ...log,
+            createdDate: toDate(log.createdAt || log.timestamp || log.at),
+          };
+        })
+        .filter(isStaffAction);
+
+      setStaffLogs(data);
+    });
+
+    return () => unsubscribe();
+  }, [limitValue]);
+
+  const alerts = useMemo(() => {
+    const combined = [...delayAlerts, ...staffLogs].sort(
+      (a, b) => b.createdDate.getTime() - a.createdDate.getTime(),
+    );
+
+    if (limitValue === "all") return combined;
+    return combined.slice(0, Number(limitValue));
+  }, [delayAlerts, staffLogs, limitValue]);
 
   const statusOptions = useMemo(
     () => Array.from(new Set(alerts.map(getStatus))).sort(),
@@ -124,8 +232,11 @@ export default function RecentAlertsLogs({ isDark = false }) {
         status,
         reason,
         alert.tripId,
+        getTarget(alert),
         alert.targetId,
         alert.actorId,
+        alert.actorName,
+        alert.actorRole,
         getDriverName(alert),
         getNotes(alert),
       ]
@@ -165,7 +276,7 @@ export default function RecentAlertsLogs({ isDark = false }) {
             className={`${theme.logTitleAmber} font-bold text-sm uppercase flex items-center gap-2`}
           >
             <FontAwesomeIcon icon={faTriangleExclamation} />
-            Recent Delays & Alerts
+            Recent Delays & Staff Actions
           </h3>
           <span
             className={`text-[10px] px-2 py-1 rounded-full border ${theme.countBadge}`}
@@ -246,8 +357,8 @@ export default function RecentAlertsLogs({ isDark = false }) {
           {filteredAlerts.length === 0 ? (
             <div className={`px-4 py-10 text-center italic ${theme.emptyText}`}>
               {alerts.length === 0
-                ? "No alerts recorded."
-                : "No alerts match the current filters."}
+                ? "No delay or staff action logs recorded."
+                : "No logs match the current filters."}
             </div>
           ) : (
             filteredAlerts.map((alert) => {
