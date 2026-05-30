@@ -261,6 +261,8 @@ export default function RecentAlertsLogs({ isDark = false }) {
     PENDING: theme.statusWarning,
     APPROVED: theme.statusSuccess,
     RESOLVED: theme.statusSuccess,
+    COMPLETED: theme.statusSuccess,
+    SUCCESS: theme.statusSuccess,
     READ: theme.roleBadge,
   };
 
@@ -364,6 +366,9 @@ export default function RecentAlertsLogs({ isDark = false }) {
             filteredAlerts.map((alert) => {
               const status = getStatus(alert);
               const reason = getReason(alert);
+              const target = getTarget(alert);
+              const actorLabel =
+                alert.logKind === "staff_action" ? "Actor" : "Driver";
 
               return (
                 <article
@@ -388,13 +393,13 @@ export default function RecentAlertsLogs({ isDark = false }) {
 
                   <div className="mt-3 grid grid-cols-2 gap-3 text-[11px]">
                     <div>
-                      <div className={theme.mobileCardMuted}>Trip</div>
+                      <div className={theme.mobileCardMuted}>Target</div>
                       <div className={`font-mono truncate ${theme.cellPrimary}`}>
-                        {alert.tripId || "No Trip"}
+                        {target}
                       </div>
                     </div>
                     <div>
-                      <div className={theme.mobileCardMuted}>Driver</div>
+                      <div className={theme.mobileCardMuted}>{actorLabel}</div>
                       <div className={`truncate ${theme.cellPrimary}`}>
                         {getDriverName(alert)}
                       </div>
@@ -436,9 +441,9 @@ export default function RecentAlertsLogs({ isDark = false }) {
         <table className={`w-full min-w-[760px] text-left text-xs ${theme.tableText}`}>
           <thead className={`sticky top-0 z-[1] uppercase ${theme.thead}`}>
             <tr>
-              <th className="px-4 py-3 font-semibold">Trip</th>
-              <th className="px-4 py-3 font-semibold">Driver</th>
-              <th className="px-4 py-3 font-semibold">Reason</th>
+              <th className="px-4 py-3 font-semibold">Target</th>
+              <th className="px-4 py-3 font-semibold">Driver / Actor</th>
+              <th className="px-4 py-3 font-semibold">Reason / Action</th>
               <th className="px-4 py-3 font-semibold">Notes</th>
               <th className="px-4 py-3 font-semibold">Status</th>
               <th className="px-4 py-3 font-semibold text-right">Time</th>
@@ -460,6 +465,9 @@ export default function RecentAlertsLogs({ isDark = false }) {
               filteredAlerts.map((alert) => {
                 const status = getStatus(alert);
                 const reason = getReason(alert);
+                const target = getTarget(alert);
+                const actorLabel =
+                  alert.logKind === "staff_action" ? "Actor" : "Driver";
 
                 return (
                   <tr
@@ -469,11 +477,14 @@ export default function RecentAlertsLogs({ isDark = false }) {
                     <td
                       className={`px-4 py-3 align-top font-mono ${theme.cellPrimary}`}
                     >
-                      {alert.tripId || "No Trip"}
+                      {target}
                     </td>
                     <td className={`px-4 py-3 align-top ${theme.cellPrimary}`}>
                       <div className="max-w-[180px] truncate">
                         {getDriverName(alert)}
+                      </div>
+                      <div className={`mt-1 text-[10px] ${theme.cellSecondary}`}>
+                        {actorLabel}
                       </div>
                     </td>
                     <td className="px-4 py-3 align-top">
