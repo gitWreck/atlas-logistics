@@ -14,6 +14,11 @@ import {
   faSync,
   faFilter,
   faExclamationCircle,
+  faList,
+  faRoute,
+  faTruck,
+  faTruckPickup,
+  faWarehouse,
 } from "@fortawesome/free-solid-svg-icons";
 import ShipmentRow from "./ShipmentRow";
 import ShipmentDrawer from "./ShipmentDrawer";
@@ -22,6 +27,102 @@ import { getBoardThemeClasses } from "@/app/utility/constant/theme";
 import UnifiedShipmentModal from "./modals/UnifiedShipmentModal";
 import PickupRequestsTable from "./PickupRequestsTable";
 import TablePaginationFooter from "../ui/TablePaginationFooter";
+import BoardTabs from "../ui/BoardTabs";
+
+const SHIPMENT_BOARD_TABS = {
+  ALL: "all",
+  DELIVERY: "delivery",
+  IN_TRANSIT: "inTransit",
+  DIVISORIA: "divisoria",
+  ODIONGAN: "odiongan",
+  PICKUPS: "pickups",
+};
+
+const DELIVERY_OPERATION_STATUSES = new Set([
+  "READY_FOR_DELIVERY",
+  "OUT_FOR_DELIVERY",
+  "DELIVERED",
+]);
+
+function getShipmentStatus(shipment) {
+  return String(shipment?.status || "").toUpperCase();
+}
+
+function isPickupShipment(shipment) {
+  const status = getShipmentStatus(shipment);
+
+  return (
+    shipment?.isPickupRequested === true ||
+    status === "PENDING_PICKUP" ||
+    status === "PICKED_UP" ||
+    shipment?.statusHistory?.some((history) =>
+      String(history?.status || "").toUpperCase().includes("PICKUP"),
+    )
+  );
+}
+
+function getWarehouseSearchText(shipment) {
+  const currentWarehouse = shipment?.currentWarehouse || {};
+  const currentWarehouseText = [
+    shipment?.currentWarehouseCode,
+    shipment?.currentWarehouseName,
+    currentWarehouse.code,
+    currentWarehouse.name,
+    shipment?.warehouseCode,
+    shipment?.warehouseName,
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+
+  if (currentWarehouseText) return currentWarehouseText;
+
+  return [
+    shipment?.route,
+    shipment?.originCode,
+    shipment?.origin,
+    shipment?.destinationCode,
+    shipment?.destination,
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+}
+
+function matchesWarehouseTab(shipment, warehouseKey) {
+  const searchText = getWarehouseSearchText(shipment);
+
+  if (warehouseKey === SHIPMENT_BOARD_TABS.DIVISORIA) {
+    return searchText.includes("divisoria") || /\bdiv\b/.test(searchText);
+  }
+
+  if (warehouseKey === SHIPMENT_BOARD_TABS.ODIONGAN) {
+    return searchText.includes("odiongan") || /\bodi\b/.test(searchText);
+  }
+
+  return true;
+}
+
+function matchesShipmentBoardTab(shipment, activeBoardTab) {
+  const status = getShipmentStatus(shipment);
+
+  if (activeBoardTab === SHIPMENT_BOARD_TABS.DELIVERY) {
+    return DELIVERY_OPERATION_STATUSES.has(status);
+  }
+
+  if (activeBoardTab === SHIPMENT_BOARD_TABS.IN_TRANSIT) {
+    return status === "IN_TRANSIT";
+  }
+
+  if (
+    activeBoardTab === SHIPMENT_BOARD_TABS.DIVISORIA ||
+    activeBoardTab === SHIPMENT_BOARD_TABS.ODIONGAN
+  ) {
+    return matchesWarehouseTab(shipment, activeBoardTab);
+  }
+
+  return true;
+}
 
 const ShipmentBoard = forwardRef(function ShipmentBoard(
   { user, profile, isDark = false },
@@ -35,6 +136,7 @@ const ShipmentBoard = forwardRef(function ShipmentBoard(
   const [selectedShipmentId, setSelectedShipmentId] = useState(null);
   const [editingPickup, setEditingPickup] = useState(null);
 
+  const [activeBoardTab, setActiveBoardTab] = useState(SHIPMENT_BOARD_TABS.ALL);
   const [activeFilter, setActiveFilter] = useState("ALL");
   const [searchQuery, setSearchQuery] = useState("");
   const [modeFilter, setModeFilter] = useState("ALL");
@@ -172,13 +274,7 @@ const ShipmentBoard = forwardRef(function ShipmentBoard(
       }
 
       if (modeFilter !== "ALL") {
-        const isPickup =
-          shipment.status === "PENDING_PICKUP" ||
-          shipment.status === "PICKED_UP" ||
-          (shipment.statusHistory &&
-            shipment.statusHistory.some((history) =>
-              history.status.includes("PICKUP"),
-            ));
+        const isPickup = isPickupShipment(shipment);
 
         if (modeFilter === "PICKUP" && !isPickup) return false;
         if (modeFilter === "DROP_OFF" && isPickup) return false;
@@ -196,9 +292,68 @@ const ShipmentBoard = forwardRef(function ShipmentBoard(
     delayType,
   ]);
 
+  const visibleShipments = useMemo(
+    () =>
+      filteredShipments.filter((shipment) =>
+        matchesShipmentBoardTab(shipment, activeBoardTab),
+      ),
+    [activeBoardTab, filteredShipments],
+  );
+
+  const boardTabs = useMemo(
+    () => [
+      {
+        key: SHIPMENT_BOARD_TABS.ALL,
+        label: "All Shipments",
+        icon: faList,
+        count: filteredShipments.length,
+      },
+      {
+        key: SHIPMENT_BOARD_TABS.DELIVERY,
+        label: "Delivery Operations",
+        icon: faTruck,
+        count: filteredShipments.filter((shipment) =>
+          DELIVERY_OPERATION_STATUSES.has(getShipmentStatus(shipment)),
+        ).length,
+      },
+      {
+        key: SHIPMENT_BOARD_TABS.IN_TRANSIT,
+        label: "In Transit",
+        icon: faRoute,
+        count: filteredShipments.filter(
+          (shipment) => getShipmentStatus(shipment) === "IN_TRANSIT",
+        ).length,
+      },
+      {
+        key: SHIPMENT_BOARD_TABS.DIVISORIA,
+        label: "Divisoria",
+        icon: faWarehouse,
+        count: filteredShipments.filter((shipment) =>
+          matchesWarehouseTab(shipment, SHIPMENT_BOARD_TABS.DIVISORIA),
+        ).length,
+      },
+      {
+        key: SHIPMENT_BOARD_TABS.ODIONGAN,
+        label: "Odiongan",
+        icon: faWarehouse,
+        count: filteredShipments.filter((shipment) =>
+          matchesWarehouseTab(shipment, SHIPMENT_BOARD_TABS.ODIONGAN),
+        ).length,
+      },
+      {
+        key: SHIPMENT_BOARD_TABS.PICKUPS,
+        label: "Pickups",
+        icon: faTruckPickup,
+        count: pickups.length,
+      },
+    ],
+    [filteredShipments, pickups.length],
+  );
+
   useEffect(() => {
     setCurrentPage(1);
   }, [
+    activeBoardTab,
     searchQuery,
     startDate,
     endDate,
@@ -210,13 +365,13 @@ const ShipmentBoard = forwardRef(function ShipmentBoard(
 
   const indexOfLastItem = currentPage * itemsPerPage;
   const indexOfFirstItem = indexOfLastItem - itemsPerPage;
-  const currentItems = filteredShipments.slice(
+  const currentItems = visibleShipments.slice(
     indexOfFirstItem,
     indexOfLastItem,
   );
   const totalPages = Math.max(
     1,
-    Math.ceil(filteredShipments.length / itemsPerPage),
+    Math.ceil(visibleShipments.length / itemsPerPage),
   );
 
   const uniqueDelayReasons = useMemo(() => {
@@ -251,195 +406,209 @@ const ShipmentBoard = forwardRef(function ShipmentBoard(
   return (
     <div className={`font-sans ${theme.page}`}>
       <main className="mx-auto p-4 sm:p-6">
-        <div
-          className={`border rounded-xl overflow-hidden shadow-xl backdrop-blur-sm ${theme.board}`}
-        >
-          {/* Header */}
+        <BoardTabs
+          tabs={boardTabs}
+          activeTab={activeBoardTab}
+          onChange={setActiveBoardTab}
+          isDark={isDark}
+          className="sticky top-0 z-30"
+        />
+
+        {activeBoardTab === SHIPMENT_BOARD_TABS.PICKUPS ? (
+          <div className="mt-6">
+            <PickupRequestsTable
+              pickups={pickups}
+              loading={loading}
+              isDark={isDark}
+              pickupLimit={pickupLimit}
+              onPickupLimitChange={setPickupLimit}
+              onSelectPickup={setSelectedShipmentId}
+              onEditPickup={(pickup) => {
+                setEditingPickup(pickup);
+                setIsNewOrderModalOpen(true);
+              }}
+            />
+          </div>
+        ) : (
           <div
-            className={`px-4 sm:px-6 py-4 border-b flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4 ${theme.header}`}
+            className={`mt-6 border rounded-xl overflow-hidden shadow-xl backdrop-blur-sm ${theme.board}`}
           >
-            <h3
-              className={`font-bold whitespace-nowrap hidden xl:flex items-center gap-2 ${theme.title}`}
+            {/* Header */}
+            <div
+              className={`px-4 sm:px-6 py-4 border-b flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4 ${theme.header}`}
             >
-              Recent Orders
-              <button
-                type="button"
-                onClick={fetchShipments}
-                disabled={loading}
-                className={`transition-colors p-1 rounded ${theme.refreshButton}`}
-                title="Refresh"
+              <h3
+                className={`font-bold whitespace-nowrap hidden xl:flex items-center gap-2 ${theme.title}`}
               >
-                <FontAwesomeIcon
-                  icon={faSync}
-                  spin={loading}
-                  className="text-xs"
-                />
-              </button>
-            </h3>
-
-            <div className="flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center gap-2 w-full xl:w-auto">
-              {/* Search */}
-              <div className="relative flex-1 min-w-[200px]">
-                <FontAwesomeIcon
-                  icon={faSearch}
-                  className={`absolute left-3 top-1/2 -translate-y-1/2 text-sm ${theme.iconMuted}`}
-                />
-                <input
-                  type="text"
-                  placeholder="Search Tracking..."
-                  className={`w-full border rounded-lg pl-9 pr-4 py-2 text-sm focus:border-blue-500 focus:outline-none ${theme.input}`}
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                />
-              </div>
-
-              <div className="flex gap-2 w-full sm:w-auto">
-                {/* Date filters */}
-                <div
-                  className={`flex items-center gap-2 border rounded-lg px-2 py-1 flex-1 sm:flex-none justify-center ${theme.filterWrap}`}
+                Recent Orders
+                <button
+                  type="button"
+                  onClick={fetchShipments}
+                  disabled={loading}
+                  className={`transition-colors p-1 rounded ${theme.refreshButton}`}
+                  title="Refresh"
                 >
-                  <input
-                    type="date"
-                    className={`bg-transparent text-xs outline-none w-24 ${theme.dateInput}`}
-                    value={startDate}
-                    onChange={(e) => setStartDate(e.target.value)}
-                  />
-                  <span className={theme.iconMuted}>-</span>
-                  <input
-                    type="date"
-                    className={`bg-transparent text-xs outline-none w-24 ${theme.dateInput}`}
-                    value={endDate}
-                    onChange={(e) => setEndDate(e.target.value)}
-                  />
-                </div>
-
-                {/* Main filter */}
-                <div className="relative w-full sm:w-36">
                   <FontAwesomeIcon
-                    icon={faFilter}
+                    icon={faSync}
+                    spin={loading}
+                    className="text-xs"
+                  />
+                </button>
+              </h3>
+
+              <div className="flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center gap-2 w-full xl:w-auto">
+                {/* Search */}
+                <div className="relative flex-1 min-w-[200px]">
+                  <FontAwesomeIcon
+                    icon={faSearch}
                     className={`absolute left-3 top-1/2 -translate-y-1/2 text-sm ${theme.iconMuted}`}
                   />
-                  <select
-                    className={`w-full border rounded-lg pl-9 pr-4 py-2 text-sm focus:border-blue-500 focus:outline-none appearance-none cursor-pointer ${theme.input}`}
-                    value={activeFilter}
-                    onChange={(e) => {
-                      setActiveFilter(e.target.value);
-                      setDelayType("ALL");
-                    }}
-                  >
-                    <option value="ALL">All View</option>
-                    <option value="CREATED">Created</option>
-                    <option value="PENDING_PICKUP">Pending Pickup</option>
-                    <option value="PICKED_UP">Picked up</option>
-                    <option value="RECEIVED">Received</option>
-                    <option value="ASSIGNED">Assigned</option>
-                    <option value="IN_TRANSIT">In Transit</option>
-                    <option value="DELIVERED">Delivered</option>
-                    <option value="DELAYED">Delayed</option>
-                  </select>
-                </div>
-              </div>
-
-              {/* Delayed reason filter */}
-              {activeFilter === "DELAYED" && (
-                <div className="relative w-full sm:w-40 animate-in fade-in slide-in-from-right-2 duration-300">
-                  <FontAwesomeIcon
-                    icon={faExclamationCircle}
-                    className={`absolute left-3 top-1/2 -translate-y-1/2 text-sm ${theme.warningIcon}`}
+                  <input
+                    type="text"
+                    placeholder="Search Tracking..."
+                    className={`w-full border rounded-lg pl-9 pr-4 py-2 text-sm focus:border-blue-500 focus:outline-none ${theme.input}`}
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
                   />
-                  <select
-                    className={`w-full border rounded-lg pl-9 pr-4 py-2 text-sm focus:border-amber-500 focus:outline-none appearance-none cursor-pointer ${theme.warningFilter}`}
-                    value={delayType}
-                    onChange={(e) => setDelayType(e.target.value)}
-                  >
-                    <option value="ALL">All Reasons</option>
-                    {uniqueDelayReasons.map((reason) => (
-                      <option key={reason} value={reason}>
-                        {reason}
-                      </option>
-                    ))}
-                  </select>
                 </div>
-              )}
-            </div>
-          </div>
 
-          {/* Table */}
-          <div className="md:overflow-x-auto">
-            <div className="md:min-w-[900px]">
-              <div
-                className={`hidden md:grid grid-cols-13 gap-4 px-6 py-3 border-b text-xs font-semibold uppercase tracking-wider ${theme.tableHead}`}
-              >
-                <div className="col-span-4">Tracking / Customer</div>
-                <div className="col-span-2">Route</div>
-                <div className="col-span-2">Details</div>
-                <div className="col-span-3">Progress</div>
-                <div className="col-span-1">Update</div>
-                <div className="col-span-1 text-right">Action</div>
-              </div>
-
-              <div className="min-h-[300px]">
-                {loading ? (
+                <div className="flex gap-2 w-full sm:w-auto">
+                  {/* Date filters */}
                   <div
-                    className={`p-10 text-center animate-pulse ${theme.emptyText}`}
+                    className={`flex items-center gap-2 border rounded-lg px-2 py-1 flex-1 sm:flex-none justify-center ${theme.filterWrap}`}
                   >
-                    Loading orders...
-                  </div>
-                ) : filteredShipments.length === 0 ? (
-                  <div className={`p-10 text-center ${theme.emptyText}`}>
-                    No orders found matching filters.
-                  </div>
-                ) : (
-                  currentItems.map((shipment) => (
-                    <ShipmentRow
-                      shipmentBoard={true}
-                      key={shipment.id}
-                      s={shipment}
-                      onClick={setSelectedShipmentId}
-                      onMessage={() => handleMessageCustomer(shipment)}
-                      isDark={isDark}
+                    <input
+                      type="date"
+                      className={`bg-transparent text-xs outline-none w-24 ${theme.dateInput}`}
+                      value={startDate}
+                      onChange={(e) => setStartDate(e.target.value)}
                     />
-                  ))
+                    <span className={theme.iconMuted}>-</span>
+                    <input
+                      type="date"
+                      className={`bg-transparent text-xs outline-none w-24 ${theme.dateInput}`}
+                      value={endDate}
+                      onChange={(e) => setEndDate(e.target.value)}
+                    />
+                  </div>
+
+                  {/* Main filter */}
+                  <div className="relative w-full sm:w-36">
+                    <FontAwesomeIcon
+                      icon={faFilter}
+                      className={`absolute left-3 top-1/2 -translate-y-1/2 text-sm ${theme.iconMuted}`}
+                    />
+                    <select
+                      className={`w-full border rounded-lg pl-9 pr-4 py-2 text-sm focus:border-blue-500 focus:outline-none appearance-none cursor-pointer ${theme.input}`}
+                      value={activeFilter}
+                      onChange={(e) => {
+                        setActiveFilter(e.target.value);
+                        setDelayType("ALL");
+                      }}
+                    >
+                      <option value="ALL">All View</option>
+                      <option value="CREATED">Created</option>
+                      <option value="PENDING_PICKUP">Pending Pickup</option>
+                      <option value="PICKED_UP">Picked up</option>
+                      <option value="RECEIVED">Received</option>
+                      <option value="ASSIGNED">Assigned</option>
+                      <option value="IN_TRANSIT">In Transit</option>
+                      <option value="READY_FOR_DELIVERY">
+                        Ready for Delivery
+                      </option>
+                      <option value="OUT_FOR_DELIVERY">Out for Delivery</option>
+                      <option value="DELIVERED">Delivered</option>
+                      <option value="DELAYED">Delayed</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* Delayed reason filter */}
+                {activeFilter === "DELAYED" && (
+                  <div className="relative w-full sm:w-40 animate-in fade-in slide-in-from-right-2 duration-300">
+                    <FontAwesomeIcon
+                      icon={faExclamationCircle}
+                      className={`absolute left-3 top-1/2 -translate-y-1/2 text-sm ${theme.warningIcon}`}
+                    />
+                    <select
+                      className={`w-full border rounded-lg pl-9 pr-4 py-2 text-sm focus:border-amber-500 focus:outline-none appearance-none cursor-pointer ${theme.warningFilter}`}
+                      value={delayType}
+                      onChange={(e) => setDelayType(e.target.value)}
+                    >
+                      <option value="ALL">All Reasons</option>
+                      {uniqueDelayReasons.map((reason) => (
+                        <option key={reason} value={reason}>
+                          {reason}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                 )}
               </div>
             </div>
+
+            {/* Table */}
+            <div className="md:overflow-x-auto">
+              <div className="md:min-w-[900px]">
+                <div
+                  className={`hidden md:grid grid-cols-13 gap-4 px-6 py-3 border-b text-xs font-semibold uppercase tracking-wider ${theme.tableHead}`}
+                >
+                  <div className="col-span-4">Tracking / Customer</div>
+                  <div className="col-span-2">Route</div>
+                  <div className="col-span-2">Details</div>
+                  <div className="col-span-3">Progress</div>
+                  <div className="col-span-1">Update</div>
+                  <div className="col-span-1 text-right">Action</div>
+                </div>
+
+                <div className="min-h-[300px]">
+                  {loading ? (
+                    <div
+                      className={`p-10 text-center animate-pulse ${theme.emptyText}`}
+                    >
+                      Loading orders...
+                    </div>
+                  ) : visibleShipments.length === 0 ? (
+                    <div className={`p-10 text-center ${theme.emptyText}`}>
+                      No orders found matching filters.
+                    </div>
+                  ) : (
+                    currentItems.map((shipment) => (
+                      <ShipmentRow
+                        shipmentBoard={true}
+                        key={shipment.id}
+                        s={shipment}
+                        onClick={setSelectedShipmentId}
+                        onMessage={() => handleMessageCustomer(shipment)}
+                        isDark={isDark}
+                      />
+                    ))
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Pagination */}
+            {visibleShipments.length > 0 && (
+              <TablePaginationFooter
+                totalItems={visibleShipments.length}
+                currentPage={currentPage}
+                itemsPerPage={itemsPerPage}
+                totalPages={totalPages}
+                limitValue={shipmentLimit}
+                limitTitle="Limit orders"
+                onLimitChange={setShipmentLimit}
+                onPrevious={() =>
+                  setCurrentPage((prev) => Math.max(prev - 1, 1))
+                }
+                onNext={() =>
+                  setCurrentPage((prev) => Math.min(prev + 1, totalPages))
+                }
+                theme={theme}
+              />
+            )}
           </div>
-
-          {/* Pagination */}
-          {filteredShipments.length > 0 && (
-            <TablePaginationFooter
-              totalItems={filteredShipments.length}
-              currentPage={currentPage}
-              itemsPerPage={itemsPerPage}
-              totalPages={totalPages}
-              limitValue={shipmentLimit}
-              limitTitle="Limit orders"
-              onLimitChange={setShipmentLimit}
-              onPrevious={() =>
-                setCurrentPage((prev) => Math.max(prev - 1, 1))
-              }
-              onNext={() =>
-                setCurrentPage((prev) => Math.min(prev + 1, totalPages))
-              }
-              theme={theme}
-            />
-          )}
-        </div>
-
-        <div className="mt-6">
-          <PickupRequestsTable
-            pickups={pickups}
-            loading={loading}
-            isDark={isDark}
-            pickupLimit={pickupLimit}
-            onPickupLimitChange={setPickupLimit}
-            onSelectPickup={setSelectedShipmentId}
-            onEditPickup={(pickup) => {
-              setEditingPickup(pickup);
-              setIsNewOrderModalOpen(true);
-            }}
-          />
-        </div>
+        )}
       </main>
 
       <ShipmentDrawer

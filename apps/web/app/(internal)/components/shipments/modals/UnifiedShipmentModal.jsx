@@ -46,6 +46,8 @@ export default function UnifiedShipmentModal({
   const { showAlert, showConfirm } = useAlert();
   console.log("UnifiedShipmentModal Rendered with editData:", editData);
   const modalTheme = getModalThemeClasses(isDark);
+  const isManager = String(profile?.role || "").toLowerCase() === "manager";
+  const canAssignTrip = !isManager;
 
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
@@ -287,7 +289,7 @@ export default function UnifiedShipmentModal({
               {step === 1
                 ? "1. Shipment Details"
                 : step === 2
-                  ? wantsTripAssignment
+                  ? wantsTripAssignment && canAssignTrip
                     ? "2. Select Trip"
                     : "2. Save Shipment"
                   : "3. Complete"}
@@ -360,7 +362,7 @@ export default function UnifiedShipmentModal({
 
           {step === 2 && (
             <div className="flex flex-col h-full overflow-hidden">
-              {wantsTripAssignment ? (
+              {wantsTripAssignment && canAssignTrip ? (
                 <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
                   <TripStep
                     key={
@@ -385,9 +387,9 @@ export default function UnifiedShipmentModal({
                         Ready to Save Shipment
                       </h3>
                       <p className={`text-sm ${modalTheme.bodyText}`}>
-                        Trip assignment is optional. Save now to keep the
-                        shipment unassigned, or assign it to a trip before
-                        saving.
+                        {canAssignTrip
+                          ? "Trip assignment is optional. Save now to keep the shipment unassigned, or assign it to a trip before saving."
+                          : "Save this shipment now. Trip assignment is restricted for manager accounts."}
                       </p>
                     </div>
 
@@ -421,16 +423,20 @@ export default function UnifiedShipmentModal({
                       </div>
                     </div>
 
-                    <button
-                      type="button"
-                      onClick={() => setWantsTripAssignment(true)}
-                      className="w-full rounded-xl py-3 font-bold flex items-center justify-center gap-2 bg-amber-500 hover:bg-amber-400 text-white transition-colors shadow-sm"
-                    >
-                      <FontAwesomeIcon icon={faTruckPickup} />
-                      <span>
-                        {isPickup ? "Assign to Pickup Route" : "Assign to Trip"}
-                      </span>
-                    </button>
+                    {canAssignTrip && (
+                      <button
+                        type="button"
+                        onClick={() => setWantsTripAssignment(true)}
+                        className="w-full rounded-xl py-3 font-bold flex items-center justify-center gap-2 bg-amber-500 hover:bg-amber-400 text-white transition-colors shadow-sm"
+                      >
+                        <FontAwesomeIcon icon={faTruckPickup} />
+                        <span>
+                          {isPickup
+                            ? "Assign to Pickup Route"
+                            : "Assign to Trip"}
+                        </span>
+                      </button>
+                    )}
                   </div>
                 </div>
               )}
@@ -532,21 +538,23 @@ export default function UnifiedShipmentModal({
               />
 
               <div className="flex w-full justify-end gap-2">
-                <button
-                  onClick={() => {
-                    if (wantsTripAssignment) {
-                      setWantsTripAssignment(false);
-                    } else {
-                      setStep(1);
-                    }
-                  }}
-                  className={`${modalTheme.secondaryButton} flex-none rounded-xl px-6 py-3 font-bold`}
-                >
-                  {wantsTripAssignment ? "Hide Trip Assignment" : "Back"}
-                </button>
+                {!isManager && (
+                  <button
+                    onClick={() => {
+                      if (wantsTripAssignment) {
+                        setWantsTripAssignment(false);
+                      } else {
+                        setStep(1);
+                      }
+                    }}
+                    className={`${modalTheme.secondaryButton} flex-none rounded-xl px-6 py-3 font-bold`}
+                  >
+                    {wantsTripAssignment ? "Hide Trip Assignment" : "Back"}
+                  </button>
+                )}
                 <button
                   onClick={() => handleMasterSubmit(null)}
-                  className="flex-1 sm:flex-none bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 px-6 rounded-xl transition-colors whitespace-nowrap"
+                  className={`${isManager ? "w-full" : "flex-1 sm:flex-none"} bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 px-6 rounded-xl transition-colors whitespace-nowrap`}
                 >
                   Save Shipment
                 </button>

@@ -40,6 +40,9 @@ export default function InvoiceTable({
   const itemsPerPage = 10;
   const theme = getTableTheme(isDark);
   const themeRow = getRowThemeClasses(isDark);
+  const mobileDividerClass = isDark
+    ? "border-b-4 border-b-slate-700/80 last:border-b-0"
+    : "border-b-4 border-b-slate-300 last:border-b-0";
 
   const filteredInvoices = useMemo(() => {
     return invoices.filter((invoice) => {
@@ -162,9 +165,7 @@ export default function InvoiceTable({
       {/* Content */}
       <div className="w-full">
         {/* Mobile */}
-        <div
-          className={`md:hidden flex flex-col divide-y ${theme.tbodyDivide}`}
-        >
+        <div className="md:hidden flex flex-col">
           {loading ? (
             <div className={`px-6 py-8 text-center ${theme.emptyText}`}>
               <div className="animate-pulse">Loading invoices...</div>
@@ -177,7 +178,7 @@ export default function InvoiceTable({
             paginatedInvoices.map((invoice) => (
               <div
                 key={invoice.id}
-                className={`p-4 flex flex-col gap-3 transition-colors ${theme.rowHover}`}
+                className={`p-4 flex flex-col gap-3 transition-colors ${mobileDividerClass} ${theme.rowHover}`}
               >
                 <div className="flex justify-between items-start gap-2">
                   <div className="truncate">

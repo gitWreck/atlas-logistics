@@ -59,23 +59,39 @@ export default function PackageMobileCard({
       </div>
 
       <div className="pl-11">
-        <div
-          className={`font-medium text-sm ${isDark ? "text-slate-200" : "text-slate-900"}`}
-        >
-          {pkg.description || "No Description"}
-        </div>
-        <div
-          className={`text-xs mt-1 flex gap-2 items-center ${isDark ? "text-slate-500" : "text-slate-600"}`}
-        >
-          <FontAwesomeIcon
-            icon={faBoxOpen}
-            className={isDark ? "text-slate-600" : "text-slate-500"}
-          />
-          {pkg.packagingType || "Package"}
-          <span className={isDark ? "text-slate-700" : "text-slate-400"}>
+        <div className="flex min-w-0 items-center gap-2">
+          <span
+            className={`min-w-0 flex-1 truncate font-medium text-sm ${isDark ? "text-slate-200" : "text-slate-900"}`}
+            title={pkg.description || "No Description"}
+          >
+            {pkg.description || "No Description"}
+          </span>
+
+          <span
+            className={`inline-flex shrink-0 items-center gap-1.5 text-xs ${isDark ? "text-slate-500" : "text-slate-600"}`}
+          >
+            <FontAwesomeIcon
+              icon={faBoxOpen}
+              className={isDark ? "text-slate-600" : "text-slate-500"}
+            />
+            {pkg.packagingType || "Package"}
+          </span>
+
+          <span
+            className={`shrink-0 text-xs ${isDark ? "text-slate-700" : "text-slate-400"}`}
+          >
             |
           </span>
-          {pkg.weight ? `${pkg.weight}kg` : "N/A"}
+
+          <span
+            className={`shrink-0 text-xs ${isDark ? "text-slate-500" : "text-slate-600"}`}
+          >
+            {pkg.weight ? `${pkg.weight}kg` : "N/A"}
+          </span>
+
+          <span className="shrink-0">
+            <StatusBadge status={pkg.status} size="xs" isDark={isDark} />
+          </span>
         </div>
 
         {(pkg.isFragile || pkg.isPerishable) && (
@@ -107,9 +123,6 @@ export default function PackageMobileCard({
           </div>
         )}
 
-        <div className="mt-3">
-          <StatusBadge status={pkg.status} size="xs" isDark={isDark} />
-        </div>
       </div>
 
       {showQR && (
