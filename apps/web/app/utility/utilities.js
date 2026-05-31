@@ -49,6 +49,8 @@ export function getVisualProgress(status) {
       return 50;
     case "OUT_FOR_DELIVERY":
       return 66;
+    case "PARTIALLY_DELIVERED":
+      return 83;
     case "DELIVERED":
       return 100;
     default:

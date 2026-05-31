@@ -11,6 +11,7 @@ import {
   faExclamationTriangle,
 } from "@fortawesome/free-solid-svg-icons";
 import LoadPackagesModal from "../manifests/modals/LoadPackagesModal";
+import { auth } from "@/lib/firebase";
 
 export default function CheckerBoard({ isDark = true }) {
   // STATE
@@ -86,9 +87,17 @@ export default function CheckerBoard({ isDark = true }) {
 
     // B. CALL SCAN API
     try {
+      const token = await auth.currentUser?.getIdToken();
+      if (!token) {
+        throw new Error("You must be signed in to scan packages.");
+      }
+
       const res = await fetch("/api/checker/scan", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
         body: JSON.stringify({
           barcode: code,
           truckTripId: selectedTrip.id,
@@ -456,10 +465,8 @@ export default function CheckerBoard({ isDark = true }) {
           onClose={() => setManualLoadShipment(null)}
           isDark={isDark}
           onSuccess={() => {
-            // Snapshot will auto-update data
             setManualLoadShipment(null);
-            // setScanStatus("SUCCESS"); // Optional visual feedback
-            // setLastMessage("Manual Update Saved");
+            fetchManifest();
           }}
         />
       )}

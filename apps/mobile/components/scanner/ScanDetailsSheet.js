@@ -287,7 +287,7 @@ export default function ScanDetailsSheet({
         </TouchableOpacity>
       )}
 
-      {!!primaryScanActions.length && (
+      {!!issueScanActions.length && (
         <View style={styles.issueActionsRow}>
           {issueScanActions.map((action) => {
             const isActive = scanActionStatus === action.status;

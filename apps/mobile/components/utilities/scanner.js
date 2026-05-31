@@ -87,6 +87,127 @@ export const getShipmentLoadedCount = (shipment = {}) => {
 export const getPackageIdentity = (pkg = {}) =>
   String(pkg.packageId || pkg.trackingNumber || "").trim();
 
+export const normalizeScanCode = (code = "") =>
+  String(code || "").trim().toUpperCase();
+
+/** Piece labels like AT-...-SHP-583090-01 → parent shipment code AT-...-SHP-583090 */
+export const deriveParentShipmentCode = (code = "") => {
+  const normalized = normalizeScanCode(code);
+  const match = normalized.match(/^(.*)-(\d{2})$/);
+  return match ? match[1] : null;
+};
+
+export const findPackageInShipment = (shipmentData = {}, code = "") => {
+  const needle = normalizeScanCode(code);
+  if (!needle) return null;
+
+  return (
+    (Array.isArray(shipmentData.packages) ? shipmentData.packages : []).find(
+      (pkg) => {
+        const packageId = normalizeScanCode(pkg.packageId);
+        const trackingNumber = normalizeScanCode(pkg.trackingNumber);
+        return packageId === needle || trackingNumber === needle;
+      },
+    ) || null
+  );
+};
+
+export const isWholeShipmentScanCode = (shipmentData = {}, code = "") => {
+  const needle = normalizeScanCode(code);
+  if (!needle) return false;
+
+  const shipmentKeys = [
+    shipmentData?.trackingNumber,
+    shipmentData?.shipmentId,
+    shipmentData?.id,
+  ]
+    .map(normalizeScanCode)
+    .filter(Boolean);
+
+  return shipmentKeys.includes(needle);
+};
+
+/** Offload/delivery: default to one piece unless the code is the master shipment label. */
+export const resolveOffloadDeliverPackageIds = (
+  shipmentData = {},
+  barcode = "",
+  scanType = "",
+) => {
+  const trimmedBarcode = String(barcode || "").trim();
+  if (!trimmedBarcode) {
+    return { isPackageLevel: false, packageIds: [] };
+  }
+
+  if (
+    scanType === "shipment" &&
+    isWholeShipmentScanCode(shipmentData, trimmedBarcode)
+  ) {
+    return {
+      isPackageLevel: false,
+      packageIds: getShipmentPackageIds(shipmentData),
+    };
+  }
+
+  const matchedPkg = findPackageInShipment(shipmentData, trimmedBarcode);
+  if (matchedPkg) {
+    const packageId = String(matchedPkg.packageId || "").trim();
+    return {
+      isPackageLevel: true,
+      packageIds: packageId ? [packageId] : [],
+    };
+  }
+
+  if (scanType === "package" || deriveParentShipmentCode(trimmedBarcode)) {
+    return {
+      isPackageLevel: true,
+      packageIds: [trimmedBarcode],
+    };
+  }
+
+  return { isPackageLevel: true, packageIds: [trimmedBarcode] };
+};
+
+export const resolveDeliveryPackageIds = ({
+  barcode = "",
+  scanType = "",
+  shipmentData = null,
+} = {}) => {
+  const trimmedBarcode = String(barcode || "").trim();
+  if (!trimmedBarcode) {
+    return { isPackageLevel: false, packageIds: null };
+  }
+
+  const matchedPkg = shipmentData
+    ? findPackageInShipment(shipmentData, trimmedBarcode)
+    : null;
+
+  if (matchedPkg) {
+    const packageId = String(matchedPkg.packageId || "").trim();
+    return {
+      isPackageLevel: true,
+      packageIds: packageId ? [packageId] : [],
+    };
+  }
+
+  if (scanType === "package") {
+    return { isPackageLevel: true, packageIds: [trimmedBarcode] };
+  }
+
+  if (scanType === "shipment") {
+    return { isPackageLevel: false, packageIds: null };
+  }
+
+  return { isPackageLevel: false, packageIds: null };
+};
+
+export const getDeliverPackageIdForScan = (shipmentData = {}, barcode = "") => {
+  const matchedPkg = findPackageInShipment(shipmentData, barcode);
+  if (matchedPkg?.packageId) {
+    return String(matchedPkg.packageId).trim();
+  }
+  return String(barcode || "").trim();
+};
+
 export const getShipmentPackageIds = (shipment = {}) =>
   (Array.isArray(shipment.packages) ? shipment.packages : [])
     .map(getPackageIdentity)

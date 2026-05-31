@@ -26,6 +26,7 @@ export default function CheckerStackLayout() {
         {/* 2. Full Screen Pages (These cover the tabs) */}
         <Stack.Screen name="trip-details" />
         <Stack.Screen name="shipment-details" />
+        <Stack.Screen name="delivery-manifest" />
 
         <Stack.Screen
           name="scan"

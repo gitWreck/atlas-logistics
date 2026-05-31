@@ -7,21 +7,57 @@ const { FieldValue } = require("firebase-admin/firestore");
 const {
   formatStatus,
   sanitizeDriverName,
-  formatTimeline,
 } = require("../utilities/helpers");
+const {
+  buildPublicTrackingHistory,
+  resolvePublicDeliveryContext,
+} = require("./publicTrackingFormat");
+const { extractTripEventContext } = require("./tripEventContext");
 
 if (!admin.apps.length) admin.initializeApp();
 const db = admin.firestore();
 
-/* ===================================================================
-   CORE LOGIC (Shared by Trigger & HTTP)
-=================================================================== */
+async function loadTripContextForShipment(shipmentData = {}) {
+  const tripDocId =
+    shipmentData.currentTripId || shipmentData.currentTruckTripId || null;
+
+  const base = {
+    tripId: null,
+    driverName: null,
+    plateNumber: null,
+    isDelayed: false,
+    delayReason: null,
+    currentLocation: "Processing",
+  };
+
+  if (!tripDocId) return base;
+
+  const tripSnap = await db.collection("truck_trips").doc(tripDocId).get();
+  if (!tripSnap.exists) return base;
+
+  const tripData = tripSnap.data() || {};
+  const tripContext = extractTripEventContext(tripData, tripSnap.id);
+
+  base.tripId = tripContext.tripId || tripSnap.id;
+  base.driverName = sanitizeDriverName(tripContext.driverName);
+  base.plateNumber = tripContext.truckPlate || null;
+
+  if (tripData.hasActiveDelay) {
+    base.isDelayed = true;
+    base.delayReason = tripData.lastDelayReason || "Operational Delay";
+    base.currentLocation = `Delayed: ${base.delayReason}`;
+  } else if (tripData.status === "IN_TRANSIT") {
+    base.currentLocation = "On the Way";
+  } else if (tripData.status === "ARRIVED" || tripData.status === "COMPLETED") {
+    base.currentLocation = "Arrived at Hub";
+  }
+
+  return base;
+}
 
 async function syncOneShipmentToPublic(shipmentId, shipmentData) {
   const publicRef = db.collection("tracking_public").doc(shipmentId);
 
-  // 1. CHECK "KILL SWITCH" & DELETION
-  // If shipment was deleted OR admin marked it as hidden
   if (
     !shipmentData ||
     shipmentData.isPubliclyVisible === false ||
@@ -31,83 +67,70 @@ async function syncOneShipmentToPublic(shipmentId, shipmentData) {
     return { action: "DELETED", id: shipmentId };
   }
 
-  // 2. FETCH TRIP CONTEXT (If assigned)
-  // We need this for Delays and Driver Name
-  let tripContext = {
-    tripId: null,
-    driverName: null,
-    plateNumber: null,
-    isDelayed: false,
-    delayReason: null,
-    currentLocation: "Processing",
-  };
+  const [tripContext, history, deliveryContext] = await Promise.all([
+    loadTripContextForShipment(shipmentData),
+    buildPublicTrackingHistory(db, shipmentId, shipmentData),
+    Promise.resolve(resolvePublicDeliveryContext(shipmentData)),
+  ]);
 
-  if (shipmentData.currentTruckTripId) {
-    const tripSnap = await db
-      .collection("truck_trips")
-      .doc(shipmentData.currentTruckTripId)
-      .get();
+  const totals = shipmentData.totals || {};
+  const totalItems =
+    totals.totalItems ||
+    totals.totalContentQty ||
+    totals.totalPackages ||
+    (Array.isArray(shipmentData.packages) ? shipmentData.packages.length : 0);
+  const deliveredCount = totals.delivered ?? totals.received ?? 0;
 
-    if (tripSnap.exists) {
-      const t = tripSnap.data();
+  const statusCode = String(shipmentData.status || "RECEIVED").toUpperCase();
+  const showLastMileContext = [
+    "OUT_FOR_DELIVERY",
+    "PARTIALLY_DELIVERED",
+    "READY_FOR_DELIVERY",
+    "DELIVERED",
+  ].includes(statusCode);
 
-      tripContext.tripId = t.tripId;
-      tripContext.driverName = sanitizeDriverName(t.driverName); // Privacy enforced here
-      tripContext.plateNumber = t.plateNumber;
-
-      // Delay Logic
-      if (t.hasActiveDelay) {
-        tripContext.isDelayed = true;
-        tripContext.delayReason = t.lastDelayReason || "Operational Delay";
-        tripContext.currentLocation = `Delayed: ${tripContext.delayReason}`;
-      } else if (t.status === "IN_TRANSIT") {
-        tripContext.currentLocation = "On the Way";
-      }
-    }
-  }
-
-  // 3. CONSTRUCT PUBLIC OBJECT
-  // Only copy safe fields. Never copy costs or internal phone numbers.
   const publicDoc = {
     trackingNumber: shipmentId,
-
-    // Core Status
     status: formatStatus(shipmentData.status),
-    statusCode: shipmentData.status, // Keep raw code for frontend icons
+    statusCode,
     origin: shipmentData.originCity || shipmentData.origin || "Origin Hub",
-    originCode: shipmentData.originCode,
+    originCode: shipmentData.originCode || null,
     destination:
-      shipmentData.destinationCity || shipmentData.destination || "Destination",
-    destinationCode: shipmentData.destinationCode,
-
-    // Customer Info (Only Name, masked if needed)
-    customerName: shipmentData.senderName || "Valued Customer",
-
-    // Progress Data (From Shipment Totals)
-    totalPackages: shipmentData.totals?.totalPackages || 0,
-    itemsDelivered: shipmentData.totals?.delivered || 0,
-
+      shipmentData.destinationCity ||
+      shipmentData.destination ||
+      "Destination",
+    destinationCode: shipmentData.destinationCode || null,
+    customerName:
+      shipmentData.sender?.name ||
+      shipmentData.senderName ||
+      "Valued Customer",
+    totalPackages: totalItems,
+    itemsDelivered: deliveredCount,
+    totals: {
+      totalItems,
+      loaded: totals.loaded ?? 0,
+      delivered: deliveredCount,
+      pending: Math.max(totalItems - (totals.loaded ?? 0), 0),
+    },
     proofOfReceipt: shipmentData.proofOfReceipt || null,
     proofOfDelivery: shipmentData.proofOfDelivery || null,
-
-    // Trip Context (Merged from above)
     ...tripContext,
-
-    // Timeline History
-    history: formatTimeline(shipmentData.statusHistory),
-
+    assignedCheckerName: showLastMileContext
+      ? deliveryContext.assignedCheckerName
+      : null,
+    deliveryVehicleName: showLastMileContext
+      ? deliveryContext.deliveryVehicleName
+      : null,
+    history,
     updatedAt: FieldValue.serverTimestamp(),
   };
 
-  // 4. WRITE TO PUBLIC COLLECTION
   await publicRef.set(publicDoc);
   return { action: "SYNCED", id: shipmentId };
 }
 
-/* ===================================================================
-   TRIGGER 1: AUTO-SYNC (Firestore Trigger)
-   Runs automatically whenever a Shipment is Created, Updated, or Deleted
-=================================================================== */
+exports.syncOneShipmentToPublic = syncOneShipmentToPublic;
+
 exports.mirrorShipmentToPublic = onDocumentWritten(
   {
     document: "shipments/{docId}",
@@ -115,8 +138,6 @@ exports.mirrorShipmentToPublic = onDocumentWritten(
   },
   async (event) => {
     const shipmentId = event.params.docId;
-
-    // Handle Deletion (Data is null)
     const shipmentData = event.data.after.exists
       ? event.data.after.data()
       : null;
@@ -130,54 +151,70 @@ exports.mirrorShipmentToPublic = onDocumentWritten(
   },
 );
 
-/* ===================================================================
-   TRIGGER 2: BULK SYNC (HTTP Endpoint)
-   Run this ONCE to migrate existing data or force a refresh
-=================================================================== */
+exports.mirrorShipmentEventToPublic = onDocumentWritten(
+  {
+    document: "shipment_events/{eventId}",
+    region: "asia-southeast1",
+  },
+  async (event) => {
+    if (!event.data.after.exists) return;
+
+    const eventData = event.data.after.data() || {};
+    const shipmentId = normalizeString(eventData.shipmentId);
+    if (!shipmentId) return;
+
+    try {
+      const shipmentSnap = await db.collection("shipments").doc(shipmentId).get();
+      if (!shipmentSnap.exists) return;
+
+      await syncOneShipmentToPublic(shipmentId, shipmentSnap.data());
+      console.log(`Event-triggered public sync for ${shipmentId}`);
+    } catch (error) {
+      console.error(`Event-triggered public sync failed for ${shipmentId}`, error);
+    }
+  },
+);
+
+function normalizeString(value) {
+  return typeof value === "string" && value.trim() ? value.trim() : null;
+}
+
 exports.syncTrackingPublicHttp = onRequest(
   { region: "asia-southeast1", timeoutSeconds: 540 },
   async (req, res) => {
-    // Security: Only allow POST or Admin Check (Optional)
-
     const snap = await db.collection("shipments").get();
-    let stats = { scanned: 0, synced: 0, deleted: 0, errors: 0 };
+    const stats = { scanned: 0, synced: 0, deleted: 0, errors: 0 };
 
-    const promises = snap.docs.map(async (doc) => {
-      stats.scanned++;
-      try {
-        const result = await syncOneShipmentToPublic(doc.id, doc.data());
-        if (result.action === "DELETED") stats.deleted++;
-        else stats.synced++;
-      } catch (e) {
-        console.error(`Error syncing ${doc.id}:`, e);
-        stats.errors++;
-      }
-    });
+    await Promise.all(
+      snap.docs.map(async (docSnap) => {
+        stats.scanned++;
+        try {
+          const result = await syncOneShipmentToPublic(docSnap.id, docSnap.data());
+          if (result.action === "DELETED") stats.deleted++;
+          else stats.synced++;
+        } catch (error) {
+          console.error(`Error syncing ${docSnap.id}:`, error);
+          stats.errors++;
+        }
+      }),
+    );
 
-    await Promise.all(promises);
     res.json({ message: "Bulk Sync Complete", stats });
   },
 );
 
-/* ===================================================================
-   TRIGGER 3: PROPAGATE TRIP UPDATES (The Missing Link)
-   When a Trip changes status (e.g. DELAYED or ARRIVED), 
-   update all associated public tracking records.
-=================================================================== */
 exports.propagateTripUpdates = onDocumentWritten(
   {
     document: "truck_trips/{tripId}",
     region: "asia-southeast1",
   },
   async (event) => {
-    // If trip was deleted, we might not need to do anything or just ignore
     if (!event.data.after.exists) return;
 
     const newData = event.data.after.data();
-    const oldData = event.data.before.data();
+    const oldData = event.data.before.exists ? event.data.before.data() : {};
     const tripId = event.params.tripId;
 
-    // OPTIMIZATION: Only run if status or delay info changed
     const statusChanged = newData.status !== oldData.status;
     const delayChanged = newData.hasActiveDelay !== oldData.hasActiveDelay;
 
@@ -185,7 +222,6 @@ exports.propagateTripUpdates = onDocumentWritten(
 
     console.log(`Trip ${tripId} updated. Propagating to public shipments...`);
 
-    // 1. Prepare the Context Update
     let tripContext = {
       currentLocation: "On the Way",
       isDelayed: false,
@@ -196,24 +232,37 @@ exports.propagateTripUpdates = onDocumentWritten(
       tripContext.isDelayed = true;
       tripContext.delayReason = newData.lastDelayReason || "Operational Delay";
       tripContext.currentLocation = `Delayed: ${tripContext.delayReason}`;
-    } else if (newData.status === "COMPLETED") {
+    } else if (newData.status === "COMPLETED" || newData.status === "ARRIVED") {
       tripContext.currentLocation = "Arrived at Hub";
     }
 
-    // 2. Find all Public Docs assigned to this Trip
-    // Note: We query 'tracking_public' directly because it's faster
     const querySnap = await db
       .collection("tracking_public")
       .where("tripId", "==", tripId)
       .get();
 
-    // 3. Batch Update
-    const batch = db.batch();
+    if (querySnap.empty) {
+      const shipmentSnap = await db
+        .collection("shipments")
+        .where("currentTripId", "==", tripId)
+        .limit(25)
+        .get();
 
-    querySnap.docs.forEach((doc) => {
-      batch.update(doc.ref, {
+      await Promise.all(
+        shipmentSnap.docs.map((docSnap) =>
+          syncOneShipmentToPublic(docSnap.id, docSnap.data()).catch((error) => {
+            console.error(`Trip propagate sync failed for ${docSnap.id}:`, error);
+          }),
+        ),
+      );
+      return;
+    }
+
+    const batch = db.batch();
+    querySnap.docs.forEach((docSnap) => {
+      batch.update(docSnap.ref, {
         ...tripContext,
-        lastUpdated: FieldValue.serverTimestamp(),
+        updatedAt: FieldValue.serverTimestamp(),
       });
     });
 

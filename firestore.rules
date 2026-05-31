@@ -3,40 +3,64 @@ service cloud.firestore {
   match /databases/{database}/documents {
 
     // --- HELPER FUNCTIONS ---
-    
-    // Check if user is authenticated
+
     function isSignedIn() {
       return request.auth != null;
     }
-    
-    // Check user role from custom claims or a 'users' collection
-    // (Assuming you store roles in a 'users' collection for this phase)
-    function hasRole(role) {
-      return isSignedIn() && 
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == role;
+
+    function userDocPath() {
+      return /databases/$(database)/documents/users/$(request.auth.uid);
     }
 
-    // Check if the user is the specific driver assigned to the trip
+    function userDoc() {
+      return get(userDocPath());
+    }
+
+    function isActiveUser() {
+      return isSignedIn() && userDoc().data.active == true;
+    }
+
+    function userRole() {
+      return userDoc().data.role.lower();
+    }
+
+    function hasRole(role) {
+      return isActiveUser() && userRole() == role.lower();
+    }
+
+    function isStaff() {
+      return isActiveUser() &&
+        userRole() in ['admin', 'manager', 'checker', 'driver'];
+    }
+
     function isAssignedDriver() {
       return resource.data.driverId == request.auth.uid;
+    }
+
+    function canReadShipment() {
+      return isStaff() ||
+        (
+          hasRole('customer') &&
+          request.auth.uid in resource.data.get('visibilityUserIds', [])
+        );
+    }
+
+    function canReadDeliveryManifest() {
+      return hasRole('admin') || hasRole('manager') ||
+        (hasRole('checker') && resource.data.checkerId == request.auth.uid);
     }
 
     // --- COLLECTIONS ---
 
     // 1. USER PROFILES + CUSTOMER-TRACKED SHIPMENTS
     match /users/{userId} {
-      // Base user profile document
-      allow read: if isSignedIn(); // Users can read profiles (or restrict to own/admin)
+      allow read: if isSignedIn();
       allow write: if request.auth.uid == userId || hasRole('admin');
 
-      // Per-user tracked shipments for customers
       match /trackedShipments/{trackingNumber} {
-        // Customers can only manage their own tracked shipments
         allow read, write: if request.auth != null && request.auth.uid == userId;
       }
 
-      // Per-user in-app notifications. Backend writes them with Admin SDK;
-      // customers can read their own and mark them as read.
       match /notifications/{notificationId} {
         allow read: if request.auth != null && request.auth.uid == userId;
         allow update: if request.auth != null
@@ -46,50 +70,60 @@ service cloud.firestore {
         allow create, delete: if false;
       }
 
-      // Expo push tokens registered by each customer device.
       match /pushTokens/{tokenId} {
         allow read, create, update, delete: if request.auth != null && request.auth.uid == userId;
       }
     }
 
     // 2. INTERNAL TRUTH: TRACKING RECORDS
-    // Contains sensitive customer data. STRICTLY INTERNAL.
     match /tracking_records/{trackingNumber} {
-      // READ: Admins, Managers, and Checkers can see details. 
-      // Drivers might need to see packages on their manifest.
-      allow read: if hasRole('admin') || hasRole('manager') || hasRole('checker') || hasRole('driver');
-      
-      // WRITE: DENY ALL. 
-      // Mandate: "All critical actions must go through Cloud Functions"
-      // This forces your Next.js app to use Server Actions/Cloud Functions to modify data.
-      allow write: if false; 
+      allow read: if isStaff();
+      allow write: if false;
     }
 
     // 3. TRIPS (Physical Truck Runs)
     match /truck_trips/{tripId} {
-      // READ: Managers and the assigned Driver.
-      allow read: if hasRole('admin') || hasRole('manager') || (hasRole('driver') && isAssignedDriver());
-      
-      // WRITE: DENY ALL. 
-      // Trip creation, locking, and status updates go through Cloud Functions.
+      allow read: if hasRole('admin') || hasRole('manager') || hasRole('checker') ||
+        (hasRole('driver') && isAssignedDriver());
       allow write: if false;
+
+      match /trip_shipments/{shipmentId} {
+        allow read: if isStaff();
+        allow write: if false;
+      }
+    }
+
+    // 3b. SHIPMENTS (internal operational records)
+    // Mobile: staff queries + customer visibilityUserIds array-contains.
+    // All writes go through Cloud Functions (Admin SDK).
+    match /shipments/{shipmentId} {
+      allow read: if canReadShipment();
+      allow create, update, delete: if false;
+    }
+
+    // 3c. CUSTODY EVENT LEDGER (append-only via Cloud Functions)
+    match /shipment_events/{eventId} {
+      allow read: if isStaff();
+      allow create, update, delete: if false;
+    }
+
+    // 3d. CHECKER DELIVERY MANIFESTS
+    // Mobile: query where checkerId == auth.uid; managers see all.
+    match /delivery_manifests/{manifestId} {
+      allow read: if canReadDeliveryManifest();
+      allow create, update, delete: if false;
     }
 
     // 4. PUBLIC PROJECTION
-    // The ONLY place the public can look.
     match /tracking_public/{trackingNumber} {
-      // READ: Open to the world (or restrict to those with the tracking # if you prefer)
       allow read: if true;
-      
-      // WRITE: DENY ALL. 
-      // Only the "Projection" Cloud Function can write here.
       allow write: if false;
     }
-    
+
     // 5. LOGS (Audit Trail)
     match /audit_logs/{logId} {
       allow read: if hasRole('admin');
-      allow write: if false; // Only written by backend
+      allow write: if false;
     }
   }
 }

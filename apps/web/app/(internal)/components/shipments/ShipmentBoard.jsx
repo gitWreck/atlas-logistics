@@ -23,6 +23,8 @@ import UnifiedShipmentModal from "./modals/UnifiedShipmentModal";
 import PickupRequestsTable from "./PickupRequestsTable";
 import TablePaginationFooter from "../ui/TablePaginationFooter";
 import ReleaseToCheckerModal from "./modals/ReleaseToCheckerModal";
+import ReconcileAtHubModal from "./modals/ReconcileAtHubModal";
+import ReceiveReturnedModal from "./modals/ReceiveReturnedModal";
 import { isEligibleForCheckerRelease } from "@/app/utility/checkerRelease";
 
 const ShipmentBoard = forwardRef(function ShipmentBoard(
@@ -35,6 +37,9 @@ const ShipmentBoard = forwardRef(function ShipmentBoard(
 
   const [isNewOrderModalOpen, setIsNewOrderModalOpen] = useState(false);
   const [isReleaseModalOpen, setIsReleaseModalOpen] = useState(false);
+  const [isReconcileModalOpen, setIsReconcileModalOpen] = useState(false);
+  const [isReceiveReturnedModalOpen, setIsReceiveReturnedModalOpen] =
+    useState(false);
   const [selectedShipmentId, setSelectedShipmentId] = useState(null);
   const [editingPickup, setEditingPickup] = useState(null);
 
@@ -237,13 +242,13 @@ const ShipmentBoard = forwardRef(function ShipmentBoard(
   const selectedShipment = [...shipments, ...pickups].find(
     (shipment) => shipment.id === selectedShipmentId,
   );
-  const canReleaseToChecker = ["manager", "admin"].includes(
+  const canManageWarehouse = ["manager", "admin"].includes(
     String(profile?.role || "").toLowerCase(),
   );
+  const canReleaseToChecker = canManageWarehouse;
   const selectedShipmentEligibleForRelease =
     !selectedShipment ||
     isEligibleForCheckerRelease(selectedShipment.status);
-
   const handleMessageCustomer = (shipment) => {
     const phone = shipment.sender?.phone || shipment.recipient?.phone;
     alert(`Logic to SMS ${phone} for Order ${shipment.shipmentId}`);
@@ -397,7 +402,7 @@ const ShipmentBoard = forwardRef(function ShipmentBoard(
                   !!selectedShipment && !selectedShipmentEligibleForRelease
                 }
               >
-                Release to Checker
+                Release for Delivery
               </button>
             )}
           </div>
@@ -484,6 +489,10 @@ const ShipmentBoard = forwardRef(function ShipmentBoard(
         data={selectedShipment}
         isDark={isDark}
         onRefresh={fetchShipments}
+        profile={profile}
+        onReconcile={() => setIsReconcileModalOpen(true)}
+        onReceiveReturned={() => setIsReceiveReturnedModalOpen(true)}
+        canManageWarehouse={canManageWarehouse}
       />
 
       {/* <NewShipmentModal
@@ -513,6 +522,22 @@ const ShipmentBoard = forwardRef(function ShipmentBoard(
         }}
         resetTrigger={isNewOrderModalOpen}
         editData={editingPickup}
+      />
+
+      <ReconcileAtHubModal
+        isOpen={isReconcileModalOpen}
+        onClose={() => setIsReconcileModalOpen(false)}
+        onSuccess={fetchShipments}
+        isDark={isDark}
+        shipment={selectedShipment}
+      />
+
+      <ReceiveReturnedModal
+        isOpen={isReceiveReturnedModalOpen}
+        onClose={() => setIsReceiveReturnedModalOpen(false)}
+        onSuccess={fetchShipments}
+        isDark={isDark}
+        shipment={selectedShipment}
       />
 
       <ReleaseToCheckerModal

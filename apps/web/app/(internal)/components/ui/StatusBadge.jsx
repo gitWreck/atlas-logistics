@@ -47,6 +47,8 @@ export default function StatusBadge({ status, reason, isDark = true }) {
     ARRIVED_PORT: "bg-indigo-500/10 text-indigo-400 border-indigo-500/20",
     READY_FOR_DELIVERY: "bg-sky-500/10 text-sky-400 border-sky-500/20",
     OUT_FOR_DELIVERY: "bg-purple-500/10 text-purple-400 border-purple-500/20",
+    PARTIALLY_DELIVERED:
+      "bg-teal-500/10 text-teal-400 border-teal-500/20",
 
     // DELAYED is amber
     DELAYED: "bg-amber-500/10 text-amber-400 border-amber-500/20",
@@ -82,6 +84,8 @@ export default function StatusBadge({ status, reason, isDark = true }) {
     ARRIVED_PORT: "bg-indigo-500/15 text-indigo-600 border-indigo-400/40",
     READY_FOR_DELIVERY: "bg-sky-500/15 text-sky-600 border-sky-400/40",
     OUT_FOR_DELIVERY: "bg-purple-500/15 text-purple-600 border-purple-400/40",
+    PARTIALLY_DELIVERED:
+      "bg-teal-500/15 text-teal-600 border-teal-400/40",
 
     DELAYED: "bg-amber-500/15 text-amber-700 border-amber-400/40",
     DELIVERED: "bg-emerald-500/15 text-emerald-600 border-emerald-400/40",

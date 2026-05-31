@@ -6,6 +6,14 @@ const { FieldValue } = require("firebase-admin/firestore");
 const { requireRole } = require("../utilities/helpers");
 const { writeShipmentEvent } = require("../tracking/writeShipmentEvent");
 const { EVENT_TYPES } = require("../tracking/eventTypes");
+const { deriveMasterShipmentStatus } = require("../packages/shipmentStatus");
+const {
+  DEFAULT_WAREHOUSE_CODE,
+  applyPieceLoadCustody,
+  assertCheckerCanAccessShipment,
+  getPackageIdentity,
+  shipmentHasWarehouseCustodyPieces,
+} = require("../warehouse/packageDeliveryOperations");
 
 if (!admin.apps.length) admin.initializeApp();
 const db = admin.firestore();
@@ -62,6 +70,131 @@ async function resolveShipmentIds({ shipmentIds, packageIds }) {
   return [...resolvedIds];
 }
 
+function assertPieceEligibleForCheckerLoad(pkg = {}, actorUid, packageId = null) {
+  const identity = packageId || getPackageIdentity(pkg) || "piece";
+  const loadedBy = String(pkg.loadedByCheckerId || "").trim();
+  if (loadedBy && loadedBy !== String(actorUid)) {
+    throw new HttpsError(
+      "failed-precondition",
+      `Package ${identity} is already loaded by another checker.`,
+    );
+  }
+
+  const custody = String(pkg.custodyOwnerType || "").toUpperCase();
+  const custodyId = String(pkg.custodyOwnerId || "").trim();
+  if (
+    custody === "CHECKER" &&
+    custodyId &&
+    custodyId !== String(actorUid) &&
+    loadedBy
+  ) {
+    throw new HttpsError(
+      "failed-precondition",
+      `Package ${identity} is in another checker's custody.`,
+    );
+  }
+}
+
+function getTimestampMs(value) {
+  if (!value) return 0;
+  if (typeof value?.toMillis === "function") return value.toMillis();
+  if (value?._seconds) return value._seconds * 1000;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? 0 : date.getTime();
+}
+
+async function resolveActiveCheckerManifestId(db, checkerId) {
+  const snap = await db
+    .collection("delivery_manifests")
+    .where("checkerId", "==", checkerId)
+    .limit(20)
+    .get();
+
+  if (snap.empty) return null;
+
+  const activeStatuses = new Set(["DRAFT", "LOADED"]);
+  const sorted = snap.docs
+    .filter((docSnap) =>
+      activeStatuses.has(String(docSnap.data()?.status || "").toUpperCase()),
+    )
+    .sort(
+      (a, b) =>
+        getTimestampMs(b.data()?.updatedAt || b.data()?.createdAt) -
+        getTimestampMs(a.data()?.updatedAt || a.data()?.createdAt),
+    );
+
+  return sorted[0]?.id || null;
+}
+
+function resolveDeliveryVehicle({
+  requestVehicleId = null,
+  requestVehicleName = null,
+  manifestData = {},
+  shipmentSnaps = [],
+  actorData = {},
+  checkerId,
+  checkerName = null,
+}) {
+  let vehicleId =
+    normalizeString(requestVehicleId) ||
+    normalizeString(manifestData.deliveryVehicleId) ||
+    normalizeString(actorData.deliveryVehicleId) ||
+    normalizeString(actorData.vehicleId) ||
+    normalizeString(actorData.assignedVehicleId);
+
+  let vehicleName =
+    normalizeString(requestVehicleName) ||
+    normalizeString(manifestData.deliveryVehicleName) ||
+    normalizeString(actorData.deliveryVehicleName) ||
+    normalizeString(actorData.vehicleName) ||
+    normalizeString(actorData.assignedVehicleName);
+
+  for (const snap of shipmentSnaps) {
+    const shipmentData = snap.exists ? snap.data() || {} : {};
+    vehicleId =
+      vehicleId || normalizeString(shipmentData.deliveryVehicleId);
+    vehicleName =
+      vehicleName || normalizeString(shipmentData.deliveryVehicleName);
+    if (vehicleId && vehicleName) break;
+  }
+
+  if (!vehicleId && !vehicleName) {
+    const label = normalizeString(checkerName);
+    vehicleId = checkerId ? `CHECKER_${checkerId}` : null;
+    vehicleName = label ? `${label}'s van` : "Checker van";
+  }
+
+  return { vehicleId, vehicleName };
+}
+
+function packageIsEligibleForLoad(
+  pkg = {},
+  targetedPackageIds = null,
+  actorUid = null,
+) {
+  if (targetedPackageIds && !targetedPackageIds.has(getPackageIdentity(pkg))) {
+    return false;
+  }
+
+  const loadedBy = String(pkg.loadedByCheckerId || "").trim();
+  if (actorUid && loadedBy && loadedBy !== String(actorUid)) {
+    return false;
+  }
+
+  const status = String(pkg.status || "").toUpperCase();
+  if (["DELIVERED", "MISSING", "DAMAGED", "CANCELLED"].includes(status)) {
+    return false;
+  }
+
+  if (pkg.availableForDelivery === true) return true;
+  if (status === "AVAILABLE_AT_WAREHOUSE") return true;
+
+  const custody = String(pkg.custodyOwnerType || "").toUpperCase();
+  if (custody === "WAREHOUSE" && status === "RECEIVED") return true;
+
+  return false;
+}
+
 exports.loadPackagesToDeliveryManifest = onCall(
   { region: "asia-southeast1", maxInstances: 10 },
   async (req) => {
@@ -87,15 +220,23 @@ exports.loadPackagesToDeliveryManifest = onCall(
       remarks = null,
     } = req.data || {};
 
+    const normalizedPackageIds = new Set(normalizeStringList(packageIds));
+    const hasPieceScope = normalizedPackageIds.size > 0;
+
     const resolvedShipmentIds = await resolveShipmentIds({
       shipmentIds,
       packageIds,
     });
 
     const now = FieldValue.serverTimestamp();
-    const normalizedManifestId = normalizeString(manifestId);
+    const nowIso = new Date().toISOString();
+    const normalizedManifestId =
+      normalizeString(manifestId) ||
+      (await resolveActiveCheckerManifestId(db, actorUid));
 
     let loadedShipmentIds = [];
+    let loadedPackageIds = [];
+    const loadedEvents = [];
     let manifestRefId = null;
     let resolvedVehicleId = null;
     let resolvedVehicleName = null;
@@ -104,8 +245,8 @@ exports.loadPackagesToDeliveryManifest = onCall(
     await db.runTransaction(async (tx) => {
       const actorRef = db.collection("users").doc(actorUid);
       const actorSnap = await tx.get(actorRef);
+      const actorData = actorSnap.exists ? actorSnap.data() || {} : {};
       if (actorSnap.exists) {
-        const actorData = actorSnap.data() || {};
         checkerName =
           actorData.fullName ||
           actorData.name ||
@@ -120,119 +261,169 @@ exports.loadPackagesToDeliveryManifest = onCall(
         shipmentRefs.map((ref) => tx.get(ref)),
       );
 
-      let sharedManifestId = normalizedManifestId;
-      const packageIdsForManifest = new Set();
+      const isNewManifest = !normalizedManifestId;
+      const manifestRef = normalizedManifestId
+        ? db.collection("delivery_manifests").doc(normalizedManifestId)
+        : db.collection("delivery_manifests").doc();
 
-      shipmentSnaps.forEach((snap, index) => {
-        if (!snap.exists) {
-          throw new HttpsError(
-            "not-found",
-            `Shipment not found: ${resolvedShipmentIds[index]}`,
-          );
+      let manifestData = {};
+      if (!isNewManifest) {
+        const existingManifestSnap = await tx.get(manifestRef);
+        if (!existingManifestSnap.exists) {
+          throw new HttpsError("not-found", "Delivery manifest not found.");
         }
-        const data = snap.data() || {};
-        const assignedCheckerId = normalizeString(data.assignedCheckerId);
-        if (assignedCheckerId !== actorUid) {
+        manifestData = existingManifestSnap.data() || {};
+        const manifestCheckerId = normalizeString(manifestData.checkerId);
+        if (manifestCheckerId && manifestCheckerId !== actorUid) {
           throw new HttpsError(
             "permission-denied",
-            `Shipment ${resolvedShipmentIds[index]} is not assigned to you.`,
+            "This delivery manifest belongs to another checker.",
           );
         }
-        const shipmentManifestId = normalizeString(data.deliveryManifestId);
-        if (!shipmentManifestId) {
-          throw new HttpsError(
-            "failed-precondition",
-            `Shipment ${resolvedShipmentIds[index]} has no delivery manifest. It must be released by warehouse first.`,
-          );
-        }
-        if (!sharedManifestId) {
-          sharedManifestId = shipmentManifestId;
-        } else if (sharedManifestId !== shipmentManifestId) {
-          throw new HttpsError(
-            "failed-precondition",
-            "All shipments in one load action must belong to the same delivery manifest.",
-          );
-        }
+      }
 
-        const status = String(data.status || "").toUpperCase();
-        if (status === "DELIVERED") {
-          throw new HttpsError(
-            "failed-precondition",
-            `Shipment ${resolvedShipmentIds[index]} is already delivered.`,
-          );
-        }
+      manifestRefId = manifestRef.id;
 
-        (Array.isArray(data.packageBarcodes) ? data.packageBarcodes : []).forEach(
-          (barcode) => {
-            if (typeof barcode === "string" && barcode.trim()) {
-              packageIdsForManifest.add(barcode.trim());
-            }
-          },
-        );
+      const resolvedVehicle = resolveDeliveryVehicle({
+        requestVehicleId: deliveryVehicleId,
+        requestVehicleName: deliveryVehicleName,
+        manifestData,
+        shipmentSnaps,
+        actorData,
+        checkerId: actorUid,
+        checkerName,
       });
-
-      if (!sharedManifestId) {
-        throw new HttpsError(
-          "failed-precondition",
-          "Could not resolve delivery manifest for selected shipments.",
-        );
-      }
-
-      manifestRefId = sharedManifestId;
-      const manifestRef = db.collection("delivery_manifests").doc(manifestRefId);
-      const manifestSnap = await tx.get(manifestRef);
-      if (!manifestSnap.exists) {
-        throw new HttpsError("not-found", "Delivery manifest not found.");
-      }
-
-      const manifestData = manifestSnap.data() || {};
-      if (normalizeString(manifestData.checkerId) !== actorUid) {
-        throw new HttpsError(
-          "permission-denied",
-          "This delivery manifest belongs to another checker.",
-        );
-      }
-
-      resolvedVehicleId =
-        normalizeString(deliveryVehicleId) ||
-        normalizeString(manifestData.deliveryVehicleId) ||
-        normalizeString(shipmentSnaps[0]?.data()?.deliveryVehicleId);
-      resolvedVehicleName =
-        normalizeString(deliveryVehicleName) ||
-        normalizeString(manifestData.deliveryVehicleName) ||
-        normalizeString(shipmentSnaps[0]?.data()?.deliveryVehicleName);
-
-      if (!resolvedVehicleId && !resolvedVehicleName) {
-        throw new HttpsError(
-          "failed-precondition",
-          "Delivery vehicle is required before loading packages.",
-        );
-      }
+      resolvedVehicleId = resolvedVehicle.vehicleId;
+      resolvedVehicleName = resolvedVehicle.vehicleName;
 
       const effectiveShipmentIds = [];
+      const effectivePackageIds = new Set();
+      const shipmentUpdates = [];
 
       shipmentSnaps.forEach((snap, index) => {
         const shipmentRef = shipmentRefs[index];
-        const shipmentData = snap.data() || {};
         const shipmentId = resolvedShipmentIds[index];
 
-        tx.update(shipmentRef, {
-          deliveryManifestId: manifestRefId,
-          deliveryVehicleId: resolvedVehicleId,
-          deliveryVehicleName: resolvedVehicleName,
-          custodyOwnerType: "DELIVERY_VEHICLE",
-          custodyOwnerId: resolvedVehicleId || manifestRefId,
-          currentLocationState: "DELIVERY_VEHICLE_LOADED",
-          status: "READY_FOR_DELIVERY",
-          updatedAt: now,
-          updatedBy: actorName || actorUid || null,
-          statusHistory: FieldValue.arrayUnion({
-            status: "LOADED_TO_DELIVERY_VEHICLE",
-            at: admin.firestore.Timestamp.now(),
-            by: actorName || actorUid || null,
-            note: remarks || "Loaded onto delivery vehicle.",
-            location: location || null,
-          }),
+        if (!snap.exists) {
+          throw new HttpsError("not-found", `Shipment not found: ${shipmentId}`);
+        }
+
+        const shipmentData = snap.data() || {};
+        assertCheckerCanAccessShipment(shipmentId, shipmentData, actorUid);
+
+        const status = String(shipmentData.status || "").toUpperCase();
+        if (status === "DELIVERED" || status === "COMPLETED") {
+          throw new HttpsError(
+            "failed-precondition",
+            `Shipment ${shipmentId} is already delivered.`,
+          );
+        }
+
+        const legacyAssigned = normalizeString(shipmentData.assignedCheckerId);
+        const poolRelease =
+          shipmentData.availableForDelivery === true ||
+          status === "AVAILABLE_FOR_DELIVERY";
+
+        if (!poolRelease && legacyAssigned && legacyAssigned !== actorUid) {
+          throw new HttpsError(
+            "permission-denied",
+            `Shipment ${shipmentId} is assigned to another checker.`,
+          );
+        }
+
+        const packages = Array.isArray(shipmentData.packages)
+          ? shipmentData.packages
+          : [];
+        let loadedCount = 0;
+
+        const updatedPackages = packages.map((pkg) => {
+          const identity = getPackageIdentity(pkg);
+          const inScope =
+            !hasPieceScope ||
+            (identity && normalizedPackageIds.has(identity));
+
+          if (!inScope) {
+            return pkg;
+          }
+
+          if (
+            !packageIsEligibleForLoad(
+              pkg,
+              hasPieceScope ? normalizedPackageIds : null,
+              actorUid,
+            )
+          ) {
+            if (hasPieceScope && identity && normalizedPackageIds.has(identity)) {
+              assertPieceEligibleForCheckerLoad(pkg, actorUid, identity);
+              throw new HttpsError(
+                "failed-precondition",
+                `Package ${identity} is not available to load.`,
+              );
+            }
+            return pkg;
+          }
+
+          loadedCount += 1;
+          effectivePackageIds.add(identity);
+          loadedEvents.push({ shipmentId, packageId: identity });
+
+          return applyPieceLoadCustody(pkg, {
+            checkerId: actorUid,
+            checkerName,
+            manifestId: manifestRefId,
+            vehicleId: resolvedVehicleId,
+            vehicleName: resolvedVehicleName,
+            nowIso,
+          });
+        });
+
+        if (loadedCount === 0) {
+          throw new HttpsError(
+            "failed-precondition",
+            hasPieceScope
+              ? `No eligible pieces to load on shipment ${shipmentId}. They may already be loaded or not released for delivery.`
+              : `No available pieces to load on shipment ${shipmentId}.`,
+          );
+        }
+
+        const shipmentStatus = deriveMasterShipmentStatus(updatedPackages, {
+          previousStatus: shipmentData.status,
+        });
+
+        const warehouseCode =
+          normalizeString(shipmentData.custodyOwnerId) ||
+          DEFAULT_WAREHOUSE_CODE;
+
+        shipmentUpdates.push({
+          ref: shipmentRef,
+          data: {
+            packages: updatedPackages,
+            deliveryManifestId: manifestRefId,
+            deliveryVehicleId: resolvedVehicleId,
+            deliveryVehicleName: resolvedVehicleName,
+            custodyOwnerType: shipmentHasWarehouseCustodyPieces(updatedPackages)
+              ? "WAREHOUSE"
+              : "CHECKER",
+            custodyOwnerId: shipmentHasWarehouseCustodyPieces(updatedPackages)
+              ? warehouseCode
+              : actorUid,
+            currentLocationState: shipmentHasWarehouseCustodyPieces(updatedPackages)
+              ? warehouseCode
+              : "CHECKER_CUSTODY",
+            status: shipmentStatus,
+            availableForDelivery: shipmentHasWarehouseCustodyPieces(updatedPackages),
+            updatedAt: now,
+            updatedBy: actorName || actorUid || null,
+            statusHistory: FieldValue.arrayUnion({
+              status: "LOADED_TO_DELIVERY_VEHICLE",
+              at: admin.firestore.Timestamp.now(),
+              by: actorName || actorUid || null,
+              note:
+                normalizeString(remarks) ||
+                `Loaded ${loadedCount} piece(s) onto delivery vehicle.`,
+              location: location || null,
+            }),
+          },
         });
 
         effectiveShipmentIds.push(shipmentId);
@@ -240,31 +431,66 @@ exports.loadPackagesToDeliveryManifest = onCall(
 
       const manifestUpdate = {
         status: "LOADED",
+        checkerId: actorUid,
+        checkerName,
         loadedAt: now,
         deliveryVehicleId: resolvedVehicleId,
         deliveryVehicleName: resolvedVehicleName,
         loadedShipmentIds: FieldValue.arrayUnion(...effectiveShipmentIds),
+        shipmentIds: FieldValue.arrayUnion(...effectiveShipmentIds),
         updatedAt: now,
         updatedBy: actorName || actorUid || null,
       };
 
-      if (packageIdsForManifest.size > 0) {
+      if (effectivePackageIds.size > 0) {
         manifestUpdate.loadedPackageIds = FieldValue.arrayUnion(
-          ...packageIdsForManifest,
+          ...effectivePackageIds,
+        );
+        manifestUpdate.packageIds = FieldValue.arrayUnion(
+          ...effectivePackageIds,
         );
       }
 
-      tx.set(manifestRef, manifestUpdate, { merge: true });
+      if (isNewManifest) {
+        tx.set(
+          manifestRef,
+          {
+            manifestId: manifestRef.id,
+            checkerId: actorUid,
+            checkerName,
+            status: "DRAFT",
+            createdAt: now,
+            createdBy: actorName || actorUid || null,
+            shipmentIds: [],
+            packageIds: [],
+            loadedPackageIds: [],
+            deliveryVehicleId: resolvedVehicleId,
+            deliveryVehicleName: resolvedVehicleName,
+            updatedAt: now,
+            updatedBy: actorName || actorUid || null,
+            ...manifestUpdate,
+          },
+          { merge: true },
+        );
+      } else {
+        tx.set(manifestRef, manifestUpdate, { merge: true });
+      }
+
+      shipmentUpdates.forEach(({ ref, data }) => {
+        tx.update(ref, data);
+      });
 
       loadedShipmentIds = effectiveShipmentIds;
+      loadedPackageIds = [...effectivePackageIds];
     });
 
     await Promise.all(
-      loadedShipmentIds.map((shipmentId) =>
+      loadedEvents.map(({ shipmentId, packageId }) =>
         writeShipmentEvent({
           db,
           event: {
             shipmentId,
+            pieceId: packageId,
             eventType: EVENT_TYPES.LOADED_TO_DELIVERY_VEHICLE,
             manifestId: manifestRefId,
             checkerId: actorUid,
@@ -288,7 +514,9 @@ exports.loadPackagesToDeliveryManifest = onCall(
       deliveryVehicleId: resolvedVehicleId,
       deliveryVehicleName: resolvedVehicleName,
       shipmentIds: loadedShipmentIds,
+      packageIds: loadedPackageIds,
       shipmentCount: loadedShipmentIds.length,
+      packageCount: loadedPackageIds.length,
     };
   },
 );

@@ -6,7 +6,10 @@ const { FieldValue } = require("firebase-admin/firestore");
 const { requireRole, updatedBy } = require("../utilities/helpers");
 const { writeShipmentEvent } = require("../tracking/writeShipmentEvent");
 const { EVENT_TYPES } = require("../tracking/eventTypes");
-const { assertEligibleForCheckerRelease } = require("./releaseEligibility");
+const {
+  assertEligibleForCheckerRelease,
+  normalizeStatus,
+} = require("./releaseEligibility");
 
 if (!admin.apps.length) admin.initializeApp();
 const db = admin.firestore();
@@ -63,6 +66,7 @@ async function resolveShipmentIds({ shipmentIds, packageIds }) {
   return [...resolvedIds];
 }
 
+/** @deprecated Prefer releaseForDeliveryOperations (Step 2.7). Legacy single-checker assign. */
 exports.releasePackagesToChecker = onCall(
   { region: "asia-southeast1", maxInstances: 10 },
   async (req) => {
@@ -153,6 +157,12 @@ exports.releasePackagesToChecker = onCall(
           : [];
         shipmentPackageIds.forEach((value) => effectivePackageIds.add(value));
 
+        const releaseNote =
+          normalizeString(remarks) ||
+          (normalizeStatus(shipmentData.status) === "RETURNED_RECEIVED_AT_HUB"
+            ? "Re-released to checker after returned intake."
+            : "Released to checker for last-mile handling.");
+
         tx.update(shipmentRef, {
           assignedCheckerId: normalizedCheckerId,
           assignedCheckerName: checkerName,
@@ -168,11 +178,19 @@ exports.releasePackagesToChecker = onCall(
           updatedAt: now,
           updatedBy: actorName || actorUid || null,
           status: "ASSIGNED",
+          previousAssignedCheckerId:
+            shipmentData.lastAssignedCheckerId ||
+            shipmentData.assignedCheckerId ||
+            null,
+          previousAssignedCheckerName:
+            shipmentData.lastAssignedCheckerName ||
+            shipmentData.assignedCheckerName ||
+            null,
           statusHistory: FieldValue.arrayUnion({
             status: "ASSIGNED_TO_CHECKER",
             at: admin.firestore.Timestamp.now(),
             by: actorName || actorUid || null,
-            note: remarks || "Released to checker for last-mile handling.",
+            note: releaseNote,
             location: warehouseCode || null,
           }),
         });

@@ -125,6 +125,7 @@ export default function TrackingResult({ data }) {
   else if (safeStatus === "DELIVERED") activeLineColor = "bg-emerald-500";
   else if (safeStatus === "READY_FOR_DELIVERY") activeLineColor = "bg-sky-500";
   else if (safeStatus === "OUT_FOR_DELIVERY") activeLineColor = "bg-purple-500";
+  else if (safeStatus === "PARTIALLY_DELIVERED") activeLineColor = "bg-teal-500";
   else if (safeStatus === "RECEIVED") activeLineColor = "bg-cyan-500";
 
   return (
@@ -189,7 +190,30 @@ export default function TrackingResult({ data }) {
         </div>
       )}
 
-      {/* --- C. TIMELINE SECTION --- */}
+      {/* --- C. LAST-MILE CONTEXT --- */}
+      {(data.assignedCheckerName || data.deliveryVehicleName) && (
+        <div className="px-6 py-4 border-b border-slate-200 bg-slate-50/80">
+          <div className="text-[10px] text-slate-500 uppercase font-bold mb-2">
+            Delivery details
+          </div>
+          <div className="space-y-1 text-sm text-slate-700">
+            {data.assignedCheckerName && (
+              <p>
+                <span className="font-semibold">Assigned to:</span>{" "}
+                {data.assignedCheckerName}
+              </p>
+            )}
+            {data.deliveryVehicleName && (
+              <p>
+                <span className="font-semibold">Vehicle:</span>{" "}
+                {data.deliveryVehicleName}
+              </p>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* --- D. TIMELINE SECTION --- */}
       <div className="w-full">
         <div className="px-6 py-8 md:hidden">
           <div className="relative">
@@ -348,7 +372,38 @@ export default function TrackingResult({ data }) {
         </div>
       </div>
 
-      {/* --- D. IMAGE SECTIONS --- */}
+      {/* --- E. ACTIVITY LOG --- */}
+      {Array.isArray(data.history) && data.history.length > 0 && (
+        <div className="border-t border-slate-200 px-6 py-5">
+          <div className="text-[10px] text-slate-500 uppercase font-bold mb-3">
+            Tracking activity
+          </div>
+          <div className="space-y-3">
+            {data.history.slice(0, 8).map((entry, index) => (
+              <div
+                key={`${entry.date}-${entry.title || entry.status}-${index}`}
+                className="border border-slate-200 rounded-xl p-3 bg-white"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-semibold text-slate-900">
+                      {entry.title || entry.status}
+                    </p>
+                    {entry.note && (
+                      <p className="text-xs text-slate-600 mt-1">{entry.note}</p>
+                    )}
+                  </div>
+                  <span className="text-[11px] text-slate-500 shrink-0">
+                    {formatDate(entry.date)}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* --- F. IMAGE SECTIONS --- */}
       <div className="border-t border-slate-200">
         {/* SECTION 1: PROOF OF RECEIPT */}
         {receiptImages.length > 0 && (
@@ -380,7 +435,7 @@ export default function TrackingResult({ data }) {
         )}
       </div>
 
-      {/* --- E. FOOTER STATS --- */}
+      {/* --- G. FOOTER STATS --- */}
       {totals && (
         <div className="mt-auto grid grid-cols-3 divide-x divide-slate-200 border-t border-slate-200 bg-slate-50">
           <StatBox label="Total Items" value={totals.totalItems || 0} />

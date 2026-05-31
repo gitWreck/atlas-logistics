@@ -14,6 +14,8 @@ import PackagesTable from "./Packages/PackagesTable";
 import ShipmentOperations from "./ShipmentOperations";
 import ShipmentProofs from "./ShipmentProofs";
 import ShipmentTimelineTab from "./ShipmentTimelineTab";
+import HubReconcileCard from "./HubReconcileCard";
+import ReturnLoopCard from "./ReturnLoopCard";
 import { getDrawerThemeClasses } from "@/app/utility/constant/theme";
 import { TabButton } from "./utils";
 
@@ -24,6 +26,9 @@ export default function ShipmentDrawer({
   isDark = false,
   onRefresh,
   profile,
+  onReconcile,
+  onReceiveReturned,
+  canManageWarehouse = false,
 }) {
   const [activeTab, setActiveTab] = useState("TIMELINE");
   const theme = getDrawerThemeClasses(isDark);
@@ -117,7 +122,21 @@ export default function ShipmentDrawer({
         {/* CONTENT */}
         <div className={`flex-1 overflow-y-auto p-6 ${theme.content}`}>
           {activeTab === "TIMELINE" && (
-            <ShipmentTimelineTab data={data} isDark={isDark} />
+            <div className="space-y-6">
+              <ReturnLoopCard
+                shipment={data}
+                isDark={isDark}
+                canManage={canManageWarehouse}
+                onReceiveReturned={onReceiveReturned}
+              />
+              <HubReconcileCard
+                shipment={data}
+                isDark={isDark}
+                canManage={canManageWarehouse}
+                onReconcile={onReconcile}
+              />
+              <ShipmentTimelineTab data={data} isDark={isDark} />
+            </div>
           )}
 
           {activeTab === "ITEMS" && (

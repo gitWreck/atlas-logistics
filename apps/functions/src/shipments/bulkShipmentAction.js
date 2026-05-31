@@ -5,6 +5,7 @@ const admin = require("firebase-admin");
 const { FieldValue } = admin.firestore;
 const { requireRole, updatedBy } = require("../utilities/helpers");
 const { writeShipmentActionLog } = require("../utilities/shipmentLogger");
+const { deriveMasterShipmentStatus } = require("../packages/shipmentStatus");
 
 if (!admin.apps.length) admin.initializeApp();
 const db = admin.firestore();
@@ -133,33 +134,7 @@ exports.bulkShipmentAction = onCall(
             return sum;
           }, 0);
 
-        const deriveShipmentStatus = (pkgs) => {
-          const totalRows = pkgs.length;
-          if (totalRows === 0) return "RECEIVED";
-
-          const deliveredRows = pkgs.filter(
-            (p) => p.status === "DELIVERED",
-          ).length;
-          const partialReceivedRows = pkgs.filter(
-            (p) => p.status === "PARTIALLY_RECEIVED",
-          ).length;
-          const loadedRows = pkgs.filter((p) => p.status === "LOADED").length;
-          const partialLoadedRows = pkgs.filter(
-            (p) => p.status === "PARTIALLY_LOADED",
-          ).length;
-          const missingRows = pkgs.filter((p) => p.status === "MISSING").length;
-
-          if (deliveredRows === totalRows) return "DELIVERED";
-          if (deliveredRows > 0 || partialReceivedRows > 0) {
-            return "PARTIALLY_RECEIVED";
-          }
-          if (loadedRows === totalRows) return "LOADED";
-          if (loadedRows > 0 || partialLoadedRows > 0) {
-            return "PARTIALLY_LOADED";
-          }
-          if (missingRows === totalRows) return "MISSING";
-          return "RECEIVED";
-        };
+        const deriveShipmentStatus = (pkgs) => deriveMasterShipmentStatus(pkgs);
 
         let tripDeltaLoaded = 0;
         let tripDeltaPending = 0;

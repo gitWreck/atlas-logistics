@@ -8,8 +8,16 @@ import {
   SHIPMENT_STEPS_HUB_TRANSFER,
   SHIPMENT_STEPS_LOCAL_PICKUP,
 } from "@/app/utility/constant/templates";
+import { useShipmentCustodyTimeline } from "@/app/(internal)/hooks/useShipmentCustodyTimeline";
+import CustodyTimeline from "@/app/(internal)/components/custody/CustodyTimeline";
 
 export default function ShipmentTimelineTab({ data, isDark = false }) {
+  const shipmentId = data?.id || data?.shipmentId || null;
+  const { events, loading, error } = useShipmentCustodyTimeline(
+    shipmentId,
+    !!shipmentId,
+  );
+
   if (!data) return null;
 
   const isPickupOrder =
@@ -128,96 +136,29 @@ export default function ShipmentTimelineTab({ data, isDark = false }) {
         </div>
       </div>
 
-      {/* STATUS HISTORY LOG */}
       <div className="mt-12 border-t pt-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
         <h3
-          className={`text-xs font-bold uppercase mb-4 tracking-widest pl-1 ${
+          className={`text-xs font-bold uppercase mb-2 tracking-widest pl-1 ${
             isDark ? "text-slate-500" : "text-slate-400"
           }`}
         >
-          Detailed Activity Log
+          Scanned Info / Custody Timeline
         </h3>
+        <p
+          className={`text-xs mb-4 pl-1 ${
+            isDark ? "text-slate-500" : "text-slate-500"
+          }`}
+        >
+          Same event history shown on checker mobile Scan Info.
+        </p>
 
-        <div className="space-y-4">
-          {data.statusHistory && data.statusHistory.length > 0 ? (
-            [...data.statusHistory].reverse().map((log, idx) => (
-              <div key={idx} className="flex gap-4 group">
-                <div className="w-24 shrink-0 pt-1">
-                  <p
-                    className={`text-[12px] font-mono font-bold leading-none ${
-                      isDark ? "text-slate-400" : "text-slate-700"
-                    }`}
-                  >
-                    {log.at?._seconds
-                      ? new Date(log.at._seconds * 1000).toLocaleTimeString(
-                          [],
-                          {
-                            hour: "2-digit",
-                            minute: "2-digit",
-                          },
-                        )
-                      : "—"}
-                  </p>
-                  <p
-                    className={`text-[11px] font-medium mt-1 opacity-60 ${
-                      isDark ? "text-slate-500" : "text-slate-500"
-                    }`}
-                  >
-                    {log.at?._seconds
-                      ? new Date(log.at._seconds * 1000).toLocaleDateString(
-                          undefined,
-                          {
-                            month: "short",
-                            day: "numeric",
-                          },
-                        )
-                      : "—"}
-                  </p>
-                </div>
-
-                <div
-                  className={`flex-1 p-3 rounded-xl border transition-colors ${
-                    isDark
-                      ? "bg-slate-800/20 border-slate-800 group-hover:border-slate-700"
-                      : "bg-slate-50 border-slate-200 group-hover:border-slate-300"
-                  }`}
-                >
-                  <div className="flex justify-between items-start mb-1">
-                    <span
-                      className={`text-[10px] font-bold px-1.5 py-0.5 rounded uppercase tracking-tighter ${
-                        isDark
-                          ? "bg-slate-800 text-slate-400"
-                          : "bg-white text-slate-600 border"
-                      }`}
-                    >
-                      {log.status.replace(/_/g, " ")}
-                    </span>
-                  </div>
-
-                  {log.note && (
-                    <p
-                      className={`text-xs mt-2 italic leading-relaxed ${
-                        isDark ? "text-slate-400" : "text-slate-600"
-                      }`}
-                    >
-                      "{log.note}"
-                    </p>
-                  )}
-                </div>
-              </div>
-            ))
-          ) : (
-            <div
-              className={`text-xs italic text-center p-8 border border-dashed rounded-xl ${
-                isDark
-                  ? "border-slate-800 text-slate-600"
-                  : "border-slate-200 text-slate-400"
-              }`}
-            >
-              No detailed logs available for this shipment yet.
-            </div>
-          )}
-        </div>
+        <CustodyTimeline
+          events={events}
+          loading={loading}
+          error={error}
+          isDark={isDark}
+          emptyMessage="No custody events recorded yet. Release, load, and delivery actions will appear here."
+        />
       </div>
     </div>
   );

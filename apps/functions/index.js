@@ -117,14 +117,22 @@ exports.updateShipmentDetails =
   require("./src/shipments/updateShipmentDetails").updateShipmentDetails;
 exports.updateShipmentImages =
   require("./src/shipments/updateShipmentImages").updateShipmentImages;
+exports.reconcileShipmentAtHub =
+  require("./src/warehouse/reconcileShipmentAtHub").reconcileShipmentAtHub;
+exports.receiveReturnedShipmentAtHub =
+  require("./src/warehouse/receiveReturnedShipmentAtHub").receiveReturnedShipmentAtHub;
 exports.releasePackagesToChecker =
   require("./src/checker/releasePackagesToChecker").releasePackagesToChecker;
+exports.releaseForDeliveryOperations =
+  require("./src/warehouse/releaseForDeliveryOperations").releaseForDeliveryOperations;
 exports.loadPackagesToDeliveryManifest =
   require("./src/checker/loadPackagesToDeliveryManifest").loadPackagesToDeliveryManifest;
 exports.reportFailedDelivery =
   require("./src/checker/reportFailedDelivery").reportFailedDelivery;
 exports.returnPackagesToWarehouse =
   require("./src/checker/returnPackagesToWarehouse").returnPackagesToWarehouse;
+exports.getShipmentCustodyTimeline =
+  require("./src/tracking/getShipmentCustodyTimeline").getShipmentCustodyTimeline;
 
 // Manifests & Certificates
 exports.generateTripManifest =
@@ -150,6 +158,7 @@ exports.processNotificationEvent =
 // Firestore Triggers
 const {
   mirrorShipmentToPublic,
+  mirrorShipmentEventToPublic,
   syncTrackingPublicHttp,
   propagateTripUpdates,
 } = require("./src/tracking/syncTrackingPublic");
@@ -157,6 +166,7 @@ const { reportCheckerTrip } = require("./src/trips/reportCheckerTrip");
 exports.reportCheckerTrip = reportCheckerTrip;
 
 exports.mirrorShipmentToPublic = mirrorShipmentToPublic;
+exports.mirrorShipmentEventToPublic = mirrorShipmentEventToPublic;
 exports.syncTrackingPublicHttp = syncTrackingPublicHttp;
 exports.propagateTripUpdates = propagateTripUpdates;
 

@@ -44,7 +44,7 @@ export default function TripDrawerFooter({
   const isAdmin = role === "admin";
   const isManager = role === "manager";
   const canViewManifestControls = isAdmin || isManager;
-  const canEditManifestControls = isAdmin;
+  const canEditManifestControls = isAdmin || isManager;
 
   const handleUnlockSuccess = () => {
     setTimeout(() => {

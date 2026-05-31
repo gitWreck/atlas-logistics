@@ -32,6 +32,7 @@ import {
   getDashboardThemeClasses,
   // getStatCardColors,
 } from "@/app/utility/constant/theme";
+import { useDashboardPreferences } from "@/app/hooks/useDashboardPreferences";
 
 const secondaryNavItems = [
   { id: "tracking", label: "Tracking", icon: faRoute, disabled: true },
@@ -42,8 +43,9 @@ const secondaryNavItems = [
 
 export default function AdminDashboardPage() {
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState("overview");
-  const [isDark, setIsDark] = useState(false);
+  const tabIds = useMemo(() => mainNavItems.map((item) => item.id), []);
+  const { isDark, toggleDarkMode, activeTab, setActiveTab } =
+    useDashboardPreferences("admin", tabIds);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
 
@@ -268,7 +270,7 @@ export default function AdminDashboardPage() {
 
             <button
               type="button"
-              onClick={() => setIsDark((prev) => !prev)}
+              onClick={toggleDarkMode}
               className={`h-9 w-9 rounded-full border flex items-center justify-center ${theme.themeToggle}`}
               title="Toggle theme"
             >

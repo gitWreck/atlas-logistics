@@ -19,6 +19,7 @@ import NotificationBell from "../../components/notifications/NotificationBell";
 import CheckerOverview from "../../components/checker/CheckerOverview.jsx";
 import CheckerBoard from "../../components/checker/CheckerBoard";
 import ShipmentBoard from "../../components/shipments/ShipmentBoard";
+import { useDashboardPreferences } from "@/app/hooks/useDashboardPreferences";
 
 const mainNavItems = [
   { id: "overview", label: "Overview", icon: faChartPie, title: "Overview", description: "Warehouse operations dashboard" },
@@ -28,8 +29,9 @@ const mainNavItems = [
 
 export default function CheckerDashboardPage() {
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState("overview");
-  const [isDark, setIsDark] = useState(false);
+  const tabIds = useMemo(() => mainNavItems.map((item) => item.id), []);
+  const { isDark, toggleDarkMode, activeTab, setActiveTab } =
+    useDashboardPreferences("checker", tabIds);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const { user, profile, loading } = useAuth();
@@ -169,7 +171,7 @@ export default function CheckerDashboardPage() {
           <div className="flex items-center gap-3 sm:gap-4 shrink-0">
             <button
               type="button"
-              onClick={() => setIsDark((prev) => !prev)}
+              onClick={toggleDarkMode}
               className="h-9 w-9 rounded-full border border-slate-200 bg-slate-50 flex items-center justify-center text-slate-500 hover:bg-slate-100 hover:text-slate-900 dark:border-slate-700 dark:bg-slate-900 dark:hover:bg-slate-800"
               title="Toggle theme"
             >
