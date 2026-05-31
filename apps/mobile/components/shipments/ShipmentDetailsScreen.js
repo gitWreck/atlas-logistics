@@ -32,8 +32,7 @@ import {
   completeCheckerDelivery,
   getCallableErrorMessage,
   getCheckerDeliveryNextAction,
-  isAssignedToChecker,
-  loadAssignedShipmentsToVehicle,
+  canCheckerAccessShipment,
   markShipmentOutForDelivery,
   reportCheckerFailedDelivery,
   returnCheckerShipmentsToWarehouse,
@@ -189,23 +188,13 @@ export default function ShipmentDetailsScreen() {
       const isCheckerLastMile =
         isChecker &&
         tripType !== "HUB_TRANSFER" &&
-        isAssignedToChecker(shipment, profile?.uid);
+        canCheckerAccessShipment(shipment, profile?.uid);
 
-      if (isCheckerLastMile && getCheckerDeliveryNextAction(shipment) === "load") {
-        await loadAssignedShipmentsToVehicle({
-          shipmentIds: [String(shipmentId)],
-          profile,
-        });
-        await refreshShipment();
-        Alert.alert(
-          "Loaded",
-          "Shipment is loaded on your delivery vehicle and ready for route start.",
-        );
-        setActionLoading(false);
-        return;
-      }
+      const checkerNextAction = isCheckerLastMile
+        ? getCheckerDeliveryNextAction(shipment, profile?.uid)
+        : null;
 
-      if (isCheckerLastMile && shipment.status === "READY_FOR_DELIVERY") {
+      if (isCheckerLastMile && checkerNextAction === "out_for_delivery") {
         await markShipmentOutForDelivery({
           shipmentId: String(shipmentId),
           profile,
@@ -217,7 +206,7 @@ export default function ShipmentDetailsScreen() {
         return;
       }
 
-      if (isCheckerLastMile && shipment.status === "FAILED_DELIVERY") {
+      if (isCheckerLastMile && checkerNextAction === "return") {
         await returnCheckerShipmentsToWarehouse({
           shipmentIds: [String(shipmentId)],
           profile,
@@ -271,11 +260,14 @@ export default function ShipmentDetailsScreen() {
         return;
       }
 
-      if (shipment.status === "OUT_FOR_DELIVERY" && isCheckerLastMile) {
+      const checkerCompletingDelivery =
+        isCheckerLastMile && checkerNextAction === "deliver";
+
+      if (checkerCompletingDelivery) {
         assertAssignedToChecker(shipment, profile?.uid);
       }
 
-      if (shipment.status === "OUT_FOR_DELIVERY") {
+      if (shipment.status === "OUT_FOR_DELIVERY" || checkerCompletingDelivery) {
         if (photos.length === 0) {
           Alert.alert(
             "Proof Required",
@@ -518,12 +510,10 @@ export default function ShipmentDetailsScreen() {
   const isCheckerLastMile =
     isChecker &&
     tripType !== "HUB_TRANSFER" &&
-    isAssignedToChecker(shipment, profile?.uid);
+    canCheckerAccessShipment(shipment, profile?.uid);
   const checkerNextAction = isCheckerLastMile
-    ? getCheckerDeliveryNextAction(shipment)
+    ? getCheckerDeliveryNextAction(shipment, profile?.uid)
     : null;
-  const canCheckerLoadVehicle =
-    isCheckerLastMile && checkerNextAction === "load";
   const canCheckerStartRoute =
     isCheckerLastMile && checkerNextAction === "out_for_delivery";
   const canCheckerCompleteDelivery =
@@ -532,7 +522,6 @@ export default function ShipmentDetailsScreen() {
     isCheckerLastMile && checkerNextAction === "return";
   const showFooter =
     canDriverHandlePickup ||
-    canCheckerLoadVehicle ||
     canCheckerStartRoute ||
     canCheckerCompleteDelivery ||
     canCheckerReturnToWarehouse;
@@ -684,6 +673,7 @@ export default function ShipmentDetailsScreen() {
           tripType={tripType}
           onSendSMS={handleManualSMS}
           checkerReturnMode={canCheckerReturnToWarehouse}
+          checkerActionPhase={isCheckerLastMile ? checkerNextAction : null}
         />
       )}
 

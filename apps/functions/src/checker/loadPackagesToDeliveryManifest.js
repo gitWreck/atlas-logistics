@@ -407,13 +407,16 @@ exports.loadPackagesToDeliveryManifest = onCall(
             custodyOwnerId: shipmentHasWarehouseCustodyPieces(updatedPackages)
               ? warehouseCode
               : actorUid,
-            currentLocationState: shipmentHasWarehouseCustodyPieces(updatedPackages)
-              ? warehouseCode
-              : "CHECKER_CUSTODY",
+          currentLocationState: shipmentHasWarehouseCustodyPieces(updatedPackages)
+            ? loadedCount > 0
+              ? "DELIVERY_VEHICLE_LOADED"
+              : warehouseCode
+            : "DELIVERY_VEHICLE_LOADED",
             status: shipmentStatus,
-            availableForDelivery: shipmentHasWarehouseCustodyPieces(updatedPackages),
-            updatedAt: now,
-            updatedBy: actorName || actorUid || null,
+          availableForDelivery: shipmentHasWarehouseCustodyPieces(updatedPackages),
+          activeCheckerIds: FieldValue.arrayUnion(actorUid),
+          updatedAt: now,
+          updatedBy: actorName || actorUid || null,
             statusHistory: FieldValue.arrayUnion({
               status: "LOADED_TO_DELIVERY_VEHICLE",
               at: admin.firestore.Timestamp.now(),

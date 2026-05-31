@@ -5,6 +5,7 @@ import {
   updateShipmentStatus,
 } from "./FirebaseFunctions";
 import { getCurrentLocationSafe, updatedBy } from "./helpers";
+import { getCheckerPieceActionPhase } from "./checkerDeliveryPool";
 
 export function canCheckerAccessShipment(shipment, checkerUid) {
   if (!shipment || !checkerUid) return false;
@@ -44,42 +45,30 @@ function normalizeStatus(value) {
   return String(value || "").trim().toUpperCase();
 }
 
-function countAvailablePieces(shipment = {}) {
-  const packages = Array.isArray(shipment.packages) ? shipment.packages : [];
-  return packages.filter((pkg) => {
-    const status = normalizeStatus(pkg.status);
-    return (
-      pkg.availableForDelivery === true ||
-      status === "AVAILABLE_AT_WAREHOUSE"
-    );
-  }).length;
-}
+/**
+ * Next action for checker last-mile (My Route / shipment details).
+ * @param {object} shipment
+ * @param {string} [checkerUid] — required for pool model (2.7); uses piece counts
+ */
+export function getCheckerDeliveryNextAction(shipment, checkerUid = null) {
+  if (checkerUid) {
+    const piecePhase = getCheckerPieceActionPhase(shipment, checkerUid);
+    if (piecePhase) return piecePhase;
+  }
 
-/** Next action for checker last-mile on the Assigned list / details screen. */
-export function getCheckerDeliveryNextAction(shipment) {
   const status = normalizeStatus(shipment?.status);
-  const locationState = normalizeStatus(shipment?.currentLocationState);
 
   if (status === "OUT_FOR_DELIVERY") return "deliver";
   if (status === "FAILED_DELIVERY") return "return";
-  if (
-    status === "READY_FOR_DELIVERY" ||
-    locationState === "DELIVERY_VEHICLE_LOADED"
-  ) {
-    return "out_for_delivery";
-  }
+  if (status === "READY_FOR_DELIVERY") return "out_for_delivery";
 
-  if (
-    shipment?.availableForDelivery === true ||
-    status === "AVAILABLE_FOR_DELIVERY" ||
-    countAvailablePieces(shipment) > 0
-  ) {
-    return "load";
-  }
+  return null;
+}
 
-  if (["ASSIGNED", "LOADED", "RELEASED", "RECEIVED", "ARRIVED"].includes(status)) {
-    return "load";
-  }
+export function getCheckerDeliveryActionLabel(action) {
+  if (action === "out_for_delivery") return "Mark out for delivery";
+  if (action === "deliver") return "Complete delivery";
+  if (action === "return") return "Return to warehouse";
   return null;
 }
 

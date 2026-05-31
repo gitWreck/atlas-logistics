@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useState } from "react";
 import {
   View,
   Text,
@@ -11,16 +11,11 @@ import {
 } from "react-native";
 import { useRouter } from "expo-router";
 import { FontAwesome5 } from "@expo/vector-icons";
-import { collection, onSnapshot, query, where } from "firebase/firestore";
-import { db } from "../../firebase";
 import { useAuth } from "../../contexts/AuthContext";
 import { useTheme } from "../../contexts/ThemeContext";
-import StatusBadge from "../../components/ui/StatusBadge";
-import {
-  countDeliveryPoolPieces,
-  formatPoolCountLine,
-  isAvailableToLoadShipment,
-} from "../../components/utilities/checkerDeliveryPool";
+import StatusBadge from "../ui/StatusBadge";
+import { useCheckerLastMile } from "../../contexts/CheckerLastMileContext";
+import { formatPoolCountLine } from "../utilities/checkerDeliveryPool";
 
 function getTimeLabel(value) {
   if (!value) return "No recent update";
@@ -38,67 +33,20 @@ export default function AvailableToLoadScreen() {
   const router = useRouter();
   const { profile } = useAuth();
   const { colors } = useTheme();
-
-  const [items, setItems] = useState([]);
-  const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
-  useEffect(() => {
-    if (!profile?.uid) {
-      setItems([]);
-      setLoading(false);
-      return undefined;
-    }
+  const { availableShipments, loading } = useCheckerLastMile();
 
-    const availableQuery = query(
-      collection(db, "shipments"),
-      where("availableForDelivery", "==", true),
-    );
-
-    const unsub = onSnapshot(
-      availableQuery,
-      (snap) => {
-        const checkerId = profile.uid;
-        const next = snap.docs
-          .map((docSnap) => ({ id: docSnap.id, ...docSnap.data() }))
-          .filter((shipment) => isAvailableToLoadShipment(shipment))
-          .map((shipment) => ({
-            ...shipment,
-            poolStats: countDeliveryPoolPieces(shipment, checkerId),
-          }))
-          .filter((shipment) => shipment.poolStats.available > 0)
-          .sort((a, b) => {
-            const aMs = a?.updatedAt?.toMillis?.() || 0;
-            const bMs = b?.updatedAt?.toMillis?.() || 0;
-            return bMs - aMs;
-          });
-
-        setItems(next);
-        setLoading(false);
-        setRefreshing(false);
-      },
-      (error) => {
-        console.error("Available-to-load snapshot failed:", error);
-        setLoading(false);
-        setRefreshing(false);
-      },
-    );
-
-    return () => unsub();
-  }, [profile?.uid]);
-
-  const summary = useMemo(() => {
-    return items.reduce(
-      (acc, item) => {
-        acc.shipments += 1;
-        acc.available += item.poolStats?.available || 0;
-        acc.mine += item.poolStats?.mine || 0;
-        acc.others += item.poolStats?.others || 0;
-        return acc;
-      },
-      { shipments: 0, available: 0, mine: 0, others: 0 },
-    );
-  }, [items]);
+  const summary = availableShipments.reduce(
+    (acc, item) => {
+      acc.shipments += 1;
+      acc.available += item.poolStats?.available || 0;
+      acc.mine += item.poolStats?.mine || 0;
+      acc.others += item.poolStats?.others || 0;
+      return acc;
+    },
+    { shipments: 0, available: 0, mine: 0, others: 0 },
+  );
 
   const openLoadScan = () => {
     router.push({
@@ -114,7 +62,10 @@ export default function AvailableToLoadScreen() {
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
-            onRefresh={() => setRefreshing(true)}
+            onRefresh={() => {
+              setRefreshing(true);
+              setTimeout(() => setRefreshing(false), 400);
+            }}
             tintColor={colors.text}
             colors={[colors.text]}
           />
@@ -140,7 +91,7 @@ export default function AvailableToLoadScreen() {
           </Text>
           <Text style={[styles.hintText, { color: colors.textMuted }]}>
             Custody stays at Odiongan until you scan each label and load it to
-            your van.
+            your van. After loading, use My Route and My Load.
           </Text>
           <TouchableOpacity
             style={[styles.scanBtn, { borderColor: colors.border }]}
@@ -160,18 +111,36 @@ export default function AvailableToLoadScreen() {
               Loading available inventory...
             </Text>
           </View>
-        ) : items.length === 0 ? (
+        ) : availableShipments.length === 0 ? (
           <View style={styles.emptyState}>
             <Text style={[styles.emptyTitle, { color: colors.text }]}>
               Nothing available to load
             </Text>
             <Text style={[styles.emptySub, { color: colors.textMuted }]}>
               When Rose releases a trip for delivery operations, pieces will
-              appear here for any checker to load.
+              appear here. After you load everything, continue on My Route.
             </Text>
+            <TouchableOpacity
+              style={[styles.linkBtn, { borderColor: colors.border }]}
+              onPress={() => router.push("/(checker)/(tabs)/deliveries")}
+              activeOpacity={0.85}
+            >
+              <Text style={[styles.linkBtnText, { color: colors.text }]}>
+                Open My Route
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.linkBtn, { borderColor: colors.border }]}
+              onPress={() => router.push("/(checker)/(tabs)/delivery-load")}
+              activeOpacity={0.85}
+            >
+              <Text style={[styles.linkBtnText, { color: colors.text }]}>
+                Open My Load
+              </Text>
+            </TouchableOpacity>
           </View>
         ) : (
-          items.map((shipment) => (
+          availableShipments.map((shipment) => (
             <View
               key={shipment.id}
               style={[
@@ -190,13 +159,21 @@ export default function AvailableToLoadScreen() {
               >
                 <View style={styles.cardHeader}>
                   <View style={styles.idWrap}>
-                    <FontAwesome5 name="warehouse" size={12} color={colors.textMuted} />
+                    <FontAwesome5
+                      name="warehouse"
+                      size={12}
+                      color={colors.textMuted}
+                    />
                     <Text style={[styles.shipmentId, { color: colors.text }]}>
                       {shipment.shipmentId || shipment.id}
                     </Text>
                   </View>
                   <StatusBadge
-                    status={shipment.status || "AVAILABLE_FOR_DELIVERY"}
+                    status={
+                      shipment.poolStats?.available > 0
+                        ? "AVAILABLE_FOR_DELIVERY"
+                        : shipment.status
+                    }
                   />
                 </View>
 
@@ -341,5 +318,18 @@ const styles = StyleSheet.create({
     lineHeight: 18,
     textAlign: "center",
     paddingHorizontal: 12,
+  },
+  linkBtn: {
+    marginTop: 12,
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    alignSelf: "stretch",
+  },
+  linkBtnText: {
+    fontSize: 13,
+    fontWeight: "700",
+    textAlign: "center",
   },
 });

@@ -10,7 +10,8 @@ import { signOut } from "firebase/auth";
 import { auth } from "../../../firebase";
 
 import CheckerHeader from "../../../components/checker/CheckerHeader";
-import { useAuth } from "../../../contexts/AuthContext"; // adjust path if needed
+import { useAuth } from "../../../contexts/AuthContext";
+import { CheckerLastMileProvider } from "../../../contexts/CheckerLastMileContext";
 import { useTheme } from "../../../contexts/ThemeContext";
 
 export default function CheckerTabsLayout() {
@@ -36,7 +37,7 @@ export default function CheckerTabsLayout() {
         onProfilePress={() => router.push("/(checker)/profile")}
       />
 
-      {/* ✅ TABS BELOW HEADER */}
+      <CheckerLastMileProvider>
       <Tabs
         screenOptions={{
           headerShown: false, // still false because we use custom header
@@ -103,6 +104,7 @@ export default function CheckerTabsLayout() {
           }}
         />
       </Tabs>
+      </CheckerLastMileProvider>
     </SafeAreaView>
   );
 }

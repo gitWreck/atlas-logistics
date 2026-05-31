@@ -149,7 +149,9 @@ export default function DeliveryManifestCard({
                 {shipment.id}
               </Text>
             </View>
-            <StatusBadge status={shipment.status || "ASSIGNED"} />
+            <StatusBadge
+              status={shipment.displayStatus || shipment.status || "ASSIGNED"}
+            />
           </TouchableOpacity>
         ))
       )}

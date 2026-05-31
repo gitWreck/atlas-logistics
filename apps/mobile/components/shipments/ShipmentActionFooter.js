@@ -62,6 +62,7 @@ export default function ShipmentActionFooter({
   tripType = "",
   onSendSMS,
   checkerReturnMode = false,
+  checkerActionPhase = null,
 }) {
   const { colors } = useTheme();
   const [isExpanded, setIsExpanded] = useState(false);
@@ -107,6 +108,18 @@ export default function ShipmentActionFooter({
   } else if (checkerReturnMode) {
     buttonTitle = "Return to Warehouse";
     isFinalAction = false;
+  } else if (checkerActionPhase === "out_for_delivery") {
+    buttonTitle = "Mark Out for Delivery";
+    isFinalAction = false;
+  } else if (checkerActionPhase === "deliver") {
+    buttonTitle = "Complete Delivery";
+    isFinalAction = true;
+    if (photoCount === 0) isDisabled = true;
+  } else if (checkerActionPhase === "return") {
+    buttonTitle = "Return to Warehouse";
+    isFinalAction = false;
+  } else if (checkerActionPhase) {
+    isDisabled = true;
   } else {
     const config = statusConfig[status];
 

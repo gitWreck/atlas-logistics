@@ -78,6 +78,7 @@ exports.receiveReturnedShipmentAtHub = onCall(
           currentLocationState: normalizedWarehouse,
           assignedCheckerId: null,
           assignedCheckerName: null,
+          activeCheckerIds: [],
           deliveryManifestId: null,
           returnReceivedAt: now,
           returnReceivedBy: actorName || actorUid || null,

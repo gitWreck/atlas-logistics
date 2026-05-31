@@ -97,7 +97,73 @@ export function isMyActiveDeliveryShipment(shipment = {}, checkerUid) {
     return true;
   }
 
+  const activeIds = Array.isArray(shipment.activeCheckerIds)
+    ? shipment.activeCheckerIds
+    : [];
+  if (activeIds.some((id) => String(id) === String(checkerUid))) {
+    return true;
+  }
+
   return countDeliveryPoolPieces(shipment, checkerUid).mine > 0;
+}
+
+function isMyPiece(pkg = {}, checkerUid, shipment = {}) {
+  if (!checkerUid) return false;
+  if (String(shipment.assignedCheckerId || "") === String(checkerUid)) {
+    return true;
+  }
+  if (String(pkg.loadedByCheckerId || "").trim() === String(checkerUid)) {
+    return true;
+  }
+  if (
+    normalizeStatus(pkg.custodyOwnerType) === "CHECKER" &&
+    String(pkg.custodyOwnerId || "").trim() === String(checkerUid)
+  ) {
+    return true;
+  }
+  return false;
+}
+
+/**
+ * Last-mile phase for this checker based on their pieces (not master status alone).
+ * @returns {'out_for_delivery'|'deliver'|'return'|null}
+ */
+export function getCheckerPieceActionPhase(shipment = {}, checkerUid = null) {
+  if (!checkerUid) return null;
+
+  const masterStatus = normalizeStatus(shipment.status);
+  if (masterStatus === "FAILED_DELIVERY") return "return";
+  if (masterStatus === "OUT_FOR_DELIVERY") return "deliver";
+
+  const packages = Array.isArray(shipment.packages) ? shipment.packages : [];
+  let myOnVan = 0;
+  let myOfd = 0;
+  let myDelivered = 0;
+
+  packages.forEach((pkg) => {
+    if (!isMyPiece(pkg, checkerUid, shipment)) return;
+
+    const status = normalizeStatus(pkg.status);
+    const qty = pieceQuantity(pkg);
+
+    if (status === "DELIVERED" || status === "COMPLETED") {
+      myDelivered += qty;
+      return;
+    }
+    if (status === "OUT_FOR_DELIVERY") {
+      myOfd += qty;
+      return;
+    }
+    if (["LOADED", "READY_FOR_DELIVERY", "PARTIALLY_LOADED"].includes(status)) {
+      myOnVan += qty;
+    }
+  });
+
+  if (myOfd > 0) return "deliver";
+  if (myOnVan > 0) return "out_for_delivery";
+  if (myDelivered > 0) return null;
+
+  return null;
 }
 
 export function formatPoolCountLine(stats = {}) {
