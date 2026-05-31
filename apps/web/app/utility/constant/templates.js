@@ -135,6 +135,7 @@ export const SHIPMENT_STATUS = [
   // { value: "ARRIVED", label: "Arrived at Destination" },
   { value: "READY_FOR_DELIVERY", label: "Ready for Delivery" },
   { value: "OUT_FOR_DELIVERY", label: "Out for Delivery" },
+  { value: "PARTIALLY_DELIVERED", label: "Partially Delivered" },
   { value: "DELIVERED", label: "Delivered" },
   { value: "COMPLETED", label: "Completed" },
   { value: "CANCELLED", label: "Cancelled" },
@@ -150,6 +151,7 @@ export const SHIPMENT_STEPS_LOCAL_PICKUP = [
   "IN_TRANSIT",
   "READY_FOR_DELIVERY",
   "OUT_FOR_DELIVERY",
+  "PARTIALLY_DELIVERED",
   "DELIVERED",
   "COMPLETED",
 ];
@@ -164,6 +166,7 @@ export const SHIPMENT_STEPS_HUB_TRANSFER = [
   "IN_TRANSIT",
   "READY_FOR_DELIVERY",
   "OUT_FOR_DELIVERY",
+  "PARTIALLY_DELIVERED",
   "DELIVERED",
   "COMPLETED",
 ];

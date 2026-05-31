@@ -23,6 +23,10 @@ const statusConfig = {
     title: "Load to Vehicle",
     final: false,
   },
+  LOADED: {
+    title: "Load onto Delivery Van",
+    final: false,
+  },
   READY_FOR_DELIVERY: {
     title: "Mark Out for Delivery",
     final: false,

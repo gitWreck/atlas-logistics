@@ -89,13 +89,10 @@ exports.returnPackagesToWarehouse = onCall(
         }
 
         if (!isManagerRole(actorRole)) {
-          const assignedCheckerId = normalizeString(data.assignedCheckerId);
-          if (assignedCheckerId !== actorUid) {
-            throw new HttpsError(
-              "permission-denied",
-              `Shipment ${shipmentId} is not assigned to you.`,
-            );
-          }
+          const {
+            assertCheckerCanAccessShipment,
+          } = require("../warehouse/packageDeliveryOperations");
+          assertCheckerCanAccessShipment(shipmentId, data, actorUid);
         }
 
         const manifestId = normalizeString(data.deliveryManifestId);
@@ -110,7 +107,7 @@ exports.returnPackagesToWarehouse = onCall(
           "Returned to Odiongan warehouse by checker.";
 
         tx.update(shipmentRefs[index], {
-          status: "RECEIVED",
+          status: "RETURNED_TO_WAREHOUSE",
           custodyOwnerType: "WAREHOUSE",
           custodyOwnerId: normalizedWarehouse,
           currentLocationState: "ODIONGAN_WAREHOUSE",
@@ -119,10 +116,21 @@ exports.returnPackagesToWarehouse = onCall(
           deliveryManifestId: null,
           deliveryVehicleId: null,
           deliveryVehicleName: null,
+          lastAssignedCheckerId:
+            normalizeString(data.assignedCheckerId) ||
+            data.lastAssignedCheckerId ||
+            null,
+          lastAssignedCheckerName:
+            normalizeString(data.assignedCheckerName) ||
+            data.lastAssignedCheckerName ||
+            null,
           returnedAt: now,
           returnedByUid: actorUid,
           returnedByName: actorName,
           returnWarehouseCode: normalizedWarehouse,
+          returnReceivedAt: null,
+          returnReceivedBy: null,
+          returnReceivedByUid: null,
           updatedAt: now,
           updatedBy: actorName || actorUid || null,
           statusHistory: FieldValue.arrayUnion({

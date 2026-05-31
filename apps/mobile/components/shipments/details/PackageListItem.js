@@ -3,6 +3,7 @@ import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
 import { FontAwesome5 } from "@expo/vector-icons";
 import StatusBadge from "../../ui/StatusBadge";
 import { useTheme } from "../../../contexts/ThemeContext";
+import { formatDisplayValue } from "../../utilities/helpers";
 
 export default function PackageListItem({
   item,
@@ -171,7 +172,7 @@ export default function PackageListItem({
             style={[styles.locationText, { color: colors.textMuted }]}
             numberOfLines={1}
           >
-            From: {item.currentLocation || "No location"}
+            From: {formatDisplayValue(item.currentLocation) || "No location"}
           </Text>
         </View>
       </View>

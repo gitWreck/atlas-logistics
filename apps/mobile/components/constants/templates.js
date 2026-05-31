@@ -69,6 +69,11 @@ export const BADGE_COLORS = {
     text: "#7E22CE",
     border: "#E9D5FF",
   },
+  PARTIALLY_DELIVERED: {
+    bg: "#CCFBF1",
+    text: "#0F766E",
+    border: "#99F6E4",
+  },
   READY_FOR_DELIVERY: {
     bg: "#EFF6FF",
     text: "#2563EB",

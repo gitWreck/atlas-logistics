@@ -26,11 +26,13 @@ import CustomerBoard from "../../components/customers/CustomerBoard";
 import { getDashboardThemeClasses } from "@/app/utility/constant/theme";
 import { mainNavItems } from "@/app/utility/constant/templates";
 import InvoiceBoard from "../../components/invoice/InvoiceBoard";
+import { useDashboardPreferences } from "@/app/hooks/useDashboardPreferences";
 
 export default function ManagerDashboardPage() {
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState("overview");
-  const [isDark, setIsDark] = useState(false);
+  const tabIds = useMemo(() => mainNavItems.map((item) => item.id), []);
+  const { isDark, toggleDarkMode, activeTab, setActiveTab } =
+    useDashboardPreferences("manager", tabIds);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
 
@@ -253,7 +255,7 @@ export default function ManagerDashboardPage() {
 
             <button
               type="button"
-              onClick={() => setIsDark((prev) => !prev)}
+              onClick={toggleDarkMode}
               className={`h-9 w-9 rounded-full border flex items-center justify-center ${theme.themeToggle}`}
               title="Toggle theme"
             >

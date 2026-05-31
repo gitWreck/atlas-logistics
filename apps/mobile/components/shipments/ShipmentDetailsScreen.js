@@ -31,6 +31,7 @@ import {
   assertAssignedToChecker,
   completeCheckerDelivery,
   getCallableErrorMessage,
+  getCheckerDeliveryNextAction,
   isAssignedToChecker,
   loadAssignedShipmentsToVehicle,
   markShipmentOutForDelivery,
@@ -48,6 +49,8 @@ import PhotoUploadSection from "./PhotoUploadSection";
 import ExistingProofsViewer from "../tracking/ExistingProofsViewer";
 
 import ShipmentPackagesPanel from "./details/ShipmentPackagesPanel";
+import CustodyTimeline from "../custody/CustodyTimeline";
+import { useShipmentCustodyTimeline } from "../../hooks/useShipmentCustodyTimeline";
 
 const DEFAULT_NOTIFICATION_CHANNELS = {
   sms: true,
@@ -81,6 +84,11 @@ export default function ShipmentDetailsScreen() {
   const [actionMessage, setActionMessage] = useState("");
   const [deliveryNotificationChannels, setDeliveryNotificationChannels] =
     useState(DEFAULT_NOTIFICATION_CHANNELS);
+  const {
+    events: custodyEvents,
+    loading: custodyLoading,
+    error: custodyError,
+  } = useShipmentCustodyTimeline(shipmentId, !!shipmentId);
 
   useEffect(() => {
     if (!shipmentId) return;
@@ -183,7 +191,7 @@ export default function ShipmentDetailsScreen() {
         tripType !== "HUB_TRANSFER" &&
         isAssignedToChecker(shipment, profile?.uid);
 
-      if (isCheckerLastMile && shipment.status === "ASSIGNED") {
+      if (isCheckerLastMile && getCheckerDeliveryNextAction(shipment) === "load") {
         await loadAssignedShipmentsToVehicle({
           shipmentIds: [String(shipmentId)],
           profile,
@@ -251,7 +259,10 @@ export default function ShipmentDetailsScreen() {
         return;
       }
 
-      if (shipment.status === "LOADED" || shipment.status === "IN_TRANSIT") {
+      if (
+        !isCheckerLastMile &&
+        (shipment.status === "LOADED" || shipment.status === "IN_TRANSIT")
+      ) {
         Alert.alert(
           "Action Blocked",
           "This shipment must be marked as ARRIVED at the warehouse before it can be taken out for delivery.",
@@ -260,10 +271,7 @@ export default function ShipmentDetailsScreen() {
         return;
       }
 
-      if (
-        shipment.status === "OUT_FOR_DELIVERY" &&
-        isCheckerLastMile
-      ) {
+      if (shipment.status === "OUT_FOR_DELIVERY" && isCheckerLastMile) {
         assertAssignedToChecker(shipment, profile?.uid);
       }
 
@@ -511,22 +519,24 @@ export default function ShipmentDetailsScreen() {
     isChecker &&
     tripType !== "HUB_TRANSFER" &&
     isAssignedToChecker(shipment, profile?.uid);
+  const checkerNextAction = isCheckerLastMile
+    ? getCheckerDeliveryNextAction(shipment)
+    : null;
   const canCheckerLoadVehicle =
-    isCheckerLastMile && shipment?.status === "ASSIGNED";
+    isCheckerLastMile && checkerNextAction === "load";
   const canCheckerStartRoute =
-    isCheckerLastMile && shipment?.status === "READY_FOR_DELIVERY";
+    isCheckerLastMile && checkerNextAction === "out_for_delivery";
   const canCheckerCompleteDelivery =
-    isCheckerLastMile && shipment?.status === "OUT_FOR_DELIVERY";
+    isCheckerLastMile && checkerNextAction === "deliver";
   const canCheckerReturnToWarehouse =
-    isCheckerLastMile && shipment?.status === "FAILED_DELIVERY";
+    isCheckerLastMile && checkerNextAction === "return";
   const showFooter =
     canDriverHandlePickup ||
     canCheckerLoadVehicle ||
     canCheckerStartRoute ||
     canCheckerCompleteDelivery ||
     canCheckerReturnToWarehouse;
-  const needsPhotoUpload =
-    canDriverHandlePickup || canCheckerCompleteDelivery;
+  const needsPhotoUpload = canDriverHandlePickup || canCheckerCompleteDelivery;
 
   const packagePanelEditable =
     isCheckerLastMile &&
@@ -541,6 +551,30 @@ export default function ShipmentDetailsScreen() {
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
         <ShipmentHeaderCard shipment={shipment} />
+
+        <View
+          style={[
+            styles.timelineCard,
+            {
+              backgroundColor: colors.surface,
+              borderColor: colors.border,
+            },
+          ]}
+        >
+          <Text style={[styles.timelineTitle, { color: colors.text }]}>
+            Scanned Info
+          </Text>
+          <Text style={[styles.timelineSubtitle, { color: colors.textMuted }]}>
+            Full custody timeline for this shipment
+          </Text>
+          <CustodyTimeline
+            events={custodyEvents}
+            loading={custodyLoading}
+            error={custodyError}
+            colors={colors}
+            isDark={isDark}
+          />
+        </View>
 
         <ExistingProofsViewer
           proofOfReceipt={shipment.proofOfReceipt}
@@ -574,10 +608,7 @@ export default function ShipmentDetailsScreen() {
               Customer notifications
             </Text>
             <Text
-              style={[
-                styles.notificationSubtitle,
-                { color: colors.textMuted },
-              ]}
+              style={[styles.notificationSubtitle, { color: colors.textMuted }]}
             >
               Send an update when this delivery is completed.
             </Text>
@@ -677,6 +708,24 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 16,
     paddingBottom: 120,
+  },
+
+  timelineCard: {
+    borderWidth: 1,
+    borderRadius: 16,
+    padding: 14,
+    marginBottom: 16,
+  },
+
+  timelineTitle: {
+    fontSize: 15,
+    fontWeight: "800",
+  },
+
+  timelineSubtitle: {
+    fontSize: 12,
+    marginTop: 4,
+    marginBottom: 12,
   },
 
   notificationCard: {

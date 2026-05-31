@@ -27,9 +27,25 @@ export const updateShipmentPackages = httpsCallable(
   functions,
   "updateShipmentPackages",
 );
+export const reconcileShipmentAtHub = httpsCallable(
+  functions,
+  "reconcileShipmentAtHub",
+);
+export const receiveReturnedShipmentAtHub = httpsCallable(
+  functions,
+  "receiveReturnedShipmentAtHub",
+);
 export const releasePackagesToChecker = httpsCallable(
   functions,
   "releasePackagesToChecker",
+);
+export const releaseForDeliveryOperations = httpsCallable(
+  functions,
+  "releaseForDeliveryOperations",
+);
+export const getShipmentCustodyTimeline = httpsCallable(
+  functions,
+  "getShipmentCustodyTimeline",
 );
 
 // TRIPS

@@ -341,6 +341,9 @@ exports.updateShipmentStatus = onCall(
         } else if (newStatus === "RECEIVED") {
           nextPkg.loadedQty = 0;
           nextPkg.receivedQty = 0;
+        } else if (newStatus === "OUT_FOR_DELIVERY") {
+          const prevLoaded = normalizeQty(pkg.loadedQty, 0);
+          nextPkg.loadedQty = prevLoaded > 0 ? Math.min(prevLoaded, quantity) : quantity;
         } else if (isFinalDeliveryStatus) {
           nextPkg.loadedQty = quantity;
           nextPkg.receivedQty = quantity;

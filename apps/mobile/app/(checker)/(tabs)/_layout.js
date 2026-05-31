@@ -76,11 +76,29 @@ export default function CheckerTabsLayout() {
           }}
         />
         <Tabs.Screen
+          name="available-to-load"
+          options={{
+            title: "Available",
+            tabBarIcon: ({ color }) => (
+              <FontAwesome5 name="warehouse" size={20} color={color} />
+            ),
+          }}
+        />
+        <Tabs.Screen
           name="deliveries"
           options={{
-            title: "Assigned",
+            title: "My Route",
             tabBarIcon: ({ color }) => (
               <FontAwesome5 name="clipboard-list" size={20} color={color} />
+            ),
+          }}
+        />
+        <Tabs.Screen
+          name="delivery-load"
+          options={{
+            title: "My Load",
+            tabBarIcon: ({ color }) => (
+              <FontAwesome5 name="shipping-fast" size={20} color={color} />
             ),
           }}
         />

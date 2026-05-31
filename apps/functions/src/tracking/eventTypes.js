@@ -5,7 +5,10 @@ const EVENT_TYPES = Object.freeze({
   LOADED_TO_TRIP: "LOADED_TO_TRIP",
   IN_TRANSIT: "IN_TRANSIT",
   ARRIVED_ODIONGAN: "ARRIVED_ODIONGAN",
+  RECONCILED: "RECONCILED",
+  RECEIVED_RETURNED_SHIPMENT: "RECEIVED_RETURNED_SHIPMENT",
   RELEASED_TO_CHECKER: "RELEASED_TO_CHECKER",
+  RELEASED_FOR_DELIVERY_OPERATIONS: "RELEASED_FOR_DELIVERY_OPERATIONS",
   ASSIGNED_TO_CHECKER: "ASSIGNED_TO_CHECKER",
   LOADED_TO_DELIVERY_VEHICLE: "LOADED_TO_DELIVERY_VEHICLE",
   OUT_FOR_DELIVERY: "OUT_FOR_DELIVERY",
@@ -25,12 +28,28 @@ function isValidEventType(eventType) {
 function resolveEventTypeForScannerStatus(status, context = {}) {
   const normalizedStatus = String(status || "").trim().toUpperCase();
   const hasTrip = Boolean(context.tripId);
+  const previousStatus = String(context.previousStatus || "")
+    .trim()
+    .toUpperCase();
 
   if (normalizedStatus === "LOADED") {
     return hasTrip ? EVENT_TYPES.LOADED_TO_TRIP : EVENT_TYPES.PARTIAL_LOAD;
   }
   if (normalizedStatus === "RECEIVED") {
-    return EVENT_TYPES.ARRIVED_ODIONGAN;
+    if (
+      previousStatus === "OUT_FOR_DELIVERY" ||
+      previousStatus === "READY_FOR_DELIVERY"
+    ) {
+      return EVENT_TYPES.RETURNED_TO_WAREHOUSE;
+    }
+    if (
+      previousStatus === "IN_TRANSIT" ||
+      previousStatus === "ARRIVED" ||
+      previousStatus === "UNLOADED"
+    ) {
+      return EVENT_TYPES.ARRIVED_ODIONGAN;
+    }
+    return EVENT_TYPES.RECEIVED_AT_DIVISORIA;
   }
   if (normalizedStatus === "DELIVERED") {
     return EVENT_TYPES.DELIVERED;

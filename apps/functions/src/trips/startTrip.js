@@ -2,6 +2,9 @@ const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const admin = require("firebase-admin");
 const { FieldValue } = require("firebase-admin/firestore");
 const { writeTripActionLog } = require("../utilities/tripLogger");
+const { writeShipmentEvent } = require("../tracking/writeShipmentEvent");
+const { EVENT_TYPES } = require("../tracking/eventTypes");
+const { extractTripEventContext } = require("../tracking/tripEventContext");
 
 if (!admin.apps.length) admin.initializeApp();
 const db = admin.firestore();
@@ -103,6 +106,27 @@ exports.startTrip = onCall({ region: "asia-southeast1" }, async (req) => {
   });
 
   await batch.commit();
+
+  const tripContext = extractTripEventContext(trip, tripId);
+  await Promise.all(
+    shipQuery.docs.map((doc) =>
+      writeShipmentEvent({
+        db,
+        event: {
+          shipmentId: doc.id,
+          eventType: EVENT_TYPES.IN_TRANSIT,
+          ...tripContext,
+          location: location || null,
+          createdBy: uid,
+          createdByRole: req.auth.token?.role || null,
+          remarks: `Trip ${tripContext.tripId || tripId} started`,
+          source: "START_TRIP",
+        },
+      }).catch((error) => {
+        console.error(`IN_TRANSIT event write failed for ${doc.id}:`, error);
+      }),
+    ),
+  );
 
   return {
     success: true,

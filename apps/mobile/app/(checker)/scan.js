@@ -37,7 +37,7 @@ import {
   updateShipmentStatus,
 } from "../../components/utilities/FirebaseFunctions";
 import {
-  assertAssignedToChecker,
+  assertCheckerCanAccessShipment,
   completeCheckerDelivery,
   getCallableErrorMessage,
   loadAssignedShipmentsToVehicle,
@@ -58,11 +58,17 @@ import {
   getProgressLabel,
   getShipmentDeliveredCount,
   getShipmentLoadedCount,
+  deriveParentShipmentCode,
+  findPackageInShipment,
+  getDeliverPackageIdForScan,
+  getPackageIdentity,
   getShipmentPackageIds,
   getShipmentScannedCount,
   getShipmentTotal,
-  isIssueStatus,
   normalizeProofImages,
+  normalizeScanCode,
+  resolveDeliveryPackageIds,
+  resolveOffloadDeliverPackageIds,
 } from "../../components/utilities/scanner";
 import {
   DELIVERY_PROOF_MAX_IMAGES,
@@ -424,9 +430,6 @@ export default function ScannerScreen() {
     if (resolvedMode === "delivery") {
       return scanActionStatus || null;
     }
-    if (resolvedMode === "info" && isIssueStatus(scanActionStatus)) {
-      return scanActionStatus;
-    }
     return null;
   };
 
@@ -450,9 +453,16 @@ export default function ScannerScreen() {
       const effectiveTripId = getEffectiveTripId(shipmentDocData);
 
       if (status === "LOAD_TO_VEHICLE") {
-        assertAssignedToChecker(shipmentDocData, profile?.uid);
+        assertCheckerCanAccessShipment(shipmentDocData, profile?.uid);
+        const loadPackageIds =
+          Array.isArray(packageIds) && packageIds.length > 0
+            ? packageIds
+            : [getDeliverPackageIdForScan(shipmentDocData, barcode)].filter(
+                Boolean,
+              );
         await loadAssignedShipmentsToVehicle({
           shipmentIds: [shipmentId],
+          packageIds: loadPackageIds,
           profile,
           remarks: remarks || "Loaded via delivery scan.",
         });
@@ -470,7 +480,7 @@ export default function ScannerScreen() {
       }
 
       if (isDeliveryScanMode && status === "OUT_FOR_DELIVERY") {
-        assertAssignedToChecker(shipmentDocData, profile?.uid);
+        assertCheckerCanAccessShipment(shipmentDocData, profile?.uid);
         await markShipmentOutForDelivery({
           shipmentId,
           profile,
@@ -490,7 +500,30 @@ export default function ScannerScreen() {
         return;
       }
 
-      if (completeShipment) {
+      let shouldCompleteShipment = completeShipment;
+      let effectivePackageIds = packageIds;
+
+      if (resolvedMode === "offloading" && status === "DELIVERED") {
+        shouldCompleteShipment = false;
+        const offloadScope = resolveOffloadDeliverPackageIds(
+          shipmentDocData,
+          barcode,
+          "package",
+        );
+        effectivePackageIds = offloadScope.packageIds;
+      } else if (shouldCompleteShipment) {
+        const scopedDelivery = resolveDeliveryPackageIds({
+          barcode,
+          scanType: "package",
+          shipmentData: shipmentDocData,
+        });
+        if (scopedDelivery.isPackageLevel) {
+          shouldCompleteShipment = false;
+          effectivePackageIds = scopedDelivery.packageIds;
+        }
+      }
+
+      if (shouldCompleteShipment) {
         await updateShipmentStatus({
           shipmentId,
           tripId: effectiveTripId,
@@ -503,9 +536,9 @@ export default function ScannerScreen() {
         });
       } else {
         const targetPackageIds =
-          Array.isArray(packageIds) && packageIds.length > 0
-            ? packageIds
-            : [barcode];
+          Array.isArray(effectivePackageIds) && effectivePackageIds.length > 0
+            ? effectivePackageIds
+            : [getDeliverPackageIdForScan(shipmentDocData, barcode)];
 
         await updateShipmentPackages({
           shipmentId,
@@ -534,13 +567,13 @@ export default function ScannerScreen() {
       showSuccessModal({
         barcode,
         shipmentId,
-        shipmentStatus: completeShipment
+        shipmentStatus: shouldCompleteShipment
           ? "COMPLETED"
           : shipmentDocData?.status || "",
         packageStatus: status,
         quantity: qty,
         message:
-          completeShipment
+          shouldCompleteShipment
             ? "Shipment completed with proof of delivery."
             : source === "manual"
               ? "Manual entry processed successfully."
@@ -695,8 +728,23 @@ export default function ScannerScreen() {
         shipmentDocData = directShipmentSnap.data();
       }
 
-      if (isDeliveryScanMode) {
-        assertAssignedToChecker(shipmentDocData, profile?.uid);
+      const deliveryScope =
+        resolvedMode === "offloading"
+          ? resolveOffloadDeliverPackageIds(
+              shipmentDocData,
+              pendingDelivery.barcode,
+              pendingDelivery.scanType,
+            )
+          : resolveDeliveryPackageIds({
+              barcode: pendingDelivery.barcode,
+              scanType: pendingDelivery.scanType,
+              shipmentData: shipmentDocData,
+            });
+      const isPackageLevelDelivery =
+        resolvedMode === "offloading" || deliveryScope.isPackageLevel;
+
+      if (isDeliveryScanMode && !isPackageLevelDelivery) {
+        assertCheckerCanAccessShipment(shipmentDocData, profile?.uid);
         const location = await getCurrentLocationSafe();
 
         await completeCheckerDelivery({
@@ -727,7 +775,9 @@ export default function ScannerScreen() {
           source: pendingDelivery.source,
           shipmentDocData,
           proofImages,
-          completeShipment: true,
+          completeShipment:
+            resolvedMode === "offloading" ? false : !isPackageLevelDelivery,
+          packageIds: deliveryScope.packageIds,
           throwOnError: false,
         });
       }
@@ -751,12 +801,16 @@ export default function ScannerScreen() {
   };
 
   const openInfoPreview = (shipmentDoc, pkg, barcode) => {
+    const pieceCode =
+      pkg?.packageId || pkg?.trackingNumber || String(barcode || "").trim();
     setScannedData({
       id: shipmentDoc.id,
       ...shipmentDoc.data(),
-      scannedPackageId: pkg?.packageId || barcode,
+      scannedPackageId: pieceCode,
+      scannedCode: pieceCode,
     });
     setInfoModalVisible(true);
+    setScanned(false);
     setProcessing(false);
   };
 
@@ -822,7 +876,7 @@ export default function ScannerScreen() {
 
     if (statusToApply === "DELIVERED") {
       if (isDeliveryScanMode) {
-        assertAssignedToChecker(shipmentData, profile?.uid);
+        assertCheckerCanAccessShipment(shipmentData, profile?.uid);
       } else {
         await assertShipmentOnTrip(shipmentDoc.id, shipmentData);
       }
@@ -830,7 +884,8 @@ export default function ScannerScreen() {
         scanType: "package",
         shipmentId: shipmentDoc.id,
         tripId: getEffectiveTripId(shipmentData),
-        barcode,
+        barcode:
+          String(pkg?.packageId || "").trim() || normalizeScanCode(barcode),
         qty: isBulk ? manualQtyOverride : null,
         source,
         shipmentDocData: shipmentData,
@@ -876,40 +931,64 @@ export default function ScannerScreen() {
   };
 
   const lookupScannedCode = async (barcode) => {
-    const packageQuery = query(
-      collection(db, "shipments"),
-      where("packageBarcodes", "array-contains", barcode),
-    );
+    const normalizedBarcode = normalizeScanCode(barcode);
+    const barcodeVariants = [
+      ...new Set([normalizedBarcode, String(barcode || "").trim()]),
+    ].filter(Boolean);
 
-    const querySnap = await getDocs(packageQuery);
-
-    if (!querySnap.empty) {
-      const shipmentDoc = querySnap.docs[0];
-      const shipmentData = shipmentDoc.data();
-
-      const pkg = (shipmentData.packages || []).find(
-        (p) => p.packageId === barcode || p.trackingNumber === barcode,
+    for (const codeVariant of barcodeVariants) {
+      const packageQuery = query(
+        collection(db, "shipments"),
+        where("packageBarcodes", "array-contains", codeVariant),
       );
+      const querySnap = await getDocs(packageQuery);
 
-      if (!pkg) {
-        throw new Error("Package not found in shipment.");
+      if (!querySnap.empty) {
+        const shipmentDoc = querySnap.docs[0];
+        const shipmentData = shipmentDoc.data();
+        const pkg = findPackageInShipment(shipmentData, normalizedBarcode);
+
+        if (!pkg) {
+          throw new Error("Package not found in shipment.");
+        }
+
+        return { shipmentDoc, shipmentData, pkg, scanType: "package" };
       }
-
-      return { shipmentDoc, shipmentData, pkg, scanType: "package" };
     }
 
-    const shipmentDoc = await getShipmentDocByCode(barcode);
+    const shipmentDoc = await getShipmentDocByCode(normalizedBarcode);
 
-    if (!shipmentDoc) {
-      throw new Error("Package or shipment not found.");
+    if (shipmentDoc) {
+      const shipmentData = shipmentDoc.data();
+      const pkg = findPackageInShipment(shipmentData, normalizedBarcode);
+
+      return {
+        shipmentDoc,
+        shipmentData,
+        pkg,
+        scanType: pkg ? "package" : "shipment",
+      };
     }
 
-    return {
-      shipmentDoc,
-      shipmentData: shipmentDoc.data(),
-      pkg: null,
-      scanType: "shipment",
-    };
+    const parentCode = deriveParentShipmentCode(normalizedBarcode);
+    if (parentCode) {
+      const parentDoc = await getShipmentDocByCode(parentCode);
+      if (parentDoc) {
+        const shipmentData = parentDoc.data();
+        const pkg = findPackageInShipment(shipmentData, normalizedBarcode);
+
+        if (pkg) {
+          return {
+            shipmentDoc: parentDoc,
+            shipmentData,
+            pkg,
+            scanType: "package",
+          };
+        }
+      }
+    }
+
+    throw new Error("Package or shipment not found.");
   };
 
   const handleProcessPackage = async (
@@ -926,8 +1005,13 @@ export default function ScannerScreen() {
       const { shipmentDoc, shipmentData, pkg, scanType } =
         await lookupScannedCode(barcode);
 
+      if (resolvedMode === "info") {
+        openInfoPreview(shipmentDoc, pkg, barcode);
+        return;
+      }
+
       if (isDeliveryScanMode) {
-        assertAssignedToChecker(shipmentData, profile?.uid);
+        assertCheckerCanAccessShipment(shipmentData, profile?.uid);
       }
 
       if (scanType === "shipment") {
@@ -1189,7 +1273,7 @@ export default function ScannerScreen() {
         latestScan={latestScan}
         latestTypeLabel={latestTypeLabel}
         primaryScanActions={primaryScanActions}
-        issueScanActions={ISSUE_SCAN_ACTIONS}
+        issueScanActions={resolvedMode === "info" ? [] : ISSUE_SCAN_ACTIONS}
         selectedScanAction={selectedScanAction}
         scanActionStatus={scanActionStatus}
         scanActionHeading={scanActionHeading}

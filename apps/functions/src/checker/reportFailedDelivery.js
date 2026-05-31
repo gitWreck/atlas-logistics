@@ -21,15 +21,9 @@ function normalizeString(value) {
   return typeof value === "string" && value.trim() ? value.trim() : null;
 }
 
-function assertAssignedChecker(shipmentId, shipmentData, checkerUid) {
-  const assignedCheckerId = normalizeString(shipmentData.assignedCheckerId);
-  if (assignedCheckerId !== checkerUid) {
-    throw new HttpsError(
-      "permission-denied",
-      `Shipment ${shipmentId} is not assigned to you.`,
-    );
-  }
-}
+const {
+  assertCheckerCanAccessShipment,
+} = require("../warehouse/packageDeliveryOperations");
 
 exports.reportFailedDelivery = onCall(
   { region: "asia-southeast1", maxInstances: 10 },
@@ -93,7 +87,7 @@ exports.reportFailedDelivery = onCall(
           );
         }
 
-        assertAssignedChecker(shipmentId, data, actorUid);
+        assertCheckerCanAccessShipment(shipmentId, data, actorUid);
 
         const failureNote =
           normalizeString(remarks) ||

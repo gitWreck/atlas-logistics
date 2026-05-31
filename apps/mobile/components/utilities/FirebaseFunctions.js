@@ -35,6 +35,10 @@ export const returnPackagesToWarehouse = httpsCallable(
   functions,
   "returnPackagesToWarehouse",
 );
+export const getShipmentCustodyTimeline = httpsCallable(
+  functions,
+  "getShipmentCustodyTimeline",
+);
 
 export const startTrip = httpsCallable(functions, "startTrip");
 export const reportTripDelay = httpsCallable(functions, "reportTripDelay");

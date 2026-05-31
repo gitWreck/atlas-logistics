@@ -18,6 +18,21 @@ export const getFormattedTime = (timestamp) => {
   }
 };
 
+export function formatDisplayValue(value) {
+  if (value == null || value === "") return null;
+  if (typeof value === "string" || typeof value === "number") {
+    return String(value);
+  }
+  if (typeof value === "object") {
+    const lat = value.lat ?? value.latitude;
+    const lng = value.lng ?? value.longitude;
+    if (lat != null && lng != null) {
+      return `${lat}, ${lng}`;
+    }
+  }
+  return null;
+}
+
 export const getCurrentLocationSafe = async () => {
   try {
     const { status } = await Location.requestForegroundPermissionsAsync();

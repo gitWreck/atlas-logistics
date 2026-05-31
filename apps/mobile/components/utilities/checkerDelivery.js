@@ -6,17 +6,81 @@ import {
 } from "./FirebaseFunctions";
 import { getCurrentLocationSafe, updatedBy } from "./helpers";
 
-export function isAssignedToChecker(shipment, checkerUid) {
+export function canCheckerAccessShipment(shipment, checkerUid) {
   if (!shipment || !checkerUid) return false;
-  return String(shipment.assignedCheckerId || "") === String(checkerUid);
+
+  if (String(shipment.assignedCheckerId || "") === String(checkerUid)) {
+    return true;
+  }
+
+  if (shipment.availableForDelivery === true) {
+    return true;
+  }
+
+  const packages = Array.isArray(shipment.packages) ? shipment.packages : [];
+  return packages.some(
+    (pkg) => String(pkg.loadedByCheckerId || "") === String(checkerUid),
+  );
 }
 
+/** @deprecated Use canCheckerAccessShipment */
+export function isAssignedToChecker(shipment, checkerUid) {
+  return canCheckerAccessShipment(shipment, checkerUid);
+}
+
+export function assertCheckerCanAccessShipment(shipment, checkerUid) {
+  if (canCheckerAccessShipment(shipment, checkerUid)) return;
+  throw new Error(
+    "This shipment is not available for you to load or deliver. Ask warehouse to release it for delivery operations first.",
+  );
+}
+
+/** @deprecated Use assertCheckerCanAccessShipment */
 export function assertAssignedToChecker(shipment, checkerUid) {
-  if (!isAssignedToChecker(shipment, checkerUid)) {
-    throw new Error(
-      "This package is not assigned to you. Ask your warehouse manager to release it first.",
+  assertCheckerCanAccessShipment(shipment, checkerUid);
+}
+
+function normalizeStatus(value) {
+  return String(value || "").trim().toUpperCase();
+}
+
+function countAvailablePieces(shipment = {}) {
+  const packages = Array.isArray(shipment.packages) ? shipment.packages : [];
+  return packages.filter((pkg) => {
+    const status = normalizeStatus(pkg.status);
+    return (
+      pkg.availableForDelivery === true ||
+      status === "AVAILABLE_AT_WAREHOUSE"
     );
+  }).length;
+}
+
+/** Next action for checker last-mile on the Assigned list / details screen. */
+export function getCheckerDeliveryNextAction(shipment) {
+  const status = normalizeStatus(shipment?.status);
+  const locationState = normalizeStatus(shipment?.currentLocationState);
+
+  if (status === "OUT_FOR_DELIVERY") return "deliver";
+  if (status === "FAILED_DELIVERY") return "return";
+  if (
+    status === "READY_FOR_DELIVERY" ||
+    locationState === "DELIVERY_VEHICLE_LOADED"
+  ) {
+    return "out_for_delivery";
   }
+
+  if (
+    shipment?.availableForDelivery === true ||
+    status === "AVAILABLE_FOR_DELIVERY" ||
+    countAvailablePieces(shipment) > 0
+  ) {
+    return "load";
+  }
+
+  if (["ASSIGNED", "LOADED", "RELEASED", "RECEIVED", "ARRIVED"].includes(status)) {
+    return "load";
+  }
+  return null;
 }
 
 export function getCallableErrorMessage(error, fallback) {
@@ -34,12 +98,16 @@ export function getCallableErrorMessage(error, fallback) {
 
 export async function loadAssignedShipmentsToVehicle({
   shipmentIds,
+  packageIds = null,
   profile,
   remarks = "",
 }) {
   const location = await getCurrentLocationSafe();
   const response = await loadPackagesToDeliveryManifest({
     shipmentIds,
+    ...(Array.isArray(packageIds) && packageIds.length > 0
+      ? { packageIds }
+      : {}),
     location: location ? `${location.lat},${location.lng}` : null,
     gpsCoordinates: location,
     remarks: remarks || "Loaded onto delivery vehicle from checker app.",

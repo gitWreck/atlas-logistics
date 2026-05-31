@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
-import { releasePackagesToChecker } from "@/app/utility/FirebaseFunctions";
+import { releaseForDeliveryOperations } from "@/app/utility/FirebaseFunctions";
 import {
   getCheckerReleaseBlockReason,
   isEligibleForCheckerRelease,
@@ -27,14 +27,9 @@ export default function ReleaseToCheckerModal({
   defaultShipmentIds = [],
   defaultShipments = [],
 }) {
-  const [checkerId, setCheckerId] = useState("");
-  const [vehicleId, setVehicleId] = useState("");
-  const [vehicleName, setVehicleName] = useState("");
   const [warehouseCode, setWarehouseCode] = useState("ODIONGAN_WAREHOUSE");
   const [remarks, setRemarks] = useState("");
   const [shipmentIdsInput, setShipmentIdsInput] = useState("");
-  const [checkers, setCheckers] = useState([]);
-  const [loadingCheckers, setLoadingCheckers] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
 
@@ -42,37 +37,6 @@ export default function ReleaseToCheckerModal({
     if (!isOpen) return;
     setShipmentIdsInput((defaultShipmentIds || []).join("\n"));
   }, [defaultShipmentIds, isOpen]);
-
-  useEffect(() => {
-    if (!isOpen) return;
-
-    const loadCheckers = async () => {
-      try {
-        setLoadingCheckers(true);
-        setError("");
-        const token = await user?.getIdToken?.();
-        const res = await fetch("/api/checkers/active", {
-          headers: {
-            "Content-Type": "application/json",
-            ...(token ? { Authorization: `Bearer ${token}` } : {}),
-          },
-          cache: "no-store",
-        });
-        const json = await res.json();
-        if (!res.ok) {
-          throw new Error(json.error || "Failed to load checkers.");
-        }
-        setCheckers(json.checkers || []);
-      } catch (err) {
-        console.error("Load checkers failed:", err);
-        setError(err.message || "Failed to load checkers.");
-      } finally {
-        setLoadingCheckers(false);
-      }
-    };
-
-    loadCheckers();
-  }, [isOpen, user]);
 
   const parsedIds = useMemo(
     () => parseShipmentIds(shipmentIdsInput),
@@ -109,10 +73,7 @@ export default function ReleaseToCheckerModal({
   }, [parsedIds, statusByShipmentId]);
 
   const canSubmit =
-    !submitting &&
-    checkerId &&
-    releaseValidation.eligible.length > 0 &&
-    !loadingCheckers;
+    !submitting && releaseValidation.eligible.length > 0;
 
   if (!isOpen) return null;
 
@@ -135,12 +96,12 @@ export default function ReleaseToCheckerModal({
         <div
           className={`px-5 py-4 border-b ${isDark ? "border-slate-800" : "border-slate-200"}`}
         >
-          <h3 className="text-lg font-bold">Release Shipments to Checker</h3>
+          <h3 className="text-lg font-bold">Release for Delivery Operations</h3>
           <p
             className={`text-xs mt-1 ${isDark ? "text-slate-400" : "text-slate-600"}`}
           >
-            Assign custody and create a delivery manifest for selected
-            shipments.
+            Makes inventory visible to all checkers. Custody stays at Odiongan
+            until each label is scanned and loaded onto a van.
           </p>
         </div>
 
@@ -178,55 +139,14 @@ export default function ReleaseToCheckerModal({
             )}
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <div className={labelClass}>Checker</div>
-              <select
-                className={inputClass}
-                value={checkerId}
-                onChange={(e) => setCheckerId(e.target.value)}
-                disabled={loadingCheckers}
-              >
-                <option value="">
-                  {loadingCheckers ? "Loading checkers..." : "Select checker"}
-                </option>
-                {checkers.map((checker) => (
-                  <option key={checker.id} value={checker.id}>
-                    {checker.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <div className={labelClass}>Warehouse Code</div>
-              <input
-                className={inputClass}
-                value={warehouseCode}
-                onChange={(e) => setWarehouseCode(e.target.value)}
-                placeholder="ODIONGAN_WAREHOUSE"
-              />
-            </div>
-
-            <div>
-              <div className={labelClass}>Delivery Vehicle ID (optional)</div>
-              <input
-                className={inputClass}
-                value={vehicleId}
-                onChange={(e) => setVehicleId(e.target.value)}
-                placeholder="DV-01"
-              />
-            </div>
-
-            <div>
-              <div className={labelClass}>Delivery Vehicle Name (optional)</div>
-              <input
-                className={inputClass}
-                value={vehicleName}
-                onChange={(e) => setVehicleName(e.target.value)}
-                placeholder="Small Truck 01"
-              />
-            </div>
+          <div>
+            <div className={labelClass}>Warehouse Code</div>
+            <input
+              className={inputClass}
+              value={warehouseCode}
+              onChange={(e) => setWarehouseCode(e.target.value)}
+              placeholder="ODIONGAN_WAREHOUSE"
+            />
           </div>
 
           <div>
@@ -235,7 +155,7 @@ export default function ReleaseToCheckerModal({
               className={inputClass}
               value={remarks}
               onChange={(e) => setRemarks(e.target.value)}
-              placeholder="Released for last-mile distribution."
+              placeholder="Released for delivery operations; custody remains at warehouse until load scan."
             />
           </div>
 
@@ -267,11 +187,8 @@ export default function ReleaseToCheckerModal({
               try {
                 setSubmitting(true);
                 setError("");
-                await releasePackagesToChecker({
-                  checkerId,
+                await releaseForDeliveryOperations({
                   shipmentIds: releaseValidation.eligible,
-                  deliveryVehicleId: vehicleId || null,
-                  deliveryVehicleName: vehicleName || null,
                   warehouseCode: warehouseCode || null,
                   remarks: remarks || null,
                 });
@@ -285,7 +202,7 @@ export default function ReleaseToCheckerModal({
               }
             }}
           >
-            {submitting ? "Releasing..." : "Release to Checker"}
+            {submitting ? "Releasing..." : "Make Available for Delivery"}
           </button>
         </div>
       </div>

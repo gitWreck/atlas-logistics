@@ -9,6 +9,8 @@ const { writeShipmentEvent } = require("../tracking/writeShipmentEvent");
 const {
   resolveEventTypeForScannerStatus,
 } = require("../tracking/eventTypes");
+const { extractTripEventContext } = require("../tracking/tripEventContext");
+const { deriveMasterShipmentStatus } = require("./shipmentStatus");
 
 if (!admin.apps.length) admin.initializeApp();
 const db = admin.firestore();
@@ -210,7 +212,8 @@ exports.updateShipmentPackages = onCall(
         normalizedScanAction === "LOAD" || normalizedScanAction === "LOADING";
       const isOffloadingAction =
         normalizedScanAction === "UNLOAD" ||
-        normalizedScanAction === "OFFLOADING";
+        normalizedScanAction === "OFFLOADING" ||
+        normalizedScanAction === "OFFLOAD";
       const oldShipmentStatus = String(oldData.status || "").toUpperCase();
       const oldTripShipmentStatus = String(
         tripShipmentSnap?.exists ? tripShipmentSnap.data()?.status || "" : "",
@@ -239,37 +242,34 @@ exports.updateShipmentPackages = onCall(
       const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
       const getPackageIdentity = (pkg = {}) =>
         String(pkg.packageId || pkg.trackingNumber || "").trim();
+      const normalizeTargetId = (id = "") =>
+        String(id || "").trim().toUpperCase();
+      const packageMatchesTarget = (pkg = {}, targetedIdSet, status) => {
+        const packageId = normalizeTargetId(pkg.packageId || "");
+        const trackingNumber = normalizeTargetId(pkg.trackingNumber || "");
+
+        // Deliver only the exact piece label (packageId). trackingNumber can
+        // duplicate the master shipment code on legacy rows and would match twice.
+        if (String(status || "").toUpperCase() === "DELIVERED") {
+          if (packageId) return targetedIdSet.has(packageId);
+          return trackingNumber ? targetedIdSet.has(trackingNumber) : false;
+        }
+
+        const identities = [pkg.packageId, pkg.trackingNumber]
+          .filter((value) => typeof value === "string" && value.trim())
+          .map((value) => normalizeTargetId(value));
+        return identities.some((id) => targetedIdSet.has(id));
+      };
       const normalizePackage = (pkg = {}) => {
         const quantity = Math.max(normalizeQty(pkg.quantity, 1), 1);
-        const defaultLoadedQty =
-          pkg.status === "LOADED" ||
-          pkg.status === "OUT_FOR_DELIVERY" ||
-          pkg.status === "DELIVERED"
-            ? quantity
-            : 0;
-        const defaultReceivedQty = pkg.status === "DELIVERED" ? quantity : 0;
-        const defaultMissingQty = pkg.status === "MISSING" ? quantity : 0;
-        const defaultDamagedQty = pkg.status === "DAMAGED" ? quantity : 0;
-        const loadedQty = clamp(
-          normalizeQty(pkg.loadedQty, defaultLoadedQty),
-          0,
-          quantity,
-        );
+        const loadedQty = clamp(normalizeQty(pkg.loadedQty, 0), 0, quantity);
         const receivedQty = clamp(
-          normalizeQty(pkg.receivedQty, defaultReceivedQty),
+          normalizeQty(pkg.receivedQty, 0),
           0,
           quantity,
         );
-        const missingQty = clamp(
-          normalizeQty(pkg.missingQty, defaultMissingQty),
-          0,
-          quantity,
-        );
-        const damagedQty = clamp(
-          normalizeQty(pkg.damagedQty, defaultDamagedQty),
-          0,
-          quantity,
-        );
+        const missingQty = clamp(normalizeQty(pkg.missingQty, 0), 0, quantity);
+        const damagedQty = clamp(normalizeQty(pkg.damagedQty, 0), 0, quantity);
 
         return {
           ...pkg,
@@ -291,16 +291,35 @@ exports.updateShipmentPackages = onCall(
         );
         const missingQty = clamp(normalizeQty(pkg.missingQty, 0), 0, quantity);
         const damagedQty = clamp(normalizeQty(pkg.damagedQty, 0), 0, quantity);
+        const storedStatus = String(pkg.status || "")
+          .trim()
+          .toUpperCase();
 
         if (damagedQty > 0) return "DAMAGED";
         if (missingQty > 0) return "MISSING";
         if (receivedQty >= quantity) return "DELIVERED";
-        if (pkg.status === "OUT_FOR_DELIVERY" && loadedQty >= quantity) {
-          return "OUT_FOR_DELIVERY";
+
+        // In-transit label only applies while quantity is still on the truck/van.
+        if (receivedQty === 0 && loadedQty > 0) {
+          if (storedStatus === "OUT_FOR_DELIVERY") {
+            return "OUT_FOR_DELIVERY";
+          }
+        if (storedStatus === "READY_FOR_DELIVERY") {
+          return "READY_FOR_DELIVERY";
         }
+        if (storedStatus === "AVAILABLE_AT_WAREHOUSE") {
+          if (loadedQty >= quantity) return "LOADED";
+          if (loadedQty > 0) return "PARTIALLY_LOADED";
+          return "AVAILABLE_AT_WAREHOUSE";
+        }
+        if (storedStatus === "LOADED") {
+            if (loadedQty >= quantity) return "LOADED";
+            return "PARTIALLY_LOADED";
+          }
+        }
+
         if (loadedQty >= quantity) return "LOADED";
         if (loadedQty > 0) return "PARTIALLY_LOADED";
-        if (pkg.status === "READY_FOR_DELIVERY") return "READY_FOR_DELIVERY";
         return "RECEIVED";
       };
 
@@ -404,7 +423,7 @@ exports.updateShipmentPackages = onCall(
         const targetedIds = packageIds
           .filter((id) => typeof id === "string" && id.trim())
           .map((id) => id.trim());
-        const targetedIdSet = new Set(targetedIds);
+        const targetedIdSet = new Set(targetedIds.map(normalizeTargetId));
 
         if (!targetedIds.length) {
           throw new HttpsError(
@@ -414,16 +433,73 @@ exports.updateShipmentPackages = onCall(
         }
 
         finalPackages = [];
+        let targetedPackageCount = 0;
+
+        if (newStatus === "DELIVERED") {
+          targetedPackageCount = oldNormalizedPackages.filter((pkg) =>
+            packageMatchesTarget(pkg, targetedIdSet, newStatus),
+          ).length;
+
+          if (targetedPackageCount === 0) {
+            throw new HttpsError(
+              "not-found",
+              `No package matched the scanned label. Expected packageId: ${targetedIds.join(", ")}`,
+            );
+          }
+
+          if (targetedPackageCount > 1) {
+            const matchedIds = oldNormalizedPackages
+              .filter((pkg) =>
+                packageMatchesTarget(pkg, targetedIdSet, newStatus),
+              )
+              .map((pkg) => getPackageIdentity(pkg))
+              .filter(Boolean);
+            throw new HttpsError(
+              "failed-precondition",
+              `Multiple packages matched this delivery scan (${matchedIds.join(", ")}). Each piece must have a unique packageId.`,
+            );
+          }
+        }
 
         oldNormalizedPackages.forEach((pkg) => {
           const identities = [pkg.packageId, pkg.trackingNumber]
             .filter((value) => typeof value === "string" && value.trim())
             .map((value) => value.trim());
-          const isTargeted = identities.some((id) => targetedIdSet.has(id));
+          const isTargeted = packageMatchesTarget(
+            pkg,
+            targetedIdSet,
+            newStatus,
+          );
+
+          if (isTargeted && newStatus !== "DELIVERED") {
+            targetedPackageCount += 1;
+          }
 
           if (!isTargeted) {
             finalPackages.push(pkg);
             return;
+          }
+
+          if (newStatus === "DELIVERED" && isDeliveryTrip) {
+            const pieceId = getPackageIdentity(pkg);
+            const loadedBy = String(pkg.loadedByCheckerId || "").trim();
+            if (loadedBy && loadedBy !== String(uid)) {
+              throw new HttpsError(
+                "failed-precondition",
+                `Package ${pieceId} is on another checker's van and cannot be delivered by you.`,
+              );
+            }
+          }
+
+          if (newStatus === "LOADED" && isDeliveryTrip && isLoadingAction) {
+            const pieceId = getPackageIdentity(pkg);
+            const loadedBy = String(pkg.loadedByCheckerId || "").trim();
+            if (loadedBy && loadedBy !== String(uid)) {
+              throw new HttpsError(
+                "failed-precondition",
+                `Package ${pieceId} is already with another checker.`,
+              );
+            }
           }
 
           const quantity = Math.max(normalizeQty(pkg.quantity, 1), 1);
@@ -472,9 +548,17 @@ exports.updateShipmentPackages = onCall(
               remarks: remarks || pkg.remarks || null,
             };
 
+            const unloadedStatus =
+              loadedQty > 0
+                ? derivePackageStatus(updatedPkg)
+                : "RECEIVED";
+
             finalPackages.push({
               ...updatedPkg,
-              status: derivePackageStatus(updatedPkg),
+              status: unloadedStatus,
+              ...(loadedQty === 0
+                ? { currentTripId: null, loadedOnTrip: null }
+                : {}),
             });
             return;
           } else if (newStatus === "LOADED") {
@@ -625,6 +709,7 @@ exports.updateShipmentPackages = onCall(
             status: derivedStatus,
           });
         });
+
       } else {
         finalPackages = newPackagesArray.map((pkg) => {
           const normalized = normalizePackage(pkg);
@@ -670,26 +755,20 @@ exports.updateShipmentPackages = onCall(
       );
       const deltaPendingQty = pendingQty - oldPendingQty;
 
-      let shipmentStatus = "RECEIVED";
-      if (newReceivedQty >= newTotalQty && newTotalQty > 0) {
-        shipmentStatus = "DELIVERED";
-      } else if (newDamagedQty >= newTotalQty && newTotalQty > 0) {
-        shipmentStatus = "DAMAGED";
-      } else if (newMissingQty >= newTotalQty && newTotalQty > 0) {
-        shipmentStatus = "MISSING";
-      } else if (
-        (shouldPromoteReadyForDelivery || wasOutForDelivery) &&
-        newLoadedQty >= newTotalQty &&
-        newTotalQty > 0
-      ) {
-        shipmentStatus = "OUT_FOR_DELIVERY";
-      } else if (newLoadedQty >= newTotalQty && newTotalQty > 0) {
-        shipmentStatus = "LOADED";
-      } else if (newLoadedQty > 0) {
-        shipmentStatus = "PARTIALLY_LOADED";
-      } else if (oldShipmentStatus === "READY_FOR_DELIVERY") {
-        shipmentStatus = "READY_FOR_DELIVERY";
-      }
+      const shipmentStatus = deriveMasterShipmentStatus(finalPackages, {
+        totals: {
+          totalQty: newTotalQty,
+          receivedQty: newReceivedQty,
+          loadedQty: newLoadedQty,
+          missingQty: newMissingQty,
+          damagedQty: newDamagedQty,
+        },
+        shouldPromoteOutForDelivery:
+          (shouldPromoteReadyForDelivery || wasOutForDelivery) &&
+          newLoadedQty >= newTotalQty &&
+          newTotalQty > 0,
+        previousStatus: oldShipmentStatus,
+      });
 
       const packageBarcodes = finalPackages
         .map((pkg) => getPackageIdentity(pkg))
@@ -889,27 +968,24 @@ exports.updateShipmentPackages = onCall(
       });
 
       if (isScannerUpdate) {
-        const eventType = resolveEventTypeForScannerStatus(newStatus, { tripId });
+        const eventType = resolveEventTypeForScannerStatus(newStatus, {
+          tripId,
+          previousStatus: oldShipmentStatus,
+        });
         if (eventType) {
+          const tripContext = extractTripEventContext(tripData, tripId);
+          const isManagerActor = ["admin", "manager"].includes(
+            String(role || "").toLowerCase(),
+          );
+
           pendingEvent = {
             shipmentId,
             eventType,
-            tripId: tripId || null,
-            truckId: tripData?.truckId || null,
-            truckName:
-              tripData?.truckName ||
-              tripData?.truckLabel ||
-              tripData?.vehicleName ||
-              null,
-            truckPlate:
-              tripData?.truckPlate ||
-              tripData?.plateNumber ||
-              tripData?.vehiclePlate ||
-              null,
-            driverId: tripData?.driverId || null,
-            driverName: tripData?.driverName || null,
-            checkerId: uid || authUid || null,
-            checkerName: name || null,
+            ...tripContext,
+            checkerId: !isManagerActor ? uid || authUid || null : null,
+            checkerName: !isManagerActor ? name || null : null,
+            warehouseManagerId: isManagerActor ? uid || authUid || null : null,
+            warehouseManagerName: isManagerActor ? name || null : null,
             location: location || null,
             createdBy: uid || authUid || null,
             createdByRole: role || null,

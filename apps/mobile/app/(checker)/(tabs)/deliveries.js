@@ -20,14 +20,20 @@ import { useTheme } from "../../../contexts/ThemeContext";
 import StatusBadge from "../../../components/ui/StatusBadge";
 import {
   getCallableErrorMessage,
+  getCheckerDeliveryNextAction,
   loadAssignedShipmentsToVehicle,
   markShipmentOutForDelivery,
   reportCheckerFailedDelivery,
   returnCheckerShipmentsToWarehouse,
 } from "../../../components/utilities/checkerDelivery";
+import {
+  countDeliveryPoolPieces,
+  isMyActiveDeliveryShipment,
+} from "../../../components/utilities/checkerDeliveryPool";
 
 const ACTIVE_ASSIGNED_STATUSES = new Set([
   "ASSIGNED",
+  "AVAILABLE_FOR_DELIVERY",
   "READY_FOR_DELIVERY",
   "OUT_FOR_DELIVERY",
   "FAILED_DELIVERY",
@@ -36,6 +42,28 @@ const ACTIVE_ASSIGNED_STATUSES = new Set([
   "PARTIALLY_LOADED",
   "PARTIALLY_DELIVERED",
 ]);
+
+function mergeShipmentLists(...lists) {
+  const byId = new Map();
+  lists.flat().forEach((shipment) => {
+    if (!shipment?.id) return;
+    byId.set(shipment.id, shipment);
+  });
+  return [...byId.values()].sort((a, b) => {
+    const aMs = a?.updatedAt?.toMillis?.() || 0;
+    const bMs = b?.updatedAt?.toMillis?.() || 0;
+    return bMs - aMs;
+  });
+}
+
+function filterActiveDeliveries(shipments = []) {
+  return shipments.filter((shipment) => {
+    const status = String(shipment.status || "").toUpperCase();
+    if (ACTIVE_ASSIGNED_STATUSES.has(status)) return true;
+    if (shipment.availableForDelivery === true) return true;
+    return false;
+  });
+}
 
 function getTimeLabel(value) {
   if (!value) return "No recent update";
@@ -67,29 +95,41 @@ export default function CheckerDeliveriesTab() {
       return;
     }
 
-    const q = query(
+    const publish = () => {
+      setItems(
+        filterActiveDeliveries(
+          mergeShipmentLists(assignedRows, poolRows).filter((shipment) =>
+            isMyActiveDeliveryShipment(shipment, checkerId),
+          ),
+        ).map((shipment) => ({
+          ...shipment,
+          poolStats: countDeliveryPoolPieces(shipment, checkerId),
+        })),
+      );
+      setLoading(false);
+      setRefreshing(false);
+    };
+
+    let assignedRows = [];
+    let poolRows = [];
+
+    const assignedQuery = query(
       collection(db, "shipments"),
       where("assignedCheckerId", "==", String(checkerId)),
     );
+    const availableQuery = query(
+      collection(db, "shipments"),
+      where("availableForDelivery", "==", true),
+    );
 
-    const unsub = onSnapshot(
-      q,
+    const unsubAssigned = onSnapshot(
+      assignedQuery,
       (snap) => {
-        const next = snap.docs
-          .map((docSnap) => ({ id: docSnap.id, ...docSnap.data() }))
-          .filter((shipment) =>
-            ACTIVE_ASSIGNED_STATUSES.has(
-              String(shipment.status || "").toUpperCase(),
-            ),
-          )
-          .sort((a, b) => {
-            const aMs = a?.updatedAt?.toMillis?.() || 0;
-            const bMs = b?.updatedAt?.toMillis?.() || 0;
-            return bMs - aMs;
-          });
-        setItems(next);
-        setLoading(false);
-        setRefreshing(false);
+        assignedRows = snap.docs.map((docSnap) => ({
+          id: docSnap.id,
+          ...docSnap.data(),
+        }));
+        publish();
       },
       (error) => {
         console.error("Assigned deliveries snapshot failed:", error);
@@ -98,7 +138,24 @@ export default function CheckerDeliveriesTab() {
       },
     );
 
-    return () => unsub();
+    const unsubPool = onSnapshot(
+      availableQuery,
+      (snap) => {
+        poolRows = snap.docs.map((docSnap) => ({
+          id: docSnap.id,
+          ...docSnap.data(),
+        }));
+        publish();
+      },
+      (error) => {
+        console.warn("Available-for-delivery snapshot failed:", error);
+      },
+    );
+
+    return () => {
+      unsubAssigned();
+      unsubPool();
+    };
   }, [profile?.uid]);
 
   const summary = useMemo(() => {
@@ -199,9 +256,19 @@ export default function CheckerDeliveriesTab() {
             My Assigned Deliveries
           </Text>
           <Text style={[styles.summaryText, { color: colors.textMuted }]}>
-            {summary.total} assigned • {summary.outForDelivery} out for delivery
+            {summary.total} active • {summary.outForDelivery} out for delivery
             • {summary.delivered} delivered
           </Text>
+          <TouchableOpacity
+            style={[styles.loadBtn, { borderColor: colors.border }]}
+            onPress={() => router.push("/(checker)/(tabs)/available-to-load")}
+            activeOpacity={0.85}
+          >
+            <FontAwesome5 name="warehouse" size={12} color={colors.text} />
+            <Text style={[styles.scanBtnText, { color: colors.text }]}>
+              Load from warehouse pool
+            </Text>
+          </TouchableOpacity>
           <TouchableOpacity
             style={[styles.scanBtn, { borderColor: colors.border }]}
             onPress={goToDeliveryScan}
@@ -210,6 +277,16 @@ export default function CheckerDeliveriesTab() {
             <FontAwesome5 name="qrcode" size={12} color={colors.text} />
             <Text style={[styles.scanBtnText, { color: colors.text }]}>
               Scan last-mile delivery
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.loadBtn, { borderColor: colors.border }]}
+            onPress={() => router.push("/(checker)/(tabs)/delivery-load")}
+            activeOpacity={0.85}
+          >
+            <FontAwesome5 name="shipping-fast" size={12} color={colors.text} />
+            <Text style={[styles.scanBtnText, { color: colors.text }]}>
+              Open my delivery load
             </Text>
           </TouchableOpacity>
         </View>
@@ -226,8 +303,9 @@ export default function CheckerDeliveriesTab() {
               No assigned deliveries yet
             </Text>
             <Text style={[styles.emptySub, { color: colors.textMuted }]}>
-              Once your warehouse manager releases packages to you, they will
-              appear here in real time.
+              Load pieces from the Available tab, or use legacy assignment from
+              warehouse. Your loaded pieces and out-for-delivery work appear
+              here.
             </Text>
           </View>
         ) : (
@@ -248,38 +326,48 @@ export default function CheckerDeliveriesTab() {
                   })
                 }
               >
-              <View style={styles.cardHeader}>
-                <View style={styles.idWrap}>
-                  <FontAwesome5 name="box" size={12} color={colors.textMuted} />
-                  <Text style={[styles.shipmentId, { color: colors.text }]}>
-                    {shipment.id}
+                <View style={styles.cardHeader}>
+                  <View style={styles.idWrap}>
+                    <FontAwesome5
+                      name="box"
+                      size={12}
+                      color={colors.textMuted}
+                    />
+                    <Text style={[styles.shipmentId, { color: colors.text }]}>
+                      {shipment.id}
+                    </Text>
+                  </View>
+                  <StatusBadge status={shipment.status || "ASSIGNED"} />
+                </View>
+
+                <Text style={[styles.customer, { color: colors.text }]}>
+                  {shipment.recipient?.name ||
+                    shipment.customerName ||
+                    shipment.receiverName ||
+                    "Unknown recipient"}
+                </Text>
+
+                <View style={styles.metaRow}>
+                  <Text style={[styles.metaText, { color: colors.textMuted }]}>
+                    Vehicle: {shipment.deliveryVehicleName || "Not assigned"}
+                  </Text>
+                  <Text style={[styles.metaText, { color: colors.textMuted }]}>
+                    POD: {shipment.proofOfDelivery ? "Available" : "Pending"}
                   </Text>
                 </View>
-                <StatusBadge status={shipment.status || "ASSIGNED"} />
-              </View>
 
-              <Text style={[styles.customer, { color: colors.text }]}>
-                {shipment.recipient?.name ||
-                  shipment.customerName ||
-                  shipment.receiverName ||
-                  "Unknown recipient"}
-              </Text>
-
-              <View style={styles.metaRow}>
-                <Text style={[styles.metaText, { color: colors.textMuted }]}>
-                  Vehicle: {shipment.deliveryVehicleName || "Not assigned"}
+                <Text style={[styles.timeText, { color: colors.textMuted }]}>
+                  Updated: {getTimeLabel(shipment.updatedAt)}
                 </Text>
-                <Text style={[styles.metaText, { color: colors.textMuted }]}>
-                  POD: {shipment.proofOfDelivery ? "Available" : "Pending"}
-                </Text>
-              </View>
-
-              <Text style={[styles.timeText, { color: colors.textMuted }]}>
-                Updated: {getTimeLabel(shipment.updatedAt)}
-              </Text>
+                {shipment.poolStats?.mine > 0 && (
+                  <Text style={[styles.metaText, { color: colors.textMuted }]}>
+                    Your van: {shipment.poolStats.mine} piece
+                    {shipment.poolStats.mine === 1 ? "" : "s"}
+                  </Text>
+                )}
               </TouchableOpacity>
 
-              {String(shipment.status || "").toUpperCase() === "ASSIGNED" && (
+              {getCheckerDeliveryNextAction(shipment) === "load" && (
                 <TouchableOpacity
                   style={[styles.actionBtn, { backgroundColor: "#042C83" }]}
                   onPress={() => runShipmentAction(shipment.id, "load")}
@@ -288,13 +376,16 @@ export default function CheckerDeliveriesTab() {
                   {actionShipmentId === shipment.id ? (
                     <ActivityIndicator color="#fff" size="small" />
                   ) : (
-                    <Text style={styles.actionBtnText}>Load to vehicle</Text>
+                    <Text style={styles.actionBtnText}>
+                      {String(shipment.status || "").toUpperCase() === "LOADED"
+                        ? "Load onto delivery van"
+                        : "Load to vehicle"}
+                    </Text>
                   )}
                 </TouchableOpacity>
               )}
 
-              {String(shipment.status || "").toUpperCase() ===
-                "READY_FOR_DELIVERY" && (
+              {getCheckerDeliveryNextAction(shipment) === "out_for_delivery" && (
                 <TouchableOpacity
                   style={[styles.actionBtn, { backgroundColor: "#f59e0b" }]}
                   onPress={() =>
@@ -312,8 +403,7 @@ export default function CheckerDeliveriesTab() {
                 </TouchableOpacity>
               )}
 
-              {String(shipment.status || "").toUpperCase() ===
-                "OUT_FOR_DELIVERY" && (
+              {getCheckerDeliveryNextAction(shipment) === "deliver" && (
                 <>
                   <TouchableOpacity
                     style={[styles.actionBtn, { backgroundColor: "#16a34a" }]}
@@ -336,8 +426,7 @@ export default function CheckerDeliveriesTab() {
                 </>
               )}
 
-              {String(shipment.status || "").toUpperCase() ===
-                "FAILED_DELIVERY" && (
+              {getCheckerDeliveryNextAction(shipment) === "return" && (
                 <TouchableOpacity
                   style={[styles.actionBtn, { backgroundColor: "#dc2626" }]}
                   onPress={() => runShipmentAction(shipment.id, "return")}
@@ -387,6 +476,17 @@ const styles = StyleSheet.create({
   },
   scanBtn: {
     marginTop: 12,
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+  },
+  loadBtn: {
+    marginTop: 8,
     borderWidth: 1,
     borderRadius: 10,
     paddingVertical: 10,

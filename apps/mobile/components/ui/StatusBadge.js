@@ -42,6 +42,11 @@ const COLORS = {
     text: "#e879f9",
     border: "rgba(192, 132, 252, 0.5)",
   },
+  PARTIALLY_DELIVERED: {
+    bg: "rgba(45, 212, 191, 0.15)",
+    text: "#2dd4bf",
+    border: "rgba(45, 212, 191, 0.5)",
+  },
   READY_FOR_DELIVERY: {
     bg: "rgba(59, 130, 246, 0.15)",
     text: "#60a5fa",
@@ -56,6 +61,16 @@ const COLORS = {
     bg: "rgba(251, 146, 60, 0.15)",
     text: "#fb923c",
     border: "rgba(251, 146, 60, 0.5)",
+  },
+  RELEASED: {
+    bg: "rgba(59, 130, 246, 0.15)",
+    text: "#60a5fa",
+    border: "rgba(59, 130, 246, 0.5)",
+  },
+  FAILED_DELIVERY: {
+    bg: "rgba(239, 68, 68, 0.15)",
+    text: "#f87171",
+    border: "rgba(239, 68, 68, 0.5)",
   },
   PENDING: {
     bg: "rgba(148, 163, 184, 0.15)",
