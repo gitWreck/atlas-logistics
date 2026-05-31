@@ -6,6 +6,9 @@ const { FieldValue } = require("firebase-admin/firestore");
 const { requireRole, updatedBy } = require("../utilities/helpers");
 const { ALLOWED_SHIPMENT_STATUSES } = require("../utilities/dataDetails");
 const { writeShipmentActionLog } = require("../utilities/shipmentLogger");
+const { deriveMasterShipmentStatus } = require("../packages/shipmentStatus");
+const { writeShipmentEvent } = require("../tracking/writeShipmentEvent");
+const { EVENT_TYPES } = require("../tracking/eventTypes");
 
 if (!admin.apps.length) admin.initializeApp();
 
@@ -241,6 +244,8 @@ exports.updateShipmentStatus = onCall(
       ? tripRef.collection("trip_shipments").doc(shipmentId)
       : null;
 
+    let checkerPromotedOutForDelivery = false;
+
     const notificationEvent = await db.runTransaction(async (tx) => {
       const shipmentSnap = await tx.get(shipmentRef);
 
@@ -326,8 +331,55 @@ exports.updateShipmentStatus = onCall(
 
       const rowCount = oldPackages.length;
 
+      const isCheckerOwnedPiece = (pkg = {}) => {
+        if (actor.role !== "checker") return true;
+        const checkerUid = String(uid || "");
+        if (
+          String(currentData.assignedCheckerId || "") === checkerUid ||
+          String(pkg.loadedByCheckerId || "") === checkerUid
+        ) {
+          return true;
+        }
+        return (
+          String(pkg.custodyOwnerType || "").toUpperCase() === "CHECKER" &&
+          String(pkg.custodyOwnerId || "") === checkerUid
+        );
+      };
+
+      const canPromotePieceToOutForDelivery = (pkg = {}) => {
+        const status = String(pkg.status || "").toUpperCase();
+        return ["LOADED", "READY_FOR_DELIVERY", "PARTIALLY_LOADED"].includes(
+          status,
+        );
+      };
+
+      if (newStatus === "OUT_FOR_DELIVERY" && actor.role === "checker") {
+        const promotableCount = oldPackages.filter(
+          (pkg) =>
+            isCheckerOwnedPiece(pkg) &&
+            canPromotePieceToOutForDelivery(pkg),
+        ).length;
+        if (promotableCount === 0) {
+          throw new HttpsError(
+            "failed-precondition",
+            "No loaded pieces on your van to mark out for delivery.",
+          );
+        }
+      }
+
       const updatedPackages = oldPackages.map((pkg) => {
         const quantity = normalizeQty(pkg.quantity, 1);
+
+        if (newStatus === "OUT_FOR_DELIVERY" && actor.role === "checker") {
+          if (!isCheckerOwnedPiece(pkg)) return pkg;
+          if (
+            String(pkg.status || "").toUpperCase() === "OUT_FOR_DELIVERY"
+          ) {
+            return pkg;
+          }
+          if (!canPromotePieceToOutForDelivery(pkg)) return pkg;
+        }
+
         const nextStatus = isFinalDeliveryStatus ? "DELIVERED" : newStatus;
 
         const nextPkg = {
@@ -343,7 +395,8 @@ exports.updateShipmentStatus = onCall(
           nextPkg.receivedQty = 0;
         } else if (newStatus === "OUT_FOR_DELIVERY") {
           const prevLoaded = normalizeQty(pkg.loadedQty, 0);
-          nextPkg.loadedQty = prevLoaded > 0 ? Math.min(prevLoaded, quantity) : quantity;
+          nextPkg.loadedQty =
+            prevLoaded > 0 ? Math.min(prevLoaded, quantity) : quantity;
         } else if (isFinalDeliveryStatus) {
           nextPkg.loadedQty = quantity;
           nextPkg.receivedQty = quantity;
@@ -354,6 +407,16 @@ exports.updateShipmentStatus = onCall(
 
         return nextPkg;
       });
+
+      checkerPromotedOutForDelivery =
+        newStatus === "OUT_FOR_DELIVERY" &&
+        actor.role === "checker" &&
+        updatedPackages.some(
+          (pkg, index) =>
+            String(pkg.status || "").toUpperCase() === "OUT_FOR_DELIVERY" &&
+            String(oldPackages[index]?.status || "").toUpperCase() !==
+              "OUT_FOR_DELIVERY",
+        );
 
       const newTotalQty = sumTotalQty(updatedPackages) || oldTotalQty;
 
@@ -375,8 +438,15 @@ exports.updateShipmentStatus = onCall(
 
       const newPendingQty = Math.max(newTotalQty - newLoadedQty, 0);
 
+      const derivedShipmentStatus =
+        newStatus === "OUT_FOR_DELIVERY" && actor.role === "checker"
+          ? deriveMasterShipmentStatus(updatedPackages, {
+              previousStatus: oldStatus,
+            })
+          : newStatus;
+
       const shipmentUpdate = {
-        status: newStatus,
+        status: derivedShipmentStatus,
         packages: updatedPackages,
         updatedAt: FieldValue.serverTimestamp(),
         updatedBy: name,
@@ -395,15 +465,36 @@ exports.updateShipmentStatus = onCall(
         "totals.delivered": newReceivedQty,
 
         statusHistory: FieldValue.arrayUnion({
-          status: newStatus,
+          status: derivedShipmentStatus,
           at: new Date(),
           by: name,
           note: remarks || `Status updated via ${sourceUI}`,
           location: location || null,
         }),
+        ...(checkerPromotedOutForDelivery
+          ? {
+              currentLocationState: "OUT_FOR_DELIVERY",
+            }
+          : {}),
       };
 
       tx.update(shipmentRef, shipmentUpdate);
+
+      if (checkerPromotedOutForDelivery) {
+        const manifestId = currentData.deliveryManifestId;
+        if (manifestId) {
+          tx.set(
+            db.collection("delivery_manifests").doc(String(manifestId)),
+            {
+              status: "OUT_FOR_DELIVERY",
+              outForDeliveryAt: FieldValue.serverTimestamp(),
+              updatedAt: FieldValue.serverTimestamp(),
+              updatedBy: name,
+            },
+            { merge: true },
+          );
+        }
+      }
 
       if (tripRef && tripShipmentRef && tripShipSnap && tripShipSnap.exists) {
         const tripUpdate = {
@@ -486,6 +577,23 @@ exports.updateShipmentStatus = onCall(
         notify,
       });
     });
+
+    if (checkerPromotedOutForDelivery) {
+      await writeShipmentEvent({
+        db,
+        event: {
+          shipmentId,
+          eventType: EVENT_TYPES.OUT_FOR_DELIVERY,
+          checkerId: uid,
+          checkerName: name,
+          location: location || null,
+          remarks: remarks || "Checker marked shipment out for delivery.",
+          createdBy: uid,
+          createdByRole: role,
+          source: sourceUI || "CHECKER_MOBILE",
+        },
+      });
+    }
 
     if (notificationEvent) {
       const trackedUserIds = await getTrackedShipmentUserIds(shipmentId);

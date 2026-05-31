@@ -145,6 +145,7 @@ exports.releaseForDeliveryOperations = onCall(
           currentLocationState: normalizedWarehouse,
           assignedCheckerId: null,
           assignedCheckerName: null,
+          activeCheckerIds: [],
           deliveryManifestId: null,
           status: effectiveStatus,
           updatedAt: now,

@@ -57,6 +57,11 @@ const COLORS = {
     text: "#fbbf24",
     border: "rgba(251, 191, 36, 0.5)",
   },
+  AVAILABLE_FOR_DELIVERY: {
+    bg: "rgba(59, 130, 246, 0.15)",
+    text: "#60a5fa",
+    border: "rgba(59, 130, 246, 0.5)",
+  },
   RECEIVED: {
     bg: "rgba(251, 146, 60, 0.15)",
     text: "#fb923c",

@@ -22,7 +22,7 @@ export default function DeliveryLoadScreen({ showBackButton = false }) {
   const { colors } = useTheme();
   const [refreshing, setRefreshing] = useState(false);
 
-  const { manifests, summary, loading } = useDeliveryManifests(profile?.uid);
+  const { manifests, summary, loading } = useDeliveryManifests();
 
   const onRefresh = () => {
     setRefreshing(true);
@@ -74,8 +74,8 @@ export default function DeliveryLoadScreen({ showBackButton = false }) {
           <Text style={[styles.summaryText, { color: colors.textMuted }]}>
             {summary.manifestCount} active load
             {summary.manifestCount === 1 ? "" : "s"} · {summary.totalPackages}{" "}
-            packages · {summary.outForDelivery} out · {summary.delivered}{" "}
-            delivered · {summary.remaining} remaining
+            pieces · {summary.onVan} on van · {summary.outForDelivery} out ·{" "}
+            {summary.delivered} delivered
           </Text>
           <TouchableOpacity
             style={[styles.scanBtn, { borderColor: colors.border }]}
