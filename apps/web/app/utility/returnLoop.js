@@ -6,10 +6,30 @@ export function normalizeShipmentStatus(status) {
   return String(status || "").trim().toUpperCase();
 }
 
+function getPackages(shipment) {
+  const data = coalesceShipment(shipment);
+  return Array.isArray(data.packages) ? data.packages : [];
+}
+
+export function countPiecesAwaitingReturnReceive(shipment) {
+  return getPackages(shipment).filter((pkg) => {
+    const status = normalizeShipmentStatus(pkg.status);
+    return status === "RETURNED_TO_WAREHOUSE" && !pkg.returnReceivedAt;
+  }).length;
+}
+
 export function isEligibleForReturnReceive(shipment) {
   const data = coalesceShipment(shipment);
+  const pendingPieces = countPiecesAwaitingReturnReceive(shipment);
+
+  if (pendingPieces > 0) {
+    return true;
+  }
+
   const status = normalizeShipmentStatus(data.status);
-  if (data.returnReceivedAt) return false;
+  if (data.returnReceivedAt && pendingPieces === 0) {
+    return false;
+  }
   if (status === "RETURNED_TO_WAREHOUSE") return true;
   if (data.returnedAt && status === "RECEIVED") return true;
   return false;
@@ -18,11 +38,13 @@ export function isEligibleForReturnReceive(shipment) {
 export function getReturnReceiveBlockReason(shipment) {
   const data = coalesceShipment(shipment);
   if (!shipment) return "Select a shipment first.";
-  if (data.returnReceivedAt) {
-    return `Already received by ${data.returnReceivedBy || "warehouse"}. Re-release to a checker when ready.`;
+
+  const pendingPieces = countPiecesAwaitingReturnReceive(shipment);
+  if (data.returnReceivedAt && pendingPieces === 0) {
+    return `Already received by ${data.returnReceivedBy || "warehouse"}. Re-release for delivery when ready.`;
   }
-  if (!isEligibleForReturnReceive(data)) {
-    return `Status is ${data.status || "unknown"}. Checker must return the shipment to Odiongan first.`;
+  if (!isEligibleForReturnReceive(shipment)) {
+    return `No pieces awaiting returned intake (status: ${data.status || "unknown"}). Checker must return pieces to Odiongan first.`;
   }
   return null;
 }
@@ -32,6 +54,11 @@ export function formatReturnSummary(shipment) {
   if (!shipment) return null;
 
   const parts = [];
+  const pendingPieces = countPiecesAwaitingReturnReceive(shipment);
+  if (pendingPieces > 0) {
+    parts.push(`${pendingPieces} piece${pendingPieces === 1 ? "" : "s"} awaiting intake`);
+  }
+
   if (data.failedAt || data.status === "FAILED_DELIVERY") {
     parts.push(
       data.failureReasonCode

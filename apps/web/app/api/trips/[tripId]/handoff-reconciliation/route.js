@@ -9,6 +9,103 @@ const toNumber = (value, fallback = 0) => {
   return Number.isFinite(num) && num >= 0 ? num : fallback;
 };
 
+async function buildReconciliationRow(tripRef, tripId, item, shipmentDocId) {
+  if (!shipmentDocId) return null;
+
+  const [tripShipmentSnap, shipmentSnap] = await Promise.all([
+    tripRef.collection("trip_shipments").doc(shipmentDocId).get(),
+    adminDb.collection("shipments").doc(shipmentDocId).get(),
+  ]);
+
+  const tripShipment = tripShipmentSnap.data() || {};
+  const shipment = shipmentSnap.data() || {};
+  const expectedCount = toNumber(
+    item?.loadedCount ??
+      item?.totalCount ??
+      tripShipment.totalItems ??
+      shipment.totals?.totalContentQty,
+    0,
+  );
+  const remainingLoaded = toNumber(tripShipment.loadedCount, 0);
+  const unloadedCount = Math.max(expectedCount - remainingLoaded, 0);
+  const isMissing = remainingLoaded > 0 || !tripShipmentSnap.exists;
+
+  return {
+    id: shipmentDocId,
+    shipmentId: shipment.shipmentId || item?.shipmentId || shipmentDocId,
+    recipientName:
+      shipment.recipient?.name || item?.receiverName || "Unknown recipient",
+    destination:
+      shipment.recipient?.city ||
+      shipment.destination ||
+      shipment.destinationCode ||
+      "Unknown destination",
+    expectedCount,
+    unloadedCount,
+    remainingLoaded,
+    missing: isMissing,
+    currentTripId: shipment.currentTripId || tripId,
+    status: shipment.status || tripShipment.status || null,
+  };
+}
+
+async function reconcileFromLockedManifest(tripRef, tripId, manifestId) {
+  const manifestSnap = await adminDb.collection("manifests").doc(manifestId).get();
+
+  if (!manifestSnap.exists) {
+    return {
+      error: "Manifest not found",
+      status: 404,
+    };
+  }
+
+  const manifest = manifestSnap.data() || {};
+  const manifestShipments = Array.isArray(manifest.shipments)
+    ? manifest.shipments
+    : [];
+
+  const rows = await Promise.all(
+    manifestShipments.map((item) => {
+      const shipmentDocId =
+        item.trackingShipmentId || item.shipmentId || item.id || null;
+      return buildReconciliationRow(tripRef, tripId, item, shipmentDocId);
+    }),
+  );
+
+  return {
+    manifestId,
+    source: "locked_manifest",
+    shipments: rows.filter(Boolean),
+  };
+}
+
+async function reconcileFromTripShipments(tripRef, tripId) {
+  const tripShipmentSnap = await tripRef.collection("trip_shipments").get();
+
+  if (tripShipmentSnap.empty) {
+    return {
+      error:
+        "Trip has no shipments to reconcile. Add shipments to the trip manifest first.",
+      status: 400,
+    };
+  }
+
+  const rows = await Promise.all(
+    tripShipmentSnap.docs.map((docSnap) => {
+      const data = docSnap.data() || {};
+      const shipmentDocId =
+        data.trackingShipmentId || docSnap.id || data.shipmentId || null;
+      return buildReconciliationRow(tripRef, tripId, data, shipmentDocId);
+    }),
+  );
+
+  return {
+    manifestId: null,
+    source: "trip_shipments",
+    shipments: rows.filter(Boolean),
+  };
+}
+
 export async function GET(_request, { params }) {
   try {
     const { tripId } = await params;
@@ -44,79 +141,29 @@ export async function GET(_request, { params }) {
     const trip = tripSnap.data() || {};
     const manifestId = trip.manifestId;
 
-    if (!manifestId) {
-      return NextResponse.json(
-        { error: "Trip has no manifest to reconcile" },
-        { status: 400 },
-      );
+    let result = manifestId
+      ? await reconcileFromLockedManifest(tripRef, tripId, manifestId)
+      : await reconcileFromTripShipments(tripRef, tripId);
+
+    if (result.error && manifestId) {
+      const fallback = await reconcileFromTripShipments(tripRef, tripId);
+      if (!fallback.error) {
+        result = fallback;
+      }
     }
 
-    const manifestSnap = await adminDb
-      .collection("manifests")
-      .doc(manifestId)
-      .get();
-
-    if (!manifestSnap.exists) {
-      return NextResponse.json(
-        { error: "Manifest not found" },
-        { status: 404 },
-      );
+    if (result.error) {
+      return NextResponse.json({ error: result.error }, { status: result.status || 400 });
     }
 
-    const manifest = manifestSnap.data() || {};
-    const manifestShipments = Array.isArray(manifest.shipments)
-      ? manifest.shipments
-      : [];
-
-    const rows = await Promise.all(
-      manifestShipments.map(async (item) => {
-        const shipmentDocId =
-          item.trackingShipmentId || item.shipmentId || item.id || null;
-
-        if (!shipmentDocId) return null;
-
-        const [tripShipmentSnap, shipmentSnap] = await Promise.all([
-          tripRef.collection("trip_shipments").doc(shipmentDocId).get(),
-          adminDb.collection("shipments").doc(shipmentDocId).get(),
-        ]);
-
-        const tripShipment = tripShipmentSnap.data() || {};
-        const shipment = shipmentSnap.data() || {};
-        const expectedCount = toNumber(
-          item.loadedCount ?? item.totalCount ?? tripShipment.totalItems,
-          0,
-        );
-        const remainingLoaded = toNumber(tripShipment.loadedCount, 0);
-        const unloadedCount = Math.max(expectedCount - remainingLoaded, 0);
-        const isMissing = remainingLoaded > 0 || !tripShipmentSnap.exists;
-
-        return {
-          id: shipmentDocId,
-          shipmentId: shipment.shipmentId || item.shipmentId || shipmentDocId,
-          recipientName:
-            shipment.recipient?.name || item.receiverName || "Unknown recipient",
-          destination:
-            shipment.recipient?.city ||
-            shipment.destination ||
-            shipment.destinationCode ||
-            "Unknown destination",
-          expectedCount,
-          unloadedCount,
-          remainingLoaded,
-          missing: isMissing,
-          currentTripId: shipment.currentTripId || tripId,
-          status: shipment.status || tripShipment.status || null,
-        };
-      }),
-    );
-
-    const shipments = rows.filter(Boolean);
+    const shipments = result.shipments || [];
     const missingShipments = shipments.filter((item) => item.missing);
     const unloadedShipments = shipments.filter((item) => !item.missing);
 
     return NextResponse.json({
       tripId,
-      manifestId,
+      manifestId: result.manifestId,
+      source: result.source,
       ready: missingShipments.length === 0,
       totals: {
         manifestShipments: shipments.length,

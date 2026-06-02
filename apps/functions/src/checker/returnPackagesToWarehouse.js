@@ -7,15 +7,24 @@ const { requireRole } = require("../utilities/helpers");
 const { writeShipmentEvent } = require("../tracking/writeShipmentEvent");
 const { EVENT_TYPES } = require("../tracking/eventTypes");
 const { resolveShipmentIds } = require("./checkerShipmentResolve");
+const { deriveMasterShipmentStatus } = require("../packages/shipmentStatus");
+const {
+  normalizePackageIdSet,
+  collectTargetPieceIdentities,
+  assertHasTargetPieces,
+  assertRequestedPiecesOwned,
+  shouldTargetCheckerPiece,
+  applyPieceReturnedToWarehouse,
+  collectActiveCheckerIds,
+  isCheckerOwnedPiece,
+} = require("./checkerPieceOperations");
+const {
+  assertCheckerCanAccessShipment,
+  shipmentHasWarehouseCustodyPieces,
+} = require("../warehouse/packageDeliveryOperations");
 
 if (!admin.apps.length) admin.initializeApp();
 const db = admin.firestore();
-
-const RETURN_ALLOWED_STATUSES = new Set([
-  "FAILED_DELIVERY",
-  "OUT_FOR_DELIVERY",
-  "READY_FOR_DELIVERY",
-]);
 
 function normalizeString(value) {
   return typeof value === "string" && value.trim() ? value.trim() : null;
@@ -25,9 +34,60 @@ function isManagerRole(role) {
   return ["admin", "manager"].includes(String(role || "").toLowerCase());
 }
 
+function collectManagerReturnPieceIdentities(packages = [], packageIdSet = null) {
+  const identities = [];
+  packages.forEach((pkg) => {
+    const status = String(pkg.status || "").toUpperCase();
+    if (!["FAILED_DELIVERY", "OUT_FOR_DELIVERY"].includes(status)) return;
+    if (packageIdSet && packageIdSet.size > 0) {
+      let matched = false;
+      for (const packageId of packageIdSet) {
+        if (
+          String(pkg.packageId || "").trim() === packageId ||
+          String(pkg.trackingNumber || "").trim() === packageId
+        ) {
+          matched = true;
+          break;
+        }
+      }
+      if (!matched) return;
+    }
+    const identity = String(pkg.packageId || pkg.trackingNumber || "").trim();
+    if (identity) identities.push(identity);
+  });
+  return identities;
+}
+
+function shouldReturnPiece(
+  pkg = {},
+  {
+    isChecker,
+    actorUid,
+    shipmentData,
+    packageIdSet,
+    managerTargetSet = null,
+  },
+) {
+  if (isChecker) {
+    return shouldTargetCheckerPiece(pkg, {
+      checkerUid: actorUid,
+      shipmentData,
+      packageIdSet,
+      mode: "return",
+    });
+  }
+
+  const identity = String(pkg.packageId || pkg.trackingNumber || "").trim();
+  if (managerTargetSet && managerTargetSet.size > 0) {
+    return managerTargetSet.has(identity);
+  }
+  return false;
+}
+
 exports.returnPackagesToWarehouse = onCall(
   { region: "asia-southeast1", maxInstances: 10 },
   async (req) => {
+    try {
     const {
       uid: actorUid,
       role: actorRole,
@@ -48,15 +108,19 @@ exports.returnPackagesToWarehouse = onCall(
       gpsCoordinates = null,
     } = req.data || {};
 
+    const packageIdSet = normalizePackageIdSet(packageIds);
     const resolvedShipmentIds = await resolveShipmentIds(db, {
       shipmentIds,
       packageIds,
     });
 
-    const normalizedWarehouse = normalizeString(warehouseCode) || "ODIONGAN_WAREHOUSE";
+    const normalizedWarehouse =
+      normalizeString(warehouseCode) || "ODIONGAN_WAREHOUSE";
     const now = FieldValue.serverTimestamp();
     const returnedShipmentIds = [];
+    const returnedEventMeta = [];
     const returnedByManifest = new Map();
+    const isChecker = !isManagerRole(actorRole);
 
     await db.runTransaction(async (tx) => {
       const shipmentRefs = resolvedShipmentIds.map((id) =>
@@ -73,76 +137,126 @@ exports.returnPackagesToWarehouse = onCall(
         }
 
         const data = snap.data() || {};
-        const status = String(data.status || "").toUpperCase();
 
-        if (status === "DELIVERED" || status === "COMPLETED") {
-          throw new HttpsError(
-            "failed-precondition",
-            `Shipment ${shipmentId} is already delivered.`,
-          );
-        }
-        if (!RETURN_ALLOWED_STATUSES.has(status)) {
-          throw new HttpsError(
-            "failed-precondition",
-            `Shipment ${shipmentId} cannot be returned from status ${status}. Mark failed delivery first if needed.`,
-          );
-        }
-
-        if (!isManagerRole(actorRole)) {
-          const {
-            assertCheckerCanAccessShipment,
-          } = require("../warehouse/packageDeliveryOperations");
+        if (isChecker) {
           assertCheckerCanAccessShipment(shipmentId, data, actorUid);
         }
 
-        const manifestId = normalizeString(data.deliveryManifestId);
-        if (manifestId) {
-          const existing = returnedByManifest.get(manifestId) || [];
-          existing.push(shipmentId);
-          returnedByManifest.set(manifestId, existing);
+        const packages = Array.isArray(data.packages) ? data.packages : [];
+
+        if (isChecker) {
+          assertRequestedPiecesOwned(
+            packages,
+            packageIdSet,
+            actorUid,
+            data,
+            "return",
+          );
         }
+
+        const targetIdentities = isChecker
+          ? collectTargetPieceIdentities(packages, {
+              checkerUid: actorUid,
+              shipmentData: data,
+              packageIdSet,
+              mode: "return",
+            })
+          : collectManagerReturnPieceIdentities(packages, packageIdSet);
+
+        if (isChecker) {
+          assertHasTargetPieces(
+            targetIdentities,
+            "return. Mark failed delivery or scan the piece first.",
+          );
+        } else if (targetIdentities.length === 0) {
+          throw new HttpsError(
+            "failed-precondition",
+            "No returnable pieces found on this shipment.",
+          );
+        }
+
+        const managerTargetSet = new Set(targetIdentities);
 
         const returnNote =
           normalizeString(remarks) ||
           "Returned to Odiongan warehouse by checker.";
 
-        tx.update(shipmentRefs[index], {
-          status: "RETURNED_TO_WAREHOUSE",
-          custodyOwnerType: "WAREHOUSE",
-          custodyOwnerId: normalizedWarehouse,
+        const updatedPackages = packages.map((pkg) => {
+          if (
+            !shouldReturnPiece(pkg, {
+              isChecker,
+              actorUid,
+              shipmentData: data,
+              packageIdSet,
+              managerTargetSet,
+            })
+          ) {
+            return pkg;
+          }
+          return applyPieceReturnedToWarehouse(pkg, {
+            warehouseCode: normalizedWarehouse,
+          });
+        });
+
+        const derivedStatus = deriveMasterShipmentStatus(updatedPackages, {
+          previousStatus: data.status,
+        });
+        const activeCheckerIds = collectActiveCheckerIds(updatedPackages);
+        const checkerStillHasPieces = updatedPackages.some((pkg) =>
+          isCheckerOwnedPiece(pkg, actorUid, data),
+        );
+
+        const manifestId = normalizeString(data.deliveryManifestId);
+        if (manifestId && targetIdentities.length > 0) {
+          const existing = returnedByManifest.get(manifestId) || [];
+          existing.push(shipmentId);
+          returnedByManifest.set(manifestId, existing);
+        }
+
+        const shipmentUpdate = {
+          packages: updatedPackages,
+          status: derivedStatus,
+          activeCheckerIds,
+          custodyOwnerType: shipmentHasWarehouseCustodyPieces(updatedPackages)
+            ? "WAREHOUSE"
+            : data.custodyOwnerType || "WAREHOUSE",
+          custodyOwnerId: shipmentHasWarehouseCustodyPieces(updatedPackages)
+            ? normalizedWarehouse
+            : data.custodyOwnerId || normalizedWarehouse,
           currentLocationState: "ODIONGAN_WAREHOUSE",
-          assignedCheckerId: null,
-          assignedCheckerName: null,
-          deliveryManifestId: null,
-          deliveryVehicleId: null,
-          deliveryVehicleName: null,
-          lastAssignedCheckerId:
-            normalizeString(data.assignedCheckerId) ||
-            data.lastAssignedCheckerId ||
-            null,
-          lastAssignedCheckerName:
-            normalizeString(data.assignedCheckerName) ||
-            data.lastAssignedCheckerName ||
-            null,
           returnedAt: now,
           returnedByUid: actorUid,
           returnedByName: actorName,
           returnWarehouseCode: normalizedWarehouse,
-          returnReceivedAt: null,
-          returnReceivedBy: null,
-          returnReceivedByUid: null,
           updatedAt: now,
           updatedBy: actorName || actorUid || null,
           statusHistory: FieldValue.arrayUnion({
-            status: "RETURNED_TO_WAREHOUSE",
+            status: derivedStatus,
             at: admin.firestore.Timestamp.now(),
             by: actorName || actorUid || null,
-            note: returnNote,
+            note: `${returnNote} (${targetIdentities.length} piece${
+              targetIdentities.length === 1 ? "" : "s"
+            })`,
             location: normalizeString(location) || normalizedWarehouse,
           }),
-        });
+        };
 
-        returnedShipmentIds.push(shipmentId);
+        if (isChecker && !checkerStillHasPieces) {
+          shipmentUpdate.assignedCheckerId = null;
+          shipmentUpdate.assignedCheckerName = null;
+          shipmentUpdate.deliveryManifestId = null;
+          shipmentUpdate.deliveryVehicleId = null;
+          shipmentUpdate.deliveryVehicleName = null;
+        }
+
+        tx.update(shipmentRefs[index], shipmentUpdate);
+
+        if (targetIdentities.length > 0) {
+          returnedShipmentIds.push(shipmentId);
+          targetIdentities.forEach((pieceId) => {
+            returnedEventMeta.push({ shipmentId, pieceId });
+          });
+        }
       });
 
       for (const [manifestId, ids] of returnedByManifest.entries()) {
@@ -160,11 +274,12 @@ exports.returnPackagesToWarehouse = onCall(
     });
 
     await Promise.all(
-      returnedShipmentIds.map((shipmentId) =>
+      returnedEventMeta.map((meta) =>
         writeShipmentEvent({
           db,
           event: {
-            shipmentId,
+            shipmentId: meta.shipmentId,
+            pieceId: meta.pieceId,
             eventType: EVENT_TYPES.RETURNED_TO_WAREHOUSE,
             checkerId: isManagerRole(actorRole) ? null : actorUid,
             checkerName: isManagerRole(actorRole) ? null : actorName,
@@ -188,6 +303,16 @@ exports.returnPackagesToWarehouse = onCall(
       warehouseCode: normalizedWarehouse,
       shipmentIds: returnedShipmentIds,
       shipmentCount: returnedShipmentIds.length,
+      packageIds: returnedEventMeta.map((meta) => meta.pieceId).filter(Boolean),
+      packageCount: returnedEventMeta.length,
     };
+    } catch (error) {
+      if (error instanceof HttpsError) throw error;
+      console.error("returnPackagesToWarehouse failed:", error);
+      throw new HttpsError(
+        "internal",
+        error?.message || "Failed to return packages to warehouse.",
+      );
+    }
   },
 );

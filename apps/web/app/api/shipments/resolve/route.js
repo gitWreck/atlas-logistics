@@ -122,6 +122,7 @@ export async function POST(req) {
       requiresAssignment: targetPackage
         ? packageAssignmentState === "ON_OTHER_TRIP"
         : !shipmentAssignedToTrip,
+      shipmentAssignedToTrip,
     });
   } catch (error) {
     console.error("Resolve API Error:", error);

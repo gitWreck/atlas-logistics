@@ -334,13 +334,10 @@ export function useCheckerLastMileSync(checkerId) {
       Object.values(shipmentsById)
         .map(enrichShipment)
         .filter((s) => isMyActiveDeliveryShipment(s, checkerId))
-        .filter((s) => {
-          if (s.actionPhase) return true;
-          return (
-            (s.poolStats?.mine || 0) > 0 ||
-            String(s.assignedCheckerId || "") === String(checkerId)
-          );
-        }),
+        .filter(
+          (s) =>
+            Boolean(s.actionPhase) || (s.poolStats?.mine || 0) > 0,
+        ),
     );
   }, [shipmentsById, checkerId]);
 

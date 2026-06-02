@@ -59,6 +59,18 @@ export const MODE_SCAN_ACTIONS = {
       icon: "check-circle",
       color: "#10b981",
     },
+    {
+      label: "Failed delivery",
+      status: "FAILED_DELIVERY",
+      icon: "exclamation-triangle",
+      color: "#dc2626",
+    },
+    {
+      label: "Return to warehouse",
+      status: "RETURNED_TO_WAREHOUSE",
+      icon: "warehouse",
+      color: "#b45309",
+    },
   ],
 };
 

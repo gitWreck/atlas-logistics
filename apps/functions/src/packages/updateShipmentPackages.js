@@ -25,7 +25,8 @@ exports.updateShipmentPackages = onCall(
       throw new HttpsError("unauthenticated", "Authentication required.");
     }
     // const actor = updatedBy(req);
-    const { name, uid, role } = updatedBy(req);
+    const { name, uid, role, usercode } = updatedBy(req);
+    const actorUid = authUid || uid;
 
     const {
       shipmentId,
@@ -483,7 +484,11 @@ exports.updateShipmentPackages = onCall(
           if (newStatus === "DELIVERED" && isDeliveryTrip) {
             const pieceId = getPackageIdentity(pkg);
             const loadedBy = String(pkg.loadedByCheckerId || "").trim();
-            if (loadedBy && loadedBy !== String(uid)) {
+            if (
+              loadedBy &&
+              loadedBy !== String(actorUid) &&
+              (!usercode || loadedBy !== String(usercode))
+            ) {
               throw new HttpsError(
                 "failed-precondition",
                 `Package ${pieceId} is on another checker's van and cannot be delivered by you.`,
@@ -494,7 +499,11 @@ exports.updateShipmentPackages = onCall(
           if (newStatus === "LOADED" && isDeliveryTrip && isLoadingAction) {
             const pieceId = getPackageIdentity(pkg);
             const loadedBy = String(pkg.loadedByCheckerId || "").trim();
-            if (loadedBy && loadedBy !== String(uid)) {
+            if (
+              loadedBy &&
+              loadedBy !== String(actorUid) &&
+              (!usercode || loadedBy !== String(usercode))
+            ) {
               throw new HttpsError(
                 "failed-precondition",
                 `Package ${pieceId} is already with another checker.`,

@@ -112,9 +112,8 @@ export default function ShipmentActionFooter({
     buttonTitle = "Mark Out for Delivery";
     isFinalAction = false;
   } else if (checkerActionPhase === "deliver") {
-    buttonTitle = "Complete Delivery";
-    isFinalAction = true;
-    if (photoCount === 0) isDisabled = true;
+    buttonTitle = "Scan to Deliver";
+    isFinalAction = false;
   } else if (checkerActionPhase === "return") {
     buttonTitle = "Return to Warehouse";
     isFinalAction = false;

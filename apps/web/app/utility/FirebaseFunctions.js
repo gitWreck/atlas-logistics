@@ -35,6 +35,7 @@ export const receiveReturnedShipmentAtHub = httpsCallable(
   functions,
   "receiveReturnedShipmentAtHub",
 );
+/** @deprecated Use releaseForDeliveryOperations (pool model; custody stays at warehouse). */
 export const releasePackagesToChecker = httpsCallable(
   functions,
   "releasePackagesToChecker",

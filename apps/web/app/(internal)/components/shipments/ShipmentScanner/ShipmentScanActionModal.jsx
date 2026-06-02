@@ -242,7 +242,7 @@ export default function ShipmentScanActionModal({
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
                       <span className="text-sm font-bold text-emerald-600">
-                        Review manifest handoff
+                        Reconcile & release shipments
                       </span>
                       <span
                         className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${
@@ -255,8 +255,8 @@ export default function ShipmentScanActionModal({
                       </span>
                     </div>
                     <span className={`mt-0.5 block text-xs ${theme.helperText}`}>
-                      Check unloaded, missing, and ready shipments before assigning
-                      to delivery.
+                      Check unloaded and missing rows, then release shipment(s) for
+                      checker scan-to-load.
                     </span>
                   </div>
                   <FontAwesomeIcon
@@ -271,9 +271,7 @@ export default function ShipmentScanActionModal({
             <HandoffPrompt
               theme={theme}
               summary={state.handoffSummary}
-              trips={state.availableTrips}
-              selectedTrip={state.selectedNextTrip}
-              onSelectTrip={actions.setSelectedNextTrip}
+              tripId={state.tripId}
               missingRemarks={state.missingRemarks}
               onRemarkChange={(shipmentId, value) =>
                 actions.setMissingRemarks((prev) => ({
@@ -281,7 +279,7 @@ export default function ShipmentScanActionModal({
                   [shipmentId]: value,
                 }))
               }
-              onAssign={actions.handleAssignNextTrip}
+              onRelease={actions.handleReleaseShipmentsFromTrip}
               onRefresh={actions.handleReviewHandoff}
               onBack={actions.resetScanResult}
               btnStatus={state.btnStatus}
@@ -290,10 +288,7 @@ export default function ShipmentScanActionModal({
             <NextTripPrompt
               theme={theme}
               item={state.resolvedItem}
-              trips={state.availableTrips}
-              selectedTrip={state.selectedNextTrip}
-              onSelectTrip={actions.setSelectedNextTrip}
-              onAssign={actions.handleAssignNextTrip}
+              onAssign={actions.handleReleaseSingleShipment}
               onSkip={() => {
                 onClose();
                 actions.resetFlow();

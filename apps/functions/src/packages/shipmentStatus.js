@@ -33,6 +33,9 @@ function deriveMasterShipmentStatus(packages = [], options = {}) {
   const partiallyLoadedRows = count("PARTIALLY_LOADED");
   const readyForDeliveryRows = count("READY_FOR_DELIVERY");
   const availableAtWarehouseRows = count("AVAILABLE_AT_WAREHOUSE");
+  const returnedToWarehouseRows = count("RETURNED_TO_WAREHOUSE");
+  const returnedReceivedRows = count("RETURNED_RECEIVED_AT_HUB");
+  const failedRows = count("FAILED_DELIVERY");
 
   if (totals) {
     const totalQty = Number(totals.totalQty) || 0;
@@ -79,14 +82,35 @@ function deriveMasterShipmentStatus(packages = [], options = {}) {
     return "PARTIALLY_DELIVERED";
   }
 
-  if (shouldPromoteOutForDelivery) {
+  if (returnedToWarehouseRows > 0 && returnedToWarehouseRows === totalRows) {
+    return "RETURNED_TO_WAREHOUSE";
+  }
+  if (returnedReceivedRows > 0 && returnedReceivedRows === totalRows) {
+    return "RETURNED_RECEIVED_AT_HUB";
+  }
+  if (returnedToWarehouseRows > 0 || returnedReceivedRows > 0) {
+    if (deliveredRows > 0) return "PARTIALLY_DELIVERED";
+    if (failedRows > 0) return "FAILED_DELIVERY";
+    return "RETURNED_TO_WAREHOUSE";
+  }
+
+  if (outForDeliveryRows > 0) {
     return "OUT_FOR_DELIVERY";
   }
 
-  if (outForDeliveryRows === totalRows) {
-    return "OUT_FOR_DELIVERY";
+  if (failedRows === totalRows) {
+    return "FAILED_DELIVERY";
   }
-  if (outForDeliveryRows > 0 && deliveredRows === 0) {
+  if (
+    failedRows > 0 &&
+    deliveredRows === 0 &&
+    outForDeliveryRows === 0 &&
+    loadedRows === 0
+  ) {
+    return "FAILED_DELIVERY";
+  }
+
+  if (shouldPromoteOutForDelivery) {
     return "OUT_FOR_DELIVERY";
   }
 

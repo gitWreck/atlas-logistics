@@ -27,28 +27,21 @@ export function getScannerErrorGuidance(message, state, trip) {
     return "Choose an active trip or reopen the trip before making scanner changes.";
   }
 
-  if (text.includes("no available delivery trips")) {
-    return "Create or activate a DELIVERY trip, then refresh reconciliation.";
-  }
-
-  if (text.includes("select a delivery trip")) {
-    return "Pick a delivery trip from the dropdown before assigning the handoff.";
+  if (text.includes("no reconciled shipments") || text.includes("eligible to release")) {
+    return "Unload and reconcile manifest shipments on this trip, then release for checker delivery.";
   }
 
   if (text.includes("add remarks")) {
     return "Add a short reason for each missing shipment before completing the handoff.";
   }
 
-  if (text.includes("not a delivery trip")) {
-    return "Select a trip with trip type DELIVERY for the handoff.";
+
+  if (text.includes("trip has no shipments to reconcile")) {
+    return "Add shipments to this trip (Manifest tab → Shipments), then unload and try again.";
   }
 
-  if (text.includes("source trip and delivery trip must be different")) {
-    return "Choose a different delivery trip than the one you just unloaded.";
-  }
-
-  if (text.includes("no manifest") || text.includes("manifest not found")) {
-    return "Lock or regenerate the source trip manifest, then review the handoff again.";
+  if (text.includes("trip has no manifest to reconcile")) {
+    return "Use Trip → Manifest → Release shipment(s), or add shipments to this trip first.";
   }
 
   if (text.includes("label not found")) {
@@ -73,6 +66,26 @@ export function getScannerErrorGuidance(message, state, trip) {
 
   if (text.includes("item is loaded")) {
     return "Scan a package with remaining load quantity, or switch to Unload if you are receiving it back.";
+  }
+
+  if (text.includes("skip unload")) {
+    return "Open Trip → Manifest → Release shipment(s) for checker delivery.";
+  }
+
+  if (text.includes("already received") || text.includes("already at the hub")) {
+    return "Skip unload. Open Trip → Manifest → Release shipment(s) for checker delivery.";
+  }
+
+  if (text.includes("still on trip")) {
+    return "Open the trip shown in the message and unload there, or scan a label that belongs to this trip.";
+  }
+
+  if (text.includes("not on the active trip manifest")) {
+    return "Add the shipment to this trip manifest first, then scan to unload.";
+  }
+
+  if (text.includes("no loaded quantity remains")) {
+    return "Confirm the piece was loaded on this trip. If Rose already received it at Odiongan, release from Manifest instead.";
   }
 
   if (text.includes("no quantity is available")) {

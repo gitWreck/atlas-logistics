@@ -70,7 +70,7 @@ export default function CheckerDeliveriesTab() {
         });
         Alert.alert(
           "Failed Delivery",
-          "Marked as failed. Return the package to Odiongan warehouse.",
+          "Your loaded pieces were marked failed. Return them to Odiongan warehouse.",
         );
       } else if (action === "return") {
         await returnCheckerShipmentsToWarehouse({
@@ -93,10 +93,22 @@ export default function CheckerDeliveriesTab() {
     }
   };
 
-  const goToDeliveryScan = () => {
+  const goToDeliveryScan = (shipmentId = null, presetScanStatus = null) => {
+    const title =
+      presetScanStatus === "FAILED_DELIVERY"
+        ? "Report Failed"
+        : presetScanStatus === "RETURNED_TO_WAREHOUSE"
+          ? "Return Piece"
+          : "Deliver Piece";
+
     router.push({
       pathname: "/(checker)/scan",
-      params: { mode: "delivery", title: "Last-Mile Delivery" },
+      params: {
+        mode: "delivery",
+        title,
+        ...(shipmentId ? { focusShipmentId: shipmentId } : {}),
+        ...(presetScanStatus ? { presetScanStatus } : {}),
+      },
     });
   };
 
@@ -141,7 +153,7 @@ export default function CheckerDeliveriesTab() {
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.scanBtn, { borderColor: colors.border }]}
-            onPress={goToDeliveryScan}
+            onPress={() => goToDeliveryScan(null, "DELIVERED")}
             activeOpacity={0.85}
           >
             <FontAwesome5 name="qrcode" size={12} color={colors.text} />
@@ -262,27 +274,34 @@ export default function CheckerDeliveriesTab() {
                     <TouchableOpacity
                       style={[styles.actionBtn, { backgroundColor: "#16a34a" }]}
                       onPress={() =>
-                        router.push({
-                          pathname: "/(checker)/shipment-details",
-                          params: { shipmentId: shipment.id },
-                        })
+                        goToDeliveryScan(shipment.id, "DELIVERED")
                       }
                     >
-                      <Text style={styles.actionBtnText}>Complete delivery</Text>
+                      <Text style={styles.actionBtnText}>Scan to deliver</Text>
                     </TouchableOpacity>
                     <TouchableOpacity
                       style={[styles.actionBtn, styles.actionBtnSecondary]}
-                      onPress={() => runShipmentAction(shipment.id, "failed")}
-                      disabled={actionShipmentId === shipment.id}
+                      onPress={() =>
+                        goToDeliveryScan(shipment.id, "FAILED_DELIVERY")
+                      }
                     >
-                      <Text style={styles.actionBtnText}>Report failed</Text>
+                      <Text style={styles.actionBtnText}>Scan failed</Text>
                     </TouchableOpacity>
                   </>
                 )}
 
                 {nextAction === "return" && (
+                  <>
                   <TouchableOpacity
                     style={[styles.actionBtn, { backgroundColor: "#dc2626" }]}
+                    onPress={() =>
+                      goToDeliveryScan(shipment.id, "RETURNED_TO_WAREHOUSE")
+                    }
+                  >
+                    <Text style={styles.actionBtnText}>Scan return</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.actionBtn, styles.actionBtnSecondary]}
                     onPress={() => runShipmentAction(shipment.id, "return")}
                     disabled={actionShipmentId === shipment.id}
                   >
@@ -290,10 +309,11 @@ export default function CheckerDeliveriesTab() {
                       <ActivityIndicator color="#fff" size="small" />
                     ) : (
                       <Text style={styles.actionBtnText}>
-                        Return to warehouse
+                        Return all my pieces
                       </Text>
                     )}
                   </TouchableOpacity>
+                  </>
                 )}
               </View>
             );
