@@ -9,6 +9,14 @@ const { writeShipmentActionLog } = require("../utilities/shipmentLogger");
 const { deriveMasterShipmentStatus } = require("../packages/shipmentStatus");
 const { writeShipmentEvent } = require("../tracking/writeShipmentEvent");
 const { EVENT_TYPES } = require("../tracking/eventTypes");
+const {
+  normalizePackageIdSet,
+  collectTargetPieceIdentities,
+  assertHasTargetPieces,
+  assertRequestedPiecesOwned,
+  shouldTargetCheckerPiece,
+  applyPieceDelivered,
+} = require("../checker/checkerPieceOperations");
 
 if (!admin.apps.length) admin.initializeApp();
 
@@ -201,7 +209,8 @@ exports.updateShipmentStatus = onCall(
       "driver",
     ]);
 
-    const { uid, role, name } = updatedBy(req);
+    const { uid, role, name, usercode } = updatedBy(req);
+    const checkerAuthUid = req.auth?.uid || uid;
 
     const {
       shipmentId,
@@ -218,6 +227,7 @@ exports.updateShipmentStatus = onCall(
       notifyPush,
       notificationChannels = null,
       sourceUI = "SYSTEM",
+      packageIds = null,
     } = req.data || {};
 
     if (!shipmentId || !newStatus) {
@@ -245,6 +255,12 @@ exports.updateShipmentStatus = onCall(
       : null;
 
     let checkerPromotedOutForDelivery = false;
+    let checkerDeliveredPieceIds = [];
+    let resultStatus = newStatus;
+
+    const packageIdSet = normalizePackageIdSet(packageIds);
+    const isCheckerPieceDelivery =
+      isFinalDeliveryStatus && actor.role === "checker";
 
     const notificationEvent = await db.runTransaction(async (tx) => {
       const shipmentSnap = await tx.get(shipmentRef);
@@ -264,7 +280,7 @@ exports.updateShipmentStatus = onCall(
         ? currentData.packages
         : [];
 
-      if (oldStatus === newStatus) {
+      if (oldStatus === newStatus && !isCheckerPieceDelivery) {
         return null;
       }
 
@@ -333,16 +349,17 @@ exports.updateShipmentStatus = onCall(
 
       const isCheckerOwnedPiece = (pkg = {}) => {
         if (actor.role !== "checker") return true;
-        const checkerUid = String(uid || "");
-        if (
-          String(currentData.assignedCheckerId || "") === checkerUid ||
-          String(pkg.loadedByCheckerId || "") === checkerUid
-        ) {
+        const checkerUid = String(checkerAuthUid || "");
+        const legacyUserCode = String(usercode || "").trim();
+        const loadedBy = String(pkg.loadedByCheckerId || "").trim();
+        if (loadedBy && (loadedBy === checkerUid || (legacyUserCode && loadedBy === legacyUserCode))) {
           return true;
         }
+        const custodyId = String(pkg.custodyOwnerId || "").trim();
         return (
           String(pkg.custodyOwnerType || "").toUpperCase() === "CHECKER" &&
-          String(pkg.custodyOwnerId || "") === checkerUid
+          (custodyId === checkerUid ||
+            (legacyUserCode && custodyId === legacyUserCode))
         );
       };
 
@@ -367,8 +384,46 @@ exports.updateShipmentStatus = onCall(
         }
       }
 
+      if (isCheckerPieceDelivery) {
+        assertRequestedPiecesOwned(
+          oldPackages,
+          packageIdSet,
+          checkerAuthUid,
+          currentData,
+          "deliver",
+        );
+        const targetIdentities = collectTargetPieceIdentities(oldPackages, {
+          checkerUid: checkerAuthUid,
+          shipmentData: currentData,
+          packageIdSet,
+          mode: "deliver",
+        });
+        assertHasTargetPieces(
+          targetIdentities,
+          "deliver. Mark out for delivery or scan the piece label first.",
+        );
+        checkerDeliveredPieceIds = targetIdentities;
+      }
+
       const updatedPackages = oldPackages.map((pkg) => {
         const quantity = normalizeQty(pkg.quantity, 1);
+
+        if (isCheckerPieceDelivery) {
+          if (
+            !shouldTargetCheckerPiece(pkg, {
+              checkerUid: checkerAuthUid,
+              shipmentData: currentData,
+              packageIdSet,
+              mode: "deliver",
+            })
+          ) {
+            return pkg;
+          }
+          return applyPieceDelivered(pkg, {
+            actorUid: checkerAuthUid,
+            actorName: name,
+          });
+        }
 
         if (newStatus === "OUT_FOR_DELIVERY" && actor.role === "checker") {
           if (!isCheckerOwnedPiece(pkg)) return pkg;
@@ -430,8 +485,13 @@ exports.updateShipmentStatus = onCall(
         newLoadedQty = 0;
         newReceivedQty = 0;
       } else if (isFinalDeliveryStatus) {
-        newLoadedQty = newTotalQty;
-        newReceivedQty = newTotalQty;
+        if (isCheckerPieceDelivery) {
+          newLoadedQty = sumLoadedQty(updatedPackages);
+          newReceivedQty = sumReceivedQty(updatedPackages);
+        } else {
+          newLoadedQty = newTotalQty;
+          newReceivedQty = newTotalQty;
+        }
       } else if (newStatus === "MISSING") {
         newLoadedQty = 0;
       }
@@ -439,9 +499,15 @@ exports.updateShipmentStatus = onCall(
       const newPendingQty = Math.max(newTotalQty - newLoadedQty, 0);
 
       const derivedShipmentStatus =
-        newStatus === "OUT_FOR_DELIVERY" && actor.role === "checker"
+        (newStatus === "OUT_FOR_DELIVERY" && actor.role === "checker") ||
+        isCheckerPieceDelivery
           ? deriveMasterShipmentStatus(updatedPackages, {
               previousStatus: oldStatus,
+              totals: {
+                totalQty: newTotalQty,
+                receivedQty: newReceivedQty,
+                loadedQty: newLoadedQty,
+              },
             })
           : newStatus;
 
@@ -479,6 +545,8 @@ exports.updateShipmentStatus = onCall(
       };
 
       tx.update(shipmentRef, shipmentUpdate);
+
+      resultStatus = derivedShipmentStatus;
 
       if (checkerPromotedOutForDelivery) {
         const manifestId = currentData.deliveryManifestId;
@@ -533,7 +601,7 @@ exports.updateShipmentStatus = onCall(
         tx.update(tripRef, tripUpdate);
 
         tx.update(tripShipmentRef, {
-          status: newStatus,
+          status: derivedShipmentStatus,
           totalItems: newTotalQty,
           loadedCount: newLoadedQty,
           pendingCount: newPendingQty,
@@ -568,7 +636,7 @@ exports.updateShipmentStatus = onCall(
         shipment: currentData,
         shipmentId,
         oldStatus,
-        newStatus,
+        newStatus: derivedShipmentStatus,
         actor: { uid, role, name },
         notificationChannels,
         notifySms,
@@ -595,6 +663,35 @@ exports.updateShipmentStatus = onCall(
       });
     }
 
+    if (isCheckerPieceDelivery && checkerDeliveredPieceIds.length > 0) {
+      await Promise.all(
+        checkerDeliveredPieceIds.map((pieceId) =>
+          writeShipmentEvent({
+            db,
+            event: {
+              shipmentId,
+              pieceId,
+              eventType: EVENT_TYPES.DELIVERED,
+              checkerId: uid,
+              checkerName: name,
+              location: location || null,
+              proofPhotoUrl: Array.isArray(proofOfDelivery)
+                ? proofOfDelivery[0] || null
+                : proofOfDelivery || null,
+              remarks:
+                remarks ||
+                `Delivered by checker (${checkerDeliveredPieceIds.length} piece${
+                  checkerDeliveredPieceIds.length === 1 ? "" : "s"
+                }).`,
+              createdBy: uid,
+              createdByRole: role,
+              source: sourceUI || "CHECKER_MOBILE",
+            },
+          }),
+        ),
+      );
+    }
+
     if (notificationEvent) {
       const trackedUserIds = await getTrackedShipmentUserIds(shipmentId);
       notificationEvent.targetUserIds = unique([
@@ -611,7 +708,8 @@ exports.updateShipmentStatus = onCall(
 
     return {
       success: true,
-      status: newStatus,
+      status: resultStatus,
+      deliveredPieceIds: checkerDeliveredPieceIds,
       notificationQueued: Boolean(notificationEvent),
     };
   },

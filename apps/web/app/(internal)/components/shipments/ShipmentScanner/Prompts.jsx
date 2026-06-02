@@ -43,9 +43,6 @@ export function InterceptorPrompt({
 export function NextTripPrompt({
   theme,
   item,
-  trips,
-  selectedTrip,
-  onSelectTrip,
   onAssign,
   onSkip,
   btnStatus,
@@ -56,24 +53,20 @@ export function NextTripPrompt({
       icon={faTruckRampBox}
       iconColor="text-blue-500"
       title="Unload Successful!"
-      description={`Shipment ${item.shipmentId} received. Assign to a delivery trip now?`}
+      description={`Shipment ${item.shipmentId} received at warehouse. Release for checker delivery operations now?`}
     >
-      <TripSearchSelect
-        theme={theme}
-        trips={trips}
-        selectedTrip={selectedTrip}
-        onSelectTrip={onSelectTrip}
-      />
       <div className="space-y-2">
         <StatusButton
           status={btnStatus}
-          label="Assign to Next Trip"
+          label="Release shipment"
+          loadingLabel="Releasing..."
+          successLabel="Released"
           icon={faCheck}
           variant="blue"
           onClick={onAssign}
         />
         <button onClick={onSkip} className="text-xs opacity-60 underline mt-2">
-          Skip (Leave in Warehouse)
+          Skip (leave in warehouse)
         </button>
       </div>
     </InterceptorPrompt>
@@ -83,12 +76,10 @@ export function NextTripPrompt({
 export function HandoffPrompt({
   theme,
   summary,
-  trips,
-  selectedTrip,
-  onSelectTrip,
+  tripId = null,
   missingRemarks,
   onRemarkChange,
-  onAssign,
+  onRelease,
   onRefresh,
   onBack,
   btnStatus,
@@ -100,19 +91,21 @@ export function HandoffPrompt({
   const remarksComplete = missingShipments.every((item) =>
     String(missingRemarks?.[item.id] || "").trim(),
   );
-  const canAssign =
-    trips.length > 0 && selectedTrip && (!hasMissing || remarksComplete);
+  const canRelease =
+    unloadedShipments.length > 0 && (!hasMissing || remarksComplete);
 
   return (
     <InterceptorPrompt
       theme={theme}
       icon={hasMissing ? faTriangleExclamation : faTruckRampBox}
       iconColor={hasMissing ? "text-amber-500" : "text-emerald-500"}
-      title="Manifest Reconciliation"
+      title="Manifest reconciliation"
       description={
         hasMissing
-          ? "Some manifest shipments still need remarks before handoff."
-          : "All manifest shipments are accounted for and ready for delivery."
+          ? "Add remarks for missing manifest rows, then release unloaded shipments for checker delivery."
+          : tripId
+            ? `All manifest shipments on ${tripId} are accounted for. Release them for checker scan-to-load.`
+            : "All manifest shipments are accounted for. Release them for checker delivery operations."
       }
     >
       <div className="grid grid-cols-3 gap-2 text-left">
@@ -191,23 +184,16 @@ export function HandoffPrompt({
         </div>
       )}
 
-      <TripSearchSelect
-        theme={theme}
-        trips={trips}
-        selectedTrip={selectedTrip}
-        onSelectTrip={onSelectTrip}
-      />
-
       <div className="space-y-2">
         <StatusButton
           status={btnStatus}
-          label="Assign to Delivery Trip"
-          loadingLabel="Assigning..."
-          successLabel="Handoff Complete"
+          label="Release shipment(s)"
+          loadingLabel="Releasing..."
+          successLabel="Released"
           icon={faCheck}
           variant="blue"
-          disabled={!canAssign}
-          onClick={onAssign}
+          disabled={!canRelease}
+          onClick={onRelease}
         />
         <div className="flex items-center justify-center gap-4">
           <button onClick={onBack} className="text-xs opacity-60 underline">

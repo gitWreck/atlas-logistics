@@ -42,6 +42,8 @@ import {
   getCallableErrorMessage,
   loadAssignedShipmentsToVehicle,
   markShipmentOutForDelivery,
+  reportCheckerFailedDelivery,
+  returnCheckerShipmentsToWarehouse,
 } from "../../components/utilities/checkerDelivery";
 import {
   getCurrentLocationSafe,
@@ -153,7 +155,8 @@ export default function ScannerScreen() {
     }),
   ).current;
 
-  const { mode, tripId } = useLocalSearchParams();
+  const { mode, tripId, presetScanStatus, focusShipmentId } =
+    useLocalSearchParams();
   const resolvedMode = Array.isArray(mode) ? mode[0] : mode;
   const resolvedTripId = Array.isArray(tripId) ? tripId[0] : tripId;
 
@@ -331,8 +334,12 @@ export default function ScannerScreen() {
   }, [resolvedTripId, resolvedMode]);
 
   useEffect(() => {
+    if (presetScanStatus) {
+      setScanActionStatus(String(presetScanStatus));
+      return;
+    }
     setScanActionStatus(getDefaultScanStatus(resolvedMode));
-  }, [resolvedMode]);
+  }, [resolvedMode, presetScanStatus]);
 
   const clearSuccessTimers = () => {
     if (successTimerRef.current) clearTimeout(successTimerRef.current);
@@ -495,6 +502,58 @@ export default function ScannerScreen() {
           packageStatus: status,
           quantity: qty,
           message: "Shipment marked out for delivery.",
+          source,
+        });
+        return;
+      }
+
+      const deliveryPieceIds =
+        Array.isArray(packageIds) && packageIds.length > 0
+          ? packageIds
+          : [getDeliverPackageIdForScan(shipmentDocData, barcode)].filter(Boolean);
+
+      if (isDeliveryScanMode && status === "FAILED_DELIVERY") {
+        assertCheckerCanAccessShipment(shipmentDocData, profile?.uid);
+        if (deliveryPieceIds.length === 0) {
+          throw new Error("Scan an individual piece label to report failed delivery.");
+        }
+        await reportCheckerFailedDelivery({
+          shipmentIds: [shipmentId],
+          packageIds: deliveryPieceIds,
+          profile,
+          reasonCode: "DELIVERY_FAILED",
+          remarks: remarks || "Failed delivery reported via scan.",
+        });
+        showSuccessModal({
+          barcode,
+          shipmentId,
+          shipmentStatus: shipmentDocData?.status || "FAILED_DELIVERY",
+          packageStatus: status,
+          quantity: qty,
+          message: "Piece marked as failed delivery.",
+          source,
+        });
+        return;
+      }
+
+      if (isDeliveryScanMode && status === "RETURNED_TO_WAREHOUSE") {
+        assertCheckerCanAccessShipment(shipmentDocData, profile?.uid);
+        if (deliveryPieceIds.length === 0) {
+          throw new Error("Scan an individual piece label to return to warehouse.");
+        }
+        await returnCheckerShipmentsToWarehouse({
+          shipmentIds: [shipmentId],
+          packageIds: deliveryPieceIds,
+          profile,
+          remarks: remarks || "Returned to Odiongan warehouse via scan.",
+        });
+        showSuccessModal({
+          barcode,
+          shipmentId,
+          shipmentStatus: "RETURNED_TO_WAREHOUSE",
+          packageStatus: status,
+          quantity: qty,
+          message: "Piece returned to Odiongan warehouse.",
           source,
         });
         return;
@@ -743,44 +802,62 @@ export default function ScannerScreen() {
       const isPackageLevelDelivery =
         resolvedMode === "offloading" || deliveryScope.isPackageLevel;
 
-      if (isDeliveryScanMode && !isPackageLevelDelivery) {
+      if (isDeliveryScanMode && isPackageLevelDelivery) {
         assertCheckerCanAccessShipment(shipmentDocData, profile?.uid);
         const location = await getCurrentLocationSafe();
+        const pieceIds =
+          Array.isArray(deliveryScope.packageIds) &&
+          deliveryScope.packageIds.length > 0
+            ? deliveryScope.packageIds
+            : null;
 
-        await completeCheckerDelivery({
-          shipmentId: canonicalShipmentId,
-          profile,
-          tripId: pendingDelivery.tripId || null,
-          location,
-          photoUrls: proofImages,
-          shipment: shipmentDocData,
-        });
+        if (pieceIds) {
+          await completeCheckerDelivery({
+            shipmentId: canonicalShipmentId,
+            packageIds: pieceIds,
+            profile,
+            tripId: pendingDelivery.tripId || null,
+            location,
+            photoUrls: proofImages,
+            shipment: shipmentDocData,
+          });
 
-        showSuccessModal({
-          barcode: pendingDelivery.barcode,
-          shipmentId: canonicalShipmentId,
-          shipmentStatus: "DELIVERED",
-          packageStatus: "DELIVERED",
-          quantity: pendingDelivery.qty,
-          message: "Delivery completed with proof of delivery.",
-          source: pendingDelivery.source,
-        });
-      } else {
-        await executeStatusUpdate({
-          shipmentId: canonicalShipmentId,
-          barcode: pendingDelivery.barcode,
-          status: "DELIVERED",
-          qty: pendingDelivery.qty,
-          remarks: proofRemarks,
-          source: pendingDelivery.source,
-          shipmentDocData,
-          proofImages,
-          completeShipment:
-            resolvedMode === "offloading" ? false : !isPackageLevelDelivery,
-          packageIds: deliveryScope.packageIds,
-          throwOnError: false,
-        });
+          showSuccessModal({
+            barcode: pendingDelivery.barcode,
+            shipmentId: canonicalShipmentId,
+            shipmentStatus: "DELIVERED",
+            packageStatus: "DELIVERED",
+            quantity: pendingDelivery.qty,
+            message: "Piece delivered with proof of delivery.",
+            source: pendingDelivery.source,
+          });
+          return;
+        }
       }
+
+      if (isDeliveryScanMode && !isPackageLevelDelivery) {
+        setDeliveryProofUploading(false);
+        Alert.alert(
+          "Scan piece label",
+          "Scan an individual piece label to deliver. Master tracking alone cannot complete delivery.",
+        );
+        return;
+      }
+
+      await executeStatusUpdate({
+        shipmentId: canonicalShipmentId,
+        barcode: pendingDelivery.barcode,
+        status: "DELIVERED",
+        qty: pendingDelivery.qty,
+        remarks: proofRemarks,
+        source: pendingDelivery.source,
+        shipmentDocData,
+        proofImages,
+        completeShipment:
+          resolvedMode === "offloading" ? false : !isPackageLevelDelivery,
+        packageIds: deliveryScope.packageIds,
+        throwOnError: false,
+      });
 
       setProcessing(false);
       resetDeliveryProof();
@@ -1067,6 +1144,21 @@ export default function ScannerScreen() {
         }
 
         if (statusToApply === "LOAD_TO_VEHICLE") {
+          await executeStatusUpdate({
+            shipmentId: shipmentDoc.id,
+            barcode,
+            status: statusToApply,
+            remarks: "",
+            source,
+            shipmentDocData: shipmentData,
+          });
+          return;
+        }
+
+        if (
+          isDeliveryScanMode &&
+          ["FAILED_DELIVERY", "RETURNED_TO_WAREHOUSE"].includes(statusToApply)
+        ) {
           await executeStatusUpdate({
             shipmentId: shipmentDoc.id,
             barcode,

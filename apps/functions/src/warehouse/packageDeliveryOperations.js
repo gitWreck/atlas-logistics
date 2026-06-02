@@ -96,6 +96,89 @@ function shipmentHasCheckerCustodyPieces(packages = []) {
   );
 }
 
+function normalizePieceStatus(pkg = {}) {
+  return String(pkg.status || "").trim().toUpperCase();
+}
+
+function isReturnedAwaitingHubReceive(pkg = {}) {
+  if (normalizePieceStatus(pkg) !== "RETURNED_TO_WAREHOUSE") return false;
+  return !pkg.returnReceivedAt;
+}
+
+function countPiecesAwaitingReturnReceive(packages = []) {
+  return packages.filter(isReturnedAwaitingHubReceive).length;
+}
+
+function shipmentHasPiecesAwaitingReturnReceive(packages = []) {
+  return countPiecesAwaitingReturnReceive(packages) > 0;
+}
+
+function applyPieceReturnedReceivedAtHub(
+  pkg = {},
+  {
+    warehouseCode = DEFAULT_WAREHOUSE_CODE,
+    actorName = null,
+    actorUid = null,
+  } = {},
+) {
+  const nowIso = new Date().toISOString();
+  const quantity = Math.max(normalizeQty(pkg.quantity, 1), 1);
+
+  return {
+    ...pkg,
+    quantity,
+    status: "RETURNED_RECEIVED_AT_HUB",
+    availableForDelivery: false,
+    custodyOwnerType: "WAREHOUSE",
+    custodyOwnerId: warehouseCode,
+    loadedByCheckerId: null,
+    loadedByCheckerName: null,
+    deliveryManifestId: null,
+    deliveryVehicleId: null,
+    deliveryVehicleName: null,
+    loadedQty: 0,
+    returnReceivedAt: nowIso,
+    returnReceivedBy: actorName || actorUid || null,
+    returnReceivedByUid: actorUid || null,
+    updatedAt: nowIso,
+  };
+}
+
+function applyReturnedPiecesReceivedAtHub(
+  packages = [],
+  {
+    warehouseCode = DEFAULT_WAREHOUSE_CODE,
+    actorName = null,
+    actorUid = null,
+    packageIdSet = null,
+  } = {},
+) {
+  return packages.map((pkg) => {
+    if (!isReturnedAwaitingHubReceive(pkg)) return pkg;
+    if (packageIdSet && packageIdSet.size > 0) {
+      const identity = getPackageIdentity(pkg);
+      let matched = false;
+      for (const packageId of packageIdSet) {
+        if (
+          identity === String(packageId).trim() ||
+          String(pkg.packageId || "").trim() === String(packageId).trim() ||
+          String(pkg.trackingNumber || "").trim() === String(packageId).trim()
+        ) {
+          matched = true;
+          break;
+        }
+      }
+      if (!matched) return pkg;
+    }
+
+    return applyPieceReturnedReceivedAtHub(pkg, {
+      warehouseCode,
+      actorName,
+      actorUid,
+    });
+  });
+}
+
 function canCheckerAccessShipment(shipmentData = {}, checkerUid) {
   if (!checkerUid) return false;
 
@@ -134,4 +217,9 @@ module.exports = {
   shipmentHasCheckerCustodyPieces,
   canCheckerAccessShipment,
   assertCheckerCanAccessShipment,
+  isReturnedAwaitingHubReceive,
+  countPiecesAwaitingReturnReceive,
+  shipmentHasPiecesAwaitingReturnReceive,
+  applyPieceReturnedReceivedAtHub,
+  applyReturnedPiecesReceivedAtHub,
 };

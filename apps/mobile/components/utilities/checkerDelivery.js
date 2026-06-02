@@ -5,7 +5,10 @@ import {
   updateShipmentStatus,
 } from "./FirebaseFunctions";
 import { getCurrentLocationSafe, updatedBy } from "./helpers";
-import { getCheckerPieceActionPhase } from "./checkerDeliveryPool";
+import {
+  countDeliveryPoolPieces,
+  getCheckerPieceActionPhase,
+} from "./checkerDeliveryPool";
 
 export function canCheckerAccessShipment(shipment, checkerUid) {
   if (!shipment || !checkerUid) return false;
@@ -54,13 +57,15 @@ export function getCheckerDeliveryNextAction(shipment, checkerUid = null) {
   if (checkerUid) {
     const piecePhase = getCheckerPieceActionPhase(shipment, checkerUid);
     if (piecePhase) return piecePhase;
+
+    const pool = countDeliveryPoolPieces(shipment, checkerUid);
+    if (pool.mine === 0) return null;
   }
 
   const status = normalizeStatus(shipment?.status);
 
   if (status === "OUT_FOR_DELIVERY") return "deliver";
   if (status === "FAILED_DELIVERY") return "return";
-  if (status === "READY_FOR_DELIVERY") return "out_for_delivery";
 
   return null;
 }
@@ -126,6 +131,7 @@ export async function markShipmentOutForDelivery({
 
 export async function reportCheckerFailedDelivery({
   shipmentIds,
+  packageIds = null,
   profile,
   reasonCode = null,
   remarks = "",
@@ -133,6 +139,7 @@ export async function reportCheckerFailedDelivery({
   const location = await getCurrentLocationSafe();
   const response = await reportFailedDelivery({
     shipmentIds,
+    ...(Array.isArray(packageIds) && packageIds.length > 0 ? { packageIds } : {}),
     reasonCode,
     remarks: remarks || "Failed delivery reported from checker app.",
     location: location ? `${location.lat},${location.lng}` : null,
@@ -160,6 +167,7 @@ export async function returnCheckerShipmentsToWarehouse({
 
 export async function completeCheckerDelivery({
   shipmentId,
+  packageIds = null,
   profile,
   tripId = null,
   location,
@@ -175,6 +183,7 @@ export async function completeCheckerDelivery({
     shipmentId,
     tripId,
     newStatus: "DELIVERED",
+    ...(Array.isArray(packageIds) && packageIds.length > 0 ? { packageIds } : {}),
     location,
     remarks: `Proof of Delivery: ${photoUrls.length} images uploaded.`,
     proofOfDelivery: photoUrls,

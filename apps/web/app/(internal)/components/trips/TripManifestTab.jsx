@@ -1,6 +1,8 @@
 "use client";
 
 import React, { useState, useMemo, useEffect } from "react";
+import ReleaseToCheckerModal from "../shipments/modals/ReleaseToCheckerModal";
+import { isEligibleForCheckerRelease } from "@/app/utility/checkerRelease";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faSearch,
@@ -24,6 +26,7 @@ import { packageLabelUrl } from "@/app/utility/constant/templates";
 import { updatedBy } from "@/app/utility/utilities";
 import StatusBadge from "../ui/StatusBadge";
 import TablePaginationFooter from "../ui/TablePaginationFooter";
+import TripDeliveryPoolSummary from "./TripDeliveryPoolSummary";
 
 export default function TripManifestTab({
   shipments = [],
@@ -46,9 +49,22 @@ export default function TripManifestTab({
   const [isBulkProcessing, setIsBulkProcessing] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [manifestLimit, setManifestLimit] = useState("50");
+  const [isReleaseModalOpen, setIsReleaseModalOpen] = useState(false);
 
   const theme = getTableTheme(isDark);
   const action = getTableActionClasses(isDark);
+
+  const canReleaseShipments = ["manager", "admin"].includes(
+    String(profile?.role || "").toLowerCase(),
+  );
+
+  const releaseTargetShipments = useMemo(() => {
+    const pool =
+      selectedIds.size > 0
+        ? shipments.filter((s) => selectedIds.has(s.id))
+        : shipments;
+    return pool.filter((s) => isEligibleForCheckerRelease(s.status));
+  }, [shipments, selectedIds]);
 
   const rowAction = {
     print: isDark
@@ -209,7 +225,10 @@ export default function TripManifestTab({
   );
 
   return (
+    <>
     <div className="space-y-4 animate-in fade-in slide-in-from-right-4 duration-300">
+      <TripDeliveryPoolSummary shipments={shipments} isDark={isDark} />
+
       {/* Header */}
       <div className={`p-4 rounded-2xl border ${theme.statCard}`}>
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
@@ -257,7 +276,24 @@ export default function TripManifestTab({
               />
             </div>
 
-            <div className="grid grid-cols-2 sm:flex gap-2">
+            <div className="grid grid-cols-2 sm:flex gap-2 flex-wrap">
+              {canReleaseShipments && (
+                <button
+                  type="button"
+                  onClick={() => setIsReleaseModalOpen(true)}
+                  disabled={isLocked || releaseTargetShipments.length === 0}
+                  className={`text-xs font-bold px-3 py-1.5 h-8 rounded-lg flex items-center justify-center gap-2 transition-colors disabled:opacity-50 whitespace-nowrap ${isDark ? "bg-indigo-600 hover:bg-indigo-500 text-white" : "bg-indigo-600 hover:bg-indigo-500 text-white"}`}
+                  title={
+                    selectedIds.size > 0
+                      ? `Release ${releaseTargetShipments.length} selected shipment(s) for checker delivery`
+                      : `Release all eligible shipments on this trip (${releaseTargetShipments.length})`
+                  }
+                >
+                  <FontAwesomeIcon icon={faBoxOpen} />
+                  Release shipment(s)
+                </button>
+              )}
+
               <button
                 type="button"
                 onClick={() =>
@@ -678,5 +714,19 @@ export default function TripManifestTab({
         )}
       </div>
     </div>
+
+    <ReleaseToCheckerModal
+      isOpen={isReleaseModalOpen}
+      onClose={() => setIsReleaseModalOpen(false)}
+      onSuccess={() => {
+        setSelectedIds(new Set());
+        onRefresh?.();
+      }}
+      isDark={isDark}
+      tripId={tripId}
+      defaultShipmentIds={releaseTargetShipments.map((s) => s.id)}
+      defaultShipments={releaseTargetShipments}
+    />
+    </>
   );
 }

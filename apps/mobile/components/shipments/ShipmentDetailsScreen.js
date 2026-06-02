@@ -178,6 +178,22 @@ export default function ShipmentDetailsScreen() {
     }
   };
 
+  const handleFooterAction = () => {
+    if (canCheckerCompleteDelivery) {
+      router.push({
+        pathname: "/(checker)/scan",
+        params: {
+          mode: "delivery",
+          title: "Deliver Piece",
+          focusShipmentId: String(shipmentId),
+          presetScanStatus: "DELIVERED",
+        },
+      });
+      return;
+    }
+    handleAction();
+  };
+
   const handleAction = async () => {
     if (!shipment) return;
 
@@ -389,7 +405,7 @@ export default function ShipmentDetailsScreen() {
         });
         Alert.alert(
           "Failed Delivery",
-          "Delivery marked as failed. Return the package to the warehouse when you are back at Odiongan.",
+          "Your loaded pieces were marked failed. Return them to Odiongan warehouse.",
         );
       } else {
         await updateShipmentStatus({
@@ -525,7 +541,7 @@ export default function ShipmentDetailsScreen() {
     canCheckerStartRoute ||
     canCheckerCompleteDelivery ||
     canCheckerReturnToWarehouse;
-  const needsPhotoUpload = canDriverHandlePickup || canCheckerCompleteDelivery;
+  const needsPhotoUpload = canDriverHandlePickup;
 
   const packagePanelEditable =
     isCheckerLastMile &&
@@ -664,7 +680,7 @@ export default function ShipmentDetailsScreen() {
         <ShipmentActionFooter
           status={shipment.status}
           actionLoading={actionLoading}
-          onAction={handleAction}
+          onAction={handleFooterAction}
           onReportIssue={() => setIsIssueModalVisible(true)}
           message={actionMessage}
           onMessageChange={setActionMessage}

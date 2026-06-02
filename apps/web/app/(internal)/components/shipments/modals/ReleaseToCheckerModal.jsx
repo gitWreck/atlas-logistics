@@ -26,6 +26,7 @@ export default function ReleaseToCheckerModal({
   isDark = false,
   defaultShipmentIds = [],
   defaultShipments = [],
+  tripId = null,
 }) {
   const [warehouseCode, setWarehouseCode] = useState("ODIONGAN_WAREHOUSE");
   const [remarks, setRemarks] = useState("");
@@ -96,12 +97,23 @@ export default function ReleaseToCheckerModal({
         <div
           className={`px-5 py-4 border-b ${isDark ? "border-slate-800" : "border-slate-200"}`}
         >
-          <h3 className="text-lg font-bold">Release for Delivery Operations</h3>
+          <h3 className="text-lg font-bold">Release shipment(s)</h3>
           <p
             className={`text-xs mt-1 ${isDark ? "text-slate-400" : "text-slate-600"}`}
           >
-            Makes inventory visible to all checkers. Custody stays at Odiongan
-            until each label is scanned and loaded onto a van.
+            {tripId ? (
+              <>
+                Release from trip{" "}
+                <span className="font-mono font-semibold">{tripId}</span>.
+                Inventory becomes visible to all checkers. Custody stays at
+                Odiongan until each label is scanned and loaded.
+              </>
+            ) : (
+              <>
+                Makes inventory visible to all checkers. Custody stays at
+                Odiongan until each label is scanned and loaded onto a van.
+              </>
+            )}
           </p>
         </div>
 
@@ -125,7 +137,7 @@ export default function ReleaseToCheckerModal({
                 ? ` of ${parsedIds.length}`
                 : ""}{" "}
               shipment(s) ready to release. Delivered, completed, and cancelled
-              shipments cannot be assigned.
+              shipments cannot be released.
             </p>
             {releaseValidation.blocked.length > 0 && (
               <div
@@ -188,6 +200,7 @@ export default function ReleaseToCheckerModal({
                 setSubmitting(true);
                 setError("");
                 await releaseForDeliveryOperations({
+                  tripId: tripId || null,
                   shipmentIds: releaseValidation.eligible,
                   warehouseCode: warehouseCode || null,
                   remarks: remarks || null,
@@ -202,7 +215,7 @@ export default function ReleaseToCheckerModal({
               }
             }}
           >
-            {submitting ? "Releasing..." : "Make Available for Delivery"}
+            {submitting ? "Releasing..." : "Release shipment(s)"}
           </button>
         </div>
       </div>

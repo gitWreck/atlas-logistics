@@ -12,6 +12,12 @@ function isAvailableAtWarehouse(pkg = {}) {
   if (["DELIVERED", "MISSING", "DAMAGED", "CANCELLED"].includes(status)) {
     return false;
   }
+  if (
+    status === "RETURNED_TO_WAREHOUSE" ||
+    status === "RETURNED_RECEIVED_AT_HUB"
+  ) {
+    return false;
+  }
   if (pkg.availableForDelivery === true) return true;
   if (status === "AVAILABLE_AT_WAREHOUSE") return true;
   const custody = normalizeStatus(pkg.custodyOwnerType);
@@ -23,6 +29,23 @@ function isLoadedByChecker(pkg = {}, checkerUid) {
   if (!checkerUid) return false;
   return String(pkg.loadedByCheckerId || "").trim() === String(checkerUid);
 }
+
+/** Matches backend checker piece ownership (load / OFD / deliver). */
+function isCheckerCustodyPiece(pkg = {}, checkerUid) {
+  if (!checkerUid) return false;
+  if (isLoadedByChecker(pkg, checkerUid)) return true;
+  return (
+    normalizeStatus(pkg.custodyOwnerType) === "CHECKER" &&
+    String(pkg.custodyOwnerId || "").trim() === String(checkerUid)
+  );
+}
+
+const ON_VAN_PIECE_STATUSES = new Set([
+  "LOADED",
+  "READY_FOR_DELIVERY",
+  "PARTIALLY_LOADED",
+  "OUT_FOR_DELIVERY",
+]);
 
 function isLoadedByOtherChecker(pkg = {}, checkerUid) {
   const loadedBy = String(pkg.loadedByCheckerId || "").trim();
@@ -59,9 +82,15 @@ export function countDeliveryPoolPieces(shipment = {}, checkerUid = null) {
       return;
     }
 
-    if (checkerUid && isLoadedByChecker(pkg, checkerUid)) {
-      stats.mine += qty;
-      return;
+    if (checkerUid && isCheckerCustodyPiece(pkg, checkerUid)) {
+      const status = normalizeStatus(pkg.status);
+      if (
+        ON_VAN_PIECE_STATUSES.has(status) ||
+        status === "FAILED_DELIVERY"
+      ) {
+        stats.mine += qty;
+        return;
+      }
     }
 
     if (
@@ -93,35 +122,16 @@ export function isAvailableToLoadShipment(shipment = {}) {
 export function isMyActiveDeliveryShipment(shipment = {}, checkerUid) {
   if (!checkerUid) return false;
 
-  if (String(shipment.assignedCheckerId || "") === String(checkerUid)) {
-    return true;
-  }
+  const pool = countDeliveryPoolPieces(shipment, checkerUid);
+  if (pool.mine > 0) return true;
 
-  const activeIds = Array.isArray(shipment.activeCheckerIds)
-    ? shipment.activeCheckerIds
-    : [];
-  if (activeIds.some((id) => String(id) === String(checkerUid))) {
-    return true;
-  }
+  if (getCheckerPieceActionPhase(shipment, checkerUid)) return true;
 
-  return countDeliveryPoolPieces(shipment, checkerUid).mine > 0;
+  return false;
 }
 
-function isMyPiece(pkg = {}, checkerUid, shipment = {}) {
-  if (!checkerUid) return false;
-  if (String(shipment.assignedCheckerId || "") === String(checkerUid)) {
-    return true;
-  }
-  if (String(pkg.loadedByCheckerId || "").trim() === String(checkerUid)) {
-    return true;
-  }
-  if (
-    normalizeStatus(pkg.custodyOwnerType) === "CHECKER" &&
-    String(pkg.custodyOwnerId || "").trim() === String(checkerUid)
-  ) {
-    return true;
-  }
-  return false;
+function isMyPiece(pkg = {}, checkerUid) {
+  return isCheckerCustodyPiece(pkg, checkerUid);
 }
 
 /**
@@ -131,23 +141,24 @@ function isMyPiece(pkg = {}, checkerUid, shipment = {}) {
 export function getCheckerPieceActionPhase(shipment = {}, checkerUid = null) {
   if (!checkerUid) return null;
 
-  const masterStatus = normalizeStatus(shipment.status);
-  if (masterStatus === "FAILED_DELIVERY") return "return";
-  if (masterStatus === "OUT_FOR_DELIVERY") return "deliver";
-
   const packages = Array.isArray(shipment.packages) ? shipment.packages : [];
   let myOnVan = 0;
   let myOfd = 0;
+  let myFailed = 0;
   let myDelivered = 0;
 
   packages.forEach((pkg) => {
-    if (!isMyPiece(pkg, checkerUid, shipment)) return;
+    if (!isMyPiece(pkg, checkerUid)) return;
 
     const status = normalizeStatus(pkg.status);
     const qty = pieceQuantity(pkg);
 
     if (status === "DELIVERED" || status === "COMPLETED") {
       myDelivered += qty;
+      return;
+    }
+    if (status === "FAILED_DELIVERY") {
+      myFailed += qty;
       return;
     }
     if (status === "OUT_FOR_DELIVERY") {
@@ -160,6 +171,7 @@ export function getCheckerPieceActionPhase(shipment = {}, checkerUid = null) {
   });
 
   if (myOfd > 0) return "deliver";
+  if (myFailed > 0) return "return";
   if (myOnVan > 0) return "out_for_delivery";
   if (myDelivered > 0) return null;
 

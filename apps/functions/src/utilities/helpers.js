@@ -255,12 +255,19 @@ async function requireRole(db, context, allowedRoles = []) {
   };
 }
 
+/**
+ * Actor identity for Firestore writes and custody checks.
+ * Always prefer Firebase Auth UID — mobile sends userCode in updatedBy.usercode
+ * for display/audit only; piece custody fields use auth.uid (see loadPackagesToDeliveryManifest).
+ */
 const updatedBy = (req) => {
-  const updatedBy = req.data?.updatedBy || {};
-  const uid = updatedBy.usercode || req.auth.uid || "unknown";
-  const name = updatedBy.username || req.auth.token?.name || null;
-  const role = updatedBy.role || req.auth.token?.role || null;
-  return { uid, name, role };
+  const payload = req.data?.updatedBy || {};
+  const authUid = req.auth?.uid || null;
+  const uid = authUid || payload.usercode || "unknown";
+  const name = payload.username || req.auth?.token?.name || null;
+  const role = payload.role || req.auth?.token?.role || null;
+  const usercode = payload.usercode || null;
+  return { uid, name, role, usercode };
 };
 
 async function assertAdminOrManager(db, tx, uid) {

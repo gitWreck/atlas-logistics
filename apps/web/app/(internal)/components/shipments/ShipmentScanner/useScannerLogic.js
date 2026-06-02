@@ -5,11 +5,12 @@ import { useState, useCallback } from "react";
 // 1. Import your centralized Firebase functions
 import {
   bulkAssignShipments,
-  finalizeTripUnloadHandoff,
+  releaseForDeliveryOperations,
   updateTripStatus,
   unlockTripManifest,
   generateTripManifest,
 } from "@/app/utility/FirebaseFunctions"; // Adjust path if your file is located elsewhere
+import { isEligibleForCheckerRelease } from "@/app/utility/checkerRelease";
 import { updatedBy } from "@/app/utility/utilities";
 
 const SCAN_STATUS_OPTIONS = {
@@ -48,6 +49,43 @@ const SCAN_STATUS_OPTIONS = {
     },
   ],
 };
+
+const ON_TRUCK_PIECE_STATUSES = new Set([
+  "LOADED",
+  "IN_TRANSIT",
+  "PARTIALLY_LOADED",
+  "OUT_FOR_DELIVERY",
+]);
+
+const ALREADY_AT_HUB_PIECE_STATUSES = new Set([
+  "RECEIVED",
+  "AVAILABLE_AT_WAREHOUSE",
+  "READY_FOR_DELIVERY",
+  "RETURNED_RECEIVED_AT_HUB",
+  "DELIVERED",
+  "COMPLETED",
+]);
+
+function explainUnloadBlockReason(pkg, { tripId, shipmentOnTrip, packageAssignmentState } = {}) {
+  if (!pkg) return "Package data is missing for this label.";
+
+  const status = String(pkg.status || "").toUpperCase();
+  const packageTripId = pkg.currentTripId || pkg.loadedOnTrip || null;
+
+  if (packageAssignmentState === "ON_OTHER_TRIP" || (packageTripId && packageTripId !== tripId)) {
+    return `This piece is still on trip ${packageTripId}. Open that trip to unload it, or scan a piece on ${tripId}.`;
+  }
+
+  if (ALREADY_AT_HUB_PIECE_STATUSES.has(status)) {
+    return `This piece is already ${status.replace(/_/g, " ").toLowerCase()} at the hub. Skip unload — use Trip → Manifest → Release shipment(s).`;
+  }
+
+  if (!shipmentOnTrip && packageAssignmentState !== "ON_THIS_TRIP") {
+    return "This shipment is not on the active trip manifest. Assign it to this trip first, then scan again.";
+  }
+
+  return "No loaded quantity remains on this trip for this label. Confirm it was loaded on this trip, or release from Manifest if already received.";
+}
 
 export default function useScannerLogic({
   trip,
@@ -142,40 +180,55 @@ export default function useScannerLogic({
     [getDefaultScanStatus],
   );
 
-  const getPackageAvailableQty = useCallback((pkg, scanAction, targetStatus) => {
-    if (!pkg) return 0;
-    const packageTripId = pkg.currentTripId || pkg.loadedOnTrip || null;
-    if (scanAction === "LOAD" && packageTripId && packageTripId !== tripId) {
-      return 0;
-    }
-    if (scanAction === "UNLOAD" && packageTripId !== tripId) {
-      return 0;
-    }
+  const getPackageAvailableQty = useCallback(
+    (pkg, scanAction, targetStatus, context = {}) => {
+      if (!pkg) return 0;
 
-    const totalQty = Math.max(Number(pkg.quantity) || 1, 1);
-    const rawLoadedQty = Number(pkg.loadedQty);
-    const hasLoadedQty = Number.isFinite(rawLoadedQty) && rawLoadedQty >= 0;
-    const status = String(pkg.status || "").toUpperCase();
-    const loadedQty = Math.min(
-      hasLoadedQty
-        ? rawLoadedQty
-        : status === "LOADED" || status === "DELIVERED"
-          ? totalQty
-          : 0,
-      totalQty,
-    );
+      const { shipmentOnTrip = false, packageAssignmentState = null } = context;
+      const packageTripId = pkg.currentTripId || pkg.loadedOnTrip || null;
+      const status = String(pkg.status || "").toUpperCase();
+      const onThisTrip =
+        packageTripId === tripId ||
+        packageAssignmentState === "ON_THIS_TRIP" ||
+        (shipmentOnTrip &&
+          !packageTripId &&
+          ON_TRUCK_PIECE_STATUSES.has(status));
 
-    if (targetStatus === "MISSING" || targetStatus === "DAMAGED") {
-      return scanAction === "LOAD"
-        ? Math.max(0, totalQty - loadedQty)
-        : Math.max(0, loadedQty);
-    }
+      if (scanAction === "LOAD" && packageTripId && packageTripId !== tripId) {
+        return 0;
+      }
+      if (scanAction === "UNLOAD" && !onThisTrip) {
+        return 0;
+      }
+      if (scanAction === "UNLOAD" && ALREADY_AT_HUB_PIECE_STATUSES.has(status)) {
+        return 0;
+      }
 
-    if (scanAction === "LOAD") {
-      return Math.max(0, totalQty - loadedQty);
-    }
-    return Math.max(0, loadedQty);
-  }, [tripId]);
+      const totalQty = Math.max(Number(pkg.quantity) || 1, 1);
+      const rawLoadedQty = Number(pkg.loadedQty);
+      const hasLoadedQty = Number.isFinite(rawLoadedQty) && rawLoadedQty > 0;
+      const loadedQty = Math.min(
+        hasLoadedQty
+          ? rawLoadedQty
+          : ON_TRUCK_PIECE_STATUSES.has(status)
+            ? totalQty
+            : 0,
+        totalQty,
+      );
+
+      if (targetStatus === "MISSING" || targetStatus === "DAMAGED") {
+        return scanAction === "LOAD"
+          ? Math.max(0, totalQty - loadedQty)
+          : Math.max(0, loadedQty);
+      }
+
+      if (scanAction === "LOAD") {
+        return Math.max(0, totalQty - loadedQty);
+      }
+      return Math.max(0, loadedQty);
+    },
+    [tripId],
+  );
 
   const getPackageIdentity = useCallback(
     (pkg) => pkg?.packageId || pkg?.trackingNumber || "",
@@ -227,6 +280,14 @@ export default function useScannerLogic({
   const getProcessableItems = useCallback(
     (item, code) => {
       const packages = Array.isArray(item?.packages) ? item.packages : [];
+      const shipmentOnTrip =
+        item?.shipmentAssignedToTrip === true ||
+        item?.requiresAssignment === false;
+      const scanContext = {
+        shipmentOnTrip,
+        packageAssignmentState: item?.packageAssignmentState || null,
+      };
+
       const targetPackages =
         item?.scanType === "PACKAGE"
           ? [findPackageByScan(packages, code, item.packageId)].filter(Boolean)
@@ -235,7 +296,12 @@ export default function useScannerLogic({
       return targetPackages
         .map((pkg) => {
           const packageId = getPackageIdentity(pkg);
-          const quantity = getPackageAvailableQty(pkg, action, scanStatus);
+          const quantity = getPackageAvailableQty(
+            pkg,
+            action,
+            scanStatus,
+            scanContext,
+          );
 
           return packageId && quantity > 0 ? { packageId, quantity } : null;
         })
@@ -286,12 +352,9 @@ export default function useScannerLogic({
       setError("");
 
       try {
-        const [summary, trips] = await Promise.all([
-          fetchJsonWithAuth(
-            `/api/trips/${encodeURIComponent(tripId)}/handoff-reconciliation`,
-          ),
-          fetchDeliveryTrips(),
-        ]);
+        const summary = await fetchJsonWithAuth(
+          `/api/trips/${encodeURIComponent(tripId)}/handoff-reconciliation`,
+        );
 
         const seededRemarks = {};
         (summary.missingShipments || []).forEach((item) => {
@@ -312,10 +375,6 @@ export default function useScannerLogic({
           setNeedsNextTrip(false);
         }
 
-        if (!trips.length) {
-          setError("No available DELIVERY trips found.");
-        }
-
         return summary;
       } catch (err) {
         setError(err.message || "Failed to reconcile manifest.");
@@ -324,7 +383,7 @@ export default function useScannerLogic({
         setLoading(false);
       }
     },
-    [fetchDeliveryTrips, fetchJsonWithAuth, missingRemarks, tripId],
+    [fetchJsonWithAuth, missingRemarks, tripId],
   );
 
   const processItems = useCallback(
@@ -472,7 +531,25 @@ export default function useScannerLogic({
           return setError("No quantity is available to load for this scan.");
         }
 
-        return setError("No quantity is available to unload for this scan.");
+        const shipmentOnTrip =
+          result.shipmentAssignedToTrip === true ||
+          result.requiresAssignment === false;
+        const targetPkg =
+          result.scanType === "PACKAGE"
+            ? findPackageByScan(
+                result.packages,
+                cleanCode,
+                result.packageId,
+              )
+            : null;
+
+        return setError(
+          explainUnloadBlockReason(targetPkg || result.packages?.[0], {
+            tripId,
+            shipmentOnTrip,
+            packageAssignmentState: result.packageAssignmentState,
+          }),
+        );
       }
 
       if (
@@ -617,9 +694,7 @@ export default function useScannerLogic({
     }
   };
 
-  const handleAssignNextTrip = async () => {
-    if (!selectedNextTrip) return setError("Select a delivery trip first.");
-
+  const handleReleaseShipmentsFromTrip = async () => {
     const missing = handoffSummary?.missingShipments || [];
     const incompleteRemark = missing.find(
       (item) => !String(missingRemarks[item.id] || "").trim(),
@@ -629,18 +704,55 @@ export default function useScannerLogic({
       return setError(`Add remarks for ${incompleteRemark.shipmentId}.`);
     }
 
-    const success = await executeFirebaseCall(finalizeTripUnloadHandoff, {
-      sourceTripId: tripId,
-      deliveryTripId: selectedNextTrip,
-      missingRemarks,
-      updatedBy: updatedBy(profile),
+    const unloaded = handoffSummary?.unloadedShipments || [];
+    const shipmentIds = unloaded
+      .filter((row) => {
+        if (!row?.id) return false;
+        const status = row.status;
+        return status == null || isEligibleForCheckerRelease(status);
+      })
+      .map((row) => row.id);
+
+    if (!shipmentIds.length) {
+      return setError(
+        "No reconciled shipments on this trip are eligible to release.",
+      );
+    }
+
+    const success = await executeFirebaseCall(releaseForDeliveryOperations, {
+      tripId,
+      shipmentIds,
+      remarks:
+        "Released for delivery operations from trip manifest reconciliation.",
     });
-    if (success)
+    if (success) {
       setTimeout(() => {
         onRefresh?.();
         onClose?.();
         resetFlow();
       }, 1000);
+    }
+  };
+
+  const handleReleaseSingleShipment = async () => {
+    const item = resolvedItem;
+    if (!item?.shipmentId && !item?.id) {
+      return setError("No shipment selected to release.");
+    }
+
+    const docId = item.id || item.shipmentId;
+    const success = await executeFirebaseCall(releaseForDeliveryOperations, {
+      tripId,
+      shipmentIds: [docId],
+      remarks: "Released for delivery operations after warehouse receive.",
+    });
+    if (success) {
+      setTimeout(() => {
+        onRefresh?.();
+        setNeedsNextTrip(false);
+        resetFlow();
+      }, 1000);
+    }
   };
 
   const handleConfirm = async () => {
@@ -755,7 +867,10 @@ export default function useScannerLogic({
       handleUnlockManifest,
       handleSetTripLoaded,
       handleLockManifest,
-      handleAssignNextTrip,
+      handleReleaseShipmentsFromTrip,
+      handleReleaseSingleShipment,
+      /** @deprecated use handleReleaseShipmentsFromTrip */
+      handleAssignNextTrip: handleReleaseShipmentsFromTrip,
       handleReviewHandoff: () => loadHandoffReview(),
       handleConfirm,
     },

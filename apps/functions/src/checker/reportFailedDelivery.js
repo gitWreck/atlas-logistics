@@ -7,23 +7,42 @@ const { requireRole } = require("../utilities/helpers");
 const { writeShipmentEvent } = require("../tracking/writeShipmentEvent");
 const { EVENT_TYPES } = require("../tracking/eventTypes");
 const { resolveShipmentIds } = require("./checkerShipmentResolve");
+const { deriveMasterShipmentStatus } = require("../packages/shipmentStatus");
+const {
+  normalizePackageIdSet,
+  collectTargetPieceIdentities,
+  assertHasTargetPieces,
+  assertRequestedPiecesOwned,
+  shouldTargetCheckerPiece,
+  applyPieceFailed,
+  collectActiveCheckerIds,
+} = require("./checkerPieceOperations");
+const {
+  assertCheckerCanAccessShipment,
+} = require("../warehouse/packageDeliveryOperations");
 
 if (!admin.apps.length) admin.initializeApp();
 const db = admin.firestore();
-
-const FAIL_ALLOWED_STATUSES = new Set([
-  "ASSIGNED",
-  "READY_FOR_DELIVERY",
-  "OUT_FOR_DELIVERY",
-]);
 
 function normalizeString(value) {
   return typeof value === "string" && value.trim() ? value.trim() : null;
 }
 
-const {
-  assertCheckerCanAccessShipment,
-} = require("../warehouse/packageDeliveryOperations");
+function normalizeQty(value, fallback = 1) {
+  const num = Number(value);
+  return Number.isFinite(num) && num >= 0 ? num : fallback;
+}
+
+function sumDeliveredQty(packages = []) {
+  return packages.reduce((sum, pkg) => {
+    const quantity = normalizeQty(pkg.quantity, 1);
+    const status = String(pkg.status || "").toUpperCase();
+    if (status === "DELIVERED" || status === "COMPLETED") {
+      return sum + quantity;
+    }
+    return sum;
+  }, 0);
+}
 
 exports.reportFailedDelivery = onCall(
   { region: "asia-southeast1", maxInstances: 10 },
@@ -48,6 +67,7 @@ exports.reportFailedDelivery = onCall(
       gpsCoordinates = null,
     } = req.data || {};
 
+    const packageIdSet = normalizePackageIdSet(packageIds);
     const resolvedShipmentIds = await resolveShipmentIds(db, {
       shipmentIds,
       packageIds,
@@ -72,22 +92,27 @@ exports.reportFailedDelivery = onCall(
         }
 
         const data = snap.data() || {};
-        const status = String(data.status || "").toUpperCase();
-
-        if (status === "DELIVERED" || status === "COMPLETED") {
-          throw new HttpsError(
-            "failed-precondition",
-            `Shipment ${shipmentId} is already delivered.`,
-          );
-        }
-        if (!FAIL_ALLOWED_STATUSES.has(status)) {
-          throw new HttpsError(
-            "failed-precondition",
-            `Shipment ${shipmentId} cannot be marked failed from status ${status}.`,
-          );
-        }
-
         assertCheckerCanAccessShipment(shipmentId, data, actorUid);
+
+        const packages = Array.isArray(data.packages) ? data.packages : [];
+        assertRequestedPiecesOwned(
+          packages,
+          packageIdSet,
+          actorUid,
+          data,
+          "mark as failed",
+        );
+
+        const targetIdentities = collectTargetPieceIdentities(packages, {
+          checkerUid: actorUid,
+          shipmentData: data,
+          packageIdSet,
+          mode: "fail",
+        });
+        assertHasTargetPieces(
+          targetIdentities,
+          "mark as failed. Scan the piece label or mark out for delivery first.",
+        );
 
         const failureNote =
           normalizeString(remarks) ||
@@ -95,8 +120,35 @@ exports.reportFailedDelivery = onCall(
             ? `Failed delivery (${reasonCode})`
             : "Failed delivery attempt.");
 
+        const updatedPackages = packages.map((pkg) => {
+          if (
+            !shouldTargetCheckerPiece(pkg, {
+              checkerUid: actorUid,
+              shipmentData: data,
+              packageIdSet,
+              mode: "fail",
+            })
+          ) {
+            return pkg;
+          }
+
+          return applyPieceFailed(pkg, {
+            actorUid,
+            actorName,
+            reasonCode: normalizeString(reasonCode),
+            remarks: failureNote,
+          });
+        });
+
+        const derivedStatus = deriveMasterShipmentStatus(updatedPackages, {
+          previousStatus: data.status,
+        });
+        const activeCheckerIds = collectActiveCheckerIds(updatedPackages);
+
         tx.update(shipmentRefs[index], {
-          status: "FAILED_DELIVERY",
+          packages: updatedPackages,
+          status: derivedStatus,
+          activeCheckerIds,
           custodyOwnerType: "CHECKER",
           custodyOwnerId: actorUid,
           currentLocationState: "FAILED_DELIVERY_WITH_CHECKER",
@@ -107,21 +159,27 @@ exports.reportFailedDelivery = onCall(
           failureRemarks: failureNote,
           updatedAt: now,
           updatedBy: actorName || actorUid || null,
+          "totals.delivered": sumDeliveredQty(updatedPackages),
           statusHistory: FieldValue.arrayUnion({
-            status: "FAILED_DELIVERY",
+            status: derivedStatus,
             at: admin.firestore.Timestamp.now(),
             by: actorName || actorUid || null,
-            note: failureNote,
+            note: `${failureNote} (${targetIdentities.length} piece${
+              targetIdentities.length === 1 ? "" : "s"
+            })`,
             location: normalizeString(location),
           }),
         });
 
         failedShipmentIds.push(shipmentId);
-        failedEventMeta.push({
-          shipmentId,
-          manifestId: normalizeString(data.deliveryManifestId),
-          deliveryVehicleId: normalizeString(data.deliveryVehicleId),
-          deliveryVehicleName: normalizeString(data.deliveryVehicleName),
+        targetIdentities.forEach((pieceId) => {
+          failedEventMeta.push({
+            shipmentId,
+            pieceId,
+            manifestId: normalizeString(data.deliveryManifestId),
+            deliveryVehicleId: normalizeString(data.deliveryVehicleId),
+            deliveryVehicleName: normalizeString(data.deliveryVehicleName),
+          });
         });
       });
     });
@@ -132,6 +190,7 @@ exports.reportFailedDelivery = onCall(
           db,
           event: {
             shipmentId: meta.shipmentId,
+            pieceId: meta.pieceId,
             eventType: EVENT_TYPES.FAILED_DELIVERY,
             checkerId: actorUid,
             checkerName: actorName,
@@ -153,6 +212,8 @@ exports.reportFailedDelivery = onCall(
       success: true,
       shipmentIds: failedShipmentIds,
       shipmentCount: failedShipmentIds.length,
+      packageIds: failedEventMeta.map((meta) => meta.pieceId).filter(Boolean),
+      packageCount: failedEventMeta.length,
     };
   },
 );
