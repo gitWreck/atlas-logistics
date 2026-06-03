@@ -82,8 +82,8 @@ export default function AdminHardDeletePanel({
           className="text-red-500 mt-0.5 shrink-0"
         />
         <span className="text-red-400">
-          Hard delete removes all records for <strong>{entityLabel}</strong>.
-          Detached shipments stay in the system. This is logged in Admin Logs.
+          Hard delete permanently removes <strong>{entityLabel}</strong>. This
+          action is recorded in Admin Logs and cannot be undone.
         </span>
       </div>
 
