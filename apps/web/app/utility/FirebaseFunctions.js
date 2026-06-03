@@ -46,6 +46,7 @@ export const updateTripSchedule = httpsCallable(
 export const updateTripDetails = httpsCallable(functions, "updateTripDetails");
 
 export const disableTruckTrip = httpsCallable(functions, "disableTruckTrip");
+export const deleteTruckTrip = httpsCallable(functions, "deleteTruckTrip");
 export const setTruckDelay = httpsCallable(functions, "setTruckDelay");
 export const clearTruckDelay = httpsCallable(functions, "clearTruckDelay");
 export const updateTripStatus = httpsCallable(functions, "updateTripStatus");
@@ -108,6 +109,7 @@ export const updateShipmentDetails = httpsCallable(
   functions,
   "updateShipmentDetails",
 );
+export const deleteShipment = httpsCallable(functions, "deleteShipment");
 
 // SMS & COMMUNICATION
 export const sendManualSms = httpsCallable(functions, "sendManualSms");

@@ -1,11 +1,14 @@
-import React, { useState } from "react";
-import TripOperations from "./TripOperations"; // Your existing operations component
+import React from "react";
+import TripOperations from "./TripOperations";
 import DriverMessageWidget from "../messaging/DriverMessageWidget";
 import TripBroadcastWidget from "../messaging/TripBroadcastWidget";
+import AdminHardDeletePanel from "../admin/AdminHardDeletePanel";
+import { deleteTruckTrip } from "@/app/utility/FirebaseFunctions";
 
 export default function TripToolsTab({
   data,
   onRefresh,
+  onDeleted,
   isDark = false,
   profile,
 }) {
@@ -32,6 +35,24 @@ export default function TripToolsTab({
       <TripBroadcastWidget trip={data} isDark={isDark} profile={profile} />
 
       <DriverMessageWidget trip={data} isDark={isDark} profile={profile} />
+
+      <hr className={isDark ? "border-slate-800" : "border-slate-200"} />
+
+      <AdminHardDeletePanel
+        title="Delete Trip"
+        description="Permanently remove this trip from the system. Shipments on the manifest are detached but not deleted. Works for any trip status."
+        entityLabel={data.tripId || data.id}
+        confirmMessage={`Delete trip ${data.tripId || data.id}? This cannot be undone.`}
+        onDelete={({ reason }) =>
+          deleteTruckTrip({
+            tripId: data.id,
+            reason,
+          })
+        }
+        onSuccess={onDeleted}
+        isDark={isDark}
+        profile={profile}
+      />
 
       {/* 3. QUICK ACTIONS GRID */}
       {/* <div className="grid grid-cols-2 gap-3">
