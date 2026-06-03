@@ -87,6 +87,8 @@ exports.removeAssignmentFromTrip =
 
 exports.disableTruckTrip =
   require("./src/trips/disableTruckTrip").disableTruckTrip;
+exports.deleteTruckTrip =
+  require("./src/trips/deleteTruckTrip").deleteTruckTrip;
 exports.completeTrip = require("./src/trips/completeTrip").completeTrip;
 exports.updateTripStatus =
   require("./src/trips/updateTripStatus").updateTripStatus;
@@ -112,6 +114,8 @@ exports.updateShipmentDetails =
   require("./src/shipments/updateShipmentDetails").updateShipmentDetails;
 exports.updateShipmentImages =
   require("./src/shipments/updateShipmentImages").updateShipmentImages;
+exports.deleteShipment =
+  require("./src/shipments/deleteShipment").deleteShipment;
 
 // Manifests & Certificates
 exports.generateTripManifest =

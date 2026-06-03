@@ -290,6 +290,10 @@ export default function TripDrawer({
                 fetchShipments();
                 onRefreshTrips?.();
               }}
+              onDeleted={() => {
+                onRefreshTrips?.();
+                onClose();
+              }}
               isDark={isDark}
               profile={profile}
             />
