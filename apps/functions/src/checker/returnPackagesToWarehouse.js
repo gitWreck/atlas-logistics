@@ -12,6 +12,7 @@ const {
   normalizePackageIdSet,
   collectTargetPieceIdentities,
   assertHasTargetPieces,
+  explainCheckerReturnFailure,
   assertRequestedPiecesOwned,
   shouldTargetCheckerPiece,
   applyPieceReturnedToWarehouse,
@@ -164,10 +165,16 @@ exports.returnPackagesToWarehouse = onCall(
           : collectManagerReturnPieceIdentities(packages, packageIdSet);
 
         if (isChecker) {
-          assertHasTargetPieces(
-            targetIdentities,
-            "return. Mark failed delivery or scan the piece first.",
-          );
+          if (targetIdentities.length === 0) {
+            throw new HttpsError(
+              "failed-precondition",
+              explainCheckerReturnFailure(packages, {
+                checkerUid: actorUid,
+                shipmentData: data,
+                packageIdSet,
+              }),
+            );
+          }
         } else if (targetIdentities.length === 0) {
           throw new HttpsError(
             "failed-precondition",

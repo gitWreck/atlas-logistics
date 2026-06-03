@@ -11,6 +11,7 @@ import {
   generateTripManifest,
 } from "@/app/utility/FirebaseFunctions"; // Adjust path if your file is located elsewhere
 import { isEligibleForCheckerRelease } from "@/app/utility/checkerRelease";
+import { isTripReleaseEligible } from "@/app/utility/tripLifecycle";
 import { updatedBy } from "@/app/utility/utilities";
 
 const SCAN_STATUS_OPTIONS = {
@@ -344,17 +345,84 @@ export default function useScannerLogic({
     return trips;
   }, [fetchJsonWithAuth]);
 
+  const finalizeTripReconciliation = useCallback(
+    async ({ notify = true } = {}) => {
+      if (!tripId) return null;
+
+      const token = await user?.getIdToken();
+      const res = await fetch(
+        `/api/trips/${encodeURIComponent(tripId)}/handoff-reconciliation`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ notify, autoPromote: true }),
+        },
+      );
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to finalize reconciliation.");
+      }
+
+      if (trip && data.tripStatus) {
+        trip.status = data.tripStatus;
+      }
+
+      return data;
+    },
+    [tripId, user, trip],
+  );
+
   const loadHandoffReview = useCallback(
-    async ({ openWhenReadyOnly = false } = {}) => {
+    async ({ openWhenReadyOnly = false, autoPromoteOnReady = true } = {}) => {
       if (!tripId) return null;
 
       setLoading(true);
       setError("");
 
       try {
-        const summary = await fetchJsonWithAuth(
+        let summary = await fetchJsonWithAuth(
           `/api/trips/${encodeURIComponent(tripId)}/handoff-reconciliation`,
         );
+
+        if (
+          autoPromoteOnReady &&
+          summary.lifecycle?.canPromoteToArrived &&
+          !summary.promoted
+        ) {
+          summary = await finalizeTripReconciliation({ notify: true });
+          onRefresh?.();
+          if (trip && summary.tripStatus) {
+            trip.status = summary.tripStatus;
+          }
+          setSuccessNotice({
+            action: "UNLOAD",
+            scanStatus: "ARRIVED",
+            scanStatusLabel: "Trip arrived",
+            code: tripId,
+            shipmentId: null,
+            scanType: "TRIP",
+            totalQuantity: summary.totals?.unloadedShipments || 0,
+            needsLoadedStatusPrompt: false,
+            message:
+              "Manifest reconciled. Trip marked ARRIVED — customers can be notified.",
+          });
+        }
+
+        const tripStatusAfter = String(
+          summary.tripStatus || trip?.status || "",
+        ).toUpperCase();
+        const tripArrived =
+          tripStatusAfter === "ARRIVED" || summary.promoted === true;
+
+        if (summary.ready && !tripArrived && summary.lifecycle?.canPromoteToArrived) {
+          setNeedsArrival(true);
+        } else {
+          setNeedsArrival(false);
+        }
 
         const seededRemarks = {};
         (summary.missingShipments || []).forEach((item) => {
@@ -383,7 +451,14 @@ export default function useScannerLogic({
         setLoading(false);
       }
     },
-    [fetchJsonWithAuth, missingRemarks, tripId],
+    [
+      fetchJsonWithAuth,
+      finalizeTripReconciliation,
+      missingRemarks,
+      onRefresh,
+      tripId,
+      trip,
+    ],
   );
 
   const processItems = useCallback(
@@ -618,25 +693,52 @@ export default function useScannerLogic({
   };
 
   const handleMarkArrived = async () => {
-    const success = await executeFirebaseCall(
-      updateTripStatus,
-      {
-        tripId,
-        status: "ARRIVED",
-        notify: false,
-        updatedBy: updatedBy(profile),
-      },
-      () => {
-        if (trip) trip.status = "ARRIVED";
-      },
-    );
-    if (success)
-      setTimeout(() => {
-        onRefresh?.();
-        setNeedsArrival(false);
-        if (trip?.manifestLocked) setNeedsUnlock(true);
-        setBtnStatus("IDLE");
-      }, 1000);
+    setLoading(true);
+    setError("");
+
+    try {
+      if (handoffSummary?.ready && handoffSummary?.lifecycle?.canPromoteToArrived) {
+        const summary = await finalizeTripReconciliation({ notify: true });
+        setHandoffSummary(summary);
+        if (trip && summary?.tripStatus) {
+          trip.status = summary.tripStatus;
+        }
+        setSuccessNotice({
+          action: "UNLOAD",
+          scanStatus: "ARRIVED",
+          scanStatusLabel: "Trip arrived",
+          code: tripId,
+          shipmentId: null,
+          scanType: "TRIP",
+          totalQuantity: summary?.totals?.unloadedShipments || 0,
+          needsLoadedStatusPrompt: false,
+          message: "Trip marked ARRIVED after reconciliation.",
+        });
+      } else {
+        const success = await executeFirebaseCall(
+          updateTripStatus,
+          {
+            tripId,
+            status: "ARRIVED",
+            notify: false,
+            updatedBy: updatedBy(profile),
+          },
+          () => {
+            if (trip) trip.status = "ARRIVED";
+          },
+        );
+        if (!success) return;
+      }
+
+      onRefresh?.();
+      setNeedsArrival(false);
+      if (trip?.manifestLocked) setNeedsUnlock(true);
+      setBtnStatus("IDLE");
+    } catch (err) {
+      setError(err.message || "Could not mark trip as ARRIVED.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleUnlockManifest = async () => {
@@ -704,7 +806,25 @@ export default function useScannerLogic({
       return setError(`Add remarks for ${incompleteRemark.shipmentId}.`);
     }
 
-    const unloaded = handoffSummary?.unloadedShipments || [];
+    let summaryForRelease = handoffSummary;
+
+    if (!summaryForRelease?.lifecycle?.canReleaseForDelivery) {
+      try {
+        summaryForRelease = await finalizeTripReconciliation({ notify: false });
+        setHandoffSummary(summaryForRelease);
+        onRefresh?.();
+        if (!summaryForRelease.lifecycle?.canReleaseForDelivery) {
+          return setError(
+            summaryForRelease.lifecycle?.releaseBlockReason ||
+              "Trip must be ARRIVED before releasing shipments.",
+          );
+        }
+      } catch (err) {
+        return setError(err.message || "Could not mark trip as ARRIVED.");
+      }
+    }
+
+    const unloaded = summaryForRelease?.unloadedShipments || [];
     const shipmentIds = unloaded
       .filter((row) => {
         if (!row?.id) return false;
@@ -738,6 +858,24 @@ export default function useScannerLogic({
     const item = resolvedItem;
     if (!item?.shipmentId && !item?.id) {
       return setError("No shipment selected to release.");
+    }
+
+    if (tripId) {
+      let canRelease = handoffSummary?.lifecycle?.canReleaseForDelivery;
+      if (!canRelease) {
+        const gate = isTripReleaseEligible({
+          status: trip?.status,
+          reconciledAt: trip?.reconciledAt,
+        });
+        canRelease = gate.eligible;
+        if (!canRelease) {
+          return setError(
+            gate.reason ||
+              handoffSummary?.lifecycle?.releaseBlockReason ||
+              "Trip must be ARRIVED before releasing shipments.",
+          );
+        }
+      }
     }
 
     const docId = item.id || item.shipmentId;

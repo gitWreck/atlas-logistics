@@ -3,6 +3,7 @@
 import React, { useState, useMemo, useEffect } from "react";
 import ReleaseToCheckerModal from "../shipments/modals/ReleaseToCheckerModal";
 import { isEligibleForCheckerRelease } from "@/app/utility/checkerRelease";
+import { isTripReleaseEligible } from "@/app/utility/tripLifecycle";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faSearch,
@@ -36,6 +37,8 @@ export default function TripManifestTab({
   onViewPackages,
   onUnassign,
   tripId,
+  tripStatus = null,
+  tripReconciledAt = null,
   onRefresh,
   isDark = false,
 
@@ -65,6 +68,15 @@ export default function TripManifestTab({
         : shipments;
     return pool.filter((s) => isEligibleForCheckerRelease(s.status));
   }, [shipments, selectedIds]);
+
+  const tripReleaseGate = useMemo(
+    () =>
+      isTripReleaseEligible({
+        status: tripStatus,
+        reconciledAt: tripReconciledAt,
+      }),
+    [tripStatus, tripReconciledAt],
+  );
 
   const rowAction = {
     print: isDark
@@ -281,12 +293,18 @@ export default function TripManifestTab({
                 <button
                   type="button"
                   onClick={() => setIsReleaseModalOpen(true)}
-                  disabled={isLocked || releaseTargetShipments.length === 0}
+                  disabled={
+                    isLocked ||
+                    releaseTargetShipments.length === 0 ||
+                    !tripReleaseGate.eligible
+                  }
                   className={`text-xs font-bold px-3 py-1.5 h-8 rounded-lg flex items-center justify-center gap-2 transition-colors disabled:opacity-50 whitespace-nowrap ${isDark ? "bg-indigo-600 hover:bg-indigo-500 text-white" : "bg-indigo-600 hover:bg-indigo-500 text-white"}`}
                   title={
-                    selectedIds.size > 0
-                      ? `Release ${releaseTargetShipments.length} selected shipment(s) for checker delivery`
-                      : `Release all eligible shipments on this trip (${releaseTargetShipments.length})`
+                    !tripReleaseGate.eligible
+                      ? tripReleaseGate.reason
+                      : selectedIds.size > 0
+                        ? `Release ${releaseTargetShipments.length} selected shipment(s) for checker delivery`
+                        : `Release all eligible shipments on this trip (${releaseTargetShipments.length})`
                   }
                 >
                   <FontAwesomeIcon icon={faBoxOpen} />
@@ -724,6 +742,8 @@ export default function TripManifestTab({
       }}
       isDark={isDark}
       tripId={tripId}
+      tripStatus={tripStatus}
+      tripReconciledAt={tripReconciledAt}
       defaultShipmentIds={releaseTargetShipments.map((s) => s.id)}
       defaultShipments={releaseTargetShipments}
     />

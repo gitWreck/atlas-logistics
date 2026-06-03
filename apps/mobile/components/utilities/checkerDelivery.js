@@ -150,6 +150,7 @@ export async function reportCheckerFailedDelivery({
 
 export async function returnCheckerShipmentsToWarehouse({
   shipmentIds,
+  packageIds = null,
   profile,
   remarks = "",
   warehouseCode = "ODIONGAN_WAREHOUSE",
@@ -157,6 +158,7 @@ export async function returnCheckerShipmentsToWarehouse({
   const location = await getCurrentLocationSafe();
   const response = await returnPackagesToWarehouse({
     shipmentIds,
+    ...(Array.isArray(packageIds) && packageIds.length > 0 ? { packageIds } : {}),
     warehouseCode,
     remarks: remarks || "Returned to Odiongan warehouse.",
     location: location ? `${location.lat},${location.lng}` : null,

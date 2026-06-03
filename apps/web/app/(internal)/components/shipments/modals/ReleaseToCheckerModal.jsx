@@ -6,6 +6,7 @@ import {
   getCheckerReleaseBlockReason,
   isEligibleForCheckerRelease,
 } from "@/app/utility/checkerRelease";
+import { isTripReleaseEligible } from "@/app/utility/tripLifecycle";
 
 function parseShipmentIds(value) {
   return [
@@ -27,6 +28,8 @@ export default function ReleaseToCheckerModal({
   defaultShipmentIds = [],
   defaultShipments = [],
   tripId = null,
+  tripStatus = null,
+  tripReconciledAt = null,
 }) {
   const [warehouseCode, setWarehouseCode] = useState("ODIONGAN_WAREHOUSE");
   const [remarks, setRemarks] = useState("");
@@ -73,8 +76,18 @@ export default function ReleaseToCheckerModal({
     return { blocked, eligible };
   }, [parsedIds, statusByShipmentId]);
 
+  const tripReleaseGate = useMemo(() => {
+    if (!tripId) return { eligible: true, reason: null };
+    return isTripReleaseEligible({
+      status: tripStatus,
+      reconciledAt: tripReconciledAt,
+    });
+  }, [tripId, tripStatus, tripReconciledAt]);
+
   const canSubmit =
-    !submitting && releaseValidation.eligible.length > 0;
+    !submitting &&
+    releaseValidation.eligible.length > 0 &&
+    tripReleaseGate.eligible;
 
   if (!isOpen) return null;
 
@@ -118,6 +131,14 @@ export default function ReleaseToCheckerModal({
         </div>
 
         <div className="p-5 space-y-4">
+          {tripId && !tripReleaseGate.eligible && (
+            <div
+              className={`text-sm rounded-lg px-3 py-2 ${isDark ? "bg-amber-900/30 text-amber-200 border border-amber-800" : "bg-amber-50 text-amber-800 border border-amber-200"}`}
+            >
+              {tripReleaseGate.reason}
+            </div>
+          )}
+
           <div>
             <div className={labelClass}>
               Shipment IDs (one per line or comma-separated)

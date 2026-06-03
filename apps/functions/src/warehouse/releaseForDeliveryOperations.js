@@ -15,6 +15,7 @@ const {
   mapPackagesForDeliveryRelease,
 } = require("./packageDeliveryOperations");
 const { deriveMasterShipmentStatus } = require("../packages/shipmentStatus");
+const { assertTripReleaseEligible } = require("../trips/tripLifecycle");
 
 if (!admin.apps.length) admin.initializeApp();
 const db = admin.firestore();
@@ -35,7 +36,10 @@ function normalizeStringList(values = []) {
   return [...unique];
 }
 
-async function resolveShipmentIdsWithTrip(db, { shipmentIds, packageIds, tripId }) {
+async function resolveShipmentIdsWithTrip(
+  db,
+  { shipmentIds, packageIds, tripId },
+) {
   const fromIds = await resolveShipmentIds(db, { shipmentIds, packageIds });
   const normalizedTripId = normalizeString(tripId);
 
@@ -93,6 +97,21 @@ exports.releaseForDeliveryOperations = onCall(
       tripId,
     });
 
+    const normalizedTripId = normalizeString(tripId);
+    if (normalizedTripId) {
+      const tripSnap = await db
+        .collection("truck_trips")
+        .doc(normalizedTripId)
+        .get();
+      if (!tripSnap.exists) {
+        throw new HttpsError(
+          "not-found",
+          `Trip not found: ${normalizedTripId}`,
+        );
+      }
+      assertTripReleaseEligible(tripSnap.data() || {});
+    }
+
     const normalizedWarehouse =
       normalizeString(warehouseCode) || DEFAULT_WAREHOUSE_CODE;
     const now = FieldValue.serverTimestamp();
@@ -109,7 +128,10 @@ exports.releaseForDeliveryOperations = onCall(
       shipmentSnaps.forEach((snap, index) => {
         const shipmentId = resolvedShipmentIds[index];
         if (!snap.exists) {
-          throw new HttpsError("not-found", `Shipment not found: ${shipmentId}`);
+          throw new HttpsError(
+            "not-found",
+            `Shipment not found: ${shipmentId}`,
+          );
         }
 
         const data = snap.data() || {};

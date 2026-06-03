@@ -119,7 +119,7 @@ export default function ItemSection({
                     <input
                       type="text"
                       className={`${inp} ${isDark ? "placeholder:text-slate-600" : "placeholder:text-slate-400"}`}
-                      value={item.description}
+                      value={item.description ?? ""}
                       onChange={(e) =>
                         onChange(idx, "description", e.target.value)
                       }
@@ -137,7 +137,7 @@ export default function ItemSection({
                     </label>
                     <select
                       className={inp}
-                      value={item.packagingType}
+                      value={item.packagingType ?? "Box"}
                       onChange={(e) =>
                         onChange(idx, "packagingType", e.target.value)
                       }
@@ -162,7 +162,11 @@ export default function ItemSection({
                       step="1"
                       min="1"
                       className={`${inp} text-left sm:text-right`}
-                      value={item.quantity}
+                      value={
+                        item.quantity === undefined || item.quantity === null
+                          ? ""
+                          : String(item.quantity)
+                      }
                       onChange={(e) =>
                         onChange(idx, "quantity", e.target.value)
                       }
@@ -190,7 +194,7 @@ export default function ItemSection({
                       <input
                         type="number"
                         className={`${inp.replace("focus:border-blue-500", "focus:border-emerald-500")} pl-7`}
-                        value={item.declaredValue}
+                        value={item.declaredValue ?? ""}
                         onChange={(e) =>
                           onChange(idx, "declaredValue", e.target.value)
                         }
@@ -206,7 +210,7 @@ export default function ItemSection({
                     </label>
                     <select
                       className={inp}
-                      value={item.packagingGroup}
+                      value={item.packagingGroup ?? "SINGLE"}
                       onChange={(e) =>
                         onChange(idx, "packagingGroup", e.target.value)
                       }

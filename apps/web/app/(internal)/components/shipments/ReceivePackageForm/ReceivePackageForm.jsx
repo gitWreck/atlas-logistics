@@ -45,18 +45,32 @@ export default function ReceivePackageForm({
   const [recipient, setRecipient] = useState(
     initialData?.recipient || { ...INITIAL_CONTACT },
   );
+  const DEFAULT_ITEM = {
+    description: "",
+    weight: "",
+    quantity: "",
+    declaredValue: "",
+    packagingType: "Box",
+    packagingGroup: "SINGLE",
+    isFragile: false,
+    isPerishable: false,
+  };
+
   const [items, setItems] = useState(
-    initialData?.items || [
-      {
-        description: "",
-        weight: "",
-        declaredValue: "",
-        packagingType: "Box",
-        packagingGroup: "Single",
-        isFragile: false,
-        isPerishable: false,
-      },
-    ],
+    initialData?.items?.length
+      ? initialData.items.map((item) => ({
+          ...DEFAULT_ITEM,
+          ...item,
+          quantity:
+            item.quantity === undefined || item.quantity === null
+              ? ""
+              : String(item.quantity),
+          declaredValue:
+            item.declaredValue === undefined || item.declaredValue === null
+              ? ""
+              : String(item.declaredValue),
+        }))
+      : [{ ...DEFAULT_ITEM }],
   );
   const [remarks, setRemarks] = useState(initialData?.remarks || "");
 
@@ -325,17 +339,7 @@ export default function ReceivePackageForm({
 
           <ItemSection
             items={items}
-            onAdd={() =>
-              setItems([
-                ...items,
-                {
-                  description: "",
-                  weight: "",
-                  packagingType: "Box",
-                  packagingGroup: "Single",
-                },
-              ])
-            }
+            onAdd={() => setItems([...items, { ...DEFAULT_ITEM }])}
             onRemove={(idx) => setItems(items.filter((_, i) => i !== idx))}
             onChange={(idx, field, val) => {
               const newItems = [...items];
