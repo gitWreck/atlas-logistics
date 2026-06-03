@@ -18,7 +18,9 @@ import {
 } from "@fortawesome/free-solid-svg-icons";
 import { getModalThemeClasses } from "@/app/utility/constant/theme";
 import { getModalActionClasses } from "@/app/utility/constant/action";
-import { formatAmount, StatusBadge, InfoBlock } from "./utils";
+import { formatAmount } from "./invoiceHelpers";
+import InvoiceStatusBadge from "../ui/InvoiceStatusBadge";
+import InfoBlock from "../ui/InfoBlock";
 import StatusButton from "../ui/StatusButton";
 import { invoiceUrl } from "@/app/utility/constant/templates";
 
@@ -69,7 +71,7 @@ export default function InvoiceDetailsModal({
                     <h2 className={`text-lg font-bold ${modalTheme.title}`}>
                       {invoice.invoiceNumber || "Untitled Invoice"}
                     </h2>
-                    <StatusBadge status={status} isDark={isDark} />
+                    <InvoiceStatusBadge status={status} isDark={isDark} />
                   </div>
                   <p className={`text-sm mt-1 ${modalTheme.bodyText}`}>
                     Shipment:{" "}

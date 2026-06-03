@@ -12,20 +12,13 @@
 const { onRequest } = require("firebase-functions/v2/https");
 const { defineSecret } = require("firebase-functions/params");
 const admin = require("firebase-admin");
+const { requireNormalizedPhone } = require("../../utilities/phoneHelpers");
 
 if (!admin.apps.length) admin.initializeApp();
 const db = admin.firestore();
 
 const FB_VERIFY_TOKEN = defineSecret("FB_VERIFY_TOKEN");
 const FB_PAGE_ACCESS_TOKEN = defineSecret("FB_PAGE_ACCESS_TOKEN");
-
-function normPhonePH(phone) {
-  if (!phone) return null;
-  let p = String(phone).replace(/[^\d]/g, "");
-  if (p.startsWith("09")) p = "63" + p.slice(1);
-  if (p.startsWith("63") && p.length === 12) return p;
-  return null;
-}
 
 function normalizeTracking(s) {
   return String(s || "").trim().toUpperCase();
@@ -84,7 +77,7 @@ exports.messengerWebhook = onRequest(
           if (!psid || !text) continue;
 
           // Heuristic: phone or tracking?
-          const maybePhone = normPhonePH(text);
+          const maybePhone = requireNormalizedPhone(text);
           const maybeTracking = normalizeTracking(text);
 
           // 1) If phone, link psid -> phone
@@ -120,7 +113,7 @@ exports.messengerWebhook = onRequest(
           const destination = d.destination || "";
 
           // If shipment has phone, auto-link
-          const phone = normPhonePH(d.phone || d.customerPhone || "");
+          const phone = requireNormalizedPhone(d.phone || d.customerPhone || "");
           if (phone) {
             const linkId = `${phone}__${psid}`;
             await db.collection("messenger_links").doc(linkId).set(

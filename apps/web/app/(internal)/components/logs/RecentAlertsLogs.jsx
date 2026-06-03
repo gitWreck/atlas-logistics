@@ -46,22 +46,46 @@ function getDetails(alert) {
 }
 
 function getStatus(alert) {
-  return String(alert.status || "PENDING").toUpperCase();
+  return String(alert.status || alert.newStatus || "PENDING").toUpperCase();
 }
 
 function getReason(alert) {
   const details = getDetails(alert);
-  return details.reason || alert.reason || alert.type || "Delay Reported";
+  return details.reason || alert.reason || alert.action || alert.type || "Alert";
 }
 
 function getDriverName(alert) {
   const details = getDetails(alert);
-  return details.driverName || alert.driverName || "Unknown Driver";
+  return (
+    details.driverName ||
+    alert.driverName ||
+    alert.actorName ||
+    alert.actorId ||
+    alert.actorUid ||
+    "Unknown"
+  );
 }
 
 function getNotes(alert) {
   const details = getDetails(alert);
-  return details.notes || alert.notes || "No additional notes";
+  return details.notes || alert.notes || alert.message || "No additional notes";
+}
+
+function getTarget(alert) {
+  return (
+    alert.tripId ||
+    alert.targetId ||
+    alert.packageId ||
+    alert.trackingPackageId ||
+    alert.trackingNumber ||
+    alert.shipmentId ||
+    alert.trackingShipmentId ||
+    alert.tripDocId ||
+    alert.invoiceId ||
+    alert.userId ||
+    alert.truckId ||
+    "System"
+  );
 }
 
 export default function RecentAlertsLogs({ isDark = false }) {
@@ -81,15 +105,19 @@ export default function RecentAlertsLogs({ isDark = false }) {
     const q = query(collection(db, "admin_alerts"), ...queryConstraints);
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      const data = snapshot.docs.map((doc) => {
-        const alert = doc.data();
+      const data = snapshot.docs
+        .map((doc) => {
+          const alert = doc.data();
 
-        return {
-          id: doc.id,
-          ...alert,
-          createdDate: toDate(alert.createdAt || alert.timestamp || alert.at),
-        };
-      });
+          return {
+            id: doc.id,
+            ...alert,
+            createdDate: toDate(alert.createdAt || alert.timestamp || alert.at),
+          };
+        })
+        .filter(
+          (alert) => String(alert.type || "").toUpperCase() !== "CHAT_MESSAGE",
+        );
 
       setAlerts(data);
     });
@@ -120,8 +148,11 @@ export default function RecentAlertsLogs({ isDark = false }) {
         status,
         reason,
         alert.tripId,
+        getTarget(alert),
         alert.targetId,
         alert.actorId,
+        alert.actorName,
+        alert.actorRole,
         getDriverName(alert),
         getNotes(alert),
       ]
@@ -146,6 +177,8 @@ export default function RecentAlertsLogs({ isDark = false }) {
     PENDING: theme.statusWarning,
     APPROVED: theme.statusSuccess,
     RESOLVED: theme.statusSuccess,
+    COMPLETED: theme.statusSuccess,
+    SUCCESS: theme.statusSuccess,
     READ: theme.roleBadge,
   };
 
@@ -249,6 +282,11 @@ export default function RecentAlertsLogs({ isDark = false }) {
             filteredAlerts.map((alert) => {
               const status = getStatus(alert);
               const reason = getReason(alert);
+              const target = getTarget(alert);
+              const actorLabel =
+                getDetails(alert).driverName || alert.driverName
+                  ? "Driver"
+                  : "Actor";
 
               return (
                 <article
@@ -273,13 +311,13 @@ export default function RecentAlertsLogs({ isDark = false }) {
 
                   <div className="mt-3 grid grid-cols-2 gap-3 text-[11px]">
                     <div>
-                      <div className={theme.mobileCardMuted}>Trip</div>
+                      <div className={theme.mobileCardMuted}>Target</div>
                       <div className={`font-mono truncate ${theme.cellPrimary}`}>
-                        {alert.tripId || "No Trip"}
+                        {target}
                       </div>
                     </div>
                     <div>
-                      <div className={theme.mobileCardMuted}>Driver</div>
+                      <div className={theme.mobileCardMuted}>{actorLabel}</div>
                       <div className={`truncate ${theme.cellPrimary}`}>
                         {getDriverName(alert)}
                       </div>
@@ -321,9 +359,9 @@ export default function RecentAlertsLogs({ isDark = false }) {
         <table className={`w-full min-w-[760px] text-left text-xs ${theme.tableText}`}>
           <thead className={`sticky top-0 z-[1] uppercase ${theme.thead}`}>
             <tr>
-              <th className="px-4 py-3 font-semibold">Trip</th>
-              <th className="px-4 py-3 font-semibold">Driver</th>
-              <th className="px-4 py-3 font-semibold">Reason</th>
+              <th className="px-4 py-3 font-semibold">Target</th>
+              <th className="px-4 py-3 font-semibold">Driver / Actor</th>
+              <th className="px-4 py-3 font-semibold">Reason / Action</th>
               <th className="px-4 py-3 font-semibold">Notes</th>
               <th className="px-4 py-3 font-semibold">Status</th>
               <th className="px-4 py-3 font-semibold text-right">Time</th>
@@ -345,6 +383,11 @@ export default function RecentAlertsLogs({ isDark = false }) {
               filteredAlerts.map((alert) => {
                 const status = getStatus(alert);
                 const reason = getReason(alert);
+                const target = getTarget(alert);
+                const actorLabel =
+                  getDetails(alert).driverName || alert.driverName
+                    ? "Driver"
+                    : "Actor";
 
                 return (
                   <tr
@@ -354,11 +397,14 @@ export default function RecentAlertsLogs({ isDark = false }) {
                     <td
                       className={`px-4 py-3 align-top font-mono ${theme.cellPrimary}`}
                     >
-                      {alert.tripId || "No Trip"}
+                      {target}
                     </td>
                     <td className={`px-4 py-3 align-top ${theme.cellPrimary}`}>
                       <div className="max-w-[180px] truncate">
                         {getDriverName(alert)}
+                      </div>
+                      <div className={`mt-1 text-[10px] ${theme.cellSecondary}`}>
+                        {actorLabel}
                       </div>
                     </td>
                     <td className="px-4 py-3 align-top">

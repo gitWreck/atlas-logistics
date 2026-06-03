@@ -42,6 +42,9 @@ export default function TripOperations({
   const [notifyDelay, setNotifyDelay] = useState(true);
 
   const theme = getWidgetThemeClasses(isDark);
+  const isManager = String(profile?.role || "").toLowerCase() === "manager";
+
+  if (isManager) return null;
 
   return (
     <div className="space-y-4">

@@ -8,6 +8,7 @@ const {
   getActorFromRequest,
   writePackageActionLog,
 } = require("../utilities/packageLogger");
+const { normalizeQty } = require("../utilities/packageHelpers");
 
 if (!admin.apps.length) admin.initializeApp();
 const db = admin.firestore();
@@ -81,11 +82,6 @@ exports.updateShipmentPackageStatus = onCall(
       // -----------------------------
       // 2. PURE LOGIC / CALCULATIONS
       // -----------------------------
-      const normalizeQty = (value, fallback = 0) => {
-        const num = Number(value);
-        return Number.isFinite(num) && num >= 0 ? num : fallback;
-      };
-
       const normalizePackage = (pkg = {}) => {
         const quantity = Math.max(normalizeQty(pkg.quantity, 1), 1);
         const loadedQty = Math.min(normalizeQty(pkg.loadedQty, 0), quantity);

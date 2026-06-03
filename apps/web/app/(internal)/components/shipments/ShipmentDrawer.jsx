@@ -16,8 +16,8 @@ import ShipmentProofs from "./ShipmentProofs";
 import ShipmentTimelineTab from "./ShipmentTimelineTab";
 import HubReconcileCard from "./HubReconcileCard";
 import ReturnLoopCard from "./ReturnLoopCard";
+import DrawerTabButton from "../ui/DrawerTabButton";
 import { getDrawerThemeClasses } from "@/app/utility/constant/theme";
-import { TabButton } from "./utils";
 
 export default function ShipmentDrawer({
   isOpen,
@@ -94,7 +94,7 @@ export default function ShipmentDrawer({
 
         {/* TABS */}
         <div className={`flex border-b ${theme.tabsWrap}`}>
-          <TabButton
+          <DrawerTabButton
             isActive={activeTab === "TIMELINE"}
             onClick={() => setActiveTab("TIMELINE")}
             icon={faTruck}
@@ -102,7 +102,7 @@ export default function ShipmentDrawer({
             theme={theme}
           />
 
-          <TabButton
+          <DrawerTabButton
             isActive={activeTab === "ITEMS"}
             onClick={() => setActiveTab("ITEMS")}
             icon={faBoxOpen}
@@ -110,7 +110,7 @@ export default function ShipmentDrawer({
             theme={theme}
           />
 
-          <TabButton
+          <DrawerTabButton
             isActive={activeTab === "TOOLS"}
             onClick={() => setActiveTab("TOOLS")}
             icon={faWrench}

@@ -1,7 +1,7 @@
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const admin = require("firebase-admin");
 const { FieldValue } = require("firebase-admin/firestore");
-const { toE164 } = require("../utilities/helpers");
+const { normalizePhone } = require("../utilities/phoneHelpers");
 
 // Ensure app is initialized
 if (admin.apps.length === 0) {
@@ -192,7 +192,7 @@ exports.createUserProfile = onCall(
         email,
         name: displayName,
         role: normalizedRole,
-        phoneNumber: phoneNumber ? toE164(phoneNumber) : null,
+        phoneNumber: phoneNumber ? normalizePhone(phoneNumber) || null : null,
         warehouseName: warehouseName || null,
         warehouseCode: warehouseCode || null,
         active: true,

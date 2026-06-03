@@ -5,6 +5,7 @@ import { WAREHOUSES } from "@/app/utility/WarehouseData";
 export default function RouteSection({
   routeInfo,
   onWarehouseChange,
+  warehouses = WAREHOUSES,
   isDark = false,
   isPickupMode = false,
 }) {
@@ -79,7 +80,7 @@ export default function RouteSection({
               required
             >
               <option value="">Select Origin...</option>
-              {WAREHOUSES.map((w) => (
+              {warehouses.map((w) => (
                 <option key={w.code} value={w.name}>
                   {w.name}
                 </option>
@@ -124,7 +125,7 @@ export default function RouteSection({
               required={!isPickupMode}
             >
               <option value="">Select Destination...</option>
-              {WAREHOUSES.filter((w) => w.code !== routeInfo.originCode).map(
+              {warehouses.filter((w) => w.code !== routeInfo.originCode).map(
                 (w) => (
                   <option key={w.code} value={w.name}>
                     {w.name}

@@ -12,11 +12,11 @@ import {
   faEye,
 } from "@fortawesome/free-solid-svg-icons";
 import { createUserProfile } from "../../../utility/FirebaseFunctions";
-import { WAREHOUSES } from "@/app/utility/WarehouseData";
 import { normalizePhoneNumber } from "@/app/utility/utilities";
-import { PROVINCES, getCities } from "@/app/utility/PhilippinesData";
+import { getCities } from "@/app/utility/PhilippinesData";
 import { getModalThemeClasses } from "@/app/utility/constant/theme";
 import { getModalActionClasses } from "@/app/utility/constant/action";
+import { useOperationalSettings } from "@/app/utility/useOperationalSettings";
 
 const INITIAL_FORM_STATE = {
   displayName: "",
@@ -73,17 +73,21 @@ export default function AddUserModal({
   const [cities, setCities] = useState([]);
   const [showPassword, setShowPassword] = useState(false);
   const [createdUser, setCreatedUser] = useState(null);
+  const { settings } = useOperationalSettings();
+  const warehouses = settings.warehouses;
+  const phLocations = settings.phLocations;
+  const provinces = Object.keys(phLocations || {}).sort();
 
   const theme = getModalThemeClasses(isDark);
   const action = getModalActionClasses();
 
   useEffect(() => {
     if (formData.province) {
-      setCities(getCities(formData.province));
+      setCities(phLocations?.[formData.province] || getCities(formData.province));
     } else {
       setCities([]);
     }
-  }, [formData.province]);
+  }, [formData.province, phLocations]);
 
   if (!isOpen) return null;
 
@@ -107,7 +111,7 @@ export default function AddUserModal({
 
   const handleWarehouseChange = (e) => {
     const selectedCode = e.target.value;
-    const selectedWarehouse = WAREHOUSES.find(
+    const selectedWarehouse = warehouses.find(
       (warehouse) => warehouse.code === selectedCode,
     );
 
@@ -323,7 +327,7 @@ export default function AddUserModal({
                       onChange={handleChange}
                     >
                       <option value="">Select Province</option>
-                      {PROVINCES.map((province) => (
+                      {provinces.map((province) => (
                         <option key={province} value={province}>
                           {province}
                         </option>
@@ -387,7 +391,7 @@ export default function AddUserModal({
                   onChange={handleWarehouseChange}
                 >
                   <option value="">Select Warehouse...</option>
-                  {WAREHOUSES.map((warehouse) => (
+                  {warehouses.map((warehouse) => (
                     <option key={warehouse.code} value={warehouse.code}>
                       {warehouse.name}
                     </option>

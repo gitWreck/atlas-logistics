@@ -38,6 +38,13 @@ function getRouteFromNotificationData(data = {}) {
     };
   }
 
+  if (data.screen === "chat" && data.conversationId) {
+    return {
+      pathname: "/(customer)/chat/[conversationId]",
+      params: { conversationId: data.conversationId },
+    };
+  }
+
   return null;
 }
 

@@ -13,6 +13,7 @@ export default function DriverSelectInput({
   onChange,
   onSelectId,
   isDark = true,
+  required = false,
 }) {
   const modalTheme = getModalThemeClasses(isDark);
 
@@ -118,7 +119,7 @@ export default function DriverSelectInput({
 
       <div className="relative">
         <input
-          // required
+          required={required}
           type="text"
           value={value}
           autoComplete="off"

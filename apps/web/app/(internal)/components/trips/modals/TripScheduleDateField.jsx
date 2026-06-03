@@ -2,30 +2,7 @@
 
 import React from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-
-function getDayLabel(value) {
-  if (!value) return "—";
-
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "—";
-
-  return date.toLocaleDateString("en-PH", {
-    weekday: "long",
-  });
-}
-
-function formatDisplayDate(value) {
-  if (!value) return "—";
-
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "—";
-
-  return date.toLocaleString("en-PH", {
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-  });
-}
+import { formatTripDisplayDate, getDayLabel } from "../tripHelpers";
 
 export default function TripScheduleDateField({
   label,
@@ -60,7 +37,9 @@ export default function TripScheduleDateField({
           className={`rounded-xl border px-3 py-2 text-xs flex items-center justify-between gap-3 ${theme.input}`}
         >
           <span className={`font-semibold ${theme.title}`}>{dayLabel}</span>
-          <span className={theme.helperText}>{formatDisplayDate(value)}</span>
+          <span className={theme.helperText}>
+            {formatTripDisplayDate(value)}
+          </span>
         </div>
       </div>
     </div>

@@ -1,11 +1,14 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
+  Modal,
   Platform,
   SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
   StatusBar as RNStatusBar,
@@ -16,6 +19,10 @@ import { doc, getDoc } from "firebase/firestore";
 import { FontAwesome5 } from "@expo/vector-icons";
 
 import { db } from "../../../firebase";
+import {
+  createConversation,
+  sendChatMessage,
+} from "../../../components/utilities/FirebaseFunctions";
 import TripProgressStepper from "../../../components/trips/TripProgressStepper";
 import ShipmentDetailHeader from "../../../components/shipments/ShipmentDetailHeader";
 import ShipmentHeaderCard from "../../../components/shipments/ShipmentHeaderCard";
@@ -32,6 +39,9 @@ export default function CustomerTrackingDetailsScreen() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [shipment, setShipment] = useState(null);
+  const [startingChat, setStartingChat] = useState(false);
+  const [supportModalVisible, setSupportModalVisible] = useState(false);
+  const [supportMessage, setSupportMessage] = useState("");
 
   const normalizedTracking = useMemo(
     () =>
@@ -130,6 +140,40 @@ export default function CustomerTrackingDetailsScreen() {
     shipment?.tripType,
   ]);
 
+  const handleMessageSupport = async () => {
+    const message = supportMessage.trim();
+    if (!message) {
+      Alert.alert("Message required", "Type a message to contact support.");
+      return;
+    }
+
+    try {
+      setStartingChat(true);
+      const result = await createConversation({
+        trackingNumber: shipment?.trackingNumber || shipment?.id || normalizedTracking,
+        message,
+      });
+      const conversationId = result?.data?.conversationId;
+      if (conversationId) {
+        if (result?.data?.reused) {
+          await sendChatMessage({ conversationId, text: message });
+        }
+
+        setSupportMessage("");
+        setSupportModalVisible(false);
+        router.push({
+          pathname: "/(customer)/chat/[conversationId]",
+          params: { conversationId },
+        });
+      }
+    } catch (err) {
+      console.error("Failed to open support chat:", err);
+      Alert.alert("Unable to send", "Please try again in a moment.");
+    } finally {
+      setStartingChat(false);
+    }
+  };
+
   if (loading) {
     return (
       <View style={[styles.center, { backgroundColor: colors.bg }]}>
@@ -197,6 +241,111 @@ export default function CustomerTrackingDetailsScreen() {
       >
         <ShipmentHeaderCard shipment={shipment} showActions={false} />
 
+        <TouchableOpacity
+          style={[
+            styles.supportButton,
+            { backgroundColor: colors.surface, borderColor: colors.border },
+          ]}
+          onPress={() => setSupportModalVisible(true)}
+          disabled={startingChat}
+          activeOpacity={0.85}
+        >
+          <View style={styles.supportIcon}>
+            <FontAwesome5 name="comments" size={15} color="#2563eb" />
+          </View>
+          <View style={styles.supportTextWrap}>
+            <Text style={[styles.supportTitle, { color: colors.text }]}>
+              Message Support
+            </Text>
+            <Text style={[styles.supportSubtitle, { color: colors.textMuted }]}>
+              Ask about this shipment
+            </Text>
+          </View>
+          {startingChat ? (
+            <ActivityIndicator size="small" color="#2563eb" />
+          ) : (
+            <FontAwesome5
+              name="chevron-right"
+              size={13}
+              color={colors.textMuted}
+            />
+          )}
+        </TouchableOpacity>
+
+        <Modal
+          transparent
+          animationType="fade"
+          visible={supportModalVisible}
+          onRequestClose={() => setSupportModalVisible(false)}
+        >
+          <View style={styles.modalBackdrop}>
+            <View
+              style={[
+                styles.modalCard,
+                { backgroundColor: colors.surface, borderColor: colors.border },
+              ]}
+            >
+              <Text style={[styles.modalTitle, { color: colors.text }]}>
+                Message Support
+              </Text>
+              <Text style={[styles.modalSubtitle, { color: colors.textMuted }]}>
+                This shipment chat appears after your message is sent.
+              </Text>
+              <TextInput
+                style={[
+                  styles.modalInput,
+                  {
+                    color: colors.text,
+                    backgroundColor: colors.cardMuted,
+                    borderColor: colors.border,
+                  },
+                ]}
+                value={supportMessage}
+                onChangeText={setSupportMessage}
+                placeholder="Ask about this shipment..."
+                placeholderTextColor={colors.textMuted}
+                multiline
+                autoFocus
+              />
+              <View style={styles.modalActions}>
+                <TouchableOpacity
+                  style={[
+                    styles.modalCancel,
+                    {
+                      borderColor: colors.border,
+                      backgroundColor: colors.cardMuted,
+                    },
+                  ]}
+                  onPress={() => {
+                    setSupportModalVisible(false);
+                    setSupportMessage("");
+                  }}
+                  disabled={startingChat}
+                >
+                  <Text style={[styles.modalCancelText, { color: colors.text }]}>
+                    Cancel
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[
+                    styles.modalSend,
+                    (!supportMessage.trim() || startingChat) &&
+                      styles.sendDisabled,
+                  ]}
+                  onPress={handleMessageSupport}
+                  disabled={!supportMessage.trim() || startingChat}
+                >
+                  {startingChat ? (
+                    <ActivityIndicator size="small" color="#ffffff" />
+                  ) : (
+                    <Text style={styles.modalSendText}>Send</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
+
         <TripProgressStepper
           currentStatus={shipment.status}
           tripType={progressType}
@@ -234,6 +383,110 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 16,
     paddingBottom: 32,
+  },
+  supportButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    borderWidth: 1,
+    borderRadius: 15,
+    padding: 14,
+    marginBottom: 16,
+    ...Platform.select({
+      ios: {
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.08,
+        shadowRadius: 8,
+      },
+      android: { elevation: 3 },
+    }),
+  },
+  supportIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#eff6ff",
+  },
+  supportTextWrap: {
+    flex: 1,
+  },
+  supportTitle: {
+    fontSize: 14,
+    fontWeight: "800",
+  },
+  supportSubtitle: {
+    marginTop: 2,
+    fontSize: 12,
+  },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(15, 23, 42, 0.45)",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 20,
+  },
+  modalCard: {
+    width: "100%",
+    maxWidth: 420,
+    borderRadius: 16,
+    borderWidth: 1,
+    padding: 18,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: "800",
+  },
+  modalSubtitle: {
+    marginTop: 5,
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  modalInput: {
+    minHeight: 112,
+    maxHeight: 180,
+    marginTop: 14,
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 14,
+    textAlignVertical: "top",
+  },
+  modalActions: {
+    marginTop: 14,
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    gap: 10,
+  },
+  modalCancel: {
+    height: 42,
+    borderRadius: 10,
+    borderWidth: 1,
+    paddingHorizontal: 16,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  modalCancelText: {
+    fontWeight: "800",
+  },
+  modalSend: {
+    minWidth: 82,
+    height: 42,
+    borderRadius: 10,
+    paddingHorizontal: 18,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#2563eb",
+  },
+  sendDisabled: {
+    opacity: 0.45,
+  },
+  modalSendText: {
+    color: "#ffffff",
+    fontWeight: "800",
   },
   emptyState: {
     flex: 1,

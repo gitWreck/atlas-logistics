@@ -74,6 +74,10 @@ export const finalizeTripUnloadHandoff = httpsCallable(
   functions,
   "finalizeTripUnloadHandoff",
 );
+export const finalizeTripUnloadReadyForDelivery = httpsCallable(
+  functions,
+  "finalizeTripUnloadReadyForDelivery",
+);
 export const resolveDelayReport = httpsCallable(
   functions,
   "resolveDelayReport",
@@ -131,6 +135,23 @@ export const sendManualSms = httpsCallable(functions, "sendManualSms");
 export const broadcastTripMessage = httpsCallable(
   functions,
   "broadcastTripMessage",
+);
+export const createConversation = httpsCallable(
+  functions,
+  "createConversation",
+);
+export const sendChatMessage = httpsCallable(functions, "sendChatMessage");
+export const markConversationRead = httpsCallable(
+  functions,
+  "markConversationRead",
+);
+export const updateConversationStatus = httpsCallable(
+  functions,
+  "updateConversationStatus",
+);
+export const assignConversation = httpsCallable(
+  functions,
+  "assignConversation",
 );
 
 // INVOICES

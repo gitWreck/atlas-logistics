@@ -8,8 +8,9 @@ import {
   faTruck,
 } from "@fortawesome/free-solid-svg-icons";
 import StatusBadge from "../ui/StatusBadge";
+import StatusDot from "../ui/StatusDot";
 import { getRowThemeClasses } from "@/app/utility/constant/theme";
-import { StatusDot } from "./utils";
+import { getShipmentRouteLabel } from "./shipmentHelpers";
 
 export default function ShipmentRow({
   shipmentBoard,
@@ -31,10 +32,13 @@ export default function ShipmentRow({
 
   const trackingNumber = s.shipmentId || "—";
   const routeCode = `${s.originCode || "N/A"} -> ${s.destinationCode || "N/A"}`;
-  const routeLabel = `${s.origin || "—"} -> ${s.destination || "—"}`;
+  const routeLabel = getShipmentRouteLabel(s);
   const updatedLabel = s.updatedAt || "Just now";
 
   const rowStateClass = isDelayed ? theme.rowDelayed : theme.rowDefaultHover;
+  const mobileDividerClass = isDark
+    ? "border-b-4 border-b-slate-700/80 md:border-b md:border-b-slate-800/50"
+    : "border-b-4 border-b-slate-300 md:border-b md:border-b-slate-200";
 
   const progressBarClass =
     s.status === "DELIVERED"
@@ -51,7 +55,7 @@ export default function ShipmentRow({
 
   return (
     <div
-      className={`relative flex flex-col gap-3 p-4 border-b cursor-pointer transition-colors group md:grid md:grid-cols-13 md:gap-4 md:px-6 md:items-center ${theme.rowBorder} ${rowStateClass}`}
+      className={`relative flex flex-col gap-3 p-4 cursor-pointer transition-colors group md:grid md:grid-cols-13 md:gap-4 md:px-6 md:items-center ${mobileDividerClass} ${rowStateClass}`}
     >
       {/* Mobile Header */}
       <div className="flex md:hidden justify-between items-start mb-1">
@@ -60,11 +64,11 @@ export default function ShipmentRow({
 
           <div>
             <div
-              className={`font-mono text-sm font-bold ${theme.tripIdTextShipment}`}
+              className={`font-mono text-base md:text-sm font-bold ${theme.tripIdTextShipment}`}
             >
               {trackingNumber}
             </div>
-            <div className={`text-[10px] ${theme.mutedText}`}>
+            <div className={`text-xs md:text-[10px] ${theme.mutedText}`}>
               {updatedLabel}
             </div>
           </div>
@@ -111,25 +115,21 @@ export default function ShipmentRow({
             <span>{trackingNumber}</span>
           </div>
 
-          <div className="flex flex-wrap md:flex-nowrap items-center gap-3 mt-1">
+          <div className="flex items-center gap-2 mt-1 min-w-0">
             <StatusBadge status={s.status} size="xs" isDark={isDark} />
 
             <span
-              className={`text-xs font-mono border-l pl-2 ${theme.statsDivider}`}
+              className={`text-xs md:text-xs font-mono border-l pl-2 shrink-0 ${theme.statsDivider}`}
             >
               {loadedCount}/{totalCount} Loaded
             </span>
 
             <span
-              className={`hidden md:block text-xs border-l pl-2 truncate max-w-[120px] ${theme.mutedText} ${theme.rowBorder.replace("border-", "border-l ")}`}
+              className={`text-xs md:text-xs border-l pl-2 truncate min-w-0 ${theme.mutedText} ${theme.rowBorder.replace("border-", "border-l ")}`}
               title={driverName}
             >
               Driver: {driverName}
             </span>
-          </div>
-
-          <div className={`md:hidden text-xs mt-1 ${theme.mutedText}`}>
-            Driver: {driverName}
           </div>
         </div>
       </div>
@@ -138,39 +138,39 @@ export default function ShipmentRow({
       <div
         className={`md:col-span-2 flex justify-between md:block items-center border-t md:border-0 pt-2 md:pt-0 ${theme.rowBorder}`}
       >
-        <div className={`text-sm font-medium ${theme.secondaryText}`}>
+        <div className={`text-base md:text-sm font-medium ${theme.secondaryText}`}>
           {routeCode}
         </div>
-        <div className={`text-xs font-mono mt-0.5 ${theme.subtleText}`}>
+        <div className={`text-sm md:text-xs font-mono mt-0.5 ${theme.subtleText}`}>
           {routeLabel}
         </div>
       </div>
 
       {/* Col 3: Sender / Recipient */}
       <div
-        className={`md:col-span-2 flex flex-col justify-center gap-1.5 md:border-0 pt-2 md:pt-0 ${theme.rowBorder}`}
+        className={`md:col-span-2 grid grid-cols-2 md:flex md:flex-col justify-center gap-2 md:gap-1.5 md:border-0 pt-2 md:pt-0 ${theme.rowBorder}`}
       >
-        <div className="flex items-center gap-2 truncate">
+        <div className="flex items-center gap-1.5 md:gap-2 min-w-0">
           <span
-            className={`text-[9px] font-bold uppercase w-8 shrink-0 ${theme.subtleText}`}
+            className={`text-[10px] md:text-[9px] font-bold uppercase shrink-0 md:w-8 ${theme.subtleText}`}
           >
             From
           </span>
           <span
-            className={`text-sm font-medium truncate ${theme.secondaryText}`}
+            className={`text-base md:text-sm font-medium truncate ${theme.secondaryText}`}
           >
             {s.sender?.name || "Unknown"}
           </span>
         </div>
 
-        <div className="flex items-center gap-2 truncate">
+        <div className="flex items-center gap-1.5 md:gap-2 min-w-0">
           <span
-            className={`text-[9px] font-bold uppercase w-8 shrink-0 ${theme.subtleText}`}
+            className={`text-[10px] md:text-[9px] font-bold uppercase shrink-0 md:w-8 ${theme.subtleText}`}
           >
             To
           </span>
           <span
-            className={`text-sm font-medium truncate ${theme.secondaryText}`}
+            className={`text-base md:text-sm font-medium truncate ${theme.secondaryText}`}
           >
             {s.recipient?.name || "Unknown"}
           </span>
@@ -190,11 +190,11 @@ export default function ShipmentRow({
 
         <div className="flex justify-between mt-1.5">
           <span
-            className={`text-[10px] font-medium uppercase ${statusTextClass}`}
+            className={`text-xs md:text-[10px] font-medium uppercase ${statusTextClass}`}
           >
             {s.status?.replaceAll("_", " ") || "UNKNOWN"}
           </span>
-          <span className={`text-[10px] ${theme.subtleText}`}>
+          <span className={`text-xs md:text-[10px] ${theme.subtleText}`}>
             {s.progress || 0}%
           </span>
         </div>

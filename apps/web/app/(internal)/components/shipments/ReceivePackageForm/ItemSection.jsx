@@ -5,21 +5,7 @@ import {
   faWineGlass,
   faSnowflake,
 } from "@fortawesome/free-solid-svg-icons";
-
-const PACKAGING_TYPES = [
-  "Box",
-  "Sack",
-  "Crate",
-  "Bundle",
-  "Roll",
-  "Envelope",
-  "Can",
-  "Pail Bucket",
-  "Drum",
-  "Pail",
-  "Bucket",
-  "Sheet",
-];
+import { PACKAGING_TYPES } from "../shipmentHelpers";
 
 const inputClass = (isDark) =>
   isDark

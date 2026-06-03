@@ -2,8 +2,10 @@
 
 import {
   faChartPie,
+  faCog,
   faFileInvoice,
   faMapSigns,
+  faComments,
   faTruck,
   faTruckLoading,
   faUsers,
@@ -100,11 +102,25 @@ export const mainNavItems = [
     description: "View customer accounts and contact details.",
   },
   {
+    id: "chat",
+    label: "Messages",
+    icon: faComments,
+    title: "Customer Messages",
+    description: "Reply to customer support and shipment conversations.",
+  },
+  {
     id: "invoice",
     label: "Invoices",
     icon: faFileInvoice,
     title: "Invoice Board",
     description: "Manage invoices and payments.",
+  },
+  {
+    id: "settings",
+    label: "Settings",
+    icon: faCog,
+    title: "Settings",
+    description: "Manage app data downloaded by staff devices.",
   },
 ];
 

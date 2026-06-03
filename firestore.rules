@@ -2,7 +2,7 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // --- HELPER FUNCTIONS ---
+    // --- HELPERS ---
 
     function isSignedIn() {
       return request.auth != null;
@@ -21,20 +21,28 @@ service cloud.firestore {
     }
 
     function userRole() {
-      return userDoc().data.role.lower();
+      return userDoc().data.get('role', '').lower();
     }
 
     function hasRole(role) {
       return isActiveUser() && userRole() == role.lower();
     }
 
+    function hasAnyRole(roles) {
+      return isActiveUser() && userRole() in roles;
+    }
+
     function isStaff() {
-      return isActiveUser() &&
-        userRole() in ['admin', 'manager', 'checker', 'driver'];
+      return hasAnyRole(['admin', 'manager', 'checker', 'driver']);
+    }
+
+    function isAdminOrManager() {
+      return hasAnyRole(['admin', 'manager']);
     }
 
     function isAssignedDriver() {
-      return resource.data.driverId == request.auth.uid;
+      return resource.data.driverId == request.auth.uid ||
+        resource.data.assignedDriverId == request.auth.uid;
     }
 
     function canReadShipment() {
@@ -46,24 +54,51 @@ service cloud.firestore {
     }
 
     function canReadDeliveryManifest() {
-      return hasRole('admin') || hasRole('manager') ||
+      return isAdminOrManager() ||
         (hasRole('checker') && resource.data.checkerId == request.auth.uid);
     }
 
-    // --- COLLECTIONS ---
+    function canReadUserProfile(userId) {
+      return isActiveUser() && (
+        request.auth.uid == userId ||
+        isStaff()
+      );
+    }
 
-    // 1. USER PROFILES + CUSTOMER-TRACKED SHIPMENTS
+    // Customer signup currently performs duplicate checks before auth.
+    // Keep this tightly limited; moving this check behind a callable/API is safer.
+    function isCustomerSignupDuplicateQuery() {
+      return !isSignedIn()
+        && request.query.limit != null
+        && request.query.limit <= 1;
+    }
+
+    // --- USERS ---
+
     match /users/{userId} {
-      allow read: if isSignedIn();
-      allow write: if request.auth.uid == userId || hasRole('admin');
+      allow get: if canReadUserProfile(userId);
+      allow list: if canReadUserProfile(userId) || isCustomerSignupDuplicateQuery();
 
+      allow create: if isSignedIn() && request.auth.uid == userId;
+      allow update: if isActiveUser() && (
+        request.auth.uid == userId ||
+        isAdminOrManager()
+      );
+      allow delete: if hasRole('admin');
+
+      // Canonical path used by addTrackedShipment.
+      match /tracked_shipments/{trackingNumber} {
+        allow read, write: if isActiveUser() && request.auth.uid == userId;
+      }
+
+      // Legacy path kept until existing data is migrated.
       match /trackedShipments/{trackingNumber} {
-        allow read, write: if request.auth != null && request.auth.uid == userId;
+        allow read, write: if isActiveUser() && request.auth.uid == userId;
       }
 
       match /notifications/{notificationId} {
-        allow read: if request.auth != null && request.auth.uid == userId;
-        allow update: if request.auth != null
+        allow read: if isActiveUser() && request.auth.uid == userId;
+        allow update: if isActiveUser()
           && request.auth.uid == userId
           && request.resource.data.diff(resource.data).changedKeys().hasOnly(['read'])
           && request.resource.data.read is bool;
@@ -71,58 +106,146 @@ service cloud.firestore {
       }
 
       match /pushTokens/{tokenId} {
-        allow read, create, update, delete: if request.auth != null && request.auth.uid == userId;
+        allow read, create, update, delete: if isActiveUser() && request.auth.uid == userId;
       }
     }
 
-    // 2. INTERNAL TRUTH: TRACKING RECORDS
+    // --- CUSTOMER SUPPORT CHAT ---
+
+    match /conversations/{conversationId} {
+      allow read: if isAdminOrManager()
+        || (isActiveUser() && resource.data.customerId == request.auth.uid)
+        || (isActiveUser() && request.auth.uid in resource.data.get('participantIds', []));
+
+      allow create, update, delete: if false;
+
+      match /messages/{messageId} {
+        allow read: if isAdminOrManager()
+          || (
+            isActiveUser()
+            && get(/databases/$(database)/documents/conversations/$(conversationId)).data.customerId == request.auth.uid
+          )
+          || (
+            isActiveUser()
+            && request.auth.uid in get(/databases/$(database)/documents/conversations/$(conversationId)).data.get('participantIds', [])
+          );
+
+        allow create, update, delete: if false;
+      }
+    }
+
+    // --- OPERATIONS ---
+
+    match /shipments/{shipmentId} {
+      allow read: if canReadShipment();
+      allow create, update, delete: if false;
+
+      match /status_events/{statusId} {
+        allow read: if isStaff();
+        allow create, update, delete: if false;
+      }
+
+      match /packages/{packageId} {
+        allow read: if canReadShipment();
+        allow create, update, delete: if false;
+      }
+
+      match /invoices/{invoiceId} {
+        allow read: if canReadShipment() || isAdminOrManager();
+        allow create, update, delete: if false;
+      }
+    }
+
     match /tracking_records/{trackingNumber} {
       allow read: if isStaff();
       allow write: if false;
-    }
 
-    // 3. TRIPS (Physical Truck Runs)
-    match /truck_trips/{tripId} {
-      allow read: if hasRole('admin') || hasRole('manager') || hasRole('checker') ||
-        (hasRole('driver') && isAssignedDriver());
-      allow write: if false;
-
-      match /trip_shipments/{shipmentId} {
+      match /status_events/{statusId} {
         allow read: if isStaff();
         allow write: if false;
       }
     }
 
-    // 3b. SHIPMENTS (internal operational records)
-    // Mobile: staff queries + customer visibilityUserIds array-contains.
-    // All writes go through Cloud Functions (Admin SDK).
-    match /shipments/{shipmentId} {
-      allow read: if canReadShipment();
+    match /truck_trips/{tripId} {
+      allow read: if isAdminOrManager() ||
+        hasRole('checker') ||
+        (hasRole('driver') && isAssignedDriver());
       allow create, update, delete: if false;
+
+      match /trip_shipments/{shipmentId} {
+        allow read: if isStaff();
+        allow create, update, delete: if false;
+      }
+
+      match /trip_packages/{packageId} {
+        allow read: if isStaff();
+        allow create, update, delete: if false;
+      }
     }
 
-    // 3c. CUSTODY EVENT LEDGER (append-only via Cloud Functions)
+    // Custody event ledger (append-only via Cloud Functions)
     match /shipment_events/{eventId} {
       allow read: if isStaff();
       allow create, update, delete: if false;
     }
 
-    // 3d. CHECKER DELIVERY MANIFESTS
-    // Mobile: query where checkerId == auth.uid; managers see all.
     match /delivery_manifests/{manifestId} {
       allow read: if canReadDeliveryManifest();
       allow create, update, delete: if false;
     }
 
-    // 4. PUBLIC PROJECTION
+    // --- BILLING ---
+
+    match /invoices/{invoiceId} {
+      allow read: if isStaff();
+      allow create, update, delete: if false;
+    }
+
+    match /invoice_events/{eventId} {
+      allow read: if isAdminOrManager();
+      allow create, update, delete: if false;
+    }
+
+    // --- PUBLIC TRACKING ---
+
     match /tracking_public/{trackingNumber} {
       allow read: if true;
       allow write: if false;
     }
 
-    // 5. LOGS (Audit Trail)
+    match /app_settings/{settingsId} {
+      allow get: if settingsId == 'operational';
+      allow list: if false;
+      allow write: if false;
+    }
+
+    // --- ALERTS AND LOGS ---
+
+    match /admin_alerts/{alertId} {
+      allow read: if isAdminOrManager();
+      allow update: if isAdminOrManager()
+        && request.resource.data.diff(resource.data).changedKeys().hasOnly(['status', 'readAt'])
+        && request.resource.data.status in ['UNREAD', 'READ'];
+      allow create, delete: if false;
+    }
+
+    match /sms_logs/{smsId} {
+      allow read: if isAdminOrManager();
+      allow write: if false;
+    }
+
     match /audit_logs/{logId} {
       allow read: if hasRole('admin');
+      allow write: if false;
+    }
+
+    match /audit_events/{eventId} {
+      allow read: if hasRole('admin');
+      allow write: if false;
+    }
+
+    match /admin_logs/{logId} {
+      allow read: if isAdminOrManager();
       allow write: if false;
     }
   }

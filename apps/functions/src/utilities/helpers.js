@@ -19,6 +19,28 @@ function requireNonEmptyString(value, fieldName) {
   return requireString(value, fieldName);
 }
 
+function unique(values = []) {
+  return [...new Set(values.filter(Boolean).map(String))];
+}
+
+function chunk(values = [], size = 30) {
+  const chunks = [];
+  for (let index = 0; index < values.length; index += size) {
+    chunks.push(values.slice(index, index + size));
+  }
+  return chunks;
+}
+
+function cleanObject(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return value;
+  }
+
+  return Object.fromEntries(
+    Object.entries(value).filter(([, entryValue]) => entryValue !== undefined),
+  );
+}
+
 /* =========================
    NUMBER / DATE PARSERS
 ========================= */
@@ -307,7 +329,7 @@ function toE164(localNumber) {
   const cleaned = localNumber.replace(/[\s\-()]/g, "");
 
   if (cleaned.startsWith("0")) {
-    return `+63${cleaned.substring(1)}`;
+    return `63${cleaned.substring(1)}`;
   }
 
   return cleaned;
@@ -322,6 +344,10 @@ function toLocal(e164Number) {
 
   if (cleaned.startsWith("+63")) {
     return `0${cleaned.substring(3)}`;
+  }
+
+  if (cleaned.startsWith("63")) {
+    return `0${cleaned.substring(2)}`;
   }
 
   return cleaned;
@@ -345,6 +371,9 @@ module.exports = {
   requireString,
   optionalString,
   requireNonEmptyString,
+  unique,
+  chunk,
+  cleanObject,
 
   parseRequiredNumber,
   parseOptionalNumber,

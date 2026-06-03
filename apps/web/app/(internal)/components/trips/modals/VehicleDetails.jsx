@@ -5,6 +5,7 @@ export default function VehicleDetails({
   formData,
   setFormData,
   isDark = false,
+  required = false,
 }) {
   return (
     <div
@@ -19,6 +20,7 @@ export default function VehicleDetails({
         }
         onSelectId={(id) => setFormData((prev) => ({ ...prev, driverId: id }))}
         isDark={isDark}
+        required={required}
       />
 
       <TruckSelectInput
@@ -28,6 +30,7 @@ export default function VehicleDetails({
         }
         onSelectId={(id) => setFormData((prev) => ({ ...prev, truckId: id }))}
         isDark={isDark}
+        required={required}
       />
 
       <div className="space-y-1">

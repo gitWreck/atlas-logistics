@@ -11,9 +11,110 @@ const {
 } = require("../tracking/eventTypes");
 const { extractTripEventContext } = require("../tracking/tripEventContext");
 const { deriveMasterShipmentStatus } = require("./shipmentStatus");
+const { getShipmentTargetUserIds } = require("../utilities/notificationHelpers");
+const { normalizeQty } = require("../utilities/packageHelpers");
 
 if (!admin.apps.length) admin.initializeApp();
 const db = admin.firestore();
+
+function formatStatusLabel(status = "") {
+  return String(status || "")
+    .replace(/_/g, " ")
+    .toLowerCase()
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function buildShipmentStatusNotificationEvent({
+  shipment,
+  shipmentId,
+  oldStatus,
+  newStatus,
+  actor,
+  notificationChannels,
+  notifySms,
+  notifyEmail,
+  notifyPush,
+  notify,
+}) {
+  if (notify === false) return null;
+
+  const requestedChannels =
+    notificationChannels && typeof notificationChannels === "object"
+      ? notificationChannels
+      : null;
+  const channels = requestedChannels
+    ? {
+        sms: requestedChannels.sms === true,
+        email: requestedChannels.email === true,
+        push: requestedChannels.push === true,
+      }
+    : {
+        sms: notifySms !== false,
+        email: notifyEmail === true,
+        push: notifyPush !== false,
+      };
+  const targetUserIds = getShipmentTargetUserIds(shipment);
+  const statusLabel = formatStatusLabel(newStatus);
+  const title = "Shipment status updated";
+  const body = `Shipment ${shipmentId} is now ${statusLabel}.`;
+
+  if (!channels.sms && !channels.email && !channels.push) {
+    return null;
+  }
+
+  return {
+    type: "SHIPMENT_STATUS_UPDATED",
+    status: "pending",
+    channels: {
+      sms: channels.sms,
+      email: channels.email,
+      push: channels.push && targetUserIds.length > 0,
+      inApp: channels.push && targetUserIds.length > 0,
+    },
+    entityType: "shipment",
+    entityId: shipmentId,
+    shipmentId,
+    targetUserIds,
+    targets: {
+      sender: {
+        uid: shipment.sender?.uid || shipment.senderUid || null,
+        name: shipment.sender?.name || shipment.senderName || "",
+        phone: shipment.sender?.phone || shipment.senderPhone || null,
+        email: shipment.sender?.email || shipment.senderEmail || null,
+      },
+      recipient: {
+        uid: shipment.recipient?.uid || shipment.recipientUid || null,
+        name: shipment.recipient?.name || shipment.recipientName || "",
+        phone:
+          shipment.recipient?.phone ||
+          shipment.recipientPhone ||
+          shipment.consigneePhone ||
+          shipment.customerPhone ||
+          null,
+        email: shipment.recipient?.email || shipment.recipientEmail || null,
+      },
+    },
+    title,
+    body,
+    smsBody: `ATLAS: Shipment ${shipmentId} is now ${statusLabel}. Track: https://atlastransport.ph/track/${shipmentId}`,
+    data: {
+      screen: "tracking",
+      trackingId: shipmentId,
+      status: newStatus,
+      oldStatus,
+      origin: shipment.origin || shipment.sender?.address?.city || null,
+      destination:
+        shipment.destination || shipment.recipient?.address?.city || null,
+    },
+    actor: {
+      uid: actor.uid,
+      name: actor.name,
+      role: actor.role,
+    },
+    createdAt: FieldValue.serverTimestamp(),
+    updatedAt: FieldValue.serverTimestamp(),
+  };
+}
 
 exports.updateShipmentPackages = onCall(
   { region: "asia-southeast1", maxInstances: 10 },
@@ -38,6 +139,11 @@ exports.updateShipmentPackages = onCall(
       location,
       scanAction,
       tripId: scannerTripId,
+      notify = true,
+      notificationChannels = null,
+      notifySms,
+      notifyEmail,
+      notifyPush,
     } = req.data || {};
 
     if (!shipmentId || typeof shipmentId !== "string") {
@@ -64,6 +170,7 @@ exports.updateShipmentPackages = onCall(
     const allowedStatuses = [
       "RECEIVED",
       "LOADED",
+      "OUT_FOR_DELIVERY",
       "DELIVERED",
       "MISSING",
       "DAMAGED",
@@ -112,14 +219,17 @@ exports.updateShipmentPackages = onCall(
       const resolveTripContext = async (candidateTripId) => {
         if (!candidateTripId) return null;
 
-        const candidateTripRef = db.collection("truck_trips").doc(candidateTripId);
+        const candidateTripRef = db
+          .collection("truck_trips")
+          .doc(candidateTripId);
         const candidateTripShipmentRef = candidateTripRef
           .collection("trip_shipments")
           .doc(shipmentId);
-        const [candidateTripSnap, candidateTripShipmentSnap] = await Promise.all([
-          tx.get(candidateTripRef),
-          tx.get(candidateTripShipmentRef),
-        ]);
+        const [candidateTripSnap, candidateTripShipmentSnap] =
+          await Promise.all([
+            tx.get(candidateTripRef),
+            tx.get(candidateTripShipmentRef),
+          ]);
 
         if (!candidateTripSnap.exists) return null;
 
@@ -166,13 +276,34 @@ exports.updateShipmentPackages = onCall(
       let tripSnap = tripContext?.tripSnap || null;
 
       if (tripId && tripRef && tripShipmentRef && !tripShipmentSnap?.exists) {
-          tx.set(tripShipmentRef, {
-            trackingShipmentId: shipmentId,
-            shipmentId: oldData.shipmentId || null,
-            route:
-              (oldData.originCode || "?") +
-              " -> " +
-              (oldData.destinationCode || "?"),
+        tx.set(tripShipmentRef, {
+          trackingShipmentId: shipmentId,
+          shipmentId: oldData.shipmentId || null,
+          route:
+            (oldData.originCode || "?") +
+            " -> " +
+            (oldData.destinationCode || "?"),
+          totalItems: 0,
+          pendingCount: 0,
+          loadedCount: 0,
+          deliveredCount: 0,
+          receivedCount: 0,
+          missingCount: 0,
+          damagedCount: 0,
+          sender: oldData.sender || null,
+          recipient: oldData.recipient || null,
+          packageBarcodes: [],
+          createdAt: FieldValue.serverTimestamp(),
+          createdBy: uid,
+          updatedAt: FieldValue.serverTimestamp(),
+          updatedBy: name,
+          updatedRole: role,
+          status: oldData.status || "ASSIGNED",
+        });
+        tripShipmentSnap = {
+          exists: true,
+          data: () => ({
+            status: oldData.status || "ASSIGNED",
             totalItems: 0,
             pendingCount: 0,
             loadedCount: 0,
@@ -180,29 +311,8 @@ exports.updateShipmentPackages = onCall(
             receivedCount: 0,
             missingCount: 0,
             damagedCount: 0,
-            sender: oldData.sender || null,
-            recipient: oldData.recipient || null,
-            packageBarcodes: [],
-            createdAt: FieldValue.serverTimestamp(),
-            createdBy: uid,
-            updatedAt: FieldValue.serverTimestamp(),
-            updatedBy: name,
-            updatedRole: role,
-            status: oldData.status || "ASSIGNED",
-          });
-          tripShipmentSnap = {
-            exists: true,
-            data: () => ({
-              status: oldData.status || "ASSIGNED",
-              totalItems: 0,
-              pendingCount: 0,
-              loadedCount: 0,
-              deliveredCount: 0,
-              receivedCount: 0,
-              missingCount: 0,
-              damagedCount: 0,
-            }),
-          };
+          }),
+        };
       }
 
       const tripData = tripSnap?.exists ? tripSnap.data() || {} : {};
@@ -234,11 +344,6 @@ exports.updateShipmentPackages = onCall(
       // -----------------------------
       const nowIso = new Date().toISOString();
       const nowServer = FieldValue.serverTimestamp();
-
-      const normalizeQty = (value, fallback = 0) => {
-        const num = Number(value);
-        return Number.isFinite(num) && num >= 0 ? num : fallback;
-      };
 
       const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
       const getPackageIdentity = (pkg = {}) =>
@@ -644,6 +749,18 @@ exports.updateShipmentPackages = onCall(
             loadedQty = clamp(loadedQty + requestedQty, 0, quantity);
             missingQty = 0;
             damagedQty = 0;
+          } else if (newStatus === "OUT_FOR_DELIVERY") {
+            const remainingQty = Math.max(quantity - loadedQty, 0);
+            const requestedQty =
+              specificQty !== undefined &&
+              specificQty !== null &&
+              specificQty !== ""
+                ? clamp(normalizeQty(specificQty, 0), 0, remainingQty)
+                : remainingQty;
+
+            loadedQty = clamp(loadedQty + requestedQty, 0, quantity);
+            missingQty = 0;
+            damagedQty = 0;
           } else if (newStatus === "DELIVERED") {
             const remainingQty = Math.max(quantity - receivedQty, 0);
             const deliverableQty =
@@ -709,9 +826,12 @@ exports.updateShipmentPackages = onCall(
             remarks: remarks || pkg.remarks || null,
           };
 
-          const derivedStatus = shouldPromoteReadyForDelivery
-            ? "OUT_FOR_DELIVERY"
-            : derivePackageStatus(updatedPkg);
+          const derivedStatus =
+            newStatus === "OUT_FOR_DELIVERY"
+              ? "OUT_FOR_DELIVERY"
+              : shouldPromoteReadyForDelivery
+                ? "OUT_FOR_DELIVERY"
+                : derivePackageStatus(updatedPkg);
 
           finalPackages.push({
             ...updatedPkg,
@@ -809,15 +929,13 @@ exports.updateShipmentPackages = onCall(
       const singleCurrentTripId =
         activeTripIds.length === 1 ? activeTripIds[0] : null;
       const tripPackages = tripId
-        ? finalPackages.filter(
-            (pkg) => {
-              const packageTripId = pkg.currentTripId || pkg.loadedOnTrip || null;
-              const packageId = getPackageIdentity(pkg);
+        ? finalPackages.filter((pkg) => {
+            const packageTripId = pkg.currentTripId || pkg.loadedOnTrip || null;
+            const packageId = getPackageIdentity(pkg);
 
-              if (packageTripId) return packageTripId === tripId;
-              return packageId ? existingTripBarcodeSet.has(packageId) : false;
-            },
-          )
+            if (packageTripId) return packageTripId === tripId;
+            return packageId ? existingTripBarcodeSet.has(packageId) : false;
+          })
         : finalPackages;
       const tripPackageBarcodes = tripPackages
         .map((pkg) => getPackageIdentity(pkg))
@@ -914,7 +1032,8 @@ exports.updateShipmentPackages = onCall(
 
         if (deltaTripReceivedQty !== 0) {
           tripUpdate.totalArrived = FieldValue.increment(deltaTripReceivedQty);
-          tripUpdate.totalDelivered = FieldValue.increment(deltaTripReceivedQty);
+          tripUpdate.totalDelivered =
+            FieldValue.increment(deltaTripReceivedQty);
         }
 
         if (deltaTripMissingQty !== 0) {
@@ -1001,6 +1120,27 @@ exports.updateShipmentPackages = onCall(
             remarks: remarks || null,
             source: isScannerUpdate ? "SCANNER" : "WEB_MODAL",
           };
+      if (
+        isScannerUpdate &&
+        shipmentStatus &&
+        shipmentStatus !== oldShipmentStatus
+      ) {
+        const notificationEvent = buildShipmentStatusNotificationEvent({
+          shipment: oldData,
+          shipmentId,
+          oldStatus: oldData.status || null,
+          newStatus: shipmentStatus,
+          actor: { uid: uid || authUid, name, role },
+          notificationChannels,
+          notifySms,
+          notifyEmail,
+          notifyPush,
+          notify,
+        });
+
+        if (notificationEvent) {
+          const notificationRef = db.collection("notification_events").doc();
+          tx.set(notificationRef, notificationEvent);
         }
       }
     });

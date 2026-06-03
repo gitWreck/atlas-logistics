@@ -9,18 +9,24 @@ export default function TripToolsTab({
   isDark = false,
   profile,
 }) {
+  const isManager = String(profile?.role || "").toLowerCase() === "manager";
+
   return (
     <div className="animate-in zoom-in-95 duration-200 space-y-6">
       {/* 1. CRITICAL OPERATIONS (Status, Delay, Assign) */}
-      <TripOperations
-        tripId={data.tripId}
-        isLocked={data.manifestLocked}
-        onSuccess={() => onRefresh()}
-        isDark={isDark}
-        profile={profile}
-      />
+      {!isManager && (
+        <TripOperations
+          tripId={data.tripId}
+          isLocked={data.manifestLocked}
+          onSuccess={() => onRefresh()}
+          isDark={isDark}
+          profile={profile}
+        />
+      )}
 
-      <hr className={isDark ? "border-slate-800" : "border-slate-200"} />
+      {!isManager && (
+        <hr className={isDark ? "border-slate-800" : "border-slate-200"} />
+      )}
 
       {/* 2. COMMUNICATION CARD */}
       <TripBroadcastWidget trip={data} isDark={isDark} profile={profile} />

@@ -6,18 +6,8 @@ import RouteSection from "./RouteSection";
 import ItemSection from "./ItemSection";
 import InputGroup from "./InputGroup";
 import { useAlert } from "@/app/context/AlertContext";
-
-const INITIAL_CONTACT = {
-  uid: null,
-  userId: null,
-  name: "",
-  phone: "",
-  unit: "",
-  street: "",
-  barangay: "",
-  city: "",
-  province: "",
-};
+import { INITIAL_CONTACT } from "../shipmentHelpers";
+import { useOperationalSettings } from "@/app/utility/useOperationalSettings";
 
 export default function ReceivePackageForm({
   // key,
@@ -29,6 +19,9 @@ export default function ReceivePackageForm({
   user,
 }) {
   const { showAlert, showConfirm } = useAlert();
+  const { settings } = useOperationalSettings();
+  const warehouses = settings.warehouses;
+  const phLocations = settings.phLocations;
 
   // Use initialData if the user clicked "Back" from Step 2
   const [routeInfo, setRouteInfo] = useState(
@@ -215,8 +208,7 @@ export default function ReceivePackageForm({
   }, []);
 
   const handleWarehouseChange = (type, value) => {
-    const { WAREHOUSES } = require("@/app/utility/WarehouseData");
-    const selected = WAREHOUSES.find((w) => w.name === value);
+    const selected = warehouses.find((w) => w.name === value);
 
     // 1. Update Route Info (Standard)
     setRouteInfo((prev) => ({
@@ -314,6 +306,7 @@ export default function ReceivePackageForm({
           <RouteSection
             routeInfo={routeInfo}
             onWarehouseChange={handleWarehouseChange}
+            warehouses={warehouses}
             isPickupMode={isPickupMode}
             isDark={isDark}
           />
@@ -326,6 +319,7 @@ export default function ReceivePackageForm({
               color="blue"
               isDark={isDark}
               user={user}
+              phLocations={phLocations}
             />
             <InputGroup
               label="Recipient Contact"
@@ -334,6 +328,7 @@ export default function ReceivePackageForm({
               color="emerald"
               isDark={isDark}
               user={user}
+              phLocations={phLocations}
             />
           </div>
 

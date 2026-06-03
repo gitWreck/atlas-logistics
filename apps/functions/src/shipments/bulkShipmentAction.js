@@ -6,6 +6,7 @@ const { FieldValue } = admin.firestore;
 const { requireRole, updatedBy } = require("../utilities/helpers");
 const { writeShipmentActionLog } = require("../utilities/shipmentLogger");
 const { deriveMasterShipmentStatus } = require("../packages/shipmentStatus");
+const { normalizeQty } = require("../utilities/packageHelpers");
 
 if (!admin.apps.length) admin.initializeApp();
 const db = admin.firestore();
@@ -23,7 +24,7 @@ exports.bulkShipmentAction = onCall(
       request.data || {};
     const userId = request.auth.uid;
 
-    const { uid, role, name } = updatedBy(req);
+    const { uid, role, name } = updatedBy(request);
 
     if (!tripId || typeof tripId !== "string") {
       throw new HttpsError("invalid-argument", "Missing tripId");
@@ -89,11 +90,6 @@ exports.bulkShipmentAction = onCall(
         ]);
 
         const nowServer = FieldValue.serverTimestamp();
-
-        const normalizeQty = (value, fallback = 0) => {
-          const num = Number(value);
-          return Number.isFinite(num) && num >= 0 ? num : fallback;
-        };
 
         const normalizePackage = (pkg = {}) => {
           const quantity = normalizeQty(pkg.quantity, 1) || 1;
