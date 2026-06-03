@@ -617,6 +617,7 @@ const ShipmentBoard = forwardRef(function ShipmentBoard(
         data={selectedShipment}
         isDark={isDark}
         onRefresh={fetchShipments}
+        profile={profile}
       />
 
       {/* <NewShipmentModal

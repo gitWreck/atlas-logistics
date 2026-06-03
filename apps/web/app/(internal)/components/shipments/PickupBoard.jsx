@@ -383,6 +383,7 @@ const PickupBoard = forwardRef(function PickupBoard(
         data={selectedPickup}
         isDark={isDark}
         onRefresh={fetchPickups}
+        profile={profile}
       />
 
       <UnifiedShipmentModal
