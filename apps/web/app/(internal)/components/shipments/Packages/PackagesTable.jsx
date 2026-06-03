@@ -96,7 +96,7 @@ export default function PackagesTable({ data, onRefresh, isDark = false }) {
           </div>
         </div>
 
-        <div className="flex flex-col sm:flex-row gap-2">
+        <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-row">
           <button
             type="button"
             // onClick={() => window.open(shipmentLabelUrl(data.id), "_blank")}
@@ -104,19 +104,19 @@ export default function PackagesTable({ data, onRefresh, isDark = false }) {
               const url = manifestUrl(data.id);
               window.open(url, "_blank");
             }}
-            className={`flex justify-center items-center gap-2 px-4 py-2 rounded-lg transition-colors text-xs font-bold whitespace-nowrap ${theme.actionButton}`}
+            className={`flex min-w-0 justify-center items-center gap-2 px-3 sm:px-4 py-2 rounded-lg transition-colors text-xs font-bold ${theme.actionButton}`}
           >
             <FontAwesomeIcon icon={faPrint} />
-            <span>Shipment Label</span>
+            <span className="truncate">Shipment Label</span>
           </button>
 
           <button
             type="button"
             onClick={() => window.open(packageLabelUrl(data.id), "_blank")}
-            className={`flex justify-center items-center gap-2 px-4 py-2 rounded-lg transition-colors text-xs font-bold whitespace-nowrap ${theme.actionButton}`}
+            className={`flex min-w-0 justify-center items-center gap-2 px-3 sm:px-4 py-2 rounded-lg transition-colors text-xs font-bold ${theme.actionButton}`}
           >
             <FontAwesomeIcon icon={faPrint} />
-            <span>Package Label/s</span>
+            <span className="truncate">Package Label/s</span>
           </button>
         </div>
       </div>

@@ -77,9 +77,14 @@ export function HandoffPrompt({
   theme,
   summary,
   tripId = null,
+  trips = [],
+  selectedTrip,
+  onSelectTrip,
   missingRemarks,
   onRemarkChange,
   onRelease,
+  onAssign,
+  onMarkReadyForDelivery,
   onRefresh,
   onBack,
   btnStatus,
@@ -97,6 +102,9 @@ export function HandoffPrompt({
     lifecycleCanRelease &&
     unloadedShipments.length > 0 &&
     (!hasMissing || remarksComplete);
+  const canAssign =
+    trips.length > 0 && selectedTrip && (!hasMissing || remarksComplete);
+  const canMarkReady = !hasMissing || remarksComplete;
 
   return (
     <InterceptorPrompt
@@ -194,7 +202,34 @@ export function HandoffPrompt({
         </p>
       )}
 
+      <TripSearchSelect
+        theme={theme}
+        trips={trips}
+        selectedTrip={selectedTrip}
+        onSelectTrip={onSelectTrip}
+      />
+
       <div className="space-y-2">
+        <StatusButton
+          status={btnStatus}
+          label="Mark Ready for Delivery"
+          loadingLabel="Marking ready..."
+          successLabel="Ready for Delivery"
+          icon={faCheck}
+          variant="emerald"
+          disabled={!canMarkReady}
+          onClick={onMarkReadyForDelivery}
+        />
+        <StatusButton
+          status={btnStatus}
+          label="Assign to Delivery Trip"
+          loadingLabel="Assigning..."
+          successLabel="Handoff Complete"
+          icon={faCheck}
+          variant="blue"
+          disabled={!canAssign}
+          onClick={onAssign}
+        />
         <StatusButton
           status={btnStatus}
           label="Release shipment(s)"
@@ -205,6 +240,12 @@ export function HandoffPrompt({
           disabled={!canRelease}
           onClick={onRelease}
         />
+        {trips.length === 0 && (
+          <div className="text-[11px] opacity-60">
+            No delivery trips available. You can still mark these shipments ready
+            for delivery.
+          </div>
+        )}
         <div className="flex items-center justify-center gap-4">
           <button onClick={onBack} className="text-xs opacity-60 underline">
             Back to scanning

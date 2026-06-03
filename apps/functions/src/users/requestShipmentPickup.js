@@ -2,6 +2,16 @@ const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const admin = require("firebase-admin");
 const { sendShipmentPickup } = require("../messaging/sendShipmentPickup");
 const {
+  normalizeAddress,
+  formatAddress,
+} = require("../utilities/addressHelpers");
+const {
+  findCustomerByPhone,
+  getPublicUserId,
+} = require("../utilities/customerHelpers");
+const { normalizePhone } = require("../utilities/phoneHelpers");
+const { buildPackages } = require("../utilities/packageHelpers");
+const {
   SEMAPHORE_API_KEY,
   SEMAPHORE_SENDER_NAME,
 } = require("../../shared/sms-service");
@@ -9,80 +19,6 @@ const { Timestamp } = admin.firestore;
 
 if (!admin.apps.length) admin.initializeApp();
 const db = admin.firestore();
-
-function normalizePhone(value = "") {
-  const digits = String(value || "").replace(/[^\d]/g, "");
-  if (digits.length === 11 && digits.startsWith("0")) {
-    return `63${digits.slice(1)}`;
-  }
-  if (digits.length === 10 && digits.startsWith("9")) {
-    return `63${digits}`;
-  }
-  return digits;
-}
-
-function phoneVariants(value = "") {
-  const normalized = normalizePhone(value);
-  const variants = new Set();
-  if (normalized) variants.add(normalized);
-  if (normalized.startsWith("63") && normalized.length === 12) {
-    variants.add(`0${normalized.slice(2)}`);
-  }
-  return [...variants].slice(0, 10);
-}
-
-function normalizeAddress(address = {}) {
-  return {
-    unit: address.unit || "",
-    street: address.street || "",
-    barangay: address.barangay || "",
-    city: address.city || "",
-    province: address.province || "",
-  };
-}
-
-function formatAddress(address = {}) {
-  return [
-    address.unit,
-    address.street,
-    address.barangay,
-    address.city,
-    address.province,
-  ]
-    .map((value) => String(value || "").trim())
-    .filter(Boolean)
-    .join(", ");
-}
-
-function getPublicUserId(user = {}, fallback = null) {
-  return (
-    user.userId ||
-    user.publicId ||
-    user.userCode ||
-    user.driverCode ||
-    fallback ||
-    null
-  );
-}
-
-async function findCustomerByPhone(phone) {
-  const variants = phoneVariants(phone);
-  if (!variants.length) return null;
-
-  const snap = await db
-    .collection("users")
-    .where("phoneNumber", "in", variants)
-    .limit(1)
-    .get();
-
-  if (snap.empty) return null;
-
-  const userDoc = snap.docs[0];
-  const data = userDoc.data() || {};
-  if (data.role && data.role !== "customer") return null;
-
-  return { uid: userDoc.id, ...data };
-}
 
 exports.requestShipmentPickup = onCall(
   {
@@ -139,7 +75,7 @@ exports.requestShipmentPickup = onCall(
     const recipientAddress = normalizeAddress(recipient);
     const senderPhone = normalizePhone(sender.phone || userData.phoneNumber);
     const recipientPhone = normalizePhone(recipient.phone);
-    const recipientCustomer = await findCustomerByPhone(recipientPhone);
+    const recipientCustomer = await findCustomerByPhone(db, recipientPhone);
     const recipientUid = recipient.uid || recipientCustomer?.uid || null;
     const shipmentVisibilityUserIds = [
       ...new Set([uid, recipientUid].filter(Boolean).map(String)),
@@ -160,77 +96,15 @@ exports.requestShipmentPickup = onCall(
 
     const shipmentRef = db.collection("shipments").doc(shipmentId);
 
-    // 4. COMBINED PACKAGING LOGIC (Standard vs Bundle)
-    const packagesArray = [];
-    const packageBarcodes = [];
-    let globalSeq = 1;
-    let totalContentQuantity = 0;
-
-    items.forEach((item) => {
-      const qty = Number(item.quantity || item.weight) || 1; // Fallback to weight if qty isn't passed
-      const pkgType = item.packagingType || item.packaging || "Box";
-
-      totalContentQuantity += qty;
-
-      // Determine if this item should be bundled or split
-      const isBundle = pkgType === "Sack" || pkgType === "Bundle";
-
-      if (isBundle) {
-        // BUNDLE LOGIC: 1 Physical Barcode, Internal Quantity = QTY
-        const seqNum = globalSeq.toString().padStart(2, "0");
-        const pkgId = `${shipmentId}-${seqNum}`;
-
-        packagesArray.push({
-          packageId: pkgId,
-          trackingNumber: pkgId,
-          sequence: globalSeq,
-          description: item.description || "Bundled Cargo",
-          quantity: qty, // Stores internal piece count
-          packagingGroup: "BULK",
-          packagingType: pkgType,
-          declaredValue: Number(item.declaredValue) || 0,
-          isFragile: Boolean(item.isFragile),
-          isPerishable: Boolean(item.isPerishable),
-          status: initialStatus,
-          currentLocation: originSummary,
-          loadedOnTrip: null,
-          isDelayed: false,
-          updatedAt: new Date().toISOString(),
-          updatedBy: uid,
-        });
-
-        packageBarcodes.push(pkgId);
-        globalSeq++;
-      } else {
-        // STANDARD LOGIC: 'QTY' Physical Barcodes, Internal Quantity = 1 per box
-        for (let i = 0; i < qty; i++) {
-          const seqNum = globalSeq.toString().padStart(2, "0");
-          const pkgId = `${shipmentId}-${seqNum}`;
-
-          packagesArray.push({
-            packageId: pkgId,
-            trackingNumber: pkgId,
-            sequence: globalSeq,
-            description: item.description || "Standard Package",
-            quantity: 1, // 1 unit per physical box
-            packagingGroup: "SINGLE",
-            packagingType: pkgType,
-            declaredValue: (Number(item.declaredValue) || 0) / qty, // Split value evenly
-            isFragile: Boolean(item.isFragile),
-            isPerishable: Boolean(item.isPerishable),
-            status: initialStatus,
-            currentLocation: originSummary,
-            loadedOnTrip: null,
-            isDelayed: false,
-            updatedAt: new Date().toISOString(),
-            updatedBy: uid,
-          });
-
-          packageBarcodes.push(pkgId);
-          globalSeq++;
-        }
-      }
-    });
+    const { packagesArray, packageBarcodes, totalContentQuantity } =
+      buildPackages({
+        items,
+        shipmentId,
+        initialStatus,
+        originSummary,
+        bundleMode: false,
+        updatedBy: uid,
+      });
 
     const now = Timestamp.now();
     const nowAt = admin.firestore.FieldValue.serverTimestamp();

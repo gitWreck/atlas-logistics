@@ -272,6 +272,9 @@ export default function ShipmentScanActionModal({
               theme={theme}
               summary={state.handoffSummary}
               tripId={state.tripId}
+              trips={state.availableTrips}
+              selectedTrip={state.selectedNextTrip}
+              onSelectTrip={actions.setSelectedNextTrip}
               missingRemarks={state.missingRemarks}
               onRemarkChange={(shipmentId, value) =>
                 actions.setMissingRemarks((prev) => ({
@@ -280,6 +283,8 @@ export default function ShipmentScanActionModal({
                 }))
               }
               onRelease={actions.handleReleaseShipmentsFromTrip}
+              onAssign={actions.handleAssignNextTrip}
+              onMarkReadyForDelivery={actions.handleMarkReadyForDelivery}
               onRefresh={actions.handleReviewHandoff}
               onBack={actions.resetScanResult}
               btnStatus={state.btnStatus}

@@ -5,7 +5,7 @@ import { useState, useCallback } from "react";
 // 1. Import your centralized Firebase functions
 import {
   bulkAssignShipments,
-  releaseForDeliveryOperations,
+  finalizeTripUnloadHandoff,
   updateTripStatus,
   unlockTripManifest,
   generateTripManifest,
@@ -893,6 +893,58 @@ export default function useScannerLogic({
     }
   };
 
+  const handleAssignNextTrip = async () => {
+    if (!selectedNextTrip) return setError("Select a delivery trip first.");
+
+    const missing = handoffSummary?.missingShipments || [];
+    const incompleteRemark = missing.find(
+      (item) => !String(missingRemarks[item.id] || "").trim(),
+    );
+
+    if (incompleteRemark) {
+      return setError(`Add remarks for ${incompleteRemark.shipmentId}.`);
+    }
+
+    const success = await executeFirebaseCall(finalizeTripUnloadHandoff, {
+      sourceTripId: tripId,
+      deliveryTripId: selectedNextTrip,
+      missingRemarks,
+      updatedBy: updatedBy(profile),
+    });
+    if (success)
+      setTimeout(() => {
+        onRefresh?.();
+        onClose?.();
+        resetFlow();
+      }, 1000);
+  };
+
+  const handleMarkReadyForDelivery = async () => {
+    const missing = handoffSummary?.missingShipments || [];
+    const incompleteRemark = missing.find(
+      (item) => !String(missingRemarks[item.id] || "").trim(),
+    );
+
+    if (incompleteRemark) {
+      return setError(`Add remarks for ${incompleteRemark.shipmentId}.`);
+    }
+
+    const success = await executeFirebaseCall(
+      finalizeTripUnloadReadyForDelivery,
+      {
+        sourceTripId: tripId,
+        missingRemarks,
+        updatedBy: updatedBy(profile),
+      },
+    );
+    if (success)
+      setTimeout(() => {
+        onRefresh?.();
+        onClose?.();
+        resetFlow();
+      }, 1000);
+  };
+
   const handleConfirm = async () => {
     const itemsToProcess = Object.entries(quantities)
       .filter(([_, qty]) => qty > 0)
@@ -1005,10 +1057,7 @@ export default function useScannerLogic({
       handleUnlockManifest,
       handleSetTripLoaded,
       handleLockManifest,
-      handleReleaseShipmentsFromTrip,
-      handleReleaseSingleShipment,
-      /** @deprecated use handleReleaseShipmentsFromTrip */
-      handleAssignNextTrip: handleReleaseShipmentsFromTrip,
+      handleAssignNextTrip,
       handleReviewHandoff: () => loadHandoffReview(),
       handleConfirm,
     },

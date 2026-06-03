@@ -3,7 +3,7 @@
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const admin = require("firebase-admin");
 const { FieldValue } = require("firebase-admin/firestore");
-const { toE164 } = require("../utilities/helpers");
+const { normalizePhone } = require("../utilities/phoneHelpers");
 
 if (admin.apps.length === 0) {
   admin.initializeApp();
@@ -65,7 +65,7 @@ exports.updateUserProfile = onCall(
         name: displayName,
         role: role,
         email: email, // ✅ Keep Firestore in sync with Auth
-        phoneNumber: phoneNumber ? toE164(phoneNumber) : null,
+        phoneNumber: phoneNumber ? normalizePhone(phoneNumber) || null : null,
         // ✅ Suggestion: If role is customer, clear warehouse data
         warehouseName: role === "customer" ? null : warehouseName || null,
         warehouseCode: role === "customer" ? null : warehouseCode || null,

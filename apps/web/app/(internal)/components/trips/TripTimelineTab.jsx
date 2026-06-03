@@ -9,7 +9,7 @@ import {
   faTruck,
 } from "@fortawesome/free-solid-svg-icons";
 import { formatFirestoreDate } from "@/app/utility/utilities";
-import TripAssignmentModal from "../manifests/modals/TripAssignmentModal";
+import TripAssignmentModal from "./modals/TripAssignmentModal";
 import EditTripDetailsModal from "./modals/EditTripDetailsModal";
 import {
   STEP_HUB_TRANSFER,

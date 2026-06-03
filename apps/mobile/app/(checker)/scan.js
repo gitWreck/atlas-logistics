@@ -76,6 +76,7 @@ import {
   DELIVERY_PROOF_MAX_IMAGES,
   DELIVERY_PROOF_MIN_IMAGES,
   EMPTY_SCAN_DETAILS,
+  EMPTY_SHIPMENT_SUMMARY,
   EMPTY_TRIP_SUMMARY,
   ISSUE_SCAN_ACTIONS,
   MODE_SCAN_ACTIONS,
@@ -83,6 +84,18 @@ import {
 } from "../../components/constants/scanner";
 import { useAuth } from "../../contexts/AuthContext";
 import { useTheme } from "../../contexts/ThemeContext";
+
+const DEFAULT_NOTIFICATION_CHANNELS = {
+  sms: true,
+  email: true,
+  push: true,
+};
+
+const NOTIFICATION_CHANNEL_OPTIONS = [
+  { key: "sms", label: "SMS", icon: "comment-dots" },
+  { key: "email", label: "Email", icon: "envelope" },
+  { key: "push", label: "Push", icon: "bell" },
+];
 
 export default function ScannerScreen() {
   const router = useRouter();
@@ -99,8 +112,10 @@ export default function ScannerScreen() {
   const [targetPackage, setTargetPackage] = useState(null);
   const [parentShipmentId, setParentShipmentId] = useState(null);
   const [parentShipmentData, setParentShipmentData] = useState(null);
+  const [pendingPackageIds, setPendingPackageIds] = useState([]);
   const [pendingActionStatus, setPendingActionStatus] = useState(null);
   const [pendingActionSource, setPendingActionSource] = useState("scan");
+  const [pendingActionRemarks, setPendingActionRemarks] = useState("");
 
   const [infoModalVisible, setInfoModalVisible] = useState(false);
   const [scannedData, setScannedData] = useState(null);
@@ -114,10 +129,16 @@ export default function ScannerScreen() {
   const [deliveryProofUploading, setDeliveryProofUploading] = useState(false);
   const [pendingDelivery, setPendingDelivery] = useState(null);
   const [tripSummary, setTripSummary] = useState(EMPTY_TRIP_SUMMARY);
+  const [shipmentSummary, setShipmentSummary] = useState(
+    EMPTY_SHIPMENT_SUMMARY,
+  );
   const [summaryLoading, setSummaryLoading] = useState(false);
   const [tripStatusUpdating, setTripStatusUpdating] = useState(false);
   const [latestScan, setLatestScan] = useState(EMPTY_SCAN_DETAILS);
   const [scanActionStatus, setScanActionStatus] = useState(null);
+  const [notificationChannels, setNotificationChannels] = useState(
+    DEFAULT_NOTIFICATION_CHANNELS,
+  );
   const successTimerRef = useRef(null);
   const countdownTimerRef = useRef(null);
   const detailsSheetHeight = useRef(
@@ -224,6 +245,54 @@ export default function ScannerScreen() {
     }
   };
 
+  const buildShipmentScanSummary = (shipmentDoc, shipmentData, modeValue) => {
+    const totalPackages = getShipmentTotal(shipmentData);
+    const loadedPackages = getShipmentLoadedCount(shipmentData);
+    const deliveredPackages = getShipmentDeliveredCount(shipmentData);
+    const baseScannedPackages = getShipmentScannedCount(
+      shipmentData,
+      modeValue,
+    );
+    const scannedPackages =
+      modeValue === "offloading"
+        ? Math.max(baseScannedPackages, loadedPackages)
+        : baseScannedPackages;
+    const progress =
+      totalPackages > 0
+        ? Math.round((scannedPackages / totalPackages) * 100)
+        : 0;
+
+    return {
+      shipmentId:
+        shipmentData?.shipmentId ||
+        shipmentData?.trackingNumber ||
+        shipmentDoc?.id ||
+        "",
+      status: shipmentData?.status || "",
+      shipmentCount: 1,
+      totalPackages,
+      scannedPackages,
+      loadedPackages,
+      deliveredPackages,
+      progress,
+    };
+  };
+
+  const refreshShipmentScanSummary = async (shipmentId) => {
+    if (!shipmentId) return EMPTY_SHIPMENT_SUMMARY;
+
+    const shipmentSnap = await getDoc(doc(db, "shipments", String(shipmentId)));
+    if (!shipmentSnap.exists()) return EMPTY_SHIPMENT_SUMMARY;
+
+    const summary = buildShipmentScanSummary(
+      { id: shipmentSnap.id },
+      shipmentSnap.data(),
+      resolvedMode,
+    );
+    setShipmentSummary(summary);
+    return summary;
+  };
+
   const getShipmentTripId = (shipmentData) => {
     const data = shipmentData ?? {};
     return (
@@ -319,8 +388,35 @@ export default function ScannerScreen() {
         appliedStatus,
       }),
     );
+    setShipmentSummary(
+      buildShipmentScanSummary(shipmentDoc, shipmentData, resolvedMode),
+    );
 
     return currentTripId;
+  };
+
+  const getCheckerWarehouseName = () => {
+    const warehouseName = String(profile?.warehouseName || "").trim();
+    const warehouseCode = String(profile?.warehouseCode || "")
+      .trim()
+      .toUpperCase();
+
+    if (warehouseName) return warehouseName;
+    if (warehouseCode === "DIV") return "Divisoria";
+    if (warehouseCode === "ODI") return "Odiongan";
+
+    return "warehouse";
+  };
+
+  const getIssueDefaultRemarks = (status) => {
+    const statusLabel =
+      status === "DAMAGED"
+        ? "Marked damaged"
+        : status === "MISSING"
+          ? "Marked missing"
+          : "Issue noted";
+
+    return `Returned to warehouse ${getCheckerWarehouseName()}. ${statusLabel}.`;
   };
 
   useEffect(() => {
@@ -354,11 +450,21 @@ export default function ScannerScreen() {
     setTargetPackage(null);
     setParentShipmentId(null);
     setParentShipmentData(null);
+    setPendingPackageIds([]);
     setPendingActionStatus(null);
     setPendingActionSource("scan");
+    setPendingActionRemarks("");
     setActionModalVisible(false);
     setInfoModalVisible(false);
     setScannedData(null);
+    setShipmentSummary(EMPTY_SHIPMENT_SUMMARY);
+  };
+
+  const toggleNotificationChannel = (key) => {
+    setNotificationChannels((current) => ({
+      ...current,
+      [key]: current[key] !== true,
+    }));
   };
 
   const resetDeliveryProof = () => {
@@ -591,6 +697,11 @@ export default function ScannerScreen() {
           remarks,
           proofOfDelivery: proofImages,
           sourceUI: "CHECKER_MOBILE",
+          notify: Object.values(notificationChannels).some(Boolean),
+          notificationChannels,
+          notifySms: notificationChannels.sms,
+          notifyEmail: notificationChannels.email,
+          notifyPush: notificationChannels.push,
           updatedBy: updatedBy(profile),
         });
       } else {
@@ -608,6 +719,11 @@ export default function ScannerScreen() {
           manualQty: qty,
           remarks,
           scanAction: resolvedMode,
+          notify: Object.values(notificationChannels).some(Boolean),
+          notificationChannels,
+          notifySms: notificationChannels.sms,
+          notifyEmail: notificationChannels.email,
+          notifyPush: notificationChannels.push,
           updatedBy: updatedBy(profile),
         });
 
@@ -621,7 +737,11 @@ export default function ScannerScreen() {
         }
       }
 
-      await fetchTripScanSummary(effectiveTripId);
+      if (effectiveTripId) {
+        await fetchTripScanSummary(effectiveTripId);
+      } else if (shipmentDocData) {
+        await refreshShipmentScanSummary(shipmentId);
+      }
 
       showSuccessModal({
         barcode,
@@ -909,7 +1029,9 @@ export default function ScannerScreen() {
       appliedStatus: statusToApply,
     });
 
-    await fetchTripScanSummary(currentTripId);
+    if (currentTripId) {
+      await fetchTripScanSummary(currentTripId);
+    }
 
     if (resolvedMode === "info" && !statusToApply) {
       openInfoPreview(shipmentDoc, pkg, barcode);
@@ -922,7 +1044,7 @@ export default function ScannerScreen() {
 
     if (
       resolvedMode === "offloading" &&
-      ["RECEIVED", "DELIVERED"].includes(statusToApply)
+      ["OUT_FOR_DELIVERY", "RECEIVED", "DELIVERED"].includes(statusToApply)
     ) {
       const packageStatus = String(pkg?.status || "").toUpperCase();
       const shipmentStatus = String(shipmentData?.status || "").toUpperCase();
@@ -940,12 +1062,19 @@ export default function ScannerScreen() {
     const packagingGroup = String(pkg?.packagingGroup || "").toUpperCase();
     const isBulk = packagingGroup === "BULK";
 
-    if (isBulk && manualQtyOverride == null) {
+    if (
+      (isBulk || isIssueStatus(statusToApply)) &&
+      manualQtyOverride == null
+    ) {
       setTargetPackage(pkg);
       setParentShipmentId(shipmentDoc.id);
       setParentShipmentData(shipmentData);
+      setPendingPackageIds([barcode]);
       setPendingActionStatus(statusToApply);
       setPendingActionSource(source);
+      setPendingActionRemarks(
+        isIssueStatus(statusToApply) ? getIssueDefaultRemarks(statusToApply) : "",
+      );
       setActionModalVisible(true);
       setProcessing(false);
       return;
@@ -1101,7 +1230,9 @@ export default function ScannerScreen() {
           appliedStatus: statusToApply,
         });
 
-        await fetchTripScanSummary(currentTripId);
+        if (currentTripId) {
+          await fetchTripScanSummary(currentTripId);
+        }
 
         if (resolvedMode === "info") {
           openInfoPreview(shipmentDoc, null, barcode);
@@ -1114,7 +1245,7 @@ export default function ScannerScreen() {
 
         if (
           resolvedMode === "offloading" &&
-          ["RECEIVED", "DELIVERED"].includes(statusToApply)
+          ["OUT_FOR_DELIVERY", "RECEIVED", "DELIVERED"].includes(statusToApply)
         ) {
           const shipmentStatus = String(
             shipmentData?.status || "",
@@ -1186,6 +1317,19 @@ export default function ScannerScreen() {
 
         if (!shipmentPackageIds.length) {
           throw new Error("No package labels found for this shipment.");
+        }
+
+        if (isIssueStatus(statusToApply)) {
+          setTargetPackage(null);
+          setParentShipmentId(shipmentDoc.id);
+          setParentShipmentData(shipmentData);
+          setPendingPackageIds(shipmentPackageIds);
+          setPendingActionStatus(statusToApply);
+          setPendingActionSource(source);
+          setPendingActionRemarks(getIssueDefaultRemarks(statusToApply));
+          setActionModalVisible(true);
+          setProcessing(false);
+          return;
         }
 
         await executeStatusUpdate({
@@ -1315,6 +1459,8 @@ export default function ScannerScreen() {
   const modeLabel = getModeLabel(resolvedMode);
   const latestTypeLabel = getLatestTypeLabel(latestScan.type);
   const progressLabel = getProgressLabel(resolvedMode);
+  const hasTripContext = !!(tripSummary.tripId || resolvedTripId);
+  const progressSummary = hasTripContext ? tripSummary : shipmentSummary;
   const primaryScanActions = MODE_SCAN_ACTIONS[resolvedMode] || [];
   const selectedScanAction = [
     ...primaryScanActions,
@@ -1372,7 +1518,8 @@ export default function ScannerScreen() {
         processing={processing}
         tripStatusUpdating={tripStatusUpdating}
         summaryLoading={summaryLoading}
-        tripSummary={tripSummary}
+        progressSummary={progressSummary}
+        hasTripContext={hasTripContext}
         progressLabel={progressLabel}
         canMarkTripCompleted={canMarkTripCompleted}
         canMarkTripOutForDelivery={canMarkTripOutForDelivery}
@@ -1381,6 +1528,9 @@ export default function ScannerScreen() {
         onResetScanner={resetScanner}
         onMarkCompleted={handleMarkCompleted}
         onMarkOutForDelivery={handleMarkOutForDelivery}
+        notificationChannels={notificationChannels}
+        notificationOptions={NOTIFICATION_CHANNEL_OPTIONS}
+        onToggleNotificationChannel={toggleNotificationChannel}
         onViewShipmentDetails={() =>
           router.push({
             pathname: "/(checker)/shipment-details",
@@ -1396,8 +1546,10 @@ export default function ScannerScreen() {
       <PackageActionModal
         visible={actionModalVisible}
         onClose={resetScanner}
-        count={1}
-        maxQty={targetPackage?.quantity || 1}
+        count={pendingPackageIds.length || 1}
+        maxQty={
+          targetPackage?.quantity || getShipmentTotal(parentShipmentData || {}) || 1
+        }
         onAction={async (status, remarks, qty) => {
           if (status === "DELIVERED") {
             try {
@@ -1425,7 +1577,16 @@ export default function ScannerScreen() {
 
           executeStatusUpdate({
             shipmentId: parentShipmentId,
-            barcode: targetPackage?.packageId,
+            barcode:
+              targetPackage?.packageId ||
+              targetPackage?.trackingNumber ||
+              pendingPackageIds[0],
+            packageIds:
+              pendingPackageIds.length > 0
+                ? pendingPackageIds
+                : targetPackage?.packageId
+                  ? [targetPackage.packageId]
+                  : null,
             status,
             qty,
             remarks,
@@ -1436,6 +1597,7 @@ export default function ScannerScreen() {
         }}
         packagingGroup={targetPackage?.packagingGroup}
         defaultAction={pendingActionStatus}
+        initialRemarks={pendingActionRemarks}
       />
 
       <ManualEntryModal

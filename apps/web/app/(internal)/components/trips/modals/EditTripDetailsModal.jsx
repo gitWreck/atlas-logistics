@@ -11,10 +11,10 @@ import {
   faTruckPickup,
 } from "@fortawesome/free-solid-svg-icons";
 import { updateTripDetails } from "@/app/utility/FirebaseFunctions";
-import { WAREHOUSES } from "@/app/utility/WarehouseData";
 import { getModalThemeClasses } from "@/app/utility/constant/theme";
 import { getModalActionClasses } from "@/app/utility/constant/action";
 import { updatedBy } from "@/app/utility/utilities";
+import { useOperationalSettings } from "@/app/utility/useOperationalSettings";
 
 const INITIAL_FORM_STATE = {
   tripType: "HUB_TRANSFER",
@@ -35,6 +35,8 @@ export default function EditTripDetailsModal({
   const [formData, setFormData] = useState(INITIAL_FORM_STATE);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const { settings } = useOperationalSettings();
+  const warehouses = settings.warehouses;
 
   const theme = getModalThemeClasses(isDark);
   const action = getModalActionClasses();
@@ -67,7 +69,7 @@ export default function EditTripDetailsModal({
   if (!isOpen || !trip) return null;
 
   const handleWarehouseChange = (type, value) => {
-    const selected = WAREHOUSES.find((warehouse) => warehouse.name === value);
+    const selected = warehouses.find((warehouse) => warehouse.name === value);
 
     setFormData((prev) => ({
       ...prev,
@@ -228,6 +230,7 @@ export default function EditTripDetailsModal({
                 value={formData.origin}
                 code={formData.originCode}
                 onChange={(value) => handleWarehouseChange("origin", value)}
+                warehouses={warehouses}
                 isDark={isDark}
                 disabled={loading}
               />
@@ -237,6 +240,7 @@ export default function EditTripDetailsModal({
                 value={formData.destination}
                 code={formData.destinationCode}
                 onChange={(value) => handleWarehouseChange("destination", value)}
+                warehouses={warehouses}
                 isDark={isDark}
                 disabled={loading}
                 excludedCode={formData.originCode}
@@ -293,8 +297,9 @@ function WarehouseSelect({
   isDark,
   disabled,
   excludedCode,
+  warehouses,
 }) {
-  const options = WAREHOUSES.filter(
+  const options = warehouses.filter(
     (warehouse) => warehouse.code !== excludedCode,
   );
 

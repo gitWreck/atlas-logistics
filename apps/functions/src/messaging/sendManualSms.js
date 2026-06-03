@@ -21,6 +21,7 @@ const { buildSmsSignature } = require("../../shared/sms-suppression");
 const { writeAuditEvent } = require("../../shared/audit");
 const { assertAdminOrManager } = require("../system/authGuards");
 const { writeMessagingActionLog } = require("../utilities/messagingLogger");
+const { requireNormalizedPhone } = require("../utilities/phoneHelpers");
 
 const {
   sendSmsViaProvider,
@@ -33,17 +34,6 @@ const db = admin.firestore();
 const FieldValue = admin.firestore.FieldValue;
 
 const MAX_SMS_CREDITS = 5;
-
-/* ======================================================
-   HELPERS
-====================================================== */
-function normalizePhonePH(phone) {
-  if (!phone) return null;
-  let p = String(phone).replace(/[^\d]/g, "");
-  if (p.startsWith("09")) p = "63" + p.slice(1);
-  if (p.startsWith("63") && p.length === 12) return p;
-  return null;
-}
 
 /* ======================================================
    FUNCTION
@@ -76,7 +66,7 @@ exports.sendManualSms = onCall(
       );
     }
 
-    const normalizedPhone = normalizePhonePH(phone);
+    const normalizedPhone = requireNormalizedPhone(phone);
     if (!normalizedPhone) {
       throw new HttpsError("invalid-argument", "Invalid PH phone number");
     }

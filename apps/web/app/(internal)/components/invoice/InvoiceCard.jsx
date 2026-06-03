@@ -15,16 +15,7 @@ import {
   faBan,
   faHashtag,
 } from "@fortawesome/free-solid-svg-icons";
-
-function formatAmount(value) {
-  const amount = Number(value || 0);
-  return new Intl.NumberFormat("en-PH", {
-    style: "currency",
-    currency: "PHP",
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(amount);
-}
+import { formatAmount } from "./invoiceHelpers";
 
 function getStatusStyles(status, isDark = false) {
   const normalized = String(status || "").toUpperCase();

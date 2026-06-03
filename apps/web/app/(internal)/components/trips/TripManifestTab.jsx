@@ -403,35 +403,43 @@ export default function TripManifestTab({
 
                   <div className="min-w-0 flex-1">
                     <div
-                      className={`font-bold text-xs font-mono break-all ${theme.cellPrimary}`}
+                      className={`font-bold text-sm font-mono break-all ${theme.cellPrimary}`}
                     >
                       {shipment.shipmentId}
                     </div>
 
                     <div
-                      className={`text-xs mt-1 truncate ${theme.cellSecondary}`}
+                      className={`text-sm mt-1 truncate ${theme.cellSecondary}`}
                     >
                       {shipment.recipient?.name || "Unknown"}
                     </div>
 
-                    <div className={`text-[11px] mt-1 ${theme.cellSecondary}`}>
+                    <div className="hidden">
                       {shipment.recipient?.address?.city || "—"}
                     </div>
 
-                    <div className="mt-2">
-                      <StatusBadge status={shipmentStatus} isDark={isDark} />
+                    <div className="mt-2 flex min-w-0 items-center gap-2">
+                      <span
+                        className={`min-w-0 flex-1 truncate text-sm font-medium ${theme.cellSecondary}`}
+                      >
+                        {shipment.recipient?.address?.city || "-"}
+                      </span>
                     </div>
                   </div>
 
-                  <span
-                    className={`shrink-0 text-[10px] font-bold px-2.5 py-1.5 rounded-lg border ${
-                      isFullyLoaded
-                        ? theme.countBadgeLoaded
-                        : theme.countBadgeDefault
-                    }`}
-                  >
-                    {loadedCount} / {totalItems}
-                  </span>
+                  <div className="flex shrink-0 flex-col items-end gap-2">
+                    <span
+                      className={`text-[10px] font-bold px-2.5 py-1.5 rounded-lg border ${
+                        isFullyLoaded
+                          ? theme.countBadgeLoaded
+                          : theme.countBadgeDefault
+                      }`}
+                    >
+                      {loadedCount} / {totalItems}
+                    </span>
+
+                    <StatusBadge status={shipmentStatus} isDark={isDark} />
+                  </div>
                 </div>
 
                 {/* <div className="mt-4 grid grid-cols-3 gap-2"> */}

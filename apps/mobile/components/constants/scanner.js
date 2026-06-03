@@ -20,6 +20,13 @@ export const MODE_SCAN_ACTIONS = {
   ],
   offloading: [
     {
+      label: "Out for Delivery",
+      shortLabel: "Out",
+      status: "OUT_FOR_DELIVERY",
+      icon: "route",
+      color: "#7c3aed",
+    },
+    {
       label: "Delivered",
       status: "DELIVERED",
       icon: "check-circle",
@@ -97,6 +104,17 @@ export const OFFLOAD_COMPLETION_SOURCE_STATUSES = [
 
 export const EMPTY_TRIP_SUMMARY = {
   tripId: "",
+  status: "",
+  shipmentCount: 0,
+  totalPackages: 0,
+  scannedPackages: 0,
+  loadedPackages: 0,
+  deliveredPackages: 0,
+  progress: 0,
+};
+
+export const EMPTY_SHIPMENT_SUMMARY = {
+  shipmentId: "",
   status: "",
   shipmentCount: 0,
   totalPackages: 0,

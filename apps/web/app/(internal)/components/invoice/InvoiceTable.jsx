@@ -17,39 +17,9 @@ import {
   getTableTheme,
 } from "@/app/utility/constant/theme";
 import ExportInvoiceList from "../exports/ExportInvoiceList";
-import { formatAmount, StatusBadge } from "./utils";
+import { formatAmount, formatInvoiceDate } from "./invoiceHelpers";
+import InvoiceStatusBadge from "../ui/InvoiceStatusBadge";
 import TablePaginationFooter from "../ui/TablePaginationFooter";
-
-function formatInvoiceDate(value) {
-  if (!value) return "";
-
-  let date;
-
-  if (typeof value?.toDate === "function") {
-    date = value.toDate();
-  } else if (value?.seconds || value?._seconds) {
-    date = new Date((value.seconds || value._seconds) * 1000);
-  } else if (value instanceof Date) {
-    date = value;
-  } else if (/^\d{4}-\d{2}-\d{2}$/.test(String(value))) {
-    const [year, month, day] = String(value).split("-").map(Number);
-    date = new Date(year, month - 1, day);
-  } else {
-    const stringValue = String(value).trim();
-    const hasYear = /\b\d{4}\b/.test(stringValue);
-    date = new Date(
-      hasYear ? stringValue : `${stringValue} ${new Date().getFullYear()}`,
-    );
-  }
-
-  if (Number.isNaN(date.getTime())) return "";
-
-  return date.toLocaleDateString("en-US", {
-    month: "long",
-    day: "numeric",
-    year: "numeric",
-  });
-}
 
 export default function InvoiceTable({
   invoices = [],
@@ -70,6 +40,9 @@ export default function InvoiceTable({
   const itemsPerPage = 10;
   const theme = getTableTheme(isDark);
   const themeRow = getRowThemeClasses(isDark);
+  const mobileDividerClass = isDark
+    ? "border-b-4 border-b-slate-700/80 last:border-b-0"
+    : "border-b-4 border-b-slate-300 last:border-b-0";
 
   const filteredInvoices = useMemo(() => {
     return invoices.filter((invoice) => {
@@ -192,9 +165,7 @@ export default function InvoiceTable({
       {/* Content */}
       <div className="w-full">
         {/* Mobile */}
-        <div
-          className={`md:hidden flex flex-col divide-y ${theme.tbodyDivide}`}
-        >
+        <div className="md:hidden flex flex-col">
           {loading ? (
             <div className={`px-6 py-8 text-center ${theme.emptyText}`}>
               <div className="animate-pulse">Loading invoices...</div>
@@ -207,7 +178,7 @@ export default function InvoiceTable({
             paginatedInvoices.map((invoice) => (
               <div
                 key={invoice.id}
-                className={`p-4 flex flex-col gap-3 transition-colors ${theme.rowHover}`}
+                className={`p-4 flex flex-col gap-3 transition-colors ${mobileDividerClass} ${theme.rowHover}`}
               >
                 <div className="flex justify-between items-start gap-2">
                   <div className="truncate">
@@ -223,7 +194,7 @@ export default function InvoiceTable({
                     </div>
                   </div>
 
-                  <StatusBadge
+                  <InvoiceStatusBadge
                     status={invoice.status || "DRAFT"}
                     isDark={isDark}
                   />
@@ -392,7 +363,7 @@ export default function InvoiceTable({
                     </td>
 
                     <td className="px-6 py-4">
-                      <StatusBadge
+                      <InvoiceStatusBadge
                         status={invoice.status || "DRAFT"}
                         isDark={isDark}
                       />

@@ -66,6 +66,9 @@ export default function CustomerRow({ customer, onClick, isDark = false }) {
   const status = getCustomerStatus(customer);
   const addressLine = getAddressLine(customer.address);
   const lastSeen = formatFirestoreDate(customer.lastAuthAt || customer.updatedAt);
+  const mobileDividerClass = isDark
+    ? "border-b-4 border-b-slate-700/80 md:border-b md:border-b-slate-800/50"
+    : "border-b-4 border-b-slate-300 md:border-b md:border-b-slate-200";
 
   const statusClass =
     status === "active"
@@ -82,7 +85,7 @@ export default function CustomerRow({ customer, onClick, isDark = false }) {
 
   return (
     <div
-      className={`relative flex flex-col gap-3 p-4 border-b cursor-pointer transition-colors group md:grid md:grid-cols-12 md:gap-4 md:px-6 md:items-center ${theme.rowBorder} ${theme.rowDefaultHover}`}
+      className={`relative grid grid-cols-2 gap-3 p-4 cursor-pointer transition-colors group md:grid-cols-12 md:gap-4 md:px-6 md:items-center ${mobileDividerClass} ${theme.rowDefaultHover}`}
       onClick={onClick}
       role="button"
       tabIndex={0}
@@ -90,7 +93,7 @@ export default function CustomerRow({ customer, onClick, isDark = false }) {
         if (event.key === "Enter" || event.key === " ") onClick?.();
       }}
     >
-      <div className="flex md:hidden justify-between items-start">
+      <div className="col-span-2 flex md:hidden justify-between items-start gap-3">
         <div className="flex items-start gap-3 min-w-0">
           <div className="mt-1">
             <StatusDot status={status} />
@@ -108,20 +111,28 @@ export default function CustomerRow({ customer, onClick, isDark = false }) {
           </div>
         </div>
 
-        <button
-          type="button"
-          className={`p-2 -mr-2 rounded ${theme.actionButton}`}
-          onClick={(event) => {
-            event.stopPropagation();
-            onClick?.();
-          }}
-          aria-label="View customer"
-        >
-          <FontAwesomeIcon icon={faEllipsisV} />
-        </button>
+        <div className="flex items-center gap-2 shrink-0">
+          <span
+            className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase border ${statusClass}`}
+          >
+            {status}
+          </span>
+
+          <button
+            type="button"
+            className={`p-2 -mr-2 rounded ${theme.actionButton}`}
+            onClick={(event) => {
+              event.stopPropagation();
+              onClick?.();
+            }}
+            aria-label="View customer"
+          >
+            <FontAwesomeIcon icon={faEllipsisV} />
+          </button>
+        </div>
       </div>
 
-      <div className="md:col-span-3 flex items-center gap-4 min-w-0">
+      <div className="hidden md:col-span-3 md:flex items-center gap-4 min-w-0">
         <div className="hidden md:block">
           <StatusDot status={status} />
         </div>
@@ -141,7 +152,7 @@ export default function CustomerRow({ customer, onClick, isDark = false }) {
       </div>
 
       <div
-        className={`md:col-span-3 flex flex-col gap-1 border-t md:border-0 pt-2 md:pt-0 min-w-0 ${theme.rowBorder}`}
+        className={`col-span-1 md:col-span-3 flex flex-col gap-1 border-t md:border-0 pt-2 md:pt-0 min-w-0 ${theme.rowBorder}`}
       >
         <div className={`text-sm truncate ${theme.secondaryText}`}>
           <FontAwesomeIcon icon={faEnvelope} className="mr-2 text-[11px]" />
@@ -153,7 +164,9 @@ export default function CustomerRow({ customer, onClick, isDark = false }) {
         </div>
       </div>
 
-      <div className="md:col-span-3 min-w-0">
+      <div
+        className={`col-span-1 md:col-span-3 border-t md:border-0 pt-2 md:pt-0 min-w-0 ${theme.rowBorder}`}
+      >
         <div className={`text-sm truncate ${theme.secondaryText}`}>
           <FontAwesomeIcon icon={faLocationDot} className="mr-2 text-[11px]" />
           {addressLine || "No address"}
@@ -163,7 +176,7 @@ export default function CustomerRow({ customer, onClick, isDark = false }) {
         </div>
       </div>
 
-      <div className="md:col-span-2 flex items-center gap-2">
+      <div className="hidden md:col-span-2 md:flex items-center gap-2">
         <span
           className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase border ${statusClass}`}
         >

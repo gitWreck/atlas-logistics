@@ -24,7 +24,8 @@ export default function ScanDetailsSheet({
   processing,
   tripStatusUpdating,
   summaryLoading,
-  tripSummary,
+  progressSummary,
+  hasTripContext,
   progressLabel,
   canMarkTripCompleted,
   canMarkTripOutForDelivery,
@@ -33,8 +34,24 @@ export default function ScanDetailsSheet({
   onResetScanner,
   onMarkCompleted,
   onMarkOutForDelivery,
+  notificationChannels,
+  notificationOptions,
+  onToggleNotificationChannel,
   onViewShipmentDetails,
 }) {
+  const summary = progressSummary || {};
+  const progressTitle = hasTripContext
+    ? summary.tripId || latestScan.currentTripId || "No trip"
+    : summary.shipmentId || latestScan.shipmentId || "No shipment";
+  const progressScopeLabel = hasTripContext
+    ? "Current Trip"
+    : "Shipment Progress";
+  const progressStatus = summary.status || "Status unavailable";
+  const progressPercent = Math.max(
+    0,
+    Math.min(Number(summary.progress) || 0, 100),
+  );
+
   return (
     <Animated.ScrollView
       style={[
@@ -108,6 +125,17 @@ export default function ScanDetailsSheet({
           value={latestScan.shipmentStatus || "Pending scan"}
           colors={colors}
         />
+        <DetailRow
+          label="Assignment"
+          value={
+            latestScan.currentTripId
+              ? `Trip ${latestScan.currentTripId}`
+              : latestScan.shipmentId
+                ? "No trip assigned"
+                : "Pending scan"
+          }
+          colors={colors}
+        />
       </View>
 
       {!!primaryScanActions.length && (
@@ -166,7 +194,7 @@ export default function ScanDetailsSheet({
                     ]}
                     numberOfLines={2}
                   >
-                    {action.label}
+                    {action.shortLabel || action.label}
                   </Text>
                 </TouchableOpacity>
               );
@@ -184,19 +212,19 @@ export default function ScanDetailsSheet({
         <View style={styles.progressHeader}>
           <View>
             <Text style={[styles.progressLabel, { color: colors.textMuted }]}>
-              Current Trip
+              {progressScopeLabel}
             </Text>
             <Text style={[styles.progressTrip, { color: colors.text }]}>
-              {tripSummary.tripId || latestScan.currentTripId || "No trip"}
+              {progressTitle}
             </Text>
             <Text style={[styles.progressStatus, { color: colors.textMuted }]}>
-              {tripSummary.status || "Status unavailable"}
+              {progressStatus}
             </Text>
           </View>
           {summaryLoading ? (
             <ActivityIndicator color="#2563eb" />
           ) : (
-            <Text style={styles.progressPercent}>{tripSummary.progress}%</Text>
+            <Text style={styles.progressPercent}>{progressPercent}%</Text>
           )}
         </View>
 
@@ -204,7 +232,7 @@ export default function ScanDetailsSheet({
           <View
             style={[
               styles.progressFill,
-              { width: `${tripSummary.progress}%` },
+              { width: `${progressPercent}%` },
             ]}
           />
         </View>
@@ -212,17 +240,17 @@ export default function ScanDetailsSheet({
         <View style={styles.statsRow}>
           <StatCell
             label="Shipments"
-            value={tripSummary.shipmentCount}
+            value={summary.shipmentCount || 0}
             colors={colors}
           />
           <StatCell
             label="Packages"
-            value={tripSummary.totalPackages}
+            value={summary.totalPackages || 0}
             colors={colors}
           />
           <StatCell
             label={progressLabel}
-            value={`${tripSummary.scannedPackages}/${tripSummary.totalPackages}`}
+            value={`${summary.scannedPackages || 0}/${summary.totalPackages || 0}`}
             colors={colors}
           />
         </View>
@@ -294,6 +322,70 @@ export default function ScanDetailsSheet({
             {tripStatusUpdating ? "Updating Trip..." : "Mark Out for Delivery"}
           </Text>
         </TouchableOpacity>
+      )}
+
+      {!!notificationOptions?.length && (
+        <View
+          style={[
+            styles.notificationCard,
+            { backgroundColor: colors.surface, borderColor: colors.border },
+          ]}
+        >
+          <View>
+            <Text style={[styles.notificationTitle, { color: colors.text }]}>
+              Customer Notifications
+            </Text>
+            <Text
+              style={[
+                styles.notificationSubtitle,
+                { color: colors.textMuted },
+              ]}
+            >
+              Send an update when scanner status changes.
+            </Text>
+          </View>
+
+          <View style={styles.notificationGrid}>
+            {notificationOptions.map((channel) => {
+              const selected = notificationChannels?.[channel.key] === true;
+
+              return (
+                <TouchableOpacity
+                  key={channel.key}
+                  style={[
+                    styles.notificationOption,
+                    {
+                      backgroundColor: colors.cardMuted,
+                      borderColor: colors.border,
+                    },
+                    selected && styles.notificationOptionActive,
+                  ]}
+                  onPress={() => onToggleNotificationChannel(channel.key)}
+                  disabled={processing}
+                  activeOpacity={0.78}
+                >
+                  <FontAwesome5
+                    name={channel.icon}
+                    size={13}
+                    color={selected ? "#10b981" : colors.textMuted}
+                  />
+                  <Text
+                    style={[
+                      styles.notificationOptionText,
+                      { color: colors.textMuted },
+                      selected && styles.notificationOptionTextActive,
+                    ]}
+                  >
+                    {channel.label}
+                  </Text>
+                  {selected && (
+                    <FontAwesome5 name="check" size={11} color="#10b981" />
+                  )}
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </View>
       )}
 
       {!!issueScanActions.length && (
@@ -670,6 +762,53 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     gap: 8,
     paddingHorizontal: 14,
+  },
+  notificationCard: {
+    backgroundColor: "#ffffff",
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "#e2e8f0",
+    padding: 14,
+    gap: 12,
+  },
+  notificationTitle: {
+    color: "#0f172a",
+    fontSize: 14,
+    fontWeight: "900",
+  },
+  notificationSubtitle: {
+    color: "#64748b",
+    fontSize: 12,
+    marginTop: 4,
+    fontWeight: "700",
+  },
+  notificationGrid: {
+    flexDirection: "row",
+    gap: 8,
+  },
+  notificationOption: {
+    flex: 1,
+    minHeight: 42,
+    borderRadius: 12,
+    borderWidth: 1,
+    backgroundColor: "#f8fafc",
+    alignItems: "center",
+    justifyContent: "center",
+    flexDirection: "row",
+    gap: 6,
+    paddingHorizontal: 8,
+  },
+  notificationOptionActive: {
+    backgroundColor: "#ecfdf5",
+    borderColor: "#10b981",
+  },
+  notificationOptionText: {
+    color: "#64748b",
+    fontSize: 12,
+    fontWeight: "900",
+  },
+  notificationOptionTextActive: {
+    color: "#047857",
   },
   issueButton: {
     flex: 1,

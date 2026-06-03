@@ -37,32 +37,30 @@ export const clampProgress = (value, total) => {
 };
 
 export const getShipmentTotal = (shipment = {}) => {
+  const data = shipment || {};
   const total =
-    shipment.totalItems ??
-    shipment.packageCount ??
-    shipment.totals?.totalContentQty ??
-    shipment.totals?.totalItems ??
-    shipment.packageBarcodes?.length ??
-    shipment.packages?.length ??
+    data.totalItems ??
+    data.packageCount ??
+    data.totals?.totalContentQty ??
+    data.totals?.totalItems ??
+    data.packageBarcodes?.length ??
+    data.packages?.length ??
     0;
 
   return Math.max(Number(total) || 0, 0);
 };
 
 export const getShipmentScannedCount = (shipment = {}, mode = "") => {
-  const total = getShipmentTotal(shipment);
-  const loaded = Number(shipment.loadedCount ?? shipment.totals?.loaded ?? 0);
-  const missing = Number(
-    shipment.missingCount ?? shipment.totals?.missing ?? 0,
-  );
-  const damaged = Number(
-    shipment.damagedCount ?? shipment.totals?.damaged ?? 0,
-  );
+  const data = shipment || {};
+  const total = getShipmentTotal(data);
+  const loaded = Number(data.loadedCount ?? data.totals?.loaded ?? 0);
+  const missing = Number(data.missingCount ?? data.totals?.missing ?? 0);
+  const damaged = Number(data.damagedCount ?? data.totals?.damaged ?? 0);
   const received = Number(
-    shipment.receivedCount ??
-      shipment.deliveredCount ??
-      shipment.totals?.received ??
-      shipment.totals?.delivered ??
+    data.receivedCount ??
+      data.deliveredCount ??
+      data.totals?.received ??
+      data.totals?.delivered ??
       0,
   );
 
@@ -78,8 +76,9 @@ export const getShipmentScannedCount = (shipment = {}, mode = "") => {
 };
 
 export const getShipmentLoadedCount = (shipment = {}) => {
-  const total = getShipmentTotal(shipment);
-  const loaded = Number(shipment.loadedCount ?? shipment.totals?.loaded ?? 0);
+  const data = shipment || {};
+  const total = getShipmentTotal(data);
+  const loaded = Number(data.loadedCount ?? data.totals?.loaded ?? 0);
 
   return clampProgress(loaded, total);
 };
@@ -209,15 +208,14 @@ export const getDeliverPackageIdForScan = (shipmentData = {}, barcode = "") => {
 };
 
 export const getShipmentPackageIds = (shipment = {}) =>
-  (Array.isArray(shipment.packages) ? shipment.packages : [])
+  (Array.isArray((shipment || {}).packages) ? (shipment || {}).packages : [])
     .map(getPackageIdentity)
     .filter(Boolean);
 
 export const getShipmentDeliveredCount = (shipment = {}) => {
-  const total = getShipmentTotal(shipment);
-  const delivered = Number(
-    shipment.deliveredCount ?? shipment.totals?.delivered ?? 0,
-  );
+  const data = shipment || {};
+  const total = getShipmentTotal(data);
+  const delivered = Number(data.deliveredCount ?? data.totals?.delivered ?? 0);
 
   return clampProgress(delivered, total);
 };

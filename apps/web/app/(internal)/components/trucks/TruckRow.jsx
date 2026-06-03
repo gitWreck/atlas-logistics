@@ -90,10 +90,13 @@ export default function TruckRow({ truck: t, onEdit, isDark = false }) {
 
   const payloadValue = t.payloadCapacity || t.payload || "-";
   const updatedAt = t.updatedAt ? formatFirestoreDate(t.updatedAt) : "-";
+  const mobileDividerClass = isDark
+    ? "border-b-4 border-b-slate-700/80 md:border-b md:border-b-slate-800/50"
+    : "border-b-4 border-b-slate-300 md:border-b md:border-b-slate-200";
 
   return (
     <div
-      className={`relative flex flex-col gap-3 p-4 transition-colors cursor-pointer group last:border-0 md:grid md:grid-cols-13 md:gap-4 md:px-6 md:items-center ${theme.rowBorder} ${theme.rowDefaultHover}`}
+      className={`relative flex flex-col gap-3 p-4 transition-colors cursor-pointer group last:border-b-0 md:grid md:grid-cols-13 md:gap-4 md:px-6 md:items-center ${mobileDividerClass} ${theme.rowDefaultHover}`}
     >
       {/* MOBILE HEADER */}
       <div className="flex md:hidden justify-between items-start mb-1">
@@ -101,12 +104,12 @@ export default function TruckRow({ truck: t, onEdit, isDark = false }) {
           <StatusDot status={t.status} />
           <div>
             <div
-              className={`font-mono text-sm font-medium uppercase ${theme.primaryText}`}
+              className={`font-mono text-base font-medium uppercase ${theme.primaryText}`}
             >
               {t.plateNumber || "NO PLATE"}
             </div>
             <div
-              className={`text-[10px] font-bold uppercase tracking-tight ${theme.mutedText}`}
+              className={`text-xs font-bold uppercase tracking-tight ${theme.mutedText}`}
             >
               {t.model || "Unknown Model"}
             </div>
@@ -154,16 +157,17 @@ export default function TruckRow({ truck: t, onEdit, isDark = false }) {
             </div>
           </div>
 
-          <div
-            className={`md:hidden text-xs font-mono mt-1 ${theme.truckTypeText}`}
-          >
-            Type: {t.type || "Unknown Type"}
+          <div className="md:hidden flex flex-wrap items-center gap-2 mt-1">
+            <span className={`text-sm font-mono ${theme.truckTypeText}`}>
+              Type: {t.type || "Unknown Type"}
+            </span>
+            <StatusBadge status={t.status} size="xs" />
           </div>
         </div>
       </div>
 
       {/* COL 2: STATUS */}
-      <div className="md:col-span-2 flex flex-row md:flex-col items-center md:items-start justify-between md:justify-start gap-2">
+      <div className="hidden md:col-span-2 md:flex md:flex-col md:items-start md:justify-start gap-2">
         <StatusBadge status={t.status} size="xs" />
       </div>
 
@@ -180,14 +184,14 @@ export default function TruckRow({ truck: t, onEdit, isDark = false }) {
 
         <div className="flex justify-between mt-1.5">
           <span
-            className={`text-[10px] font-bold uppercase ${
+            className={`text-xs md:text-[10px] font-bold uppercase ${
               isCritical ? theme.statusTextDelayed : theme.mutedText
             }`}
           >
             {pmsLabel}
           </span>
 
-          <span className={`text-[10px] font-mono ${theme.subtleText}`}>
+          <span className={`text-xs md:text-[10px] font-mono ${theme.subtleText}`}>
             {pmsRemainingKm} KM left
           </span>
         </div>
@@ -195,10 +199,10 @@ export default function TruckRow({ truck: t, onEdit, isDark = false }) {
 
       {/* COL 4: DETAILS / COMPLIANCE */}
       <div
-        className={`md:col-span-2 flex flex-col justify-center gap-1.5 mt-2 md:mt-0 border-t md:border-0 pt-2 md:pt-0 ${theme.rowBorder}`}
+        className={`md:col-span-2 flex flex-wrap items-center gap-x-3 gap-y-1 md:flex-col md:items-start md:justify-center md:gap-1.5 mt-2 md:mt-0 border-t md:border-0 pt-2 md:pt-0 ${theme.rowBorder}`}
       >
         <div
-          className={`text-xs flex items-center gap-2 ${theme.truckMetaText}`}
+          className={`text-sm md:text-xs flex items-center gap-2 whitespace-nowrap ${theme.truckMetaText}`}
         >
           <FontAwesomeIcon
             icon={faWeightHanging}
@@ -207,10 +211,10 @@ export default function TruckRow({ truck: t, onEdit, isDark = false }) {
           {payloadValue} KG
         </div>
 
-        <div className="flex flex-wrap gap-1.5 mt-1">
+        <div className="flex flex-wrap items-center gap-1.5">
           {isLtoDue && (
             <span
-              className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${theme.complianceWarningBadge}`}
+              className={`text-[10px] md:text-[9px] font-bold px-1.5 py-0.5 rounded ${theme.complianceWarningBadge}`}
             >
               LTO RENEWAL
             </span>
@@ -218,7 +222,7 @@ export default function TruckRow({ truck: t, onEdit, isDark = false }) {
 
           {isOilDue && (
             <span
-              className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${theme.complianceDangerBadge}`}
+              className={`text-[10px] md:text-[9px] font-bold px-1.5 py-0.5 rounded ${theme.complianceDangerBadge}`}
             >
               OIL CHANGE
             </span>
@@ -226,7 +230,7 @@ export default function TruckRow({ truck: t, onEdit, isDark = false }) {
 
           {isTireDue && (
             <span
-              className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${theme.complianceDangerBadge}`}
+              className={`text-[10px] md:text-[9px] font-bold px-1.5 py-0.5 rounded ${theme.complianceDangerBadge}`}
             >
               TIRES DUE
             </span>
@@ -234,7 +238,7 @@ export default function TruckRow({ truck: t, onEdit, isDark = false }) {
 
           {!hasComplianceAlerts && (
             <span
-              className={`text-[10px] font-bold uppercase tracking-wider ${theme.complianceOkText}`}
+              className={`text-xs md:text-[10px] font-bold uppercase tracking-wider ${theme.complianceOkText}`}
             >
               Fully Compliant
             </span>
@@ -242,7 +246,7 @@ export default function TruckRow({ truck: t, onEdit, isDark = false }) {
         </div>
 
         <div
-          className={`text-[10px] flex items-center gap-2 ${theme.subtleText}`}
+          className={`text-xs md:text-[10px] flex items-center gap-2 whitespace-nowrap ${theme.subtleText}`}
         >
           <span>
             LTO:{" "}

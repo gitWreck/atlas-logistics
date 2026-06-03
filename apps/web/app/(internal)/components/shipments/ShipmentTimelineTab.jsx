@@ -1,8 +1,12 @@
 "use client";
 
-import React from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faCheckCircle } from "@fortawesome/free-solid-svg-icons";
+import {
+  faCheckCircle,
+  faChevronLeft,
+  faChevronRight,
+} from "@fortawesome/free-solid-svg-icons";
 import { InfoCard } from "../ui/InfoCard";
 import {
   SHIPMENT_STEPS_HUB_TRANSFER,
@@ -10,6 +14,8 @@ import {
 } from "@/app/utility/constant/templates";
 import { useShipmentCustodyTimeline } from "@/app/(internal)/hooks/useShipmentCustodyTimeline";
 import CustodyTimeline from "@/app/(internal)/components/custody/CustodyTimeline";
+
+const ACTIVITY_LOGS_PER_PAGE = 5;
 
 export default function ShipmentTimelineTab({ data, isDark = false }) {
   const shipmentId = data?.id || data?.shipmentId || null;

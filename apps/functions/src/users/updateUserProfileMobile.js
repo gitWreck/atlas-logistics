@@ -3,7 +3,7 @@
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const admin = require("firebase-admin");
 const { FieldValue } = admin.firestore;
-const { toE164 } = require("../utilities/helpers"); // ✅ Added helper for phone formatting
+const { normalizePhone } = require("../utilities/phoneHelpers");
 
 if (!admin.apps.length) admin.initializeApp();
 const db = admin.firestore();
@@ -55,15 +55,14 @@ exports.updateUserProfileMobile = onCall(
     // 2. HANDLE PHONE & ADDRESS (Only for Customers or by Admins)
     if (isAdmin || targetData.role === "customer") {
       if (phoneNumber) {
-        const e164 = toE164(phoneNumber);
-        const digits = String(e164).replace(/\D/g, "");
-        if (!/^63[89]\d{9}$/.test(digits)) {
+        const normalizedPhone = normalizePhone(phoneNumber);
+        if (!/^63[89]\d{9}$/.test(normalizedPhone)) {
           throw new HttpsError(
             "invalid-argument",
             "Invalid Philippine mobile number.",
           );
         }
-        firestoreUpdates.phoneNumber = e164;
+        firestoreUpdates.phoneNumber = normalizedPhone;
       }
 
       if (address && typeof address === "object") {
