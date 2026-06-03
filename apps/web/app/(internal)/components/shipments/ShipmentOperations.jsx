@@ -11,19 +11,13 @@ import NotifyToggle from "../messaging/NotifyToggle";
 import { runAction, updatedBy } from "@/app/utility/utilities";
 import { SHIPMENT_STATUS } from "@/app/utility/constant/templates";
 import { getWidgetThemeClasses } from "@/app/utility/constant/theme";
-import {
-  updateShipmentStatus,
-  deleteShipment,
-} from "@/app/utility/FirebaseFunctions";
-import AdminHardDeletePanel from "../admin/AdminHardDeletePanel";
+import { updateShipmentStatus } from "@/app/utility/FirebaseFunctions";
 
 export default function ShipmentOperations({
   shipmentId,
-  shipmentLabel,
   currentStatus,
   isDark = false,
   onRefresh,
-  onDeleted,
   profile,
 }) {
   const [statusSelect, setStatusSelect] = useState("");
@@ -33,10 +27,7 @@ export default function ShipmentOperations({
 
   const theme = getWidgetThemeClasses(isDark);
 
-  const label = shipmentLabel || shipmentId;
-
   return (
-    <div className="space-y-6">
     <div className={`border rounded-xl p-5 shadow-lg ${theme.container}`}>
       <div className="flex items-start justify-between gap-3 mb-3">
         <h3
@@ -127,23 +118,6 @@ export default function ShipmentOperations({
           }
         />
       </div>
-    </div>
-
-    <AdminHardDeletePanel
-      title="Delete Shipment"
-      description="Permanently remove this shipment and its tracking data. If assigned to a trip, it is removed from the manifest first. Works for any shipment status."
-      entityLabel={label}
-      confirmMessage={`Delete shipment ${label}? This cannot be undone.`}
-      onDelete={({ reason }) =>
-        deleteShipment({
-          shipmentId,
-          reason,
-        })
-      }
-      onSuccess={onDeleted}
-      isDark={isDark}
-      profile={profile}
-    />
     </div>
   );
 }

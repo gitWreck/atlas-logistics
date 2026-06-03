@@ -11,11 +11,15 @@ import StatusBadge from "../ui/StatusBadge";
 import StatusDot from "../ui/StatusDot";
 import { getRowThemeClasses } from "@/app/utility/constant/theme";
 import { getShipmentRouteLabel } from "./shipmentHelpers";
+import AdminRowDeleteButton from "../admin/AdminRowDeleteButton";
+import { deleteShipment } from "@/app/utility/FirebaseFunctions";
 
 export default function ShipmentRow({
   shipmentBoard,
   s,
   onClick,
+  onDeleted,
+  profile,
   isDark = false,
   onEdit,
 }) {
@@ -30,7 +34,7 @@ export default function ShipmentRow({
   const totalCount = s.metrics?.totalContent || 0;
   const driverName = s.truckDetails?.driverName || "Unassigned";
 
-  const trackingNumber = s.shipmentId || "—";
+  const trackingNumber = s.shipmentId || s.trackingNumber || "—";
   const routeCode = `${s.originCode || "N/A"} -> ${s.destinationCode || "N/A"}`;
   const routeLabel = getShipmentRouteLabel(s);
   const updatedLabel = s.updatedAt || "Just now";
@@ -74,7 +78,7 @@ export default function ShipmentRow({
           </div>
         </div>
 
-        <div className="flex items-center">
+        <div className="flex items-center gap-0.5">
           {s.isPickupRequested === true && (
             <button
               type="button"
@@ -90,7 +94,7 @@ export default function ShipmentRow({
 
           <button
             type="button"
-            className={`p-2 -mr-2 rounded transition-colors ${theme.actionButton}`}
+            className={`p-2 rounded transition-colors ${theme.actionButton}`}
             onClick={(e) => {
               e.stopPropagation();
               onClick(s.id);
@@ -98,6 +102,16 @@ export default function ShipmentRow({
           >
             <FontAwesomeIcon icon={faEllipsisV} />
           </button>
+
+          <AdminRowDeleteButton
+            profile={profile}
+            title="Delete Shipment"
+            entityLabel={trackingNumber}
+            onDelete={() => deleteShipment({ shipmentId: s.id })}
+            onSuccess={onDeleted}
+            isDark={isDark}
+            buttonClassName={theme.actionButton}
+          />
         </div>
       </div>
 
@@ -216,7 +230,7 @@ export default function ShipmentRow({
       </div>
 
       {/* Col 6: Actions */}
-      <div className="hidden md:block col-span-1 text-right">
+      <div className="hidden md:flex col-span-1 justify-end items-center gap-0.5">
         {s.isPickupRequested === true && shipmentBoard !== true && (
           <button
             type="button"
@@ -240,6 +254,16 @@ export default function ShipmentRow({
         >
           <FontAwesomeIcon icon={faEllipsisV} />
         </button>
+
+        <AdminRowDeleteButton
+          profile={profile}
+          title="Delete Shipment"
+          entityLabel={trackingNumber}
+          onDelete={() => deleteShipment({ shipmentId: s.id })}
+          onSuccess={onDeleted}
+          isDark={isDark}
+          buttonClassName={theme.actionButton}
+        />
       </div>
     </div>
   );

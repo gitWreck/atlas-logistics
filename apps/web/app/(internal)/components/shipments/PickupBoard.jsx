@@ -320,6 +320,8 @@ const PickupBoard = forwardRef(function PickupBoard(
                       key={pickup.id}
                       s={pickup}
                       onClick={setSelectedPickupId}
+                      onDeleted={fetchPickups}
+                      profile={profile}
                       isDark={isDark}
                       onEdit={() => {
                         setEditingPickup(pickup);
