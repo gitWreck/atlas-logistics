@@ -58,60 +58,89 @@ export default function PackageListItem({
       activeOpacity={0.85}
       delayLongPress={300}
     >
-      <View style={styles.left}>
-        <View
-          style={[
-            styles.iconWrap,
-            { backgroundColor: colors.cardMuted, borderColor: colors.border },
-            selected && styles.selectedIconWrap,
-            isLoaded && {
-              backgroundColor: isDark ? "#1e3a8a" : "#eff6ff",
-              borderColor: isDark ? "#3b82f6" : "#bfdbfe",
-            },
-            isMissing && {
-              backgroundColor: isDark ? "#7f1d1d" : "#fef2f2",
-              borderColor: isDark ? "#dc2626" : "#fecaca",
-            },
-          ]}
-        >
-          <FontAwesome5
-            name={selected ? "check" : packageIcon}
-            size={15}
-            color={
-              selected
-                ? "#ffffff"
-                : isLoaded
-                  ? "#2563eb"
-                  : isMissing
-                    ? "#dc2626"
-                    : colors.textMuted
-            }
-          />
-        </View>
-
-        <Text style={[styles.sequenceText, { color: colors.textMuted }]}>
-          #{item.sequence || "—"}
-        </Text>
-      </View>
-
-      <View style={styles.center}>
-        <View style={styles.topRow}>
-          <Text
+      <View style={styles.headerRow}>
+        <View style={styles.iconColumn}>
+          <View
             style={[
-              styles.packageId,
-              { color: colors.text },
-              selected && styles.selectedText,
+              styles.iconWrap,
+              { backgroundColor: colors.cardMuted, borderColor: colors.border },
+              selected && styles.selectedIconWrap,
+              isLoaded && {
+                backgroundColor: isDark ? "#1e3a8a" : "#eff6ff",
+                borderColor: isDark ? "#3b82f6" : "#bfdbfe",
+              },
+              isMissing && {
+                backgroundColor: isDark ? "#7f1d1d" : "#fef2f2",
+                borderColor: isDark ? "#dc2626" : "#fecaca",
+              },
             ]}
           >
-            {item.packageId || "No Package ID"}
+            <FontAwesome5
+              name={selected ? "check" : packageIcon}
+              size={16}
+              color={
+                selected
+                  ? "#ffffff"
+                  : isLoaded
+                    ? "#2563eb"
+                    : isMissing
+                      ? "#dc2626"
+                      : colors.textMuted
+              }
+            />
+          </View>
+          <Text style={[styles.sequenceText, { color: colors.textMuted }]}>
+            #{item.sequence || "—"}
           </Text>
-
-          {/* {!selected && <StatusBadge status={item.status} />} */}
         </View>
 
+        <View style={styles.headerContent}>
+          <View style={styles.titleRow}>
+            <Text
+              style={[
+                styles.packageId,
+                { color: colors.text },
+                selected && styles.selectedText,
+              ]}
+              numberOfLines={1}
+              ellipsizeMode="middle"
+            >
+              {item.packageId || "No Package ID"}
+            </Text>
+
+            {showMenu && (
+              <TouchableOpacity
+                style={[
+                  styles.menuBtn,
+                  {
+                    backgroundColor: colors.cardMuted,
+                    borderColor: colors.border,
+                  },
+                  selected && styles.menuBtnSelected,
+                ]}
+                onPress={() => onMenuPress?.(item)}
+              >
+                <FontAwesome5
+                  name="ellipsis-v"
+                  size={14}
+                  color={selected ? "#2563eb" : colors.textMuted}
+                />
+              </TouchableOpacity>
+            )}
+          </View>
+
+          {!selected && (
+            <View style={styles.statusRow}>
+              <StatusBadge status={item.status} />
+            </View>
+          )}
+        </View>
+      </View>
+
+      <View style={styles.body}>
         <Text
           style={[styles.description, { color: colors.textMuted }]}
-          numberOfLines={1}
+          numberOfLines={2}
         >
           {item.description || "No description"}
         </Text>
@@ -142,64 +171,42 @@ export default function PackageListItem({
           </View>
         </View>
 
-        <View style={styles.badgesRow}>
-          {item.isFragile && (
-            <View style={[styles.tag, styles.fragileTag]}>
-              <FontAwesome5 name="wine-glass-alt" size={9} color="#991b1b" />
-              <Text style={[styles.tagText, styles.fragileTagText]}>
-                Fragile
-              </Text>
-            </View>
-          )}
+        {(item.isFragile || item.isPerishable) && (
+          <View style={styles.badgesRow}>
+            {item.isFragile && (
+              <View style={[styles.tag, styles.fragileTag]}>
+                <FontAwesome5 name="wine-glass-alt" size={9} color="#991b1b" />
+                <Text style={[styles.tagText, styles.fragileTagText]}>
+                  Fragile
+                </Text>
+              </View>
+            )}
 
-          {item.isPerishable && (
-            <View style={[styles.tag, styles.perishableTag]}>
-              <FontAwesome5 name="snowflake" size={9} color="#065f46" />
-              <Text style={[styles.tagText, styles.perishableTagText]}>
-                Perishable
-              </Text>
-            </View>
-          )}
-        </View>
+            {item.isPerishable && (
+              <View style={[styles.tag, styles.perishableTag]}>
+                <FontAwesome5 name="snowflake" size={9} color="#065f46" />
+                <Text style={[styles.tagText, styles.perishableTagText]}>
+                  Perishable
+                </Text>
+              </View>
+            )}
+          </View>
+        )}
 
         <View style={styles.locationRow}>
           <FontAwesome5
             name="map-marker-alt"
-            size={11}
+            size={12}
             color={colors.textMuted}
+            style={styles.locationIcon}
           />
           <Text
             style={[styles.locationText, { color: colors.textMuted }]}
-            numberOfLines={1}
+            numberOfLines={2}
           >
             From: {formatDisplayValue(item.currentLocation) || "No location"}
           </Text>
         </View>
-      </View>
-
-      <View style={styles.right}>
-        {showMenu && (
-          <TouchableOpacity
-            style={[
-              styles.menuBtn,
-              { backgroundColor: colors.cardMuted, borderColor: colors.border },
-              selected && styles.menuBtnSelected,
-            ]}
-            onPress={() => onMenuPress?.(item)}
-          >
-            <FontAwesome5
-              name="ellipsis-v"
-              size={14}
-              color={selected ? "#2563eb" : colors.textMuted}
-            />
-          </TouchableOpacity>
-        )}
-
-        {!selected && (
-          <View style={styles.statusWrap}>
-            <StatusBadge status={item.status} />
-          </View>
-        )}
       </View>
     </TouchableOpacity>
   );
@@ -207,84 +214,36 @@ export default function PackageListItem({
 
 const styles = StyleSheet.create({
   card: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    padding: 14,
+    padding: 16,
     backgroundColor: "#ffffff",
-    borderRadius: 20,
-    // marginHorizontal: 16,
-    marginVertical: 7,
+    borderRadius: 16,
+    marginVertical: 8,
     borderWidth: 1,
     borderColor: "#e2e8f0",
-    // shadowColor: "#0f172a",
-    shadowOffset: { width: 0, height: 6 },
-    // shadowOpacity: 0.05,
-    // shadowRadius: 14,
+    gap: 14,
     elevation: 2,
   },
 
-  loadedCard: {
-    borderColor: "#bfdbfe",
-    backgroundColor: "#f8fbff",
+  headerRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 14,
   },
 
-  missingCard: {
-    borderColor: "#fecaca",
-    backgroundColor: "#fffafa",
-  },
-
-  selectedCard: {
-    borderColor: "#60a5fa",
-    backgroundColor: "#eff6ff",
-    shadowOpacity: 0.08,
-  },
-
-  left: {
+  iconColumn: {
     alignItems: "center",
-    marginRight: 12,
-    paddingTop: 2,
-  },
-
-  center: {
-    flex: 1,
-  },
-
-  right: {
-    marginLeft: 10,
-    justifyContent: "space-between", // key change
-    alignItems: "flex-end",
+    width: 48,
   },
 
   iconWrap: {
-    width: 42,
-    height: 42,
+    width: 44,
+    height: 44,
     borderRadius: 14,
     backgroundColor: "#f8fafc",
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 1,
     borderColor: "#e2e8f0",
-  },
-
-  statusWrap: {
-    marginTop: 8,
-    alignItems: "flex-end",
-  },
-
-  right: {
-    marginLeft: 10,
-    justifyContent: "space-between", // key change
-    alignItems: "flex-end",
-  },
-
-  loadedIconWrap: {
-    backgroundColor: "#eff6ff",
-    borderColor: "#bfdbfe",
-  },
-
-  missingIconWrap: {
-    backgroundColor: "#fef2f2",
-    borderColor: "#fecaca",
   },
 
   selectedIconWrap: {
@@ -296,53 +255,63 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: "800",
     color: "#94a3b8",
-    marginTop: 6,
+    marginTop: 8,
     letterSpacing: 0.4,
   },
 
-  topRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
+  headerContent: {
+    flex: 1,
     gap: 10,
-    marginBottom: 4,
+    minWidth: 0,
+  },
+
+  titleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
   },
 
   packageId: {
     flex: 1,
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: "800",
     color: "#0f172a",
-    marginRight: 8,
+    lineHeight: 20,
   },
 
   selectedText: {
     color: "#1d4ed8",
   },
 
+  statusRow: {
+    alignSelf: "flex-start",
+  },
+
+  body: {
+    gap: 12,
+  },
+
   description: {
-    fontSize: 12.5,
+    fontSize: 13,
     color: "#475569",
-    marginBottom: 8,
-    lineHeight: 18,
+    lineHeight: 19,
   },
 
   metaRow: {
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 8,
-    marginBottom: 8,
   },
 
   metaPill: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 5,
+    gap: 6,
     backgroundColor: "#f8fafc",
     borderWidth: 1,
     borderColor: "#e2e8f0",
-    paddingHorizontal: 8,
-    paddingVertical: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
     borderRadius: 999,
   },
 
@@ -355,8 +324,7 @@ const styles = StyleSheet.create({
   badgesRow: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 6,
-    marginBottom: 8,
+    gap: 8,
   },
 
   tag: {
@@ -395,16 +363,20 @@ const styles = StyleSheet.create({
 
   locationRow: {
     flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
+    alignItems: "flex-start",
+    gap: 8,
+  },
+
+  locationIcon: {
     marginTop: 2,
   },
 
   locationText: {
     flex: 1,
-    fontSize: 11,
+    fontSize: 12,
     color: "#94a3b8",
     fontWeight: "600",
+    lineHeight: 17,
   },
 
   menuBtn: {
@@ -416,7 +388,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#f8fafc",
     borderWidth: 1,
     borderColor: "#e2e8f0",
-    marginTop: 2,
+    flexShrink: 0,
   },
 
   menuBtnSelected: {

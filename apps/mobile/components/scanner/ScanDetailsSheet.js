@@ -128,15 +128,22 @@ export default function ScanDetailsSheet({
             </Text>
           </View>
 
-          <View style={styles.offloadToggleRow}>
+          <View
+            style={[
+              styles.offloadToggleRow,
+              primaryScanActions.length > 2 && styles.offloadToggleRowGrid,
+            ]}
+          >
             {primaryScanActions.map((action) => {
               const isActive = scanActionStatus === action.status;
+              const useGridLayout = primaryScanActions.length > 2;
 
               return (
                 <TouchableOpacity
                   key={action.status || action.label}
                   style={[
                     styles.offloadToggleButton,
+                    useGridLayout && styles.offloadToggleButtonGrid,
                     isActive && {
                       backgroundColor: action.color,
                       borderColor: action.color,
@@ -148,14 +155,16 @@ export default function ScanDetailsSheet({
                 >
                   <FontAwesome5
                     name={action.icon}
-                    size={13}
+                    size={useGridLayout ? 16 : 13}
                     color={isActive ? "#ffffff" : action.color}
                   />
                   <Text
                     style={[
                       styles.offloadToggleText,
+                      useGridLayout && styles.offloadToggleTextGrid,
                       isActive && styles.offloadToggleTextActive,
                     ]}
+                    numberOfLines={2}
                   >
                     {action.label}
                   </Text>
@@ -469,6 +478,9 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: 10,
   },
+  offloadToggleRowGrid: {
+    flexWrap: "wrap",
+  },
   offloadToggleButton: {
     flex: 1,
     minHeight: 44,
@@ -482,10 +494,24 @@ const styles = StyleSheet.create({
     gap: 8,
     paddingHorizontal: 10,
   },
+  offloadToggleButtonGrid: {
+    flex: 0,
+    flexBasis: "47%",
+    flexGrow: 1,
+    minHeight: 72,
+    flexDirection: "column",
+    paddingHorizontal: 8,
+    paddingVertical: 10,
+    gap: 6,
+  },
   offloadToggleText: {
     color: "#334155",
     fontSize: 12,
     fontWeight: "800",
+  },
+  offloadToggleTextGrid: {
+    textAlign: "center",
+    lineHeight: 16,
   },
   offloadToggleTextActive: {
     color: "#ffffff",
