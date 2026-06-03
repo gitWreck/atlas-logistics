@@ -9,6 +9,7 @@ const {
   updatedBy,
 } = require("../utilities/helpers");
 const { VALID_TRIP_STATUSES } = require("../utilities/dataDetails");
+const { isAllowedTripTransition } = require("./tripLifecycle");
 const {
   SEMAPHORE_API_KEY,
   SEMAPHORE_SENDER_NAME,
@@ -40,7 +41,9 @@ exports.updateTripStatus = onCall(
 
     const tripId = requireString(req.data?.tripId, "tripId");
     const newStatus = requireString(req.data?.status, "status").toUpperCase();
-    const notify = !!req.data?.notify; // Optional: whether to send SMS notifications for this status change
+    const notify = !!req.data?.notify;
+    const promotionSource = String(req.data?.promotionSource || "").trim();
+    const markReconciled = !!req.data?.markReconciled;
 
     // Validate Status Enum
 
@@ -63,6 +66,16 @@ exports.updateTripStatus = onCall(
 
       const oldStatus = tripSnap.data().status;
 
+      if (
+        oldStatus &&
+        newStatus &&
+        !isAllowedTripTransition(oldStatus, newStatus)
+      ) {
+        console.warn(
+          `[updateTripStatus] Non-forward transition ${oldStatus} → ${newStatus} for trip ${tripId}`,
+        );
+      }
+
       // 2. Prepare Updates
       const updates = {
         status: newStatus,
@@ -72,12 +85,20 @@ exports.updateTripStatus = onCall(
 
       // --- STATUS SPECIFIC LOGIC ---
 
+      if (newStatus === "ARRIVED") {
+        updates.arrivedAt = admin.firestore.FieldValue.serverTimestamp();
+        if (
+          markReconciled ||
+          promotionSource === "RECONCILIATION"
+        ) {
+          updates.reconciledAt = admin.firestore.FieldValue.serverTimestamp();
+        }
+      }
+
       // A. If Completing -> Set timestamps & archive flag
       if (newStatus === "COMPLETED") {
         updates.completedAt = admin.firestore.FieldValue.serverTimestamp();
         updates.active = false;
-        // Optional: unlock manifest if you want it editable after completion (unlikely)
-        // updates.manifestLocked = true;
       }
 
       // B. If Cancelling -> Set active false
@@ -123,7 +144,11 @@ exports.updateTripStatus = onCall(
         type: "STATUS_CHANGE",
         oldStatus,
         newStatus,
-        method: "MANUAL_OVERRIDE",
+        method:
+          promotionSource === "RECONCILIATION"
+            ? "RECONCILIATION"
+            : "MANUAL_OVERRIDE",
+        promotionSource: promotionSource || null,
         by: uid,
         at: admin.firestore.FieldValue.serverTimestamp(),
       });

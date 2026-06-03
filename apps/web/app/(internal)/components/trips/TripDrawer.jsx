@@ -271,6 +271,8 @@ export default function TripDrawer({
               }
               onUnassign={(shipment) => setShipmentToUnassign(shipment)}
               tripId={data?.tripId}
+              tripStatus={data?.status}
+              tripReconciledAt={data?.reconciledAt}
               onRefresh={() => {
                 fetchShipments();
                 onRefreshTrips?.();

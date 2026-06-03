@@ -21,6 +21,9 @@ const FAILABLE_PIECE_STATUSES = new Set([
 const RETURNABLE_PIECE_STATUSES = new Set([
   "FAILED_DELIVERY",
   "OUT_FOR_DELIVERY",
+  "LOADED",
+  "READY_FOR_DELIVERY",
+  "PARTIALLY_LOADED",
 ]);
 
 function normalizePackageIdSet(packageIds) {
@@ -116,6 +119,54 @@ function collectTargetPieceIdentities(
     if (identity) identities.push(identity);
   });
   return identities;
+}
+
+function explainCheckerReturnFailure(
+  packages = [],
+  { checkerUid, shipmentData = {}, packageIdSet = null } = {},
+) {
+  const ids =
+    packageIdSet && packageIdSet.size > 0
+      ? [...packageIdSet]
+      : packages
+          .map((pkg) => getPackageIdentity(pkg))
+          .filter(Boolean);
+
+  for (const packageId of ids) {
+    const pkg = packages.find((row) => packageMatchesId(row, packageId));
+    if (!pkg) {
+      return `Package ${packageId} was not found on this shipment.`;
+    }
+
+    const pieceStatus = String(pkg.status || "").trim().toUpperCase();
+
+    if (!isCheckerOwnedPiece(pkg, checkerUid, shipmentData)) {
+      if (
+        pieceStatus === "AVAILABLE_AT_WAREHOUSE" ||
+        (shipmentData?.availableForDelivery === true &&
+          !pkg.loadedByCheckerId &&
+          String(pkg.custodyOwnerType || "").toUpperCase() === "WAREHOUSE")
+      ) {
+        return (
+          "This piece is in the warehouse pool, not on your van. " +
+          "Load it from Available first. If you reverted test data, clear availableForDelivery on the shipment."
+        );
+      }
+      return `Package ${packageId} is not on your van. Load it before returning.`;
+    }
+
+    if (!isPieceReturnable(pkg)) {
+      return (
+        `Cannot return piece in status ${pieceStatus || "unknown"}. ` +
+        "Mark failed delivery first, or load the piece to your van."
+      );
+    }
+  }
+
+  return (
+    "No eligible pieces found for you to return. " +
+    "Mark failed delivery or scan a piece that is on your van (loaded or out for delivery)."
+  );
 }
 
 function assertHasTargetPieces(identities = [], actionLabel = "perform this action") {
@@ -253,6 +304,7 @@ module.exports = {
   shouldTargetCheckerPiece,
   collectTargetPieceIdentities,
   assertHasTargetPieces,
+  explainCheckerReturnFailure,
   assertRequestedPiecesOwned,
   applyPieceDelivered,
   applyPieceFailed,

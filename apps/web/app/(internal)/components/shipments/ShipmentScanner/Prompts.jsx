@@ -91,8 +91,12 @@ export function HandoffPrompt({
   const remarksComplete = missingShipments.every((item) =>
     String(missingRemarks?.[item.id] || "").trim(),
   );
+  const lifecycleCanRelease = summary?.lifecycle?.canReleaseForDelivery !== false;
+  const releaseBlockReason = summary?.lifecycle?.releaseBlockReason || null;
   const canRelease =
-    unloadedShipments.length > 0 && (!hasMissing || remarksComplete);
+    lifecycleCanRelease &&
+    unloadedShipments.length > 0 &&
+    (!hasMissing || remarksComplete);
 
   return (
     <InterceptorPrompt
@@ -182,6 +186,12 @@ export function HandoffPrompt({
             ))}
           </div>
         </div>
+      )}
+
+      {!lifecycleCanRelease && releaseBlockReason && (
+        <p className="text-xs text-amber-500/90 text-center px-2">
+          {releaseBlockReason}
+        </p>
       )}
 
       <div className="space-y-2">
@@ -334,7 +344,7 @@ export function ArrivalPrompt({ theme, btnStatus, onMarkArrived }) {
       icon={faTruckRampBox}
       iconColor="text-blue-500"
       title="Mark Trip as Arrived"
-      description="This trip is still in transit. Mark it as arrived, then continue unloading."
+      description="Reconciliation is complete but the trip was not auto-promoted. Mark ARRIVED to continue (fallback — normally happens after reconcile)."
     >
       <StatusButton
         status={btnStatus}

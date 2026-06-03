@@ -2,12 +2,38 @@ function normalizeStatus(value) {
   return String(value || "").trim().toUpperCase();
 }
 
+/** Master statuses that may appear in the checker pool after Rose release. */
+const DELIVERY_POOL_MASTER_STATUSES = new Set([
+  "AVAILABLE_FOR_DELIVERY",
+  "PARTIALLY_DELIVERED",
+  "PARTIALLY_AVAILABLE_FOR_DELIVERY",
+  "RECONCILED",
+  "UNLOADED",
+  "ARRIVED",
+  "RETURNED_RECEIVED_AT_HUB",
+]);
+
+/**
+ * Stale `availableForDelivery` can remain after manual status reverts (e.g. RECEIVED).
+ */
+export function isShipmentInDeliveryPool(shipment = {}) {
+  if (shipment?.availableForDelivery !== true) return false;
+  const master = normalizeStatus(shipment.status);
+  return DELIVERY_POOL_MASTER_STATUSES.has(master);
+}
+
 function pieceQuantity(pkg = {}) {
   const qty = Number(pkg.quantity);
   return Number.isFinite(qty) && qty > 0 ? qty : 1;
 }
 
-function isAvailableAtWarehouse(pkg = {}) {
+/**
+ * Pool-eligible piece at Odiongan (Step 2.7 / 3.7).
+ * Requires shipment-level release unless piece still has release flag.
+ */
+function isAvailableAtWarehouse(pkg = {}, shipment = {}) {
+  if (!isShipmentInDeliveryPool(shipment)) return false;
+  const poolReleased = shipment?.availableForDelivery === true;
   const status = normalizeStatus(pkg.status);
   if (["DELIVERED", "MISSING", "DAMAGED", "CANCELLED"].includes(status)) {
     return false;
@@ -18,10 +44,15 @@ function isAvailableAtWarehouse(pkg = {}) {
   ) {
     return false;
   }
-  if (pkg.availableForDelivery === true) return true;
-  if (status === "AVAILABLE_AT_WAREHOUSE") return true;
+  if (!poolReleased && pkg.availableForDelivery !== true) {
+    return false;
+  }
+  if (pkg.availableForDelivery === true && poolReleased) return true;
+  if (status === "AVAILABLE_AT_WAREHOUSE" && poolReleased) return true;
   const custody = normalizeStatus(pkg.custodyOwnerType);
-  if (custody === "WAREHOUSE" && !pkg.loadedByCheckerId) return true;
+  if (custody === "WAREHOUSE" && !pkg.loadedByCheckerId && poolReleased) {
+    return true;
+  }
   return false;
 }
 
@@ -77,7 +108,7 @@ export function countDeliveryPoolPieces(shipment = {}, checkerUid = null) {
       return;
     }
 
-    if (isAvailableAtWarehouse(pkg)) {
+    if (isAvailableAtWarehouse(pkg, shipment)) {
       stats.available += qty;
       return;
     }
@@ -108,10 +139,10 @@ export function shipmentHasAvailablePieces(shipment = {}) {
   return countDeliveryPoolPieces(shipment).available > 0;
 }
 
-/** Shipments with inventory this checker can still load from the pool. */
+/** Shipments Rose released to the checker pool (Firestore + piece rules). */
 export function isAvailableToLoadShipment(shipment = {}) {
-  if (shipment?.availableForDelivery !== true) {
-    return shipmentHasAvailablePieces(shipment);
+  if (!isShipmentInDeliveryPool(shipment)) {
+    return false;
   }
   return shipmentHasAvailablePieces(shipment);
 }
