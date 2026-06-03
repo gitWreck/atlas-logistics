@@ -34,17 +34,11 @@ exports.deleteShipment = onCall(
     const { user } = await requireRole(db, req, ["admin", "manager"]);
 
     const shipmentId = req.data?.shipmentId || req.data?.shipmentDocId;
-    const reason = String(req.data?.reason || "").trim();
+    const reason =
+      String(req.data?.reason || "").trim() || "Deleted from admin UI";
 
     if (!shipmentId || typeof shipmentId !== "string") {
       throw new HttpsError("invalid-argument", "shipmentId is required");
-    }
-
-    if (!reason) {
-      throw new HttpsError(
-        "invalid-argument",
-        "A deletion reason is required for the audit log.",
-      );
     }
 
     const { uid, role, name } = updatedBy(req);

@@ -128,15 +128,10 @@ export default function ShipmentDrawer({
             <div className="space-y-8 animate-in zoom-in-95 duration-200">
               <ShipmentOperations
                 shipmentId={data.id}
-                shipmentLabel={data.shipmentId || data.trackingNumber || data.id}
                 currentStatus={data.status}
                 isDark={isDark}
                 onRefresh={() => {
                   onRefresh?.();
-                }}
-                onDeleted={() => {
-                  onRefresh?.();
-                  onClose();
                 }}
                 profile={profile}
               />
