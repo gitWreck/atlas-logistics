@@ -19,7 +19,7 @@ const FILTER_OPTIONS = [
 ];
 
 export default function TrackedShipmentList({ shipments, onShipmentPress }) {
-  const { colors } = useTheme();
+  const { colors, resolvedScheme } = useTheme();
   const [searchText, setSearchText] = useState("");
   const [activeFilter, setActiveFilter] = useState("ALL");
 
@@ -106,24 +106,37 @@ export default function TrackedShipmentList({ shipments, onShipmentPress }) {
         >
           {FILTER_OPTIONS.map((opt) => {
             const isActive = activeFilter === opt.value;
+            const activeChipColors =
+              resolvedScheme === "dark"
+                ? { bg: "#0284c7", border: "#0284c7", text: "#ffffff" }
+                : { bg: "#0f172a", border: "#0f172a", text: "#ffffff" };
+
             return (
               <TouchableOpacity
                 key={opt.value}
                 style={[
                   styles.tabChip,
-                  {
-                    backgroundColor: colors.surface,
-                    borderColor: colors.border,
-                  },
-                  isActive && styles.tabChipActive,
+                  isActive
+                    ? {
+                        backgroundColor: activeChipColors.bg,
+                        borderColor: activeChipColors.border,
+                      }
+                    : {
+                        backgroundColor: colors.surface,
+                        borderColor: colors.border,
+                      },
                 ]}
                 onPress={() => setActiveFilter(opt.value)}
               >
                 <Text
                   style={[
                     styles.tabChipText,
-                    { color: colors.textMuted },
-                    isActive && styles.tabChipTextActive,
+                    {
+                      color: isActive
+                        ? activeChipColors.text
+                        : colors.textMuted,
+                      fontWeight: isActive ? "700" : "600",
+                    },
                   ]}
                 >
                   {opt.label}
@@ -299,23 +312,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     height: 32,
     borderRadius: 999,
-    backgroundColor: "#ffffff",
     borderWidth: 1,
-    borderColor: "#e2e8f0",
     alignItems: "center",
     justifyContent: "center",
-  },
-  tabChipActive: {
-    backgroundColor: "#0f172a",
-    borderColor: "#0f172a",
   },
   tabChipText: {
     fontSize: 12,
     fontWeight: "600",
-    color: "#475569",
-  },
-  tabChipTextActive: {
-    color: "#ffffff",
   },
   emptyState: {
     alignItems: "center",

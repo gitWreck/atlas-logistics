@@ -62,6 +62,11 @@ const COLORS = {
     text: "#60a5fa",
     border: "rgba(59, 130, 246, 0.5)",
   },
+  AVAILABLE_AT_WAREHOUSE: {
+    bg: "rgba(59, 130, 246, 0.15)",
+    text: "#60a5fa",
+    border: "rgba(59, 130, 246, 0.5)",
+  },
   RECEIVED: {
     bg: "rgba(251, 146, 60, 0.15)",
     text: "#fb923c",
@@ -93,36 +98,56 @@ export default function StatusBadge({ status }) {
 
   // 3. Format Text (Remove underscores)
   const label = currentStatus.replace(/_/g, " ");
+  const isLongLabel = label.length > 16;
 
   return (
     <View
       style={[
         styles.badge,
+        isLongLabel && styles.badgeCompact,
         { backgroundColor: theme.bg, borderColor: theme.border },
       ]}
     >
-      <Text style={[styles.text, { color: theme.text }]}>{label}</Text>
+      <Text
+        style={[
+          styles.text,
+          isLongLabel && styles.textCompact,
+          { color: theme.text },
+        ]}
+        numberOfLines={2}
+      >
+        {label}
+      </Text>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   badge: {
-    // ✅ BIGGER DIMENSIONS
-    paddingHorizontal: 12, // Was 10
-    paddingVertical: 6, // Was 4
+    paddingHorizontal: 10,
+    paddingVertical: 6,
     borderRadius: 8,
     borderWidth: 1,
     alignSelf: "flex-start",
     alignItems: "center",
     justifyContent: "center",
-    minWidth: 90, // ✅ Ensures they are all roughly the same width
+    maxWidth: "100%",
+    flexShrink: 1,
+  },
+  badgeCompact: {
+    paddingHorizontal: 8,
+    paddingVertical: 5,
   },
   text: {
-    // ✅ BIGGER FONT
-    fontSize: 12, // Was 10
+    fontSize: 12,
     fontWeight: "800",
     letterSpacing: 0.5,
     textTransform: "uppercase",
+    textAlign: "center",
+  },
+  textCompact: {
+    fontSize: 10,
+    letterSpacing: 0.3,
+    lineHeight: 13,
   },
 });

@@ -84,8 +84,16 @@ const ShipmentHeaderCard = ({ shipment }) => {
     <View style={styles.card}>
       {/* Top Row: ID & Status */}
       <View style={styles.header}>
-        <Text style={styles.idText}>{shipment.id || "ID: --"}</Text>
-        <StatusBadge status={shipment.status} />
+        <Text
+          style={styles.idText}
+          numberOfLines={1}
+          ellipsizeMode="middle"
+        >
+          {shipment.id || "ID: --"}
+        </Text>
+        <View style={styles.statusWrap}>
+          <StatusBadge status={shipment.status} />
+        </View>
       </View>
 
       {/* Destination (Big) */}
@@ -198,16 +206,24 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
-    alignItems: "center",
+    alignItems: "flex-start",
+    gap: 10,
     marginBottom: 12,
     paddingBottom: 12,
     borderBottomWidth: 1,
     borderBottomColor: SEPARATOR,
   },
   idText: {
+    flex: 1,
+    flexShrink: 1,
     color: LABEL_GREY,
     fontWeight: "bold",
     fontSize: 14,
+  },
+  statusWrap: {
+    flexShrink: 1,
+    maxWidth: "52%",
+    alignItems: "flex-end",
   },
   section: {
     marginBottom: 12,

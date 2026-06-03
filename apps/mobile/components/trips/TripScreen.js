@@ -229,6 +229,10 @@ export default function TripScreen() {
 
   const renderTabs = () => {
     const tabs = isChecker ? CHECKER_TAB_OPTIONS : DRIVER_TAB_OPTIONS;
+    const activeChipColors =
+      resolvedScheme === "dark"
+        ? { bg: "#0284c7", border: "#0284c7", text: "#ffffff" }
+        : { bg: "#0f172a", border: "#0f172a", text: "#ffffff" };
 
     return (
       <View style={styles.tabsContainer}>
@@ -244,16 +248,27 @@ export default function TripScreen() {
               <TouchableOpacity
                 style={[
                   styles.tabChip,
-                  { backgroundColor: colors.surface, borderColor: colors.border },
-                  isActive && styles.tabChipActive,
+                  isActive
+                    ? {
+                        backgroundColor: activeChipColors.bg,
+                        borderColor: activeChipColors.border,
+                      }
+                    : {
+                        backgroundColor: colors.surface,
+                        borderColor: colors.border,
+                      },
                 ]}
                 onPress={() => setActiveTab(item.key)}
               >
                 <Text
                   style={[
                     styles.tabChipText,
-                    { color: colors.textMuted },
-                    isActive && styles.tabChipTextActive,
+                    {
+                      color: isActive
+                        ? activeChipColors.text
+                        : colors.textMuted,
+                      fontWeight: isActive ? "700" : "600",
+                    },
                   ]}
                 >
                   {item.label}
@@ -405,23 +420,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     height: 38,
     borderRadius: 999,
-    backgroundColor: "#ffffff",
     borderWidth: 1,
-    borderColor: "#e2e8f0",
     alignItems: "center",
     justifyContent: "center",
-  },
-  tabChipActive: {
-    backgroundColor: "#0f172a",
-    borderColor: "#0f172a",
   },
   tabChipText: {
     fontSize: 13,
     fontWeight: "600",
-    color: "#475569",
-  },
-  tabChipTextActive: {
-    color: "#ffffff",
   },
 
   searchRow: {
