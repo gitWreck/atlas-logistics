@@ -427,9 +427,11 @@ const ShipmentBoard = forwardRef(function ShipmentBoard(
               pickups={pickups}
               loading={loading}
               isDark={isDark}
+              profile={profile}
               pickupLimit={pickupLimit}
               onPickupLimitChange={setPickupLimit}
               onSelectPickup={setSelectedShipmentId}
+              onDeleted={fetchShipments}
               onEditPickup={(pickup) => {
                 setEditingPickup(pickup);
                 setIsNewOrderModalOpen(true);
@@ -586,6 +588,8 @@ const ShipmentBoard = forwardRef(function ShipmentBoard(
                         key={shipment.id}
                         s={shipment}
                         onClick={setSelectedShipmentId}
+                        onDeleted={fetchShipments}
+                        profile={profile}
                         onMessage={() => handleMessageCustomer(shipment)}
                         isDark={isDark}
                       />

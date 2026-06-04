@@ -87,6 +87,8 @@ exports.removeAssignmentFromTrip =
 
 exports.disableTruckTrip =
   require("./src/trips/disableTruckTrip").disableTruckTrip;
+exports.deleteTruckTrip =
+  require("./src/trips/deleteTruckTrip").deleteTruckTrip;
 exports.completeTrip = require("./src/trips/completeTrip").completeTrip;
 exports.updateTripStatus =
   require("./src/trips/updateTripStatus").updateTripStatus;
@@ -128,6 +130,8 @@ exports.returnPackagesToWarehouse =
   require("./src/checker/returnPackagesToWarehouse").returnPackagesToWarehouse;
 exports.getShipmentCustodyTimeline =
   require("./src/tracking/getShipmentCustodyTimeline").getShipmentCustodyTimeline;
+exports.deleteShipment =
+  require("./src/shipments/deleteShipment").deleteShipment;
 
 // Manifests & Certificates
 exports.generateTripManifest =

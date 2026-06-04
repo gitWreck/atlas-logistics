@@ -14,9 +14,11 @@ export default function CompletedTripsTable({
   trips = [],
   loading = false,
   isDark = false,
+  profile,
   completedTripLimit = "50",
   onCompletedTripLimitChange,
   onSelectTrip,
+  onDeleted,
 }) {
   const [currentPage, setCurrentPage] = useState(1);
   const [searchQuery, setSearchQuery] = useState("");
@@ -132,6 +134,8 @@ export default function CompletedTripsTable({
                   key={trip.id}
                   trip={trip}
                   onClick={onSelectTrip}
+                  onDeleted={onDeleted}
+                  profile={profile}
                   isDark={isDark}
                 />
               ))

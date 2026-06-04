@@ -298,9 +298,11 @@ const TripBoard = forwardRef(function TripBoard(
               trips={completedTrips}
               loading={loading}
               isDark={isDark}
+              profile={profile}
               completedTripLimit={completedTripLimit}
               onCompletedTripLimitChange={setCompletedTripLimit}
               onSelectTrip={setSelectedTripId}
+              onDeleted={fetchTrips}
             />
           </div>
         ) : (
@@ -441,6 +443,8 @@ const TripBoard = forwardRef(function TripBoard(
                           key={trip.id}
                           trip={trip}
                           onClick={setSelectedTripId}
+                          onDeleted={fetchTrips}
+                          profile={profile}
                           isDark={isDark}
                         />
                       ))

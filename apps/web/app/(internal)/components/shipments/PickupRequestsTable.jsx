@@ -16,10 +16,12 @@ export default function PickupRequestsTable({
   pickups = [],
   loading = false,
   isDark = false,
+  profile,
   pickupLimit = "50",
   onPickupLimitChange,
   onSelectPickup,
   onEditPickup,
+  onDeleted,
 }) {
   const [activeFilter, setActiveFilter] = useState("ALL");
   const [searchQuery, setSearchQuery] = useState("");
@@ -228,6 +230,8 @@ export default function PickupRequestsTable({
                   s={pickup}
                   onClick={onSelectPickup}
                   onEdit={onEditPickup}
+                  onDeleted={onDeleted}
+                  profile={profile}
                   isDark={isDark}
                 />
               ))
