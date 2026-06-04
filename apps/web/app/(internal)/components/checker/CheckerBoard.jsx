@@ -10,7 +10,7 @@ import {
   faPen,
   faExclamationTriangle,
 } from "@fortawesome/free-solid-svg-icons";
-import LoadPackagesModal from "../manifests/modals/LoadPackagesModal";
+import LoadPackagesModal from "./modals/LoadPackagesModal";
 import { auth } from "@/lib/firebase";
 
 export default function CheckerBoard({ isDark = true }) {
