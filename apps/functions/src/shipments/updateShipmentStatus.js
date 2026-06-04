@@ -6,7 +6,7 @@ const { FieldValue } = require("firebase-admin/firestore");
 const { chunk, requireRole, unique, updatedBy } = require("../utilities/helpers");
 const { ALLOWED_SHIPMENT_STATUSES } = require("../utilities/dataDetails");
 const { writeShipmentActionLog } = require("../utilities/shipmentLogger");
-const { deriveMasterShipmentStatus, computePackageBreakdown } = require("../packages/shipmentStatus");
+const { buildDerivedShipmentSnapshot } = require("../packages/shipmentStatus");
 const { writeShipmentEvent } = require("../tracking/writeShipmentEvent");
 const { EVENT_TYPES } = require("../tracking/eventTypes");
 const {
@@ -263,10 +263,6 @@ exports.updateShipmentStatus = onCall(
         ? currentData.packages
         : [];
 
-      if (oldStatus === newStatus && !isCheckerPieceDelivery) {
-        return null;
-      }
-
       const normalizePackage = (pkg = {}) => {
         const quantity = normalizeQty(pkg.quantity, 1) || 1;
         const loadedQty = Math.min(normalizeQty(pkg.loadedQty, 0), quantity);
@@ -476,23 +472,43 @@ exports.updateShipmentStatus = onCall(
 
       const newPendingQty = Math.max(newTotalQty - newLoadedQty, 0);
 
-      const derivedShipmentStatus =
-        (newStatus === "OUT_FOR_DELIVERY" && actor.role === "checker") ||
-        isCheckerPieceDelivery
-          ? deriveMasterShipmentStatus(updatedPackages, {
-              previousStatus: oldStatus,
-              totals: {
-                totalQty: newTotalQty,
-                receivedQty: newReceivedQty,
-                loadedQty: newLoadedQty,
-              },
-            })
-          : newStatus;
+      const derivedSnapshot = buildDerivedShipmentSnapshot(updatedPackages, {
+        previousStatus: oldStatus,
+        totals: {
+          totalQty: newTotalQty,
+          receivedQty: newReceivedQty,
+          loadedQty: newLoadedQty,
+        },
+        shouldPromoteOutForDelivery:
+          newStatus === "OUT_FOR_DELIVERY" &&
+          (actor.role === "checker" || checkerPromotedOutForDelivery),
+      });
+
+      const derivedShipmentStatus = derivedSnapshot.status;
+      const reconciledPackages = derivedSnapshot.packages;
+
+      const packagesUnchanged =
+        reconciledPackages.length === oldPackages.length &&
+        reconciledPackages.every(
+          (pkg, index) =>
+            String(pkg.status || "").toUpperCase() ===
+              String(oldPackages[index]?.status || "").toUpperCase() &&
+            pkg.availableForDelivery === oldPackages[index]?.availableForDelivery,
+        );
+
+      if (
+        !isCheckerPieceDelivery &&
+        packagesUnchanged &&
+        derivedShipmentStatus === oldStatus
+      ) {
+        return null;
+      }
 
       const shipmentUpdate = {
         status: derivedShipmentStatus,
-        packages: updatedPackages,
-        packageBreakdown: computePackageBreakdown(updatedPackages),
+        packages: reconciledPackages,
+        packageBreakdown: derivedSnapshot.packageBreakdown,
+        availableForDelivery: derivedSnapshot.availableForDelivery,
         updatedAt: FieldValue.serverTimestamp(),
         updatedBy: name,
         remarks: remarks || null,

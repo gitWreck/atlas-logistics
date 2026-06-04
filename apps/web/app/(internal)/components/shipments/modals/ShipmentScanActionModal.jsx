@@ -275,9 +275,7 @@ export default function ShipmentScanActionModal({
       .map(([pkgId, qty]) => ({ packageId: pkgId, quantity: qty }));
 
     if (itemsToProcess.length === 0) {
-      return setError(
-        "Please enter a quantity greater than zero for at least one item.",
-      );
+      return setError("No quantity is available to process for this scan.");
     }
 
     setLoading(true);
@@ -803,27 +801,21 @@ function ResolvedItemPanel({ item, action, quantities, setQuantities, theme }) {
     return pkg.loadedQty || 0;
   };
 
-  const handleQtyChange = (pkgId, value, maxAllowed) => {
-    let num = parseInt(value, 10);
-    if (isNaN(num) || num < 0) num = 0;
-    if (num > maxAllowed) num = maxAllowed;
-    setQuantities((prev) => ({ ...prev, [pkgId]: num }));
-  };
-
-  const handleAddAll = () => {
-    const maxedOut = {};
+  useEffect(() => {
+    const autoQuantities = {};
     displayPackages.forEach((pkg) => {
-      maxedOut[pkg.packageId] = getAvailableForPkg(pkg);
+      const available = getAvailableForPkg(pkg);
+      if (pkg.packageId && available > 0) {
+        autoQuantities[pkg.packageId] = available;
+      }
     });
-    setQuantities(maxedOut);
-  };
+    setQuantities(autoQuantities);
+  }, [item, action, displayPackages, setQuantities]);
 
   return (
     <div className="space-y-4">
       {/* Header Panel */}
-      <div
-        className={`rounded-xl border p-4 flex justify-between items-start gap-2 ${theme.panelSurface}`}
-      >
+      <div className={`rounded-xl border p-4 ${theme.panelSurface}`}>
         <div className="min-w-0">
           <div className="text-[10px] font-bold uppercase opacity-50 flex items-center gap-2">
             <FontAwesomeIcon icon={faBarcode} />
@@ -836,12 +828,6 @@ function ResolvedItemPanel({ item, action, quantities, setQuantities, theme }) {
             Dest: {item.destination}
           </div>
         </div>
-        <button
-          onClick={handleAddAll}
-          className="shrink-0 px-3 py-2 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded-lg transition-colors"
-        >
-          Add All Available
-        </button>
       </div>
 
       {/* Package Manifest Checklist */}
@@ -855,7 +841,7 @@ function ResolvedItemPanel({ item, action, quantities, setQuantities, theme }) {
         <div className="divide-y divide-white/5 max-h-[300px] overflow-y-auto">
           {displayPackages.map((pkg) => {
             const available = getAvailableForPkg(pkg);
-            const currentVal = quantities[pkg.packageId] || "";
+            const qtyToProcess = quantities[pkg.packageId] ?? available;
             const isFullyProcessed = available <= 0;
 
             return (
@@ -879,23 +865,10 @@ function ResolvedItemPanel({ item, action, quantities, setQuantities, theme }) {
                   </div>
                 </div>
 
-                <div className="w-20 shrink-0">
-                  <input
-                    type="number"
-                    min="0"
-                    max={available}
-                    disabled={isFullyProcessed}
-                    value={currentVal}
-                    onChange={(e) =>
-                      handleQtyChange(pkg.packageId, e.target.value, available)
-                    }
-                    placeholder="0"
-                    className={`w-full rounded-lg border px-2 py-2 text-center font-bold text-sm transition-colors ${
-                      isFullyProcessed
-                        ? "opacity-30 bg-gray-500/10"
-                        : theme.input
-                    }`}
-                  />
+                <div
+                  className={`w-14 shrink-0 text-center text-lg font-bold tabular-nums ${isFullyProcessed ? "opacity-30" : ""}`}
+                >
+                  {isFullyProcessed ? "—" : qtyToProcess}
                 </div>
               </div>
             );

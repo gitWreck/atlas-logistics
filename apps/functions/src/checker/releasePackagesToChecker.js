@@ -10,6 +10,7 @@ const {
   assertEligibleForCheckerRelease,
   normalizeStatus,
 } = require("./releaseEligibility");
+const { buildDerivedShipmentSnapshot } = require("../packages/shipmentStatus");
 
 if (!admin.apps.length) admin.initializeApp();
 const db = admin.firestore();
@@ -163,6 +164,13 @@ exports.releasePackagesToChecker = onCall(
             ? "Re-released to checker after returned intake."
             : "Released to checker for last-mile handling.");
 
+        const packages = Array.isArray(shipmentData.packages)
+          ? shipmentData.packages
+          : [];
+        const derivedSnapshot = buildDerivedShipmentSnapshot(packages, {
+          previousStatus: shipmentData.status,
+        });
+
         tx.update(shipmentRef, {
           assignedCheckerId: normalizedCheckerId,
           assignedCheckerName: checkerName,
@@ -177,7 +185,10 @@ exports.releasePackagesToChecker = onCall(
           releasedAt: now,
           updatedAt: now,
           updatedBy: actorName || actorUid || null,
-          status: "ASSIGNED",
+          status: derivedSnapshot.status,
+          packages: derivedSnapshot.packages,
+          packageBreakdown: derivedSnapshot.packageBreakdown,
+          availableForDelivery: derivedSnapshot.availableForDelivery,
           previousAssignedCheckerId:
             shipmentData.lastAssignedCheckerId ||
             shipmentData.assignedCheckerId ||

@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useEffect, useMemo } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faBarcode } from "@fortawesome/free-solid-svg-icons";
 
@@ -24,9 +24,13 @@ export default function ManifestPanel({
     );
   };
 
-  const displayPackages = isShipment
-    ? item.packages || []
-    : item.packages?.filter(isScannedPackage) || [];
+  const displayPackages = useMemo(
+    () =>
+      isShipment
+        ? item.packages || []
+        : item.packages?.filter(isScannedPackage) || [],
+    [isShipment, item.packages, item.packageId, item.trackingNumber],
+  );
 
   const getAvailableForPkg = (pkg) => {
     const totalQty = Math.max(Number(pkg?.quantity) || 1, 1);
@@ -52,27 +56,23 @@ export default function ManifestPanel({
     return Math.max(0, loadedQty);
   };
 
-  const handleQtyChange = (pkgId, value, maxAllowed) => {
-    let num = parseInt(value, 10);
-    if (isNaN(num) || num < 0) num = 0;
-    if (num > maxAllowed) num = maxAllowed;
-    setQuantities((prev) => ({ ...prev, [pkgId]: num }));
-  };
+  useEffect(() => {
+    if (!item) return;
 
-  const handleAddAll = () => {
-    const maxedOut = {};
+    const autoQuantities = {};
     displayPackages.forEach((pkg) => {
       const packageKey = getPackageKey(pkg);
-      if (packageKey) maxedOut[packageKey] = getAvailableForPkg(pkg);
+      const available = getAvailableForPkg(pkg);
+      if (packageKey && available > 0) {
+        autoQuantities[packageKey] = available;
+      }
     });
-    setQuantities(maxedOut);
-  };
+    setQuantities(autoQuantities);
+  }, [displayPackages, action, scanStatus, setQuantities]);
 
   return (
     <div className="space-y-4">
-      <div
-        className={`rounded-xl border p-4 flex justify-between items-start gap-2 ${theme.panelSurface}`}
-      >
+      <div className={`rounded-xl border p-4 ${theme.panelSurface}`}>
         <div className="min-w-0">
           <div className="text-[10px] font-bold uppercase opacity-50 flex items-center gap-2">
             <FontAwesomeIcon icon={faBarcode} /> {item.scanType}
@@ -84,12 +84,6 @@ export default function ManifestPanel({
             Dest: {item.destination}
           </div>
         </div>
-        <button
-          onClick={handleAddAll}
-          className="shrink-0 px-3 py-2 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded-lg transition-colors"
-        >
-          Add All Available
-        </button>
       </div>
 
       <div
@@ -102,7 +96,7 @@ export default function ManifestPanel({
           {displayPackages.map((pkg) => {
             const packageKey = getPackageKey(pkg);
             const available = getAvailableForPkg(pkg);
-            const currentVal = quantities[packageKey] || "";
+            const qtyToProcess = quantities[packageKey] ?? available;
             const isFullyProcessed = available <= 0;
             const totalQty = Math.max(Number(pkg.quantity) || 1, 1);
 
@@ -126,19 +120,10 @@ export default function ManifestPanel({
                     </span>
                   </div>
                 </div>
-                <div className="w-20 shrink-0">
-                  <input
-                    type="number"
-                    min="0"
-                    max={available}
-                    disabled={isFullyProcessed}
-                    value={currentVal}
-                    onChange={(e) =>
-                      handleQtyChange(packageKey, e.target.value, available)
-                    }
-                    placeholder="0"
-                    className={`w-full rounded-lg border px-2 py-2 text-center font-bold text-sm transition-colors ${isFullyProcessed ? "opacity-30 bg-gray-500/10" : theme.input}`}
-                  />
+                <div
+                  className={`w-14 shrink-0 text-center text-lg font-bold tabular-nums ${isFullyProcessed ? "opacity-30" : ""}`}
+                >
+                  {isFullyProcessed ? "—" : qtyToProcess}
                 </div>
               </div>
             );

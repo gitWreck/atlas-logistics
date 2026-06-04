@@ -2,6 +2,7 @@ const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const admin = require("firebase-admin");
 const { requireRole, updatedBy } = require("../utilities/helpers"); // Assuming this exists as per your code
 const { writeShipmentActionLog } = require("../utilities/shipmentLogger");
+const { buildDerivedShipmentSnapshot } = require("../packages/shipmentStatus");
 
 if (!admin.apps.length) admin.initializeApp();
 const db = admin.firestore();
@@ -131,18 +132,24 @@ exports.bulkAssignShipments = onCall(
           status: "ASSIGNED",
         });
 
-        // --- B. Update Shipment Root ---
-        // Matches 'trackingRef' update
+        const packages = Array.isArray(data.packages) ? data.packages : [];
+        const derivedSnapshot = buildDerivedShipmentSnapshot(packages, {
+          previousStatus: data.status,
+        });
+
+        // --- B. Update Shipment Root (master status derived from packages) ---
         batch.update(ref, {
           currentTripId: tripId,
           assignedToTripAt: now,
-          status: "ASSIGNED",
+          status: derivedSnapshot.status,
+          packages: derivedSnapshot.packages,
+          packageBreakdown: derivedSnapshot.packageBreakdown,
+          availableForDelivery: derivedSnapshot.availableForDelivery,
 
           updatedAt: now,
           updatedBy: name,
           updatedRole: role,
 
-          // Append to History
           statusHistory: admin.firestore.FieldValue.arrayUnion({
             status: "ASSIGNED",
             at: timestampNow,

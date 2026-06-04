@@ -2,6 +2,7 @@ const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const admin = require("firebase-admin");
 const { FieldValue } = admin.firestore;
 const { requireRole } = require("../utilities/helpers");
+const { buildDerivedShipmentSnapshot } = require("./shipmentStatus");
 
 if (!admin.apps.length) admin.initializeApp();
 const db = admin.firestore();
@@ -82,16 +83,30 @@ exports.updatePackageStatus = onCall(
         0,
       );
 
-      let finalShipmentStatus = "RECEIVED";
-      if (currentlyLoadedPieces === totalPiecesInShipment)
-        finalShipmentStatus = "LOADED";
-      else if (currentlyLoadedPieces > 0)
-        finalShipmentStatus = "PARTIALLY_LOADED";
+      const derivedSnapshot = buildDerivedShipmentSnapshot(pkgArray, {
+        previousStatus: data.status,
+        totals: {
+          totalQty: totalPiecesInShipment,
+          loadedQty: currentlyLoadedPieces,
+          receivedQty: pkgArray.reduce(
+            (acc, p) =>
+              acc +
+              (["DELIVERED", "COMPLETED"].includes(
+                String(p.status || "").toUpperCase(),
+              )
+                ? Number(p.quantity) || 1
+                : 0),
+            0,
+          ),
+        },
+      });
 
       // 4. Update the Shipment Document
       tx.update(shipmentRef, {
-        packages: pkgArray,
-        status: finalShipmentStatus,
+        packages: derivedSnapshot.packages,
+        packageBreakdown: derivedSnapshot.packageBreakdown,
+        status: derivedSnapshot.status,
+        availableForDelivery: derivedSnapshot.availableForDelivery,
         "totals.loaded": currentlyLoadedPieces,
         updatedAt: FieldValue.serverTimestamp(),
       });
@@ -105,7 +120,7 @@ exports.updatePackageStatus = onCall(
 
         // Update the Manifest Entry
         tx.update(tripShipmentRef, {
-          status: finalShipmentStatus,
+          status: derivedSnapshot.status,
           loadedCount: currentlyLoadedPieces,
           updatedAt: FieldValue.serverTimestamp(),
         });

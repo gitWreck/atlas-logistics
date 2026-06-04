@@ -622,7 +622,14 @@ export default function useScannerLogic({
         )
       ) {
         setResolvedItem(nextResolvedItem);
-        setQuantities({});
+        setQuantities(
+          Object.fromEntries(
+            itemsToProcess.map(({ packageId, quantity }) => [
+              packageId,
+              quantity,
+            ]),
+          ),
+        );
         return;
       }
 
@@ -675,6 +682,15 @@ export default function useScannerLogic({
       );
       setResolvedItem(needsAssignmentItem);
       setNeedsAssignmentItem(null);
+      if (scanCode) {
+        setQuantities(
+          Object.fromEntries(
+            getProcessableItems(needsAssignmentItem, scanCode).map(
+              ({ packageId, quantity }) => [packageId, quantity],
+            ),
+          ),
+        );
+      }
     }
     setLoading(false);
   };
@@ -886,7 +902,7 @@ export default function useScannerLogic({
       .map(([pkgId, qty]) => ({ packageId: pkgId, quantity: qty }));
 
     if (itemsToProcess.length === 0)
-      return setError("Please enter a quantity greater than zero.");
+      return setError("No quantity is available to process for this scan.");
 
     setLoading(true);
     setError("");
