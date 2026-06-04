@@ -13,8 +13,16 @@ import { formatFirestoreDate } from "@/app/utility/utilities";
 import { getTripStatsDisplay } from "@/app/utility/tripStats";
 import { getRowThemeClasses } from "@/app/utility/constant/theme";
 import StatusDot from "../ui/StatusDot";
+import AdminRowDeleteButton from "../admin/AdminRowDeleteButton";
+import { deleteTruckTrip } from "@/app/utility/FirebaseFunctions";
 
-export default function TripRow({ trip, onClick, isDark = false }) {
+export default function TripRow({
+  trip,
+  onClick,
+  onDeleted,
+  profile,
+  isDark = false,
+}) {
   const theme = getRowThemeClasses(isDark);
 
   const normalizedStatus = String(trip.status || "").toUpperCase();
@@ -127,16 +135,28 @@ export default function TripRow({ trip, onClick, isDark = false }) {
           </div>
         </div>
 
-        <button
-          type="button"
-          className={`p-2 -mr-2 rounded ${theme.actionButton}`}
-          onClick={(e) => {
-            e.stopPropagation();
-            onClick(trip.id);
-          }}
-        >
-          <FontAwesomeIcon icon={faEllipsisV} />
-        </button>
+        <div className="flex items-center gap-0.5">
+          <button
+            type="button"
+            className={`p-2 rounded ${theme.actionButton}`}
+            onClick={(e) => {
+              e.stopPropagation();
+              onClick(trip.id);
+            }}
+          >
+            <FontAwesomeIcon icon={faEllipsisV} />
+          </button>
+          <AdminRowDeleteButton
+            profile={profile}
+            title="Delete Trip"
+            entityLabel={trip.tripId || trip.id}
+            description="Shipments on this trip are detached, not deleted."
+            onDelete={() => deleteTruckTrip({ tripId: trip.id })}
+            onSuccess={onDeleted}
+            isDark={isDark}
+            buttonClassName={theme.actionButton}
+          />
+        </div>
       </div>
 
       {/* Col 1 */}
@@ -295,7 +315,7 @@ export default function TripRow({ trip, onClick, isDark = false }) {
       </div>
 
       {/* Col 6 */}
-      <div className="hidden md:block col-span-1 text-right">
+      <div className="hidden md:flex col-span-1 justify-end items-center gap-0.5">
         <button
           type="button"
           className={`p-2 rounded-full transition-colors ${theme.actionButton}`}
@@ -306,6 +326,16 @@ export default function TripRow({ trip, onClick, isDark = false }) {
         >
           <FontAwesomeIcon icon={faEllipsisV} />
         </button>
+        <AdminRowDeleteButton
+          profile={profile}
+          title="Delete Trip"
+          entityLabel={trip.tripId || trip.id}
+          description="Shipments on this trip are detached, not deleted."
+          onDelete={() => deleteTruckTrip({ tripId: trip.id })}
+          onSuccess={onDeleted}
+          isDark={isDark}
+          buttonClassName={theme.actionButton}
+        />
       </div>
     </div>
   );

@@ -1,5 +1,5 @@
-import React, { useState } from "react";
-import TripOperations from "./TripOperations"; // Your existing operations component
+import React from "react";
+import TripOperations from "./TripOperations";
 import DriverMessageWidget from "../messaging/DriverMessageWidget";
 import TripBroadcastWidget from "../messaging/TripBroadcastWidget";
 
