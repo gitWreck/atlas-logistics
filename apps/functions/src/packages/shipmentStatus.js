@@ -261,9 +261,92 @@ function deriveMasterShipmentStatus(packages = [], options = {}) {
   return "RECEIVED";
 }
 
+const POOL_DERIVED_MASTER_STATUSES = new Set([
+  "AVAILABLE_FOR_DELIVERY",
+  "PARTIALLY_AVAILABLE_FOR_DELIVERY",
+]);
+
+const MASTER_STATUSES_SKIP_PACKAGE_DERIVE = new Set([
+  "PENDING_PICKUP",
+  "CANCELLED",
+  "pending",
+]);
+
+/**
+ * Remove stale availableForDelivery flags on pieces when derived master is not pool-eligible.
+ * Prevents master AVAILABLE_FOR_DELIVERY while labels stay AVAILABLE_AT_WAREHOUSE.
+ */
+function stripStalePackagePoolFlags(packages = [], derivedStatus = "") {
+  if (POOL_DERIVED_MASTER_STATUSES.has(String(derivedStatus || "").toUpperCase())) {
+    return packages;
+  }
+
+  return packages.map((pkg) => {
+    if (pkg?.availableForDelivery !== true) return pkg;
+    const status = normalizePackageStatus(pkg);
+    if (RELEASED_POOL_STATUSES.has(status)) return pkg;
+    return { ...pkg, availableForDelivery: false };
+  });
+}
+
+function resolveShipmentAvailableForDelivery(derivedStatus = "") {
+  const normalized = String(derivedStatus || "").trim().toUpperCase();
+  if (normalized === "COMPLETED") return false;
+  if (POOL_DERIVED_MASTER_STATUSES.has(normalized)) return true;
+  return false;
+}
+
+/**
+ * Canonical post-mutation snapshot: derive master + breakdown + pool flag hygiene.
+ */
+function buildDerivedShipmentSnapshot(packages = [], options = {}) {
+  const {
+    previousStatus = "",
+    totals = null,
+    shouldPromoteOutForDelivery = false,
+    preserveStatuses = MASTER_STATUSES_SKIP_PACKAGE_DERIVE,
+  } = options;
+
+  const previous = String(previousStatus || "").trim();
+  if (preserveStatuses.has(previous)) {
+    return {
+      status: previous,
+      packages,
+      packageBreakdown: computePackageBreakdown(packages),
+      availableForDelivery: resolveShipmentAvailableForDelivery(previous),
+    };
+  }
+
+  const deriveOptions = {
+    previousStatus,
+    shouldPromoteOutForDelivery,
+    ...(totals ? { totals } : {}),
+  };
+
+  let derivedStatus = deriveMasterShipmentStatus(packages, deriveOptions);
+  let normalizedPackages = stripStalePackagePoolFlags(packages, derivedStatus);
+
+  const afterStrip = deriveMasterShipmentStatus(normalizedPackages, deriveOptions);
+  if (afterStrip !== derivedStatus) {
+    derivedStatus = afterStrip;
+    normalizedPackages = stripStalePackagePoolFlags(normalizedPackages, derivedStatus);
+  }
+
+  return {
+    status: derivedStatus,
+    packages: normalizedPackages,
+    packageBreakdown: computePackageBreakdown(normalizedPackages),
+    availableForDelivery: resolveShipmentAvailableForDelivery(derivedStatus),
+  };
+}
+
 module.exports = {
   normalizePackageStatus,
   allPiecesDelivered,
   deriveMasterShipmentStatus,
   computePackageBreakdown,
+  stripStalePackagePoolFlags,
+  resolveShipmentAvailableForDelivery,
+  buildDerivedShipmentSnapshot,
+  MASTER_STATUSES_SKIP_PACKAGE_DERIVE,
 };

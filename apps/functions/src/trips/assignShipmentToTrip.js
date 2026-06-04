@@ -7,6 +7,7 @@ const {
   getActorFromRequest,
   writeTripActionLog,
 } = require("../utilities/tripLogger");
+const { buildDerivedShipmentSnapshot } = require("../packages/shipmentStatus");
 
 if (!admin.apps.length) admin.initializeApp();
 const db = admin.firestore();
@@ -87,6 +88,10 @@ exports.assignShipmentToTrip = onCall(
       }
 
       const now = admin.firestore.FieldValue.serverTimestamp();
+      const packages = Array.isArray(tracking.packages) ? tracking.packages : [];
+      const derivedSnapshot = buildDerivedShipmentSnapshot(packages, {
+        previousStatus: tracking.status,
+      });
 
       // Calculate Items to Add (Safely handle missing totals)
       const itemsToAdd = Number(
@@ -123,7 +128,7 @@ exports.assignShipmentToTrip = onCall(
         });
       }
 
-      // 🔗 Update tracking record
+      // 🔗 Update tracking record (master status derived from packages)
       tx.update(shipmentRef, {
         currentTripId: tripId,
         assignedToTripAt: now,
@@ -131,7 +136,10 @@ exports.assignShipmentToTrip = onCall(
         updatedAt: now,
         updatedBy: uid,
 
-        status: "ASSIGNED",
+        status: derivedSnapshot.status,
+        packages: derivedSnapshot.packages,
+        packageBreakdown: derivedSnapshot.packageBreakdown,
+        availableForDelivery: derivedSnapshot.availableForDelivery,
         statusHistory: [
           ...(tracking.statusHistory ?? []),
           {

@@ -2,6 +2,10 @@ const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const admin = require("firebase-admin");
 const { writeShipmentActionLog } = require("../utilities/shipmentLogger");
 const { updatedBy } = require("../utilities/helpers");
+const {
+  buildDerivedShipmentSnapshot,
+  MASTER_STATUSES_SKIP_PACKAGE_DERIVE,
+} = require("../packages/shipmentStatus");
 
 if (!admin.apps.length) admin.initializeApp();
 const db = admin.firestore();
@@ -22,7 +26,6 @@ exports.updateShipmentDetails = onCall(
       originCode,
       destination,
       destinationCode,
-      status,
       currentLocation,
       proofOfReceipt,
     } = request.data || {};
@@ -36,7 +39,25 @@ exports.updateShipmentDetails = onCall(
     const shipmentRef = db.collection("shipments").doc(shipmentId);
     const nowAt = admin.firestore.FieldValue.serverTimestamp();
 
-    // 2. Construct the Update Payload
+    const shipmentSnap = await shipmentRef.get();
+    if (!shipmentSnap.exists) {
+      throw new HttpsError("not-found", "Shipment not found.");
+    }
+
+    const shipmentData = shipmentSnap.data() || {};
+    const packages = Array.isArray(shipmentData.packages) ? shipmentData.packages : [];
+    const derivedSnapshot = buildDerivedShipmentSnapshot(packages, {
+      previousStatus: shipmentData.status,
+    });
+
+    const preserveCurrentStatus = MASTER_STATUSES_SKIP_PACKAGE_DERIVE.has(
+      String(shipmentData.status || "").trim(),
+    );
+    const resolvedStatus = preserveCurrentStatus
+      ? shipmentData.status
+      : derivedSnapshot.status;
+
+    // 2. Construct the Update Payload (master status always from packages when allowed)
     const updatePayload = {
       "sender.name": sender.name,
       "sender.phone": sender.phone,
@@ -48,7 +69,10 @@ exports.updateShipmentDetails = onCall(
       originCode: originCode,
       destination: destination,
       destinationCode: destinationCode,
-      status: status,
+      status: resolvedStatus,
+      packages: derivedSnapshot.packages,
+      packageBreakdown: derivedSnapshot.packageBreakdown,
+      availableForDelivery: derivedSnapshot.availableForDelivery,
       currentLocation: currentLocation,
       updatedAt: nowAt,
       updatedBy: name,
