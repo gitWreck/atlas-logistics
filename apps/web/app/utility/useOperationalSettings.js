@@ -21,6 +21,7 @@ function readCachedSettings() {
   }
 }
 
+//cache
 export function cacheOperationalSettings(settings) {
   if (typeof window === "undefined") return;
   window.localStorage.setItem(
