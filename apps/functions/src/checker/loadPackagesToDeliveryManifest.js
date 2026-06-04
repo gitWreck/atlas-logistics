@@ -6,7 +6,11 @@ const { FieldValue } = require("firebase-admin/firestore");
 const { requireRole } = require("../utilities/helpers");
 const { writeShipmentEvent } = require("../tracking/writeShipmentEvent");
 const { EVENT_TYPES } = require("../tracking/eventTypes");
-const { deriveMasterShipmentStatus } = require("../packages/shipmentStatus");
+const { deriveMasterShipmentStatus, computePackageBreakdown } = require("../packages/shipmentStatus");
+const {
+  isReleasedForDeliveryPool,
+  PACKAGE_STATUS,
+} = require("../packages/packageStatus");
 const {
   DEFAULT_WAREHOUSE_CODE,
   applyPieceLoadCustody,
@@ -187,10 +191,24 @@ function packageIsEligibleForLoad(
   }
 
   if (pkg.availableForDelivery === true) return true;
-  if (status === "AVAILABLE_AT_WAREHOUSE") return true;
+  if (isReleasedForDeliveryPool(pkg)) return true;
+  if (
+    [
+      PACKAGE_STATUS.AVAILABLE_AT_WAREHOUSE,
+      PACKAGE_STATUS.AVAILABLE_AT_ODIONGAN_WAREHOUSE,
+      PACKAGE_STATUS.RELEASED_FOR_DELIVERY,
+    ].includes(status)
+  ) {
+    return true;
+  }
 
   const custody = String(pkg.custodyOwnerType || "").toUpperCase();
-  if (custody === "WAREHOUSE" && status === "RECEIVED") return true;
+  if (
+    custody === "WAREHOUSE" &&
+    (status === "RECEIVED" || status === PACKAGE_STATUS.RECEIVED_AT_DIVISORIA)
+  ) {
+    return true;
+  }
 
   return false;
 }
@@ -389,6 +407,7 @@ exports.loadPackagesToDeliveryManifest = onCall(
         const shipmentStatus = deriveMasterShipmentStatus(updatedPackages, {
           previousStatus: shipmentData.status,
         });
+        const packageBreakdown = computePackageBreakdown(updatedPackages);
 
         const warehouseCode =
           normalizeString(shipmentData.custodyOwnerId) ||
@@ -398,6 +417,7 @@ exports.loadPackagesToDeliveryManifest = onCall(
           ref: shipmentRef,
           data: {
             packages: updatedPackages,
+            packageBreakdown,
             deliveryManifestId: manifestRefId,
             deliveryVehicleId: resolvedVehicleId,
             deliveryVehicleName: resolvedVehicleName,
@@ -407,16 +427,16 @@ exports.loadPackagesToDeliveryManifest = onCall(
             custodyOwnerId: shipmentHasWarehouseCustodyPieces(updatedPackages)
               ? warehouseCode
               : actorUid,
-          currentLocationState: shipmentHasWarehouseCustodyPieces(updatedPackages)
-            ? loadedCount > 0
-              ? "DELIVERY_VEHICLE_LOADED"
-              : warehouseCode
-            : "DELIVERY_VEHICLE_LOADED",
+            currentLocationState: shipmentHasWarehouseCustodyPieces(updatedPackages)
+              ? loadedCount > 0
+                ? "DELIVERY_VEHICLE_LOADED"
+                : warehouseCode
+              : "DELIVERY_VEHICLE_LOADED",
             status: shipmentStatus,
-          availableForDelivery: shipmentHasWarehouseCustodyPieces(updatedPackages),
-          activeCheckerIds: FieldValue.arrayUnion(actorUid),
-          updatedAt: now,
-          updatedBy: actorName || actorUid || null,
+            availableForDelivery: shipmentHasWarehouseCustodyPieces(updatedPackages),
+            activeCheckerIds: FieldValue.arrayUnion(actorUid),
+            updatedAt: now,
+            updatedBy: actorName || actorUid || null,
             statusHistory: FieldValue.arrayUnion({
               status: "LOADED_TO_DELIVERY_VEHICLE",
               at: admin.firestore.Timestamp.now(),

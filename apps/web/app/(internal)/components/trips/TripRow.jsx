@@ -10,6 +10,7 @@ import {
   faTruckPickup,
 } from "@fortawesome/free-solid-svg-icons";
 import { formatFirestoreDate } from "@/app/utility/utilities";
+import { getTripStatsDisplay } from "@/app/utility/tripStats";
 import { getRowThemeClasses } from "@/app/utility/constant/theme";
 import StatusDot from "../ui/StatusDot";
 
@@ -20,8 +21,10 @@ export default function TripRow({ trip, onClick, isDark = false }) {
   const isCompleted = ["COMPLETED", "DELIVERED"].includes(normalizedStatus);
   const isDelayed = !!trip.delayReason && !trip.delayCleared;
   const isManifestLocked = !!trip.manifestLocked;
-  const loadedCount = trip.totalLoaded || 0;
-  const totalCount = trip.totalItems || 0;
+  const tripStats = getTripStatsDisplay(trip);
+  const statsCount = tripStats.count;
+  const totalCount = tripStats.total;
+  const statsLabel = tripStats.label;
   const driverName = trip.driverName || "Unassigned";
 
   const tripType = String(trip.tripType || "HUB_TRANSFER").toUpperCase();
@@ -180,7 +183,7 @@ export default function TripRow({ trip, onClick, isDark = false }) {
             <span
               className={`md:hidden font-mono text-xs ${theme.mutedText}`}
             >
-              {loadedCount}/{totalCount} Items
+              {statsCount}/{totalCount} {statsLabel}
             </span>
           </div>
         </div>
@@ -231,7 +234,7 @@ export default function TripRow({ trip, onClick, isDark = false }) {
         <span
           className={`text-[14px] font-mono border-l pl-2 ${theme.statsDivider}`}
         >
-          {loadedCount}/{totalCount} Loaded
+          {statsCount}/{totalCount} {statsLabel}
         </span>
       </div>
 

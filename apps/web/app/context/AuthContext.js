@@ -17,6 +17,9 @@ export function AuthProvider({ children }) {
         setUser(null);
         setProfile(null);
         setLoading(false);
+        if (typeof window !== "undefined") {
+          window.__atlasGetIdToken = null;
+        }
         return;
       }
 
@@ -56,6 +59,10 @@ export function AuthProvider({ children }) {
       firebaseUser.customClaims = tokenResult.claims;
       setUser(firebaseUser);
       setLoading(false);
+
+      if (typeof window !== "undefined") {
+        window.__atlasGetIdToken = () => firebaseUser.getIdToken();
+      }
     });
 
     return unsub;

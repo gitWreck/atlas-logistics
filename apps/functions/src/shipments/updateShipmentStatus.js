@@ -6,7 +6,7 @@ const { FieldValue } = require("firebase-admin/firestore");
 const { chunk, requireRole, unique, updatedBy } = require("../utilities/helpers");
 const { ALLOWED_SHIPMENT_STATUSES } = require("../utilities/dataDetails");
 const { writeShipmentActionLog } = require("../utilities/shipmentLogger");
-const { deriveMasterShipmentStatus } = require("../packages/shipmentStatus");
+const { deriveMasterShipmentStatus, computePackageBreakdown } = require("../packages/shipmentStatus");
 const { writeShipmentEvent } = require("../tracking/writeShipmentEvent");
 const { EVENT_TYPES } = require("../tracking/eventTypes");
 const {
@@ -19,6 +19,7 @@ const {
 } = require("../checker/checkerPieceOperations");
 const { getShipmentTargetUserIds } = require("../utilities/notificationHelpers");
 const { normalizeQty } = require("../utilities/packageHelpers");
+const { tryAutoCompleteTrip } = require("../trips/autoCompleteTrip");
 
 if (!admin.apps.length) admin.initializeApp();
 
@@ -234,6 +235,7 @@ exports.updateShipmentStatus = onCall(
     let checkerPromotedOutForDelivery = false;
     let checkerDeliveredPieceIds = [];
     let resultStatus = newStatus;
+    let completedTripId = null;
 
     const packageIdSet = normalizePackageIdSet(packageIds);
     const isCheckerPieceDelivery =
@@ -247,8 +249,12 @@ exports.updateShipmentStatus = onCall(
       }
 
       let tripShipSnap = null;
+      let tripSnap = null;
       if (tripShipmentRef) {
         tripShipSnap = await tx.get(tripShipmentRef);
+      }
+      if (tripRef) {
+        tripSnap = await tx.get(tripRef);
       }
 
       const currentData = shipmentSnap.data() || {};
@@ -486,6 +492,7 @@ exports.updateShipmentStatus = onCall(
       const shipmentUpdate = {
         status: derivedShipmentStatus,
         packages: updatedPackages,
+        packageBreakdown: computePackageBreakdown(updatedPackages),
         updatedAt: FieldValue.serverTimestamp(),
         updatedBy: name,
         remarks: remarks || null,
@@ -514,11 +521,34 @@ exports.updateShipmentStatus = onCall(
               currentLocationState: "OUT_FOR_DELIVERY",
             }
           : {}),
+        ...(derivedShipmentStatus === "COMPLETED"
+          ? {
+              availableForDelivery: false,
+              currentLocationState: "DELIVERED",
+              completedAt: FieldValue.serverTimestamp(),
+            }
+          : {}),
       };
 
       tx.update(shipmentRef, shipmentUpdate);
 
       resultStatus = derivedShipmentStatus;
+
+      if (derivedShipmentStatus === "COMPLETED") {
+        const manifestId = String(currentData.deliveryManifestId || "").trim();
+        if (manifestId) {
+          tx.set(
+            db.collection("delivery_manifests").doc(manifestId),
+            {
+              status: "COMPLETED",
+              completedAt: FieldValue.serverTimestamp(),
+              updatedAt: FieldValue.serverTimestamp(),
+              updatedBy: name,
+            },
+            { merge: true },
+          );
+        }
+      }
 
       if (checkerPromotedOutForDelivery) {
         const manifestId = currentData.deliveryManifestId;
@@ -570,6 +600,7 @@ exports.updateShipmentStatus = onCall(
           tripUpdate.totalExceptions = FieldValue.increment(newTotalQty);
         }
 
+        completedTripId = tripId;
         tx.update(tripRef, tripUpdate);
 
         tx.update(tripShipmentRef, {
@@ -617,6 +648,19 @@ exports.updateShipmentStatus = onCall(
         notify,
       });
     });
+
+    if (completedTripId) {
+      try {
+        await tryAutoCompleteTrip(completedTripId, {
+          actorId: uid,
+          actorName: name,
+          actorRole: role,
+          source: "UPDATE_SHIPMENT_STATUS",
+        });
+      } catch (autoCompleteError) {
+        console.error("Auto-complete trip failed:", autoCompleteError);
+      }
+    }
 
     if (checkerPromotedOutForDelivery) {
       await writeShipmentEvent({

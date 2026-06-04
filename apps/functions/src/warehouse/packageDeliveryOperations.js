@@ -1,8 +1,14 @@
 "use strict";
 
 const { HttpsError } = require("firebase-functions/v2/https");
+const {
+  PACKAGE_STATUS,
+  ODIONGAN_WAREHOUSE,
+  resolveOdionganPoolStatus,
+  resolveDeliveryVehicleLoadedStatus,
+} = require("../packages/packageStatus");
 
-const DEFAULT_WAREHOUSE_CODE = "ODIONGAN_WAREHOUSE";
+const DEFAULT_WAREHOUSE_CODE = ODIONGAN_WAREHOUSE;
 
 const TERMINAL_PIECE_STATUSES = new Set([
   "DELIVERED",
@@ -40,7 +46,7 @@ function mapPackagesForDeliveryRelease(packages = [], warehouseCode = DEFAULT_WA
       ...pkg,
       quantity,
       availableForDelivery: true,
-      status: "AVAILABLE_AT_WAREHOUSE",
+      status: resolveOdionganPoolStatus(pkg, { released: true }),
       custodyOwnerType: "WAREHOUSE",
       custodyOwnerId: warehouseCode,
       loadedByCheckerId: null,
@@ -68,7 +74,7 @@ function applyPieceLoadCustody(
     quantity,
     loadedQty: quantity,
     availableForDelivery: false,
-    status: "LOADED",
+    status: resolveDeliveryVehicleLoadedStatus(),
     custodyOwnerType: "CHECKER",
     custodyOwnerId: checkerId,
     loadedByCheckerId: checkerId,
@@ -127,7 +133,7 @@ function applyPieceReturnedReceivedAtHub(
   return {
     ...pkg,
     quantity,
-    status: "RETURNED_RECEIVED_AT_HUB",
+    status: PACKAGE_STATUS.RETURNED_RECEIVED_AT_ODIONGAN,
     availableForDelivery: false,
     custodyOwnerType: "WAREHOUSE",
     custodyOwnerId: warehouseCode,

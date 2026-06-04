@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faTruckRampBox,
@@ -8,15 +8,8 @@ import {
   faLock,
   faUnlock,
   faTriangleExclamation,
-  faRoute,
 } from "@fortawesome/free-solid-svg-icons";
 import StatusButton from "../../ui/StatusButton"; // Adjust path
-
-function getTripSearchLabel(trip) {
-  if (!trip) return "";
-
-  return `${trip.id}${trip.route ? ` - ${trip.route}` : ""}`;
-}
 
 export function InterceptorPrompt({
   theme,
@@ -77,14 +70,9 @@ export function HandoffPrompt({
   theme,
   summary,
   tripId = null,
-  trips = [],
-  selectedTrip,
-  onSelectTrip,
   missingRemarks,
   onRemarkChange,
   onRelease,
-  onAssign,
-  onMarkReadyForDelivery,
   onRefresh,
   onBack,
   btnStatus,
@@ -102,9 +90,6 @@ export function HandoffPrompt({
     lifecycleCanRelease &&
     unloadedShipments.length > 0 &&
     (!hasMissing || remarksComplete);
-  const canAssign =
-    trips.length > 0 && selectedTrip && (!hasMissing || remarksComplete);
-  const canMarkReady = !hasMissing || remarksComplete;
 
   return (
     <InterceptorPrompt
@@ -202,34 +187,13 @@ export function HandoffPrompt({
         </p>
       )}
 
-      <TripSearchSelect
-        theme={theme}
-        trips={trips}
-        selectedTrip={selectedTrip}
-        onSelectTrip={onSelectTrip}
-      />
+      <p className="text-[11px] opacity-60 text-center px-1">
+        Releases to the delivery pool. Custody stays at Odiongan until a checker
+        scans and loads each label. You can also use Trip → Manifest → Release
+        shipment(s).
+      </p>
 
       <div className="space-y-2">
-        <StatusButton
-          status={btnStatus}
-          label="Mark Ready for Delivery"
-          loadingLabel="Marking ready..."
-          successLabel="Ready for Delivery"
-          icon={faCheck}
-          variant="emerald"
-          disabled={!canMarkReady}
-          onClick={onMarkReadyForDelivery}
-        />
-        <StatusButton
-          status={btnStatus}
-          label="Assign to Delivery Trip"
-          loadingLabel="Assigning..."
-          successLabel="Handoff Complete"
-          icon={faCheck}
-          variant="blue"
-          disabled={!canAssign}
-          onClick={onAssign}
-        />
         <StatusButton
           status={btnStatus}
           label="Release shipment(s)"
@@ -240,12 +204,6 @@ export function HandoffPrompt({
           disabled={!canRelease}
           onClick={onRelease}
         />
-        {trips.length === 0 && (
-          <div className="text-[11px] opacity-60">
-            No delivery trips available. You can still mark these shipments ready
-            for delivery.
-          </div>
-        )}
         <div className="flex items-center justify-center gap-4">
           <button onClick={onBack} className="text-xs opacity-60 underline">
             Back to scanning
@@ -256,116 +214,6 @@ export function HandoffPrompt({
         </div>
       </div>
     </InterceptorPrompt>
-  );
-}
-
-function TripSearchSelect({ theme, trips, selectedTrip, onSelectTrip }) {
-  const [tripQuery, setTripQuery] = useState("");
-  const [showTripSuggestions, setShowTripSuggestions] = useState(false);
-
-  const selectedTripItem = useMemo(
-    () => trips.find((trip) => trip.id === selectedTrip) || null,
-    [selectedTrip, trips],
-  );
-
-  const filteredTripOptions = useMemo(() => {
-    const keyword = tripQuery.trim().toLowerCase();
-    if (!keyword) return trips;
-
-    return trips.filter((trip) =>
-      `${trip.id} ${trip.driverName || ""} ${trip.truckPlate || ""} ${
-        trip.route || ""
-      } ${trip.status || ""}`
-        .toLowerCase()
-        .includes(keyword),
-    );
-  }, [tripQuery, trips]);
-
-  useEffect(() => {
-    setTripQuery(getTripSearchLabel(selectedTripItem));
-  }, [selectedTripItem]);
-
-  const handleTripType = (text) => {
-    setTripQuery(text);
-    setShowTripSuggestions(true);
-
-    const exactMatch = trips.find(
-      (trip) =>
-        trip.id.toLowerCase() === text.trim().toLowerCase() ||
-        getTripSearchLabel(trip).toLowerCase() === text.trim().toLowerCase(),
-    );
-
-    onSelectTrip(exactMatch?.id || "");
-  };
-
-  const handleTripSelect = (trip) => {
-    onSelectTrip(trip?.id || "");
-    setTripQuery(getTripSearchLabel(trip));
-    setShowTripSuggestions(false);
-  };
-
-  return (
-    <div className="text-left">
-      <label className="text-[10px] font-bold uppercase opacity-60">
-        Delivery Trip
-      </label>
-      <div className="relative mt-2">
-        <input
-          type="text"
-          value={tripQuery}
-          autoComplete="off"
-          placeholder={
-            trips.length === 0
-              ? "No DELIVERY trips available"
-              : "Type to search delivery trip..."
-          }
-          disabled={trips.length === 0}
-          onChange={(e) => handleTripType(e.target.value)}
-          onFocus={() => setShowTripSuggestions(true)}
-          onBlur={() => setTimeout(() => setShowTripSuggestions(false), 200)}
-          className={`w-full rounded-lg border px-3 py-2 text-sm font-bold outline-none transition-colors focus:border-blue-500 disabled:opacity-60 ${theme.input}`}
-        />
-
-        {showTripSuggestions && trips.length > 0 && (
-          <div
-            className={`absolute top-full left-0 right-0 mt-1 rounded-xl border shadow-xl z-50 max-h-56 overflow-y-auto ${theme.modal || theme.panelSurface}`}
-          >
-            {filteredTripOptions.length > 0 ? (
-              filteredTripOptions.map((trip) => (
-                <button
-                  key={trip.id}
-                  type="button"
-                  onMouseDown={() => handleTripSelect(trip)}
-                  className={`w-full text-left px-3 py-2 border-b last:border-b-0 transition-colors hover:bg-slate-500/10 ${theme.divider || ""}`}
-                >
-                  <div
-                    className={`text-sm font-semibold flex items-center gap-2 ${theme.title}`}
-                  >
-                    <FontAwesomeIcon icon={faRoute} />
-                    {trip.id}
-                  </div>
-                  <div className={`text-[11px] mt-0.5 ${theme.helperText}`}>
-                    {trip.driverName || "Unassigned Driver"} -{" "}
-                    {trip.truckPlate || "No Plate"} - {trip.status || "CREATED"}
-                  </div>
-                  {trip.route && (
-                    <div className={`text-[11px] mt-0.5 ${theme.helperText}`}>
-                      {trip.route}
-                    </div>
-                  )}
-                </button>
-              ))
-            ) : (
-              <div
-                className={`p-3 text-center text-xs italic ${theme.helperText}`}
-              >
-                No matching trips found
-              </div>
-            )}
-          </div>
-        )}
-      </div>
-    </div>
   );
 }
 

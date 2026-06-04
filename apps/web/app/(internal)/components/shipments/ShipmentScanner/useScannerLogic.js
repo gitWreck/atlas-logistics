@@ -5,7 +5,7 @@ import { useState, useCallback } from "react";
 // 1. Import your centralized Firebase functions
 import {
   bulkAssignShipments,
-  finalizeTripUnloadHandoff,
+  releaseForDeliveryOperations,
   updateTripStatus,
   unlockTripManifest,
   generateTripManifest,
@@ -115,10 +115,7 @@ export default function useScannerLogic({
   const [needsLoadedStatus, setNeedsLoadedStatus] = useState(false);
   const [needsLock, setNeedsLock] = useState(false);
 
-  // Next Trip States
   const [needsNextTrip, setNeedsNextTrip] = useState(false);
-  const [availableTrips, setAvailableTrips] = useState([]);
-  const [selectedNextTrip, setSelectedNextTrip] = useState("");
   const [needsHandoff, setNeedsHandoff] = useState(false);
   const [handoffSummary, setHandoffSummary] = useState(null);
   const [missingRemarks, setMissingRemarks] = useState({});
@@ -334,16 +331,6 @@ export default function useScannerLogic({
     },
     [user],
   );
-
-  const fetchDeliveryTrips = useCallback(async () => {
-    const tripData = await fetchJsonWithAuth("/api/trips/delivery");
-    const trips = tripData.trips || [];
-
-    setAvailableTrips(trips);
-    setSelectedNextTrip((current) => current || trips[0]?.id || "");
-
-    return trips;
-  }, [fetchJsonWithAuth]);
 
   const finalizeTripReconciliation = useCallback(
     async ({ notify = true } = {}) => {
@@ -893,58 +880,6 @@ export default function useScannerLogic({
     }
   };
 
-  const handleAssignNextTrip = async () => {
-    if (!selectedNextTrip) return setError("Select a delivery trip first.");
-
-    const missing = handoffSummary?.missingShipments || [];
-    const incompleteRemark = missing.find(
-      (item) => !String(missingRemarks[item.id] || "").trim(),
-    );
-
-    if (incompleteRemark) {
-      return setError(`Add remarks for ${incompleteRemark.shipmentId}.`);
-    }
-
-    const success = await executeFirebaseCall(finalizeTripUnloadHandoff, {
-      sourceTripId: tripId,
-      deliveryTripId: selectedNextTrip,
-      missingRemarks,
-      updatedBy: updatedBy(profile),
-    });
-    if (success)
-      setTimeout(() => {
-        onRefresh?.();
-        onClose?.();
-        resetFlow();
-      }, 1000);
-  };
-
-  const handleMarkReadyForDelivery = async () => {
-    const missing = handoffSummary?.missingShipments || [];
-    const incompleteRemark = missing.find(
-      (item) => !String(missingRemarks[item.id] || "").trim(),
-    );
-
-    if (incompleteRemark) {
-      return setError(`Add remarks for ${incompleteRemark.shipmentId}.`);
-    }
-
-    const success = await executeFirebaseCall(
-      finalizeTripUnloadReadyForDelivery,
-      {
-        sourceTripId: tripId,
-        missingRemarks,
-        updatedBy: updatedBy(profile),
-      },
-    );
-    if (success)
-      setTimeout(() => {
-        onRefresh?.();
-        onClose?.();
-        resetFlow();
-      }, 1000);
-  };
-
   const handleConfirm = async () => {
     const itemsToProcess = Object.entries(quantities)
       .filter(([_, qty]) => qty > 0)
@@ -1026,8 +961,6 @@ export default function useScannerLogic({
       needsLoadedStatus,
       needsLock,
       needsNextTrip,
-      availableTrips,
-      selectedNextTrip,
       needsHandoff,
       handoffSummary,
       missingRemarks,
@@ -1041,7 +974,6 @@ export default function useScannerLogic({
       setScanStatus,
       setQuantities,
       setManualCode,
-      setSelectedNextTrip,
       setMissingRemarks,
       setError,
       setSuccessNotice,
@@ -1057,7 +989,8 @@ export default function useScannerLogic({
       handleUnlockManifest,
       handleSetTripLoaded,
       handleLockManifest,
-      handleAssignNextTrip,
+      handleReleaseShipmentsFromTrip,
+      handleReleaseSingleShipment,
       handleReviewHandoff: () => loadHandoffReview(),
       handleConfirm,
     },

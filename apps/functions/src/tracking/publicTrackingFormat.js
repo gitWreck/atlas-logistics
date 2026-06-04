@@ -24,6 +24,7 @@ const PUBLIC_EVENT_LABELS = Object.freeze({
   OUT_FOR_DELIVERY: "Out for delivery",
   PARTIALLY_DELIVERED: "Partially delivered",
   DELIVERED: "Delivered",
+  COMPLETED: "Delivered",
   FAILED_DELIVERY: "Delivery attempt unsuccessful",
   RETURNED_TO_WAREHOUSE: "Returned to warehouse",
   PARTIAL_LOAD: "Partial load",
@@ -59,7 +60,7 @@ function getPublicEventLabel(eventType, fallbackTitle) {
 function mapEventToPublicStatusCode(eventType) {
   const key = String(eventType || "").trim().toUpperCase();
   if (key === "PARTIALLY_DELIVERED") return "PARTIALLY_DELIVERED";
-  if (key === "DELIVERED") return "DELIVERED";
+  if (key === "DELIVERED" || key === "COMPLETED") return "DELIVERED";
   if (
     key === "OUT_FOR_DELIVERY" ||
     key === "LOADED_TO_DELIVERY_VEHICLE" ||

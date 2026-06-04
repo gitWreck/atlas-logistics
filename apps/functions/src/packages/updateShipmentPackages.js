@@ -10,9 +10,18 @@ const {
   resolveEventTypeForScannerStatus,
 } = require("../tracking/eventTypes");
 const { extractTripEventContext } = require("../tracking/tripEventContext");
-const { deriveMasterShipmentStatus } = require("./shipmentStatus");
+const { deriveMasterShipmentStatus, computePackageBreakdown } = require("./shipmentStatus");
+const {
+  PACKAGE_STATUS,
+  ODIONGAN_WAREHOUSE,
+  derivePackageStatusFromQuantities,
+  resolveLinehaulLoadedStatus,
+  resolveDeliveryVehicleLoadedStatus,
+  resolveHubUnloadStatus,
+} = require("./packageStatus");
 const { getShipmentTargetUserIds } = require("../utilities/notificationHelpers");
 const { normalizeQty } = require("../utilities/packageHelpers");
+const { tryAutoCompleteTrip } = require("../trips/autoCompleteTrip");
 
 if (!admin.apps.length) admin.initializeApp();
 const db = admin.firestore();
@@ -195,6 +204,8 @@ exports.updateShipmentPackages = onCall(
     const shipmentRef = db.collection("shipments").doc(shipmentId);
 
     let pendingEvent = null;
+    let completedTripId = null;
+    let shouldTryAutoCompleteTrip = false;
 
     await db.runTransaction(async (tx) => {
       // -----------------------------
@@ -387,47 +398,8 @@ exports.updateShipmentPackages = onCall(
         };
       };
 
-      const derivePackageStatus = (pkg) => {
-        const quantity = Math.max(normalizeQty(pkg.quantity, 1), 1);
-        const loadedQty = clamp(normalizeQty(pkg.loadedQty, 0), 0, quantity);
-        const receivedQty = clamp(
-          normalizeQty(pkg.receivedQty, 0),
-          0,
-          quantity,
-        );
-        const missingQty = clamp(normalizeQty(pkg.missingQty, 0), 0, quantity);
-        const damagedQty = clamp(normalizeQty(pkg.damagedQty, 0), 0, quantity);
-        const storedStatus = String(pkg.status || "")
-          .trim()
-          .toUpperCase();
-
-        if (damagedQty > 0) return "DAMAGED";
-        if (missingQty > 0) return "MISSING";
-        if (receivedQty >= quantity) return "DELIVERED";
-
-        // In-transit label only applies while quantity is still on the truck/van.
-        if (receivedQty === 0 && loadedQty > 0) {
-          if (storedStatus === "OUT_FOR_DELIVERY") {
-            return "OUT_FOR_DELIVERY";
-          }
-        if (storedStatus === "READY_FOR_DELIVERY") {
-          return "READY_FOR_DELIVERY";
-        }
-        if (storedStatus === "AVAILABLE_AT_WAREHOUSE") {
-          if (loadedQty >= quantity) return "LOADED";
-          if (loadedQty > 0) return "PARTIALLY_LOADED";
-          return "AVAILABLE_AT_WAREHOUSE";
-        }
-        if (storedStatus === "LOADED") {
-            if (loadedQty >= quantity) return "LOADED";
-            return "PARTIALLY_LOADED";
-          }
-        }
-
-        if (loadedQty >= quantity) return "LOADED";
-        if (loadedQty > 0) return "PARTIALLY_LOADED";
-        return "RECEIVED";
-      };
+      const derivePackageStatus = (pkg) =>
+        derivePackageStatusFromQuantities(pkg, { isDeliveryTrip });
 
       const sumTotalQty = (pkgs) =>
         pkgs.reduce(
@@ -448,16 +420,31 @@ exports.updateShipmentPackages = onCall(
         );
 
       const sumReceivedQty = (pkgs) =>
-        pkgs.reduce(
-          (sum, p) =>
+        pkgs.reduce((sum, p) => {
+          const quantity = Math.max(normalizeQty(p.quantity, 1), 1);
+          const status = String(p.status || "").toUpperCase();
+          if (["DELIVERED", "COMPLETED"].includes(status)) {
+            return sum + quantity;
+          }
+          if (
+            [
+              "ARRIVED_AT_ODIONGAN",
+              "AVAILABLE_AT_ODIONGAN_WAREHOUSE",
+              "RELEASED_FOR_DELIVERY",
+              "READY_FOR_DELIVERY",
+            ].includes(status)
+          ) {
+            return sum + quantity;
+          }
+          return (
             sum +
             clamp(
               normalizeQty(p.receivedQty, 0),
               0,
-              Math.max(normalizeQty(p.quantity, 1), 1),
-            ),
-          0,
-        );
+              quantity,
+            )
+          );
+        }, 0);
 
       const sumMissingQty = (pkgs) =>
         pkgs.reduce(
@@ -643,9 +630,7 @@ exports.updateShipmentPackages = onCall(
                 : loadedQty;
 
             loadedQty = clamp(loadedQty - requestedQty, 0, quantity);
-            if (receivedQty > loadedQty) {
-              receivedQty = loadedQty;
-            }
+            receivedQty = clamp(receivedQty + requestedQty, 0, quantity);
             missingQty = 0;
             damagedQty = 0;
 
@@ -665,13 +650,23 @@ exports.updateShipmentPackages = onCall(
             const unloadedStatus =
               loadedQty > 0
                 ? derivePackageStatus(updatedPkg)
-                : "RECEIVED";
+                : resolveHubUnloadStatus(pkg);
 
             finalPackages.push({
               ...updatedPkg,
               status: unloadedStatus,
               ...(loadedQty === 0
-                ? { currentTripId: null, loadedOnTrip: null }
+                ? {
+                    currentTripId: null,
+                    loadedOnTrip: null,
+                    ...(resolveHubUnloadStatus(pkg) ===
+                    PACKAGE_STATUS.ARRIVED_AT_ODIONGAN
+                      ? {
+                          custodyOwnerType: "WAREHOUSE",
+                          custodyOwnerId: ODIONGAN_WAREHOUSE,
+                        }
+                      : {}),
+                  }
                 : {}),
             });
             return;
@@ -712,7 +707,7 @@ exports.updateShipmentPackages = onCall(
                 damagedQty: 0,
                 currentTripId: null,
                 loadedOnTrip: null,
-                status: "RECEIVED",
+                status: PACKAGE_STATUS.RECEIVED_AT_DIVISORIA,
                 updatedAt: nowIso,
                 updatedBy: name,
                 remarks: remarks || pkg.remarks || null,
@@ -735,8 +730,10 @@ exports.updateShipmentPackages = onCall(
                 loadedBy: name,
                 splitFromPackageId: getPackageIdentity(pkg),
                 status: shouldPromoteReadyForDelivery
-                  ? "OUT_FOR_DELIVERY"
-                  : "LOADED",
+                  ? PACKAGE_STATUS.OUT_FOR_DELIVERY
+                  : isDeliveryTrip
+                    ? resolveDeliveryVehicleLoadedStatus()
+                    : resolveLinehaulLoadedStatus(),
                 updatedAt: nowIso,
                 updatedBy: name,
                 remarks: remarks || pkg.remarks || null,
@@ -826,16 +823,30 @@ exports.updateShipmentPackages = onCall(
             remarks: remarks || pkg.remarks || null,
           };
 
-          const derivedStatus =
+          let derivedStatus =
             newStatus === "OUT_FOR_DELIVERY"
               ? "OUT_FOR_DELIVERY"
               : shouldPromoteReadyForDelivery
                 ? "OUT_FOR_DELIVERY"
                 : derivePackageStatus(updatedPkg);
 
+          if (newStatus === "DELIVERED" && isDeliveryTrip) {
+            derivedStatus = "DELIVERED";
+          }
+
           finalPackages.push({
             ...updatedPkg,
             status: derivedStatus,
+            ...(newStatus === "DELIVERED" && isDeliveryTrip
+              ? {
+                  loadedQty: 0,
+                  custodyOwnerType: "CUSTOMER",
+                  custodyOwnerId: null,
+                  deliveredAt: nowIso,
+                  deliveredByCheckerId: actorUid,
+                  deliveredByCheckerName: name,
+                }
+              : {}),
           });
         });
 
@@ -868,7 +879,11 @@ exports.updateShipmentPackages = onCall(
       const newDamagedQty = sumDamagedQty(finalPackages);
 
       const pendingQty = Math.max(
-        newTotalQty - newLoadedQty - newMissingQty - newDamagedQty,
+        newTotalQty -
+          newLoadedQty -
+          newReceivedQty -
+          newMissingQty -
+          newDamagedQty,
         0,
       );
       const totalRows = finalPackages.length;
@@ -879,7 +894,11 @@ exports.updateShipmentPackages = onCall(
       const deltaMissingQty = newMissingQty - oldMissingQty;
       const deltaDamagedQty = newDamagedQty - oldDamagedQty;
       const oldPendingQty = Math.max(
-        oldTotalQty - oldLoadedQty - oldMissingQty - oldDamagedQty,
+        oldTotalQty -
+          oldLoadedQty -
+          oldReceivedQty -
+          oldMissingQty -
+          oldDamagedQty,
         0,
       );
       const deltaPendingQty = pendingQty - oldPendingQty;
@@ -898,6 +917,7 @@ exports.updateShipmentPackages = onCall(
           newTotalQty > 0,
         previousStatus: oldShipmentStatus,
       });
+      const packageBreakdown = computePackageBreakdown(finalPackages);
 
       const packageBarcodes = finalPackages
         .map((pkg) => getPackageIdentity(pkg))
@@ -946,7 +966,11 @@ exports.updateShipmentPackages = onCall(
       const tripMissingQty = sumMissingQty(tripPackages);
       const tripDamagedQty = sumDamagedQty(tripPackages);
       const tripPendingQty = Math.max(
-        tripTotalQty - tripLoadedQty - tripMissingQty - tripDamagedQty,
+        tripTotalQty -
+          tripLoadedQty -
+          tripReceivedQty -
+          tripMissingQty -
+          tripDamagedQty,
         0,
       );
 
@@ -959,6 +983,7 @@ exports.updateShipmentPackages = onCall(
         currentTripIds: activeTripIds,
         currentTripId: singleCurrentTripId,
         status: shipmentStatus,
+        packageBreakdown,
 
         "totals.totalItems": totalRows, // row count only
         "totals.totalContentQty": newTotalQty, // actual quantity
@@ -972,6 +997,13 @@ exports.updateShipmentPackages = onCall(
         updatedAt: nowServer,
         updatedBy: name,
         ...(location ? { lastLocation: location } : {}),
+        ...(shipmentStatus === "COMPLETED"
+          ? {
+              availableForDelivery: false,
+              currentLocationState: "DELIVERED",
+              completedAt: nowServer,
+            }
+          : {}),
         statusHistory: FieldValue.arrayUnion({
           status: shipmentStatus,
           at: new Date(),
@@ -982,6 +1014,22 @@ exports.updateShipmentPackages = onCall(
           location: location || null,
         }),
       });
+
+      if (shipmentStatus === "COMPLETED") {
+        const manifestId = String(oldData.deliveryManifestId || "").trim();
+        if (manifestId) {
+          tx.set(
+            db.collection("delivery_manifests").doc(manifestId),
+            {
+              status: "COMPLETED",
+              completedAt: nowServer,
+              updatedAt: nowServer,
+              updatedBy: name,
+            },
+            { merge: true },
+          );
+        }
+      }
 
       if (tripId && tripRef && tripShipmentRef) {
         const oldTripShipment = tripShipmentSnap?.exists
@@ -1032,8 +1080,10 @@ exports.updateShipmentPackages = onCall(
 
         if (deltaTripReceivedQty !== 0) {
           tripUpdate.totalArrived = FieldValue.increment(deltaTripReceivedQty);
-          tripUpdate.totalDelivered =
-            FieldValue.increment(deltaTripReceivedQty);
+          if (isDeliveryTrip) {
+            tripUpdate.totalDelivered =
+              FieldValue.increment(deltaTripReceivedQty);
+          }
         }
 
         if (deltaTripMissingQty !== 0) {
@@ -1048,6 +1098,8 @@ exports.updateShipmentPackages = onCall(
           tripUpdate.itemPending = FieldValue.increment(deltaTripPendingQty);
         }
 
+        completedTripId = tripId;
+        shouldTryAutoCompleteTrip = true;
         tx.update(tripRef, tripUpdate);
       }
 
@@ -1120,6 +1172,9 @@ exports.updateShipmentPackages = onCall(
             remarks: remarks || null,
             source: isScannerUpdate ? "SCANNER" : "WEB_MODAL",
           };
+        }
+      }
+
       if (
         isScannerUpdate &&
         shipmentStatus &&
@@ -1144,6 +1199,19 @@ exports.updateShipmentPackages = onCall(
         }
       }
     });
+
+    if (completedTripId && shouldTryAutoCompleteTrip) {
+      try {
+        await tryAutoCompleteTrip(completedTripId, {
+          actorId: uid || authUid,
+          actorName: name,
+          actorRole: role,
+          source: "UPDATE_SHIPMENT_PACKAGES",
+        });
+      } catch (autoCompleteError) {
+        console.error("Auto-complete trip failed:", autoCompleteError);
+      }
+    }
 
     if (pendingEvent) {
       try {

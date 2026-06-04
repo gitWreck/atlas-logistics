@@ -7,6 +7,7 @@ import {
   faTrafficLight,
   faExclamationTriangle,
 } from "@fortawesome/free-solid-svg-icons";
+import { getPackageStatusLabel } from "@/app/utility/packageStatus";
 
 // Map reasons to specific icons
 const delayIcons = {
@@ -49,6 +50,26 @@ export default function StatusBadge({ status, reason, isDark = true }) {
     OUT_FOR_DELIVERY: "bg-purple-500/10 text-purple-400 border-purple-500/20",
     PARTIALLY_DELIVERED:
       "bg-teal-500/10 text-teal-400 border-teal-500/20",
+    PARTIALLY_IN_TRANSIT:
+      "bg-blue-500/10 text-blue-300 border-blue-500/20",
+    PARTIALLY_ARRIVED:
+      "bg-indigo-500/10 text-indigo-300 border-indigo-500/20",
+    PARTIALLY_AVAILABLE_FOR_DELIVERY:
+      "bg-sky-500/10 text-sky-300 border-sky-500/20",
+    AVAILABLE_FOR_DELIVERY:
+      "bg-sky-500/10 text-sky-300 border-sky-500/20",
+    AVAILABLE_AT_ODIONGAN_WAREHOUSE:
+      "bg-cyan-500/10 text-cyan-300 border-cyan-500/20",
+    RELEASED_FOR_DELIVERY:
+      "bg-sky-500/10 text-sky-400 border-sky-500/20",
+    RECEIVED_AT_DIVISORIA:
+      "bg-cyan-500/10 text-cyan-400 border-cyan-500/20",
+    LOADED_TO_TRIP:
+      "bg-orange-500/10 text-orange-300 border-orange-500/20",
+    ARRIVED_AT_ODIONGAN:
+      "bg-indigo-500/10 text-indigo-400 border-indigo-500/20",
+    LOADED_TO_DELIVERY_VEHICLE:
+      "bg-purple-500/10 text-purple-300 border-purple-500/20",
 
     // DELAYED is amber
     DELAYED: "bg-amber-500/10 text-amber-400 border-amber-500/20",
@@ -86,6 +107,26 @@ export default function StatusBadge({ status, reason, isDark = true }) {
     OUT_FOR_DELIVERY: "bg-purple-500/15 text-purple-600 border-purple-400/40",
     PARTIALLY_DELIVERED:
       "bg-teal-500/15 text-teal-600 border-teal-400/40",
+    PARTIALLY_IN_TRANSIT:
+      "bg-blue-500/15 text-blue-600 border-blue-400/40",
+    PARTIALLY_ARRIVED:
+      "bg-indigo-500/15 text-indigo-600 border-indigo-400/40",
+    PARTIALLY_AVAILABLE_FOR_DELIVERY:
+      "bg-sky-500/15 text-sky-600 border-sky-400/40",
+    AVAILABLE_FOR_DELIVERY:
+      "bg-sky-500/15 text-sky-600 border-sky-400/40",
+    AVAILABLE_AT_ODIONGAN_WAREHOUSE:
+      "bg-cyan-500/15 text-cyan-600 border-cyan-400/40",
+    RELEASED_FOR_DELIVERY:
+      "bg-sky-500/15 text-sky-700 border-sky-400/40",
+    RECEIVED_AT_DIVISORIA:
+      "bg-cyan-500/15 text-cyan-600 border-cyan-400/40",
+    LOADED_TO_TRIP:
+      "bg-orange-500/15 text-orange-600 border-orange-400/40",
+    ARRIVED_AT_ODIONGAN:
+      "bg-indigo-500/15 text-indigo-600 border-indigo-400/40",
+    LOADED_TO_DELIVERY_VEHICLE:
+      "bg-purple-500/15 text-purple-600 border-purple-400/40",
 
     DELAYED: "bg-amber-500/15 text-amber-700 border-amber-400/40",
     DELIVERED: "bg-emerald-500/15 text-emerald-600 border-emerald-400/40",
@@ -121,7 +162,7 @@ export default function StatusBadge({ status, reason, isDark = true }) {
           {reason.replace(/_/g, " ")}
         </>
       ) : (
-        normalizedStatus.replace(/_/g, " ")
+        getPackageStatusLabel(normalizedStatus)
       )}
     </span>
   );

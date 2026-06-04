@@ -55,6 +55,7 @@ import {
   clampSheetHeight,
   DEFAULT_DETAILS_SHEET_HEIGHT,
   getDefaultScanStatus,
+  isIssueStatus,
   getLatestTypeLabel,
   getModeLabel,
   getProgressLabel,

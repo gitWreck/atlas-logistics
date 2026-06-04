@@ -5,6 +5,11 @@ const {
   getPackageIdentity,
   isTerminalPiece,
 } = require("../warehouse/packageDeliveryOperations");
+const {
+  isReleasedForDeliveryPool,
+  PACKAGE_STATUS,
+  WAREHOUSE_POOL_STATUSES,
+} = require("../packages/packageStatus");
 
 const DELIVERABLE_PIECE_STATUSES = new Set([
   "OUT_FOR_DELIVERY",
@@ -142,7 +147,8 @@ function explainCheckerReturnFailure(
 
     if (!isCheckerOwnedPiece(pkg, checkerUid, shipmentData)) {
       if (
-        pieceStatus === "AVAILABLE_AT_WAREHOUSE" ||
+        WAREHOUSE_POOL_STATUSES.has(pieceStatus) ||
+        isReleasedForDeliveryPool(pkg) ||
         (shipmentData?.availableForDelivery === true &&
           !pkg.loadedByCheckerId &&
           String(pkg.custodyOwnerType || "").toUpperCase() === "WAREHOUSE")
@@ -280,7 +286,8 @@ function collectActiveCheckerIds(packages = []) {
     if (isTerminalPiece(pkg)) return;
     const status = String(pkg.status || "").trim().toUpperCase();
     if (
-      ["RETURNED_TO_WAREHOUSE", "AVAILABLE_AT_WAREHOUSE"].includes(status)
+      WAREHOUSE_POOL_STATUSES.has(status) ||
+      status === PACKAGE_STATUS.RETURNED_TO_WAREHOUSE
     ) {
       return;
     }

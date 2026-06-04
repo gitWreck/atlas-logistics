@@ -4,57 +4,47 @@ const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const admin = require("firebase-admin");
 const { requireAuth } = require("../utilities/helpers");
 const { logger } = require("firebase-functions");
+const { FieldValue } = require("firebase-admin/firestore");
+const {
+  PACKAGE_STATUS,
+  normalizePackageStatus,
+} = require("./packageStatus");
+const {
+  packageOnTrip,
+  packageEligibleForLinehaulLoad,
+  applyLinehaulLoad,
+  applyLinehaulUnloadAtHub,
+  buildShipmentSnapshot,
+  normalizePackageRow,
+} = require("./tripPackageOperations");
+const { tryAutoCompleteTrip } = require("../trips/autoCompleteTrip");
 
 if (!admin.apps.length) admin.initializeApp();
 const db = admin.firestore();
 
-/* ======================================================
-   HELPER: Count Logic (+1 / -1)
-   Updates the 'shipments' parent document totals
-====================================================== */
-function getCountUpdates(oldStatus, newStatus) {
-  const updates = {};
-  const increment = admin.firestore.FieldValue.increment;
+const LOADED_LIKE_STATUSES = new Set([
+  PACKAGE_STATUS.LOADED,
+  PACKAGE_STATUS.LOADED_TO_TRIP,
+  PACKAGE_STATUS.IN_TRANSIT,
+  PACKAGE_STATUS.PARTIALLY_LOADED,
+]);
 
-  // 1. SUBTRACT from Old Bucket
-  if (oldStatus === "PENDING") updates["totals.pending"] = increment(-1);
-  else if (oldStatus === "RECEIVED") updates["totals.received"] = increment(-1);
-  else if (oldStatus === "LOADED") updates["totals.loaded"] = increment(-1);
-  else if (oldStatus === "DELIVERED")
-    updates["totals.delivered"] = increment(-1);
-
-  // 2. ADD to New Bucket
-  if (newStatus === "LOADED") updates["totals.loaded"] = increment(1);
-  else if (newStatus === "DELIVERED")
-    updates["totals.delivered"] = increment(1);
-  else if (newStatus === "RECEIVED") updates["totals.received"] = increment(1);
-
-  return updates;
-}
-
-/* ======================================================
-   MAIN FUNCTION: SCAN PACKAGES
-   Accepts: { barcode: string, mode: "loading" | "delivering" }
-====================================================== */
 exports.scanPackages = onCall(
   { region: "asia-southeast1", maxInstances: 10 },
   async (req) => {
-    // 1. AUTH & ROLES
     const uid = await requireAuth(req);
     const userSnap = await db.collection("users").doc(uid).get();
-    const userRole = userSnap.data().role; // "checker", "driver", "admin"
+    const userRole = userSnap.data()?.role;
 
-    // 2. INPUT CLEANING
     const rawBarcode = req.data.barcode;
     const barcode = (rawBarcode || "").trim();
-    const mode = req.data.mode; // "loading" or "delivering"
-    const location = req.data.location || null; // Optional { lat, lng }
+    const mode = req.data.mode;
+    const location = req.data.location || null;
 
-    logger.info("🔍 SCAN START", { barcode, mode, user: uid, role: userRole });
+    logger.info("SCAN START", { barcode, mode, user: uid, role: userRole });
 
     if (!barcode) throw new HttpsError("invalid-argument", "Barcode required");
 
-    // 3. VALIDATION & PERMISSIONS
     if (!["loading", "delivering"].includes(mode)) {
       throw new HttpsError(
         "invalid-argument",
@@ -63,21 +53,16 @@ exports.scanPackages = onCall(
     }
 
     if (mode === "loading") {
-      // ⛔️ ONLY CHECKERS CAN LOAD (Drivers cannot mark items as loaded onto their own truck)
       if (userRole !== "checker" && userRole !== "admin") {
         throw new HttpsError(
           "permission-denied",
           "Only Checkers can Load items onto the truck.",
         );
       }
-    } else if (mode === "delivering") {
-      // ✅ BOTH CAN DELIVER (Offload)
-      if (!["checker", "driver", "admin"].includes(userRole)) {
-        throw new HttpsError("permission-denied", "Unauthorized role.");
-      }
+    } else if (!["checker", "driver", "admin"].includes(userRole)) {
+      throw new HttpsError("permission-denied", "Unauthorized role.");
     }
 
-    // 4. FIND SHIPMENT
     const shipmentsRef = db.collection("shipments");
     const q = shipmentsRef
       .where("packageBarcodes", "array-contains", barcode)
@@ -91,7 +76,10 @@ exports.scanPackages = onCall(
     const shipmentDoc = querySnapshot.docs[0];
     const shipmentData = shipmentDoc.data();
     const shipmentId = shipmentDoc.id;
-    const tripId = shipmentData.currentTruckTripId;
+    const tripId =
+      shipmentData.currentTruckTripId ||
+      shipmentData.currentTripId ||
+      null;
 
     if (!tripId) {
       throw new HttpsError(
@@ -100,7 +88,6 @@ exports.scanPackages = onCall(
       );
     }
 
-    // 5. CHECK TRIP STATUS
     const tripRef = db.collection("truck_trips").doc(tripId);
     const tripSnap = await tripRef.get();
 
@@ -109,228 +96,241 @@ exports.scanPackages = onCall(
       throw new HttpsError("failed-precondition", "Trip is already COMPLETED.");
     }
 
-    // 6. FIND PACKAGE & VALIDATE
-    const targetPackage = shipmentData.packages.find(
+    const packages = Array.isArray(shipmentData.packages)
+      ? shipmentData.packages.map(normalizePackageRow)
+      : [];
+
+    const targetIndex = packages.findIndex(
       (p) => (p.packageId || p.trackingNumber) === barcode,
     );
-    if (!targetPackage)
+    if (targetIndex === -1) {
       throw new HttpsError(
         "not-found",
         "Package data missing inside shipment.",
       );
-
-    const oldStatus = targetPackage.status || "PENDING";
-    const newStatus = mode === "loading" ? "LOADED" : "DELIVERED";
-
-    // Prevent Redundant Scans
-    if (oldStatus === newStatus) {
-      throw new HttpsError(
-        "already-exists",
-        `Package is already ${newStatus}.`,
-      );
     }
 
-    // 🛡️ LOGIC GUARD: Can't deliver if not loaded
-    if (mode === "delivering" && oldStatus !== "LOADED") {
+    const targetPackage = packages[targetIndex];
+    const oldStatus = normalizePackageStatus(targetPackage);
+
+    if (mode === "loading") {
+      if (!packageEligibleForLinehaulLoad(targetPackage)) {
+        throw new HttpsError(
+          "failed-precondition",
+          "Package is not eligible to load on this trip.",
+        );
+      }
+    } else if (!LOADED_LIKE_STATUSES.has(oldStatus) && !packageOnTrip(targetPackage, tripId)) {
       throw new HttpsError(
         "failed-precondition",
-        "Package must be LOADED before it can be DELIVERED.",
+        "Package must be loaded on this trip before it can be offloaded.",
       );
     }
 
-    // ======================================================
-    // PREPARE BATCH UPDATES
-    // ======================================================
-    const batch = db.batch();
-    const timestamp = admin.firestore.FieldValue.serverTimestamp();
     const isoDate = new Date().toISOString();
+    const timestamp = FieldValue.serverTimestamp();
+    const actorName = userSnap.data()?.name || uid;
 
-    // A. Update Shipment (Packages Array)
-    const newLogEntry = {
-      action: newStatus,
-      by: uid,
-      at: isoDate,
-      tripId: tripId,
-      location: location || null,
-    };
+    const result = await db.runTransaction(async (tx) => {
+      const freshSnap = await tx.get(shipmentDoc.ref);
+      const freshData = freshSnap.data() || {};
+      const beforePackages = Array.isArray(freshData.packages)
+        ? freshData.packages.map(normalizePackageRow)
+        : [];
 
-    const updatedPackages = shipmentData.packages.map((pkg) => {
-      if ((pkg.packageId || pkg.trackingNumber) === barcode) {
-        return {
-          ...pkg,
-          status: newStatus,
-          loadedAt: mode === "loading" ? isoDate : pkg.loadedAt,
-          deliveredAt:
-            mode === "delivering" ? isoDate : pkg.deliveredAt || null,
-          loadedBy: mode === "loading" ? uid : pkg.loadedBy,
-          deliveredBy: mode === "delivering" ? uid : pkg.deliveredBy || null,
-          loadedOnTrip: mode === "loading" ? tripId : pkg.loadedOnTrip,
-          audit_log: [...(pkg.audit_log || []), newLogEntry],
+      const idx = beforePackages.findIndex(
+        (p) => (p.packageId || p.trackingNumber) === barcode,
+      );
+      if (idx === -1) {
+        throw new HttpsError("not-found", "Package no longer on shipment.");
+      }
+
+      const pkg = beforePackages[idx];
+      const previousStatus = normalizePackageStatus(pkg);
+
+      let nextPkg = pkg;
+      if (mode === "loading") {
+        if (!packageEligibleForLinehaulLoad(pkg)) {
+          throw new HttpsError(
+            "already-exists",
+            "Package is already loaded or not eligible.",
+          );
+        }
+        nextPkg = applyLinehaulLoad(pkg, {
+          tripId,
+          actorName,
+          nowIso: isoDate,
+        });
+      } else {
+        if (
+          !LOADED_LIKE_STATUSES.has(previousStatus) &&
+          !packageOnTrip(pkg, tripId)
+        ) {
+          throw new HttpsError(
+            "failed-precondition",
+            "Package must be loaded on this trip before offload.",
+          );
+        }
+        nextPkg = applyLinehaulUnloadAtHub(pkg, { tripId, nowIso: isoDate });
+        nextPkg = {
+          ...nextPkg,
+          deliveredBy: uid,
+          audit_log: [
+            ...(pkg.audit_log || []),
+            {
+              action: "OFFLOAD_AT_HUB",
+              by: uid,
+              at: isoDate,
+              tripId,
+              location,
+            },
+          ],
         };
       }
-      return pkg;
-    });
 
-    // Update Shipment Totals
-    const totalUpdates = getCountUpdates(oldStatus, newStatus);
-
-    batch.update(shipmentDoc.ref, {
-      packages: updatedPackages,
-      updatedAt: timestamp,
-      updatedBy: uid,
-      ...totalUpdates,
-      ...(location ? { lastLocation: location } : {}),
-    });
-
-    // B. Update Trip Shipment (Manifest Logic)
-    const tripShipmentRef = tripRef
-      .collection("trip_shipments")
-      .doc(shipmentId);
-    const increment = admin.firestore.FieldValue.increment;
-
-    let manifestUpdate = {};
-    if (mode === "loading") {
-      manifestUpdate = {
-        pendingCount: increment(-1),
-        loadedCount: increment(1),
-      };
-    } else if (mode === "delivering") {
-      manifestUpdate = {
-        loadedCount: increment(-1),
-        deliveredCount: increment(1),
-      };
-    }
-
-    // C. Update Root Trip (Dashboard Stats)
-    let tripUpdate = {};
-    if (mode === "loading") {
-      tripUpdate = {
-        itemPending: increment(-1),
-        totalLoaded: increment(1),
-      };
-      if (
-        tripSnap.data().status === "ASSIGNED" ||
-        tripSnap.data().status === "CREATED"
-      ) {
-        tripUpdate.status = "LOADING";
+      if (normalizePackageStatus(nextPkg) === previousStatus) {
+        throw new HttpsError(
+          "already-exists",
+          `Package is already ${previousStatus}.`,
+        );
       }
-    } else if (mode === "delivering") {
-      tripUpdate = {
-        totalLoaded: increment(-1),
-        totalDelivered: increment(1),
-      };
-    }
 
-    batch.update(tripRef, {
-      ...tripUpdate,
-      updatedAt: timestamp,
-    });
+      const updatedPackages = [...beforePackages];
+      updatedPackages[idx] = nextPkg;
 
-    // D. Global Audit Log
-    const auditRef = db.collection("audit_logs").doc();
-    batch.set(auditRef, {
-      action: "SCAN_ITEM",
-      subAction: mode.toUpperCase(),
-      trackingNumber: barcode,
-      packageId: barcode,
-      shipmentId: shipmentId,
-      tripId: tripId,
-      performedBy: uid,
-      timestamp: timestamp,
-      details: { previousStatus: oldStatus, newStatus: newStatus },
-    });
-
-    // ======================================================
-    // E. STATUS AUTOMATION (Auto-Update Text Status)
-    // ======================================================
-
-    // 1. SHIPMENT STATUS
-    const currentLoaded =
-      (shipmentData.totals.loaded || 0) + (mode === "loading" ? 1 : -1);
-    const currentDelivered =
-      (shipmentData.totals.delivered || 0) + (mode === "delivering" ? 1 : 0);
-    const totalItems = shipmentData.totals.totalItems;
-
-    if (
-      mode === "loading" &&
-      currentLoaded > 0 &&
-      shipmentData.status !== "IN_TRANSIT"
-    ) {
-      // 🚛 Start moving
-      const historyEntry = {
-        status: "IN_TRANSIT",
-        at: new Date(),
-        by: uid,
-        note: "Auto-marked IN_TRANSIT via scan",
-        location: location || null,
-      };
-
-      batch.update(shipmentDoc.ref, {
-        status: "IN_TRANSIT",
-        updatedAt: timestamp,
-        statusHistory: admin.firestore.FieldValue.arrayUnion(historyEntry),
-        ...(location ? { lastLocation: location } : {}),
+      const snapshot = buildShipmentSnapshot(updatedPackages, {
+        previousStatus: freshData.status,
       });
-    } else if (mode === "delivering" && currentDelivered >= totalItems) {
-      // ✅ Finished
-      const historyEntry = {
-        status: "COMPLETED",
-        at: new Date(),
-        by: uid,
-        note: "Auto-marked COMPLETED via scan",
-        location: location || null,
-      };
 
-      batch.update(shipmentDoc.ref, {
-        status: "COMPLETED",
-        updatedAt: timestamp,
-        statusHistory: admin.firestore.FieldValue.arrayUnion(historyEntry),
-        ...(location ? { lastLocation: location } : {}),
-      });
-    }
+      const newPackageStatus = normalizePackageStatus(nextPkg);
 
-    // 2. TRIP SHIPMENT STATUS (Manifest)
-    const tsSnap = await tripShipmentRef.get();
-    const tsData = tsSnap.exists
-      ? tsSnap.data()
-      : { loadedCount: 0, deliveredCount: 0, totalItems: totalItems };
-
-    const tsLoaded = (tsData.loadedCount || 0) + (mode === "loading" ? 1 : -1);
-    const tsDelivered =
-      (tsData.deliveredCount || 0) + (mode === "delivering" ? 1 : 0);
-
-    let newManifestStatus = tsData.status || "ASSIGNED";
-
-    if (mode === "loading") {
-      if (tsLoaded >= tsData.totalItems) newManifestStatus = "LOADED";
-      else if (tsLoaded > 0) newManifestStatus = "LOADING";
-    }
-
-    if (mode === "delivering") {
-      if (tsDelivered >= tsData.totalItems) newManifestStatus = "COMPLETED";
-      else if (tsDelivered > 0) newManifestStatus = "UNLOADING";
-    }
-
-    batch.set(
-      tripShipmentRef,
-      {
-        ...manifestUpdate, // Include counts here to ensure atomic set
-        status: newManifestStatus,
+      tx.update(shipmentDoc.ref, {
+        status: snapshot.status,
+        packages: snapshot.packages,
+        packageBreakdown: snapshot.packageBreakdown,
+        currentTripIds: snapshot.currentTripIds,
+        currentTripId: snapshot.currentTripId,
+        "totals.totalItems": snapshot.totals.totalItems,
+        "totals.totalContentQty": snapshot.totals.totalContentQty,
+        "totals.loaded": snapshot.totals.loaded,
+        "totals.pending": snapshot.totals.pending,
+        "totals.received": snapshot.totals.received,
+        "totals.delivered": snapshot.totals.delivered,
+        "totals.missing": snapshot.totals.missing,
+        "totals.damaged": snapshot.totals.damaged,
         updatedAt: timestamp,
         updatedBy: uid,
-      },
-      { merge: true },
-    );
+        ...(location ? { lastLocation: location } : {}),
+        statusHistory: FieldValue.arrayUnion({
+          status: snapshot.status,
+          at: new Date(),
+          by: uid,
+          note:
+            mode === "loading"
+              ? `Package ${barcode} loaded to trip ${tripId}.`
+              : `Package ${barcode} offloaded at hub from trip ${tripId}.`,
+          location: location || null,
+        }),
+      });
 
-    // ======================================================
-    // COMMIT
-    // ======================================================
-    await batch.commit();
+      const tripShipmentRef = tripRef.collection("trip_shipments").doc(shipmentId);
+      const tripShipmentSnap = await tx.get(tripShipmentRef);
+      const tripShipmentData = tripShipmentSnap.exists
+        ? tripShipmentSnap.data() || {}
+        : { totalItems: snapshot.totals.totalContentQty };
+
+      const increment = FieldValue.increment;
+      const manifestUpdate =
+        mode === "loading"
+          ? { pendingCount: increment(-1), loadedCount: increment(1) }
+          : { loadedCount: increment(-1), deliveredCount: increment(1) };
+
+      const tsLoaded = (tripShipmentData.loadedCount || 0) + (mode === "loading" ? 1 : -1);
+      const tsDelivered =
+        (tripShipmentData.deliveredCount || 0) + (mode === "delivering" ? 1 : 0);
+      const tsTotal = tripShipmentData.totalItems || snapshot.totals.totalContentQty;
+
+      let newManifestStatus = tripShipmentData.status || "ASSIGNED";
+      if (mode === "loading") {
+        if (tsLoaded >= tsTotal) newManifestStatus = "LOADED";
+        else if (tsLoaded > 0) newManifestStatus = "LOADING";
+      } else if (tsDelivered >= tsTotal) {
+        newManifestStatus = "COMPLETED";
+      } else if (tsDelivered > 0) {
+        newManifestStatus = "UNLOADING";
+      }
+
+      tx.set(
+        tripShipmentRef,
+        {
+          ...manifestUpdate,
+          status: newManifestStatus,
+          updatedAt: timestamp,
+          updatedBy: uid,
+        },
+        { merge: true },
+      );
+
+      const tripUpdate = {
+        updatedAt: timestamp,
+      };
+      if (mode === "loading") {
+        tripUpdate.itemPending = increment(-1);
+        tripUpdate.totalLoaded = increment(1);
+        if (["ASSIGNED", "CREATED"].includes(tripSnap.data().status)) {
+          tripUpdate.status = "LOADING";
+        }
+      } else {
+        tripUpdate.totalArrived = increment(1);
+        const tripStatus = String(tripSnap.data().status || "").toUpperCase();
+        if (["IN_TRANSIT", "LOADED", "ARRIVED"].includes(tripStatus)) {
+          tripUpdate.status = "UNLOADING";
+        }
+      }
+
+      tx.update(tripRef, tripUpdate);
+
+      const auditRef = db.collection("audit_logs").doc();
+      tx.set(auditRef, {
+        action: "SCAN_ITEM",
+        subAction: mode.toUpperCase(),
+        trackingNumber: barcode,
+        packageId: barcode,
+        shipmentId,
+        tripId,
+        performedBy: uid,
+        timestamp,
+        details: {
+          previousStatus,
+          newStatus: newPackageStatus,
+          shipmentStatus: snapshot.status,
+        },
+      });
+
+      return {
+        previousStatus,
+        newStatus: newPackageStatus,
+        shipmentStatus: snapshot.status,
+        tripType: tripSnap.data()?.tripType || null,
+      };
+    });
+
+    try {
+      await tryAutoCompleteTrip(tripId, {
+        actorId: uid,
+        actorName,
+        actorRole: userRole,
+        source: "SCAN_PACKAGES",
+      });
+    } catch (autoCompleteError) {
+      console.error("Auto-complete trip failed:", autoCompleteError);
+    }
 
     return {
       success: true,
-      message: `${newStatus}: ${barcode}`,
-      previousStatus: oldStatus,
+      message: `${result.newStatus}: ${barcode}`,
+      previousStatus: result.previousStatus,
+      shipmentStatus: result.shipmentStatus,
     };
   },
 );

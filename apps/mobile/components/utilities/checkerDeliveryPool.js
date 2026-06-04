@@ -7,10 +7,19 @@ const DELIVERY_POOL_MASTER_STATUSES = new Set([
   "AVAILABLE_FOR_DELIVERY",
   "PARTIALLY_DELIVERED",
   "PARTIALLY_AVAILABLE_FOR_DELIVERY",
+  "PARTIALLY_LOADED",
+  "LOADED",
+  "READY_FOR_DELIVERY",
+  "OUT_FOR_DELIVERY",
   "RECONCILED",
   "UNLOADED",
   "ARRIVED",
+  "PARTIALLY_IN_TRANSIT",
+  "PARTIALLY_ARRIVED",
+  "RETURNED_RECEIVED_AT_ODIONGAN",
   "RETURNED_RECEIVED_AT_HUB",
+  "FAILED_DELIVERY",
+  "COMPLETED",
 ]);
 
 /**
@@ -40,7 +49,8 @@ function isAvailableAtWarehouse(pkg = {}, shipment = {}) {
   }
   if (
     status === "RETURNED_TO_WAREHOUSE" ||
-    status === "RETURNED_RECEIVED_AT_HUB"
+    status === "RETURNED_RECEIVED_AT_HUB" ||
+    status === "RETURNED_RECEIVED_AT_ODIONGAN"
   ) {
     return false;
   }
@@ -49,6 +59,14 @@ function isAvailableAtWarehouse(pkg = {}, shipment = {}) {
   }
   if (pkg.availableForDelivery === true && poolReleased) return true;
   if (status === "AVAILABLE_AT_WAREHOUSE" && poolReleased) return true;
+  if (
+    ["AVAILABLE_AT_ODIONGAN_WAREHOUSE", "RELEASED_FOR_DELIVERY"].includes(
+      status,
+    ) &&
+    poolReleased
+  ) {
+    return true;
+  }
   const custody = normalizeStatus(pkg.custodyOwnerType);
   if (custody === "WAREHOUSE" && !pkg.loadedByCheckerId && poolReleased) {
     return true;
