@@ -14,7 +14,7 @@ const {
   DEFAULT_WAREHOUSE_CODE,
   mapPackagesForDeliveryRelease,
 } = require("./packageDeliveryOperations");
-const { deriveMasterShipmentStatus } = require("../packages/shipmentStatus");
+const { deriveMasterShipmentStatus, computePackageBreakdown } = require("../packages/shipmentStatus");
 const { assertTripReleaseEligible } = require("../trips/tripLifecycle");
 
 if (!admin.apps.length) admin.initializeApp();
@@ -149,6 +149,7 @@ exports.releaseForDeliveryOperations = onCall(
         const shipmentStatus = deriveMasterShipmentStatus(updatedPackages, {
           previousStatus: data.status,
         });
+        const packageBreakdown = computePackageBreakdown(updatedPackages);
 
         const effectiveStatus =
           shipmentStatus === "RECEIVED"
@@ -157,6 +158,7 @@ exports.releaseForDeliveryOperations = onCall(
 
         tx.update(shipmentRefs[index], {
           packages: updatedPackages,
+          packageBreakdown,
           availableForDelivery: true,
           availableForDeliveryAt: now,
           availableForDeliveryBy: actorName || actorUid || null,

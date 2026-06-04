@@ -70,10 +70,12 @@ export const disableTruckTrip = httpsCallable(functions, "disableTruckTrip");
 export const setTruckDelay = httpsCallable(functions, "setTruckDelay");
 export const clearTruckDelay = httpsCallable(functions, "clearTruckDelay");
 export const updateTripStatus = httpsCallable(functions, "updateTripStatus");
+/** @deprecated Use releaseForDeliveryOperations after trip ARRIVED (pool model). */
 export const finalizeTripUnloadHandoff = httpsCallable(
   functions,
   "finalizeTripUnloadHandoff",
 );
+/** @deprecated Use releaseForDeliveryOperations after trip ARRIVED (pool model). */
 export const finalizeTripUnloadReadyForDelivery = httpsCallable(
   functions,
   "finalizeTripUnloadReadyForDelivery",

@@ -8,7 +8,7 @@
  *
  * Automatic promotions (Steps 1.2+):
  *   - ARRIVED: reconciliation ready (all manifest rows accounted at Odiongan)
- *   - COMPLETED: optional — all trip_shipments off truck / hub receive complete
+ *   - COMPLETED: when every manifest shipment is fully delivered (not hub unload)
  */
 
 const TRIP_STATUSES = Object.freeze({
@@ -47,20 +47,28 @@ const AUTO_PROMOTE_TO_ARRIVED_FROM = new Set([
   TRIP_STATUSES.ARRIVED,
 ]);
 
-/** Statuses that may auto-promote to COMPLETED (optional rule). */
+/** Statuses that may auto-promote to COMPLETED when all shipments are delivered. */
 const AUTO_PROMOTE_TO_COMPLETED_FROM = new Set([
   TRIP_STATUSES.ARRIVED,
   TRIP_STATUSES.IN_TRANSIT,
   TRIP_STATUSES.OUT_FOR_DELIVERY,
+  TRIP_STATUSES.LOADED,
+  "UNLOADING",
+]);
+
+const DELIVERED_TRIP_SHIPMENT_STATUSES = new Set([
+  "COMPLETED",
+  "DELIVERED",
+  "DELIVERED_COMPLETE",
 ]);
 
 /** Trip statuses that allow last-mile pool release (Step 1.4). */
-const RELEASE_ELIGIBLE_TRIP_STATUSES = new Set([
-  TRIP_STATUSES.ARRIVED,
-]);
+const RELEASE_ELIGIBLE_TRIP_STATUSES = new Set([TRIP_STATUSES.ARRIVED]);
 
 function normalizeTripStatus(status) {
-  return String(status || "").trim().toUpperCase();
+  return String(status || "")
+    .trim()
+    .toUpperCase();
 }
 
 function lifecycleIndex(status) {
@@ -192,7 +200,26 @@ function evaluateTripShipmentRow(tripShipment = {}) {
 }
 
 /**
- * Optional: promote to COMPLETED when nothing left on truck for this trip.
+ * Whether a manifest row represents a fully delivered shipment (not hub receive).
+ */
+function isTripShipmentDelivered(row = {}) {
+  const loadedCount = toNumber(row.loadedCount, 0);
+  const totalItems = toNumber(row.totalItems, 0);
+  const status = normalizeTripStatus(row.status);
+  const shipmentStatus = normalizeTripStatus(row.shipmentStatus);
+
+  if (totalItems <= 0) return false;
+  if (loadedCount > 0) return false;
+
+  if (DELIVERED_TRIP_SHIPMENT_STATUSES.has(status)) return true;
+  if (DELIVERED_TRIP_SHIPMENT_STATUSES.has(shipmentStatus)) return true;
+  if (row.allPackagesDelivered === true) return true;
+
+  return false;
+}
+
+/**
+ * Promote to COMPLETED when every manifest shipment is fully processed.
  */
 function shouldPromoteTripToCompleted(trip = {}, tripShipmentRows = []) {
   const currentStatus = normalizeTripStatus(trip.status);
@@ -226,25 +253,25 @@ function shouldPromoteTripToCompleted(trip = {}, tripShipmentRows = []) {
     };
   }
 
-  const stillOnTruck = rows.filter(
-    (row) => evaluateTripShipmentRow(row).pendingOnTruck,
-  );
+  const incompleteRows = rows.filter((row) => !isTripShipmentDelivered(row));
 
-  if (stillOnTruck.length > 0) {
+  if (incompleteRows.length > 0) {
     return {
       promote: false,
-      reason: "SHIPMENTS_STILL_ON_TRUCK",
+      reason: "SHIPMENTS_NOT_ALL_DELIVERED",
       currentStatus,
       nextStatus: null,
-      pendingOnTruckCount: stillOnTruck.length,
+      incompleteShipmentCount: incompleteRows.length,
+      message: `${incompleteRows.length} shipment(s) on this trip are not fully delivered yet.`,
     };
   }
 
   return {
     promote: true,
-    reason: "ALL_SHIPMENTS_UNLOADED",
+    reason: "ALL_SHIPMENTS_DELIVERED",
     currentStatus,
     nextStatus: TRIP_STATUSES.COMPLETED,
+    message: "All trip shipments are delivered. Trip marked COMPLETED.",
   };
 }
 
@@ -327,9 +354,11 @@ function getTripStatusSideEffects(nextStatus, options = {}) {
   }
 
   if (
-    [TRIP_STATUSES.CREATED, TRIP_STATUSES.LOADED, TRIP_STATUSES.IN_TRANSIT].includes(
-      status,
-    )
+    [
+      TRIP_STATUSES.CREATED,
+      TRIP_STATUSES.LOADED,
+      TRIP_STATUSES.IN_TRANSIT,
+    ].includes(status)
   ) {
     effects.setActive = true;
   }
@@ -340,7 +369,10 @@ function getTripStatusSideEffects(nextStatus, options = {}) {
 /**
  * Combined lifecycle evaluation for handoff reconcile API / Step 1.2.
  */
-function evaluateTripLifecycleAfterReconciliation(trip = {}, reconciliationRows = []) {
+function evaluateTripLifecycleAfterReconciliation(
+  trip = {},
+  reconciliationRows = [],
+) {
   const reconciliation = evaluateReconciliationRows(reconciliationRows);
   const arrivedDecision = shouldPromoteTripToArrived(trip, reconciliation);
 
@@ -365,6 +397,7 @@ module.exports = {
   evaluateReconciliationRows,
   shouldPromoteTripToArrived,
   evaluateTripShipmentRow,
+  isTripShipmentDelivered,
   shouldPromoteTripToCompleted,
   isTripReleaseEligible,
   assertTripReleaseEligible,

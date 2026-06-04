@@ -27,6 +27,7 @@ import { getModalActionClasses } from "@/app/utility/constant/action";
 import { formatFirestoreDate } from "@/app/utility/utilities";
 import StatusBadge from "../../ui/StatusBadge";
 import TablePaginationFooter from "../../ui/TablePaginationFooter";
+import PackageBreakdownPanel from "./PackageBreakdownPanel";
 import {
   BASIC_PACKAGING_TYPES,
   INITIAL_PACKAGE_STATE,
@@ -449,6 +450,11 @@ export default function ViewPackagesModal({
                       />
                     </div>
                   </div>
+
+                  <PackageBreakdownPanel
+                    shipment={shipmentDetails}
+                    isDark={isDark}
+                  />
 
                   <div
                     className={`border rounded-2xl p-4 ${modalTheme.panelSurface}`}

@@ -37,7 +37,94 @@ const AUTO_PROMOTE_TO_ARRIVED_FROM = new Set([
   TRIP_STATUSES.ARRIVED,
 ]);
 
+const AUTO_PROMOTE_TO_COMPLETED_FROM = new Set([
+  TRIP_STATUSES.ARRIVED,
+  TRIP_STATUSES.IN_TRANSIT,
+  TRIP_STATUSES.OUT_FOR_DELIVERY,
+  TRIP_STATUSES.LOADED,
+  "UNLOADING",
+]);
+
+const DELIVERED_TRIP_SHIPMENT_STATUSES = new Set([
+  "COMPLETED",
+  "DELIVERED",
+  "DELIVERED_COMPLETE",
+]);
+
 const RELEASE_ELIGIBLE_TRIP_STATUSES = new Set([TRIP_STATUSES.ARRIVED]);
+
+function toNumber(value, fallback = 0) {
+  const num = Number(value);
+  return Number.isFinite(num) && num >= 0 ? num : fallback;
+}
+
+export function isTripShipmentDelivered(row = {}) {
+  const status = normalizeTripStatus(row.status);
+  const shipmentStatus = normalizeTripStatus(row.shipmentStatus);
+
+  if (DELIVERED_TRIP_SHIPMENT_STATUSES.has(status)) return true;
+  if (DELIVERED_TRIP_SHIPMENT_STATUSES.has(shipmentStatus)) return true;
+  if (row.allPackagesDelivered === true) return true;
+
+  const loadedCount = toNumber(row.loadedCount, 0);
+  const totalItems = toNumber(row.totalItems, 0);
+
+  if (totalItems <= 0) return false;
+  if (loadedCount > 0) return false;
+
+  return false;
+}
+
+export function shouldPromoteTripToCompleted(trip = {}, tripShipmentRows = []) {
+  const currentStatus = normalizeTripStatus(trip.status);
+  const rows = Array.isArray(tripShipmentRows) ? tripShipmentRows : [];
+
+  if (currentStatus === TRIP_STATUSES.COMPLETED) {
+    return {
+      promote: false,
+      reason: "ALREADY_COMPLETED",
+      currentStatus,
+      nextStatus: TRIP_STATUSES.COMPLETED,
+    };
+  }
+
+  if (!AUTO_PROMOTE_TO_COMPLETED_FROM.has(currentStatus)) {
+    return {
+      promote: false,
+      reason: "INVALID_STATUS_FOR_COMPLETED",
+      currentStatus,
+      nextStatus: null,
+    };
+  }
+
+  if (rows.length === 0) {
+    return {
+      promote: false,
+      reason: "NO_TRIP_SHIPMENTS",
+      currentStatus,
+      nextStatus: null,
+    };
+  }
+
+  const incompleteRows = rows.filter((row) => !isTripShipmentDelivered(row));
+
+  if (incompleteRows.length > 0) {
+    return {
+      promote: false,
+      reason: "SHIPMENTS_NOT_ALL_DELIVERED",
+      currentStatus,
+      nextStatus: null,
+      incompleteShipmentCount: incompleteRows.length,
+    };
+  }
+
+  return {
+    promote: true,
+    reason: "ALL_SHIPMENTS_DELIVERED",
+    currentStatus,
+    nextStatus: TRIP_STATUSES.COMPLETED,
+  };
+}
 
 export function normalizeTripStatus(status) {
   return String(status || "").trim().toUpperCase();

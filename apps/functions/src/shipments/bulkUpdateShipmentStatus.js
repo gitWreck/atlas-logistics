@@ -2,8 +2,19 @@
 
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const admin = require("firebase-admin");
-const { requireAuth, updatedBy } = require("../utilities/helpers");
+const { updatedBy } = require("../utilities/helpers");
 const { writeShipmentActionLog } = require("../utilities/shipmentLogger");
+const {
+  packageOnTrip,
+  applyLinehaulDelivered,
+  applyLinehaulUnloadAtHub,
+  buildShipmentSnapshot,
+  normalizePackageRow,
+  sumLoadedQty,
+  sumReceivedQty,
+  sumTotalQty,
+} = require("../packages/tripPackageOperations");
+const { tryAutoCompleteTrip } = require("../trips/autoCompleteTrip");
 
 if (!admin.apps.length) admin.initializeApp();
 const db = admin.firestore();
@@ -11,20 +22,14 @@ const db = admin.firestore();
 exports.bulkUpdateShipmentStatus = onCall(
   { region: "asia-southeast1", maxInstances: 10 },
   async (req) => {
-    // 1. AUTHENTICATION
-    // const uid = await requireAuth(req);
     const { tripId, shipmentIds, newStatus, location } = req.data || {};
 
-    // 2. VALIDATION
     if (!tripId || !shipmentIds || !Array.isArray(shipmentIds) || !newStatus) {
       throw new HttpsError("invalid-argument", "Missing required fields.");
     }
 
     const { uid, role, name } = updatedBy(req);
 
-    // Firestore Batch Limit is 500 operations.
-    // Each shipment uses ~3 ops (Shipment + TripShipment + Event).
-    // Safe limit is ~150 items.
     if (shipmentIds.length > 150) {
       throw new HttpsError(
         "invalid-argument",
@@ -36,33 +41,24 @@ exports.bulkUpdateShipmentStatus = onCall(
     const isoDate = new Date().toISOString();
     const batch = db.batch();
 
-    // Track Deltas for Parent Trip Counters
     let tripPendingDelta = 0;
     let tripLoadedDelta = 0;
     let tripDeliveredDelta = 0;
     let updateCount = 0;
 
-    // 3. FETCH CURRENT DATA (Parallel Read)
     const shipmentRefs = shipmentIds.map((id) =>
       db.collection("shipments").doc(id),
     );
     const snapshots = await db.getAll(...shipmentRefs);
 
-    // 4. PROCESS EACH SHIPMENT
     snapshots.forEach((doc) => {
       if (!doc.exists) return;
 
       const data = doc.data();
       const currentStatus = data.status || "PENDING";
 
-      // 🛡️ GUARD 1: Idempotency (Skip if no change)
-      if (currentStatus === newStatus) return;
-
-      // 🛡️ GUARD 2: Protect Final States
-      // Don't let a bulk action revert a Completed shipment back to something else
-      if (currentStatus === "COMPLETED" || currentStatus === "DELIVERED") {
-        return;
-      }
+      if (currentStatus === newStatus && newStatus !== "COMPLETED") return;
+      if (currentStatus === "COMPLETED") return;
 
       updateCount++;
       const shipmentRef = db.collection("shipments").doc(doc.id);
@@ -72,109 +68,112 @@ exports.bulkUpdateShipmentStatus = onCall(
         .collection("trip_shipments")
         .doc(doc.id);
 
-      // ====================================================
-      // SCENARIO A: FORCE DELIVERED / COMPLETED
-      // ====================================================
+      const oldPackages = Array.isArray(data.packages)
+        ? data.packages.map(normalizePackageRow)
+        : [];
+
+      const oldLoadedQty = sumLoadedQty(oldPackages);
+      const oldReceivedQty = sumReceivedQty(oldPackages);
+      const oldTotalQty = sumTotalQty(oldPackages);
+
+      let updatedPackages = oldPackages;
+
       if (newStatus === "DELIVERED" || newStatus === "COMPLETED") {
-        const totals = data.totals || {};
-        const currentPending = totals.pending || 0;
-        const currentLoaded = totals.loaded || 0;
-        const totalItems = totals.totalItems || 0;
+        updatedPackages = oldPackages.map((pkg) => {
+          if (!packageOnTrip(pkg, tripId)) return pkg;
+          return applyLinehaulDelivered(pkg, { tripId, nowIso: isoDate });
+        });
+      } else if (newStatus === "ARRIVED" || newStatus === "RECEIVED") {
+        updatedPackages = oldPackages.map((pkg) => {
+          if (!packageOnTrip(pkg, tripId)) return pkg;
+          return applyLinehaulUnloadAtHub(pkg, { tripId, nowIso: isoDate });
+        });
+      }
 
-        // 1. Calculate Deltas (Drain Pending/Loaded -> Fill Delivered)
-        // We subtract whatever is currently in the "Active" buckets
-        const pendingChange = -currentPending;
-        const loadedChange = -currentLoaded;
-        // We add whatever is needed to reach 100% delivered
-        const deliveredChange = totalItems - (totals.delivered || 0);
+      const snapshot = buildShipmentSnapshot(updatedPackages, {
+        previousStatus: data.status,
+      });
 
-        // 2. Accumulate Trip Deltas
-        tripPendingDelta += pendingChange;
-        tripLoadedDelta += loadedChange;
-        tripDeliveredDelta += deliveredChange;
+      const deltaLoaded = snapshot.totals.loaded - oldLoadedQty;
+      const deltaDelivered = snapshot.totals.received - oldReceivedQty;
+      const deltaPending =
+        snapshot.totals.pending - Math.max(oldTotalQty - oldLoadedQty, 0);
 
-        // 3. Update Individual Packages (Visual Sync)
-        const updatedPackages = (data.packages || []).map((p) => ({
-          ...p,
-          status: "DELIVERED",
-          deliveredAt: p.deliveredAt || isoDate,
-          deliveredBy: p.deliveredBy || name,
-        }));
+      tripPendingDelta += deltaPending;
+      tripLoadedDelta += deltaLoaded;
+      tripDeliveredDelta += deltaDelivered;
 
-        // 4. Update Shipment Doc
-        const historyEntry = {
-          status: "COMPLETED",
-          at: new Date(),
-          by: name,
-          note: "Bulk status update to COMPLETED",
-          location: location || null,
-        };
+      const packagesChanged =
+        newStatus === "DELIVERED" ||
+        newStatus === "COMPLETED" ||
+        newStatus === "ARRIVED" ||
+        newStatus === "RECEIVED";
 
+      const historyEntry = {
+        status: packagesChanged ? snapshot.status : newStatus,
+        at: new Date(),
+        by: name,
+        note: packagesChanged
+          ? `Bulk ${newStatus} applied to packages on trip ${tripId}.`
+          : `Bulk manifest status set to ${newStatus}.`,
+        location: location || null,
+      };
+
+      if (packagesChanged) {
         batch.update(shipmentRef, {
-          status: "COMPLETED",
-          "totals.pending": 0,
-          "totals.loaded": 0,
-          "totals.received": 0, // Assuming they are gone from warehouse
-          "totals.delivered": totalItems,
-          packages: updatedPackages,
+          status: snapshot.status,
+          packages: snapshot.packages,
+          packageBreakdown: snapshot.packageBreakdown,
+          currentTripIds: snapshot.currentTripIds,
+          currentTripId: snapshot.currentTripId,
+          "totals.totalItems": snapshot.totals.totalItems,
+          "totals.totalContentQty": snapshot.totals.totalContentQty,
+          "totals.loaded": snapshot.totals.loaded,
+          "totals.pending": snapshot.totals.pending,
+          "totals.received": snapshot.totals.received,
+          "totals.delivered": snapshot.totals.delivered,
+          "totals.missing": snapshot.totals.missing,
+          "totals.damaged": snapshot.totals.damaged,
           updatedAt: timestamp,
           updatedBy: name,
           statusHistory: admin.firestore.FieldValue.arrayUnion(historyEntry),
           ...(location ? { lastLocation: location } : {}),
         });
-
-        // 5. Update Trip Manifest Doc
-        batch.update(tripShipmentRef, {
-          status: "COMPLETED",
-          pendingCount: 0,
-          loadedCount: 0,
-          deliveredCount: totalItems,
-          updatedAt: timestamp,
-        });
-      }
-      // ====================================================
-      // SCENARIO B: SIMPLE STATUS CHANGE (e.g. Out For Delivery)
-      // ====================================================
-      else {
-        // Just update the status text. Do not touch the counters.
-        const historyEntry = {
-          status: newStatus,
-          at: new Date(),
-          by: name,
-          note: `Bulk status update to ${newStatus}`,
-          location: location || null,
-        };
-
+      } else {
         batch.update(shipmentRef, {
-          status: newStatus,
+          packageBreakdown: snapshot.packageBreakdown,
           updatedAt: timestamp,
           updatedBy: name,
           statusHistory: admin.firestore.FieldValue.arrayUnion(historyEntry),
           ...(location ? { lastLocation: location } : {}),
         });
-
-        // Map status for manifest (Optional logic)
-        let manifestStatus = newStatus;
-        if (newStatus === "OUT_FOR_DELIVERY") manifestStatus = "UNLOADING";
-
-        batch.update(tripShipmentRef, {
-          status: manifestStatus,
-          updatedAt: timestamp,
-        });
       }
 
-      // 6. ADD SHIPMENT STATUS EVENT
+      let manifestStatus = newStatus;
+      if (newStatus === "OUT_FOR_DELIVERY") manifestStatus = "UNLOADING";
+      if (packagesChanged) manifestStatus = snapshot.status;
+
+      batch.update(tripShipmentRef, {
+        status: manifestStatus,
+        loadedCount: snapshot.totals.loaded,
+        pendingCount: snapshot.totals.pending,
+        deliveredCount: snapshot.totals.received,
+        receivedCount: snapshot.totals.received,
+        missingCount: snapshot.totals.missing,
+        damagedCount: snapshot.totals.damaged,
+        updatedAt: timestamp,
+      });
+
       const shipEventRef = shipmentRef.collection("status_events").doc();
       batch.set(shipEventRef, {
         type: "BULK_UPDATE",
-        status: newStatus,
+        status: packagesChanged ? snapshot.status : newStatus,
         message: `Bulk updated to ${newStatus}`,
         updatedBy: name,
         createdAt: timestamp,
       });
     });
 
-    // 5. UPDATE PARENT TRIP COUNTERS (Only if needed)
     const tripRef = db.collection("truck_trips").doc(tripId);
 
     if (
@@ -191,36 +190,40 @@ exports.bulkUpdateShipmentStatus = onCall(
       });
     }
 
-    // 6. ADD TRIP TIMELINE EVENT
     if (updateCount > 0) {
       const tripEventRef = tripRef.collection("status_events").doc();
       batch.set(tripEventRef, {
         type: "BULK_UPDATE",
         message: `Bulk updated ${updateCount} shipments to ${newStatus}`,
-        newStatus: newStatus,
+        newStatus,
         affectedCount: updateCount,
         performedBy: name,
         createdAt: timestamp,
       });
 
-      // 7. GLOBAL AUDIT LOG
       writeShipmentActionLog({
         db,
         batch,
         collection: "audit_logs",
         action: "BULK_STATUS_UPDATE",
-        tripId: tripId,
-        newStatus: newStatus,
+        tripId,
+        newStatus,
         count: updateCount,
         actorId: uid,
         actorRole: role,
         actorName: name,
-        timestamp: timestamp,
+        timestamp,
       });
     }
 
-    // 8. COMMIT
     await batch.commit();
+
+    await tryAutoCompleteTrip(tripId, {
+      actorId: uid,
+      actorName: name,
+      actorRole: role,
+      source: "BULK_UPDATE_SHIPMENT_STATUS",
+    });
 
     return {
       success: true,

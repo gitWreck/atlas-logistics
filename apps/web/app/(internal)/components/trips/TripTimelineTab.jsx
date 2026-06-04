@@ -37,7 +37,11 @@ export default function TripTimelineTab({
   const isAdmin = String(profile?.role || "").toLowerCase() === "admin";
 
   const isCancelled = data.status === "CANCELLED";
-  const currentStepIndex = isCancelled ? -1 : steps.indexOf(data.status);
+  const timelineStatus =
+    data.status === "UNLOADING" ? "ARRIVED" : data.status;
+  const currentStepIndex = isCancelled
+    ? -1
+    : steps.indexOf(timelineStatus);
 
   return (
     <div className="animate-in fade-in slide-in-from-left-4 duration-300">
@@ -141,8 +145,13 @@ export default function TripTimelineTab({
 
           {!isCancelled &&
             steps.map((step, idx) => {
-              const isDone = currentStepIndex >= idx;
-              const isCurrent = data.status === step;
+              const isDone =
+                data.status === "COMPLETED"
+                  ? idx <= currentStepIndex
+                  : currentStepIndex >= idx;
+              const isCurrent =
+                data.status === step ||
+                (data.status === "UNLOADING" && step === "ARRIVED");
 
               return (
                 <div key={step} className="relative pb-8 last:pb-0">

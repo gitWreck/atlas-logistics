@@ -5,8 +5,20 @@ const admin = require("firebase-admin");
 const { FieldValue } = admin.firestore;
 const { requireRole, updatedBy } = require("../utilities/helpers");
 const { writeShipmentActionLog } = require("../utilities/shipmentLogger");
-const { deriveMasterShipmentStatus } = require("../packages/shipmentStatus");
-const { normalizeQty } = require("../utilities/packageHelpers");
+const {
+  packageEligibleForLinehaulLoad,
+  packageOnTrip,
+  applyLinehaulLoad,
+  applyLinehaulUnloadAtHub,
+  applyLinehaulMissing,
+  applyLinehaulDelivered,
+  buildShipmentSnapshot,
+  sumLoadedQty,
+  sumReceivedQty,
+  sumTotalQty,
+  normalizePackageRow,
+} = require("../packages/tripPackageOperations");
+const { tryAutoCompleteTrip } = require("../trips/autoCompleteTrip");
 
 if (!admin.apps.length) admin.initializeApp();
 const db = admin.firestore();
@@ -22,7 +34,6 @@ exports.bulkShipmentAction = onCall(
 
     const { tripId, shipmentIds, action, location, remarks } =
       request.data || {};
-    const userId = request.auth.uid;
 
     const { uid, role, name } = updatedBy(request);
 
@@ -90,47 +101,7 @@ exports.bulkShipmentAction = onCall(
         ]);
 
         const nowServer = FieldValue.serverTimestamp();
-
-        const normalizePackage = (pkg = {}) => {
-          const quantity = normalizeQty(pkg.quantity, 1) || 1;
-          const loadedQty = Math.min(normalizeQty(pkg.loadedQty, 0), quantity);
-          const receivedQty = Math.min(
-            normalizeQty(pkg.receivedQty, 0),
-            quantity,
-          );
-
-          return {
-            ...pkg,
-            quantity,
-            loadedQty,
-            receivedQty,
-          };
-        };
-
-        const sumTotalQty = (pkgs) =>
-          pkgs.reduce((sum, pkg) => sum + normalizeQty(pkg.quantity, 1), 0);
-
-        const sumLoadedQty = (pkgs) =>
-          pkgs.reduce((sum, pkg) => {
-            const quantity = normalizeQty(pkg.quantity, 1);
-            if (pkg.status === "LOADED") return sum + quantity;
-            if (pkg.status === "PARTIALLY_LOADED") {
-              return sum + Math.min(normalizeQty(pkg.loadedQty, 0), quantity);
-            }
-            return sum;
-          }, 0);
-
-        const sumReceivedQty = (pkgs) =>
-          pkgs.reduce((sum, pkg) => {
-            const quantity = normalizeQty(pkg.quantity, 1);
-            if (pkg.status === "DELIVERED") return sum + quantity;
-            if (pkg.status === "PARTIALLY_RECEIVED") {
-              return sum + Math.min(normalizeQty(pkg.receivedQty, 0), quantity);
-            }
-            return sum;
-          }, 0);
-
-        const deriveShipmentStatus = (pkgs) => deriveMasterShipmentStatus(pkgs);
+        const nowIso = new Date().toISOString();
 
         let tripDeltaLoaded = 0;
         let tripDeltaPending = 0;
@@ -148,75 +119,54 @@ exports.bulkShipmentAction = onCall(
           }
 
           const shipData = shipDoc.data() || {};
-
-          if (shipData.currentTripId && shipData.currentTripId !== tripId) {
-            throw new HttpsError(
-              "failed-precondition",
-              `Shipment ${shipDoc.id} belongs to another trip (${shipData.currentTripId})`,
-            );
-          }
-
           const oldPackagesRaw = Array.isArray(shipData.packages)
             ? shipData.packages
             : [];
-          const oldPackages = oldPackagesRaw.map(normalizePackage);
+          const oldPackages = oldPackagesRaw.map(normalizePackageRow);
+
+          const oldLoadedQty = sumLoadedQty(oldPackages);
+          const oldReceivedQty = sumReceivedQty(oldPackages);
+          const oldTotalQty = sumTotalQty(oldPackages);
 
           const updatedPackages = oldPackages.map((pkg) => {
-            const quantity = normalizeQty(pkg.quantity, 1);
-
             if (targetStatus === "LOADED") {
-              return {
-                ...pkg,
-                status: "LOADED",
-                loadedQty: quantity,
-                updatedAt: new Date().toISOString(),
-              };
+              if (!packageEligibleForLinehaulLoad(pkg)) return pkg;
+              return applyLinehaulLoad(pkg, {
+                tripId,
+                actorName: name,
+                nowIso,
+              });
             }
 
             if (targetStatus === "RECEIVED") {
-              return {
-                ...pkg,
-                status: "RECEIVED",
-                loadedQty: 0,
-                updatedAt: new Date().toISOString(),
-              };
+              if (!packageOnTrip(pkg, tripId)) return pkg;
+              return applyLinehaulUnloadAtHub(pkg, { tripId, nowIso });
             }
 
             if (targetStatus === "DELIVERED") {
-              return {
-                ...pkg,
-                status: "DELIVERED",
-                loadedQty: quantity,
-                receivedQty: quantity,
-                updatedAt: new Date().toISOString(),
-              };
+              if (!packageOnTrip(pkg, tripId)) return pkg;
+              return applyLinehaulDelivered(pkg, { tripId, nowIso });
             }
 
             if (targetStatus === "MISSING") {
-              return {
-                ...pkg,
-                status: "MISSING",
-                updatedAt: new Date().toISOString(),
-              };
+              if (!packageOnTrip(pkg, tripId)) return pkg;
+              return applyLinehaulMissing(pkg, { tripId, nowIso });
             }
 
             return pkg;
           });
 
-          const oldTotalQty = sumTotalQty(oldPackages);
-          const newTotalQty = sumTotalQty(updatedPackages);
+          const snapshot = buildShipmentSnapshot(updatedPackages, {
+            previousStatus: shipData.status,
+          });
 
-          const oldLoadedQty = sumLoadedQty(oldPackages);
-          const newLoadedQty = sumLoadedQty(updatedPackages);
-
-          const oldReceivedQty = sumReceivedQty(oldPackages);
-          const newReceivedQty = sumReceivedQty(updatedPackages);
-
-          const newPendingQty = Math.max(newTotalQty - newLoadedQty, 0);
-          const oldPendingQty = Math.max(oldTotalQty - oldLoadedQty, 0);
+          const newLoadedQty = snapshot.totals.loaded;
+          const newReceivedQty = snapshot.totals.received;
+          const newTotalQty = snapshot.totals.totalContentQty;
+          const newPendingQty = snapshot.totals.pending;
 
           const deltaLoaded = newLoadedQty - oldLoadedQty;
-          const deltaPending = newPendingQty - oldPendingQty;
+          const deltaPending = newPendingQty - Math.max(oldTotalQty - oldLoadedQty, 0);
           const deltaDelivered = newReceivedQty - oldReceivedQty;
 
           tripDeltaLoaded += deltaLoaded;
@@ -224,18 +174,21 @@ exports.bulkShipmentAction = onCall(
           tripDeltaDelivered += deltaDelivered;
           tripDeltaArrived += deltaDelivered;
 
-          const shipmentStatus = deriveShipmentStatus(updatedPackages);
-
           t.update(shipRef, {
-            status: shipmentStatus,
-            packages: updatedPackages,
+            status: snapshot.status,
+            packages: snapshot.packages,
+            packageBreakdown: snapshot.packageBreakdown,
+            currentTripIds: snapshot.currentTripIds,
+            currentTripId: snapshot.currentTripId,
 
-            "totals.totalItems": updatedPackages.length,
+            "totals.totalItems": snapshot.totals.totalItems,
             "totals.totalContentQty": newTotalQty,
             "totals.loaded": newLoadedQty,
             "totals.pending": newPendingQty,
             "totals.received": newReceivedQty,
             "totals.delivered": newReceivedQty,
+            "totals.missing": snapshot.totals.missing,
+            "totals.damaged": snapshot.totals.damaged,
 
             updatedAt: nowServer,
             updatedBy: name,
@@ -243,10 +196,12 @@ exports.bulkShipmentAction = onCall(
             remarks: remarks || null,
 
             statusHistory: FieldValue.arrayUnion({
-              status: shipmentStatus,
+              status: snapshot.status,
               at: new Date(),
               by: name,
-              note: remarks || `Bulk ${action} applied.`,
+              note:
+                remarks ||
+                `Bulk ${action} applied to packages on trip ${tripId}.`,
               location: location || null,
             }),
 
@@ -255,26 +210,30 @@ exports.bulkShipmentAction = onCall(
 
           if (tripShipDoc.exists) {
             t.update(tripShipRef, {
-              status: shipmentStatus,
+              status: snapshot.status,
               totalItems: newTotalQty,
               loadedCount: newLoadedQty,
               pendingCount: newPendingQty,
               deliveredCount: newReceivedQty,
               receivedCount: newReceivedQty,
+              missingCount: snapshot.totals.missing,
+              damagedCount: snapshot.totals.damaged,
               updatedAt: nowServer,
               updatedBy: name,
             });
           }
         }
 
-        t.update(tripRef, {
+        const tripUpdate = {
           totalLoaded: FieldValue.increment(tripDeltaLoaded),
           itemPending: FieldValue.increment(tripDeltaPending),
           totalDelivered: FieldValue.increment(tripDeltaDelivered),
           totalArrived: FieldValue.increment(tripDeltaArrived),
           updatedAt: nowServer,
           updatedBy: name,
-        });
+        };
+
+        t.update(tripRef, tripUpdate);
 
         writeShipmentActionLog({
           db,
@@ -302,9 +261,21 @@ exports.bulkShipmentAction = onCall(
         });
       });
 
+      try {
+        await tryAutoCompleteTrip(tripId, {
+          actorId: uid,
+          actorName: name,
+          actorRole: role,
+          source: "BULK_SHIPMENT_ACTION",
+        });
+      } catch (autoCompleteError) {
+        console.error("Auto-complete trip failed:", autoCompleteError);
+      }
+
       return { success: true };
     } catch (error) {
       console.error("Bulk Action Error:", error);
+      if (error instanceof HttpsError) throw error;
       throw new HttpsError("internal", error.message || "Bulk action failed");
     }
   },

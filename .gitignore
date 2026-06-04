@@ -26,6 +26,7 @@ ios/
 # Environment Variables (VERY IMPORTANT)
 .env
 .env.local
+apps/functions/service-account.json
 .env.development.local
 .env.test.local
 .env.production.local
