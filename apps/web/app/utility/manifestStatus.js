@@ -109,6 +109,44 @@ export function canUnloadAtHub(trip = {}) {
   return resolveManifestStatus(trip) === MANIFEST_STATUS.RECEIVING_IN_PROGRESS;
 }
 
+export function isManifestReconciled(trip = {}) {
+  return resolveManifestStatus(trip) === MANIFEST_STATUS.RECONCILED;
+}
+
+/** User-facing reason when hub unload is blocked (scanner + resolve API). */
+export function getUnloadBlockReason(trip = {}) {
+  if (!isHubTransferTrip(trip)) {
+    const tripStatus = normalizeTripStatus(trip.status);
+    if (["ARRIVED", "LOADED", "IN_TRANSIT", "COMPLETED"].includes(tripStatus)) {
+      return null;
+    }
+    return `Cannot unload. Trip status is currently ${tripStatus || "UNKNOWN"}.`;
+  }
+
+  if (canUnloadAtHub(trip)) return null;
+
+  const tripStatus = normalizeTripStatus(trip.status);
+  const manifestStatus = resolveManifestStatus(trip);
+
+  if (manifestStatus === MANIFEST_STATUS.RECONCILED) {
+    return "Manifest is reconciled. Open Reconcile & release shipments below to release to delivery operations.";
+  }
+
+  if (canStartReceiving(trip)) {
+    return "Start receiving on this trip before unloading packages.";
+  }
+
+  if (tripStatus === "IN_TRANSIT" && manifestStatus === MANIFEST_STATUS.LOCKED) {
+    return "Start receiving on this trip before unloading packages.";
+  }
+
+  if (tripStatus !== "ARRIVED") {
+    return `Trip must be ARRIVED with receiving in progress before unloading (current: ${tripStatus || "unknown"}).`;
+  }
+
+  return "Receiving has not been started on this trip. Click Start Receiving first.";
+}
+
 export function getManifestStatusLabel(tripOrStatus) {
   const status =
     tripOrStatus && typeof tripOrStatus === "object"

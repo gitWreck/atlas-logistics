@@ -15,7 +15,9 @@ import {
 import {
   canUnloadAtHub,
   canStartReceiving,
+  getUnloadBlockReason,
   isHubTransferTrip,
+  isManifestReconciled,
 } from "@/app/utility/manifestStatus";
 
 export function ActionSelector({ action, trip, theme, actions }) {
@@ -53,15 +55,18 @@ export function ActionSelector({ action, trip, theme, actions }) {
   const handleSelect = (id) => {
     actions.resetFlow();
     if (id === "UNLOAD") {
+      if (hubTrip && isManifestReconciled(trip)) {
+        actions.setAction(id);
+        return actions.openReleaseHandoff();
+      }
       if (hubTrip && canStartReceiving(trip)) {
         return actions.setNeedsStartReceiving(true) || actions.setAction(id);
       }
       if (!canUnloadFromStatus) {
-        return actions.setError(
-          hubTrip
-            ? "Start receiving on this trip before unloading packages."
-            : `Cannot unload. Trip status is currently ${currentTripStatus || "UNKNOWN"}.`,
-        );
+        const reason = hubTrip
+          ? getUnloadBlockReason(trip)
+          : `Cannot unload. Trip status is currently ${currentTripStatus || "UNKNOWN"}.`;
+        return actions.setError(reason || "Cannot unload packages on this trip.");
       }
     }
     if (id === "LOAD") {
