@@ -314,11 +314,11 @@ const ShipmentBoard = forwardRef(function ShipmentBoard(
         count: filteredShipments.length,
       },
       {
-        key: SHIPMENT_BOARD_TABS.DELIVERY,
-        label: "Delivery Operations",
-        icon: faTruck,
+        key: SHIPMENT_BOARD_TABS.DIVISORIA,
+        label: "Divisoria",
+        icon: faWarehouse,
         count: filteredShipments.filter((shipment) =>
-          DELIVERY_OPERATION_STATUSES.has(getShipmentStatus(shipment)),
+          matchesWarehouseTab(shipment, SHIPMENT_BOARD_TABS.DIVISORIA),
         ).length,
       },
       {
@@ -330,19 +330,19 @@ const ShipmentBoard = forwardRef(function ShipmentBoard(
         ).length,
       },
       {
-        key: SHIPMENT_BOARD_TABS.DIVISORIA,
-        label: "Divisoria",
-        icon: faWarehouse,
-        count: filteredShipments.filter((shipment) =>
-          matchesWarehouseTab(shipment, SHIPMENT_BOARD_TABS.DIVISORIA),
-        ).length,
-      },
-      {
         key: SHIPMENT_BOARD_TABS.ODIONGAN,
         label: "Odiongan",
         icon: faWarehouse,
         count: filteredShipments.filter((shipment) =>
           matchesWarehouseTab(shipment, SHIPMENT_BOARD_TABS.ODIONGAN),
+        ).length,
+      },
+      {
+        key: SHIPMENT_BOARD_TABS.DELIVERY,
+        label: "Delivery Operations",
+        icon: faTruck,
+        count: filteredShipments.filter((shipment) =>
+          DELIVERY_OPERATION_STATUSES.has(getShipmentStatus(shipment)),
         ).length,
       },
       {
