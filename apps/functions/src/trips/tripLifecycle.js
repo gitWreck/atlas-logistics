@@ -65,6 +65,12 @@ const DELIVERED_TRIP_SHIPMENT_STATUSES = new Set([
 /** Trip statuses that allow last-mile pool release (Step 1.4). */
 const RELEASE_ELIGIBLE_TRIP_STATUSES = new Set([TRIP_STATUSES.ARRIVED]);
 
+const {
+  MANIFEST_STATUS,
+  isHubTransferTrip,
+  resolveManifestStatus,
+} = require("./manifestStatus");
+
 function normalizeTripStatus(status) {
   return String(status || "")
     .trim()
@@ -283,6 +289,19 @@ function isTripReleaseEligible(trip = {}, options = {}) {
   const status = normalizeTripStatus(trip.status);
 
   if (RELEASE_ELIGIBLE_TRIP_STATUSES.has(status)) {
+    if (isHubTransferTrip(trip)) {
+      const manifestStatus = resolveManifestStatus(trip);
+      if (
+        manifestStatus !== MANIFEST_STATUS.RECONCILED &&
+        !trip.reconciledAt
+      ) {
+        return {
+          eligible: false,
+          reason:
+            "Manifest must be reconciled before releasing to delivery operations.",
+        };
+      }
+    }
     return { eligible: true, reason: null };
   }
 

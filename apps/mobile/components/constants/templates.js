@@ -40,6 +40,31 @@ export const BADGE_COLORS = {
     text: "#0369A1",
     border: "#BAE6FD",
   },
+  UNLOADING: {
+    bg: "#F0FDFA",
+    text: "#0F766E",
+    border: "#99F6E4",
+  },
+  OPEN: {
+    bg: "#F8FAFC",
+    text: "#475569",
+    border: "#CBD5E1",
+  },
+  LOCKED: {
+    bg: "#FFFBEB",
+    text: "#B45309",
+    border: "#FDE68A",
+  },
+  RECEIVING_IN_PROGRESS: {
+    bg: "#F0FDFA",
+    text: "#0F766E",
+    border: "#99F6E4",
+  },
+  RECONCILED: {
+    bg: "#F0FDF4",
+    text: "#15803D",
+    border: "#BBF7D0",
+  },
   COMPLETED: {
     bg: "#F0FDF4",
     text: "#15803D",

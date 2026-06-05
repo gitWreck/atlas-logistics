@@ -30,12 +30,12 @@ const PACKAGE_STATUS = Object.freeze({
 });
 
 const PACKAGE_STATUS_LABELS = Object.freeze({
-  [PACKAGE_STATUS.RECEIVED_AT_DIVISORIA]: "Received at Divisoria Warehouse",
+  [PACKAGE_STATUS.RECEIVED_AT_DIVISORIA]: "Received at Divisoria",
   [PACKAGE_STATUS.LOADED_TO_TRIP]: "Loaded to trip",
   [PACKAGE_STATUS.IN_TRANSIT]: "In transit",
   [PACKAGE_STATUS.ARRIVED_AT_ODIONGAN]: "Arrived at Odiongan",
   [PACKAGE_STATUS.AVAILABLE_AT_ODIONGAN_WAREHOUSE]:
-    "Available at Odiongan Warehouse",
+    "Available at Odiongan",
   [PACKAGE_STATUS.RELEASED_FOR_DELIVERY]: "Released for delivery",
   [PACKAGE_STATUS.LOADED_TO_DELIVERY_VEHICLE]: "Loaded to delivery vehicle",
   [PACKAGE_STATUS.READY_FOR_DELIVERY]: "Ready for delivery",
@@ -48,10 +48,10 @@ const PACKAGE_STATUS_LABELS = Object.freeze({
   [PACKAGE_STATUS.DAMAGED]: "Damaged",
   [PACKAGE_STATUS.FAILED_DELIVERY]: "Failed delivery",
   [PACKAGE_STATUS.CANCELLED]: "Cancelled",
-  [PACKAGE_STATUS.RECEIVED]: "Received at Divisoria Warehouse",
+  [PACKAGE_STATUS.RECEIVED]: "Received at Divisoria",
   [PACKAGE_STATUS.LOADED]: "Loaded",
   [PACKAGE_STATUS.PARTIALLY_LOADED]: "Partially loaded",
-  [PACKAGE_STATUS.AVAILABLE_AT_WAREHOUSE]: "Available at Odiongan Warehouse",
+  [PACKAGE_STATUS.AVAILABLE_AT_WAREHOUSE]: "Available at Odiongan",
   [PACKAGE_STATUS.RETURNED_RECEIVED_AT_HUB]: "Returned received at Odiongan",
   [PACKAGE_STATUS.COMPLETED]: "Delivered",
 });
@@ -343,6 +343,59 @@ function allPiecesDelivered(packages = []) {
   );
 }
 
+function isCustomerDeliveryComplete(pkg = {}, options = {}) {
+  const { isDeliveryTrip = false } = options;
+  if (normalizeCustodyType(pkg) === "CUSTOMER") return true;
+  if (pkg.deliveredAt || pkg.deliveredByCheckerId) return true;
+  return isDeliveryTrip;
+}
+
+function isHubReceiveComplete(pkg = {}, options = {}) {
+  const { isHubReceive = false } = options;
+  const storedStatus = normalizePackageStatusCode(pkg.status, pkg);
+
+  if (isHubReceive) return true;
+  if (AT_ODIONGAN_STATUSES.has(storedStatus)) return true;
+  if (WAREHOUSE_POOL_STATUSES.has(storedStatus)) return true;
+  if (
+    normalizeCustodyType(pkg) === "WAREHOUSE" &&
+    normalizeWarehouseCode(pkg.custodyOwnerId) === ODIONGAN_WAREHOUSE
+  ) {
+    return true;
+  }
+  return false;
+}
+
+/**
+ * Full receivedQty means customer delivery on last-mile trips,
+ * but hub offload at Odiongan — not delivered to consignee.
+ */
+function resolveFullyReceivedStatus(pkg = {}, options = {}) {
+  const storedStatus = normalizePackageStatusCode(pkg.status, pkg);
+
+  if (isCustomerDeliveryComplete(pkg, options)) {
+    return PACKAGE_STATUS.DELIVERED;
+  }
+  if (isHubReceiveComplete(pkg, options)) {
+    if (
+      pkg.availableForDelivery === true ||
+      storedStatus === PACKAGE_STATUS.RELEASED_FOR_DELIVERY
+    ) {
+      return PACKAGE_STATUS.RELEASED_FOR_DELIVERY;
+    }
+    if (AT_ODIONGAN_STATUSES.has(storedStatus)) return storedStatus;
+    if (WAREHOUSE_POOL_STATUSES.has(storedStatus)) return storedStatus;
+    return PACKAGE_STATUS.ARRIVED_AT_ODIONGAN;
+  }
+
+  const { isDeliveryTrip = false } = options;
+  if (!isDeliveryTrip) {
+    return PACKAGE_STATUS.ARRIVED_AT_ODIONGAN;
+  }
+
+  return PACKAGE_STATUS.DELIVERED;
+}
+
 /**
  * Derive display/storage status from quantity fields (scanner modal path).
  */
@@ -357,7 +410,14 @@ function derivePackageStatusFromQuantities(pkg = {}, options = {}) {
 
   if (damagedQty > 0) return PACKAGE_STATUS.DAMAGED;
   if (missingQty > 0) return PACKAGE_STATUS.MISSING;
-  if (receivedQty >= quantity) return PACKAGE_STATUS.DELIVERED;
+  if (receivedQty >= quantity) {
+    return resolveFullyReceivedStatus(pkg, options);
+  }
+
+  // Dispatched linehaul pieces stay in transit even while loadedQty > 0.
+  if (storedStatus === PACKAGE_STATUS.IN_TRANSIT) {
+    return PACKAGE_STATUS.IN_TRANSIT;
+  }
 
   if (receivedQty === 0 && loadedQty > 0) {
     if (storedStatus === PACKAGE_STATUS.OUT_FOR_DELIVERY) {

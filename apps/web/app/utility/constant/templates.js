@@ -133,8 +133,6 @@ export const STEP_LOCAL_PICKUP = [
 ];
 
 export const STEP_HUB_TRANSFER = [
-  "CREATED",
-  "ASSIGNED",
   "LOADING",
   "LOADED",
   "IN_TRANSIT",
@@ -142,11 +140,20 @@ export const STEP_HUB_TRANSFER = [
   "COMPLETED",
 ];
 
+export const STEP_HUB_MANIFEST = [
+  "OPEN",
+  "LOCKED",
+  "RECEIVING_IN_PROGRESS",
+  "RECONCILED",
+];
+
 export const SHIPMENT_STATUS = [
   { value: "PENDING_PICKUP", label: "Pending Pickup" },
   { value: "PICKED_UP", label: "Picked Up" },
   { value: "RECEIVED", label: "Received at Hub" },
+  { value: "PARTIALLY_LOADED", label: "Partially Loaded" },
   { value: "LOADED", label: "Loaded on Truck" },
+  { value: "PARTIALLY_IN_TRANSIT", label: "Partially In Transit" },
   { value: "IN_TRANSIT", label: "In Transit" },
   // { value: "ARRIVED", label: "Arrived at Destination" },
   { value: "READY_FOR_DELIVERY", label: "Ready for Delivery" },
@@ -164,6 +171,7 @@ export const SHIPMENT_STEPS_LOCAL_PICKUP = [
   "ASSIGNED",
   "PARTIALLY_LOADED",
   "LOADED",
+  "PARTIALLY_IN_TRANSIT",
   "IN_TRANSIT",
   "READY_FOR_DELIVERY",
   "OUT_FOR_DELIVERY",
@@ -179,6 +187,7 @@ export const SHIPMENT_STEPS_HUB_TRANSFER = [
 
   "PARTIALLY_LOADED",
   "LOADED",
+  "PARTIALLY_IN_TRANSIT",
   "IN_TRANSIT",
   "READY_FOR_DELIVERY",
   "OUT_FOR_DELIVERY",

@@ -26,6 +26,12 @@ import { getTableActionClasses } from "@/app/utility/constant/action";
 import { packageLabelUrl } from "@/app/utility/constant/templates";
 import { updatedBy } from "@/app/utility/utilities";
 import StatusBadge from "../ui/StatusBadge";
+import ManifestStatusBadge from "../ui/ManifestStatusBadge";
+import {
+  MANIFEST_STATUS,
+  resolveManifestStatus,
+  isHubTransferTrip,
+} from "@/app/utility/manifestStatus";
 import TablePaginationFooter from "../ui/TablePaginationFooter";
 import TripDeliveryPoolSummary from "./TripDeliveryPoolSummary";
 
@@ -39,6 +45,9 @@ export default function TripManifestTab({
   tripId,
   tripStatus = null,
   tripReconciledAt = null,
+  tripManifestStatus = null,
+  tripType = null,
+  trip = null,
   onRefresh,
   isDark = false,
 
@@ -69,13 +78,27 @@ export default function TripManifestTab({
     return pool.filter((s) => isEligibleForCheckerRelease(s.status));
   }, [shipments, selectedIds]);
 
+  const hubTrip = isHubTransferTrip(
+    trip || { tripType, manifestStatus: tripManifestStatus, reconciledAt: tripReconciledAt },
+  );
+  const manifestStatus = resolveManifestStatus(
+    trip || {
+      manifestStatus: tripManifestStatus,
+      reconciledAt: tripReconciledAt,
+      manifestLocked: isLocked,
+    },
+  );
+  const isManifestReconciled = manifestStatus === MANIFEST_STATUS.RECONCILED;
+
   const tripReleaseGate = useMemo(
     () =>
       isTripReleaseEligible({
         status: tripStatus,
         reconciledAt: tripReconciledAt,
+        manifestStatus,
+        tripType: tripType || trip?.tripType,
       }),
-    [tripStatus, tripReconciledAt],
+    [tripStatus, tripReconciledAt, manifestStatus, tripType, trip?.tripType],
   );
 
   const rowAction = {
@@ -241,6 +264,38 @@ export default function TripManifestTab({
     <div className="space-y-4 animate-in fade-in slide-in-from-right-4 duration-300">
       <TripDeliveryPoolSummary shipments={shipments} isDark={isDark} />
 
+      {hubTrip && (
+        <div
+          className={`flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-4 rounded-2xl border ${theme.statCard}`}
+        >
+          <div className="flex items-center gap-3">
+            <span className={`text-xs font-bold uppercase ${theme.cellSecondary}`}>
+              Manifest
+            </span>
+            <ManifestStatusBadge
+              trip={
+                trip || {
+                  tripType,
+                  manifestStatus,
+                  reconciledAt: tripReconciledAt,
+                  manifestLocked: isLocked,
+                }
+              }
+              isDark={isDark}
+            />
+          </div>
+          <p className={`text-xs ${theme.cellSecondary}`}>
+            {isManifestReconciled
+              ? "Reconciliation complete. Release shipments to delivery operations when ready."
+              : manifestStatus === MANIFEST_STATUS.RECEIVING_IN_PROGRESS
+                ? "Receiving in progress. Finish unload scans, then finalize reconciliation."
+                : manifestStatus === MANIFEST_STATUS.LOCKED
+                  ? "Manifest is locked. Start receiving at Odiongan before unloading."
+                  : "Manifest is open. Load packages, set trip to LOADED, then lock before dispatch."}
+          </p>
+        </div>
+      )}
+
       {/* Header */}
       <div className={`p-4 rounded-2xl border ${theme.statCard}`}>
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
@@ -308,7 +363,9 @@ export default function TripManifestTab({
                   }
                 >
                   <FontAwesomeIcon icon={faBoxOpen} />
-                  Release shipment(s)
+                  {hubTrip && !isManifestReconciled
+                    ? "Release (reconcile first)"
+                    : "Release to Delivery Operations"}
                 </button>
               )}
 

@@ -18,6 +18,10 @@ const {
   normalizePackageRow,
 } = require("./tripPackageOperations");
 const { tryAutoCompleteTrip } = require("../trips/autoCompleteTrip");
+const {
+  assertCanUnloadAtHub,
+  isHubTransferTrip,
+} = require("../trips/manifestStatus");
 
 if (!admin.apps.length) admin.initializeApp();
 const db = admin.firestore();
@@ -92,8 +96,14 @@ exports.scanPackages = onCall(
     const tripSnap = await tripRef.get();
 
     if (!tripSnap.exists) throw new HttpsError("not-found", "Trip not found.");
-    if (tripSnap.data().status === "COMPLETED") {
+
+    const tripData = tripSnap.data() || {};
+    if (tripData.status === "COMPLETED") {
       throw new HttpsError("failed-precondition", "Trip is already COMPLETED.");
+    }
+
+    if (mode === "delivering" && isHubTransferTrip(tripData)) {
+      assertCanUnloadAtHub(tripData, tripId);
     }
 
     const packages = Array.isArray(shipmentData.packages)
@@ -200,6 +210,9 @@ exports.scanPackages = onCall(
 
       const snapshot = buildShipmentSnapshot(updatedPackages, {
         previousStatus: freshData.status,
+        isHubReceive: mode === "delivering" && isHubTransferTrip(tripData),
+        isDeliveryTrip:
+          mode === "delivering" && !isHubTransferTrip(tripData),
       });
 
       const newPackageStatus = normalizePackageStatus(nextPkg);
@@ -282,10 +295,6 @@ exports.scanPackages = onCall(
         }
       } else {
         tripUpdate.totalArrived = increment(1);
-        const tripStatus = String(tripSnap.data().status || "").toUpperCase();
-        if (["IN_TRANSIT", "LOADED", "ARRIVED"].includes(tripStatus)) {
-          tripUpdate.status = "UNLOADING";
-        }
       }
 
       tx.update(tripRef, tripUpdate);

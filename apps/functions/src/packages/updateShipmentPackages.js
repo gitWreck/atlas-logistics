@@ -22,6 +22,7 @@ const {
 const { getShipmentTargetUserIds } = require("../utilities/notificationHelpers");
 const { normalizeQty } = require("../utilities/packageHelpers");
 const { tryAutoCompleteTrip } = require("../trips/autoCompleteTrip");
+const { assertCanUnloadAtHub } = require("../trips/manifestStatus");
 
 if (!admin.apps.length) admin.initializeApp();
 const db = admin.firestore();
@@ -336,6 +337,10 @@ exports.updateShipmentPackages = onCall(
         normalizedScanAction === "UNLOAD" ||
         normalizedScanAction === "OFFLOADING" ||
         normalizedScanAction === "OFFLOAD";
+
+      if (isScannerUpdate && isOffloadingAction && tripSnap?.exists) {
+        assertCanUnloadAtHub(tripData, tripId);
+      }
       const oldShipmentStatus = String(oldData.status || "").toUpperCase();
       const oldTripShipmentStatus = String(
         tripShipmentSnap?.exists ? tripShipmentSnap.data()?.status || "" : "",
@@ -398,8 +403,10 @@ exports.updateShipmentPackages = onCall(
         };
       };
 
+      const isHubReceive =
+        isOffloadingAction && newStatus === "RECEIVED" && !isDeliveryTrip;
       const derivePackageStatus = (pkg) =>
-        derivePackageStatusFromQuantities(pkg, { isDeliveryTrip });
+        derivePackageStatusFromQuantities(pkg, { isDeliveryTrip, isHubReceive });
 
       const sumTotalQty = (pkgs) =>
         pkgs.reduce(
@@ -664,6 +671,7 @@ exports.updateShipmentPackages = onCall(
                       ? {
                           custodyOwnerType: "WAREHOUSE",
                           custodyOwnerId: ODIONGAN_WAREHOUSE,
+                          hubReceivedAt: nowIso,
                         }
                       : {}),
                   }
@@ -989,7 +997,7 @@ exports.updateShipmentPackages = onCall(
         "totals.totalContentQty": newTotalQty, // actual quantity
         "totals.loaded": newLoadedQty,
         "totals.received": newReceivedQty,
-        "totals.delivered": newReceivedQty,
+        "totals.delivered": packageBreakdown.delivered,
         "totals.missing": newMissingQty,
         "totals.damaged": newDamagedQty,
         "totals.pending": pendingQty,

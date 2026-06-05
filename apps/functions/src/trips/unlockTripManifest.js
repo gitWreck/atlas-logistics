@@ -8,6 +8,11 @@ const {
   updatedBy,
 } = require("../utilities/helpers");
 const { writeTripActionLog } = require("../utilities/tripLogger");
+const {
+  MANIFEST_STATUS,
+  canUnlockManifest,
+  resolveManifestStatus,
+} = require("./manifestStatus");
 
 if (!admin.apps.length) admin.initializeApp();
 const db = admin.firestore();
@@ -49,12 +54,18 @@ exports.unlockTripManifest = onCall(
         return { success: true, message: "Trip was already unlocked." };
       }
 
+      if (!canUnlockManifest(trip)) {
+        throw new HttpsError(
+          "failed-precondition",
+          `Cannot unlock manifest while status is ${resolveManifestStatus(trip)}. Receiving must not be in progress.`,
+        );
+      }
+
       // 2. UNLOCK OPERATIONS
       tx.update(tripRef, {
         manifestLocked: false,
         // We DO NOT clear manifestId yet. We keep it as a reference to the "last generated" one.
-        // But we mark the status so the UI knows the current state is "dirty" or "open".
-        manifestStatus: "OPEN_FOR_EDIT",
+        manifestStatus: MANIFEST_STATUS.OPEN,
 
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
         updatedBy: name,

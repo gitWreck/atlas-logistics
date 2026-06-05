@@ -17,6 +17,7 @@ const {
 const { broadcastTripLogic } = require("../messaging/broadcastTripMessage"); // Import if you want to call it directly
 const { STATUS_MESSAGES } = require("../utilities/dataDetails");
 const { writeTripActionLog } = require("../utilities/tripLogger");
+const { MANIFEST_STATUS } = require("./manifestStatus");
 
 if (!admin.apps.length) admin.initializeApp();
 const db = admin.firestore();
@@ -86,12 +87,13 @@ exports.updateTripStatus = onCall(
       // --- STATUS SPECIFIC LOGIC ---
 
       if (newStatus === "ARRIVED") {
-        updates.arrivedAt = admin.firestore.FieldValue.serverTimestamp();
-        if (
-          markReconciled ||
-          promotionSource === "RECONCILIATION"
-        ) {
+        if (!tripSnap.data().arrivedAt) {
+          updates.arrivedAt = admin.firestore.FieldValue.serverTimestamp();
+        }
+        if (markReconciled || promotionSource === "RECONCILIATION") {
           updates.reconciledAt = admin.firestore.FieldValue.serverTimestamp();
+          updates.manifestStatus = MANIFEST_STATUS.RECONCILED;
+          updates.manifestLocked = true;
         }
       }
 
@@ -117,6 +119,19 @@ exports.updateTripStatus = onCall(
 
       // 3. Apply Update
       tx.update(tripRef, updates);
+
+      if (
+        (markReconciled || promotionSource === "RECONCILIATION") &&
+        tripSnap.data().manifestId
+      ) {
+        const manifestRef = db
+          .collection("manifests")
+          .doc(tripSnap.data().manifestId);
+        tx.update(manifestRef, {
+          status: MANIFEST_STATUS.RECONCILED,
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+      }
 
       // 4. Audit Log
       writeTripActionLog({
@@ -175,9 +190,15 @@ exports.updateTripStatus = onCall(
         let safeShipmentStatus = tripStatus;
 
         // 1. Protect the Chain of Custody
-        if (tripStatus === "ARRIVED" || tripStatus === "COMPLETED") {
-          // Do nothing to the shipments! They stay IN_TRANSIT until the
-          // warehouse workers physically scan the barcodes.
+        if (
+          tripStatus === "ARRIVED" ||
+          tripStatus === "COMPLETED" ||
+          tripStatus === "IN_TRANSIT" ||
+          tripStatus === "LOADED"
+        ) {
+          // Trip LOADED = truck ready to lock/dispatch, not every piece scanned.
+          // IN_TRANSIT promotion is package-aware (dispatchTrip / startTrip).
+          // Shipment master status must stay derived from package rows.
           return;
         }
 

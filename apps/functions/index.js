@@ -63,6 +63,8 @@ exports.createTruckTrip =
   require("./src/trips/createTruckTrip").createTruckTrip;
 
 exports.startTrip = require("./src/trips/startTrip").startTrip;
+exports.startReceiving = require("./src/trips/startReceiving").startReceiving;
+exports.dispatchTrip = require("./src/trips/dispatchTrip").dispatchTrip;
 exports.reportTripDelay =
   require("./src/trips/reportTripDelay").reportTripDelay;
 exports.setTruckDelay = require("./src/trips/setTruckDelay").setTruckDelay;

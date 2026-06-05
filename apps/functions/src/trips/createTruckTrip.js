@@ -10,6 +10,7 @@ const {
   assertAdminOrManager,
 } = require("../utilities/helpers");
 const { writeTripActionLog } = require("../utilities/tripLogger");
+const { MANIFEST_STATUS } = require("./manifestStatus");
 
 if (!admin.apps.length) admin.initializeApp();
 const db = admin.firestore();
@@ -142,6 +143,8 @@ exports.createTruckTrip = onCall(
         throw new HttpsError("aborted", "Trip ID collision. Please retry.");
       }
 
+      const isHubTransfer = tripType === "HUB_TRANSFER";
+
       const tripData = {
         tripId,
         tripType,
@@ -166,9 +169,12 @@ exports.createTruckTrip = onCall(
         plannedDeparture,
         estimatedArrival,
 
-        status: "CREATED",
-        statusIndex: 0,
+        status: isHubTransfer ? "LOADING" : "CREATED",
+        statusIndex: isHubTransfer ? 2 : 0,
         active: true,
+
+        manifestStatus: isHubTransfer ? MANIFEST_STATUS.OPEN : null,
+        manifestLocked: false,
 
         totalLoaded: 0,
         totalItems: 0,

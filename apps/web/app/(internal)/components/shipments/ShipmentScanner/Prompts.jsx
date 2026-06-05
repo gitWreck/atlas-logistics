@@ -86,23 +86,36 @@ export function HandoffPrompt({
   );
   const lifecycleCanRelease = summary?.lifecycle?.canReleaseForDelivery !== false;
   const releaseBlockReason = summary?.lifecycle?.releaseBlockReason || null;
-  const canRelease =
-    lifecycleCanRelease &&
+  const countsReady =
+    summary?.ready &&
     unloadedShipments.length > 0 &&
     (!hasMissing || remarksComplete);
+  const canRelease = countsReady && (lifecycleCanRelease || summary?.ready);
 
   return (
     <InterceptorPrompt
       theme={theme}
       icon={hasMissing ? faTriangleExclamation : faTruckRampBox}
       iconColor={hasMissing ? "text-amber-500" : "text-emerald-500"}
-      title="Manifest reconciliation"
+      title={
+        summary?.ready && lifecycleCanRelease
+          ? "Manifest reconciled"
+          : summary?.ready
+            ? "Ready to release"
+            : "Manifest reconciliation"
+      }
       description={
         hasMissing
-          ? "Add remarks for missing manifest rows, then release unloaded shipments for checker delivery."
-          : tripId
-            ? `All manifest shipments on ${tripId} are accounted for. Release them for checker scan-to-load.`
-            : "All manifest shipments are accounted for. Release them for checker delivery operations."
+          ? "Add remarks for missing manifest rows, then finalize reconciliation and release for delivery operations."
+          : summary?.ready
+            ? tripId
+              ? lifecycleCanRelease
+                ? `All shipments on ${tripId} are accounted for. Release to delivery operations.`
+                : `All shipments on ${tripId} are accounted for. Click Release below to finalize and send to delivery operations.`
+              : lifecycleCanRelease
+                ? "All manifest shipments are accounted for. Release to delivery operations."
+                : "All manifest shipments are accounted for. Click Release to finalize reconciliation."
+            : "Unload remaining packages or add missing remarks to complete reconciliation."
       }
     >
       <div className="grid grid-cols-3 gap-2 text-left">
@@ -181,7 +194,7 @@ export function HandoffPrompt({
         </div>
       )}
 
-      {!lifecycleCanRelease && releaseBlockReason && (
+      {!lifecycleCanRelease && releaseBlockReason && !summary?.ready && (
         <p className="text-xs text-amber-500/90 text-center px-2">
           {releaseBlockReason}
         </p>
@@ -196,7 +209,7 @@ export function HandoffPrompt({
       <div className="space-y-2">
         <StatusButton
           status={btnStatus}
-          label="Release shipment(s)"
+          label="Release to Delivery Operations"
           loadingLabel="Releasing..."
           successLabel="Released"
           icon={faCheck}
@@ -226,6 +239,28 @@ function MetricCard({ label, value, theme }) {
   );
 }
 
+export function StartReceivingPrompt({ theme, btnStatus, onStartReceiving }) {
+  return (
+    <InterceptorPrompt
+      theme={theme}
+      icon={faTruckRampBox}
+      iconColor="text-emerald-500"
+      title="Start Receiving"
+      description="Accept custody at the destination hub before scanning packages. This marks the trip as arrived and opens receiving."
+    >
+      <StatusButton
+        status={btnStatus}
+        label="Start Receiving"
+        loadingLabel="Starting..."
+        successLabel="Receiving started!"
+        icon={faCheck}
+        variant="emerald"
+        onClick={onStartReceiving}
+      />
+    </InterceptorPrompt>
+  );
+}
+
 export function ArrivalPrompt({ theme, btnStatus, onMarkArrived }) {
   return (
     <InterceptorPrompt
@@ -233,7 +268,7 @@ export function ArrivalPrompt({ theme, btnStatus, onMarkArrived }) {
       icon={faTruckRampBox}
       iconColor="text-blue-500"
       title="Mark Trip as Arrived"
-      description="Reconciliation is complete but the trip was not auto-promoted. Mark ARRIVED to continue (fallback — normally happens after reconcile)."
+      description="Legacy fallback only. Hub trips should use Start Receiving before scanning; reconciliation marks the manifest RECONCILED."
     >
       <StatusButton
         status={btnStatus}
@@ -300,7 +335,7 @@ export function LockPrompt({ theme, trip, btnStatus, onLock, onSkip }) {
       icon={faLock}
       iconColor="text-emerald-500"
       title="Ready for Dispatch"
-      description="The trip is loaded. Lock the manifest to prevent further changes before dispatch."
+      description="The trip is loaded. Lock the manifest to seal it. The trip stays LOADED — use Dispatch Trip in the trip drawer next."
     >
       <div className="space-y-2">
         <StatusButton

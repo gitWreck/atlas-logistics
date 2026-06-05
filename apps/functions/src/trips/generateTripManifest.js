@@ -23,6 +23,7 @@ const {
   sha256Hex,
 } = require("../utilities/helpers");
 const { writeTripActionLog } = require("../utilities/tripLogger");
+const { MANIFEST_STATUS } = require("./manifestStatus");
 
 if (!admin.apps.length) admin.initializeApp();
 const db = admin.firestore();
@@ -227,6 +228,7 @@ exports.generateTripManifest = onCall(
       // B. Lock Trip
       tx.update(tripRef, {
         manifestLocked: true,
+        manifestStatus: MANIFEST_STATUS.LOCKED,
         manifestId,
         manifestHash: hash,
         manifestGeneratedAt: nowTs,

@@ -120,6 +120,19 @@ export function getTripStatsDisplay(trip) {
 
   if (["ARRIVED", "UNLOADING"].includes(status)) {
     const count = total > 0 ? Math.min(processedAtHub, total) : processedAtHub;
+    const manifestStatus = String(trip.manifestStatus || "").toUpperCase();
+    const isReceiving =
+      status === "UNLOADING" ||
+      manifestStatus === "RECEIVING_IN_PROGRESS" ||
+      (trip.receivingStartedAt && !trip.reconciledAt);
+
+    if (isReceiving && !isDelivery) {
+      return {
+        count,
+        total,
+        label: "Receiving",
+      };
+    }
 
     return {
       count,

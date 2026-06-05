@@ -158,6 +158,7 @@ exports.bulkShipmentAction = onCall(
 
           const snapshot = buildShipmentSnapshot(updatedPackages, {
             previousStatus: shipData.status,
+            isHubReceive: targetStatus === "RECEIVED",
           });
 
           const newLoadedQty = snapshot.totals.loaded;

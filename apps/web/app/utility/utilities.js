@@ -14,9 +14,11 @@ export function calculateProgress(status) {
     case "LOADING":
       return 40;
     case "PARTIALLY_LOADED":
-      return 50;
+      return 55;
     case "LOADED":
       return 60;
+    case "PARTIALLY_IN_TRANSIT":
+      return 68;
     case "IN_TRANSIT":
       return 75;
     case "ARRIVED":

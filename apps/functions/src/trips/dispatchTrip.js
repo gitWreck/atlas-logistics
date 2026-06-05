@@ -1,0 +1,199 @@
+"use strict";
+
+const { onCall, HttpsError } = require("firebase-functions/v2/https");
+const admin = require("firebase-admin");
+const { FieldValue } = require("firebase-admin/firestore");
+const { requireRole, requireString } = require("../utilities/helpers");
+const { writeTripActionLog } = require("../utilities/tripLogger");
+const { writeShipmentEvent } = require("../tracking/writeShipmentEvent");
+const { EVENT_TYPES } = require("../tracking/eventTypes");
+const { extractTripEventContext } = require("../tracking/tripEventContext");
+const {
+  packageOnTrip,
+  applyLinehaulInTransit,
+  buildShipmentSnapshot,
+  normalizePackageRow,
+} = require("../packages/tripPackageOperations");
+const {
+  canDispatchTrip,
+  isHubTransferTrip,
+  MANIFEST_STATUS,
+} = require("./manifestStatus");
+
+if (!admin.apps.length) admin.initializeApp();
+const db = admin.firestore();
+
+exports.dispatchTrip = onCall(
+  { region: "asia-southeast1", maxInstances: 10 },
+  async (req) => {
+    await requireRole(db, req, ["admin", "manager"]);
+
+    const tripId = requireString(req.data?.tripId, "tripId");
+    const location = req.data?.location || null;
+    const uid = req.auth.uid;
+
+    const userSnap = await db.collection("users").doc(uid).get();
+    const actorName = String(userSnap.data()?.name || "").trim() || "Unknown User";
+
+    const tripRef = db.collection("truck_trips").doc(tripId);
+    const tripSnap = await tripRef.get();
+
+    if (!tripSnap.exists) {
+      throw new HttpsError("not-found", "Trip not found");
+    }
+
+    const trip = tripSnap.data() || {};
+
+    if (!isHubTransferTrip(trip)) {
+      throw new HttpsError(
+        "failed-precondition",
+        "Dispatch Trip is only available for hub transfer trips.",
+      );
+    }
+
+    if (!canDispatchTrip(trip)) {
+      throw new HttpsError(
+        "failed-precondition",
+        "Trip must be LOADED (or IN_TRANSIT pending dispatch) with a locked manifest before dispatch.",
+      );
+    }
+
+    const shipQuery = await tripRef.collection("trip_shipments").get();
+    const shipmentCount = shipQuery.size;
+    const nowIso = new Date().toISOString();
+    const timestamp = FieldValue.serverTimestamp();
+
+    await db.runTransaction(async (tx) => {
+      const shipmentWrites = [];
+
+      for (const tripShipDoc of shipQuery.docs) {
+        const shipmentId = tripShipDoc.id;
+        const shipmentRef = db.collection("shipments").doc(shipmentId);
+        const shipmentSnap = await tx.get(shipmentRef);
+
+        if (!shipmentSnap.exists) continue;
+
+        const shipmentData = shipmentSnap.data() || {};
+        const oldPackages = Array.isArray(shipmentData.packages)
+          ? shipmentData.packages.map(normalizePackageRow)
+          : [];
+
+        const hasTripPackages = oldPackages.some((pkg) =>
+          packageOnTrip(pkg, tripId),
+        );
+        if (!hasTripPackages) continue;
+
+        const updatedPackages = oldPackages.map((pkg) =>
+          applyLinehaulInTransit(pkg, { tripId, nowIso }),
+        );
+
+        const snapshot = buildShipmentSnapshot(updatedPackages, {
+          previousStatus: shipmentData.status,
+        });
+
+        const historyEntry = {
+          status: snapshot.status,
+          at: admin.firestore.Timestamp.now(),
+          note: `Trip ${trip.tripId || tripId} dispatched — packages on this trip marked in transit.`,
+          by: uid,
+          location: location || null,
+        };
+
+        shipmentWrites.push({
+          tripShipRef: tripShipDoc.ref,
+          shipmentRef,
+          snapshot,
+          historyEntry,
+        });
+      }
+
+      tx.update(tripRef, {
+        status: "IN_TRANSIT",
+        manifestStatus: MANIFEST_STATUS.LOCKED,
+        manifestLocked: true,
+        startedAt: timestamp,
+        dispatchedAt: timestamp,
+        dispatchedBy: uid,
+        dispatchedByName: actorName,
+        updatedAt: timestamp,
+        updatedBy: actorName,
+        startedBy: uid,
+      });
+
+      for (const {
+        tripShipRef,
+        shipmentRef,
+        snapshot,
+        historyEntry,
+      } of shipmentWrites) {
+        tx.update(tripShipRef, {
+          status: snapshot.status,
+          updatedAt: timestamp,
+        });
+
+        tx.update(shipmentRef, {
+          status: snapshot.status,
+          packages: snapshot.packages,
+          packageBreakdown: snapshot.packageBreakdown,
+          currentTripIds: snapshot.currentTripIds,
+          currentTripId: snapshot.currentTripId,
+          updatedAt: timestamp,
+          statusHistory: FieldValue.arrayUnion(historyEntry),
+          ...(location ? { lastLocation: location } : {}),
+        });
+      }
+
+      writeTripActionLog({
+        db,
+        tx,
+        collection: "audit_logs",
+        action: "DISPATCH_TRIP",
+        targetCollection: "truck_trips",
+        targetId: tripId,
+        tripId,
+        actorId: uid,
+        actorName,
+        actorRole: req.auth.token?.role || null,
+        details: {
+          tripNumber: trip.tripId || tripId,
+          plateNumber: trip.truckPlateNumber || trip.plateNumber || "N/A",
+          driverName: trip.driverName || null,
+          driverId: trip.driverId || null,
+          packagesUpdated: shipmentCount,
+          previousStatus: trip.status || "LOADED",
+          newStatus: "IN_TRANSIT",
+        },
+        note: "Trip dispatched from origin hub.",
+        timestamp,
+      });
+    });
+
+    const tripContext = extractTripEventContext(trip, tripId);
+    await Promise.all(
+      shipQuery.docs.map((doc) =>
+        writeShipmentEvent({
+          db,
+          event: {
+            shipmentId: doc.id,
+            eventType: EVENT_TYPES.IN_TRANSIT,
+            ...tripContext,
+            location: location || null,
+            createdBy: uid,
+            createdByRole: req.auth.token?.role || null,
+            remarks: `Trip ${tripContext.tripId || tripId} dispatched`,
+            source: "DISPATCH_TRIP",
+          },
+        }).catch((error) => {
+          console.error(`IN_TRANSIT event write failed for ${doc.id}:`, error);
+        }),
+      ),
+    );
+
+    return {
+      success: true,
+      message: `Trip dispatched. ${shipmentCount} shipment(s) marked in transit.`,
+      status: "IN_TRANSIT",
+      manifestStatus: MANIFEST_STATUS.LOCKED,
+    };
+  },
+);

@@ -13,10 +13,10 @@ export function getScannerErrorGuidance(message, state, trip) {
       return "Mark the trip as LOADED first, then scan again.";
     }
     if (currentTripStatus === "IN_TRANSIT") {
-      return "Unload scanning is allowed from IN_TRANSIT. Try refreshing the trip and scanning again.";
+      return "Click Start Receiving on the trip before unloading packages.";
     }
 
-    return "Unload scans are available when the trip is LOADED, IN_TRANSIT, or ARRIVED. Update the trip status, then try again.";
+    return "Start receiving on this trip, then scan packages to unload.";
   }
 
   if (text.includes("manifest") && text.includes("locked")) {

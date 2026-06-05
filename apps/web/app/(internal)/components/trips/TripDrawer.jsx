@@ -15,6 +15,7 @@ import TripManifestTab from "./TripManifestTab";
 import TripToolsTab from "./TripToolsTab";
 import TripDrawerFooter from "./TripDrawerFooter";
 import StatusBadge from "../ui/StatusBadge";
+import ManifestStatusBadge from "../ui/ManifestStatusBadge";
 import DrawerTabButton from "../ui/DrawerTabButton";
 import UnassignShipmentModal from "./modals/UnassignShipmentModal";
 import BulkAssignmentModal from "./modals/BulkAssignmentModal";
@@ -186,7 +187,11 @@ export default function TripDrawer({
             </h2>
 
             <div className="flex gap-2 mt-2 items-center flex-wrap">
-              <StatusBadge status={data.status} isDark={isDark} />
+              <StatusBadge
+                status={data.status === "UNLOADING" ? "ARRIVED" : data.status}
+                isDark={isDark}
+              />
+              <ManifestStatusBadge trip={data} isDark={isDark} />
               <span
                 className={`text-xs border-l pl-2 ml-1 ${theme.mutedText} ${theme.divider}`}
               >
@@ -274,6 +279,9 @@ export default function TripDrawer({
               tripId={data?.tripId}
               tripStatus={data?.status}
               tripReconciledAt={data?.reconciledAt}
+              tripManifestStatus={data?.manifestStatus}
+              tripType={data?.tripType}
+              trip={data}
               onRefresh={() => {
                 fetchShipments();
                 onRefreshTrips?.();
