@@ -101,19 +101,22 @@ export function getTripStatsDisplay(trip) {
   const processedAtHub = Math.max(received, arrived);
 
   if (status === "COMPLETED") {
-    const count = Math.max(processedAtHub, received, loaded);
+    const processed = Math.max(processedAtHub, received, loaded);
+    // Counters are often zeroed after trip completion; show full total when done.
+    const count = total > 0 ? total : processed;
     return {
-      count: total > 0 ? Math.min(count, total) : count,
-      total,
+      count,
+      total: total > 0 ? total : Math.max(total, processed),
       label: "Completed",
     };
   }
 
   if (status === "DELIVERED") {
-    const count = processedAtHub > 0 ? processedAtHub : loaded;
+    const processed = Math.max(processedAtHub, loaded);
+    const count = total > 0 ? total : processed;
     return {
-      count: total > 0 ? Math.min(count, total) : count,
-      total,
+      count,
+      total: total > 0 ? total : Math.max(total, processed),
       label: isDelivery ? "Delivered" : "Completed",
     };
   }
