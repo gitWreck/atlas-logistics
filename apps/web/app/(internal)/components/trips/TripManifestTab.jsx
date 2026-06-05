@@ -1,9 +1,6 @@
 "use client";
 
 import React, { useState, useMemo, useEffect } from "react";
-import ReleaseToCheckerModal from "../shipments/modals/ReleaseToCheckerModal";
-import { isEligibleForCheckerRelease } from "@/app/utility/checkerRelease";
-import { isTripReleaseEligible } from "@/app/utility/tripLifecycle";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faSearch,
@@ -61,22 +58,8 @@ export default function TripManifestTab({
   const [isBulkProcessing, setIsBulkProcessing] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [manifestLimit, setManifestLimit] = useState("50");
-  const [isReleaseModalOpen, setIsReleaseModalOpen] = useState(false);
-
   const theme = getTableTheme(isDark);
   const action = getTableActionClasses(isDark);
-
-  const canReleaseShipments = ["manager", "admin"].includes(
-    String(profile?.role || "").toLowerCase(),
-  );
-
-  const releaseTargetShipments = useMemo(() => {
-    const pool =
-      selectedIds.size > 0
-        ? shipments.filter((s) => selectedIds.has(s.id))
-        : shipments;
-    return pool.filter((s) => isEligibleForCheckerRelease(s.status));
-  }, [shipments, selectedIds]);
 
   const hubTrip = isHubTransferTrip(
     trip || { tripType, manifestStatus: tripManifestStatus, reconciledAt: tripReconciledAt },
@@ -89,17 +72,6 @@ export default function TripManifestTab({
     },
   );
   const isManifestReconciled = manifestStatus === MANIFEST_STATUS.RECONCILED;
-
-  const tripReleaseGate = useMemo(
-    () =>
-      isTripReleaseEligible({
-        status: tripStatus,
-        reconciledAt: tripReconciledAt,
-        manifestStatus,
-        tripType: tripType || trip?.tripType,
-      }),
-    [tripStatus, tripReconciledAt, manifestStatus, tripType, trip?.tripType],
-  );
 
   const rowAction = {
     print: isDark
@@ -286,7 +258,7 @@ export default function TripManifestTab({
           </div>
           <p className={`text-xs ${theme.cellSecondary}`}>
             {isManifestReconciled
-              ? "Reconciliation complete. Release shipments to delivery operations when ready."
+              ? "Reconciliation complete. Release shipments from the trip scanner when ready."
               : manifestStatus === MANIFEST_STATUS.RECEIVING_IN_PROGRESS
                 ? "Receiving in progress. Finish unload scans, then finalize reconciliation."
                 : manifestStatus === MANIFEST_STATUS.LOCKED
@@ -344,31 +316,6 @@ export default function TripManifestTab({
             </div>
 
             <div className="grid grid-cols-2 sm:flex gap-2 flex-wrap">
-              {canReleaseShipments && (
-                <button
-                  type="button"
-                  onClick={() => setIsReleaseModalOpen(true)}
-                  disabled={
-                    isLocked ||
-                    releaseTargetShipments.length === 0 ||
-                    !tripReleaseGate.eligible
-                  }
-                  className={`text-xs font-bold px-3 py-1.5 h-8 rounded-lg flex items-center justify-center gap-2 transition-colors disabled:opacity-50 whitespace-nowrap ${isDark ? "bg-indigo-600 hover:bg-indigo-500 text-white" : "bg-indigo-600 hover:bg-indigo-500 text-white"}`}
-                  title={
-                    !tripReleaseGate.eligible
-                      ? tripReleaseGate.reason
-                      : selectedIds.size > 0
-                        ? `Release ${releaseTargetShipments.length} selected shipment(s) for checker delivery`
-                        : `Release all eligible shipments on this trip (${releaseTargetShipments.length})`
-                  }
-                >
-                  <FontAwesomeIcon icon={faBoxOpen} />
-                  {hubTrip && !isManifestReconciled
-                    ? "Release (reconcile first)"
-                    : "Release to Delivery Operations"}
-                </button>
-              )}
-
               <button
                 type="button"
                 onClick={() =>
@@ -797,21 +744,6 @@ export default function TripManifestTab({
         )}
       </div>
     </div>
-
-    <ReleaseToCheckerModal
-      isOpen={isReleaseModalOpen}
-      onClose={() => setIsReleaseModalOpen(false)}
-      onSuccess={() => {
-        setSelectedIds(new Set());
-        onRefresh?.();
-      }}
-      isDark={isDark}
-      tripId={tripId}
-      tripStatus={tripStatus}
-      tripReconciledAt={tripReconciledAt}
-      defaultShipmentIds={releaseTargetShipments.map((s) => s.id)}
-      defaultShipments={releaseTargetShipments}
-    />
     </>
   );
 }

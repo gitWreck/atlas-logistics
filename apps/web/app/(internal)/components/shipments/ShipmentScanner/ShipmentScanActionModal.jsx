@@ -95,6 +95,7 @@ export default function ShipmentScanActionModal({
   const [scannerSession, setScannerSession] = useState(0);
 
   const { state, actions } = useScannerLogic({
+    isOpen,
     trip,
     onResolveScan,
     onConfirmOperation,

@@ -30,6 +30,8 @@ export default function ReleaseToCheckerModal({
   tripId = null,
   tripStatus = null,
   tripReconciledAt = null,
+  tripManifestStatus = null,
+  tripType = null,
 }) {
   const [warehouseCode, setWarehouseCode] = useState("ODIONGAN_WAREHOUSE");
   const [remarks, setRemarks] = useState("");
@@ -81,8 +83,10 @@ export default function ReleaseToCheckerModal({
     return isTripReleaseEligible({
       status: tripStatus,
       reconciledAt: tripReconciledAt,
+      manifestStatus: tripManifestStatus,
+      tripType: tripType,
     });
-  }, [tripId, tripStatus, tripReconciledAt]);
+  }, [tripId, tripStatus, tripReconciledAt, tripManifestStatus, tripType]);
 
   const canSubmit =
     !submitting &&

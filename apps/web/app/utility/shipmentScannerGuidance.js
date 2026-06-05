@@ -41,7 +41,11 @@ export function getScannerErrorGuidance(message, state, trip) {
   }
 
   if (text.includes("trip has no manifest to reconcile")) {
-    return "Use Trip → Manifest → Release shipment(s), or add shipments to this trip first.";
+    return "Add shipments to this trip first, then unload and use Reconcile & release shipments.";
+  }
+
+  if (text.includes("manifest is reconciled")) {
+    return "Tap Reconcile & release shipments (or Unload) to open the release screen.";
   }
 
   if (text.includes("label not found")) {
@@ -69,11 +73,11 @@ export function getScannerErrorGuidance(message, state, trip) {
   }
 
   if (text.includes("skip unload")) {
-    return "Open Trip → Manifest → Release shipment(s) for checker delivery.";
+    return "Use Reconcile & release shipments in this scanner to release for checker delivery.";
   }
 
   if (text.includes("already received") || text.includes("already at the hub")) {
-    return "Skip unload. Open Trip → Manifest → Release shipment(s) for checker delivery.";
+    return "Skip unload. Use Reconcile & release shipments in this scanner.";
   }
 
   if (text.includes("still on trip")) {

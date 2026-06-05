@@ -202,8 +202,7 @@ export function HandoffPrompt({
 
       <p className="text-[11px] opacity-60 text-center px-1">
         Releases to the delivery pool. Custody stays at Odiongan until a checker
-        scans and loads each label. You can also use Trip → Manifest → Release
-        shipment(s).
+        scans and loads each label.
       </p>
 
       <div className="space-y-2">

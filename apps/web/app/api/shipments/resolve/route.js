@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { adminDb, adminAuth } from "@/lib/firebase-admin";
 import { headers } from "next/headers";
+import { getUnloadBlockReason } from "@/app/utility/manifestStatus";
 
 export async function POST(req) {
   try {
@@ -23,25 +24,25 @@ export async function POST(req) {
         .collection("truck_trips")
         .doc(tripId)
         .get();
-      const tripStatus = String(tripCheck.data()?.status || "")
-        .trim()
-        .toUpperCase();
       const tripData = tripCheck.data() || {};
       const tripType = String(tripData.tripType || "HUB_TRANSFER").toUpperCase();
-      const manifestStatus = String(tripData.manifestStatus || "").toUpperCase();
       const isHubTransfer = tripType === "HUB_TRANSFER";
+      const unloadBlockReason = isHubTransfer
+        ? getUnloadBlockReason(tripData)
+        : null;
+      const tripStatus = String(tripData.status || "").trim().toUpperCase();
       const canUnload = isHubTransfer
-        ? tripStatus === "ARRIVED" &&
-          (manifestStatus === "RECEIVING_IN_PROGRESS" ||
-            !!tripData.receivingStartedAt)
+        ? !unloadBlockReason
         : ["ARRIVED", "LOADED", "IN_TRANSIT"].includes(tripStatus);
 
       if (tripCheck.exists && !canUnload) {
         return NextResponse.json({
           found: false,
-          message: isHubTransfer
-            ? "Start receiving on this trip before unloading packages."
-            : "Trip must be ARRIVED, LOADED, or IN_TRANSIT before unloading.",
+          message:
+            unloadBlockReason ||
+            (isHubTransfer
+              ? "Start receiving on this trip before unloading packages."
+              : "Trip must be ARRIVED, LOADED, or IN_TRANSIT before unloading."),
         });
       }
     }

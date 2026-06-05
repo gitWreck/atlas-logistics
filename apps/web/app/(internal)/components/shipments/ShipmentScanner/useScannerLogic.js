@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
+import { isManifestReconciled } from "@/app/utility/manifestStatus";
 
 // 1. Import your centralized Firebase functions
 import {
@@ -79,7 +80,7 @@ function explainUnloadBlockReason(pkg, { tripId, shipmentOnTrip, packageAssignme
   }
 
   if (ALREADY_AT_HUB_PIECE_STATUSES.has(status)) {
-    return `This piece is already ${status.replace(/_/g, " ").toLowerCase()} at the hub. Skip unload — use Trip → Manifest → Release shipment(s).`;
+    return `This piece is already ${status.replace(/_/g, " ").toLowerCase()} at the hub. Skip unload — use Reconcile & release shipments in this scanner.`;
   }
 
   if (!shipmentOnTrip && packageAssignmentState !== "ON_THIS_TRIP") {
@@ -90,6 +91,7 @@ function explainUnloadBlockReason(pkg, { tripId, shipmentOnTrip, packageAssignme
 }
 
 export default function useScannerLogic({
+  isOpen = false,
   trip,
   onResolveScan,
   onConfirmOperation,
@@ -460,6 +462,21 @@ export default function useScannerLogic({
     ],
   );
 
+  const openReleaseHandoff = useCallback(async () => {
+    setError("");
+    setSuccessNotice(null);
+    setAction("UNLOAD");
+    await loadHandoffReview({ openWhenReadyOnly: false });
+  }, [loadHandoffReview]);
+
+  useEffect(() => {
+    if (!isOpen || !tripId || !isManifestReconciled(trip)) return;
+    setError("");
+    setSuccessNotice(null);
+    setAction("UNLOAD");
+    loadHandoffReview({ openWhenReadyOnly: false });
+  }, [isOpen, tripId, trip?.manifestStatus, trip?.reconciledAt, loadHandoffReview, trip]);
+
   const processItems = useCallback(
     async ({ item, code, itemsToProcess }) => {
       await onConfirmOperation({
@@ -540,7 +557,13 @@ export default function useScannerLogic({
         action,
         scanCode: cleanCode,
       });
-      if (!result?.found) return setError(result.message || "Label not found.");
+      if (!result?.found) {
+        if (action === "UNLOAD" && isManifestReconciled(trip)) {
+          await openReleaseHandoff();
+          return;
+        }
+        return setError(result.message || "Label not found.");
+      }
 
       if (result.packageAssignmentState === "ON_OTHER_TRIP") {
         return setError(
@@ -1064,6 +1087,7 @@ export default function useScannerLogic({
       handleReleaseShipmentsFromTrip,
       handleReleaseSingleShipment,
       handleReviewHandoff: () => loadHandoffReview(),
+      openReleaseHandoff,
       handleConfirm,
     },
   };
