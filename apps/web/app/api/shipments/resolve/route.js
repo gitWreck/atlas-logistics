@@ -26,14 +26,22 @@ export async function POST(req) {
       const tripStatus = String(tripCheck.data()?.status || "")
         .trim()
         .toUpperCase();
-      const canUnload = ["ARRIVED", "LOADED", "IN_TRANSIT"].includes(
-        tripStatus,
-      );
+      const tripData = tripCheck.data() || {};
+      const tripType = String(tripData.tripType || "HUB_TRANSFER").toUpperCase();
+      const manifestStatus = String(tripData.manifestStatus || "").toUpperCase();
+      const isHubTransfer = tripType === "HUB_TRANSFER";
+      const canUnload = isHubTransfer
+        ? tripStatus === "ARRIVED" &&
+          (manifestStatus === "RECEIVING_IN_PROGRESS" ||
+            !!tripData.receivingStartedAt)
+        : ["ARRIVED", "LOADED", "IN_TRANSIT"].includes(tripStatus);
 
       if (tripCheck.exists && !canUnload) {
         return NextResponse.json({
           found: false,
-          message: "Trip must be ARRIVED, LOADED, or IN_TRANSIT before unloading.",
+          message: isHubTransfer
+            ? "Start receiving on this trip before unloading packages."
+            : "Trip must be ARRIVED, LOADED, or IN_TRANSIT before unloading.",
         });
       }
     }

@@ -20,9 +20,34 @@ const COLORS = {
     border: "#94a3b8",
   },
   ARRIVED: {
-    bg: "rgba(97, 40, 231, 0.91)", // Slate
+    bg: "rgba(97, 40, 231, 0.91)",
     text: "#f0f0f0ff",
     border: "rgba(138, 111, 202, 0.91)",
+  },
+  UNLOADING: {
+    bg: "rgba(45, 212, 191, 0.2)",
+    text: "#2dd4bf",
+    border: "rgba(45, 212, 191, 0.5)",
+  },
+  OPEN: {
+    bg: "rgba(148, 163, 184, 0.2)",
+    text: "#cbd5e1",
+    border: "#94a3b8",
+  },
+  LOCKED: {
+    bg: "rgba(245, 158, 11, 0.2)",
+    text: "#fbbf24",
+    border: "rgba(245, 158, 11, 0.5)",
+  },
+  RECEIVING_IN_PROGRESS: {
+    bg: "rgba(45, 212, 191, 0.2)",
+    text: "#2dd4bf",
+    border: "rgba(45, 212, 191, 0.5)",
+  },
+  RECONCILED: {
+    bg: "rgba(34, 197, 94, 0.15)",
+    text: "#4ade80",
+    border: "rgba(34, 197, 94, 0.5)",
   },
 
   // Existing Package Statuses
@@ -89,6 +114,18 @@ const COLORS = {
   },
 };
 
+COLORS.RECEIVED_AT_DIVISORIA = COLORS.RECEIVED;
+COLORS.AVAILABLE_AT_ODIONGAN_WAREHOUSE = COLORS.AVAILABLE_AT_WAREHOUSE;
+COLORS.ARRIVED_AT_ODIONGAN = COLORS.AVAILABLE_AT_WAREHOUSE;
+
+const STATUS_LABELS = {
+  RECEIVED_AT_DIVISORIA: "Received at Divisoria",
+  RECEIVED: "Received at Divisoria",
+  AVAILABLE_AT_ODIONGAN_WAREHOUSE: "Available at Odiongan",
+  AVAILABLE_AT_WAREHOUSE: "Available at Odiongan",
+  ARRIVED_AT_ODIONGAN: "Arrived at Odiongan",
+};
+
 export default function StatusBadge({ status }) {
   // 1. Normalize Status
   const currentStatus = (status || "PENDING").toUpperCase();
@@ -96,8 +133,9 @@ export default function StatusBadge({ status }) {
   // 2. Get Colors (Fallback to PENDING if undefined)
   const theme = COLORS[currentStatus] || COLORS.PENDING;
 
-  // 3. Format Text (Remove underscores)
-  const label = currentStatus.replace(/_/g, " ");
+  // 3. Format Text
+  const label =
+    STATUS_LABELS[currentStatus] || currentStatus.replace(/_/g, " ");
   const isLongLabel = label.length > 16;
 
   return (

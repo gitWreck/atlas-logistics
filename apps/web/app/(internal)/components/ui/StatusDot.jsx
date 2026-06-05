@@ -4,17 +4,24 @@ export default function StatusDot({
   animateActive = true,
 }) {
   const normalizedStatus = String(status || "").toUpperCase();
+  const displayStatus =
+    normalizedStatus === "UNLOADING" ? "ARRIVED" : normalizedStatus;
   let color = "bg-blue-500";
   let animate = false;
 
-  if (["COMPLETED", "DELIVERED"].includes(normalizedStatus)) {
+  if (["COMPLETED", "DELIVERED"].includes(displayStatus)) {
     color = "bg-emerald-500";
   }
 
-  if (normalizedStatus === "CREATED") color = "bg-slate-600";
+  if (displayStatus === "CREATED") color = "bg-slate-600";
 
-  if (normalizedStatus === "IN_TRANSIT") {
+  if (displayStatus === "IN_TRANSIT") {
     color = "bg-blue-500";
+    animate = true;
+  }
+
+  if (displayStatus === "ARRIVED" || normalizedStatus === "UNLOADING") {
+    color = "bg-teal-500";
     animate = true;
   }
 

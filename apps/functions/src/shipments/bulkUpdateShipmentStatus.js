@@ -92,6 +92,7 @@ exports.bulkUpdateShipmentStatus = onCall(
 
       const snapshot = buildShipmentSnapshot(updatedPackages, {
         previousStatus: data.status,
+        isHubReceive: newStatus === "ARRIVED" || newStatus === "RECEIVED",
       });
 
       const deltaLoaded = snapshot.totals.loaded - oldLoadedQty;

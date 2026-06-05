@@ -4,9 +4,17 @@ const { HttpsError } = require("firebase-functions/v2/https");
 const {
   PACKAGE_STATUS,
   ODIONGAN_WAREHOUSE,
+  normalizePackageStatus,
   resolveOdionganPoolStatus,
   resolveDeliveryVehicleLoadedStatus,
 } = require("../packages/packageStatus");
+
+const STILL_ON_LINEHAUL_STATUSES = new Set([
+  PACKAGE_STATUS.IN_TRANSIT,
+  PACKAGE_STATUS.LOADED_TO_TRIP,
+  PACKAGE_STATUS.LOADED,
+  PACKAGE_STATUS.PARTIALLY_LOADED,
+]);
 
 const DEFAULT_WAREHOUSE_CODE = ODIONGAN_WAREHOUSE;
 
@@ -32,11 +40,75 @@ function isTerminalPiece(pkg = {}) {
   );
 }
 
-function mapPackagesForDeliveryRelease(packages = [], warehouseCode = DEFAULT_WAREHOUSE_CODE) {
+/** Only hub-received inventory at Odiongan may enter the checker pool. */
+const DELIVERY_RELEASE_ELIGIBLE_PIECE_STATUSES = new Set([
+  PACKAGE_STATUS.ARRIVED_AT_ODIONGAN,
+  PACKAGE_STATUS.AVAILABLE_AT_ODIONGAN_WAREHOUSE,
+]);
+
+function matchesReleasePackageScope(pkg = {}, packageIdSet = null) {
+  if (!packageIdSet || packageIdSet.size === 0) return true;
+  const identity = getPackageIdentity(pkg);
+  return identity ? packageIdSet.has(identity) : false;
+}
+
+/**
+ * Only pieces physically received at Odiongan (unload scan) may enter checker pool.
+ * Pieces still on the truck, at Divisoria, or without hub receive qty are skipped.
+ */
+function isEligiblePieceForDeliveryRelease(pkg = {}) {
+  if (isTerminalPiece(pkg)) return false;
+
+  const status = normalizePackageStatus(pkg);
+  if (status === PACKAGE_STATUS.RELEASED_FOR_DELIVERY) {
+    return pkg.availableForDelivery !== true;
+  }
+
+  if (
+    status === PACKAGE_STATUS.RECEIVED_AT_DIVISORIA ||
+    STILL_ON_LINEHAUL_STATUSES.has(status)
+  ) {
+    return false;
+  }
+
+  if (String(pkg.currentTripId || pkg.loadedOnTrip || "").trim()) {
+    return false;
+  }
+
+  const quantity = Math.max(normalizeQty(pkg.quantity, 1), 1);
+  const loadedQty = normalizeQty(pkg.loadedQty, 0);
+  const receivedQty = normalizeQty(pkg.receivedQty, 0);
+
+  if (loadedQty > 0) return false;
+  if (receivedQty < quantity) return false;
+
+  const custody = String(pkg.custodyOwnerType || "").toUpperCase();
+  const warehouse = String(pkg.custodyOwnerId || "").toUpperCase();
+  if (custody !== "WAREHOUSE" || !warehouse.includes("ODIONGAN")) {
+    return false;
+  }
+
+  if (!DELIVERY_RELEASE_ELIGIBLE_PIECE_STATUSES.has(status)) {
+    return false;
+  }
+
+  return true;
+}
+
+function mapPackagesForDeliveryRelease(
+  packages = [],
+  warehouseCode = DEFAULT_WAREHOUSE_CODE,
+  options = {},
+) {
+  const { packageIdSet = null } = options;
   const nowIso = new Date().toISOString();
 
   return packages.map((pkg) => {
-    if (isTerminalPiece(pkg)) {
+    if (!matchesReleasePackageScope(pkg, packageIdSet)) {
+      return pkg;
+    }
+
+    if (!isEligiblePieceForDeliveryRelease(pkg)) {
       return pkg;
     }
 
@@ -51,9 +123,39 @@ function mapPackagesForDeliveryRelease(packages = [], warehouseCode = DEFAULT_WA
       custodyOwnerId: warehouseCode,
       loadedByCheckerId: null,
       loadedByCheckerName: null,
+      currentTripId: null,
+      loadedOnTrip: null,
+      loadedQty: 0,
+      hubReceivedAt: pkg.hubReceivedAt || nowIso,
+      releasedToDeliveryOpsAt: nowIso,
       updatedAt: nowIso,
     };
   });
+}
+
+function countPiecesEligibleForDeliveryRelease(packages = [], options = {}) {
+  const { packageIdSet = null } = options;
+  if (!Array.isArray(packages)) return 0;
+
+  return packages.filter(
+    (pkg) =>
+      matchesReleasePackageScope(pkg, packageIdSet) &&
+      isEligiblePieceForDeliveryRelease(pkg),
+  ).length;
+}
+
+function listPiecesEligibleForDeliveryRelease(packages = [], options = {}) {
+  const { packageIdSet = null } = options;
+  if (!Array.isArray(packages)) return [];
+
+  return packages
+    .filter(
+      (pkg) =>
+        matchesReleasePackageScope(pkg, packageIdSet) &&
+        isEligiblePieceForDeliveryRelease(pkg),
+    )
+    .map((pkg) => getPackageIdentity(pkg))
+    .filter(Boolean);
 }
 
 function applyPieceLoadCustody(
@@ -218,6 +320,10 @@ module.exports = {
   getPackageIdentity,
   isTerminalPiece,
   mapPackagesForDeliveryRelease,
+  isEligiblePieceForDeliveryRelease,
+  countPiecesEligibleForDeliveryRelease,
+  listPiecesEligibleForDeliveryRelease,
+  matchesReleasePackageScope,
   applyPieceLoadCustody,
   shipmentHasWarehouseCustodyPieces,
   shipmentHasCheckerCustodyPieces,

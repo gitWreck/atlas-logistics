@@ -71,6 +71,8 @@ export const deleteTruckTrip = httpsCallable(functions, "deleteTruckTrip");
 export const setTruckDelay = httpsCallable(functions, "setTruckDelay");
 export const clearTruckDelay = httpsCallable(functions, "clearTruckDelay");
 export const updateTripStatus = httpsCallable(functions, "updateTripStatus");
+export const startReceiving = httpsCallable(functions, "startReceiving");
+export const dispatchTrip = httpsCallable(functions, "dispatchTrip");
 /** @deprecated Use releaseForDeliveryOperations after trip ARRIVED (pool model). */
 export const finalizeTripUnloadHandoff = httpsCallable(
   functions,

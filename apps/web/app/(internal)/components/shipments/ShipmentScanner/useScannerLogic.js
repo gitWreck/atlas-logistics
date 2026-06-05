@@ -9,6 +9,7 @@ import {
   updateTripStatus,
   unlockTripManifest,
   generateTripManifest,
+  startReceiving,
 } from "@/app/utility/FirebaseFunctions"; // Adjust path if your file is located elsewhere
 import { isEligibleForCheckerRelease } from "@/app/utility/checkerRelease";
 import { isTripReleaseEligible } from "@/app/utility/tripLifecycle";
@@ -111,6 +112,7 @@ export default function useScannerLogic({
   const [needsAssignmentItem, setNeedsAssignmentItem] = useState(null);
   const [recentlyAssigned, setRecentlyAssigned] = useState(new Set());
   const [needsArrival, setNeedsArrival] = useState(false);
+  const [needsStartReceiving, setNeedsStartReceiving] = useState(false);
   const [needsUnlock, setNeedsUnlock] = useState(false);
   const [needsLoadedStatus, setNeedsLoadedStatus] = useState(false);
   const [needsLock, setNeedsLock] = useState(false);
@@ -135,6 +137,7 @@ export default function useScannerLogic({
     setQuantities({});
     setNeedsAssignmentItem(null);
     setNeedsArrival(false);
+    setNeedsStartReceiving(false);
     setNeedsUnlock(false);
     setNeedsLoadedStatus(false);
     setNeedsLock(false);
@@ -375,27 +378,36 @@ export default function useScannerLogic({
           `/api/trips/${encodeURIComponent(tripId)}/handoff-reconciliation`,
         );
 
-        if (
+        const tripStatusForFinalize = String(
+          summary.tripStatus || trip?.status || "",
+        ).toUpperCase();
+        const shouldFinalizeReconcile =
           autoPromoteOnReady &&
-          summary.lifecycle?.canPromoteToArrived &&
-          !summary.promoted
-        ) {
+          summary.ready &&
+          !summary.promoted &&
+          (summary.lifecycle?.canPromoteToArrived ||
+            tripStatusForFinalize === "ARRIVED");
+
+        if (shouldFinalizeReconcile) {
           summary = await finalizeTripReconciliation({ notify: true });
           onRefresh?.();
           if (trip && summary.tripStatus) {
             trip.status = summary.tripStatus;
           }
+          if (trip) {
+            trip.manifestStatus = "RECONCILED";
+          }
           setSuccessNotice({
             action: "UNLOAD",
-            scanStatus: "ARRIVED",
-            scanStatusLabel: "Trip arrived",
+            scanStatus: "RECONCILED",
+            scanStatusLabel: "Manifest reconciled",
             code: tripId,
             shipmentId: null,
             scanType: "TRIP",
             totalQuantity: summary.totals?.unloadedShipments || 0,
             needsLoadedStatusPrompt: false,
             message:
-              "Manifest reconciled. Trip marked ARRIVED — customers can be notified.",
+              "Manifest reconciled. Release shipments to delivery operations when ready.",
           });
         }
 
@@ -695,6 +707,35 @@ export default function useScannerLogic({
     setLoading(false);
   };
 
+  const handleStartReceiving = async () => {
+    setLoading(true);
+    setError("");
+
+    try {
+      const success = await executeFirebaseCall(
+        startReceiving,
+        { tripId, updatedBy: updatedBy(profile) },
+        () => {
+          if (trip) {
+            trip.status = "ARRIVED";
+            trip.manifestStatus = "RECEIVING_IN_PROGRESS";
+            trip.manifestLocked = true;
+            trip.receivingStartedAt = new Date().toISOString();
+          }
+        },
+      );
+      if (!success) return;
+
+      onRefresh?.();
+      setNeedsStartReceiving(false);
+      setBtnStatus("IDLE");
+    } catch (err) {
+      setError(err.message || "Could not start receiving.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleMarkArrived = async () => {
     setLoading(true);
     setError("");
@@ -706,16 +747,19 @@ export default function useScannerLogic({
         if (trip && summary?.tripStatus) {
           trip.status = summary.tripStatus;
         }
+        if (trip) {
+          trip.manifestStatus = "RECONCILED";
+        }
         setSuccessNotice({
           action: "UNLOAD",
-          scanStatus: "ARRIVED",
-          scanStatusLabel: "Trip arrived",
+          scanStatus: "RECONCILED",
+          scanStatusLabel: "Manifest reconciled",
           code: tripId,
           shipmentId: null,
           scanType: "TRIP",
           totalQuantity: summary?.totals?.unloadedShipments || 0,
           needsLoadedStatusPrompt: false,
-          message: "Trip marked ARRIVED after reconciliation.",
+          message: "Manifest reconciled after handoff review.",
         });
       } else {
         const success = await executeFirebaseCall(
@@ -735,7 +779,6 @@ export default function useScannerLogic({
 
       onRefresh?.();
       setNeedsArrival(false);
-      if (trip?.manifestLocked) setNeedsUnlock(true);
       setBtnStatus("IDLE");
     } catch (err) {
       setError(err.message || "Could not mark trip as ARRIVED.");
@@ -784,13 +827,23 @@ export default function useScannerLogic({
       () => {
         if (trip) {
           trip.manifestLocked = true;
-          trip.status = "IN_TRANSIT";
+          trip.manifestStatus = "LOCKED";
         }
       },
     );
     if (success) {
-      // Safely ensure backend status aligns with local optimistic IN_TRANSIT
-      executeFirebaseCall(updateTripStatus, { tripId, status: "IN_TRANSIT" });
+      setSuccessNotice({
+        action: "LOAD",
+        scanStatus: "LOCKED",
+        scanStatusLabel: "Manifest locked",
+        code: tripId,
+        shipmentId: null,
+        scanType: "TRIP",
+        totalQuantity: 0,
+        needsLoadedStatusPrompt: false,
+        message:
+          "Manifest locked. Trip stays LOADED — use Dispatch Trip in the trip drawer.",
+      });
       setTimeout(() => {
         onRefresh?.();
         setNeedsLock(false);
@@ -973,6 +1026,7 @@ export default function useScannerLogic({
       quantities,
       needsAssignmentItem,
       needsArrival,
+      needsStartReceiving,
       needsUnlock,
       needsLoadedStatus,
       needsLock,
@@ -997,11 +1051,13 @@ export default function useScannerLogic({
       setNeedsLock,
       setNeedsUnlock,
       setNeedsArrival,
+      setNeedsStartReceiving,
       resetFlow,
       resetScanResult,
       handleResolveScan,
       handleAssignShipment,
       handleMarkArrived,
+      handleStartReceiving,
       handleUnlockManifest,
       handleSetTripLoaded,
       handleLockManifest,

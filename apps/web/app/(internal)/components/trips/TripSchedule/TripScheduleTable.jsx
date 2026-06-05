@@ -19,6 +19,7 @@ import {
   getTripTruckLabel,
 } from "@/app/utility/tripScheduleHelpers";
 import StatusBadge from "../../ui/StatusBadge";
+import ManifestStatusBadge from "../../ui/ManifestStatusBadge";
 import TablePaginationFooter from "../../ui/TablePaginationFooter";
 import {
   formatScheduleDate,
@@ -205,7 +206,8 @@ export default function TripScheduleTable({
             <div className="block lg:hidden p-3 sm:p-4 space-y-3">
               {paginatedTrips.map((trip) => {
                 const hasConflict = hasTripConflict(trip);
-                const statusLabel = trip.status || "Scheduled";
+                const statusLabel =
+                  trip.status === "UNLOADING" ? "ARRIVED" : trip.status || "Scheduled";
 
                 return (
                   <div
@@ -253,8 +255,9 @@ export default function TripScheduleTable({
                         </p>
                       </div>
 
-                      <div className="flex items-center gap-2">
+                      <div className="flex flex-wrap items-center gap-2">
                         <StatusBadge status={statusLabel} isDark={isDark} />
+                        <ManifestStatusBadge trip={trip} isDark={isDark} />
                         {hasConflict && (
                           <span
                             className={`inline-flex px-2 py-1 rounded-full text-[10px] border ${theme.statusInactive}`}
@@ -370,7 +373,8 @@ export default function TripScheduleTable({
                 <tbody className={`divide-y ${theme.tbodyDivide}`}>
                   {paginatedTrips.map((trip) => {
                     const hasConflict = hasTripConflict(trip);
-                    const statusLabel = trip.status || "Scheduled";
+                    const statusLabel =
+                  trip.status === "UNLOADING" ? "ARRIVED" : trip.status || "Scheduled";
 
                     return (
                       <tr
@@ -437,6 +441,7 @@ export default function TripScheduleTable({
                         <td className="px-4 py-3 align-top">
                           <div className="flex flex-wrap items-center gap-2">
                             <StatusBadge status={statusLabel} isDark={isDark} />
+                            <ManifestStatusBadge trip={trip} isDark={isDark} />
                             {hasConflict && (
                               <span
                                 className={`inline-flex px-2 py-1 rounded-full text-[10px] border ${theme.statusInactive}`}

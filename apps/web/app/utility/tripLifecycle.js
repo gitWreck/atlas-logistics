@@ -202,8 +202,22 @@ export function shouldPromoteTripToArrived(trip = {}, reconciliationSummary = {}
 export function isTripReleaseEligible(trip = {}, options = {}) {
   const { allowReconciledFallback = true } = options;
   const status = normalizeTripStatus(trip.status);
+  const isHubTransfer =
+    String(trip.tripType || "HUB_TRANSFER").toUpperCase() === "HUB_TRANSFER";
+  const manifestStatus = String(trip.manifestStatus || "").toUpperCase();
 
   if (RELEASE_ELIGIBLE_TRIP_STATUSES.has(status)) {
+    if (
+      isHubTransfer &&
+      manifestStatus !== "RECONCILED" &&
+      !trip.reconciledAt
+    ) {
+      return {
+        eligible: false,
+        reason:
+          "Manifest must be reconciled before releasing to delivery operations.",
+      };
+    }
     return { eligible: true, reason: null };
   }
 

@@ -13,6 +13,7 @@ const {
   buildShipmentSnapshot,
   normalizePackageRow,
 } = require("../packages/tripPackageOperations");
+const { isHubTransferTrip } = require("./manifestStatus");
 
 if (!admin.apps.length) admin.initializeApp();
 const db = admin.firestore();
@@ -31,6 +32,13 @@ exports.startTrip = onCall({ region: "asia-southeast1" }, async (req) => {
 
   if (!tripSnap.exists) throw new HttpsError("not-found", "Trip not found");
   const trip = tripSnap.data();
+
+  if (isHubTransferTrip(trip)) {
+    throw new HttpsError(
+      "failed-precondition",
+      "Hub transfer trips must be dispatched from the web dashboard. Drivers cannot start hub trips from mobile.",
+    );
+  }
 
   if (trip.status !== "LOADED") {
     throw new HttpsError(
@@ -86,7 +94,7 @@ exports.startTrip = onCall({ region: "asia-southeast1" }, async (req) => {
       };
 
       tx.update(tripShipDoc.ref, {
-        status: "IN_TRANSIT",
+        status: snapshot.status,
         updatedAt: timestamp,
       });
 

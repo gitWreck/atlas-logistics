@@ -13,6 +13,8 @@ const {
 const {
   DEFAULT_WAREHOUSE_CODE,
   mapPackagesForDeliveryRelease,
+  countPiecesEligibleForDeliveryRelease,
+  listPiecesEligibleForDeliveryRelease,
 } = require("./packageDeliveryOperations");
 const { buildDerivedShipmentSnapshot } = require("../packages/shipmentStatus");
 const { assertTripReleaseEligible } = require("../trips/tripLifecycle");
@@ -62,19 +64,23 @@ async function resolveShipmentIdsWithTrip(
     .collection("trip_shipments")
     .get();
 
+  // Explicit shipmentIds/packageIds win — do not expand to every shipment on the trip.
+  if (fromIds.length > 0) {
+    return fromIds;
+  }
+
   const tripShipmentIds = tripShipmentSnap.docs
     .map((docSnap) => docSnap.data()?.trackingShipmentId || docSnap.id)
     .filter(Boolean);
 
-  const merged = new Set([...fromIds, ...tripShipmentIds]);
-  if (merged.size === 0) {
+  if (tripShipmentIds.length === 0) {
     throw new HttpsError(
       "not-found",
       "No shipments found for this trip or selection.",
     );
   }
 
-  return [...merged];
+  return tripShipmentIds;
 }
 
 exports.releaseForDeliveryOperations = onCall(
@@ -116,6 +122,10 @@ exports.releaseForDeliveryOperations = onCall(
       normalizeString(warehouseCode) || DEFAULT_WAREHOUSE_CODE;
     const now = FieldValue.serverTimestamp();
     const releasedIds = [];
+    const releasedPackageIds = [];
+    const normalizedPackageIds = normalizeStringList(packageIds);
+    const packageIdSet =
+      normalizedPackageIds.length > 0 ? new Set(normalizedPackageIds) : null;
 
     await db.runTransaction(async (tx) => {
       const shipmentRefs = resolvedShipmentIds.map((id) =>
@@ -141,9 +151,28 @@ exports.releaseForDeliveryOperations = onCall(
           normalizeString(remarks) ||
           "Released for delivery operations. Custody remains at Odiongan until each label is loaded.";
 
+        const sourcePackages = Array.isArray(data.packages) ? data.packages : [];
+        const releaseScope = { packageIdSet };
+        const releasableCount = countPiecesEligibleForDeliveryRelease(
+          sourcePackages,
+          releaseScope,
+        );
+        if (releasableCount === 0) {
+          throw new HttpsError(
+            "failed-precondition",
+            `Shipment ${shipmentId} has no hub-received packages to release. Unload and reconcile at Odiongan first.`,
+          );
+        }
+
+        const packageIdsForShipment = listPiecesEligibleForDeliveryRelease(
+          sourcePackages,
+          releaseScope,
+        );
+
         const updatedPackages = mapPackagesForDeliveryRelease(
-          Array.isArray(data.packages) ? data.packages : [],
+          sourcePackages,
           normalizedWarehouse,
+          releaseScope,
         );
 
         const derivedSnapshot = buildDerivedShipmentSnapshot(updatedPackages, {
@@ -158,7 +187,7 @@ exports.releaseForDeliveryOperations = onCall(
         tx.update(shipmentRefs[index], {
           packages: derivedSnapshot.packages,
           packageBreakdown: derivedSnapshot.packageBreakdown,
-          availableForDelivery: true,
+          availableForDelivery: derivedSnapshot.availableForDelivery,
           availableForDeliveryAt: now,
           availableForDeliveryBy: actorName || actorUid || null,
           releasedForDeliveryAt: now,
@@ -183,6 +212,7 @@ exports.releaseForDeliveryOperations = onCall(
         });
 
         releasedIds.push(shipmentId);
+        releasedPackageIds.push(...packageIdsForShipment);
       });
     });
 
@@ -212,6 +242,8 @@ exports.releaseForDeliveryOperations = onCall(
       warehouseCode: normalizedWarehouse,
       shipmentIds: releasedIds,
       shipmentCount: releasedIds.length,
+      packageIds: releasedPackageIds,
+      packageCount: releasedPackageIds.length,
     };
   },
 );

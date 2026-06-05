@@ -12,14 +12,22 @@ import {
   faWarehouse,
   faCircleNotch,
 } from "@fortawesome/free-solid-svg-icons";
+import {
+  canUnloadAtHub,
+  canStartReceiving,
+  isHubTransferTrip,
+} from "@/app/utility/manifestStatus";
 
 export function ActionSelector({ action, trip, theme, actions }) {
   const currentTripStatus = String(trip?.status || "").trim().toUpperCase();
   const isManifestLocked = !!trip?.manifestLocked;
   const isLoadDisabled = currentTripStatus === "IN_TRANSIT" || isManifestLocked;
-  const canUnloadFromStatus = ["ARRIVED", "LOADED", "IN_TRANSIT", "COMPLETED"].includes(
-    currentTripStatus,
-  );
+  const hubTrip = isHubTransferTrip(trip);
+  const canUnloadFromStatus = hubTrip
+    ? canUnloadAtHub(trip)
+    : ["ARRIVED", "LOADED", "IN_TRANSIT", "COMPLETED"].includes(
+        currentTripStatus,
+      );
 
   const options = [
     {
@@ -45,12 +53,16 @@ export function ActionSelector({ action, trip, theme, actions }) {
   const handleSelect = (id) => {
     actions.resetFlow();
     if (id === "UNLOAD") {
-      if (currentTripStatus === "ARRIVED" && isManifestLocked)
-        return actions.setNeedsUnlock(true) || actions.setAction(id);
-      if (!canUnloadFromStatus)
+      if (hubTrip && canStartReceiving(trip)) {
+        return actions.setNeedsStartReceiving(true) || actions.setAction(id);
+      }
+      if (!canUnloadFromStatus) {
         return actions.setError(
-          `Cannot unload. Trip status is currently ${currentTripStatus || "UNKNOWN"}.`,
+          hubTrip
+            ? "Start receiving on this trip before unloading packages."
+            : `Cannot unload. Trip status is currently ${currentTripStatus || "UNKNOWN"}.`,
         );
+      }
     }
     if (id === "LOAD") {
       const isFull = trip?.itemPending === 0 && trip?.totalItems > 0;

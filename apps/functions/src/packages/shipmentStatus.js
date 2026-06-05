@@ -5,7 +5,50 @@ const {
   allPiecesDelivered,
   computePackageBreakdown,
   PACKAGE_STATUS,
+  pieceQty,
 } = require("./packageStatus");
+
+const LOADED_ON_TRIP_STATUSES = new Set([
+  PACKAGE_STATUS.LOADED_TO_TRIP,
+  PACKAGE_STATUS.PARTIALLY_LOADED,
+  PACKAGE_STATUS.LOADED,
+]);
+
+function sumQtyForStatuses(packages = [], statuses = new Set()) {
+  if (!Array.isArray(packages) || !statuses.size) return 0;
+
+  return packages.reduce((sum, pkg) => {
+    const status = normalizePackageStatus(pkg);
+    if (!statuses.has(status)) return sum;
+    return sum + pieceQty(pkg);
+  }, 0);
+}
+
+function sumDispatchedInTransitQty(packages = []) {
+  return sumQtyForStatuses(packages, new Set([PACKAGE_STATUS.IN_TRANSIT]));
+}
+
+function sumLoadedOnTripQty(packages = []) {
+  return sumQtyForStatuses(packages, LOADED_ON_TRIP_STATUSES);
+}
+
+function resolveDispatchedTransitMasterStatus({
+  packages = [],
+  totalQty = 0,
+  atDivisoriaQty = 0,
+}) {
+  const dispatchedInTransitQty = sumDispatchedInTransitQty(packages);
+  if (dispatchedInTransitQty <= 0) return null;
+
+  if (dispatchedInTransitQty < totalQty || atDivisoriaQty > 0) {
+    return "PARTIALLY_IN_TRANSIT";
+  }
+  if (dispatchedInTransitQty >= totalQty) {
+    return "IN_TRANSIT";
+  }
+
+  return null;
+}
 
 const RELEASED_POOL_STATUSES = new Set([
   PACKAGE_STATUS.RELEASED_FOR_DELIVERY,
@@ -151,10 +194,32 @@ function deriveMasterShipmentStatus(packages = [], options = {}) {
     if (shouldPromoteOutForDelivery) {
       return "OUT_FOR_DELIVERY";
     }
+
+    if (releasedQty > 0 || availablePoolRows > 0) {
+      if (deliveredQty > 0) return "PARTIALLY_DELIVERED";
+      if (releasedQty > 0 && releasedQty < totalQty) {
+        return "PARTIALLY_AVAILABLE_FOR_DELIVERY";
+      }
+      return "AVAILABLE_FOR_DELIVERY";
+    }
+
+    const dispatchedTransitStatus = resolveDispatchedTransitMasterStatus({
+      packages,
+      totalQty,
+      atDivisoriaQty,
+    });
+    if (dispatchedTransitStatus) {
+      return dispatchedTransitStatus;
+    }
+
+    const loadedOnTripQty = sumLoadedOnTripQty(packages);
+    if (loadedOnTripQty > 0 && atDivisoriaQty > 0) {
+      return "PARTIALLY_LOADED";
+    }
     if (totalContentQty > 0 && loadedQty >= totalContentQty) {
       return "LOADED";
     }
-    if (loadedQty > 0) {
+    if (loadedQty > 0 || loadedOnTripQty > 0) {
       return "PARTIALLY_LOADED";
     }
   }
@@ -206,14 +271,26 @@ function deriveMasterShipmentStatus(packages = [], options = {}) {
     return "OUT_FOR_DELIVERY";
   }
 
-  if (inTransitQty > 0 && inTransitQty < totalQty) {
-    return "PARTIALLY_IN_TRANSIT";
+  if (releasedQty > 0 || availablePoolRows > 0) {
+    if (deliveredQty > 0) return "PARTIALLY_DELIVERED";
+    if (releasedQty > 0 && releasedQty < totalQty) {
+      return "PARTIALLY_AVAILABLE_FOR_DELIVERY";
+    }
+    return "AVAILABLE_FOR_DELIVERY";
   }
-  if (inTransitQty > 0 && atDivisoriaQty > 0) {
-    return "PARTIALLY_IN_TRANSIT";
+
+  const dispatchedTransitStatus = resolveDispatchedTransitMasterStatus({
+    packages,
+    totalQty,
+    atDivisoriaQty,
+  });
+  if (dispatchedTransitStatus) {
+    return dispatchedTransitStatus;
   }
-  if (inTransitQty === totalQty) {
-    return "IN_TRANSIT";
+
+  const loadedOnTripQty = sumLoadedOnTripQty(packages);
+  if (loadedOnTripQty > 0 && atDivisoriaQty > 0) {
+    return "PARTIALLY_LOADED";
   }
 
   if (loadedRows === totalRows) {
@@ -221,14 +298,6 @@ function deriveMasterShipmentStatus(packages = [], options = {}) {
   }
   if (loadedRows > 0 || onCheckerQty > 0) {
     return "PARTIALLY_LOADED";
-  }
-
-  if (releasedQty > 0 || availablePoolRows > 0) {
-    if (deliveredQty > 0) return "PARTIALLY_DELIVERED";
-    if (releasedQty > 0 && releasedQty < totalQty) {
-      return "PARTIALLY_AVAILABLE_FOR_DELIVERY";
-    }
-    return "AVAILABLE_FOR_DELIVERY";
   }
 
   if (atOdionganQty > 0 && atOdionganQty < totalQty && deliveredQty === 0) {
@@ -254,7 +323,7 @@ function deriveMasterShipmentStatus(packages = [], options = {}) {
   if (atDivisoriaQty === totalQty) {
     return "RECEIVED";
   }
-  if (atDivisoriaQty > 0 && inTransitQty > 0) {
+  if (atDivisoriaQty > 0 && loadedOnTripQty > 0) {
     return "PARTIALLY_LOADED";
   }
 

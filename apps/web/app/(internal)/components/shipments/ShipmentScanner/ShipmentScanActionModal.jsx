@@ -19,6 +19,7 @@ import useScannerLogic from "./useScannerLogic";
 import {
   NextTripPrompt,
   ArrivalPrompt,
+  StartReceivingPrompt,
   UnlockPrompt,
   LoadedStatusPrompt,
   LockPrompt,
@@ -117,6 +118,7 @@ export default function ShipmentScanActionModal({
     !state.needsHandoff &&
     !state.needsNextTrip &&
     !state.needsArrival &&
+    !state.needsStartReceiving &&
     !state.needsUnlock &&
     !state.needsLoadedStatus &&
     !state.needsLock &&
@@ -218,6 +220,7 @@ export default function ShipmentScanActionModal({
             !state.needsHandoff &&
             !state.needsNextTrip &&
             !state.needsArrival &&
+            !state.needsStartReceiving &&
             !state.needsUnlock &&
             !state.resolvedItem &&
             !state.needsAssignmentItem && (
@@ -294,6 +297,12 @@ export default function ShipmentScanActionModal({
                 actions.resetFlow();
               }}
               btnStatus={state.btnStatus}
+            />
+          ) : state.needsStartReceiving ? (
+            <StartReceivingPrompt
+              theme={theme}
+              btnStatus={state.btnStatus}
+              onStartReceiving={actions.handleStartReceiving}
             />
           ) : state.needsArrival ? (
             <ArrivalPrompt

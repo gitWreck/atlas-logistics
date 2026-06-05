@@ -89,8 +89,25 @@ export async function POST(request, { params }) {
     let promotionSkippedReason = null;
     let tripStatus = payload.tripStatus;
 
+    const tripAlreadyArrived =
+      String(payload.tripStatus || "").toUpperCase() === "ARRIVED";
+
     if (!autoPromote) {
       promotionSkippedReason = "AUTO_PROMOTE_DISABLED";
+    } else if (payload.ready && tripAlreadyArrived) {
+      await invokeCallable(
+        "updateTripStatus",
+        {
+          tripId,
+          status: "ARRIVED",
+          notify,
+          promotionSource: "RECONCILIATION",
+          markReconciled: true,
+        },
+        auth.token,
+      );
+      promoted = true;
+      tripStatus = "ARRIVED";
     } else if (!payload.lifecycle.canPromoteToArrived) {
       promotionSkippedReason = payload.lifecycle.promotionReason;
     } else {

@@ -70,6 +70,17 @@ function sumLoadedQty(packages = []) {
   }, 0);
 }
 
+function sumDeliveredQty(packages = []) {
+  return packages.reduce((sum, pkg) => {
+    const quantity = Math.max(normalizeQty(pkg.quantity, 1), 1);
+    const status = normalizePackageStatus(pkg);
+    if (status === PACKAGE_STATUS.DELIVERED || status === PACKAGE_STATUS.COMPLETED) {
+      return sum + quantity;
+    }
+    return sum;
+  }, 0);
+}
+
 function sumReceivedQty(packages = []) {
   return packages.reduce((sum, pkg) => {
     const quantity = Math.max(normalizeQty(pkg.quantity, 1), 1);
@@ -154,6 +165,7 @@ function applyLinehaulUnloadAtHub(pkg = {}, { tripId, nowIso } = {}) {
     loadedOnTrip: null,
     custodyOwnerType: "WAREHOUSE",
     custodyOwnerId: ODIONGAN_WAREHOUSE,
+    hubReceivedAt: timestamp,
     updatedAt: timestamp,
   };
 }
@@ -222,6 +234,9 @@ function buildShipmentSnapshot(packages = [], options = {}) {
   );
   const activeTripIds = collectActiveTripIds(normalizedPackages);
 
+  const packageBreakdown = computePackageBreakdown(normalizedPackages);
+  const deliveredQty = packageBreakdown.delivered || sumDeliveredQty(normalizedPackages);
+
   const shipmentStatus = deriveMasterShipmentStatus(normalizedPackages, {
     ...options,
     totals: {
@@ -236,7 +251,7 @@ function buildShipmentSnapshot(packages = [], options = {}) {
   return {
     packages: normalizedPackages,
     status: shipmentStatus,
-    packageBreakdown: computePackageBreakdown(normalizedPackages),
+    packageBreakdown,
     currentTripIds: activeTripIds,
     currentTripId: activeTripIds.length === 1 ? activeTripIds[0] : null,
     totals: {
@@ -244,7 +259,7 @@ function buildShipmentSnapshot(packages = [], options = {}) {
       totalContentQty: totalQty,
       loaded: loadedQty,
       received: receivedQty,
-      delivered: receivedQty,
+      delivered: deliveredQty,
       missing: missingQty,
       damaged: damagedQty,
       pending: pendingQty,
@@ -259,6 +274,7 @@ module.exports = {
   sumTotalQty,
   sumLoadedQty,
   sumReceivedQty,
+  sumDeliveredQty,
   sumMissingQty,
   sumDamagedQty,
   applyLinehaulLoad,

@@ -114,12 +114,14 @@ export default function TripDetailsScreen() {
   }, [isChecker, isDriver, role]);
 
   const canViewShipments = !!trip && !isCompleted;
-  const canDriverStartTrip = isDriver && isReadyToStart && hasLockedManifest;
+  const isHubTransfer = String(trip?.tripType || "HUB_TRANSFER").toUpperCase() === "HUB_TRANSFER";
+  const canDriverStartTrip =
+    isDriver && isReadyToStart && hasLockedManifest && !isHubTransfer;
   const shouldShowManifestLockNotice =
     isDriver && isReadyToStart && !hasLockedManifest;
   const canDriverReportDelay = isDriver && isDriving && !isDelayed;
   const canDriverClearDelay = isDriver && isDelayed;
-  const canDriverMarkArrived = isDriver && isDriving;
+  const canDriverMarkArrived = isDriver && isDriving && !isHubTransfer;
   const canDriverCompleteTrip = isDriver && isArrived;
 
   const canCheckerOpenShipments = isChecker && !!trip;

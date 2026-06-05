@@ -13,6 +13,7 @@ import { formatFirestoreDate } from "@/app/utility/utilities";
 import { getTripStatsDisplay } from "@/app/utility/tripStats";
 import { getRowThemeClasses } from "@/app/utility/constant/theme";
 import StatusDot from "../ui/StatusDot";
+import ManifestStatusBadge from "../ui/ManifestStatusBadge";
 import AdminRowDeleteButton from "../admin/AdminRowDeleteButton";
 import { deleteTruckTrip } from "@/app/utility/FirebaseFunctions";
 
@@ -69,9 +70,11 @@ export default function TripRow({
       ? theme.statusTextCompleted
       : theme.statusTextDefault;
 
+  const displayTripStatus =
+    trip.status === "UNLOADING" ? "ARRIVED" : trip.status;
   const statusLabel = isDelayed
     ? trip.delayReason?.replaceAll("_", " ") || "DELAYED"
-    : trip.status?.replaceAll("_", " ");
+    : displayTripStatus?.replaceAll("_", " ");
 
   const tripTypeLabel = isDelivery ? "DEL" : isLocal ? "PKP" : "HUB";
 
@@ -235,16 +238,20 @@ export default function TripRow({
             {tripTypeFullLabel}
           </span>
 
-          {isManifestLocked && (
-            <span
-              className={`text-[10px] md:text-[9px] font-bold px-1.5 py-0.5 rounded border inline-flex items-center gap-1 ${lockedBadgeClass}`}
-            >
-              <FontAwesomeIcon
-                icon={faLock}
-                className="text-[9px] md:text-[8px] text-current"
-              />
-              LOCKED
-            </span>
+          {isHubTransfer ? (
+            <ManifestStatusBadge trip={trip} isDark={isDark} />
+          ) : (
+            isManifestLocked && (
+              <span
+                className={`text-[10px] md:text-[9px] font-bold px-1.5 py-0.5 rounded border inline-flex items-center gap-1 ${lockedBadgeClass}`}
+              >
+                <FontAwesomeIcon
+                  icon={faLock}
+                  className="text-[9px] md:text-[8px] text-current"
+                />
+                LOCKED
+              </span>
+            )
           )}
         </div>
       </div>

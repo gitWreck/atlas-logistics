@@ -7,14 +7,25 @@ import {
   faUnlock,
   faPrint,
   faTimes,
-  faRotateLeft,
+  faTruck,
+  faTruckRampBox,
 } from "@fortawesome/free-solid-svg-icons";
 import StatusButton from "../ui/StatusButton";
 import {
   generateTripManifest,
-  reopenTrip,
   unlockTripManifest,
+  startReceiving,
+  dispatchTrip,
 } from "@/app/utility/FirebaseFunctions";
+import {
+  canStartReceiving,
+  canDispatchTrip,
+  getDispatchTripBlockReason,
+  getManifestStatusLabel,
+  isHubTransferTrip,
+  MANIFEST_STATUS,
+  resolveManifestStatus,
+} from "@/app/utility/manifestStatus";
 import { runAction, updatedBy } from "@/app/utility/utilities";
 import { getDrawerThemeClasses } from "@/app/utility/constant/theme";
 import ExportTripButton from "../exports/ExportTripManifest";
@@ -30,7 +41,8 @@ export default function TripDrawerFooter({
 }) {
   const [lockStatus, setLockStatus] = useState("IDLE");
   const [unlockStatus, setUnlockStatus] = useState("IDLE");
-  const [reopenStatus, setReopenStatus] = useState("IDLE");
+  const [dispatchStatus, setDispatchStatus] = useState("IDLE");
+  const [receivingStatus, setReceivingStatus] = useState("IDLE");
 
   const [showUnlockReason, setShowUnlockReason] = useState(false);
   const [unlockReason, setUnlockReason] = useState("");
@@ -40,11 +52,20 @@ export default function TripDrawerFooter({
   if (!data) return null;
 
   const isLocked = data.manifestLocked;
+  const manifestStatus = resolveManifestStatus(data);
+  const manifestStatusLabel = getManifestStatusLabel(data);
   const role = String(profile?.role || "").toLowerCase();
   const isAdmin = role === "admin";
   const isManager = role === "manager";
   const canViewManifestControls = isAdmin || isManager;
   const canEditManifestControls = isAdmin || isManager;
+  const isHubTrip = isHubTransferTrip(data);
+  const showDispatchTrip = canEditManifestControls && canDispatchTrip(data);
+  const showStartReceiving = canEditManifestControls && canStartReceiving(data);
+  const dispatchBlockReason =
+    canEditManifestControls && isHubTrip
+      ? getDispatchTripBlockReason(data)
+      : null;
 
   const handleUnlockSuccess = () => {
     setTimeout(() => {
@@ -55,6 +76,67 @@ export default function TripDrawerFooter({
 
   return (
     <div className={`p-4 border-t flex flex-col gap-3 ${theme.footerPanel}`}>
+      <div className={`rounded-lg border px-3 py-2 text-xs ${theme.footerPanel}`}>
+        <span className="font-bold uppercase opacity-60">Manifest</span>
+        <span className="ml-2 font-semibold">{manifestStatusLabel}</span>
+        <span className="ml-2 opacity-50">({manifestStatus})</span>
+      </div>
+
+      {canEditManifestControls && isHubTrip && (
+        <div className="flex flex-col gap-2">
+          {showDispatchTrip ? (
+            <StatusButton
+              status={dispatchStatus}
+              label="Dispatch Trip"
+              loadingLabel="Dispatching..."
+              successLabel="Dispatched!"
+              icon={faTruck}
+              variant="blue"
+              onClick={() =>
+                runAction(
+                  setDispatchStatus,
+                  () =>
+                    dispatchTrip({
+                      tripId: data.id || data.tripId,
+                      updatedBy: updatedBy(profile),
+                    }),
+                  () => onSuccess?.(),
+                )
+              }
+            />
+          ) : (
+            manifestStatus === MANIFEST_STATUS.LOCKED &&
+            dispatchBlockReason && (
+              <p className={`text-xs px-1 ${theme.mutedText}`}>
+                {dispatchBlockReason}
+              </p>
+            )
+          )}
+
+          {showStartReceiving && (
+            <StatusButton
+              status={receivingStatus}
+              label="Start Receiving"
+              loadingLabel="Starting..."
+              successLabel="Receiving started!"
+              icon={faTruckRampBox}
+              variant="emerald"
+              onClick={() =>
+                runAction(
+                  setReceivingStatus,
+                  () =>
+                    startReceiving({
+                      tripId: data.tripId,
+                      updatedBy: updatedBy(profile),
+                    }),
+                  () => onSuccess?.(),
+                )
+              }
+            />
+          )}
+        </div>
+      )}
+
       {canEditManifestControls && showUnlockReason && (
         <div
           className={`p-3 rounded-xl border animate-in slide-in-from-bottom-2 duration-200 ${theme.reasonBox}`}
