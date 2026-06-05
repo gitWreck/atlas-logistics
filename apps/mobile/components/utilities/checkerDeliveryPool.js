@@ -89,7 +89,9 @@ function isCheckerCustodyPiece(pkg = {}, checkerUid) {
   );
 }
 
+/** Piece statuses that count as on this checker's van (My Route / My Load). */
 const ON_VAN_PIECE_STATUSES = new Set([
+  "LOADED_TO_DELIVERY_VEHICLE",
   "LOADED",
   "READY_FOR_DELIVERY",
   "PARTIALLY_LOADED",
@@ -214,7 +216,14 @@ export function getCheckerPieceActionPhase(shipment = {}, checkerUid = null) {
       myOfd += qty;
       return;
     }
-    if (["LOADED", "READY_FOR_DELIVERY", "PARTIALLY_LOADED"].includes(status)) {
+    if (
+      [
+        "LOADED_TO_DELIVERY_VEHICLE",
+        "LOADED",
+        "READY_FOR_DELIVERY",
+        "PARTIALLY_LOADED",
+      ].includes(status)
+    ) {
       myOnVan += qty;
     }
   });
@@ -225,6 +234,30 @@ export function getCheckerPieceActionPhase(shipment = {}, checkerUid = null) {
   if (myDelivered > 0) return null;
 
   return null;
+}
+
+const AWAITING_OUT_FOR_DELIVERY_STATUSES = new Set([
+  "LOADED_TO_DELIVERY_VEHICLE",
+  "LOADED",
+  "READY_FOR_DELIVERY",
+  "PARTIALLY_LOADED",
+]);
+
+/** Piece loaded on this checker's van but not yet marked out for delivery. */
+export function isCheckerPieceAwaitingOutForDelivery(pkg = {}, checkerUid = null) {
+  if (!checkerUid || !isMyPiece(pkg, checkerUid)) return false;
+  return AWAITING_OUT_FOR_DELIVERY_STATUSES.has(normalizeStatus(pkg.status));
+}
+
+export function shipmentHasCheckerPiecesAwaitingOutForDelivery(
+  shipment = {},
+  checkerUid = null,
+) {
+  if (!checkerUid) return false;
+  const packages = Array.isArray(shipment.packages) ? shipment.packages : [];
+  return packages.some((pkg) =>
+    isCheckerPieceAwaitingOutForDelivery(pkg, checkerUid),
+  );
 }
 
 export function formatPoolCountLine(stats = {}) {

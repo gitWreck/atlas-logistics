@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { isManifestReconciled } from "@/app/utility/manifestStatus";
 
 // 1. Import your centralized Firebase functions
@@ -129,6 +129,7 @@ export default function useScannerLogic({
   const [error, setError] = useState("");
   const [successNotice, setSuccessNotice] = useState(null);
   const [btnStatus, setBtnStatus] = useState("IDLE");
+  const handoffBootstrappedRef = useRef(false);
 
   const resetFlow = useCallback(() => {
     setAction(null);
@@ -369,10 +370,14 @@ export default function useScannerLogic({
   );
 
   const loadHandoffReview = useCallback(
-    async ({ openWhenReadyOnly = false, autoPromoteOnReady = true } = {}) => {
+    async ({
+      openWhenReadyOnly = false,
+      autoPromoteOnReady = true,
+      silent = false,
+    } = {}) => {
       if (!tripId) return null;
 
-      setLoading(true);
+      if (!silent) setLoading(true);
       setError("");
 
       try {
@@ -383,12 +388,14 @@ export default function useScannerLogic({
         const tripStatusForFinalize = String(
           summary.tripStatus || trip?.status || "",
         ).toUpperCase();
+        const tripAlreadyArrived = tripStatusForFinalize === "ARRIVED";
+        const tripAlreadyReconciled = isManifestReconciled(trip);
         const shouldFinalizeReconcile =
           autoPromoteOnReady &&
           summary.ready &&
           !summary.promoted &&
-          (summary.lifecycle?.canPromoteToArrived ||
-            tripStatusForFinalize === "ARRIVED");
+          !tripAlreadyReconciled &&
+          (summary.lifecycle?.canPromoteToArrived || tripAlreadyArrived);
 
         if (shouldFinalizeReconcile) {
           summary = await finalizeTripReconciliation({ notify: true });
@@ -425,13 +432,14 @@ export default function useScannerLogic({
           setNeedsArrival(false);
         }
 
-        const seededRemarks = {};
-        (summary.missingShipments || []).forEach((item) => {
-          seededRemarks[item.id] = missingRemarks[item.id] || "";
-        });
-
         setHandoffSummary(summary);
-        setMissingRemarks(seededRemarks);
+        setMissingRemarks((prev) => {
+          const seededRemarks = {};
+          (summary.missingShipments || []).forEach((item) => {
+            seededRemarks[item.id] = prev[item.id] || "";
+          });
+          return seededRemarks;
+        });
 
         const shouldOpen =
           !openWhenReadyOnly ||
@@ -449,33 +457,49 @@ export default function useScannerLogic({
         setError(err.message || "Failed to reconcile manifest.");
         return null;
       } finally {
-        setLoading(false);
+        if (!silent) setLoading(false);
       }
     },
-    [
-      fetchJsonWithAuth,
-      finalizeTripReconciliation,
-      missingRemarks,
-      onRefresh,
-      tripId,
-      trip,
-    ],
+    [fetchJsonWithAuth, finalizeTripReconciliation, onRefresh, tripId, trip],
+  );
+
+  const handleReviewHandoff = useCallback(
+    () =>
+      loadHandoffReview({
+        autoPromoteOnReady: !isManifestReconciled(trip),
+        silent: true,
+      }),
+    [loadHandoffReview, trip],
   );
 
   const openReleaseHandoff = useCallback(async () => {
     setError("");
     setSuccessNotice(null);
     setAction("UNLOAD");
-    await loadHandoffReview({ openWhenReadyOnly: false });
-  }, [loadHandoffReview]);
+    await loadHandoffReview({
+      openWhenReadyOnly: false,
+      autoPromoteOnReady: !isManifestReconciled(trip),
+    });
+  }, [loadHandoffReview, trip]);
 
   useEffect(() => {
-    if (!isOpen || !tripId || !isManifestReconciled(trip)) return;
+    if (!isOpen) {
+      handoffBootstrappedRef.current = false;
+      return;
+    }
+    if (!tripId || !isManifestReconciled(trip)) return;
+    if (handoffBootstrappedRef.current) return;
+    handoffBootstrappedRef.current = true;
     setError("");
     setSuccessNotice(null);
     setAction("UNLOAD");
-    loadHandoffReview({ openWhenReadyOnly: false });
-  }, [isOpen, tripId, trip?.manifestStatus, trip?.reconciledAt, loadHandoffReview, trip]);
+    loadHandoffReview({
+      openWhenReadyOnly: false,
+      autoPromoteOnReady: false,
+    });
+    // Intentionally once per modal open — avoid refresh loop from trip prop updates.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, tripId, trip?.manifestStatus, trip?.reconciledAt]);
 
   const processItems = useCallback(
     async ({ item, code, itemsToProcess }) => {
@@ -1086,7 +1110,7 @@ export default function useScannerLogic({
       handleLockManifest,
       handleReleaseShipmentsFromTrip,
       handleReleaseSingleShipment,
-      handleReviewHandoff: () => loadHandoffReview(),
+      handleReviewHandoff,
       openReleaseHandoff,
       handleConfirm,
     },
