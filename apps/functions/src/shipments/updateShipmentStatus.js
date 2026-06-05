@@ -20,6 +20,7 @@ const {
 const { getShipmentTargetUserIds } = require("../utilities/notificationHelpers");
 const { normalizeQty } = require("../utilities/packageHelpers");
 const { tryAutoCompleteTrip } = require("../trips/autoCompleteTrip");
+const { PACKAGE_STATUS } = require("../packages/packageStatus");
 
 if (!admin.apps.length) admin.initializeApp();
 
@@ -339,9 +340,12 @@ exports.updateShipmentStatus = onCall(
 
       const canPromotePieceToOutForDelivery = (pkg = {}) => {
         const status = String(pkg.status || "").toUpperCase();
-        return ["LOADED", "READY_FOR_DELIVERY", "PARTIALLY_LOADED"].includes(
-          status,
-        );
+        return [
+          PACKAGE_STATUS.LOADED_TO_DELIVERY_VEHICLE,
+          PACKAGE_STATUS.LOADED,
+          PACKAGE_STATUS.READY_FOR_DELIVERY,
+          PACKAGE_STATUS.PARTIALLY_LOADED,
+        ].includes(status);
       };
 
       if (newStatus === "OUT_FOR_DELIVERY" && actor.role === "checker") {

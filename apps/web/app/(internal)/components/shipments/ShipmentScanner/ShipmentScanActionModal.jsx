@@ -160,7 +160,7 @@ export default function ShipmentScanActionModal({
             actions={actions}
           />
 
-          {state.successNotice && !state.error && (
+          {state.successNotice && !state.error && !state.needsHandoff && (
             <div
               className={`rounded-xl border p-4 flex items-start gap-3 ${theme.panelSurface}`}
             >

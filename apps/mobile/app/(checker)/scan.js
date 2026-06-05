@@ -46,6 +46,10 @@ import {
   returnCheckerShipmentsToWarehouse,
 } from "../../components/utilities/checkerDelivery";
 import {
+  isCheckerPieceAwaitingOutForDelivery,
+  shipmentHasCheckerPiecesAwaitingOutForDelivery,
+} from "../../components/utilities/checkerDeliveryPool";
+import {
   getCurrentLocationSafe,
   updatedBy,
 } from "../../components/utilities/helpers";
@@ -568,6 +572,38 @@ export default function ScannerScreen() {
 
       if (status === "LOAD_TO_VEHICLE") {
         assertCheckerCanAccessShipment(shipmentDocData, profile?.uid);
+
+        const matchedPkg = findPackageInShipment(shipmentDocData, barcode);
+        const shouldMarkOutForDelivery = matchedPkg
+          ? isCheckerPieceAwaitingOutForDelivery(matchedPkg, profile?.uid)
+          : shipmentHasCheckerPiecesAwaitingOutForDelivery(
+              shipmentDocData,
+              profile?.uid,
+            );
+
+        if (shouldMarkOutForDelivery) {
+          await markShipmentOutForDelivery({
+            shipmentId,
+            profile,
+            tripId: effectiveTripId || null,
+            remarks:
+              remarks ||
+              "Marked out for delivery via scan (piece already on van).",
+          });
+
+          showSuccessModal({
+            barcode,
+            shipmentId,
+            shipmentStatus: "OUT_FOR_DELIVERY",
+            packageStatus: "OUT_FOR_DELIVERY",
+            quantity: qty,
+            message:
+              "Piece is already on your van. Shipment marked out for delivery.",
+            source,
+          });
+          return;
+        }
+
         const loadPackageIds =
           Array.isArray(packageIds) && packageIds.length > 0
             ? packageIds
@@ -1276,6 +1312,23 @@ export default function ScannerScreen() {
         }
 
         if (statusToApply === "LOAD_TO_VEHICLE") {
+          if (
+            shipmentHasCheckerPiecesAwaitingOutForDelivery(
+              shipmentData,
+              profile?.uid,
+            )
+          ) {
+            await executeStatusUpdate({
+              shipmentId: shipmentDoc.id,
+              barcode,
+              status: "OUT_FOR_DELIVERY",
+              remarks: "",
+              source,
+              shipmentDocData: shipmentData,
+            });
+            return;
+          }
+
           await executeStatusUpdate({
             shipmentId: shipmentDoc.id,
             barcode,

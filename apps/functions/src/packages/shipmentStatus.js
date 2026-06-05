@@ -87,6 +87,56 @@ function countStatusRows(packages = [], matcher) {
 }
 
 /**
+ * Last-mile checker load (pool → van). Must not reuse linehaul PARTIALLY_LOADED.
+ */
+function resolveLastMileCheckerMasterStatus({
+  onCheckerQty = 0,
+  releasedQty = 0,
+  availablePoolRows = 0,
+  atOdionganQty = 0,
+  deliveredQty = 0,
+  totalQty = 0,
+} = {}) {
+  if (onCheckerQty <= 0) return null;
+
+  if (deliveredQty > 0 && deliveredQty < totalQty) {
+    return "PARTIALLY_DELIVERED";
+  }
+
+  const poolRemaining = releasedQty > 0 || availablePoolRows > 0 || atOdionganQty > 0;
+  if (poolRemaining || onCheckerQty < totalQty) {
+    return "PARTIALLY_AVAILABLE_FOR_DELIVERY";
+  }
+
+  return "READY_FOR_DELIVERY";
+}
+
+function resolveLinehaulLoadedMasterStatus({
+  packages = [],
+  totalRows = 0,
+  atDivisoriaQty = 0,
+  loadedRows = 0,
+} = {}) {
+  const linehaulLoadedRows = countStatusRows(packages, LINEHAUL_LOADED_STATUSES);
+  const loadedOnTripQty = sumLoadedOnTripQty(packages);
+
+  if (loadedOnTripQty > 0 && atDivisoriaQty > 0) {
+    return "PARTIALLY_LOADED";
+  }
+  if (linehaulLoadedRows === totalRows && linehaulLoadedRows > 0) {
+    return "LOADED";
+  }
+  if (linehaulLoadedRows > 0 || loadedOnTripQty > 0) {
+    return "PARTIALLY_LOADED";
+  }
+  if (loadedRows > 0) {
+    return "PARTIALLY_LOADED";
+  }
+
+  return null;
+}
+
+/**
  * Derive master shipment status from package rows and optional qty totals.
  * Mixed delivery states → PARTIALLY_DELIVERED.
  * When every piece is delivered → COMPLETED.
@@ -203,6 +253,16 @@ function deriveMasterShipmentStatus(packages = [], options = {}) {
       return "AVAILABLE_FOR_DELIVERY";
     }
 
+    const lastMileStatus = resolveLastMileCheckerMasterStatus({
+      onCheckerQty,
+      releasedQty,
+      availablePoolRows,
+      atOdionganQty,
+      deliveredQty,
+      totalQty,
+    });
+    if (lastMileStatus) return lastMileStatus;
+
     const dispatchedTransitStatus = resolveDispatchedTransitMasterStatus({
       packages,
       totalQty,
@@ -212,16 +272,24 @@ function deriveMasterShipmentStatus(packages = [], options = {}) {
       return dispatchedTransitStatus;
     }
 
-    const loadedOnTripQty = sumLoadedOnTripQty(packages);
-    if (loadedOnTripQty > 0 && atDivisoriaQty > 0) {
-      return "PARTIALLY_LOADED";
-    }
     if (totalContentQty > 0 && loadedQty >= totalContentQty) {
+      const linehaulOnly = resolveLinehaulLoadedMasterStatus({
+        packages,
+        totalRows,
+        atDivisoriaQty,
+        loadedRows,
+      });
+      if (linehaulOnly) return linehaulOnly;
       return "LOADED";
     }
-    if (loadedQty > 0 || loadedOnTripQty > 0) {
-      return "PARTIALLY_LOADED";
-    }
+
+    const linehaulStatus = resolveLinehaulLoadedMasterStatus({
+      packages,
+      totalRows,
+      atDivisoriaQty,
+      loadedRows,
+    });
+    if (linehaulStatus) return linehaulStatus;
   }
 
   if (deliveredQty > 0 && deliveredQty < totalQty) {
@@ -279,6 +347,16 @@ function deriveMasterShipmentStatus(packages = [], options = {}) {
     return "AVAILABLE_FOR_DELIVERY";
   }
 
+  const lastMileStatus = resolveLastMileCheckerMasterStatus({
+    onCheckerQty,
+    releasedQty,
+    availablePoolRows,
+    atOdionganQty,
+    deliveredQty,
+    totalQty,
+  });
+  if (lastMileStatus) return lastMileStatus;
+
   const dispatchedTransitStatus = resolveDispatchedTransitMasterStatus({
     packages,
     totalQty,
@@ -288,17 +366,13 @@ function deriveMasterShipmentStatus(packages = [], options = {}) {
     return dispatchedTransitStatus;
   }
 
-  const loadedOnTripQty = sumLoadedOnTripQty(packages);
-  if (loadedOnTripQty > 0 && atDivisoriaQty > 0) {
-    return "PARTIALLY_LOADED";
-  }
-
-  if (loadedRows === totalRows) {
-    return "LOADED";
-  }
-  if (loadedRows > 0 || onCheckerQty > 0) {
-    return "PARTIALLY_LOADED";
-  }
+  const linehaulStatus = resolveLinehaulLoadedMasterStatus({
+    packages,
+    totalRows,
+    atDivisoriaQty,
+    loadedRows,
+  });
+  if (linehaulStatus) return linehaulStatus;
 
   if (atOdionganQty > 0 && atOdionganQty < totalQty && deliveredQty === 0) {
     return "PARTIALLY_ARRIVED";

@@ -12,6 +12,8 @@ import {
   SHIPMENT_STEPS_HUB_TRANSFER,
   SHIPMENT_STEPS_LOCAL_PICKUP,
 } from "@/app/utility/constant/templates";
+import { getShipmentTimelinePosition } from "@/app/utility/shipmentTimeline";
+import { getPackageStatusLabel } from "@/app/utility/packageStatus";
 import { useShipmentCustodyTimeline } from "@/app/(internal)/hooks/useShipmentCustodyTimeline";
 import CustodyTimeline from "@/app/(internal)/components/custody/CustodyTimeline";
 
@@ -35,7 +37,9 @@ export default function ShipmentTimelineTab({ data, isDark = false }) {
     ? SHIPMENT_STEPS_LOCAL_PICKUP
     : SHIPMENT_STEPS_HUB_TRANSFER;
 
-  const currentStepIndex = STEPS.indexOf(data.status);
+  const timeline = getShipmentTimelinePosition(data.status, STEPS);
+  const currentStepIndex = timeline.index;
+  const currentStatusLabel = getPackageStatusLabel(data.status);
 
   return (
     <div className="animate-in fade-in slide-in-from-left-4 duration-300">
@@ -79,9 +83,21 @@ export default function ShipmentTimelineTab({ data, isDark = false }) {
               isDark ? "border-slate-800" : "border-slate-200"
             }`}
           >
+            {currentStepIndex < 0 && (
+              <p
+                className={`text-xs mb-4 ml-2 ${
+                  isDark ? "text-amber-400/90" : "text-amber-700"
+                }`}
+              >
+                Status{" "}
+                <span className="font-mono font-semibold">{data.status}</span> is
+                not mapped on this timeline yet. Badge above shows the live status.
+              </p>
+            )}
+
             {STEPS.map((step, idx) => {
-              const isDone = currentStepIndex >= idx;
-              const isCurrent = data.status === step;
+              const isDone = currentStepIndex >= 0 && idx < currentStepIndex;
+              const isCurrent = currentStepIndex >= 0 && idx === currentStepIndex;
 
               return (
                 <div key={step} className="relative pb-8 last:pb-0">
@@ -131,7 +147,8 @@ export default function ShipmentTimelineTab({ data, isDark = false }) {
                           isDark ? "text-blue-400" : "text-blue-600"
                         }`}
                       >
-                        Current Stage • {data.updatedAt}
+                        Current: {currentStatusLabel}
+                        {data.updatedAt ? ` • ${data.updatedAt}` : ""}
                       </p>
                     )}
                   </div>
