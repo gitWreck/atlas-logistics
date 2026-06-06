@@ -241,6 +241,17 @@ export function getTripBoardStatusLabel(trip) {
     return "Awaiting Loading";
   }
 
+  if (LOADING_PHASE_TRIP_STATUSES.has(status)) {
+    const stats = getTripStatsDisplay(trip);
+    const loaded = clampCount(stats.count);
+    const total = clampCount(stats.total);
+
+    if (loaded > 0) {
+      if (total > 0 && loaded >= total) return "Loaded";
+      return "Loading";
+    }
+  }
+
   if (status === "UNLOADING") return "ARRIVED";
   return trip?.status || status;
 }

@@ -1139,6 +1139,16 @@ exports.updateShipmentPackages = onCall(
           tripUpdate.itemPending = FieldValue.increment(deltaTripPendingQty);
         }
 
+        if (
+          deltaTripLoadedQty > 0 &&
+          (isLoadingAction || String(newStatus || "").toUpperCase() === "LOADED")
+        ) {
+          const currentTripStatus = String(tripData.status || "").toUpperCase();
+          if (["CREATED", "ASSIGNED"].includes(currentTripStatus)) {
+            tripUpdate.status = "LOADING";
+          }
+        }
+
         completedTripId = tripId;
         shouldTryAutoCompleteTrip = true;
         tx.update(tripRef, tripUpdate);

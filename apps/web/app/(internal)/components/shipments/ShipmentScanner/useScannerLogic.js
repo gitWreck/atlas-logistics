@@ -442,7 +442,10 @@ export default function useScannerLogic({
             code: tripId,
             shipmentId: null,
             scanType: "TRIP",
-            totalQuantity: summary.totals?.unloadedShipments || 0,
+            totalQuantity:
+              summary.totals?.unloadedPieces ||
+              summary.totals?.unloadedShipments ||
+              0,
             needsLoadedStatusPrompt: false,
             message:
               "Manifest reconciled. Release shipments to delivery operations when ready.",
@@ -472,7 +475,9 @@ export default function useScannerLogic({
 
         const shouldOpen =
           !openWhenReadyOnly ||
-          (summary.ready && summary.totals?.manifestShipments > 0);
+          (summary.ready &&
+            (summary.totals?.manifestPieces > 0 ||
+              summary.totals?.manifestShipments > 0));
 
         if (shouldOpen) {
           setNeedsHandoff(true);

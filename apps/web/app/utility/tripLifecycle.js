@@ -151,6 +151,7 @@ export function evaluateReconciliationRows(rows = []) {
     (sum, row) => sum + toPieceCount(row.remainingLoaded),
     0,
   );
+  const missingPieces = Math.max(manifestPieces - unloadedPieces, 0);
 
   return {
     manifestShipments: shipments.length,
@@ -159,6 +160,7 @@ export function evaluateReconciliationRows(rows = []) {
     manifestPieces,
     unloadedPieces,
     onTruckPieces,
+    missingPieces,
     ready: shipments.length > 0 && missingShipments.length === 0,
     missingShipmentIds: missingShipments
       .map((row) => row.id || row.shipmentId)
