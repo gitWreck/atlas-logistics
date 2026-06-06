@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faTruckRampBox,
@@ -8,6 +8,10 @@ import {
   faLock,
   faUnlock,
   faTriangleExclamation,
+  faTruck,
+  faBoxOpen,
+  faChevronDown,
+  faChevronUp,
 } from "@fortawesome/free-solid-svg-icons";
 import StatusButton from "../../ui/StatusButton"; // Adjust path
 
@@ -66,6 +70,154 @@ export function NextTripPrompt({
   );
 }
 
+function formatReconciliationTimestamp(value) {
+  if (!value) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  return date.toLocaleString("en-PH", {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
+
+function resolvePieceTotals(summary = {}) {
+  const totals = summary.totals || {};
+  const manifestPieces = Number(totals.manifestPieces) || 0;
+  const unloadedPieces = Number(totals.unloadedPieces) || 0;
+  const missingPieces =
+    Number.isFinite(Number(totals.missingPieces)) &&
+    Number(totals.missingPieces) >= 0
+      ? Number(totals.missingPieces)
+      : Math.max(manifestPieces - unloadedPieces, 0);
+
+  return { manifestPieces, unloadedPieces, missingPieces };
+}
+
+function ReconciliationMetricCard({
+  label,
+  value,
+  subtext,
+  icon,
+  accentClass,
+  theme,
+}) {
+  return (
+    <div className={`rounded-xl border p-3 text-left ${theme.panelSurface}`}>
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <div className="text-[10px] font-bold uppercase opacity-50">
+            {label}
+          </div>
+          <div className="mt-1 text-2xl font-bold leading-none">{value}</div>
+          <div className="text-[10px] opacity-50 mt-1">packages</div>
+        </div>
+        <div className={`shrink-0 text-lg ${accentClass}`}>
+          <FontAwesomeIcon icon={icon} />
+        </div>
+      </div>
+      {subtext ? (
+        <p className="mt-2 text-[10px] leading-snug opacity-60">{subtext}</p>
+      ) : null}
+    </div>
+  );
+}
+
+function ReadyShipmentRow({ item, theme, defaultExpanded = true }) {
+  const [expanded, setExpanded] = useState(defaultExpanded);
+  const totalLabels = Number(item.expectedCount) || 0;
+  const receivedLabels = Number(item.unloadedCount) || 0;
+  const pieces = Array.isArray(item.pieces) ? item.pieces : [];
+  const isReady =
+    item.labelSummary?.ready ??
+    (totalLabels > 0 && receivedLabels >= totalLabels);
+
+  return (
+    <div
+      className={`rounded-xl border overflow-hidden ${
+        isReady ? "border-emerald-500/40" : theme.panelSurface
+      }`}
+    >
+      <button
+        type="button"
+        onClick={() => setExpanded((prev) => !prev)}
+        className={`w-full px-3 py-2.5 flex items-center justify-between gap-3 text-left ${
+          isReady ? "bg-emerald-500/5" : ""
+        }`}
+      >
+        <div className="min-w-0">
+          <div className="text-xs font-mono font-bold truncate">
+            {item.shipmentId}
+          </div>
+          <div className="text-[11px] opacity-60">
+            {receivedLabels} of {totalLabels || receivedLabels} labels received
+          </div>
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          <span
+            className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
+              isReady
+                ? "bg-emerald-500/15 text-emerald-600"
+                : "bg-amber-500/15 text-amber-600"
+            }`}
+          >
+            {receivedLabels}/{totalLabels || receivedLabels}{" "}
+            {isReady ? "Ready" : "Pending"}
+          </span>
+          <FontAwesomeIcon
+            icon={expanded ? faChevronUp : faChevronDown}
+            className="text-[10px] opacity-50"
+          />
+        </div>
+      </button>
+
+      {expanded && pieces.length > 0 ? (
+        <div className="border-t divide-y divide-white/5">
+          {pieces.map((piece) => {
+            const received = piece.state === "received";
+            return (
+              <div key={piece.pieceId} className="px-3 py-2.5 text-left">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="text-xs font-mono font-bold truncate">
+                      {piece.pieceId}
+                    </div>
+                    {received && piece.receivedBy ? (
+                      <div className="text-[11px] opacity-60 mt-0.5">
+                        Received by {piece.receivedBy}
+                        {piece.receivedAt
+                          ? ` · ${formatReconciliationTimestamp(piece.receivedAt)}`
+                          : ""}
+                      </div>
+                    ) : null}
+                  </div>
+                  <span
+                    className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${
+                      received
+                        ? "bg-emerald-500/15 text-emerald-600"
+                        : piece.state === "on_truck"
+                          ? "bg-amber-500/15 text-amber-600"
+                          : "bg-red-500/15 text-red-600"
+                    }`}
+                  >
+                    {received
+                      ? "Received"
+                      : piece.state === "on_truck"
+                        ? "On truck"
+                        : "Missing"}
+                  </span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 export function HandoffPrompt({
   theme,
   summary,
@@ -78,6 +230,7 @@ export function HandoffPrompt({
   btnStatus,
 }) {
   const totals = summary?.totals || {};
+  const context = summary?.context || {};
   const missingShipments = summary?.missingShipments || [];
   const unloadedShipments = summary?.unloadedShipments || [];
   const hasMissing = missingShipments.length > 0;
@@ -91,6 +244,15 @@ export function HandoffPrompt({
     unloadedShipments.length > 0 &&
     (!hasMissing || remarksComplete);
   const canRelease = countsReady && (lifecycleCanRelease || summary?.ready);
+  const { manifestPieces, unloadedPieces, missingPieces } =
+    resolvePieceTotals(summary);
+
+  const loadedSubtext = context.loadedScanBy
+    ? `Scanned by ${context.loadedScanBy} at ${context.originWarehouse || "origin warehouse"}`
+    : `Loaded at ${context.originWarehouse || "origin warehouse"}`;
+  const unloadedSubtext = context.unloadedScanBy
+    ? `Scanned by ${context.unloadedScanBy} at ${context.destinationWarehouse || "destination hub"}`
+    : `Received at ${context.destinationWarehouse || "destination hub"}`;
 
   return (
     <InterceptorPrompt
@@ -106,7 +268,7 @@ export function HandoffPrompt({
       }
       description={
         hasMissing
-          ? "Add remarks for missing manifest rows, then finalize reconciliation and release for delivery operations."
+          ? "Add remarks for missing labels, then finalize reconciliation and release for delivery operations."
           : summary?.ready
             ? tripId
               ? lifecycleCanRelease
@@ -115,35 +277,32 @@ export function HandoffPrompt({
               : lifecycleCanRelease
                 ? "All manifest shipments are accounted for. Release to delivery operations."
                 : "All manifest shipments are accounted for. Click Release to finalize reconciliation."
-            : "Unload remaining packages or add missing remarks to complete reconciliation."
+            : "Unload remaining labels or add missing remarks to complete reconciliation."
       }
     >
       <div className="grid grid-cols-3 gap-2 text-left">
-        <MetricCard
-          label="Pieces on trip"
-          value={
-            totals.manifestPieces ??
-            totals.manifestShipments ??
-            0
-          }
+        <ReconciliationMetricCard
+          label="Loaded into truck"
+          value={manifestPieces}
+          subtext={loadedSubtext}
+          icon={faTruck}
+          accentClass="text-emerald-500"
           theme={theme}
         />
-        <MetricCard
-          label="Unloaded"
-          value={
-            totals.unloadedPieces ??
-            totals.unloadedShipments ??
-            0
-          }
+        <ReconciliationMetricCard
+          label="Unloaded (received)"
+          value={unloadedPieces}
+          subtext={unloadedSubtext}
+          icon={faBoxOpen}
+          accentClass="text-blue-500"
           theme={theme}
         />
-        <MetricCard
-          label="Still on truck"
-          value={
-            totals.onTruckPieces ??
-            totals.missingShipments ??
-            0
-          }
+        <ReconciliationMetricCard
+          label="Missing"
+          value={missingPieces}
+          subtext="Difference between loaded and unloaded"
+          icon={faTriangleExclamation}
+          accentClass="text-red-500"
           theme={theme}
         />
       </div>
@@ -169,14 +328,15 @@ export function HandoffPrompt({
                     </div>
                   </div>
                   <span className="shrink-0 text-[10px] font-bold text-amber-500">
-                    {item.remainingLoaded} left
+                    {item.remainingLoaded} label
+                    {item.remainingLoaded === 1 ? "" : "s"} on truck
                   </span>
                 </div>
                 <textarea
                   value={missingRemarks[item.id] || ""}
                   onChange={(e) => onRemarkChange(item.id, e.target.value)}
                   rows={2}
-                  placeholder="Add a remark for this missing shipment..."
+                  placeholder="Add a remark for this missing label..."
                   className={`mt-3 w-full rounded-lg border px-3 py-2 text-xs ${theme.input}`}
                 />
               </div>
@@ -184,23 +344,18 @@ export function HandoffPrompt({
           </div>
         </div>
       ) : (
-        <div className="text-left">
-          <div className="text-[10px] font-bold uppercase opacity-60 mb-2">
+        <div className="text-left space-y-2">
+          <div className="text-[10px] font-bold uppercase opacity-60">
             Ready Shipments
           </div>
-          <div className="max-h-36 overflow-y-auto rounded-lg border divide-y divide-white/5">
-            {unloadedShipments.map((item) => (
-              <div
+          <div className="max-h-56 overflow-y-auto space-y-2 pr-1">
+            {unloadedShipments.map((item, index) => (
+              <ReadyShipmentRow
                 key={item.id}
-                className="p-2 flex justify-between gap-3 text-xs"
-              >
-                <span className="font-mono font-bold truncate">
-                  {item.shipmentId}
-                </span>
-                <span className="opacity-60 shrink-0">
-                  {item.unloadedCount}/{item.expectedCount}
-                </span>
-              </div>
+                item={item}
+                theme={theme}
+                defaultExpanded={index === 0}
+              />
             ))}
           </div>
         </div>
@@ -212,10 +367,18 @@ export function HandoffPrompt({
         </p>
       )}
 
-      <p className="text-[11px] opacity-60 text-center px-1">
-        Releases to the delivery pool. Custody stays at Odiongan until a checker
-        scans and loads each label.
-      </p>
+      <div
+        className={`rounded-lg border px-3 py-2.5 text-left text-[11px] leading-relaxed ${
+          theme.panelSurface
+        } border-blue-500/30 text-blue-600/90`}
+      >
+        Packages are now at {context.destinationWarehouse || "the destination hub"}{" "}
+        and ready to be released to delivery operations. Custody remains at{" "}
+        {context.destinationWarehouse?.includes("Odiongan")
+          ? "Odiongan"
+          : context.destinationWarehouse || "the hub"}{" "}
+        until a checker scans and loads each label.
+      </div>
 
       <div className="space-y-2">
         <StatusButton
@@ -238,15 +401,6 @@ export function HandoffPrompt({
         </div>
       </div>
     </InterceptorPrompt>
-  );
-}
-
-function MetricCard({ label, value, theme }) {
-  return (
-    <div className={`rounded-lg border p-3 ${theme.panelSurface}`}>
-      <div className="text-[10px] font-bold uppercase opacity-50">{label}</div>
-      <div className="text-lg font-bold">{value}</div>
-    </div>
   );
 }
 
