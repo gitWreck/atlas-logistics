@@ -92,6 +92,10 @@ export function getScannerErrorGuidance(message, state, trip) {
     return "Confirm the piece was loaded on this trip. If Rose already received it at Odiongan, release from Manifest instead.";
   }
 
+  if (text.includes("already loaded on trip")) {
+    return "This label was already scanned onto this trip. Review the Package Already Loaded panel above.";
+  }
+
   if (text.includes("no quantity is available")) {
     return "Confirm the package has loaded quantity before unloading, or choose another scan status/package.";
   }

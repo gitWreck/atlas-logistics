@@ -1,6 +1,18 @@
+import { calculateProgress } from "./utilities";
+
 function clampCount(value) {
   return Math.max(0, Number(value) || 0);
 }
+
+const LOADING_PHASE_TRIP_STATUSES = new Set([
+  "CREATED",
+  "ASSIGNED",
+  "LOADING",
+  "PARTIALLY_LOADED",
+]);
+
+/** Max progress while cargo is still being loaded at origin (before IN_TRANSIT). */
+const LOADING_PHASE_PROGRESS_CAP = 60;
 
 const DELIVERED_TRIP_SHIPMENT_STATUSES = new Set([
   "COMPLETED",
@@ -8,10 +20,20 @@ const DELIVERED_TRIP_SHIPMENT_STATUSES = new Set([
   "DELIVERED_COMPLETE",
 ]);
 
+function resolveShipmentExpectedTotal(shipment = {}) {
+  const barcodeCount = Array.isArray(shipment.packageBarcodes)
+    ? shipment.packageBarcodes.length
+    : 0;
+  return Math.max(
+    clampCount(shipment.totalItems),
+    barcodeCount > 0 ? barcodeCount : 0,
+  );
+}
+
 function aggregateFromTripShipments(shipments = []) {
   return shipments.reduce(
     (acc, shipment) => {
-      const total = clampCount(shipment.totalItems);
+      const total = resolveShipmentExpectedTotal(shipment);
       const loaded = clampCount(shipment.loadedCount);
       const received = clampCount(
         shipment.deliveredCount ?? shipment.receivedCount,
@@ -179,6 +201,55 @@ export function getTripStatsDisplay(trip) {
   return {
     count: total > 0 ? Math.min(loaded, total) : loaded,
     total,
-    label: "Loaded",
+    label: total <= 0 && loaded <= 0 ? "Awaiting" : "Loaded",
   };
+}
+
+/**
+ * Trip board progress bar — uses actual load counts during the loading phase.
+ * Empty trips (0/0) must show 0%, not a fixed status milestone like 40%.
+ */
+export function calculateTripProgress(trip) {
+  const status = String(trip?.status || "").toUpperCase();
+  const stats = getTripStatsDisplay(trip);
+  const total = clampCount(stats.total);
+  const loaded = clampCount(stats.count);
+
+  if (LOADING_PHASE_TRIP_STATUSES.has(status)) {
+    if (total <= 0) return 0;
+    const ratio = Math.min(loaded / total, 1);
+    return Math.round(ratio * LOADING_PHASE_PROGRESS_CAP);
+  }
+
+  return calculateProgress(status);
+}
+
+export function isTripAwaitingLoading(trip) {
+  const status = String(trip?.status || "").toUpperCase();
+  const stats = getTripStatsDisplay(trip);
+  return (
+    LOADING_PHASE_TRIP_STATUSES.has(status) &&
+    stats.total <= 0 &&
+    stats.count <= 0
+  );
+}
+
+export function getTripBoardStatusLabel(trip) {
+  const status = String(trip?.status || "").toUpperCase();
+
+  if (isTripAwaitingLoading(trip)) {
+    return "Awaiting Loading";
+  }
+
+  if (status === "UNLOADING") return "ARRIVED";
+  return trip?.status || status;
+}
+
+/** Hub transfer drawer timeline — empty trips stay on Awaiting Loading, not Loading. */
+export function resolveHubTripTimelineStep(trip) {
+  const status = String(trip?.status || "").toUpperCase();
+  if (status === "UNLOADING") return "ARRIVED";
+  if (isTripAwaitingLoading(trip)) return "AWAITING_LOADING";
+  if (LOADING_PHASE_TRIP_STATUSES.has(status)) return "LOADING";
+  return status;
 }

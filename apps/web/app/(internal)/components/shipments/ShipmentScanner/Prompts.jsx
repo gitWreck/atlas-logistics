@@ -120,18 +120,30 @@ export function HandoffPrompt({
     >
       <div className="grid grid-cols-3 gap-2 text-left">
         <MetricCard
-          label="Manifest"
-          value={totals.manifestShipments || 0}
+          label="Pieces on trip"
+          value={
+            totals.manifestPieces ??
+            totals.manifestShipments ??
+            0
+          }
           theme={theme}
         />
         <MetricCard
           label="Unloaded"
-          value={totals.unloadedShipments || 0}
+          value={
+            totals.unloadedPieces ??
+            totals.unloadedShipments ??
+            0
+          }
           theme={theme}
         />
         <MetricCard
-          label="Missing"
-          value={totals.missingShipments || 0}
+          label="Still on truck"
+          value={
+            totals.onTruckPieces ??
+            totals.missingShipments ??
+            0
+          }
           theme={theme}
         />
       </div>

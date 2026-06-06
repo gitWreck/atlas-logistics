@@ -130,15 +130,35 @@ export function normalizeTripStatus(status) {
   return String(status || "").trim().toUpperCase();
 }
 
+function toPieceCount(value) {
+  const num = Number(value);
+  return Number.isFinite(num) && num >= 0 ? num : 0;
+}
+
 export function evaluateReconciliationRows(rows = []) {
   const shipments = Array.isArray(rows) ? rows : [];
   const missingShipments = shipments.filter((row) => row.missing === true);
   const unloadedShipments = shipments.filter((row) => !row.missing);
+  const manifestPieces = shipments.reduce(
+    (sum, row) => sum + toPieceCount(row.expectedCount),
+    0,
+  );
+  const unloadedPieces = shipments.reduce(
+    (sum, row) => sum + toPieceCount(row.unloadedCount),
+    0,
+  );
+  const onTruckPieces = shipments.reduce(
+    (sum, row) => sum + toPieceCount(row.remainingLoaded),
+    0,
+  );
 
   return {
     manifestShipments: shipments.length,
     unloadedShipments: unloadedShipments.length,
     missingShipments: missingShipments.length,
+    manifestPieces,
+    unloadedPieces,
+    onTruckPieces,
     ready: shipments.length > 0 && missingShipments.length === 0,
     missingShipmentIds: missingShipments
       .map((row) => row.id || row.shipmentId)

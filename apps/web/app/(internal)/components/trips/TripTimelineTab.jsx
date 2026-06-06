@@ -24,15 +24,10 @@ import {
   getManifestStatusLabel,
   resolveManifestStatus,
 } from "@/app/utility/manifestStatus";
-
-function resolveHubTripTimelineStatus(status) {
-  const normalized = String(status || "").toUpperCase();
-  if (normalized === "UNLOADING") return "ARRIVED";
-  if (["CREATED", "ASSIGNED"].includes(normalized)) return "LOADING";
-  return normalized;
-}
+import { resolveHubTripTimelineStep } from "@/app/utility/tripStats";
 
 function formatStepLabel(step) {
+  if (step === "AWAITING_LOADING") return "Awaiting Loading";
   return String(step || "")
     .replace(/_/g, " ")
     .toLowerCase()
@@ -59,10 +54,10 @@ export default function TripTimelineTab({
   const isAdmin = String(profile?.role || "").toLowerCase() === "admin";
 
   const isCancelled = data.status === "CANCELLED";
-  const timelineStatus = isLocal
+  const timelineStep = isLocal
     ? data.status
-    : resolveHubTripTimelineStatus(data.status);
-  const currentStepIndex = isCancelled ? -1 : steps.indexOf(timelineStatus);
+    : resolveHubTripTimelineStep(data);
+  const currentStepIndex = isCancelled ? -1 : steps.indexOf(timelineStep);
 
   const manifestStatus = resolveManifestStatus(data);
   const manifestStepIndex = STEP_HUB_MANIFEST.indexOf(manifestStatus);
@@ -220,7 +215,7 @@ export default function TripTimelineTab({
           )}
 
           {!isCancelled && renderTimelineSteps(steps, {
-            activeStatus: data.status,
+            activeStatus: timelineStep,
             activeIndex: currentStepIndex,
           })}
         </div>

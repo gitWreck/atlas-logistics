@@ -10,7 +10,10 @@ import {
   faTruckPickup,
 } from "@fortawesome/free-solid-svg-icons";
 import { formatFirestoreDate } from "@/app/utility/utilities";
-import { getTripStatsDisplay } from "@/app/utility/tripStats";
+import {
+  getTripBoardStatusLabel,
+  getTripStatsDisplay,
+} from "@/app/utility/tripStats";
 import { getRowThemeClasses } from "@/app/utility/constant/theme";
 import StatusDot from "../ui/StatusDot";
 import ManifestStatusBadge from "../ui/ManifestStatusBadge";
@@ -70,11 +73,10 @@ export default function TripRow({
       ? theme.statusTextCompleted
       : theme.statusTextDefault;
 
-  const displayTripStatus =
-    trip.status === "UNLOADING" ? "ARRIVED" : trip.status;
+  const boardStatusLabel = getTripBoardStatusLabel(trip);
   const statusLabel = isDelayed
     ? trip.delayReason?.replaceAll("_", " ") || "DELAYED"
-    : displayTripStatus?.replaceAll("_", " ");
+    : boardStatusLabel?.replaceAll("_", " ");
 
   const tripTypeLabel = isDelivery ? "DEL" : isLocal ? "PKP" : "HUB";
 

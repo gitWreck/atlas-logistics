@@ -10,7 +10,7 @@ const OFFLOAD_GRADIENT_COLORS = ["#042C83", "#10b981"];
 const INFO_GRADIENT_COLORS = ["#042C83", "#6366f1"];
 
 export default function OperationsGrid({
-  onScanLoad,
+  // onScanLoad,
   onScanOffload,
   onScanInfo,
   onScanDelivery,
@@ -24,9 +24,9 @@ export default function OperationsGrid({
       </Text>
 
       <View style={styles.gridContainer}>
-        {/* ROW 1: Load & Offload */}
+        {/* ROW 1: Offload (main-truck load hidden for now) */}
         <View style={styles.row}>
-          {/* A. LOAD TRUCK */}
+          {/* A. LOAD TRUCK — main long-haul trip load; disabled for now
           <TouchableOpacity
             style={styles.gridBtnTouchable}
             onPress={onScanLoad}
@@ -44,6 +44,7 @@ export default function OperationsGrid({
               <Text style={styles.btnTitle}>LOAD TRUCK</Text>
             </LinearGradient>
           </TouchableOpacity>
+          */}
 
           {/* B. OFFLOAD */}
           <TouchableOpacity
@@ -64,7 +65,7 @@ export default function OperationsGrid({
           </TouchableOpacity>
         </View>
 
-        {/* ROW 2: Last mile + Scan Info */}
+        {/* ROW 2: Load truck (delivery mode) + Scan Info */}
         <View style={styles.row}>
           <TouchableOpacity
             style={styles.gridBtnTouchable}
@@ -72,15 +73,15 @@ export default function OperationsGrid({
             activeOpacity={0.85}
           >
             <LinearGradient
-              colors={["#042C83", "#f59e0b"]}
+              colors={LOAD_GRADIENT_COLORS}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 0 }}
               style={styles.gridBtn}
             >
               <View style={styles.iconCircle}>
-                <FontAwesome5 name="shipping-fast" size={22} color="#f59e0b" />
+                <FontAwesome5 name="truck" size={24} color="#3b82f6" />
               </View>
-              <Text style={styles.btnTitle}>LAST-MILE DELIVERY</Text>
+              <Text style={styles.btnTitle}>LOAD TRUCK</Text>
             </LinearGradient>
           </TouchableOpacity>
 

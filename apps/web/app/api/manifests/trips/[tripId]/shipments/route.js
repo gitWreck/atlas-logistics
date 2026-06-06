@@ -84,10 +84,21 @@ export async function GET(request, { params }) {
           (sum, pkg) => sum + Math.min(Number(pkg[field]) || 0, packageQty(pkg)),
           0,
         );
-      const visibleTotalQty =
-        hasPackageScopedManifest
-          ? visiblePackages.reduce((sum, pkg) => sum + packageQty(pkg), 0)
-          : data.totalItems || root.totals?.totalContentQty || 0;
+      const shipmentExpectedTotal = Math.max(
+        Number(root.totals?.totalContentQty) || 0,
+        Number(root.totals?.totalItems) || 0,
+        rootPackages.reduce((sum, pkg) => sum + packageQty(pkg), 0),
+        (root.packageBarcodes || []).length,
+        (data.packageBarcodes || []).length,
+        Number(data.totalItems) || 0,
+      );
+      const tripScopedTotalQty = hasPackageScopedManifest
+        ? visiblePackages.reduce((sum, pkg) => sum + packageQty(pkg), 0)
+        : Number(data.totalItems) || 0;
+      const visibleTotalQty = Math.max(
+        shipmentExpectedTotal,
+        tripScopedTotalQty,
+      );
       const visibleLoadedQty =
         data.loadedCount ?? sumQty("loadedQty") ?? root.totals?.loaded ?? 0;
       const visibleReceivedQty =
@@ -105,6 +116,7 @@ export async function GET(request, { params }) {
         Math.max(
           visibleTotalQty -
             visibleLoadedQty -
+            visibleReceivedQty -
             visibleMissingQty -
             visibleDamagedQty,
           0,

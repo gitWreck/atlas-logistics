@@ -2,6 +2,11 @@ import { NextResponse } from "next/server";
 import { adminDb, adminAuth } from "@/lib/firebase-admin";
 import { headers } from "next/headers";
 import { getUnloadBlockReason } from "@/app/utility/manifestStatus";
+import {
+  buildAlreadyLoadedInfo,
+  isPackageFullyLoadedOnTrip,
+  pickLatestLoadEvent,
+} from "@/lib/scannerLoadDuplicate";
 
 export async function POST(req) {
   try {
@@ -107,6 +112,57 @@ export async function POST(req) {
       } else {
         packageAssignmentState = "ON_OTHER_TRIP";
       }
+    }
+
+    if (
+      action === "LOAD" &&
+      tripId &&
+      targetPackage &&
+      isPackageFullyLoadedOnTrip(targetPackage, tripId)
+    ) {
+      const [tripSnap, eventsSnap] = await Promise.all([
+        adminDb.collection("truck_trips").doc(tripId).get(),
+        adminDb
+          .collection("shipment_events")
+          .where("shipmentId", "==", data.shipmentId || shipmentDoc.id)
+          .limit(40)
+          .get(),
+      ]);
+
+      const tripData = tripSnap.exists ? tripSnap.data() || {} : {};
+      let truckData = null;
+      if (tripData.truckId) {
+        const resolvedTruckSnap = await adminDb
+          .collection("trucks")
+          .doc(tripData.truckId)
+          .get();
+        truckData = resolvedTruckSnap.exists ? resolvedTruckSnap.data() : null;
+      }
+
+      const loadEvent = pickLatestLoadEvent(
+        eventsSnap.docs.map((docSnap) => docSnap.data()),
+        tripId,
+        cleanCode,
+      );
+
+      return NextResponse.json({
+        found: true,
+        alreadyLoaded: true,
+        label: cleanCode,
+        scanType: "PACKAGE",
+        shipmentId: data.shipmentId,
+        packageId: targetPackage.packageId || cleanCode,
+        packageAssignmentState: "ON_THIS_TRIP",
+        loadInfo: buildAlreadyLoadedInfo({
+          packageId: targetPackage.packageId || cleanCode,
+          tripId,
+          shipment: data,
+          trip: tripData,
+          truck: truckData,
+          targetPackage,
+          loadEvent,
+        }),
+      });
     }
 
     // 3. Construct Response

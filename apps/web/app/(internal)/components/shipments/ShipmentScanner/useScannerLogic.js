@@ -15,6 +15,10 @@ import {
 import { isEligibleForCheckerRelease } from "@/app/utility/checkerRelease";
 import { isTripReleaseEligible } from "@/app/utility/tripLifecycle";
 import { updatedBy } from "@/app/utility/utilities";
+import {
+  buildAlreadyLoadedInfo,
+  isPackageFullyLoadedOnTrip,
+} from "@/lib/scannerLoadDuplicate";
 
 const SCAN_STATUS_OPTIONS = {
   LOAD: [
@@ -128,8 +132,29 @@ export default function useScannerLogic({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [successNotice, setSuccessNotice] = useState(null);
+  const [alreadyLoadedNotice, setAlreadyLoadedNotice] = useState(null);
   const [btnStatus, setBtnStatus] = useState("IDLE");
   const handoffBootstrappedRef = useRef(false);
+  const successNoticeTimerRef = useRef(null);
+
+  const showSuccessNotice = useCallback((payload) => {
+    if (successNoticeTimerRef.current) {
+      clearTimeout(successNoticeTimerRef.current);
+    }
+    setSuccessNotice(payload);
+    successNoticeTimerRef.current = setTimeout(() => {
+      setSuccessNotice(null);
+      successNoticeTimerRef.current = null;
+    }, 1500);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (successNoticeTimerRef.current) {
+        clearTimeout(successNoticeTimerRef.current);
+      }
+    };
+  }, []);
 
   const resetFlow = useCallback(() => {
     setAction(null);
@@ -151,7 +176,12 @@ export default function useScannerLogic({
     setBtnStatus("IDLE");
     setLoading(false);
     setError("");
+    if (successNoticeTimerRef.current) {
+      clearTimeout(successNoticeTimerRef.current);
+      successNoticeTimerRef.current = null;
+    }
     setSuccessNotice(null);
+    setAlreadyLoadedNotice(null);
   }, []);
 
   const resetScanResult = useCallback(() => {
@@ -164,11 +194,10 @@ export default function useScannerLogic({
     setNeedsHandoff(false);
     setHandoffSummary(null);
     setMissingRemarks({});
-    setAvailableTrips([]);
-    setSelectedNextTrip("");
     setBtnStatus("IDLE");
     setLoading(false);
     setError("");
+    setAlreadyLoadedNotice(null);
   }, []);
 
   const getDefaultScanStatus = useCallback(
@@ -521,13 +550,14 @@ export default function useScannerLogic({
       const shouldOfferLoadedStatus =
         shouldPromptLoadedStatusAfterLoad(totalQuantity);
 
-      setSuccessNotice({
+      showSuccessNotice({
         action,
         scanStatus,
         scanStatusLabel:
           SCAN_STATUS_OPTIONS[action]?.find((opt) => opt.value === scanStatus)
             ?.label || scanStatus,
         code,
+        tripId,
         shipmentId: item.shipmentId,
         scanType: item.scanType,
         totalQuantity,
@@ -561,6 +591,7 @@ export default function useScannerLogic({
       resetScanResult,
       scanStatus,
       shouldPromptLoadedStatusAfterLoad,
+      showSuccessNotice,
       trip,
       tripId,
     ],
@@ -574,7 +605,12 @@ export default function useScannerLogic({
 
     setLoading(true);
     setError("");
+    if (successNoticeTimerRef.current) {
+      clearTimeout(successNoticeTimerRef.current);
+      successNoticeTimerRef.current = null;
+    }
     setSuccessNotice(null);
+    setAlreadyLoadedNotice(null);
     try {
       const result = await onResolveScan({
         tripId,
@@ -593,6 +629,13 @@ export default function useScannerLogic({
         return setError(
           `Package ${result.packageId || cleanCode} is already assigned to trip ${result.packageCurrentTripId}. Transfer it before scanning on this trip.`,
         );
+      }
+
+      if (action === "LOAD" && result.alreadyLoaded && result.loadInfo) {
+        setAlreadyLoadedNotice(result.loadInfo);
+        setScanCode(cleanCode);
+        setManualCode("");
+        return;
       }
 
       setScanCode(cleanCode);
@@ -649,6 +692,34 @@ export default function useScannerLogic({
 
       if (!itemsToProcess.length) {
         if (action === "LOAD") {
+          const targetPkg =
+            result.scanType === "PACKAGE"
+              ? findPackageByScan(
+                  result.packages,
+                  cleanCode,
+                  result.packageId,
+                )
+              : null;
+
+          if (
+            targetPkg &&
+            isPackageFullyLoadedOnTrip(targetPkg, tripId)
+          ) {
+            setAlreadyLoadedNotice(
+              buildAlreadyLoadedInfo({
+                packageId: getPackageIdentity(targetPkg) || cleanCode,
+                tripId,
+                shipment: {
+                  origin: trip?.origin,
+                  originCode: trip?.originCode,
+                },
+                trip,
+                targetPackage: targetPkg,
+              }),
+            );
+            return;
+          }
+
           return setError("No quantity is available to load for this scan.");
         }
 
@@ -671,25 +742,6 @@ export default function useScannerLogic({
             packageAssignmentState: result.packageAssignmentState,
           }),
         );
-      }
-
-      if (
-        action === "LOAD" &&
-        result.scanType === "PACKAGE" &&
-        ["UNASSIGNED_PACKAGE", "UNASSIGNED_PACKAGE_FROM_ASSIGNED_SHIPMENT"].includes(
-          result.packageAssignmentState,
-        )
-      ) {
-        setResolvedItem(nextResolvedItem);
-        setQuantities(
-          Object.fromEntries(
-            itemsToProcess.map(({ packageId, quantity }) => [
-              packageId,
-              quantity,
-            ]),
-          ),
-        );
-        return;
       }
 
       await processItems({
@@ -730,21 +782,36 @@ export default function useScannerLogic({
   // 3. Updated all handlers to pass the imported functions directly
   const handleAssignShipment = async () => {
     setLoading(true);
+    const assignmentItem = needsAssignmentItem;
     const success = await executeFirebaseCall(bulkAssignShipments, {
       tripId,
-      shipmentIds: [needsAssignmentItem.shipmentId],
+      shipmentIds: [assignmentItem.shipmentId],
       updatedBy: updatedBy(profile),
     });
     if (success) {
       setRecentlyAssigned((prev) =>
-        new Set(prev).add(needsAssignmentItem.shipmentId),
+        new Set(prev).add(assignmentItem.shipmentId),
       );
-      setResolvedItem(needsAssignmentItem);
       setNeedsAssignmentItem(null);
+
+      if (action === "LOAD" && scanCode) {
+        const itemsToProcess = getProcessableItems(assignmentItem, scanCode);
+        if (itemsToProcess.length > 0) {
+          await processItems({
+            item: assignmentItem,
+            code: scanCode,
+            itemsToProcess,
+          });
+          setLoading(false);
+          return;
+        }
+      }
+
+      setResolvedItem(assignmentItem);
       if (scanCode) {
         setQuantities(
           Object.fromEntries(
-            getProcessableItems(needsAssignmentItem, scanCode).map(
+            getProcessableItems(assignmentItem, scanCode).map(
               ({ packageId, quantity }) => [packageId, quantity],
             ),
           ),
@@ -1025,13 +1092,14 @@ export default function useScannerLogic({
       const shouldOfferLoadedStatus =
         shouldPromptLoadedStatusAfterLoad(totalQuantity);
 
-      setSuccessNotice({
+      showSuccessNotice({
         action,
         scanStatus,
         scanStatusLabel:
           SCAN_STATUS_OPTIONS[action]?.find((opt) => opt.value === scanStatus)
             ?.label || scanStatus,
         code: scanCode,
+        tripId,
         shipmentId: resolvedItem.shipmentId,
         scanType: resolvedItem.scanType,
         totalQuantity,
@@ -1084,6 +1152,7 @@ export default function useScannerLogic({
       loading,
       error,
       successNotice,
+      alreadyLoadedNotice,
       btnStatus,
     },
     actions: {

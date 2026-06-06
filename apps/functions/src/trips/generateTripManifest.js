@@ -127,14 +127,19 @@ exports.generateTripManifest = onCall(
           // return;
         }
 
-        totalItems += loadedCount; // Manifest only counts what is ON the truck
-
-        // Filter packages: Only include those marked as LOADED (or OUT_FOR_DELIVERY)
-        // This ensures the manifest accurately reflects physical cargo.
         const manifestedPackages = packages.filter((p) =>
-          ["LOADED", "OUT_FOR_DELIVERY", "DELIVERED"].includes(p.status),
+          [
+            "LOADED",
+            "LOADED_TO_TRIP",
+            "IN_TRANSIT",
+            "PARTIALLY_LOADED",
+            "OUT_FOR_DELIVERY",
+          ].includes(String(p.status || "").toUpperCase()),
         );
-        const actualLoadedCount = manifestedPackages.length;
+        const actualLoadedCount = manifestedPackages.reduce((sum, pkg) => {
+          const qty = Number(pkg.quantity);
+          return sum + (Number.isFinite(qty) && qty > 0 ? qty : 1);
+        }, 0);
         totalItems += actualLoadedCount;
 
         items.push({

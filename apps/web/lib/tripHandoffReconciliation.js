@@ -6,6 +6,64 @@ const toNumber = (value, fallback = 0) => {
   return Number.isFinite(num) && num >= 0 ? num : fallback;
 };
 
+const ON_TRUCK_PIECE_STATUSES = new Set([
+  "LOADED",
+  "LOADED_TO_TRIP",
+  "IN_TRANSIT",
+  "PARTIALLY_LOADED",
+  "OUT_FOR_DELIVERY",
+]);
+
+const UNLOADED_AT_HUB_PIECE_STATUSES = new Set([
+  "ARRIVED_AT_ODIONGAN",
+  "AVAILABLE_AT_ODIONGAN_WAREHOUSE",
+  "RELEASED_FOR_DELIVERY",
+  "RECEIVED_AT_DIVISORIA",
+  "RECEIVED",
+  "AVAILABLE_AT_WAREHOUSE",
+]);
+
+function pieceQuantity(pkg = {}) {
+  const qty = Number(pkg.quantity);
+  return Number.isFinite(qty) && qty > 0 ? qty : 1;
+}
+
+function countPiecesByStatus(packages = [], statusSet) {
+  return packages.reduce((sum, pkg) => {
+    const status = String(pkg.status || "").toUpperCase();
+    return statusSet.has(status) ? sum + pieceQuantity(pkg) : sum;
+  }, 0);
+}
+
+function resolveExpectedPieceCount(item = {}, tripShipment = {}, shipment = {}) {
+  const tripTotal = toNumber(tripShipment.totalItems, 0);
+  if (tripTotal > 0) return tripTotal;
+
+  const manifestLoaded = toNumber(item.loadedCount, -1);
+  if (manifestLoaded > 0) return manifestLoaded;
+
+  const tripLoaded = toNumber(tripShipment.loadedCount, 0);
+  const tripReceived = toNumber(
+    tripShipment.receivedCount ?? tripShipment.deliveredCount,
+    0,
+  );
+  const tripDerivedTotal = tripLoaded + tripReceived;
+  if (tripDerivedTotal > 0) return tripDerivedTotal;
+
+  const packages = Array.isArray(shipment.packages) ? shipment.packages : [];
+  const onTruck = countPiecesByStatus(packages, ON_TRUCK_PIECE_STATUSES);
+  const atHub = countPiecesByStatus(packages, UNLOADED_AT_HUB_PIECE_STATUSES);
+  if (onTruck + atHub > 0) return onTruck + atHub;
+
+  const manifestTotal = toNumber(item.totalCount, 0);
+  if (manifestTotal > 0) return manifestTotal;
+
+  return toNumber(
+    shipment.totals?.totalContentQty ?? shipment.totals?.totalItems,
+    0,
+  );
+}
+
 async function buildReconciliationRow(tripRef, tripId, item, shipmentDocId) {
   if (!shipmentDocId) return null;
 
@@ -16,15 +74,19 @@ async function buildReconciliationRow(tripRef, tripId, item, shipmentDocId) {
 
   const tripShipment = tripShipmentSnap.data() || {};
   const shipment = shipmentSnap.data() || {};
-  const expectedCount = toNumber(
-    item?.loadedCount ??
-      item?.totalCount ??
-      tripShipment.totalItems ??
-      shipment.totals?.totalContentQty,
+  const expectedCount = resolveExpectedPieceCount(item, tripShipment, shipment);
+  const remainingLoaded = toNumber(tripShipment.loadedCount, 0);
+  const receivedAtHub = toNumber(
+    tripShipment.receivedCount ?? tripShipment.deliveredCount,
     0,
   );
-  const remainingLoaded = toNumber(tripShipment.loadedCount, 0);
-  const unloadedCount = Math.max(expectedCount - remainingLoaded, 0);
+  const unloadedCount =
+    receivedAtHub > 0
+      ? Math.min(
+          receivedAtHub,
+          expectedCount > 0 ? expectedCount : receivedAtHub,
+        )
+      : Math.max(expectedCount - remainingLoaded, 0);
   const isMissing = remainingLoaded > 0 || !tripShipmentSnap.exists;
 
   return {
@@ -143,6 +205,9 @@ export async function runTripHandoffReconciliation(tripId) {
       manifestShipments: lifecycleEval.reconciliation.manifestShipments,
       unloadedShipments: lifecycleEval.reconciliation.unloadedShipments,
       missingShipments: lifecycleEval.reconciliation.missingShipments,
+      manifestPieces: lifecycleEval.reconciliation.manifestPieces,
+      unloadedPieces: lifecycleEval.reconciliation.unloadedPieces,
+      onTruckPieces: lifecycleEval.reconciliation.onTruckPieces,
     },
     lifecycle: {
       recommendedNextStatus: lifecycleEval.recommendedNextStatus,

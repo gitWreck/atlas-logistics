@@ -169,8 +169,8 @@ exports.createTruckTrip = onCall(
         plannedDeparture,
         estimatedArrival,
 
-        status: isHubTransfer ? "LOADING" : "CREATED",
-        statusIndex: isHubTransfer ? 2 : 0,
+        status: "CREATED",
+        statusIndex: 0,
         active: true,
 
         manifestStatus: isHubTransfer ? MANIFEST_STATUS.OPEN : null,

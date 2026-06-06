@@ -20,7 +20,8 @@ import {
 } from "@fortawesome/free-solid-svg-icons";
 import TripRow from "./TripRow";
 import CompletedTripsTable from "./CompletedTripsTable";
-import { calculateProgress, updatedBy } from "@/app/utility/utilities";
+import { updatedBy } from "@/app/utility/utilities";
+import { calculateTripProgress } from "@/app/utility/tripStats";
 import { getBoardThemeClasses } from "@/app/utility/constant/theme";
 import TripDrawer from "./TripDrawer";
 import CreateTripModal from "./modals/CreateTripModal";
@@ -100,7 +101,7 @@ const TripBoard = forwardRef(function TripBoard(
 
       const formatted = (data.trips || []).map((trip) => ({
         ...trip,
-        progress: calculateProgress(trip.status),
+        progress: calculateTripProgress(trip),
       }));
 
       setTrips(formatted);

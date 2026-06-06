@@ -10,6 +10,7 @@ import {
   faCamera,
   faClipboardCheck,
   faArrowRight,
+  faExclamationTriangle,
 } from "@fortawesome/free-solid-svg-icons";
 import { getModalThemeClasses } from "@/app/utility/constant/theme";
 import { getModalActionClasses } from "@/app/utility/constant/action";
@@ -160,28 +161,102 @@ export default function ShipmentScanActionModal({
             actions={actions}
           />
 
+          {state.alreadyLoadedNotice && !state.error && (
+            <div
+              className={`rounded-xl border p-4 flex items-start gap-3 ${
+                isDark
+                  ? "border-amber-400/40 bg-amber-500/10"
+                  : "border-amber-300 bg-amber-50"
+              }`}
+            >
+              <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-amber-500 text-white">
+                <FontAwesomeIcon icon={faExclamationTriangle} />
+              </div>
+              <div className="min-w-0 space-y-2 text-xs">
+                <div className="text-sm font-bold text-amber-600">
+                  Package Already Loaded
+                </div>
+                <div>
+                  <span className="opacity-60">Package:</span>
+                  <div className="font-mono font-bold text-sm">
+                    {state.alreadyLoadedNotice.packageId}
+                  </div>
+                </div>
+                <div>
+                  <span className="opacity-60">Trip:</span>
+                  <div className="font-mono font-bold text-sm">
+                    {state.alreadyLoadedNotice.tripId}
+                  </div>
+                </div>
+                {state.alreadyLoadedNotice.loadedBy && (
+                  <div>
+                    <span className="opacity-60">Loaded By:</span>
+                    <div className="font-semibold">
+                      {state.alreadyLoadedNotice.loadedBy}
+                    </div>
+                  </div>
+                )}
+                {state.alreadyLoadedNotice.loadedByRole && (
+                  <div>
+                    <span className="opacity-60">Role:</span>
+                    <div className="font-semibold">
+                      {state.alreadyLoadedNotice.loadedByRole}
+                    </div>
+                  </div>
+                )}
+                {state.alreadyLoadedNotice.location && (
+                  <div>
+                    <span className="opacity-60">Location:</span>
+                    <div className="font-semibold">
+                      {state.alreadyLoadedNotice.location}
+                    </div>
+                  </div>
+                )}
+                {state.alreadyLoadedNotice.truckName && (
+                  <div>
+                    <span className="opacity-60">Truck:</span>
+                    <div className="font-semibold">
+                      {state.alreadyLoadedNotice.truckName}
+                      {state.alreadyLoadedNotice.truckPlate
+                        ? ` (${state.alreadyLoadedNotice.truckPlate})`
+                        : ""}
+                    </div>
+                  </div>
+                )}
+                {state.alreadyLoadedNotice.loadedAt && (
+                  <div>
+                    <span className="opacity-60">Time:</span>
+                    <div className="font-semibold">
+                      {state.alreadyLoadedNotice.loadedAt}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
           {state.successNotice && !state.error && !state.needsHandoff && (
             <div
-              className={`rounded-xl border p-4 flex items-start gap-3 ${theme.panelSurface}`}
+              className={`rounded-xl border p-4 flex items-start gap-3 animate-in fade-in duration-200 ${theme.panelSurface}`}
             >
               <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-white">
                 <FontAwesomeIcon icon={faCheck} />
               </div>
               <div className="min-w-0">
                 <div className="text-sm font-bold text-emerald-500">
-                  Successfully scanned
+                  Successfully Scanned
                 </div>
-                <div className="mt-1 text-xs opacity-70">
-                  {state.successNotice.action} completed for{" "}
-                  <span className="font-mono font-bold">
+                <div className="mt-2 space-y-2 text-xs opacity-80">
+                  <p>
+                    {state.successNotice.action} completed for
+                  </p>
+                  <p className="font-mono font-bold text-sm opacity-100">
                     {state.successNotice.code}
-                  </span>
-                  {state.successNotice.scanStatusLabel
-                    ? ` as ${state.successNotice.scanStatusLabel}`
-                    : ""}
-                  {state.successNotice.totalQuantity > 0
-                    ? ` (${state.successNotice.totalQuantity} item${state.successNotice.totalQuantity === 1 ? "" : "s"})`
-                    : ""}
+                  </p>
+                  <p>Added to Manifest:</p>
+                  <p className="font-mono font-bold text-sm opacity-100">
+                    {state.successNotice.tripId || state.tripId}
+                  </p>
                 </div>
               </div>
             </div>
@@ -340,7 +415,7 @@ export default function ShipmentScanActionModal({
               action={state.action}
               onAssign={actions.handleAssignShipment}
             />
-          ) : state.resolvedItem ? (
+          ) : state.resolvedItem && state.action !== "LOAD" ? (
             <ManifestPanel
               item={state.resolvedItem}
               action={state.action}
@@ -423,7 +498,8 @@ export default function ShipmentScanActionModal({
 
         {/* Footer */}
         <div className={`p-4 border-t flex gap-3 ${theme.header}`}>
-          {state.resolvedItem || state.needsAssignmentItem ? (
+          {state.needsAssignmentItem ||
+          (state.resolvedItem && state.action !== "LOAD") ? (
             <>
               <button
                 onClick={actions.resetFlow}
@@ -431,27 +507,29 @@ export default function ShipmentScanActionModal({
               >
                 <FontAwesomeIcon icon={faUndo} className="mr-2" /> Reset
               </button>
-              {state.resolvedItem && !state.needsAssignmentItem && (
-                <button
-                  onClick={actions.handleConfirm}
-                  disabled={state.loading}
-                  className={`flex-[2] ${actionTheme.primary}`}
-                >
-                  {state.loading ? (
-                    <FontAwesomeIcon
-                      icon={faCircleNotch}
-                      spin
-                      className="mr-2"
-                    />
-                  ) : (
-                    <FontAwesomeIcon icon={faCheck} className="mr-2" />
-                  )}
-                  Confirm{" "}
-                  {state.scanStatusOptions.find(
-                    (opt) => opt.value === state.scanStatus,
-                  )?.label || state.action}
-                </button>
-              )}
+              {state.resolvedItem &&
+                !state.needsAssignmentItem &&
+                state.action !== "LOAD" && (
+                  <button
+                    onClick={actions.handleConfirm}
+                    disabled={state.loading}
+                    className={`flex-[2] ${actionTheme.primary}`}
+                  >
+                    {state.loading ? (
+                      <FontAwesomeIcon
+                        icon={faCircleNotch}
+                        spin
+                        className="mr-2"
+                      />
+                    ) : (
+                      <FontAwesomeIcon icon={faCheck} className="mr-2" />
+                    )}
+                    Confirm{" "}
+                    {state.scanStatusOptions.find(
+                      (opt) => opt.value === state.scanStatus,
+                    )?.label || state.action}
+                  </button>
+                )}
             </>
           ) : (
             <button
