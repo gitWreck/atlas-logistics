@@ -133,6 +133,7 @@ export const STEP_LOCAL_PICKUP = [
 ];
 
 export const STEP_HUB_TRANSFER = [
+  "AWAITING_LOADING",
   "LOADING",
   "LOADED",
   "IN_TRANSIT",

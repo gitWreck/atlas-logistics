@@ -700,6 +700,13 @@ exports.updateShipmentPackages = onCall(
               );
             }
 
+            if (tripId && packageTripId === tripId && remainingQty <= 0) {
+              throw new HttpsError(
+                "failed-precondition",
+                `Package ${getPackageIdentity(pkg)} is already loaded on trip ${tripId}.`,
+              );
+            }
+
             if (
               tripId &&
               requestedQty > 0 &&
@@ -736,6 +743,10 @@ exports.updateShipmentPackages = onCall(
                 loadedOnTrip: tripId,
                 loadedAt: nowIso,
                 loadedBy: name,
+                loadedByRole: role || null,
+                loadedByUid: actorUid || null,
+                loadedAtLocation:
+                  location || oldData.origin || oldData.originCode || null,
                 splitFromPackageId: getPackageIdentity(pkg),
                 status: shouldPromoteReadyForDelivery
                   ? PACKAGE_STATUS.OUT_FOR_DELIVERY
@@ -845,6 +856,20 @@ exports.updateShipmentPackages = onCall(
           finalPackages.push({
             ...updatedPkg,
             status: derivedStatus,
+            ...(newStatus === "LOADED"
+              ? {
+                  loadedAt: pkg.loadedAt || nowIso,
+                  loadedBy: pkg.loadedBy || name,
+                  loadedByRole: pkg.loadedByRole || role || null,
+                  loadedByUid: pkg.loadedByUid || actorUid || null,
+                  loadedAtLocation:
+                    pkg.loadedAtLocation ||
+                    location ||
+                    oldData.origin ||
+                    oldData.originCode ||
+                    null,
+                }
+              : {}),
             ...(newStatus === "DELIVERED" && isDeliveryTrip
               ? {
                   loadedQty: 0,
@@ -973,14 +998,9 @@ exports.updateShipmentPackages = onCall(
       const tripReceivedQty = sumReceivedQty(tripPackages);
       const tripMissingQty = sumMissingQty(tripPackages);
       const tripDamagedQty = sumDamagedQty(tripPackages);
-      const tripPendingQty = Math.max(
-        tripTotalQty -
-          tripLoadedQty -
-          tripReceivedQty -
-          tripMissingQty -
-          tripDamagedQty,
-        0,
-      );
+      const shipmentExpectedTotal =
+        normalizeQty(oldData.totals?.totalContentQty, 0) ||
+        normalizeQty(oldData.totals?.totalItems, 0);
 
       // -----------------------------
       // 5. WRITES
@@ -1052,17 +1072,30 @@ exports.updateShipmentPackages = onCall(
         const oldTripMissingQty = normalizeQty(oldTripShipment.missingCount, 0);
         const oldTripDamagedQty = normalizeQty(oldTripShipment.damagedCount, 0);
         const oldTripPendingQty = normalizeQty(oldTripShipment.pendingCount, 0);
-        const deltaTripTotalQty = tripTotalQty - oldTripTotalQty;
+        const nextTripTotalItems = Math.max(
+          oldTripTotalQty,
+          shipmentExpectedTotal,
+          tripTotalQty,
+        );
+        const nextTripPendingQty = Math.max(
+          nextTripTotalItems -
+            tripLoadedQty -
+            tripReceivedQty -
+            tripMissingQty -
+            tripDamagedQty,
+          0,
+        );
+        const deltaTripTotalQty = nextTripTotalItems - oldTripTotalQty;
         const deltaTripLoadedQty = tripLoadedQty - oldTripLoadedQty;
         const deltaTripReceivedQty = tripReceivedQty - oldTripReceivedQty;
         const deltaTripMissingQty = tripMissingQty - oldTripMissingQty;
         const deltaTripDamagedQty = tripDamagedQty - oldTripDamagedQty;
-        const deltaTripPendingQty = tripPendingQty - oldTripPendingQty;
+        const deltaTripPendingQty = nextTripPendingQty - oldTripPendingQty;
 
         tx.update(tripShipmentRef, {
           status: shipmentStatus,
-          totalItems: tripTotalQty,
-          pendingCount: tripPendingQty,
+          totalItems: nextTripTotalItems,
+          pendingCount: nextTripPendingQty,
           loadedCount: tripLoadedQty,
           deliveredCount: tripReceivedQty,
           receivedCount: tripReceivedQty,
@@ -1169,6 +1202,10 @@ exports.updateShipmentPackages = onCall(
           pendingEvent = {
             shipmentId,
             eventType,
+            pieceId:
+              targetedTrackingNumbers.length === 1
+                ? targetedTrackingNumbers[0]
+                : null,
             ...tripContext,
             checkerId: !isManagerActor ? uid || authUid || null : null,
             checkerName: !isManagerActor ? name || null : null,

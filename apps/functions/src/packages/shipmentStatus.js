@@ -56,7 +56,9 @@ const RELEASED_POOL_STATUSES = new Set([
   PACKAGE_STATUS.AVAILABLE_AT_WAREHOUSE,
 ]);
 
-const READY_FOR_DELIVERY_STATUSES = new Set([PACKAGE_STATUS.READY_FOR_DELIVERY]);
+const READY_FOR_DELIVERY_STATUSES = new Set([
+  PACKAGE_STATUS.READY_FOR_DELIVERY,
+]);
 
 const OUT_FOR_DELIVERY_STATUSES = new Set([PACKAGE_STATUS.OUT_FOR_DELIVERY]);
 
@@ -103,7 +105,8 @@ function resolveLastMileCheckerMasterStatus({
     return "PARTIALLY_DELIVERED";
   }
 
-  const poolRemaining = releasedQty > 0 || availablePoolRows > 0 || atOdionganQty > 0;
+  const poolRemaining =
+    releasedQty > 0 || availablePoolRows > 0 || atOdionganQty > 0;
   if (poolRemaining || onCheckerQty < totalQty) {
     return "PARTIALLY_AVAILABLE_FOR_DELIVERY";
   }
@@ -117,7 +120,10 @@ function resolveLinehaulLoadedMasterStatus({
   atDivisoriaQty = 0,
   loadedRows = 0,
 } = {}) {
-  const linehaulLoadedRows = countStatusRows(packages, LINEHAUL_LOADED_STATUSES);
+  const linehaulLoadedRows = countStatusRows(
+    packages,
+    LINEHAUL_LOADED_STATUSES,
+  );
   const loadedOnTripQty = sumLoadedOnTripQty(packages);
 
   if (loadedOnTripQty > 0 && atDivisoriaQty > 0) {
@@ -420,7 +426,9 @@ const MASTER_STATUSES_SKIP_PACKAGE_DERIVE = new Set([
  * Prevents master AVAILABLE_FOR_DELIVERY while labels stay AVAILABLE_AT_WAREHOUSE.
  */
 function stripStalePackagePoolFlags(packages = [], derivedStatus = "") {
-  if (POOL_DERIVED_MASTER_STATUSES.has(String(derivedStatus || "").toUpperCase())) {
+  if (
+    POOL_DERIVED_MASTER_STATUSES.has(String(derivedStatus || "").toUpperCase())
+  ) {
     return packages;
   }
 
@@ -433,7 +441,9 @@ function stripStalePackagePoolFlags(packages = [], derivedStatus = "") {
 }
 
 function resolveShipmentAvailableForDelivery(derivedStatus = "") {
-  const normalized = String(derivedStatus || "").trim().toUpperCase();
+  const normalized = String(derivedStatus || "")
+    .trim()
+    .toUpperCase();
   if (normalized === "COMPLETED") return false;
   if (POOL_DERIVED_MASTER_STATUSES.has(normalized)) return true;
   return false;
@@ -469,10 +479,16 @@ function buildDerivedShipmentSnapshot(packages = [], options = {}) {
   let derivedStatus = deriveMasterShipmentStatus(packages, deriveOptions);
   let normalizedPackages = stripStalePackagePoolFlags(packages, derivedStatus);
 
-  const afterStrip = deriveMasterShipmentStatus(normalizedPackages, deriveOptions);
+  const afterStrip = deriveMasterShipmentStatus(
+    normalizedPackages,
+    deriveOptions,
+  );
   if (afterStrip !== derivedStatus) {
     derivedStatus = afterStrip;
-    normalizedPackages = stripStalePackagePoolFlags(normalizedPackages, derivedStatus);
+    normalizedPackages = stripStalePackagePoolFlags(
+      normalizedPackages,
+      derivedStatus,
+    );
   }
 
   return {
