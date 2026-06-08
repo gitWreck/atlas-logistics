@@ -19,6 +19,7 @@ import {
   buildAlreadyLoadedInfo,
   isPackageFullyLoadedOnTrip,
 } from "@/lib/scannerLoadDuplicate";
+import { getTripPackageStats } from "@/app/utility/tripStats";
 
 const SCAN_STATUS_OPTIONS = {
   LOAD: [
@@ -281,14 +282,15 @@ export default function useScannerLogic({
         return false;
       }
 
-      const itemPending = Number(trip?.itemPending);
-      const totalItems = Number(trip?.totalItems) || 0;
-      const totalLoaded = Number(trip?.totalLoaded) || 0;
-      const currentPending = Number.isFinite(itemPending)
-        ? itemPending
-        : Math.max(totalItems - totalLoaded, 0);
+      const stats = getTripPackageStats(trip);
+      const processed = Number(processedQuantity) || 1;
+      const nextLoaded = stats.loadedPackages + processed;
 
-      return totalItems > 0 && currentPending - processedQuantity <= 0;
+      return (
+        stats.tripPackageTotal > 0 &&
+        nextLoaded >= stats.tripPackageTotal &&
+        stats.loadedPackages < stats.tripPackageTotal
+      );
     },
     [action, scanStatus, trip],
   );
@@ -570,11 +572,11 @@ export default function useScannerLogic({
       });
       onRefresh?.();
 
-      if (shouldOfferLoadedStatus) {
-        if (trip) {
-          trip.itemPending = 0;
-          trip.totalLoaded = trip.totalItems || trip.totalLoaded || 0;
-        }
+      if (shouldOfferLoadedStatus && trip) {
+        const stats = getTripPackageStats(trip);
+        trip.itemPending = 0;
+        trip.totalLoaded = stats.loadedPackages;
+        trip.totalItems = stats.tripPackageTotal;
       }
 
       if (action === "UNLOAD") {
@@ -1003,6 +1005,7 @@ export default function useScannerLogic({
     const shipmentIds = unloaded
       .filter((row) => {
         if (!row?.id) return false;
+        if ((Number(row.unloadedCount) || 0) <= 0) return false;
         const status = row.status;
         return status == null || isEligibleForCheckerRelease(status);
       })
@@ -1112,11 +1115,11 @@ export default function useScannerLogic({
       });
       onRefresh?.();
 
-      if (shouldOfferLoadedStatus) {
-        if (trip) {
-          trip.itemPending = 0;
-          trip.totalLoaded = trip.totalItems || trip.totalLoaded || 0;
-        }
+      if (shouldOfferLoadedStatus && trip) {
+        const stats = getTripPackageStats(trip);
+        trip.itemPending = 0;
+        trip.totalLoaded = stats.loadedPackages;
+        trip.totalItems = stats.tripPackageTotal;
       }
 
       if (action === "UNLOAD") {

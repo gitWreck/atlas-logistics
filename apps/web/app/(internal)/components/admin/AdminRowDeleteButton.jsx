@@ -4,11 +4,8 @@ import React, { useState } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faTrash } from "@fortawesome/free-solid-svg-icons";
 import AdminDeleteConfirmModal from "./AdminDeleteConfirmModal";
-
-function isAdminStaff(profile) {
-  const role = String(profile?.role || "").toLowerCase();
-  return role === "admin" || role === "manager";
-}
+import { useAuth } from "@/app/context/AuthContext";
+import { canDeleteShipmentsAndTrips } from "@/app/utility/deletePermissions";
 
 export default function AdminRowDeleteButton({
   profile,
@@ -20,9 +17,10 @@ export default function AdminRowDeleteButton({
   isDark = false,
   buttonClassName = "",
 }) {
+  const { user } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
 
-  if (!isAdminStaff(profile)) return null;
+  if (!canDeleteShipmentsAndTrips(profile, user)) return null;
 
   return (
     <>

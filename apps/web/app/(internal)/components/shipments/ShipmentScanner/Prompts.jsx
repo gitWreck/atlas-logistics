@@ -349,14 +349,20 @@ export function HandoffPrompt({
             Ready Shipments
           </div>
           <div className="max-h-56 overflow-y-auto space-y-2 pr-1">
-            {unloadedShipments.map((item, index) => (
-              <ReadyShipmentRow
-                key={item.id}
-                item={item}
-                theme={theme}
-                defaultExpanded={index === 0}
-              />
-            ))}
+            {unloadedShipments.length > 0 ? (
+              unloadedShipments.map((item, index) => (
+                <ReadyShipmentRow
+                  key={item.id}
+                  item={item}
+                  theme={theme}
+                  defaultExpanded={index === 0}
+                />
+              ))
+            ) : (
+              <p className={`text-xs px-1 ${theme.panelSurface} rounded-lg border p-3`}>
+                No hub-received shipments are ready to release yet.
+              </p>
+            )}
           </div>
         </div>
       )}

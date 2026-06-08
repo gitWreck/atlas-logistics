@@ -31,6 +31,7 @@ import {
 } from "@/app/utility/manifestStatus";
 import TablePaginationFooter from "../ui/TablePaginationFooter";
 import TripDeliveryPoolSummary from "./TripDeliveryPoolSummary";
+import TripLoadSummary from "./TripLoadSummary";
 
 export default function TripManifestTab({
   shipments = [],
@@ -234,7 +235,11 @@ export default function TripManifestTab({
   return (
     <>
     <div className="space-y-4 animate-in fade-in slide-in-from-right-4 duration-300">
-      <TripDeliveryPoolSummary shipments={shipments} isDark={isDark} />
+      {hubTrip ? (
+        <TripLoadSummary trip={trip} shipments={shipments} isDark={isDark} />
+      ) : (
+        <TripDeliveryPoolSummary shipments={shipments} isDark={isDark} />
+      )}
 
       {hubTrip && (
         <div
@@ -276,7 +281,7 @@ export default function TripManifestTab({
               <div
                 className={`text-xs font-bold uppercase ${theme.cellSecondary}`}
               >
-                Total Shipments
+                {hubTrip ? "Tracking Numbers" : "Total Shipments"}
               </div>
 
               <div className={`text-2xl font-bold ${theme.headingText}`}>
@@ -380,8 +385,11 @@ export default function TripManifestTab({
 
             const isSelected = selectedIds.has(shipment.id);
             const loadedCount = shipment.loadedCount || 0;
-            const totalItems = shipment.totals.totalContentQty || 0;
-            const isFullyLoaded = loadedCount >= (totalItems || 1);
+            const shipmentPieceTotal =
+              shipment.shipmentPieceTotal ||
+              shipment.totals?.totalContentQty ||
+              0;
+            const isFullyLoaded = loadedCount >= (shipmentPieceTotal || 1);
             const shipmentStatus = shipment.status || "UNKNOWN";
 
             return (
@@ -439,7 +447,7 @@ export default function TripManifestTab({
                           : theme.countBadgeDefault
                       }`}
                     >
-                      {loadedCount} / {totalItems}
+                      {loadedCount} / {shipmentPieceTotal}
                     </span>
 
                     <StatusBadge status={shipmentStatus} isDark={isDark} />
@@ -594,8 +602,12 @@ export default function TripManifestTab({
                 paginatedData.map((shipment, idx) => {
                   const isSelected = selectedIds.has(shipment.id);
                   const loadedCount = shipment.loadedCount || 0;
-                  const totalItems = shipment.totals.totalContentQty || 0;
-                  const isFullyLoaded = loadedCount >= (totalItems || 1);
+                  const shipmentPieceTotal =
+                    shipment.shipmentPieceTotal ||
+                    shipment.totals?.totalContentQty ||
+                    0;
+                  const isFullyLoaded =
+                    loadedCount >= (shipmentPieceTotal || 1);
                   const shipmentStatus = shipment.status || "UNKNOWN";
 
                   return (
@@ -658,7 +670,7 @@ export default function TripManifestTab({
                               : theme.countBadgeDefault
                           }`}
                         >
-                          {loadedCount} / {totalItems}
+                          {loadedCount} / {shipmentPieceTotal}
                         </span>
                       </td>
 

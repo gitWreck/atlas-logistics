@@ -3,7 +3,7 @@
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const admin = require("firebase-admin");
 const { FieldValue } = admin.firestore;
-const { requireRole, updatedBy } = require("../utilities/helpers");
+const { requireShipmentTripDeleteAccess, updatedBy } = require("../utilities/helpers");
 const { writeTripActionLog } = require("../utilities/tripLogger");
 const { deleteSubcollection } = require("../utilities/firestoreCleanup");
 
@@ -78,7 +78,7 @@ async function detachShipmentsFromTrip(tripDocId, actorName) {
 exports.deleteTruckTrip = onCall(
   { region: "asia-southeast1", maxInstances: 10 },
   async (req) => {
-    const { user } = await requireRole(db, req, ["admin", "manager"]);
+    const { user } = await requireShipmentTripDeleteAccess(db, req);
 
     const tripId = req.data?.tripId || req.data?.tripDocId;
     const reason =

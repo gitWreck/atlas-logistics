@@ -277,6 +277,53 @@ async function requireRole(db, context, allowedRoles = []) {
   };
 }
 
+const SHIPMENT_TRIP_DELETE_MANAGER_EMAIL = "roselyn@gmail.com";
+
+function resolveActorEmail(userData = {}, context = {}) {
+  return String(
+    userData.email || context.auth?.token?.email || "",
+  ).toLowerCase();
+}
+
+function canDeleteShipmentsAndTrips(role, email) {
+  const normalizedRole = String(role || "").toLowerCase();
+  const normalizedEmail = String(email || "").toLowerCase();
+
+  if (normalizedRole === "admin") return true;
+  return (
+    normalizedRole === "manager" &&
+    normalizedEmail === SHIPMENT_TRIP_DELETE_MANAGER_EMAIL
+  );
+}
+
+async function requireShipmentTripDeleteAccess(db, context) {
+  const uid = requireAuth(context);
+
+  const userSnap = await db.collection("users").doc(uid).get();
+
+  if (!userSnap.exists || userSnap.data()?.active !== true) {
+    throw new HttpsError("permission-denied", "Inactive or missing user");
+  }
+
+  const userData = userSnap.data() || {};
+  const role = String(userData.role || "").toLowerCase();
+  const email = resolveActorEmail(userData, context);
+
+  if (!canDeleteShipmentsAndTrips(role, email)) {
+    throw new HttpsError(
+      "permission-denied",
+      "You do not have permission to delete shipments or trips",
+    );
+  }
+
+  return {
+    uid,
+    role,
+    email,
+    user: userData,
+  };
+}
+
 /**
  * Actor identity for Firestore writes and custody checks.
  * Always prefer Firebase Auth UID — mobile sends userCode in updatedBy.usercode
@@ -393,6 +440,8 @@ module.exports = {
 
   requireAuth,
   requireRole,
+  requireShipmentTripDeleteAccess,
+  canDeleteShipmentsAndTrips,
   assertAdminOrManager,
 
   toE164,

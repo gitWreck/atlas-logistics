@@ -24,7 +24,10 @@ import {
   getManifestStatusLabel,
   resolveManifestStatus,
 } from "@/app/utility/manifestStatus";
-import { resolveHubTripTimelineStep } from "@/app/utility/tripStats";
+import {
+  getTripPackageStats,
+  resolveHubTripTimelineStep,
+} from "@/app/utility/tripStats";
 
 function formatStepLabel(step) {
   if (step === "AWAITING_LOADING") return "Awaiting Loading";
@@ -36,6 +39,7 @@ function formatStepLabel(step) {
 
 export default function TripTimelineTab({
   data,
+  shipments = [],
   onRefresh,
   isDark = false,
   user,
@@ -70,6 +74,10 @@ export default function TripTimelineTab({
         : manifestStatus === "LOCKED"
           ? data.manifestGeneratedAt
           : data.createdAt;
+
+  const packageStats = getTripPackageStats(
+    shipments.length > 0 ? { ...data, shipments } : data,
+  );
 
   const renderTimelineSteps = (stepList, { activeStatus, activeIndex }) =>
     stepList.map((step, idx) => {
@@ -180,6 +188,30 @@ export default function TripTimelineTab({
           }
           isDark={isDark}
         />
+      </div>
+
+      <div className="mb-6">
+        <h4
+          className={`text-xs font-bold uppercase tracking-wider mb-3 ${theme.sectionLabel}`}
+        >
+          Trip Statistics
+        </h4>
+        <div className={theme.infoCardGrid}>
+          <InfoCard
+            label="Loaded Packages"
+            value={packageStats.displayLoaded}
+            isDark={isDark}
+          />
+          <InfoCard
+            label="Total Shipments"
+            value={String(packageStats.shipmentCount)}
+            isDark={isDark}
+          />
+        </div>
+        <p className={`mt-2 text-[11px] leading-relaxed ${theme.fadedText}`}>
+          Counts reflect labels scanned onto this truck only. Remaining warehouse
+          pieces from partial shipments are not included until loaded on a trip.
+        </p>
       </div>
 
       <div className={theme.mutedText}>

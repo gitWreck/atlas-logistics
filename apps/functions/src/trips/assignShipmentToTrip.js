@@ -93,11 +93,6 @@ exports.assignShipmentToTrip = onCall(
         previousStatus: tracking.status,
       });
 
-      // Calculate Items to Add (Safely handle missing totals)
-      const itemsToAdd = Number(
-        tracking.totals?.totalContentQty || tracking.totals?.totalItems || 0,
-      );
-
       // 📦 Ensure trip_shipments exists (NO loading yet)
       if (!shipSnap.exists) {
         tx.set(shipRef, {
@@ -106,16 +101,17 @@ exports.assignShipmentToTrip = onCall(
           route:
             tracking.originCode + " -> " + tracking.destinationCode || null,
 
-          totalItems: itemsToAdd || 0,
-          pendingCount: itemsToAdd, // Initially, all items are pending
+          // Trip-scoped counts grow only as labels are scanned onto the truck.
+          totalItems: 0,
+          pendingCount: 0,
           loadedCount: 0,
           deliveredCount: 0,
 
           sender: tracking.sender,
           recipient: tracking.recipient,
 
-          // Copy barcodes for the Checker API (Important for scanning!)
-          packageBarcodes: tracking.packageBarcodes || [],
+          // Populated as each label is scanned onto this trip.
+          packageBarcodes: [],
 
           createdAt: now,
           createdBy: uid,
@@ -152,17 +148,7 @@ exports.assignShipmentToTrip = onCall(
         updatedRole: role,
       });
 
-      // --------------------------------------------------------
-      // 🆕 NEW: Update Trip Counters (itemPending)
-      // --------------------------------------------------------
       tx.update(tripRef, {
-        // Also update totalItems (optional, but good practice to track capacity)
-        totalItems: admin.firestore.FieldValue.increment(itemsToAdd),
-        itemPending: admin.firestore.FieldValue.increment(itemsToAdd),
-
-        // totalLoaded: 0,
-        // totalDelivered: 0,
-
         updatedAt: now,
         updatedBy: uid,
       });
