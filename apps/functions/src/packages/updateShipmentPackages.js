@@ -987,7 +987,22 @@ exports.updateShipmentPackages = onCall(
             const packageId = getPackageIdentity(pkg);
 
             if (packageTripId) return packageTripId === tripId;
-            return packageId ? existingTripBarcodeSet.has(packageId) : false;
+
+            if (!packageId || !existingTripBarcodeSet.has(packageId)) {
+              return false;
+            }
+
+            const loadedQty = normalizeQty(pkg.loadedQty, 0);
+            const receivedQty = normalizeQty(pkg.receivedQty, 0);
+            if (loadedQty > 0 || receivedQty > 0) return true;
+
+            return [
+              "LOADED",
+              "LOADED_TO_TRIP",
+              "IN_TRANSIT",
+              "OUT_FOR_DELIVERY",
+              "ARRIVED_AT_ODIONGAN",
+            ].includes(String(pkg.status || "").toUpperCase());
           })
         : finalPackages;
       const tripPackageBarcodes = tripPackages
@@ -998,10 +1013,6 @@ exports.updateShipmentPackages = onCall(
       const tripReceivedQty = sumReceivedQty(tripPackages);
       const tripMissingQty = sumMissingQty(tripPackages);
       const tripDamagedQty = sumDamagedQty(tripPackages);
-      const shipmentExpectedTotal =
-        normalizeQty(oldData.totals?.totalContentQty, 0) ||
-        normalizeQty(oldData.totals?.totalItems, 0);
-
       // -----------------------------
       // 5. WRITES
       // -----------------------------
@@ -1074,8 +1085,9 @@ exports.updateShipmentPackages = onCall(
         const oldTripPendingQty = normalizeQty(oldTripShipment.pendingCount, 0);
         const nextTripTotalItems = Math.max(
           oldTripTotalQty,
-          shipmentExpectedTotal,
           tripTotalQty,
+          tripLoadedQty + tripReceivedQty + tripMissingQty + tripDamagedQty,
+          tripPackageBarcodes.length,
         );
         const nextTripPendingQty = Math.max(
           nextTripTotalItems -

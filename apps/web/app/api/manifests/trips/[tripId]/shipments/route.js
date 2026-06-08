@@ -67,38 +67,55 @@ export async function GET(request, { params }) {
       const tripBarcodeSet = new Set(
         (data.packageBarcodes || []).filter(Boolean).map(String),
       );
+      const packageQty = (pkg) => Math.max(Number(pkg.quantity) || 1, 1);
       const tripPackages = rootPackages.filter((pkg) => {
         const packageTripId = pkg.currentTripId || pkg.loadedOnTrip || null;
         const packageId = pkg.packageId || pkg.trackingNumber || null;
 
         if (packageTripId) return packageTripId === tripId;
-        return packageId ? tripBarcodeSet.has(String(packageId)) : false;
+        if (!packageId || !tripBarcodeSet.has(String(packageId))) return false;
+
+        const loadedQty = Math.min(Number(pkg.loadedQty) || 0, packageQty(pkg));
+        const receivedQty = Math.min(
+          Number(pkg.receivedQty) || 0,
+          packageQty(pkg),
+        );
+        if (loadedQty > 0 || receivedQty > 0) return true;
+
+        return [
+          "LOADED",
+          "LOADED_TO_TRIP",
+          "IN_TRANSIT",
+          "OUT_FOR_DELIVERY",
+          "ARRIVED_AT_ODIONGAN",
+        ].includes(String(pkg.status || "").toUpperCase());
       });
       const hasPackageScopedManifest = tripPackages.length || tripBarcodeSet.size;
       const visiblePackages = hasPackageScopedManifest
         ? tripPackages
         : rootPackages;
-      const packageQty = (pkg) => Math.max(Number(pkg.quantity) || 1, 1);
       const sumQty = (field) =>
         visiblePackages.reduce(
           (sum, pkg) => sum + Math.min(Number(pkg[field]) || 0, packageQty(pkg)),
           0,
         );
-      const shipmentExpectedTotal = Math.max(
+      const shipmentFullPieceTotal = Math.max(
         Number(root.totals?.totalContentQty) || 0,
         Number(root.totals?.totalItems) || 0,
         rootPackages.reduce((sum, pkg) => sum + packageQty(pkg), 0),
         (root.packageBarcodes || []).length,
-        (data.packageBarcodes || []).length,
-        Number(data.totalItems) || 0,
       );
-      const tripScopedTotalQty = hasPackageScopedManifest
-        ? visiblePackages.reduce((sum, pkg) => sum + packageQty(pkg), 0)
-        : Number(data.totalItems) || 0;
-      const visibleTotalQty = Math.max(
-        shipmentExpectedTotal,
-        tripScopedTotalQty,
-      );
+      const tripScopedPieceTotal = hasPackageScopedManifest
+        ? Math.max(
+            visiblePackages.reduce((sum, pkg) => sum + packageQty(pkg), 0),
+            Number(data.loadedCount) || 0,
+            tripBarcodeSet.size,
+          )
+        : Math.max(
+            Number(data.loadedCount) || 0,
+            Number(data.totalItems) || 0,
+            tripBarcodeSet.size,
+          );
       const visibleLoadedQty =
         data.loadedCount ?? sumQty("loadedQty") ?? root.totals?.loaded ?? 0;
       const visibleReceivedQty =
@@ -114,7 +131,7 @@ export async function GET(request, { params }) {
       const visiblePendingQty =
         data.pendingCount ??
         Math.max(
-          visibleTotalQty -
+          tripScopedPieceTotal -
             visibleLoadedQty -
             visibleReceivedQty -
             visibleMissingQty -
@@ -166,8 +183,9 @@ export async function GET(request, { params }) {
           ...(root.totals || {}),
           totalItems: hasPackageScopedManifest
             ? visiblePackages.length
-            : data.totalItems || 0,
-          totalContentQty: visibleTotalQty,
+            : tripScopedPieceTotal,
+          totalContentQty: shipmentFullPieceTotal,
+          tripPieceTotal: tripScopedPieceTotal,
           loaded: visibleLoadedQty,
           received: visibleReceivedQty,
           delivered: visibleReceivedQty,
@@ -176,7 +194,8 @@ export async function GET(request, { params }) {
           damaged: visibleDamagedQty,
         },
 
-        totalItems: visibleTotalQty,
+        shipmentPieceTotal: shipmentFullPieceTotal,
+        totalItems: tripScopedPieceTotal,
         loadedCount: visibleLoadedQty,
         receivedCount: visibleReceivedQty,
         deliveredCount: visibleReceivedQty,

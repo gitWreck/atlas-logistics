@@ -256,6 +256,7 @@ export default function TripDrawer({
           {activeTab === "TIMELINE" && (
             <TripTimelineTab
               data={data}
+              shipments={shipments}
               onRefresh={() => onRefreshTrips?.()}
               isDark={isDark}
               user={user}
@@ -360,6 +361,7 @@ export default function TripDrawer({
         isOpen={isScanModalOpen}
         onClose={() => setScanModalOpen(false)}
         trip={data}
+        manifestShipments={shipments}
         isDark={isDark}
         onResolveScan={resolveScannedLabel} // Just pass the function reference
         onConfirmOperation={confirmScanAction} // No extra async wrapper needed here

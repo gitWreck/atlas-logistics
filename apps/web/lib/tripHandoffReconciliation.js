@@ -19,9 +19,6 @@ const RECEIVED_AT_HUB_PIECE_STATUSES = new Set([
   "AVAILABLE_AT_ODIONGAN_WAREHOUSE",
   "RELEASED_FOR_DELIVERY",
   "READY_FOR_DELIVERY",
-  "RECEIVED_AT_DIVISORIA",
-  "RECEIVED",
-  "AVAILABLE_AT_WAREHOUSE",
 ]);
 
 function pieceQuantity(pkg = {}) {
@@ -39,19 +36,31 @@ function getPackageIdentity(pkg = {}) {
   );
 }
 
+function packageWasOnTrip(pkg = {}, tripId = "", tripBarcodeSet = new Set()) {
+  const packageTripId = String(pkg.currentTripId || pkg.loadedOnTrip || "").trim();
+  if (packageTripId === tripId) return true;
+
+  const packageId = getPackageIdentity(pkg);
+  if (!packageId || !tripBarcodeSet.has(String(packageId))) return false;
+
+  const status = String(pkg.status || "").toUpperCase();
+  if (RECEIVED_AT_HUB_PIECE_STATUSES.has(status) || pkg.hubReceivedAt) {
+    return true;
+  }
+  if (LOADED_ON_TRUCK_PIECE_STATUSES.has(status)) return true;
+
+  const loadedQty = toNumber(pkg.loadedQty, 0);
+  const receivedQty = toNumber(pkg.receivedQty, 0);
+  return loadedQty > 0 || receivedQty > 0;
+}
+
 function getTripPackages(shipment = {}, tripShipment = {}, tripId = "") {
   const packages = Array.isArray(shipment.packages) ? shipment.packages : [];
   const tripBarcodeSet = new Set(
     (tripShipment.packageBarcodes || []).filter(Boolean).map(String),
   );
 
-  return packages.filter((pkg) => {
-    const packageTripId = String(pkg.currentTripId || pkg.loadedOnTrip || "").trim();
-    const packageId = getPackageIdentity(pkg);
-
-    if (packageTripId) return packageTripId === tripId;
-    return packageId ? tripBarcodeSet.has(String(packageId)) : false;
-  });
+  return packages.filter((pkg) => packageWasOnTrip(pkg, tripId, tripBarcodeSet));
 }
 
 function classifyTripPiece(pkg = {}, tripId = "") {
@@ -210,55 +219,27 @@ async function buildReconciliationRow(tripRef, tripId, item, shipmentDocId) {
   const tripPackages = getTripPackages(shipment, tripShipment, tripId);
   const pieceSummary = summarizeTripPieces(tripPackages, tripId);
 
-  let loadedIntoTruck = pieceSummary.loadedIntoTruck;
-  let unloadedCount = pieceSummary.unloaded;
-  let remainingLoaded = pieceSummary.stillOnTruck;
-  let missingPieces = pieceSummary.missing;
-
   const tripLoaded = toNumber(tripShipment.loadedCount, 0);
   const tripReceived = toNumber(
     tripShipment.receivedCount ?? tripShipment.deliveredCount,
     0,
   );
   const tripMissing = toNumber(tripShipment.missingCount, 0);
-
   const manifestLoadedCount = toNumber(item.loadedCount, 0);
 
-  if (loadedIntoTruck === 0 && tripLoaded + tripReceived + tripMissing > 0) {
-    loadedIntoTruck = Math.max(
-      tripReceived + tripLoaded + tripMissing,
-      manifestLoadedCount,
-    );
-    unloadedCount = tripReceived;
-    remainingLoaded = tripLoaded;
-    missingPieces = tripMissing;
-  }
-
-  if (manifestLoadedCount > loadedIntoTruck) {
-    loadedIntoTruck = manifestLoadedCount;
-  }
-
-  const expectedCount = resolveExpectedPieceCount(
-    item,
-    tripShipment,
-    shipment,
-    tripId,
-    { loadedIntoTruck },
+  let loadedIntoTruck = Math.max(
+    pieceSummary.loadedIntoTruck,
+    tripLoaded + tripReceived + tripMissing,
+    manifestLoadedCount,
   );
+  let unloadedCount = Math.max(pieceSummary.unloaded, tripReceived);
+  let remainingLoaded = Math.max(pieceSummary.stillOnTruck, tripLoaded);
+  let missingPieces = Math.max(pieceSummary.missing, tripMissing);
 
-  if (expectedCount > loadedIntoTruck) {
-    loadedIntoTruck = expectedCount;
-  }
-
-  if (unloadedCount === 0 && tripReceived > 0) {
-    unloadedCount = tripReceived;
-  }
-
-  if (remainingLoaded === 0 && tripLoaded > 0) {
-    remainingLoaded = tripLoaded;
-  }
-
-  const isMissing = remainingLoaded > 0 || !tripShipmentSnap.exists;
+  const onTrip = loadedIntoTruck > 0;
+  const isMissing = onTrip && remainingLoaded > 0;
+  const isReadyForRelease =
+    onTrip && !isMissing && unloadedCount > 0 && unloadedCount >= loadedIntoTruck;
 
   return {
     id: shipmentDocId,
@@ -270,18 +251,20 @@ async function buildReconciliationRow(tripRef, tripId, item, shipmentDocId) {
       shipment.destination ||
       shipment.destinationCode ||
       "Unknown destination",
-    expectedCount: loadedIntoTruck || expectedCount,
+    expectedCount: loadedIntoTruck,
     unloadedCount,
     remainingLoaded,
     missingPieces,
+    onTrip,
     missing: isMissing,
+    readyForRelease: isReadyForRelease,
     currentTripId: shipment.currentTripId || tripId,
     status: shipment.status || tripShipment.status || null,
     pieces: pieceSummary.pieces,
     labelSummary: {
-      total: loadedIntoTruck || expectedCount,
+      total: loadedIntoTruck,
       received: unloadedCount,
-      ready: !isMissing && unloadedCount >= (loadedIntoTruck || expectedCount),
+      ready: isReadyForRelease,
     },
   };
 }
@@ -369,9 +352,13 @@ export async function runTripHandoffReconciliation(tripId) {
     return { error: result.error, status: result.status || 400 };
   }
 
-  const shipments = result.shipments || [];
+  const allRows = result.shipments || [];
+  const shipments = allRows.filter((item) => item.onTrip);
+  const assignedNotLoaded = allRows.filter((item) => !item.onTrip);
   const missingShipments = shipments.filter((item) => item.missing);
-  const unloadedShipments = shipments.filter((item) => !item.missing);
+  const unloadedShipments = shipments.filter(
+    (item) => !item.missing && item.unloadedCount > 0,
+  );
   const lifecycleEval = evaluateTripLifecycleAfterReconciliation(trip, shipments);
   const context = buildReconciliationContext(
     trip,
@@ -408,6 +395,7 @@ export async function runTripHandoffReconciliation(tripId) {
     shipments,
     unloadedShipments,
     missingShipments,
+    assignedNotLoaded,
   };
 }
 
@@ -426,6 +414,7 @@ export function formatHandoffReconciliationResponse(payload) {
     shipments: payload.shipments,
     unloadedShipments: payload.unloadedShipments,
     missingShipments: payload.missingShipments,
+    assignedNotLoaded: payload.assignedNotLoaded || [],
     promoted: payload.promoted || false,
     promotionSkippedReason: payload.promotionSkippedReason || null,
   };

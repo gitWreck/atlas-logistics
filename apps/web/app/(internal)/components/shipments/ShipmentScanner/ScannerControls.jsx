@@ -19,6 +19,7 @@ import {
   isHubTransferTrip,
   isManifestReconciled,
 } from "@/app/utility/manifestStatus";
+import { getTripPackageStats } from "@/app/utility/tripStats";
 
 export function ActionSelector({ action, trip, theme, actions }) {
   const currentTripStatus = String(trip?.status || "").trim().toUpperCase();
@@ -70,7 +71,10 @@ export function ActionSelector({ action, trip, theme, actions }) {
       }
     }
     if (id === "LOAD") {
-      const isFull = trip?.itemPending === 0 && trip?.totalItems > 0;
+      const stats = getTripPackageStats(trip);
+      const isFull =
+        stats.tripPackageTotal > 0 &&
+        stats.loadedPackages >= stats.tripPackageTotal;
       if (currentTripStatus === "LOADED" && !isManifestLocked)
         return actions.setNeedsLock(true) || actions.setAction(id);
       if (

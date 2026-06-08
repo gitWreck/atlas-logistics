@@ -59,7 +59,6 @@ exports.bulkAssignShipments = onCall(
       const batch = db.batch();
 
       // Track aggregates for this specific batch
-      let batchTotalItems = 0;
       let batchHasUpdates = false;
 
       // Fetch all shipments in this chunk in parallel
@@ -89,10 +88,6 @@ exports.bulkAssignShipments = onCall(
           return;
         }
 
-        const itemsToAdd = Number(
-          data.totals?.totalContentQty || data.totals?.totalItems || 0,
-        );
-        batchTotalItems += itemsToAdd;
         batchHasUpdates = true;
         successCount++;
 
@@ -111,16 +106,15 @@ exports.bulkAssignShipments = onCall(
           route:
             (data.originCode || "?") + " -> " + (data.destinationCode || "?"),
 
-          totalItems: itemsToAdd,
-          pendingCount: itemsToAdd, // Initially all pending
+          totalItems: 0,
+          pendingCount: 0,
           loadedCount: 0,
           deliveredCount: 0,
 
           sender: data.sender,
           recipient: data.recipient,
 
-          // Copy barcodes for the Checker API (Important for scanning!)
-          packageBarcodes: data.packageBarcodes || [],
+          packageBarcodes: [],
 
           createdAt: now,
           createdBy: name,
@@ -181,15 +175,8 @@ exports.bulkAssignShipments = onCall(
         });
       });
 
-      // --- E. Update Trip Aggregates (Once per batch) ---
       if (batchHasUpdates) {
         batch.update(tripRef, {
-          totalItems: admin.firestore.FieldValue.increment(batchTotalItems),
-          itemPending: admin.firestore.FieldValue.increment(batchTotalItems),
-
-          // totalLoaded: 0,
-          // totalDelivered: 0,
-
           updatedAt: admin.firestore.FieldValue.serverTimestamp(),
           updatedBy: name,
         });

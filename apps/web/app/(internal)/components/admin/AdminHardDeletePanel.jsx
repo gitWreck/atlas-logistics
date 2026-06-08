@@ -8,13 +8,10 @@ import {
 } from "@fortawesome/free-solid-svg-icons";
 import StatusButton from "../ui/StatusButton";
 import { useAlert } from "@/app/context/AlertContext";
+import { useAuth } from "@/app/context/AuthContext";
 import { runAction } from "@/app/utility/utilities";
 import { getWidgetThemeClasses } from "@/app/utility/constant/theme";
-
-function isAdminStaff(profile) {
-  const role = String(profile?.role || "").toLowerCase();
-  return role === "admin" || role === "manager";
-}
+import { canDeleteShipmentsAndTrips } from "@/app/utility/deletePermissions";
 
 export default function AdminHardDeletePanel({
   title,
@@ -27,12 +24,13 @@ export default function AdminHardDeletePanel({
   isDark = false,
   profile,
 }) {
+  const { user } = useAuth();
   const { showAlert, showConfirm } = useAlert();
   const [reason, setReason] = useState("");
   const [status, setStatus] = useState("IDLE");
   const theme = getWidgetThemeClasses(isDark);
 
-  if (!isAdminStaff(profile)) return null;
+  if (!canDeleteShipmentsAndTrips(profile, user)) return null;
 
   const handleDelete = async () => {
     const trimmedReason = reason.trim();

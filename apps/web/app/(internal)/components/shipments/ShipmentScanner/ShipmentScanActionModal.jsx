@@ -36,25 +36,14 @@ import {
 } from "./ScannerControls";
 import ManifestPanel from "./ManifestPanel";
 import StatusBadge from "../../ui/StatusBadge";
+import { getTripPackageStats } from "@/app/utility/tripStats";
 
-const getLoadedPackageCount = (trip) => {
-  const explicitLoaded = Number(trip?.totalLoaded ?? trip?.loadedCount);
-  if (Number.isFinite(explicitLoaded)) return Math.max(explicitLoaded, 0);
-
-  const totalItems = Number(trip?.totalItems) || 0;
-  const itemPending = Number(trip?.itemPending);
-  if (Number.isFinite(itemPending)) {
-    return Math.max(totalItems - itemPending, 0);
-  }
-
-  return 0;
-};
-
-function TripScanDetailsCard({ trip, theme, isDark }) {
-  const totalItems = Math.max(Number(trip?.totalItems) || 0, 0);
-  const loadedPackages = getLoadedPackageCount(trip);
-  const loadedLabel =
-    totalItems > 0 ? `${loadedPackages}/${totalItems}` : `${loadedPackages}`;
+function TripScanDetailsCard({ trip, theme, isDark, manifestShipments = [] }) {
+  const tripWithShipments =
+    manifestShipments.length > 0
+      ? { ...trip, shipments: manifestShipments }
+      : trip;
+  const stats = getTripPackageStats(tripWithShipments);
 
   return (
     <div className={`rounded-xl border p-4 ${theme.panelSurface}`}>
@@ -71,7 +60,13 @@ function TripScanDetailsCard({ trip, theme, isDark }) {
           <div className="text-[10px] font-bold uppercase opacity-60">
             Loaded Packages
           </div>
-          <div className="mt-1 text-sm font-bold">{loadedLabel}</div>
+          <div className="mt-1 text-sm font-bold">{stats.displayLoaded}</div>
+        </div>
+        <div className="col-span-2">
+          <div className="text-[10px] font-bold uppercase opacity-60">
+            Total Shipments
+          </div>
+          <div className="mt-1 text-sm font-bold">{stats.shipmentCount}</div>
         </div>
       </div>
     </div>
@@ -82,6 +77,7 @@ export default function ShipmentScanActionModal({
   isOpen = false,
   onClose,
   trip = null,
+  manifestShipments = [],
   isDark = false,
   onResolveScan,
   onConfirmOperation,
@@ -459,7 +455,12 @@ export default function ShipmentScanActionModal({
                 theme={theme}
               />
 
-              <TripScanDetailsCard trip={trip} theme={theme} isDark={isDark} />
+              <TripScanDetailsCard
+                trip={trip}
+                manifestShipments={manifestShipments}
+                theme={theme}
+                isDark={isDark}
+              />
 
               <ScannerEngineSelect
                 value={scannerEngine}

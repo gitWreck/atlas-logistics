@@ -135,6 +135,8 @@ exports.releaseForDeliveryOperations = onCall(
         shipmentRefs.map((ref) => tx.get(ref)),
       );
 
+      const releaseCandidates = [];
+
       shipmentSnaps.forEach((snap, index) => {
         const shipmentId = resolvedShipmentIds[index];
         if (!snap.exists) {
@@ -147,22 +149,28 @@ exports.releaseForDeliveryOperations = onCall(
         const data = snap.data() || {};
         assertEligibleForDeliveryOperationsRelease(shipmentId, data.status);
 
-        const releaseNote =
-          normalizeString(remarks) ||
-          "Released for delivery operations. Custody remains at Odiongan until each label is loaded.";
-
         const sourcePackages = Array.isArray(data.packages) ? data.packages : [];
         const releaseScope = { packageIdSet };
         const releasableCount = countPiecesEligibleForDeliveryRelease(
           sourcePackages,
           releaseScope,
         );
-        if (releasableCount === 0) {
-          throw new HttpsError(
-            "failed-precondition",
-            `Shipment ${shipmentId} has no hub-received packages to release. Unload and reconcile at Odiongan first.`,
-          );
-        }
+        if (releasableCount === 0) return;
+
+        releaseCandidates.push({ index, shipmentId, data, sourcePackages, releaseScope });
+      });
+
+      if (releaseCandidates.length === 0) {
+        throw new HttpsError(
+          "failed-precondition",
+          "No shipments have hub-received packages to release. Unload and reconcile at Odiongan first.",
+        );
+      }
+
+      releaseCandidates.forEach(({ index, shipmentId, data, sourcePackages, releaseScope }) => {
+        const releaseNote =
+          normalizeString(remarks) ||
+          "Released for delivery operations. Custody remains at Odiongan until each label is loaded.";
 
         const packageIdsForShipment = listPiecesEligibleForDeliveryRelease(
           sourcePackages,
