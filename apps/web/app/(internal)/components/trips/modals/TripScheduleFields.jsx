@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo } from "react";
+import React, { useEffect, useMemo, useRef } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faCalendarDays,
@@ -244,36 +244,74 @@ function ScheduleDateField({
   helper,
   required = false,
 }) {
+  const inputRef = useRef(null);
+  const fieldId = `${label.toLowerCase().replace(/\s+/g, "-")}-date`;
+
+  const openPicker = () => {
+    const input = inputRef.current;
+    if (!input) return;
+
+    if (typeof input.showPicker === "function") {
+      try {
+        input.showPicker();
+        return;
+      } catch {
+        // Some browsers throw if showPicker is called outside a user gesture.
+      }
+    }
+
+    input.focus();
+    input.click();
+  };
+
   return (
     <div className="space-y-1.5">
       <label
+        htmlFor={fieldId}
         className={`text-[10px] font-bold uppercase flex items-center gap-2 ${theme.label}`}
       >
         <FontAwesomeIcon icon={icon} className="text-[9px]" />
         {label}
       </label>
 
+      <button
+        type="button"
+        onClick={openPicker}
+        className={`w-full border rounded-lg p-3 text-left text-sm outline-none focus:border-blue-500 transition-colors cursor-pointer ${theme.input} ${
+          error ? "border-red-500" : ""
+        }`}
+      >
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <div className={`font-semibold ${value ? "" : theme.helperText}`}>
+              {formatDisplayDate(value)}
+            </div>
+
+            {helper ? (
+              <div className={`text-[11px] mt-1 ${theme.helperText}`}>
+                {helper}
+              </div>
+            ) : null}
+          </div>
+
+          <FontAwesomeIcon
+            icon={faCalendarDays}
+            className={`text-sm shrink-0 mt-0.5 ${theme.helperText}`}
+          />
+        </div>
+      </button>
+
       <input
+        ref={inputRef}
+        id={fieldId}
         type="date"
         value={value}
         onChange={(e) => onChange?.(e.target.value)}
         required={required}
-        className={`w-full border rounded-lg p-2 text-sm outline-none focus:border-blue-500 transition-colors ${theme.input} ${
-          error ? "border-red-500" : ""
-        }`}
+        tabIndex={-1}
+        aria-hidden="true"
+        className="sr-only"
       />
-
-      <div
-        className={`w-full border rounded-lg p-3 text-sm ${theme.input} ${
-          error ? "border-red-500" : ""
-        }`}
-      >
-        <div className="font-semibold">{formatDisplayDate(value)}</div>
-
-        {helper ? (
-          <div className={`text-[11px] mt-1 ${theme.helperText}`}>{helper}</div>
-        ) : null}
-      </div>
 
       {error ? <p className={theme.errorBox}>{error}</p> : null}
     </div>
