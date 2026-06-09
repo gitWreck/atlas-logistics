@@ -18,7 +18,13 @@ const delayIcons = {
   OTHER: faExclamationTriangle,
 };
 
-export default function StatusBadge({ status, reason, isDark = true }) {
+export default function StatusBadge({
+  status,
+  reason,
+  isDark = true,
+  className = "",
+  compact = false,
+}) {
   if (!status) return null;
 
   let normalizedStatus = status.toUpperCase().replace(/\s+/g, "_");
@@ -157,12 +163,15 @@ export default function StatusBadge({ status, reason, isDark = true }) {
 
   const styles = isDark ? stylesDark : stylesLight;
   const defaultStyle = isDark ? "bg-slate-800 text-slate-400 border-slate-700" : "bg-slate-200 text-slate-700 border-slate-300";
+  const sizeClass = compact
+    ? "px-1.5 py-0.5 text-[10px] md:text-[9px] tracking-normal"
+    : "px-2 py-0.5 text-[10px] tracking-wide";
 
   return (
     <span
-      className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide border ${
+      className={`inline-flex items-center gap-1.5 rounded font-bold uppercase border leading-none ${sizeClass} ${
         styles[normalizedStatus] || defaultStyle
-      }`}
+      } ${className}`}
     >
       {/* 2. CONDITIONAL CONTENT: */}
       {reason ? (

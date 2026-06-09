@@ -58,19 +58,35 @@ function toNumber(value, fallback = 0) {
   return Number.isFinite(num) && num >= 0 ? num : fallback;
 }
 
-export function isTripShipmentDelivered(row = {}) {
-  const status = normalizeTripStatus(row.status);
-  const shipmentStatus = normalizeTripStatus(row.shipmentStatus);
+function hasTripScopedCargo(row = {}) {
+  const barcodeCount = (row.packageBarcodes || []).filter(Boolean).length;
+  if (barcodeCount > 0) return true;
+  if (toNumber(row.loadedCount, 0) > 0) return true;
+  if (toNumber(row.receivedCount ?? row.deliveredCount, 0) > 0) return true;
+  if (toNumber(row.missingCount, 0) > 0) return true;
+  if (toNumber(row.damagedCount, 0) > 0) return true;
+  return false;
+}
 
-  if (DELIVERED_TRIP_SHIPMENT_STATUSES.has(status)) return true;
-  if (DELIVERED_TRIP_SHIPMENT_STATUSES.has(shipmentStatus)) return true;
-  if (row.allPackagesDelivered === true) return true;
+export function isTripShipmentDelivered(row = {}) {
+  if (!hasTripScopedCargo(row)) return true;
 
   const loadedCount = toNumber(row.loadedCount, 0);
-  const totalItems = toNumber(row.totalItems, 0);
-
-  if (totalItems <= 0) return false;
   if (loadedCount > 0) return false;
+
+  if (row.allTripScopedPackagesDelivered === true) return true;
+
+  const tripScopedTotal = toNumber(row.tripScopedTotal, 0);
+  const tripScopedDelivered = toNumber(row.tripScopedDelivered, 0);
+  if (tripScopedTotal > 0 && tripScopedDelivered >= tripScopedTotal) {
+    return true;
+  }
+
+  const totalItems = toNumber(row.totalItems, 0);
+  if (totalItems <= 0) return false;
+
+  const status = normalizeTripStatus(row.status);
+  if (DELIVERED_TRIP_SHIPMENT_STATUSES.has(status)) return true;
 
   return false;
 }

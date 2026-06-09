@@ -2,11 +2,78 @@ import { NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebase-admin";
 import { getAuth } from "firebase-admin/auth";
 import { headers } from "next/headers";
+import {
+  MANIFEST_STATUS,
+  isHubTransferTrip,
+  resolveManifestStatus,
+} from "@/app/utility/manifestStatus";
+import { getTripScopedPackages } from "@/app/utility/tripScopedPackages";
 
 export const dynamic = "force-dynamic"; // Prevent caching
 
 const COMPLETED_TRIP_STATUSES = ["COMPLETED", "DELIVERED"];
 const COMPLETED_TRIP_STATUS_SET = new Set(COMPLETED_TRIP_STATUSES);
+
+function tripNeedsDeliveryEnrichment(trip = {}) {
+  if (!isHubTransferTrip(trip)) return false;
+  if (trip.reconciledAt) return true;
+  return resolveManifestStatus(trip) === MANIFEST_STATUS.RECONCILED;
+}
+
+async function getShipmentDocsInBatches(shipmentIds = []) {
+  const uniqueIds = [...new Set(shipmentIds.filter(Boolean))];
+  if (uniqueIds.length === 0) return new Map();
+
+  const masterById = new Map();
+  const batchSize = 10;
+
+  for (let index = 0; index < uniqueIds.length; index += batchSize) {
+    const chunk = uniqueIds.slice(index, index + batchSize);
+    const refs = chunk.map((id) => adminDb.collection("shipments").doc(id));
+    const snaps = await adminDb.getAll(...refs);
+    snaps.forEach((snap) => {
+      if (snap.exists) {
+        masterById.set(snap.id, snap.data());
+      }
+    });
+  }
+
+  return masterById;
+}
+
+async function enrichHubTripsWithMasterPackages(trips = []) {
+  const tripsToEnrich = trips.filter(tripNeedsDeliveryEnrichment);
+  if (tripsToEnrich.length === 0) return trips;
+
+  const shipmentIds = [];
+  tripsToEnrich.forEach((trip) => {
+    (trip.shipments || []).forEach((row) => {
+      shipmentIds.push(row.trackingShipmentId || row.id);
+    });
+  });
+
+  const masterById = await getShipmentDocsInBatches(shipmentIds);
+
+  return trips.map((trip) => {
+    if (!tripNeedsDeliveryEnrichment(trip)) return trip;
+
+    const shipments = (trip.shipments || []).map((row) => {
+      const masterId = row.trackingShipmentId || row.id;
+      const master = masterById.get(masterId);
+      if (!master) return row;
+
+      return {
+        ...row,
+        packages: getTripScopedPackages(row, { packages: master.packages }, trip.id),
+        masterStatus: master.status || null,
+        releasedForDeliveryAt: master.releasedForDeliveryAt || null,
+        availableForDelivery: master.availableForDelivery === true,
+      };
+    });
+
+    return { ...trip, shipments };
+  });
+}
 
 function parseLimit(searchParams, key) {
   const limitParam = searchParams.get(key) || searchParams.get("limit") || "50";
@@ -117,7 +184,9 @@ export async function GET(request) {
       }),
     );
 
-    return NextResponse.json({ trips });
+    const enrichedTrips = await enrichHubTripsWithMasterPackages(trips);
+
+    return NextResponse.json({ trips: enrichedTrips });
   } catch (error) {
     console.error("API Error fetching trips:", error);
     return NextResponse.json(

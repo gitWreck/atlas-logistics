@@ -18,6 +18,7 @@ import {
   query,
   where,
   getDocs,
+  limit,
 } from "firebase/firestore";
 
 import { auth, db } from "../../../firebase";
@@ -141,12 +142,15 @@ export default function CustomerSignupScreen() {
 
       const usersRef = collection(db, "users");
       const [emailSnap, identitySnap] = await Promise.all([
-        getDocs(query(usersRef, where("email", "==", email.trim()))),
+        getDocs(
+          query(usersRef, where("email", "==", email.trim()), limit(1)),
+        ),
         getDocs(
           query(
             usersRef,
             where("name", "==", fullName.trim()),
             where("phoneNumber", "in", phoneVariants),
+            limit(1),
           ),
         ),
       ]);

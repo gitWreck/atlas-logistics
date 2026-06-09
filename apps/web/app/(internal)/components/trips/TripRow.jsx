@@ -37,6 +37,7 @@ export default function TripRow({
   const statsCount = tripStats.count;
   const totalCount = tripStats.total;
   const statsLabel = tripStats.label;
+  const statsSubLabel = tripStats.subLabel;
   const driverName = trip.driverName || "Unassigned";
 
   const tripType = String(trip.tripType || "HUB_TRANSFER").toUpperCase();
@@ -209,6 +210,7 @@ export default function TripRow({
               className={`md:hidden font-mono text-xs ${theme.mutedText}`}
             >
               {statsCount}/{totalCount} {statsLabel}
+              {statsSubLabel ? ` · ${statsSubLabel}` : ""}
             </span>
           </div>
         </div>
@@ -235,17 +237,17 @@ export default function TripRow({
 
         <div className="md:mt-1 flex flex-wrap items-center gap-1.5">
           <span
-            className={`text-[10px] md:text-[9px] font-bold px-1.5 py-0.5 rounded border ${typeBadgeClass}`}
+            className={`inline-flex items-center text-[10px] md:text-[9px] font-bold px-1.5 py-0.5 rounded border leading-none ${typeBadgeClass}`}
           >
             {tripTypeFullLabel}
           </span>
 
           {isHubTransfer ? (
-            <ManifestStatusBadge trip={trip} isDark={isDark} />
+            <ManifestStatusBadge trip={trip} isDark={isDark} compact />
           ) : (
             isManifestLocked && (
               <span
-                className={`text-[10px] md:text-[9px] font-bold px-1.5 py-0.5 rounded border inline-flex items-center gap-1 ${lockedBadgeClass}`}
+                className={`inline-flex items-center text-[10px] md:text-[9px] font-bold px-1.5 py-0.5 rounded border leading-none gap-1 ${lockedBadgeClass}`}
               >
                 <FontAwesomeIcon
                   icon={faLock}
@@ -259,12 +261,20 @@ export default function TripRow({
       </div>
 
       {/* Col 3 */}
-      <div className="hidden md:block col-span-1 pr-4">
-        <span
-          className={`text-[14px] font-mono border-l pl-2 ${theme.statsDivider}`}
-        >
-          {statsCount}/{totalCount} {statsLabel}
-        </span>
+      <div className="hidden md:block col-span-2 pr-2">
+        <div className={`border-l pl-3 min-w-0 ${theme.statsDivider}`}>
+          <span className="text-[14px] font-mono block">
+            {statsCount}/{totalCount}
+          </span>
+          <span className={`text-[10px] block mt-0.5 ${theme.mutedText}`}>
+            {statsLabel}
+          </span>
+          {statsSubLabel ? (
+            <span className={`text-[9px] block mt-0.5 ${theme.subtleText}`}>
+              {statsSubLabel}
+            </span>
+          ) : null}
+        </div>
       </div>
 
       {/* Col 4 */}
@@ -272,7 +282,11 @@ export default function TripRow({
         <div
           className={`hidden md:flex justify-between text-[10px] mb-1 ${theme.mutedText}`}
         >
-          <span>{trip.progress}%</span>
+          <span>
+            {Number.isFinite(trip.progress)
+              ? `${trip.progress}%`
+              : "0%"}
+          </span>
         </div>
 
         <div
@@ -302,9 +316,9 @@ export default function TripRow({
       </div>
 
       {/* Col 5 */}
-      <div className="hidden md:flex col-span-2 flex-col gap-1">
+      <div className="hidden md:flex col-span-1 flex-col gap-1 min-w-0">
         <div
-          className={`text-[14px] flex items-center gap-1.5 ${theme.mutedText}`}
+          className={`text-[12px] flex items-center gap-1.5 whitespace-nowrap ${theme.mutedText}`}
         >
           {formatFirestoreDate(trip.updatedAt)}
         </div>

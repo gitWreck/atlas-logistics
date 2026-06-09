@@ -8,8 +8,6 @@ const {
   getEventTitle,
 } = require("./custodyTimelineFormat");
 const { enrichTimelineWithTripContext } = require("./enrichTimelineWithTripContext");
-const { sanitizeDriverName } = require("../utilities/helpers");
-
 const PUBLIC_EVENT_LABELS = Object.freeze({
   RECEIVED_AT_DIVISORIA: "Received at origin hub",
   LOADED_TO_TRIP: "In transit",
@@ -76,6 +74,29 @@ function mapEventToPublicStatusCode(eventType) {
   return key || "RECEIVED";
 }
 
+const INTERNAL_ONLY_EVENT_TYPES = new Set(["LOADED_TO_TRIP"]);
+
+function shouldIncludeInPublicTimeline(event = {}) {
+  const eventType = String(event.eventType || "").trim().toUpperCase();
+  return !INTERNAL_ONLY_EVENT_TYPES.has(eventType);
+}
+
+function collapseDuplicateInTransitEvents(events = []) {
+  const inTransitEvents = events.filter(
+    (event) =>
+      String(event.eventType || "").trim().toUpperCase() === "IN_TRANSIT",
+  );
+
+  if (inTransitEvents.length <= 1) return events;
+
+  const latestInTransit = inTransitEvents[inTransitEvents.length - 1];
+  return events.filter((event) => {
+    const eventType = String(event.eventType || "").trim().toUpperCase();
+    if (eventType !== "IN_TRANSIT") return true;
+    return event === latestInTransit;
+  });
+}
+
 function buildPublicNote(event = {}) {
   const parts = [];
 
@@ -88,16 +109,11 @@ function buildPublicNote(event = {}) {
     }
   }
 
-  if (
-    ["IN_TRANSIT", "LOADED_TO_TRIP"].includes(
-      String(event.eventType || "").toUpperCase(),
-    ) &&
-    event.driverName
-  ) {
-    parts.push(`Driver: ${sanitizeDriverName(event.driverName)}`);
-  }
+  const eventType = String(event.eventType || "").toUpperCase();
+  const isInTransitEvent =
+    eventType === "IN_TRANSIT" || eventType === "LOADED_TO_TRIP";
 
-  if (event.remarks && typeof event.remarks === "string") {
+  if (!isInTransitEvent && event.remarks && typeof event.remarks === "string") {
     parts.push(event.remarks);
   }
 
@@ -124,9 +140,7 @@ function formatPublicTimelineEntry(event = {}) {
     deliveryVehicleName: LAST_MILE_EVENT_TYPES.has(eventType)
       ? normalizeString(event.deliveryVehicleName)
       : null,
-    driverName: ["IN_TRANSIT", "LOADED_TO_TRIP"].includes(eventType)
-      ? sanitizeDriverName(event.driverName)
-      : null,
+    driverName: null,
   };
 }
 
@@ -156,7 +170,9 @@ async function buildPublicTrackingHistory(db, shipmentId, shipmentData = {}) {
     shipmentData,
   );
 
-  return enriched
+  return collapseDuplicateInTransitEvents(
+    enriched.filter(shouldIncludeInPublicTimeline),
+  )
     .map((event) => formatPublicTimelineEntry(event))
     .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 }
