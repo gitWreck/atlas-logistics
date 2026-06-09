@@ -695,6 +695,10 @@ export function getModalThemeClasses(isDark) {
       ? "bg-slate-950 border-slate-700 text-white placeholder:text-slate-500"
       : "bg-white border-slate-200 text-slate-900 placeholder:text-slate-400",
 
+    dateInput: isDark
+      ? "text-white [color-scheme:dark] [&::-webkit-calendar-picker-indicator]:cursor-pointer [&::-webkit-calendar-picker-indicator]:opacity-80"
+      : "text-slate-900 [color-scheme:light] [&::-webkit-calendar-picker-indicator]:cursor-pointer",
+
     closeButton: isDark
       ? "text-slate-500 hover:text-red-400 transition-colors"
       : "text-slate-500 hover:text-red-600 transition-colors",
