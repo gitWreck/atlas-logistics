@@ -90,10 +90,11 @@ import {
 import { useAuth } from "../../contexts/AuthContext";
 import { useTheme } from "../../contexts/ThemeContext";
 
+/** Off by default — SMS/email on every scan slows the backend noticeably. */
 const DEFAULT_NOTIFICATION_CHANNELS = {
-  sms: true,
-  email: true,
-  push: true,
+  sms: false,
+  email: false,
+  push: false,
 };
 
 const NOTIFICATION_CHANNEL_OPTIONS = [
@@ -565,9 +566,10 @@ export default function ScannerScreen() {
     completeShipment = false,
     throwOnError = false,
     packageIds = null,
+    location: locationOverride = null,
   }) => {
     try {
-      const location = await getCurrentLocationSafe();
+      const location = locationOverride ?? (await getCurrentLocationSafe());
       const effectiveTripId = getEffectiveTripId(shipmentDocData);
 
       if (status === "LOAD_TO_VEHICLE") {
@@ -775,9 +777,9 @@ export default function ScannerScreen() {
       }
 
       if (effectiveTripId) {
-        await fetchTripScanSummary(effectiveTripId);
+        void fetchTripScanSummary(effectiveTripId);
       } else if (shipmentDocData) {
-        await refreshShipmentScanSummary(shipmentId);
+        void refreshShipmentScanSummary(shipmentId);
       }
 
       showSuccessModal({
@@ -1054,10 +1056,11 @@ export default function ScannerScreen() {
     barcode,
     manualQtyOverride = null,
     source = "scan",
+    location = null,
   }) => {
     const shipmentData = shipmentDoc.data();
     const statusToApply = getStatusToApply();
-    const currentTripId = setLatestScanDetails({
+    setLatestScanDetails({
       shipmentDoc,
       shipmentData,
       pkg,
@@ -1065,10 +1068,6 @@ export default function ScannerScreen() {
       source,
       appliedStatus: statusToApply,
     });
-
-    if (currentTripId) {
-      await fetchTripScanSummary(currentTripId);
-    }
 
     if (resolvedMode === "info" && !statusToApply) {
       openInfoPreview(shipmentDoc, pkg, barcode);
@@ -1144,6 +1143,7 @@ export default function ScannerScreen() {
       remarks: "",
       source,
       shipmentDocData: shipmentData,
+      location,
     });
   };
 
@@ -1154,17 +1154,26 @@ export default function ScannerScreen() {
       return directSnap;
     }
 
-    const trackingSnap = await getDocs(
-      query(collection(db, "shipments"), where("trackingNumber", "==", code)),
-    );
+    const [trackingSnap, shipmentIdSnap] = await Promise.all([
+      getDocs(
+        query(
+          collection(db, "shipments"),
+          where("trackingNumber", "==", code),
+          limit(1),
+        ),
+      ),
+      getDocs(
+        query(
+          collection(db, "shipments"),
+          where("shipmentId", "==", code),
+          limit(1),
+        ),
+      ),
+    ]);
 
     if (!trackingSnap.empty) {
       return trackingSnap.docs[0];
     }
-
-    const shipmentIdSnap = await getDocs(
-      query(collection(db, "shipments"), where("shipmentId", "==", code)),
-    );
 
     if (!shipmentIdSnap.empty) {
       return shipmentIdSnap.docs[0];
@@ -1179,12 +1188,31 @@ export default function ScannerScreen() {
       ...new Set([normalizedBarcode, String(barcode || "").trim()]),
     ].filter(Boolean);
 
+    const parentCode = deriveParentShipmentCode(normalizedBarcode);
+    if (parentCode) {
+      const parentDoc = await getShipmentDocByCode(parentCode);
+      if (parentDoc) {
+        const shipmentData = parentDoc.data();
+        const pkg = findPackageInShipment(shipmentData, normalizedBarcode);
+        if (pkg) {
+          return {
+            shipmentDoc: parentDoc,
+            shipmentData,
+            pkg,
+            scanType: "package",
+          };
+        }
+      }
+    }
+
     for (const codeVariant of barcodeVariants) {
-      const packageQuery = query(
-        collection(db, "shipments"),
-        where("packageBarcodes", "array-contains", codeVariant),
+      const querySnap = await getDocs(
+        query(
+          collection(db, "shipments"),
+          where("packageBarcodes", "array-contains", codeVariant),
+          limit(1),
+        ),
       );
-      const querySnap = await getDocs(packageQuery);
 
       if (!querySnap.empty) {
         const shipmentDoc = querySnap.docs[0];
@@ -1213,24 +1241,6 @@ export default function ScannerScreen() {
       };
     }
 
-    const parentCode = deriveParentShipmentCode(normalizedBarcode);
-    if (parentCode) {
-      const parentDoc = await getShipmentDocByCode(parentCode);
-      if (parentDoc) {
-        const shipmentData = parentDoc.data();
-        const pkg = findPackageInShipment(shipmentData, normalizedBarcode);
-
-        if (pkg) {
-          return {
-            shipmentDoc: parentDoc,
-            shipmentData,
-            pkg,
-            scanType: "package",
-          };
-        }
-      }
-    }
-
     throw new Error("Package or shipment not found.");
   };
 
@@ -1244,9 +1254,12 @@ export default function ScannerScreen() {
     setProcessing(true);
     Vibration.vibrate();
 
+    const locationPromise = getCurrentLocationSafe();
+
     try {
       const { shipmentDoc, shipmentData, pkg, scanType } =
         await lookupScannedCode(barcode);
+      const resolvedLocation = await locationPromise;
 
       if (resolvedMode === "info") {
         openInfoPreview(shipmentDoc, pkg, barcode);
@@ -1259,17 +1272,13 @@ export default function ScannerScreen() {
 
       if (scanType === "shipment") {
         const statusToApply = getStatusToApply();
-        const currentTripId = setLatestScanDetails({
+        setLatestScanDetails({
           shipmentDoc,
           shipmentData,
           barcode,
           source,
           appliedStatus: statusToApply,
         });
-
-        if (currentTripId) {
-          await fetchTripScanSummary(currentTripId);
-        }
 
         if (resolvedMode === "info") {
           openInfoPreview(shipmentDoc, null, barcode);
@@ -1325,6 +1334,7 @@ export default function ScannerScreen() {
               remarks: "",
               source,
               shipmentDocData: shipmentData,
+              location: resolvedLocation,
             });
             return;
           }
@@ -1336,6 +1346,7 @@ export default function ScannerScreen() {
             remarks: "",
             source,
             shipmentDocData: shipmentData,
+            location: resolvedLocation,
           });
           return;
         }
@@ -1351,6 +1362,7 @@ export default function ScannerScreen() {
             remarks: "",
             source,
             shipmentDocData: shipmentData,
+            location: resolvedLocation,
           });
           return;
         }
@@ -1363,6 +1375,7 @@ export default function ScannerScreen() {
             remarks: "",
             source,
             shipmentDocData: shipmentData,
+            location: resolvedLocation,
           });
           return;
         }
@@ -1395,6 +1408,7 @@ export default function ScannerScreen() {
           remarks: "",
           source,
           shipmentDocData: shipmentData,
+          location: resolvedLocation,
         });
         return;
       }
@@ -1405,6 +1419,7 @@ export default function ScannerScreen() {
         barcode,
         manualQtyOverride,
         source,
+        location: resolvedLocation,
       });
     } catch (error) {
       console.error("Process package error:", error);

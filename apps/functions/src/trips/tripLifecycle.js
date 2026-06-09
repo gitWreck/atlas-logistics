@@ -222,21 +222,39 @@ function evaluateTripShipmentRow(tripShipment = {}) {
   };
 }
 
+function hasTripScopedCargo(row = {}) {
+  const barcodeCount = (row.packageBarcodes || []).filter(Boolean).length;
+  if (barcodeCount > 0) return true;
+  if (toNumber(row.loadedCount, 0) > 0) return true;
+  if (toNumber(row.receivedCount ?? row.deliveredCount, 0) > 0) return true;
+  if (toNumber(row.missingCount, 0) > 0) return true;
+  if (toNumber(row.damagedCount, 0) > 0) return true;
+  return false;
+}
+
 /**
- * Whether a manifest row represents a fully delivered shipment (not hub receive).
+ * Whether every trip-scoped label on this row is customer-delivered.
+ * Assigned-but-never-loaded rows and warehouse remainders do not block completion.
  */
 function isTripShipmentDelivered(row = {}) {
-  const loadedCount = toNumber(row.loadedCount, 0);
-  const totalItems = toNumber(row.totalItems, 0);
-  const status = normalizeTripStatus(row.status);
-  const shipmentStatus = normalizeTripStatus(row.shipmentStatus);
+  if (!hasTripScopedCargo(row)) return true;
 
-  if (totalItems <= 0) return false;
+  const loadedCount = toNumber(row.loadedCount, 0);
   if (loadedCount > 0) return false;
 
+  if (row.allTripScopedPackagesDelivered === true) return true;
+
+  const tripScopedTotal = toNumber(row.tripScopedTotal, 0);
+  const tripScopedDelivered = toNumber(row.tripScopedDelivered, 0);
+  if (tripScopedTotal > 0 && tripScopedDelivered >= tripScopedTotal) {
+    return true;
+  }
+
+  const totalItems = toNumber(row.totalItems, 0);
+  if (totalItems <= 0) return false;
+
+  const status = normalizeTripStatus(row.status);
   if (DELIVERED_TRIP_SHIPMENT_STATUSES.has(status)) return true;
-  if (DELIVERED_TRIP_SHIPMENT_STATUSES.has(shipmentStatus)) return true;
-  if (row.allPackagesDelivered === true) return true;
 
   return false;
 }
@@ -285,7 +303,7 @@ function shouldPromoteTripToCompleted(trip = {}, tripShipmentRows = []) {
       currentStatus,
       nextStatus: null,
       incompleteShipmentCount: incompleteRows.length,
-      message: `${incompleteRows.length} shipment(s) on this trip are not fully delivered yet.`,
+      message: `${incompleteRows.length} shipment(s) on this trip still have undelivered trip-scoped labels.`,
     };
   }
 

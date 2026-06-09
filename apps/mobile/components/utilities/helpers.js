@@ -33,14 +33,29 @@ export function formatDisplayValue(value) {
   return null;
 }
 
+const LOCATION_TIMEOUT_MS = 3500;
+
 export const getCurrentLocationSafe = async () => {
   try {
     const { status } = await Location.requestForegroundPermissionsAsync();
     if (status !== "granted") return null;
-    const loc = await Location.getCurrentPositionAsync({
-      accuracy: Location.Accuracy.High,
-    });
-    if (!loc) return null;
+
+    const lastKnown = await Location.getLastKnownPositionAsync();
+    if (lastKnown?.coords) {
+      return {
+        lat: lastKnown.coords.latitude,
+        lng: lastKnown.coords.longitude,
+      };
+    }
+
+    const loc = await Promise.race([
+      Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.Balanced,
+      }),
+      new Promise((resolve) => setTimeout(() => resolve(null), LOCATION_TIMEOUT_MS)),
+    ]);
+
+    if (!loc?.coords) return null;
     return { lat: loc.coords.latitude, lng: loc.coords.longitude };
   } catch (error) {
     console.log("Location error:", error);

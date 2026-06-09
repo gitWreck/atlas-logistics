@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { adminDb, adminAuth } from "@/lib/firebase-admin";
 import { headers } from "next/headers";
 import { formatFirestoreDate } from "@/app/utility/utilities";
+import { resolveShipmentDeliveryMetrics } from "@/app/utility/shipmentProgress";
 
 export const dynamic = "force-dynamic";
 
@@ -123,10 +124,15 @@ export async function GET(request) {
       // Use totalContentQty if it exists (Bundled Mode), fallback to totalItems
       const totalUnits =
         data.totals?.totalContentQty || data.totals?.totalItems || 1;
-      const deliveredUnits = data.totals?.delivered || 0;
       const loadedUnits = data.totals?.loaded || 0;
+      const { total: deliveryTotal, delivered: deliveredUnits } =
+        resolveShipmentDeliveryMetrics(data);
+      const effectiveTotal = deliveryTotal > 0 ? deliveryTotal : totalUnits;
 
-      const progressPercent = Math.round((deliveredUnits / totalUnits) * 100);
+      const progressPercent =
+        effectiveTotal > 0
+          ? Math.round((deliveredUnits / effectiveTotal) * 100)
+          : 0;
       const loadPercent = Math.round(
         (loadedUnits / (data.totals?.totalItems || 1)) * 100,
       );
@@ -147,7 +153,7 @@ export async function GET(request) {
 
         // Calculated Metrics for Dashboard
         metrics: {
-          totalContent: totalUnits,
+          totalContent: effectiveTotal,
           totalPackages: data.totals?.totalItems || 0,
           totalDelivered: deliveredUnits,
           totalLoaded: loadedUnits,

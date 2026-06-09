@@ -33,6 +33,24 @@ function formatDate(timestamp) {
   });
 }
 
+function isInTransitHistoryEntry(entry) {
+  const code = String(entry?.statusCode || entry?.status || "")
+    .toUpperCase()
+    .replace(/\s+/g, "_");
+  return code === "IN_TRANSIT";
+}
+
+function dedupePublicHistory(history = []) {
+  let keptInTransit = false;
+
+  return history.filter((entry) => {
+    if (!isInTransitHistoryEntry(entry)) return true;
+    if (keptInTransit) return false;
+    keptInTransit = true;
+    return true;
+  });
+}
+
 function getEstimatedArrival(data) {
   return (
     data?.estimatedArrival ||
@@ -379,7 +397,7 @@ export default function TrackingResult({ data }) {
             Tracking activity
           </div>
           <div className="space-y-3">
-            {data.history.slice(0, 8).map((entry, index) => (
+            {dedupePublicHistory(data.history).slice(0, 8).map((entry, index) => (
               <div
                 key={`${entry.date}-${entry.title || entry.status}-${index}`}
                 className="border border-slate-200 rounded-xl p-3 bg-white"
@@ -389,7 +407,7 @@ export default function TrackingResult({ data }) {
                     <p className="text-sm font-semibold text-slate-900">
                       {entry.title || entry.status}
                     </p>
-                    {entry.note && (
+                    {entry.note && !isInTransitHistoryEntry(entry) && (
                       <p className="text-xs text-slate-600 mt-1">{entry.note}</p>
                     )}
                   </div>

@@ -11,14 +11,18 @@ export default function ManifestStatusBadge({
   trip = null,
   isDark = true,
   className = "",
+  compact = false,
 }) {
   if (!trip || !isHubTransferTrip(trip)) return null;
 
   const status = resolveManifestStatus(trip);
 
   return (
-    <span className={className}>
-      <StatusBadge status={status} isDark={isDark} />
-    </span>
+    <StatusBadge
+      status={status}
+      isDark={isDark}
+      className={className}
+      compact={compact}
+    />
   );
 }

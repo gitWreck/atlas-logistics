@@ -3,13 +3,13 @@
 const { FieldValue } = require("firebase-admin/firestore");
 const { logger } = require("firebase-functions");
 const { writeTripActionLog } = require("../utilities/tripLogger");
-const { allPiecesDelivered } = require("../packages/packageStatus");
 const {
   TRIP_STATUSES,
   normalizeTripStatus,
   shouldPromoteTripToCompleted,
   getTripStatusSideEffects,
 } = require("./tripLifecycle");
+const { evaluateTripScopedDelivery } = require("./tripScopedDelivery");
 
 async function loadTripShipmentRows(tx, tripRef) {
   const snap = await tx.get(tripRef.collection("trip_shipments"));
@@ -20,13 +20,14 @@ async function loadTripShipmentRows(tx, tripRef) {
  * Merge master shipment status so hub trips can complete after last-mile delivery
  * even when trip_shipments rows were last updated at hub unload (ARRIVED).
  */
-async function enrichTripShipmentRowsFromShipments(tx, db, rows = []) {
+async function enrichTripShipmentRowsFromShipments(tx, db, tripId, rows = []) {
   if (!rows.length) return rows;
 
   const shipmentSnaps = await Promise.all(
     rows.map((row) => {
-      if (!row?.id) return Promise.resolve(null);
-      return tx.get(db.collection("shipments").doc(row.id));
+      const shipmentId = row.trackingShipmentId || row.id;
+      if (!shipmentId) return Promise.resolve(null);
+      return tx.get(db.collection("shipments").doc(shipmentId));
     }),
   );
 
@@ -36,12 +37,15 @@ async function enrichTripShipmentRowsFromShipments(tx, db, rows = []) {
 
     const shipment = snap.data() || {};
     const masterStatus = normalizeTripStatus(shipment.status);
-    const packages = Array.isArray(shipment.packages) ? shipment.packages : [];
+    const scopedDelivery = evaluateTripScopedDelivery(row, shipment, tripId);
 
     return {
       ...row,
       shipmentStatus: masterStatus,
-      allPackagesDelivered: allPiecesDelivered(packages),
+      tripScopedTotal: scopedDelivery.tripScopedTotal,
+      tripScopedDelivered: scopedDelivery.tripScopedDelivered,
+      allTripScopedPackagesDelivered:
+        scopedDelivery.allTripScopedPackagesDelivered,
     };
   });
 }
@@ -153,6 +157,7 @@ async function tryAutoCompleteTrip(tripId, meta = {}) {
     const enrichedRows = await enrichTripShipmentRowsFromShipments(
       tx,
       db,
+      tripRef.id,
       tripShipmentRows,
     );
 

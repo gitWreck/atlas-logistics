@@ -1,19 +1,25 @@
 /* =========================================================
    Backfill trip auto-completion
    ---------------------------------------------------------
-   Closes hub/delivery trips stuck at ARRIVED/UNLOADING when all
-   manifest shipments are already processed.
+   Closes hub/delivery trips stuck at ARRIVED when all
+   trip-scoped labels are customer-delivered.
 
    Usage (from apps/functions):
      DRY_RUN=1 node scripts/backfillAutoCompleteTrips.js
-     TRIP_ID=TRIP-HUB-20260604-0003 node scripts/backfillAutoCompleteTrips.js
-     node scripts/backfillAutoCompleteTrips.js
+     TRIP_ID=TRIP-HUB-20260609-0001 node scripts/backfillAutoCompleteTrips.js
+
+   Windows (Git Bash):
+     TRIP_ID=TRIP-HUB-20260609-0001 FIREBASE_PROJECT_ID=atlas-tracking node scripts/backfillAutoCompleteTrips.js
+
+   Auth: set FIREBASE_SERVICE_ACCOUNT_KEY (web .env.local) or
+         GOOGLE_APPLICATION_CREDENTIALS to a service account JSON file.
 ========================================================= */
 
 const admin = require("firebase-admin");
 const { tryAutoCompleteTrip } = require("../src/trips/autoCompleteTrip");
+const { initAdminApp, resolveTripDocRef } = require("./initAdmin");
 
-if (!admin.apps.length) admin.initializeApp();
+initAdminApp();
 const db = admin.firestore();
 
 const DRY_RUN = process.env.DRY_RUN === "1";
@@ -31,11 +37,12 @@ async function main() {
   let docs = [];
 
   if (TRIP_ID) {
-    const snap = await db.collection("truck_trips").doc(TRIP_ID).get();
-    if (!snap.exists) {
+    const tripRef = await resolveTripDocRef(db, TRIP_ID);
+    if (!tripRef) {
       console.error(`Trip not found: ${TRIP_ID}`);
       process.exit(1);
     }
+    const snap = await tripRef.get();
     docs = [snap];
   } else {
     const snap = await db

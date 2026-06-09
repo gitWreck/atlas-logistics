@@ -421,9 +421,9 @@ const TripBoard = forwardRef(function TripBoard(
                   >
                     <div className="col-span-3">Trip Info / Driver</div>
                     <div className="col-span-2">Route</div>
-                    <div className="col-span-1">Stats</div>
+                    <div className="col-span-2">Stats</div>
                     <div className="col-span-3">Progress</div>
-                    <div className="col-span-2">Update</div>
+                    <div className="col-span-1">Update</div>
                     <div className="col-span-1 text-right">Action</div>
                   </div>
 

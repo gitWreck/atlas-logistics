@@ -2,7 +2,13 @@ import { calculateProgress } from "./utilities";
 import {
   MANIFEST_STATUS,
   resolveManifestStatus,
+  isHubTransferTrip,
 } from "./manifestStatus";
+import {
+  calculateHubBoardProgress,
+  getHubBoardStatsDisplay,
+  getHubBoardStatusLabel,
+} from "./tripHubBoardStats";
 
 function clampCount(value) {
   return Math.max(0, Number(value) || 0);
@@ -242,6 +248,15 @@ export function getTripLoadStatusHint(trip = {}) {
       : "Manifest is locked. Start receiving at destination when arrived.";
   }
   if (["LOADING", "CREATED", "ASSIGNED", "PARTIALLY_LOADED"].includes(status)) {
+    const shipments = Array.isArray(trip?.shipments) ? trip.shipments : [];
+    const { loaded, tripPieceTotal } =
+      shipments.length > 0
+        ? resolveTripTotals({ ...trip, shipments })
+        : resolveTripTotals(trip);
+    const total = Math.max(tripPieceTotal, loaded);
+    if (total > 0 && loaded >= total) {
+      return "All pieces scanned. Set trip to LOADED when ready.";
+    }
     return "Manifest is open. Loading in progress.";
   }
   if (status === "LOADED") {
@@ -292,6 +307,20 @@ export function aggregateTripLoadSummary(trip = {}, shipments = []) {
  * Returns phase-aware trip stats for the trip board (e.g. "376/376 Loaded").
  */
 export function getTripStatsDisplay(trip) {
+  if (isHubTransferTrip(trip)) {
+    const hubStats = getHubBoardStatsDisplay(trip);
+    if (hubStats) {
+      return {
+        count: hubStats.count,
+        total: hubStats.total,
+        label: hubStats.label,
+        subLabel: hubStats.subLabel,
+        shipmentCount: resolveTripTotals(trip).shipmentCount,
+        hubPhase: hubStats.phase,
+      };
+    }
+  }
+
   const status = String(trip?.status || "").toUpperCase();
   const tripType = String(trip?.tripType || "HUB_TRANSFER").toUpperCase();
   const isDelivery = tripType === "DELIVERY";
@@ -390,10 +419,18 @@ export function getTripStatsDisplay(trip) {
     };
   }
 
+  const inLoadingPhase = LOADING_PHASE_TRIP_STATUSES.has(status);
+  let label = "Loaded";
+  if (total <= 0 && loaded <= 0) {
+    label = "Awaiting";
+  } else if (inLoadingPhase) {
+    label = "Loading";
+  }
+
   return {
     count: total > 0 ? Math.min(loaded, total) : loaded,
     total,
-    label: total <= 0 && loaded <= 0 ? "Awaiting" : "Loaded",
+    label,
     shipmentCount,
   };
 }
@@ -402,6 +439,11 @@ export function getTripStatsDisplay(trip) {
  * Trip board progress bar — uses actual load counts during the loading phase.
  */
 export function calculateTripProgress(trip) {
+  if (isHubTransferTrip(trip)) {
+    const hubProgress = calculateHubBoardProgress(trip);
+    if (hubProgress != null) return hubProgress;
+  }
+
   const status = String(trip?.status || "").toUpperCase();
   const stats = getTripStatsDisplay(trip);
   const total = clampCount(stats.total);
@@ -410,10 +452,12 @@ export function calculateTripProgress(trip) {
   if (LOADING_PHASE_TRIP_STATUSES.has(status)) {
     if (total <= 0) return loaded > 0 ? 1 : 0;
     const ratio = Math.min(loaded / total, 1);
-    return Math.round(ratio * LOADING_PHASE_PROGRESS_CAP);
+    // Cap below the LOADED milestone (60%) until the trip is explicitly set to LOADED.
+    const loadingCap = LOADING_PHASE_PROGRESS_CAP - 1;
+    return Math.round(ratio * loadingCap);
   }
 
-  if (["IN_TRANSIT", "LOADED"].includes(status) && total > 0 && loaded >= total) {
+  if (status === "LOADED") {
     return LOADING_PHASE_PROGRESS_CAP;
   }
 
@@ -433,17 +477,18 @@ export function isTripAwaitingLoading(trip) {
 export function getTripBoardStatusLabel(trip) {
   const status = String(trip?.status || "").toUpperCase();
 
+  if (isHubTransferTrip(trip)) {
+    const hubLabel = getHubBoardStatusLabel(trip);
+    if (hubLabel) return hubLabel;
+  }
+
   if (isTripAwaitingLoading(trip)) {
     return "Awaiting Loading";
   }
 
   if (LOADING_PHASE_TRIP_STATUSES.has(status)) {
     const stats = getTripStatsDisplay(trip);
-    const loaded = clampCount(stats.count);
-    const total = clampCount(stats.total);
-
-    if (loaded > 0) {
-      if (total > 0 && loaded >= total) return "Loaded";
+    if (clampCount(stats.count) > 0 || clampCount(stats.total) > 0) {
       return "Loading";
     }
   }

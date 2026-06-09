@@ -23,6 +23,7 @@ import {
 import ShipmentRow from "./ShipmentRow";
 import ShipmentDrawer from "./ShipmentDrawer";
 import { calculateProgress } from "@/app/utility/utilities";
+import { calculateShipmentProgress } from "@/app/utility/shipmentProgress";
 import { getBoardThemeClasses } from "@/app/utility/constant/theme";
 import UnifiedShipmentModal from "./modals/UnifiedShipmentModal";
 import PickupRequestsTable from "./PickupRequestsTable";
@@ -209,7 +210,7 @@ const ShipmentBoard = forwardRef(function ShipmentBoard(
       const formattedShipments = (shipmentsData.shipments || []).map(
         (shipment) => ({
           ...shipment,
-          progress: calculateProgress(shipment.status),
+          progress: calculateShipmentProgress(shipment),
         }),
       );
 
