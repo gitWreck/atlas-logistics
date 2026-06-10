@@ -166,6 +166,71 @@ export function resolveShipmentPackageBreakdown(shipment = {}) {
   );
 }
 
+const DIVISORIA_HUB_STATUSES = new Set([
+  "RECEIVED",
+  "PENDING_PICKUP",
+  "PICKED_UP",
+]);
+
+const ODIONGAN_HUB_STATUSES = new Set([
+  "ARRIVED",
+  "PARTIALLY_ARRIVED",
+  "AVAILABLE_AT_WAREHOUSE",
+  "AVAILABLE_FOR_DELIVERY",
+  "PARTIALLY_AVAILABLE_FOR_DELIVERY",
+]);
+
+function readExplicitWarehouseHub(shipment = {}) {
+  const currentWarehouse = shipment?.currentWarehouse || {};
+  const code = String(
+    shipment?.currentWarehouseCode ||
+      currentWarehouse.code ||
+      shipment?.warehouseCode ||
+      "",
+  ).toUpperCase();
+  const name = String(
+    shipment?.currentWarehouseName ||
+      currentWarehouse.name ||
+      shipment?.warehouseName ||
+      "",
+  ).toLowerCase();
+
+  if (!code && !name) return null;
+  if (code === "DIV" || name.includes("divisoria")) return "divisoria";
+  if (code === "ODI" || name.includes("odiongan")) return "odiongan";
+  return null;
+}
+
+/** True when shipment has cargo at Divisoria hub (not merely routed from there). */
+export function shipmentMatchesDivisoriaHub(shipment = {}) {
+  const explicitHub = readExplicitWarehouseHub(shipment);
+  if (explicitHub) return explicitHub === "divisoria";
+
+  const breakdown = resolveShipmentPackageBreakdown(shipment);
+  if (breakdown.atDivisoria > 0) return true;
+  if (breakdown.total > 0) return false;
+
+  return DIVISORIA_HUB_STATUSES.has(normalizeStatus(shipment.status));
+}
+
+/** True when shipment has cargo at Odiongan hub (arrived / warehouse / release pool). */
+export function shipmentMatchesOdionganHub(shipment = {}) {
+  const explicitHub = readExplicitWarehouseHub(shipment);
+  if (explicitHub) return explicitHub === "odiongan";
+
+  const breakdown = resolveShipmentPackageBreakdown(shipment);
+  if (
+    breakdown.atOdiongan > 0 ||
+    breakdown.releasedForDelivery > 0 ||
+    breakdown.returned > 0
+  ) {
+    return true;
+  }
+  if (breakdown.total > 0) return false;
+
+  return ODIONGAN_HUB_STATUSES.has(normalizeStatus(shipment.status));
+}
+
 export function getActiveBreakdownRows(breakdown = {}) {
   return BREAKDOWN_LABELS.filter(
     ({ key }) => Number(breakdown[key] || 0) > 0,

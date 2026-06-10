@@ -58,7 +58,7 @@ export default function TrackingPage() {
 
   return (
     <div className="min-h-screen bg-slate-100 text-slate-900 font-sans flex items-center justify-center p-4">
-      <div className="w-full max-w-xl bg-white border border-slate-200 rounded-3xl shadow-2xl shadow-slate-200/70 overflow-hidden relative">
+      <div className="w-full max-w-2xl bg-white border border-slate-200 rounded-3xl shadow-2xl shadow-slate-200/70 overflow-hidden relative">
         {/* HEADER */}
         <div className="p-8 text-center bg-slate-50 border-b border-slate-200">
           <div className="w-20 h-20 mx-auto mb-3">
