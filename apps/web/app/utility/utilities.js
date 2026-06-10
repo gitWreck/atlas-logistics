@@ -54,23 +54,26 @@ export function calculateProgress(status) {
 export function getVisualProgress(status) {
   switch (status) {
     case "RECEIVED":
+    case "RECEIVED_AT_DIVISORIA":
+    case "PENDING_PICKUP":
+    case "PICKED_UP":
       return 0;
     case "IN_TRANSIT":
     case "PARTIALLY_IN_TRANSIT":
-      return 33;
+    case "LOADED":
+      return 25;
     case "ARRIVED":
     case "PARTIALLY_ARRIVED":
-      return 45;
     case "AVAILABLE_FOR_DELIVERY":
     case "PARTIALLY_AVAILABLE_FOR_DELIVERY":
-      return 50;
     case "READY_FOR_DELIVERY":
-      return 55;
+    case "AVAILABLE_AT_WAREHOUSE":
+      return 50;
     case "OUT_FOR_DELIVERY":
-      return 66;
     case "PARTIALLY_DELIVERED":
-      return 83;
+      return 75;
     case "DELIVERED":
+    case "COMPLETED":
       return 100;
     default:
       return 0;

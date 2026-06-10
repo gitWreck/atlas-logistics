@@ -24,6 +24,10 @@ import ShipmentRow from "./ShipmentRow";
 import ShipmentDrawer from "./ShipmentDrawer";
 import { calculateProgress } from "@/app/utility/utilities";
 import { calculateShipmentProgress } from "@/app/utility/shipmentProgress";
+import {
+  shipmentMatchesDivisoriaHub,
+  shipmentMatchesOdionganHub,
+} from "@/app/utility/packageStatus";
 import { getBoardThemeClasses } from "@/app/utility/constant/theme";
 import UnifiedShipmentModal from "./modals/UnifiedShipmentModal";
 import PickupRequestsTable from "./PickupRequestsTable";
@@ -64,43 +68,13 @@ function isPickupShipment(shipment) {
   );
 }
 
-function getWarehouseSearchText(shipment) {
-  const currentWarehouse = shipment?.currentWarehouse || {};
-  const currentWarehouseText = [
-    shipment?.currentWarehouseCode,
-    shipment?.currentWarehouseName,
-    currentWarehouse.code,
-    currentWarehouse.name,
-    shipment?.warehouseCode,
-    shipment?.warehouseName,
-  ]
-    .filter(Boolean)
-    .join(" ")
-    .toLowerCase();
-
-  if (currentWarehouseText) return currentWarehouseText;
-
-  return [
-    shipment?.route,
-    shipment?.originCode,
-    shipment?.origin,
-    shipment?.destinationCode,
-    shipment?.destination,
-  ]
-    .filter(Boolean)
-    .join(" ")
-    .toLowerCase();
-}
-
 function matchesWarehouseTab(shipment, warehouseKey) {
-  const searchText = getWarehouseSearchText(shipment);
-
   if (warehouseKey === SHIPMENT_BOARD_TABS.DIVISORIA) {
-    return searchText.includes("divisoria") || /\bdiv\b/.test(searchText);
+    return shipmentMatchesDivisoriaHub(shipment);
   }
 
   if (warehouseKey === SHIPMENT_BOARD_TABS.ODIONGAN) {
-    return searchText.includes("odiongan") || /\bodi\b/.test(searchText);
+    return shipmentMatchesOdionganHub(shipment);
   }
 
   return true;

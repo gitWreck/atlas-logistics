@@ -1,10 +1,6 @@
 import React, { useState } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
-  faBoxOpen,
-  faTruckFast,
-  faTruckRampBox,
-  faCheckCircle,
   faExclamationTriangle,
   faCamera,
   faClock,
@@ -12,13 +8,16 @@ import {
   faChevronUp,
   faTimes,
   faExpand,
-  faReceipt,
   faBox,
 } from "@fortawesome/free-solid-svg-icons";
 
 // Make sure you have this component created from the previous step!
 import StatusBadge from "../ui/StatusBadge";
 import { getVisualProgress } from "@/app/utility/utilities";
+import {
+  buildPublicTrackingMilestones,
+  getMilestoneStepState,
+} from "@/app/utility/publicTrackingMilestones";
 
 function formatDate(timestamp) {
   if (!timestamp) return "Just now";
@@ -101,50 +100,30 @@ export default function TrackingResult({ data }) {
   const currentProgress = getVisualProgress(safeStatus);
   const isDelayed = delayReason && !delayCleared;
   const estimatedArrival = getEstimatedArrival(data);
-
-  // Timeline Config
-  const MILESTONES = [
-    {
-      val: 0,
-      label: "Received",
-      icon: faBoxOpen,
-      color: "text-cyan-400",
-      border: "border-cyan-500",
-      bg: "bg-cyan-500",
-    },
-    {
-      val: 33,
-      label: "In Transit",
-      icon: faTruckFast,
-      color: "text-blue-400",
-      border: "border-blue-500",
-      bg: "bg-blue-500",
-    },
-    {
-      val: 66,
-      label: "Out for Delivery",
-      icon: faTruckRampBox,
-      color: "text-purple-400",
-      border: "border-purple-500",
-      bg: "bg-purple-500",
-    },
-    {
-      val: 100,
-      label: "Delivered",
-      icon: faCheckCircle,
-      color: "text-emerald-400",
-      border: "border-emerald-500",
-      bg: "bg-emerald-500",
-    },
-  ];
+  const MILESTONES = buildPublicTrackingMilestones(data);
 
   let activeLineColor = "bg-blue-600";
   if (isDelayed) activeLineColor = "bg-amber-500";
-  else if (safeStatus === "DELIVERED") activeLineColor = "bg-emerald-500";
-  else if (safeStatus === "READY_FOR_DELIVERY") activeLineColor = "bg-sky-500";
+  else if (safeStatus === "DELIVERED" || safeStatus === "COMPLETED")
+    activeLineColor = "bg-emerald-500";
+  else if (
+    [
+      "ARRIVED",
+      "PARTIALLY_ARRIVED",
+      "AVAILABLE_FOR_DELIVERY",
+      "PARTIALLY_AVAILABLE_FOR_DELIVERY",
+      "READY_FOR_DELIVERY",
+      "AVAILABLE_AT_WAREHOUSE",
+    ].includes(safeStatus)
+  )
+    activeLineColor = "bg-sky-500";
   else if (safeStatus === "OUT_FOR_DELIVERY") activeLineColor = "bg-purple-500";
   else if (safeStatus === "PARTIALLY_DELIVERED") activeLineColor = "bg-teal-500";
-  else if (safeStatus === "RECEIVED") activeLineColor = "bg-cyan-500";
+  else if (
+    safeStatus === "RECEIVED" ||
+    safeStatus === "RECEIVED_AT_DIVISORIA"
+  )
+    activeLineColor = "bg-cyan-500";
 
   return (
     <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 bg-white rounded-b-3xl overflow-hidden flex flex-col h-full relative shadow-2xl shadow-slate-200/70">
@@ -231,162 +210,89 @@ export default function TrackingResult({ data }) {
         </div>
       )}
 
-      {/* --- D. TIMELINE SECTION --- */}
-      <div className="w-full">
-        <div className="px-6 py-8 md:hidden">
-          <div className="relative">
-            {MILESTONES.map((step, index) => {
-              const isPast = step.val < currentProgress;
-              const isActive = step.val === currentProgress;
-              const isLast = index === MILESTONES.length - 1;
+      {/* --- D. TIMELINE SECTION (vertical — fits narrow card, shows all 5 steps) --- */}
+      <div className="w-full border-b border-slate-200 px-4 py-8 sm:px-6">
+        <div className="relative">
+          {MILESTONES.map((step, index) => {
+            const { isPast, isActive } = getMilestoneStepState(
+              currentProgress,
+              index,
+              MILESTONES,
+            );
+            const isLast = index === MILESTONES.length - 1;
 
-              let dotStyle = "border-slate-300 bg-white text-slate-400";
+            let dotStyle = "border-slate-300 bg-white text-slate-400";
 
-              if (isActive) {
-                dotStyle = isDelayed
-                  ? "border-amber-500 bg-white text-amber-600 shadow-[0_0_0_4px_rgba(245,158,11,0.12)]"
-                  : `${step.border} bg-white ${step.color.replace("400", "600")} shadow-[0_0_0_4px_rgba(59,130,246,0.10)]`;
-              } else if (isPast) {
-                dotStyle = "border-blue-600 bg-white text-blue-600";
-              }
+            if (isActive) {
+              dotStyle = isDelayed
+                ? "border-amber-500 bg-white text-amber-600 shadow-[0_0_0_4px_rgba(245,158,11,0.12)]"
+                : `${step.border} bg-white ${step.color.replace("400", "600")} shadow-[0_0_0_4px_rgba(59,130,246,0.10)]`;
+            } else if (isPast) {
+              dotStyle = "border-blue-600 bg-white text-blue-600";
+            }
 
-              return (
-                <div
-                  key={step.label}
-                  className="relative flex gap-4 pb-8 last:pb-0"
-                >
-                  <div className="relative flex w-10 shrink-0 justify-center">
-                    {!isLast && (
-                      <div className="absolute left-1/2 top-10 bottom-0 w-1 -translate-x-1/2 rounded-full bg-slate-200" />
-                    )}
-                    {!isLast && isPast && (
-                      <div
-                        className={`absolute left-1/2 top-10 bottom-0 w-1 -translate-x-1/2 rounded-full ${activeLineColor}`}
+            return (
+              <div
+                key={`${step.val}-${step.label}`}
+                className="relative flex gap-3 pb-5 last:pb-0"
+              >
+                <div className="relative flex w-9 shrink-0 justify-center">
+                  {!isLast && (
+                    <div className="absolute left-1/2 top-9 bottom-0 w-1 -translate-x-1/2 rounded-full bg-slate-200" />
+                  )}
+                  {!isLast && isPast && (
+                    <div
+                      className={`absolute left-1/2 top-9 bottom-0 w-1 -translate-x-1/2 rounded-full ${activeLineColor}`}
+                    />
+                  )}
+                  <div className="relative flex items-center justify-center w-9 h-9">
+                    {isActive && !isDelayed && (
+                      <span
+                        className={`absolute inline-flex h-full w-full rounded-full opacity-20 animate-ping ${step.bg}`}
                       />
                     )}
-                    <div className="relative flex items-center justify-center w-10 h-10">
-                      {isActive && !isDelayed && (
-                        <span
-                          className={`absolute inline-flex h-full w-full rounded-full opacity-20 animate-ping ${step.bg}`}
-                        />
-                      )}
-                      <div
-                        className={`w-10 h-10 rounded-full border-2 flex items-center justify-center transition-all duration-500 relative z-10 ${dotStyle}`}
-                      >
-                        <FontAwesomeIcon
-                          icon={
-                            isActive && isDelayed
-                              ? faExclamationTriangle
-                              : step.icon
-                          }
-                          className="text-sm"
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="min-w-0 pt-1">
                     <div
-                      className={`text-xs font-bold uppercase tracking-wider transition-colors duration-500 ${
-                        isActive
-                          ? isDelayed
-                            ? "text-amber-700"
-                            : "text-slate-950"
-                          : isPast
-                            ? "text-blue-700"
-                            : "text-slate-500"
-                      }`}
+                      className={`w-9 h-9 rounded-full border-2 flex items-center justify-center transition-all duration-500 relative z-10 ${dotStyle}`}
                     >
-                      {step.label}
-                    </div>
-                    <div className="mt-1 text-xs text-slate-500">
-                      {isActive
-                        ? isDelayed
-                          ? "Attention required"
-                          : "Current stage"
-                        : isPast
-                          ? "Completed"
-                          : "Pending"}
+                      <FontAwesomeIcon
+                        icon={
+                          isActive && isDelayed
+                            ? faExclamationTriangle
+                            : step.icon
+                        }
+                        className="text-xs"
+                      />
                     </div>
                   </div>
                 </div>
-              );
-            })}
-          </div>
-        </div>
 
-        <div className="hidden md:block overflow-x-auto no-scrollbar">
-          <div className="px-10 pt-12 pb-16 min-w-[320px]">
-            <div className="relative w-full">
-              {/* 1. BACKGROUND TRACK */}
-              <div className="absolute top-5 left-0 w-full h-1 bg-slate-200 rounded-full z-0" />
-
-              {/* 2. ACTIVE PROGRESS LINE */}
-              <div
-                className={`absolute top-5 left-0 h-1 rounded-full transition-all duration-1000 z-0 ${activeLineColor}`}
-                style={{ width: `${currentProgress}%` }}
-              />
-
-              {/* 3. MILESTONE DOTS */}
-              <div className="flex justify-between w-full relative z-10">
-                {MILESTONES.map((step) => {
-                  const isPast = step.val < currentProgress;
-                  const isActive = step.val === currentProgress;
-
-                  let dotStyle = "border-slate-300 bg-white text-slate-400";
-
-                  if (isActive) {
-                    if (isDelayed) {
-                      dotStyle =
-                        "border-amber-500 bg-white text-amber-600 shadow-[0_0_0_4px_rgba(245,158,11,0.12)]";
-                    } else {
-                      dotStyle = `${step.border} bg-white ${step.color.replace("400", "600")} shadow-[0_0_0_4px_rgba(59,130,246,0.10)]`;
-                    }
-                  } else if (isPast) {
-                    dotStyle = "border-blue-600 bg-white text-blue-600";
-                  }
-
-                  return (
-                    <div
-                      key={step.label}
-                      className="flex flex-col items-center relative group w-10 shrink-0"
-                    >
-                      <div className="relative flex items-center justify-center w-10 h-10">
-                        {isActive && !isDelayed && (
-                          <span
-                            className={`absolute inline-flex h-full w-full rounded-full opacity-75 animate-ping ${step.bg}`}
-                          />
-                        )}
-                        <div
-                          className={`w-10 h-10 rounded-full border-2 flex items-center justify-center transition-all duration-500 relative z-10 ${dotStyle}`}
-                        >
-                          <FontAwesomeIcon
-                            icon={
-                              isActive && isDelayed
-                                ? faExclamationTriangle
-                                : step.icon
-                            }
-                            className="text-sm"
-                          />
-                        </div>
-                      </div>
-
-                      <div className="absolute top-12 w-32 text-center -left-11">
-                        <span
-                          className={`text-[10px] font-bold uppercase tracking-wider block transition-colors duration-500 
-                        ${isActive ? "text-slate-950" : "text-slate-500"}
-                        ${isActive && isDelayed ? "text-amber-700" : ""}
-                      `}
-                        >
-                          {step.label}
-                        </span>
-                      </div>
-                    </div>
-                  );
-                })}
+                <div className="min-w-0 flex-1 pt-0.5">
+                  <div
+                    className={`text-sm font-bold leading-snug transition-colors duration-500 ${
+                      isActive
+                        ? isDelayed
+                          ? "text-amber-700"
+                          : "text-slate-950"
+                        : isPast
+                          ? "text-blue-700"
+                          : "text-slate-500"
+                    }`}
+                  >
+                    {step.label}
+                  </div>
+                  <div className="mt-1 text-[11px] text-slate-500">
+                    {isActive
+                      ? isDelayed
+                        ? "Attention required"
+                        : "Current stage"
+                      : isPast
+                        ? "Completed"
+                        : "Pending"}
+                  </div>
+                </div>
               </div>
-            </div>
-          </div>
+            );
+          })}
         </div>
       </div>
 
