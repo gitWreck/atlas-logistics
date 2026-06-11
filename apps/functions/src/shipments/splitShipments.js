@@ -4,6 +4,10 @@ const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const admin = require("firebase-admin");
 const { FieldValue } = admin.firestore;
 const { writeShipmentActionLog } = require("../utilities/shipmentLogger");
+const {
+  assertCustodyStructuralEditAllowed,
+  loadTripForShipment,
+} = require("../trips/manifestLockGuard");
 
 if (!admin.apps.length) admin.initializeApp();
 const db = admin.firestore();
@@ -58,6 +62,9 @@ exports.splitShipments = onCall(
         throw new HttpsError("not-found", "Origin shipment not found.");
 
       const originData = originSnap.data();
+      const { trip } = await loadTripForShipment(tx, db, { shipment: originData });
+      assertCustodyStructuralEditAllowed(originData, trip);
+
       const allPackages = originData.packages || [];
 
       // itemsToSplit expected: [{ packageId: "AT-01", splitQty: 10 }]

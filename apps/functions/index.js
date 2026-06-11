@@ -89,6 +89,12 @@ exports.removeAssignmentFromTrip =
 
 exports.disableTruckTrip =
   require("./src/trips/disableTruckTrip").disableTruckTrip;
+exports.cancelTruckTrip =
+  require("./src/trips/cancelTruckTrip").cancelTruckTrip;
+exports.archiveTruckTrip =
+  require("./src/trips/archiveTruckTrip").archiveTruckTrip;
+exports.getTripAuditLog =
+  require("./src/trips/getTripAuditLog").getTripAuditLog;
 exports.deleteTruckTrip =
   require("./src/trips/deleteTruckTrip").deleteTruckTrip;
 exports.completeTrip = require("./src/trips/completeTrip").completeTrip;

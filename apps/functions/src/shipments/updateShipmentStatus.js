@@ -21,6 +21,7 @@ const { getShipmentTargetUserIds } = require("../utilities/notificationHelpers")
 const { normalizeQty } = require("../utilities/packageHelpers");
 const { tryAutoCompleteTrip } = require("../trips/autoCompleteTrip");
 const { PACKAGE_STATUS } = require("../packages/packageStatus");
+const { assertCustodyScanStatusAllowed } = require("../trips/manifestLockGuard");
 
 if (!admin.apps.length) admin.initializeApp();
 
@@ -260,6 +261,9 @@ exports.updateShipmentStatus = onCall(
 
       const currentData = shipmentSnap.data() || {};
       const oldStatus = currentData.status || null;
+      const tripData = tripSnap?.exists ? tripSnap.data() : null;
+      assertCustodyScanStatusAllowed(currentData, tripData, newStatus);
+
       const currentPackages = Array.isArray(currentData.packages)
         ? currentData.packages
         : [];

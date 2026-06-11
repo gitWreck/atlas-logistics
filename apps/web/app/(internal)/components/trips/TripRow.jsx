@@ -17,8 +17,7 @@ import {
 import { getRowThemeClasses } from "@/app/utility/constant/theme";
 import StatusDot from "../ui/StatusDot";
 import ManifestStatusBadge from "../ui/ManifestStatusBadge";
-import AdminRowDeleteButton from "../admin/AdminRowDeleteButton";
-import { deleteTruckTrip } from "@/app/utility/FirebaseFunctions";
+import TripLifecycleMenu from "./TripLifecycleMenu";
 
 export default function TripRow({
   trip,
@@ -152,12 +151,9 @@ export default function TripRow({
           >
             <FontAwesomeIcon icon={faEllipsisV} />
           </button>
-          <AdminRowDeleteButton
+          <TripLifecycleMenu
+            trip={trip}
             profile={profile}
-            title="Delete Trip"
-            entityLabel={trip.tripId || trip.id}
-            description="Shipments on this trip are detached, not deleted."
-            onDelete={() => deleteTruckTrip({ tripId: trip.id })}
             onSuccess={onDeleted}
             isDark={isDark}
             buttonClassName={theme.actionButton}
@@ -349,12 +345,9 @@ export default function TripRow({
         >
           <FontAwesomeIcon icon={faEllipsisV} />
         </button>
-        <AdminRowDeleteButton
+        <TripLifecycleMenu
+          trip={trip}
           profile={profile}
-          title="Delete Trip"
-          entityLabel={trip.tripId || trip.id}
-          description="Shipments on this trip are detached, not deleted."
-          onDelete={() => deleteTruckTrip({ tripId: trip.id })}
           onSuccess={onDeleted}
           isDark={isDark}
           buttonClassName={theme.actionButton}

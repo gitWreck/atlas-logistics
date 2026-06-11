@@ -3,10 +3,8 @@
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const admin = require("firebase-admin");
 const { requireRole } = require("../utilities/helpers");
-const {
-  getActorFromRequest,
-  writeTripActionLog,
-} = require("../utilities/tripLogger");
+const { getActorFromRequest } = require("../utilities/tripLogger");
+const { writeCustodyAuditLog } = require("../utilities/custodyAuditLog");
 const { buildDerivedShipmentSnapshot } = require("../packages/shipmentStatus");
 
 if (!admin.apps.length) admin.initializeApp();
@@ -163,15 +161,20 @@ exports.assignShipmentToTrip = onCall(
         // createdRole: role,
       });
 
-      // 🧾 Admin audit log
-      writeTripActionLog({
+      writeCustodyAuditLog({
         db,
         tx,
         action: "ASSIGN_SHIPMENT_TO_TRIP",
-        tripId,
-        trackingShipmentId,
-        ...actor,
-        createdAt: now,
+        targetCollection: "shipments",
+        targetId: trackingShipmentId,
+        tripDocId: tripId,
+        tripId: trip.tripId || tripId,
+        actorId: actor.actorId,
+        actorName: actor.actorName,
+        actorRole: actor.actorRole,
+        previousValue: { currentTripId: tracking.currentTripId || null },
+        newValue: { currentTripId: tripId },
+        note: `Shipment ${trackingShipmentId} assigned to trip.`,
       });
     });
 

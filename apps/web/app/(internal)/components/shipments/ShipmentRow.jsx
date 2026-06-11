@@ -13,6 +13,7 @@ import { getRowThemeClasses } from "@/app/utility/constant/theme";
 import { getShipmentRouteLabel } from "./shipmentHelpers";
 import AdminRowDeleteButton from "../admin/AdminRowDeleteButton";
 import { deleteShipment } from "@/app/utility/FirebaseFunctions";
+import { isShipmentCustodyLocked } from "@/app/utility/custodyLock";
 
 export default function ShipmentRow({
   shipmentBoard,
@@ -34,6 +35,7 @@ export default function ShipmentRow({
   const totalCount = s.metrics?.totalContent || 0;
   const driverName = s.truckDetails?.driverName || "Unassigned";
 
+  const custodyLocked = isShipmentCustodyLocked(s);
   const trackingNumber = s.shipmentId || s.trackingNumber || "—";
   const routeCode = `${s.originCode || "N/A"} -> ${s.destinationCode || "N/A"}`;
   const routeLabel = getShipmentRouteLabel(s);
@@ -82,9 +84,16 @@ export default function ShipmentRow({
           {s.isPickupRequested === true && (
             <button
               type="button"
-              className={`p-2 rounded transition-colors ${theme.actionButton}`}
+              className={`p-2 rounded transition-colors ${theme.actionButton} disabled:opacity-40`}
+              disabled={custodyLocked}
+              title={
+                custodyLocked
+                  ? "Manifest locked — unlock required to edit"
+                  : "Edit pickup"
+              }
               onClick={(e) => {
                 e.stopPropagation();
+                if (custodyLocked) return;
                 onEdit?.(s);
               }}
             >

@@ -6,6 +6,10 @@ const {
   buildDerivedShipmentSnapshot,
   MASTER_STATUSES_SKIP_PACKAGE_DERIVE,
 } = require("../packages/shipmentStatus");
+const {
+  assertCustodyStructuralEditAllowed,
+  loadTripForShipment,
+} = require("../trips/manifestLockGuard");
 
 if (!admin.apps.length) admin.initializeApp();
 const db = admin.firestore();
@@ -45,6 +49,9 @@ exports.updateShipmentDetails = onCall(
     }
 
     const shipmentData = shipmentSnap.data() || {};
+    const { trip } = await loadTripForShipment(null, db, { shipment: shipmentData });
+    assertCustodyStructuralEditAllowed(shipmentData, trip);
+
     const packages = Array.isArray(shipmentData.packages) ? shipmentData.packages : [];
     const derivedSnapshot = buildDerivedShipmentSnapshot(packages, {
       previousStatus: shipmentData.status,

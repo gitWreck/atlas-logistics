@@ -18,6 +18,10 @@ import HubReconcileCard from "./HubReconcileCard";
 import ReturnLoopCard from "./ReturnLoopCard";
 import DrawerTabButton from "../ui/DrawerTabButton";
 import { getDrawerThemeClasses } from "@/app/utility/constant/theme";
+import {
+  getCustodyLockMessage,
+  isShipmentCustodyLocked,
+} from "@/app/utility/custodyLock";
 
 export default function ShipmentDrawer({
   isOpen,
@@ -40,6 +44,8 @@ export default function ShipmentDrawer({
   }, [isOpen, data]);
 
   if (!data) return null;
+
+  const custodyLocked = isShipmentCustodyLocked(data);
 
   return (
     <>
@@ -119,6 +125,13 @@ export default function ShipmentDrawer({
           />
         </div>
 
+        {custodyLocked && (
+          <div className="mx-6 mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-900">
+            <span className="font-bold uppercase tracking-wide">Manifest locked</span>
+            <p className="mt-1 leading-relaxed">{getCustodyLockMessage()}</p>
+          </div>
+        )}
+
         {/* CONTENT */}
         <div className={`flex-1 overflow-y-auto p-6 ${theme.content}`}>
           {activeTab === "TIMELINE" && (
@@ -149,6 +162,7 @@ export default function ShipmentDrawer({
                 shipmentId={data.id}
                 currentStatus={data.status}
                 isDark={isDark}
+                custodyLocked={custodyLocked}
                 onRefresh={() => {
                   onRefresh?.();
                 }}

@@ -22,7 +22,7 @@ const {
   stableStringify,
   sha256Hex,
 } = require("../utilities/helpers");
-const { writeTripActionLog } = require("../utilities/tripLogger");
+const { writeCustodyAuditLog } = require("../utilities/custodyAuditLog");
 const { MANIFEST_STATUS } = require("./manifestStatus");
 
 if (!admin.apps.length) admin.initializeApp();
@@ -250,26 +250,31 @@ exports.generateTripManifest = onCall(
         createdBy: uid,
       });
 
-      // D. Global Audit Log
-      writeTripActionLog({
+      writeCustodyAuditLog({
         db,
         tx,
-        collection: "audit_logs",
-        action: "GENERATE_TRIP_MANIFEST",
+        action: "LOCK_MANIFEST",
         tripId,
+        tripDocId: tripId,
         targetId: tripId,
         targetCollection: "truck_trips",
-        at: nowTs,
         actorId: uid,
         actorName: generatedByName,
         actorRole: req.auth.token?.role || null,
-        note: `Manifest generated with ${totalShipments} shipments (${totalItems} items).`,
-        details: {
+        reason: "Manifest locked for dispatch",
+        previousValue: {
+          manifestLocked: trip.manifestLocked === true,
+          manifestStatus: trip.manifestStatus || null,
+        },
+        newValue: {
+          manifestLocked: true,
+          manifestStatus: MANIFEST_STATUS.LOCKED,
           manifestId,
           hash,
           totalShipments,
           totalItems,
         },
+        note: `Manifest locked with ${totalShipments} shipments (${totalItems} items).`,
       });
 
       return {

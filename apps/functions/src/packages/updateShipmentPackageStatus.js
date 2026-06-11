@@ -9,6 +9,9 @@ const {
   writePackageActionLog,
 } = require("../utilities/packageLogger");
 const { normalizeQty } = require("../utilities/packageHelpers");
+const {
+  assertCustodyStructuralEditAllowed,
+} = require("../trips/manifestLockGuard");
 
 if (!admin.apps.length) admin.initializeApp();
 const db = admin.firestore();
@@ -65,11 +68,17 @@ exports.updateShipmentPackageStatus = onCall(
       let tripRef = null;
       let tripShipmentRef = null;
       let tripShipmentSnap = null;
+      let tripData = null;
 
       if (currentTripId) {
         tripRef = db.collection("truck_trips").doc(currentTripId);
         tripShipmentRef = tripRef.collection("trip_shipments").doc(shipmentId);
-        tripShipmentSnap = await tx.get(tripShipmentRef);
+        const [tripSnap, tripShipmentDoc] = await Promise.all([
+          tx.get(tripRef),
+          tx.get(tripShipmentRef),
+        ]);
+        tripShipmentSnap = tripShipmentDoc;
+        tripData = tripSnap.exists ? tripSnap.data() : null;
 
         if (!tripShipmentSnap.exists) {
           throw new HttpsError(
@@ -78,6 +87,8 @@ exports.updateShipmentPackageStatus = onCall(
           );
         }
       }
+
+      assertCustodyStructuralEditAllowed(shipmentData, tripData);
 
       // -----------------------------
       // 2. PURE LOGIC / CALCULATIONS
