@@ -3,6 +3,9 @@
 import React, { useState } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
+  faArchive,
+  faBan,
+  faClipboardList,
   faLock,
   faUnlock,
   faPrint,
@@ -12,11 +15,21 @@ import {
 } from "@fortawesome/free-solid-svg-icons";
 import StatusButton from "../ui/StatusButton";
 import {
+  archiveTruckTrip,
+  cancelTruckTrip,
   generateTripManifest,
   unlockTripManifest,
   startReceiving,
   dispatchTrip,
 } from "@/app/utility/FirebaseFunctions";
+import {
+  canArchiveTrip,
+  canCancelTrip,
+  canManageTripLifecycle,
+  canViewTripAuditLog,
+} from "@/app/utility/tripLifecycle";
+import TripReasonConfirmModal from "./TripReasonConfirmModal";
+import TripAuditLogModal from "./TripAuditLogModal";
 import {
   canStartReceiving,
   canDispatchTrip,
@@ -46,6 +59,9 @@ export default function TripDrawerFooter({
 
   const [showUnlockReason, setShowUnlockReason] = useState(false);
   const [unlockReason, setUnlockReason] = useState("");
+  const [cancelOpen, setCancelOpen] = useState(false);
+  const [archiveOpen, setArchiveOpen] = useState(false);
+  const [auditOpen, setAuditOpen] = useState(false);
 
   const theme = getDrawerThemeClasses(isDark);
 
@@ -66,6 +82,12 @@ export default function TripDrawerFooter({
     canEditManifestControls && isHubTrip
       ? getDispatchTripBlockReason(data)
       : null;
+
+  const canManageLifecycle = canManageTripLifecycle(profile, user);
+  const canAudit = canViewTripAuditLog(profile);
+  const showCancelTrip = canManageLifecycle && canCancelTrip(data);
+  const showArchiveTrip = canManageLifecycle && canArchiveTrip(data);
+  const showLifecycleSection = showCancelTrip || showArchiveTrip || canAudit;
 
   const handleUnlockSuccess = () => {
     setTimeout(() => {
@@ -276,6 +298,87 @@ export default function TripDrawerFooter({
 
         <ExportTripButton trip={data} user={user} />
       </div>
+
+      {showLifecycleSection && (
+        <div
+          className={`rounded-lg border px-3 py-3 flex flex-col gap-2 ${theme.footerPanel}`}
+        >
+          <span className="text-[10px] font-bold uppercase opacity-60">
+            Trip Lifecycle
+          </span>
+          <div className="flex flex-wrap gap-2">
+            {showCancelTrip && (
+              <button
+                type="button"
+                disabled={showUnlockReason}
+                onClick={() => setCancelOpen(true)}
+                className={theme.warningOutlineButton}
+              >
+                <FontAwesomeIcon icon={faBan} />
+                Cancel Trip
+              </button>
+            )}
+            {showArchiveTrip && (
+              <button
+                type="button"
+                disabled={showUnlockReason}
+                onClick={() => setArchiveOpen(true)}
+                className={theme.secondaryActionButton}
+              >
+                <FontAwesomeIcon icon={faArchive} />
+                Archive Trip
+              </button>
+            )}
+            {canAudit && (
+              <button
+                type="button"
+                disabled={showUnlockReason}
+                onClick={() => setAuditOpen(true)}
+                className={theme.secondaryActionButton}
+              >
+                <FontAwesomeIcon icon={faClipboardList} />
+                View Audit Log
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
+      <TripReasonConfirmModal
+        isOpen={cancelOpen}
+        onClose={() => setCancelOpen(false)}
+        title="Cancel Trip"
+        entityLabel={data.tripId || data.id}
+        description={`Cancel ${data.tripId || data.id}? Shipments stay in the system and are detached from this trip.`}
+        confirmLabel="Cancel Trip"
+        isDark={isDark}
+        onConfirm={async (reason) => {
+          await cancelTruckTrip({ tripId: data.id || data.tripId, reason });
+          onSuccess?.();
+        }}
+      />
+
+      <TripReasonConfirmModal
+        isOpen={archiveOpen}
+        onClose={() => setArchiveOpen(false)}
+        title="Archive Trip"
+        entityLabel={data.tripId || data.id}
+        description={`Archive ${data.tripId || data.id}? The record is kept for audit but hidden from the active board.`}
+        confirmLabel="Archive Trip"
+        confirmVariant="red"
+        isDark={isDark}
+        onConfirm={async (reason) => {
+          await archiveTruckTrip({ tripId: data.id || data.tripId, reason });
+          onSuccess?.();
+        }}
+      />
+
+      <TripAuditLogModal
+        isOpen={auditOpen}
+        onClose={() => setAuditOpen(false)}
+        trip={data}
+        isDark={isDark}
+      />
     </div>
   );
 }

@@ -15,6 +15,7 @@ const {
   sumTotalQty,
 } = require("../packages/tripPackageOperations");
 const { tryAutoCompleteTrip } = require("../trips/autoCompleteTrip");
+const { assertCustodyScanStatusAllowed } = require("../trips/manifestLockGuard");
 
 if (!admin.apps.length) admin.initializeApp();
 const db = admin.firestore();
@@ -46,10 +47,19 @@ exports.bulkUpdateShipmentStatus = onCall(
     let tripDeliveredDelta = 0;
     let updateCount = 0;
 
+    const tripRef = db.collection("truck_trips").doc(tripId);
+    const tripSnap = await tripRef.get();
+    const tripData = tripSnap.exists ? tripSnap.data() : null;
+
     const shipmentRefs = shipmentIds.map((id) =>
       db.collection("shipments").doc(id),
     );
     const snapshots = await db.getAll(...shipmentRefs);
+
+    snapshots.forEach((doc) => {
+      if (!doc.exists) return;
+      assertCustodyScanStatusAllowed(doc.data(), tripData, newStatus);
+    });
 
     snapshots.forEach((doc) => {
       if (!doc.exists) return;
@@ -174,8 +184,6 @@ exports.bulkUpdateShipmentStatus = onCall(
         createdAt: timestamp,
       });
     });
-
-    const tripRef = db.collection("truck_trips").doc(tripId);
 
     if (
       tripPendingDelta !== 0 ||

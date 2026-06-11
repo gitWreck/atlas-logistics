@@ -23,6 +23,10 @@ const { getShipmentTargetUserIds } = require("../utilities/notificationHelpers")
 const { normalizeQty } = require("../utilities/packageHelpers");
 const { tryAutoCompleteTrip } = require("../trips/autoCompleteTrip");
 const { assertCanUnloadAtHub } = require("../trips/manifestStatus");
+const {
+  assertCustodyStructuralEditAllowed,
+  assertCustodyScanStatusAllowed,
+} = require("../trips/manifestLockGuard");
 
 if (!admin.apps.length) admin.initializeApp();
 const db = admin.firestore();
@@ -286,6 +290,13 @@ exports.updateShipmentPackages = onCall(
       let tripShipmentRef = tripContext?.tripShipmentRef || null;
       let tripShipmentSnap = tripContext?.tripShipmentSnap || null;
       let tripSnap = tripContext?.tripSnap || null;
+      const tripData = tripSnap?.exists ? tripSnap.data() || {} : {};
+
+      if (isModalReplace) {
+        assertCustodyStructuralEditAllowed(oldData, tripData);
+      } else if (isScannerUpdate) {
+        assertCustodyScanStatusAllowed(oldData, tripData, newStatus);
+      }
 
       if (tripId && tripRef && tripShipmentRef && !tripShipmentSnap?.exists) {
         tx.set(tripShipmentRef, {
@@ -327,7 +338,6 @@ exports.updateShipmentPackages = onCall(
         };
       }
 
-      const tripData = tripSnap?.exists ? tripSnap.data() || {} : {};
       const tripType = String(tripData.tripType || "").toUpperCase();
       const isDeliveryTrip = tripType === "DELIVERY";
       const normalizedScanAction = String(scanAction || "").toUpperCase();

@@ -32,6 +32,10 @@ import { getModalThemeClasses } from "@/app/utility/constant/theme";
 import CustomerNotificationChannels, {
   DEFAULT_CUSTOMER_NOTIFICATION_CHANNELS,
 } from "../../notifications/CustomerNotificationChannels";
+import {
+  getCustodyLockMessage,
+  isShipmentCustodyLocked,
+} from "@/app/utility/custodyLock";
 
 export default function UnifiedShipmentModal({
   profile,
@@ -128,6 +132,12 @@ export default function UnifiedShipmentModal({
 
       // We only generate a manual ID if we are creating a NEW shipment
       const isEditMode = !!(editData && editData.id);
+      if (isEditMode && isShipmentCustodyLocked(editData)) {
+        setLoading(false);
+        showAlert("Manifest locked", getCustodyLockMessage(), "warning");
+        return;
+      }
+
       const targetShipmentId = isEditMode
         ? editData.id
         : generateShipmentId(originCode, destCode);

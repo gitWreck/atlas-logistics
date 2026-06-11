@@ -3,6 +3,8 @@
  * Keep in sync when changing promotion rules (Step 1.1+).
  */
 
+import { canDeleteShipmentsAndTrips } from "./deletePermissions";
+
 export const TRIP_STATUSES = Object.freeze({
   CREATED: "CREATED",
   ASSIGNED: "ASSIGNED",
@@ -290,4 +292,29 @@ export function evaluateTripLifecycleAfterReconciliation(trip = {}, reconciliati
       ? arrived.nextStatus
       : normalizeTripStatus(trip.status),
   };
+}
+
+// Trip board admin lifecycle (cancel / archive / audit)
+export function canManageTripLifecycle(profile, user = null) {
+  return canDeleteShipmentsAndTrips(profile, user);
+}
+
+export function canViewTripAuditLog(profile) {
+  const role = String(profile?.role || "").toLowerCase();
+  return role === "admin" || role === "manager";
+}
+
+export function canCancelTrip(trip = {}) {
+  if (trip.archived === true) return false;
+  const status = String(trip.status || "").toUpperCase();
+  return !["COMPLETED", "DELIVERED", "CANCELLED"].includes(status);
+}
+
+export function canArchiveTrip(trip = {}) {
+  if (trip.archived === true) return false;
+  const status = String(trip.status || "").toUpperCase();
+  return (
+    ["COMPLETED", "DELIVERED", "CANCELLED"].includes(status) ||
+    trip.active === false
+  );
 }

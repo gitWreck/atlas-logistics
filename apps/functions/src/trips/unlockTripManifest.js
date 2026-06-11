@@ -7,7 +7,7 @@ const {
   requireString,
   updatedBy,
 } = require("../utilities/helpers");
-const { writeTripActionLog } = require("../utilities/tripLogger");
+const { writeCustodyAuditLog } = require("../utilities/custodyAuditLog");
 const {
   MANIFEST_STATUS,
   canUnlockManifest,
@@ -61,32 +61,38 @@ exports.unlockTripManifest = onCall(
         );
       }
 
-      // 2. UNLOCK OPERATIONS
+      const previousValue = {
+        manifestLocked: trip.manifestLocked === true,
+        manifestStatus: resolveManifestStatus(trip),
+        manifestId: trip.manifestId || null,
+      };
+      const newValue = {
+        manifestLocked: false,
+        manifestStatus: MANIFEST_STATUS.OPEN,
+        manifestId: trip.manifestId || null,
+      };
+
       tx.update(tripRef, {
         manifestLocked: false,
-        // We DO NOT clear manifestId yet. We keep it as a reference to the "last generated" one.
         manifestStatus: MANIFEST_STATUS.OPEN,
-
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
         updatedBy: name,
       });
 
-      // 3. AUDIT LOG (Crucial for compliance)
-      // Since Manifests are legal documents, unlocking them is a sensitive action.
-      writeTripActionLog({
+      writeCustodyAuditLog({
         db,
         tx,
-        collection: "audit_logs",
         action: "UNLOCK_MANIFEST",
         tripId,
+        tripDocId: tripId,
         targetId: tripId,
         targetCollection: "truck_trips",
-        previousManifestId: trip.manifestId || null,
-        reason: reason,
-        at: admin.firestore.FieldValue.serverTimestamp(),
         actorId: uid,
-        actorName: actorName,
+        actorName,
         actorRole: role || null,
+        reason,
+        previousValue,
+        newValue,
         note: `Manifest unlocked by manager. Reason: ${reason}`,
       });
 

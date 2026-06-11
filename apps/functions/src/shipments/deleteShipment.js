@@ -7,6 +7,10 @@ const { requireShipmentTripDeleteAccess, updatedBy } = require("../utilities/hel
 const { normalizeQty } = require("../utilities/packageHelpers");
 const { writeShipmentActionLog } = require("../utilities/shipmentLogger");
 const { deleteSubcollection } = require("../utilities/firestoreCleanup");
+const {
+  assertCustodyStructuralEditAllowed,
+  loadTripForShipment,
+} = require("../trips/manifestLockGuard");
 
 if (!admin.apps.length) admin.initializeApp();
 const db = admin.firestore();
@@ -52,6 +56,9 @@ exports.deleteShipment = onCall(
     }
 
     const shipment = shipmentSnap.data() || {};
+    const { trip } = await loadTripForShipment(null, db, { shipment });
+    assertCustodyStructuralEditAllowed(shipment, trip);
+
     const before = snapshotShipment(shipment, shipmentId);
     const tripId = shipment.currentTripId || shipment.currentTruckTripId || null;
 

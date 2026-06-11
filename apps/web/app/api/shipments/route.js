@@ -167,6 +167,10 @@ export async function GET(request) {
               driverName: assignedTrip.driverName || "Unassigned",
               truckPlate: assignedTrip.truckPlateNumber || "N/A",
               status: assignedTrip.status,
+              manifestLocked: assignedTrip.manifestLocked === true,
+              manifestStatus: assignedTrip.manifestStatus || null,
+              reconciledAt: assignedTrip.reconciledAt || null,
+              receivingStartedAt: assignedTrip.receivingStartedAt || null,
               delayCleared: assignedTrip.delayCleared,
               delayReason: assignedTrip.delayReason || null,
             }

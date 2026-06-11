@@ -5,6 +5,11 @@ const admin = require("firebase-admin");
 const { FieldValue } = require("firebase-admin/firestore");
 const { writeShipmentActionLog } = require("../utilities/shipmentLogger");
 const { updatedBy } = require("../utilities/helpers");
+const {
+  assertCustodyStructuralEditAllowed,
+  isShipmentCustodyLocked,
+  loadTripForShipment,
+} = require("../trips/manifestLockGuard");
 
 if (!admin.apps.length) admin.initializeApp();
 const db = admin.firestore();
@@ -47,6 +52,15 @@ exports.updateShipmentImages = onCall(
       const shipmentSnap = await tx.get(shipmentRef);
       if (!shipmentSnap.exists) {
         throw new HttpsError("not-found", "Shipment not found.");
+      }
+
+      const shipmentData = shipmentSnap.data() || {};
+      const { trip } = await loadTripForShipment(tx, db, { shipment: shipmentData });
+
+      if (type === "receipt") {
+        assertCustodyStructuralEditAllowed(shipmentData, trip);
+      } else if (isShipmentCustodyLocked(shipmentData, trip)) {
+        // POD photos are allowed through the deliver workflow while locked.
       }
 
       // ============================================================

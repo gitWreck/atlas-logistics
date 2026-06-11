@@ -67,7 +67,11 @@ export const updateTripSchedule = httpsCallable(
 export const updateTripDetails = httpsCallable(functions, "updateTripDetails");
 
 export const disableTruckTrip = httpsCallable(functions, "disableTruckTrip");
+/** @deprecated Hard delete disabled — use cancelTruckTrip or archiveTruckTrip */
 export const deleteTruckTrip = httpsCallable(functions, "deleteTruckTrip");
+export const cancelTruckTrip = httpsCallable(functions, "cancelTruckTrip");
+export const archiveTruckTrip = httpsCallable(functions, "archiveTruckTrip");
+export const getTripAuditLog = httpsCallable(functions, "getTripAuditLog");
 export const setTruckDelay = httpsCallable(functions, "setTruckDelay");
 export const clearTruckDelay = httpsCallable(functions, "clearTruckDelay");
 export const updateTripStatus = httpsCallable(functions, "updateTripStatus");

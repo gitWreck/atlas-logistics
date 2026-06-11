@@ -5,7 +5,7 @@ const admin = require("firebase-admin");
 const { FieldValue } = admin.firestore;
 const { requireRole, updatedBy } = require("../utilities/helpers");
 const { writeShipmentActionLog } = require("../utilities/shipmentLogger");
-const { writeTripActionLog } = require("../utilities/tripLogger");
+const { writeCustodyAuditLog } = require("../utilities/custodyAuditLog");
 const { normalizeQty } = require("../utilities/packageHelpers");
 
 if (!admin.apps.length) admin.initializeApp();
@@ -258,25 +258,24 @@ exports.unassignShipmentFromTrip = onCall(
         createdAt: now,
       });
 
-      writeTripActionLog({
+      writeCustodyAuditLog({
         db,
         tx,
         action: "UNASSIGN_SHIPMENT_FROM_TRIP",
-        trackingShipmentId,
-        tripId,
-        details: {
-          removedTotal: removeTotal,
-          removedPending: removePending,
-          removedLoaded: removeLoaded,
-          removedDelivered: removeDelivered,
-          removedMissing: removeMissing,
-          removedDamaged: removeDamaged,
-          resultingStatus: shipmentStatus,
-        },
+        targetCollection: "shipments",
+        targetId: trackingShipmentId,
+        tripDocId: tripId,
+        tripId: trip.tripId || tripId,
         actorId: uid,
         actorName: name || null,
         actorRole: role || null,
-        createdAt: now,
+        previousValue: { currentTripId: tripId },
+        newValue: { currentTripId: null, resultingStatus: shipmentStatus },
+        note: `Shipment ${trackingShipmentId} unassigned from trip.`,
+        meta: {
+          removedTotal: removeTotal,
+          removedLoaded: removeLoaded,
+        },
       });
     });
 

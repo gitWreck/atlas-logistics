@@ -11,8 +11,21 @@ import { getTripScopedPackages } from "@/app/utility/tripScopedPackages";
 
 export const dynamic = "force-dynamic"; // Prevent caching
 
-const COMPLETED_TRIP_STATUSES = ["COMPLETED", "DELIVERED"];
+const COMPLETED_TRIP_STATUSES = ["COMPLETED", "DELIVERED", "CANCELLED"];
 const COMPLETED_TRIP_STATUS_SET = new Set(COMPLETED_TRIP_STATUSES);
+
+function isActiveTripDoc(data = {}) {
+  const status = String(data.status || "").toUpperCase();
+  if (data.archived === true) return false;
+  if (COMPLETED_TRIP_STATUS_SET.has(status)) return false;
+  return true;
+}
+
+function isCompletedTripDoc(data = {}) {
+  const status = String(data.status || "").toUpperCase();
+  if (data.archived === true) return true;
+  return COMPLETED_TRIP_STATUS_SET.has(status);
+}
 
 function tripNeedsDeliveryEnrichment(trip = {}) {
   if (!isHubTransferTrip(trip)) return false;
@@ -119,16 +132,11 @@ export async function GET(request) {
       .orderBy("updatedAt", "desc")
       .get();
 
-    const activeDocs = snapshot.docs.filter(
-      (doc) =>
-        !COMPLETED_TRIP_STATUS_SET.has(
-          String(doc.data().status || "").toUpperCase(),
-        ),
+    const activeDocs = snapshot.docs.filter((doc) =>
+      isActiveTripDoc(doc.data()),
     );
     const completedDocs = snapshot.docs.filter((doc) =>
-      COMPLETED_TRIP_STATUS_SET.has(
-        String(doc.data().status || "").toUpperCase(),
-      ),
+      isCompletedTripDoc(doc.data()),
     );
     const limitedActiveDocs =
       activeLimit === "all" ? activeDocs : activeDocs.slice(0, Number(activeLimit));

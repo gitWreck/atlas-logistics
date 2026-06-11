@@ -12,6 +12,7 @@ import { runAction, updatedBy } from "@/app/utility/utilities";
 import { SHIPMENT_STATUS } from "@/app/utility/constant/templates";
 import { getWidgetThemeClasses } from "@/app/utility/constant/theme";
 import { updateShipmentStatus } from "@/app/utility/FirebaseFunctions";
+import { getCustodyLockMessage } from "@/app/utility/custodyLock";
 
 export default function ShipmentOperations({
   shipmentId,
@@ -19,6 +20,7 @@ export default function ShipmentOperations({
   isDark = false,
   onRefresh,
   profile,
+  custodyLocked = false,
 }) {
   const [statusSelect, setStatusSelect] = useState("");
   const [remarks, setRemarks] = useState("");
@@ -26,6 +28,27 @@ export default function ShipmentOperations({
   const [opStatus, setOpStatus] = useState("IDLE");
 
   const theme = getWidgetThemeClasses(isDark);
+
+  if (custodyLocked) {
+    return (
+      <div className={`border rounded-xl p-5 shadow-lg ${theme.container}`}>
+        <div className="flex items-start gap-3">
+          <FontAwesomeIcon
+            icon={faExclamationTriangle}
+            className="text-amber-500 mt-0.5 shrink-0"
+          />
+          <div>
+            <h3 className={`text-sm font-bold ${theme.title}`}>
+              Manifest locked
+            </h3>
+            <p className={`text-xs mt-2 ${theme.bodyText}`}>
+              {getCustodyLockMessage()}
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className={`border rounded-xl p-5 shadow-lg ${theme.container}`}>
