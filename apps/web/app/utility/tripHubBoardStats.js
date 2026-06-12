@@ -415,3 +415,25 @@ export function calculateHubBoardProgress(trip = {}) {
     Math.max(0, Math.round(stats.progressPercent * 100) / 100),
   );
 }
+
+/**
+ * Per-shipment trip progress for manifest rows after arrival (delivered / released).
+ */
+export function getShipmentTripProgressDisplay(tripShipment = {}, trip = {}) {
+  const tripId = String(trip.id || trip.tripId || "").trim();
+  const delivered = countDeliveredTripScopedPieces(tripShipment, tripShipment, tripId);
+  const released = countReleasedTripScopedPieces(tripShipment, tripShipment, tripId);
+  const tripScopedTotal = resolveTripScopedPieceTotal(tripShipment);
+  const denominator = released > 0 ? released : tripScopedTotal;
+
+  return {
+    count: delivered,
+    total: denominator,
+    displayValue:
+      denominator > 0 ? `${delivered}/${denominator}` : String(delivered),
+    subLabel:
+      released > 0
+        ? `Delivered out of ${denominator} released on this trip`
+        : `Delivered out of ${denominator} pieces on this trip`,
+  };
+}

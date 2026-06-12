@@ -14,9 +14,14 @@ import { getShipmentRouteLabel } from "./shipmentHelpers";
 import AdminRowDeleteButton from "../admin/AdminRowDeleteButton";
 import { deleteShipment } from "@/app/utility/FirebaseFunctions";
 import { isShipmentCustodyLocked } from "@/app/utility/custodyLock";
+import {
+  getOdionganHubBoardStatusKey,
+  getOdionganHubBoardStatusLabel,
+} from "@/app/utility/packageStatus";
 
 export default function ShipmentRow({
   shipmentBoard,
+  warehouseTab = null,
   s,
   onClick,
   onDeleted,
@@ -40,6 +45,13 @@ export default function ShipmentRow({
   const routeCode = `${s.originCode || "N/A"} -> ${s.destinationCode || "N/A"}`;
   const routeLabel = getShipmentRouteLabel(s);
   const updatedLabel = s.updatedAt || "Just now";
+  const isOdionganTab = warehouseTab === "odiongan";
+  const boardStatusKey = isOdionganTab
+    ? getOdionganHubBoardStatusKey(s)
+    : s.status;
+  const boardStatusLabel = isOdionganTab
+    ? getOdionganHubBoardStatusLabel(s)
+    : s.status?.replaceAll("_", " ") || "UNKNOWN";
 
   const rowStateClass = isDelayed ? theme.rowDelayed : theme.rowDefaultHover;
   const mobileDividerClass = isDark
@@ -139,7 +151,12 @@ export default function ShipmentRow({
           </div>
 
           <div className="flex items-center gap-2 mt-1 min-w-0">
-            <StatusBadge status={s.status} size="xs" isDark={isDark} />
+            <StatusBadge
+              status={boardStatusKey}
+              label={isOdionganTab ? boardStatusLabel : undefined}
+              size="xs"
+              isDark={isDark}
+            />
 
             <span
               className={`text-xs md:text-xs font-mono border-l pl-2 shrink-0 ${theme.statsDivider}`}
@@ -161,10 +178,14 @@ export default function ShipmentRow({
       <div
         className={`md:col-span-2 flex justify-between md:block items-center border-t md:border-0 pt-2 md:pt-0 ${theme.rowBorder}`}
       >
-        <div className={`text-base md:text-sm font-medium ${theme.secondaryText}`}>
+        <div
+          className={`text-base md:text-sm font-medium ${theme.secondaryText}`}
+        >
           {routeCode}
         </div>
-        <div className={`text-sm md:text-xs font-mono mt-0.5 ${theme.subtleText}`}>
+        <div
+          className={`text-sm md:text-xs font-mono mt-0.5 ${theme.subtleText}`}
+        >
           {routeLabel}
         </div>
       </div>
@@ -215,7 +236,7 @@ export default function ShipmentRow({
           <span
             className={`text-xs md:text-[10px] font-medium uppercase ${statusTextClass}`}
           >
-            {s.status?.replaceAll("_", " ") || "UNKNOWN"}
+            {boardStatusLabel}
           </span>
           <span className={`text-xs md:text-[10px] ${theme.subtleText}`}>
             {s.progress || 0}%

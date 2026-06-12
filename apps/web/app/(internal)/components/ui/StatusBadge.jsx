@@ -21,6 +21,7 @@ const delayIcons = {
 export default function StatusBadge({
   status,
   reason,
+  label,
   isDark = true,
   className = "",
   compact = false,
@@ -183,7 +184,7 @@ export default function StatusBadge({
           {reason.replace(/_/g, " ")}
         </>
       ) : (
-        getPackageStatusLabel(normalizedStatus)
+        label || getPackageStatusLabel(normalizedStatus)
       )}
     </span>
   );

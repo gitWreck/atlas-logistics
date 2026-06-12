@@ -4,7 +4,6 @@ import React from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faBox,
-  faEllipsisV,
   faLock,
   faTruck,
   faTruckPickup,
@@ -140,25 +139,14 @@ export default function TripRow({
           </div>
         </div>
 
-        <div className="flex items-center gap-0.5">
-          <button
-            type="button"
-            className={`p-2 rounded ${theme.actionButton}`}
-            onClick={(e) => {
-              e.stopPropagation();
-              onClick(trip.id);
-            }}
-          >
-            <FontAwesomeIcon icon={faEllipsisV} />
-          </button>
-          <TripLifecycleMenu
-            trip={trip}
-            profile={profile}
-            onSuccess={onDeleted}
-            isDark={isDark}
-            buttonClassName={theme.actionButton}
-          />
-        </div>
+        <TripLifecycleMenu
+          trip={trip}
+          profile={profile}
+          onOpenTrip={() => onClick(trip.id)}
+          onSuccess={onDeleted}
+          isDark={isDark}
+          buttonClassName={theme.actionButton}
+        />
       </div>
 
       {/* Col 1 */}
@@ -334,20 +322,11 @@ export default function TripRow({
       </div>
 
       {/* Col 6 */}
-      <div className="hidden md:flex col-span-1 justify-end items-center gap-0.5">
-        <button
-          type="button"
-          className={`p-2 rounded-full transition-colors ${theme.actionButton}`}
-          onClick={(e) => {
-            e.stopPropagation();
-            onClick(trip.id);
-          }}
-        >
-          <FontAwesomeIcon icon={faEllipsisV} />
-        </button>
+      <div className="hidden md:flex col-span-1 justify-end items-center">
         <TripLifecycleMenu
           trip={trip}
           profile={profile}
+          onOpenTrip={() => onClick(trip.id)}
           onSuccess={onDeleted}
           isDark={isDark}
           buttonClassName={theme.actionButton}
