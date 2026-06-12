@@ -5,10 +5,21 @@ import {
   isHubTransferTrip,
 } from "./manifestStatus";
 import {
+  aggregateHubDeliveryOpsCounts,
   calculateHubBoardProgress,
   getHubBoardStatsDisplay,
   getHubBoardStatusLabel,
+  getShipmentTripProgressDisplay,
+  HUB_BOARD_PHASE,
+  resolveHubBoardPhase,
 } from "./tripHubBoardStats";
+
+export { getShipmentTripProgressDisplay };
+
+export const TRIP_LOAD_SUMMARY_PHASE = Object.freeze({
+  LOADING: "LOADING",
+  ARRIVED: "ARRIVED",
+});
 
 function clampCount(value) {
   return Math.max(0, Number(value) || 0);
@@ -271,8 +282,78 @@ export function getTripLoadStatusHint(trip = {}) {
   return `Trip status: ${status || "unknown"}`;
 }
 
+function resolveTripLoadSummaryPhase(trip = {}) {
+  const status = String(trip?.status || "").toUpperCase();
+  const manifestStatus = resolveManifestStatus(trip);
+
+  if (
+    LOADING_PHASE_TRIP_STATUSES.has(status) ||
+    status === "IN_TRANSIT" ||
+    status === "LOADED"
+  ) {
+    return TRIP_LOAD_SUMMARY_PHASE.LOADING;
+  }
+
+  if (
+    ["ARRIVED", "UNLOADING", "READY_FOR_DELIVERY", "OUT_FOR_DELIVERY", "COMPLETED", "DELIVERED"].includes(
+      status,
+    ) ||
+    manifestStatus === MANIFEST_STATUS.RECONCILED
+  ) {
+    return TRIP_LOAD_SUMMARY_PHASE.ARRIVED;
+  }
+
+  return TRIP_LOAD_SUMMARY_PHASE.LOADING;
+}
+
+function buildArrivedPrimaryCard(tripWithShipments = {}) {
+  const hubPhase = resolveHubBoardPhase(tripWithShipments);
+  const delivery = aggregateHubDeliveryOpsCounts(tripWithShipments);
+  const total = delivery.total;
+  const delivered = delivery.delivered;
+  const released = delivery.released;
+
+  if (
+    hubPhase === HUB_BOARD_PHASE.UNLOADING ||
+    hubPhase === HUB_BOARD_PHASE.UNLOADING_COMPLETE
+  ) {
+    const hubStats = getHubBoardStatsDisplay(tripWithShipments);
+    const count = hubStats?.count ?? 0;
+    const hubTotal = hubStats?.total ?? total;
+    return {
+      label:
+        hubPhase === HUB_BOARD_PHASE.UNLOADING
+          ? "Remaining to Unload"
+          : "Unloaded",
+      displayValue:
+        hubTotal > 0 ? `${count}/${hubTotal}` : String(count),
+      subtext: hubStats?.subLabel || "Unload progress at destination hub",
+    };
+  }
+
+  if (hubPhase === HUB_BOARD_PHASE.RECONCILED) {
+    return {
+      label: "Packages Reconciled",
+      displayValue: total > 0 ? `${total}/${total}` : "0",
+      subtext: "All items verified and matched",
+    };
+  }
+
+  const denominator = released > 0 ? released : total;
+  return {
+    label: "Trip Progress",
+    displayValue:
+      denominator > 0 ? `${delivered}/${denominator}` : String(delivered),
+    subtext:
+      released > 0
+        ? `Delivered out of ${denominator} pieces released on this trip`
+        : `Delivered out of ${denominator} pieces on this trip`,
+  };
+}
+
 /**
  * Active trip drawer — packages on truck vs warehouse remainders vs shipment count.
+ * Switches to delivery-progress UI once the trip leaves IN_TRANSIT.
  */
 export function aggregateTripLoadSummary(trip = {}, shipments = []) {
   const tripWithShipments =
@@ -283,23 +364,55 @@ export function aggregateTripLoadSummary(trip = {}, shipments = []) {
   const remainingInWarehouse = resolveRemainingWarehousePieces(shipments);
   const originWarehouse =
     trip?.origin || trip?.originName || "origin warehouse";
+  const shipmentCount =
+    packageStats.shipmentCount ||
+    (Array.isArray(shipments) ? shipments.length : 0);
+  const phase = resolveTripLoadSummaryPhase(tripWithShipments);
+  const isArrivedPhase = phase === TRIP_LOAD_SUMMARY_PHASE.ARRIVED;
+  const delivery = isArrivedPhase
+    ? aggregateHubDeliveryOpsCounts(tripWithShipments)
+    : null;
+  const deliveredPackages = delivery?.delivered ?? 0;
+
+  const remainingSummaryLine =
+    remainingInWarehouse > 0
+      ? `${remainingInWarehouse} pieces remain in ${originWarehouse} warehouse for next trip`
+      : null;
+
+  const primaryCard = isArrivedPhase
+    ? buildArrivedPrimaryCard(tripWithShipments)
+    : {
+        label: "Packages Loaded",
+        displayValue: String(packageStats.loadedPackages),
+        subtext: "Pieces scanned and loaded on this trip",
+      };
 
   return {
+    phase,
+    isArrivedPhase,
     loadedPackages: packageStats.loadedPackages,
     tripPackageTotal: packageStats.tripPackageTotal,
-    trackingNumbers:
-      packageStats.shipmentCount ||
-      (Array.isArray(shipments) ? shipments.length : 0),
+    deliveredPackages,
+    releasedPackages: delivery?.released ?? 0,
+    trackingNumbers: shipmentCount,
     remainingInWarehouse,
     tripStatus: String(trip?.status || "UNKNOWN").toUpperCase(),
     manifestStatus: resolveManifestStatus(trip),
-    statusHint: getTripLoadStatusHint(trip),
+    statusHint: getTripLoadStatusHint(tripWithShipments),
     originWarehouse,
-    loadedSummaryLine: `${packageStats.loadedPackages} pieces loaded across ${packageStats.shipmentCount || shipments.length} shipments`,
-    remainingSummaryLine:
-      remainingInWarehouse > 0
-        ? `${remainingInWarehouse} pieces remain in ${originWarehouse} warehouse for next trip`
-        : null,
+    primaryCard,
+    remainingCardSubtext: isArrivedPhase
+      ? `Pieces waiting in ${originWarehouse} warehouse for next trip`
+      : "Pieces to be assigned to a future trip",
+    primarySummaryLine: isArrivedPhase
+      ? `${deliveredPackages} pieces delivered across ${shipmentCount} shipment${shipmentCount === 1 ? "" : "s"}`
+      : `${packageStats.loadedPackages} pieces loaded across ${shipmentCount} shipment${shipmentCount === 1 ? "" : "s"}`,
+    loadedSummaryLine: `${packageStats.loadedPackages} pieces loaded across ${shipmentCount} shipment${shipmentCount === 1 ? "" : "s"}`,
+    remainingSummaryLine,
+    sectionTitle: isArrivedPhase ? "Trip Overview" : "Trip Load Summary",
+    remainingCardLabel: isArrivedPhase
+      ? `Remaining in ${originWarehouse}`
+      : "Remaining in Warehouse",
   };
 }
 

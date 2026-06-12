@@ -6,7 +6,8 @@ import {
   faArchive,
   faBan,
   faClipboardList,
-  faEllipsisH,
+  faEllipsisV,
+  faFolderOpen,
 } from "@fortawesome/free-solid-svg-icons";
 import { useAuth } from "@/app/context/AuthContext";
 import {
@@ -25,6 +26,7 @@ import TripAuditLogModal from "./TripAuditLogModal";
 export default function TripLifecycleMenu({
   trip,
   profile,
+  onOpenTrip,
   onSuccess,
   isDark = false,
   buttonClassName = "",
@@ -40,6 +42,7 @@ export default function TripLifecycleMenu({
   const canAudit = canViewTripAuditLog(profile);
   const showCancel = canManage && canCancelTrip(trip);
   const showArchive = canManage && canArchiveTrip(trip);
+  const showAdminSection = showCancel || showArchive || canAudit;
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -54,9 +57,6 @@ export default function TripLifecycleMenu({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [menuOpen]);
 
-  if (!canManage && !canAudit) return null;
-  if (!showCancel && !showArchive && !canAudit) return null;
-
   const tripDocId = trip.id;
   const entityLabel = trip.tripId || tripDocId;
 
@@ -67,6 +67,8 @@ export default function TripLifecycleMenu({
   const menuItemClass = isDark
     ? "hover:bg-slate-800 text-slate-200"
     : "hover:bg-slate-100 text-slate-700";
+
+  const dividerClass = isDark ? "border-slate-700" : "border-slate-200";
 
   return (
     <>
@@ -81,14 +83,30 @@ export default function TripLifecycleMenu({
             setMenuOpen((open) => !open);
           }}
         >
-          <FontAwesomeIcon icon={faEllipsisH} className="text-sm" />
+          <FontAwesomeIcon icon={faEllipsisV} className="text-sm" />
         </button>
 
         {menuOpen && (
           <div
-            className={`absolute right-0 top-full mt-1 z-20 min-w-[180px] rounded-lg border py-1 ${menuPanelClass}`}
+            className={`absolute right-0 top-full mt-1 z-20 min-w-[190px] rounded-lg border py-1 ${menuPanelClass}`}
             onClick={(event) => event.stopPropagation()}
           >
+            <button
+              type="button"
+              className={`w-full px-3 py-2 text-left text-xs font-medium flex items-center gap-2 ${menuItemClass}`}
+              onClick={() => {
+                setMenuOpen(false);
+                onOpenTrip?.();
+              }}
+            >
+              <FontAwesomeIcon icon={faFolderOpen} className="text-slate-400" />
+              View trip details
+            </button>
+
+            {showAdminSection && (
+              <div className={`my-1 border-t ${dividerClass}`} />
+            )}
+
             {showCancel && (
               <button
                 type="button"
@@ -99,7 +117,7 @@ export default function TripLifecycleMenu({
                 }}
               >
                 <FontAwesomeIcon icon={faBan} className="text-amber-500" />
-                Cancel Trip
+                Cancel trip
               </button>
             )}
 
@@ -113,7 +131,7 @@ export default function TripLifecycleMenu({
                 }}
               >
                 <FontAwesomeIcon icon={faArchive} className="text-slate-400" />
-                Archive Trip
+                Archive trip
               </button>
             )}
 
@@ -130,7 +148,7 @@ export default function TripLifecycleMenu({
                   icon={faClipboardList}
                   className="text-blue-400"
                 />
-                View Audit Log
+                View audit log
               </button>
             )}
           </div>

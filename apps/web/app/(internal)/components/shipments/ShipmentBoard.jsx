@@ -63,7 +63,9 @@ function isPickupShipment(shipment) {
     status === "PENDING_PICKUP" ||
     status === "PICKED_UP" ||
     shipment?.statusHistory?.some((history) =>
-      String(history?.status || "").toUpperCase().includes("PICKUP"),
+      String(history?.status || "")
+        .toUpperCase()
+        .includes("PICKUP"),
     )
   );
 }
@@ -560,6 +562,11 @@ const ShipmentBoard = forwardRef(function ShipmentBoard(
                     currentItems.map((shipment) => (
                       <ShipmentRow
                         shipmentBoard={true}
+                        warehouseTab={
+                          activeBoardTab === SHIPMENT_BOARD_TABS.ODIONGAN
+                            ? "odiongan"
+                            : null
+                        }
                         key={shipment.id}
                         s={shipment}
                         onClick={setSelectedShipmentId}
@@ -653,7 +660,6 @@ const ShipmentBoard = forwardRef(function ShipmentBoard(
         isDark={isDark}
         shipment={selectedShipment}
       />
-
     </div>
   );
 });

@@ -7,10 +7,19 @@ import {
   faWarehouse,
   faBarcode,
   faCircleCheck,
+  faTruck,
 } from "@fortawesome/free-solid-svg-icons";
 import { aggregateTripLoadSummary } from "@/app/utility/tripStats";
 
-function SummaryCard({ label, value, subtext, icon, accent, isDark }) {
+function SummaryCard({
+  label,
+  value,
+  subtext,
+  icon,
+  accent,
+  isDark,
+  valueClassName = "",
+}) {
   const cardClass = isDark
     ? "rounded-2xl border border-slate-800 bg-slate-900/70 p-4"
     : "rounded-2xl border border-slate-200 bg-white p-4";
@@ -25,7 +34,10 @@ function SummaryCard({ label, value, subtext, icon, accent, isDark }) {
             {label}
           </div>
           <div
-            className={`mt-1 text-2xl font-bold leading-none ${isDark ? "text-white" : "text-slate-900"}`}
+            className={`mt-1 text-2xl font-bold leading-none ${
+              valueClassName ||
+              (isDark ? "text-white" : "text-slate-900")
+            }`}
           >
             {value}
           </div>
@@ -53,7 +65,12 @@ export default function TripLoadSummary({ trip = null, shipments = [], isDark = 
     [trip, shipments],
   );
 
-  if (!stats.trackingNumbers && stats.loadedPackages <= 0) return null;
+  const hasContent =
+    stats.trackingNumbers > 0 ||
+    stats.loadedPackages > 0 ||
+    stats.isArrivedPhase;
+
+  if (!hasContent) return null;
 
   const sectionLabel = isDark ? "text-slate-400" : "text-slate-500";
   const bannerClass = isDark
@@ -61,7 +78,7 @@ export default function TripLoadSummary({ trip = null, shipments = [], isDark = 
     : "rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3";
 
   const accents = {
-    loaded: {
+    primary: {
       iconWrap: isDark ? "bg-blue-500/15" : "bg-blue-50",
       icon: isDark ? "text-blue-300" : "text-blue-600",
     },
@@ -79,25 +96,34 @@ export default function TripLoadSummary({ trip = null, shipments = [], isDark = 
     },
   };
 
+  const primaryIcon = stats.isArrivedPhase ? faTruck : faBox;
+
   return (
     <div className="space-y-3">
       <h3 className={`text-xs font-bold uppercase tracking-wider ${sectionLabel}`}>
-        Trip Load Summary
+        {stats.sectionTitle}
       </h3>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
         <SummaryCard
-          label="Packages Loaded"
-          value={stats.loadedPackages}
-          subtext="Pieces scanned and loaded on this trip"
-          icon={faBox}
-          accent={accents.loaded}
+          label={stats.primaryCard.label}
+          value={stats.primaryCard.displayValue}
+          subtext={stats.primaryCard.subtext}
+          icon={primaryIcon}
+          accent={accents.primary}
           isDark={isDark}
+          valueClassName={
+            stats.isArrivedPhase
+              ? isDark
+                ? "text-blue-300"
+                : "text-blue-700"
+              : ""
+          }
         />
         <SummaryCard
-          label="Remaining in Warehouse"
+          label={stats.remainingCardLabel}
           value={stats.remainingInWarehouse}
-          subtext="Pieces to be assigned to a future trip"
+          subtext={stats.remainingCardSubtext}
           icon={faWarehouse}
           accent={accents.remaining}
           isDark={isDark}
@@ -126,7 +152,7 @@ export default function TripLoadSummary({ trip = null, shipments = [], isDark = 
         <p
           className={`text-sm font-semibold ${isDark ? "text-blue-300" : "text-blue-700"}`}
         >
-          {stats.loadedSummaryLine}
+          {stats.primarySummaryLine}
         </p>
         {stats.remainingSummaryLine ? (
           <p

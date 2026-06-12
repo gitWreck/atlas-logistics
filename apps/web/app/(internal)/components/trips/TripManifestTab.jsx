@@ -32,6 +32,8 @@ import {
 import TablePaginationFooter from "../ui/TablePaginationFooter";
 import TripDeliveryPoolSummary from "./TripDeliveryPoolSummary";
 import TripLoadSummary from "./TripLoadSummary";
+import TripShipmentProgressCell from "./TripShipmentProgressCell";
+import { aggregateTripLoadSummary } from "@/app/utility/tripStats";
 
 export default function TripManifestTab({
   shipments = [],
@@ -73,6 +75,31 @@ export default function TripManifestTab({
     },
   );
   const isManifestReconciled = manifestStatus === MANIFEST_STATUS.RECONCILED;
+
+  const loadSummary = useMemo(
+    () =>
+      aggregateTripLoadSummary(
+        trip || {
+          tripType,
+          manifestStatus,
+          reconciledAt: tripReconciledAt,
+          manifestLocked: isLocked,
+          status: tripStatus,
+        },
+        shipments,
+      ),
+    [
+      trip,
+      tripType,
+      manifestStatus,
+      tripReconciledAt,
+      isLocked,
+      tripStatus,
+      shipments,
+    ],
+  );
+  const isArrivedPhase = loadSummary.isArrivedPhase;
+  const progressColumnLabel = isArrivedPhase ? "Trip Progress" : "Loaded Qty";
 
   const rowAction = {
     print: isDark
@@ -381,8 +408,6 @@ export default function TripManifestTab({
           </div>
         ) : (
           paginatedData.map((shipment, idx) => {
-            console.log("shipemnt data: ", shipment);
-
             const isSelected = selectedIds.has(shipment.id);
             const loadedCount = shipment.loadedCount || 0;
             const shipmentPieceTotal =
@@ -440,15 +465,33 @@ export default function TripManifestTab({
                   </div>
 
                   <div className="flex shrink-0 flex-col items-end gap-2">
-                    <span
-                      className={`text-[10px] font-bold px-2.5 py-1.5 rounded-lg border ${
-                        isFullyLoaded
-                          ? theme.countBadgeLoaded
-                          : theme.countBadgeDefault
-                      }`}
-                    >
-                      {loadedCount} / {shipmentPieceTotal}
-                    </span>
+                    {isArrivedPhase ? (
+                      <TripShipmentProgressCell
+                        shipment={shipment}
+                        trip={
+                          trip || {
+                            id: tripId,
+                            tripId,
+                            status: tripStatus,
+                            tripType,
+                            manifestStatus,
+                            reconciledAt: tripReconciledAt,
+                          }
+                        }
+                        isDark={isDark}
+                        compact
+                      />
+                    ) : (
+                      <span
+                        className={`text-[10px] font-bold px-2.5 py-1.5 rounded-lg border ${
+                          isFullyLoaded
+                            ? theme.countBadgeLoaded
+                            : theme.countBadgeDefault
+                        }`}
+                      >
+                        {loadedCount} / {shipmentPieceTotal}
+                      </span>
+                    )}
 
                     <StatusBadge status={shipmentStatus} isDark={isDark} />
                   </div>
@@ -574,7 +617,7 @@ export default function TripManifestTab({
                 <th className="px-4 py-3">Tracking / Customer</th>
                 <th className="px-4 py-3">Destination</th>
                 <th className="px-4 py-3 text-center">Shipment Status</th>
-                <th className="px-4 py-3 text-center">Loaded Qty</th>
+                <th className="px-4 py-3 text-center">{progressColumnLabel}</th>
                 <th className="px-4 py-3 text-right">Action</th>
               </tr>
             </thead>
@@ -663,15 +706,34 @@ export default function TripManifestTab({
                       </td>
 
                       <td className="px-4 py-3 text-center">
-                        <span
-                          className={`text-[10px] font-bold px-2 py-2 rounded border ${
-                            isFullyLoaded
-                              ? theme.countBadgeLoaded
-                              : theme.countBadgeDefault
-                          }`}
-                        >
-                          {loadedCount} / {shipmentPieceTotal}
-                        </span>
+                        {isArrivedPhase ? (
+                          <div className="flex justify-center">
+                            <TripShipmentProgressCell
+                              shipment={shipment}
+                              trip={
+                                trip || {
+                                  id: tripId,
+                                  tripId,
+                                  status: tripStatus,
+                                  tripType,
+                                  manifestStatus,
+                                  reconciledAt: tripReconciledAt,
+                                }
+                              }
+                              isDark={isDark}
+                            />
+                          </div>
+                        ) : (
+                          <span
+                            className={`text-[10px] font-bold px-2 py-2 rounded border ${
+                              isFullyLoaded
+                                ? theme.countBadgeLoaded
+                                : theme.countBadgeDefault
+                            }`}
+                          >
+                            {loadedCount} / {shipmentPieceTotal}
+                          </span>
+                        )}
                       </td>
 
                       <td className="px-4 py-3 text-right">
