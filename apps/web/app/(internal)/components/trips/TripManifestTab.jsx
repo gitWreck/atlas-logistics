@@ -80,6 +80,8 @@ export default function TripManifestTab({
     () =>
       aggregateTripLoadSummary(
         trip || {
+          id: tripId,
+          tripId,
           tripType,
           manifestStatus,
           reconciledAt: tripReconciledAt,

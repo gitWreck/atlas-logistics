@@ -12,6 +12,7 @@ import {
   getShipmentTripProgressDisplay,
   HUB_BOARD_PHASE,
   resolveHubBoardPhase,
+  resolveHubTripDeliveryTotals,
 } from "./tripHubBoardStats";
 
 export { getShipmentTripProgressDisplay };
@@ -309,9 +310,9 @@ function resolveTripLoadSummaryPhase(trip = {}) {
 function buildArrivedPrimaryCard(tripWithShipments = {}) {
   const hubPhase = resolveHubBoardPhase(tripWithShipments);
   const delivery = aggregateHubDeliveryOpsCounts(tripWithShipments);
-  const total = delivery.total;
-  const delivered = delivery.delivered;
-  const released = delivery.released;
+  const progressTotals = resolveHubTripDeliveryTotals(tripWithShipments);
+  const total = progressTotals.tripTotal;
+  const delivered = progressTotals.delivered;
 
   if (
     hubPhase === HUB_BOARD_PHASE.UNLOADING ||
@@ -339,15 +340,13 @@ function buildArrivedPrimaryCard(tripWithShipments = {}) {
     };
   }
 
-  const denominator = released > 0 ? released : total;
+  const denominator = total;
+  const count = progressTotals.count;
   return {
     label: "Trip Progress",
     displayValue:
-      denominator > 0 ? `${delivered}/${denominator}` : String(delivered),
-    subtext:
-      released > 0
-        ? `Delivered out of ${denominator} pieces released on this trip`
-        : `Delivered out of ${denominator} pieces on this trip`,
+      denominator > 0 ? `${count}/${denominator}` : String(count),
+    subtext: `Delivered out of ${denominator} pieces on this trip`,
   };
 }
 
@@ -372,7 +371,10 @@ export function aggregateTripLoadSummary(trip = {}, shipments = []) {
   const delivery = isArrivedPhase
     ? aggregateHubDeliveryOpsCounts(tripWithShipments)
     : null;
-  const deliveredPackages = delivery?.delivered ?? 0;
+  const progressTotals = isArrivedPhase
+    ? resolveHubTripDeliveryTotals(tripWithShipments)
+    : null;
+  const deliveredPackages = progressTotals?.count ?? 0;
 
   const remainingSummaryLine =
     remainingInWarehouse > 0
@@ -393,7 +395,7 @@ export function aggregateTripLoadSummary(trip = {}, shipments = []) {
     loadedPackages: packageStats.loadedPackages,
     tripPackageTotal: packageStats.tripPackageTotal,
     deliveredPackages,
-    releasedPackages: delivery?.released ?? 0,
+    releasedPackages: progressTotals?.tripTotal ?? delivery?.total ?? 0,
     trackingNumbers: shipmentCount,
     remainingInWarehouse,
     tripStatus: String(trip?.status || "UNKNOWN").toUpperCase(),
