@@ -33,7 +33,6 @@ import {
   getCallableErrorMessage,
   getCheckerDeliveryNextAction,
   canCheckerAccessShipment,
-  markShipmentOutForDelivery,
   reportCheckerFailedDelivery,
   returnCheckerShipmentsToWarehouse,
 } from "../utilities/checkerDelivery";
@@ -209,18 +208,6 @@ export default function ShipmentDetailsScreen() {
       const checkerNextAction = isCheckerLastMile
         ? getCheckerDeliveryNextAction(shipment, profile?.uid)
         : null;
-
-      if (isCheckerLastMile && checkerNextAction === "out_for_delivery") {
-        await markShipmentOutForDelivery({
-          shipmentId: String(shipmentId),
-          profile,
-          tripId: resolvedTripId || null,
-        });
-        await refreshShipment();
-        Alert.alert("Success", "Shipment marked out for delivery.");
-        setActionLoading(false);
-        return;
-      }
 
       if (isCheckerLastMile && checkerNextAction === "return") {
         await returnCheckerShipmentsToWarehouse({
@@ -530,15 +517,12 @@ export default function ShipmentDetailsScreen() {
   const checkerNextAction = isCheckerLastMile
     ? getCheckerDeliveryNextAction(shipment, profile?.uid)
     : null;
-  const canCheckerStartRoute =
-    isCheckerLastMile && checkerNextAction === "out_for_delivery";
   const canCheckerCompleteDelivery =
     isCheckerLastMile && checkerNextAction === "deliver";
   const canCheckerReturnToWarehouse =
     isCheckerLastMile && checkerNextAction === "return";
   const showFooter =
     canDriverHandlePickup ||
-    canCheckerStartRoute ||
     canCheckerCompleteDelivery ||
     canCheckerReturnToWarehouse;
   const needsPhotoUpload = canDriverHandlePickup;

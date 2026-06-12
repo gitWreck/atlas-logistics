@@ -54,7 +54,6 @@ function sortShipmentsNewest(shipments = []) {
 export function getCheckerShipmentDisplayStatus(shipment, checkerUid) {
   const phase = getCheckerPieceActionPhase(shipment, checkerUid);
   if (phase === "deliver") return "OUT_FOR_DELIVERY";
-  if (phase === "out_for_delivery") return "LOADED";
   if (phase === "return") return "FAILED_DELIVERY";
 
   const stats = countDeliveryPoolPieces(shipment, checkerUid);

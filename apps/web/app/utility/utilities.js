@@ -33,6 +33,8 @@ export function calculateProgress(status) {
       return 84;
     case "READY_FOR_DELIVERY":
       return 85;
+    case "PARTIALLY_OUT_FOR_DELIVERY":
+      return 87;
     case "OUT_FOR_DELIVERY":
       return 90;
     case "PARTIALLY_DELIVERED":
@@ -69,6 +71,8 @@ export function getVisualProgress(status) {
     case "READY_FOR_DELIVERY":
     case "AVAILABLE_AT_WAREHOUSE":
       return 50;
+    case "PARTIALLY_OUT_FOR_DELIVERY":
+      return 62;
     case "OUT_FOR_DELIVERY":
     case "PARTIALLY_DELIVERED":
       return 75;

@@ -90,13 +90,15 @@ export async function GET(request, { params }) {
           "ARRIVED_AT_ODIONGAN",
         ].includes(String(pkg.status || "").toUpperCase());
       });
-      const hasPackageScopedManifest = tripPackages.length || tripBarcodeSet.size;
+      const hasPackageScopedManifest =
+        tripPackages.length || tripBarcodeSet.size;
       const visiblePackages = hasPackageScopedManifest
         ? tripPackages
         : rootPackages;
       const sumQty = (field) =>
         visiblePackages.reduce(
-          (sum, pkg) => sum + Math.min(Number(pkg[field]) || 0, packageQty(pkg)),
+          (sum, pkg) =>
+            sum + Math.min(Number(pkg[field]) || 0, packageQty(pkg)),
           0,
         );
       const shipmentFullPieceTotal = Math.max(
@@ -173,6 +175,10 @@ export async function GET(request, { params }) {
           }`,
 
         status: root.status || data.status || null,
+        masterStatus: root.status || data.status || null,
+        packageBreakdown: root.packageBreakdown || null,
+        releasedForDeliveryAt: root.releasedForDeliveryAt || null,
+        availableForDelivery: root.availableForDelivery === true,
         currentTripId: root.currentTripId || data.currentTripId || tripId,
 
         packages: visiblePackages,

@@ -114,6 +114,25 @@ function resolveLastMileCheckerMasterStatus({
   return "READY_FOR_DELIVERY";
 }
 
+function resolveOutForDeliveryMasterStatus({
+  outForDeliveryQty = 0,
+  outForDeliveryRows = 0,
+  releasedQty = 0,
+  availablePoolRows = 0,
+  deliveredQty = 0,
+  totalQty = 0,
+  totalRows = 0,
+} = {}) {
+  if (outForDeliveryQty <= 0 && outForDeliveryRows <= 0) return null;
+
+  if (deliveredQty > 0 && deliveredQty < totalQty) {
+    return "PARTIALLY_DELIVERED";
+  }
+
+  // Any checker load scan moves the shipment into last-mile delivery.
+  return "OUT_FOR_DELIVERY";
+}
+
 function resolveLinehaulLoadedMasterStatus({
   packages = [],
   totalRows = 0,
@@ -324,9 +343,16 @@ function deriveMasterShipmentStatus(packages = [], options = {}) {
     return "RETURNED_TO_WAREHOUSE";
   }
 
-  if (outForDeliveryQty > 0 || outForDeliveryRows > 0) {
-    return "OUT_FOR_DELIVERY";
-  }
+  const outForDeliveryStatus = resolveOutForDeliveryMasterStatus({
+    outForDeliveryQty,
+    outForDeliveryRows,
+    releasedQty,
+    availablePoolRows,
+    deliveredQty,
+    totalQty,
+    totalRows,
+  });
+  if (outForDeliveryStatus) return outForDeliveryStatus;
 
   if (failedRows === totalRows) {
     return "FAILED_DELIVERY";
@@ -440,12 +466,31 @@ function stripStalePackagePoolFlags(packages = [], derivedStatus = "") {
   });
 }
 
-function resolveShipmentAvailableForDelivery(derivedStatus = "") {
+function shipmentHasPiecesInCheckerLoadPool(packages = []) {
+  if (!Array.isArray(packages)) return false;
+
+  return packages.some((pkg) => {
+    if (pkg?.loadedByCheckerId) return false;
+    const status = normalizePackageStatus(pkg);
+    if (RELEASED_POOL_STATUSES.has(status)) return true;
+    return pkg?.availableForDelivery === true;
+  });
+}
+
+function resolveShipmentAvailableForDelivery(
+  derivedStatus = "",
+  packages = [],
+) {
   const normalized = String(derivedStatus || "")
     .trim()
     .toUpperCase();
   if (normalized === "COMPLETED") return false;
   if (POOL_DERIVED_MASTER_STATUSES.has(normalized)) return true;
+  if (
+    ["OUT_FOR_DELIVERY", "PARTIALLY_OUT_FOR_DELIVERY"].includes(normalized)
+  ) {
+    return shipmentHasPiecesInCheckerLoadPool(packages);
+  }
   return false;
 }
 
@@ -466,7 +511,10 @@ function buildDerivedShipmentSnapshot(packages = [], options = {}) {
       status: previous,
       packages,
       packageBreakdown: computePackageBreakdown(packages),
-      availableForDelivery: resolveShipmentAvailableForDelivery(previous),
+      availableForDelivery: resolveShipmentAvailableForDelivery(
+        previous,
+        packages,
+      ),
     };
   }
 
@@ -495,7 +543,10 @@ function buildDerivedShipmentSnapshot(packages = [], options = {}) {
     status: derivedStatus,
     packages: normalizedPackages,
     packageBreakdown: computePackageBreakdown(normalizedPackages),
-    availableForDelivery: resolveShipmentAvailableForDelivery(derivedStatus),
+    availableForDelivery: resolveShipmentAvailableForDelivery(
+      derivedStatus,
+      normalizedPackages,
+    ),
   };
 }
 

@@ -19,8 +19,6 @@ import StatusBadge from "../../../components/ui/StatusBadge";
 import {
   getCallableErrorMessage,
   getCheckerDeliveryNextAction,
-  getCheckerDeliveryActionLabel,
-  markShipmentOutForDelivery,
   reportCheckerFailedDelivery,
   returnCheckerShipmentsToWarehouse,
 } from "../../../components/utilities/checkerDelivery";
@@ -55,13 +53,7 @@ export default function CheckerDeliveriesTab() {
     setActionShipmentId(shipmentId);
 
     try {
-      if (action === "out_for_delivery") {
-        await markShipmentOutForDelivery({
-          shipmentId,
-          profile,
-        });
-        Alert.alert("Success", "Shipment marked out for delivery.");
-      } else if (action === "failed") {
+      if (action === "failed") {
         await reportCheckerFailedDelivery({
           shipmentIds: [shipmentId],
           profile,
@@ -94,17 +86,20 @@ export default function CheckerDeliveriesTab() {
   };
 
   const goToDeliveryScan = (shipmentId = null, presetScanStatus = null) => {
+    const isOffloadAction =
+      presetScanStatus === "FAILED_DELIVERY" ||
+      presetScanStatus === "RETURNED_TO_WAREHOUSE";
     const title =
       presetScanStatus === "FAILED_DELIVERY"
-        ? "Report Failed"
+        ? "Failed Delivery"
         : presetScanStatus === "RETURNED_TO_WAREHOUSE"
-          ? "Return Piece"
+          ? "Return to Warehouse"
           : "Deliver Piece";
 
     router.push({
       pathname: "/(checker)/scan",
       params: {
-        mode: "delivery",
+        mode: isOffloadAction ? "offloading" : "delivery",
         title,
         ...(shipmentId ? { focusShipmentId: shipmentId } : {}),
         ...(presetScanStatus ? { presetScanStatus } : {}),
@@ -185,8 +180,8 @@ export default function CheckerDeliveriesTab() {
               No active route yet
             </Text>
             <Text style={[styles.emptySub, { color: colors.textMuted }]}>
-              Load pieces from the Available tab first. They will appear here
-              in real time for out-for-delivery and delivery.
+              Load pieces from the Available tab first. Each scan marks them out
+              for delivery and they will appear here for last-mile delivery.
             </Text>
           </View>
         ) : (
@@ -251,24 +246,6 @@ export default function CheckerDeliveriesTab() {
                   </Text>
                 </TouchableOpacity>
 
-                {nextAction === "out_for_delivery" && (
-                  <TouchableOpacity
-                    style={[styles.actionBtn, { backgroundColor: "#f59e0b" }]}
-                    onPress={() =>
-                      runShipmentAction(shipment.id, "out_for_delivery")
-                    }
-                    disabled={actionShipmentId === shipment.id}
-                  >
-                    {actionShipmentId === shipment.id ? (
-                      <ActivityIndicator color="#fff" size="small" />
-                    ) : (
-                      <Text style={styles.actionBtnText}>
-                        {getCheckerDeliveryActionLabel("out_for_delivery")}
-                      </Text>
-                    )}
-                  </TouchableOpacity>
-                )}
-
                 {nextAction === "deliver" && (
                   <>
                     <TouchableOpacity
@@ -285,7 +262,9 @@ export default function CheckerDeliveriesTab() {
                         goToDeliveryScan(shipment.id, "FAILED_DELIVERY")
                       }
                     >
-                      <Text style={styles.actionBtnText}>Scan failed</Text>
+                      <Text style={styles.actionBtnText}>
+                        Scan failed delivery
+                      </Text>
                     </TouchableOpacity>
                   </>
                 )}
@@ -298,21 +277,10 @@ export default function CheckerDeliveriesTab() {
                       goToDeliveryScan(shipment.id, "RETURNED_TO_WAREHOUSE")
                     }
                   >
-                    <Text style={styles.actionBtnText}>Scan return</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[styles.actionBtn, styles.actionBtnSecondary]}
-                    onPress={() => runShipmentAction(shipment.id, "return")}
-                    disabled={actionShipmentId === shipment.id}
-                  >
-                    {actionShipmentId === shipment.id ? (
-                      <ActivityIndicator color="#fff" size="small" />
-                    ) : (
-                      <Text style={styles.actionBtnText}>
-                        Return all my pieces
-                      </Text>
-                    )}
-                  </TouchableOpacity>
+                    <Text style={styles.actionBtnText}>
+                      Scan return to warehouse
+                    </Text>
+                    </TouchableOpacity>
                   </>
                 )}
               </View>

@@ -15,7 +15,6 @@ import {
   faFilter,
   faExclamationCircle,
   faList,
-  faRoute,
   faTruck,
   faTruckPickup,
   faWarehouse,
@@ -39,7 +38,6 @@ import BoardTabs from "../ui/BoardTabs";
 const SHIPMENT_BOARD_TABS = {
   ALL: "all",
   DELIVERY: "delivery",
-  IN_TRANSIT: "inTransit",
   DIVISORIA: "divisoria",
   ODIONGAN: "odiongan",
   PICKUPS: "pickups",
@@ -87,10 +85,6 @@ function matchesShipmentBoardTab(shipment, activeBoardTab) {
 
   if (activeBoardTab === SHIPMENT_BOARD_TABS.DELIVERY) {
     return DELIVERY_OPERATION_STATUSES.has(status);
-  }
-
-  if (activeBoardTab === SHIPMENT_BOARD_TABS.IN_TRANSIT) {
-    return status === "IN_TRANSIT";
   }
 
   if (
@@ -296,14 +290,6 @@ const ShipmentBoard = forwardRef(function ShipmentBoard(
         icon: faWarehouse,
         count: filteredShipments.filter((shipment) =>
           matchesWarehouseTab(shipment, SHIPMENT_BOARD_TABS.DIVISORIA),
-        ).length,
-      },
-      {
-        key: SHIPMENT_BOARD_TABS.IN_TRANSIT,
-        label: "In Transit",
-        icon: faRoute,
-        count: filteredShipments.filter(
-          (shipment) => getShipmentStatus(shipment) === "IN_TRANSIT",
         ).length,
       },
       {

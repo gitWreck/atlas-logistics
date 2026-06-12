@@ -5,7 +5,7 @@ export const EVENT_TITLES = {
   ARRIVED_ODIONGAN: "Received at Odiongan",
   RELEASED_TO_CHECKER: "Released by warehouse manager",
   ASSIGNED_TO_CHECKER: "Assigned to checker",
-  LOADED_TO_DELIVERY_VEHICLE: "Loaded to delivery vehicle",
+  LOADED_TO_DELIVERY_VEHICLE: "Out for delivery",
   OUT_FOR_DELIVERY: "Out for delivery",
   DELIVERED: "Delivered",
   FAILED_DELIVERY: "Failed delivery",

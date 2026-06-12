@@ -6,7 +6,6 @@ const {
   ODIONGAN_WAREHOUSE,
   normalizePackageStatus,
   resolveOdionganPoolStatus,
-  resolveDeliveryVehicleLoadedStatus,
 } = require("../packages/packageStatus");
 
 const STILL_ON_LINEHAUL_STATUSES = new Set([
@@ -176,12 +175,13 @@ function applyPieceLoadCustody(
     quantity,
     loadedQty: quantity,
     availableForDelivery: false,
-    status: resolveDeliveryVehicleLoadedStatus(),
+    status: PACKAGE_STATUS.OUT_FOR_DELIVERY,
     custodyOwnerType: "CHECKER",
     custodyOwnerId: checkerId,
     loadedByCheckerId: checkerId,
     loadedByCheckerName: checkerName,
     loadedAt: nowIso,
+    outForDeliveryAt: nowIso,
     loadedBy: checkerName || checkerId,
     deliveryManifestId: manifestId || pkg.deliveryManifestId || null,
     deliveryVehicleId: vehicleId || pkg.deliveryVehicleId || null,
@@ -195,6 +195,35 @@ function shipmentHasWarehouseCustodyPieces(packages = []) {
     if (isTerminalPiece(pkg)) return false;
     const custody = String(pkg.custodyOwnerType || "").toUpperCase();
     return custody === "WAREHOUSE" || custody === "";
+  });
+}
+
+/** True while any piece is still in the checker load pool (partial last-mile). */
+function shipmentHasPiecesAvailableForCheckerLoad(packages = [], actorUid = null) {
+  if (!Array.isArray(packages)) return false;
+
+  return packages.some((pkg) => {
+    if (isTerminalPiece(pkg)) return false;
+
+    const loadedBy = String(pkg.loadedByCheckerId || "").trim();
+    if (loadedBy) {
+      if (!actorUid || loadedBy !== String(actorUid)) return false;
+      return false;
+    }
+
+    const status = normalizePackageStatus(pkg);
+    if (pkg.availableForDelivery === true) return true;
+    if (status === PACKAGE_STATUS.RELEASED_FOR_DELIVERY) return true;
+    if (
+      [
+        PACKAGE_STATUS.AVAILABLE_AT_WAREHOUSE,
+        PACKAGE_STATUS.AVAILABLE_AT_ODIONGAN_WAREHOUSE,
+      ].includes(status)
+    ) {
+      return true;
+    }
+
+    return false;
   });
 }
 
@@ -326,6 +355,7 @@ module.exports = {
   matchesReleasePackageScope,
   applyPieceLoadCustody,
   shipmentHasWarehouseCustodyPieces,
+  shipmentHasPiecesAvailableForCheckerLoad,
   shipmentHasCheckerCustodyPieces,
   canCheckerAccessShipment,
   assertCheckerCanAccessShipment,

@@ -13,6 +13,18 @@ export const dynamic = "force-dynamic"; // Prevent caching
 
 const COMPLETED_TRIP_STATUSES = ["COMPLETED", "DELIVERED", "CANCELLED"];
 const COMPLETED_TRIP_STATUS_SET = new Set(COMPLETED_TRIP_STATUSES);
+const ACTIVE_TRIP_STATUSES = [
+  "CREATED",
+  "ASSIGNED",
+  "LOADING",
+  "PARTIALLY_LOADED",
+  "LOADED",
+  "IN_TRANSIT",
+  "ARRIVED",
+  "UNLOADING",
+  "READY_FOR_DELIVERY",
+  "OUT_FOR_DELIVERY",
+];
 
 function isActiveTripDoc(data = {}) {
   const status = String(data.status || "").toUpperCase();
@@ -77,7 +89,12 @@ async function enrichHubTripsWithMasterPackages(trips = []) {
 
       return {
         ...row,
-        packages: getTripScopedPackages(row, { packages: master.packages }, trip.id),
+        packages: getTripScopedPackages(
+          row,
+          { packages: master.packages },
+          trip.id,
+        ),
+        packageBreakdown: master.packageBreakdown || null,
         masterStatus: master.status || null,
         releasedForDeliveryAt: master.releasedForDeliveryAt || null,
         availableForDelivery: master.availableForDelivery === true,
@@ -97,6 +114,157 @@ function parseLimit(searchParams, key) {
   }
 
   return limitParam;
+}
+
+function toIsoTimestamp(value) {
+  return value?.toDate ? value.toDate().toISOString() : null;
+}
+
+function serializeTripDoc(
+  doc,
+  { includeShipments = false, shipments = [] } = {},
+) {
+  const data = doc.data();
+
+  return {
+    id: doc.id,
+    ...data,
+    shipments: includeShipments ? shipments : [],
+    createdAt: toIsoTimestamp(data.createdAt),
+    updatedAt: toIsoTimestamp(data.updatedAt),
+    packageTotal: data.packageTotal || 0,
+  };
+}
+
+function sortDocsByUpdatedAtDesc(docs = []) {
+  return [...docs].sort((left, right) => {
+    const leftMs = left.data().updatedAt?.toMillis?.() || 0;
+    const rightMs = right.data().updatedAt?.toMillis?.() || 0;
+    return rightMs - leftMs;
+  });
+}
+
+function sliceLimitedDocs(docs = [], limit) {
+  if (limit === "all") return docs;
+  return docs.slice(0, Number(limit));
+}
+
+async function fetchTripShipmentSummaries(tripId) {
+  const shipmentsSnapshot = await adminDb
+    .collection("truck_trips")
+    .doc(tripId)
+    .collection("trip_shipments")
+    .get();
+
+  return shipmentsSnapshot.docs.map((subDoc) => {
+    const sData = subDoc.data();
+    return {
+      id: subDoc.id,
+      ...sData,
+      createdAt: toIsoTimestamp(sData.createdAt),
+    };
+  });
+}
+
+async function fetchAllTripDocs() {
+  const snapshot = await adminDb
+    .collection("truck_trips")
+    .orderBy("updatedAt", "desc")
+    .get();
+
+  return snapshot.docs;
+}
+
+async function fetchIndexedTripDocs(activeLimit, completedLimit) {
+  const activeFetchLimit = Math.min(Number(activeLimit) + 20, 250);
+  const completedFetchLimit = Math.min(Number(completedLimit) + 20, 250);
+  const archivedFetchLimit = Math.min(Number(completedLimit) + 20, 250);
+
+  const [activeSnapshot, completedSnapshot, archivedSnapshot] =
+    await Promise.all([
+      adminDb
+        .collection("truck_trips")
+        .where("status", "in", ACTIVE_TRIP_STATUSES)
+        .orderBy("updatedAt", "desc")
+        .limit(activeFetchLimit)
+        .get(),
+      adminDb
+        .collection("truck_trips")
+        .where("status", "in", COMPLETED_TRIP_STATUSES)
+        .orderBy("updatedAt", "desc")
+        .limit(completedFetchLimit)
+        .get(),
+      adminDb
+        .collection("truck_trips")
+        .where("archived", "==", true)
+        .orderBy("updatedAt", "desc")
+        .limit(archivedFetchLimit)
+        .get(),
+    ]);
+
+  const tripDocs = new Map();
+  [
+    ...activeSnapshot.docs,
+    ...completedSnapshot.docs,
+    ...archivedSnapshot.docs,
+  ].forEach((doc) => {
+    tripDocs.set(doc.id, doc);
+  });
+
+  return sortDocsByUpdatedAtDesc([...tripDocs.values()]);
+}
+
+async function fetchTripDocsForBoard(activeLimit, completedLimit) {
+  if (activeLimit === "all" || completedLimit === "all") {
+    return fetchAllTripDocs();
+  }
+
+  try {
+    return await fetchIndexedTripDocs(activeLimit, completedLimit);
+  } catch (error) {
+    console.warn(
+      "Indexed truck_trips query failed; falling back to full scan:",
+      error.message,
+    );
+    return fetchAllTripDocs();
+  }
+}
+
+function selectLimitedTripDocs(allDocs, activeLimit, completedLimit) {
+  const activeDocs = sliceLimitedDocs(
+    allDocs.filter((doc) => isActiveTripDoc(doc.data())),
+    activeLimit,
+  );
+  const completedDocs = sliceLimitedDocs(
+    allDocs.filter((doc) => isCompletedTripDoc(doc.data())),
+    completedLimit,
+  );
+
+  const tripDocs = new Map();
+  [...activeDocs, ...completedDocs].forEach((doc) => {
+    tripDocs.set(doc.id, doc);
+  });
+
+  return [...tripDocs.values()];
+}
+
+async function buildTripList(docs, { view = "board" } = {}) {
+  const trips = await Promise.all(
+    docs.map(async (doc) => {
+      const tripData = { id: doc.id, ...doc.data() };
+      const needsShipmentContext =
+        view === "full" || tripNeedsDeliveryEnrichment(tripData);
+
+      if (!needsShipmentContext) {
+        return serializeTripDoc(doc);
+      }
+
+      const shipments = await fetchTripShipmentSummaries(doc.id);
+      return serializeTripDoc(doc, { includeShipments: true, shipments });
+    }),
+  );
+
+  return enrichHubTripsWithMasterPackages(trips);
 }
 
 export async function GET(request) {
@@ -125,76 +293,17 @@ export async function GET(request) {
     const { searchParams } = new URL(request.url);
     const activeLimit = parseLimit(searchParams, "activeLimit");
     const completedLimit = parseLimit(searchParams, "completedLimit");
+    const view = searchParams.get("view") || "board";
 
-    // 3. FETCH TRIPS PARENT DOCS
-    const snapshot = await adminDb
-      .collection("truck_trips")
-      .orderBy("updatedAt", "desc")
-      .get();
-
-    const activeDocs = snapshot.docs.filter((doc) =>
-      isActiveTripDoc(doc.data()),
+    const allDocs = await fetchTripDocsForBoard(activeLimit, completedLimit);
+    const limitedDocs = selectLimitedTripDocs(
+      allDocs,
+      activeLimit,
+      completedLimit,
     );
-    const completedDocs = snapshot.docs.filter((doc) =>
-      isCompletedTripDoc(doc.data()),
-    );
-    const limitedActiveDocs =
-      activeLimit === "all" ? activeDocs : activeDocs.slice(0, Number(activeLimit));
-    const limitedCompletedDocs =
-      completedLimit === "all"
-        ? completedDocs
-        : completedDocs.slice(0, Number(completedLimit));
+    const trips = await buildTripList(limitedDocs, { view });
 
-    const tripDocs = new Map();
-    [...limitedActiveDocs, ...limitedCompletedDocs].forEach((doc) => {
-      tripDocs.set(doc.id, doc);
-    });
-
-    // 4. TRANSFORM DATA & FETCH SUBCOLLECTIONS
-    // We use Promise.all to fetch subcollections in parallel
-    const trips = await Promise.all(
-      Array.from(tripDocs.values()).map(async (doc) => {
-        const data = doc.data();
-
-        // A. Fetch the 'trip_shipments' subcollection for THIS trip
-        const shipmentsSnapshot = await adminDb
-          .collection("truck_trips")
-          .doc(doc.id)
-          .collection("trip_shipments")
-          .get();
-
-        // B. Map shipment docs to clean JSON
-        const shipments = shipmentsSnapshot.docs.map((subDoc) => {
-          const sData = subDoc.data();
-          return {
-            id: subDoc.id,
-            ...sData,
-            // Safety check for timestamps inside shipments if they exist
-            createdAt: sData.createdAt?.toDate
-              ? sData.createdAt.toDate().toISOString()
-              : null,
-          };
-        });
-
-        // C. Return the Parent Trip + The Array of Shipments
-        return {
-          id: doc.id,
-          ...data,
-          shipments: shipments, // <--- HERE IS YOUR ARRAY
-          createdAt: data.createdAt?.toDate
-            ? data.createdAt.toDate().toISOString()
-            : null,
-          updatedAt: data.updatedAt?.toDate
-            ? data.updatedAt.toDate().toISOString()
-            : null,
-          packageTotal: data.packageTotal || 0,
-        };
-      }),
-    );
-
-    const enrichedTrips = await enrichHubTripsWithMasterPackages(trips);
-
-    return NextResponse.json({ trips: enrichedTrips });
+    return NextResponse.json({ trips });
   } catch (error) {
     console.error("API Error fetching trips:", error);
     return NextResponse.json(

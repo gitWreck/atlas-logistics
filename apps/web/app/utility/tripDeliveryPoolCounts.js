@@ -103,7 +103,7 @@ export function formatTripDeliveryPoolLine(stats = {}) {
     parts.push(`${stats.atWarehouse} @ warehouse`);
   }
   Object.entries(stats.onChecker || {}).forEach(([checker, qty]) => {
-    parts.push(`${qty} ${checker}`);
+    parts.push(`${qty} out for delivery (${checker})`);
   });
   if (stats.delivered > 0) parts.push(`${stats.delivered} delivered`);
   if (stats.failed > 0) parts.push(`${stats.failed} failed`);

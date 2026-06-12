@@ -62,7 +62,9 @@ function clampCount(value) {
 }
 
 function normalizeStatus(value) {
-  return String(value || "").trim().toUpperCase();
+  return String(value || "")
+    .trim()
+    .toUpperCase();
 }
 
 function pieceQty(pkg = {}) {
@@ -70,10 +72,17 @@ function pieceQty(pkg = {}) {
   return Number.isFinite(qty) && qty > 0 ? qty : 1;
 }
 
-function countReleasedTripScopedPieces(tripShipment = {}, shipment = {}, tripId = "") {
+function countReleasedTripScopedPieces(
+  tripShipment = {},
+  shipment = {},
+  tripId = "",
+) {
   const scoped = getTripScopedPackages(tripShipment, shipment, tripId);
   if (scoped.length === 0) {
-    if (shipment.releasedForDeliveryAt || shipment.availableForDelivery === true) {
+    if (
+      shipment.releasedForDeliveryAt ||
+      shipment.availableForDelivery === true
+    ) {
       return resolveTripScopedPieceTotal(tripShipment);
     }
     return 0;
@@ -99,7 +108,10 @@ function countTripReleasePipelineTotal(
   shipment = {},
 ) {
   if (scopedPackages.length === 0) {
-    if (shipment.releasedForDeliveryAt || shipment.availableForDelivery === true) {
+    if (
+      shipment.releasedForDeliveryAt ||
+      shipment.availableForDelivery === true
+    ) {
       return resolveTripScopedPieceTotal(tripShipment);
     }
     return 0;
@@ -135,13 +147,58 @@ function resolveTripContextId(trip = {}) {
   return String(trip.id || trip.tripId || "").trim();
 }
 
-function countOnCheckerTripScopedPieces(tripShipment = {}, shipment = {}, tripId = "") {
+function countOutForDeliveryTripScopedPieces(
+  tripShipment = {},
+  shipment = {},
+  tripId = "",
+) {
+  const scoped = getTripScopedPackages(tripShipment, shipment, tripId);
+  if (scoped.length > 0) {
+    return scoped.reduce((sum, pkg) => {
+      const status = normalizeStatus(pkg.status);
+      if (
+        status === "OUT_FOR_DELIVERY" ||
+        status === "LOADED_TO_DELIVERY_VEHICLE"
+      ) {
+        return sum + pieceQty(pkg);
+      }
+      return sum;
+    }, 0);
+  }
+
+  const breakdown =
+    tripShipment.packageBreakdown || shipment.packageBreakdown || {};
+  const fromBreakdown = clampCount(breakdown.outForDelivery);
+  if (fromBreakdown > 0) return fromBreakdown;
+
+  const masterStatus = normalizeStatus(
+    tripShipment.masterStatus || shipment.status,
+  );
+  if (masterStatus === "OUT_FOR_DELIVERY") {
+    return resolveTripScopedPieceTotal(tripShipment);
+  }
+  if (masterStatus === "PARTIALLY_OUT_FOR_DELIVERY") {
+    return Math.max(fromBreakdown, 1);
+  }
+
+  return 0;
+}
+
+function countOnCheckerTripScopedPieces(
+  tripShipment = {},
+  shipment = {},
+  tripId = "",
+) {
   const scoped = getTripScopedPackages(tripShipment, shipment, tripId);
   if (scoped.length === 0) return 0;
 
   return scoped.reduce((sum, pkg) => {
     const status = normalizeStatus(pkg.status);
-    if (["DELIVERED", "COMPLETED", "MISSING", "DAMAGED", "CANCELLED"].includes(status)) {
+    if (
+      ["DELIVERED", "COMPLETED", "MISSING", "DAMAGED", "CANCELLED"].includes(
+        status,
+      )
+    ) {
       return sum;
     }
     if (pkg.loadedByCheckerId) return sum + pieceQty(pkg);
@@ -158,15 +215,102 @@ function countOnCheckerTripScopedPieces(tripShipment = {}, shipment = {}, tripId
   }, 0);
 }
 
-function countDeliveredTripScopedPieces(tripShipment = {}, shipment = {}, tripId = "") {
+function countDeliveredTripScopedPieces(
+  tripShipment = {},
+  shipment = {},
+  tripId = "",
+) {
   const scoped = getTripScopedPackages(tripShipment, shipment, tripId);
-  return scoped.reduce((sum, pkg) => {
-    const status = normalizeStatus(pkg.status);
-    if (status === "DELIVERED" || status === "COMPLETED") {
-      return sum + pieceQty(pkg);
-    }
-    return sum;
-  }, 0);
+  if (scoped.length > 0) {
+    return scoped.reduce((sum, pkg) => {
+      const status = normalizeStatus(pkg.status);
+      if (status === "DELIVERED" || status === "COMPLETED") {
+        return sum + pieceQty(pkg);
+      }
+      return sum;
+    }, 0);
+  }
+
+  return clampCount(tripShipment.deliveredCount ?? tripShipment.receivedCount);
+}
+
+const ON_TRUCK_PIECE_STATUSES = new Set([
+  "IN_TRANSIT",
+  "LOADED",
+  "LOADED_TO_TRIP",
+  "PARTIALLY_LOADED",
+]);
+
+const HUB_RECEIVED_PIECE_STATUSES = new Set([
+  "ARRIVED_AT_ODIONGAN",
+  "AVAILABLE_AT_ODIONGAN_WAREHOUSE",
+  "RELEASED_FOR_DELIVERY",
+  "AVAILABLE_FOR_DELIVERY",
+  "READY_FOR_DELIVERY",
+  "LOADED_TO_DELIVERY_VEHICLE",
+  "OUT_FOR_DELIVERY",
+  "DELIVERED",
+  "COMPLETED",
+  "FAILED_DELIVERY",
+  "RETURNED_TO_WAREHOUSE",
+  "RETURNED_RECEIVED_AT_HUB",
+  "RETURNED_RECEIVED_AT_ODIONGAN",
+]);
+
+function countHubReceivedTripScopedPieces(
+  scopedPackages = [],
+  tripShipment = {},
+) {
+  if (scopedPackages.length > 0) {
+    return scopedPackages.reduce((sum, pkg) => {
+      const status = normalizeStatus(pkg.status);
+      const qty = pieceQty(pkg);
+      const receivedQty = Math.min(
+        Math.max(0, Number(pkg.receivedQty) || 0),
+        qty,
+      );
+
+      if (receivedQty > 0) return sum + receivedQty;
+      if (pkg.hubReceivedAt) return sum + qty;
+      if (ON_TRUCK_PIECE_STATUSES.has(status)) return sum;
+      if (HUB_RECEIVED_PIECE_STATUSES.has(status)) return sum + qty;
+
+      return sum;
+    }, 0);
+  }
+
+  return clampCount(tripShipment.receivedCount ?? tripShipment.deliveredCount);
+}
+
+function buildShipmentProgressResult(count, total) {
+  const safeTotal = clampCount(total);
+  const safeCount =
+    safeTotal > 0 ? Math.min(clampCount(count), safeTotal) : clampCount(count);
+
+  return {
+    count: safeCount,
+    total: safeTotal,
+    displayValue:
+      safeTotal > 0 ? `${safeCount}/${safeTotal}` : String(safeCount),
+  };
+}
+
+function resolveTripLevelDeliveryOpsCounts(trip = {}) {
+  const total = Math.max(
+    clampCount(trip.totalItems),
+    clampCount(trip.totalLoaded),
+    clampCount(trip.totalArrived),
+  );
+  const delivered = clampCount(trip.totalDelivered);
+
+  return {
+    total,
+    delivered,
+    released: 0,
+    releasePipeline: delivered,
+    loadedToChecker: 0,
+    outForDelivery: 0,
+  };
 }
 
 export function aggregateHubDeliveryOpsCounts(trip = {}) {
@@ -177,6 +321,11 @@ export function aggregateHubDeliveryOpsCounts(trip = {}) {
   let released = 0;
   let releasePipeline = 0;
   let loadedToChecker = 0;
+  let outForDelivery = 0;
+
+  if (shipments.length === 0) {
+    return resolveTripLevelDeliveryOpsCounts(trip);
+  }
 
   shipments.forEach((row) => {
     const scopedPackages = getTripScopedPackages(row, row, tripId);
@@ -196,8 +345,13 @@ export function aggregateHubDeliveryOpsCounts(trip = {}) {
         (sum, qty) => sum + clampCount(qty),
         0,
       );
+      outForDelivery += countOutForDeliveryTripScopedPieces(row, row, tripId);
       released += countReleasedTripScopedPieces(row, row, tripId);
-      releasePipeline += countTripReleasePipelineTotal(scopedPackages, row, row);
+      releasePipeline += countTripReleasePipelineTotal(
+        scopedPackages,
+        row,
+        row,
+      );
       return;
     }
 
@@ -205,6 +359,7 @@ export function aggregateHubDeliveryOpsCounts(trip = {}) {
     released += countReleasedTripScopedPieces(row, row, tripId);
     releasePipeline += countTripReleasePipelineTotal([], row, row);
     loadedToChecker += countOnCheckerTripScopedPieces(row, row, tripId);
+    outForDelivery += countOutForDeliveryTripScopedPieces(row, row, tripId);
   });
 
   return {
@@ -213,6 +368,7 @@ export function aggregateHubDeliveryOpsCounts(trip = {}) {
     released,
     releasePipeline,
     loadedToChecker,
+    outForDelivery: Math.max(outForDelivery, loadedToChecker),
   };
 }
 
@@ -237,8 +393,7 @@ function resolveUnloadingTotals(trip = {}) {
       0,
     );
     hubReceived = shipments.reduce(
-      (sum, row) =>
-        sum + clampCount(row.receivedCount ?? row.deliveredCount),
+      (sum, row) => sum + clampCount(row.receivedCount ?? row.deliveredCount),
       0,
     );
     tripPieceTotal = shipments.reduce(
@@ -288,10 +443,7 @@ export function resolveHubBoardPhase(trip = {}) {
     return HUB_BOARD_PHASE.DELIVERY_COMPLETED;
   }
 
-  if (
-    manifestStatus === MANIFEST_STATUS.RECONCILED ||
-    trip.reconciledAt
-  ) {
+  if (manifestStatus === MANIFEST_STATUS.RECONCILED || trip.reconciledAt) {
     const pendingDelivery = Math.max(total - delivered, 0);
     if (
       total > 0 &&
@@ -301,14 +453,17 @@ export function resolveHubBoardPhase(trip = {}) {
     ) {
       return HUB_BOARD_PHASE.DELIVERY_COMPLETED;
     }
-    if (delivered > 0) {
-      return HUB_BOARD_PHASE.OUT_FOR_DELIVERY;
-    }
     if (
+      delivery.outForDelivery > 0 ||
       delivery.loadedToChecker > 0 ||
+      tripHasOutForDeliveryShipments(trip) ||
       status === "OUT_FOR_DELIVERY" ||
+      status === "PARTIALLY_OUT_FOR_DELIVERY" ||
       status === "READY_FOR_DELIVERY"
     ) {
+      return HUB_BOARD_PHASE.OUT_FOR_DELIVERY;
+    }
+    if (delivered > 0) {
       return HUB_BOARD_PHASE.OUT_FOR_DELIVERY;
     }
     if (delivery.released > 0 || tripHasReleasedShipments(trip)) {
@@ -336,10 +491,26 @@ function tripHasReleasedShipments(trip = {}) {
     (row) =>
       row.releasedForDeliveryAt ||
       row.availableForDelivery === true ||
-      ["AVAILABLE_FOR_DELIVERY", "RELEASED_FOR_DELIVERY", "READY_FOR_DELIVERY"].includes(
-        normalizeStatus(row.status || row.masterStatus),
-      ),
+      [
+        "AVAILABLE_FOR_DELIVERY",
+        "PARTIALLY_AVAILABLE_FOR_DELIVERY",
+        "RELEASED_FOR_DELIVERY",
+        "READY_FOR_DELIVERY",
+      ].includes(normalizeStatus(row.status || row.masterStatus)),
   );
+}
+
+function tripHasOutForDeliveryShipments(trip = {}) {
+  const shipments = Array.isArray(trip.shipments) ? trip.shipments : [];
+  return shipments.some((row) => {
+    const masterStatus = normalizeStatus(row.masterStatus || row.status);
+    if (
+      ["OUT_FOR_DELIVERY", "PARTIALLY_OUT_FOR_DELIVERY"].includes(masterStatus)
+    ) {
+      return true;
+    }
+    return clampCount(row.packageBreakdown?.outForDelivery) > 0;
+  });
 }
 
 export function getHubBoardStatsDisplay(trip = {}) {
@@ -395,19 +566,21 @@ export function getHubBoardStatsDisplay(trip = {}) {
       count: 0,
       total,
       label: "Packages Released",
-      subLabel: "Packages released to checkers for delivery",
+      subLabel:
+        "Released to checker pool — each load scan marks a piece out for delivery",
       progressPercent: 0,
     };
   }
 
   if (phase === HUB_BOARD_PHASE.OUT_FOR_DELIVERY) {
     const delivered = delivery.delivered;
+
     return {
       phase,
       count: delivered,
       total,
       label: "Out for Delivery",
-      subLabel: "Delivery in progress",
+      subLabel: "Delivery in progress — progress counts confirmed deliveries",
       progressPercent: total > 0 ? (delivered / total) * 100 : 0,
     };
   }
@@ -454,26 +627,56 @@ export function calculateHubBoardProgress(trip = {}) {
 }
 
 /**
- * Per-shipment trip progress for manifest rows after arrival (delivered / released).
+ * Per-shipment trip progress for manifest rows — phase-aware:
+ * unloading → received at Odiongan / on trip, reconciled → verified / on trip,
+ * release & delivery → delivered / on trip.
  */
 export function getShipmentTripProgressDisplay(tripShipment = {}, trip = {}) {
   const tripId = resolveTripContextId(trip);
-  const scopedPackages = getTripScopedPackages(tripShipment, tripShipment, tripId);
-  const delivered = countDeliveredTripScopedPieces(
+  const scopedPackages = getTripScopedPackages(
     tripShipment,
     tripShipment,
     tripId,
   );
   const tripScopedTotal = resolveTripScopedPieceTotal(tripShipment);
-  const denominator = tripScopedTotal;
-  const count =
-    denominator > 0 ? Math.min(delivered, denominator) : delivered;
+  const hubPhase = isHubTransferTrip(trip) ? resolveHubBoardPhase(trip) : null;
 
-  return {
-    count,
-    total: denominator,
-    displayValue:
-      denominator > 0 ? `${count}/${denominator}` : String(count),
-    subLabel: `Delivered out of ${denominator} pieces on this trip`,
-  };
+  if (
+    hubPhase === HUB_BOARD_PHASE.UNLOADING ||
+    hubPhase === HUB_BOARD_PHASE.UNLOADING_COMPLETE
+  ) {
+    const received = countHubReceivedTripScopedPieces(
+      scopedPackages,
+      tripShipment,
+    );
+    return buildShipmentProgressResult(received, tripScopedTotal);
+  }
+
+  if (hubPhase === HUB_BOARD_PHASE.RECONCILED) {
+    const received = countHubReceivedTripScopedPieces(
+      scopedPackages,
+      tripShipment,
+    );
+    const verified = Math.max(received, tripScopedTotal);
+    return buildShipmentProgressResult(verified, tripScopedTotal);
+  }
+
+  if (
+    hubPhase === HUB_BOARD_PHASE.OUT_FOR_DELIVERY ||
+    hubPhase === HUB_BOARD_PHASE.RELEASED
+  ) {
+    const delivered = countDeliveredTripScopedPieces(
+      tripShipment,
+      tripShipment,
+      tripId,
+    );
+    return buildShipmentProgressResult(delivered, tripScopedTotal);
+  }
+
+  const delivered = countDeliveredTripScopedPieces(
+    tripShipment,
+    tripShipment,
+    tripId,
+  );
+  return buildShipmentProgressResult(delivered, tripScopedTotal);
 }

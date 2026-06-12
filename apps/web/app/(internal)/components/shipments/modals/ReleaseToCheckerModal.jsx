@@ -123,12 +123,14 @@ export default function ReleaseToCheckerModal({
                 Release from trip{" "}
                 <span className="font-mono font-semibold">{tripId}</span>.
                 Inventory becomes visible to all checkers. Custody stays at
-                Odiongan until each label is scanned and loaded.
+                Odiongan until each piece is scanned under Load (marks out for
+                delivery automatically).
               </>
             ) : (
               <>
                 Makes inventory visible to all checkers. Custody stays at
-                Odiongan until each label is scanned and loaded onto a van.
+                Odiongan until each piece is scanned under Load (marks out for
+                delivery automatically).
               </>
             )}
           </p>
@@ -192,7 +194,7 @@ export default function ReleaseToCheckerModal({
               className={inputClass}
               value={remarks}
               onChange={(e) => setRemarks(e.target.value)}
-              placeholder="Released for delivery operations; custody remains at warehouse until load scan."
+              placeholder="Released for delivery; checker Load scan marks each piece out for delivery."
             />
           </div>
 

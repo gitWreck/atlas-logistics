@@ -26,9 +26,14 @@ const DELIVERY_POOL_MASTER_STATUSES = new Set([
  * Stale `availableForDelivery` can remain after manual status reverts (e.g. RECEIVED).
  */
 export function isShipmentInDeliveryPool(shipment = {}) {
-  if (shipment?.availableForDelivery !== true) return false;
   const master = normalizeStatus(shipment.status);
-  return DELIVERY_POOL_MASTER_STATUSES.has(master);
+  if (shipment?.availableForDelivery === true) {
+    return (
+      DELIVERY_POOL_MASTER_STATUSES.has(master) ||
+      master === "PARTIALLY_OUT_FOR_DELIVERY"
+    );
+  }
+  return shipmentHasCheckerLoadPoolPieces(shipment);
 }
 
 function pieceQuantity(pkg = {}) {
@@ -36,42 +41,69 @@ function pieceQuantity(pkg = {}) {
   return Number.isFinite(qty) && qty > 0 ? qty : 1;
 }
 
+const TERMINAL_POOL_PIECE_STATUSES = new Set([
+  "DELIVERED",
+  "MISSING",
+  "DAMAGED",
+  "CANCELLED",
+]);
+
+const RETURNED_POOL_PIECE_STATUSES = new Set([
+  "RETURNED_TO_WAREHOUSE",
+  "RETURNED_RECEIVED_AT_HUB",
+  "RETURNED_RECEIVED_AT_ODIONGAN",
+]);
+
+const ON_VAN_LOADED_PIECE_STATUSES = new Set([
+  "OUT_FOR_DELIVERY",
+  "LOADED_TO_DELIVERY_VEHICLE",
+]);
+
 /**
- * Pool-eligible piece at Odiongan (Step 2.7 / 3.7).
- * Requires shipment-level release unless piece still has release flag.
+ * Piece still in the Odiongan release pool and eligible for a checker load scan.
+ * Must not depend on shipment.availableForDelivery alone — partial loads can clear
+ * that flag while other pieces remain RELEASED_FOR_DELIVERY.
  */
+export function isCheckerPieceAvailableToLoad(pkg = {}, shipment = {}) {
+  const status = normalizeStatus(pkg.status);
+  if (TERMINAL_POOL_PIECE_STATUSES.has(status)) return false;
+  if (RETURNED_POOL_PIECE_STATUSES.has(status)) return false;
+  if (pkg.loadedByCheckerId) return false;
+  if (ON_VAN_LOADED_PIECE_STATUSES.has(status)) return false;
+
+  if (pkg.availableForDelivery === true) return true;
+  if (status === "RELEASED_FOR_DELIVERY") return true;
+  if (
+    ["AVAILABLE_AT_ODIONGAN_WAREHOUSE", "AVAILABLE_AT_WAREHOUSE"].includes(
+      status,
+    )
+  ) {
+    return (
+      shipment?.availableForDelivery === true ||
+      pkg.availableForDelivery === true
+    );
+  }
+
+  const custody = normalizeStatus(pkg.custodyOwnerType);
+  if (
+    custody === "WAREHOUSE" &&
+    shipment?.availableForDelivery === true
+  ) {
+    return true;
+  }
+
+  return false;
+}
+
+function shipmentHasCheckerLoadPoolPieces(shipment = {}) {
+  const packages = Array.isArray(shipment.packages) ? shipment.packages : [];
+  return packages.some((pkg) => isCheckerPieceAvailableToLoad(pkg, shipment));
+}
+
+/** @deprecated use isCheckerPieceAvailableToLoad */
 function isAvailableAtWarehouse(pkg = {}, shipment = {}) {
   if (!isShipmentInDeliveryPool(shipment)) return false;
-  const poolReleased = shipment?.availableForDelivery === true;
-  const status = normalizeStatus(pkg.status);
-  if (["DELIVERED", "MISSING", "DAMAGED", "CANCELLED"].includes(status)) {
-    return false;
-  }
-  if (
-    status === "RETURNED_TO_WAREHOUSE" ||
-    status === "RETURNED_RECEIVED_AT_HUB" ||
-    status === "RETURNED_RECEIVED_AT_ODIONGAN"
-  ) {
-    return false;
-  }
-  if (!poolReleased && pkg.availableForDelivery !== true) {
-    return false;
-  }
-  if (pkg.availableForDelivery === true && poolReleased) return true;
-  if (status === "AVAILABLE_AT_WAREHOUSE" && poolReleased) return true;
-  if (
-    ["AVAILABLE_AT_ODIONGAN_WAREHOUSE", "RELEASED_FOR_DELIVERY"].includes(
-      status,
-    ) &&
-    poolReleased
-  ) {
-    return true;
-  }
-  const custody = normalizeStatus(pkg.custodyOwnerType);
-  if (custody === "WAREHOUSE" && !pkg.loadedByCheckerId && poolReleased) {
-    return true;
-  }
-  return false;
+  return isCheckerPieceAvailableToLoad(pkg, shipment);
 }
 
 function isLoadedByChecker(pkg = {}, checkerUid) {
@@ -80,7 +112,7 @@ function isLoadedByChecker(pkg = {}, checkerUid) {
 }
 
 /** Matches backend checker piece ownership (load / OFD / deliver). */
-function isCheckerCustodyPiece(pkg = {}, checkerUid) {
+export function isCheckerCustodyPiece(pkg = {}, checkerUid) {
   if (!checkerUid) return false;
   if (isLoadedByChecker(pkg, checkerUid)) return true;
   return (
@@ -187,7 +219,7 @@ function isMyPiece(pkg = {}, checkerUid) {
 
 /**
  * Last-mile phase for this checker based on their pieces (not master status alone).
- * @returns {'out_for_delivery'|'deliver'|'return'|null}
+ * @returns {'deliver'|'return'|null}
  */
 export function getCheckerPieceActionPhase(shipment = {}, checkerUid = null) {
   if (!checkerUid) return null;
@@ -230,7 +262,7 @@ export function getCheckerPieceActionPhase(shipment = {}, checkerUid = null) {
 
   if (myOfd > 0) return "deliver";
   if (myFailed > 0) return "return";
-  if (myOnVan > 0) return "out_for_delivery";
+  if (myOnVan > 0) return "deliver";
   if (myDelivered > 0) return null;
 
   return null;

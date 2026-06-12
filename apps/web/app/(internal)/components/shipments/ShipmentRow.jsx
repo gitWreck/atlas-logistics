@@ -36,7 +36,12 @@ export default function ShipmentRow({
   const isDelayed =
     !!s.truckDetails?.delayReason && !s.truckDetails?.delayCleared;
 
-  const loadedCount = s.metrics?.totalLoaded || 0;
+  const isOdionganTab = warehouseTab === "odiongan";
+  const checkerLoadedCount = s.metrics?.checkerLoaded || 0;
+  const linehaulLoadedCount = s.metrics?.totalLoaded || 0;
+  const loadedCount = isOdionganTab
+    ? checkerLoadedCount || linehaulLoadedCount
+    : linehaulLoadedCount;
   const totalCount = s.metrics?.totalContent || 0;
   const driverName = s.truckDetails?.driverName || "Unassigned";
 
@@ -45,7 +50,6 @@ export default function ShipmentRow({
   const routeCode = `${s.originCode || "N/A"} -> ${s.destinationCode || "N/A"}`;
   const routeLabel = getShipmentRouteLabel(s);
   const updatedLabel = s.updatedAt || "Just now";
-  const isOdionganTab = warehouseTab === "odiongan";
   const boardStatusKey = isOdionganTab
     ? getOdionganHubBoardStatusKey(s)
     : s.status;

@@ -1,6 +1,6 @@
 import { Dimensions } from "react-native";
 
-export const SUCCESS_MODAL_SECONDS = 5;
+export const SUCCESS_MODAL_SECONDS = 2;
 export const DELIVERY_PROOF_MIN_IMAGES = 1;
 export const DELIVERY_PROOF_MAX_IMAGES = 5;
 
@@ -33,10 +33,22 @@ export const MODE_SCAN_ACTIONS = {
       color: "#2563eb",
     },
     {
+      label: "Failed delivery",
+      status: "FAILED_DELIVERY",
+      icon: "exclamation-triangle",
+      color: "#dc2626",
+    },
+    {
       label: "Received",
       status: "RECEIVED",
       icon: "warehouse",
       color: "#10b981",
+    },
+    {
+      label: "Return to warehouse",
+      status: "RETURNED_TO_WAREHOUSE",
+      icon: "warehouse",
+      color: "#b45309",
     },
   ],
   info: [
@@ -49,34 +61,16 @@ export const MODE_SCAN_ACTIONS = {
   ],
   delivery: [
     {
-      label: "Load to van",
+      label: "Load",
       status: "LOAD_TO_VEHICLE",
       icon: "truck",
       color: "#2563eb",
-    },
-    {
-      label: "Out for delivery",
-      status: "OUT_FOR_DELIVERY",
-      icon: "shipping-fast",
-      color: "#f59e0b",
     },
     {
       label: "Delivered",
       status: "DELIVERED",
       icon: "check-circle",
       color: "#10b981",
-    },
-    {
-      label: "Failed delivery",
-      status: "FAILED_DELIVERY",
-      icon: "exclamation-triangle",
-      color: "#dc2626",
-    },
-    {
-      label: "Return to warehouse",
-      status: "RETURNED_TO_WAREHOUSE",
-      icon: "warehouse",
-      color: "#b45309",
     },
   ],
 };

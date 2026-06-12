@@ -5,9 +5,10 @@ const PACKAGE_STATUS_LABELS = {
   ARRIVED_AT_ODIONGAN: "Arrived at Odiongan",
   AVAILABLE_AT_ODIONGAN_WAREHOUSE: "Available at Odiongan",
   RELEASED_FOR_DELIVERY: "Released for delivery",
-  LOADED_TO_DELIVERY_VEHICLE: "Loaded to delivery vehicle",
+  LOADED_TO_DELIVERY_VEHICLE: "Out for delivery",
   READY_FOR_DELIVERY: "Ready for delivery",
   OUT_FOR_DELIVERY: "Out for delivery",
+  PARTIALLY_OUT_FOR_DELIVERY: "Partially out for delivery",
   DELIVERED: "Delivered",
   RETURNED_TO_WAREHOUSE: "Returned to warehouse",
   RETURNED_RECEIVED_AT_ODIONGAN: "Returned received at Odiongan",
@@ -33,7 +34,7 @@ const BREAKDOWN_LABELS = [
   { key: "inTransit", label: "In transit" },
   { key: "atOdiongan", label: "At Odiongan" },
   { key: "releasedForDelivery", label: "Released for delivery" },
-  { key: "onCheckerVan", label: "On checker van" },
+  { key: "onCheckerVan", label: "On checker van (legacy)" },
   { key: "outForDelivery", label: "Out for delivery" },
   { key: "delivered", label: "Delivered" },
   { key: "returned", label: "Returned" },
@@ -92,16 +93,16 @@ function classifyPackageBucket(pkg = {}) {
   ) {
     return { bucket: "returned", qty };
   }
-  if (status === "OUT_FOR_DELIVERY") return { bucket: "outForDelivery", qty };
   if (
-    [
-      "LOADED_TO_DELIVERY_VEHICLE",
-      "LOADED",
-      "READY_FOR_DELIVERY",
-      "PARTIALLY_LOADED",
-    ].includes(status) ||
+    status === "OUT_FOR_DELIVERY" ||
+    status === "LOADED_TO_DELIVERY_VEHICLE"
+  ) {
+    return { bucket: "outForDelivery", qty };
+  }
+  if (
+    ["LOADED", "READY_FOR_DELIVERY", "PARTIALLY_LOADED"].includes(status) ||
     (normalizeStatus(pkg.custodyOwnerType) === "CHECKER" &&
-      !["DELIVERED", "COMPLETED"].includes(status))
+      !["DELIVERED", "COMPLETED", "OUT_FOR_DELIVERY"].includes(status))
   ) {
     return { bucket: "onCheckerVan", qty };
   }
@@ -260,12 +261,22 @@ function getDivisoriaHubPieceCount(shipment = {}, breakdown = {}) {
   return count;
 }
 
-/** Pieces at Odiongan after unload/reconcile or released to delivery ops from Odiongan. */
-function getOdionganWarehousePieceCount(breakdown = {}) {
+/** Pieces en route to Odiongan after the linehaul trip has departed Divisoria. */
+function getOdionganEnRoutePieceCount(shipment = {}, breakdown = {}) {
+  const inTransitQty = Number(breakdown.inTransit || 0);
+  if (inTransitQty > 0 && !isTripStillAtDivisoriaOrigin(shipment)) {
+    return inTransitQty;
+  }
+  return 0;
+}
+
+/** Pieces at Odiongan, in delivery-ops pool, or en route from Divisoria. */
+function getOdionganWarehousePieceCount(shipment = {}, breakdown = {}) {
   return (
     Number(breakdown.atOdiongan || 0) +
     Number(breakdown.releasedForDelivery || 0) +
-    Number(breakdown.onCheckerVan || 0)
+    Number(breakdown.onCheckerVan || 0) +
+    getOdionganEnRoutePieceCount(shipment, breakdown)
   );
 }
 
@@ -292,18 +303,20 @@ export function shipmentMatchesDivisoriaHub(shipment = {}) {
 
 /**
  * Odiongan Warehouse tab: at least one piece at Odiongan after unload/reconcile,
- * or in the Odiongan delivery-ops pool. Partial arrivals are included (e.g. 1/4
- * arrived, 3/4 still on truck). Excludes shipments with zero Odiongan inventory.
+ * en route from Divisoria, or in the Odiongan delivery-ops pool. Partial arrivals
+ * are included (e.g. 1/4 arrived, 3/4 still on truck). Excludes shipments with
+ * zero Odiongan-bound inventory.
  */
 export function shipmentMatchesOdionganHub(shipment = {}) {
   const breakdown = resolveShipmentPackageBreakdown(shipment);
 
   if (breakdown.total > 0) {
-    return getOdionganWarehousePieceCount(breakdown) > 0;
+    return getOdionganWarehousePieceCount(shipment, breakdown) > 0;
   }
 
   const status = normalizeStatus(shipment.status);
   if (status === "PARTIALLY_ARRIVED") return true;
+  if (status === "IN_TRANSIT" || status === "PARTIALLY_IN_TRANSIT") return true;
 
   if (!isTripReconciledAtOdiongan(shipment)) return false;
 
@@ -318,19 +331,26 @@ export function getOdionganHubBoardStatusLabel(shipment = {}) {
   const breakdown = resolveShipmentPackageBreakdown(shipment);
   const reconciled = isTripReconciledAtOdiongan(shipment);
 
-  if (Number(breakdown.releasedForDelivery || 0) > 0) {
+  const outForDeliveryQty = Number(breakdown.outForDelivery || 0);
+  const releasedQty = Number(breakdown.releasedForDelivery || 0);
+  if (outForDeliveryQty > 0) {
+    return "Out for delivery";
+  }
+  if (releasedQty > 0) {
     return "Released for delivery";
   }
   if (Number(breakdown.onCheckerVan || 0) > 0) {
-    return "Ready for delivery";
+    return "Out for delivery";
   }
   const atOdionganQty = Number(breakdown.atOdiongan || 0);
   const stillInTransitQty = Number(breakdown.inTransit || 0);
+  const tripDeparted = !isTripStillAtDivisoriaOrigin(shipment);
   const isPartialArrival =
-    atOdionganQty > 0 &&
-    stillInTransitQty > 0 &&
-    !isTripStillAtDivisoriaOrigin(shipment);
+    atOdionganQty > 0 && stillInTransitQty > 0 && tripDeparted;
 
+  if (stillInTransitQty > 0 && atOdionganQty === 0 && tripDeparted) {
+    return "In transit";
+  }
   if (isPartialArrival) {
     return "Partially arrived at Odiongan";
   }
@@ -374,10 +394,15 @@ export function getOdionganHubBoardStatusLabel(shipment = {}) {
 export function getOdionganHubBoardStatusKey(shipment = {}) {
   const label = getOdionganHubBoardStatusLabel(shipment);
   if (label === "Released for delivery") return "RELEASED_FOR_DELIVERY";
+  if (label === "Partially out for delivery") {
+    return "PARTIALLY_OUT_FOR_DELIVERY";
+  }
+  if (label === "Out for delivery") return "OUT_FOR_DELIVERY";
   if (label === "Ready for delivery") return "READY_FOR_DELIVERY";
   if (label === "Reconciled") return "RECONCILED";
   if (label === "Arrived at Odiongan") return "ARRIVED_AT_ODIONGAN";
   if (label === "Partially arrived at Odiongan") return "PARTIALLY_ARRIVED";
+  if (label === "In transit") return "IN_TRANSIT";
   return normalizeStatus(shipment.status);
 }
 
