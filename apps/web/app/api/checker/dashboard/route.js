@@ -20,11 +20,10 @@ export async function GET(request) {
       .count()
       .get();
 
-    // B. Loaded Today (Status = LOADED and LoadedAt >= Today)
-    // Note: You might need a composite index for this: status + loadedAt
-    const loadedQuery = shipmentsRef
-      .where("status", "==", "LOADED")
-      .where("loadedAt", ">=", startOfDayTimestamp)
+    // B. Out for delivery today (checker load scan sets this per piece)
+    const outForDeliveryQuery = shipmentsRef
+      .where("status", "==", "OUT_FOR_DELIVERY")
+      .where("updatedAt", ">=", startOfDayTimestamp)
       .count()
       .get();
 
@@ -34,18 +33,18 @@ export async function GET(request) {
       .count()
       .get();
 
-    // D. Recent Outbound Table (Loaded or Out for Delivery)
+    // D. Recent outbound table (checker load → out for delivery)
     const historyQuery = shipmentsRef
-      .where("status", "in", ["LOADED", "OUT_FOR_DELIVERY"])
+      .where("status", "==", "OUT_FOR_DELIVERY")
       .orderBy("updatedAt", "desc")
       .limit(10)
       .get();
 
     // 4. Await All
-    const [receivedSnap, loadedSnap, pendingSnap, historySnap] =
+    const [receivedSnap, outForDeliverySnap, pendingSnap, historySnap] =
       await Promise.all([
         receivedQuery,
-        loadedQuery,
+        outForDeliveryQuery,
         pendingQuery,
         historyQuery,
       ]);
@@ -66,7 +65,7 @@ export async function GET(request) {
     return NextResponse.json({
       stats: {
         received: receivedSnap.data().count,
-        loaded: loadedSnap.data().count,
+        outForDelivery: outForDeliverySnap.data().count,
         pending: pendingSnap.data().count,
       },
       recentShipments,

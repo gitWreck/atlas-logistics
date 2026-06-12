@@ -81,10 +81,14 @@ const TripBoard = forwardRef(function TripBoard(
       if (!user) return;
 
       const token = await user.getIdToken();
-      const tripsUrl =
-        activeTripLimit === "50" && completedTripLimit === "50"
-          ? "/api/trips"
-          : `/api/trips?activeLimit=${activeTripLimit}&completedLimit=${completedTripLimit}`;
+      const tripsParams = new URLSearchParams({ view: "board" });
+      if (activeTripLimit !== "50") {
+        tripsParams.set("activeLimit", activeTripLimit);
+      }
+      if (completedTripLimit !== "50") {
+        tripsParams.set("completedLimit", completedTripLimit);
+      }
+      const tripsUrl = `/api/trips?${tripsParams.toString()}`;
 
       const res = await fetch(tripsUrl, {
         method: "GET",

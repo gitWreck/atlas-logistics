@@ -15,7 +15,11 @@ import { useRouter } from "next/navigation";
 export default function CheckerOverview({ isDark = true }) {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
-  const [stats, setStats] = useState({ received: 0, loaded: 0, pending: 0 });
+  const [stats, setStats] = useState({
+    received: 0,
+    outForDelivery: 0,
+    pending: 0,
+  });
   const [recentShipments, setRecentShipments] = useState([]);
   const [quickScan, setQuickScan] = useState("");
 
@@ -37,7 +41,7 @@ export default function CheckerOverview({ isDark = true }) {
       // 2. SET REAL DATA
       setStats({
         received: data.stats.received || 0,
-        loaded: data.stats.loaded || 0,
+        outForDelivery: data.stats.outForDelivery || 0,
         pending: data.stats.pending || 0,
       });
 
@@ -119,11 +123,11 @@ export default function CheckerOverview({ isDark = true }) {
           bg="bg-blue-500/10"
         />
         <StatusCard
-          title="Loaded to Trucks"
-          value={stats.loaded}
+          title="Out for Delivery"
+          value={stats.outForDelivery}
           icon={faTruckLoading}
-          color="text-emerald-400"
-          bg="bg-emerald-500/10"
+          color="text-purple-400"
+          bg="bg-purple-500/10"
         />
         <StatusCard
           title="Pending / Floor"
@@ -139,7 +143,7 @@ export default function CheckerOverview({ isDark = true }) {
         <div className={`px-6 py-4 border-b flex justify-between items-center ${isDark ? "border-slate-800" : "border-slate-200"}`}>
           <h2 className={`font-bold flex items-center gap-2 ${titleClass}`}>
             <FontAwesomeIcon icon={faTruck} className="text-slate-500" />
-            Out for Delivery / Loaded
+            Out for Delivery
           </h2>
           <button className={`text-xs text-slate-500 transition-colors ${isDark ? "hover:text-white" : "hover:text-slate-900"}`}>
             View All History
@@ -192,14 +196,11 @@ export default function CheckerOverview({ isDark = true }) {
                       </span>
                     </td>
                     <td className="px-6 py-4 text-right">
-                      <span
-                        className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${
-                          s.status === "OUT_FOR_DELIVERY"
-                            ? "bg-purple-500/10 text-purple-400 border border-purple-500/20"
-                            : "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
-                        }`}
-                      >
-                        {s.status.replace(/_/g, " ")}
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase bg-purple-500/10 text-purple-400 border border-purple-500/20">
+                        {String(s.status || "OUT_FOR_DELIVERY").replace(
+                          /_/g,
+                          " ",
+                        )}
                       </span>
                     </td>
                   </tr>

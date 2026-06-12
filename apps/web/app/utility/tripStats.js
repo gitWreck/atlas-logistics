@@ -296,9 +296,14 @@ function resolveTripLoadSummaryPhase(trip = {}) {
   }
 
   if (
-    ["ARRIVED", "UNLOADING", "READY_FOR_DELIVERY", "OUT_FOR_DELIVERY", "COMPLETED", "DELIVERED"].includes(
-      status,
-    ) ||
+    [
+      "ARRIVED",
+      "UNLOADING",
+      "READY_FOR_DELIVERY",
+      "OUT_FOR_DELIVERY",
+      "COMPLETED",
+      "DELIVERED",
+    ].includes(status) ||
     manifestStatus === MANIFEST_STATUS.RECONCILED
   ) {
     return TRIP_LOAD_SUMMARY_PHASE.ARRIVED;
@@ -326,8 +331,7 @@ function buildArrivedPrimaryCard(tripWithShipments = {}) {
         hubPhase === HUB_BOARD_PHASE.UNLOADING
           ? "Remaining to Unload"
           : "Unloaded",
-      displayValue:
-        hubTotal > 0 ? `${count}/${hubTotal}` : String(count),
+      displayValue: hubTotal > 0 ? `${count}/${hubTotal}` : String(count),
       subtext: hubStats?.subLabel || "Unload progress at destination hub",
     };
   }
@@ -340,12 +344,19 @@ function buildArrivedPrimaryCard(tripWithShipments = {}) {
     };
   }
 
+  if (hubPhase === HUB_BOARD_PHASE.OUT_FOR_DELIVERY) {
+    return {
+      label: "Out for Delivery",
+      displayValue: total > 0 ? `${delivered}/${total}` : String(delivered),
+      subtext: "Delivered out of pieces on this trip",
+    };
+  }
+
   const denominator = total;
   const count = progressTotals.count;
   return {
     label: "Trip Progress",
-    displayValue:
-      denominator > 0 ? `${count}/${denominator}` : String(count),
+    displayValue: denominator > 0 ? `${count}/${denominator}` : String(count),
     subtext: `Delivered out of ${denominator} pieces on this trip`,
   };
 }
@@ -455,7 +466,8 @@ export function getTripStatsDisplay(trip) {
 
   if (status === "COMPLETED") {
     const processed = Math.max(processedAtHub, received, loaded);
-    const count = total > 0 ? Math.min(Math.max(processed, loaded), total) : processed;
+    const count =
+      total > 0 ? Math.min(Math.max(processed, loaded), total) : processed;
     return {
       count,
       total: total > 0 ? total : Math.max(total, processed),
@@ -466,7 +478,8 @@ export function getTripStatsDisplay(trip) {
 
   if (status === "DELIVERED") {
     const processed = Math.max(processedAtHub, loaded);
-    const count = total > 0 ? Math.min(Math.max(processed, loaded), total) : processed;
+    const count =
+      total > 0 ? Math.min(Math.max(processed, loaded), total) : processed;
     return {
       count,
       total: total > 0 ? total : Math.max(total, processed),

@@ -108,9 +108,6 @@ export default function ShipmentActionFooter({
   } else if (checkerReturnMode) {
     buttonTitle = "Return to Warehouse";
     isFinalAction = false;
-  } else if (checkerActionPhase === "out_for_delivery") {
-    buttonTitle = "Mark Out for Delivery";
-    isFinalAction = false;
   } else if (checkerActionPhase === "deliver") {
     buttonTitle = "Scan to Deliver";
     isFinalAction = false;

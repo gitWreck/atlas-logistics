@@ -65,7 +65,7 @@ export default function OperationsGrid({
           </TouchableOpacity>
         </View>
 
-        {/* ROW 2: Load truck (delivery mode) + Scan Info */}
+        {/* ROW 2: Load (last-mile) + Scan Info */}
         <View style={styles.row}>
           <TouchableOpacity
             style={styles.gridBtnTouchable}
@@ -81,7 +81,7 @@ export default function OperationsGrid({
               <View style={styles.iconCircle}>
                 <FontAwesome5 name="truck" size={24} color="#3b82f6" />
               </View>
-              <Text style={styles.btnTitle}>LOAD TRUCK</Text>
+              <Text style={styles.btnTitle}>LOAD</Text>
             </LinearGradient>
           </TouchableOpacity>
 

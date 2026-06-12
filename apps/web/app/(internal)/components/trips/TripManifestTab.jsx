@@ -65,7 +65,11 @@ export default function TripManifestTab({
   const action = getTableActionClasses(isDark);
 
   const hubTrip = isHubTransferTrip(
-    trip || { tripType, manifestStatus: tripManifestStatus, reconciledAt: tripReconciledAt },
+    trip || {
+      tripType,
+      manifestStatus: tripManifestStatus,
+      reconciledAt: tripReconciledAt,
+    },
   );
   const manifestStatus = resolveManifestStatus(
     trip || {
@@ -102,6 +106,31 @@ export default function TripManifestTab({
   );
   const isArrivedPhase = loadSummary.isArrivedPhase;
   const progressColumnLabel = isArrivedPhase ? "Trip Progress" : "Loaded Qty";
+
+  const tripProgressContext = useMemo(
+    () => ({
+      ...(trip || {
+        id: tripId,
+        tripId,
+        tripType,
+        manifestStatus,
+        reconciledAt: tripReconciledAt,
+        manifestLocked: isLocked,
+        status: tripStatus,
+      }),
+      shipments,
+    }),
+    [
+      trip,
+      tripId,
+      tripType,
+      manifestStatus,
+      tripReconciledAt,
+      isLocked,
+      tripStatus,
+      shipments,
+    ],
+  );
 
   const rowAction = {
     print: isDark
@@ -263,563 +292,552 @@ export default function TripManifestTab({
 
   return (
     <>
-    <div className="space-y-4 animate-in fade-in slide-in-from-right-4 duration-300">
-      {hubTrip ? (
-        <TripLoadSummary trip={trip} shipments={shipments} isDark={isDark} />
-      ) : (
-        <TripDeliveryPoolSummary shipments={shipments} isDark={isDark} />
-      )}
+      <div className="space-y-4 animate-in fade-in slide-in-from-right-4 duration-300">
+        {hubTrip ? (
+          <TripLoadSummary trip={trip} shipments={shipments} isDark={isDark} />
+        ) : (
+          <TripDeliveryPoolSummary shipments={shipments} isDark={isDark} />
+        )}
 
-      {hubTrip && (
-        <div
-          className={`flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-4 rounded-2xl border ${theme.statCard}`}
-        >
-          <div className="flex items-center gap-3">
-            <span className={`text-xs font-bold uppercase ${theme.cellSecondary}`}>
-              Manifest
-            </span>
-            <ManifestStatusBadge
-              trip={
-                trip || {
-                  tripType,
-                  manifestStatus,
-                  reconciledAt: tripReconciledAt,
-                  manifestLocked: isLocked,
-                }
-              }
-              isDark={isDark}
-            />
-          </div>
-          <p className={`text-xs ${theme.cellSecondary}`}>
-            {isManifestReconciled
-              ? "Reconciliation complete. Release shipments from the trip scanner when ready."
-              : manifestStatus === MANIFEST_STATUS.RECEIVING_IN_PROGRESS
-                ? "Receiving in progress. Finish unload scans, then finalize reconciliation."
-                : manifestStatus === MANIFEST_STATUS.LOCKED
-                  ? "Manifest is locked. Start receiving at Odiongan before unloading."
-                  : "Manifest is open. Load packages, set trip to LOADED, then lock before dispatch."}
-          </p>
-        </div>
-      )}
-
-      {/* Header */}
-      <div className={`p-4 rounded-2xl border ${theme.statCard}`}>
-        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <div
+        {hubTrip && (
+          <div
+            className={`flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-4 rounded-2xl border ${theme.statCard}`}
+          >
+            <div className="flex items-center gap-3">
+              <span
                 className={`text-xs font-bold uppercase ${theme.cellSecondary}`}
               >
-                {hubTrip ? "Tracking Numbers" : "Total Shipments"}
-              </div>
+                Manifest
+              </span>
+              <ManifestStatusBadge
+                trip={
+                  trip || {
+                    tripType,
+                    manifestStatus,
+                    reconciledAt: tripReconciledAt,
+                    manifestLocked: isLocked,
+                  }
+                }
+                isDark={isDark}
+              />
+            </div>
+            <p className={`text-xs ${theme.cellSecondary}`}>
+              {isManifestReconciled
+                ? "Reconciliation complete. Release shipments from the trip scanner when ready."
+                : manifestStatus === MANIFEST_STATUS.RECEIVING_IN_PROGRESS
+                  ? "Receiving in progress. Finish unload scans, then finalize reconciliation."
+                  : manifestStatus === MANIFEST_STATUS.LOCKED
+                    ? "Manifest is locked. Start receiving at Odiongan before unloading."
+                    : "Manifest is open. Load packages, set trip to LOADED, then lock before dispatch."}
+            </p>
+          </div>
+        )}
 
-              <div className={`text-2xl font-bold ${theme.headingText}`}>
-                {shipments.length}{" "}
-                {/* <span className={`text-sm font-normal ${theme.cellSecondary}`}>
+        {/* Header */}
+        <div className={`p-4 rounded-2xl border ${theme.statCard}`}>
+          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <div
+                  className={`text-xs font-bold uppercase ${theme.cellSecondary}`}
+                >
+                  {hubTrip ? "Tracking Numbers" : "Total Shipments"}
+                </div>
+
+                <div className={`text-2xl font-bold ${theme.headingText}`}>
+                  {shipments.length}{" "}
+                  {/* <span className={`text-sm font-normal ${theme.cellSecondary}`}>
                   shipment{shipments.length > 1 ? "s" : ""}
                 </span> */}
+                </div>
               </div>
+
+              {selectedIds.size > 0 && (
+                <div
+                  className={`lg:hidden text-xs font-bold px-3 py-1.5 rounded-full border ${theme.selectedInfo}`}
+                >
+                  {selectedIds.size} selected
+                </div>
+              )}
             </div>
 
-            {selectedIds.size > 0 && (
-              <div
-                className={`lg:hidden text-xs font-bold px-3 py-1.5 rounded-full border ${theme.selectedInfo}`}
-              >
-                {selectedIds.size} selected
+            {/* <div className="flex flex-col sm:flex-row gap-2 w-full lg:w-auto"> */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-[1fr_auto_auto] gap-2 w-full">
+              {/* <div className="relative flex-1 lg:w-64"> */}
+              <div className="relative col-span-1 sm:col-span-2 lg:col-span-1">
+                <FontAwesomeIcon
+                  icon={faSearch}
+                  className={`absolute left-3 top-1/2 -translate-y-1/2 text-xs ${theme.inputIcon}`}
+                />
+
+                <input
+                  type="text"
+                  placeholder="Search tracking or recipient..."
+                  // className={`w-full border rounded-xl pl-9 pr-3 py-2.5 text-sm focus:border-blue-500 outline-none ${theme.input}`}
+                  className={`w-full border rounded-lg pl-9 pr-3 py-1.5 text-xs h-8 leading-none focus:border-blue-500 outline-none ${theme.input}`}
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                />
               </div>
-            )}
-          </div>
 
-          {/* <div className="flex flex-col sm:flex-row gap-2 w-full lg:w-auto"> */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-[1fr_auto_auto] gap-2 w-full">
-            {/* <div className="relative flex-1 lg:w-64"> */}
-            <div className="relative col-span-1 sm:col-span-2 lg:col-span-1">
-              <FontAwesomeIcon
-                icon={faSearch}
-                className={`absolute left-3 top-1/2 -translate-y-1/2 text-xs ${theme.inputIcon}`}
-              />
+              <div className="grid grid-cols-2 sm:flex gap-2 flex-wrap">
+                <button
+                  type="button"
+                  onClick={() =>
+                    window.open(
+                      `/components/print/labels?tripId=${tripId}&mode=individual`,
+                      "_blank",
+                    )
+                  }
+                  // className={`text-xs font-bold px-3 py-2.5 rounded-xl flex items-center justify-center gap-2 transition-colors border ${action.soft}`}
+                  className={`text-xs font-bold px-3 py-1.5 h-8 rounded-lg flex items-center justify-center gap-2 transition-colors ${action.soft}`}
+                  title="Print All Labels"
+                >
+                  <FontAwesomeIcon icon={faPrint} />
+                  Labels
+                </button>
 
-              <input
-                type="text"
-                placeholder="Search tracking or recipient..."
-                // className={`w-full border rounded-xl pl-9 pr-3 py-2.5 text-sm focus:border-blue-500 outline-none ${theme.input}`}
-                className={`w-full border rounded-lg pl-9 pr-3 py-1.5 text-xs h-8 leading-none focus:border-blue-500 outline-none ${theme.input}`}
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-              />
-            </div>
-
-            <div className="grid grid-cols-2 sm:flex gap-2 flex-wrap">
-              <button
-                type="button"
-                onClick={() =>
-                  window.open(
-                    `/components/print/labels?tripId=${tripId}&mode=individual`,
-                    "_blank",
-                  )
-                }
-                // className={`text-xs font-bold px-3 py-2.5 rounded-xl flex items-center justify-center gap-2 transition-colors border ${action.soft}`}
-                className={`text-xs font-bold px-3 py-1.5 h-8 rounded-lg flex items-center justify-center gap-2 transition-colors ${action.soft}`}
-                title="Print All Labels"
-              >
-                <FontAwesomeIcon icon={faPrint} />
-                Labels
-              </button>
-
-              <button
-                type="button"
-                onClick={onAddShipment}
-                disabled={isLocked}
-                // className={`text-xs font-bold px-3 py-2.5 rounded-xl flex items-center justify-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap ${action.solid}`}
-                className={`text-xs font-bold px-3 py-1.5 h-8 rounded-lg flex items-center justify-center gap-2 transition-colors ${action.solid}`}
-              >
-                <FontAwesomeIcon icon={faPlus} />
-                Shipments
-              </button>
+                <button
+                  type="button"
+                  onClick={onAddShipment}
+                  disabled={isLocked}
+                  // className={`text-xs font-bold px-3 py-2.5 rounded-xl flex items-center justify-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap ${action.solid}`}
+                  className={`text-xs font-bold px-3 py-1.5 h-8 rounded-lg flex items-center justify-center gap-2 transition-colors ${action.solid}`}
+                >
+                  <FontAwesomeIcon icon={faPlus} />
+                  Shipments
+                </button>
+              </div>
             </div>
           </div>
         </div>
-      </div>
 
-      {/* Bulk Action Bar */}
-      {selectedIds.size > 0 && (
-        <div
-          className={`p-3 rounded-2xl border flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3 animate-in slide-in-from-top-2 ${theme.bulkBar}`}
-        >
-          <div className={`text-xs font-bold ${theme.bulkBarText}`}>
-            {selectedIds.size} selected
-          </div>
-
-          {renderBulkActions()}
-        </div>
-      )}
-
-      {/* Mobile Cards */}
-      <div className="block lg:hidden space-y-3">
-        {loading ? (
+        {/* Bulk Action Bar */}
+        {selectedIds.size > 0 && (
           <div
-            className={`rounded-2xl border px-4 py-8 text-center animate-pulse ${theme.container} ${theme.emptyText}`}
+            className={`p-3 rounded-2xl border flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3 animate-in slide-in-from-top-2 ${theme.bulkBar}`}
           >
-            Loading manifest...
+            <div className={`text-xs font-bold ${theme.bulkBarText}`}>
+              {selectedIds.size} selected
+            </div>
+
+            {renderBulkActions()}
           </div>
-        ) : filteredData.length === 0 ? (
-          <div
-            className={`rounded-2xl border px-4 py-8 text-center italic ${theme.container} ${theme.emptyText}`}
-          >
-            No shipments found.
-          </div>
-        ) : (
-          paginatedData.map((shipment, idx) => {
-            const isSelected = selectedIds.has(shipment.id);
-            const loadedCount = shipment.loadedCount || 0;
-            const shipmentPieceTotal =
-              shipment.shipmentPieceTotal ||
-              shipment.totals?.totalContentQty ||
-              0;
-            const isFullyLoaded = loadedCount >= (shipmentPieceTotal || 1);
-            const shipmentStatus = shipment.status || "UNKNOWN";
+        )}
 
-            return (
-              <div
-                key={shipment.id || idx}
-                className={`rounded-2xl border p-4 transition-colors ${
-                  isSelected ? theme.selectedRow : theme.container
-                }`}
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <button
-                    type="button"
-                    onClick={() => handleSelectOne(shipment.id)}
-                    className="pt-1"
-                  >
-                    <FontAwesomeIcon
-                      icon={isSelected ? faCheckSquare : faSquare}
-                      className={
-                        isSelected ? theme.checkboxActive : theme.checkboxIdle
-                      }
-                    />
-                  </button>
+        {/* Mobile Cards */}
+        <div className="block lg:hidden space-y-3">
+          {loading ? (
+            <div
+              className={`rounded-2xl border px-4 py-8 text-center animate-pulse ${theme.container} ${theme.emptyText}`}
+            >
+              Loading manifest...
+            </div>
+          ) : filteredData.length === 0 ? (
+            <div
+              className={`rounded-2xl border px-4 py-8 text-center italic ${theme.container} ${theme.emptyText}`}
+            >
+              No shipments found.
+            </div>
+          ) : (
+            paginatedData.map((shipment, idx) => {
+              const isSelected = selectedIds.has(shipment.id);
+              const loadedCount = shipment.loadedCount || 0;
+              const shipmentPieceTotal =
+                shipment.shipmentPieceTotal ||
+                shipment.totals?.totalContentQty ||
+                0;
+              const isFullyLoaded = loadedCount >= (shipmentPieceTotal || 1);
+              const shipmentStatus = shipment.status || "UNKNOWN";
 
-                  <div className="min-w-0 flex-1">
-                    <div
-                      className={`font-bold text-sm font-mono break-all ${theme.cellPrimary}`}
+              return (
+                <div
+                  key={shipment.id || idx}
+                  className={`rounded-2xl border p-4 transition-colors ${
+                    isSelected ? theme.selectedRow : theme.container
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <button
+                      type="button"
+                      onClick={() => handleSelectOne(shipment.id)}
+                      className="pt-1"
                     >
-                      {shipment.shipmentId}
-                    </div>
+                      <FontAwesomeIcon
+                        icon={isSelected ? faCheckSquare : faSquare}
+                        className={
+                          isSelected ? theme.checkboxActive : theme.checkboxIdle
+                        }
+                      />
+                    </button>
 
-                    <div
-                      className={`text-sm mt-1 truncate ${theme.cellSecondary}`}
-                    >
-                      {shipment.recipient?.name || "Unknown"}
-                    </div>
-
-                    <div className="hidden">
-                      {shipment.recipient?.address?.city || "—"}
-                    </div>
-
-                    <div className="mt-2 flex min-w-0 items-center gap-2">
-                      <span
-                        className={`min-w-0 flex-1 truncate text-sm font-medium ${theme.cellSecondary}`}
+                    <div className="min-w-0 flex-1">
+                      <div
+                        className={`font-bold text-sm font-mono break-all ${theme.cellPrimary}`}
                       >
-                        {shipment.recipient?.address?.city || "-"}
-                      </span>
+                        {shipment.shipmentId}
+                      </div>
+
+                      <div
+                        className={`text-sm mt-1 truncate ${theme.cellSecondary}`}
+                      >
+                        {shipment.recipient?.name || "Unknown"}
+                      </div>
+
+                      <div className="hidden">
+                        {shipment.recipient?.address?.city || "—"}
+                      </div>
+
+                      <div className="mt-2 flex min-w-0 items-center gap-2">
+                        <span
+                          className={`min-w-0 flex-1 truncate text-sm font-medium ${theme.cellSecondary}`}
+                        >
+                          {shipment.recipient?.address?.city || "-"}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="flex shrink-0 flex-col items-end gap-2">
+                      {isArrivedPhase ? (
+                        <TripShipmentProgressCell
+                          shipment={shipment}
+                          trip={tripProgressContext}
+                          isDark={isDark}
+                          compact
+                        />
+                      ) : (
+                        <span
+                          className={`text-[10px] font-bold px-2.5 py-1.5 rounded-lg border ${
+                            isFullyLoaded
+                              ? theme.countBadgeLoaded
+                              : theme.countBadgeDefault
+                          }`}
+                        >
+                          {loadedCount} / {shipmentPieceTotal}
+                        </span>
+                      )}
+
+                      <StatusBadge status={shipmentStatus} isDark={isDark} />
                     </div>
                   </div>
 
-                  <div className="flex shrink-0 flex-col items-end gap-2">
-                    {isArrivedPhase ? (
-                      <TripShipmentProgressCell
-                        shipment={shipment}
-                        trip={
-                          trip || {
-                            id: tripId,
-                            tripId,
-                            status: tripStatus,
-                            tripType,
-                            manifestStatus,
-                            reconciledAt: tripReconciledAt,
-                          }
-                        }
-                        isDark={isDark}
-                        compact
-                      />
-                    ) : (
-                      <span
-                        className={`text-[10px] font-bold px-2.5 py-1.5 rounded-lg border ${
-                          isFullyLoaded
-                            ? theme.countBadgeLoaded
-                            : theme.countBadgeDefault
-                        }`}
+                  {/* <div className="mt-4 grid grid-cols-3 gap-2"> */}
+                  <div className="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        window.open(
+                          packageLabelUrl(shipment.shipmentId),
+                          "_blank",
+                        )
+                      }
+                      className={`text-xs border px-3 py-2 rounded-xl transition-all flex items-center justify-center gap-2 ${rowAction.print}`}
+                    >
+                      <FontAwesomeIcon icon={faPrint} />
+                      Print
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => onViewPackages?.(shipment)}
+                      className={`text-xs border px-3 py-2 rounded-xl transition-all flex items-center justify-center gap-2 ${rowAction.view}`}
+                    >
+                      <FontAwesomeIcon icon={faBoxOpen} />
+                      View
+                    </button>
+
+                    {getShipmentInvoice(shipment).hasInvoice ? (
+                      <button
+                        type="button"
+                        onClick={() => onViewInvoice?.(shipment)}
+                        className={`text-xs border px-3 py-2 rounded-xl transition-all flex items-center justify-center gap-2 ${rowAction.invoice}`}
                       >
-                        {loadedCount} / {shipmentPieceTotal}
-                      </span>
+                        <FontAwesomeIcon icon={faReceipt} />
+                        Invoice
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => onCreateInvoice?.(shipment)}
+                        className={`text-xs border px-3 py-2 rounded-xl transition-all flex items-center justify-center gap-2 ${rowAction.createInvoice}`}
+                      >
+                        <FontAwesomeIcon icon={faFileInvoiceDollar} />
+                        Invoice
+                      </button>
                     )}
 
-                    <StatusBadge status={shipmentStatus} isDark={isDark} />
+                    <button
+                      type="button"
+                      onClick={() => onUnassign(shipment)}
+                      className={`text-xs border px-3 py-2 rounded-xl transition-all flex items-center justify-center gap-2 disabled:opacity-50 ${rowAction.remove}`}
+                      disabled={isLocked}
+                    >
+                      <FontAwesomeIcon icon={faMinus} />
+                      Remove
+                    </button>
                   </div>
                 </div>
-
-                {/* <div className="mt-4 grid grid-cols-3 gap-2"> */}
-                <div className="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-2">
-                  <button
-                    type="button"
-                    onClick={() =>
-                      window.open(
-                        packageLabelUrl(shipment.shipmentId),
-                        "_blank",
-                      )
-                    }
-                    className={`text-xs border px-3 py-2 rounded-xl transition-all flex items-center justify-center gap-2 ${rowAction.print}`}
-                  >
-                    <FontAwesomeIcon icon={faPrint} />
-                    Print
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => onViewPackages?.(shipment)}
-                    className={`text-xs border px-3 py-2 rounded-xl transition-all flex items-center justify-center gap-2 ${rowAction.view}`}
-                  >
-                    <FontAwesomeIcon icon={faBoxOpen} />
-                    View
-                  </button>
-
-                  {getShipmentInvoice(shipment).hasInvoice ? (
-                    <button
-                      type="button"
-                      onClick={() => onViewInvoice?.(shipment)}
-                      className={`text-xs border px-3 py-2 rounded-xl transition-all flex items-center justify-center gap-2 ${rowAction.invoice}`}
-                    >
-                      <FontAwesomeIcon icon={faReceipt} />
-                      Invoice
-                    </button>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => onCreateInvoice?.(shipment)}
-                      className={`text-xs border px-3 py-2 rounded-xl transition-all flex items-center justify-center gap-2 ${rowAction.createInvoice}`}
-                    >
-                      <FontAwesomeIcon icon={faFileInvoiceDollar} />
-                      Invoice
-                    </button>
-                  )}
-
-                  <button
-                    type="button"
-                    onClick={() => onUnassign(shipment)}
-                    className={`text-xs border px-3 py-2 rounded-xl transition-all flex items-center justify-center gap-2 disabled:opacity-50 ${rowAction.remove}`}
-                    disabled={isLocked}
-                  >
-                    <FontAwesomeIcon icon={faMinus} />
-                    Remove
-                  </button>
-                </div>
-              </div>
-            );
-          })
-        )}
-      </div>
-
-      {!loading && filteredData.length > 0 && (
-        <div
-          className={`block lg:hidden border rounded-2xl overflow-hidden ${theme.container}`}
-        >
-          <TablePaginationFooter
-            totalItems={filteredData.length}
-            currentPage={safeCurrentPage}
-            itemsPerPage={itemsPerPage}
-            totalPages={totalPages}
-            limitValue={manifestLimit}
-            limitTitle="Manifest rows per page"
-            onLimitChange={setManifestLimit}
-            onPrevious={() => setCurrentPage((page) => Math.max(1, page - 1))}
-            onNext={() =>
-              setCurrentPage((page) => Math.min(totalPages, page + 1))
-            }
-            theme={theme}
-          />
-        </div>
-      )}
-
-      {/* Desktop Table */}
-      <div
-        className={`hidden lg:block border rounded-2xl overflow-hidden ${theme.container}`}
-      >
-        <div className="overflow-x-auto">
-          <table className={`w-full text-left text-sm ${theme.tableText}`}>
-            <thead
-              className={`uppercase font-bold text-[10px] tracking-wider ${theme.thead}`}
-            >
-              <tr>
-                <th
-                  className={`px-4 py-3 w-10 text-center ${theme.stickyHead}`}
-                >
-                  <button
-                    type="button"
-                    onClick={handleSelectAll}
-                    disabled={filteredData.length === 0}
-                    className={
-                      isDark
-                        ? "hover:text-white transition-colors"
-                        : "hover:text-slate-900 transition-colors"
-                    }
-                  >
-                    <FontAwesomeIcon
-                      icon={isAllSelected ? faCheckSquare : faSquare}
-                      className={
-                        selectedIds.size > 0
-                          ? theme.checkboxActive
-                          : theme.checkboxIdle
-                      }
-                    />
-                  </button>
-                </th>
-
-                <th className="px-4 py-3 w-10 text-center">#</th>
-                <th className="px-4 py-3">Tracking / Customer</th>
-                <th className="px-4 py-3">Destination</th>
-                <th className="px-4 py-3 text-center">Shipment Status</th>
-                <th className="px-4 py-3 text-center">{progressColumnLabel}</th>
-                <th className="px-4 py-3 text-right">Action</th>
-              </tr>
-            </thead>
-
-            <tbody className={`divide-y ${theme.tbodyDivide}`}>
-              {loading ? (
-                <tr>
-                  <td
-                    colSpan="7"
-                    className={`px-4 py-8 text-center animate-pulse ${theme.emptyText}`}
-                  >
-                    Loading manifest...
-                  </td>
-                </tr>
-              ) : filteredData.length === 0 ? (
-                <tr>
-                  <td
-                    colSpan="7"
-                    className={`px-4 py-8 text-center italic ${theme.emptyText}`}
-                  >
-                    No shipments found.
-                  </td>
-                </tr>
-              ) : (
-                paginatedData.map((shipment, idx) => {
-                  const isSelected = selectedIds.has(shipment.id);
-                  const loadedCount = shipment.loadedCount || 0;
-                  const shipmentPieceTotal =
-                    shipment.shipmentPieceTotal ||
-                    shipment.totals?.totalContentQty ||
-                    0;
-                  const isFullyLoaded =
-                    loadedCount >= (shipmentPieceTotal || 1);
-                  const shipmentStatus = shipment.status || "UNKNOWN";
-
-                  return (
-                    <tr
-                      key={shipment.id || idx}
-                      className={`transition-colors ${
-                        isSelected ? theme.selectedRow : theme.rowHover
-                      }`}
-                    >
-                      <td className="px-4 py-3 text-center">
-                        <button
-                          type="button"
-                          onClick={() => handleSelectOne(shipment.id)}
-                        >
-                          <FontAwesomeIcon
-                            icon={isSelected ? faCheckSquare : faSquare}
-                            className={
-                              isSelected
-                                ? theme.checkboxActive
-                                : theme.checkboxIdle
-                            }
-                          />
-                        </button>
-                      </td>
-
-                      <td
-                        className={`px-4 py-3 text-center font-mono text-xs ${theme.cellSecondary}`}
-                      >
-                        {pageStartIndex + idx + 1}
-                      </td>
-
-                      <td className="px-4 py-3">
-                        <div
-                          className={`font-bold text-xs font-mono ${theme.cellPrimary}`}
-                        >
-                          {shipment.shipmentId}
-                        </div>
-                        <div
-                          className={`text-[11px] truncate max-w-[180px] ${theme.cellSecondary}`}
-                        >
-                          {shipment.recipient?.name || "Unknown"}
-                        </div>
-                      </td>
-
-                      <td
-                        className={`px-4 py-3 text-xs ${theme.cellSecondary}`}
-                      >
-                        {shipment.recipient?.address?.city || "—"}
-                      </td>
-
-                      <td className="px-4 py-3 text-center">
-                        <StatusBadge status={shipmentStatus} isDark={isDark} />
-                      </td>
-
-                      <td className="px-4 py-3 text-center">
-                        {isArrivedPhase ? (
-                          <div className="flex justify-center">
-                            <TripShipmentProgressCell
-                              shipment={shipment}
-                              trip={
-                                trip || {
-                                  id: tripId,
-                                  tripId,
-                                  status: tripStatus,
-                                  tripType,
-                                  manifestStatus,
-                                  reconciledAt: tripReconciledAt,
-                                }
-                              }
-                              isDark={isDark}
-                            />
-                          </div>
-                        ) : (
-                          <span
-                            className={`text-[10px] font-bold px-2 py-2 rounded border ${
-                              isFullyLoaded
-                                ? theme.countBadgeLoaded
-                                : theme.countBadgeDefault
-                            }`}
-                          >
-                            {loadedCount} / {shipmentPieceTotal}
-                          </span>
-                        )}
-                      </td>
-
-                      <td className="px-4 py-3 text-right">
-                        <div className="flex justify-end gap-2">
-                          <button
-                            type="button"
-                            onClick={() =>
-                              window.open(
-                                packageLabelUrl(shipment.shipmentId),
-                                "_blank",
-                              )
-                            }
-                            className={`text-xs border px-3 py-1.5 rounded transition-all flex items-center gap-1 ${rowAction.print}`}
-                            title="Print Label"
-                          >
-                            <FontAwesomeIcon icon={faPrint} />
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={() => onViewPackages?.(shipment)}
-                            className={`text-xs border px-3 py-1.5 rounded transition-all flex items-center gap-1 ${rowAction.view}`}
-                            title="View Packages"
-                          >
-                            <FontAwesomeIcon icon={faBoxOpen} />
-                          </button>
-
-                          {getShipmentInvoice(shipment).hasInvoice ? (
-                            <button
-                              type="button"
-                              onClick={() => onViewInvoice?.(shipment)}
-                              className={`text-xs border px-3 py-1.5 rounded transition-all flex items-center gap-1 ${rowAction.invoice}`}
-                              title={`View Invoice ${getShipmentInvoice(shipment).invoiceNumber || ""}`}
-                            >
-                              <FontAwesomeIcon icon={faReceipt} />
-                            </button>
-                          ) : (
-                            <button
-                              type="button"
-                              onClick={() => onCreateInvoice?.(shipment)}
-                              className={`text-xs border px-3 py-1.5 rounded transition-all flex items-center gap-1 ${rowAction.createInvoice}`}
-                              title="Create Invoice"
-                            >
-                              <FontAwesomeIcon icon={faFileInvoiceDollar} />
-                            </button>
-                          )}
-
-                          <button
-                            type="button"
-                            onClick={() => onUnassign(shipment)}
-                            className={`w-8 h-8 text-xs border px-3 py-1.5 rounded transition-all flex items-center justify-center disabled:opacity-50 ${rowAction.remove}`}
-                            disabled={isLocked}
-                            title="Remove Shipment"
-                          >
-                            <FontAwesomeIcon icon={faMinus} />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
+              );
+            })
+          )}
         </div>
 
         {!loading && filteredData.length > 0 && (
-          <TablePaginationFooter
-            totalItems={filteredData.length}
-            currentPage={safeCurrentPage}
-            itemsPerPage={itemsPerPage}
-            totalPages={totalPages}
-            limitValue={manifestLimit}
-            limitTitle="Manifest rows per page"
-            onLimitChange={setManifestLimit}
-            onPrevious={() => setCurrentPage((page) => Math.max(1, page - 1))}
-            onNext={() =>
-              setCurrentPage((page) => Math.min(totalPages, page + 1))
-            }
-            theme={theme}
-          />
+          <div
+            className={`block lg:hidden border rounded-2xl overflow-hidden ${theme.container}`}
+          >
+            <TablePaginationFooter
+              totalItems={filteredData.length}
+              currentPage={safeCurrentPage}
+              itemsPerPage={itemsPerPage}
+              totalPages={totalPages}
+              limitValue={manifestLimit}
+              limitTitle="Manifest rows per page"
+              onLimitChange={setManifestLimit}
+              onPrevious={() => setCurrentPage((page) => Math.max(1, page - 1))}
+              onNext={() =>
+                setCurrentPage((page) => Math.min(totalPages, page + 1))
+              }
+              theme={theme}
+            />
+          </div>
         )}
+
+        {/* Desktop Table */}
+        <div
+          className={`hidden lg:block border rounded-2xl overflow-hidden ${theme.container}`}
+        >
+          <div className="overflow-x-auto">
+            <table className={`w-full text-left text-sm ${theme.tableText}`}>
+              <thead
+                className={`uppercase font-bold text-[10px] tracking-wider ${theme.thead}`}
+              >
+                <tr>
+                  <th
+                    className={`px-4 py-3 w-10 text-center ${theme.stickyHead}`}
+                  >
+                    <button
+                      type="button"
+                      onClick={handleSelectAll}
+                      disabled={filteredData.length === 0}
+                      className={
+                        isDark
+                          ? "hover:text-white transition-colors"
+                          : "hover:text-slate-900 transition-colors"
+                      }
+                    >
+                      <FontAwesomeIcon
+                        icon={isAllSelected ? faCheckSquare : faSquare}
+                        className={
+                          selectedIds.size > 0
+                            ? theme.checkboxActive
+                            : theme.checkboxIdle
+                        }
+                      />
+                    </button>
+                  </th>
+
+                  <th className="px-4 py-3 w-10 text-center">#</th>
+                  <th className="px-4 py-3">Tracking / Customer</th>
+                  <th className="px-4 py-3">Destination</th>
+                  <th className="px-4 py-3 text-center">Shipment Status</th>
+                  <th className="px-4 py-3 text-center">
+                    {progressColumnLabel}
+                  </th>
+                  <th className="px-4 py-3 text-right">Action</th>
+                </tr>
+              </thead>
+
+              <tbody className={`divide-y ${theme.tbodyDivide}`}>
+                {loading ? (
+                  <tr>
+                    <td
+                      colSpan="7"
+                      className={`px-4 py-8 text-center animate-pulse ${theme.emptyText}`}
+                    >
+                      Loading manifest...
+                    </td>
+                  </tr>
+                ) : filteredData.length === 0 ? (
+                  <tr>
+                    <td
+                      colSpan="7"
+                      className={`px-4 py-8 text-center italic ${theme.emptyText}`}
+                    >
+                      No shipments found.
+                    </td>
+                  </tr>
+                ) : (
+                  paginatedData.map((shipment, idx) => {
+                    const isSelected = selectedIds.has(shipment.id);
+                    const loadedCount = shipment.loadedCount || 0;
+                    const shipmentPieceTotal =
+                      shipment.shipmentPieceTotal ||
+                      shipment.totals?.totalContentQty ||
+                      0;
+                    const isFullyLoaded =
+                      loadedCount >= (shipmentPieceTotal || 1);
+                    const shipmentStatus = shipment.status || "UNKNOWN";
+
+                    return (
+                      <tr
+                        key={shipment.id || idx}
+                        className={`transition-colors ${
+                          isSelected ? theme.selectedRow : theme.rowHover
+                        }`}
+                      >
+                        <td className="px-4 py-3 text-center">
+                          <button
+                            type="button"
+                            onClick={() => handleSelectOne(shipment.id)}
+                          >
+                            <FontAwesomeIcon
+                              icon={isSelected ? faCheckSquare : faSquare}
+                              className={
+                                isSelected
+                                  ? theme.checkboxActive
+                                  : theme.checkboxIdle
+                              }
+                            />
+                          </button>
+                        </td>
+
+                        <td
+                          className={`px-4 py-3 text-center font-mono text-xs ${theme.cellSecondary}`}
+                        >
+                          {pageStartIndex + idx + 1}
+                        </td>
+
+                        <td className="px-4 py-3">
+                          <div
+                            className={`font-bold text-xs font-mono ${theme.cellPrimary}`}
+                          >
+                            {shipment.shipmentId}
+                          </div>
+                          <div
+                            className={`text-[11px] truncate max-w-[180px] ${theme.cellSecondary}`}
+                          >
+                            {shipment.recipient?.name || "Unknown"}
+                          </div>
+                        </td>
+
+                        <td
+                          className={`px-4 py-3 text-xs ${theme.cellSecondary}`}
+                        >
+                          {shipment.recipient?.address?.city || "—"}
+                        </td>
+
+                        <td className="px-4 py-3 text-center">
+                          <StatusBadge
+                            status={shipmentStatus}
+                            isDark={isDark}
+                          />
+                        </td>
+
+                        <td className="px-4 py-3 text-center">
+                          {isArrivedPhase ? (
+                            <div className="flex justify-center">
+                              <TripShipmentProgressCell
+                                shipment={shipment}
+                                trip={tripProgressContext}
+                                isDark={isDark}
+                              />
+                            </div>
+                          ) : (
+                            <span
+                              className={`text-[10px] font-bold px-2 py-2 rounded border ${
+                                isFullyLoaded
+                                  ? theme.countBadgeLoaded
+                                  : theme.countBadgeDefault
+                              }`}
+                            >
+                              {loadedCount} / {shipmentPieceTotal}
+                            </span>
+                          )}
+                        </td>
+
+                        <td className="px-4 py-3 text-right">
+                          <div className="flex justify-end gap-2">
+                            <button
+                              type="button"
+                              onClick={() =>
+                                window.open(
+                                  packageLabelUrl(shipment.shipmentId),
+                                  "_blank",
+                                )
+                              }
+                              className={`text-xs border px-3 py-1.5 rounded transition-all flex items-center gap-1 ${rowAction.print}`}
+                              title="Print Label"
+                            >
+                              <FontAwesomeIcon icon={faPrint} />
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => onViewPackages?.(shipment)}
+                              className={`text-xs border px-3 py-1.5 rounded transition-all flex items-center gap-1 ${rowAction.view}`}
+                              title="View Packages"
+                            >
+                              <FontAwesomeIcon icon={faBoxOpen} />
+                            </button>
+
+                            {getShipmentInvoice(shipment).hasInvoice ? (
+                              <button
+                                type="button"
+                                onClick={() => onViewInvoice?.(shipment)}
+                                className={`text-xs border px-3 py-1.5 rounded transition-all flex items-center gap-1 ${rowAction.invoice}`}
+                                title={`View Invoice ${getShipmentInvoice(shipment).invoiceNumber || ""}`}
+                              >
+                                <FontAwesomeIcon icon={faReceipt} />
+                              </button>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => onCreateInvoice?.(shipment)}
+                                className={`text-xs border px-3 py-1.5 rounded transition-all flex items-center gap-1 ${rowAction.createInvoice}`}
+                                title="Create Invoice"
+                              >
+                                <FontAwesomeIcon icon={faFileInvoiceDollar} />
+                              </button>
+                            )}
+
+                            <button
+                              type="button"
+                              onClick={() => onUnassign(shipment)}
+                              className={`w-8 h-8 text-xs border px-3 py-1.5 rounded transition-all flex items-center justify-center disabled:opacity-50 ${rowAction.remove}`}
+                              disabled={isLocked}
+                              title="Remove Shipment"
+                            >
+                              <FontAwesomeIcon icon={faMinus} />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          {!loading && filteredData.length > 0 && (
+            <TablePaginationFooter
+              totalItems={filteredData.length}
+              currentPage={safeCurrentPage}
+              itemsPerPage={itemsPerPage}
+              totalPages={totalPages}
+              limitValue={manifestLimit}
+              limitTitle="Manifest rows per page"
+              onLimitChange={setManifestLimit}
+              onPrevious={() => setCurrentPage((page) => Math.max(1, page - 1))}
+              onNext={() =>
+                setCurrentPage((page) => Math.min(totalPages, page + 1))
+              }
+              theme={theme}
+            />
+          )}
+        </div>
       </div>
-    </div>
     </>
   );
 }

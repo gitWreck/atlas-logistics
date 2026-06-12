@@ -13,8 +13,6 @@ import * as ImagePicker from "expo-image-picker";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import {
   collection,
-  query,
-  where,
   getDocs,
   doc,
   getDoc,
@@ -25,6 +23,8 @@ import { db, storage } from "../../firebase";
 import PermissionRequest from "../../components/scanner/PermissionRequest";
 import ManualEntryModal from "../../components/scanner/ManualEntryModal";
 import DeliveryProofModal from "../../components/scanner/DeliveryProofModal";
+import BatchDeliverySummaryModal from "../../components/scanner/BatchDeliverySummaryModal";
+import FailedDeliveryReasonModal from "../../components/scanner/FailedDeliveryReasonModal";
 import ScanSuccessModal from "../../components/scanner/ScanSuccessModal";
 import ScannerCameraPane from "../../components/scanner/ScannerCameraPane";
 import ScanDetailsSheet from "../../components/scanner/ScanDetailsSheet";
@@ -46,13 +46,30 @@ import {
   returnCheckerShipmentsToWarehouse,
 } from "../../components/utilities/checkerDelivery";
 import {
+  isCheckerCustodyPiece,
   isCheckerPieceAwaitingOutForDelivery,
-  shipmentHasCheckerPiecesAwaitingOutForDelivery,
+  isCheckerPieceAvailableToLoad,
 } from "../../components/utilities/checkerDeliveryPool";
 import {
   getCurrentLocationSafe,
   updatedBy,
 } from "../../components/utilities/helpers";
+import {
+  buildTripBarcodeIndex,
+  createScanLookupCache,
+  getShipmentDocByCode,
+  lookupScannedShipment,
+} from "../../components/utilities/scanLookup";
+import {
+  appendBatchDeliveryPiece,
+  assertPieceEligibleForBatchScan,
+  getBatchPieceLabel,
+  getBatchScanCompleteLabel,
+  getBatchScanSummaryEyebrow,
+  isBatchDeliveryScanMode,
+  isBatchScanMode,
+} from "../../components/utilities/batchDelivery";
+import { getFailureReasonLabel } from "../../components/constants/failureReasons";
 import {
   buildLatestScanDetails,
   canApplyOffloadCompletion,
@@ -65,7 +82,6 @@ import {
   getProgressLabel,
   getShipmentDeliveredCount,
   getShipmentLoadedCount,
-  deriveParentShipmentCode,
   findPackageInShipment,
   getDeliverPackageIdForScan,
   getPackageIdentity,
@@ -134,6 +150,13 @@ export default function ScannerScreen() {
   const [deliveryProofRemarks, setDeliveryProofRemarks] = useState("");
   const [deliveryProofUploading, setDeliveryProofUploading] = useState(false);
   const [pendingDelivery, setPendingDelivery] = useState(null);
+  const [batchDeliverySession, setBatchDeliverySession] = useState(null);
+  const [batchSummaryVisible, setBatchSummaryVisible] = useState(false);
+  const [failedReasonVisible, setFailedReasonVisible] = useState(false);
+  const [failedProofPhotos, setFailedProofPhotos] = useState([]);
+  const [failedProofUploading, setFailedProofUploading] = useState(false);
+  const autoOpenPodCameraRef = useRef(false);
+  const pickDeliveryProofImageRef = useRef(async () => {});
   const [tripSummary, setTripSummary] = useState(EMPTY_TRIP_SUMMARY);
   const [shipmentSummary, setShipmentSummary] = useState(
     EMPTY_SHIPMENT_SUMMARY,
@@ -147,6 +170,11 @@ export default function ScannerScreen() {
   );
   const successTimerRef = useRef(null);
   const countdownTimerRef = useRef(null);
+  const scanLookupCacheRef = useRef(createScanLookupCache());
+  const tripBarcodeIndexRef = useRef(new Map());
+  const cachedLocationRef = useRef(null);
+  const summaryRefreshTimerRef = useRef(null);
+  const lastScanRef = useRef({ code: "", at: 0 });
   const detailsSheetHeight = useRef(
     new Animated.Value(DEFAULT_DETAILS_SHEET_HEIGHT),
   ).current;
@@ -187,13 +215,30 @@ export default function ScannerScreen() {
   const resolvedMode = Array.isArray(mode) ? mode[0] : mode;
   const resolvedTripId = Array.isArray(tripId) ? tripId[0] : tripId;
 
-  const fetchTripScanSummary = async (targetTripId = resolvedTripId) => {
+  const scheduleTripSummaryRefresh = (targetTripId = resolvedTripId) => {
+    if (!targetTripId) return;
+    if (summaryRefreshTimerRef.current) {
+      clearTimeout(summaryRefreshTimerRef.current);
+    }
+    summaryRefreshTimerRef.current = setTimeout(() => {
+      summaryRefreshTimerRef.current = null;
+      void fetchTripScanSummary(targetTripId, { showLoading: false });
+    }, 800);
+  };
+
+  const fetchTripScanSummary = async (
+    targetTripId = resolvedTripId,
+    { showLoading = true } = {},
+  ) => {
     if (!targetTripId) {
       setTripSummary(EMPTY_TRIP_SUMMARY);
+      tripBarcodeIndexRef.current = new Map();
       return EMPTY_TRIP_SUMMARY;
     }
 
-    setSummaryLoading(true);
+    if (showLoading) {
+      setSummaryLoading(true);
+    }
 
     try {
       const [tripSnap, shipmentSnap] = await Promise.all([
@@ -202,6 +247,18 @@ export default function ScannerScreen() {
           collection(db, "truck_trips", String(targetTripId), "trip_shipments"),
         ),
       ]);
+
+      const shipmentIds = shipmentSnap.docs.map((shipmentDoc) => shipmentDoc.id);
+      const shipmentDocs = shipmentIds.length
+        ? await Promise.all(
+            shipmentIds.map((shipmentId) =>
+              getDoc(doc(db, "shipments", String(shipmentId))),
+            ),
+          )
+        : [];
+      tripBarcodeIndexRef.current = buildTripBarcodeIndex(
+        shipmentDocs.filter((shipmentDoc) => shipmentDoc.exists()),
+      );
 
       const shipments = shipmentSnap.docs.map((shipmentDoc) => ({
         id: shipmentDoc.id,
@@ -428,7 +485,18 @@ export default function ScannerScreen() {
   useEffect(() => {
     return () => {
       clearSuccessTimers();
+      if (summaryRefreshTimerRef.current) {
+        clearTimeout(summaryRefreshTimerRef.current);
+      }
     };
+  }, []);
+
+  useEffect(() => {
+    void getCurrentLocationSafe().then((location) => {
+      if (location) {
+        cachedLocationRef.current = location;
+      }
+    });
   }, []);
 
   useEffect(() => {
@@ -450,6 +518,32 @@ export default function ScannerScreen() {
     countdownTimerRef.current = null;
   };
 
+  const clearBatchDeliverySession = () => {
+    setBatchDeliverySession(null);
+    setBatchSummaryVisible(false);
+  };
+
+  useEffect(() => {
+    if (!isBatchScanMode(resolvedMode, scanActionStatus)) {
+      clearBatchDeliverySession();
+      setFailedReasonVisible(false);
+      setFailedProofPhotos([]);
+    }
+  }, [resolvedMode, scanActionStatus]);
+
+  useEffect(() => {
+    if (
+      !deliveryProofVisible ||
+      !autoOpenPodCameraRef.current ||
+      deliveryProofPhotos.length > 0
+    ) {
+      return;
+    }
+
+    autoOpenPodCameraRef.current = false;
+    void pickDeliveryProofImageRef.current(true);
+  }, [deliveryProofVisible, deliveryProofPhotos.length]);
+
   const resetScanner = () => {
     setScanned(false);
     setProcessing(false);
@@ -464,6 +558,7 @@ export default function ScannerScreen() {
     setInfoModalVisible(false);
     setScannedData(null);
     setShipmentSummary(EMPTY_SHIPMENT_SUMMARY);
+    clearBatchDeliverySession();
   };
 
   const toggleNotificationChannel = (key) => {
@@ -479,10 +574,39 @@ export default function ScannerScreen() {
     setDeliveryProofRemarks("");
     setDeliveryProofUploading(false);
     setPendingDelivery(null);
+    clearBatchDeliverySession();
   };
 
   const cancelDeliveryProof = () => {
-    resetDeliveryProof();
+    const delivery = pendingDelivery;
+    setDeliveryProofVisible(false);
+    setDeliveryProofPhotos([]);
+    setDeliveryProofRemarks("");
+    setDeliveryProofUploading(false);
+    setPendingDelivery(null);
+
+    if (delivery?.batchPieces?.length) {
+      const shipmentData = delivery.shipmentDocData || {};
+      setBatchDeliverySession({
+        shipmentId: delivery.shipmentId,
+        shipmentDocData: shipmentData,
+        tripId: delivery.tripId || null,
+        customerName:
+          shipmentData.recipient?.name ||
+          shipmentData.customerName ||
+          "Customer",
+        shipmentLabel:
+          shipmentData.shipmentId ||
+          shipmentData.trackingNumber ||
+          delivery.shipmentId,
+        pieces: delivery.batchPieces,
+      });
+      setBatchSummaryVisible(true);
+      setScanned(false);
+      setProcessing(false);
+      return;
+    }
+
     resetScanner();
   };
 
@@ -517,6 +641,8 @@ export default function ScannerScreen() {
 
     setCountdown(SUCCESS_MODAL_SECONDS);
     setSuccessModalVisible(true);
+    setProcessing(false);
+    setScanned(false);
 
     countdownTimerRef.current = setInterval(() => {
       setCountdown((prev) => {
@@ -553,6 +679,14 @@ export default function ScannerScreen() {
   };
 
   const isDeliveryScanMode = resolvedMode === "delivery";
+  const isBatchDeliveryScan = isBatchDeliveryScanMode(
+    resolvedMode,
+    scanActionStatus,
+  );
+  const isBatchScan = isBatchScanMode(resolvedMode, scanActionStatus);
+  const batchScanAction = String(
+    batchDeliverySession?.scanActionStatus || scanActionStatus || "",
+  ).toUpperCase();
 
   const executeStatusUpdate = async ({
     shipmentId,
@@ -569,28 +703,62 @@ export default function ScannerScreen() {
     location: locationOverride = null,
   }) => {
     try {
-      const location = locationOverride ?? (await getCurrentLocationSafe());
+      let location = locationOverride ?? cachedLocationRef.current;
+      if (!location) {
+        location = await getCurrentLocationSafe();
+        if (location) {
+          cachedLocationRef.current = location;
+        }
+      }
       const effectiveTripId = getEffectiveTripId(shipmentDocData);
 
       if (status === "LOAD_TO_VEHICLE") {
         assertCheckerCanAccessShipment(shipmentDocData, profile?.uid);
 
-        const matchedPkg = findPackageInShipment(shipmentDocData, barcode);
-        const shouldMarkOutForDelivery = matchedPkg
-          ? isCheckerPieceAwaitingOutForDelivery(matchedPkg, profile?.uid)
-          : shipmentHasCheckerPiecesAwaitingOutForDelivery(
-              shipmentDocData,
-              profile?.uid,
-            );
+        const loadPackageIds =
+          Array.isArray(packageIds) && packageIds.length > 0
+            ? packageIds
+            : [getDeliverPackageIdForScan(shipmentDocData, barcode)].filter(
+                Boolean,
+              );
 
-        if (shouldMarkOutForDelivery) {
+        if (loadPackageIds.length === 0) {
+          throw new Error(
+            "Scan an individual piece label to load. Master tracking alone cannot load pieces.",
+          );
+        }
+
+        const matchedPkg = findPackageInShipment(shipmentDocData, barcode);
+        const pieceStatus = String(matchedPkg?.status || "").toUpperCase();
+
+        if (
+          matchedPkg &&
+          pieceStatus === "OUT_FOR_DELIVERY" &&
+          isCheckerCustodyPiece(matchedPkg, profile?.uid)
+        ) {
+          showSuccessModal({
+            barcode,
+            shipmentId,
+            shipmentStatus: "OUT_FOR_DELIVERY",
+            packageStatus: "OUT_FOR_DELIVERY",
+            quantity: qty,
+            message: "Piece is already out for delivery on your van.",
+            source,
+          });
+          return;
+        }
+
+        if (
+          matchedPkg &&
+          isCheckerPieceAwaitingOutForDelivery(matchedPkg, profile?.uid)
+        ) {
           await markShipmentOutForDelivery({
             shipmentId,
             profile,
             tripId: effectiveTripId || null,
             remarks:
               remarks ||
-              "Marked out for delivery via scan (piece already on van).",
+              "Marked out for delivery via scan (legacy loaded piece).",
           });
 
           showSuccessModal({
@@ -599,54 +767,37 @@ export default function ScannerScreen() {
             shipmentStatus: "OUT_FOR_DELIVERY",
             packageStatus: "OUT_FOR_DELIVERY",
             quantity: qty,
-            message:
-              "Piece is already on your van. Shipment marked out for delivery.",
+            message: "Piece marked out for delivery.",
             source,
           });
           return;
         }
 
-        const loadPackageIds =
-          Array.isArray(packageIds) && packageIds.length > 0
-            ? packageIds
-            : [getDeliverPackageIdForScan(shipmentDocData, barcode)].filter(
-                Boolean,
-              );
+        if (
+          matchedPkg &&
+          !isCheckerPieceAvailableToLoad(matchedPkg, shipmentDocData)
+        ) {
+          throw new Error(
+            "This piece is not released for delivery or is not available to load.",
+          );
+        }
+
         await loadAssignedShipmentsToVehicle({
           shipmentIds: [shipmentId],
           packageIds: loadPackageIds,
           profile,
-          remarks: remarks || "Loaded via delivery scan.",
-        });
-
-        showSuccessModal({
-          barcode,
-          shipmentId,
-          shipmentStatus: "READY_FOR_DELIVERY",
-          packageStatus: "LOAD_TO_VEHICLE",
-          quantity: qty,
-          message: "Shipment loaded onto your delivery vehicle.",
-          source,
-        });
-        return;
-      }
-
-      if (isDeliveryScanMode && status === "OUT_FOR_DELIVERY") {
-        assertCheckerCanAccessShipment(shipmentDocData, profile?.uid);
-        await markShipmentOutForDelivery({
-          shipmentId,
-          profile,
-          tripId: effectiveTripId || null,
-          remarks: remarks || "Marked out for delivery via scan.",
+          remarks:
+            remarks || "Loaded and marked out for delivery via checker scan.",
         });
 
         showSuccessModal({
           barcode,
           shipmentId,
           shipmentStatus: "OUT_FOR_DELIVERY",
-          packageStatus: status,
+          packageStatus: "OUT_FOR_DELIVERY",
           quantity: qty,
-          message: "Shipment marked out for delivery.",
+          message:
+            "Piece loaded to your van and marked out for delivery.",
           source,
         });
         return;
@@ -681,7 +832,7 @@ export default function ScannerScreen() {
         return;
       }
 
-      if (isDeliveryScanMode && status === "RETURNED_TO_WAREHOUSE") {
+      if (resolvedMode === "offloading" && status === "RETURNED_TO_WAREHOUSE") {
         assertCheckerCanAccessShipment(shipmentDocData, profile?.uid);
         if (deliveryPieceIds.length === 0) {
           throw new Error("Scan an individual piece label to return to warehouse.");
@@ -777,7 +928,7 @@ export default function ScannerScreen() {
       }
 
       if (effectiveTripId) {
-        void fetchTripScanSummary(effectiveTripId);
+        scheduleTripSummaryRefresh(effectiveTripId);
       } else if (shipmentDocData) {
         void refreshShipmentScanSummary(shipmentId);
       }
@@ -845,6 +996,306 @@ export default function ScannerScreen() {
     setProcessing(false);
   };
 
+  const openBatchDeliveryProof = (session) => {
+    const pieces = Array.isArray(session?.pieces) ? session.pieces : [];
+    if (pieces.length === 0) return;
+
+    autoOpenPodCameraRef.current = true;
+    openDeliveryProofModal({
+      scanType: "package",
+      shipmentId: session.shipmentId,
+      tripId: session.tripId || null,
+      barcode: pieces[0]?.barcode || pieces[0]?.packageId,
+      source: "scan",
+      shipmentDocData: session.shipmentDocData,
+      packageIds: pieces.map((piece) => piece.packageId),
+      batchPieces: pieces,
+      isBatchDelivery: pieces.length > 1,
+    });
+    setBatchSummaryVisible(false);
+  };
+
+  const addPieceToBatchDelivery = ({
+    shipmentDoc,
+    pkg,
+    barcode,
+    source = "scan",
+    actionStatus = scanActionStatus,
+  }) => {
+    const shipmentData = shipmentDoc.data();
+    const packageId = assertPieceEligibleForBatchScan(pkg, shipmentData, {
+      mode: resolvedMode,
+      scanActionStatus: actionStatus,
+      checkerUid: profile?.uid,
+    });
+
+    assertCheckerCanAccessShipment(shipmentData, profile?.uid);
+
+    const normalizedAction = String(actionStatus || "").toUpperCase();
+
+    if (
+      batchDeliverySession &&
+      batchDeliverySession.shipmentId !== shipmentDoc.id
+    ) {
+      throw new Error(
+        "Complete the current batch before scanning another shipment.",
+      );
+    }
+
+    if (
+      batchDeliverySession &&
+      batchDeliverySession.scanActionStatus &&
+      batchDeliverySession.scanActionStatus !== normalizedAction
+    ) {
+      throw new Error(
+        "Complete or cancel the current batch before switching actions.",
+      );
+    }
+
+    const piece = {
+      packageId,
+      barcode: String(barcode || packageId).trim(),
+      label: getBatchPieceLabel(pkg, barcode),
+    };
+
+    const baseSession =
+      batchDeliverySession?.shipmentId === shipmentDoc.id
+        ? batchDeliverySession
+        : {
+            shipmentId: shipmentDoc.id,
+            shipmentDocData: shipmentData,
+            scanActionStatus: String(actionStatus || "").toUpperCase(),
+            tripId: getEffectiveTripId(shipmentData),
+            customerName:
+              shipmentData.recipient?.name ||
+              shipmentData.customerName ||
+              "Customer",
+            shipmentLabel:
+              shipmentData.shipmentId ||
+              shipmentData.trackingNumber ||
+              shipmentDoc.id,
+            pieces: [],
+          };
+
+    const { session, added, duplicate } = appendBatchDeliveryPiece(
+      baseSession,
+      piece,
+    );
+
+    setBatchDeliverySession(session);
+    setBatchSummaryVisible(true);
+    setScanned(false);
+    setProcessing(false);
+
+    if (duplicate) {
+      Vibration.vibrate();
+      Alert.alert(
+        "Already scanned",
+        `${piece.label} is already in this delivery batch.`,
+      );
+      return;
+    }
+
+    if (added) {
+      Vibration.vibrate();
+    }
+  };
+
+  const handleCompleteBatchScan = () => {
+    if (!batchDeliverySession?.pieces?.length) return;
+
+    const action = String(
+      batchDeliverySession.scanActionStatus || scanActionStatus || "",
+    ).toUpperCase();
+
+    if (action === "DELIVERED") {
+      openBatchDeliveryProof(batchDeliverySession);
+      return;
+    }
+
+    if (action === "FAILED_DELIVERY") {
+      setBatchSummaryVisible(false);
+      setFailedReasonVisible(true);
+      return;
+    }
+
+    if (action === "RETURNED_TO_WAREHOUSE") {
+      const pieceCount = batchDeliverySession.pieces.length;
+      Alert.alert(
+        "Confirm return to warehouse",
+        `Return ${pieceCount} scanned piece${
+          pieceCount === 1 ? "" : "s"
+        } to Odiongan warehouse custody?`,
+        [
+          { text: "Cancel", style: "cancel" },
+          {
+            text: "Confirm return",
+            onPress: () => completeReturnBatch(batchDeliverySession),
+          },
+        ],
+      );
+    }
+  };
+
+  const uploadFailureProofPhotos = async (shipmentId, photos) => {
+    if (!photos.length) return [];
+    const uploaded = [];
+    for (let index = 0; index < photos.length; index += 1) {
+      const uri = photos[index];
+      const response = await fetch(uri);
+      const blob = await response.blob();
+      const fileRef = ref(
+        storage,
+        `shipments/${shipmentId}/failure-proof/${Date.now()}_${index}.jpg`,
+      );
+      await uploadBytes(fileRef, blob);
+      uploaded.push(await getDownloadURL(fileRef));
+    }
+    return uploaded;
+  };
+
+  const pickFailedProofImage = async (useCamera) => {
+    if (failedProofPhotos.length >= 3) {
+      Alert.alert("Limit reached", "You can attach up to 3 photos.");
+      return;
+    }
+
+    const options = {
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      quality: 0.5,
+    };
+
+    let result;
+    if (useCamera) {
+      const perm = await ImagePicker.requestCameraPermissionsAsync();
+      if (!perm.granted) {
+        Alert.alert("Permission Needed", "Camera access is required.");
+        return;
+      }
+      result = await ImagePicker.launchCameraAsync(options);
+    } else {
+      const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!perm.granted) {
+        Alert.alert("Permission Needed", "Photo library access is required.");
+        return;
+      }
+      result = await ImagePicker.launchImageLibraryAsync(options);
+    }
+
+    if (!result.canceled && result.assets?.[0]?.uri) {
+      setFailedProofPhotos((current) => [...current, result.assets[0].uri]);
+    }
+  };
+
+  const completeFailedBatch = async ({ reasonCode, remarks }) => {
+    const session = batchDeliverySession;
+    if (!session?.pieces?.length || failedProofUploading) return;
+
+    setFailedProofUploading(true);
+    setProcessing(true);
+
+    try {
+      const packageIds = session.pieces.map((piece) => piece.packageId);
+      const reasonLabel = getFailureReasonLabel(reasonCode);
+      const note =
+        String(remarks || "").trim() ||
+        `Failed delivery: ${reasonLabel} (${packageIds.length} piece${
+          packageIds.length === 1 ? "" : "s"
+        }).`;
+
+      const photoUrls = await uploadFailureProofPhotos(
+        session.shipmentId,
+        failedProofPhotos,
+      );
+
+      await reportCheckerFailedDelivery({
+        shipmentIds: [session.shipmentId],
+        packageIds,
+        profile,
+        reasonCode,
+        remarks: note,
+        failurePhotoUrls: photoUrls,
+      });
+
+      setFailedReasonVisible(false);
+      setFailedProofPhotos([]);
+      clearBatchDeliverySession();
+
+      showSuccessModal({
+        barcode: packageIds[0],
+        shipmentId: session.shipmentId,
+        shipmentStatus: "FAILED_DELIVERY",
+        packageStatus: "FAILED_DELIVERY",
+        quantity: packageIds.length,
+        message: `${packageIds.length} piece${
+          packageIds.length === 1 ? "" : "s"
+        } marked failed. Custody remains with you until returned at Odiongan.`,
+        source: "scan",
+      });
+    } catch (error) {
+      Alert.alert(
+        "Failed delivery error",
+        getActionErrorMessage(error, "Could not mark pieces as failed."),
+      );
+      setProcessing(false);
+    } finally {
+      setFailedProofUploading(false);
+    }
+  };
+
+  const completeReturnBatch = async (session) => {
+    if (!session?.pieces?.length || processing) return;
+
+    setProcessing(true);
+
+    try {
+      const packageIds = session.pieces.map((piece) => piece.packageId);
+
+      await returnCheckerShipmentsToWarehouse({
+        shipmentIds: [session.shipmentId],
+        packageIds,
+        profile,
+        remarks: `Returned ${packageIds.length} piece${
+          packageIds.length === 1 ? "" : "s"
+        } to Odiongan warehouse.`,
+      });
+
+      clearBatchDeliverySession();
+      setBatchSummaryVisible(false);
+
+      showSuccessModal({
+        barcode: packageIds[0],
+        shipmentId: session.shipmentId,
+        shipmentStatus: "RETURNED_TO_WAREHOUSE",
+        packageStatus: "RETURNED_TO_WAREHOUSE",
+        quantity: packageIds.length,
+        message: `${packageIds.length} piece${
+          packageIds.length === 1 ? "" : "s"
+        } returned to Odiongan warehouse.`,
+        source: "scan",
+      });
+    } catch (error) {
+      Alert.alert(
+        "Return error",
+        getActionErrorMessage(error, "Could not return pieces to warehouse."),
+      );
+      setProcessing(false);
+    }
+  };
+
+  const handleRemoveBatchPiece = (packageId) => {
+    setBatchDeliverySession((current) => {
+      if (!current) return null;
+      const pieces = current.pieces.filter((piece) => piece.packageId !== packageId);
+      if (pieces.length === 0) {
+        setBatchSummaryVisible(false);
+        return null;
+      }
+      return { ...current, pieces };
+    });
+  };
+
   const pickDeliveryProofImage = async (useCamera) => {
     const existingCount = pendingDelivery?.existingProofs?.length || 0;
     if (
@@ -886,6 +1337,7 @@ export default function ScannerScreen() {
       setDeliveryProofPhotos((current) => [...current, result.assets[0].uri]);
     }
   };
+  pickDeliveryProofImageRef.current = pickDeliveryProofImage;
 
   const removeDeliveryProofPhoto = (index) => {
     setDeliveryProofPhotos((current) =>
@@ -931,6 +1383,7 @@ export default function ScannerScreen() {
 
       if (!directShipmentSnap.exists()) {
         const resolvedShipmentDoc = await getShipmentDocByCode(
+          db,
           pendingDelivery.barcode,
         );
 
@@ -946,20 +1399,28 @@ export default function ScannerScreen() {
         shipmentDocData = directShipmentSnap.data();
       }
 
+      const batchPackageIds = Array.isArray(pendingDelivery.packageIds)
+        ? pendingDelivery.packageIds.filter(Boolean)
+        : [];
+
       const deliveryScope =
-        resolvedMode === "offloading"
-          ? resolveOffloadDeliverPackageIds(
-              shipmentDocData,
-              pendingDelivery.barcode,
-              pendingDelivery.scanType,
-            )
-          : resolveDeliveryPackageIds({
-              barcode: pendingDelivery.barcode,
-              scanType: pendingDelivery.scanType,
-              shipmentData: shipmentDocData,
-            });
+        batchPackageIds.length > 0
+          ? { isPackageLevel: true, packageIds: batchPackageIds }
+          : resolvedMode === "offloading"
+            ? resolveOffloadDeliverPackageIds(
+                shipmentDocData,
+                pendingDelivery.barcode,
+                pendingDelivery.scanType,
+              )
+            : resolveDeliveryPackageIds({
+                barcode: pendingDelivery.barcode,
+                scanType: pendingDelivery.scanType,
+                shipmentData: shipmentDocData,
+              });
       const isPackageLevelDelivery =
-        resolvedMode === "offloading" || deliveryScope.isPackageLevel;
+        batchPackageIds.length > 0 ||
+        resolvedMode === "offloading" ||
+        deliveryScope.isPackageLevel;
 
       if (isDeliveryScanMode && isPackageLevelDelivery) {
         assertCheckerCanAccessShipment(shipmentDocData, profile?.uid);
@@ -979,19 +1440,60 @@ export default function ScannerScreen() {
             location,
             photoUrls: proofImages,
             shipment: shipmentDocData,
+            notificationChannels,
           });
 
+          const pieceCount = pieceIds.length;
           showSuccessModal({
             barcode: pendingDelivery.barcode,
             shipmentId: canonicalShipmentId,
             shipmentStatus: "DELIVERED",
             packageStatus: "DELIVERED",
             quantity: pendingDelivery.qty,
-            message: "Piece delivered with proof of delivery.",
+            message:
+              pieceCount > 1
+                ? `${pieceCount} pieces delivered with shared proof of delivery.`
+                : "Piece delivered with proof of delivery.",
             source: pendingDelivery.source,
           });
           return;
         }
+      }
+
+      if (
+        resolvedMode === "offloading" &&
+        isPackageLevelDelivery &&
+        batchPackageIds.length > 0
+      ) {
+        const location = await getCurrentLocationSafe();
+        await executeStatusUpdate({
+          shipmentId: canonicalShipmentId,
+          barcode: pendingDelivery.barcode,
+          status: "DELIVERED",
+          qty: pendingDelivery.qty,
+          remarks: proofRemarks,
+          source: pendingDelivery.source,
+          shipmentDocData,
+          proofImages,
+          packageIds: batchPackageIds,
+          location,
+          throwOnError: true,
+        });
+
+        const pieceCount = batchPackageIds.length;
+        showSuccessModal({
+          barcode: pendingDelivery.barcode,
+          shipmentId: canonicalShipmentId,
+          shipmentStatus: "DELIVERED",
+          packageStatus: "DELIVERED",
+          quantity: pendingDelivery.qty,
+          message:
+            pieceCount > 1
+              ? `${pieceCount} pieces delivered with shared proof of delivery.`
+              : "Piece delivered with proof of delivery.",
+          source: pendingDelivery.source,
+        });
+        return;
       }
 
       if (isDeliveryScanMode && !isPackageLevelDelivery) {
@@ -1116,6 +1618,25 @@ export default function ScannerScreen() {
       return;
     }
 
+    if (
+      isBatchScan &&
+      ["DELIVERED", "FAILED_DELIVERY", "RETURNED_TO_WAREHOUSE"].includes(
+        statusToApply,
+      )
+    ) {
+      if (statusToApply === "DELIVERED" && !isDeliveryScanMode) {
+        await assertShipmentOnTrip(shipmentDoc.id, shipmentData);
+      }
+      addPieceToBatchDelivery({
+        shipmentDoc,
+        pkg,
+        barcode,
+        source,
+        actionStatus: statusToApply,
+      });
+      return;
+    }
+
     if (statusToApply === "DELIVERED") {
       if (isDeliveryScanMode) {
         assertCheckerCanAccessShipment(shipmentData, profile?.uid);
@@ -1131,6 +1652,9 @@ export default function ScannerScreen() {
         qty: isBulk ? manualQtyOverride : null,
         source,
         shipmentDocData: shipmentData,
+        packageIds: [
+          getDeliverPackageIdForScan(shipmentData, barcode),
+        ].filter(Boolean),
       });
       return;
     }
@@ -1147,103 +1671,6 @@ export default function ScannerScreen() {
     });
   };
 
-  const getShipmentDocByCode = async (code) => {
-    const directSnap = await getDoc(doc(db, "shipments", code));
-
-    if (directSnap.exists()) {
-      return directSnap;
-    }
-
-    const [trackingSnap, shipmentIdSnap] = await Promise.all([
-      getDocs(
-        query(
-          collection(db, "shipments"),
-          where("trackingNumber", "==", code),
-          limit(1),
-        ),
-      ),
-      getDocs(
-        query(
-          collection(db, "shipments"),
-          where("shipmentId", "==", code),
-          limit(1),
-        ),
-      ),
-    ]);
-
-    if (!trackingSnap.empty) {
-      return trackingSnap.docs[0];
-    }
-
-    if (!shipmentIdSnap.empty) {
-      return shipmentIdSnap.docs[0];
-    }
-
-    return null;
-  };
-
-  const lookupScannedCode = async (barcode) => {
-    const normalizedBarcode = normalizeScanCode(barcode);
-    const barcodeVariants = [
-      ...new Set([normalizedBarcode, String(barcode || "").trim()]),
-    ].filter(Boolean);
-
-    const parentCode = deriveParentShipmentCode(normalizedBarcode);
-    if (parentCode) {
-      const parentDoc = await getShipmentDocByCode(parentCode);
-      if (parentDoc) {
-        const shipmentData = parentDoc.data();
-        const pkg = findPackageInShipment(shipmentData, normalizedBarcode);
-        if (pkg) {
-          return {
-            shipmentDoc: parentDoc,
-            shipmentData,
-            pkg,
-            scanType: "package",
-          };
-        }
-      }
-    }
-
-    for (const codeVariant of barcodeVariants) {
-      const querySnap = await getDocs(
-        query(
-          collection(db, "shipments"),
-          where("packageBarcodes", "array-contains", codeVariant),
-          limit(1),
-        ),
-      );
-
-      if (!querySnap.empty) {
-        const shipmentDoc = querySnap.docs[0];
-        const shipmentData = shipmentDoc.data();
-        const pkg = findPackageInShipment(shipmentData, normalizedBarcode);
-
-        if (!pkg) {
-          throw new Error("Package not found in shipment.");
-        }
-
-        return { shipmentDoc, shipmentData, pkg, scanType: "package" };
-      }
-    }
-
-    const shipmentDoc = await getShipmentDocByCode(normalizedBarcode);
-
-    if (shipmentDoc) {
-      const shipmentData = shipmentDoc.data();
-      const pkg = findPackageInShipment(shipmentData, normalizedBarcode);
-
-      return {
-        shipmentDoc,
-        shipmentData,
-        pkg,
-        scanType: pkg ? "package" : "shipment",
-      };
-    }
-
-    throw new Error("Package or shipment not found.");
-  };
-
   const handleProcessPackage = async (
     barcode,
     manualQtyOverride = null,
@@ -1254,12 +1681,24 @@ export default function ScannerScreen() {
     setProcessing(true);
     Vibration.vibrate();
 
-    const locationPromise = getCurrentLocationSafe();
+    const locationPromise = cachedLocationRef.current
+      ? Promise.resolve(cachedLocationRef.current)
+      : getCurrentLocationSafe().then((location) => {
+          if (location) {
+            cachedLocationRef.current = location;
+          }
+          return location;
+        });
 
     try {
-      const { shipmentDoc, shipmentData, pkg, scanType } =
-        await lookupScannedCode(barcode);
-      const resolvedLocation = await locationPromise;
+      const [{ shipmentDoc, shipmentData, pkg, scanType }, resolvedLocation] =
+        await Promise.all([
+          lookupScannedShipment(db, barcode, {
+            tripIndex: tripBarcodeIndexRef.current,
+            cache: scanLookupCacheRef.current,
+          }),
+          locationPromise,
+        ]);
 
       if (resolvedMode === "info") {
         openInfoPreview(shipmentDoc, pkg, barcode);
@@ -1304,7 +1743,19 @@ export default function ScannerScreen() {
           }
         }
 
+        if (
+          isBatchScan &&
+          ["DELIVERED", "FAILED_DELIVERY", "RETURNED_TO_WAREHOUSE"].includes(
+            statusToApply,
+          )
+        ) {
+          throw new Error(
+            "Scan each piece label. Master tracking alone cannot complete this action.",
+          );
+        }
+
         if (statusToApply === "DELIVERED") {
+
           if (!isDeliveryScanMode) {
             await assertShipmentOnTrip(shipmentDoc.id, shipmentData);
           }
@@ -1321,63 +1772,9 @@ export default function ScannerScreen() {
         }
 
         if (statusToApply === "LOAD_TO_VEHICLE") {
-          if (
-            shipmentHasCheckerPiecesAwaitingOutForDelivery(
-              shipmentData,
-              profile?.uid,
-            )
-          ) {
-            await executeStatusUpdate({
-              shipmentId: shipmentDoc.id,
-              barcode,
-              status: "OUT_FOR_DELIVERY",
-              remarks: "",
-              source,
-              shipmentDocData: shipmentData,
-              location: resolvedLocation,
-            });
-            return;
-          }
-
-          await executeStatusUpdate({
-            shipmentId: shipmentDoc.id,
-            barcode,
-            status: statusToApply,
-            remarks: "",
-            source,
-            shipmentDocData: shipmentData,
-            location: resolvedLocation,
-          });
-          return;
-        }
-
-        if (
-          isDeliveryScanMode &&
-          ["FAILED_DELIVERY", "RETURNED_TO_WAREHOUSE"].includes(statusToApply)
-        ) {
-          await executeStatusUpdate({
-            shipmentId: shipmentDoc.id,
-            barcode,
-            status: statusToApply,
-            remarks: "",
-            source,
-            shipmentDocData: shipmentData,
-            location: resolvedLocation,
-          });
-          return;
-        }
-
-        if (isDeliveryScanMode && statusToApply === "OUT_FOR_DELIVERY") {
-          await executeStatusUpdate({
-            shipmentId: shipmentDoc.id,
-            barcode,
-            status: statusToApply,
-            remarks: "",
-            source,
-            shipmentDocData: shipmentData,
-            location: resolvedLocation,
-          });
-          return;
+          throw new Error(
+            "Scan an individual piece label to load. Master tracking alone cannot load pieces.",
+          );
         }
 
         const shipmentPackageIds = getShipmentPackageIds(shipmentData);
@@ -1433,10 +1830,20 @@ export default function ScannerScreen() {
   };
 
   const onCameraScan = ({ data }) => {
-    if (!scanned && !processing) {
-      setScanned(true);
-      handleProcessPackage(data, null, "scan");
+    if (scanned || processing) return;
+
+    const code = String(data || "").trim();
+    if (!code) return;
+
+    const now = Date.now();
+    const lastScan = lastScanRef.current;
+    if (lastScan.code === code && now - lastScan.at < 1200) {
+      return;
     }
+    lastScanRef.current = { code, at: now };
+
+    setScanned(true);
+    handleProcessPackage(code, null, "scan");
   };
 
   const onManualSubmit = async (code) => {
@@ -1622,6 +2029,20 @@ export default function ScannerScreen() {
         onAction={async (status, remarks, qty) => {
           if (status === "DELIVERED") {
             try {
+              if (isBatchDeliveryScan) {
+                addPieceToBatchDelivery({
+                  shipmentDoc: {
+                    id: parentShipmentId,
+                    data: () => parentShipmentData,
+                  },
+                  pkg: targetPackage,
+                  barcode: targetPackage?.packageId,
+                  source: pendingActionSource,
+                });
+                setActionModalVisible(false);
+                return;
+              }
+
               await assertShipmentOnTrip(parentShipmentId, parentShipmentData);
               openDeliveryProofModal({
                 scanType: "package",
@@ -1632,6 +2053,9 @@ export default function ScannerScreen() {
                 source: pendingActionSource,
                 shipmentDocData: parentShipmentData,
                 remarks,
+                packageIds: targetPackage?.packageId
+                  ? [targetPackage.packageId]
+                  : null,
               });
               setActionModalVisible(false);
             } catch (error) {
@@ -1694,6 +2118,53 @@ export default function ScannerScreen() {
         }}
       />
 
+      <BatchDeliverySummaryModal
+        visible={batchSummaryVisible && (batchDeliverySession?.pieces?.length || 0) > 0}
+        customerName={batchDeliverySession?.customerName}
+        shipmentLabel={batchDeliverySession?.shipmentLabel}
+        pieces={batchDeliverySession?.pieces || []}
+        eyebrow={getBatchScanSummaryEyebrow(batchScanAction)}
+        completeLabel={getBatchScanCompleteLabel(batchScanAction)}
+        accentColor={
+          batchScanAction === "FAILED_DELIVERY"
+            ? "#dc2626"
+            : batchScanAction === "RETURNED_TO_WAREHOUSE"
+              ? "#b45309"
+              : "#2563eb"
+        }
+        iconName={
+          batchScanAction === "FAILED_DELIVERY"
+            ? "exclamation-triangle"
+            : batchScanAction === "RETURNED_TO_WAREHOUSE"
+              ? "warehouse"
+              : "check-circle"
+        }
+        onRemovePiece={handleRemoveBatchPiece}
+        onCompleteScan={handleCompleteBatchScan}
+        onCancel={() => setBatchSummaryVisible(false)}
+      />
+
+      <FailedDeliveryReasonModal
+        visible={failedReasonVisible && (batchDeliverySession?.pieces?.length || 0) > 0}
+        uploading={failedProofUploading}
+        customerName={batchDeliverySession?.customerName}
+        pieceCount={batchDeliverySession?.pieces?.length || 0}
+        pieces={batchDeliverySession?.pieces || []}
+        photos={failedProofPhotos}
+        onClose={() => {
+          if (failedProofUploading) return;
+          setFailedReasonVisible(false);
+        }}
+        onPickImage={() => pickFailedProofImage(false)}
+        onTakePhoto={() => pickFailedProofImage(true)}
+        onRemovePhoto={(index) =>
+          setFailedProofPhotos((current) =>
+            current.filter((_, photoIndex) => photoIndex !== index),
+          )
+        }
+        onConfirm={completeFailedBatch}
+      />
+
       <DeliveryProofModal
         visible={deliveryProofVisible}
         uploading={deliveryProofUploading}
@@ -1703,6 +2174,12 @@ export default function ScannerScreen() {
         minImages={DELIVERY_PROOF_MIN_IMAGES}
         maxImages={DELIVERY_PROOF_MAX_IMAGES}
         canSubmit={canCompletePendingDelivery}
+        batchPieceCount={
+          pendingDelivery?.packageIds?.length ||
+          pendingDelivery?.batchPieces?.length ||
+          0
+        }
+        batchPieces={pendingDelivery?.batchPieces || []}
         onClose={cancelDeliveryProof}
         onPickImage={() => pickDeliveryProofImage(false)}
         onTakePhoto={() => pickDeliveryProofImage(true)}

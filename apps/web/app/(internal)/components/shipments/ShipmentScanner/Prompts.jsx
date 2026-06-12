@@ -383,7 +383,8 @@ export function HandoffPrompt({
         {context.destinationWarehouse?.includes("Odiongan")
           ? "Odiongan"
           : context.destinationWarehouse || "the hub"}{" "}
-        until a checker scans and loads each label.
+        until a checker scans each piece under Load (out for delivery is set
+        automatically per scan).
       </div>
 
       <div className="space-y-2">

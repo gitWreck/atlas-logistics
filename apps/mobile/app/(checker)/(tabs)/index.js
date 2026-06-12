@@ -137,7 +137,16 @@ export default function CheckerIndex() {
         <OperationsGrid
           onScanOffload={() => goToScan("offloading", "Offload Items")}
           onScanInfo={() => goToScan("info", "Information")}
-          onScanDelivery={() => goToScan("delivery", "Load Truck")}
+          onScanDelivery={() =>
+            router.push({
+              pathname: "/(checker)/scan",
+              params: {
+                mode: "delivery",
+                title: "Load",
+                presetScanStatus: "LOAD_TO_VEHICLE",
+              },
+            })
+          }
         />
       </ScrollView>
     </View>

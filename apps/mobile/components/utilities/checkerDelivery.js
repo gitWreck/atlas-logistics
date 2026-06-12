@@ -45,7 +45,9 @@ export function assertAssignedToChecker(shipment, checkerUid) {
 }
 
 function normalizeStatus(value) {
-  return String(value || "").trim().toUpperCase();
+  return String(value || "")
+    .trim()
+    .toUpperCase();
 }
 
 /**
@@ -104,7 +106,7 @@ export async function loadAssignedShipmentsToVehicle({
       : {}),
     location: location ? `${location.lat},${location.lng}` : null,
     gpsCoordinates: location,
-    remarks: remarks || "Loaded onto delivery vehicle from checker app.",
+    remarks: remarks || "Loaded out for delivery from checker app.",
   });
 
   return response?.data || {};
@@ -135,15 +137,21 @@ export async function reportCheckerFailedDelivery({
   profile,
   reasonCode = null,
   remarks = "",
+  failurePhotoUrls = null,
 }) {
   const location = await getCurrentLocationSafe();
   const response = await reportFailedDelivery({
     shipmentIds,
-    ...(Array.isArray(packageIds) && packageIds.length > 0 ? { packageIds } : {}),
+    ...(Array.isArray(packageIds) && packageIds.length > 0
+      ? { packageIds }
+      : {}),
     reasonCode,
     remarks: remarks || "Failed delivery reported from checker app.",
     location: location ? `${location.lat},${location.lng}` : null,
     gpsCoordinates: location,
+    ...(Array.isArray(failurePhotoUrls) && failurePhotoUrls.length > 0
+      ? { failurePhotoUrls }
+      : {}),
   });
   return response?.data || {};
 }
@@ -158,7 +166,9 @@ export async function returnCheckerShipmentsToWarehouse({
   const location = await getCurrentLocationSafe();
   const response = await returnPackagesToWarehouse({
     shipmentIds,
-    ...(Array.isArray(packageIds) && packageIds.length > 0 ? { packageIds } : {}),
+    ...(Array.isArray(packageIds) && packageIds.length > 0
+      ? { packageIds }
+      : {}),
     warehouseCode,
     remarks: remarks || "Returned to Odiongan warehouse.",
     location: location ? `${location.lat},${location.lng}` : null,
@@ -185,7 +195,9 @@ export async function completeCheckerDelivery({
     shipmentId,
     tripId,
     newStatus: "DELIVERED",
-    ...(Array.isArray(packageIds) && packageIds.length > 0 ? { packageIds } : {}),
+    ...(Array.isArray(packageIds) && packageIds.length > 0
+      ? { packageIds }
+      : {}),
     location,
     remarks: `Proof of Delivery: ${photoUrls.length} images uploaded.`,
     proofOfDelivery: photoUrls,

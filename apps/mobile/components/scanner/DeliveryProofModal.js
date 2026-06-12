@@ -21,6 +21,8 @@ export default function DeliveryProofModal({
   minImages = 1,
   maxImages = 5,
   canSubmit = false,
+  batchPieceCount = 0,
+  batchPieces = [],
   onClose,
   onPickImage,
   onTakePhoto,
@@ -29,6 +31,7 @@ export default function DeliveryProofModal({
   onSubmit,
 }) {
   const limitReached = totalCount >= maxImages;
+  const isBatch = batchPieceCount > 1 || batchPieces.length > 1;
 
   return (
     <Modal
@@ -42,7 +45,9 @@ export default function DeliveryProofModal({
           <View style={styles.header}>
             <View>
               <Text style={styles.eyebrow}>Proof of Delivery</Text>
-              <Text style={styles.title}>Complete Shipment</Text>
+              <Text style={styles.title}>
+                {isBatch ? "Confirm Delivery" : "Complete Shipment"}
+              </Text>
             </View>
             <TouchableOpacity
               onPress={onClose}
@@ -55,9 +60,20 @@ export default function DeliveryProofModal({
           </View>
 
           <Text style={styles.message}>
-            Add at least {minImages} delivery photo. You can attach up to{" "}
-            {maxImages} images before marking this shipment completed.
+            {isBatch
+              ? `One POD photo covers all ${batchPieceCount || batchPieces.length} scanned pieces. Add at least ${minImages} photo (up to ${maxImages}).`
+              : `Add at least ${minImages} delivery photo. You can attach up to ${maxImages} images before marking this shipment completed.`}
           </Text>
+
+          {isBatch && batchPieces.length > 0 && (
+            <View style={styles.batchList}>
+              {batchPieces.map((piece) => (
+                <Text key={piece.packageId} style={styles.batchItem}>
+                  ✓ {piece.label}
+                </Text>
+              ))}
+            </View>
+          )}
 
           <View style={styles.countPill}>
             <Text style={styles.countText}>
@@ -132,7 +148,11 @@ export default function DeliveryProofModal({
               <FontAwesome5 name="check-circle" size={15} color="#ffffff" />
             )}
             <Text style={styles.submitText}>
-              {uploading ? "Uploading Proof..." : "Mark Shipment Completed"}
+              {uploading
+                ? "Uploading Proof..."
+                : isBatch
+                  ? "Confirm Delivery"
+                  : "Mark Shipment Completed"}
             </Text>
           </TouchableOpacity>
         </View>
@@ -185,6 +205,20 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: "700",
     lineHeight: 19,
+  },
+  batchList: {
+    borderRadius: 12,
+    backgroundColor: "#f0fdf4",
+    borderWidth: 1,
+    borderColor: "#bbf7d0",
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    gap: 4,
+  },
+  batchItem: {
+    color: "#166534",
+    fontSize: 12,
+    fontWeight: "700",
   },
   countPill: {
     alignSelf: "flex-start",

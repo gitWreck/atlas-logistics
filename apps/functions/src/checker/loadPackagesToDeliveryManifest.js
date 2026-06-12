@@ -16,6 +16,7 @@ const {
   applyPieceLoadCustody,
   assertCheckerCanAccessShipment,
   getPackageIdentity,
+  shipmentHasPiecesAvailableForCheckerLoad,
   shipmentHasWarehouseCustodyPieces,
 } = require("../warehouse/packageDeliveryOperations");
 
@@ -337,10 +338,17 @@ exports.loadPackagesToDeliveryManifest = onCall(
           );
         }
 
+        const packages = Array.isArray(shipmentData.packages)
+          ? shipmentData.packages
+          : [];
+
         const legacyAssigned = normalizeString(shipmentData.assignedCheckerId);
         const poolRelease =
           shipmentData.availableForDelivery === true ||
-          status === "AVAILABLE_FOR_DELIVERY";
+          status === "AVAILABLE_FOR_DELIVERY" ||
+          status === "OUT_FOR_DELIVERY" ||
+          status === "PARTIALLY_OUT_FOR_DELIVERY" ||
+          shipmentHasPiecesAvailableForCheckerLoad(packages, actorUid);
 
         if (!poolRelease && legacyAssigned && legacyAssigned !== actorUid) {
           throw new HttpsError(
@@ -348,10 +356,6 @@ exports.loadPackagesToDeliveryManifest = onCall(
             `Shipment ${shipmentId} is assigned to another checker.`,
           );
         }
-
-        const packages = Array.isArray(shipmentData.packages)
-          ? shipmentData.packages
-          : [];
         let loadedCount = 0;
 
         const updatedPackages = packages.map((pkg) => {
@@ -433,17 +437,20 @@ exports.loadPackagesToDeliveryManifest = onCall(
                 : warehouseCode
               : "DELIVERY_VEHICLE_LOADED",
             status: shipmentStatus,
-            availableForDelivery: shipmentHasWarehouseCustodyPieces(updatedPackages),
+            availableForDelivery: shipmentHasPiecesAvailableForCheckerLoad(
+              updatedPackages,
+              actorUid,
+            ),
             activeCheckerIds: FieldValue.arrayUnion(actorUid),
             updatedAt: now,
             updatedBy: actorName || actorUid || null,
             statusHistory: FieldValue.arrayUnion({
-              status: "LOADED_TO_DELIVERY_VEHICLE",
+              status: shipmentStatus,
               at: admin.firestore.Timestamp.now(),
               by: actorName || actorUid || null,
               note:
                 normalizeString(remarks) ||
-                `Loaded ${loadedCount} piece(s) onto delivery vehicle.`,
+                `Loaded ${loadedCount} piece(s) out for delivery via checker scan.`,
               location: location || null,
             }),
           },
@@ -514,7 +521,7 @@ exports.loadPackagesToDeliveryManifest = onCall(
           event: {
             shipmentId,
             pieceId: packageId,
-            eventType: EVENT_TYPES.LOADED_TO_DELIVERY_VEHICLE,
+            eventType: EVENT_TYPES.OUT_FOR_DELIVERY,
             manifestId: manifestRefId,
             checkerId: actorUid,
             checkerName,

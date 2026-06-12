@@ -51,7 +51,11 @@ export default function AvailableToLoadScreen() {
   const openLoadScan = () => {
     router.push({
       pathname: "/(checker)/scan",
-      params: { mode: "delivery", title: "Load to Van" },
+      params: {
+        mode: "delivery",
+        title: "Load",
+        presetScanStatus: "LOAD_TO_VEHICLE",
+      },
     });
   };
 
@@ -90,8 +94,9 @@ export default function AvailableToLoadScreen() {
               : ""}
           </Text>
           <Text style={[styles.hintText, { color: colors.textMuted }]}>
-            Custody stays at Odiongan until you scan each label and load it to
-            your van. After loading, use My Route and My Load.
+            Scan each piece label under Load. Released pieces move to your
+            custody and out for delivery automatically — no separate step
+            needed.
           </Text>
           <TouchableOpacity
             style={[styles.scanBtn, { borderColor: colors.border }]}
@@ -100,7 +105,7 @@ export default function AvailableToLoadScreen() {
           >
             <FontAwesome5 name="qrcode" size={12} color={colors.text} />
             <Text style={[styles.scanBtnText, { color: colors.text }]}>
-              Scan to load piece
+              Load
             </Text>
           </TouchableOpacity>
         </View>
@@ -202,7 +207,7 @@ export default function AvailableToLoadScreen() {
               >
                 <FontAwesome5 name="dolly" size={12} color={colors.text} />
                 <Text style={[styles.loadBtnText, { color: colors.text }]}>
-                  Scan load ({shipment.poolStats.available} available)
+                  Load ({shipment.poolStats.available} available)
                 </Text>
               </TouchableOpacity>
             </View>

@@ -65,7 +65,12 @@ exports.reportFailedDelivery = onCall(
       remarks = null,
       location = null,
       gpsCoordinates = null,
+      failurePhotoUrls = null,
     } = req.data || {};
+
+    const normalizedFailurePhotos = Array.isArray(failurePhotoUrls)
+      ? failurePhotoUrls.map((url) => normalizeString(url)).filter(Boolean)
+      : [];
 
     const packageIdSet = normalizePackageIdSet(packageIds);
     const resolvedShipmentIds = await resolveShipmentIds(db, {
@@ -145,7 +150,7 @@ exports.reportFailedDelivery = onCall(
         });
         const activeCheckerIds = collectActiveCheckerIds(updatedPackages);
 
-        tx.update(shipmentRefs[index], {
+        const shipmentUpdate = {
           packages: updatedPackages,
           status: derivedStatus,
           activeCheckerIds,
@@ -169,7 +174,13 @@ exports.reportFailedDelivery = onCall(
             })`,
             location: normalizeString(location),
           }),
-        });
+        };
+
+        if (normalizedFailurePhotos.length > 0) {
+          shipmentUpdate.failureProofUrls = normalizedFailurePhotos;
+        }
+
+        tx.update(shipmentRefs[index], shipmentUpdate);
 
         failedShipmentIds.push(shipmentId);
         targetIdentities.forEach((pieceId) => {

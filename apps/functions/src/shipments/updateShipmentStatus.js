@@ -3,7 +3,12 @@
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const admin = require("firebase-admin");
 const { FieldValue } = require("firebase-admin/firestore");
-const { chunk, requireRole, unique, updatedBy } = require("../utilities/helpers");
+const {
+  chunk,
+  requireRole,
+  unique,
+  updatedBy,
+} = require("../utilities/helpers");
 const { ALLOWED_SHIPMENT_STATUSES } = require("../utilities/dataDetails");
 const { writeShipmentActionLog } = require("../utilities/shipmentLogger");
 const { buildDerivedShipmentSnapshot } = require("../packages/shipmentStatus");
@@ -17,11 +22,15 @@ const {
   shouldTargetCheckerPiece,
   applyPieceDelivered,
 } = require("../checker/checkerPieceOperations");
-const { getShipmentTargetUserIds } = require("../utilities/notificationHelpers");
+const {
+  getShipmentTargetUserIds,
+} = require("../utilities/notificationHelpers");
 const { normalizeQty } = require("../utilities/packageHelpers");
 const { tryAutoCompleteTrip } = require("../trips/autoCompleteTrip");
 const { PACKAGE_STATUS } = require("../packages/packageStatus");
-const { assertCustodyScanStatusAllowed } = require("../trips/manifestLockGuard");
+const {
+  assertCustodyScanStatusAllowed,
+} = require("../trips/manifestLockGuard");
 
 if (!admin.apps.length) admin.initializeApp();
 
@@ -331,7 +340,11 @@ exports.updateShipmentStatus = onCall(
         const checkerUid = String(checkerAuthUid || "");
         const legacyUserCode = String(usercode || "").trim();
         const loadedBy = String(pkg.loadedByCheckerId || "").trim();
-        if (loadedBy && (loadedBy === checkerUid || (legacyUserCode && loadedBy === legacyUserCode))) {
+        if (
+          loadedBy &&
+          (loadedBy === checkerUid ||
+            (legacyUserCode && loadedBy === legacyUserCode))
+        ) {
           return true;
         }
         const custodyId = String(pkg.custodyOwnerId || "").trim();
@@ -355,8 +368,7 @@ exports.updateShipmentStatus = onCall(
       if (newStatus === "OUT_FOR_DELIVERY" && actor.role === "checker") {
         const promotableCount = oldPackages.filter(
           (pkg) =>
-            isCheckerOwnedPiece(pkg) &&
-            canPromotePieceToOutForDelivery(pkg),
+            isCheckerOwnedPiece(pkg) && canPromotePieceToOutForDelivery(pkg),
         ).length;
         if (promotableCount === 0) {
           throw new HttpsError(
@@ -409,9 +421,7 @@ exports.updateShipmentStatus = onCall(
 
         if (newStatus === "OUT_FOR_DELIVERY" && actor.role === "checker") {
           if (!isCheckerOwnedPiece(pkg)) return pkg;
-          if (
-            String(pkg.status || "").toUpperCase() === "OUT_FOR_DELIVERY"
-          ) {
+          if (String(pkg.status || "").toUpperCase() === "OUT_FOR_DELIVERY") {
             return pkg;
           }
           if (!canPromotePieceToOutForDelivery(pkg)) return pkg;
@@ -501,7 +511,8 @@ exports.updateShipmentStatus = onCall(
           (pkg, index) =>
             String(pkg.status || "").toUpperCase() ===
               String(oldPackages[index]?.status || "").toUpperCase() &&
-            pkg.availableForDelivery === oldPackages[index]?.availableForDelivery,
+            pkg.availableForDelivery ===
+              oldPackages[index]?.availableForDelivery,
         );
 
       if (
