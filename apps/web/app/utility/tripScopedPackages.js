@@ -59,8 +59,50 @@ function isOriginOnlyPiece(pkg = {}) {
   return false;
 }
 
+function isLinkedToTrip(pkg = {}, tripId = "", tripBarcodeSet = new Set()) {
+  const packageTripId = String(pkg.currentTripId || pkg.loadedOnTrip || "").trim();
+  if (tripId && packageTripId === tripId) return true;
+
+  const packageId = getPackageIdentity(pkg);
+  return Boolean(packageId && tripBarcodeSet.has(String(packageId)));
+}
+
 export function packageWasOnTrip(pkg = {}, tripId = "", tripBarcodeSet = new Set()) {
   const status = normalizeStatus(pkg.status);
+
+  if (isOriginOnlyPiece(pkg)) return false;
+
+  const onThisTrip = isLinkedToTrip(pkg, tripId, tripBarcodeSet);
+
+  // With trip context, only count pieces explicitly tied to this trip.
+  if (tripId) {
+    if (!onThisTrip) return false;
+
+    if (
+      status === "OUT_FOR_DELIVERY" ||
+      status === "LOADED_TO_DELIVERY_VEHICLE"
+    ) {
+      return true;
+    }
+
+    if (pkg.hubReceivedAt) return true;
+
+    if (POST_HUB_DELIVERY_PIECE_STATUSES.has(status)) {
+      return Boolean(
+        pkg.loadedByCheckerId || pkg.availableForDelivery || pkg.deliveredAt,
+      );
+    }
+
+    if (RECEIVED_AT_HUB_PIECE_STATUSES.has(status)) return true;
+    if (LOADED_ON_TRUCK_PIECE_STATUSES.has(status)) return true;
+
+    const loadedQty = Number(pkg.loadedQty);
+    const receivedQty = Number(pkg.receivedQty);
+    if (Number.isFinite(loadedQty) && loadedQty > 0) return true;
+    if (Number.isFinite(receivedQty) && receivedQty > 0) return true;
+
+    return true;
+  }
 
   if (
     status === "OUT_FOR_DELIVERY" ||
@@ -69,20 +111,13 @@ export function packageWasOnTrip(pkg = {}, tripId = "", tripBarcodeSet = new Set
     return true;
   }
 
-  if (isOriginOnlyPiece(pkg)) return false;
-
-  const packageTripId = String(pkg.currentTripId || pkg.loadedOnTrip || "").trim();
-  if (tripId && packageTripId === tripId) return true;
-
-  const packageId = getPackageIdentity(pkg);
-  const inBarcodeSet = Boolean(packageId && tripBarcodeSet.has(String(packageId)));
-
-  if (inBarcodeSet) return true;
-
+  if (onThisTrip) return true;
   if (pkg.hubReceivedAt) return true;
 
   if (POST_HUB_DELIVERY_PIECE_STATUSES.has(status)) {
-    return Boolean(pkg.loadedByCheckerId || pkg.availableForDelivery || pkg.deliveredAt);
+    return Boolean(
+      pkg.loadedByCheckerId || pkg.availableForDelivery || pkg.deliveredAt,
+    );
   }
 
   if (RECEIVED_AT_HUB_PIECE_STATUSES.has(status)) return true;

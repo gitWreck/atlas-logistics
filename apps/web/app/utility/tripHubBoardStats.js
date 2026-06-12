@@ -92,6 +92,49 @@ function countReleasedTripScopedPieces(tripShipment = {}, shipment = {}, tripId 
   }, 0);
 }
 
+/** Pieces released for delivery on this trip (delivered + still in the pipeline). */
+function countTripReleasePipelineTotal(
+  scopedPackages = [],
+  tripShipment = {},
+  shipment = {},
+) {
+  if (scopedPackages.length === 0) {
+    if (shipment.releasedForDeliveryAt || shipment.availableForDelivery === true) {
+      return resolveTripScopedPieceTotal(tripShipment);
+    }
+    return 0;
+  }
+
+  const pool = countShipmentDeliveryPool(scopedPackages);
+  const onChecker = Object.values(pool.onChecker || {}).reduce(
+    (sum, qty) => sum + clampCount(qty),
+    0,
+  );
+
+  // Each piece is counted once: delivered, still at hub pool, or with a checker/vehicle.
+  return pool.delivered + pool.atWarehouse + onChecker;
+}
+
+/** Trip-level delivery progress — shared by trip board and manifest overview. */
+export function resolveHubTripDeliveryTotals(trip = {}) {
+  const unloading = resolveUnloadingTotals(trip);
+  const delivery = aggregateHubDeliveryOpsCounts(trip);
+  const tripTotal = Math.max(unloading.total, delivery.total);
+  const delivered = delivery.delivered;
+  const count = tripTotal > 0 ? Math.min(delivered, tripTotal) : delivered;
+
+  return {
+    tripTotal,
+    delivered,
+    count,
+    releasePipeline: delivery.releasePipeline,
+  };
+}
+
+function resolveTripContextId(trip = {}) {
+  return String(trip.id || trip.tripId || "").trim();
+}
+
 function countOnCheckerTripScopedPieces(tripShipment = {}, shipment = {}, tripId = "") {
   const scoped = getTripScopedPackages(tripShipment, shipment, tripId);
   if (scoped.length === 0) return 0;
@@ -128,10 +171,11 @@ function countDeliveredTripScopedPieces(tripShipment = {}, shipment = {}, tripId
 
 export function aggregateHubDeliveryOpsCounts(trip = {}) {
   const shipments = Array.isArray(trip.shipments) ? trip.shipments : [];
-  const tripId = String(trip.id || "").trim();
+  const tripId = resolveTripContextId(trip);
   let total = 0;
   let delivered = 0;
   let released = 0;
+  let releasePipeline = 0;
   let loadedToChecker = 0;
 
   shipments.forEach((row) => {
@@ -152,22 +196,14 @@ export function aggregateHubDeliveryOpsCounts(trip = {}) {
         (sum, qty) => sum + clampCount(qty),
         0,
       );
-      released += scopedPackages.reduce((sum, pkg) => {
-        const status = normalizeStatus(pkg.status);
-        if (pkg.availableForDelivery === true) return sum + pieceQty(pkg);
-        if (
-          status === "RELEASED_FOR_DELIVERY" ||
-          status === "AVAILABLE_FOR_DELIVERY"
-        ) {
-          return sum + pieceQty(pkg);
-        }
-        return sum;
-      }, 0);
+      released += countReleasedTripScopedPieces(row, row, tripId);
+      releasePipeline += countTripReleasePipelineTotal(scopedPackages, row, row);
       return;
     }
 
     delivered += countDeliveredTripScopedPieces(row, row, tripId);
     released += countReleasedTripScopedPieces(row, row, tripId);
+    releasePipeline += countTripReleasePipelineTotal([], row, row);
     loadedToChecker += countOnCheckerTripScopedPieces(row, row, tripId);
   });
 
@@ -175,6 +211,7 @@ export function aggregateHubDeliveryOpsCounts(trip = {}) {
     total,
     delivered,
     released,
+    releasePipeline,
     loadedToChecker,
   };
 }
@@ -420,20 +457,23 @@ export function calculateHubBoardProgress(trip = {}) {
  * Per-shipment trip progress for manifest rows after arrival (delivered / released).
  */
 export function getShipmentTripProgressDisplay(tripShipment = {}, trip = {}) {
-  const tripId = String(trip.id || trip.tripId || "").trim();
-  const delivered = countDeliveredTripScopedPieces(tripShipment, tripShipment, tripId);
-  const released = countReleasedTripScopedPieces(tripShipment, tripShipment, tripId);
+  const tripId = resolveTripContextId(trip);
+  const scopedPackages = getTripScopedPackages(tripShipment, tripShipment, tripId);
+  const delivered = countDeliveredTripScopedPieces(
+    tripShipment,
+    tripShipment,
+    tripId,
+  );
   const tripScopedTotal = resolveTripScopedPieceTotal(tripShipment);
-  const denominator = released > 0 ? released : tripScopedTotal;
+  const denominator = tripScopedTotal;
+  const count =
+    denominator > 0 ? Math.min(delivered, denominator) : delivered;
 
   return {
-    count: delivered,
+    count,
     total: denominator,
     displayValue:
-      denominator > 0 ? `${delivered}/${denominator}` : String(delivered),
-    subLabel:
-      released > 0
-        ? `Delivered out of ${denominator} released on this trip`
-        : `Delivered out of ${denominator} pieces on this trip`,
+      denominator > 0 ? `${count}/${denominator}` : String(count),
+    subLabel: `Delivered out of ${denominator} pieces on this trip`,
   };
 }
