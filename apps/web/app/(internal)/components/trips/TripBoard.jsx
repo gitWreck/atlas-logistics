@@ -34,6 +34,8 @@ import {
   getTripStatus,
   getWarehouseOriginFilter,
   isCompletedTrip,
+  isCancelledTrip,
+  isArchivedTrip,
   matchesOriginFilter,
 } from "./tripHelpers";
 
@@ -184,6 +186,8 @@ const TripBoard = forwardRef(function TripBoard(
   const activeTrips = useMemo(() => {
     return originFilteredTrips.filter((trip) => {
       if (isCompletedTrip(trip)) return false;
+      if (isCancelledTrip(trip)) return false;
+      if (isArchivedTrip(trip)) return false;
 
       if (activeFilter === "ACTIVE") {
         return ["IN_TRANSIT", "LOADED"].includes(getTripStatus(trip));
@@ -201,6 +205,16 @@ const TripBoard = forwardRef(function TripBoard(
     () => originFilteredTrips.filter(isCompletedTrip),
     [originFilteredTrips],
   );
+  const cancelledTrips = useMemo(
+    () => originFilteredTrips.filter(isCancelledTrip),
+    [originFilteredTrips],
+  );
+  const archivedTrips = useMemo(
+    () => originFilteredTrips.filter(isArchivedTrip),
+    [originFilteredTrips],
+  );
+  const closedTripsCount =
+    completedTrips.length + cancelledTrips.length + archivedTrips.length;
   const boardTabs = useMemo(
     () => [
       {
@@ -219,10 +233,14 @@ const TripBoard = forwardRef(function TripBoard(
         key: TRIP_BOARD_TABS.COMPLETED,
         label: "Completed Trips",
         icon: faCheckCircle,
-        count: completedTrips.length,
+        count: closedTripsCount,
       },
     ],
-    [activeTrips.length, completedTrips.length, tripScheduleCandidates.length],
+    [
+      activeTrips.length,
+      closedTripsCount,
+      tripScheduleCandidates.length,
+    ],
   );
 
   useEffect(() => {
@@ -300,7 +318,9 @@ const TripBoard = forwardRef(function TripBoard(
         ) : activeBoardTab === TRIP_BOARD_TABS.COMPLETED ? (
           <div className="mt-6">
             <CompletedTripsTable
-              trips={completedTrips}
+              completedTrips={completedTrips}
+              cancelledTrips={cancelledTrips}
+              archivedTrips={archivedTrips}
               loading={loading}
               isDark={isDark}
               profile={profile}

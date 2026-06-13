@@ -3,15 +3,58 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
+  faArchive,
+  faBan,
   faCheckCircle,
   faSearch,
 } from "@fortawesome/free-solid-svg-icons";
 import TripRow from "./TripRow";
-import { getBoardThemeClasses } from "@/app/utility/constant/theme";
+import {
+  getBoardThemeClasses,
+  getOverviewThemeClasses,
+} from "@/app/utility/constant/theme";
 import TablePaginationFooter from "../ui/TablePaginationFooter";
 
+const COMPLETED_SUB_TABS = {
+  COMPLETED: "completed",
+  CANCELLED: "cancelled",
+  ARCHIVED: "archived",
+};
+
+const SUB_TAB_CONFIG = {
+  [COMPLETED_SUB_TABS.COMPLETED]: {
+    label: "Completed",
+    icon: faCheckCircle,
+    iconClass: "text-emerald-500",
+    searchPlaceholder: "Search completed trips...",
+    emptyMessage: "No completed trips found.",
+    emptySearchMessage: "No completed trips match your search.",
+    loadingMessage: "Loading completed trips...",
+  },
+  [COMPLETED_SUB_TABS.CANCELLED]: {
+    label: "Cancelled",
+    icon: faBan,
+    iconClass: "text-red-500",
+    searchPlaceholder: "Search cancelled trips...",
+    emptyMessage: "No cancelled trips found.",
+    emptySearchMessage: "No cancelled trips match your search.",
+    loadingMessage: "Loading cancelled trips...",
+  },
+  [COMPLETED_SUB_TABS.ARCHIVED]: {
+    label: "Archive",
+    icon: faArchive,
+    iconClass: "text-slate-400",
+    searchPlaceholder: "Search archived trips...",
+    emptyMessage: "No archived trips found.",
+    emptySearchMessage: "No archived trips match your search.",
+    loadingMessage: "Loading archived trips...",
+  },
+};
+
 export default function CompletedTripsTable({
-  trips = [],
+  completedTrips = [],
+  cancelledTrips = [],
+  archivedTrips = [],
   loading = false,
   isDark = false,
   profile,
@@ -20,17 +63,54 @@ export default function CompletedTripsTable({
   onSelectTrip,
   onDeleted,
 }) {
+  const [activeSubTab, setActiveSubTab] = useState(
+    COMPLETED_SUB_TABS.COMPLETED,
+  );
   const [currentPage, setCurrentPage] = useState(1);
   const [searchQuery, setSearchQuery] = useState("");
   const itemsPerPage = 10;
   const theme = getBoardThemeClasses(isDark);
+  const overviewTheme = getOverviewThemeClasses(isDark);
+
+  const tripsBySubTab = useMemo(
+    () => ({
+      [COMPLETED_SUB_TABS.COMPLETED]: completedTrips,
+      [COMPLETED_SUB_TABS.CANCELLED]: cancelledTrips,
+      [COMPLETED_SUB_TABS.ARCHIVED]: archivedTrips,
+    }),
+    [archivedTrips, cancelledTrips, completedTrips],
+  );
+
+  const activeTrips = tripsBySubTab[activeSubTab] || [];
+  const subTabConfig = SUB_TAB_CONFIG[activeSubTab];
+
+  const subTabs = useMemo(
+    () => [
+      {
+        key: COMPLETED_SUB_TABS.COMPLETED,
+        label: "Completed",
+        count: completedTrips.length,
+      },
+      {
+        key: COMPLETED_SUB_TABS.CANCELLED,
+        label: "Cancelled",
+        count: cancelledTrips.length,
+      },
+      {
+        key: COMPLETED_SUB_TABS.ARCHIVED,
+        label: "Archive",
+        count: archivedTrips.length,
+      },
+    ],
+    [archivedTrips.length, cancelledTrips.length, completedTrips.length],
+  );
 
   const filteredTrips = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
 
-    if (!query) return trips;
+    if (!query) return activeTrips;
 
-    return trips.filter((trip) => {
+    return activeTrips.filter((trip) => {
       const searchContent = [
         trip.tripId,
         trip.driverName,
@@ -47,7 +127,7 @@ export default function CompletedTripsTable({
 
       return searchContent.includes(query);
     });
-  }, [searchQuery, trips]);
+  }, [activeTrips, searchQuery]);
 
   const totalPages = Math.max(
     1,
@@ -62,7 +142,11 @@ export default function CompletedTripsTable({
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [completedTripLimit, filteredTrips]);
+  }, [activeSubTab, completedTripLimit, filteredTrips]);
+
+  useEffect(() => {
+    setSearchQuery("");
+  }, [activeSubTab]);
 
   return (
     <div
@@ -70,13 +154,37 @@ export default function CompletedTripsTable({
     >
       <div className={`px-4 sm:px-6 py-4 border-b ${theme.header}`}>
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
-          <h3 className={`font-bold flex items-center gap-2 ${theme.title}`}>
-            <FontAwesomeIcon
-              icon={faCheckCircle}
-              className="text-emerald-500"
-            />
-            Completed Trips
-          </h3>
+          <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+            <h3
+              className={`font-bold flex items-center gap-2 shrink-0 ${theme.title}`}
+            >
+              <FontAwesomeIcon
+                icon={subTabConfig.icon}
+                className={subTabConfig.iconClass}
+              />
+              {subTabConfig.label} Trips
+            </h3>
+
+            <div
+              className={`flex w-full sm:w-auto p-1 rounded-lg border ${overviewTheme.segmentedControl}`}
+            >
+              {subTabs.map((tab) => (
+                <button
+                  key={tab.key}
+                  type="button"
+                  onClick={() => setActiveSubTab(tab.key)}
+                  className={`flex-1 sm:flex-none px-3 py-1.5 text-xs font-bold uppercase rounded-md transition-all text-center whitespace-nowrap ${
+                    activeSubTab === tab.key
+                      ? overviewTheme.segmentedControlActive
+                      : overviewTheme.segmentedControlIdle
+                  }`}
+                >
+                  {tab.label}
+                  <span className="ml-1 opacity-70">({tab.count})</span>
+                </button>
+              ))}
+            </div>
+          </div>
 
           <div className="flex flex-col sm:flex-row sm:items-center gap-2 w-full lg:w-auto">
             <div className="relative w-full sm:w-72">
@@ -86,7 +194,7 @@ export default function CompletedTripsTable({
               />
               <input
                 type="text"
-                placeholder="Search completed trips..."
+                placeholder={subTabConfig.searchPlaceholder}
                 className={`w-full rounded-lg pl-9 pr-4 py-2 text-sm focus:border-emerald-500 focus:outline-none border ${theme.input}`}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
@@ -96,7 +204,7 @@ export default function CompletedTripsTable({
             <span
               className={`text-xs font-bold px-2.5 py-1 rounded-full border whitespace-nowrap ${theme.pageBadge}`}
             >
-              {filteredTrips.length} of {trips.length}
+              {filteredTrips.length} of {activeTrips.length}
             </span>
           </div>
         </div>
@@ -120,13 +228,13 @@ export default function CompletedTripsTable({
               <div
                 className={`p-10 text-center animate-pulse ${theme.emptyText}`}
               >
-                Loading completed trips...
+                {subTabConfig.loadingMessage}
               </div>
             ) : currentItems.length === 0 ? (
               <div className={`p-10 text-center ${theme.emptyText}`}>
                 {searchQuery.trim()
-                  ? "No completed trips match your search."
-                  : "No completed trips found."}
+                  ? subTabConfig.emptySearchMessage
+                  : subTabConfig.emptyMessage}
               </div>
             ) : (
               currentItems.map((trip) => (

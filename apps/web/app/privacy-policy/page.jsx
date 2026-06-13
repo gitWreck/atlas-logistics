@@ -7,268 +7,310 @@ export default function PrivacyPolicyPage() {
     <main className="min-h-screen bg-white px-4 py-12 text-slate-900">
       <div className="mx-auto w-full max-w-3xl">
         <h1 className="mb-2 text-3xl font-semibold">Privacy Policy</h1>
-        <p className="mb-8 text-sm text-slate-500">Last updated: March 3, 2026</p>
-
-        <p className="mb-6 text-sm leading-relaxed">
-          This Privacy Policy explains how <strong>Atlas Transport Corporation</strong> (“we”, “our”, or
-          “us”) collects, uses, and protects information when you interact with our Facebook Messenger
-          business application (the “App”). Atlas Transport Corporation provides reliable trucking
-          services from Manila to Romblon, offering fast, safe, and on-time delivery.
-        </p>
+        <p className="mb-8 text-sm text-slate-500">Effective Date: June 13, 2026</p>
 
         <section className="mb-8 text-sm leading-relaxed">
-          <h2 className="mb-2 text-lg font-semibold">1. Controller Information</h2>
+          <h2 className="mb-2 text-lg font-semibold">Atlas Transport Privacy Policy</h2>
+          <p className="mb-3">
+            Atlas Transport Corporation OPC (&quot;Atlas Transport&quot;, &quot;we&quot;, &quot;our&quot;, or
+            &quot;us&quot;) is committed to protecting your privacy and safeguarding your personal information.
+            This Privacy Policy explains how we collect, use, store, disclose, and protect information when
+            you use the Atlas Transport mobile application, website, and related services.
+          </p>
           <p>
-            <strong>Atlas Transport Corporation</strong>
-            <br />
-            Odiongan, Rombol, Philippines
-            <br />
-            Email:{" "}
-            <a href="mailto:Atlastransportopc@gmail.com" className="text-blue-600 underline">
-              Atlastransportopc@gmail.com
-            </a>
-            <br />
-            Phone: +63 912 545 3219
+            By using our services, you agree to the collection and use of information in accordance with this
+            Privacy Policy.
           </p>
         </section>
 
+        <hr className="my-8 border-slate-200" />
+
         <section className="mb-8 text-sm leading-relaxed">
-          <h2 className="mb-2 text-lg font-semibold">2. Information We Collect</h2>
-          <p>
-            When you interact with our Facebook Messenger App, we may collect the following information:
-          </p>
+          <h2 className="mb-2 text-lg font-semibold">1. Information We Collect</h2>
+
+          <h3 className="mt-4 mb-1 font-semibold">Account Information</h3>
+          <p>When creating an account or using our services, we may collect:</p>
           <ul className="mt-3 list-disc pl-6">
-          <li>
-            <strong>Messenger profile information</strong>: your name, profile picture, language, time
-            zone, and Page-scoped ID provided by Meta/Facebook.
-          </li>
-          <li>
-            <strong>Message content</strong>: text messages, images, and any other content you send to us
-            through Messenger (for example, questions, booking details, and delivery information).
-          </li>
-          <li>
-            <strong>Booking and service details</strong>: pickup and drop-off locations, contact numbers,
-            shipment descriptions, preferred dates and times, and other information related to trucking
-            services between Manila, Romblon, and other locations we may serve.
-          </li>
-          <li>
-            <strong>Technical information</strong>: date and time of your messages, delivery and read
-            receipts, and basic log data (such as IP address, browser type, and device information) when
-            you access any web pages linked from the App.
-          </li>
+            <li>Full name</li>
+            <li>Email address</li>
+            <li>Phone number</li>
+            <li>Company name (if applicable)</li>
+            <li>Username and account identifiers</li>
+            <li>User role and permissions</li>
+          </ul>
+
+          <h3 className="mt-4 mb-1 font-semibold">Shipment and Delivery Information</h3>
+          <p>To provide transportation and logistics services, we may collect:</p>
+          <ul className="mt-3 list-disc pl-6">
+            <li>Shipment tracking numbers</li>
+            <li>Package details</li>
+            <li>Sender and recipient information</li>
+            <li>Pickup and delivery addresses</li>
+            <li>Delivery instructions</li>
+            <li>Delivery status updates</li>
+            <li>Chain-of-custody records</li>
+          </ul>
+
+          <h3 className="mt-4 mb-1 font-semibold">Location Information</h3>
+          <p>
+            For operational purposes, Atlas may collect location information from authorized employees,
+            drivers, warehouse personnel, and delivery checkers while using the application.
+          </p>
+          <p className="mt-3">Location information may be used for:</p>
+          <ul className="mt-3 list-disc pl-6">
+            <li>Delivery verification</li>
+            <li>Route management</li>
+            <li>Driver accountability</li>
+            <li>Shipment tracking</li>
+            <li>Operational reporting</li>
+            <li>Security and fraud prevention</li>
+          </ul>
+
+          <h3 className="mt-4 mb-1 font-semibold">Proof of Delivery Information</h3>
+          <p>Atlas may collect:</p>
+          <ul className="mt-3 list-disc pl-6">
+            <li>Delivery photographs</li>
+            <li>Pickup photographs</li>
+            <li>Warehouse receiving photographs</li>
+            <li>Digital signatures</li>
+            <li>Delivery confirmation records</li>
+          </ul>
+          <p className="mt-3">
+            These records are used solely for proof of delivery, shipment verification, chain-of-custody
+            documentation, customer support, dispute resolution, and operational recordkeeping.
+          </p>
+
+          <h3 className="mt-4 mb-1 font-semibold">Device Information</h3>
+          <p>We may automatically collect:</p>
+          <ul className="mt-3 list-disc pl-6">
+            <li>Device type</li>
+            <li>Device operating system</li>
+            <li>App version</li>
+            <li>Device identifiers</li>
+            <li>IP address</li>
+            <li>Mobile network information</li>
+            <li>Browser information (for web users)</li>
+          </ul>
+
+          <h3 className="mt-4 mb-1 font-semibold">Diagnostic Information</h3>
+          <p>We may collect:</p>
+          <ul className="mt-3 list-disc pl-6">
+            <li>Crash reports</li>
+            <li>Error logs</li>
+            <li>Performance data</li>
+            <li>Diagnostic information</li>
+            <li>Application usage statistics</li>
+          </ul>
+          <p className="mt-3">
+            This information helps us improve application reliability, performance, and security.
+          </p>
+        </section>
+
+        <hr className="my-8 border-slate-200" />
+
+        <section className="mb-8 text-sm leading-relaxed">
+          <h2 className="mb-2 text-lg font-semibold">2. How We Use Information</h2>
+          <p>Atlas uses collected information to:</p>
+          <ul className="mt-3 list-disc pl-6">
+            <li>Provide transportation and logistics services</li>
+            <li>Manage shipments and deliveries</li>
+            <li>Verify package custody and delivery status</li>
+            <li>Process customer requests</li>
+            <li>Authenticate users</li>
+            <li>Manage employee and operational access</li>
+            <li>Provide customer support</li>
+            <li>Improve platform performance</li>
+            <li>Maintain security and fraud prevention measures</li>
+            <li>Comply with legal obligations</li>
+            <li>Generate operational reports and analytics</li>
           </ul>
         </section>
 
-        <section className="mb-8 text-sm leading-relaxed">
-          <h2 className="mb-2 text-lg font-semibold">3. How We Use Your Information</h2>
-          <p>We use the information we collect for the following purposes:</p>
-          <ul className="mt-3 list-disc pl-6">
-          <li>
-            <strong>To provide and operate our services</strong>: handle inquiries, bookings, quotations,
-            tracking updates, and customer support for trucking services from Manila to Romblon and other
-            routes.
-          </li>
-          <li>
-            <strong>Communication</strong>: respond to your messages, send confirmations, delivery
-            updates, reminders, and important notifications.
-          </li>
-          <li>
-            <strong>Service improvements</strong>: analyze usage patterns to improve our routes, pricing,
-            operations, and customer experience.
-          </li>
-          <li>
-            <strong>Security and fraud prevention</strong>: detect, prevent, or address fraud, abuse, or
-            security incidents.
-          </li>
-          <li>
-            <strong>Legal and regulatory compliance</strong>: comply with legal obligations under
-            applicable laws in the Philippines and other relevant jurisdictions.
-          </li>
-          </ul>
-        </section>
+        <hr className="my-8 border-slate-200" />
 
         <section className="mb-8 text-sm leading-relaxed">
-          <h2 className="mb-2 text-lg font-semibold">4. Legal Bases for Processing</h2>
-          <p>
-            Where applicable, including under the Philippine Data Privacy Act of 2012 and similar laws,
-            we process your personal data based on:
-          </p>
+          <h2 className="mb-2 text-lg font-semibold">3. Data Sharing and Disclosure</h2>
+          <p className="mb-3">Atlas does not sell personal information.</p>
+          <p>Information may be shared only when necessary with:</p>
           <ul className="mt-3 list-disc pl-6">
-          <li>
-            <strong>Your consent</strong>: when you choose to contact us, use our Messenger App, or
-            provide information for bookings and inquiries.
-          </li>
-          <li>
-            <strong>Contract</strong>: to take steps at your request before entering into a service
-            agreement and to perform our obligations relating to your bookings.
-          </li>
-          <li>
-            <strong>Legitimate interests</strong>: to manage and improve our operations, secure our
-            systems, and communicate with customers, where our interests are not overridden by your
-            rights.
-          </li>
-          <li>
-            <strong>Legal obligations</strong>: to comply with applicable laws, regulations, and lawful
-            requests from authorities.
-          </li>
+            <li>Authorized Atlas personnel</li>
+            <li>Service providers supporting our operations</li>
+            <li>Cloud hosting providers</li>
+            <li>SMS notification providers</li>
+            <li>Email notification providers</li>
+            <li>Analytics and diagnostic providers</li>
+            <li>Government authorities when legally required</li>
           </ul>
+          <p className="mt-3">
+            All third-party providers are required to protect information consistent with applicable privacy
+            laws.
+          </p>
         </section>
 
+        <hr className="my-8 border-slate-200" />
+
         <section className="mb-8 text-sm leading-relaxed">
-          <h2 className="mb-2 text-lg font-semibold">5. How We Share Your Information</h2>
+          <h2 className="mb-2 text-lg font-semibold">4. Tracking and Advertising</h2>
+          <p>Atlas Transport does not use personal information for:</p>
+          <ul className="mt-3 list-disc pl-6">
+            <li>Third-party advertising</li>
+            <li>Behavioral advertising</li>
+            <li>Cross-app tracking</li>
+            <li>Data brokerage activities</li>
+          </ul>
+          <p className="mt-3">
+            Information collected through the application is used solely to provide logistics and
+            transportation services and improve platform functionality.
+          </p>
+        </section>
+
+        <hr className="my-8 border-slate-200" />
+
+        <section className="mb-8 text-sm leading-relaxed">
+          <h2 className="mb-2 text-lg font-semibold">5. Data Security</h2>
           <p>
-            We do <strong>not</strong> sell your personal information. We may share your information only
-            in the following circumstances:
+            We implement reasonable administrative, technical, and physical safeguards to protect information
+            against:
           </p>
           <ul className="mt-3 list-disc pl-6">
-          <li>
-            <strong>Service providers and partners</strong>: third parties who help us operate our
-            services (for example, hosting providers, IT support, communication tools, and logistics
-            partners). They process data only on our instructions and under confidentiality obligations.
-          </li>
-          <li>
-            <strong>Transport and logistics partners</strong>: drivers, subcontractors, and other
-            partners involved in providing trucking and delivery services, but only to the extent
-            necessary to perform the service (for example, sharing your name, contact number, and
-            delivery address).
-          </li>
-          <li>
-            <strong>Legal requirements</strong>: when we believe disclosure is reasonably necessary to
-            comply with a law, regulation, legal process, or governmental request.
-          </li>
-          <li>
-            <strong>Protection of rights</strong>: to enforce our agreements, protect our rights or
-            property, or protect the safety of our users, employees, or others.
-          </li>
+            <li>Unauthorized access</li>
+            <li>Unauthorized disclosure</li>
+            <li>Loss</li>
+            <li>Theft</li>
+            <li>Misuse</li>
+            <li>Alteration</li>
           </ul>
+          <p className="mt-3">
+            Despite our efforts, no method of electronic storage or transmission is completely secure.
+          </p>
         </section>
+
+        <hr className="my-8 border-slate-200" />
 
         <section className="mb-8 text-sm leading-relaxed">
           <h2 className="mb-2 text-lg font-semibold">6. Data Retention</h2>
-          <p>
-            We retain your personal information only for as long as necessary to fulfill the purposes
-            described in this Privacy Policy, including providing services, complying with legal,
-            accounting, or reporting requirements, and resolving disputes.
-          </p>
-          <p className="mt-3">
-            Message content and booking records may be retained for [e.g., “up to 24 months”] after your
-            last interaction with us, unless a longer retention period is required by law. After that,
-            data will be securely deleted or anonymized.
-          </p>
-        </section>
-
-        <section className="mb-8 text-sm leading-relaxed">
-          <h2 className="mb-2 text-lg font-semibold">7. Your Rights and Choices</h2>
-          <p>
-            Subject to applicable law (including the Philippine Data Privacy Act of 2012), you may have
-            the right to:
-          </p>
+          <p>Atlas retains information only for as long as necessary to:</p>
           <ul className="mt-3 list-disc pl-6">
-          <li>
-            <strong>Access</strong>: request a copy of the personal data we hold about you.
-          </li>
-          <li>
-            <strong>Correction</strong>: request that we correct or update inaccurate or incomplete
-            information.
-          </li>
-          <li>
-            <strong>Deletion</strong>: request that we delete your personal data, subject to legal or
-            legitimate business reasons for retention.
-          </li>
-          <li>
-            <strong>Objection and restriction</strong>: object to or request the restriction of certain
-            processing activities.
-          </li>
-          <li>
-            <strong>Withdraw consent</strong>: withdraw any consent you have previously given, without
-            affecting the lawfulness of processing before withdrawal.
-          </li>
+            <li>Provide services</li>
+            <li>Maintain shipment records</li>
+            <li>Support operational requirements</li>
+            <li>Resolve disputes</li>
+            <li>Meet legal and regulatory obligations</li>
+            <li>Maintain security and audit records</li>
           </ul>
           <p className="mt-3">
-            To exercise any of these rights, contact us at{" "}
-            <a href="mailto:Atlastransportopc@gmail.com" className="text-blue-600 underline">
-              Atlastransportopc@gmail.com
+            When information is no longer required, it will be securely deleted or anonymized.
+          </p>
+        </section>
+
+        <hr className="my-8 border-slate-200" />
+
+        <section className="mb-8 text-sm leading-relaxed">
+          <h2 className="mb-2 text-lg font-semibold">7. Your Rights</h2>
+          <p>Depending on your location and applicable laws, you may have rights to:</p>
+          <ul className="mt-3 list-disc pl-6">
+            <li>Access your information</li>
+            <li>Correct inaccurate information</li>
+            <li>Request deletion of your information</li>
+            <li>Request restriction of processing</li>
+            <li>Object to certain uses of information</li>
+            <li>Receive a copy of your information</li>
+          </ul>
+          <p className="mt-3">Requests may be submitted through the contact information below.</p>
+        </section>
+
+        <hr className="my-8 border-slate-200" />
+
+        <section className="mb-8 text-sm leading-relaxed">
+          <h2 className="mb-2 text-lg font-semibold">8. Account Deletion</h2>
+          <p>
+            Users may request account deletion by contacting:{" "}
+            <a href="mailto:support@atlastransport.ph" className="text-blue-600 underline">
+              support@atlastransport.ph
             </a>
-            . We may need to verify your identity before processing your request.
           </p>
+          <p className="mt-3">Certain records may be retained where required for:</p>
+          <ul className="mt-3 list-disc pl-6">
+            <li>Shipment recordkeeping</li>
+            <li>Legal compliance</li>
+            <li>Fraud prevention</li>
+            <li>Security investigations</li>
+            <li>Operational auditing</li>
+          </ul>
         </section>
+
+        <hr className="my-8 border-slate-200" />
 
         <section className="mb-8 text-sm leading-relaxed">
-          <h2 className="mb-2 text-lg font-semibold">8. Facebook / Meta Platform</h2>
+          <h2 className="mb-2 text-lg font-semibold">9. Children&apos;s Privacy</h2>
           <p>
-            Our App uses the Facebook Messenger platform provided by Meta Platforms, Inc. Your use of
-            Messenger is also subject to Facebook’s own terms and privacy policies. We do not control how
-            Facebook collects and processes your data. For more information, please review Facebook’s Data
-            Policy and Terms of Service available through your Facebook account or on Facebook’s website.
-          </p>
-        </section>
-
-        <section className="mb-8 text-sm leading-relaxed">
-          <h2 className="mb-2 text-lg font-semibold">9. International Data Transfers</h2>
-          <p>
-            Although Atlas Transport Corporation is based in the Philippines, your information may be
-            transferred to and processed in other countries where our service providers are located. Where
-            required by law, we will take appropriate measures to ensure that any international transfers
-            comply with applicable data protection requirements.
-          </p>
-        </section>
-
-        <section className="mb-8 text-sm leading-relaxed">
-          <h2 className="mb-2 text-lg font-semibold">10. Security</h2>
-          <p>
-            We use reasonable technical and organizational measures to protect your personal information
-            from unauthorized access, loss, misuse, or alteration. However, no method of transmission over
-            the internet or electronic storage is completely secure, and we cannot guarantee absolute
-            security.
-          </p>
-        </section>
-
-        <section className="mb-8 text-sm leading-relaxed">
-          <h2 className="mb-2 text-lg font-semibold">11. Children&apos;s Privacy</h2>
-          <p>
-            Our services and App are not directed to children under the age of 13, and we do not knowingly
-            collect personal information from children. If you believe that a child has provided us with
-            personal data, please contact us so we can remove it.
-          </p>
-        </section>
-
-        <section className="mb-8 text-sm leading-relaxed">
-          <h2 className="mb-2 text-lg font-semibold">12. Changes to This Privacy Policy</h2>
-          <p>
-            We may update this Privacy Policy from time to time. When we do, we will revise the “Last
-            updated” date at the top of this page. Your continued use of our Facebook Messenger App after
-            any changes means you accept the updated policy.
-          </p>
-        </section>
-
-        <section className="mb-10 text-sm leading-relaxed">
-          <h2 className="mb-2 text-lg font-semibold">13. Contact Us</h2>
-          <p>
-            If you have any questions or concerns about this Privacy Policy or our data practices, please
-            contact us at:
+            Atlas Transport services are not intended for children under the age of 13. We do not knowingly
+            collect personal information from children.
           </p>
           <p className="mt-3">
-            <strong>Atlas Transport Corporation</strong>
+            If we become aware that information has been collected from a child without appropriate consent,
+            we will take steps to remove that information.
+          </p>
+        </section>
+
+        <hr className="my-8 border-slate-200" />
+
+        <section className="mb-8 text-sm leading-relaxed">
+          <h2 className="mb-2 text-lg font-semibold">10. International Data Transfers</h2>
+          <p>
+            Information may be processed and stored in countries where Atlas or its service providers
+            operate. By using the service, you consent to such transfers where permitted by law.
+          </p>
+        </section>
+
+        <hr className="my-8 border-slate-200" />
+
+        <section className="mb-8 text-sm leading-relaxed">
+          <h2 className="mb-2 text-lg font-semibold">11. Changes to This Privacy Policy</h2>
+          <p className="mb-3">Atlas may update this Privacy Policy periodically.</p>
+          <p className="mb-3">
+            Updated versions will be posted at:{" "}
+            <a
+              href="https://atlastransport.ph/privacy-policy"
+              className="text-blue-600 underline"
+            >
+              https://atlastransport.ph/privacy-policy
+            </a>
+          </p>
+          <p>
+            The effective date at the top of this policy will indicate when changes become effective.
+          </p>
+        </section>
+
+        <hr className="my-8 border-slate-200" />
+
+        <section className="mb-10 text-sm leading-relaxed">
+          <h2 className="mb-2 text-lg font-semibold">12. Contact Us</h2>
+          <p className="mb-3">
+            For privacy-related questions, concerns, or requests, contact:
+          </p>
+          <p>
+            <strong>Atlas Transport Corporation OPC</strong>
             <br />
-            Odiongan, Rombol, Philippines
+            Website:{" "}
+            <a href="https://atlastransport.ph" className="text-blue-600 underline">
+              https://atlastransport.ph
+            </a>
             <br />
             Email:{" "}
-            <a href="mailto:Atlastransportopc@gmail.com" className="text-blue-600 underline">
-              Atlastransportopc@gmail.com
+            <a href="mailto:support@atlastransport.ph" className="text-blue-600 underline">
+              support@atlastransport.ph
             </a>
             <br />
             Phone: +63 912 545 3219
+            <br />
+            Privacy Contact:{" "}
+            <a href="mailto:support@atlastransport.ph" className="text-blue-600 underline">
+              support@atlastransport.ph
+            </a>
           </p>
         </section>
-
-        <hr className="my-6 border-slate-200" />
-        <p className="text-xs text-slate-500">
-          This template is provided for general informational purposes only and does not constitute legal
-          advice. You should consult with a qualified attorney to ensure that this Privacy Policy complies
-          with all applicable laws and Facebook/Meta platform requirements for your specific situation.
-        </p>
       </div>
     </main>
   );
 }
-
