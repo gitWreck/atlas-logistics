@@ -39,10 +39,11 @@ export default function TripLifecycleMenu({
   const menuRef = useRef(null);
 
   const canManage = canManageTripLifecycle(profile, user);
-  const canAudit = canViewTripAuditLog(profile);
+  const canAudit = canViewTripAuditLog(profile, user);
   const showCancel = canManage && canCancelTrip(trip);
   const showArchive = canManage && canArchiveTrip(trip);
   const showAdminSection = showCancel || showArchive || canAudit;
+  const openTripDirectly = !showAdminSection;
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -75,18 +76,22 @@ export default function TripLifecycleMenu({
       <div className="relative" ref={menuRef}>
         <button
           type="button"
-          title="Trip actions"
-          aria-label="Trip actions"
+          title={openTripDirectly ? "View trip details" : "Trip actions"}
+          aria-label={openTripDirectly ? "View trip details" : "Trip actions"}
           className={`p-2 rounded-full transition-colors ${buttonClassName}`}
           onClick={(event) => {
             event.stopPropagation();
+            if (openTripDirectly) {
+              onOpenTrip?.();
+              return;
+            }
             setMenuOpen((open) => !open);
           }}
         >
           <FontAwesomeIcon icon={faEllipsisV} className="text-sm" />
         </button>
 
-        {menuOpen && (
+        {menuOpen && showAdminSection && (
           <div
             className={`absolute right-0 top-full mt-1 z-20 min-w-[190px] rounded-lg border py-1 ${menuPanelClass}`}
             onClick={(event) => event.stopPropagation()}

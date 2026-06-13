@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebase-admin";
 import { getAuth } from "firebase-admin/auth";
 import { headers } from "next/headers";
+import { canDeleteShipmentsAndTrips } from "@/app/utility/deletePermissions";
 
 export const dynamic = "force-dynamic";
 
@@ -67,11 +68,17 @@ export async function GET(_req, context) {
 
     const decodedToken = await getAuth().verifyIdToken(token);
     const userDoc = await adminDb.collection("users").doc(decodedToken.uid).get();
-    const role = String(userDoc.data()?.role || "").toLowerCase();
+    const userData = userDoc.data() || {};
 
-    if (!userDoc.exists || !["admin", "manager"].includes(role)) {
+    if (
+      !userDoc.exists ||
+      !canDeleteShipmentsAndTrips(
+        { role: userData.role, email: userData.email },
+        { email: decodedToken.email },
+      )
+    ) {
       return NextResponse.json(
-        { error: "Forbidden: Admin or manager access required" },
+        { error: "Forbidden: Admin or warehouse manager access required" },
         { status: 403 },
       );
     }
