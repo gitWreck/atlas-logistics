@@ -28,6 +28,7 @@ import CreateTripModal from "./modals/CreateTripModal";
 import TripScheduleOverview from "./TripSchedule/TripScheduleOverview";
 import TripScheduleModal from "./TripSchedule/TripScheduleModal";
 import { updateTripSchedule } from "@/app/utility/FirebaseFunctions";
+import { canManageTripLifecycle } from "@/app/utility/tripLifecycle";
 import TablePaginationFooter from "../ui/TablePaginationFooter";
 import BoardTabs from "../ui/BoardTabs";
 import {
@@ -213,8 +214,10 @@ const TripBoard = forwardRef(function TripBoard(
     () => originFilteredTrips.filter(isArchivedTrip),
     [originFilteredTrips],
   );
-  const closedTripsCount =
-    completedTrips.length + cancelledTrips.length + archivedTrips.length;
+  const canViewLifecycleTabs = canManageTripLifecycle(profile, user);
+  const closedTripsCount = canViewLifecycleTabs
+    ? completedTrips.length + cancelledTrips.length + archivedTrips.length
+    : completedTrips.length;
   const boardTabs = useMemo(
     () => [
       {

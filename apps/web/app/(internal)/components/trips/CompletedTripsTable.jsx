@@ -14,6 +14,8 @@ import {
   getOverviewThemeClasses,
 } from "@/app/utility/constant/theme";
 import TablePaginationFooter from "../ui/TablePaginationFooter";
+import { useAuth } from "@/app/context/AuthContext";
+import { canManageTripLifecycle } from "@/app/utility/tripLifecycle";
 
 const COMPLETED_SUB_TABS = {
   COMPLETED: "completed",
@@ -63,6 +65,8 @@ export default function CompletedTripsTable({
   onSelectTrip,
   onDeleted,
 }) {
+  const { user } = useAuth();
+  const canViewLifecycleTabs = canManageTripLifecycle(profile, user);
   const [activeSubTab, setActiveSubTab] = useState(
     COMPLETED_SUB_TABS.COMPLETED,
   );
@@ -84,26 +88,37 @@ export default function CompletedTripsTable({
   const activeTrips = tripsBySubTab[activeSubTab] || [];
   const subTabConfig = SUB_TAB_CONFIG[activeSubTab];
 
-  const subTabs = useMemo(
-    () => [
+  const subTabs = useMemo(() => {
+    const tabs = [
       {
         key: COMPLETED_SUB_TABS.COMPLETED,
         label: "Completed",
         count: completedTrips.length,
       },
-      {
-        key: COMPLETED_SUB_TABS.CANCELLED,
-        label: "Cancelled",
-        count: cancelledTrips.length,
-      },
-      {
-        key: COMPLETED_SUB_TABS.ARCHIVED,
-        label: "Archive",
-        count: archivedTrips.length,
-      },
-    ],
-    [archivedTrips.length, cancelledTrips.length, completedTrips.length],
-  );
+    ];
+
+    if (canViewLifecycleTabs) {
+      tabs.push(
+        {
+          key: COMPLETED_SUB_TABS.CANCELLED,
+          label: "Cancelled",
+          count: cancelledTrips.length,
+        },
+        {
+          key: COMPLETED_SUB_TABS.ARCHIVED,
+          label: "Archive",
+          count: archivedTrips.length,
+        },
+      );
+    }
+
+    return tabs;
+  }, [
+    archivedTrips.length,
+    cancelledTrips.length,
+    canViewLifecycleTabs,
+    completedTrips.length,
+  ]);
 
   const filteredTrips = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
@@ -148,6 +163,12 @@ export default function CompletedTripsTable({
     setSearchQuery("");
   }, [activeSubTab]);
 
+  useEffect(() => {
+    if (!canViewLifecycleTabs && activeSubTab !== COMPLETED_SUB_TABS.COMPLETED) {
+      setActiveSubTab(COMPLETED_SUB_TABS.COMPLETED);
+    }
+  }, [activeSubTab, canViewLifecycleTabs]);
+
   return (
     <div
       className={`rounded-xl overflow-hidden shadow-xl backdrop-blur-sm border ${theme.board}`}
@@ -165,25 +186,27 @@ export default function CompletedTripsTable({
               {subTabConfig.label} Trips
             </h3>
 
-            <div
-              className={`flex w-full sm:w-auto p-1 rounded-lg border ${overviewTheme.segmentedControl}`}
-            >
-              {subTabs.map((tab) => (
-                <button
-                  key={tab.key}
-                  type="button"
-                  onClick={() => setActiveSubTab(tab.key)}
-                  className={`flex-1 sm:flex-none px-3 py-1.5 text-xs font-bold uppercase rounded-md transition-all text-center whitespace-nowrap ${
-                    activeSubTab === tab.key
-                      ? overviewTheme.segmentedControlActive
-                      : overviewTheme.segmentedControlIdle
-                  }`}
-                >
-                  {tab.label}
-                  <span className="ml-1 opacity-70">({tab.count})</span>
-                </button>
-              ))}
-            </div>
+            {canViewLifecycleTabs && (
+              <div
+                className={`flex w-full sm:w-auto p-1 rounded-lg border ${overviewTheme.segmentedControl}`}
+              >
+                {subTabs.map((tab) => (
+                  <button
+                    key={tab.key}
+                    type="button"
+                    onClick={() => setActiveSubTab(tab.key)}
+                    className={`flex-1 sm:flex-none px-3 py-1.5 text-xs font-bold uppercase rounded-md transition-all text-center whitespace-nowrap ${
+                      activeSubTab === tab.key
+                        ? overviewTheme.segmentedControlActive
+                        : overviewTheme.segmentedControlIdle
+                    }`}
+                  >
+                    {tab.label}
+                    <span className="ml-1 opacity-70">({tab.count})</span>
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
           <div className="flex flex-col sm:flex-row sm:items-center gap-2 w-full lg:w-auto">
