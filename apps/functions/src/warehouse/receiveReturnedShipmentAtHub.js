@@ -20,6 +20,7 @@ const {
   applyReturnedPiecesReceivedAtHub,
   countPiecesAwaitingReturnReceive: countPendingAfter,
   getPackageIdentity,
+  pieceReceivedReturnedIntake,
   shipmentHasWarehouseCustodyPieces,
 } = require("./packageDeliveryOperations");
 
@@ -42,11 +43,7 @@ function collectReceivedPieceIdentities(beforePackages = [], afterPackages = [])
     const identity = getPackageIdentity(pkg);
     if (!identity) return;
     const before = beforeById.get(identity);
-    if (
-      before &&
-      String(before.status || "").toUpperCase() === "RETURNED_TO_WAREHOUSE" &&
-      String(pkg.status || "").toUpperCase() === "RETURNED_RECEIVED_AT_HUB"
-    ) {
+    if (pieceReceivedReturnedIntake(before, pkg)) {
       identities.push(identity);
     }
   });

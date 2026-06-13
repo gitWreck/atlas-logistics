@@ -13,9 +13,31 @@ function getPackages(shipment) {
 
 export function countPiecesAwaitingReturnReceive(shipment) {
   return getPackages(shipment).filter((pkg) => {
+    if (pkg.returnReceivedAt) return false;
     const status = normalizeShipmentStatus(pkg.status);
-    return status === "RETURNED_TO_WAREHOUSE" && !pkg.returnReceivedAt;
+    if (status === "RETURNED_TO_WAREHOUSE") return true;
+    if (status === "FAILED_DELIVERY") {
+      const custody = String(pkg.custodyOwnerType || "").trim().toUpperCase();
+      const warehouse = String(pkg.custodyOwnerId || "").trim().toUpperCase();
+      return custody === "WAREHOUSE" && warehouse.includes("ODIONGAN");
+    }
+    return false;
   }).length;
+}
+
+export function isEligibleForReturnRelease(shipment) {
+  const data = coalesceShipment(shipment);
+  if (!data?.id && !data?.shipmentId) return false;
+  if (data.availableForDelivery === true) return false;
+
+  const packages = getPackages(shipment);
+  return packages.some((pkg) => {
+    const status = normalizeShipmentStatus(pkg.status);
+    if (["RETURNED_RECEIVED_AT_ODIONGAN", "RETURNED_RECEIVED_AT_HUB"].includes(status)) {
+      return true;
+    }
+    return Boolean(pkg.returnReceivedAt);
+  });
 }
 
 export function isEligibleForReturnReceive(shipment) {

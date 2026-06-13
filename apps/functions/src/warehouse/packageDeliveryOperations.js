@@ -39,11 +39,23 @@ function isTerminalPiece(pkg = {}) {
   );
 }
 
-/** Only hub-received inventory at Odiongan may enter the checker pool. */
+/** Hub unload / reconcile intake — normal first-time release path. */
 const DELIVERY_RELEASE_ELIGIBLE_PIECE_STATUSES = new Set([
   PACKAGE_STATUS.ARRIVED_AT_ODIONGAN,
   PACKAGE_STATUS.AVAILABLE_AT_ODIONGAN_WAREHOUSE,
 ]);
+
+/** Checker return loop — warehouse received the physical return. */
+const RETURNED_RECEIVED_STATUSES = new Set([
+  PACKAGE_STATUS.RETURNED_RECEIVED_AT_ODIONGAN,
+  PACKAGE_STATUS.RETURNED_RECEIVED_AT_HUB,
+]);
+
+function isReturnedReceivedAtHubPiece(pkg = {}) {
+  const status = normalizePackageStatus(pkg);
+  if (RETURNED_RECEIVED_STATUSES.has(status)) return true;
+  return Boolean(pkg.returnReceivedAt);
+}
 
 function matchesReleasePackageScope(pkg = {}, packageIdSet = null) {
   if (!packageIdSet || packageIdSet.size === 0) return true;
@@ -70,21 +82,32 @@ function isEligiblePieceForDeliveryRelease(pkg = {}) {
     return false;
   }
 
-  if (String(pkg.currentTripId || pkg.loadedOnTrip || "").trim()) {
-    return false;
+  const returnedReceived = isReturnedReceivedAtHubPiece(pkg);
+
+  if (!returnedReceived) {
+    if (String(pkg.currentTripId || pkg.loadedOnTrip || "").trim()) {
+      return false;
+    }
   }
 
   const quantity = Math.max(normalizeQty(pkg.quantity, 1), 1);
   const loadedQty = normalizeQty(pkg.loadedQty, 0);
-  const receivedQty = normalizeQty(pkg.receivedQty, 0);
 
   if (loadedQty > 0) return false;
-  if (receivedQty < quantity) return false;
+
+  if (!returnedReceived) {
+    const receivedQty = normalizeQty(pkg.receivedQty, 0);
+    if (receivedQty < quantity) return false;
+  }
 
   const custody = String(pkg.custodyOwnerType || "").toUpperCase();
   const warehouse = String(pkg.custodyOwnerId || "").toUpperCase();
   if (custody !== "WAREHOUSE" || !warehouse.includes("ODIONGAN")) {
     return false;
+  }
+
+  if (returnedReceived) {
+    return true;
   }
 
   if (!DELIVERY_RELEASE_ELIGIBLE_PIECE_STATUSES.has(status)) {
@@ -237,9 +260,27 @@ function normalizePieceStatus(pkg = {}) {
   return String(pkg.status || "").trim().toUpperCase();
 }
 
+function isFailedDeliveryAtOdionganWarehouse(pkg = {}) {
+  if (normalizePieceStatus(pkg) !== "FAILED_DELIVERY") return false;
+  const custody = String(pkg.custodyOwnerType || "").toUpperCase();
+  const warehouse = String(pkg.custodyOwnerId || "").toUpperCase();
+  return custody === "WAREHOUSE" && warehouse.includes("ODIONGAN");
+}
+
 function isReturnedAwaitingHubReceive(pkg = {}) {
-  if (normalizePieceStatus(pkg) !== "RETURNED_TO_WAREHOUSE") return false;
-  return !pkg.returnReceivedAt;
+  if (pkg.returnReceivedAt) return false;
+
+  const status = normalizePieceStatus(pkg);
+  if (status === "RETURNED_TO_WAREHOUSE") return true;
+  if (isFailedDeliveryAtOdionganWarehouse(pkg)) return true;
+
+  return false;
+}
+
+function pieceReceivedReturnedIntake(before = {}, after = {}) {
+  if (!before || !after) return false;
+  if (before.returnReceivedAt || !after.returnReceivedAt) return false;
+  return isReturnedAwaitingHubReceive(before);
 }
 
 function countPiecesAwaitingReturnReceive(packages = []) {
@@ -274,6 +315,8 @@ function applyPieceReturnedReceivedAtHub(
     deliveryVehicleId: null,
     deliveryVehicleName: null,
     loadedQty: 0,
+    currentTripId: null,
+    loadedOnTrip: null,
     returnReceivedAt: nowIso,
     returnReceivedBy: actorName || actorUid || null,
     returnReceivedByUid: actorUid || null,
@@ -364,4 +407,5 @@ module.exports = {
   shipmentHasPiecesAwaitingReturnReceive,
   applyPieceReturnedReceivedAtHub,
   applyReturnedPiecesReceivedAtHub,
+  pieceReceivedReturnedIntake,
 };

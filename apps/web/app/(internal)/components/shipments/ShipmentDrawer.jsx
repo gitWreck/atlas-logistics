@@ -32,6 +32,7 @@ export default function ShipmentDrawer({
   profile,
   onReconcile,
   onReceiveReturned,
+  onReleaseToCheckers,
   canManageWarehouse = false,
 }) {
   const [activeTab, setActiveTab] = useState("TIMELINE");
@@ -141,6 +142,7 @@ export default function ShipmentDrawer({
                 isDark={isDark}
                 canManage={canManageWarehouse}
                 onReceiveReturned={onReceiveReturned}
+                onReleaseToCheckers={onReleaseToCheckers}
               />
               <HubReconcileCard
                 shipment={data}
