@@ -84,7 +84,7 @@ export default function TripDrawerFooter({
       : null;
 
   const canManageLifecycle = canManageTripLifecycle(profile, user);
-  const canAudit = canViewTripAuditLog(profile);
+  const canAudit = canViewTripAuditLog(profile, user);
   const showCancelTrip = canManageLifecycle && canCancelTrip(data);
   const showArchiveTrip = canManageLifecycle && canArchiveTrip(data);
   const showLifecycleSection = showCancelTrip || showArchiveTrip || canAudit;

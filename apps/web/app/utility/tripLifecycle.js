@@ -299,9 +299,8 @@ export function canManageTripLifecycle(profile, user = null) {
   return canDeleteShipmentsAndTrips(profile, user);
 }
 
-export function canViewTripAuditLog(profile) {
-  const role = String(profile?.role || "").toLowerCase();
-  return role === "admin" || role === "manager";
+export function canViewTripAuditLog(profile, user = null) {
+  return canDeleteShipmentsAndTrips(profile, user);
 }
 
 export function canCancelTrip(trip = {}) {

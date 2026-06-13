@@ -2,7 +2,7 @@
 
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const admin = require("firebase-admin");
-const { requireRole } = require("../utilities/helpers");
+const { requireTripLifecycleAdmin } = require("./tripLifecycleAdmin");
 
 if (!admin.apps.length) admin.initializeApp();
 const db = admin.firestore();
@@ -29,7 +29,7 @@ function normalizeLogEntry(doc) {
 exports.getTripAuditLog = onCall(
   { region: "asia-southeast1", maxInstances: 10 },
   async (req) => {
-    await requireRole(db, req, ["admin", "manager"]);
+    await requireTripLifecycleAdmin(db, req);
 
     const tripDocId = String(req.data?.tripDocId || req.data?.tripId || "").trim();
     if (!tripDocId) {
