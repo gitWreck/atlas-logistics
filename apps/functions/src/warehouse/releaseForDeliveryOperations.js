@@ -15,6 +15,7 @@ const {
   mapPackagesForDeliveryRelease,
   countPiecesEligibleForDeliveryRelease,
   listPiecesEligibleForDeliveryRelease,
+  countPiecesAwaitingReturnReceive,
 } = require("./packageDeliveryOperations");
 const { buildDerivedShipmentSnapshot } = require("../packages/shipmentStatus");
 const { assertTripReleaseEligible } = require("../trips/tripLifecycle");
@@ -161,9 +162,19 @@ exports.releaseForDeliveryOperations = onCall(
       });
 
       if (releaseCandidates.length === 0) {
+        const awaitingReturn = shipmentSnaps.reduce((sum, snap) => {
+          if (!snap.exists) return sum;
+          const packages = Array.isArray(snap.data()?.packages)
+            ? snap.data().packages
+            : [];
+          return sum + countPiecesAwaitingReturnReceive(packages);
+        }, 0);
+
         throw new HttpsError(
           "failed-precondition",
-          "No shipments have hub-received packages to release. Unload and reconcile at Odiongan first.",
+          awaitingReturn > 0
+            ? "Returned pieces must be received at Odiongan first (Shipment drawer → Return loop → Receive returned), then release for delivery."
+            : "No shipments have hub-received packages to release. Unload and reconcile at Odiongan first, or receive returned pieces before releasing.",
         );
       }
 

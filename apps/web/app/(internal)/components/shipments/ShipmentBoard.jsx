@@ -33,6 +33,7 @@ import PickupRequestsTable from "./PickupRequestsTable";
 import TablePaginationFooter from "../ui/TablePaginationFooter";
 import ReconcileAtHubModal from "./modals/ReconcileAtHubModal";
 import ReceiveReturnedModal from "./modals/ReceiveReturnedModal";
+import ReleaseToCheckerModal from "./modals/ReleaseToCheckerModal";
 import BoardTabs from "../ui/BoardTabs";
 
 const SHIPMENT_BOARD_TABS = {
@@ -108,6 +109,8 @@ const ShipmentBoard = forwardRef(function ShipmentBoard(
   const [isNewOrderModalOpen, setIsNewOrderModalOpen] = useState(false);
   const [isReconcileModalOpen, setIsReconcileModalOpen] = useState(false);
   const [isReceiveReturnedModalOpen, setIsReceiveReturnedModalOpen] =
+    useState(false);
+  const [isReleaseToCheckerModalOpen, setIsReleaseToCheckerModalOpen] =
     useState(false);
   const [selectedShipmentId, setSelectedShipmentId] = useState(null);
   const [editingPickup, setEditingPickup] = useState(null);
@@ -599,6 +602,7 @@ const ShipmentBoard = forwardRef(function ShipmentBoard(
         profile={profile}
         onReconcile={() => setIsReconcileModalOpen(true)}
         onReceiveReturned={() => setIsReceiveReturnedModalOpen(true)}
+        onReleaseToCheckers={() => setIsReleaseToCheckerModalOpen(true)}
         canManageWarehouse={canManageWarehouse}
       />
 
@@ -645,6 +649,18 @@ const ShipmentBoard = forwardRef(function ShipmentBoard(
         onSuccess={fetchShipments}
         isDark={isDark}
         shipment={selectedShipment}
+      />
+
+      <ReleaseToCheckerModal
+        isOpen={isReleaseToCheckerModalOpen}
+        onClose={() => setIsReleaseToCheckerModalOpen(false)}
+        onSuccess={fetchShipments}
+        isDark={isDark}
+        user={user}
+        defaultShipmentIds={
+          selectedShipment?.id ? [selectedShipment.id] : []
+        }
+        defaultShipments={selectedShipment ? [selectedShipment] : []}
       />
     </div>
   );

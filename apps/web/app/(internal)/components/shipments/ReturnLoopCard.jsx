@@ -6,6 +6,7 @@ import { faUndo } from "@fortawesome/free-solid-svg-icons";
 import {
   formatReturnSummary,
   isEligibleForReturnReceive,
+  isEligibleForReturnRelease,
 } from "@/app/utility/returnLoop";
 
 export default function ReturnLoopCard({
@@ -13,11 +14,13 @@ export default function ReturnLoopCard({
   isDark = false,
   canManage = false,
   onReceiveReturned,
+  onReleaseToCheckers,
 }) {
   if (!shipment) return null;
 
   const summary = formatReturnSummary(shipment);
   const awaitingReceive = isEligibleForReturnReceive(shipment);
+  const readyToRelease = isEligibleForReturnRelease(shipment);
   const received = Boolean(shipment.returnReceivedAt);
 
   const boxClass = isDark
@@ -42,6 +45,15 @@ export default function ReturnLoopCard({
             Receive returned
           </button>
         )}
+        {canManage && readyToRelease && onReleaseToCheckers && (
+          <button
+            type="button"
+            onClick={onReleaseToCheckers}
+            className="text-xs font-semibold rounded-lg bg-blue-600 text-white px-3 py-1.5 hover:bg-blue-500"
+          >
+            Release to checkers
+          </button>
+        )}
       </div>
 
       {summary ? (
@@ -62,7 +74,12 @@ export default function ReturnLoopCard({
         </p>
       )}
 
-      {received && (
+      {received && !readyToRelease && shipment.availableForDelivery && (
+        <p className="text-xs mt-2 font-semibold text-sky-500">
+          Released to checker pool — ready for load scan.
+        </p>
+      )}
+      {readyToRelease && (
         <p className="text-xs mt-2 font-semibold text-emerald-500">
           Ready to re-release to another checker.
         </p>
