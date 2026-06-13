@@ -182,7 +182,7 @@ export default function ShipmentDetailsScreen() {
       router.push({
         pathname: "/(checker)/scan",
         params: {
-          mode: "delivery",
+          mode: "offloading",
           title: "Deliver Piece",
           focusShipmentId: String(shipmentId),
           presetScanStatus: "DELIVERED",

@@ -75,7 +75,6 @@ import {
   canApplyOffloadCompletion,
   clampSheetHeight,
   DEFAULT_DETAILS_SHEET_HEIGHT,
-  getDefaultScanStatus,
   isIssueStatus,
   getLatestTypeLabel,
   getModeLabel,
@@ -99,8 +98,10 @@ import {
   EMPTY_SCAN_DETAILS,
   EMPTY_SHIPMENT_SUMMARY,
   EMPTY_TRIP_SUMMARY,
+  getDefaultScanStatus,
+  getPrimaryScanActions,
+  isCheckerLastMileScanMode,
   ISSUE_SCAN_ACTIONS,
-  MODE_SCAN_ACTIONS,
   SUCCESS_MODAL_SECONDS,
 } from "../../components/constants/scanner";
 import { useAuth } from "../../contexts/AuthContext";
@@ -508,8 +509,10 @@ export default function ScannerScreen() {
       setScanActionStatus(String(presetScanStatus));
       return;
     }
-    setScanActionStatus(getDefaultScanStatus(resolvedMode));
-  }, [resolvedMode, presetScanStatus]);
+    setScanActionStatus(
+      getDefaultScanStatus(resolvedMode, { tripId: resolvedTripId }),
+    );
+  }, [resolvedMode, presetScanStatus, resolvedTripId]);
 
   const clearSuccessTimers = () => {
     if (successTimerRef.current) clearTimeout(successTimerRef.current);
@@ -678,7 +681,9 @@ export default function ScannerScreen() {
     return null;
   };
 
-  const isDeliveryScanMode = resolvedMode === "delivery";
+  const isCheckerLastMileScan = isCheckerLastMileScanMode(resolvedMode, {
+    tripId: resolvedTripId,
+  });
   const isBatchDeliveryScan = isBatchDeliveryScanMode(
     resolvedMode,
     scanActionStatus,
@@ -808,7 +813,7 @@ export default function ScannerScreen() {
           ? packageIds
           : [getDeliverPackageIdForScan(shipmentDocData, barcode)].filter(Boolean);
 
-      if (isDeliveryScanMode && status === "FAILED_DELIVERY") {
+      if (isCheckerLastMileScan && status === "FAILED_DELIVERY") {
         assertCheckerCanAccessShipment(shipmentDocData, profile?.uid);
         if (deliveryPieceIds.length === 0) {
           throw new Error("Scan an individual piece label to report failed delivery.");
@@ -953,7 +958,7 @@ export default function ScannerScreen() {
       console.error("Package update failed:", error?.code, error?.message, error);
       Alert.alert(
         "Action Failed",
-        isDeliveryScanMode
+        isCheckerLastMileScan
           ? getCallableErrorMessage(error, "Failed to update package.")
           : getActionErrorMessage(error, "Failed to update package."),
         [{ text: "Retry", onPress: resetScanner }],
@@ -1422,7 +1427,7 @@ export default function ScannerScreen() {
         resolvedMode === "offloading" ||
         deliveryScope.isPackageLevel;
 
-      if (isDeliveryScanMode && isPackageLevelDelivery) {
+      if (isCheckerLastMileScan && isPackageLevelDelivery) {
         assertCheckerCanAccessShipment(shipmentDocData, profile?.uid);
         const location = await getCurrentLocationSafe();
         const pieceIds =
@@ -1496,7 +1501,7 @@ export default function ScannerScreen() {
         return;
       }
 
-      if (isDeliveryScanMode && !isPackageLevelDelivery) {
+      if (isCheckerLastMileScan && !isPackageLevelDelivery) {
         setDeliveryProofUploading(false);
         Alert.alert(
           "Scan piece label",
@@ -1624,7 +1629,7 @@ export default function ScannerScreen() {
         statusToApply,
       )
     ) {
-      if (statusToApply === "DELIVERED" && !isDeliveryScanMode) {
+      if (statusToApply === "DELIVERED" && !isCheckerLastMileScan) {
         await assertShipmentOnTrip(shipmentDoc.id, shipmentData);
       }
       addPieceToBatchDelivery({
@@ -1638,7 +1643,7 @@ export default function ScannerScreen() {
     }
 
     if (statusToApply === "DELIVERED") {
-      if (isDeliveryScanMode) {
+      if (isCheckerLastMileScan) {
         assertCheckerCanAccessShipment(shipmentData, profile?.uid);
       } else {
         await assertShipmentOnTrip(shipmentDoc.id, shipmentData);
@@ -1705,7 +1710,7 @@ export default function ScannerScreen() {
         return;
       }
 
-      if (isDeliveryScanMode) {
+      if (isCheckerLastMileScan) {
         assertCheckerCanAccessShipment(shipmentData, profile?.uid);
       }
 
@@ -1756,7 +1761,7 @@ export default function ScannerScreen() {
 
         if (statusToApply === "DELIVERED") {
 
-          if (!isDeliveryScanMode) {
+          if (!isCheckerLastMileScan) {
             await assertShipmentOnTrip(shipmentDoc.id, shipmentData);
           }
           openDeliveryProofModal({
@@ -1937,7 +1942,9 @@ export default function ScannerScreen() {
   const progressLabel = getProgressLabel(resolvedMode);
   const hasTripContext = !!(tripSummary.tripId || resolvedTripId);
   const progressSummary = hasTripContext ? tripSummary : shipmentSummary;
-  const primaryScanActions = MODE_SCAN_ACTIONS[resolvedMode] || [];
+  const primaryScanActions = getPrimaryScanActions(resolvedMode, {
+    tripId: resolvedTripId,
+  });
   const selectedScanAction = [
     ...primaryScanActions,
     ...ISSUE_SCAN_ACTIONS,

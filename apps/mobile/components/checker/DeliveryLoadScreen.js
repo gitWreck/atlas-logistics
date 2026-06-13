@@ -82,7 +82,11 @@ export default function DeliveryLoadScreen({ showBackButton = false }) {
             onPress={() =>
               router.push({
                 pathname: "/(checker)/scan",
-                params: { mode: "delivery", title: "Last-Mile Delivery" },
+                params: {
+                  mode: "offloading",
+                  title: "Deliver Piece",
+                  presetScanStatus: "DELIVERED",
+                },
               })
             }
             activeOpacity={0.85}

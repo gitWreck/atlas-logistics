@@ -87,6 +87,7 @@ export default function CheckerDeliveriesTab() {
 
   const goToDeliveryScan = (shipmentId = null, presetScanStatus = null) => {
     const isOffloadAction =
+      presetScanStatus === "DELIVERED" ||
       presetScanStatus === "FAILED_DELIVERY" ||
       presetScanStatus === "RETURNED_TO_WAREHOUSE";
     const title =
