@@ -75,7 +75,17 @@ function getTripStatus(trip) {
 }
 
 function isCompletedTrip(trip) {
+  if (trip?.archived === true) return false;
   return COMPLETED_TRIP_STATUSES.has(getTripStatus(trip));
+}
+
+function isCancelledTrip(trip) {
+  if (trip?.archived === true) return false;
+  return getTripStatus(trip) === "CANCELLED";
+}
+
+function isArchivedTrip(trip) {
+  return trip?.archived === true;
 }
 
 function getWarehouseOriginFilter(profile) {
@@ -135,6 +145,8 @@ export {
   formatTripDisplayDate,
   getTripStatus,
   isCompletedTrip,
+  isCancelledTrip,
+  isArchivedTrip,
   getWarehouseOriginFilter,
   matchesOriginFilter,
   getPlannedLoadingStart,

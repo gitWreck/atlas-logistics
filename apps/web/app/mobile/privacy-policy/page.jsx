@@ -6,314 +6,311 @@ export default function MobilePrivacyPolicyPage() {
   return (
     <main className="min-h-screen bg-white px-4 py-12 text-slate-900">
       <div className="mx-auto w-full max-w-3xl">
-        <h1 className="mb-2 text-3xl font-semibold">
-          Atlas Trucking Mobile App Privacy Policy
-        </h1>
-        <p className="mb-8 text-sm text-slate-500">
-          Effective Date: March 5, 2026
-        </p>
+        <h1 className="mb-2 text-3xl font-semibold">Privacy Policy</h1>
+        <p className="mb-8 text-sm text-slate-500">Effective Date: June 13, 2026</p>
 
-        <section className="mb-6 text-sm leading-relaxed">
-          <p className="mb-2">
-            This Privacy Policy explains how{" "}
-            <strong>Atlas Transport Corporation</strong> (“Atlas”, “we”, “our”,
-            or “us”) collects, uses, and protects information when you use the{" "}
-            <strong>Atlas Trucking Mobile App</strong> (the “App”).
+        <section className="mb-8 text-sm leading-relaxed">
+          <h2 className="mb-2 text-lg font-semibold">Atlas Transport Privacy Policy</h2>
+          <p className="mb-3">
+            Atlas Transport Corporation OPC (&quot;Atlas Transport&quot;, &quot;we&quot;, &quot;our&quot;, or
+            &quot;us&quot;) is committed to protecting your privacy and safeguarding your personal information.
+            This Privacy Policy explains how we collect, use, store, disclose, and protect information when
+            you use the Atlas Transport mobile application, website, and related services.
           </p>
           <p>
-            By installing or using the App, you acknowledge that you have read
-            and understood this Privacy Policy. This Policy is designed to
-            comply with the Philippine Data Privacy Act of 2012 (RA 10173),
-            Google Play User Data Policy, Apple App Store Privacy Guidelines,
-            and applicable U.S. privacy laws including CCPA/CPRA.
+            By using our services, you agree to the collection and use of information in accordance with this
+            Privacy Policy.
           </p>
         </section>
 
-        <section className="mb-8 text-sm leading-relaxed">
-          <h2 className="mb-2 text-lg font-semibold">
-            1. Information We Collect
-          </h2>
+        <hr className="my-8 border-slate-200" />
 
-          <h3 className="mt-3 mb-1 font-semibold">A. Personal Information</h3>
-          <ul className="mb-3 list-disc pl-6">
-            <li>Name</li>
+        <section className="mb-8 text-sm leading-relaxed">
+          <h2 className="mb-2 text-lg font-semibold">1. Information We Collect</h2>
+
+          <h3 className="mt-4 mb-1 font-semibold">Account Information</h3>
+          <p>When creating an account or using our services, we may collect:</p>
+          <ul className="mt-3 list-disc pl-6">
+            <li>Full name</li>
+            <li>Email address</li>
             <li>Phone number</li>
-            <li>Delivery address</li>
+            <li>Company name (if applicable)</li>
+            <li>Username and account identifiers</li>
+            <li>User role and permissions</li>
           </ul>
 
-          <h3 className="mt-3 mb-1 font-semibold">B. Shipment Information</h3>
-          <ul className="mb-3 list-disc pl-6">
+          <h3 className="mt-4 mb-1 font-semibold">Shipment and Delivery Information</h3>
+          <p>To provide transportation and logistics services, we may collect:</p>
+          <ul className="mt-3 list-disc pl-6">
+            <li>Shipment tracking numbers</li>
             <li>Package details</li>
-            <li>Tracking numbers</li>
-            <li>Photos of shipments</li>
-            <li>Delivery confirmation images</li>
+            <li>Sender and recipient information</li>
+            <li>Pickup and delivery addresses</li>
+            <li>Delivery instructions</li>
+            <li>Delivery status updates</li>
+            <li>Chain-of-custody records</li>
           </ul>
 
-          <h3 className="mt-3 mb-1 font-semibold">C. Location Data</h3>
+          <h3 className="mt-4 mb-1 font-semibold">Location Information</h3>
           <p>
-            For drivers only, the App may collect:
+            For operational purposes, Atlas may collect location information from authorized employees,
+            drivers, warehouse personnel, and delivery checkers while using the application.
           </p>
-          <ul className="mb-3 mt-2 list-disc pl-6">
-            <li>Precise real-time location during active deliveries</li>
-            <li>Background location while a delivery is in progress</li>
+          <p className="mt-3">Location information may be used for:</p>
+          <ul className="mt-3 list-disc pl-6">
+            <li>Delivery verification</li>
+            <li>Route management</li>
+            <li>Driver accountability</li>
+            <li>Shipment tracking</li>
+            <li>Operational reporting</li>
+            <li>Security and fraud prevention</li>
           </ul>
-          <p className="mt-2">
-            Location tracking is used solely to support active delivery
-            operations and automatically stops when the delivery is completed.
-            Customers are not continuously tracked.
+
+          <h3 className="mt-4 mb-1 font-semibold">Proof of Delivery Information</h3>
+          <p>Atlas may collect:</p>
+          <ul className="mt-3 list-disc pl-6">
+            <li>Delivery photographs</li>
+            <li>Pickup photographs</li>
+            <li>Warehouse receiving photographs</li>
+            <li>Digital signatures</li>
+            <li>Delivery confirmation records</li>
+          </ul>
+          <p className="mt-3">
+            These records are used solely for proof of delivery, shipment verification, chain-of-custody
+            documentation, customer support, dispute resolution, and operational recordkeeping.
           </p>
 
-          <h3 className="mt-3 mb-1 font-semibold">D. Device &amp; Technical Data</h3>
-          <ul className="list-disc pl-6">
-            <li>Device identifiers (if applicable)</li>
-            <li>App usage logs</li>
-            <li>Crash reports</li>
+          <h3 className="mt-4 mb-1 font-semibold">Device Information</h3>
+          <p>We may automatically collect:</p>
+          <ul className="mt-3 list-disc pl-6">
+            <li>Device type</li>
+            <li>Device operating system</li>
+            <li>App version</li>
+            <li>Device identifiers</li>
             <li>IP address</li>
+            <li>Mobile network information</li>
+            <li>Browser information (for web users)</li>
           </ul>
+
+          <h3 className="mt-4 mb-1 font-semibold">Diagnostic Information</h3>
+          <p>We may collect:</p>
+          <ul className="mt-3 list-disc pl-6">
+            <li>Crash reports</li>
+            <li>Error logs</li>
+            <li>Performance data</li>
+            <li>Diagnostic information</li>
+            <li>Application usage statistics</li>
+          </ul>
+          <p className="mt-3">
+            This information helps us improve application reliability, performance, and security.
+          </p>
         </section>
 
+        <hr className="my-8 border-slate-200" />
+
         <section className="mb-8 text-sm leading-relaxed">
-          <h2 className="mb-2 text-lg font-semibold">
-            2. How We Use Information
-          </h2>
-          <p>We use collected data to:</p>
+          <h2 className="mb-2 text-lg font-semibold">2. How We Use Information</h2>
+          <p>Atlas uses collected information to:</p>
           <ul className="mt-3 list-disc pl-6">
-            <li>Process and manage shipments</li>
-            <li>Provide tracking updates</li>
-            <li>Confirm deliveries</li>
-            <li>Improve service quality</li>
-            <li>Prevent fraud</li>
-            <li>Ensure operational safety</li>
+            <li>Provide transportation and logistics services</li>
+            <li>Manage shipments and deliveries</li>
+            <li>Verify package custody and delivery status</li>
+            <li>Process customer requests</li>
+            <li>Authenticate users</li>
+            <li>Manage employee and operational access</li>
+            <li>Provide customer support</li>
+            <li>Improve platform performance</li>
+            <li>Maintain security and fraud prevention measures</li>
             <li>Comply with legal obligations</li>
+            <li>Generate operational reports and analytics</li>
           </ul>
-          <p className="mt-3">
-            We do <strong>not</strong> sell personal data.
-          </p>
-          <p>
-            We do <strong>not</strong> use personal data for behavioral
-            advertising.
-          </p>
-          <p>
-            We do <strong>not</strong> track users across third-party apps or
-            websites for advertising or marketing purposes.
-          </p>
         </section>
 
-        <section className="mb-8 text-sm leading-relaxed">
-          <h2 className="mb-2 text-lg font-semibold">
-            3. Background Location Disclosure (Apple &amp; Google Required)
-          </h2>
-          <p>
-            For drivers, background location access is required to:
-          </p>
-          <ul className="mt-3 list-disc pl-6">
-            <li>Provide real-time shipment tracking</li>
-            <li>Ensure delivery accuracy</li>
-            <li>Improve operational safety</li>
-            <li>Provide live updates to customers</li>
-          </ul>
-          <p className="mt-3">
-            Users may disable location services in device settings; however,
-            delivery tracking features may not function properly if location
-            access is disabled.
-          </p>
-        </section>
+        <hr className="my-8 border-slate-200" />
 
         <section className="mb-8 text-sm leading-relaxed">
-          <h2 className="mb-2 text-lg font-semibold">
-            4. Camera &amp; Photo Access Disclosure
-          </h2>
-          <p>
-            The App requests camera access in order to:
-          </p>
+          <h2 className="mb-2 text-lg font-semibold">3. Data Sharing and Disclosure</h2>
+          <p className="mb-3">Atlas does not sell personal information.</p>
+          <p>Information may be shared only when necessary with:</p>
           <ul className="mt-3 list-disc pl-6">
-            <li>Capture shipment intake photos</li>
-            <li>Capture proof-of-delivery images</li>
-          </ul>
-          <p className="mt-3">
-            Photos are used strictly for shipment documentation and dispute
-            resolution.
-          </p>
-        </section>
-
-        <section className="mb-8 text-sm leading-relaxed">
-          <h2 className="mb-2 text-lg font-semibold">
-            5. Third-Party Service Providers
-          </h2>
-          <p>
-            We use trusted third-party providers, including but not limited to:
-          </p>
-          <ul className="mt-3 list-disc pl-6">
+            <li>Authorized Atlas personnel</li>
+            <li>Service providers supporting our operations</li>
             <li>Cloud hosting providers</li>
-            <li>Firebase (authentication, database, analytics)</li>
             <li>SMS notification providers</li>
-            <li>Mapping and location services</li>
+            <li>Email notification providers</li>
+            <li>Analytics and diagnostic providers</li>
+            <li>Government authorities when legally required</li>
           </ul>
           <p className="mt-3">
-            These third-party providers may collect and process personal data on
-            our behalf strictly for app functionality, analytics, cloud storage,
-            mapping services, and SMS notifications. They are contractually
-            obligated to maintain confidentiality and implement appropriate
-            security safeguards.
+            All third-party providers are required to protect information consistent with applicable privacy
+            laws.
           </p>
         </section>
 
+        <hr className="my-8 border-slate-200" />
+
         <section className="mb-8 text-sm leading-relaxed">
-          <h2 className="mb-2 text-lg font-semibold">
-            6. Data Storage &amp; Cross-Border Transfers
-          </h2>
-          <p>
-            Data may be stored on secure cloud servers located outside the
-            Philippines. We implement safeguards consistent with:
-          </p>
+          <h2 className="mb-2 text-lg font-semibold">4. Tracking and Advertising</h2>
+          <p>Atlas Transport does not use personal information for:</p>
           <ul className="mt-3 list-disc pl-6">
-            <li>Philippine Data Privacy Act</li>
-            <li>U.S. data protection standards</li>
-            <li>Industry best practices</li>
+            <li>Third-party advertising</li>
+            <li>Behavioral advertising</li>
+            <li>Cross-app tracking</li>
+            <li>Data brokerage activities</li>
           </ul>
+          <p className="mt-3">
+            Information collected through the application is used solely to provide logistics and
+            transportation services and improve platform functionality.
+          </p>
         </section>
 
+        <hr className="my-8 border-slate-200" />
+
         <section className="mb-8 text-sm leading-relaxed">
-          <h2 className="mb-2 text-lg font-semibold">7. Data Retention</h2>
+          <h2 className="mb-2 text-lg font-semibold">5. Data Security</h2>
           <p>
-            Shipment records and related documentation may be retained for:
+            We implement reasonable administrative, technical, and physical safeguards to protect information
+            against:
           </p>
           <ul className="mt-3 list-disc pl-6">
+            <li>Unauthorized access</li>
+            <li>Unauthorized disclosure</li>
+            <li>Loss</li>
+            <li>Theft</li>
+            <li>Misuse</li>
+            <li>Alteration</li>
+          </ul>
+          <p className="mt-3">
+            Despite our efforts, no method of electronic storage or transmission is completely secure.
+          </p>
+        </section>
+
+        <hr className="my-8 border-slate-200" />
+
+        <section className="mb-8 text-sm leading-relaxed">
+          <h2 className="mb-2 text-lg font-semibold">6. Data Retention</h2>
+          <p>Atlas retains information only for as long as necessary to:</p>
+          <ul className="mt-3 list-disc pl-6">
+            <li>Provide services</li>
+            <li>Maintain shipment records</li>
+            <li>Support operational requirements</li>
+            <li>Resolve disputes</li>
+            <li>Meet legal and regulatory obligations</li>
+            <li>Maintain security and audit records</li>
+          </ul>
+          <p className="mt-3">
+            When information is no longer required, it will be securely deleted or anonymized.
+          </p>
+        </section>
+
+        <hr className="my-8 border-slate-200" />
+
+        <section className="mb-8 text-sm leading-relaxed">
+          <h2 className="mb-2 text-lg font-semibold">7. Your Rights</h2>
+          <p>Depending on your location and applicable laws, you may have rights to:</p>
+          <ul className="mt-3 list-disc pl-6">
+            <li>Access your information</li>
+            <li>Correct inaccurate information</li>
+            <li>Request deletion of your information</li>
+            <li>Request restriction of processing</li>
+            <li>Object to certain uses of information</li>
+            <li>Receive a copy of your information</li>
+          </ul>
+          <p className="mt-3">Requests may be submitted through the contact information below.</p>
+        </section>
+
+        <hr className="my-8 border-slate-200" />
+
+        <section className="mb-8 text-sm leading-relaxed">
+          <h2 className="mb-2 text-lg font-semibold">8. Account Deletion</h2>
+          <p>
+            Users may request account deletion by contacting:{" "}
+            <a href="mailto:support@atlastransport.ph" className="text-blue-600 underline">
+              support@atlastransport.ph
+            </a>
+          </p>
+          <p className="mt-3">Certain records may be retained where required for:</p>
+          <ul className="mt-3 list-disc pl-6">
+            <li>Shipment recordkeeping</li>
             <li>Legal compliance</li>
             <li>Fraud prevention</li>
-            <li>Audit requirements</li>
-            <li>Dispute resolution</li>
+            <li>Security investigations</li>
+            <li>Operational auditing</li>
           </ul>
+        </section>
+
+        <hr className="my-8 border-slate-200" />
+
+        <section className="mb-8 text-sm leading-relaxed">
+          <h2 className="mb-2 text-lg font-semibold">9. Children&apos;s Privacy</h2>
+          <p>
+            Atlas Transport services are not intended for children under the age of 13. We do not knowingly
+            collect personal information from children.
+          </p>
           <p className="mt-3">
-            Retention periods may extend beyond shipment completion where
-            legally required.
+            If we become aware that information has been collected from a child without appropriate consent,
+            we will take steps to remove that information.
           </p>
         </section>
 
+        <hr className="my-8 border-slate-200" />
+
         <section className="mb-8 text-sm leading-relaxed">
-          <h2 className="mb-2 text-lg font-semibold">8. Data Security</h2>
+          <h2 className="mb-2 text-lg font-semibold">10. International Data Transfers</h2>
           <p>
-            We implement reasonable technical and organizational measures,
-            including role-based access controls, encrypted data transmission
-            (HTTPS/TLS), secure cloud infrastructure, authentication controls,
-            and audit logging to protect personal data. However, no method of
-            transmission over the internet or electronic storage is completely
-            secure, and we cannot guarantee absolute security.
+            Information may be processed and stored in countries where Atlas or its service providers
+            operate. By using the service, you consent to such transfers where permitted by law.
           </p>
         </section>
 
-        <section className="mb-8 text-sm leading-relaxed">
-          <h2 className="mb-2 text-lg font-semibold">9. Data Breach Protocol</h2>
-          <p>
-            In the event of a data breach posing risk to users, we will:
-          </p>
-          <ul className="mt-3 list-disc pl-6">
-            <li>Investigate and mitigate the incident immediately</li>
-            <li>
-              Notify the National Privacy Commission (Philippines) where
-              required
-            </li>
-            <li>
-              Notify affected users in accordance with applicable data
-              protection laws
-            </li>
-          </ul>
-        </section>
+        <hr className="my-8 border-slate-200" />
 
         <section className="mb-8 text-sm leading-relaxed">
-          <h2 className="mb-2 text-lg font-semibold">10. User Rights</h2>
-          <p className="mb-2">
-            Under the Philippine Data Privacy Act of 2012 (RA 10173), users may:
-          </p>
-          <ul className="mb-3 list-disc pl-6">
-            <li>Request access to their personal data</li>
-            <li>Request correction of inaccurate or incomplete data</li>
-            <li>Object to processing, subject to legal limitations</li>
-            <li>
-              Request deletion, subject to legal retention requirements and
-              legitimate business needs
-            </li>
-          </ul>
-          <p className="mb-2">
-            Under U.S. laws such as CCPA/CPRA (for eligible residents), users
-            may:
-          </p>
-          <ul className="mb-3 list-disc pl-6">
-            <li>Request disclosure of collected personal data</li>
-            <li>Request deletion of personal data</li>
-            <li>Request information about categories of data collected</li>
-            <li>
-              Opt out of the sale of personal data (Atlas does not sell personal
-              data)
-            </li>
-          </ul>
-          <p>
-            For privacy-related inquiries or to exercise your rights, you may
-            contact our designated Data Protection Officer at{" "}
+          <h2 className="mb-2 text-lg font-semibold">11. Changes to This Privacy Policy</h2>
+          <p className="mb-3">Atlas may update this Privacy Policy periodically.</p>
+          <p className="mb-3">
+            Updated versions will be posted at:{" "}
             <a
-              href="mailto:Atlastransportopc@gmail.com"
+              href="https://atlastransport.ph/privacy-policy"
               className="text-blue-600 underline"
             >
-              Atlastransportopc@gmail.com
+              https://atlastransport.ph/privacy-policy
             </a>
-            . We may verify the identity of the requester before processing any
-            request.
+          </p>
+          <p>
+            The effective date at the top of this policy will indicate when changes become effective.
           </p>
         </section>
 
-        <section className="mb-8 text-sm leading-relaxed">
-          <h2 className="mb-2 text-lg font-semibold">
-            11. Account &amp; Data Deletion
-          </h2>
-          <p>
-            Users may request account deletion by:
-          </p>
-          <ul className="mt-3 list-disc pl-6">
-            <li>
-              Emailing{" "}
-              <a
-                href="mailto:Atlastransportopc@gmail.com"
-                className="text-blue-600 underline"
-              >
-                Atlastransportopc@gmail.com
-              </a>
-            </li>
-            <li>Using in-app deletion features (if available)</li>
-          </ul>
-          <p className="mt-3">
-            We will respond to verified data deletion requests within thirty
-            (30) days, unless an extension is legally permitted. Upon
-            verification, personal data will be deleted within a reasonable
-            period, except where retention is required for legal, regulatory,
-            fraud prevention, or dispute resolution purposes.
-          </p>
-        </section>
-
-        <section className="mb-8 text-sm leading-relaxed">
-          <h2 className="mb-2 text-lg font-semibold">12. Children&apos;s Privacy</h2>
-          <p>
-            The App is not directed to children under 13 years of age. We do
-            not knowingly collect personal data from children. If you believe
-            that a child has provided us with personal data, please contact us
-            so that we can investigate and, where appropriate, delete the data.
-          </p>
-        </section>
+        <hr className="my-8 border-slate-200" />
 
         <section className="mb-10 text-sm leading-relaxed">
-          <h2 className="mb-2 text-lg font-semibold">
-            13. Updates to This Privacy Policy
-          </h2>
+          <h2 className="mb-2 text-lg font-semibold">12. Contact Us</h2>
+          <p className="mb-3">
+            For privacy-related questions, concerns, or requests, contact:
+          </p>
           <p>
-            We may update this Privacy Policy from time to time. When changes
-            are made, we will revise the “Effective Date” at the top of this
-            Policy. If material changes are made, we may provide additional
-            notice within the App or by other appropriate means. Continued use
-            of the App after the updated Policy becomes effective constitutes
-            acceptance of the revised Privacy Policy.
+            <strong>Atlas Transport Corporation OPC</strong>
+            <br />
+            Website:{" "}
+            <a href="https://atlastransport.ph" className="text-blue-600 underline">
+              https://atlastransport.ph
+            </a>
+            <br />
+            Email:{" "}
+            <a href="mailto:support@atlastransport.ph" className="text-blue-600 underline">
+              support@atlastransport.ph
+            </a>
+            <br />
+            Phone: +63 912 545 3219
+            <br />
+            Privacy Contact:{" "}
+            <a href="mailto:support@atlastransport.ph" className="text-blue-600 underline">
+              support@atlastransport.ph
+            </a>
           </p>
         </section>
       </div>
     </main>
   );
 }
-
