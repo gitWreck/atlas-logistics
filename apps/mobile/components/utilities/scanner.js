@@ -20,8 +20,11 @@ export const normalizeProofImages = (images) => {
     : [images].filter(Boolean);
 };
 
-export const getDefaultScanStatus = (mode) =>
-  MODE_SCAN_ACTIONS[mode]?.[0]?.status ?? null;
+export {
+  getDefaultScanStatus,
+  getPrimaryScanActions,
+  isCheckerLastMileScanMode,
+} from "../constants/scanner";
 
 export const isIssueStatus = (status) =>
   ISSUE_SCAN_ACTIONS.some((action) => action.status === status);
@@ -220,8 +223,12 @@ export const getShipmentDeliveredCount = (shipment = {}) => {
   return clampProgress(delivered, total);
 };
 
-export const getModeLabel = (mode) =>
-  mode === "offloading" ? "Offloading" : mode === "info" ? "Info" : "Loading";
+export const getModeLabel = (mode) => {
+  if (mode === "offloading") return "Offloading";
+  if (mode === "delivery") return "Load";
+  if (mode === "info") return "Info";
+  return "Loading";
+};
 
 export const getLatestTypeLabel = (type) =>
   type === "package" ? "Package" : type === "shipment" ? "Shipment" : "Waiting";

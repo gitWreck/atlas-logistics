@@ -162,7 +162,8 @@ export default function ScanDetailsSheet({
               primaryScanActions.length > 2 && styles.offloadToggleRowGrid,
             ]}
           >
-            {primaryScanActions.map((action) => {
+            {primaryScanActions.length > 1 &&
+              primaryScanActions.map((action) => {
               const isActive = scanActionStatus === action.status;
               const useGridLayout = primaryScanActions.length > 2;
 
