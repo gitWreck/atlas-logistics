@@ -116,6 +116,7 @@ exports.requestShipmentPickup = onCall(
       trackingNumber: shipmentId,
       currentTripId: null,
       visibilityUserIds: shipmentVisibilityUserIds,
+      customerId: uid,
       createdSource: "mobile_pickup",
 
       sender: {

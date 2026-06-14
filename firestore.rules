@@ -17,7 +17,9 @@ service cloud.firestore {
     }
 
     function isActiveUser() {
-      return isSignedIn() && userDoc().data.active == true;
+      return isSignedIn()
+        && exists(userDocPath())
+        && userDoc().data.get('active', true) != false;
     }
 
     function userRole() {
@@ -45,12 +47,13 @@ service cloud.firestore {
         resource.data.assignedDriverId == request.auth.uid;
     }
 
-    function canReadShipment() {
-      return isStaff() ||
-        (
-          hasRole('customer') &&
-          request.auth.uid in resource.data.get('visibilityUserIds', [])
-        );
+    function customerOwnsShipment() {
+      return hasRole('customer') && (
+        resource.data.get('sender', {}).get('uid', null) == request.auth.uid ||
+        resource.data.get('recipient', {}).get('uid', null) == request.auth.uid ||
+        resource.data.get('createdBy', null) == request.auth.uid ||
+        resource.data.get('customerId', null) == request.auth.uid
+      );
     }
 
     function canReadDeliveryManifest() {
@@ -59,9 +62,12 @@ service cloud.firestore {
     }
 
     function canReadUserProfile(userId) {
-      return isActiveUser() && (
-        request.auth.uid == userId ||
-        isStaff()
+      return isSignedIn() && (
+        (
+          request.auth.uid == userId
+          && (!exists(userDocPath()) || userDoc().data.get('active', true) != false)
+        ) ||
+        isActiveUser() && isStaff()
       );
     }
 
@@ -97,9 +103,12 @@ service cloud.firestore {
       }
 
       match /notifications/{notificationId} {
-        allow read: if isActiveUser() && request.auth.uid == userId;
+        allow read: if isActiveUser()
+          && request.auth.uid == userId
+          && resource.data.get('ownerId', userId) == request.auth.uid;
         allow update: if isActiveUser()
           && request.auth.uid == userId
+          && resource.data.get('ownerId', userId) == request.auth.uid
           && request.resource.data.diff(resource.data).changedKeys().hasOnly(['read'])
           && request.resource.data.read is bool;
         allow create, delete: if false;
@@ -137,7 +146,13 @@ service cloud.firestore {
     // --- OPERATIONS ---
 
     match /shipments/{shipmentId} {
-      allow read: if canReadShipment();
+      allow get: if isStaff() || customerOwnsShipment();
+      allow list: if isStaff()
+        || customerOwnsShipment()
+        || (
+          hasRole('customer')
+          && request.auth.uid in resource.data.get('visibilityUserIds', [])
+        );
       allow create, update, delete: if false;
 
       match /status_events/{statusId} {
@@ -146,12 +161,19 @@ service cloud.firestore {
       }
 
       match /packages/{packageId} {
-        allow read: if canReadShipment();
+        allow get: if isStaff() || customerOwnsShipment();
+        allow list: if isStaff()
+          || customerOwnsShipment()
+          || (
+            hasRole('customer')
+            && request.auth.uid in get(/databases/$(database)/documents/shipments/$(shipmentId)).data.get('visibilityUserIds', [])
+          );
         allow create, update, delete: if false;
       }
 
       match /invoices/{invoiceId} {
-        allow read: if canReadShipment() || isAdminOrManager();
+        allow get: if isStaff() || customerOwnsShipment();
+        allow list: if isStaff() || customerOwnsShipment() || isAdminOrManager();
         allow create, update, delete: if false;
       }
     }

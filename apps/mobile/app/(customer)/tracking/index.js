@@ -18,11 +18,13 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { doc, getDoc } from "firebase/firestore";
 import { FontAwesome5 } from "@expo/vector-icons";
 
-import { db } from "../../../firebase";
+import { db, auth } from "../../../firebase";
 import {
   createConversation,
   sendChatMessage,
 } from "../../../components/utilities/FirebaseFunctions";
+import { customerOwnsShipment } from "../../../components/utilities/customerShipmentAccess";
+import { useAuth } from "../../../contexts/AuthContext";
 import TripProgressStepper from "../../../components/trips/TripProgressStepper";
 import ShipmentDetailHeader from "../../../components/shipments/ShipmentDetailHeader";
 import ShipmentHeaderCard from "../../../components/shipments/ShipmentHeaderCard";
@@ -33,6 +35,7 @@ import { useTheme } from "../../../contexts/ThemeContext";
 export default function CustomerTrackingDetailsScreen() {
   const { trackingId } = useLocalSearchParams();
   const router = useRouter();
+  const { profile } = useAuth();
   const { colors, resolvedScheme } = useTheme();
   const statusStyle = resolvedScheme === "dark" ? "light" : "dark";
 
@@ -70,7 +73,24 @@ export default function CustomerTrackingDetailsScreen() {
         return;
       }
 
-      setShipment({ id: snap.id, ...snap.data() });
+      const shipmentData = { id: snap.id, ...snap.data() };
+      const customer = {
+        uid: auth.currentUser?.uid,
+        email: auth.currentUser?.email || profile?.email,
+        phoneNumber: profile?.phoneNumber,
+        phone: profile?.phone,
+        publicId: profile?.publicId,
+        userCode: profile?.userCode,
+        customerCode: profile?.customerCode,
+      };
+
+      if (!customerOwnsShipment(shipmentData, customer)) {
+        setShipment(null);
+        setError("You do not have access to this shipment.");
+        return;
+      }
+
+      setShipment(shipmentData);
     } catch (err) {
       console.error("Failed to load tracking details:", err);
       setShipment(null);
@@ -78,7 +98,7 @@ export default function CustomerTrackingDetailsScreen() {
     } finally {
       setLoading(false);
     }
-  }, [normalizedTracking]);
+  }, [normalizedTracking, profile]);
 
   useEffect(() => {
     fetchData();

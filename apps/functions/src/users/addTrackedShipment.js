@@ -126,6 +126,20 @@ exports.addTrackedShipment = onCall(
       { merge: true },
     );
 
+    const shipmentUpdates = {
+      visibilityUserIds: FieldValue.arrayUnion(uid),
+      updatedAt: FieldValue.serverTimestamp(),
+    };
+
+    if (isSender) {
+      shipmentUpdates["sender.uid"] = uid;
+    }
+    if (isRecipient) {
+      shipmentUpdates["recipient.uid"] = uid;
+    }
+
+    await db.collection("shipments").doc(normalizedTracking).update(shipmentUpdates);
+
     return {
       success: true,
       trackingNumber: normalizedTracking,

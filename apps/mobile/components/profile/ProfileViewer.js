@@ -23,6 +23,7 @@ import {
   updateUserProfileMobile,
 } from "../utilities/FirebaseFunctions";
 import { useTheme } from "../../contexts/ThemeContext";
+import ShipmentDetailHeader from "../shipments/ShipmentDetailHeader";
 import DropdownModal from "../customer/RequestPickup/DropdownModal";
 import { PROVINCES, getCities } from "../utilities/PhilippinesData";
 
@@ -70,7 +71,7 @@ const roleConfig = {
   },
 };
 
-export default function ProfileViewer() {
+export default function ProfileViewer({ showBackButton = false }) {
   const router = useRouter();
   const { user, refreshUser, signOut } = useAuth();
   const { preference, setPreference, resolvedScheme, colors } = useTheme();
@@ -398,6 +399,14 @@ export default function ProfileViewer() {
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.bg }]}>
+      {showBackButton && (
+        <ShipmentDetailHeader
+          title="Profile"
+          subtitle="Account and address details"
+          onBack={() => router.back()}
+        />
+      )}
+
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}

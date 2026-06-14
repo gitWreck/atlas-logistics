@@ -1,9 +1,10 @@
 "use client";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { signInWithEmailAndPassword } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase"; // Ensure this path matches your setup
+import { useAuth } from "@/app/context/AuthContext";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faCircleNotch,
@@ -12,8 +13,24 @@ import {
   faEyeSlash,
 } from "@fortawesome/free-solid-svg-icons";
 
+function getDashboardPathForRole(role) {
+  switch (role?.toUpperCase()) {
+    case "ADMIN":
+      return "/admin/dashboard";
+    case "MANAGER":
+      return "/manager/dashboard";
+    case "DRIVER":
+      return "/driver/dashboard";
+    case "CHECKER":
+      return "/checker/dashboard";
+    default:
+      return null;
+  }
+}
+
 export default function LoginPage() {
   const router = useRouter();
+  const { user, profile, loading: authLoading } = useAuth();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -21,6 +38,13 @@ export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+
+  const dashboardPath = profile ? getDashboardPathForRole(profile.role) : null;
+
+  useEffect(() => {
+    if (authLoading || !user || !dashboardPath) return;
+    router.replace(dashboardPath);
+  }, [authLoading, user, dashboardPath, router]);
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -44,25 +68,13 @@ export default function LoginPage() {
       }
 
       const userData = userDoc.data();
-      const role = userData.role?.toUpperCase();
+      const path = getDashboardPathForRole(userData.role);
 
-      // 4. Route to Dashboard
-      switch (role) {
-        case "ADMIN":
-          router.push("/admin/dashboard");
-          break;
-        case "MANAGER":
-          router.push("/manager/dashboard");
-          break;
-        case "DRIVER":
-          router.push("/driver/dashboard");
-          break;
-        case "CHECKER":
-          router.push("/checker/dashboard");
-          break;
-        default:
-          throw new Error("Unauthorized role. Access denied.");
+      if (!path) {
+        throw new Error("Unauthorized role. Access denied.");
       }
+
+      router.replace(path);
     } catch (err) {
       console.error("Login Error:", err);
       // Friendly error messages
@@ -76,6 +88,18 @@ export default function LoginPage() {
       setLoading(false);
     }
   };
+
+  if (authLoading || (user && dashboardPath)) {
+    return (
+      <div className="min-h-screen min-h-[100dvh] flex items-center justify-center bg-slate-100">
+        <FontAwesomeIcon
+          icon={faCircleNotch}
+          spin
+          className="text-3xl text-blue-600"
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen min-h-[100dvh] flex items-center justify-center bg-slate-100 p-4 sm:p-6 py-8 sm:py-6 overflow-x-hidden">

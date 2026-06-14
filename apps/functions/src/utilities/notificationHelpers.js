@@ -1,6 +1,10 @@
 "use strict";
 
 const { chunk, unique } = require("./helpers");
+const {
+  customerOwnsShipment,
+  getShipmentOwnerUserIds,
+} = require("./customerShipmentAccess");
 
 function normalizeNotificationChannels({
   notificationChannels,
@@ -29,16 +33,39 @@ function normalizeNotificationChannels({
 }
 
 function getShipmentTargetUserIds(shipment = {}) {
-  return unique([
-    ...(Array.isArray(shipment.visibilityUserIds)
-      ? shipment.visibilityUserIds
-      : []),
-    shipment.customerId,
-    shipment.senderUid,
-    shipment.recipientUid,
-    shipment.sender?.uid,
-    shipment.recipient?.uid,
-  ]);
+  return getShipmentOwnerUserIds(shipment);
+}
+
+async function filterShipmentNotificationTargets(db, shipment = {}, candidateIds = []) {
+  const uniqueCandidates = unique(
+    (Array.isArray(candidateIds) ? candidateIds : []).filter(Boolean).map(String),
+  );
+
+  if (!uniqueCandidates.length) return [];
+
+  const authorized = [];
+
+  await Promise.all(
+    uniqueCandidates.map(async (uid) => {
+      if (getShipmentOwnerUserIds(shipment).includes(uid)) {
+        authorized.push(uid);
+        return;
+      }
+
+      const userSnap = await db.collection("users").doc(uid).get();
+      if (!userSnap.exists) return;
+
+      const user = userSnap.data() || {};
+      if (user.active === false) return;
+      if (user.role && user.role !== "customer") return;
+
+      if (customerOwnsShipment(shipment, { uid, ...user })) {
+        authorized.push(uid);
+      }
+    }),
+  );
+
+  return unique(authorized);
 }
 
 function getShipmentTargetEmails(shipment = {}) {
@@ -103,6 +130,7 @@ async function getTripNotificationTargets(db, tripId) {
 }
 
 module.exports = {
+  filterShipmentNotificationTargets,
   getShipmentTargetEmails,
   getShipmentTargetUserIds,
   getShipmentTrackingId,

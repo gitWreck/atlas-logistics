@@ -163,6 +163,7 @@ exports.createShipment = onCall(
       trackingNumber: shipmentId,
       currentTripId: null,
       visibilityUserIds: shipmentVisibilityUserIds,
+      customerId: primaryCustomerId,
       createdSource: "web",
 
       sender: {
