@@ -3,17 +3,14 @@
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const admin = require("firebase-admin");
 const { FieldValue, Timestamp } = require("firebase-admin/firestore");
+const { customerOwnsShipment } = require("../utilities/customerShipmentAccess");
 
 if (!admin.apps.length) admin.initializeApp();
 
 const db = admin.firestore();
 
-function canManageShipment(data, uid) {
-  const visibility = Array.isArray(data.visibilityUserIds)
-    ? data.visibilityUserIds
-    : [];
-  const createdBy = data.createdBy || data.sender?.uid || null;
-  return visibility.includes(uid) || String(createdBy) === String(uid);
+function canManageShipment(data, uid, user = {}) {
+  return customerOwnsShipment(data, { uid, ...user });
 }
 
 exports.customerManageShipment = onCall(
@@ -25,6 +22,8 @@ exports.customerManageShipment = onCall(
 
     const uid = request.auth.uid;
     const { shipmentId, action } = request.data || {};
+    const userSnap = await db.collection("users").doc(uid).get();
+    const user = userSnap.exists ? userSnap.data() || {} : {};
 
     if (!shipmentId || typeof shipmentId !== "string") {
       throw new HttpsError("invalid-argument", "shipmentId is required.");
@@ -47,7 +46,7 @@ exports.customerManageShipment = onCall(
 
       const data = snap.data() || {};
 
-      if (!canManageShipment(data, uid)) {
+      if (!canManageShipment(data, uid, user)) {
         throw new HttpsError(
           "permission-denied",
           "You cannot manage this shipment.",

@@ -1982,6 +1982,7 @@ export default function ScannerScreen() {
         flashEnabled={flashEnabled}
         modeLabel={modeLabel}
         detailsSheetHeight={detailsSheetHeight}
+        onBack={() => router.back()}
         onToggleFlash={() => setFlashEnabled((current) => !current)}
         onBarcodeScanned={onCameraScan}
       />

@@ -9,6 +9,7 @@ import {
   ScrollView,
   TouchableOpacity,
 } from "react-native";
+import { Image } from "expo-image";
 import { useRouter } from "expo-router";
 import { signInWithEmailAndPassword, signOut } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
@@ -112,66 +113,89 @@ export default function LoginScreen() {
   };
 
   return (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === "ios" ? "padding" : "height"}
-      style={styles.container}
-    >
-      <ScrollView contentContainerStyle={styles.scrollContainer}>
-        <LoginHeader
-          title="ATLAS LOGIN"
-          subtitle="Secure Gateway for Operations"
-        />
-
-        <AtlasInput
-          label="Email Address"
-          placeholder="user@atlas.com"
-          value={email}
-          onChangeText={handleEmailChange}
-          keyboardType="email-address"
-        />
-
-        <AtlasInput
-          label="Password"
-          placeholder="••••••••"
-          value={password}
-          onChangeText={handlePasswordChange}
-          secureTextEntry={true}
-        />
-
-        <GradientButton
-          title="Sign In"
-          onPress={handleLogin}
-          loading={loading}
-          disabled={disabled}
-        />
-
-        {/* Customer CTA with only "Create your account" tappable */}
-        <View style={styles.customerCtaContainer}>
-          <Text style={styles.customerCtaText}>
-            Are you a customer?{" "}
-            <Text
-              style={styles.customerCtaLink}
-              onPress={() => router.push("/signup/")}
-            >
-              Create your account
-            </Text>
-          </Text>
-        </View>
-        {/* Forgot Password Link */}
-        <TouchableOpacity
-          style={styles.forgotPassword}
-          onPress={() => router.push("/(auth)/forgot-password")}
+    <View style={styles.container}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        style={styles.content}
+      >
+        <ScrollView
+          contentContainerStyle={styles.scrollContainer}
+          keyboardShouldPersistTaps="handled"
         >
-          <Text style={styles.forgotPasswordText}>Forgot your password?</Text>
-        </TouchableOpacity>
-      </ScrollView>
-    </KeyboardAvoidingView>
+          <LoginHeader
+            title="ATLAS LOGIN"
+            subtitle="Secure Gateway for Operations"
+          />
+
+          <AtlasInput
+            label="Email Address"
+            placeholder="user@atlas.com"
+            value={email}
+            onChangeText={handleEmailChange}
+            keyboardType="email-address"
+          />
+
+          <AtlasInput
+            label="Password"
+            placeholder="••••••••"
+            value={password}
+            onChangeText={handlePasswordChange}
+            secureTextEntry={true}
+          />
+
+          <GradientButton
+            title="Sign In"
+            onPress={handleLogin}
+            loading={loading}
+            disabled={disabled}
+          />
+
+          <View style={styles.customerCtaContainer}>
+            <Text style={styles.customerCtaText}>
+              Are you a customer?{" "}
+              <Text
+                style={styles.customerCtaLink}
+                onPress={() => router.push("/signup/")}
+              >
+                Create your account
+              </Text>
+            </Text>
+          </View>
+
+          <TouchableOpacity
+            style={styles.forgotPassword}
+            onPress={() => router.push("/(auth)/forgot-password")}
+          >
+            <Text style={styles.forgotPasswordText}>Forgot your password?</Text>
+          </TouchableOpacity>
+        </ScrollView>
+      </KeyboardAvoidingView>
+
+      <Image
+        source={require("../../assets/login_bg.jpeg")}
+        style={styles.footerImage}
+        contentFit="cover"
+        contentPosition="bottom"
+      />
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#FFFFFF" },
-  scrollContainer: { flexGrow: 1, justifyContent: "center", padding: 20 },
+  content: { flex: 1 },
+  scrollContainer: {
+    flexGrow: 1,
+    justifyContent: "center",
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 16,
+  },
+  footerImage: {
+    width: "100%",
+    height: 168,
+    backgroundColor: "#FFFFFF",
+  },
   note: {
     textAlign: "center",
     color: "#94a3b8",

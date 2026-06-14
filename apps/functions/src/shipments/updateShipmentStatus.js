@@ -23,6 +23,7 @@ const {
   applyPieceDelivered,
 } = require("../checker/checkerPieceOperations");
 const {
+  filterShipmentNotificationTargets,
   getShipmentTargetUserIds,
 } = require("../utilities/notificationHelpers");
 const { normalizeQty } = require("../utilities/packageHelpers");
@@ -745,16 +746,23 @@ exports.updateShipmentStatus = onCall(
 
     if (notificationEvent) {
       const trackedUserIds = await getTrackedShipmentUserIds(shipmentId);
-      notificationEvent.targetUserIds = unique([
+      const candidateUserIds = unique([
         ...(notificationEvent.targetUserIds || []),
         ...trackedUserIds,
       ]);
+      notificationEvent.targetUserIds = await filterShipmentNotificationTargets(
+        db,
+        { id: shipmentId, ...shipment },
+        candidateUserIds,
+      );
       if (notificationEvent.channels?.push === true) {
         notificationEvent.channels.inApp =
           notificationEvent.targetUserIds.length > 0;
       }
 
-      await db.collection("notification_events").doc().set(notificationEvent);
+      if (notificationEvent.targetUserIds.length > 0) {
+        await db.collection("notification_events").doc().set(notificationEvent);
+      }
     }
 
     return {

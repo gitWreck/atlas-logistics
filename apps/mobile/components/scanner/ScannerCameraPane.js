@@ -2,6 +2,8 @@ import React from "react";
 import {
   ActivityIndicator,
   Animated,
+  Platform,
+  StatusBar,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -9,6 +11,7 @@ import {
 } from "react-native";
 import { CameraView } from "expo-camera";
 import { FontAwesome5 } from "@expo/vector-icons";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 export default function ScannerCameraPane({
   scanned,
@@ -16,9 +19,16 @@ export default function ScannerCameraPane({
   flashEnabled,
   modeLabel,
   detailsSheetHeight,
+  onBack,
   onToggleFlash,
   onBarcodeScanned,
 }) {
+  const insets = useSafeAreaInsets();
+  const statusBarInset =
+    insets.top ||
+    (Platform.OS === "android" ? StatusBar.currentHeight || 0 : 0);
+  const topOffset = statusBarInset + 12;
+
   return (
     <View style={styles.cameraPane}>
       <CameraView
@@ -36,13 +46,23 @@ export default function ScannerCameraPane({
             { paddingBottom: detailsSheetHeight },
           ]}
         >
-          <View style={styles.modeBadge}>
+          <TouchableOpacity
+            style={[styles.backButton, { top: topOffset }]}
+            onPress={onBack}
+            activeOpacity={0.82}
+          >
+            <FontAwesome5 name="arrow-left" size={14} color="#ffffff" />
+            <Text style={styles.backButtonText}>Back</Text>
+          </TouchableOpacity>
+
+          <View style={[styles.modeBadge, { top: topOffset }]}>
             <Text style={styles.modeBadgeText}>{modeLabel}</Text>
           </View>
 
           <TouchableOpacity
             style={[
               styles.flashButton,
+              { top: topOffset },
               flashEnabled && styles.flashButtonActive,
             ]}
             onPress={onToggleFlash}
@@ -94,9 +114,26 @@ const styles = StyleSheet.create({
     alignItems: "center",
     padding: 18,
   },
+  backButton: {
+    position: "absolute",
+    left: 18,
+    minHeight: 36,
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 7,
+    backgroundColor: "rgba(15, 23, 42, 0.78)",
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.18)",
+  },
+  backButtonText: {
+    color: "#ffffff",
+    fontSize: 12,
+    fontWeight: "800",
+  },
   modeBadge: {
     position: "absolute",
-    top: 18,
     alignSelf: "center",
     backgroundColor: "rgba(15, 23, 42, 0.78)",
     borderWidth: 1,
@@ -113,7 +150,6 @@ const styles = StyleSheet.create({
   },
   flashButton: {
     position: "absolute",
-    top: 18,
     right: 18,
     minHeight: 36,
     borderRadius: 999,

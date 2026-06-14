@@ -28,10 +28,17 @@ import TrackedShipmentList from "../../components/customer/TrackedShipmentList";
 import FloatingAddButton from "../../components/customer/FloatingAddButton";
 import RequestPickupModal from "../../components/customer/RequestPickup/RequestPickupModal";
 import { requestShipmentPickup } from "../../components/utilities/FirebaseFunctions";
+import {
+  customerOwnsShipment,
+  mapShipmentDoc,
+  sortShipments,
+} from "../../components/utilities/customerShipmentAccess";
+import { useAuth } from "../../contexts/AuthContext";
 import { useTheme } from "../../contexts/ThemeContext";
 
 export default function CustomerDashboard() {
   const router = useRouter();
+  const { profile } = useAuth();
   const { colors, resolvedScheme } = useTheme();
   const [shipments, setShipments] = useState([]);
   const [userData, setUserData] = useState(null);
@@ -59,51 +66,64 @@ export default function CustomerDashboard() {
       .catch(() => {});
   }, []);
 
-  // 2. Subscribe to Shipments
+  // 2. Subscribe to shipments owned by this customer only
   useEffect(() => {
     const user = auth.currentUser;
-    if (!user) return;
+    if (!user || !profile?.uid) return;
 
-    if (auth.currentUser?.displayName) {
-      setUserName(auth.currentUser.displayName);
-    }
+    const customer = {
+      uid: user.uid,
+      email: user.email || profile.email,
+      phoneNumber: profile.phoneNumber,
+      phone: profile.phone,
+      publicId: profile.publicId,
+      userCode: profile.userCode,
+      customerCode: profile.customerCode,
+    };
 
-    const ref = collection(db, "shipments");
-    const q = query(
-      ref,
-      where("visibilityUserIds", "array-contains", user.uid),
+    const shipmentQueries = [
+      query(collection(db, "shipments"), where("sender.uid", "==", user.uid)),
+      query(
+        collection(db, "shipments"),
+        where("recipient.uid", "==", user.uid),
+      ),
+      query(collection(db, "shipments"), where("customerId", "==", user.uid)),
+      query(
+        collection(db, "shipments"),
+        where("visibilityUserIds", "array-contains", user.uid),
+      ),
+    ];
+
+    const snapshotsByQuery = {};
+
+    const mergeAndSetShipments = () => {
+      const shipmentMap = new Map();
+
+      Object.values(snapshotsByQuery).forEach((snapshot) => {
+        snapshot.docs.forEach((docSnap) => {
+          const item = mapShipmentDoc(docSnap);
+          if (customerOwnsShipment(item, customer)) {
+            shipmentMap.set(docSnap.id, item);
+          }
+        });
+      });
+
+      setShipments(sortShipments([...shipmentMap.values()]));
+    };
+
+    const unsubscribers = shipmentQueries.map((q, index) =>
+      onSnapshot(
+        q,
+        (snapshot) => {
+          snapshotsByQuery[index] = snapshot;
+          mergeAndSetShipments();
+        },
+        (error) => console.error("Shipment subscription error:", error),
+      ),
     );
 
-    const unsubscribe = onSnapshot(
-      q,
-      (snapshot) => {
-        const items = snapshot.docs
-          .map((docSnap) => {
-            const data = docSnap.data();
-            const updatedAt =
-              data.updatedAt?.toDate?.() || data.createdAt?.toDate?.() || null;
-
-            return {
-              id: docSnap.id,
-              ...data,
-              trackingNumber:
-                data.trackingNumber || data.shipmentId || docSnap.id,
-              rawUpdatedAt: data.updatedAt || data.createdAt || null,
-              updatedAt: updatedAt
-                ? updatedAt.toLocaleDateString()
-                : "Recently updated",
-              sortTime: updatedAt ? updatedAt.getTime() : 0,
-            };
-          })
-          .sort((a, b) => b.sortTime - a.sortTime);
-
-        setShipments(items);
-      },
-      (error) => console.error("Subscription error:", error),
-    );
-
-    return unsubscribe;
-  }, []);
+    return () => unsubscribers.forEach((unsubscribe) => unsubscribe());
+  }, [profile?.uid, profile?.phoneNumber, profile?.email]);
 
   useEffect(() => {
     const user = auth.currentUser;

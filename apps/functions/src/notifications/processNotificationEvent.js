@@ -55,6 +55,7 @@ async function writeInAppNotifications({ eventId, event }) {
       data: event.data || {},
       entityType: event.entityType || null,
       entityId: event.entityId || null,
+      ownerId: uid,
       read: false,
       createdAt: now,
     });

@@ -3,6 +3,7 @@
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const admin = require("firebase-admin");
 const { requireAuth, requireRole } = require("../utilities/helpers");
+const { customerOwnsShipment } = require("../utilities/customerShipmentAccess");
 
 if (!admin.apps.length) admin.initializeApp();
 
@@ -171,6 +172,7 @@ async function notifyStaff({ conversationId, conversation, message, sender }) {
       },
       entityType: "conversation",
       entityId: conversationId,
+      ownerId: uid,
       read: false,
       createdAt: now,
     });
@@ -215,6 +217,7 @@ async function notifyCustomer({ conversationId, customerId, message, sender }) {
     },
     entityType: "conversation",
     entityId: conversationId,
+    ownerId: customerId,
     read: false,
     createdAt: FieldValue.serverTimestamp(),
   });
@@ -244,6 +247,13 @@ exports.createConversation = onCall(
         throw new HttpsError("not-found", "Shipment not found.");
       }
       shipmentData = shipmentSnap.data() || {};
+
+      if (!customerOwnsShipment(shipmentData, { uid, ...user })) {
+        throw new HttpsError(
+          "permission-denied",
+          "You are not authorized to access this shipment.",
+        );
+      }
     }
 
     if (trackingNumber) {

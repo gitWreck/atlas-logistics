@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import {
   Platform,
+  Alert,
   SafeAreaView,
   StyleSheet,
   StatusBar as RNStatusBar,
@@ -10,6 +11,7 @@ import { useRouter } from "expo-router";
 import {
   collection,
   doc,
+  getDoc,
   onSnapshot,
   orderBy,
   query,
@@ -19,13 +21,26 @@ import {
 import { auth, db } from "../../firebase";
 import ShipmentDetailHeader from "../../components/shipments/ShipmentDetailHeader";
 import CustomerNotificationsList from "../../components/notifications/CustomerNotificationsList";
+import { customerOwnsShipment } from "../../components/utilities/customerShipmentAccess";
+import { useAuth } from "../../contexts/AuthContext";
 import { useTheme } from "../../contexts/ThemeContext";
 
 export default function CustomerNotificationsScreen() {
   const router = useRouter();
+  const { profile } = useAuth();
   const { colors, resolvedScheme } = useTheme();
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
+
+  const customer = {
+    uid: auth.currentUser?.uid,
+    email: auth.currentUser?.email || profile?.email,
+    phoneNumber: profile?.phoneNumber,
+    phone: profile?.phone,
+    publicId: profile?.publicId,
+    userCode: profile?.userCode,
+    customerCode: profile?.customerCode,
+  };
 
   useEffect(() => {
     const user = auth.currentUser;
@@ -43,10 +58,15 @@ export default function CustomerNotificationsScreen() {
       q,
       (snapshot) => {
         setNotifications(
-          snapshot.docs.map((docSnap) => ({
-            id: docSnap.id,
-            ...docSnap.data(),
-          })),
+          snapshot.docs
+            .map((docSnap) => ({
+              id: docSnap.id,
+              ...docSnap.data(),
+            }))
+            .filter((notification) => {
+              const ownerId = notification.ownerId || user.uid;
+              return ownerId === user.uid;
+            }),
         );
         setLoading(false);
       },
@@ -76,6 +96,30 @@ export default function CustomerNotificationsScreen() {
       notification.entityId;
 
     if (notification.data?.screen === "tracking" && trackingId) {
+      try {
+        const snap = await getDoc(
+          doc(db, "shipments", String(trackingId).trim().toUpperCase()),
+        );
+
+        if (!snap.exists()) {
+          Alert.alert("Unavailable", "This shipment could not be found.");
+          return;
+        }
+
+        const shipmentData = { id: snap.id, ...snap.data() };
+        if (!customerOwnsShipment(shipmentData, { uid: user.uid, ...customer })) {
+          Alert.alert(
+            "Access denied",
+            "This notification is not linked to your account.",
+          );
+          return;
+        }
+      } catch (error) {
+        console.error("Notification shipment ownership check failed:", error);
+        Alert.alert("Unable to open", "Please try again in a moment.");
+        return;
+      }
+
       router.push({
         pathname: "/(customer)/tracking/",
         params: { trackingId },
