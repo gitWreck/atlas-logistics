@@ -10,8 +10,10 @@ export default function LoginHeader({
   return (
     <View style={[styles.header, { marginBottom }]}>
       <Image
-        source={require("../../assets/atlas-login.svg")}
+        source={require("../../assets/atlas-login.png")}
         style={[styles.logo, { width: logoSize, height: logoSize }]}
+        contentFit="contain"
+        accessibilityLabel="Atlas logo"
       />
       <Text style={styles.title}>{title}</Text>
       <Text style={styles.subtitle}>{subtitle}</Text>
