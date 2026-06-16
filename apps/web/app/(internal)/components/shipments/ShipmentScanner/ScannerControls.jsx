@@ -15,6 +15,8 @@ import {
 import {
   canUnloadAtHub,
   canStartReceiving,
+  canDispatchCorrectionTrip,
+  canResumeReceiving,
   getUnloadBlockReason,
   isHubTransferTrip,
   isManifestReconciled,
@@ -59,6 +61,14 @@ export function ActionSelector({ action, trip, theme, actions }) {
       if (hubTrip && isManifestReconciled(trip)) {
         actions.setAction(id);
         return actions.openReleaseHandoff();
+      }
+      if (hubTrip && canResumeReceiving(trip)) {
+        return actions.setNeedsResumeReceiving(true) || actions.setAction(id);
+      }
+      if (hubTrip && canDispatchCorrectionTrip(trip)) {
+        return (
+          actions.setNeedsCorrectionDispatch(true) || actions.setAction(id)
+        );
       }
       if (hubTrip && canStartReceiving(trip)) {
         return actions.setNeedsStartReceiving(true) || actions.setAction(id);

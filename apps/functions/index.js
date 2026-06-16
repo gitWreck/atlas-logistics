@@ -76,6 +76,8 @@ exports.reportCheckerTrip =
 
 exports.assignShipmentToTrip =
   require("./src/trips/assignShipmentToTrip").assignShipmentToTrip;
+exports.manualAssignShipmentToTrip =
+  require("./src/trips/manualAssignShipmentToTrip").manualAssignShipmentToTrip;
 exports.unassignShipmentFromTrip =
   require("./src/trips/unassignShipmentFromTrip").unassignShipmentFromTrip;
 exports.assignDriverToTrip =

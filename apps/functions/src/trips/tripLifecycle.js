@@ -316,12 +316,95 @@ function shouldPromoteTripToCompleted(trip = {}, tripShipmentRows = []) {
   };
 }
 
+const ADMIN_OVERRIDE_RECEIVING_STATUSES = new Set([
+  MANIFEST_STATUS.RECEIVING_IN_PROGRESS,
+  MANIFEST_STATUS.LOCKED,
+  MANIFEST_STATUS.RECONCILED,
+]);
+
+/**
+ * Validate admin override release when reconciliation counts do not match.
+ * missingPackages: [{ shipmentDocId, shipmentId, missingLabels? }]
+ */
+function validateAdminOverrideRelease({
+  trip = {},
+  missingPackages = [],
+  missingRemarks = {},
+} = {}) {
+  const entries = Array.isArray(missingPackages) ? missingPackages : [];
+
+  for (const entry of entries) {
+    const docId = entry?.shipmentDocId || entry?.id || null;
+    const publicId = entry?.shipmentId || docId || "unknown";
+    const remark = String(
+      missingRemarks[docId] || missingRemarks[publicId] || "",
+    ).trim();
+
+    if (!remark) {
+      return {
+        valid: false,
+        message: `Add remarks for missing package ${publicId} before admin override release.`,
+      };
+    }
+  }
+
+  const status = normalizeTripStatus(trip.status);
+  if (TERMINAL_TRIP_STATUSES.has(status)) {
+    return {
+      valid: false,
+      message: `Cannot admin override release from terminal trip status ${status}.`,
+    };
+  }
+
+  return { valid: true, message: null, missingCount: entries.length };
+}
+
 /**
  * Last-mile release gate (Step 1.4).
  */
 function isTripReleaseEligible(trip = {}, options = {}) {
-  const { allowReconciledFallback = true } = options;
+  const {
+    allowReconciledFallback = true,
+    adminOverride = false,
+    isAdmin = false,
+  } = options;
   const status = normalizeTripStatus(trip.status);
+
+  if (adminOverride && isAdmin) {
+    if (TERMINAL_TRIP_STATUSES.has(status)) {
+      return {
+        eligible: false,
+        reason: `Cannot admin override release from terminal trip status ${status}.`,
+      };
+    }
+
+    if (RELEASE_ELIGIBLE_TRIP_STATUSES.has(status)) {
+      return { eligible: true, reason: null, adminOverride: true };
+    }
+
+    const manifestStatus = resolveManifestStatus(trip);
+    const hubReceivingActive =
+      isHubTransferTrip(trip) &&
+      (ADMIN_OVERRIDE_RECEIVING_STATUSES.has(manifestStatus) ||
+        trip.receivingStartedAt);
+
+    if (
+      hubReceivingActive &&
+      [TRIP_STATUSES.IN_TRANSIT, TRIP_STATUSES.LOADED].includes(status)
+    ) {
+      return {
+        eligible: true,
+        reason: null,
+        adminOverride: true,
+        requiresArrivedPromotion: true,
+      };
+    }
+
+    return {
+      eligible: false,
+      reason: `Admin override release requires trip IN_TRANSIT (receiving) or ARRIVED (current: ${status || "unknown"}).`,
+    };
+  }
 
   if (RELEASE_ELIGIBLE_TRIP_STATUSES.has(status)) {
     if (isHubTransferTrip(trip)) {
@@ -361,9 +444,9 @@ function isTripReleaseEligible(trip = {}, options = {}) {
 /**
  * Callable guard for releaseForDeliveryOperations (Step 1.4).
  */
-function assertTripReleaseEligible(trip = {}) {
-  const decision = isTripReleaseEligible(trip);
-  if (decision.eligible) return;
+function assertTripReleaseEligible(trip = {}, options = {}) {
+  const decision = isTripReleaseEligible(trip, options);
+  if (decision.eligible) return decision;
 
   const { HttpsError } = require("firebase-functions/v2/https");
   throw new HttpsError(
@@ -453,6 +536,7 @@ module.exports = {
   evaluateTripShipmentRow,
   isTripShipmentDelivered,
   shouldPromoteTripToCompleted,
+  validateAdminOverrideRelease,
   isTripReleaseEligible,
   assertTripReleaseEligible,
   getTripStatusSideEffects,

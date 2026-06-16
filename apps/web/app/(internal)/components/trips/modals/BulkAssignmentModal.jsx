@@ -11,6 +11,10 @@ import {
 import { bulkAssignShipments } from "@/app/utility/FirebaseFunctions";
 import TablePaginationFooter from "../../ui/TablePaginationFooter";
 import {
+  resolveManifestStatus,
+  MANIFEST_STATUS,
+} from "@/app/utility/manifestStatus";
+import {
   getModalThemeClasses,
   getTableTheme,
 } from "@/app/utility/constant/theme";
@@ -31,6 +35,7 @@ export default function BulkAssignmentModal({
   const [candidates, setCandidates] = useState([]);
   const [selectedIds, setSelectedIds] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
+  const [assignmentReason, setAssignmentReason] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
 
   const [nextCursor, setNextCursor] = useState(null);
@@ -46,6 +51,7 @@ export default function BulkAssignmentModal({
       setNextCursor(null);
       setSelectedIds([]);
       setSearchTerm("");
+      setAssignmentReason("");
       setCurrentPage(1);
       fetchCandidates(null);
     }
@@ -81,13 +87,27 @@ export default function BulkAssignmentModal({
   const filteredList = useMemo(() => {
     return candidates.filter((item) => {
       const search = searchTerm.toLowerCase();
+      const packageIds = (item.packages || [])
+        .map((pkg) => pkg.packageId || pkg.trackingNumber || "")
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+
       return (
         item.shipmentId?.toLowerCase().includes(search) ||
+        item.id?.toLowerCase().includes(search) ||
+        packageIds.includes(search) ||
         item.destination?.toLowerCase().includes(search) ||
         item.recipient?.name?.toLowerCase().includes(search)
       );
     });
   }, [candidates, searchTerm]);
+
+  const tripManifestStatus = resolveManifestStatus(trip || {});
+  const requiresAssignmentReason =
+    tripManifestStatus === MANIFEST_STATUS.RECEIVING_IN_PROGRESS ||
+    tripManifestStatus === MANIFEST_STATUS.RECONCILED ||
+    String(trip?.status || "").toUpperCase() === "ARRIVED";
 
   useEffect(() => {
     setCurrentPage(1);
@@ -143,12 +163,17 @@ export default function BulkAssignmentModal({
 
   const handleSubmit = async () => {
     if (selectedIds.length === 0) return;
+    if (requiresAssignmentReason && !String(assignmentReason || "").trim()) {
+      alert("Add a reason for assigning shipments after manifest unlock.");
+      return;
+    }
 
     setSubmitting(true);
     try {
       const result = await bulkAssignShipments({
-        tripId: trip.tripId,
+        tripId: trip.id || trip.tripId,
         shipmentIds: selectedIds,
+        reason: String(assignmentReason || "").trim() || null,
       });
 
       if (result.data.success) {
@@ -206,7 +231,7 @@ export default function BulkAssignmentModal({
             <input
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Search destination, name, or tracking..."
+              placeholder="Search tracking, package label, destination, or recipient..."
               className={`w-full border rounded-lg pl-10 pr-4 py-2.5 text-sm focus:border-blue-500 outline-none ${modalTheme.input}`}
             />
             <FontAwesomeIcon
@@ -340,6 +365,20 @@ export default function BulkAssignmentModal({
           />
         )}
 
+        {requiresAssignmentReason && (
+          <div className={`px-5 py-3 border-t ${modalTheme.header}`}>
+            <label className={`block text-xs font-bold mb-2 ${modalTheme.bodyText}`}>
+              Reason for adding to manifest
+            </label>
+            <textarea
+              value={assignmentReason}
+              onChange={(e) => setAssignmentReason(e.target.value)}
+              placeholder="e.g. Missing piece AT-20260612-SHP-677769-09 was on truck but not on manifest"
+              className={`w-full border rounded-lg p-3 text-sm min-h-[72px] outline-none focus:border-blue-500 ${modalTheme.input}`}
+            />
+          </div>
+        )}
+
         {/* FOOTER */}
         <div
           className={`p-5 border-t rounded-b-xl flex justify-end gap-3 ${modalTheme.header}`}
@@ -355,7 +394,12 @@ export default function BulkAssignmentModal({
           <button
             type="button"
             onClick={handleSubmit}
-            disabled={submitting || selectedIds.length === 0}
+            disabled={
+              submitting ||
+              selectedIds.length === 0 ||
+              (requiresAssignmentReason &&
+                !String(assignmentReason || "").trim())
+            }
             className={modalAction.primaryInline}
           >
             {submitting ? (

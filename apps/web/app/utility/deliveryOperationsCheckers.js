@@ -1,3 +1,5 @@
+// Delivery Operations checker tabs — disabled for now (see ShipmentBoard.jsx).
+
 export const ALL_CHECKERS_TAB = "all";
 
 function normalizeStatus(value = "") {

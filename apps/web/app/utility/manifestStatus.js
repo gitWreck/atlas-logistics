@@ -75,6 +75,7 @@ export function canStartReceiving(trip = {}) {
 
 export function canDispatchTrip(trip = {}) {
   if (!isHubTransferTrip(trip)) return false;
+  if (isCorrectionCycleTrip(trip)) return false;
   if (resolveManifestStatus(trip) !== MANIFEST_STATUS.LOCKED) return false;
 
   const status = normalizeTripStatus(trip.status);
@@ -86,10 +87,48 @@ export function canDispatchTrip(trip = {}) {
   return false;
 }
 
+export function isCorrectionCycleTrip(trip = {}) {
+  return Boolean(trip.manifestReopenedAt);
+}
+
+export function canDispatchCorrectionTrip(trip = {}) {
+  if (!isHubTransferTrip(trip)) return false;
+  if (!isCorrectionCycleTrip(trip)) return false;
+
+  const status = normalizeTripStatus(trip.status);
+  if (!["ARRIVED", "LOADED", "LOADING"].includes(status)) return false;
+  if (!trip.manifestLocked) return false;
+  if (resolveManifestStatus(trip) !== MANIFEST_STATUS.LOCKED) return false;
+  if (trip.correctionDispatchedAt) return false;
+  return true;
+}
+
+export function canResumeReceiving(trip = {}) {
+  if (!isHubTransferTrip(trip)) return false;
+  if (!isCorrectionCycleTrip(trip)) return false;
+  if (!trip.manifestLocked) return false;
+  if (resolveManifestStatus(trip) !== MANIFEST_STATUS.LOCKED) return false;
+
+  const status = normalizeTripStatus(trip.status);
+
+  if (status === "ARRIVED" && trip.correctionDispatchedAt) return true;
+
+  if (
+    status === "IN_TRANSIT" &&
+    trip.dispatchedAt &&
+    trip.receivingStartedAt
+  ) {
+    return true;
+  }
+
+  return false;
+}
+
 export function getDispatchTripBlockReason(trip = {}) {
   if (!isHubTransferTrip(trip)) return null;
-  if (canDispatchTrip(trip)) return null;
+  if (canDispatchTrip(trip) || canDispatchCorrectionTrip(trip)) return null;
   if (resolveManifestStatus(trip) !== MANIFEST_STATUS.LOCKED) return null;
+
   if (trip.dispatchedAt) return "This trip was already dispatched.";
 
   const status = normalizeTripStatus(trip.status);
@@ -107,6 +146,28 @@ export function canUnloadAtHub(trip = {}) {
   if (!isHubTransferTrip(trip)) return true;
   if (normalizeTripStatus(trip.status) !== "ARRIVED") return false;
   return resolveManifestStatus(trip) === MANIFEST_STATUS.RECEIVING_IN_PROGRESS;
+}
+
+export function canUnlockManifest(trip = {}, options = {}) {
+  const { isAdmin = false } = options;
+  const manifestStatus = resolveManifestStatus(trip);
+
+  if (
+    manifestStatus === MANIFEST_STATUS.LOCKED ||
+    manifestStatus === MANIFEST_STATUS.OPEN
+  ) {
+    return true;
+  }
+
+  if (isAdmin && manifestStatus === MANIFEST_STATUS.RECONCILED) {
+    return true;
+  }
+
+  return false;
+}
+
+export function isManifestEditable(trip = {}) {
+  return trip.manifestLocked !== true;
 }
 
 export function isManifestReconciled(trip = {}) {
@@ -134,6 +195,22 @@ export function getUnloadBlockReason(trip = {}) {
 
   if (canStartReceiving(trip)) {
     return "Start receiving on this trip before unloading packages.";
+  }
+
+  if (canDispatchCorrectionTrip(trip)) {
+    return "Dispatch correction loads before resuming receiving.";
+  }
+
+  if (canResumeReceiving(trip)) {
+    return "Resume receiving on this trip before unloading packages.";
+  }
+
+  if (
+    isCorrectionCycleTrip(trip) &&
+    tripStatus === "IN_TRANSIT" &&
+    trip.receivingStartedAt
+  ) {
+    return "Resume receiving on this trip before unloading packages.";
   }
 
   if (tripStatus === "IN_TRANSIT" && manifestStatus === MANIFEST_STATUS.LOCKED) {

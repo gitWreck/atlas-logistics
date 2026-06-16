@@ -676,12 +676,12 @@ exports.updateShipmentPackages = onCall(
                 ? {
                     currentTripId: null,
                     loadedOnTrip: null,
-                    ...(resolveHubUnloadStatus(pkg) ===
-                    PACKAGE_STATUS.ARRIVED_AT_ODIONGAN
+                    ...(unloadedStatus === PACKAGE_STATUS.ARRIVED_AT_ODIONGAN
                       ? {
                           custodyOwnerType: "WAREHOUSE",
                           custodyOwnerId: ODIONGAN_WAREHOUSE,
-                          hubReceivedAt: nowIso,
+                          hubReceivedAt: pkg.hubReceivedAt || nowIso,
+                          receivedQty: Math.max(receivedQty, quantity),
                         }
                       : {}),
                   }

@@ -239,12 +239,90 @@ export function shouldPromoteTripToArrived(trip = {}, reconciliationSummary = {}
   };
 }
 
+const ADMIN_OVERRIDE_RECEIVING_STATUSES = new Set([
+  "RECEIVING_IN_PROGRESS",
+  "LOCKED",
+  "RECONCILED",
+]);
+
+export function validateAdminOverrideRelease({
+  trip = {},
+  missingPackages = [],
+  missingRemarks = {},
+} = {}) {
+  const entries = Array.isArray(missingPackages) ? missingPackages : [];
+
+  for (const entry of entries) {
+    const docId = entry?.shipmentDocId || entry?.id || null;
+    const publicId = entry?.shipmentId || docId || "unknown";
+    const remark = String(
+      missingRemarks[docId] || missingRemarks[publicId] || "",
+    ).trim();
+
+    if (!remark) {
+      return {
+        valid: false,
+        message: `Add remarks for missing package ${publicId} before admin override release.`,
+      };
+    }
+  }
+
+  const status = normalizeTripStatus(trip.status);
+  if (["COMPLETED", "CANCELLED"].includes(status)) {
+    return {
+      valid: false,
+      message: `Cannot admin override release from terminal trip status ${status}.`,
+    };
+  }
+
+  return { valid: true, message: null, missingCount: entries.length };
+}
+
 export function isTripReleaseEligible(trip = {}, options = {}) {
-  const { allowReconciledFallback = true } = options;
+  const {
+    allowReconciledFallback = true,
+    adminOverride = false,
+    isAdmin = false,
+  } = options;
   const status = normalizeTripStatus(trip.status);
   const isHubTransfer =
     String(trip.tripType || "HUB_TRANSFER").toUpperCase() === "HUB_TRANSFER";
   const manifestStatus = String(trip.manifestStatus || "").toUpperCase();
+
+  if (adminOverride && isAdmin) {
+    if (["COMPLETED", "CANCELLED"].includes(status)) {
+      return {
+        eligible: false,
+        reason: `Cannot admin override release from terminal trip status ${status}.`,
+      };
+    }
+
+    if (RELEASE_ELIGIBLE_TRIP_STATUSES.has(status)) {
+      return { eligible: true, reason: null, adminOverride: true };
+    }
+
+    const hubReceivingActive =
+      isHubTransfer &&
+      (ADMIN_OVERRIDE_RECEIVING_STATUSES.has(manifestStatus) ||
+        trip.receivingStartedAt);
+
+    if (
+      hubReceivingActive &&
+      [TRIP_STATUSES.IN_TRANSIT, TRIP_STATUSES.LOADED].includes(status)
+    ) {
+      return {
+        eligible: true,
+        reason: null,
+        adminOverride: true,
+        requiresArrivedPromotion: true,
+      };
+    }
+
+    return {
+      eligible: false,
+      reason: `Admin override release requires trip IN_TRANSIT (receiving) or ARRIVED (current: ${status || "unknown"}).`,
+    };
+  }
 
   if (RELEASE_ELIGIBLE_TRIP_STATUSES.has(status)) {
     if (

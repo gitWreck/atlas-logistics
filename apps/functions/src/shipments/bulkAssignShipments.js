@@ -2,6 +2,7 @@ const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const admin = require("firebase-admin");
 const { requireRole, updatedBy } = require("../utilities/helpers"); // Assuming this exists as per your code
 const { writeShipmentActionLog } = require("../utilities/shipmentLogger");
+const { writeCustodyAuditLog } = require("../utilities/custodyAuditLog");
 const { buildDerivedShipmentSnapshot } = require("../packages/shipmentStatus");
 
 if (!admin.apps.length) admin.initializeApp();
@@ -18,7 +19,7 @@ exports.bulkAssignShipments = onCall(
     const userSnap = await db.collection("users").doc(req.auth.uid).get();
     const userRole = userSnap.exists ? userSnap.data().role : "unknown";
 
-    const { tripId, shipmentIds } = req.data;
+    const { tripId, shipmentIds, reason: assignmentReason = null } = req.data;
 
     const { uid, role, name } = updatedBy(req);
 
@@ -172,6 +173,28 @@ exports.bulkAssignShipments = onCall(
           actorName: name,
           actorRole: role,
           createdAt: now,
+        });
+
+        writeCustodyAuditLog({
+          db,
+          batch,
+          action: "ASSIGN_SHIPMENT_TO_TRIP",
+          targetCollection: "shipments",
+          targetId: snap.id,
+          tripId: tripData.tripId || tripId,
+          tripDocId: tripId,
+          actorId: uid,
+          actorName: name,
+          actorRole: role,
+          reason:
+            assignmentReason ||
+            "Shipment added to trip manifest after unlock.",
+          previousValue: { currentTripId: data.currentTripId || null },
+          newValue: {
+            currentTripId: tripId,
+            shipmentId: data.shipmentId || snap.id,
+          },
+          note: `Shipment ${data.shipmentId || snap.id} assigned to trip ${tripData.tripId || tripId}.`,
         });
       });
 

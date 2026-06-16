@@ -35,13 +35,14 @@ import ReconcileAtHubModal from "./modals/ReconcileAtHubModal";
 import ReceiveReturnedModal from "./modals/ReceiveReturnedModal";
 import ReleaseToCheckerModal from "./modals/ReleaseToCheckerModal";
 import BoardTabs from "../ui/BoardTabs";
-import DeliveryCheckerTabs from "./DeliveryCheckerTabs";
-import {
-  ALL_CHECKERS_TAB,
-  buildDeliveryCheckerTabs,
-  findDeliveryCheckerTab,
-  shipmentHasCheckerPieces,
-} from "@/app/utility/deliveryOperationsCheckers";
+// Delivery Operations checker tabs (disabled for now)
+// import DeliveryCheckerTabs from "./DeliveryCheckerTabs";
+// import {
+//   ALL_CHECKERS_TAB,
+//   buildDeliveryCheckerTabs,
+//   findDeliveryCheckerTab,
+//   shipmentHasCheckerPieces,
+// } from "@/app/utility/deliveryOperationsCheckers";
 
 const SHIPMENT_BOARD_TABS = {
   ALL: "all",
@@ -123,8 +124,8 @@ const ShipmentBoard = forwardRef(function ShipmentBoard(
   const [editingPickup, setEditingPickup] = useState(null);
 
   const [activeBoardTab, setActiveBoardTab] = useState(SHIPMENT_BOARD_TABS.ALL);
-  const [activeDeliveryChecker, setActiveDeliveryChecker] =
-    useState(ALL_CHECKERS_TAB);
+  // const [activeDeliveryChecker, setActiveDeliveryChecker] =
+  //   useState(ALL_CHECKERS_TAB);
   const [activeFilter, setActiveFilter] = useState("ALL");
   const [searchQuery, setSearchQuery] = useState("");
   const [modeFilter, setModeFilter] = useState("ALL");
@@ -280,44 +281,53 @@ const ShipmentBoard = forwardRef(function ShipmentBoard(
     delayType,
   ]);
 
-  const deliveryTabShipments = useMemo(
+  // Delivery Operations checker tabs (disabled for now)
+  // const deliveryTabShipments = useMemo(
+  //   () =>
+  //     filteredShipments.filter((shipment) =>
+  //       matchesShipmentBoardTab(shipment, SHIPMENT_BOARD_TABS.DELIVERY),
+  //     ),
+  //   [filteredShipments],
+  // );
+  //
+  // const deliveryCheckerTabs = useMemo(
+  //   () => buildDeliveryCheckerTabs(deliveryTabShipments),
+  //   [deliveryTabShipments],
+  // );
+
+  const visibleShipments = useMemo(
     () =>
       filteredShipments.filter((shipment) =>
-        matchesShipmentBoardTab(shipment, SHIPMENT_BOARD_TABS.DELIVERY),
+        matchesShipmentBoardTab(shipment, activeBoardTab),
       ),
-    [filteredShipments],
+    [activeBoardTab, filteredShipments],
   );
 
-  const deliveryCheckerTabs = useMemo(
-    () => buildDeliveryCheckerTabs(deliveryTabShipments),
-    [deliveryTabShipments],
-  );
-
-  const visibleShipments = useMemo(() => {
-    let result = filteredShipments.filter((shipment) =>
-      matchesShipmentBoardTab(shipment, activeBoardTab),
-    );
-
-    if (
-      activeBoardTab === SHIPMENT_BOARD_TABS.DELIVERY &&
-      activeDeliveryChecker !== ALL_CHECKERS_TAB
-    ) {
-      const checkerTab = findDeliveryCheckerTab(
-        deliveryCheckerTabs,
-        activeDeliveryChecker,
-      );
-      result = result.filter((shipment) =>
-        shipmentHasCheckerPieces(shipment, activeDeliveryChecker, checkerTab),
-      );
-    }
-
-    return result;
-  }, [
-    activeBoardTab,
-    activeDeliveryChecker,
-    deliveryCheckerTabs,
-    filteredShipments,
-  ]);
+  // const visibleShipments = useMemo(() => {
+  //   let result = filteredShipments.filter((shipment) =>
+  //     matchesShipmentBoardTab(shipment, activeBoardTab),
+  //   );
+  //
+  //   if (
+  //     activeBoardTab === SHIPMENT_BOARD_TABS.DELIVERY &&
+  //     activeDeliveryChecker !== ALL_CHECKERS_TAB
+  //   ) {
+  //     const checkerTab = findDeliveryCheckerTab(
+  //       deliveryCheckerTabs,
+  //       activeDeliveryChecker,
+  //     );
+  //     result = result.filter((shipment) =>
+  //       shipmentHasCheckerPieces(shipment, activeDeliveryChecker, checkerTab),
+  //     );
+  //   }
+  //
+  //   return result;
+  // }, [
+  //   activeBoardTab,
+  //   activeDeliveryChecker,
+  //   deliveryCheckerTabs,
+  //   filteredShipments,
+  // ]);
 
   const boardTabs = useMemo(
     () => [
@@ -365,7 +375,6 @@ const ShipmentBoard = forwardRef(function ShipmentBoard(
     setCurrentPage(1);
   }, [
     activeBoardTab,
-    activeDeliveryChecker,
     searchQuery,
     startDate,
     endDate,
@@ -375,19 +384,19 @@ const ShipmentBoard = forwardRef(function ShipmentBoard(
     shipmentLimit,
   ]);
 
-  useEffect(() => {
-    if (activeBoardTab !== SHIPMENT_BOARD_TABS.DELIVERY) {
-      setActiveDeliveryChecker(ALL_CHECKERS_TAB);
-      return;
-    }
-
-    const hasActiveTab = deliveryCheckerTabs.some(
-      (tab) => tab.key === activeDeliveryChecker,
-    );
-    if (!hasActiveTab) {
-      setActiveDeliveryChecker(ALL_CHECKERS_TAB);
-    }
-  }, [activeBoardTab, activeDeliveryChecker, deliveryCheckerTabs]);
+  // useEffect(() => {
+  //   if (activeBoardTab !== SHIPMENT_BOARD_TABS.DELIVERY) {
+  //     setActiveDeliveryChecker(ALL_CHECKERS_TAB);
+  //     return;
+  //   }
+  //
+  //   const hasActiveTab = deliveryCheckerTabs.some(
+  //     (tab) => tab.key === activeDeliveryChecker,
+  //   );
+  //   if (!hasActiveTab) {
+  //     setActiveDeliveryChecker(ALL_CHECKERS_TAB);
+  //   }
+  // }, [activeBoardTab, activeDeliveryChecker, deliveryCheckerTabs]);
 
   const indexOfLastItem = currentPage * itemsPerPage;
   const indexOfFirstItem = indexOfLastItem - itemsPerPage;
@@ -460,7 +469,10 @@ const ShipmentBoard = forwardRef(function ShipmentBoard(
             />
           </div>
         ) : (
-          <>
+          <div
+            className={`mt-6 border rounded-xl overflow-hidden shadow-xl backdrop-blur-sm ${theme.board}`}
+          >
+            {/* Delivery Operations checker tabs (disabled for now)
             {activeBoardTab === SHIPMENT_BOARD_TABS.DELIVERY && (
               <DeliveryCheckerTabs
                 tabs={deliveryCheckerTabs}
@@ -469,10 +481,7 @@ const ShipmentBoard = forwardRef(function ShipmentBoard(
                 isDark={isDark}
               />
             )}
-
-            <div
-              className={`mt-6 border rounded-xl overflow-hidden shadow-xl backdrop-blur-sm ${theme.board}`}
-            >
+            */}
             {/* Header */}
             <div
               className={`px-4 sm:px-6 py-4 border-b flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4 ${theme.header}`}
@@ -655,7 +664,6 @@ const ShipmentBoard = forwardRef(function ShipmentBoard(
               />
             )}
           </div>
-          </>
         )}
       </main>
 

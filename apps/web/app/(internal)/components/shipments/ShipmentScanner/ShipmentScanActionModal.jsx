@@ -21,6 +21,7 @@ import {
   NextTripPrompt,
   ArrivalPrompt,
   StartReceivingPrompt,
+  CorrectionDispatchPrompt,
   UnlockPrompt,
   LoadedStatusPrompt,
   LockPrompt,
@@ -117,6 +118,8 @@ export default function ShipmentScanActionModal({
     !state.needsNextTrip &&
     !state.needsArrival &&
     !state.needsStartReceiving &&
+    !state.needsResumeReceiving &&
+    !state.needsCorrectionDispatch &&
     !state.needsUnlock &&
     !state.needsLoadedStatus &&
     !state.needsLock &&
@@ -293,6 +296,8 @@ export default function ShipmentScanActionModal({
             !state.needsNextTrip &&
             !state.needsArrival &&
             !state.needsStartReceiving &&
+            !state.needsResumeReceiving &&
+            !state.needsCorrectionDispatch &&
             !state.needsUnlock &&
             !state.resolvedItem &&
             !state.needsAssignmentItem && (
@@ -348,6 +353,7 @@ export default function ShipmentScanActionModal({
               summary={state.handoffSummary}
               tripId={state.tripId}
               missingRemarks={state.missingRemarks}
+              isAdmin={state.isAdmin}
               onRemarkChange={(shipmentId, value) =>
                 actions.setMissingRemarks((prev) => ({
                   ...prev,
@@ -369,6 +375,19 @@ export default function ShipmentScanActionModal({
                 actions.resetFlow();
               }}
               btnStatus={state.btnStatus}
+            />
+          ) : state.needsCorrectionDispatch ? (
+            <CorrectionDispatchPrompt
+              theme={theme}
+              btnStatus={state.btnStatus}
+              onDispatch={actions.handleCorrectionDispatch}
+            />
+          ) : state.needsResumeReceiving ? (
+            <StartReceivingPrompt
+              theme={theme}
+              btnStatus={state.btnStatus}
+              mode="resume"
+              onStartReceiving={actions.handleStartReceiving}
             />
           ) : state.needsStartReceiving ? (
             <StartReceivingPrompt

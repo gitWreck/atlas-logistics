@@ -14,8 +14,10 @@ const {
   buildShipmentSnapshot,
   normalizePackageRow,
 } = require("../packages/tripPackageOperations");
+const { PACKAGE_STATUS } = require("../packages/packageStatus");
 const {
   canDispatchTrip,
+  canDispatchCorrectionTrip,
   isHubTransferTrip,
   MANIFEST_STATUS,
 } = require("./manifestStatus");
@@ -43,6 +45,7 @@ exports.dispatchTrip = onCall(
     }
 
     const trip = tripSnap.data() || {};
+    const isCorrectionDispatch = canDispatchCorrectionTrip(trip);
 
     if (!isHubTransferTrip(trip)) {
       throw new HttpsError(
@@ -51,7 +54,7 @@ exports.dispatchTrip = onCall(
       );
     }
 
-    if (!canDispatchTrip(trip)) {
+    if (!canDispatchTrip(trip) && !isCorrectionDispatch) {
       throw new HttpsError(
         "failed-precondition",
         "Trip must be LOADED (or IN_TRANSIT pending dispatch) with a locked manifest before dispatch.",
@@ -83,9 +86,16 @@ exports.dispatchTrip = onCall(
         );
         if (!hasTripPackages) continue;
 
-        const updatedPackages = oldPackages.map((pkg) =>
-          applyLinehaulInTransit(pkg, { tripId, nowIso }),
-        );
+        const updatedPackages = oldPackages.map((pkg) => {
+          if (!packageOnTrip(pkg, tripId)) return pkg;
+
+          if (isCorrectionDispatch) {
+            const pkgStatus = String(pkg.status || "").toUpperCase();
+            if (pkgStatus !== PACKAGE_STATUS.LOADED_TO_TRIP) return pkg;
+          }
+
+          return applyLinehaulInTransit(pkg, { tripId, nowIso });
+        });
 
         const snapshot = buildShipmentSnapshot(updatedPackages, {
           previousStatus: shipmentData.status,
@@ -94,7 +104,9 @@ exports.dispatchTrip = onCall(
         const historyEntry = {
           status: snapshot.status,
           at: admin.firestore.Timestamp.now(),
-          note: `Trip ${trip.tripId || tripId} dispatched — packages on this trip marked in transit.`,
+          note: isCorrectionDispatch
+            ? `Trip ${trip.tripId || tripId} correction dispatch — newly loaded packages marked in transit.`
+            : `Trip ${trip.tripId || tripId} dispatched — packages on this trip marked in transit.`,
           by: uid,
           location: location || null,
         };
@@ -107,18 +119,29 @@ exports.dispatchTrip = onCall(
         });
       }
 
-      tx.update(tripRef, {
-        status: "IN_TRANSIT",
-        manifestStatus: MANIFEST_STATUS.LOCKED,
-        manifestLocked: true,
-        startedAt: timestamp,
-        dispatchedAt: timestamp,
-        dispatchedBy: uid,
-        dispatchedByName: actorName,
-        updatedAt: timestamp,
-        updatedBy: actorName,
-        startedBy: uid,
-      });
+      tx.update(tripRef, isCorrectionDispatch
+        ? {
+            status: "ARRIVED",
+            manifestStatus: MANIFEST_STATUS.LOCKED,
+            manifestLocked: true,
+            correctionDispatchedAt: timestamp,
+            correctionDispatchedBy: uid,
+            correctionDispatchedByName: actorName,
+            updatedAt: timestamp,
+            updatedBy: actorName,
+          }
+        : {
+            status: "IN_TRANSIT",
+            manifestStatus: MANIFEST_STATUS.LOCKED,
+            manifestLocked: true,
+            startedAt: timestamp,
+            dispatchedAt: timestamp,
+            dispatchedBy: uid,
+            dispatchedByName: actorName,
+            updatedAt: timestamp,
+            updatedBy: actorName,
+            startedBy: uid,
+          });
 
       for (const {
         tripShipRef,
@@ -147,7 +170,7 @@ exports.dispatchTrip = onCall(
         db,
         tx,
         collection: "audit_logs",
-        action: "DISPATCH_TRIP",
+        action: isCorrectionDispatch ? "DISPATCH_CORRECTION" : "DISPATCH_TRIP",
         targetCollection: "truck_trips",
         targetId: tripId,
         tripId,
@@ -161,9 +184,12 @@ exports.dispatchTrip = onCall(
           driverId: trip.driverId || null,
           packagesUpdated: shipmentCount,
           previousStatus: trip.status || "LOADED",
-          newStatus: "IN_TRANSIT",
+          newStatus: isCorrectionDispatch ? "ARRIVED" : "IN_TRANSIT",
+          correctionDispatch: isCorrectionDispatch,
         },
-        note: "Trip dispatched from origin hub.",
+        note: isCorrectionDispatch
+          ? "Correction loads dispatched on arrived trip."
+          : "Trip dispatched from origin hub.",
         timestamp,
       });
     });
@@ -191,9 +217,12 @@ exports.dispatchTrip = onCall(
 
     return {
       success: true,
-      message: `Trip dispatched. ${shipmentCount} shipment(s) marked in transit.`,
-      status: "IN_TRANSIT",
+      message: isCorrectionDispatch
+        ? `Correction dispatch complete. Newly loaded package(s) marked in transit.`
+        : `Trip dispatched. ${shipmentCount} shipment(s) marked in transit.`,
+      status: isCorrectionDispatch ? "ARRIVED" : "IN_TRANSIT",
       manifestStatus: MANIFEST_STATUS.LOCKED,
+      correctionDispatch: isCorrectionDispatch,
     };
   },
 );
