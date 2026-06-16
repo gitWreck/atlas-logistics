@@ -8,7 +8,9 @@ const { writeTripActionLog } = require("../utilities/tripLogger");
 const {
   MANIFEST_STATUS,
   canStartReceiving,
+  canResumeReceiving,
   isHubTransferTrip,
+  normalizeTripStatus,
 } = require("./manifestStatus");
 
 if (!admin.apps.length) admin.initializeApp();
@@ -34,6 +36,7 @@ exports.startReceiving = onCall(
       }
 
       const trip = tripSnap.data() || {};
+      const isResume = canResumeReceiving(trip);
 
       if (!isHubTransferTrip(trip)) {
         throw new HttpsError(
@@ -42,22 +45,91 @@ exports.startReceiving = onCall(
         );
       }
 
-      if (!canStartReceiving(trip)) {
+      if (!canStartReceiving(trip) && !isResume) {
         const status = String(trip.status || "").toUpperCase();
-        if (trip.receivingStartedAt) {
+        if (trip.receivingStartedAt && !trip.manifestReopenedAt) {
           throw new HttpsError(
             "failed-precondition",
             "Receiving has already been started on this trip.",
           );
         }
+        if (trip.manifestReopenedAt && !trip.correctionDispatchedAt && !trip.dispatchedAt) {
+          throw new HttpsError(
+            "failed-precondition",
+            "Dispatch correction loads before resuming receiving.",
+          );
+        }
         throw new HttpsError(
           "failed-precondition",
-          `Cannot start receiving from trip status ${status}. Trip must be IN_TRANSIT with a locked manifest.`,
+          `Cannot start receiving from trip status ${status}. Trip must be IN_TRANSIT with a locked manifest, or ARRIVED after correction dispatch.`,
         );
       }
 
       const now = FieldValue.serverTimestamp();
       const manifestId = trip.manifestId || null;
+
+      if (isResume) {
+        const resumeFromInTransit =
+          normalizeTripStatus(trip.status) === "IN_TRANSIT";
+
+        tx.update(tripRef, {
+          ...(resumeFromInTransit ? { status: "ARRIVED" } : {}),
+          manifestStatus: MANIFEST_STATUS.RECEIVING_IN_PROGRESS,
+          manifestLocked: true,
+          receivingResumedAt: now,
+          receivingResumedBy: uid,
+          receivingResumedByName: actorName,
+          updatedAt: now,
+          updatedBy: actorName,
+        });
+
+        if (manifestId) {
+          const manifestRef = db.collection("manifests").doc(manifestId);
+          tx.update(manifestRef, {
+            status: MANIFEST_STATUS.RECEIVING_IN_PROGRESS,
+            updatedAt: now,
+          });
+        }
+
+        const manifestEventRef = tripRef.collection("manifest_events").doc();
+        tx.set(manifestEventRef, {
+          type: "RECEIVING_RESUMED",
+          manifestId,
+          createdAt: now,
+          createdBy: uid,
+          createdByName: actorName,
+        });
+
+        writeTripActionLog({
+          db,
+          tx,
+          collection: "audit_logs",
+          action: "RESUME_RECEIVING",
+          targetCollection: "truck_trips",
+          targetId: tripId,
+          tripId,
+          actorId: uid,
+          actorName,
+          actorRole: req.auth.token?.role || null,
+          details: {
+            tripNumber: trip.tripId || tripId,
+            previousManifestStatus: trip.manifestStatus || null,
+            newManifestStatus: MANIFEST_STATUS.RECEIVING_IN_PROGRESS,
+            plateNumber: trip.truckPlateNumber || trip.plateNumber || null,
+            driverName: trip.driverName || null,
+          },
+          note: "Receiving resumed after manifest correction on arrived trip.",
+          timestamp: now,
+        });
+
+        return {
+          success: true,
+          tripId,
+          status: "ARRIVED",
+          manifestStatus: MANIFEST_STATUS.RECEIVING_IN_PROGRESS,
+          resumed: true,
+        };
+      }
 
       tx.update(tripRef, {
         status: "ARRIVED",

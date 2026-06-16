@@ -14,6 +14,7 @@ import {
   faChevronUp,
 } from "@fortawesome/free-solid-svg-icons";
 import StatusButton from "../../ui/StatusButton"; // Adjust path
+import { hasReleasableHandoffPieces } from "@/app/utility/handoffRelease";
 
 export function InterceptorPrompt({
   theme,
@@ -228,6 +229,7 @@ export function HandoffPrompt({
   onRefresh,
   onBack,
   btnStatus,
+  isAdmin = false,
 }) {
   const totals = summary?.totals || {};
   const context = summary?.context || {};
@@ -239,11 +241,17 @@ export function HandoffPrompt({
   );
   const lifecycleCanRelease = summary?.lifecycle?.canReleaseForDelivery !== false;
   const releaseBlockReason = summary?.lifecycle?.releaseBlockReason || null;
-  const countsReady =
+  const standardCountsReady =
     summary?.ready &&
-    unloadedShipments.length > 0 &&
+    hasReleasableHandoffPieces(summary) &&
     (!hasMissing || remarksComplete);
-  const canRelease = countsReady && (lifecycleCanRelease || summary?.ready);
+  const adminOverrideEligible =
+    isAdmin &&
+    hasReleasableHandoffPieces(summary) &&
+    (!hasMissing || remarksComplete);
+  const canRelease = adminOverrideEligible
+    ? true
+    : standardCountsReady && (lifecycleCanRelease || summary?.ready);
   const { manifestPieces, unloadedPieces, missingPieces } =
     resolvePieceTotals(summary);
 
@@ -262,14 +270,18 @@ export function HandoffPrompt({
       title={
         summary?.ready && lifecycleCanRelease
           ? "Manifest reconciled"
-          : summary?.ready
-            ? "Ready to release"
-            : "Manifest reconciliation"
+          : adminOverrideEligible && hasMissing
+            ? "Admin override release"
+            : summary?.ready
+              ? "Ready to release"
+              : "Manifest reconciliation"
       }
       description={
-        hasMissing
-          ? "Add remarks for missing labels, then finalize reconciliation and release for delivery operations."
-          : summary?.ready
+        hasMissing && isAdmin
+          ? "Admin override: document remarks for each missing label, then release verified packages to delivery operations."
+          : hasMissing
+            ? "Add remarks for missing labels, then finalize reconciliation and release for delivery operations."
+            : summary?.ready
             ? tripId
               ? lifecycleCanRelease
                 ? `All shipments on ${tripId} are accounted for. Release to delivery operations.`
@@ -367,11 +379,19 @@ export function HandoffPrompt({
         </div>
       )}
 
-      {!lifecycleCanRelease && releaseBlockReason && !summary?.ready && (
+      {adminOverrideEligible && hasMissing ? (
+        <p className="text-xs text-amber-500/90 text-center px-2">
+          Reconciliation variance will be logged. Verified packages will be
+          released to delivery operations; missing labels stay on record until
+          corrected on the manifest.
+        </p>
+      ) : null}
+
+      {!lifecycleCanRelease && releaseBlockReason && !summary?.ready && !adminOverrideEligible ? (
         <p className="text-xs text-amber-500/90 text-center px-2">
           {releaseBlockReason}
         </p>
-      )}
+      ) : null}
 
       <div
         className={`rounded-lg border px-3 py-2.5 text-left text-[11px] leading-relaxed ${
@@ -411,23 +431,56 @@ export function HandoffPrompt({
   );
 }
 
-export function StartReceivingPrompt({ theme, btnStatus, onStartReceiving }) {
+export function StartReceivingPrompt({
+  theme,
+  btnStatus,
+  onStartReceiving,
+  mode = "start",
+}) {
+  const isResume = mode === "resume";
+
   return (
     <InterceptorPrompt
       theme={theme}
       icon={faTruckRampBox}
       iconColor="text-emerald-500"
-      title="Start Receiving"
-      description="Accept custody at the destination hub before scanning packages. This marks the trip as arrived and opens receiving."
+      title={isResume ? "Resume Receiving" : "Start Receiving"}
+      description={
+        isResume
+          ? "Correction loads were dispatched. Resume receiving to open unload scans at Odiongan."
+          : "Accept custody at the destination hub before scanning packages. This marks the trip as arrived and opens receiving."
+      }
     >
       <StatusButton
         status={btnStatus}
-        label="Start Receiving"
-        loadingLabel="Starting..."
-        successLabel="Receiving started!"
+        label={isResume ? "Resume Receiving" : "Start Receiving"}
+        loadingLabel={isResume ? "Resuming..." : "Starting..."}
+        successLabel={isResume ? "Receiving resumed!" : "Receiving started!"}
         icon={faCheck}
         variant="emerald"
         onClick={onStartReceiving}
+      />
+    </InterceptorPrompt>
+  );
+}
+
+export function CorrectionDispatchPrompt({ theme, btnStatus, onDispatch }) {
+  return (
+    <InterceptorPrompt
+      theme={theme}
+      icon={faTruckRampBox}
+      iconColor="text-blue-500"
+      title="Dispatch Correction"
+      description="Newly loaded packages must be dispatched before you can resume receiving and unload at Odiongan."
+    >
+      <StatusButton
+        status={btnStatus}
+        label="Dispatch Correction"
+        loadingLabel="Dispatching..."
+        successLabel="Dispatched!"
+        icon={faCheck}
+        variant="blue"
+        onClick={onDispatch}
       />
     </InterceptorPrompt>
   );

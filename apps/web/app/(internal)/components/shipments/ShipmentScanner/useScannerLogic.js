@@ -11,9 +11,11 @@ import {
   unlockTripManifest,
   generateTripManifest,
   startReceiving,
+  dispatchTrip,
 } from "@/app/utility/FirebaseFunctions"; // Adjust path if your file is located elsewhere
 import { isEligibleForCheckerRelease } from "@/app/utility/checkerRelease";
-import { isTripReleaseEligible } from "@/app/utility/tripLifecycle";
+import { isTripReleaseEligible, validateAdminOverrideRelease } from "@/app/utility/tripLifecycle";
+import { getReleasableHandoffShipments, hasReleasableHandoffPieces } from "@/app/utility/handoffRelease";
 import { updatedBy } from "@/app/utility/utilities";
 import {
   buildAlreadyLoadedInfo,
@@ -120,6 +122,8 @@ export default function useScannerLogic({
   const [recentlyAssigned, setRecentlyAssigned] = useState(new Set());
   const [needsArrival, setNeedsArrival] = useState(false);
   const [needsStartReceiving, setNeedsStartReceiving] = useState(false);
+  const [needsResumeReceiving, setNeedsResumeReceiving] = useState(false);
+  const [needsCorrectionDispatch, setNeedsCorrectionDispatch] = useState(false);
   const [needsUnlock, setNeedsUnlock] = useState(false);
   const [needsLoadedStatus, setNeedsLoadedStatus] = useState(false);
   const [needsLock, setNeedsLock] = useState(false);
@@ -127,6 +131,8 @@ export default function useScannerLogic({
   const [needsNextTrip, setNeedsNextTrip] = useState(false);
   const [needsHandoff, setNeedsHandoff] = useState(false);
   const [handoffSummary, setHandoffSummary] = useState(null);
+  const isAdmin = String(profile?.role || "").toLowerCase() === "admin";
+
   const [missingRemarks, setMissingRemarks] = useState({});
 
   // UI States
@@ -167,6 +173,8 @@ export default function useScannerLogic({
     setNeedsAssignmentItem(null);
     setNeedsArrival(false);
     setNeedsStartReceiving(false);
+    setNeedsResumeReceiving(false);
+    setNeedsCorrectionDispatch(false);
     setNeedsUnlock(false);
     setNeedsLoadedStatus(false);
     setNeedsLock(false);
@@ -272,6 +280,7 @@ export default function useScannerLogic({
   const shouldPromptLoadedStatusAfterLoad = useCallback(
     (processedQuantity) => {
       if (action !== "LOAD" || scanStatus !== "LOADED") return false;
+      if (trip?.manifestReopenedAt) return false;
 
       const currentTripStatus = String(trip?.status || "").toUpperCase();
       if (
@@ -780,7 +789,11 @@ export default function useScannerLogic({
       return true;
     } catch (err) {
       console.error(err);
-      setError(err.message || "Failed to execute database action");
+      setError(
+        err?.message ||
+          err?.details ||
+          "Failed to execute database action",
+      );
       setBtnStatus("ERROR");
       return false;
     }
@@ -832,6 +845,8 @@ export default function useScannerLogic({
     setLoading(true);
     setError("");
 
+    const isResume = needsResumeReceiving;
+
     try {
       const success = await executeFirebaseCall(
         startReceiving,
@@ -841,7 +856,11 @@ export default function useScannerLogic({
             trip.status = "ARRIVED";
             trip.manifestStatus = "RECEIVING_IN_PROGRESS";
             trip.manifestLocked = true;
-            trip.receivingStartedAt = new Date().toISOString();
+            if (isResume) {
+              trip.receivingResumedAt = new Date().toISOString();
+            } else {
+              trip.receivingStartedAt = new Date().toISOString();
+            }
           }
         },
       );
@@ -849,9 +868,39 @@ export default function useScannerLogic({
 
       onRefresh?.();
       setNeedsStartReceiving(false);
+      setNeedsResumeReceiving(false);
       setBtnStatus("IDLE");
     } catch (err) {
       setError(err.message || "Could not start receiving.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCorrectionDispatch = async () => {
+    setLoading(true);
+    setError("");
+
+    try {
+      const success = await executeFirebaseCall(
+        dispatchTrip,
+        { tripId, updatedBy: updatedBy(profile) },
+        () => {
+          if (trip) {
+            trip.status = "ARRIVED";
+            trip.manifestStatus = "LOCKED";
+            trip.manifestLocked = true;
+            trip.correctionDispatchedAt = new Date().toISOString();
+          }
+        },
+      );
+      if (!success) return;
+
+      onRefresh?.();
+      setNeedsCorrectionDispatch(false);
+      setBtnStatus("IDLE");
+    } catch (err) {
+      setError(err.message || "Could not dispatch correction loads.");
     } finally {
       setLoading(false);
     }
@@ -983,9 +1032,15 @@ export default function useScannerLogic({
       return setError(`Add remarks for ${incompleteRemark.shipmentId}.`);
     }
 
+    const useAdminOverride =
+      isAdmin &&
+      missing.length > 0 &&
+      missing.every((item) => String(missingRemarks[item.id] || "").trim()) &&
+      hasReleasableHandoffPieces(handoffSummary);
+
     let summaryForRelease = handoffSummary;
 
-    if (!summaryForRelease?.lifecycle?.canReleaseForDelivery) {
+    if (!useAdminOverride && !summaryForRelease?.lifecycle?.canReleaseForDelivery) {
       try {
         summaryForRelease = await finalizeTripReconciliation({ notify: false });
         setHandoffSummary(summaryForRelease);
@@ -1001,7 +1056,34 @@ export default function useScannerLogic({
       }
     }
 
-    const unloaded = summaryForRelease?.unloadedShipments || [];
+    if (useAdminOverride) {
+      const validation = validateAdminOverrideRelease({
+        trip: trip || {},
+        missingPackages: missing.map((item) => ({
+          shipmentDocId: item.id,
+          shipmentId: item.shipmentId,
+          missingLabels: item.remainingLoaded,
+        })),
+        missingRemarks,
+      });
+      if (!validation.valid) {
+        return setError(validation.message || "Admin override release is not valid.");
+      }
+
+      const gate = isTripReleaseEligible(trip || {}, {
+        adminOverride: true,
+        isAdmin: true,
+      });
+      if (!gate.eligible) {
+        return setError(
+          gate.reason ||
+            handoffSummary?.lifecycle?.releaseBlockReason ||
+            "Trip is not eligible for admin override release.",
+        );
+      }
+    }
+
+    const unloaded = getReleasableHandoffShipments(summaryForRelease);
     const shipmentIds = unloaded
       .filter((row) => {
         if (!row?.id) return false;
@@ -1017,11 +1099,30 @@ export default function useScannerLogic({
       );
     }
 
+    const overrideRemarks = missing
+      .map((item) => {
+        const remark = String(missingRemarks[item.id] || "").trim();
+        if (!remark) return null;
+        return `${item.shipmentId}: ${remark}`;
+      })
+      .filter(Boolean)
+      .join(" | ");
+
     const success = await executeFirebaseCall(releaseForDeliveryOperations, {
       tripId,
       shipmentIds,
-      remarks:
-        "Released for delivery operations from trip manifest reconciliation.",
+      adminOverride: useAdminOverride,
+      missingRemarks,
+      missingPackages: missing.map((item) => ({
+        shipmentDocId: item.id,
+        shipmentId: item.shipmentId,
+        missingLabels: item.remainingLoaded,
+      })),
+      remarks: useAdminOverride
+        ? overrideRemarks ||
+          "Admin override release with reconciliation variance."
+        : "Released for delivery operations from trip manifest reconciliation.",
+      updatedBy: updatedBy(profile),
     });
     if (success) {
       setTimeout(() => {
@@ -1150,6 +1251,8 @@ export default function useScannerLogic({
       needsAssignmentItem,
       needsArrival,
       needsStartReceiving,
+      needsResumeReceiving,
+      needsCorrectionDispatch,
       needsUnlock,
       needsLoadedStatus,
       needsLock,
@@ -1157,6 +1260,7 @@ export default function useScannerLogic({
       needsHandoff,
       handoffSummary,
       missingRemarks,
+      isAdmin,
       loading,
       error,
       successNotice,
@@ -1176,12 +1280,15 @@ export default function useScannerLogic({
       setNeedsUnlock,
       setNeedsArrival,
       setNeedsStartReceiving,
+      setNeedsResumeReceiving,
+      setNeedsCorrectionDispatch,
       resetFlow,
       resetScanResult,
       handleResolveScan,
       handleAssignShipment,
       handleMarkArrived,
       handleStartReceiving,
+      handleCorrectionDispatch,
       handleUnlockManifest,
       handleSetTripLoaded,
       handleLockManifest,

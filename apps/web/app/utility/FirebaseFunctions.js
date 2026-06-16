@@ -55,6 +55,10 @@ export const assignShipmentToTrip = httpsCallable(
   functions,
   "assignShipmentToTrip",
 );
+export const manualAssignShipmentToTrip = httpsCallable(
+  functions,
+  "manualAssignShipmentToTrip",
+);
 export const unassignShipmentFromTrip = httpsCallable(
   functions,
   "unassignShipmentFromTrip",

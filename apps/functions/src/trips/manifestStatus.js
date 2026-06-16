@@ -78,8 +78,13 @@ function canStartReceiving(trip = {}) {
   );
 }
 
+function isCorrectionCycleTrip(trip = {}) {
+  return Boolean(trip.manifestReopenedAt);
+}
+
 function canDispatchTrip(trip = {}) {
   if (!isHubTransferTrip(trip)) return false;
+  if (isCorrectionCycleTrip(trip)) return false;
   if (resolveManifestStatus(trip) !== MANIFEST_STATUS.LOCKED) return false;
 
   const status = normalizeTripStatus(trip.status);
@@ -90,18 +95,77 @@ function canDispatchTrip(trip = {}) {
   return false;
 }
 
+/**
+ * After reopening a reconciled ARRIVED trip: re-dispatch newly loaded packages
+ * before resuming receiving at Odiongan.
+ */
+function canDispatchCorrectionTrip(trip = {}) {
+  if (!isHubTransferTrip(trip)) return false;
+  if (!isCorrectionCycleTrip(trip)) return false;
+
+  const status = normalizeTripStatus(trip.status);
+  if (!["ARRIVED", "LOADED", "LOADING"].includes(status)) return false;
+  if (!trip.manifestLocked) return false;
+  if (resolveManifestStatus(trip) !== MANIFEST_STATUS.LOCKED) return false;
+  if (trip.correctionDispatchedAt) return false;
+  return true;
+}
+
+/**
+ * Opens receiving again on a correction-cycle trip after dispatch.
+ */
+function canResumeReceiving(trip = {}) {
+  if (!isHubTransferTrip(trip)) return false;
+  if (!isCorrectionCycleTrip(trip)) return false;
+  if (!trip.manifestLocked) return false;
+  if (resolveManifestStatus(trip) !== MANIFEST_STATUS.LOCKED) return false;
+
+  const status = normalizeTripStatus(trip.status);
+
+  if (status === "ARRIVED" && trip.correctionDispatchedAt) return true;
+
+  // Recovery when correction trip used regular dispatch and is stuck IN_TRANSIT.
+  if (
+    status === "IN_TRANSIT" &&
+    trip.dispatchedAt &&
+    trip.receivingStartedAt
+  ) {
+    return true;
+  }
+
+  return false;
+}
+
 function canUnloadAtHub(trip = {}) {
   if (!isHubTransferTrip(trip)) return true;
   if (normalizeTripStatus(trip.status) !== "ARRIVED") return false;
   return resolveManifestStatus(trip) === MANIFEST_STATUS.RECEIVING_IN_PROGRESS;
 }
 
-function canUnlockManifest(trip = {}) {
+/**
+ * Managers may unlock before receiving starts (LOCKED / OPEN).
+ * Admins may also reopen RECONCILED manifests for post-reconciliation corrections.
+ */
+function canUnlockManifest(trip = {}, options = {}) {
+  const { isAdmin = false } = options;
   const manifestStatus = resolveManifestStatus(trip);
-  return (
+
+  if (
     manifestStatus === MANIFEST_STATUS.LOCKED ||
     manifestStatus === MANIFEST_STATUS.OPEN
-  );
+  ) {
+    return true;
+  }
+
+  if (isAdmin && manifestStatus === MANIFEST_STATUS.RECONCILED) {
+    return true;
+  }
+
+  return false;
+}
+
+function isManifestEditable(trip = {}) {
+  return trip.manifestLocked !== true;
 }
 
 function getManifestStatusLabel(tripOrStatus) {
@@ -133,6 +197,31 @@ function assertCanUnloadAtHub(trip = {}, tripId = "") {
     );
   }
 
+  if (canDispatchCorrectionTrip(trip)) {
+    throw new HttpsError(
+      "failed-precondition",
+      "Dispatch correction loads on this trip before resuming receiving.",
+    );
+  }
+
+  if (canResumeReceiving(trip)) {
+    throw new HttpsError(
+      "failed-precondition",
+      "Resume receiving on this trip before unloading packages.",
+    );
+  }
+
+  if (
+    isCorrectionCycleTrip(trip) &&
+    tripStatus === "IN_TRANSIT" &&
+    trip.receivingStartedAt
+  ) {
+    throw new HttpsError(
+      "failed-precondition",
+      "Resume receiving on this trip before unloading packages.",
+    );
+  }
+
   if (tripStatus !== "ARRIVED") {
     throw new HttpsError(
       "failed-precondition",
@@ -151,6 +240,7 @@ module.exports = {
   MANIFEST_STATUS_LABELS,
   LOCKED_MANIFEST_STATUSES,
   normalizeManifestStatus,
+  normalizeTripStatus,
   resolveManifestStatus,
   isManifestOpen,
   isManifestLocked,
@@ -158,8 +248,12 @@ module.exports = {
   isHubTransferTrip,
   canStartReceiving,
   canDispatchTrip,
+  isCorrectionCycleTrip,
+  canDispatchCorrectionTrip,
+  canResumeReceiving,
   canUnloadAtHub,
   canUnlockManifest,
+  isManifestEditable,
   getManifestStatusLabel,
   assertCanUnloadAtHub,
 };

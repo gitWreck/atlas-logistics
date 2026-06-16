@@ -41,6 +41,10 @@ exports.generateTripManifest = onCall(
     const userSnap = await db.collection("users").doc(uid).get();
     const user = userSnap.exists ? userSnap.data() : {};
     const generatedByName = String(user.name || "").trim() || "Unknown User";
+    const actorRole = String(user.role || "").toLowerCase();
+    const isAdmin = actorRole === "admin";
+    const emptyLockReason =
+      typeof req.data?.reason === "string" ? req.data.reason.trim() : "";
 
     const tripRef = db.collection("truck_trips").doc(tripId);
     const tripShipmentsRef = tripRef.collection("trip_shipments");
@@ -165,8 +169,8 @@ exports.generateTripManifest = onCall(
         });
       });
 
-      // Guard: Prevent empty manifest (0 loaded items)
-      if (totalItems === 0) {
+      // Guard: prevent empty manifest for managers; admin may lock with 0 loaded (corrections / empty trip).
+      if (totalItems === 0 && !isAdmin) {
         throw new HttpsError(
           "failed-precondition",
           "Cannot lock manifest: No items are loaded on the truck.",
@@ -260,8 +264,11 @@ exports.generateTripManifest = onCall(
         targetCollection: "truck_trips",
         actorId: uid,
         actorName: generatedByName,
-        actorRole: req.auth.token?.role || null,
-        reason: "Manifest locked for dispatch",
+        actorRole: actorRole || null,
+        reason:
+          totalItems === 0
+            ? emptyLockReason || "Admin locked manifest with no loaded items"
+            : "Manifest locked for dispatch",
         previousValue: {
           manifestLocked: trip.manifestLocked === true,
           manifestStatus: trip.manifestStatus || null,
@@ -273,8 +280,12 @@ exports.generateTripManifest = onCall(
           hash,
           totalShipments,
           totalItems,
+          emptyManifestOverride: totalItems === 0,
         },
-        note: `Manifest locked with ${totalShipments} shipments (${totalItems} items).`,
+        note:
+          totalItems === 0
+            ? `Admin locked manifest with ${totalShipments} assigned shipment(s) and 0 loaded items.`
+            : `Manifest locked with ${totalShipments} shipments (${totalItems} items).`,
       });
 
       return {

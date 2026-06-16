@@ -2,25 +2,32 @@ import React from "react";
 import TripOperations from "./TripOperations";
 import DriverMessageWidget from "../messaging/DriverMessageWidget";
 import TripBroadcastWidget from "../messaging/TripBroadcastWidget";
+import { isManifestEditable } from "@/app/utility/manifestStatus";
 
 export default function TripToolsTab({
   data,
   onRefresh,
   isDark = false,
   profile,
+  user,
 }) {
   const isManager = String(profile?.role || "").toLowerCase() === "manager";
+  const tripDocId = data?.id || data?.tripId;
 
   return (
     <div className="animate-in zoom-in-95 duration-200 space-y-6">
       {/* 1. CRITICAL OPERATIONS (Status, Delay, Assign) */}
       {!isManager && (
         <TripOperations
-          tripId={data.tripId}
-          isLocked={data.manifestLocked}
+          tripId={tripDocId}
+          manifestEditable={isManifestEditable(data)}
+          tripStatus={data?.status}
+          tripManifestStatus={data?.manifestStatus}
+          tripReconciledAt={data?.reconciledAt}
           onSuccess={() => onRefresh()}
           isDark={isDark}
           profile={profile}
+          user={user}
         />
       )}
 

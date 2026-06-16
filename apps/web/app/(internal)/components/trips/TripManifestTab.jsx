@@ -28,6 +28,7 @@ import {
   MANIFEST_STATUS,
   resolveManifestStatus,
   isHubTransferTrip,
+  isManifestEditable,
 } from "@/app/utility/manifestStatus";
 import TablePaginationFooter from "../ui/TablePaginationFooter";
 import TripDeliveryPoolSummary from "./TripDeliveryPoolSummary";
@@ -39,6 +40,7 @@ export default function TripManifestTab({
   shipments = [],
   loading,
   isLocked,
+  manifestEditable: manifestEditableProp,
   onAddShipment,
   onViewPackages,
   onUnassign,
@@ -78,6 +80,17 @@ export default function TripManifestTab({
       manifestLocked: isLocked,
     },
   );
+  const manifestEditable =
+    manifestEditableProp ??
+    isManifestEditable(
+      trip || {
+        manifestLocked: isLocked,
+        manifestStatus: tripManifestStatus,
+        reconciledAt: tripReconciledAt,
+      },
+    );
+  const manifestLocked = !manifestEditable;
+
   const isManifestReconciled = manifestStatus === MANIFEST_STATUS.RECONCILED;
 
   const loadSummary = useMemo(
@@ -245,7 +258,7 @@ export default function TripManifestTab({
       <button
         type="button"
         onClick={() => handleBulkAction("UNLOAD")}
-        disabled={isBulkProcessing || isLocked}
+        disabled={isBulkProcessing || manifestLocked}
         className={`px-3 py-2 border text-xs font-bold rounded-lg flex items-center justify-center gap-2 transition-colors disabled:opacity-50 whitespace-nowrap ${action.bulkNeutral}`}
       >
         <FontAwesomeIcon icon={faDolly} />
@@ -255,7 +268,7 @@ export default function TripManifestTab({
       <button
         type="button"
         onClick={() => handleBulkAction("LOAD")}
-        disabled={isBulkProcessing || isLocked}
+        disabled={isBulkProcessing || manifestLocked}
         className={`px-3 py-2 text-xs font-bold rounded-lg flex items-center justify-center gap-2 transition-colors disabled:opacity-50 whitespace-nowrap ${action.bulkLoad}`}
       >
         {isBulkProcessing ? (
@@ -271,7 +284,7 @@ export default function TripManifestTab({
       <button
         type="button"
         onClick={() => handleBulkAction("OUT_FOR_DELIVERY")}
-        disabled={isBulkProcessing || isLocked}
+        disabled={isBulkProcessing || manifestLocked}
         className={`px-3 py-2 text-xs font-bold rounded-lg flex items-center justify-center gap-2 transition-colors disabled:opacity-50 whitespace-nowrap ${action.bulkOut}`}
       >
         <FontAwesomeIcon icon={faTruckFast} />
@@ -281,7 +294,7 @@ export default function TripManifestTab({
       <button
         type="button"
         onClick={() => handleBulkAction("DELIVERED")}
-        disabled={isBulkProcessing || isLocked}
+        disabled={isBulkProcessing || manifestLocked}
         className={`px-3 py-2 text-xs font-bold rounded-lg flex items-center justify-center gap-2 transition-colors disabled:opacity-50 whitespace-nowrap ${action.bulkDelivered}`}
       >
         <FontAwesomeIcon icon={faCheckDouble} />
@@ -323,8 +336,11 @@ export default function TripManifestTab({
             </div>
             <p className={`text-xs ${theme.cellSecondary}`}>
               {isManifestReconciled
-                ? "Reconciliation complete. Release shipments from the trip scanner when ready."
-                : manifestStatus === MANIFEST_STATUS.RECEIVING_IN_PROGRESS
+                ? "Reconciliation complete. Admin can unlock to add missing shipments, then scan load/unload and lock again."
+                : manifestEditable &&
+                    manifestStatus === MANIFEST_STATUS.RECEIVING_IN_PROGRESS
+                  ? "Manifest reopened. Add missing shipments, finish unload scans, then lock and reconcile again."
+                  : manifestStatus === MANIFEST_STATUS.RECEIVING_IN_PROGRESS
                   ? "Receiving in progress. Finish unload scans, then finalize reconciliation."
                   : manifestStatus === MANIFEST_STATUS.LOCKED
                     ? "Manifest is locked. Start receiving at Odiongan before unloading."
@@ -400,9 +416,8 @@ export default function TripManifestTab({
                 <button
                   type="button"
                   onClick={onAddShipment}
-                  disabled={isLocked}
-                  // className={`text-xs font-bold px-3 py-2.5 rounded-xl flex items-center justify-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap ${action.solid}`}
-                  className={`text-xs font-bold px-3 py-1.5 h-8 rounded-lg flex items-center justify-center gap-2 transition-colors ${action.solid}`}
+                  disabled={manifestLocked}
+                  className={`text-xs font-bold px-3 py-1.5 h-8 rounded-lg flex items-center justify-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap ${action.solid}`}
                 >
                   <FontAwesomeIcon icon={faPlus} />
                   Shipments
@@ -570,7 +585,7 @@ export default function TripManifestTab({
                       type="button"
                       onClick={() => onUnassign(shipment)}
                       className={`text-xs border px-3 py-2 rounded-xl transition-all flex items-center justify-center gap-2 disabled:opacity-50 ${rowAction.remove}`}
-                      disabled={isLocked}
+                      disabled={manifestLocked}
                     >
                       <FontAwesomeIcon icon={faMinus} />
                       Remove
@@ -805,7 +820,7 @@ export default function TripManifestTab({
                               type="button"
                               onClick={() => onUnassign(shipment)}
                               className={`w-8 h-8 text-xs border px-3 py-1.5 rounded transition-all flex items-center justify-center disabled:opacity-50 ${rowAction.remove}`}
-                              disabled={isLocked}
+                              disabled={manifestLocked}
                               title="Remove Shipment"
                             >
                               <FontAwesomeIcon icon={faMinus} />

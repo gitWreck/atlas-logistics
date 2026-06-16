@@ -17,73 +17,98 @@ const {
 if (!admin.apps.length) admin.initializeApp();
 const db = admin.firestore();
 
+function resolveNextManifestStatusAfterUnlock() {
+  return MANIFEST_STATUS.OPEN;
+}
+
 /* ======================================================
    unlockTripManifest
    ======================================================
    ✅ Allows Admin/Manager to edit a trip again
+   ✅ Admin may reopen RECONCILED manifests for corrections
    ✅ Sets manifestLocked = false
    ✅ Logs the security event (Important!)
 ====================================================== */
 exports.unlockTripManifest = onCall(
   { region: "asia-southeast1", maxInstances: 10 },
   async (req) => {
-    // 1. Auth & Role Check
     await requireRole(db, req, ["admin", "manager"]);
 
-    // const updatedBy = req.data?.updatedBy || {};
-
     const { uid, role, name } = updatedBy(req);
+    const isAdmin = String(role || "").toLowerCase() === "admin";
 
     const tripId = requireString(req.data?.tripId, "tripId");
-    const reason = requireString(req.data?.reason, "reason"); // Reason is mandatory for audits
+    const reason = requireString(req.data?.reason, "reason");
 
     const tripRef = db.collection("truck_trips").doc(tripId);
 
-    // Get user details for the log
     const userSnap = await db.collection("users").doc(req.auth.uid).get();
-    const actorName = userSnap.data()?.name || "Unknown Manager";
+    const actorName = userSnap.data()?.name || name || "Unknown User";
 
     await db.runTransaction(async (tx) => {
       const tripSnap = await tx.get(tripRef);
       if (!tripSnap.exists) throw new HttpsError("not-found", "Trip not found");
 
       const trip = tripSnap.data();
+      const manifestStatus = resolveManifestStatus(trip);
+      const wasReconciled = manifestStatus === MANIFEST_STATUS.RECONCILED;
+      const wasLocked = trip.manifestLocked === true;
 
-      // Check if it's actually locked
-      if (trip.manifestLocked !== true) {
-        return { success: true, message: "Trip was already unlocked." };
-      }
-
-      if (!canUnlockManifest(trip)) {
+      if (!canUnlockManifest(trip, { isAdmin })) {
+        const hint =
+          wasReconciled && !isAdmin
+            ? " Only an Admin can unlock a reconciled manifest."
+            : "";
         throw new HttpsError(
           "failed-precondition",
-          `Cannot unlock manifest while status is ${resolveManifestStatus(trip)}. Receiving must not be in progress.`,
+          `Cannot unlock manifest while status is ${manifestStatus}.${hint}`,
         );
       }
 
+      if (!wasLocked && !wasReconciled) {
+        return;
+      }
+
+      const nextManifestStatus = resolveNextManifestStatusAfterUnlock();
+
       const previousValue = {
-        manifestLocked: trip.manifestLocked === true,
-        manifestStatus: resolveManifestStatus(trip),
+        manifestLocked: wasLocked,
+        manifestStatus,
         manifestId: trip.manifestId || null,
+        reconciledAt: trip.reconciledAt || null,
       };
       const newValue = {
         manifestLocked: false,
-        manifestStatus: MANIFEST_STATUS.OPEN,
+        manifestStatus: nextManifestStatus,
         manifestId: trip.manifestId || null,
+        reconciledAt: null,
       };
 
-      tx.update(tripRef, {
+      const tripUpdate = {
         manifestLocked: false,
-        manifestStatus: MANIFEST_STATUS.OPEN,
+        manifestStatus: nextManifestStatus,
+        manifestReopenedAt: admin.firestore.FieldValue.serverTimestamp(),
+        manifestReopenedBy: uid,
+        manifestReopenReason: reason,
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
         updatedBy: name,
-      });
+        reconciledAt: admin.firestore.FieldValue.delete(),
+        reconciledBy: admin.firestore.FieldValue.delete(),
+        correctionDispatchedAt: admin.firestore.FieldValue.delete(),
+        correctionDispatchedBy: admin.firestore.FieldValue.delete(),
+        correctionDispatchedByName: admin.firestore.FieldValue.delete(),
+        receivingResumedAt: admin.firestore.FieldValue.delete(),
+        receivingResumedBy: admin.firestore.FieldValue.delete(),
+        receivingResumedByName: admin.firestore.FieldValue.delete(),
+      };
+
+      tx.update(tripRef, tripUpdate);
 
       writeCustodyAuditLog({
         db,
         tx,
-        action: "UNLOCK_MANIFEST",
-        tripId,
+        action: wasReconciled ? "REOPEN_RECONCILED_MANIFEST" : "UNLOCK_MANIFEST",
+        tripId: trip.tripId || tripId,
         tripDocId: tripId,
         targetId: tripId,
         targetCollection: "truck_trips",
@@ -93,15 +118,20 @@ exports.unlockTripManifest = onCall(
         reason,
         previousValue,
         newValue,
-        note: `Manifest unlocked by manager. Reason: ${reason}`,
+        note: wasReconciled
+          ? `Reconciled manifest reopened by admin for corrections. Reason: ${reason}`
+          : `Manifest unlocked. Reason: ${reason}`,
       });
 
-      // Optional: Add event to trip subcollection history
       const eventRef = tripRef.collection("manifest_events").doc();
       tx.set(eventRef, {
-        type: "MANIFEST_UNLOCKED",
+        type: wasReconciled ? "MANIFEST_REOPENED" : "MANIFEST_UNLOCKED",
         reason,
-        unlockedBy: name,
+        unlockedBy: actorName,
+        unlockedByUid: uid,
+        unlockedByRole: role || null,
+        previousManifestStatus: manifestStatus,
+        nextManifestStatus,
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
       });
     });

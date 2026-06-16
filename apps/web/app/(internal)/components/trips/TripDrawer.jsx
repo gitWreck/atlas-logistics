@@ -26,6 +26,7 @@ import InvoiceFormModal from "../invoice/InvoiceFormModal";
 import useInvoiceWorkflow from "../invoice/useInvoiceWorkflow";
 import { updateShipmentPackages } from "@/app/utility/FirebaseFunctions";
 import { getDrawerThemeClasses } from "@/app/utility/constant/theme";
+import { isManifestEditable } from "@/app/utility/manifestStatus";
 import { updatedBy } from "@/app/utility/utilities";
 
 export default function TripDrawer({
@@ -269,8 +270,8 @@ export default function TripDrawer({
               shipments={shipments}
               loading={loadingShips}
               isLocked={data.manifestLocked}
+              manifestEditable={isManifestEditable(data)}
               onAddShipment={() => {
-                console.log("testtt");
                 setBulkModalOpen(true);
               }}
               onViewPackages={(shipment) =>
@@ -303,6 +304,7 @@ export default function TripDrawer({
               }}
               isDark={isDark}
               profile={profile}
+              user={user}
             />
           )}
         </div>

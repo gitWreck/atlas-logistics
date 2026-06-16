@@ -63,6 +63,34 @@ function matchesReleasePackageScope(pkg = {}, packageIdSet = null) {
   return identity ? packageIdSet.has(identity) : false;
 }
 
+function hasOdionganWarehouseCustody(pkg = {}) {
+  const custody = String(pkg.custodyOwnerType || "").toUpperCase();
+  const warehouse = String(pkg.custodyOwnerId || "").toUpperCase();
+  return custody === "WAREHOUSE" && warehouse.includes("ODIONGAN");
+}
+
+/** Hub unload complete: at Odiongan, not still loaded on the truck. */
+function isPieceHubReceivedAtOdiongan(pkg = {}) {
+  const status = normalizePackageStatus(pkg);
+  const quantity = Math.max(normalizeQty(pkg.quantity, 1), 1);
+  const loadedQty = normalizeQty(pkg.loadedQty, 0);
+  const receivedQty = normalizeQty(pkg.receivedQty, 0);
+
+  if (loadedQty > 0) return false;
+  if (
+    status === PACKAGE_STATUS.RECEIVED_AT_DIVISORIA ||
+    STILL_ON_LINEHAUL_STATUSES.has(status)
+  ) {
+    return false;
+  }
+
+  if (DELIVERY_RELEASE_ELIGIBLE_PIECE_STATUSES.has(status)) {
+    return receivedQty >= quantity || Boolean(pkg.hubReceivedAt);
+  }
+
+  return Boolean(pkg.hubReceivedAt) && receivedQty > 0;
+}
+
 /**
  * Only pieces physically received at Odiongan (unload scan) may enter checker pool.
  * Pieces still on the truck, at Divisoria, or without hub receive qty are skipped.
@@ -82,39 +110,24 @@ function isEligiblePieceForDeliveryRelease(pkg = {}) {
     return false;
   }
 
-  const returnedReceived = isReturnedReceivedAtHubPiece(pkg);
-
-  if (!returnedReceived) {
-    if (String(pkg.currentTripId || pkg.loadedOnTrip || "").trim()) {
-      return false;
-    }
-  }
-
-  const quantity = Math.max(normalizeQty(pkg.quantity, 1), 1);
-  const loadedQty = normalizeQty(pkg.loadedQty, 0);
-
-  if (loadedQty > 0) return false;
-
-  if (!returnedReceived) {
-    const receivedQty = normalizeQty(pkg.receivedQty, 0);
-    if (receivedQty < quantity) return false;
-  }
-
-  const custody = String(pkg.custodyOwnerType || "").toUpperCase();
-  const warehouse = String(pkg.custodyOwnerId || "").toUpperCase();
-  if (custody !== "WAREHOUSE" || !warehouse.includes("ODIONGAN")) {
-    return false;
-  }
-
-  if (returnedReceived) {
+  if (isReturnedReceivedAtHubPiece(pkg)) {
     return true;
   }
 
-  if (!DELIVERY_RELEASE_ELIGIBLE_PIECE_STATUSES.has(status)) {
+  if (!isPieceHubReceivedAtOdiongan(pkg)) {
     return false;
   }
 
-  return true;
+  // Stale trip ids must not block a fully hub-received piece; release clears them.
+  if (hasOdionganWarehouseCustody(pkg)) {
+    return true;
+  }
+
+  if (DELIVERY_RELEASE_ELIGIBLE_PIECE_STATUSES.has(status)) {
+    return true;
+  }
+
+  return Boolean(pkg.hubReceivedAt);
 }
 
 function mapPackagesForDeliveryRelease(
@@ -135,10 +148,15 @@ function mapPackagesForDeliveryRelease(
     }
 
     const quantity = Math.max(normalizeQty(pkg.quantity, 1), 1);
+    const receivedQty = Math.max(
+      normalizeQty(pkg.receivedQty, 0),
+      isPieceHubReceivedAtOdiongan(pkg) ? quantity : 0,
+    );
 
     return {
       ...pkg,
       quantity,
+      receivedQty,
       availableForDelivery: true,
       status: resolveOdionganPoolStatus(pkg, { released: true }),
       custodyOwnerType: "WAREHOUSE",

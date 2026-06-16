@@ -33,9 +33,13 @@ import TripAuditLogModal from "./TripAuditLogModal";
 import {
   canStartReceiving,
   canDispatchTrip,
+  canDispatchCorrectionTrip,
+  canResumeReceiving,
+  canUnlockManifest,
   getDispatchTripBlockReason,
   getManifestStatusLabel,
   isHubTransferTrip,
+  isManifestEditable,
   MANIFEST_STATUS,
   resolveManifestStatus,
 } from "@/app/utility/manifestStatus";
@@ -68,6 +72,7 @@ export default function TripDrawerFooter({
   if (!data) return null;
 
   const isLocked = data.manifestLocked;
+  const tripDocId = data.id || data.tripId;
   const manifestStatus = resolveManifestStatus(data);
   const manifestStatusLabel = getManifestStatusLabel(data);
   const role = String(profile?.role || "").toLowerCase();
@@ -75,9 +80,17 @@ export default function TripDrawerFooter({
   const isManager = role === "manager";
   const canViewManifestControls = isAdmin || isManager;
   const canEditManifestControls = isAdmin || isManager;
+  const manifestEditable = isManifestEditable(data);
+  const canUnlock =
+    canUnlockManifest(data, { isAdmin }) &&
+    (isLocked || manifestStatus === MANIFEST_STATUS.RECONCILED);
   const isHubTrip = isHubTransferTrip(data);
   const showDispatchTrip = canEditManifestControls && canDispatchTrip(data);
+  const showDispatchCorrection =
+    canEditManifestControls && canDispatchCorrectionTrip(data);
   const showStartReceiving = canEditManifestControls && canStartReceiving(data);
+  const showResumeReceiving =
+    canEditManifestControls && canResumeReceiving(data);
   const dispatchBlockReason =
     canEditManifestControls && isHubTrip
       ? getDispatchTripBlockReason(data)
@@ -102,11 +115,42 @@ export default function TripDrawerFooter({
         <span className="font-bold uppercase opacity-60">Manifest</span>
         <span className="ml-2 font-semibold">{manifestStatusLabel}</span>
         <span className="ml-2 opacity-50">({manifestStatus})</span>
+        {manifestStatus === MANIFEST_STATUS.RECONCILED && !isAdmin && (
+          <p className="mt-2 text-[11px] opacity-70">
+            Reconciled manifests can only be unlocked by an Admin.
+          </p>
+        )}
+        {manifestEditable && manifestStatus !== MANIFEST_STATUS.OPEN && (
+          <p className="mt-2 text-[11px] text-amber-500">
+            Manifest is open for edits. Add shipments, scan loads/unloads, then
+            lock again when done.
+          </p>
+        )}
       </div>
 
       {canEditManifestControls && isHubTrip && (
         <div className="flex flex-col gap-2">
-          {showDispatchTrip ? (
+          {showDispatchCorrection ? (
+            <StatusButton
+              status={dispatchStatus}
+              label="Dispatch Correction"
+              loadingLabel="Dispatching..."
+              successLabel="Dispatched!"
+              icon={faTruck}
+              variant="blue"
+              onClick={() =>
+                runAction(
+                  setDispatchStatus,
+                  () =>
+                    dispatchTrip({
+                      tripId: tripDocId,
+                      updatedBy: updatedBy(profile),
+                    }),
+                  () => onSuccess?.(),
+                )
+              }
+            />
+          ) : showDispatchTrip ? (
             <StatusButton
               status={dispatchStatus}
               label="Dispatch Trip"
@@ -119,7 +163,7 @@ export default function TripDrawerFooter({
                   setDispatchStatus,
                   () =>
                     dispatchTrip({
-                      tripId: data.id || data.tripId,
+                      tripId: tripDocId,
                       updatedBy: updatedBy(profile),
                     }),
                   () => onSuccess?.(),
@@ -135,7 +179,27 @@ export default function TripDrawerFooter({
             )
           )}
 
-          {showStartReceiving && (
+          {showResumeReceiving ? (
+            <StatusButton
+              status={receivingStatus}
+              label="Resume Receiving"
+              loadingLabel="Resuming..."
+              successLabel="Receiving resumed!"
+              icon={faTruckRampBox}
+              variant="emerald"
+              onClick={() =>
+                runAction(
+                  setReceivingStatus,
+                  () =>
+                    startReceiving({
+                      tripId: tripDocId,
+                      updatedBy: updatedBy(profile),
+                    }),
+                  () => onSuccess?.(),
+                )
+              }
+            />
+          ) : showStartReceiving ? (
             <StatusButton
               status={receivingStatus}
               label="Start Receiving"
@@ -148,14 +212,14 @@ export default function TripDrawerFooter({
                   setReceivingStatus,
                   () =>
                     startReceiving({
-                      tripId: data.tripId,
+                      tripId: tripDocId,
                       updatedBy: updatedBy(profile),
                     }),
                   () => onSuccess?.(),
                 )
               }
             />
-          )}
+          ) : null}
         </div>
       )}
 
@@ -206,7 +270,7 @@ export default function TripDrawerFooter({
                 setLockStatus,
                 () =>
                   generateTripManifest({
-                    tripId: data.tripId,
+                    tripId: tripDocId,
                     updatedBy: updatedBy(profile),
                   }),
                 () => onSuccess?.(),
@@ -217,9 +281,14 @@ export default function TripDrawerFooter({
           {!showUnlockReason ? (
             <button
               type="button"
-              disabled={!canEditManifestControls || !isLocked}
+              disabled={!canEditManifestControls || !canUnlock}
               onClick={() => setShowUnlockReason(true)}
               className={theme.warningOutlineButton}
+              title={
+                manifestStatus === MANIFEST_STATUS.RECONCILED && !isAdmin
+                  ? "Only Admin can unlock a reconciled manifest"
+                  : undefined
+              }
             >
               <FontAwesomeIcon icon={faUnlock} />
               Unlock Manifest
@@ -239,7 +308,7 @@ export default function TripDrawerFooter({
                   setUnlockStatus,
                   () =>
                     unlockTripManifest({
-                      tripId: data.tripId,
+                      tripId: tripDocId,
                       reason: unlockReason,
                       updatedBy: updatedBy(profile),
                     }),

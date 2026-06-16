@@ -18,13 +18,67 @@ const {
   countPiecesAwaitingReturnReceive,
 } = require("./packageDeliveryOperations");
 const { buildDerivedShipmentSnapshot } = require("../packages/shipmentStatus");
-const { assertTripReleaseEligible } = require("../trips/tripLifecycle");
+const {
+  assertTripReleaseEligible,
+  validateAdminOverrideRelease,
+  TRIP_STATUSES,
+} = require("../trips/tripLifecycle");
+const { MANIFEST_STATUS } = require("../trips/manifestStatus");
+const { writeCustodyAuditLog } = require("../utilities/custodyAuditLog");
+const { writeTripActionLog } = require("../utilities/tripLogger");
 
 if (!admin.apps.length) admin.initializeApp();
 const db = admin.firestore();
 
 function normalizeString(value) {
   return typeof value === "string" && value.trim() ? value.trim() : null;
+}
+
+function normalizeMissingPackages(values = []) {
+  if (!Array.isArray(values)) return [];
+  return values
+    .map((entry) => {
+      if (!entry || typeof entry !== "object") return null;
+      const shipmentDocId =
+        normalizeString(entry.shipmentDocId) ||
+        normalizeString(entry.id) ||
+        null;
+      const shipmentId =
+        normalizeString(entry.shipmentId) || shipmentDocId || null;
+      if (!shipmentDocId && !shipmentId) return null;
+      return {
+        shipmentDocId: shipmentDocId || shipmentId,
+        shipmentId: shipmentId || shipmentDocId,
+        missingLabels:
+          Number(entry.missingLabels ?? entry.remainingLoaded) || 0,
+      };
+    })
+    .filter(Boolean);
+}
+
+function normalizeMissingRemarks(value = {}) {
+  if (!value || typeof value !== "object") return {};
+  const normalized = {};
+  for (const [key, remark] of Object.entries(value)) {
+    const trimmed = normalizeString(remark);
+    if (trimmed) normalized[key] = trimmed;
+  }
+  return normalized;
+}
+
+function buildAdminOverrideAuditNote({
+  tripId,
+  missingPackageId,
+  reason,
+  actorName,
+}) {
+  return [
+    "ADMIN OVERRIDE RELEASE",
+    `Trip: ${tripId}`,
+    `Missing Package: ${missingPackageId}`,
+    `Reason: ${reason}`,
+    `Released By: ${actorName}`,
+  ].join("\n");
 }
 
 function normalizeStringList(values = []) {
@@ -84,19 +138,87 @@ async function resolveShipmentIdsWithTrip(
   return tripShipmentIds;
 }
 
+async function loadReleaseCandidates(db, resolvedShipmentIds, packageIdSet) {
+  const shipmentRefs = resolvedShipmentIds.map((id) =>
+    db.collection("shipments").doc(id),
+  );
+  const shipmentSnaps = await Promise.all(shipmentRefs.map((ref) => ref.get()));
+  const releaseScope = { packageIdSet };
+  const releaseCandidates = [];
+  let awaitingReturn = 0;
+
+  shipmentSnaps.forEach((snap, index) => {
+    const shipmentId = resolvedShipmentIds[index];
+    if (!snap.exists) {
+      throw new HttpsError("not-found", `Shipment not found: ${shipmentId}`);
+    }
+
+    const data = snap.data() || {};
+    assertEligibleForDeliveryOperationsRelease(shipmentId, data.status);
+
+    const sourcePackages = Array.isArray(data.packages) ? data.packages : [];
+    const releasableCount = countPiecesEligibleForDeliveryRelease(
+      sourcePackages,
+      releaseScope,
+    );
+    awaitingReturn += countPiecesAwaitingReturnReceive(sourcePackages);
+
+    if (releasableCount === 0) return;
+
+    releaseCandidates.push({
+      index,
+      shipmentId,
+      data,
+      sourcePackages,
+      releaseScope,
+      shipmentRef: shipmentRefs[index],
+    });
+  });
+
+  if (releaseCandidates.length === 0) {
+    throw new HttpsError(
+      "failed-precondition",
+      awaitingReturn > 0
+        ? "Returned pieces must be received at Odiongan first (Shipment drawer → Return loop → Receive returned), then release for delivery."
+        : "No shipments have hub-received packages to release. Unload and reconcile at Odiongan first, or receive returned pieces before releasing.",
+    );
+  }
+
+  return releaseCandidates;
+}
+
 exports.releaseForDeliveryOperations = onCall(
   { region: "asia-southeast1", maxInstances: 10 },
   async (req) => {
-    await requireRole(db, req, ["admin", "manager"]);
-
-    const { uid: actorUid, name: actorName, role: actorRole } = updatedBy(req);
+    try {
+    const actor = await requireRole(db, req, ["admin", "manager"]);
+    const actorUid = actor.uid;
+    const actorRole = actor.role;
+    const actorName =
+      actor.user?.name || updatedBy(req).name || actorUid || null;
     const {
       shipmentIds,
       packageIds,
       tripId = null,
       warehouseCode = DEFAULT_WAREHOUSE_CODE,
       remarks = null,
+      adminOverride = false,
+      missingRemarks = {},
+      missingPackages = [],
     } = req.data || {};
+
+    const isAdmin = String(actorRole || "").toLowerCase() === "admin";
+    const useAdminOverride = adminOverride === true;
+
+    if (useAdminOverride && !isAdmin) {
+      throw new HttpsError(
+        "permission-denied",
+        "Only admins can release with reconciliation override.",
+      );
+    }
+
+    const normalizedMissingRemarks = normalizeMissingRemarks(missingRemarks);
+    const normalizedMissingPackages = normalizeMissingPackages(missingPackages);
 
     const resolvedShipmentIds = await resolveShipmentIdsWithTrip(db, {
       shipmentIds,
@@ -105,6 +227,8 @@ exports.releaseForDeliveryOperations = onCall(
     });
 
     const normalizedTripId = normalizeString(tripId);
+    let tripReleaseDecision = null;
+
     if (normalizedTripId) {
       const tripSnap = await db
         .collection("truck_trips")
@@ -116,72 +240,137 @@ exports.releaseForDeliveryOperations = onCall(
           `Trip not found: ${normalizedTripId}`,
         );
       }
-      assertTripReleaseEligible(tripSnap.data() || {});
+
+      const tripData = tripSnap.data() || {};
+
+      if (useAdminOverride) {
+        const validation = validateAdminOverrideRelease({
+          trip: tripData,
+          missingPackages: normalizedMissingPackages,
+          missingRemarks: normalizedMissingRemarks,
+        });
+        if (!validation.valid) {
+          throw new HttpsError(
+            "failed-precondition",
+            validation.message || "Admin override release is not valid.",
+          );
+        }
+      }
+
+      tripReleaseDecision = assertTripReleaseEligible(tripData, {
+        adminOverride: useAdminOverride,
+        isAdmin,
+      });
     }
 
     const normalizedWarehouse =
       normalizeString(warehouseCode) || DEFAULT_WAREHOUSE_CODE;
     const now = FieldValue.serverTimestamp();
-    const releasedIds = [];
-    const releasedPackageIds = [];
     const normalizedPackageIds = normalizeStringList(packageIds);
     const packageIdSet =
       normalizedPackageIds.length > 0 ? new Set(normalizedPackageIds) : null;
 
-    await db.runTransaction(async (tx) => {
-      const shipmentRefs = resolvedShipmentIds.map((id) =>
-        db.collection("shipments").doc(id),
-      );
-      const shipmentSnaps = await Promise.all(
-        shipmentRefs.map((ref) => tx.get(ref)),
-      );
+    const releaseCandidates = await loadReleaseCandidates(
+      db,
+      resolvedShipmentIds,
+      packageIdSet,
+    );
 
-      const releaseCandidates = [];
+    const txResult = await db.runTransaction(async (tx) => {
+      const releasedIds = [];
+      const releasedPackageIds = [];
+      const adminOverrideAuditEntries = [];
+      let tripPublicId = normalizedTripId || null;
 
-      shipmentSnaps.forEach((snap, index) => {
-        const shipmentId = resolvedShipmentIds[index];
-        if (!snap.exists) {
+      if (normalizedTripId && useAdminOverride) {
+        const tripRef = db.collection("truck_trips").doc(normalizedTripId);
+        const tripSnap = await tx.get(tripRef);
+        if (!tripSnap.exists) {
           throw new HttpsError(
             "not-found",
-            `Shipment not found: ${shipmentId}`,
+            `Trip not found: ${normalizedTripId}`,
           );
         }
 
-        const data = snap.data() || {};
-        assertEligibleForDeliveryOperationsRelease(shipmentId, data.status);
+        const tripData = tripSnap.data() || {};
+        tripPublicId = tripData.tripId || normalizedTripId;
+        const nowTs = admin.firestore.Timestamp.now();
+        const tripUpdate = {
+          updatedAt: now,
+          updatedBy: actorName || actorUid || null,
+        };
 
-        const sourcePackages = Array.isArray(data.packages) ? data.packages : [];
-        const releaseScope = { packageIdSet };
-        const releasableCount = countPiecesEligibleForDeliveryRelease(
-          sourcePackages,
-          releaseScope,
-        );
-        if (releasableCount === 0) return;
+        if (tripReleaseDecision?.requiresArrivedPromotion) {
+          tripUpdate.status = TRIP_STATUSES.ARRIVED;
+          tripUpdate.arrivedAt = now;
+        }
 
-        releaseCandidates.push({ index, shipmentId, data, sourcePackages, releaseScope });
-      });
+        tripUpdate.manifestStatus = MANIFEST_STATUS.RECONCILED;
+        tripUpdate.reconciledAt = now;
+        tripUpdate.reconciledBy = actorUid || null;
+        tripUpdate.reconciledByName = actorName || null;
+        tripUpdate.adminOverrideReleaseAt = now;
+        tripUpdate.adminOverrideReleaseBy = actorUid || null;
+        tripUpdate.adminOverrideReleaseByName = actorName || null;
+        tripUpdate.reconciliationVariance = {
+          missingPackages: normalizedMissingPackages.map((entry) => ({
+            shipmentDocId: entry.shipmentDocId,
+            shipmentId: entry.shipmentId,
+            missingLabels: entry.missingLabels,
+            remark:
+              normalizedMissingRemarks[entry.shipmentDocId] ||
+              normalizedMissingRemarks[entry.shipmentId] ||
+              null,
+          })),
+          releasedBy: actorName || actorUid || null,
+          releasedAt: nowTs,
+        };
 
-      if (releaseCandidates.length === 0) {
-        const awaitingReturn = shipmentSnaps.reduce((sum, snap) => {
-          if (!snap.exists) return sum;
-          const packages = Array.isArray(snap.data()?.packages)
-            ? snap.data().packages
-            : [];
-          return sum + countPiecesAwaitingReturnReceive(packages);
-        }, 0);
+        tx.update(tripRef, tripUpdate);
 
-        throw new HttpsError(
-          "failed-precondition",
-          awaitingReturn > 0
-            ? "Returned pieces must be received at Odiongan first (Shipment drawer → Return loop → Receive returned), then release for delivery."
-            : "No shipments have hub-received packages to release. Unload and reconcile at Odiongan first, or receive returned pieces before releasing.",
-        );
+        for (const entry of normalizedMissingPackages) {
+          const remark =
+            normalizedMissingRemarks[entry.shipmentDocId] ||
+            normalizedMissingRemarks[entry.shipmentId] ||
+            "";
+          const tripShipmentRef = tripRef
+            .collection("trip_shipments")
+            .doc(entry.shipmentDocId);
+
+          tx.set(
+            tripShipmentRef,
+            {
+              missingRemarks: remark,
+              missingOnReconciliation: true,
+              adminOverrideResolved: true,
+              updatedAt: now,
+              updatedBy: actorName || actorUid || null,
+            },
+            { merge: true },
+          );
+
+          adminOverrideAuditEntries.push({
+            tripId: tripPublicId,
+            missingPackageId: entry.shipmentId,
+            reason: remark,
+          });
+        }
       }
 
-      releaseCandidates.forEach(({ index, shipmentId, data, sourcePackages, releaseScope }) => {
-        const releaseNote =
-          normalizeString(remarks) ||
-          "Released for delivery operations. Custody remains at Odiongan until each label is loaded.";
+      for (const candidate of releaseCandidates) {
+        const {
+          shipmentId,
+          data,
+          sourcePackages,
+          releaseScope,
+          shipmentRef,
+        } = candidate;
+
+        const releaseNote = useAdminOverride
+          ? normalizeString(remarks) ||
+            "Admin override release with reconciliation variance."
+          : normalizeString(remarks) ||
+            "Released for delivery operations. Custody remains at Odiongan until each label is loaded.";
 
         const packageIdsForShipment = listPiecesEligibleForDeliveryRelease(
           sourcePackages,
@@ -203,7 +392,7 @@ exports.releaseForDeliveryOperations = onCall(
             ? "AVAILABLE_FOR_DELIVERY"
             : derivedSnapshot.status;
 
-        tx.update(shipmentRefs[index], {
+        tx.update(shipmentRef, {
           packages: derivedSnapshot.packages,
           packageBreakdown: derivedSnapshot.packageBreakdown,
           availableForDelivery: derivedSnapshot.availableForDelivery,
@@ -232,8 +421,69 @@ exports.releaseForDeliveryOperations = onCall(
 
         releasedIds.push(shipmentId);
         releasedPackageIds.push(...packageIdsForShipment);
-      });
+      }
+
+      return {
+        releasedIds,
+        releasedPackageIds,
+        adminOverrideAuditEntries,
+        tripPublicId,
+      };
     });
+
+    const {
+      releasedIds,
+      releasedPackageIds,
+      adminOverrideAuditEntries,
+      tripPublicId,
+    } = txResult;
+
+    if (useAdminOverride && normalizedTripId && tripPublicId) {
+      for (const entry of adminOverrideAuditEntries) {
+        const auditNote = buildAdminOverrideAuditNote({
+          tripId: entry.tripId,
+          missingPackageId: entry.missingPackageId,
+          reason: entry.reason,
+          actorName: actorName || actorUid || "Admin",
+        });
+
+        await writeCustodyAuditLog({
+          db,
+          action: "ADMIN_OVERRIDE_RELEASE",
+          tripId: entry.tripId,
+          tripDocId: normalizedTripId,
+          targetId: normalizedTripId,
+          targetCollection: "truck_trips",
+          actorId: actorUid || null,
+          actorName: actorName || null,
+          actorRole: actorRole || "admin",
+          reason: entry.reason,
+          note: auditNote,
+          meta: {
+            missingPackageId: entry.missingPackageId,
+            adminOverride: true,
+          },
+        });
+      }
+
+      await writeTripActionLog({
+        db,
+        action: "ADMIN_OVERRIDE_RELEASE",
+        tripId: tripPublicId,
+        tripDocId: normalizedTripId,
+        actorId: actorUid || null,
+        actorName: actorName || null,
+        actorRole: actorRole || "admin",
+        details: {
+          missingPackages: adminOverrideAuditEntries,
+          releasedShipmentCount: releasedIds.length,
+          releasedPackageCount: releasedPackageIds.length,
+        },
+        meta: {
+          adminOverride: true,
+        },
+      });
+    }
 
     await Promise.all(
       releasedIds.map((shipmentId) =>
@@ -263,6 +513,15 @@ exports.releaseForDeliveryOperations = onCall(
       shipmentCount: releasedIds.length,
       packageIds: releasedPackageIds,
       packageCount: releasedPackageIds.length,
+      adminOverride: useAdminOverride,
     };
+    } catch (error) {
+      if (error instanceof HttpsError) throw error;
+      console.error("releaseForDeliveryOperations failed:", error);
+      throw new HttpsError(
+        "internal",
+        error?.message || "Release for delivery operations failed.",
+      );
+    }
   },
 );
