@@ -16,6 +16,12 @@ import {
 import { isEligibleForCheckerRelease } from "@/app/utility/checkerRelease";
 import { isTripReleaseEligible, validateAdminOverrideRelease } from "@/app/utility/tripLifecycle";
 import { getReleasableHandoffShipments, hasReleasableHandoffPieces } from "@/app/utility/handoffRelease";
+import {
+  flattenMissingPackages,
+  areMissingPackageRemarksComplete,
+  resolveRemarkForMissingPackage,
+  buildMissingRemarksForRelease,
+} from "@/app/utility/reconciliationPieces";
 import { updatedBy } from "@/app/utility/utilities";
 import {
   buildAlreadyLoadedInfo,
@@ -478,8 +484,13 @@ export default function useScannerLogic({
         setHandoffSummary(summary);
         setMissingRemarks((prev) => {
           const seededRemarks = {};
-          (summary.missingShipments || []).forEach((item) => {
-            seededRemarks[item.id] = prev[item.id] || "";
+          const missingPackages =
+            Array.isArray(summary.missingPackages) &&
+            summary.missingPackages.length > 0
+              ? summary.missingPackages
+              : flattenMissingPackages(summary.missingShipments || []);
+          missingPackages.forEach((pkg) => {
+            seededRemarks[pkg.packageId] = prev[pkg.packageId] || "";
           });
           return seededRemarks;
         });
@@ -1023,19 +1034,23 @@ export default function useScannerLogic({
   };
 
   const handleReleaseShipmentsFromTrip = async () => {
-    const missing = handoffSummary?.missingShipments || [];
-    const incompleteRemark = missing.find(
-      (item) => !String(missingRemarks[item.id] || "").trim(),
+    const missingPackages =
+      Array.isArray(handoffSummary?.missingPackages) &&
+      handoffSummary.missingPackages.length > 0
+        ? handoffSummary.missingPackages
+        : flattenMissingPackages(handoffSummary?.missingShipments || []);
+    const incompleteRemark = missingPackages.find(
+      (pkg) => !resolveRemarkForMissingPackage(pkg, missingRemarks),
     );
 
     if (incompleteRemark) {
-      return setError(`Add remarks for ${incompleteRemark.shipmentId}.`);
+      return setError(`Add remarks for missing package ${incompleteRemark.packageId}.`);
     }
 
     const useAdminOverride =
       isAdmin &&
-      missing.length > 0 &&
-      missing.every((item) => String(missingRemarks[item.id] || "").trim()) &&
+      missingPackages.length > 0 &&
+      areMissingPackageRemarksComplete(missingPackages, missingRemarks) &&
       hasReleasableHandoffPieces(handoffSummary);
 
     let summaryForRelease = handoffSummary;
@@ -1057,14 +1072,19 @@ export default function useScannerLogic({
     }
 
     if (useAdminOverride) {
+      const remarksPayload = buildMissingRemarksForRelease(
+        missingPackages,
+        missingRemarks,
+      );
       const validation = validateAdminOverrideRelease({
         trip: trip || {},
-        missingPackages: missing.map((item) => ({
-          shipmentDocId: item.id,
-          shipmentId: item.shipmentId,
-          missingLabels: item.remainingLoaded,
+        missingPackages: missingPackages.map((pkg) => ({
+          packageId: pkg.packageId,
+          shipmentDocId: pkg.shipmentDocId,
+          shipmentId: pkg.shipmentId,
+          pieceSuffix: pkg.pieceSuffix,
         })),
-        missingRemarks,
+        missingRemarks: remarksPayload,
       });
       if (!validation.valid) {
         return setError(validation.message || "Admin override release is not valid.");
@@ -1099,24 +1119,31 @@ export default function useScannerLogic({
       );
     }
 
-    const overrideRemarks = missing
-      .map((item) => {
-        const remark = String(missingRemarks[item.id] || "").trim();
+    const overrideRemarks = missingPackages
+      .map((pkg) => {
+        const remark = resolveRemarkForMissingPackage(pkg, missingRemarks);
         if (!remark) return null;
-        return `${item.shipmentId}: ${remark}`;
+        return `${pkg.packageId}: ${remark}`;
       })
       .filter(Boolean)
       .join(" | ");
+
+    const remarksPayload = buildMissingRemarksForRelease(
+      missingPackages,
+      missingRemarks,
+    );
 
     const success = await executeFirebaseCall(releaseForDeliveryOperations, {
       tripId,
       shipmentIds,
       adminOverride: useAdminOverride,
-      missingRemarks,
-      missingPackages: missing.map((item) => ({
-        shipmentDocId: item.id,
-        shipmentId: item.shipmentId,
-        missingLabels: item.remainingLoaded,
+      missingRemarks: remarksPayload,
+      missingPackages: missingPackages.map((pkg) => ({
+        packageId: pkg.packageId,
+        shipmentDocId: pkg.shipmentDocId,
+        shipmentId: pkg.shipmentId,
+        pieceSuffix: pkg.pieceSuffix,
+        missingPieceIds: pkg.packageId ? [pkg.packageId] : [],
       })),
       remarks: useAdminOverride
         ? overrideRemarks ||

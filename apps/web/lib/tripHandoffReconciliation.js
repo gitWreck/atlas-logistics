@@ -1,5 +1,6 @@
 import { adminDb } from "@/lib/firebase-admin";
 import { evaluateTripLifecycleAfterReconciliation } from "@/app/utility/tripLifecycle";
+import { extractMissingPackagesFromRow, flattenMissingPackages } from "@/app/utility/reconciliationPieces";
 
 const toNumber = (value, fallback = 0) => {
   const num = Number(value);
@@ -241,7 +242,7 @@ async function buildReconciliationRow(tripRef, tripId, item, shipmentDocId) {
   const isReadyForRelease =
     onTrip && !isMissing && unloadedCount > 0 && unloadedCount >= loadedIntoTruck;
 
-  return {
+  const rowDraft = {
     id: shipmentDocId,
     shipmentId: shipment.shipmentId || item?.shipmentId || shipmentDocId,
     recipientName:
@@ -266,6 +267,11 @@ async function buildReconciliationRow(tripRef, tripId, item, shipmentDocId) {
       received: unloadedCount,
       ready: isReadyForRelease,
     },
+  };
+
+  return {
+    ...rowDraft,
+    missingPackages: isMissing ? extractMissingPackagesFromRow(rowDraft) : [],
   };
 }
 
@@ -356,9 +362,8 @@ export async function runTripHandoffReconciliation(tripId) {
   const shipments = allRows.filter((item) => item.onTrip);
   const assignedNotLoaded = allRows.filter((item) => !item.onTrip);
   const missingShipments = shipments.filter((item) => item.missing);
-  const unloadedShipments = shipments.filter(
-    (item) => !item.missing && item.unloadedCount > 0,
-  );
+  const missingPackages = flattenMissingPackages(missingShipments);
+  const unloadedShipments = shipments.filter((item) => !item.missing);
   const lifecycleEval = evaluateTripLifecycleAfterReconciliation(trip, shipments);
   const context = buildReconciliationContext(
     trip,
@@ -382,6 +387,8 @@ export async function runTripHandoffReconciliation(tripId) {
       unloadedPieces: lifecycleEval.reconciliation.unloadedPieces,
       onTruckPieces: lifecycleEval.reconciliation.onTruckPieces,
       missingPieces: lifecycleEval.reconciliation.missingPieces,
+      missingPackages: missingPackages.length,
+      missingPackageIds: missingPackages.map((entry) => entry.packageId),
     },
     lifecycle: {
       recommendedNextStatus: lifecycleEval.recommendedNextStatus,
@@ -395,6 +402,7 @@ export async function runTripHandoffReconciliation(tripId) {
     shipments,
     unloadedShipments,
     missingShipments,
+    missingPackages,
     assignedNotLoaded,
   };
 }
@@ -414,6 +422,7 @@ export function formatHandoffReconciliationResponse(payload) {
     shipments: payload.shipments,
     unloadedShipments: payload.unloadedShipments,
     missingShipments: payload.missingShipments,
+    missingPackages: payload.missingPackages || [],
     assignedNotLoaded: payload.assignedNotLoaded || [],
     promoted: payload.promoted || false,
     promotionSkippedReason: payload.promotionSkippedReason || null,
