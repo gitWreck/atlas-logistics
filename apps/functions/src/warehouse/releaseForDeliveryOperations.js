@@ -30,6 +30,7 @@ const {
   parsePackageIdentity,
   resolveRemarkForMissingPackage,
 } = require("../trips/reconciliationPieces");
+const { sealManifestAmendment } = require("../trips/manifestAmendment");
 
 if (!admin.apps.length) admin.initializeApp();
 const db = admin.firestore();
@@ -445,6 +446,36 @@ exports.releaseForDeliveryOperations = onCall(
             ),
           });
         }
+
+        const overrideAmendmentEntries = normalizedMissingPackages.map(
+          (entry) => ({
+            changeType: "LATE_FOUND",
+            shipmentId: entry.shipmentId,
+            shipmentDocId: entry.shipmentDocId,
+            packageId: entry.packageId,
+            reason: resolveRemarkForMissingPackage(
+              entry,
+              normalizedMissingRemarks,
+            ),
+            recordedBy: actorUid || null,
+            recordedByName: actorName || null,
+          }),
+        );
+
+        sealManifestAmendment({
+          tx,
+          db,
+          tripRef,
+          trip: tripData,
+          tripDocId: normalizedTripId,
+          actorId: actorUid || null,
+          actorName: actorName || actorUid || "Admin",
+          actorRole: actorRole || "admin",
+          reason:
+            normalizeString(remarks) ||
+            "Admin override release — missing packages documented in manifest addendum.",
+          entries: overrideAmendmentEntries,
+        });
       }
 
       for (const candidate of releaseCandidates) {

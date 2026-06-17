@@ -13,6 +13,7 @@ const {
   canUnlockManifest,
   resolveManifestStatus,
 } = require("./manifestStatus");
+const { resetPendingAmendmentSession } = require("./manifestAmendment");
 
 if (!admin.apps.length) admin.initializeApp();
 const db = admin.firestore();
@@ -103,6 +104,10 @@ exports.unlockTripManifest = onCall(
       };
 
       tx.update(tripRef, tripUpdate);
+
+      if (trip.manifestId) {
+        resetPendingAmendmentSession(tx, tripRef);
+      }
 
       writeCustodyAuditLog({
         db,

@@ -347,13 +347,13 @@ export default function TripDrawerFooter({
         </div>
       )}
 
-      <div className="flex gap-3 pt-1">
+      <div className="flex flex-wrap gap-3 pt-1">
         <button
           type="button"
           disabled={showUnlockReason}
           onClick={() =>
             window.open(
-              `/components/print/manifest?tripId=${data.tripId}`,
+              `/components/print/manifest?tripId=${tripDocId}`,
               "_blank",
             )
           }
@@ -364,6 +364,28 @@ export default function TripDrawerFooter({
           <FontAwesomeIcon icon={faPrint} />
           Print Manifest
         </button>
+
+        {data.latestAmendmentId ? (
+          <button
+            type="button"
+            disabled={showUnlockReason}
+            onClick={() =>
+              window.open(
+                `/components/print/manifest-amendment?amendmentId=${data.latestAmendmentId}`,
+                "_blank",
+              )
+            }
+            className={`${theme.secondaryActionButton} ${
+              showUnlockReason ? "opacity-30 pointer-events-none" : ""
+            }`}
+          >
+            <FontAwesomeIcon icon={faPrint} />
+            Print Addendum
+            {data.latestAmendmentVersion
+              ? ` (${data.latestAmendmentVersion})`
+              : ""}
+          </button>
+        ) : null}
 
         <ExportTripButton trip={data} user={user} />
       </div>

@@ -148,6 +148,8 @@ exports.generateTripManifest =
   require("./src/trips/generateTripManifest").generateTripManifest;
 exports.verifyTripManifest =
   require("./src/trips/verifyTripManifest").verifyTripManifest;
+exports.verifyManifestAmendment =
+  require("./src/trips/verifyManifestAmendment").verifyManifestAmendment;
 exports.unlockTripManifest =
   require("./src/trips/unlockTripManifest").unlockTripManifest;
 
