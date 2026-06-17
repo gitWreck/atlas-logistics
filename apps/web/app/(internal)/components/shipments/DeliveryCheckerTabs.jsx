@@ -1,4 +1,3 @@
-// Delivery Operations checker tabs — disabled for now (see ShipmentBoard.jsx).
 "use client";
 
 import React from "react";

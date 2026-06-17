@@ -26,6 +26,7 @@ import { calculateShipmentProgress } from "@/app/utility/shipmentProgress";
 import {
   shipmentMatchesDivisoriaHub,
   shipmentMatchesOdionganHub,
+  resolveShipmentPackageBreakdown,
 } from "@/app/utility/packageStatus";
 import { getBoardThemeClasses } from "@/app/utility/constant/theme";
 import UnifiedShipmentModal from "./modals/UnifiedShipmentModal";
@@ -35,14 +36,13 @@ import ReconcileAtHubModal from "./modals/ReconcileAtHubModal";
 import ReceiveReturnedModal from "./modals/ReceiveReturnedModal";
 import ReleaseToCheckerModal from "./modals/ReleaseToCheckerModal";
 import BoardTabs from "../ui/BoardTabs";
-// Delivery Operations checker tabs (disabled for now)
-// import DeliveryCheckerTabs from "./DeliveryCheckerTabs";
-// import {
-//   ALL_CHECKERS_TAB,
-//   buildDeliveryCheckerTabs,
-//   findDeliveryCheckerTab,
-//   shipmentHasCheckerPieces,
-// } from "@/app/utility/deliveryOperationsCheckers";
+import DeliveryCheckerTabs from "./DeliveryCheckerTabs";
+import {
+  ALL_CHECKERS_TAB,
+  buildDeliveryCheckerTabs,
+  findDeliveryCheckerTab,
+  shipmentHasCheckerPieces,
+} from "@/app/utility/deliveryOperationsCheckers";
 
 const SHIPMENT_BOARD_TABS = {
   ALL: "all",
@@ -56,6 +56,13 @@ const DELIVERY_OPERATION_STATUSES = new Set([
   "READY_FOR_DELIVERY",
   "OUT_FOR_DELIVERY",
   "DELIVERED",
+]);
+
+const DELIVERY_OPERATION_EXTENDED_STATUSES = new Set([
+  ...DELIVERY_OPERATION_STATUSES,
+  "PARTIALLY_OUT_FOR_DELIVERY",
+  "PARTIALLY_DELIVERED",
+  "FAILED_DELIVERY",
 ]);
 
 function getShipmentStatus(shipment) {
@@ -106,6 +113,32 @@ function matchesShipmentBoardTab(shipment, activeBoardTab) {
   return true;
 }
 
+function shipmentMatchesDeliveryCheckerPool(shipment) {
+  const status = getShipmentStatus(shipment);
+
+  if (DELIVERY_OPERATION_EXTENDED_STATUSES.has(status)) {
+    return true;
+  }
+
+  if (
+    Array.isArray(shipment.activeCheckerIds) &&
+    shipment.activeCheckerIds.length > 0
+  ) {
+    return true;
+  }
+
+  const breakdown = resolveShipmentPackageBreakdown(shipment);
+  if (
+    Number(breakdown.outForDelivery || 0) +
+      Number(breakdown.onCheckerVan || 0) >
+    0
+  ) {
+    return true;
+  }
+
+  return shipmentHasCheckerPieces(shipment);
+}
+
 const ShipmentBoard = forwardRef(function ShipmentBoard(
   { user, profile, isDark = false },
   ref,
@@ -124,8 +157,9 @@ const ShipmentBoard = forwardRef(function ShipmentBoard(
   const [editingPickup, setEditingPickup] = useState(null);
 
   const [activeBoardTab, setActiveBoardTab] = useState(SHIPMENT_BOARD_TABS.ALL);
-  // const [activeDeliveryChecker, setActiveDeliveryChecker] =
-  //   useState(ALL_CHECKERS_TAB);
+  const [activeDeliveryChecker, setActiveDeliveryChecker] =
+    useState(ALL_CHECKERS_TAB);
+  const [checkerNameById, setCheckerNameById] = useState({});
   const [activeFilter, setActiveFilter] = useState("ALL");
   const [searchQuery, setSearchQuery] = useState("");
   const [modeFilter, setModeFilter] = useState("ALL");
@@ -216,6 +250,38 @@ const ShipmentBoard = forwardRef(function ShipmentBoard(
     fetchShipments();
   }, [fetchShipments]);
 
+  useEffect(() => {
+    if (activeBoardTab !== SHIPMENT_BOARD_TABS.DELIVERY || !user) return;
+
+    let cancelled = false;
+
+    (async () => {
+      try {
+        const token = await user.getIdToken();
+        const res = await fetch("/api/checkers/active", {
+          headers: { Authorization: `Bearer ${token}` },
+          cache: "no-store",
+        });
+        if (!res.ok || cancelled) return;
+
+        const data = await res.json();
+        const map = {};
+        (data.checkers || []).forEach((checker) => {
+          if (checker?.id) {
+            map[checker.id] = checker.name || checker.id;
+          }
+        });
+        setCheckerNameById(map);
+      } catch (err) {
+        console.warn("Checker directory unavailable:", err);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeBoardTab, user]);
+
   const filteredShipments = useMemo(() => {
     return shipments.filter((shipment) => {
       const searchContent = [
@@ -281,53 +347,53 @@ const ShipmentBoard = forwardRef(function ShipmentBoard(
     delayType,
   ]);
 
-  // Delivery Operations checker tabs (disabled for now)
-  // const deliveryTabShipments = useMemo(
-  //   () =>
-  //     filteredShipments.filter((shipment) =>
-  //       matchesShipmentBoardTab(shipment, SHIPMENT_BOARD_TABS.DELIVERY),
-  //     ),
-  //   [filteredShipments],
-  // );
-  //
-  // const deliveryCheckerTabs = useMemo(
-  //   () => buildDeliveryCheckerTabs(deliveryTabShipments),
-  //   [deliveryTabShipments],
-  // );
-
-  const visibleShipments = useMemo(
+  const deliveryTabShipments = useMemo(
     () =>
       filteredShipments.filter((shipment) =>
-        matchesShipmentBoardTab(shipment, activeBoardTab),
+        shipmentMatchesDeliveryCheckerPool(shipment),
       ),
-    [activeBoardTab, filteredShipments],
+    [filteredShipments],
   );
 
-  // const visibleShipments = useMemo(() => {
-  //   let result = filteredShipments.filter((shipment) =>
-  //     matchesShipmentBoardTab(shipment, activeBoardTab),
-  //   );
-  //
-  //   if (
-  //     activeBoardTab === SHIPMENT_BOARD_TABS.DELIVERY &&
-  //     activeDeliveryChecker !== ALL_CHECKERS_TAB
-  //   ) {
-  //     const checkerTab = findDeliveryCheckerTab(
-  //       deliveryCheckerTabs,
-  //       activeDeliveryChecker,
-  //     );
-  //     result = result.filter((shipment) =>
-  //       shipmentHasCheckerPieces(shipment, activeDeliveryChecker, checkerTab),
-  //     );
-  //   }
-  //
-  //   return result;
-  // }, [
-  //   activeBoardTab,
-  //   activeDeliveryChecker,
-  //   deliveryCheckerTabs,
-  //   filteredShipments,
-  // ]);
+  const deliveryCheckerTabs = useMemo(
+    () => buildDeliveryCheckerTabs(deliveryTabShipments, checkerNameById),
+    [checkerNameById, deliveryTabShipments],
+  );
+
+  const visibleShipments = useMemo(() => {
+    if (activeBoardTab === SHIPMENT_BOARD_TABS.DELIVERY) {
+      let result = filteredShipments.filter((shipment) =>
+        shipmentMatchesDeliveryCheckerPool(shipment),
+      );
+
+      if (activeDeliveryChecker !== ALL_CHECKERS_TAB) {
+        const checkerTab = findDeliveryCheckerTab(
+          deliveryCheckerTabs,
+          activeDeliveryChecker,
+        );
+        result = result.filter((shipment) =>
+          shipmentHasCheckerPieces(
+            shipment,
+            activeDeliveryChecker,
+            checkerTab,
+            checkerNameById,
+          ),
+        );
+      }
+
+      return result;
+    }
+
+    return filteredShipments.filter((shipment) =>
+      matchesShipmentBoardTab(shipment, activeBoardTab),
+    );
+  }, [
+    activeBoardTab,
+    activeDeliveryChecker,
+    checkerNameById,
+    deliveryCheckerTabs,
+    filteredShipments,
+  ]);
 
   const boardTabs = useMemo(
     () => [
@@ -375,6 +441,7 @@ const ShipmentBoard = forwardRef(function ShipmentBoard(
     setCurrentPage(1);
   }, [
     activeBoardTab,
+    activeDeliveryChecker,
     searchQuery,
     startDate,
     endDate,
@@ -384,19 +451,19 @@ const ShipmentBoard = forwardRef(function ShipmentBoard(
     shipmentLimit,
   ]);
 
-  // useEffect(() => {
-  //   if (activeBoardTab !== SHIPMENT_BOARD_TABS.DELIVERY) {
-  //     setActiveDeliveryChecker(ALL_CHECKERS_TAB);
-  //     return;
-  //   }
-  //
-  //   const hasActiveTab = deliveryCheckerTabs.some(
-  //     (tab) => tab.key === activeDeliveryChecker,
-  //   );
-  //   if (!hasActiveTab) {
-  //     setActiveDeliveryChecker(ALL_CHECKERS_TAB);
-  //   }
-  // }, [activeBoardTab, activeDeliveryChecker, deliveryCheckerTabs]);
+  useEffect(() => {
+    if (activeBoardTab !== SHIPMENT_BOARD_TABS.DELIVERY) {
+      setActiveDeliveryChecker(ALL_CHECKERS_TAB);
+      return;
+    }
+
+    const hasActiveTab = deliveryCheckerTabs.some(
+      (tab) => tab.key === activeDeliveryChecker,
+    );
+    if (!hasActiveTab) {
+      setActiveDeliveryChecker(ALL_CHECKERS_TAB);
+    }
+  }, [activeBoardTab, activeDeliveryChecker, deliveryCheckerTabs]);
 
   const indexOfLastItem = currentPage * itemsPerPage;
   const indexOfFirstItem = indexOfLastItem - itemsPerPage;
@@ -469,10 +536,7 @@ const ShipmentBoard = forwardRef(function ShipmentBoard(
             />
           </div>
         ) : (
-          <div
-            className={`mt-6 border rounded-xl overflow-hidden shadow-xl backdrop-blur-sm ${theme.board}`}
-          >
-            {/* Delivery Operations checker tabs (disabled for now)
+          <>
             {activeBoardTab === SHIPMENT_BOARD_TABS.DELIVERY && (
               <DeliveryCheckerTabs
                 tabs={deliveryCheckerTabs}
@@ -481,7 +545,10 @@ const ShipmentBoard = forwardRef(function ShipmentBoard(
                 isDark={isDark}
               />
             )}
-            */}
+
+            <div
+              className={`mt-6 border rounded-xl overflow-hidden shadow-xl backdrop-blur-sm ${theme.board}`}
+            >
             {/* Header */}
             <div
               className={`px-4 sm:px-6 py-4 border-b flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4 ${theme.header}`}
@@ -664,6 +731,7 @@ const ShipmentBoard = forwardRef(function ShipmentBoard(
               />
             )}
           </div>
+          </>
         )}
       </main>
 

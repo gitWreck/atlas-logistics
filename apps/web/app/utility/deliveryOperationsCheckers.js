@@ -1,4 +1,4 @@
-// Delivery Operations checker tabs — disabled for now (see ShipmentBoard.jsx).
+import { resolveShipmentPackageBreakdown } from "@/app/utility/packageStatus";
 
 export const ALL_CHECKERS_TAB = "all";
 
@@ -20,50 +20,161 @@ function isLikelyFirebaseUid(value = "") {
   return /^[a-zA-Z0-9]{20,}$/.test(String(value || "").trim());
 }
 
+export function resolveCheckerUid(pkg = {}) {
+  const custodyIsChecker = normalizeStatus(pkg.custodyOwnerType) === "CHECKER";
+  const custodyId = String(pkg.custodyOwnerId || "").trim();
+
+  return (
+    String(pkg.loadedByCheckerId || "").trim() ||
+    String(pkg.deliveredByCheckerId || "").trim() ||
+    String(pkg.loadedByUid || "").trim() ||
+    (custodyIsChecker ? custodyId : "")
+  );
+}
+
+function resolveCheckerLabel(pkg = {}, checkerNameById = {}) {
+  const uid = resolveCheckerUid(pkg);
+  const name = String(
+    pkg.loadedByCheckerName ||
+      pkg.deliveredByCheckerName ||
+      pkg.loadedBy ||
+      "",
+  ).trim();
+
+  if (name && (!uid || name.toLowerCase() !== uid.toLowerCase())) {
+    return name;
+  }
+  if (uid && checkerNameById[uid]) return checkerNameById[uid];
+  return name || uid || "Checker";
+}
+
 /** Package scanned and loaded by a checker (checker has custody). */
 export function isPackageOnChecker(pkg = {}) {
   if (isExcludedCheckerPiece(pkg)) return false;
 
-  const loadedBy = String(pkg.loadedByCheckerId || "").trim();
-  if (loadedBy) return true;
+  if (resolveCheckerUid(pkg)) return true;
 
   const custody = normalizeStatus(pkg.custodyOwnerType);
   const custodyId = String(pkg.custodyOwnerId || "").trim();
-  return custody === "CHECKER" && Boolean(custodyId);
+  if (custody === "CHECKER" && custodyId) return true;
+
+  return false;
 }
 
 /**
  * Resolve checker identity from package scan/custody fields.
  * Tabs are keyed by checker user id when available; label comes from loadedByCheckerName.
  */
-export function getCheckerIdentity(pkg = {}) {
-  const loadedById = String(pkg.loadedByCheckerId || "").trim();
-  const custodyId = String(pkg.custodyOwnerId || "").trim();
-  const name = String(pkg.loadedByCheckerName || "").trim();
+export function getCheckerIdentity(pkg = {}, checkerNameById = {}) {
+  const uid = resolveCheckerUid(pkg);
   const custodyIsChecker = normalizeStatus(pkg.custodyOwnerType) === "CHECKER";
+  const custodyId = String(pkg.custodyOwnerId || "").trim();
+  const label = resolveCheckerLabel(pkg, checkerNameById);
 
-  const key =
-    loadedById ||
-    (custodyIsChecker ? custodyId : "") ||
-    name ||
-    "unknown";
+  const key = uid || (custodyIsChecker ? custodyId : "") || label || "unknown";
 
-  const label = name || loadedById || custodyId || "Checker";
-
-  return { key, label };
+  return { key, label: label || key || "Checker" };
 }
 
-function packageMatchesCheckerKey(pkg = {}, checkerKey = ALL_CHECKERS_TAB) {
+function packageMatchesCheckerKey(
+  pkg = {},
+  checkerKey = ALL_CHECKERS_TAB,
+  checkerNameById = {},
+) {
   if (checkerKey === ALL_CHECKERS_TAB) return true;
-  return getCheckerIdentity(pkg).key === checkerKey;
+  return getCheckerIdentity(pkg, checkerNameById).key === checkerKey;
 }
 
-function packageMatchesCheckerTab(pkg = {}, tab = null) {
+function packageMatchesCheckerTab(pkg = {}, tab = null, checkerNameById = {}) {
   if (!tab || tab.key === ALL_CHECKERS_TAB) return true;
 
-  const { key } = getCheckerIdentity(pkg);
+  const { key } = getCheckerIdentity(pkg, checkerNameById);
   const matchKeys = Array.isArray(tab.matchKeys) ? tab.matchKeys : [tab.key];
   return matchKeys.includes(key);
+}
+
+function addCheckerTabCount(checkerMap, { key, label, qty }) {
+  if (!key || qty <= 0) return qty;
+
+  if (!checkerMap.has(key)) {
+    checkerMap.set(key, { key, label, count: 0, matchKeys: [key] });
+  }
+
+  const row = checkerMap.get(key);
+  row.count += qty;
+  if (label && (row.label === row.key || !row.label)) {
+    row.label = label;
+  }
+
+  return qty;
+}
+
+function countCheckerPiecesFromPackages(
+  shipment = {},
+  checkerKey = ALL_CHECKERS_TAB,
+  checkerTab = null,
+  checkerNameById = {},
+) {
+  const packages = Array.isArray(shipment?.packages) ? shipment.packages : [];
+  let count = 0;
+
+  packages.forEach((pkg) => {
+    if (!isPackageOnChecker(pkg)) return;
+
+    if (checkerTab) {
+      if (!packageMatchesCheckerTab(pkg, checkerTab, checkerNameById)) return;
+    } else if (
+      !packageMatchesCheckerKey(pkg, checkerKey, checkerNameById)
+    ) {
+      return;
+    }
+
+    count += pieceQty(pkg);
+  });
+
+  return count;
+}
+
+function countShipmentCheckerPoolPieces(shipment = {}) {
+  const breakdown = resolveShipmentPackageBreakdown(shipment);
+  return (
+    Number(breakdown.outForDelivery || 0) + Number(breakdown.onCheckerVan || 0)
+  );
+}
+
+/**
+ * When piece rows are missing checker ids but shipment.activeCheckerIds and
+ * packageBreakdown show last-mile inventory, attribute the remainder to the
+ * sole active checker on that shipment.
+ */
+function countCheckerFallbackPieces(
+  shipment = {},
+  checkerKey = ALL_CHECKERS_TAB,
+  checkerNameById = {},
+) {
+  const packageCount = countCheckerPiecesFromPackages(
+    shipment,
+    ALL_CHECKERS_TAB,
+    null,
+    checkerNameById,
+  );
+  const poolCount = countShipmentCheckerPoolPieces(shipment);
+  const remainder = Math.max(poolCount - packageCount, 0);
+  if (remainder <= 0) return 0;
+
+  const activeIds = (Array.isArray(shipment.activeCheckerIds)
+    ? shipment.activeCheckerIds
+    : []
+  )
+    .map((id) => String(id || "").trim())
+    .filter(Boolean);
+
+  if (activeIds.length !== 1) return 0;
+  if (checkerKey !== ALL_CHECKERS_TAB && activeIds[0] !== checkerKey) {
+    return 0;
+  }
+
+  return remainder;
 }
 
 /**
@@ -128,34 +239,39 @@ export function countCheckerPiecesInShipment(
   shipment = {},
   checkerKey = ALL_CHECKERS_TAB,
   checkerTab = null,
+  checkerNameById = {},
 ) {
-  const packages = Array.isArray(shipment?.packages) ? shipment.packages : [];
-  let count = 0;
-
-  packages.forEach((pkg) => {
-    if (!isPackageOnChecker(pkg)) return;
-
-    if (checkerTab) {
-      if (!packageMatchesCheckerTab(pkg, checkerTab)) return;
-    } else if (!packageMatchesCheckerKey(pkg, checkerKey)) {
-      return;
-    }
-
-    count += pieceQty(pkg);
-  });
-
-  return count;
+  return (
+    countCheckerPiecesFromPackages(
+      shipment,
+      checkerKey,
+      checkerTab,
+      checkerNameById,
+    ) +
+    countCheckerFallbackPieces(shipment, checkerKey, checkerNameById)
+  );
 }
 
 export function shipmentHasCheckerPieces(
   shipment = {},
   checkerKey = ALL_CHECKERS_TAB,
   checkerTab = null,
+  checkerNameById = {},
 ) {
-  return countCheckerPiecesInShipment(shipment, checkerKey, checkerTab) > 0;
+  return (
+    countCheckerPiecesInShipment(
+      shipment,
+      checkerKey,
+      checkerTab,
+      checkerNameById,
+    ) > 0
+  );
 }
 
-export function buildDeliveryCheckerTabs(shipments = []) {
+export function buildDeliveryCheckerTabs(
+  shipments = [],
+  checkerNameById = {},
+) {
   const checkerMap = new Map();
   let totalCount = 0;
 
@@ -165,20 +281,28 @@ export function buildDeliveryCheckerTabs(shipments = []) {
     packages.forEach((pkg) => {
       if (!isPackageOnChecker(pkg)) return;
 
-      const { key, label } = getCheckerIdentity(pkg);
+      const { key, label } = getCheckerIdentity(pkg, checkerNameById);
       const qty = pieceQty(pkg);
-      totalCount += qty;
-
-      if (!checkerMap.has(key)) {
-        checkerMap.set(key, { key, label, count: 0, matchKeys: [key] });
-      }
-
-      const row = checkerMap.get(key);
-      row.count += qty;
-      if (label && row.label === row.key) {
-        row.label = label;
-      }
+      totalCount += addCheckerTabCount(checkerMap, { key, label, qty });
     });
+
+    const fallbackQty = Math.max(
+      countCheckerFallbackPieces(shipment, ALL_CHECKERS_TAB, checkerNameById),
+      0,
+    );
+    if (fallbackQty > 0) {
+      const activeId = String(shipment.activeCheckerIds[0] || "").trim();
+      const label =
+        checkerNameById[activeId] ||
+        String(shipment.assignedCheckerName || "").trim() ||
+        activeId ||
+        "Checker";
+      totalCount += addCheckerTabCount(checkerMap, {
+        key: activeId,
+        label,
+        qty: fallbackQty,
+      });
+    }
   });
 
   const checkerTabs = mergeCheckerTabsByLabel([...checkerMap.values()]).sort(
