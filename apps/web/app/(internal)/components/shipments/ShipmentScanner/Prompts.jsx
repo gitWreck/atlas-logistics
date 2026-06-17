@@ -15,6 +15,10 @@ import {
 } from "@fortawesome/free-solid-svg-icons";
 import StatusButton from "../../ui/StatusButton"; // Adjust path
 import { hasReleasableHandoffPieces } from "@/app/utility/handoffRelease";
+import {
+  flattenMissingPackages,
+  areMissingPackageRemarksComplete,
+} from "@/app/utility/reconciliationPieces";
 
 export function InterceptorPrompt({
   theme,
@@ -219,6 +223,49 @@ function ReadyShipmentRow({ item, theme, defaultExpanded = true }) {
   );
 }
 
+function MissingPackageRemarkCard({
+  pkg,
+  theme,
+  missingRemarks,
+  onRemarkChange,
+}) {
+  return (
+    <div className={`rounded-lg border p-3 ${theme.panelSurface}`}>
+      <div className="space-y-1 text-left">
+        <div className="text-[10px] font-bold uppercase opacity-50">
+          Missing Package
+        </div>
+        <div className="text-xs font-mono font-bold break-all">
+          {pkg.packageId}
+        </div>
+        <div className="text-[11px] opacity-70">
+          <span className="font-semibold">Shipment:</span>{" "}
+          <span className="font-mono">{pkg.shipmentId}</span>
+        </div>
+        {pkg.pieceSuffix ? (
+          <div className="text-[11px] opacity-70">
+            <span className="font-semibold">Missing Piece:</span>{" "}
+            <span className="font-mono">{pkg.pieceSuffix}</span>
+          </div>
+        ) : null}
+        {pkg.recipientName ? (
+          <div className="text-[11px] opacity-60 truncate">
+            {pkg.recipientName}
+            {pkg.destination ? ` - ${pkg.destination}` : ""}
+          </div>
+        ) : null}
+      </div>
+      <textarea
+        value={missingRemarks[pkg.packageId] || ""}
+        onChange={(e) => onRemarkChange(pkg.packageId, e.target.value)}
+        rows={2}
+        placeholder={`Add a remark for ${pkg.packageId}...`}
+        className={`mt-3 w-full rounded-lg border px-3 py-2 text-xs ${theme.input}`}
+      />
+    </div>
+  );
+}
+
 export function HandoffPrompt({
   theme,
   summary,
@@ -234,10 +281,15 @@ export function HandoffPrompt({
   const totals = summary?.totals || {};
   const context = summary?.context || {};
   const missingShipments = summary?.missingShipments || [];
+  const missingPackages =
+    Array.isArray(summary?.missingPackages) && summary.missingPackages.length > 0
+      ? summary.missingPackages
+      : flattenMissingPackages(missingShipments);
   const unloadedShipments = summary?.unloadedShipments || [];
-  const hasMissing = missingShipments.length > 0;
-  const remarksComplete = missingShipments.every((item) =>
-    String(missingRemarks?.[item.id] || "").trim(),
+  const hasMissing = missingPackages.length > 0;
+  const remarksComplete = areMissingPackageRemarksComplete(
+    missingPackages,
+    missingRemarks,
   );
   const lifecycleCanRelease = summary?.lifecycle?.canReleaseForDelivery !== false;
   const releaseBlockReason = summary?.lifecycle?.releaseBlockReason || null;
@@ -321,37 +373,33 @@ export function HandoffPrompt({
 
       {hasMissing ? (
         <div className="space-y-3 text-left">
+          {adminOverrideEligible ? (
+            <div className={`rounded-lg border p-3 ${theme.panelSurface}`}>
+              <div className="text-[10px] font-bold uppercase opacity-60">
+                Missing Packages ({missingPackages.length})
+              </div>
+              <ul className="mt-2 space-y-1 text-xs font-mono">
+                {missingPackages.map((pkg) => (
+                  <li key={pkg.packageId} className="flex items-start gap-2">
+                    <span className="opacity-50">•</span>
+                    <span className="break-all">{pkg.packageId}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
           <div className="text-[10px] font-bold uppercase opacity-60">
             Missing Remarks
           </div>
           <div className="space-y-3 max-h-56 overflow-y-auto pr-1">
-            {missingShipments.map((item) => (
-              <div
-                key={item.id}
-                className={`rounded-lg border p-3 ${theme.panelSurface}`}
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <div className="text-xs font-mono font-bold truncate">
-                      {item.shipmentId}
-                    </div>
-                    <div className="text-[11px] opacity-60 truncate">
-                      {item.recipientName} - {item.destination}
-                    </div>
-                  </div>
-                  <span className="shrink-0 text-[10px] font-bold text-amber-500">
-                    {item.remainingLoaded} label
-                    {item.remainingLoaded === 1 ? "" : "s"} on truck
-                  </span>
-                </div>
-                <textarea
-                  value={missingRemarks[item.id] || ""}
-                  onChange={(e) => onRemarkChange(item.id, e.target.value)}
-                  rows={2}
-                  placeholder="Add a remark for this missing label..."
-                  className={`mt-3 w-full rounded-lg border px-3 py-2 text-xs ${theme.input}`}
-                />
-              </div>
+            {missingPackages.map((pkg) => (
+              <MissingPackageRemarkCard
+                key={pkg.packageId}
+                pkg={pkg}
+                theme={theme}
+                missingRemarks={missingRemarks}
+                onRemarkChange={onRemarkChange}
+              />
             ))}
           </div>
         </div>

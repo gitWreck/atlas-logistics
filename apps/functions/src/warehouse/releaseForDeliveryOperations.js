@@ -26,6 +26,10 @@ const {
 const { MANIFEST_STATUS } = require("../trips/manifestStatus");
 const { writeCustodyAuditLog } = require("../utilities/custodyAuditLog");
 const { writeTripActionLog } = require("../utilities/tripLogger");
+const {
+  parsePackageIdentity,
+  resolveRemarkForMissingPackage,
+} = require("../trips/reconciliationPieces");
 
 if (!admin.apps.length) admin.initializeApp();
 const db = admin.firestore();
@@ -36,24 +40,67 @@ function normalizeString(value) {
 
 function normalizeMissingPackages(values = []) {
   if (!Array.isArray(values)) return [];
-  return values
-    .map((entry) => {
-      if (!entry || typeof entry !== "object") return null;
-      const shipmentDocId =
-        normalizeString(entry.shipmentDocId) ||
-        normalizeString(entry.id) ||
-        null;
-      const shipmentId =
-        normalizeString(entry.shipmentId) || shipmentDocId || null;
-      if (!shipmentDocId && !shipmentId) return null;
-      return {
-        shipmentDocId: shipmentDocId || shipmentId,
-        shipmentId: shipmentId || shipmentDocId,
-        missingLabels:
-          Number(entry.missingLabels ?? entry.remainingLoaded) || 0,
-      };
-    })
-    .filter(Boolean);
+  const normalized = [];
+  const seen = new Set();
+
+  for (const entry of values) {
+    if (!entry || typeof entry !== "object") continue;
+
+    const packageId = normalizeString(entry.packageId);
+    const shipmentDocId =
+      normalizeString(entry.shipmentDocId) ||
+      normalizeString(entry.id) ||
+      null;
+    const shipmentId =
+      normalizeString(entry.shipmentId) || shipmentDocId || null;
+    const pieceIds = Array.isArray(entry.missingPieceIds)
+      ? entry.missingPieceIds.map((value) => normalizeString(value)).filter(Boolean)
+      : [];
+
+    const pushEntry = (resolvedPackageId, resolvedShipmentId, resolvedDocId) => {
+      if (!resolvedPackageId || seen.has(resolvedPackageId)) return;
+      seen.add(resolvedPackageId);
+      const parsed = parsePackageIdentity(
+        resolvedPackageId,
+        resolvedShipmentId || null,
+      );
+      normalized.push({
+        packageId: parsed.packageId,
+        shipmentDocId: resolvedDocId || parsed.shipmentId,
+        shipmentId: parsed.shipmentId || resolvedShipmentId || resolvedDocId,
+        pieceSuffix:
+          normalizeString(entry.pieceSuffix) || parsed.pieceSuffix || null,
+      });
+    };
+
+    if (packageId) {
+      pushEntry(packageId, shipmentId, shipmentDocId);
+      continue;
+    }
+
+    if (pieceIds.length > 0) {
+      for (const pieceId of pieceIds) {
+        pushEntry(pieceId, shipmentId, shipmentDocId);
+      }
+      continue;
+    }
+
+    if (!shipmentDocId && !shipmentId) continue;
+
+    const legacyKey = shipmentDocId || shipmentId;
+    if (seen.has(legacyKey)) continue;
+    seen.add(legacyKey);
+    normalized.push({
+      packageId: shipmentId,
+      shipmentDocId: shipmentDocId || shipmentId,
+      shipmentId: shipmentId || shipmentDocId,
+      pieceSuffix: null,
+      missingLabels:
+        Number(entry.missingLabels ?? entry.remainingLoaded) || 0,
+    });
+  }
+
+  return normalized;
 }
 
 function normalizeMissingRemarks(value = {}) {
@@ -69,16 +116,30 @@ function normalizeMissingRemarks(value = {}) {
 function buildAdminOverrideAuditNote({
   tripId,
   missingPackageId,
+  shipmentId,
+  pieceSuffix,
   reason,
   actorName,
+  timestamp,
 }) {
-  return [
+  const lines = [
     "ADMIN OVERRIDE RELEASE",
     `Trip: ${tripId}`,
     `Missing Package: ${missingPackageId}`,
+    `Shipment: ${shipmentId}`,
+  ];
+
+  if (pieceSuffix) {
+    lines.push(`Missing Piece: ${pieceSuffix}`);
+  }
+
+  lines.push(
     `Reason: ${reason}`,
     `Released By: ${actorName}`,
-  ].join("\n");
+    `Timestamp: ${timestamp}`,
+  );
+
+  return lines.join("\n");
 }
 
 function normalizeStringList(values = []) {
@@ -314,13 +375,14 @@ exports.releaseForDeliveryOperations = onCall(
         tripUpdate.adminOverrideReleaseByName = actorName || null;
         tripUpdate.reconciliationVariance = {
           missingPackages: normalizedMissingPackages.map((entry) => ({
+            packageId: entry.packageId,
             shipmentDocId: entry.shipmentDocId,
             shipmentId: entry.shipmentId,
-            missingLabels: entry.missingLabels,
-            remark:
-              normalizedMissingRemarks[entry.shipmentDocId] ||
-              normalizedMissingRemarks[entry.shipmentId] ||
-              null,
+            pieceSuffix: entry.pieceSuffix,
+            remark: resolveRemarkForMissingPackage(
+              entry,
+              normalizedMissingRemarks,
+            ),
           })),
           releasedBy: actorName || actorUid || null,
           releasedAt: nowTs,
@@ -328,19 +390,40 @@ exports.releaseForDeliveryOperations = onCall(
 
         tx.update(tripRef, tripUpdate);
 
+        const missingByShipment = new Map();
         for (const entry of normalizedMissingPackages) {
-          const remark =
-            normalizedMissingRemarks[entry.shipmentDocId] ||
-            normalizedMissingRemarks[entry.shipmentId] ||
-            "";
+          const docId = entry.shipmentDocId;
+          if (!missingByShipment.has(docId)) {
+            missingByShipment.set(docId, []);
+          }
+          missingByShipment.get(docId).push(entry);
+        }
+
+        for (const [shipmentDocId, entries] of missingByShipment.entries()) {
+          const packageEntries = entries.map((entry) => ({
+            packageId: entry.packageId,
+            shipmentId: entry.shipmentId,
+            pieceSuffix: entry.pieceSuffix,
+            remark: resolveRemarkForMissingPackage(
+              entry,
+              normalizedMissingRemarks,
+            ),
+          }));
+          const combinedRemarks = packageEntries
+            .map((entry) =>
+              entry.remark ? `${entry.packageId}: ${entry.remark}` : null,
+            )
+            .filter(Boolean)
+            .join(" | ");
           const tripShipmentRef = tripRef
             .collection("trip_shipments")
-            .doc(entry.shipmentDocId);
+            .doc(shipmentDocId);
 
           tx.set(
             tripShipmentRef,
             {
-              missingRemarks: remark,
+              missingPackages: packageEntries,
+              missingRemarks: combinedRemarks || null,
               missingOnReconciliation: true,
               adminOverrideResolved: true,
               updatedAt: now,
@@ -348,11 +431,18 @@ exports.releaseForDeliveryOperations = onCall(
             },
             { merge: true },
           );
+        }
 
+        for (const entry of normalizedMissingPackages) {
           adminOverrideAuditEntries.push({
             tripId: tripPublicId,
-            missingPackageId: entry.shipmentId,
-            reason: remark,
+            missingPackageId: entry.packageId,
+            shipmentId: entry.shipmentId,
+            pieceSuffix: entry.pieceSuffix,
+            reason: resolveRemarkForMissingPackage(
+              entry,
+              normalizedMissingRemarks,
+            ),
           });
         }
       }
@@ -439,12 +529,24 @@ exports.releaseForDeliveryOperations = onCall(
     } = txResult;
 
     if (useAdminOverride && normalizedTripId && tripPublicId) {
+      const auditTimestamp = new Date().toLocaleString("en-PH", {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+        hour: "numeric",
+        minute: "2-digit",
+        second: "2-digit",
+      });
+
       for (const entry of adminOverrideAuditEntries) {
         const auditNote = buildAdminOverrideAuditNote({
           tripId: entry.tripId,
           missingPackageId: entry.missingPackageId,
+          shipmentId: entry.shipmentId,
+          pieceSuffix: entry.pieceSuffix,
           reason: entry.reason,
           actorName: actorName || actorUid || "Admin",
+          timestamp: auditTimestamp,
         });
 
         await writeCustodyAuditLog({
@@ -461,6 +563,8 @@ exports.releaseForDeliveryOperations = onCall(
           note: auditNote,
           meta: {
             missingPackageId: entry.missingPackageId,
+            shipmentId: entry.shipmentId,
+            pieceSuffix: entry.pieceSuffix || null,
             adminOverride: true,
           },
         });

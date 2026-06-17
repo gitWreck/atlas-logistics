@@ -127,6 +127,11 @@ function evaluateReconciliationRows(rows = []) {
     0,
   );
   const missingPieces = Math.max(manifestPieces - unloadedPieces, 0);
+  const missingPackageIds = missingShipments.flatMap((row) =>
+    Array.isArray(row.missingPackages)
+      ? row.missingPackages.map((entry) => entry.packageId).filter(Boolean)
+      : [],
+  );
 
   return {
     manifestShipments: shipments.length,
@@ -136,6 +141,8 @@ function evaluateReconciliationRows(rows = []) {
     unloadedPieces,
     onTruckPieces,
     missingPieces,
+    missingPackages: missingPackageIds.length,
+    missingPackageIds,
     ready: shipments.length > 0 && missingShipments.length === 0,
     missingShipmentIds: missingShipments
       .map((row) => row.id || row.shipmentId)
@@ -324,21 +331,20 @@ const ADMIN_OVERRIDE_RECEIVING_STATUSES = new Set([
 
 /**
  * Validate admin override release when reconciliation counts do not match.
- * missingPackages: [{ shipmentDocId, shipmentId, missingLabels? }]
+ * missingPackages: [{ packageId, shipmentDocId, shipmentId, pieceSuffix? }]
  */
 function validateAdminOverrideRelease({
   trip = {},
   missingPackages = [],
   missingRemarks = {},
 } = {}) {
+  const { resolveRemarkForMissingPackage } = require("./reconciliationPieces");
   const entries = Array.isArray(missingPackages) ? missingPackages : [];
 
   for (const entry of entries) {
-    const docId = entry?.shipmentDocId || entry?.id || null;
-    const publicId = entry?.shipmentId || docId || "unknown";
-    const remark = String(
-      missingRemarks[docId] || missingRemarks[publicId] || "",
-    ).trim();
+    const remark = resolveRemarkForMissingPackage(entry, missingRemarks);
+    const publicId =
+      entry?.packageId || entry?.shipmentId || entry?.shipmentDocId || "unknown";
 
     if (!remark) {
       return {

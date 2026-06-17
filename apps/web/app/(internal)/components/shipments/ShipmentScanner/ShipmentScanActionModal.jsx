@@ -354,10 +354,10 @@ export default function ShipmentScanActionModal({
               tripId={state.tripId}
               missingRemarks={state.missingRemarks}
               isAdmin={state.isAdmin}
-              onRemarkChange={(shipmentId, value) =>
+              onRemarkChange={(packageId, value) =>
                 actions.setMissingRemarks((prev) => ({
                   ...prev,
-                  [shipmentId]: value,
+                  [packageId]: value,
                 }))
               }
               onRelease={actions.handleReleaseShipmentsFromTrip}
