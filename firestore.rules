@@ -203,6 +203,16 @@ service cloud.firestore {
         allow read: if isStaff();
         allow create, update, delete: if false;
       }
+
+      match /manifest_amendments/{amendmentId} {
+        allow read: if isAdminOrManager();
+        allow create, update, delete: if false;
+      }
+
+      match /manifest_events/{eventId} {
+        allow read: if isAdminOrManager();
+        allow create, update, delete: if false;
+      }
     }
 
     // Custody event ledger (append-only via Cloud Functions)
@@ -213,6 +223,17 @@ service cloud.firestore {
 
     match /delivery_manifests/{manifestId} {
       allow read: if canReadDeliveryManifest();
+      allow create, update, delete: if false;
+    }
+
+    // Sealed linehaul manifests and amendments (server-written; staff read)
+    match /manifests/{manifestId} {
+      allow read: if isAdminOrManager();
+      allow create, update, delete: if false;
+    }
+
+    match /manifest_amendments/{amendmentId} {
+      allow read: if isAdminOrManager();
       allow create, update, delete: if false;
     }
 

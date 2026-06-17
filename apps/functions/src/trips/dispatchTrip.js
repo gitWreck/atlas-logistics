@@ -21,6 +21,7 @@ const {
   isHubTransferTrip,
   MANIFEST_STATUS,
 } = require("./manifestStatus");
+const { sealManifestAmendment } = require("./manifestAmendment");
 
 if (!admin.apps.length) admin.initializeApp();
 const db = admin.firestore();
@@ -67,6 +68,8 @@ exports.dispatchTrip = onCall(
     const timestamp = FieldValue.serverTimestamp();
 
     await db.runTransaction(async (tx) => {
+      const freshTripSnap = await tx.get(tripRef);
+      const freshTrip = freshTripSnap.data() || trip;
       const shipmentWrites = [];
 
       for (const tripShipDoc of shipQuery.docs) {
@@ -192,6 +195,22 @@ exports.dispatchTrip = onCall(
           : "Trip dispatched from origin hub.",
         timestamp,
       });
+
+      if (isCorrectionDispatch) {
+        sealManifestAmendment({
+          tx,
+          db,
+          tripRef,
+          trip: freshTrip,
+          tripDocId: tripId,
+          actorId: uid,
+          actorName,
+          actorRole: req.auth.token?.role || null,
+          reason:
+            freshTrip.manifestReopenReason ||
+            "Correction dispatch — manifest addendum sealed.",
+        });
+      }
     });
 
     const tripContext = extractTripEventContext(trip, tripId);

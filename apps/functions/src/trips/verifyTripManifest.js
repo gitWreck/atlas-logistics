@@ -80,11 +80,8 @@ exports.verifyTripManifest = onRequest(
         const payloadToHash = {
           manifestId: data.manifestId,
           tripId: data.tripId,
-          // Status is NOT part of the hash usually, but if you included it in generation, include it here.
-          // Based on previous code, we hashed the 'payload' object BEFORE adding 'hash' or 'createdAt'.
-
-          // We need to match the structure from generateTripManifest Step 6:
-          status: "LOCKED", // This was hardcoded in the payload in generation script
+          status: "LOCKED",
+          ...(data.version ? { version: data.version } : {}),
 
           trip: {
             tripCode: data.trip?.tripCode || null,
