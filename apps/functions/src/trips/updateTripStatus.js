@@ -18,6 +18,7 @@ const { broadcastTripLogic } = require("../messaging/broadcastTripMessage"); // 
 const { STATUS_MESSAGES } = require("../utilities/dataDetails");
 const { writeTripActionLog } = require("../utilities/tripLogger");
 const { MANIFEST_STATUS } = require("./manifestStatus");
+const { sealTripDeliveryManifest } = require("./tripDeliveryManifest");
 
 if (!admin.apps.length) admin.initializeApp();
 const db = admin.firestore();
@@ -109,12 +110,27 @@ exports.updateTripStatus = onCall(
         updates.cancelledAt = admin.firestore.FieldValue.serverTimestamp();
       }
 
-      // C. If Reactivating (e.g. from Completed back to In Transit)
+      // C. If Reactivating (e.g. from Completed back to an operational status)
       else if (["CREATED", "LOADED", "IN_TRANSIT"].includes(newStatus)) {
         updates.active = true;
         // Clear completion data if we are 'undoing' a completion
         updates.completedAt = admin.firestore.FieldValue.delete();
         updates.cancelledAt = admin.firestore.FieldValue.delete();
+      }
+
+      // D. Undo mistaken completion while keeping hub trip at ARRIVED (or LOADING)
+      if (
+        newStatus !== "COMPLETED" &&
+        newStatus !== "CANCELLED" &&
+        (String(oldStatus || "").toUpperCase() === "COMPLETED" ||
+          tripSnap.data().completedAt ||
+          tripSnap.data().active === false)
+      ) {
+        updates.active = true;
+        updates.completedAt = admin.firestore.FieldValue.delete();
+        updates.autoCompletedAt = admin.firestore.FieldValue.delete();
+        updates.autoCompletedReason = admin.firestore.FieldValue.delete();
+        updates.autoCompletedBy = admin.firestore.FieldValue.delete();
       }
 
       // 3. Apply Update
@@ -258,6 +274,20 @@ exports.updateTripStatus = onCall(
           // Don't throw error here, or you will roll back the Status Update!
           // We want the status to change even if SMS fails.
         }
+      }
+    }
+
+    if (newStatus === "COMPLETED") {
+      try {
+        await sealTripDeliveryManifest({
+          db,
+          tripDocId: tripId,
+          actorId: uid,
+          actorName: name || null,
+          actorRole: role || null,
+        });
+      } catch (error) {
+        console.warn("Delivery manifest seal skipped:", error?.message || error);
       }
     }
 

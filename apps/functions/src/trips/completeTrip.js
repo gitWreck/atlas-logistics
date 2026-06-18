@@ -3,6 +3,7 @@
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const admin = require("firebase-admin");
 const { writeTripActionLog } = require("../utilities/tripLogger");
+const { sealTripDeliveryManifest } = require("./tripDeliveryManifest");
 
 if (!admin.apps.length) admin.initializeApp();
 const db = admin.firestore();
@@ -63,7 +64,7 @@ exports.completeTrip = onCall(
     const tripRef = db.collection("truck_trips").doc(tripDocId);
     const pkgsRef = tripRef.collection("trip_packages");
 
-    return db.runTransaction(async (tx) => {
+    const result = await db.runTransaction(async (tx) => {
       const role = await assertAdminOrManager(tx, uid);
 
       const tripSnap = await tx.get(tripRef);
@@ -188,7 +189,23 @@ exports.completeTrip = onCall(
         totalCount,
         totalDelivered,
         status: "COMPLETED",
+        actorRole: role,
+        actorName: req.auth.token?.name || null,
       };
     });
-  }
+
+    try {
+      await sealTripDeliveryManifest({
+        db,
+        tripDocId,
+        actorId: uid,
+        actorName: result.actorName || null,
+        actorRole: result.actorRole || null,
+      });
+    } catch (error) {
+      console.warn("Delivery manifest seal skipped:", error?.message || error);
+    }
+
+    return result;
+  },
 );
