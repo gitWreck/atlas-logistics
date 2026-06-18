@@ -35,6 +35,8 @@ import TripDeliveryPoolSummary from "./TripDeliveryPoolSummary";
 import TripLoadSummary from "./TripLoadSummary";
 import TripShipmentProgressCell from "./TripShipmentProgressCell";
 import { aggregateTripLoadSummary } from "@/app/utility/tripStats";
+import { isCompletedTrip } from "./tripHelpers";
+import TripCompletedManifestsView from "./TripCompletedManifestsView";
 
 export default function TripManifestTab({
   shipments = [],
@@ -57,6 +59,7 @@ export default function TripManifestTab({
   onCreateInvoice,
   onViewInvoice,
   profile,
+  user = null,
 }) {
   const [search, setSearch] = useState("");
   const [selectedIds, setSelectedIds] = useState(new Set());
@@ -302,6 +305,18 @@ export default function TripManifestTab({
       </button>
     </div>
   );
+
+  if (isCompletedTrip(trip)) {
+    return (
+      <TripCompletedManifestsView
+        trip={trip}
+        user={user}
+        profile={profile}
+        isDark={isDark}
+        onRefresh={onRefresh}
+      />
+    );
+  }
 
   return (
     <>

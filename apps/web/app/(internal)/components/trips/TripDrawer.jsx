@@ -28,6 +28,7 @@ import { updateShipmentPackages } from "@/app/utility/FirebaseFunctions";
 import { getDrawerThemeClasses } from "@/app/utility/constant/theme";
 import { isManifestEditable } from "@/app/utility/manifestStatus";
 import { updatedBy } from "@/app/utility/utilities";
+import { isCompletedTrip } from "./tripHelpers";
 
 export default function TripDrawer({
   isOpen,
@@ -108,6 +109,11 @@ export default function TripDrawer({
   }, [isOpen, data?.tripId]);
 
   if (!data) return null;
+
+  const completedTrip = isCompletedTrip(data);
+  const manifestTabLabel = completedTrip
+    ? `Manifests (${data.deliveryManifestId && data.manifestId ? 2 : data.manifestLocked || data.deliveryManifestId ? 1 : 0})`
+    : `Manifest (${shipments.length})`;
 
   async function fetchScannerApi(endpoint, payload) {
     const token = await user?.getIdToken();
@@ -239,7 +245,7 @@ export default function TripDrawer({
             isActive={activeTab === "MANIFEST"}
             onClick={() => setActiveTab("MANIFEST")}
             icon={faClipboardList}
-            label={`Manifest (${shipments.length})`}
+            label={manifestTabLabel}
           />
 
           <DrawerTabButton
@@ -292,6 +298,7 @@ export default function TripDrawer({
               onViewInvoice={handleViewInvoice}
               onCreateInvoice={openCreateInvoice}
               profile={profile}
+              user={user}
             />
           )}
 

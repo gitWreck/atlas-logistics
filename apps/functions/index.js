@@ -146,6 +146,8 @@ exports.deleteShipment =
 // Manifests & Certificates
 exports.generateTripManifest =
   require("./src/trips/generateTripManifest").generateTripManifest;
+exports.generateTripDeliveryManifest =
+  require("./src/trips/generateTripDeliveryManifest").generateTripDeliveryManifest;
 exports.verifyTripManifest =
   require("./src/trips/verifyTripManifest").verifyTripManifest;
 exports.verifyManifestAmendment =

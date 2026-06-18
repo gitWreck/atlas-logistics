@@ -101,6 +101,8 @@ export default function TripDrawerFooter({
   const showCancelTrip = canManageLifecycle && canCancelTrip(data);
   const showArchiveTrip = canManageLifecycle && canArchiveTrip(data);
   const showLifecycleSection = showCancelTrip || showArchiveTrip || canAudit;
+  const completedTrip = String(data.status || "").toUpperCase() === "COMPLETED" ||
+    String(data.status || "").toUpperCase() === "DELIVERED";
 
   const handleUnlockSuccess = () => {
     setTimeout(() => {
@@ -108,6 +110,8 @@ export default function TripDrawerFooter({
       setUnlockReason("");
     }, 1500);
   };
+
+  if (completedTrip) return null;
 
   return (
     <div className={`p-4 border-t flex flex-col gap-3 ${theme.footerPanel}`}>

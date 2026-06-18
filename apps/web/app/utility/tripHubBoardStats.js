@@ -640,6 +640,9 @@ export function getShipmentTripProgressDisplay(tripShipment = {}, trip = {}) {
   );
   const tripScopedTotal = resolveTripScopedPieceTotal(tripShipment);
   const hubPhase = isHubTransferTrip(trip) ? resolveHubBoardPhase(trip) : null;
+  const shipmentStatus = normalizeStatus(
+    tripShipment.masterStatus || tripShipment.status,
+  );
 
   if (
     hubPhase === HUB_BOARD_PHASE.UNLOADING ||
@@ -671,6 +674,20 @@ export function getShipmentTripProgressDisplay(tripShipment = {}, trip = {}) {
       tripId,
     );
     return buildShipmentProgressResult(delivered, tripScopedTotal);
+  }
+
+  // Shipment hub-received but trip metadata still IN_TRANSIT (stale / manual repair).
+  if (["ARRIVED", "PARTIALLY_ARRIVED"].includes(shipmentStatus)) {
+    const received = countHubReceivedTripScopedPieces(
+      scopedPackages,
+      tripShipment,
+    );
+    const storedReceived = clampCount(
+      tripShipment.receivedCount ?? tripShipment.deliveredCount,
+    );
+    const count = Math.max(received, storedReceived);
+    const total = Math.max(tripScopedTotal, count, storedReceived);
+    return buildShipmentProgressResult(count, total);
   }
 
   const delivered = countDeliveredTripScopedPieces(
