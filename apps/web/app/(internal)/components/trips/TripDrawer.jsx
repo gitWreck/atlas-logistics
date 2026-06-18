@@ -8,6 +8,7 @@ import {
   faWrench,
   faUnlock,
   faTimes,
+  faSync,
 } from "@fortawesome/free-solid-svg-icons";
 
 import TripTimelineTab from "./TripTimelineTab";
@@ -47,6 +48,7 @@ export default function TripDrawer({
     useState(null);
   const [isBulkModalOpen, setBulkModalOpen] = useState(false);
   const [isScanModalOpen, setScanModalOpen] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
   const theme = getDrawerThemeClasses(isDark);
 
@@ -161,6 +163,17 @@ export default function TripDrawer({
     await openInvoiceDetailsById(shipment?.invoiceId, shipment);
   };
 
+  const handleRefresh = async () => {
+    if (!data?.tripId || refreshing) return;
+
+    setRefreshing(true);
+    try {
+      await Promise.all([fetchShipments(), onRefreshTrips?.()]);
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
   return (
     <>
       <div
@@ -208,7 +221,6 @@ export default function TripDrawer({
           </div>
 
           <div className="flex items-center gap-2 shrink-0">
-            {/* New Modal Button */}
             <button
               type="button"
               onClick={() => setScanModalOpen(true)}
@@ -216,7 +228,20 @@ export default function TripDrawer({
             >
               Scan
             </button>
-            {/* Close Button */}
+            <button
+              type="button"
+              onClick={handleRefresh}
+              disabled={refreshing || loadingShips}
+              className={`p-2 rounded-lg transition-colors ${theme.closeButton}`}
+              title="Refresh trip"
+              aria-label="Refresh trip"
+            >
+              <FontAwesomeIcon
+                icon={faSync}
+                spin={refreshing || loadingShips}
+                className="w-4 h-4"
+              />
+            </button>
             <button
               type="button"
               onClick={onClose}
