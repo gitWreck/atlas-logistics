@@ -23,6 +23,7 @@ import DelayWidget from "../delay/DelayWidget";
 import RecentAlertsLogs from "../logs/RecentAlertsLogs";
 import RecentAdminLogs from "../logs/RecentAdminLogs";
 import RecentSmsLogs from "../logs/RecentSmsLogs";
+import NotificationHistory from "../logs/NotificationHistory";
 import Statistics from "../statistics/Statistics";
 import { getOverviewThemeClasses } from "@/app/utility/constant/theme";
 
@@ -288,6 +289,7 @@ export default function AdminOverview({ user, isDark = false }) {
       {/* <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8"></div> */}
       <RecentAdminLogs isDark={isDark} />
       <RecentSmsLogs isDark={isDark} />
+      <NotificationHistory isDark={isDark} />
       <RecentAlertsLogs isDark={isDark} />
 
       <AddUserModal

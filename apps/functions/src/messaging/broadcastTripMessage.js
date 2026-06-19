@@ -1,26 +1,25 @@
 "use strict";
 
+const crypto = require("crypto");
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const admin = require("firebase-admin");
 const { assertAdminOrManager } = require("../system/authGuards");
 const { writeMessagingActionLog } = require("../utilities/messagingLogger");
-
-// 1. IMPORT EVERYTHING FROM SHARED SERVICE
-// We get the function AND the Secret definitions from one place.
 const {
-  sendSmsViaProvider,
   SEMAPHORE_API_KEY,
   SEMAPHORE_SENDER_NAME,
 } = require("../../shared/sms-service");
+const {
+  CUSTOMER_NOTIFICATION_TYPES,
+  sendTripCustomerNotifications,
+} = require("../notifications/customerNotificationService");
 
 if (!admin.apps.length) admin.initializeApp();
 const db = admin.firestore();
 
 /**
- * ==================================================================
- * CORE LOGIC: broadcastTripLogic
- * Purpose: Reusable function to blast SMS to all customers on a trip.
- * ==================================================================
+ * Broadcast SMS to trip customers with deduplication.
+ * Manual broadcasts use a message-hash suffix so identical blasts are deduped.
  */
 async function broadcastTripLogic({
   tripId,
@@ -29,90 +28,63 @@ async function broadcastTripLogic({
   type = "BROADCAST",
   actorName = null,
   actorRole = null,
+  notificationType = null,
+  channels = { sms: true, email: false, push: false },
 }) {
   if (!tripId || !message) {
     throw new Error("Missing tripId or message for broadcast.");
   }
 
-  // 1. Fetch Shipments to find recipients
-  const shipmentsSnap = await db
-    .collection("shipments")
-    .where("currentTripId", "==", tripId)
-    .get();
+  const db = admin.firestore();
+  const resolvedType =
+    notificationType ||
+    `${CUSTOMER_NOTIFICATION_TYPES.MANUAL_BROADCAST}_${crypto
+      .createHash("sha1")
+      .update(String(message))
+      .digest("hex")
+      .slice(0, 10)}`;
 
-  if (shipmentsSnap.empty) {
-    console.log(`[Broadcast] Trip ${tripId} has no shipments. Skipping.`);
-    return { success: true, count: 0, sent: 0, failed: 0 };
-  }
-
-  // 2. Extract Unique Phone Numbers (Deduplication)
-  const recipients = new Map();
-
-  shipmentsSnap.forEach((doc) => {
-    const data = doc.data();
-    const phone = data.recipient?.phone;
-
-    if (phone && typeof phone === "string" && phone.length >= 10) {
-      recipients.set(phone, {
-        phone,
-        name: data.recipient?.name || "Customer",
-      });
-    }
+  const result = await sendTripCustomerNotifications({
+    db,
+    tripId,
+    notificationType: resolvedType,
+    channels,
+    customSmsMessage: String(message).trim(),
+    customEmail: {
+      subject: "Atlas Transport update",
+      text: String(message).trim(),
+      html: `<p>${String(message).trim()}</p>`,
+    },
+    customPush: String(message).trim(),
+    actor: {
+      uid: actorUid || "SYSTEM",
+      name: actorName || "SYSTEM",
+      role: actorRole || "SYSTEM",
+    },
+    source: type,
   });
 
-  const uniqueList = Array.from(recipients.values());
-  const totalRecipients = uniqueList.length;
+  const sent =
+    result.results?.reduce(
+      (sum, entry) =>
+        sum +
+        (entry.channelResults || []).filter((row) => row.sent === true).length,
+      0,
+    ) || result.sent || 0;
 
-  if (totalRecipients === 0) {
-    console.log(
-      `[Broadcast] Trip ${tripId} has shipments but no valid phones.`,
-    );
-    return { success: true, count: 0, sent: 0, failed: 0 };
-  }
-
-  console.log(
-    `[Broadcast] Starting ${type} for Trip ${tripId} to ${totalRecipients} unique numbers.`,
-  );
-
-  // 3. Send Messages
-  const results = await Promise.allSettled(
-    uniqueList.map(async (recipient) => {
-      try {
-        // This calls the shared function which uses .value() internally
-        await sendSmsViaProvider({ phone: recipient.phone, message });
-        return { status: "fulfilled", phone: recipient.phone };
-      } catch (err) {
-        console.error(
-          `[Broadcast] Failed to send to ${recipient.phone}:`,
-          err.message,
-        );
-        return {
-          status: "rejected",
-          phone: recipient.phone,
-          error: err.message,
-        };
-      }
-    }),
-  );
-
-  // 4. Calculate Stats
-  const successCount = results.filter((r) => r.status === "fulfilled").length;
-  const failCount = totalRecipients - successCount;
-
-  // 5. Audit / Logging
   try {
     await writeMessagingActionLog({
       db,
-      type: type,
+      type,
       tripId,
       message,
       actorId: actorUid || "SYSTEM",
       actorName: actorName || null,
       actorRole: actorRole || null,
       requestedBy: actorName || "SYSTEM",
-      totalTargets: totalRecipients,
-      successCount,
-      failCount,
+      totalTargets: result.customers || 0,
+      successCount: sent,
+      failCount: Math.max((result.customers || 0) - sent, 0),
       provider: "semaphore",
       at: admin.firestore.FieldValue.serverTimestamp(),
     });
@@ -122,24 +94,17 @@ async function broadcastTripLogic({
 
   return {
     success: true,
-    total: totalRecipients,
-    sent: successCount,
-    failed: failCount,
+    total: result.customers || 0,
+    sent,
+    failed: Math.max((result.customers || 0) - sent, 0),
+    deduped: result,
   };
 }
 
-/**
- * ==================================================================
- * CLOUD FUNCTION: broadcastTripMessage
- * Purpose: The API endpoint callable from the Frontend (React)
- * ==================================================================
- */
 exports.broadcastTripMessage = onCall(
   {
     region: "asia-southeast1",
     maxInstances: 10,
-    // 2. PASS THE IMPORTED SECRETS HERE
-    // This allows this function to access the keys needed by sendSmsViaProvider
     secrets: [SEMAPHORE_API_KEY, SEMAPHORE_SENDER_NAME],
     timeoutSeconds: 300,
     memory: "256MiB",
@@ -149,7 +114,7 @@ exports.broadcastTripMessage = onCall(
     const { tripId, message } = request.data;
 
     try {
-      const result = await broadcastTripLogic({
+      return await broadcastTripLogic({
         tripId,
         message,
         actorUid: actor.uid,
@@ -157,8 +122,6 @@ exports.broadcastTripMessage = onCall(
         actorRole: actor.role,
         type: "MANUAL_BROADCAST",
       });
-
-      return result;
     } catch (error) {
       console.error("Broadcast Logic Failed:", error);
       throw new HttpsError("internal", error.message);
@@ -166,5 +129,4 @@ exports.broadcastTripMessage = onCall(
   },
 );
 
-// 3. EXPORT THE LOGIC so updateTripStatus.js can use it
 exports.broadcastTripLogic = broadcastTripLogic;

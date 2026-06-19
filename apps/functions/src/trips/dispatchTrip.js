@@ -36,7 +36,8 @@ exports.dispatchTrip = onCall(
     const uid = req.auth.uid;
 
     const userSnap = await db.collection("users").doc(uid).get();
-    const actorName = String(userSnap.data()?.name || "").trim() || "Unknown User";
+    const actorName =
+      String(userSnap.data()?.name || "").trim() || "Unknown User";
 
     const tripRef = db.collection("truck_trips").doc(tripId);
     const tripSnap = await tripRef.get();
@@ -122,29 +123,32 @@ exports.dispatchTrip = onCall(
         });
       }
 
-      tx.update(tripRef, isCorrectionDispatch
-        ? {
-            status: "ARRIVED",
-            manifestStatus: MANIFEST_STATUS.LOCKED,
-            manifestLocked: true,
-            correctionDispatchedAt: timestamp,
-            correctionDispatchedBy: uid,
-            correctionDispatchedByName: actorName,
-            updatedAt: timestamp,
-            updatedBy: actorName,
-          }
-        : {
-            status: "IN_TRANSIT",
-            manifestStatus: MANIFEST_STATUS.LOCKED,
-            manifestLocked: true,
-            startedAt: timestamp,
-            dispatchedAt: timestamp,
-            dispatchedBy: uid,
-            dispatchedByName: actorName,
-            updatedAt: timestamp,
-            updatedBy: actorName,
-            startedBy: uid,
-          });
+      tx.update(
+        tripRef,
+        isCorrectionDispatch
+          ? {
+              status: "ARRIVED",
+              manifestStatus: MANIFEST_STATUS.LOCKED,
+              manifestLocked: true,
+              correctionDispatchedAt: timestamp,
+              correctionDispatchedBy: uid,
+              correctionDispatchedByName: actorName,
+              updatedAt: timestamp,
+              updatedBy: actorName,
+            }
+          : {
+              status: "IN_TRANSIT",
+              manifestStatus: MANIFEST_STATUS.LOCKED,
+              manifestLocked: true,
+              startedAt: timestamp,
+              dispatchedAt: timestamp,
+              dispatchedBy: uid,
+              dispatchedByName: actorName,
+              updatedAt: timestamp,
+              updatedBy: actorName,
+              startedBy: uid,
+            },
+      );
 
       for (const {
         tripShipRef,
