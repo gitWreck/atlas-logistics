@@ -4,11 +4,16 @@ import {
   faBoxOpen,
   faWineGlass,
   faSnowflake,
+  faEllipsisV,
+  faPen,
 } from "@fortawesome/free-solid-svg-icons";
 import StatusBadge from "../../ui/StatusBadge";
 import PackageActionModal from "./PackageActionModal";
+import PieceStatusOverrideModal from "./PieceStatusOverrideModal";
 import ShipmentLabel from "../ShipmentLabel";
 import { useState } from "react";
+import { useAuth } from "@/app/context/AuthContext";
+import { canOverridePieceStatus } from "@/app/utility/roleAccess";
 
 // --- SUB-COMPONENT: MOBILE CARD ROW ---
 export default function PackageMobileCard({
@@ -16,9 +21,16 @@ export default function PackageMobileCard({
   idx,
   shipmentData,
   isDark = false,
+  onRefresh,
+  profile = null,
 }) {
+  const { profile: authProfile } = useAuth();
+  const effectiveProfile = profile || authProfile;
+  const showPieceStatusOverride = canOverridePieceStatus(effectiveProfile);
+
   const [showQR, setShowQR] = useState(false);
   const [showActionModal, setShowActionModal] = useState(false);
+  const [showStatusModal, setShowStatusModal] = useState(false);
 
   return (
     <div
@@ -44,8 +56,22 @@ export default function PackageMobileCard({
           </div>
         </div>
 
-        <button
-          onClick={() => setShowQR(!showQR)}
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={() => setShowActionModal(true)}
+            className={`w-8 h-8 rounded inline-flex items-center justify-center transition-all ${
+              isDark
+                ? "bg-slate-800 text-slate-400 border border-slate-700"
+                : "bg-slate-200 text-slate-600 border border-slate-300"
+            }`}
+            title="Piece actions"
+          >
+            <FontAwesomeIcon icon={faEllipsisV} />
+          </button>
+
+          <button
+            onClick={() => setShowQR(!showQR)}
           className={`w-8 h-8 rounded inline-flex items-center justify-center transition-all ${
             showQR
               ? "bg-blue-600 text-white shadow-lg shadow-blue-900/50"
@@ -55,7 +81,8 @@ export default function PackageMobileCard({
           }`}
         >
           <FontAwesomeIcon icon={faQrcode} />
-        </button>
+          </button>
+        </div>
       </div>
 
       <div className="pl-11">
@@ -89,8 +116,22 @@ export default function PackageMobileCard({
             {pkg.weight ? `${pkg.weight}kg` : "N/A"}
           </span>
 
-          <span className="shrink-0">
+          <span className="shrink-0 flex items-center gap-1.5">
             <StatusBadge status={pkg.status} size="xs" isDark={isDark} />
+            {showPieceStatusOverride && (
+              <button
+                type="button"
+                onClick={() => setShowStatusModal(true)}
+                className={`w-7 h-7 rounded inline-flex items-center justify-center ${
+                  isDark
+                    ? "bg-slate-800 text-slate-400 border border-slate-700"
+                    : "bg-slate-200 text-slate-600 border border-slate-300"
+                }`}
+                title="Change piece status"
+              >
+                <FontAwesomeIcon icon={faPen} className="text-[10px]" />
+              </button>
+            )}
           </span>
         </div>
 
@@ -142,12 +183,23 @@ export default function PackageMobileCard({
         </div>
       )}
       {/* Add the Modal Component at the end of the row/card */}
+      {showStatusModal && (
+        <PieceStatusOverrideModal
+          pkg={pkg}
+          shipmentId={shipmentData.id}
+          onClose={() => setShowStatusModal(false)}
+          isDark={isDark}
+          onRefresh={onRefresh}
+        />
+      )}
+
       {showActionModal && (
         <PackageActionModal
           pkg={pkg}
           shipmentId={shipmentData.id}
           onClose={() => setShowActionModal(false)}
           isDark={isDark}
+          onRefresh={onRefresh}
         />
       )}
     </div>

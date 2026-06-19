@@ -51,6 +51,8 @@ exports.createShipment =
   require("./src/shipments/createShipment").createShipment;
 exports.updateShipmentStatus =
   require("./src/shipments/updateShipmentStatus").updateShipmentStatus;
+exports.overrideShipmentPieceStatus =
+  require("./src/shipments/overrideShipmentPieceStatus").overrideShipmentPieceStatus;
 exports.updatePackageStatus =
   require("./src/packages/updatePackageStatus").updatePackageStatus;
 exports.updateShipmentPackages =

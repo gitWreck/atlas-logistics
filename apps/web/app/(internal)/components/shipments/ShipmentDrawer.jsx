@@ -218,6 +218,7 @@ export default function ShipmentDrawer({
               onRefresh={handleRefresh}
               data={displayData}
               isDark={isDark}
+              profile={profile}
             />
           )}
 

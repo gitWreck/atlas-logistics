@@ -1,5 +1,5 @@
 import { getFunctions, httpsCallable } from "firebase/functions";
-import { app as mainApp } from "@/lib/firebase";
+import { app as mainApp, auth } from "@/lib/firebase";
 
 // ⚠️ Make sure this matches your deployed region!
 const functions = getFunctions(mainApp, "asia-southeast1");
@@ -15,10 +15,89 @@ export const createShipmentWithPackages = httpsCallable(
   functions,
   "createShipmentWithPackages",
 );
-export const updateShipmentStatus = httpsCallable(
-  functions,
-  "updateShipmentStatus",
-);
+export async function updateShipmentStatus({
+  shipmentId,
+  newStatus,
+  notify = true,
+  remarks = null,
+  tripId = null,
+  sourceUI = "SHIPMENT_DRAWER",
+  notifySms,
+  notifyEmail,
+  notifyPush,
+  location = null,
+}) {
+  const token = await auth.currentUser?.getIdToken();
+  if (!token) {
+    throw new Error("You must be signed in to update shipment status.");
+  }
+
+  const res = await fetch(
+    `/api/shipments/${encodeURIComponent(shipmentId)}/update-status`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        newStatus,
+        notify,
+        remarks,
+        tripId,
+        sourceUI,
+        notifySms,
+        notifyEmail,
+        notifyPush,
+        location,
+      }),
+    },
+  );
+
+  const payload = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(payload.error || "Failed to update shipment status.");
+  }
+
+  return payload;
+}
+
+export async function overrideShipmentPieceStatus({
+  shipmentId,
+  packageId,
+  newStatus,
+  remarks = null,
+  sourceUI = "SHIPMENT_DRAWER",
+}) {
+  const token = await auth.currentUser?.getIdToken();
+  if (!token) {
+    throw new Error("You must be signed in to update piece status.");
+  }
+
+  const res = await fetch(
+    `/api/shipments/${encodeURIComponent(shipmentId)}/override-piece-status`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        packageId,
+        newStatus,
+        remarks,
+        sourceUI,
+      }),
+    },
+  );
+
+  const payload = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(payload.error || "Failed to update piece status.");
+  }
+
+  return payload;
+}
 export const updateShipmentPackageStatus = httpsCallable(
   functions,
   "updateShipmentPackageStatus",

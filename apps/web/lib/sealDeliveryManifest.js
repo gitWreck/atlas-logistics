@@ -1,5 +1,7 @@
 import crypto from "crypto";
 import { adminDb } from "@/lib/firebase-admin";
+import { buildDeliveryManifestShipments } from "@/lib/deliveryManifestLedger";
+import { loadTripManifestShipments } from "@/lib/tripManifestShipments";
 
 const DELIVERY_MANIFEST_VERSION = "DELIVERY-v1.0";
 
@@ -90,21 +92,17 @@ export async function ensureDeliveryManifestSealed(tripDocId) {
   if (trip.deliveryManifestId) return trip.deliveryManifestId;
   if (!["COMPLETED", "DELIVERED"].includes(status)) return null;
 
-  const shipmentsSnap = await adminDb
-    .collection("shipments")
-    .where("currentTripId", "==", tripDocId)
-    .get();
-
   let shippingTotals = null;
   if (trip.manifestId) {
     const manifestSnap = await adminDb.collection("manifests").doc(trip.manifestId).get();
     if (manifestSnap.exists) shippingTotals = manifestSnap.data()?.totals || null;
   }
 
-  const shipments = shipmentsSnap.docs.map((doc) => doc.data());
+  const shipments = await loadTripManifestShipments(adminDb, tripDocId);
   const stats = aggregateDeliveryStats(shipments, shippingTotals);
   const completedAtMs = Date.now();
   const manifestId = `DELIVERY-MANIFEST-${tripDocId}-${completedAtMs}`;
+  const shipmentLedger = buildDeliveryManifestShipments(shipments);
 
   const payload = {
     manifestId,
@@ -136,6 +134,7 @@ export async function ensureDeliveryManifestSealed(tripDocId) {
       podCaptured: stats.podCaptured,
       totalShipments: stats.totalShipments,
     },
+    shipments: shipmentLedger,
     verifyUrl: `https://atlastransport.ph/verify/${tripDocId}-DELIVERY`,
   };
 
