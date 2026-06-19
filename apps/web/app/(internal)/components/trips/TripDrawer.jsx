@@ -9,6 +9,7 @@ import {
   faUnlock,
   faTimes,
   faSync,
+  faQrcode,
 } from "@fortawesome/free-solid-svg-icons";
 
 import TripTimelineTab from "./TripTimelineTab";
@@ -21,6 +22,7 @@ import DrawerTabButton from "../ui/DrawerTabButton";
 import UnassignShipmentModal from "./modals/UnassignShipmentModal";
 import BulkAssignmentModal from "./modals/BulkAssignmentModal";
 import ViewPackagesModal from "../shipments/Packages/ViewPackagesModal";
+import ScanFoundPackageModal from "./modals/ScanFoundPackageModal";
 import ShipmentScanActionModal from "../shipments/ShipmentScanner/ShipmentScanActionModal";
 import InvoiceDetailsModal from "../invoice/InvoiceDetailsModal";
 import InvoiceFormModal from "../invoice/InvoiceFormModal";
@@ -48,6 +50,7 @@ export default function TripDrawer({
     useState(null);
   const [isBulkModalOpen, setBulkModalOpen] = useState(false);
   const [isScanModalOpen, setScanModalOpen] = useState(false);
+  const [isFoundScanOpen, setFoundScanOpen] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
   const theme = getDrawerThemeClasses(isDark);
@@ -113,6 +116,11 @@ export default function TripDrawer({
   if (!data) return null;
 
   const completedTrip = isCompletedTrip(data);
+  const role = String(profile?.role || "").toLowerCase();
+  const canScanFoundPackage =
+    ["admin", "manager"].includes(role) &&
+    Boolean(data?.reconciledAt) &&
+    !completedTrip;
   const manifestTabLabel = completedTrip
     ? `Manifests (${data.deliveryManifestId && data.manifestId ? 2 : data.manifestLocked || data.deliveryManifestId ? 1 : 0})`
     : `Manifest (${shipments.length})`;
@@ -228,6 +236,17 @@ export default function TripDrawer({
             >
               Scan
             </button>
+            {canScanFoundPackage && (
+              <button
+                type="button"
+                onClick={() => setFoundScanOpen(true)}
+                className="px-3 py-2 rounded-lg text-xs font-semibold bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 hover:bg-emerald-500/20 transition-all"
+                title="Recover a missing package found after reconciliation"
+              >
+                <FontAwesomeIcon icon={faQrcode} className="mr-1.5" />
+                Found
+              </button>
+            )}
             <button
               type="button"
               onClick={handleRefresh}
@@ -391,6 +410,18 @@ export default function TripDrawer({
           onRefreshTrips?.();
         }}
         isDark={isDark}
+      />
+
+      <ScanFoundPackageModal
+        isOpen={isFoundScanOpen}
+        onClose={() => setFoundScanOpen(false)}
+        tripId={data?.id || data?.tripId}
+        tripPublicId={data?.tripId}
+        isDark={isDark}
+        onRefresh={() => {
+          fetchShipments();
+          onRefreshTrips?.();
+        }}
       />
 
       <ShipmentScanActionModal
