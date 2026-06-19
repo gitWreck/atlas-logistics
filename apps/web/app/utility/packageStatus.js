@@ -416,4 +416,34 @@ export function getActiveBreakdownRows(breakdown = {}) {
   }));
 }
 
+/** Canonical piece-level statuses for admin override (not shipment master statuses). */
+const PIECE_OVERRIDE_STATUS_OPTIONS = [
+  { value: "RECEIVED_AT_DIVISORIA", label: "Received at Divisoria" },
+  { value: "LOADED_TO_TRIP", label: "Loaded to trip" },
+  { value: "IN_TRANSIT", label: "In transit" },
+  { value: "ARRIVED_AT_ODIONGAN", label: "Arrived at Odiongan" },
+  { value: "AVAILABLE_AT_ODIONGAN_WAREHOUSE", label: "Available at Odiongan" },
+  { value: "RELEASED_FOR_DELIVERY", label: "Released for delivery" },
+  {
+    value: "LOADED_TO_DELIVERY_VEHICLE",
+    label: "Loaded to delivery vehicle",
+  },
+  { value: "READY_FOR_DELIVERY", label: "Ready for delivery" },
+  { value: "OUT_FOR_DELIVERY", label: "Out for delivery" },
+  { value: "DELIVERED", label: "Delivered" },
+  { value: "RETURNED_TO_WAREHOUSE", label: "Returned to warehouse" },
+  {
+    value: "RETURNED_RECEIVED_AT_ODIONGAN",
+    label: "Returned received at Odiongan",
+  },
+  { value: "MISSING", label: "Missing" },
+  { value: "DAMAGED", label: "Damaged" },
+  { value: "FAILED_DELIVERY", label: "Failed delivery" },
+  { value: "CANCELLED", label: "Cancelled" },
+  { value: "LOADED", label: "Loaded" },
+  { value: "PARTIALLY_LOADED", label: "Partially loaded" },
+];
+
+export const PIECE_STATUS_OPTIONS = PIECE_OVERRIDE_STATUS_OPTIONS;
+
 export { BREAKDOWN_LABELS, PACKAGE_STATUS_LABELS };

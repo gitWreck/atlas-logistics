@@ -20,7 +20,7 @@ import {
 
 const ITEMS_PER_PAGE = 5;
 
-export default function PackagesTable({ data, onRefresh, isDark = false }) {
+export default function PackagesTable({ data, onRefresh, isDark = false, profile = null }) {
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState("ALL");
   const [currentPage, setCurrentPage] = useState(1);
@@ -152,6 +152,7 @@ export default function PackagesTable({ data, onRefresh, isDark = false }) {
                     shipmentData={data}
                     isDark={isDark}
                     onRefresh={onRefresh}
+                    profile={profile}
                   />
                 ))
               ) : (
@@ -180,6 +181,8 @@ export default function PackagesTable({ data, onRefresh, isDark = false }) {
                 idx={startIndex + idx}
                 shipmentData={data}
                 isDark={isDark}
+                onRefresh={onRefresh}
+                profile={profile}
               />
             ))
           ) : (

@@ -365,6 +365,8 @@ export default function TripDrawer({
           onRefreshTrips?.();
         }}
         isDark={isDark}
+        profile={profile}
+        allowShipmentStatusOverride={false}
       />
 
       <UnassignShipmentModal

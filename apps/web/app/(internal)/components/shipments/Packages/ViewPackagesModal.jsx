@@ -28,6 +28,10 @@ import { formatFirestoreDate } from "@/app/utility/utilities";
 import StatusBadge from "../../ui/StatusBadge";
 import TablePaginationFooter from "../../ui/TablePaginationFooter";
 import PackageBreakdownPanel from "./PackageBreakdownPanel";
+import ShipmentOperations from "../ShipmentOperations";
+import PieceStatusOverrideModal from "./PieceStatusOverrideModal";
+import { useAuth } from "@/app/context/AuthContext";
+import { canOverrideShipmentStatus, canOverridePieceStatus } from "@/app/utility/roleAccess";
 import {
   BASIC_PACKAGING_TYPES,
   INITIAL_PACKAGE_STATE,
@@ -65,7 +69,16 @@ export default function ViewPackagesModal({
   isLocked,
   onRefresh,
   isDark = false,
+  profile = null,
+  allowShipmentStatusOverride = true,
 }) {
+  const { profile: authProfile } = useAuth();
+  const effectiveProfile = profile || authProfile;
+  const showShipmentStatusOverride =
+    allowShipmentStatusOverride &&
+    canOverrideShipmentStatus(effectiveProfile);
+  const showPieceStatusOverride = canOverridePieceStatus(effectiveProfile);
+
   const [packages, setPackages] = useState([]);
   const [fullShipment, setFullShipment] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -79,6 +92,7 @@ export default function ViewPackagesModal({
   const [currentPage, setCurrentPage] = useState(1);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("ALL");
+  const [pieceForStatusOverride, setPieceForStatusOverride] = useState(null);
 
   const modalTheme = getModalThemeClasses(isDark);
   const modalAction = getModalActionClasses();
@@ -97,8 +111,16 @@ export default function ViewPackagesModal({
       setCurrentPage(1);
       setSearch("");
       setStatusFilter("ALL");
+      setPieceForStatusOverride(null);
     }
   }, [isOpen, shipment?.id]);
+
+  const handleRefreshAll = async () => {
+    if (shipment?.id) {
+      await fetchFullShipmentDetails(shipment.id);
+    }
+    onRefresh?.();
+  };
 
   const fetchFullShipmentDetails = async (id) => {
     try {
@@ -456,6 +478,17 @@ export default function ViewPackagesModal({
                     isDark={isDark}
                   />
 
+                  {showShipmentStatusOverride && (
+                    <ShipmentOperations
+                      shipmentId={shipment.id}
+                      currentStatus={shipmentDetails.status}
+                      isDark={isDark}
+                      custodyLocked={isLocked}
+                      profile={effectiveProfile}
+                      onRefresh={handleRefreshAll}
+                    />
+                  )}
+
                   <div
                     className={`border rounded-2xl p-4 ${modalTheme.panelSurface}`}
                   >
@@ -691,11 +724,30 @@ export default function ViewPackagesModal({
                                     </span>
                                   </div>
 
-                                  <div className="mt-3">
+                                  <div className="mt-3 flex items-center gap-2">
                                     <StatusBadge
                                       status={pkg.status}
                                       isDark={isDark}
                                     />
+                                    {showPieceStatusOverride && (
+                                      <button
+                                        type="button"
+                                        onClick={() =>
+                                          setPieceForStatusOverride(pkg)
+                                        }
+                                        className={`h-7 w-7 rounded inline-flex items-center justify-center ${
+                                          isDark
+                                            ? "bg-slate-800 hover:bg-slate-700 text-slate-400 border border-slate-700"
+                                            : "bg-slate-200 hover:bg-slate-300 text-slate-600 border border-slate-300"
+                                        }`}
+                                        title="Change piece status"
+                                      >
+                                        <FontAwesomeIcon
+                                          icon={faPen}
+                                          className="text-[10px]"
+                                        />
+                                      </button>
+                                    )}
                                   </div>
 
                                   {isEditing ? (
@@ -1001,10 +1053,31 @@ export default function ViewPackagesModal({
                                   </td>
 
                                   <td className="px-4 py-3">
-                                    <StatusBadge
-                                      status={pkg.status}
-                                      isDark={isDark}
-                                    />
+                                    <div className="flex items-center gap-2">
+                                      <StatusBadge
+                                        status={pkg.status}
+                                        isDark={isDark}
+                                      />
+                                      {showPieceStatusOverride && (
+                                        <button
+                                          type="button"
+                                          onClick={() =>
+                                            setPieceForStatusOverride(pkg)
+                                          }
+                                          className={`h-7 w-7 rounded flex items-center justify-center ${
+                                            isDark
+                                              ? "bg-slate-800 hover:bg-slate-700 text-slate-400"
+                                              : "bg-slate-200 hover:bg-slate-300 text-slate-600"
+                                          }`}
+                                          title="Change piece status"
+                                        >
+                                          <FontAwesomeIcon
+                                            icon={faPen}
+                                            className="text-[10px]"
+                                          />
+                                        </button>
+                                      )}
+                                    </div>
                                   </td>
 
                                   <td className="px-4 py-3 text-right">
@@ -1104,6 +1177,16 @@ export default function ViewPackagesModal({
           </div>
         </div>
       </div>
+
+      {pieceForStatusOverride && (
+        <PieceStatusOverrideModal
+          pkg={pieceForStatusOverride}
+          shipmentId={shipment.id}
+          onClose={() => setPieceForStatusOverride(null)}
+          isDark={isDark}
+          onRefresh={handleRefreshAll}
+        />
+      )}
 
       {isSplitModalOpen && (
         <SplitShipmentModal

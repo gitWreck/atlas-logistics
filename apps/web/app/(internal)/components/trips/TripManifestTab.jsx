@@ -547,7 +547,9 @@ export default function TripManifestTab({
                         </span>
                       )}
 
-                      <StatusBadge status={shipmentStatus} isDark={isDark} />
+                      <div className="flex items-center gap-1.5">
+                        <StatusBadge status={shipmentStatus} isDark={isDark} />
+                      </div>
                     </div>
                   </div>
 

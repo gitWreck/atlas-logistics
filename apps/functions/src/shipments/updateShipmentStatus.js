@@ -253,6 +253,8 @@ exports.updateShipmentStatus = onCall(
     const isCheckerPieceDelivery =
       isFinalDeliveryStatus && actor.role === "checker";
 
+    let updatedShipmentData = null;
+
     const notificationEvent = await db.runTransaction(async (tx) => {
       const shipmentSnap = await tx.get(shipmentRef);
 
@@ -270,6 +272,7 @@ exports.updateShipmentStatus = onCall(
       }
 
       const currentData = shipmentSnap.data() || {};
+      updatedShipmentData = currentData;
       const oldStatus = currentData.status || null;
       const tripData = tripSnap?.exists ? tripSnap.data() : null;
       assertCustodyScanStatusAllowed(currentData, tripData, newStatus);
@@ -752,7 +755,7 @@ exports.updateShipmentStatus = onCall(
       ]);
       notificationEvent.targetUserIds = await filterShipmentNotificationTargets(
         db,
-        { id: shipmentId, ...shipment },
+        { id: shipmentId, ...(updatedShipmentData || {}) },
         candidateUserIds,
       );
       if (notificationEvent.channels?.push === true) {

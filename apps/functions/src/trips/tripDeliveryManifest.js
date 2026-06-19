@@ -98,7 +98,88 @@ function aggregateDeliveryStatsFromShipments(shipments = [], shippingTotals = nu
   return stats;
 }
 
-async function loadTripShipments(db, tripDocId) {
+async function loadTripManifestShipments(db, tripDocId) {
+  const TRIP_SCOPED_STATUSES = new Set([
+    "LOADED",
+    "LOADED_TO_TRIP",
+    "IN_TRANSIT",
+    "OUT_FOR_DELIVERY",
+    "ARRIVED_AT_ODIONGAN",
+    "AVAILABLE_AT_ODIONGAN_WAREHOUSE",
+    "RELEASED_FOR_DELIVERY",
+    "AVAILABLE_FOR_DELIVERY",
+    "READY_FOR_DELIVERY",
+    "LOADED_TO_DELIVERY_VEHICLE",
+    "DELIVERED",
+    "COMPLETED",
+    "FAILED_DELIVERY",
+    "RETURNED_TO_WAREHOUSE",
+    "RETURNED_RECEIVED_AT_HUB",
+    "RETURNED_RECEIVED_AT_ODIONGAN",
+  ]);
+
+  function packageBelongsToTrip(pkg, tripId, tripBarcodeSet) {
+    const packageTripId = pkg.currentTripId || pkg.loadedOnTrip || null;
+    const packageId = pkg.packageId || pkg.trackingNumber || null;
+
+    if (packageTripId) return packageTripId === tripId;
+    if (!packageId || !tripBarcodeSet.has(String(packageId))) return false;
+
+    const loadedQty = Math.min(Number(pkg.loadedQty) || 0, pieceQty(pkg));
+    const receivedQty = Math.min(Number(pkg.receivedQty) || 0, pieceQty(pkg));
+    if (loadedQty > 0 || receivedQty > 0) return true;
+
+    return TRIP_SCOPED_STATUSES.has(normalizeStatus(pkg.status));
+  }
+
+  const tripShipmentsSnap = await db
+    .collection("truck_trips")
+    .doc(tripDocId)
+    .collection("trip_shipments")
+    .get();
+
+  if (!tripShipmentsSnap.empty) {
+    const shipmentIds = tripShipmentsSnap.docs.map((doc) => doc.id);
+    const rootSnaps = await db.getAll(
+      ...shipmentIds.map((id) => db.collection("shipments").doc(id)),
+    );
+
+    const rootMap = {};
+    rootSnaps.forEach((snap) => {
+      if (snap.exists) rootMap[snap.id] = snap.data();
+    });
+
+    return tripShipmentsSnap.docs.map((doc) => {
+      const data = doc.data() || {};
+      const root = rootMap[doc.id] || {};
+      const rootPackages = Array.isArray(root.packages) ? root.packages : [];
+      const tripBarcodeSet = new Set(
+        (data.packageBarcodes || []).filter(Boolean).map(String),
+      );
+      const tripPackages = rootPackages.filter((pkg) =>
+        packageBelongsToTrip(pkg, tripDocId, tripBarcodeSet),
+      );
+      const visiblePackages =
+        tripPackages.length > 0 || tripBarcodeSet.size > 0
+          ? tripPackages
+          : rootPackages;
+
+      return {
+        id: doc.id,
+        ...data,
+        shipmentId: data.shipmentId || root.shipmentId || doc.id,
+        originCode: root.originCode || data.originCode || null,
+        destinationCode: root.destinationCode || data.destinationCode || null,
+        destinationCity: root.destinationCity || data.destinationCity || null,
+        destination: root.destination || data.destination || null,
+        recipient: root.recipient || data.recipient || null,
+        receiverName: root.recipient?.name || data.receiverName || null,
+        packages: visiblePackages,
+        proofOfDelivery: root.proofOfDelivery || null,
+      };
+    });
+  }
+
   const snap = await db
     .collection("shipments")
     .where("currentTripId", "==", tripDocId)
@@ -117,17 +198,85 @@ async function loadShippingManifestTotals(db, shippingManifestId) {
   return snap.data()?.totals || null;
 }
 
+function buildDeliveryManifestShipments(shipments = []) {
+  const rows = [];
+
+  shipments.forEach((shipment) => {
+    const packages = Array.isArray(shipment.packages) ? shipment.packages : [];
+    const contents = [];
+    let deliveredCount = 0;
+    let failedCount = 0;
+    let returnedCount = 0;
+
+    packages.forEach((pkg) => {
+      const status = normalizeStatus(pkg.status);
+      let outcome = null;
+      if (status === "DELIVERED" || status === "COMPLETED") outcome = "DELIVERED";
+      else if (status === "FAILED_DELIVERY") outcome = "FAILED_DELIVERY";
+      else if (
+        [
+          "RETURNED_TO_WAREHOUSE",
+          "RETURNED_RECEIVED_AT_HUB",
+          "RETURNED_RECEIVED_AT_ODIONGAN",
+        ].includes(status)
+      ) {
+        outcome = "RETURNED_TO_WAREHOUSE";
+      }
+      if (!outcome) return;
+
+      const qty = pieceQty(pkg);
+      if (outcome === "DELIVERED") deliveredCount += qty;
+      if (outcome === "FAILED_DELIVERY") failedCount += qty;
+      if (outcome === "RETURNED_TO_WAREHOUSE") returnedCount += qty;
+
+      contents.push({
+        packageId:
+          pkg.packageId || pkg.trackingNumber || pkg.pieceId || pkg.barcode || null,
+        description: pkg.description || "Standard Pkg",
+        status: outcome,
+        quantity: qty,
+      });
+    });
+
+    if (!contents.length) return;
+
+    const originCode = shipment.originCode || "ORG";
+    const destCode = shipment.destinationCode || "DEST";
+
+    rows.push({
+      trackingShipmentId: shipment.id || null,
+      shipmentId: shipment.shipmentId || shipment.id,
+      route: `${originCode} -> ${destCode}`,
+      destinationLabel:
+        shipment.destinationCity ||
+        shipment.destination ||
+        shipment.recipient?.city ||
+        destCode,
+      receiverName: shipment.recipient?.name || shipment.receiverName || null,
+      deliveredCount,
+      failedCount,
+      returnedCount,
+      totalOutcomeCount: deliveredCount + failedCount + returnedCount,
+      contents,
+    });
+  });
+
+  return rows.sort((a, b) => String(a.shipmentId).localeCompare(String(b.shipmentId)));
+}
+
 function buildDeliveryManifestPayload({
   tripDocId,
   trip,
   shippingManifestId,
   shippingManifestHash,
   stats,
+  shipments = [],
   actorId,
   actorName,
   completedAtMs,
 }) {
   const manifestId = `DELIVERY-MANIFEST-${tripDocId}-${completedAtMs}`;
+  const shipmentLedger = buildDeliveryManifestShipments(shipments);
 
   return {
     manifestId,
@@ -159,6 +308,7 @@ function buildDeliveryManifestPayload({
       podCaptured: stats.podCaptured,
       totalShipments: stats.totalShipments,
     },
+    shipments: shipmentLedger,
     verifyUrl: `https://atlastransport.ph/verify/${tripDocId}-DELIVERY`,
   };
 }
@@ -171,7 +321,7 @@ async function sealTripDeliveryManifest({
   actorRole = null,
 }) {
   const tripRef = db.collection("truck_trips").doc(tripDocId);
-  const preloadedShipments = await loadTripShipments(db, tripDocId);
+  const preloadedShipments = await loadTripManifestShipments(db, tripDocId);
   const preTripSnap = await tripRef.get();
   const preTrip = preTripSnap.exists ? preTripSnap.data() || {} : {};
   const preloadedShippingTotals = await loadShippingManifestTotals(db, preTrip.manifestId);
@@ -210,6 +360,7 @@ async function sealTripDeliveryManifest({
       shippingManifestId: trip.manifestId || null,
       shippingManifestHash: trip.manifestHash || null,
       stats,
+      shipments: preloadedShipments,
       actorId: actorId || trip.lastUpdatedBy || trip.autoCompletedBy || null,
       actorName: actorName || trip.updatedBy || null,
       completedAtMs,

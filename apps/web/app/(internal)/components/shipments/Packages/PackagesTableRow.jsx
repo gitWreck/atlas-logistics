@@ -9,9 +9,13 @@ import {
   faEllipsisV,
   faWineGlass,
   faSnowflake,
+  faPen,
 } from "@fortawesome/free-solid-svg-icons";
 import PackageActionModal from "./PackageActionModal";
+import PieceStatusOverrideModal from "./PieceStatusOverrideModal";
 import { getRowThemeClasses } from "@/app/utility/constant/theme";
+import { useAuth } from "@/app/context/AuthContext";
+import { canOverridePieceStatus } from "@/app/utility/roleAccess";
 
 export default function PackageTableRow({
   pkg,
@@ -19,9 +23,15 @@ export default function PackageTableRow({
   shipmentData,
   isDark = false,
   onRefresh,
+  profile = null,
 }) {
+  const { profile: authProfile } = useAuth();
+  const effectiveProfile = profile || authProfile;
+  const showPieceStatusOverride = canOverridePieceStatus(effectiveProfile);
+
   const [showQR, setShowQR] = useState(false);
   const [showActionModal, setShowActionModal] = useState(false);
+  const [showStatusModal, setShowStatusModal] = useState(false);
 
   const theme = getRowThemeClasses(isDark);
 
@@ -82,7 +92,19 @@ export default function PackageTableRow({
         </td>
 
         <td className="p-4">
-          <StatusBadge status={pkg.status} size="xs" isDark={isDark} />
+          <div className="flex items-center gap-2">
+            <StatusBadge status={pkg.status} size="xs" isDark={isDark} />
+            {showPieceStatusOverride && (
+              <button
+                type="button"
+                onClick={() => setShowStatusModal(true)}
+                className={`w-7 h-7 rounded inline-flex items-center justify-center transition-all ${theme.iconActionButton}`}
+                title="Change piece status"
+              >
+                <FontAwesomeIcon icon={faPen} className="text-[10px]" />
+              </button>
+            )}
+          </div>
         </td>
 
         <td className="p-4 text-right">
@@ -124,6 +146,16 @@ export default function PackageTableRow({
             </div>
           </td>
         </tr>
+      )}
+
+      {showStatusModal && (
+        <PieceStatusOverrideModal
+          pkg={pkg}
+          shipmentId={shipmentData.id}
+          onClose={() => setShowStatusModal(false)}
+          isDark={isDark}
+          onRefresh={onRefresh}
+        />
       )}
 
       {showActionModal && (

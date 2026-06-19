@@ -1,6 +1,11 @@
 import { adminDb } from "@/lib/firebase-admin";
 import { resolveTripDocument } from "@/lib/printManifestData";
 import { buildPrintManifestPayload } from "@/lib/printManifestData";
+import {
+  buildDeliveryDestinationsFromShipments,
+  buildDeliveryManifestShipments,
+} from "@/lib/deliveryManifestLedger";
+import { loadTripManifestShipments } from "@/lib/tripManifestShipments";
 
 const DELIVERY_MANIFEST_VERSION = "DELIVERY-v1.0";
 
@@ -363,7 +368,13 @@ export async function buildTripManifestsPayload(tripIdOrPublicId) {
 }
 
 export async function buildPrintDeliveryManifestPayload(tripIdOrPublicId) {
-  const payload = await buildTripManifestsPayload(tripIdOrPublicId);
+  const trip = await resolveTripDocument(tripIdOrPublicId);
+  if (!trip) {
+    return { error: "Trip not found", status: 404 };
+  }
+
+  const { id: tripDocId, data: tripData } = trip;
+  const payload = await buildTripManifestsPayload(tripDocId);
   if (payload.error) return payload;
 
   const delivery = payload.manifests.delivery;
@@ -373,6 +384,72 @@ export async function buildPrintDeliveryManifestPayload(tripIdOrPublicId) {
       status: 404,
     };
   }
+
+  const shipments = await loadTripManifestShipments(adminDb, tripDocId);
+
+  let deliveryManifestDoc = null;
+  if (tripData.deliveryManifestId) {
+    const manifestSnap = await adminDb
+      .collection("manifests")
+      .doc(tripData.deliveryManifestId)
+      .get();
+    if (manifestSnap.exists) {
+      deliveryManifestDoc = manifestSnap.data() || {};
+    }
+  }
+
+  const destinationsFromSealed =
+    Array.isArray(deliveryManifestDoc?.shipments) &&
+    deliveryManifestDoc.shipments.length > 0
+      ? buildDeliveryDestinationsFromShipments(
+          deliveryManifestDoc.shipments.map((row) => ({
+            id: row.trackingShipmentId,
+            shipmentId: row.shipmentId,
+            originCode: row.route?.split("->")[0]?.trim(),
+            destinationCode: row.route?.split("->")[1]?.trim(),
+            destinationCity: row.destinationLabel || row.route?.split("->")[1]?.trim(),
+            recipient: { name: row.receiverName },
+            packages: row.contents?.map((piece) => ({
+              packageId: piece.packageId,
+              description: piece.description,
+              status: piece.status,
+              quantity: piece.quantity,
+            })),
+          })),
+        )
+      : [];
+
+  const destinations =
+    destinationsFromSealed.length > 0
+      ? destinationsFromSealed
+      : buildDeliveryDestinationsFromShipments(shipments);
+
+  const hubDestination =
+    tripData.destination ||
+    deliveryManifestDoc?.trip?.destination ||
+    payload.manifests.shipping.summary.destination ||
+    null;
+
+  if (hubDestination && destinations.length > 0) {
+    destinations.forEach((group) => {
+      const routeDest = String(group.routeCode || "").split("->").pop()?.trim();
+      if (
+        !group.destination ||
+        group.destination === routeDest ||
+        group.destination === "ODI" ||
+        group.destination === "DEST" ||
+        group.destination === "UNKNOWN"
+      ) {
+        group.destination = hubDestination;
+      }
+    });
+  }
+
+  const shippingRef =
+    delivery.shippingManifestReference ||
+    tripData.manifestId ||
+    deliveryManifestDoc?.shippingManifestReference ||
+    null;
 
   return {
     tripId: payload.tripId,
@@ -385,9 +462,23 @@ export async function buildPrintDeliveryManifestPayload(tripIdOrPublicId) {
     verifyUrl: delivery.verifyUrl,
     stamps: ["COMPLETED", "OFFICIAL_RECORD"],
     totals: delivery.summary,
-    shippingManifestReference: delivery.shippingManifestReference,
-    origin: payload.manifests.shipping.summary.origin,
-    destination: payload.manifests.shipping.summary.destination,
-    route: payload.manifests.shipping.summary.route,
+    shippingManifestReference: shippingRef,
+    origin:
+      payload.manifests.shipping.summary.origin ||
+      tripData.origin ||
+      deliveryManifestDoc?.trip?.origin ||
+      "Divisoria Hub",
+    destination:
+      payload.manifests.shipping.summary.destination ||
+      tripData.destination ||
+      deliveryManifestDoc?.trip?.destination ||
+      "Odiongan Hub",
+    route:
+      payload.manifests.shipping.summary.route ||
+      tripData.route ||
+      deliveryManifestDoc?.trip?.route ||
+      "—",
+    destinations,
+    shipmentLedger: buildDeliveryManifestShipments(shipments),
   };
 }
