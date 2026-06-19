@@ -25,8 +25,11 @@ function writeCustodyAuditLog({
   newValue = null,
   note = null,
   meta = {},
+  createdAt = null,
+  fieldValue = null,
 }) {
-  const timestamp = admin.firestore.FieldValue.serverTimestamp();
+  const fv = fieldValue || admin.firestore.FieldValue;
+  const timestamp = createdAt || fv.serverTimestamp();
   const logRef = db.collection(collection).doc();
 
   const logData = cleanObject({

@@ -60,8 +60,16 @@ function tripRequiresAmendmentTracking(trip = {}) {
   return Boolean(trip.manifestId || trip.manifestHash);
 }
 
-function appendPendingAmendmentEntry(tx, tripRef, trip, entry = {}) {
+function appendPendingAmendmentEntry(
+  tx,
+  tripRef,
+  trip,
+  entry = {},
+  fieldValue = null,
+) {
   if (!tripRequiresAmendmentTracking(trip)) return;
+
+  const fv = fieldValue || admin.firestore.FieldValue;
 
   const normalized = normalizeAmendmentEntry({
     ...entry,
@@ -77,7 +85,7 @@ function appendPendingAmendmentEntry(tx, tripRef, trip, entry = {}) {
   tx.update(tripRef, {
     pendingAmendmentEntries: existing,
     amendmentSessionActive: true,
-    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    updatedAt: fv.serverTimestamp(),
   });
 
   trip.pendingAmendmentEntries = existing;

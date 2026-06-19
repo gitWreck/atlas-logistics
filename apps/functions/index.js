@@ -80,6 +80,8 @@ exports.assignShipmentToTrip =
   require("./src/trips/assignShipmentToTrip").assignShipmentToTrip;
 exports.manualAssignShipmentToTrip =
   require("./src/trips/manualAssignShipmentToTrip").manualAssignShipmentToTrip;
+exports.recoverFoundPackage =
+  require("./src/trips/recoverFoundPackage").recoverFoundPackage;
 exports.unassignShipmentFromTrip =
   require("./src/trips/unassignShipmentFromTrip").unassignShipmentFromTrip;
 exports.assignDriverToTrip =

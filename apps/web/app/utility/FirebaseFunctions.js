@@ -98,6 +98,42 @@ export async function overrideShipmentPieceStatus({
 
   return payload;
 }
+
+export async function recoverFoundPackage({
+  tripId,
+  packageLabel,
+  remarks = null,
+  sourceUI = "TRIP_DRAWER",
+}) {
+  const token = await auth.currentUser?.getIdToken();
+  if (!token) {
+    throw new Error("You must be signed in to recover found packages.");
+  }
+
+  const res = await fetch(
+    `/api/trips/${encodeURIComponent(tripId)}/recover-found-package`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        packageLabel,
+        remarks,
+        sourceUI,
+      }),
+    },
+  );
+
+  const payload = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(payload.error || "Failed to recover found package.");
+  }
+
+  return payload;
+}
+
 export const updateShipmentPackageStatus = httpsCallable(
   functions,
   "updateShipmentPackageStatus",
