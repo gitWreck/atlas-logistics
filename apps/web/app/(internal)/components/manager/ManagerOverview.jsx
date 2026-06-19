@@ -5,6 +5,7 @@ import ManagerRecentTable from "./ManagerRecentTable";
 import DelayApprovalWidget from "../delay/DelayWidget";
 import RecentAlertsLogs from "../logs/RecentAlertsLogs";
 import RecentSmsLogs from "../logs/RecentSmsLogs";
+import NotificationHistory from "../logs/NotificationHistory";
 import AddUserModal from "../admin/AddUserModal";
 import UserManagementTable from "../admin/UserManagementTable";
 import { getOverviewThemeClasses } from "@/app/utility/constant/theme";
@@ -180,6 +181,7 @@ export default function ManagerOverview({
       </div> */}
       <RecentAlertsLogs isDark={isDark} />
       <RecentSmsLogs isDark={isDark} />
+      <NotificationHistory isDark={isDark} />
 
       <AddUserModal
         isOpen={isCustomerModalOpen}

@@ -277,6 +277,11 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    match /notificationLogs/{logId} {
+      allow read: if isAdminOrManager();
+      allow write: if false;
+    }
+
     match /audit_logs/{logId} {
       allow read: if hasRole('admin');
       allow write: if false;

@@ -24,11 +24,9 @@ function sumQtyForStatuses(packages = [], statuses = new Set()) {
   }, 0);
 }
 
+/** Only true linehaul dispatch (IN_TRANSIT). LOADED_TO_TRIP stays LOADED until dispatchTrip. */
 function sumDispatchedInTransitQty(packages = []) {
-  return sumQtyForStatuses(
-    packages,
-    new Set([PACKAGE_STATUS.IN_TRANSIT, PACKAGE_STATUS.LOADED_TO_TRIP]),
-  );
+  return sumQtyForStatuses(packages, new Set([PACKAGE_STATUS.IN_TRANSIT]));
 }
 
 function sumLoadedOnTripQty(packages = []) {

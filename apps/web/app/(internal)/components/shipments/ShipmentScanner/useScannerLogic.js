@@ -385,7 +385,7 @@ export default function useScannerLogic({
   );
 
   const finalizeTripReconciliation = useCallback(
-    async ({ notify = true } = {}) => {
+    async ({ notify = false } = {}) => {
       if (!tripId) return null;
 
       const token = await user?.getIdToken();
@@ -444,7 +444,7 @@ export default function useScannerLogic({
           (summary.lifecycle?.canPromoteToArrived || tripAlreadyArrived);
 
         if (shouldFinalizeReconcile) {
-          summary = await finalizeTripReconciliation({ notify: true });
+          summary = await finalizeTripReconciliation({ notify: false });
           onRefresh?.();
           if (trip && summary.tripStatus) {
             trip.status = summary.tripStatus;
@@ -923,7 +923,7 @@ export default function useScannerLogic({
 
     try {
       if (handoffSummary?.ready && handoffSummary?.lifecycle?.canPromoteToArrived) {
-        const summary = await finalizeTripReconciliation({ notify: true });
+        const summary = await finalizeTripReconciliation({ notify: false });
         setHandoffSummary(summary);
         if (trip && summary?.tripStatus) {
           trip.status = summary.tripStatus;

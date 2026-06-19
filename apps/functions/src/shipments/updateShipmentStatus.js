@@ -4,9 +4,7 @@ const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const admin = require("firebase-admin");
 const { FieldValue } = require("firebase-admin/firestore");
 const {
-  chunk,
   requireRole,
-  unique,
   updatedBy,
 } = require("../utilities/helpers");
 const { ALLOWED_SHIPMENT_STATUSES } = require("../utilities/dataDetails");
@@ -23,165 +21,74 @@ const {
   applyPieceDelivered,
 } = require("../checker/checkerPieceOperations");
 const {
-  filterShipmentNotificationTargets,
-  getShipmentTargetUserIds,
+  assertCustodyScanStatusAllowed,
+} = require("../trips/manifestLockGuard");
+const {
+  resolveShipmentCustomerNotificationType,
+  shouldBlockCustomerNotification,
+} = require("../notifications/customerNotificationTypes");
+const {
+  sendShipmentCustomerNotification,
+} = require("../notifications/customerNotificationService");
+const {
+  normalizeNotificationChannels,
 } = require("../utilities/notificationHelpers");
 const { normalizeQty } = require("../utilities/packageHelpers");
 const { tryAutoCompleteTrip } = require("../trips/autoCompleteTrip");
 const { PACKAGE_STATUS } = require("../packages/packageStatus");
-const {
-  assertCustodyScanStatusAllowed,
-} = require("../trips/manifestLockGuard");
 
 if (!admin.apps.length) admin.initializeApp();
 
 const db = admin.firestore();
 
-function formatStatusLabel(status = "") {
-  return String(status || "")
-    .replace(/_/g, " ")
-    .toLowerCase()
-    .replace(/\b\w/g, (letter) => letter.toUpperCase());
-}
-
-async function getTrackedShipmentUserIds(shipmentId) {
-  const trackingNumber = String(shipmentId || "")
-    .trim()
-    .toUpperCase();
-
-  if (!trackingNumber) return [];
-
-  const trackedUserIds = [];
-
-  try {
-    await Promise.all(
-      chunk([trackingNumber]).map(async (trackingChunk) => {
-        const trackedSnap = await db
-          .collectionGroup("tracked_shipments")
-          .where("trackingNumber", "in", trackingChunk)
-          .get();
-
-        trackedSnap.docs.forEach((doc) => {
-          const userRef = doc.ref.parent.parent;
-          if (userRef?.id) trackedUserIds.push(userRef.id);
-        });
-      }),
-    );
-  } catch (error) {
-    if (error?.code === 9 || error?.code === "failed-precondition") {
-      console.warn(
-        "[updateShipmentStatus] Skipping tracked shipment notification lookup. Firestore collection-group index may still be missing/building.",
-        error?.message || error,
-      );
-      return [];
-    }
-
-    throw error;
-  }
-
-  return unique(trackedUserIds);
-}
-
-function buildStatusNotificationEvent({
+function buildShipmentNotificationPlan({
   shipment,
-  shipmentId,
   oldStatus,
   newStatus,
-  actor,
+  notify,
   notificationChannels,
   notifySms,
   notifyEmail,
   notifyPush,
-  notify,
+  sourceUI,
+  tripId,
 }) {
-  if (notify === false) return null;
-
-  const requestedChannels =
-    notificationChannels && typeof notificationChannels === "object"
-      ? notificationChannels
-      : null;
-
-  const channels = requestedChannels
-    ? {
-        sms: requestedChannels.sms === true,
-        email: requestedChannels.email === true,
-        push: requestedChannels.push === true,
-        inApp:
-          requestedChannels.inApp === true || requestedChannels.push === true,
-      }
-    : {
-        sms: notifySms !== false,
-        email: notifyEmail === true,
-        push: notifyPush !== false,
-        inApp: true,
-      };
-
-  const targetUserIds = getShipmentTargetUserIds(shipment);
-  const statusLabel = formatStatusLabel(newStatus);
-  const title = "Shipment status updated";
-  const body = `Shipment ${shipmentId} is now ${statusLabel}.`;
-  const smsBody = `ATLAS: Shipment ${shipmentId} is now ${statusLabel}. Track: https://atlastransport.ph/track/${shipmentId}`;
-
+  if (notify !== true) return null;
   if (
-    !channels.sms &&
-    !channels.email &&
-    !channels.push &&
-    (!channels.inApp || targetUserIds.length === 0)
+    shouldBlockCustomerNotification({
+      notify: true,
+      source: sourceUI,
+    })
   ) {
     return null;
   }
 
+  const notificationType = resolveShipmentCustomerNotificationType(
+    oldStatus,
+    newStatus,
+  );
+  if (!notificationType) return null;
+
+  const channels = normalizeNotificationChannels({
+    notificationChannels,
+    notify,
+    notifySms,
+    notifyEmail,
+    notifyPush,
+  });
+
+  if (!channels.sms && !channels.email && !channels.push) {
+    return null;
+  }
+
   return {
-    type: "SHIPMENT_STATUS_UPDATED",
-    status: "pending",
-    channels: {
-      sms: channels.sms,
-      email: channels.email,
-      push: channels.push,
-      inApp: channels.inApp && targetUserIds.length > 0,
-    },
-    entityType: "shipment",
-    entityId: shipmentId,
-    shipmentId,
-    targetUserIds,
-    targets: {
-      sender: {
-        uid: shipment.sender?.uid || shipment.senderUid || null,
-        name: shipment.sender?.name || shipment.senderName || "",
-        phone: shipment.sender?.phone || shipment.senderPhone || null,
-        email: shipment.sender?.email || shipment.senderEmail || null,
-      },
-      recipient: {
-        uid: shipment.recipient?.uid || shipment.recipientUid || null,
-        name: shipment.recipient?.name || shipment.recipientName || "",
-        phone:
-          shipment.recipient?.phone ||
-          shipment.recipientPhone ||
-          shipment.consigneePhone ||
-          shipment.customerPhone ||
-          null,
-        email: shipment.recipient?.email || shipment.recipientEmail || null,
-      },
-    },
-    title,
-    body,
-    smsBody,
-    data: {
-      screen: "tracking",
-      trackingId: shipmentId,
-      status: newStatus,
-      oldStatus,
-      origin: shipment.origin || shipment.sender?.address?.city || null,
-      destination:
-        shipment.destination || shipment.recipient?.address?.city || null,
-    },
-    actor: {
-      uid: actor.uid,
-      name: actor.name,
-      role: actor.role,
-    },
-    createdAt: FieldValue.serverTimestamp(),
-    updatedAt: FieldValue.serverTimestamp(),
+    notificationType,
+    channels,
+    tripId:
+      tripId ||
+      shipment.currentTripId ||
+      shipment.currentTruckTripId ||
+      null,
   };
 }
 
@@ -211,7 +118,7 @@ exports.updateShipmentStatus = onCall(
       proofOfDelivery,
       proofOfReceipt,
       paymentStatus,
-      notify = true,
+      notify = false,
       notifySms,
       notifyEmail,
       notifyPush,
@@ -255,7 +162,7 @@ exports.updateShipmentStatus = onCall(
 
     let updatedShipmentData = null;
 
-    const notificationEvent = await db.runTransaction(async (tx) => {
+    const notificationPlan = await db.runTransaction(async (tx) => {
       const shipmentSnap = await tx.get(shipmentRef);
 
       if (!shipmentSnap.exists) {
@@ -674,17 +581,17 @@ exports.updateShipmentStatus = onCall(
         timestamp: FieldValue.serverTimestamp(),
       });
 
-      return buildStatusNotificationEvent({
+      return buildShipmentNotificationPlan({
         shipment: currentData,
-        shipmentId,
         oldStatus,
         newStatus: derivedShipmentStatus,
-        actor: { uid, role, name },
+        notify,
         notificationChannels,
         notifySms,
         notifyEmail,
         notifyPush,
-        notify,
+        sourceUI,
+        tripId,
       });
     });
 
@@ -747,24 +654,26 @@ exports.updateShipmentStatus = onCall(
       );
     }
 
-    if (notificationEvent) {
-      const trackedUserIds = await getTrackedShipmentUserIds(shipmentId);
-      const candidateUserIds = unique([
-        ...(notificationEvent.targetUserIds || []),
-        ...trackedUserIds,
-      ]);
-      notificationEvent.targetUserIds = await filterShipmentNotificationTargets(
-        db,
-        { id: shipmentId, ...(updatedShipmentData || {}) },
-        candidateUserIds,
-      );
-      if (notificationEvent.channels?.push === true) {
-        notificationEvent.channels.inApp =
-          notificationEvent.targetUserIds.length > 0;
-      }
+    let notificationDelivered = false;
 
-      if (notificationEvent.targetUserIds.length > 0) {
-        await db.collection("notification_events").doc().set(notificationEvent);
+    if (notificationPlan) {
+      try {
+        await sendShipmentCustomerNotification({
+          db,
+          shipment: updatedShipmentData || {},
+          shipmentId,
+          notificationType: notificationPlan.notificationType,
+          channels: notificationPlan.channels,
+          tripId: notificationPlan.tripId,
+          actor: { uid, name, role },
+          source: sourceUI || "SHIPMENT_STATUS",
+        });
+        notificationDelivered = true;
+      } catch (notificationError) {
+        console.error(
+          "[updateShipmentStatus] Customer notification failed:",
+          notificationError,
+        );
       }
     }
 
@@ -772,7 +681,7 @@ exports.updateShipmentStatus = onCall(
       success: true,
       status: resultStatus,
       deliveredPieceIds: checkerDeliveredPieceIds,
-      notificationQueued: Boolean(notificationEvent),
+      notificationQueued: notificationDelivered,
     };
   },
 );

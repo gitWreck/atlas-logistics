@@ -14,11 +14,13 @@ const {
   SEMAPHORE_API_KEY,
   SEMAPHORE_SENDER_NAME,
 } = require("../../shared/sms-service");
-const { broadcastTripLogic } = require("../messaging/broadcastTripMessage"); // Import if you want to call it directly
-const { STATUS_MESSAGES } = require("../utilities/dataDetails");
+
 const { writeTripActionLog } = require("../utilities/tripLogger");
 const { MANIFEST_STATUS } = require("./manifestStatus");
 const { sealTripDeliveryManifest } = require("./tripDeliveryManifest");
+const {
+  sendTripStatusCustomerNotifications,
+} = require("../notifications/customerNotificationService");
 
 if (!admin.apps.length) admin.initializeApp();
 const db = admin.firestore();
@@ -61,12 +63,14 @@ exports.updateTripStatus = onCall(
     const tripRef = db.collection("truck_trips").doc(tripId);
     const userSnap = await db.collection("users").doc(req.auth.uid).get();
     const actorName = userSnap.data()?.name || "Unknown Admin";
+    let oldTripStatus = null;
 
     await db.runTransaction(async (tx) => {
       const tripSnap = await tx.get(tripRef);
       if (!tripSnap.exists) throw new HttpsError("not-found", "Trip not found");
 
       const oldStatus = tripSnap.data().status;
+      oldTripStatus = oldStatus;
 
       if (
         oldStatus &&
@@ -245,35 +249,28 @@ exports.updateTripStatus = onCall(
       // We just log the error so you can debug.
     }
 
-    // If user checked the box, trigger the notification
-    // --- 4. OPTIONAL: AUTOMATED SMS NOTIFICATION ---
     if (notify === true) {
-      // 1. Define Standard Messages
-
-      const messageText = STATUS_MESSAGES[newStatus];
-
-      if (messageText) {
-        console.log(
-          `[Notify] Sending broadcast for trip ${tripId} with status ${newStatus}`,
-        );
-
-        // 2. Reuse your broadcast logic (Internal Call)
-        // We import the logic from your existing broadcast function or just invoke it here.
-        // Since this is "server-side to server-side", we can just call the logic directly.
-
-        try {
-          await broadcastTripLogic({
-            tripId: tripId,
-            message: messageText,
-            actorUid: uid || "SYSTEM",
-            actorName: actorName || "SYSTEM",
-            actorRole: role || "SYSTEM",
-          }).catch((err) => console.error("Broadcast failed:", err));
-        } catch (err) {
-          console.error("[Notify] Failed to queue SMS:", err);
-          // Don't throw error here, or you will roll back the Status Update!
-          // We want the status to change even if SMS fails.
-        }
+      try {
+        await sendTripStatusCustomerNotifications({
+          db,
+          tripId,
+          oldStatus: oldTripStatus,
+          newStatus,
+          notify: true,
+          promotionSource,
+          source:
+            promotionSource === "RECONCILIATION"
+              ? "RECONCILIATION"
+              : "TRIP_STATUS_OVERRIDE",
+          channels: { sms: true, email: false, push: true },
+          actor: {
+            uid: uid || "SYSTEM",
+            name: actorName || "SYSTEM",
+            role: role || "SYSTEM",
+          },
+        });
+      } catch (err) {
+        console.error("[Notify] Failed to send trip customer notifications:", err);
       }
     }
 
@@ -291,6 +288,6 @@ exports.updateTripStatus = onCall(
       }
     }
 
-    return { success: true, oldStatus: "FETCHED_INSIDE", newStatus };
+    return { success: true, oldStatus: oldTripStatus, newStatus };
   },
 );

@@ -19,7 +19,6 @@ const {
   resolveDeliveryVehicleLoadedStatus,
   resolveHubUnloadStatus,
 } = require("./packageStatus");
-const { getShipmentTargetUserIds } = require("../utilities/notificationHelpers");
 const { normalizeQty } = require("../utilities/packageHelpers");
 const { tryAutoCompleteTrip } = require("../trips/autoCompleteTrip");
 const { assertCanUnloadAtHub } = require("../trips/manifestStatus");
@@ -31,105 +30,6 @@ const { packageLinkedToTrip } = require("./tripPackageOperations");
 
 if (!admin.apps.length) admin.initializeApp();
 const db = admin.firestore();
-
-function formatStatusLabel(status = "") {
-  return String(status || "")
-    .replace(/_/g, " ")
-    .toLowerCase()
-    .replace(/\b\w/g, (letter) => letter.toUpperCase());
-}
-
-function buildShipmentStatusNotificationEvent({
-  shipment,
-  shipmentId,
-  oldStatus,
-  newStatus,
-  actor,
-  notificationChannels,
-  notifySms,
-  notifyEmail,
-  notifyPush,
-  notify,
-}) {
-  if (notify === false) return null;
-
-  const requestedChannels =
-    notificationChannels && typeof notificationChannels === "object"
-      ? notificationChannels
-      : null;
-  const channels = requestedChannels
-    ? {
-        sms: requestedChannels.sms === true,
-        email: requestedChannels.email === true,
-        push: requestedChannels.push === true,
-      }
-    : {
-        sms: notifySms !== false,
-        email: notifyEmail === true,
-        push: notifyPush !== false,
-      };
-  const targetUserIds = getShipmentTargetUserIds(shipment);
-  const statusLabel = formatStatusLabel(newStatus);
-  const title = "Shipment status updated";
-  const body = `Shipment ${shipmentId} is now ${statusLabel}.`;
-
-  if (!channels.sms && !channels.email && !channels.push) {
-    return null;
-  }
-
-  return {
-    type: "SHIPMENT_STATUS_UPDATED",
-    status: "pending",
-    channels: {
-      sms: channels.sms,
-      email: channels.email,
-      push: channels.push && targetUserIds.length > 0,
-      inApp: channels.push && targetUserIds.length > 0,
-    },
-    entityType: "shipment",
-    entityId: shipmentId,
-    shipmentId,
-    targetUserIds,
-    targets: {
-      sender: {
-        uid: shipment.sender?.uid || shipment.senderUid || null,
-        name: shipment.sender?.name || shipment.senderName || "",
-        phone: shipment.sender?.phone || shipment.senderPhone || null,
-        email: shipment.sender?.email || shipment.senderEmail || null,
-      },
-      recipient: {
-        uid: shipment.recipient?.uid || shipment.recipientUid || null,
-        name: shipment.recipient?.name || shipment.recipientName || "",
-        phone:
-          shipment.recipient?.phone ||
-          shipment.recipientPhone ||
-          shipment.consigneePhone ||
-          shipment.customerPhone ||
-          null,
-        email: shipment.recipient?.email || shipment.recipientEmail || null,
-      },
-    },
-    title,
-    body,
-    smsBody: `ATLAS: Shipment ${shipmentId} is now ${statusLabel}. Track: https://atlastransport.ph/track/${shipmentId}`,
-    data: {
-      screen: "tracking",
-      trackingId: shipmentId,
-      status: newStatus,
-      oldStatus,
-      origin: shipment.origin || shipment.sender?.address?.city || null,
-      destination:
-        shipment.destination || shipment.recipient?.address?.city || null,
-    },
-    actor: {
-      uid: actor.uid,
-      name: actor.name,
-      role: actor.role,
-    },
-    createdAt: FieldValue.serverTimestamp(),
-    updatedAt: FieldValue.serverTimestamp(),
-  };
-}
 
 exports.updateShipmentPackages = onCall(
   { region: "asia-southeast1", maxInstances: 10 },
@@ -154,7 +54,7 @@ exports.updateShipmentPackages = onCall(
       location,
       scanAction,
       tripId: scannerTripId,
-      notify = true,
+      notify = false,
       notificationChannels = null,
       notifySms,
       notifyEmail,
@@ -1247,29 +1147,6 @@ exports.updateShipmentPackages = onCall(
         }
       }
 
-      if (
-        isScannerUpdate &&
-        shipmentStatus &&
-        shipmentStatus !== oldShipmentStatus
-      ) {
-        const notificationEvent = buildShipmentStatusNotificationEvent({
-          shipment: oldData,
-          shipmentId,
-          oldStatus: oldData.status || null,
-          newStatus: shipmentStatus,
-          actor: { uid: uid || authUid, name, role },
-          notificationChannels,
-          notifySms,
-          notifyEmail,
-          notifyPush,
-          notify,
-        });
-
-        if (notificationEvent) {
-          const notificationRef = db.collection("notification_events").doc();
-          tx.set(notificationRef, notificationEvent);
-        }
-      }
     });
 
     if (completedTripId && shouldTryAutoCompleteTrip) {
