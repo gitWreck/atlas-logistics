@@ -22,7 +22,51 @@ function packageOnTrip(pkg = {}, tripId = "") {
   if (!trip) return false;
   const loadedOn = String(pkg.loadedOnTrip || "").trim();
   const currentTrip = String(pkg.currentTripId || "").trim();
-  return loadedOn === trip || currentTrip === trip;
+  const hubReceivedOn = String(pkg.hubReceivedOnTrip || "").trim();
+  return loadedOn === trip || currentTrip === trip || hubReceivedOn === trip;
+}
+
+function getPackageIdentity(pkg = {}) {
+  return String(pkg.packageId || pkg.trackingNumber || "").trim();
+}
+
+/**
+ * Whether a package row belongs to a trip_shipments counter scope.
+ * Uses trip ids, hub receive trip stamp, manifest barcodes, or active scan ids.
+ */
+function packageLinkedToTrip(
+  pkg = {},
+  tripId = "",
+  barcodeSet = new Set(),
+  options = {},
+) {
+  const trip = String(tripId || "").trim();
+  if (!trip) return false;
+
+  const loadedOn = String(pkg.loadedOnTrip || "").trim();
+  const currentTrip = String(pkg.currentTripId || "").trim();
+  const hubReceivedOn = String(pkg.hubReceivedOnTrip || "").trim();
+  if (loadedOn === trip || currentTrip === trip || hubReceivedOn === trip) {
+    return true;
+  }
+
+  const packageId = getPackageIdentity(pkg);
+  const scannedIds = options.scannedPackageIds || new Set();
+  if (packageId && scannedIds.has(packageId)) return true;
+
+  if (!packageId || !barcodeSet.has(packageId)) return false;
+
+  const loadedQty = normalizeQty(pkg.loadedQty, 0);
+  const receivedQty = normalizeQty(pkg.receivedQty, 0);
+  if (loadedQty > 0 || receivedQty > 0) return true;
+
+  return [
+    PACKAGE_STATUS.LOADED,
+    PACKAGE_STATUS.LOADED_TO_TRIP,
+    PACKAGE_STATUS.IN_TRANSIT,
+    PACKAGE_STATUS.OUT_FOR_DELIVERY,
+    PACKAGE_STATUS.ARRIVED_AT_ODIONGAN,
+  ].includes(normalizePackageStatus(pkg));
 }
 
 function packageEligibleForLinehaulLoad(pkg = {}) {
@@ -163,6 +207,7 @@ function applyLinehaulUnloadAtHub(pkg = {}, { tripId, nowIso } = {}) {
     receivedQty: normalized.quantity,
     currentTripId: null,
     loadedOnTrip: null,
+    hubReceivedOnTrip: tripId || pkg.hubReceivedOnTrip || null,
     custodyOwnerType: "WAREHOUSE",
     custodyOwnerId: ODIONGAN_WAREHOUSE,
     hubReceivedAt: timestamp,
@@ -269,6 +314,8 @@ function buildShipmentSnapshot(packages = [], options = {}) {
 
 module.exports = {
   packageOnTrip,
+  packageLinkedToTrip,
+  getPackageIdentity,
   packageEligibleForLinehaulLoad,
   normalizePackageRow,
   sumTotalQty,

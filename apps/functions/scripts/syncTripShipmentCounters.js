@@ -34,6 +34,7 @@ const {
   sumMissingQty,
   sumDamagedQty,
   sumTotalQty,
+  packageLinkedToTrip,
 } = require("../src/packages/tripPackageOperations");
 const { initAdminApp, resolveTripDocRef } = require("./initAdmin");
 
@@ -88,12 +89,8 @@ function isOnTruckPiece(pkg = {}) {
   return normalizeQty(pkg.loadedQty, 0) > 0;
 }
 
-function packageLinkedToTrip(pkg = {}, tripId = "", barcodeSet = new Set()) {
-  const linkedTrip = String(pkg.currentTripId || pkg.loadedOnTrip || "").trim();
-  if (linkedTrip && linkedTrip === tripId) return true;
-
-  const identity = getPackageIdentity(pkg);
-  return Boolean(identity && barcodeSet.has(identity));
+function packageLinkedToTripForScope(pkg = {}, tripId = "", barcodeSet = new Set()) {
+  return packageLinkedToTrip(pkg, tripId, barcodeSet);
 }
 
 function resolveTripScopedPackages(
@@ -108,7 +105,7 @@ function resolveTripScopedPackages(
   );
 
   const linked = normalized.filter((pkg) =>
-    packageLinkedToTrip(pkg, tripId, barcodeSet),
+    packageLinkedToTripForScope(pkg, tripId, barcodeSet),
   );
   if (linked.length > 0 || scope === "linked") {
     return linked;
@@ -125,6 +122,13 @@ function resolveTripScopedPackages(
 function classifyPieceForTripCounters(pkg = {}) {
   const status = normalizePackageStatus(pkg);
   const qty = pieceQty(pkg);
+
+  if (
+    status === PACKAGE_STATUS.DELIVERED ||
+    status === PACKAGE_STATUS.COMPLETED
+  ) {
+    return { bucket: "received", qty };
+  }
 
   if (status === PACKAGE_STATUS.MISSING || normalizeQty(pkg.missingQty, 0) > 0) {
     return { bucket: "missing", qty };
@@ -340,7 +344,15 @@ async function main() {
   );
 }
 
-main().catch((error) => {
-  console.error(error);
-  process.exit(1);
-});
+if (require.main === module) {
+  main().catch((error) => {
+    console.error(error);
+    process.exit(1);
+  });
+}
+
+module.exports = {
+  syncTripShipment,
+  resolveTripScopedPackages,
+  summarizeTripScopedPackages,
+};

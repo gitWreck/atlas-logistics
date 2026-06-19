@@ -27,6 +27,7 @@ const {
   assertCustodyStructuralEditAllowed,
   assertCustodyScanStatusAllowed,
 } = require("../trips/manifestLockGuard");
+const { packageLinkedToTrip } = require("./tripPackageOperations");
 
 if (!admin.apps.length) admin.initializeApp();
 const db = admin.firestore();
@@ -676,6 +677,7 @@ exports.updateShipmentPackages = onCall(
                 ? {
                     currentTripId: null,
                     loadedOnTrip: null,
+                    ...(tripId ? { hubReceivedOnTrip: tripId } : {}),
                     ...(unloadedStatus === PACKAGE_STATUS.ARRIVED_AT_ODIONGAN
                       ? {
                           custodyOwnerType: "WAREHOUSE",
@@ -685,7 +687,9 @@ exports.updateShipmentPackages = onCall(
                         }
                       : {}),
                   }
-                : {}),
+                : tripId
+                  ? { hubReceivedOnTrip: tripId }
+                  : {}),
             });
             return;
           } else if (newStatus === "LOADED") {
@@ -991,33 +995,24 @@ exports.updateShipmentPackages = onCall(
       }
       const singleCurrentTripId =
         activeTripIds.length === 1 ? activeTripIds[0] : null;
+      const scannedPackageIdSet = new Set(
+        (Array.isArray(packageIds) ? packageIds : [])
+          .filter(Boolean)
+          .map((id) => String(id).trim()),
+      );
       const tripPackages = tripId
-        ? finalPackages.filter((pkg) => {
-            const packageTripId = pkg.currentTripId || pkg.loadedOnTrip || null;
-            const packageId = getPackageIdentity(pkg);
-
-            if (packageTripId) return packageTripId === tripId;
-
-            if (!packageId || !existingTripBarcodeSet.has(packageId)) {
-              return false;
-            }
-
-            const loadedQty = normalizeQty(pkg.loadedQty, 0);
-            const receivedQty = normalizeQty(pkg.receivedQty, 0);
-            if (loadedQty > 0 || receivedQty > 0) return true;
-
-            return [
-              "LOADED",
-              "LOADED_TO_TRIP",
-              "IN_TRANSIT",
-              "OUT_FOR_DELIVERY",
-              "ARRIVED_AT_ODIONGAN",
-            ].includes(String(pkg.status || "").toUpperCase());
-          })
+        ? finalPackages.filter((pkg) =>
+            packageLinkedToTrip(pkg, tripId, existingTripBarcodeSet, {
+              scannedPackageIds: isHubReceive ? scannedPackageIdSet : new Set(),
+            }),
+          )
         : finalPackages;
-      const tripPackageBarcodes = tripPackages
-        .map((pkg) => getPackageIdentity(pkg))
-        .filter(Boolean);
+      const tripPackageBarcodes = [
+        ...new Set([
+          ...tripPackages.map((pkg) => getPackageIdentity(pkg)).filter(Boolean),
+          ...(isHubReceive ? [...scannedPackageIdSet] : []),
+        ]),
+      ];
       const tripTotalQty = sumTotalQty(tripPackages);
       const tripLoadedQty = sumLoadedQty(tripPackages);
       const tripReceivedQty = sumReceivedQty(tripPackages);

@@ -61,7 +61,9 @@ function isLinkedToTrip(pkg = {}, tripId = "", tripBarcodeSet = new Set()) {
   const packageTripId = String(
     pkg.currentTripId || pkg.loadedOnTrip || "",
   ).trim();
+  const hubReceivedOnTrip = String(pkg.hubReceivedOnTrip || "").trim();
   if (tripId && packageTripId === tripId) return true;
+  if (tripId && hubReceivedOnTrip === tripId) return true;
 
   const packageId = getPackageIdentity(pkg);
   return Boolean(packageId && tripBarcodeSet.has(String(packageId)));
