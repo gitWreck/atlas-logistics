@@ -33,7 +33,7 @@ export async function POST(request, { params }) {
         shipmentId,
         newStatus: body.newStatus,
         remarks: body.remarks ?? null,
-        notify: body.notify !== false,
+        notify: body.notify === true,
         notifySms: body.notifySms,
         notifyEmail: body.notifyEmail,
         notifyPush: body.notifyPush,

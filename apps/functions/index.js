@@ -171,6 +171,8 @@ exports.broadcastTripMessage =
   require("./src/messaging/broadcastTripMessage").broadcastTripMessage;
 exports.processNotificationEvent =
   require("./src/notifications/processNotificationEvent").processNotificationEvent;
+exports.retryCustomerNotification =
+  require("./src/notifications/retryCustomerNotification").retryCustomerNotification;
 
 // Chat
 exports.createConversation =

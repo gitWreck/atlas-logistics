@@ -89,6 +89,26 @@ function resolveCustomerIdentity(shipment = {}) {
   };
 }
 
+async function enrichGroupContact(db, group = {}) {
+  if (!group.uid) return group;
+
+  const userSnap = await db.collection("users").doc(String(group.uid)).get();
+  if (!userSnap.exists) return group;
+
+  const user = userSnap.data() || {};
+  const phone =
+    group.phone ||
+    requireNormalizedPhone(user.phoneNumber || user.phone || user.mobile || "");
+  const email =
+    group.email || String(user.email || "").trim().toLowerCase() || null;
+
+  return {
+    ...group,
+    phone: phone || null,
+    email,
+  };
+}
+
 function groupShipmentsByCustomer(shipments = []) {
   const groups = new Map();
 
@@ -114,18 +134,46 @@ function groupShipmentsByCustomer(shipments = []) {
 }
 
 async function loadTripShipments(db, tripId) {
-  const [currentTripSnap, currentTruckTripSnap] = await Promise.all([
-    db.collection("shipments").where("currentTripId", "==", tripId).get(),
-    db.collection("shipments").where("currentTruckTripId", "==", tripId).get(),
-  ]);
-
   const shipmentMap = new Map();
-  currentTripSnap.docs.forEach((doc) =>
-    shipmentMap.set(doc.id, { id: doc.id, ...doc.data() }),
-  );
-  currentTruckTripSnap.docs.forEach((doc) =>
-    shipmentMap.set(doc.id, { id: doc.id, ...doc.data() }),
-  );
+  const addDoc = (doc) => {
+    if (!doc?.exists) return;
+    shipmentMap.set(doc.id, { id: doc.id, ...doc.data() });
+  };
+
+  const [currentTripSnap, currentTruckTripSnap, tripShipSnap, tripIdsArraySnap] =
+    await Promise.all([
+      db.collection("shipments").where("currentTripId", "==", tripId).get(),
+      db
+        .collection("shipments")
+        .where("currentTruckTripId", "==", tripId)
+        .get(),
+      db
+        .collection("truck_trips")
+        .doc(tripId)
+        .collection("trip_shipments")
+        .get()
+        .catch(() => ({ docs: [] })),
+      db
+        .collection("shipments")
+        .where("currentTripIds", "array-contains", tripId)
+        .get()
+        .catch(() => ({ docs: [] })),
+    ]);
+
+  currentTripSnap.docs.forEach(addDoc);
+  currentTruckTripSnap.docs.forEach(addDoc);
+  tripIdsArraySnap.docs.forEach(addDoc);
+
+  const manifestShipmentIds = tripShipSnap.docs
+    .map((doc) => doc.id)
+    .filter((id) => !shipmentMap.has(id));
+
+  if (manifestShipmentIds.length) {
+    const shipmentSnaps = await Promise.all(
+      manifestShipmentIds.map((id) => db.collection("shipments").doc(id).get()),
+    );
+    shipmentSnaps.forEach(addDoc);
+  }
 
   return [...shipmentMap.values()];
 }
@@ -136,9 +184,21 @@ async function claimNotificationLog(db, dedupKey, payload) {
   return db.runTransaction(async (tx) => {
     const snap = await tx.get(ref);
     if (snap.exists) {
-      const status = String(snap.data()?.status || "").toLowerCase();
-      if (status === "sent" || status === "pending") {
+      const existing = snap.data() || {};
+      const status = String(existing.status || "").toLowerCase();
+      if (status === "sent") {
         return { claimed: false, reason: "duplicate", ref };
+      }
+      if (status === "pending" || status === "queued") {
+        const updatedAt =
+          existing.updatedAt?.toDate?.() || existing.createdAt?.toDate?.();
+        const staleMs = 5 * 60 * 1000;
+        const isStale =
+          updatedAt instanceof Date &&
+          Date.now() - updatedAt.getTime() > staleMs;
+        if (!isStale) {
+          return { claimed: false, reason: "duplicate", ref };
+        }
       }
       if (status === "failed" && payload.allowRetry !== true) {
         return { claimed: false, reason: "failed_exists", ref };
@@ -149,6 +209,7 @@ async function claimNotificationLog(db, dedupKey, payload) {
       ref,
       {
         ...payload,
+        messageBody: payload.messageBody || null,
         status: "pending",
         createdAt: FieldValue.serverTimestamp(),
         updatedAt: FieldValue.serverTimestamp(),
@@ -160,12 +221,20 @@ async function claimNotificationLog(db, dedupKey, payload) {
   });
 }
 
+function resolveSmsLogStatus(providerStatus = "") {
+  const status = String(providerStatus || "").toLowerCase();
+  if (status === "sent") return "sent";
+  if (status === "queued" || status === "pending") return "queued";
+  return "queued";
+}
+
 async function markNotificationLog(ref, status, extra = {}) {
   await ref.update({
     status,
     ...extra,
     updatedAt: FieldValue.serverTimestamp(),
     ...(status === "sent" ? { sentAt: FieldValue.serverTimestamp() } : {}),
+    ...(status === "queued" ? { queuedAt: FieldValue.serverTimestamp() } : {}),
     ...(status === "failed" ? { failedAt: FieldValue.serverTimestamp() } : {}),
   });
 }
@@ -260,10 +329,13 @@ async function deliverChannel({
   source = "SYSTEM",
   allowRetry = false,
 }) {
+  const contact =
+    channel === "SMS" ? await enrichGroupContact(db, group) : group;
+
   const claim = await claimNotificationLog(db, dedupKey, {
-    customerId: group.customerId,
-    customerPhone: group.phone || null,
-    customerEmail: group.email || null,
+    customerId: contact.customerId,
+    customerPhone: contact.phone || null,
+    customerEmail: contact.email || group.email || null,
     tripId: tripId || NO_TRIP_SCOPE,
     notificationType,
     channel,
@@ -272,6 +344,7 @@ async function deliverChannel({
     createdBy: actor.uid || actor.id || "SYSTEM",
     source,
     allowRetry,
+    messageBody: customSmsMessage || customPush || null,
   });
 
   if (!claim.claimed) {
@@ -295,9 +368,9 @@ async function deliverChannel({
 
   try {
     if (channel === "SMS") {
-      if (!group.phone) {
+      if (!contact.phone) {
         await markNotificationLog(claim.ref, "failed", {
-          error: "No valid phone",
+          error: "No valid phone on shipment or user profile",
         });
         return { channel, skipped: true, reason: "no_phone" };
       }
@@ -307,7 +380,30 @@ async function deliverChannel({
         });
         return { channel, skipped: true, reason: "no_template" };
       }
-      await sendSmsViaProvider({ phone: group.phone, message: smsMessage });
+      const providerResult = await sendSmsViaProvider({
+        phone: contact.phone,
+        message: smsMessage,
+      });
+      const logStatus = resolveSmsLogStatus(providerResult.status);
+      await markNotificationLog(claim.ref, logStatus, {
+        provider: "semaphore",
+        providerMessageId: providerResult.messageId || null,
+        providerStatus: providerResult.status || null,
+        providerNetwork: providerResult.network || null,
+        providerRecipient: providerResult.recipient || null,
+        providerSenderName: providerResult.senderName || null,
+      });
+
+      if (logStatus === "queued") {
+        return {
+          channel,
+          queued: true,
+          providerStatus: providerResult.status,
+          providerMessageId: providerResult.messageId,
+        };
+      }
+
+      return { channel, sent: true, providerMessageId: providerResult.messageId };
     } else if (channel === "EMAIL") {
       if (!group.email) {
         await markNotificationLog(claim.ref, "failed", {
@@ -360,6 +456,7 @@ async function sendTripCustomerNotifications({
   db,
   tripId,
   notificationType,
+  shipments: providedShipments = null,
   channels = { sms: true, email: false, push: true },
   actor = {},
   source = "TRIP_STATUS",
@@ -372,7 +469,10 @@ async function sendTripCustomerNotifications({
     return { success: true, sent: 0, skipped: true, reason: "missing_args" };
   }
 
-  const shipments = await loadTripShipments(db, tripId);
+  const shipments =
+    Array.isArray(providedShipments) && providedShipments.length
+      ? providedShipments
+      : await loadTripShipments(db, tripId);
   if (!shipments.length) {
     return { success: true, sent: 0, skipped: true, reason: "no_shipments" };
   }
@@ -574,14 +674,430 @@ async function sendTripStatusCustomerNotifications({
   });
 }
 
+async function sendAutomaticTripLifecycleNotification({
+  db,
+  tripId,
+  notificationType,
+  shipments = null,
+  source = "TRIP_LIFECYCLE",
+  channels = { sms: true, email: false, push: true },
+  actor = {},
+}) {
+  if (!tripId || !notificationType) {
+    return { success: true, skipped: true, reason: "missing_args" };
+  }
+
+  if (
+    shouldBlockCustomerNotification({
+      notify: true,
+      source,
+    })
+  ) {
+    return { success: true, skipped: true, reason: "blocked_source" };
+  }
+
+  return sendTripCustomerNotifications({
+    db,
+    tripId,
+    notificationType,
+    shipments,
+    channels,
+    actor,
+    source,
+  });
+}
+
+async function sendAutomaticShipmentLifecycleNotification({
+  db,
+  shipment,
+  shipmentId,
+  notificationType,
+  tripId = null,
+  source = "SHIPMENT_LIFECYCLE",
+  channels = { sms: true, email: false, push: true },
+  actor = {},
+}) {
+  if (!shipmentId || !notificationType) {
+    return { success: true, skipped: true, reason: "missing_args" };
+  }
+
+  if (
+    shouldBlockCustomerNotification({
+      notify: true,
+      source,
+    })
+  ) {
+    return { success: true, skipped: true, reason: "blocked_source" };
+  }
+
+  const scopedTripId =
+    tripId ||
+    shipment?.currentTripId ||
+    shipment?.currentTruckTripId ||
+    NO_TRIP_SCOPE;
+  const dedupNotificationType = `${notificationType}__${shipmentId}`;
+  const group = groupShipmentsByCustomer([
+    { id: shipmentId, ...(shipment || {}) },
+  ])[0];
+
+  if (!group) {
+    return { success: true, sent: 0, skipped: true, reason: "no_customer" };
+  }
+
+  const shipmentCount = Math.max(group.shipmentIds.length, 1);
+  const customSmsMessage = buildCustomerSmsMessage(
+    notificationType,
+    shipmentCount,
+  );
+  const customEmail = buildCustomerEmailContent({
+    notificationType,
+    shipmentCount,
+    shipmentIds: group.shipmentIds,
+    tripId: scopedTripId === NO_TRIP_SCOPE ? null : scopedTripId,
+  });
+  const customPush = buildCustomerPushBody(
+    notificationType,
+    shipmentCount,
+    group.shipmentIds,
+  );
+
+  const channelResults = await Promise.all(
+    [
+      channels.sms === true ? "SMS" : null,
+      channels.email === true ? "EMAIL" : null,
+      channels.push === true ? "PUSH" : null,
+    ]
+      .filter(Boolean)
+      .map((channel) =>
+        deliverChannel({
+          db,
+          channel,
+          dedupKey: buildDedupKey({
+            customerId: group.customerId,
+            tripId: scopedTripId,
+            notificationType: dedupNotificationType,
+            channel,
+          }),
+          group,
+          tripId: scopedTripId,
+          notificationType,
+          customSmsMessage,
+          customEmail,
+          customPush,
+          actor,
+          source,
+        }),
+      ),
+  );
+
+  return {
+    success: true,
+    sent: channelResults.filter((result) => result.sent === true).length,
+    queued: channelResults.filter((result) => result.queued === true).length,
+    results: channelResults,
+  };
+}
+
+function buildCustomerGroup({
+  phone = null,
+  email = null,
+  uid = null,
+  name = "Customer",
+  shipmentId = null,
+  shipmentIds = [],
+}) {
+  const shipment = {
+    recipient: { phone, email, uid, name },
+  };
+  const identity = resolveCustomerIdentity(shipment);
+  if (!identity.customerId) return null;
+
+  const ids = [
+    ...(Array.isArray(shipmentIds) ? shipmentIds : []),
+    ...(shipmentId ? [shipmentId] : []),
+  ].filter(Boolean);
+
+  return {
+    ...identity,
+    shipmentIds: [...new Set(ids.map(String))],
+    shipments: shipmentId ? [{ id: shipmentId, ...shipment }] : [],
+  };
+}
+
+async function sendDirectCustomerNotification({
+  db,
+  phone = null,
+  email = null,
+  uid = null,
+  name = "Customer",
+  tripId = null,
+  shipmentId = null,
+  shipmentIds = [],
+  notificationType,
+  channels = { sms: true, email: false, push: false },
+  customSmsMessage = null,
+  customEmail = null,
+  customPush = null,
+  actor = {},
+  source = "DIRECT",
+  allowRetry = false,
+  skipDedup = false,
+}) {
+  const group = buildCustomerGroup({
+    phone,
+    email,
+    uid,
+    name,
+    shipmentId,
+    shipmentIds,
+  });
+
+  if (!group) {
+    return { success: true, sent: 0, skipped: true, reason: "no_customer" };
+  }
+
+  const scopedTripId = tripId || NO_TRIP_SCOPE;
+
+  if (skipDedup && channels.sms === true && group.phone && customSmsMessage) {
+    try {
+      await sendSmsViaProvider({ phone: group.phone, message: customSmsMessage });
+      return { success: true, sent: 1, skippedDedup: true };
+    } catch (error) {
+      return {
+        success: false,
+        sent: 0,
+        error: error?.message || String(error),
+      };
+    }
+  }
+
+  const channelResults = await Promise.all(
+    [
+      channels.sms === true ? "SMS" : null,
+      channels.email === true ? "EMAIL" : null,
+      channels.push === true ? "PUSH" : null,
+    ]
+      .filter(Boolean)
+      .map((channel) =>
+        deliverChannel({
+          db,
+          channel,
+          dedupKey: buildDedupKey({
+            customerId: group.customerId,
+            tripId: scopedTripId,
+            notificationType,
+            channel,
+          }),
+          group,
+          tripId: scopedTripId,
+          notificationType,
+          customSmsMessage,
+          customEmail,
+          customPush,
+          actor,
+          source,
+          allowRetry,
+        }),
+      ),
+  );
+
+  return {
+    success: true,
+    sent: channelResults.filter((result) => result.sent === true).length,
+    results: channelResults,
+  };
+}
+
+async function retryNotificationLog({ db, dedupKey, actor = {} }) {
+  const ref = db.collection("notificationLogs").doc(String(dedupKey || "").trim());
+  const snap = await ref.get();
+
+  if (!snap.exists) {
+    return { success: false, reason: "not_found" };
+  }
+
+  const log = snap.data() || {};
+  const status = String(log.status || "").toLowerCase();
+
+  if (status !== "failed") {
+    return { success: true, skipped: true, reason: "not_failed" };
+  }
+
+  const uid =
+    log.customerId && String(log.customerId).startsWith("UID_")
+      ? String(log.customerId).slice(4)
+      : null;
+
+  const group = buildCustomerGroup({
+    phone: log.customerPhone,
+    email: log.customerEmail,
+    uid,
+    shipmentIds: log.shipmentIds || [],
+  });
+
+  if (!group) {
+    return { success: false, reason: "no_customer" };
+  }
+
+  const channel = String(log.channel || "SMS").toUpperCase();
+  const customSmsMessage =
+    channel === "SMS" ? log.messageBody || null : null;
+  const customPush = channel === "PUSH" ? log.messageBody || null : null;
+  const customEmail =
+    channel === "EMAIL" && log.messageBody
+      ? {
+          subject: "Atlas Transport update",
+          text: log.messageBody,
+          html: `<p>${log.messageBody}</p>`,
+        }
+      : null;
+
+  return deliverChannel({
+    db,
+    channel,
+    dedupKey,
+    group,
+    tripId: log.tripId || NO_TRIP_SCOPE,
+    notificationType: log.notificationType,
+    customSmsMessage,
+    customEmail,
+    customPush,
+    actor,
+    source: "RETRY",
+    allowRetry: true,
+  });
+}
+
+function uniqueCustomerGroups(parties = [], shipmentId = null) {
+  const groups = [];
+  const seen = new Set();
+
+  parties.forEach((party) => {
+    const group = buildCustomerGroup({
+      phone: party.phone,
+      email: party.email,
+      uid: party.uid,
+      name: party.name,
+      shipmentId,
+    });
+    if (!group || seen.has(group.customerId)) return;
+    seen.add(group.customerId);
+    groups.push(group);
+  });
+
+  return groups;
+}
+
+async function sendShipmentCreatedCustomerNotifications({
+  db,
+  shipmentId,
+  sender = {},
+  recipient = {},
+  channels = { sms: true, email: false, push: true },
+  actor = {},
+  tripId = null,
+}) {
+  const groups = uniqueCustomerGroups(
+    [
+      {
+        phone: sender.phone,
+        email: sender.email,
+        uid: sender.uid,
+        name: sender.name,
+      },
+      {
+        phone: recipient.phone,
+        email: recipient.email,
+        uid: recipient.uid,
+        name: recipient.name,
+      },
+    ],
+    shipmentId,
+  );
+
+  if (!groups.length) {
+    return { success: true, sent: 0, skipped: true, reason: "no_customer" };
+  }
+
+  const scopedTripId = tripId || NO_TRIP_SCOPE;
+  const messageNotificationType =
+    CUSTOMER_NOTIFICATION_TYPES.RECEIVED_AT_DIVISORIA;
+  const dedupNotificationType = `${messageNotificationType}__${shipmentId}`;
+  const results = [];
+
+  for (const group of groups) {
+    const shipmentCount = Math.max(group.shipmentIds.length, 1);
+    const customSmsMessage = buildCustomerSmsMessage(
+      messageNotificationType,
+      shipmentCount,
+    );
+    const customEmail = buildCustomerEmailContent({
+      notificationType: messageNotificationType,
+      shipmentCount,
+      shipmentIds: group.shipmentIds,
+      tripId: scopedTripId === NO_TRIP_SCOPE ? null : scopedTripId,
+    });
+    const customPush = buildCustomerPushBody(
+      messageNotificationType,
+      shipmentCount,
+      group.shipmentIds,
+    );
+
+    const channelResults = await Promise.all(
+      [
+        channels.sms === true ? "SMS" : null,
+        channels.email === true ? "EMAIL" : null,
+        channels.push === true ? "PUSH" : null,
+      ]
+        .filter(Boolean)
+        .map((channel) =>
+          deliverChannel({
+            db,
+            channel,
+            dedupKey: buildDedupKey({
+              customerId: group.customerId,
+              tripId: scopedTripId,
+              notificationType: dedupNotificationType,
+              channel,
+            }),
+            group,
+            tripId: scopedTripId,
+            notificationType: messageNotificationType,
+            customSmsMessage,
+            customEmail,
+            customPush,
+            actor,
+            source: "SHIPMENT_CREATED",
+          }),
+        ),
+    );
+    results.push({ customerId: group.customerId, channelResults });
+  }
+
+  const sent = results.reduce(
+    (sum, entry) =>
+      sum +
+      entry.channelResults.filter((result) => result.sent === true).length,
+    0,
+  );
+
+  return { success: true, customers: groups.length, sent, results };
+}
+
 module.exports = {
   NO_TRIP_SCOPE,
   buildDedupKey,
+  buildCustomerGroup,
   groupShipmentsByCustomer,
   loadTripShipments,
   resolveCustomerIdentity,
+  retryNotificationLog,
+  sendDirectCustomerNotification,
+  sendShipmentCreatedCustomerNotifications,
   sendShipmentCustomerNotification,
   sendTripCustomerNotifications,
   sendTripStatusCustomerNotifications,
+  sendAutomaticTripLifecycleNotification,
+  sendAutomaticShipmentLifecycleNotification,
   CUSTOMER_NOTIFICATION_TYPES,
 };

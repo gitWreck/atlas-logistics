@@ -52,6 +52,13 @@ async function processShipmentCreatedEvent({ eventId, event }) {
   const channels = event.channels || {};
   const result = {};
 
+  if (event.customerNotifyHandled === true) {
+    if (channels.inApp === true) {
+      result.inApp = await writeInAppNotifications({ eventId, event });
+    }
+    return result;
+  }
+
   if (channels.inApp === true) {
     result.inApp = await writeInAppNotifications({ eventId, event });
   }
