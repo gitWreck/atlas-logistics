@@ -26,6 +26,7 @@ const { writeShipmentEvent } = require("../tracking/writeShipmentEvent");
 const { EVENT_TYPES } = require("../tracking/eventTypes");
 const { MANIFEST_STATUS } = require("./manifestStatus");
 const { TRIP_STATUSES } = require("./tripLifecycle");
+const { buildTripShipmentCounterUpdate } = require("./tripShipmentCounters");
 
 const LOADED_ON_TRUCK_STATUSES = new Set([
   PACKAGE_STATUS.LOADED,
@@ -387,7 +388,6 @@ async function runRecoverFoundPackage(
     });
 
     if (tripShipmentSnap.exists) {
-      const qty = classification.quantity;
       const tripLoadedBefore = normalizeQty(tripShipment.loadedCount, 0);
       const tripReceivedBefore = normalizeQty(
         tripShipment.receivedCount ?? tripShipment.deliveredCount,
@@ -395,43 +395,31 @@ async function runRecoverFoundPackage(
       );
       const tripMissingBefore = normalizeQty(tripShipment.missingCount, 0);
 
-      let loadedCount = tripLoadedBefore;
-      let receivedCount = tripReceivedBefore;
-      let missingCount = tripMissingBefore;
-
-      if (classification.bucket === "on_truck") {
-        loadedCount = Math.max(loadedCount - qty, 0);
-      }
-      if (
-        classification.bucket === "missing" ||
-        classification.bucket === "on_truck" ||
-        classification.bucket === "on_trip"
-      ) {
-        receivedCount += qty;
-        missingCount = Math.max(missingCount - qty, 0);
-      }
+      const counterStats = buildTripShipmentCounterUpdate(
+        derivedSnapshot.packages,
+        tripShipment,
+        normalizedTripId,
+      );
 
       const tripShipmentUpdate = {
         status: derivedSnapshot.status,
-        totalItems: newTotalQty,
-        loadedCount,
-        receivedCount,
-        deliveredCount: receivedCount,
-        pendingCount: newPendingQty,
-        missingCount,
+        totalItems: counterStats.totalItems,
+        loadedCount: counterStats.loadedCount,
+        receivedCount: counterStats.receivedCount,
+        deliveredCount: counterStats.deliveredCount,
+        pendingCount: counterStats.pendingCount,
+        missingCount: counterStats.missingCount,
+        damagedCount: counterStats.damagedCount,
+        packageBarcodes: counterStats.packageBarcodes,
         updatedAt: fv.serverTimestamp(),
         updatedBy: name,
       };
 
-      if (!barcodeSet.has(packageLabelResolved)) {
-        tripShipmentUpdate.packageBarcodes = fv.arrayUnion(packageLabelResolved);
-      }
-
       tx.update(tripShipmentRef, tripShipmentUpdate);
 
-      const deltaLoaded = loadedCount - tripLoadedBefore;
-      const deltaReceived = receivedCount - tripReceivedBefore;
-      const deltaMissing = missingCount - tripMissingBefore;
+      const deltaLoaded = counterStats.loadedCount - tripLoadedBefore;
+      const deltaReceived = counterStats.receivedCount - tripReceivedBefore;
+      const deltaMissing = counterStats.missingCount - tripMissingBefore;
 
       const tripUpdate = {
         updatedAt: fv.serverTimestamp(),
