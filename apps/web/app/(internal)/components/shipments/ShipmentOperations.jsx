@@ -7,6 +7,7 @@ import {
   faExclamationTriangle,
 } from "@fortawesome/free-solid-svg-icons";
 import StatusButton from "../ui/StatusButton";
+import NotifyToggle from "../messaging/NotifyToggle";
 import { runAction } from "@/app/utility/utilities";
 import { SHIPMENT_STATUS } from "@/app/utility/constant/templates";
 import { getWidgetThemeClasses } from "@/app/utility/constant/theme";
@@ -22,6 +23,7 @@ export default function ShipmentOperations({
   custodyLocked = false,
 }) {
   const [statusSelect, setStatusSelect] = useState("");
+  const [notifyCustomers, setNotifyCustomers] = useState(false);
   const [opStatus, setOpStatus] = useState("IDLE");
 
   const theme = getWidgetThemeClasses(isDark);
@@ -57,7 +59,8 @@ export default function ShipmentOperations({
       </h3>
 
       <p className={`text-xs mb-4 ${theme.bodyText}`}>
-        Manually update the shipment status. Customers are not notified.
+        Manually update the shipment status. Customer notifications are off
+        unless you enable them below.
       </p>
 
       <div className="space-y-3">
@@ -77,6 +80,12 @@ export default function ShipmentOperations({
             </option>
           ))}
         </select>
+
+        <NotifyToggle
+          checked={notifyCustomers}
+          onChange={setNotifyCustomers}
+          color="amber"
+        />
       </div>
 
       {statusSelect === "CANCELLED" && (
@@ -108,11 +117,14 @@ export default function ShipmentOperations({
                 updateShipmentStatus({
                   shipmentId,
                   newStatus: statusSelect,
-                  notify: false,
-                  sourceUI: "SHIPMENT_DRAWER",
+                  notify: notifyCustomers,
+                  notifySms: notifyCustomers,
+                  notifyPush: notifyCustomers,
+                  sourceUI: "SHIPMENT_STATUS_OVERRIDE",
                 }),
               () => {
                 setStatusSelect("");
+                setNotifyCustomers(false);
                 onRefresh?.();
               },
             )

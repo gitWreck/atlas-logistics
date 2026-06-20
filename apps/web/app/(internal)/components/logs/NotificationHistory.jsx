@@ -19,6 +19,7 @@ import {
 } from "@fortawesome/free-solid-svg-icons";
 import { formatDistanceToNow } from "date-fns";
 import { getTableTheme } from "@/app/utility/constant/theme";
+import { retryCustomerNotification } from "@/app/utility/FirebaseFunctions";
 
 const LIMIT_OPTIONS = ["50", "100", "200"];
 
@@ -48,8 +49,17 @@ function statusClass(status, theme) {
   const key = String(status || "").toLowerCase();
   if (key === "sent") return theme.statusSuccess;
   if (key === "failed") return theme.statusDanger;
-  if (key === "pending") return theme.statusWarning;
+  if (key === "pending" || key === "queued") return theme.statusWarning;
   return theme.cellSecondary;
+}
+
+function formatStatusLabel(log = {}) {
+  const status = String(log.status || "unknown").toUpperCase();
+  const providerStatus = String(log.providerStatus || "").trim();
+  if (providerStatus && log.channel === "SMS") {
+    return `${status} · ${providerStatus}`;
+  }
+  return status;
 }
 
 export default function NotificationHistory({ isDark = false }) {
@@ -58,8 +68,23 @@ export default function NotificationHistory({ isDark = false }) {
   const [channelFilter, setChannelFilter] = useState("ALL");
   const [statusFilter, setStatusFilter] = useState("ALL");
   const [limitValue, setLimitValue] = useState("100");
+  const [retryingId, setRetryingId] = useState(null);
 
   const theme = getTableTheme(isDark);
+
+  const handleRetry = async (dedupKey) => {
+    if (!dedupKey || retryingId) return;
+
+    setRetryingId(dedupKey);
+    try {
+      await retryCustomerNotification({ dedupKey });
+    } catch (error) {
+      console.error("Notification retry failed:", error);
+      window.alert(error?.message || "Failed to retry notification.");
+    } finally {
+      setRetryingId(null);
+    }
+  };
 
   useEffect(() => {
     const constraints = [orderBy("createdAt", "desc")];
@@ -167,6 +192,7 @@ export default function NotificationHistory({ isDark = false }) {
           >
             <option value="ALL">All statuses</option>
             <option value="SENT">Sent</option>
+            <option value="QUEUED">Queued</option>
             <option value="PENDING">Pending</option>
             <option value="FAILED">Failed</option>
           </select>
@@ -203,6 +229,7 @@ export default function NotificationHistory({ isDark = false }) {
                 "Status",
                 "Source",
                 "Sent",
+                "Actions",
               ].map((heading) => (
                 <th key={heading} className="px-4 py-3 font-bold">
                   {heading}
@@ -213,7 +240,7 @@ export default function NotificationHistory({ isDark = false }) {
           <tbody className={`divide-y ${theme.tbodyDivide}`}>
             {filteredLogs.length === 0 ? (
               <tr>
-                <td colSpan={8} className={`px-4 py-10 text-center italic ${theme.emptyText}`}>
+                <td colSpan={9} className={`px-4 py-10 text-center italic ${theme.emptyText}`}>
                   No notification logs found.
                 </td>
               </tr>
@@ -241,7 +268,13 @@ export default function NotificationHistory({ isDark = false }) {
                       {log.shipmentCount || (log.shipmentIds || []).length || 0}
                     </td>
                     <td className={`px-4 py-3 font-semibold ${statusClass(log.status, theme)}`}>
-                      {String(log.status || "unknown").toUpperCase()}
+                      <div>{formatStatusLabel(log)}</div>
+                      {log.providerMessageId ? (
+                        <div className={`text-[10px] font-normal mt-1 ${theme.cellSecondary}`}>
+                          Semaphore #{log.providerMessageId}
+                          {log.providerNetwork ? ` · ${log.providerNetwork}` : ""}
+                        </div>
+                      ) : null}
                     </td>
                     <td className={`px-4 py-3 ${theme.cellSecondary}`}>
                       {formatLabel(log.source)}
@@ -250,6 +283,21 @@ export default function NotificationHistory({ isDark = false }) {
                       {sentAt
                         ? formatDistanceToNow(sentAt, { addSuffix: true })
                         : "—"}
+                    </td>
+                    <td className={`px-4 py-3 ${theme.cellSecondary}`}>
+                      {String(log.status || "").toLowerCase() === "failed" ||
+                      String(log.status || "").toLowerCase() === "queued" ? (
+                        <button
+                          type="button"
+                          disabled={retryingId === log.id}
+                          onClick={() => handleRetry(log.id)}
+                          className={`px-2 py-1 rounded border text-[10px] font-bold ${theme.editButton}`}
+                        >
+                          {retryingId === log.id ? "Retrying..." : "Retry"}
+                        </button>
+                      ) : (
+                        "—"
+                      )}
                     </td>
                   </tr>
                 );

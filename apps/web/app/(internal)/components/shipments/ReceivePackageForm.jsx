@@ -11,7 +11,7 @@ import {
   faWarehouse, // Added
   faRoute, // Added
 } from "@fortawesome/free-solid-svg-icons";
-import { createShipmentWithPackages } from "@/app/utility/FirebaseFunctions";
+import { createShipment } from "@/app/utility/FirebaseFunctions";
 import InputGroup from "./ReceivePackageForm/InputGroup";
 import { BASIC_PACKAGING_TYPES, INITIAL_CONTACT } from "./shipmentHelpers";
 import { useOperationalSettings } from "@/app/utility/useOperationalSettings";
@@ -137,18 +137,18 @@ export default function ReceivePackageForm({
         sender: {
           name: sender.name,
           phone: sender.phone,
-          details: {
+          address: {
             unit: sender.unit,
             street: sender.street,
             barangay: sender.barangay,
-            city: sender.city, // Optional: Keep manual city entry for door-to-door info
+            city: sender.city,
             province: sender.province,
           },
         },
         recipient: {
           name: recipient.name,
           phone: recipient.phone,
-          details: {
+          address: {
             unit: recipient.unit,
             street: recipient.street,
             barangay: recipient.barangay,
@@ -157,18 +157,24 @@ export default function ReceivePackageForm({
           },
         },
 
-        // --- 3. UPDATED: USE ROUTE INFO FOR CODES ---
-        origin: routeInfo.origin, // e.g. "Divisoria"
-        originCode: routeInfo.originCode, // e.g. "DIV"
-        destination: routeInfo.destination, // e.g. "Odiongan"
-        destinationCode: routeInfo.destinationCode, // e.g. "ODI"
+        origin: routeInfo.origin,
+        originCode: routeInfo.originCode,
+        destination: routeInfo.destination,
+        destinationCode: routeInfo.destinationCode,
 
         items: finalItems,
         remarks,
+        notifySms: true,
+        notifyPush: true,
+        notificationChannels: {
+          sms: true,
+          email: false,
+          push: true,
+        },
       };
 
-      const result = await createShipmentWithPackages(payload);
-      const { shipmentId } = result.data;
+      const result = await createShipment(payload);
+      const shipmentId = result.data?.shipmentId || result.data?.data?.shipmentId;
 
       alert(`Success! Created ${shipmentId} packages.`);
       if (onSuccess) onSuccess();

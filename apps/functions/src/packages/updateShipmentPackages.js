@@ -27,12 +27,41 @@ const {
   assertCustodyScanStatusAllowed,
 } = require("../trips/manifestLockGuard");
 const { packageLinkedToTrip } = require("./tripPackageOperations");
+const {
+  sendAutomaticShipmentLifecycleNotification,
+  CUSTOMER_NOTIFICATION_TYPES,
+} = require("../notifications/customerNotificationService");
+const {
+  SEMAPHORE_API_KEY,
+  SEMAPHORE_SENDER_NAME,
+} = require("../../shared/sms-service");
+const { defineSecret } = require("firebase-functions/params");
+
+const SMTP_EMAIL = defineSecret("SMTP_EMAIL");
+const SMTP_PASSWORD = defineSecret("SMTP_PASSWORD");
+
+function wasShipmentOutForDelivery(status = "") {
+  const normalized = String(status || "").toUpperCase();
+  return (
+    normalized === "OUT_FOR_DELIVERY" ||
+    normalized === "PARTIALLY_OUT_FOR_DELIVERY"
+  );
+}
+
+function wasShipmentDelivered(status = "") {
+  const normalized = String(status || "").toUpperCase();
+  return normalized === "DELIVERED" || normalized === "COMPLETED";
+}
 
 if (!admin.apps.length) admin.initializeApp();
 const db = admin.firestore();
 
 exports.updateShipmentPackages = onCall(
-  { region: "asia-southeast1", maxInstances: 10 },
+  {
+    region: "asia-southeast1",
+    maxInstances: 10,
+    secrets: [SEMAPHORE_API_KEY, SEMAPHORE_SENDER_NAME, SMTP_EMAIL, SMTP_PASSWORD],
+  },
   async (req) => {
     await requireRole(db, req, ["admin", "manager", "checker"]);
 
@@ -112,6 +141,8 @@ exports.updateShipmentPackages = onCall(
     let pendingEvent = null;
     let completedTripId = null;
     let shouldTryAutoCompleteTrip = false;
+    let outForDeliveryNotificationContext = null;
+    let deliveredNotificationContext = null;
 
     await db.runTransaction(async (tx) => {
       // -----------------------------
@@ -1147,6 +1178,55 @@ exports.updateShipmentPackages = onCall(
         }
       }
 
+      if (
+        isScannerUpdate &&
+        String(newStatus || "").toUpperCase() === "OUT_FOR_DELIVERY" &&
+        !wasOutForDelivery &&
+        !wasShipmentOutForDelivery(oldShipmentStatus) &&
+        !wasShipmentOutForDelivery(oldTripShipmentStatus)
+      ) {
+        outForDeliveryNotificationContext = {
+          shipment: {
+            ...oldData,
+            packages: finalPackages,
+            status: shipmentStatus,
+            packageBreakdown,
+            currentTripId: singleCurrentTripId,
+            currentTripIds: activeTripIds,
+          },
+          tripId:
+            tripId ||
+            singleCurrentTripId ||
+            oldData.currentTripId ||
+            oldData.currentTruckTripId ||
+            null,
+        };
+      }
+
+      if (
+        isScannerUpdate &&
+        String(newStatus || "").toUpperCase() === "DELIVERED" &&
+        !wasShipmentDelivered(oldShipmentStatus) &&
+        wasShipmentDelivered(shipmentStatus)
+      ) {
+        deliveredNotificationContext = {
+          shipment: {
+            ...oldData,
+            packages: finalPackages,
+            status: shipmentStatus,
+            packageBreakdown,
+            currentTripId: singleCurrentTripId,
+            currentTripIds: activeTripIds,
+          },
+          tripId:
+            tripId ||
+            singleCurrentTripId ||
+            oldData.currentTripId ||
+            oldData.currentTruckTripId ||
+            null,
+        };
+      }
+
     });
 
     if (completedTripId && shouldTryAutoCompleteTrip) {
@@ -1173,6 +1253,52 @@ exports.updateShipmentPackages = onCall(
       }
     }
 
-    return { success: true };
+    let customerNotificationResult = null;
+    if (outForDeliveryNotificationContext) {
+      try {
+        customerNotificationResult =
+          await sendAutomaticShipmentLifecycleNotification({
+            db,
+            shipment: outForDeliveryNotificationContext.shipment,
+            shipmentId,
+            tripId: outForDeliveryNotificationContext.tripId,
+            notificationType: CUSTOMER_NOTIFICATION_TYPES.OUT_FOR_DELIVERY,
+            source: "SCANNER_OUT_FOR_DELIVERY",
+            channels: { sms: true, email: false, push: true },
+            actor: { uid: actorUid, name, role },
+          });
+      } catch (notificationError) {
+        console.error(
+          "[updateShipmentPackages] Out-for-delivery notification failed:",
+          notificationError,
+        );
+      }
+    }
+
+    if (deliveredNotificationContext) {
+      try {
+        const deliveredResult = await sendAutomaticShipmentLifecycleNotification({
+          db,
+          shipment: deliveredNotificationContext.shipment,
+          shipmentId,
+          tripId: deliveredNotificationContext.tripId,
+          notificationType: CUSTOMER_NOTIFICATION_TYPES.DELIVERED,
+          source: "SCANNER_DELIVERED",
+          channels: { sms: true, email: false, push: true },
+          actor: { uid: actorUid, name, role },
+        });
+        customerNotificationResult = deliveredResult;
+      } catch (notificationError) {
+        console.error(
+          "[updateShipmentPackages] Delivered notification failed:",
+          notificationError,
+        );
+      }
+    }
+
+    return {
+      success: true,
+      customerNotification: customerNotificationResult,
+    };
   },
 );

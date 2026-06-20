@@ -19,6 +19,26 @@ const {
   shipmentHasPiecesAvailableForCheckerLoad,
   shipmentHasWarehouseCustodyPieces,
 } = require("../warehouse/packageDeliveryOperations");
+const {
+  sendAutomaticShipmentLifecycleNotification,
+  CUSTOMER_NOTIFICATION_TYPES,
+} = require("../notifications/customerNotificationService");
+const {
+  SEMAPHORE_API_KEY,
+  SEMAPHORE_SENDER_NAME,
+} = require("../../shared/sms-service");
+const { defineSecret } = require("firebase-functions/params");
+
+const SMTP_EMAIL = defineSecret("SMTP_EMAIL");
+const SMTP_PASSWORD = defineSecret("SMTP_PASSWORD");
+
+function wasShipmentOutForDelivery(status = "") {
+  const normalized = String(status || "").toUpperCase();
+  return (
+    normalized === "OUT_FOR_DELIVERY" ||
+    normalized === "PARTIALLY_OUT_FOR_DELIVERY"
+  );
+}
 
 if (!admin.apps.length) admin.initializeApp();
 const db = admin.firestore();
@@ -215,7 +235,11 @@ function packageIsEligibleForLoad(
 }
 
 exports.loadPackagesToDeliveryManifest = onCall(
-  { region: "asia-southeast1", maxInstances: 10 },
+  {
+    region: "asia-southeast1",
+    maxInstances: 10,
+    secrets: [SEMAPHORE_API_KEY, SEMAPHORE_SENDER_NAME, SMTP_EMAIL, SMTP_PASSWORD],
+  },
   async (req) => {
     const {
       uid: actorUid,
@@ -260,6 +284,7 @@ exports.loadPackagesToDeliveryManifest = onCall(
     let resolvedVehicleId = null;
     let resolvedVehicleName = null;
     let checkerName = actorName || null;
+    let outForDeliveryNotifications = [];
 
     await db.runTransaction(async (tx) => {
       const actorRef = db.collection("users").doc(actorUid);
@@ -456,6 +481,25 @@ exports.loadPackagesToDeliveryManifest = onCall(
           },
         });
 
+        if (!wasShipmentOutForDelivery(status)) {
+          outForDeliveryNotifications.push({
+            shipmentId,
+            shipment: {
+              ...shipmentData,
+              packages: updatedPackages,
+              packageBreakdown,
+              status: shipmentStatus,
+              deliveryManifestId: manifestRefId,
+              deliveryVehicleId: resolvedVehicleId,
+              deliveryVehicleName: resolvedVehicleName,
+            },
+            tripId:
+              shipmentData.currentTripId ||
+              shipmentData.currentTruckTripId ||
+              null,
+          });
+        }
+
         effectiveShipmentIds.push(shipmentId);
       });
 
@@ -537,6 +581,30 @@ exports.loadPackagesToDeliveryManifest = onCall(
         }),
       ),
     );
+
+    for (const entry of outForDeliveryNotifications) {
+      try {
+        await sendAutomaticShipmentLifecycleNotification({
+          db,
+          shipment: entry.shipment,
+          shipmentId: entry.shipmentId,
+          tripId: entry.tripId,
+          notificationType: CUSTOMER_NOTIFICATION_TYPES.OUT_FOR_DELIVERY,
+          source: "CHECKER_LOAD_MANIFEST",
+          channels: { sms: true, email: false, push: true },
+          actor: {
+            uid: actorUid,
+            name: checkerName,
+            role: actorRole || "checker",
+          },
+        });
+      } catch (notificationError) {
+        console.error(
+          `[loadPackagesToDeliveryManifest] Notification failed for ${entry.shipmentId}:`,
+          notificationError,
+        );
+      }
+    }
 
     return {
       success: true,

@@ -29,6 +29,8 @@ const {
 } = require("../notifications/customerNotificationTypes");
 const {
   sendShipmentCustomerNotification,
+  sendAutomaticShipmentLifecycleNotification,
+  CUSTOMER_NOTIFICATION_TYPES,
 } = require("../notifications/customerNotificationService");
 const {
   normalizeNotificationChannels,
@@ -36,10 +38,31 @@ const {
 const { normalizeQty } = require("../utilities/packageHelpers");
 const { tryAutoCompleteTrip } = require("../trips/autoCompleteTrip");
 const { PACKAGE_STATUS } = require("../packages/packageStatus");
+const {
+  SEMAPHORE_API_KEY,
+  SEMAPHORE_SENDER_NAME,
+} = require("../../shared/sms-service");
+const { defineSecret } = require("firebase-functions/params");
+
+const SMTP_EMAIL = defineSecret("SMTP_EMAIL");
+const SMTP_PASSWORD = defineSecret("SMTP_PASSWORD");
 
 if (!admin.apps.length) admin.initializeApp();
 
 const db = admin.firestore();
+
+function wasShipmentOutForDelivery(status = "") {
+  const normalized = String(status || "").toUpperCase();
+  return (
+    normalized === "OUT_FOR_DELIVERY" ||
+    normalized === "PARTIALLY_OUT_FOR_DELIVERY"
+  );
+}
+
+function wasShipmentDelivered(status = "") {
+  const normalized = String(status || "").toUpperCase();
+  return normalized === "DELIVERED" || normalized === "COMPLETED";
+}
 
 function buildShipmentNotificationPlan({
   shipment,
@@ -93,7 +116,11 @@ function buildShipmentNotificationPlan({
 }
 
 exports.updateShipmentStatus = onCall(
-  { region: "asia-southeast1", maxInstances: 10 },
+  {
+    region: "asia-southeast1",
+    maxInstances: 10,
+    secrets: [SEMAPHORE_API_KEY, SEMAPHORE_SENDER_NAME, SMTP_EMAIL, SMTP_PASSWORD],
+  },
   async (req) => {
     if (!req.auth) {
       throw new HttpsError("unauthenticated", "Auth required.");
@@ -155,6 +182,8 @@ exports.updateShipmentStatus = onCall(
     let checkerDeliveredPieceIds = [];
     let resultStatus = newStatus;
     let completedTripId = null;
+    let shipmentWasOutForDelivery = false;
+    let shipmentWasDelivered = false;
 
     const packageIdSet = normalizePackageIdSet(packageIds);
     const isCheckerPieceDelivery =
@@ -181,6 +210,8 @@ exports.updateShipmentStatus = onCall(
       const currentData = shipmentSnap.data() || {};
       updatedShipmentData = currentData;
       const oldStatus = currentData.status || null;
+      shipmentWasOutForDelivery = wasShipmentOutForDelivery(oldStatus);
+      shipmentWasDelivered = wasShipmentDelivered(oldStatus);
       const tripData = tripSnap?.exists ? tripSnap.data() : null;
       assertCustodyScanStatusAllowed(currentData, tripData, newStatus);
 
@@ -672,6 +703,63 @@ exports.updateShipmentStatus = onCall(
       } catch (notificationError) {
         console.error(
           "[updateShipmentStatus] Customer notification failed:",
+          notificationError,
+        );
+      }
+    } else if (
+      checkerPromotedOutForDelivery &&
+      !shipmentWasOutForDelivery &&
+      newStatus === "OUT_FOR_DELIVERY"
+    ) {
+      try {
+        const freshSnap = await shipmentRef.get();
+        const freshShipment = freshSnap.exists ? freshSnap.data() || {} : {};
+        await sendAutomaticShipmentLifecycleNotification({
+          db,
+          shipment: freshShipment,
+          shipmentId,
+          tripId:
+            tripId ||
+            freshShipment.currentTripId ||
+            freshShipment.currentTruckTripId ||
+            null,
+          notificationType: CUSTOMER_NOTIFICATION_TYPES.OUT_FOR_DELIVERY,
+          source: "CHECKER_OUT_FOR_DELIVERY",
+          channels: { sms: true, email: false, push: true },
+          actor: { uid, name, role },
+        });
+        notificationDelivered = true;
+      } catch (notificationError) {
+        console.error(
+          "[updateShipmentStatus] Automatic out-for-delivery notification failed:",
+          notificationError,
+        );
+      }
+    } else if (
+      !shipmentWasDelivered &&
+      wasShipmentDelivered(resultStatus)
+    ) {
+      try {
+        const freshSnap = await shipmentRef.get();
+        const freshShipment = freshSnap.exists ? freshSnap.data() || {} : {};
+        await sendAutomaticShipmentLifecycleNotification({
+          db,
+          shipment: freshShipment,
+          shipmentId,
+          tripId:
+            tripId ||
+            freshShipment.currentTripId ||
+            freshShipment.currentTruckTripId ||
+            null,
+          notificationType: CUSTOMER_NOTIFICATION_TYPES.DELIVERED,
+          source: "SHIPMENT_DELIVERED",
+          channels: { sms: true, email: false, push: true },
+          actor: { uid, name, role },
+        });
+        notificationDelivered = true;
+      } catch (notificationError) {
+        console.error(
+          "[updateShipmentStatus] Automatic delivered notification failed:",
           notificationError,
         );
       }

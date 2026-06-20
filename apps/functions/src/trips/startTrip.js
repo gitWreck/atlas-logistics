@@ -14,11 +14,28 @@ const {
   normalizePackageRow,
 } = require("../packages/tripPackageOperations");
 const { isHubTransferTrip } = require("./manifestStatus");
+const {
+  sendAutomaticTripLifecycleNotification,
+  CUSTOMER_NOTIFICATION_TYPES,
+} = require("../notifications/customerNotificationService");
+const {
+  SEMAPHORE_API_KEY,
+  SEMAPHORE_SENDER_NAME,
+} = require("../../shared/sms-service");
+const { defineSecret } = require("firebase-functions/params");
+
+const SMTP_EMAIL = defineSecret("SMTP_EMAIL");
+const SMTP_PASSWORD = defineSecret("SMTP_PASSWORD");
 
 if (!admin.apps.length) admin.initializeApp();
 const db = admin.firestore();
 
-exports.startTrip = onCall({ region: "asia-southeast1" }, async (req) => {
+exports.startTrip = onCall(
+  {
+    region: "asia-southeast1",
+    secrets: [SEMAPHORE_API_KEY, SEMAPHORE_SENDER_NAME, SMTP_EMAIL, SMTP_PASSWORD],
+  },
+  async (req) => {
   if (!req.auth) {
     throw new HttpsError("unauthenticated", "User must be logged in.");
   }
@@ -151,8 +168,36 @@ exports.startTrip = onCall({ region: "asia-southeast1" }, async (req) => {
     ),
   );
 
+  let customerNotificationResult = null;
+  try {
+    const manifestShipmentSnaps = await Promise.all(
+      shipQuery.docs.map((doc) => db.collection("shipments").doc(doc.id).get()),
+    );
+    const manifestShipments = manifestShipmentSnaps
+      .filter((snap) => snap.exists)
+      .map((snap) => ({ id: snap.id, ...snap.data() }));
+
+    customerNotificationResult = await sendAutomaticTripLifecycleNotification({
+      db,
+      tripId,
+      notificationType: CUSTOMER_NOTIFICATION_TYPES.IN_TRANSIT,
+      shipments: manifestShipments,
+      source: "START_TRIP",
+      channels: { sms: true, email: false, push: true },
+      actor: {
+        uid,
+        name: req.auth.token?.name || null,
+        role: req.auth.token?.role || null,
+      },
+    });
+  } catch (notificationError) {
+    console.error("[startTrip] Customer notification failed:", notificationError);
+  }
+
   return {
     success: true,
     message: `Trip started. ${shipmentCount} shipment(s) updated; only packages on this trip were marked in transit.`,
+    customerNotification: customerNotificationResult,
   };
-});
+  },
+);

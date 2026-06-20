@@ -18,7 +18,7 @@ export const createShipmentWithPackages = httpsCallable(
 export async function updateShipmentStatus({
   shipmentId,
   newStatus,
-  notify = true,
+  notify = false,
   remarks = null,
   tripId = null,
   sourceUI = "SHIPMENT_DRAWER",
@@ -264,6 +264,10 @@ export const sendManualSms = httpsCallable(functions, "sendManualSms");
 export const broadcastTripMessage = httpsCallable(
   functions,
   "broadcastTripMessage",
+);
+export const retryCustomerNotification = httpsCallable(
+  functions,
+  "retryCustomerNotification",
 );
 export const createConversation = httpsCallable(
   functions,
