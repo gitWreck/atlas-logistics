@@ -7,6 +7,7 @@ import { countShipmentDeliveryPool } from "./tripDeliveryPoolCounts";
 import {
   getTripScopedPackages,
   resolveHubHandoffPieceTotal,
+  resolveTripScopedPieceTotal,
 } from "./tripScopedPackages";
 
 function resolveShipmentFullPieceTotal(shipment = {}) {
@@ -21,44 +22,13 @@ function resolveShipmentFullPieceTotal(shipment = {}) {
   );
 }
 
-function resolveTripScopedPieceTotal(shipment = {}) {
-  const loaded = clampCount(shipment.loadedCount);
-  const received = clampCount(
-    shipment.deliveredCount ?? shipment.receivedCount,
-  );
-  const missing = clampCount(shipment.missingCount);
-  const damaged = clampCount(shipment.damagedCount);
-  const onTrip = loaded + received + missing + damaged;
-
-  const tripBarcodeCount = Array.isArray(shipment.packageBarcodes)
-    ? shipment.packageBarcodes.filter(Boolean).length
-    : 0;
-  const onTripQty = Math.max(onTrip, loaded);
-
-  if (tripBarcodeCount > 0) {
-    if (onTripQty > 0 && tripBarcodeCount > onTripQty) {
-      return onTripQty;
-    }
-    return Math.max(onTripQty, tripBarcodeCount);
-  }
-
-  if (onTrip > 0) return onTrip;
-
-  const storedTotal = clampCount(shipment.totalItems);
-  const fullShipmentTotal = resolveShipmentFullPieceTotal(shipment);
-
-  if (storedTotal > 0 && fullShipmentTotal > storedTotal && loaded > 0) {
-    return Math.max(loaded, onTrip);
-  }
-  if (storedTotal > 0 && loaded > 0 && storedTotal > loaded + received) {
-    return Math.max(loaded, onTrip);
-  }
-
-  return storedTotal > 0 ? storedTotal : loaded;
-}
-
 function clampCount(value) {
   return Math.max(0, Number(value) || 0);
+}
+
+function resolveRowTripScopedTotal(row = {}, tripId = "") {
+  const scopedPackages = getTripScopedPackages(row, row, tripId);
+  return resolveTripScopedPieceTotal(row, scopedPackages);
 }
 
 function normalizeStatus(value) {
@@ -83,7 +53,7 @@ function countReleasedTripScopedPieces(
       shipment.releasedForDeliveryAt ||
       shipment.availableForDelivery === true
     ) {
-      return resolveTripScopedPieceTotal(tripShipment);
+      return resolveRowTripScopedTotal(tripShipment, tripId);
     }
     return 0;
   }
@@ -106,13 +76,14 @@ function countTripReleasePipelineTotal(
   scopedPackages = [],
   tripShipment = {},
   shipment = {},
+  tripId = "",
 ) {
   if (scopedPackages.length === 0) {
     if (
       shipment.releasedForDeliveryAt ||
       shipment.availableForDelivery === true
     ) {
-      return resolveTripScopedPieceTotal(tripShipment);
+      return resolveRowTripScopedTotal(tripShipment, tripId);
     }
     return 0;
   }
@@ -175,7 +146,7 @@ function countOutForDeliveryTripScopedPieces(
     tripShipment.masterStatus || shipment.status,
   );
   if (masterStatus === "OUT_FOR_DELIVERY") {
-    return resolveTripScopedPieceTotal(tripShipment);
+    return resolveRowTripScopedTotal(tripShipment, tripId);
   }
   if (masterStatus === "PARTIALLY_OUT_FOR_DELIVERY") {
     return Math.max(fromBreakdown, 1);
@@ -334,7 +305,7 @@ export function aggregateHubDeliveryOpsCounts(trip = {}) {
         ? resolveHubHandoffPieceTotal(row, scopedPackages)
         : Math.max(
             resolveHubHandoffPieceTotal(row, []),
-            resolveTripScopedPieceTotal(row),
+            resolveRowTripScopedTotal(row, tripId),
           );
     total += tripScopedTotal;
 
@@ -351,13 +322,14 @@ export function aggregateHubDeliveryOpsCounts(trip = {}) {
         scopedPackages,
         row,
         row,
+        tripId,
       );
       return;
     }
 
     delivered += countDeliveredTripScopedPieces(row, row, tripId);
     released += countReleasedTripScopedPieces(row, row, tripId);
-    releasePipeline += countTripReleasePipelineTotal([], row, row);
+    releasePipeline += countTripReleasePipelineTotal([], row, row, tripId);
     loadedToChecker += countOnCheckerTripScopedPieces(row, row, tripId);
     outForDelivery += countOutForDeliveryTripScopedPieces(row, row, tripId);
   });
@@ -397,7 +369,7 @@ function resolveUnloadingTotals(trip = {}) {
       0,
     );
     tripPieceTotal = shipments.reduce(
-      (sum, row) => sum + resolveTripScopedPieceTotal(row),
+      (sum, row) => sum + resolveRowTripScopedTotal(row, resolveTripContextId(trip)),
       0,
     );
   }
@@ -638,7 +610,7 @@ export function getShipmentTripProgressDisplay(tripShipment = {}, trip = {}) {
     tripShipment,
     tripId,
   );
-  const tripScopedTotal = resolveTripScopedPieceTotal(tripShipment);
+  const tripScopedTotal = resolveTripScopedPieceTotal(tripShipment, scopedPackages);
   const hubPhase = isHubTransferTrip(trip) ? resolveHubBoardPhase(trip) : null;
   const shipmentStatus = normalizeStatus(
     tripShipment.masterStatus || tripShipment.status,

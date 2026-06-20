@@ -172,7 +172,7 @@ function countTripScopedDelivered(packages = []) {
   );
 }
 
-function resolveTripScopedPieceTotal(tripShipment = {}, scopedPackages = []) {
+export function resolveTripScopedPieceTotal(tripShipment = {}, scopedPackages = []) {
   const loaded = Math.max(0, Number(tripShipment.loadedCount) || 0);
   const received = Math.max(
     0,
