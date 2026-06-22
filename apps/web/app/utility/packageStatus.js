@@ -5,6 +5,7 @@ const PACKAGE_STATUS_LABELS = {
   ARRIVED_AT_ODIONGAN: "Arrived at Odiongan",
   AVAILABLE_AT_ODIONGAN_WAREHOUSE: "Available at Odiongan",
   RELEASED_FOR_DELIVERY: "Released for delivery",
+  ROUTE_ASSIGNED: "Route assigned",
   LOADED_TO_DELIVERY_VEHICLE: "Out for delivery",
   READY_FOR_DELIVERY: "Ready for delivery",
   OUT_FOR_DELIVERY: "Out for delivery",
@@ -34,6 +35,7 @@ const BREAKDOWN_LABELS = [
   { key: "inTransit", label: "In transit" },
   { key: "atOdiongan", label: "At Odiongan" },
   { key: "releasedForDelivery", label: "Released for delivery" },
+  { key: "routeAssigned", label: "Route assigned" },
   { key: "onCheckerVan", label: "On checker van (legacy)" },
   { key: "outForDelivery", label: "Out for delivery" },
   { key: "delivered", label: "Delivered" },
@@ -109,6 +111,9 @@ function classifyPackageBucket(pkg = {}) {
   if (["IN_TRANSIT", "LOADED_TO_TRIP"].includes(status)) {
     return { bucket: "inTransit", qty };
   }
+  if (status === "ROUTE_ASSIGNED") {
+    return { bucket: "routeAssigned", qty };
+  }
   if (
     status === "RELEASED_FOR_DELIVERY" ||
     (pkg.availableForDelivery === true &&
@@ -144,6 +149,7 @@ export function computePackageBreakdown(packages = []) {
     inTransit: 0,
     atOdiongan: 0,
     releasedForDelivery: 0,
+    routeAssigned: 0,
     onCheckerVan: 0,
     outForDelivery: 0,
     delivered: 0,

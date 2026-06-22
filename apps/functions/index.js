@@ -138,6 +138,9 @@ exports.reportFailedDelivery =
   require("./src/checker/reportFailedDelivery").reportFailedDelivery;
 exports.returnPackagesToWarehouse =
   require("./src/checker/returnPackagesToWarehouse").returnPackagesToWarehouse;
+exports.assignRoute = require("./src/routes/assignRoute").assignRoute;
+exports.listDeliveryRoutes =
+  require("./src/routes/listDeliveryRoutes").listDeliveryRoutes;
 exports.getShipmentCustodyTimeline =
   require("./src/tracking/getShipmentCustodyTimeline").getShipmentCustodyTimeline;
 exports.deleteShipment =

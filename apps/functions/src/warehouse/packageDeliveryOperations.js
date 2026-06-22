@@ -255,6 +255,7 @@ function shipmentHasPiecesAvailableForCheckerLoad(packages = [], actorUid = null
     const status = normalizePackageStatus(pkg);
     if (pkg.availableForDelivery === true) return true;
     if (status === PACKAGE_STATUS.RELEASED_FOR_DELIVERY) return true;
+    if (status === PACKAGE_STATUS.ROUTE_ASSIGNED) return true;
     if (
       [
         PACKAGE_STATUS.AVAILABLE_AT_WAREHOUSE,

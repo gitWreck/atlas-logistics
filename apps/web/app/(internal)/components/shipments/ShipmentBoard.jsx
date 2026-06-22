@@ -35,10 +35,13 @@ import TablePaginationFooter from "../ui/TablePaginationFooter";
 import ReconcileAtHubModal from "./modals/ReconcileAtHubModal";
 import ReceiveReturnedModal from "./modals/ReceiveReturnedModal";
 import ReleaseToCheckerModal from "./modals/ReleaseToCheckerModal";
+import AssignRouteModal from "./modals/AssignRouteModal";
 import BoardTabs from "../ui/BoardTabs";
 import DeliveryCheckerTabs from "./DeliveryCheckerTabs";
+import DeliveryCheckerSummaryCards from "./DeliveryCheckerSummaryCards";
 import {
   ALL_CHECKERS_TAB,
+  aggregateCheckerDeliveryStats,
   buildDeliveryCheckerTabs,
   findDeliveryCheckerTab,
   shipmentHasCheckerPieces,
@@ -153,6 +156,7 @@ const ShipmentBoard = forwardRef(function ShipmentBoard(
     useState(false);
   const [isReleaseToCheckerModalOpen, setIsReleaseToCheckerModalOpen] =
     useState(false);
+  const [isAssignRouteModalOpen, setIsAssignRouteModalOpen] = useState(false);
   const [selectedShipmentId, setSelectedShipmentId] = useState(null);
   const [editingPickup, setEditingPickup] = useState(null);
 
@@ -360,6 +364,22 @@ const ShipmentBoard = forwardRef(function ShipmentBoard(
     [checkerNameById, deliveryTabShipments],
   );
 
+  const checkerDeliveryStats = useMemo(
+    () =>
+      aggregateCheckerDeliveryStats(
+        deliveryTabShipments,
+        activeDeliveryChecker,
+        findDeliveryCheckerTab(deliveryCheckerTabs, activeDeliveryChecker),
+        checkerNameById,
+      ),
+    [
+      activeDeliveryChecker,
+      checkerNameById,
+      deliveryCheckerTabs,
+      deliveryTabShipments,
+    ],
+  );
+
   const visibleShipments = useMemo(() => {
     if (activeBoardTab === SHIPMENT_BOARD_TABS.DELIVERY) {
       let result = filteredShipments.filter((shipment) =>
@@ -494,6 +514,7 @@ const ShipmentBoard = forwardRef(function ShipmentBoard(
   const canManageWarehouse = ["manager", "admin"].includes(
     String(profile?.role || "").toLowerCase(),
   );
+  const canAssignRoute = canManageWarehouse;
   const handleMessageCustomer = (shipment) => {
     const phone = shipment.sender?.phone || shipment.recipient?.phone;
     alert(`Logic to SMS ${phone} for Order ${shipment.shipmentId}`);
@@ -538,12 +559,29 @@ const ShipmentBoard = forwardRef(function ShipmentBoard(
         ) : (
           <>
             {activeBoardTab === SHIPMENT_BOARD_TABS.DELIVERY && (
-              <DeliveryCheckerTabs
-                tabs={deliveryCheckerTabs}
-                activeTab={activeDeliveryChecker}
-                onChange={setActiveDeliveryChecker}
-                isDark={isDark}
-              />
+              <>
+                <DeliveryCheckerTabs
+                  tabs={deliveryCheckerTabs}
+                  activeTab={activeDeliveryChecker}
+                  onChange={setActiveDeliveryChecker}
+                  isDark={isDark}
+                />
+                <DeliveryCheckerSummaryCards
+                  stats={checkerDeliveryStats}
+                  isDark={isDark}
+                />
+                {canAssignRoute && (
+                  <div className="mt-4 flex justify-end">
+                    <button
+                      type="button"
+                      onClick={() => setIsAssignRouteModalOpen(true)}
+                      className="rounded-lg bg-sky-600 px-4 py-2 text-xs font-semibold text-white hover:bg-sky-500"
+                    >
+                      Assign delivery route
+                    </button>
+                  </div>
+                )}
+              </>
             )}
 
             <div
@@ -745,7 +783,9 @@ const ShipmentBoard = forwardRef(function ShipmentBoard(
         onReconcile={() => setIsReconcileModalOpen(true)}
         onReceiveReturned={() => setIsReceiveReturnedModalOpen(true)}
         onReleaseToCheckers={() => setIsReleaseToCheckerModalOpen(true)}
+        onAssignRoute={() => setIsAssignRouteModalOpen(true)}
         canManageWarehouse={canManageWarehouse}
+        canAssignRoute={canAssignRoute}
       />
 
       {/* <NewShipmentModal
@@ -799,6 +839,17 @@ const ShipmentBoard = forwardRef(function ShipmentBoard(
         onSuccess={fetchShipments}
         isDark={isDark}
         user={user}
+        defaultShipmentIds={
+          selectedShipment?.id ? [selectedShipment.id] : []
+        }
+        defaultShipments={selectedShipment ? [selectedShipment] : []}
+      />
+
+      <AssignRouteModal
+        isOpen={isAssignRouteModalOpen}
+        onClose={() => setIsAssignRouteModalOpen(false)}
+        onSuccess={fetchShipments}
+        isDark={isDark}
         defaultShipmentIds={
           selectedShipment?.id ? [selectedShipment.id] : []
         }

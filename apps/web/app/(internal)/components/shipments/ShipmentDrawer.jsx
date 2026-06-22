@@ -15,6 +15,7 @@ import ShipmentOperations from "./ShipmentOperations";
 import ShipmentProofs from "./ShipmentProofs";
 import ShipmentTimelineTab from "./ShipmentTimelineTab";
 import HubReconcileCard from "./HubReconcileCard";
+import DeliveryRouteCard from "./DeliveryRouteCard";
 import ReturnLoopCard from "./ReturnLoopCard";
 import DrawerTabButton from "../ui/DrawerTabButton";
 import { getDrawerThemeClasses } from "@/app/utility/constant/theme";
@@ -33,7 +34,9 @@ export default function ShipmentDrawer({
   onReconcile,
   onReceiveReturned,
   onReleaseToCheckers,
+  onAssignRoute,
   canManageWarehouse = false,
+  canAssignRoute = false,
 }) {
   const [activeTab, setActiveTab] = useState("TIMELINE");
   const theme = getDrawerThemeClasses(isDark);
@@ -149,6 +152,12 @@ export default function ShipmentDrawer({
                 isDark={isDark}
                 canManage={canManageWarehouse}
                 onReconcile={onReconcile}
+              />
+              <DeliveryRouteCard
+                shipment={data}
+                isDark={isDark}
+                canManage={canAssignRoute}
+                onAssignRoute={onAssignRoute}
               />
               <ShipmentTimelineTab data={data} isDark={isDark} />
             </div>
