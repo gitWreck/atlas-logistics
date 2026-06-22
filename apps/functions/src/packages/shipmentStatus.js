@@ -52,6 +52,7 @@ function resolveDispatchedTransitMasterStatus({
 
 const RELEASED_POOL_STATUSES = new Set([
   PACKAGE_STATUS.RELEASED_FOR_DELIVERY,
+  PACKAGE_STATUS.ROUTE_ASSIGNED,
   PACKAGE_STATUS.AVAILABLE_AT_ODIONGAN_WAREHOUSE,
   PACKAGE_STATUS.AVAILABLE_AT_WAREHOUSE,
 ]);
@@ -193,7 +194,8 @@ function deriveMasterShipmentStatus(packages = [], options = {}) {
   const inTransitQty = breakdown.inTransit;
   const atDivisoriaQty = breakdown.atDivisoria;
   const atOdionganQty = breakdown.atOdiongan;
-  const releasedQty = breakdown.releasedForDelivery;
+  const releasedQty =
+    breakdown.releasedForDelivery + (breakdown.routeAssigned || 0);
   const onCheckerQty = breakdown.onCheckerVan;
   const outForDeliveryQty = breakdown.outForDelivery;
 
@@ -212,6 +214,7 @@ function deriveMasterShipmentStatus(packages = [], options = {}) {
   );
   const availablePoolRows = countStatusRows(packages, (status, pkg) => {
     if (RELEASED_POOL_STATUSES.has(status)) return true;
+    if (status === PACKAGE_STATUS.ROUTE_ASSIGNED) return true;
     return (
       (status === PACKAGE_STATUS.AVAILABLE_AT_ODIONGAN_WAREHOUSE ||
         status === PACKAGE_STATUS.AVAILABLE_AT_WAREHOUSE) &&

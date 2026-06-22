@@ -206,6 +206,18 @@ export function getStatCardTheme(isDark) {
         ? "bg-red-500/10 text-red-300"
         : "bg-red-100 text-red-600",
     },
+
+    violet: {
+      card: isDark
+        ? "bg-violet-950/40 border-violet-800"
+        : "bg-violet-50 border-violet-100",
+      title: isDark ? "text-violet-300" : "text-violet-700",
+      value: isDark ? "text-violet-100" : "text-violet-900",
+      subtitle: isDark ? "text-violet-400" : "text-violet-600",
+      iconWrap: isDark
+        ? "bg-violet-500/10 text-violet-300"
+        : "bg-violet-100 text-violet-600",
+    },
   };
 }
 

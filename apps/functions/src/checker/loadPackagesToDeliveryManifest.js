@@ -9,6 +9,7 @@ const { EVENT_TYPES } = require("../tracking/eventTypes");
 const { deriveMasterShipmentStatus, computePackageBreakdown } = require("../packages/shipmentStatus");
 const {
   isReleasedForDeliveryPool,
+  hasAssignedRoute,
   PACKAGE_STATUS,
 } = require("../packages/packageStatus");
 const {
@@ -82,6 +83,13 @@ function assertPieceEligibleForCheckerLoad(pkg = {}, actorUid, packageId = null)
     throw new HttpsError(
       "failed-precondition",
       `Package ${identity} is already loaded by another checker.`,
+    );
+  }
+
+  if (!hasAssignedRoute(pkg)) {
+    throw new HttpsError(
+      "failed-precondition",
+      `Package ${identity} has no delivery route assigned. Ask a manager to assign a route before loading.`,
     );
   }
 
@@ -188,6 +196,10 @@ function packageIsEligibleForLoad(
 
   const status = String(pkg.status || "").toUpperCase();
   if (["DELIVERED", "MISSING", "DAMAGED", "CANCELLED"].includes(status)) {
+    return false;
+  }
+
+  if (!hasAssignedRoute(pkg)) {
     return false;
   }
 

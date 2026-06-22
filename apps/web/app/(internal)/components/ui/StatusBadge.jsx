@@ -65,6 +65,7 @@ export default function StatusBadge({
     AVAILABLE_AT_ODIONGAN_WAREHOUSE:
       "bg-cyan-500/10 text-cyan-300 border-cyan-500/20",
     RELEASED_FOR_DELIVERY: "bg-sky-500/10 text-sky-400 border-sky-500/20",
+    ROUTE_ASSIGNED: "bg-indigo-500/10 text-indigo-400 border-indigo-500/20",
     RECEIVED_AT_DIVISORIA: "bg-cyan-500/10 text-cyan-400 border-cyan-500/20",
     LOADED_TO_TRIP: "bg-orange-500/10 text-orange-300 border-orange-500/20",
     ARRIVED_AT_ODIONGAN:
@@ -121,6 +122,7 @@ export default function StatusBadge({
     AVAILABLE_AT_ODIONGAN_WAREHOUSE:
       "bg-cyan-500/15 text-cyan-600 border-cyan-400/40",
     RELEASED_FOR_DELIVERY: "bg-sky-500/15 text-sky-700 border-sky-400/40",
+    ROUTE_ASSIGNED: "bg-indigo-500/15 text-indigo-700 border-indigo-400/40",
     RECEIVED_AT_DIVISORIA: "bg-cyan-500/15 text-cyan-600 border-cyan-400/40",
     LOADED_TO_TRIP: "bg-orange-500/15 text-orange-600 border-orange-400/40",
     ARRIVED_AT_ODIONGAN:

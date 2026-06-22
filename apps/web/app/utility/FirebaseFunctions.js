@@ -44,6 +44,8 @@ export const releaseForDeliveryOperations = httpsCallable(
   functions,
   "releaseForDeliveryOperations",
 );
+export const assignRoute = httpsCallable(functions, "assignRoute");
+export const listDeliveryRoutes = httpsCallable(functions, "listDeliveryRoutes");
 export const getShipmentCustodyTimeline = httpsCallable(
   functions,
   "getShipmentCustodyTimeline",

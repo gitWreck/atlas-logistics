@@ -11,6 +11,7 @@ import {
   faSnowflake,
 } from "@fortawesome/free-solid-svg-icons";
 import PackageActionModal from "./PackageActionModal";
+import { getPackageRouteLabel } from "@/app/utility/deliveryRoutes";
 import { getRowThemeClasses } from "@/app/utility/constant/theme";
 
 export default function PackageTableRow({
@@ -85,6 +86,18 @@ export default function PackageTableRow({
           <StatusBadge status={pkg.status} size="xs" isDark={isDark} />
         </td>
 
+        <td className="p-4">
+          <span
+            className={`text-xs ${
+              getPackageRouteLabel(pkg) === "Unassigned Route"
+                ? "text-amber-500 font-semibold"
+                : theme.mutedText
+            }`}
+          >
+            {getPackageRouteLabel(pkg)}
+          </span>
+        </td>
+
         <td className="p-4 text-right">
           <div className="flex justify-end gap-1">
             <button
@@ -112,7 +125,7 @@ export default function PackageTableRow({
         <tr
           className={`animate-in fade-in zoom-in-95 duration-200 ${theme.expandedRow}`}
         >
-          <td colSpan="5" className="p-4">
+          <td colSpan="6" className="p-4">
             <div
               className={`flex items-center gap-6 border rounded-xl p-4 max-w-lg mx-auto shadow-inner ${theme.expandedCard}`}
             >

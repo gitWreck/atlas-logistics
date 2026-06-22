@@ -331,3 +331,93 @@ export function findDeliveryCheckerTab(tabs = [], checkerKey = ALL_CHECKERS_TAB)
     ) || null
   );
 }
+
+function classifyCheckerPackageBucket(pkg = {}) {
+  const status = normalizeStatus(pkg.status);
+
+  if (["DELIVERED", "COMPLETED"].includes(status)) {
+    return "delivered";
+  }
+
+  if (
+    [
+      "FAILED_DELIVERY",
+      "RETURNED_TO_WAREHOUSE",
+      "RETURNED_RECEIVED_AT_HUB",
+      "RETURNED_RECEIVED_AT_ODIONGAN",
+    ].includes(status)
+  ) {
+    return "returnedFailed";
+  }
+
+  return "outForDelivery";
+}
+
+function packageMatchesCheckerSelection(
+  pkg = {},
+  checkerKey = ALL_CHECKERS_TAB,
+  checkerTab = null,
+  checkerNameById = {},
+) {
+  if (!isPackageOnChecker(pkg)) return false;
+
+  if (checkerTab) {
+    return packageMatchesCheckerTab(pkg, checkerTab, checkerNameById);
+  }
+
+  return packageMatchesCheckerKey(pkg, checkerKey, checkerNameById);
+}
+
+export function aggregateCheckerDeliveryStats(
+  shipments = [],
+  checkerKey = ALL_CHECKERS_TAB,
+  checkerTab = null,
+  checkerNameById = {},
+) {
+  const stats = {
+    total: 0,
+    delivered: 0,
+    outForDelivery: 0,
+    returnedFailed: 0,
+  };
+
+  shipments.forEach((shipment) => {
+    const packages = Array.isArray(shipment?.packages) ? shipment.packages : [];
+
+    packages.forEach((pkg) => {
+      if (
+        !packageMatchesCheckerSelection(
+          pkg,
+          checkerKey,
+          checkerTab,
+          checkerNameById,
+        )
+      ) {
+        return;
+      }
+
+      const qty = pieceQty(pkg);
+      const bucket = classifyCheckerPackageBucket(pkg);
+
+      stats.total += qty;
+      stats[bucket] += qty;
+    });
+
+    const fallbackQty = countCheckerFallbackPieces(
+      shipment,
+      checkerKey,
+      checkerNameById,
+    );
+    if (fallbackQty > 0) {
+      stats.total += fallbackQty;
+      stats.outForDelivery += fallbackQty;
+    }
+  });
+
+  return stats;
+}
+
+export function formatCheckerStatPercent(value = 0, total = 0) {
+  if (!total) return "0% of total";
+  return `${((Number(value) / Number(total)) * 100).toFixed(1)}% of total`;
+}

@@ -10,6 +10,7 @@ const PACKAGE_STATUS = Object.freeze({
   ARRIVED_AT_ODIONGAN: "ARRIVED_AT_ODIONGAN",
   AVAILABLE_AT_ODIONGAN_WAREHOUSE: "AVAILABLE_AT_ODIONGAN_WAREHOUSE",
   RELEASED_FOR_DELIVERY: "RELEASED_FOR_DELIVERY",
+  ROUTE_ASSIGNED: "ROUTE_ASSIGNED",
   LOADED_TO_DELIVERY_VEHICLE: "LOADED_TO_DELIVERY_VEHICLE",
   READY_FOR_DELIVERY: "READY_FOR_DELIVERY",
   OUT_FOR_DELIVERY: "OUT_FOR_DELIVERY",
@@ -37,6 +38,7 @@ const PACKAGE_STATUS_LABELS = Object.freeze({
   [PACKAGE_STATUS.AVAILABLE_AT_ODIONGAN_WAREHOUSE]:
     "Available at Odiongan",
   [PACKAGE_STATUS.RELEASED_FOR_DELIVERY]: "Released for delivery",
+  [PACKAGE_STATUS.ROUTE_ASSIGNED]: "Route assigned",
   [PACKAGE_STATUS.LOADED_TO_DELIVERY_VEHICLE]: "Loaded to delivery vehicle",
   [PACKAGE_STATUS.READY_FOR_DELIVERY]: "Ready for delivery",
   [PACKAGE_STATUS.OUT_FOR_DELIVERY]: "Out for delivery",
@@ -105,6 +107,7 @@ const WAREHOUSE_POOL_STATUSES = new Set([
   PACKAGE_STATUS.AVAILABLE_AT_ODIONGAN_WAREHOUSE,
   PACKAGE_STATUS.AVAILABLE_AT_WAREHOUSE,
   PACKAGE_STATUS.RELEASED_FOR_DELIVERY,
+  PACKAGE_STATUS.ROUTE_ASSIGNED,
 ]);
 
 /** Statuses that must not be downgraded to RECEIVED_AT_DIVISORIA when qty is zero. */
@@ -250,12 +253,17 @@ function isAvailableAtWarehousePool(pkg = {}) {
 function isReleasedForDeliveryPool(pkg = {}) {
   const status = normalizePackageStatus(pkg);
   if (status === PACKAGE_STATUS.RELEASED_FOR_DELIVERY) return true;
+  if (status === PACKAGE_STATUS.ROUTE_ASSIGNED) return true;
   return (
     pkg.availableForDelivery === true &&
     (WAREHOUSE_POOL_STATUSES.has(status) ||
       AT_ODIONGAN_STATUSES.has(status) ||
       normalizeCustodyType(pkg) === "WAREHOUSE")
   );
+}
+
+function hasAssignedRoute(pkg = {}) {
+  return Boolean(String(pkg.assignedRouteId || "").trim());
 }
 
 function classifyPackageBucket(pkg = {}) {
@@ -282,6 +290,9 @@ function classifyPackageBucket(pkg = {}) {
   }
   if (ON_CHECKER_VAN_STATUSES.has(status)) {
     return { bucket: "onCheckerVan", qty };
+  }
+  if (status === PACKAGE_STATUS.ROUTE_ASSIGNED) {
+    return { bucket: "routeAssigned", qty };
   }
   if (isReleasedForDeliveryPool(pkg)) {
     return { bucket: "releasedForDelivery", qty };
@@ -310,6 +321,7 @@ function createEmptyPackageBreakdown() {
     inTransit: 0,
     atOdiongan: 0,
     releasedForDelivery: 0,
+    routeAssigned: 0,
     onCheckerVan: 0,
     outForDelivery: 0,
     delivered: 0,
@@ -521,6 +533,7 @@ module.exports = {
   getPackageStatusLabel,
   isAvailableAtWarehousePool,
   isReleasedForDeliveryPool,
+  hasAssignedRoute,
   classifyPackageBucket,
   createEmptyPackageBreakdown,
   computePackageBreakdown,
