@@ -147,7 +147,7 @@ async function tryAutoCompleteTrip(tripId, meta = {}) {
   const db = admin.firestore();
   const tripRef = db.collection("truck_trips").doc(tripId);
 
-  return db.runTransaction(async (tx) => {
+  const result = await db.runTransaction(async (tx) => {
     const tripSnap = await tx.get(tripRef);
     if (!tripSnap.exists) {
       return { completed: false, reason: "TRIP_NOT_FOUND" };
@@ -192,8 +192,34 @@ async function tryAutoCompleteTrip(tripId, meta = {}) {
       ...(meta.actorName ? { updatedBy: meta.actorName } : {}),
     });
 
-    return { completed: true, reason: decision.reason };
+    return { completed: true, reason: decision.reason, tripId: tripRef.id };
   });
+
+  if (result.completed && result.tripId) {
+    await sealDeliveryManifestAfterComplete(result.tripId, meta);
+  }
+
+  return result;
+}
+
+async function sealDeliveryManifestAfterComplete(tripId, meta = {}) {
+  try {
+    const { sealTripDeliveryManifest } = require("./tripDeliveryManifest");
+    const admin = require("firebase-admin");
+    const db = admin.firestore();
+    await sealTripDeliveryManifest({
+      db,
+      tripDocId: tripId,
+      actorId: meta.actorId || null,
+      actorName: meta.actorName || null,
+      actorRole: meta.actorRole || null,
+    });
+  } catch (error) {
+    logger.warn("Delivery manifest seal skipped", {
+      tripId,
+      message: error?.message || String(error),
+    });
+  }
 }
 
 module.exports = {

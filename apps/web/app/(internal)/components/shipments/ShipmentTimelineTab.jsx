@@ -14,6 +14,7 @@ import {
 } from "@/app/utility/constant/templates";
 import { getShipmentTimelinePosition } from "@/app/utility/shipmentTimeline";
 import { getPackageStatusLabel } from "@/app/utility/packageStatus";
+import { formatFirestoreDate } from "@/app/utility/utilities";
 import { useShipmentCustodyTimeline } from "@/app/(internal)/hooks/useShipmentCustodyTimeline";
 import CustodyTimeline from "@/app/(internal)/components/custody/CustodyTimeline";
 
@@ -148,7 +149,9 @@ export default function ShipmentTimelineTab({ data, isDark = false }) {
                         }`}
                       >
                         Current: {currentStatusLabel}
-                        {data.updatedAt ? ` • ${data.updatedAt}` : ""}
+                        {data.updatedAt
+                          ? ` • ${formatFirestoreDate(data.updatedAt)}`
+                          : ""}
                       </p>
                     )}
                   </div>

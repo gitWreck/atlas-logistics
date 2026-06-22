@@ -22,6 +22,12 @@ const { writeAuditEvent } = require("../../shared/audit");
 const { assertAdminOrManager } = require("../system/authGuards");
 const { writeMessagingActionLog } = require("../utilities/messagingLogger");
 const { requireNormalizedPhone } = require("../utilities/phoneHelpers");
+const crypto = require("crypto");
+const {
+  CUSTOMER_NOTIFICATION_TYPES,
+  NO_TRIP_SCOPE,
+  sendDirectCustomerNotification,
+} = require("../notifications/customerNotificationService");
 
 const {
   sendSmsViaProvider,
@@ -114,17 +120,48 @@ exports.sendManualSms = onCall(
 
     // 📤 Send
     let providerResult;
+    const notificationType = `${CUSTOMER_NOTIFICATION_TYPES.MANUAL_BROADCAST}_${crypto
+      .createHash("sha1")
+      .update(String(message))
+      .digest("hex")
+      .slice(0, 10)}`;
+
     try {
-      // providerResult = await sendViaSemaphore({
-      //   phone: normalizedPhone,
-      //   message,
-      //   apiKey,
-      //   sender,
-      // });
-      providerResult = await sendSmsViaProvider({
-        phone: normalizedPhone,
-        message,
-      });
+      if (force) {
+        providerResult = await sendSmsViaProvider({
+          phone: normalizedPhone,
+          message,
+        });
+      } else {
+        const dedupResult = await sendDirectCustomerNotification({
+          db,
+          phone: normalizedPhone,
+          tripId: tripDocId || NO_TRIP_SCOPE,
+          shipmentId: trackingId || null,
+          notificationType,
+          channels: { sms: true, email: false, push: false },
+          customSmsMessage: String(message).trim(),
+          actor: { uid, role },
+          source: "MANUAL_SMS",
+        });
+
+        if ((dedupResult.sent || 0) < 1) {
+          const duplicate = dedupResult.results?.some(
+            (entry) => entry.skipped && entry.reason === "duplicate",
+          );
+          if (duplicate) {
+            return {
+              success: true,
+              suppressed: true,
+              phone: normalizedPhone,
+              reason: "deduplicated",
+            };
+          }
+          throw new Error(dedupResult.error || "SMS send skipped");
+        }
+
+        providerResult = dedupResult;
+      }
     } catch (err) {
       await writeMessagingActionLog({
         db,

@@ -41,7 +41,7 @@ exports.requestShipmentPickup = onCall(
       items,
       remarks,
       location, // ✅ Extract the passed location {lat, lng}
-      notifySms = true, // Default to true for customer peace of mind
+      notifySms = false,
     } = request.data || {};
 
     if (!sender || !recipient) {

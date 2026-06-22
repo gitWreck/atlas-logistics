@@ -39,7 +39,8 @@ function getPackageIdentity(pkg = {}) {
 
 function packageWasOnTrip(pkg = {}, tripId = "", tripBarcodeSet = new Set()) {
   const packageTripId = String(pkg.currentTripId || pkg.loadedOnTrip || "").trim();
-  if (packageTripId === tripId) return true;
+  const hubReceivedOnTrip = String(pkg.hubReceivedOnTrip || "").trim();
+  if (packageTripId === tripId || hubReceivedOnTrip === tripId) return true;
 
   const packageId = getPackageIdentity(pkg);
   if (!packageId || !tripBarcodeSet.has(String(packageId))) return false;
@@ -61,14 +62,22 @@ function getTripPackages(shipment = {}, tripShipment = {}, tripId = "") {
     (tripShipment.packageBarcodes || []).filter(Boolean).map(String),
   );
 
-  return packages.filter((pkg) => packageWasOnTrip(pkg, tripId, tripBarcodeSet));
+  return packages.filter((pkg) => {
+    if (packageWasOnTrip(pkg, tripId, tripBarcodeSet)) return true;
+    return String(pkg.hubReceivedOnTrip || "").trim() === tripId;
+  });
 }
 
 function classifyTripPiece(pkg = {}, tripId = "") {
   const status = String(pkg.status || "").toUpperCase();
   const qty = pieceQuantity(pkg);
   const onTrip =
-    String(pkg.currentTripId || pkg.loadedOnTrip || "").trim() === tripId;
+    String(pkg.currentTripId || pkg.loadedOnTrip || "").trim() === tripId ||
+    String(pkg.hubReceivedOnTrip || "").trim() === tripId;
+
+  if (status === "DELIVERED" || status === "COMPLETED") {
+    return { bucket: "received", qty };
+  }
 
   if (status === "MISSING" || toNumber(pkg.missingQty, 0) > 0) {
     return { bucket: "missing", qty };
@@ -207,6 +216,51 @@ function buildReconciliationContext(trip = {}, manifest = {}, shipments = []) {
   };
 }
 
+function findUnlinkedVariancePackages(
+  shipment = {},
+  tripShipment = {},
+  tripId = "",
+  pieces = [],
+  loadedIntoTruck = 0,
+  unloadedCount = 0,
+) {
+  const gap = loadedIntoTruck - unloadedCount;
+  if (gap <= 0) return [];
+
+  const scopedIds = new Set(
+    pieces.map((piece) => String(piece.pieceId || "")).filter(Boolean),
+  );
+  const tripBarcodes = new Set(
+    (tripShipment.packageBarcodes || []).filter(Boolean).map(String),
+  );
+  const packages = Array.isArray(shipment.packages) ? shipment.packages : [];
+
+  return packages
+    .filter((pkg) => {
+      const pieceId = getPackageIdentity(pkg);
+      if (!pieceId || scopedIds.has(String(pieceId))) return false;
+
+      const hubReceivedOnTrip = String(pkg.hubReceivedOnTrip || "").trim();
+      const loadedOnTrip = String(pkg.loadedOnTrip || "").trim();
+      if (hubReceivedOnTrip === tripId || loadedOnTrip === tripId) return true;
+
+      if (pkg.hubReceivedAt && !tripBarcodes.has(String(pieceId))) return true;
+
+      return false;
+    })
+    .map((pkg) => ({
+      pieceId: getPackageIdentity(pkg),
+      quantity: pieceQuantity(pkg),
+      state: "variance",
+      packageStatus: String(pkg.status || "").toUpperCase() || null,
+      loadedBy: pkg.loadedBy || null,
+      loadedAt: pkg.loadedAt || null,
+      loadedAtLocation: pkg.loadedAtLocation || null,
+      receivedBy: pkg.receivedBy || pkg.updatedBy || null,
+      receivedAt: pkg.hubReceivedAt || pkg.updatedAt || null,
+    }));
+}
+
 async function buildReconciliationRow(tripRef, tripId, item, shipmentDocId) {
   if (!shipmentDocId) return null;
 
@@ -238,9 +292,31 @@ async function buildReconciliationRow(tripRef, tripId, item, shipmentDocId) {
   let missingPieces = Math.max(pieceSummary.missing, tripMissing);
 
   const onTrip = loadedIntoTruck > 0;
-  const isMissing = onTrip && remainingLoaded > 0;
+  const pieceCountVariance = loadedIntoTruck > unloadedCount;
+  const isMissing = onTrip && (remainingLoaded > 0 || pieceCountVariance);
   const isReadyForRelease =
     onTrip && !isMissing && unloadedCount > 0 && unloadedCount >= loadedIntoTruck;
+
+  const variancePieces =
+    pieceCountVariance && remainingLoaded === 0
+      ? findUnlinkedVariancePackages(
+          shipment,
+          tripShipment,
+          tripId,
+          pieceSummary.pieces,
+          loadedIntoTruck,
+          unloadedCount,
+        )
+      : [];
+  const reconciliationPieces =
+    variancePieces.length > 0
+      ? [...pieceSummary.pieces, ...variancePieces]
+      : pieceSummary.pieces;
+
+  const piecesForMissingExtraction = [
+    ...pieceSummary.pieces,
+    ...variancePieces.map((piece) => ({ ...piece, state: "on_truck" })),
+  ];
 
   const rowDraft = {
     id: shipmentDocId,
@@ -261,7 +337,7 @@ async function buildReconciliationRow(tripRef, tripId, item, shipmentDocId) {
     readyForRelease: isReadyForRelease,
     currentTripId: shipment.currentTripId || tripId,
     status: shipment.status || tripShipment.status || null,
-    pieces: pieceSummary.pieces,
+    pieces: reconciliationPieces,
     labelSummary: {
       total: loadedIntoTruck,
       received: unloadedCount,
@@ -271,7 +347,12 @@ async function buildReconciliationRow(tripRef, tripId, item, shipmentDocId) {
 
   return {
     ...rowDraft,
-    missingPackages: isMissing ? extractMissingPackagesFromRow(rowDraft) : [],
+    missingPackages: isMissing
+      ? extractMissingPackagesFromRow({
+          ...rowDraft,
+          pieces: piecesForMissingExtraction,
+        })
+      : [],
   };
 }
 

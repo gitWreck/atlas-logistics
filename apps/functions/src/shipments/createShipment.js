@@ -10,11 +10,22 @@ const {
   findCustomerByPhone,
   getPublicUserId,
 } = require("../utilities/customerHelpers");
-const { normalizePhone } = require("../utilities/phoneHelpers");
+const { requireNormalizedPhone, normalizePhone } = require("../utilities/phoneHelpers");
 const {
   buildPackages,
   shouldUseBundleMode,
 } = require("../utilities/packageHelpers");
+const {
+  sendShipmentCreatedCustomerNotifications,
+} = require("../notifications/customerNotificationService");
+const {
+  SEMAPHORE_API_KEY,
+  SEMAPHORE_SENDER_NAME,
+} = require("../../shared/sms-service");
+const { defineSecret } = require("firebase-functions/params");
+
+const SMTP_EMAIL = defineSecret("SMTP_EMAIL");
+const SMTP_PASSWORD = defineSecret("SMTP_PASSWORD");
 
 const { Timestamp } = admin.firestore;
 
@@ -26,6 +37,7 @@ exports.createShipment = onCall(
   {
     region: "asia-southeast1",
     maxInstances: 10,
+    secrets: [SEMAPHORE_API_KEY, SEMAPHORE_SENDER_NAME, SMTP_EMAIL, SMTP_PASSWORD],
   },
   async (request) => {
     if (!request.auth) {
@@ -82,8 +94,12 @@ exports.createShipment = onCall(
 
     const senderAddress = normalizeAddress(sender?.address);
     const recipientAddress = normalizeAddress(recipient?.address);
-    const senderPhone = normalizePhone(sender?.phone);
-    const recipientPhone = normalizePhone(recipient?.phone);
+    const senderPhone =
+      requireNormalizedPhone(sender?.phone) || normalizePhone(sender?.phone) || null;
+    const recipientPhone =
+      requireNormalizedPhone(recipient?.phone) ||
+      normalizePhone(recipient?.phone) ||
+      null;
     const [senderCustomer, recipientCustomer] = await Promise.all([
       findCustomerByPhone(db, senderPhone),
       findCustomerByPhone(db, recipientPhone),
@@ -253,9 +269,9 @@ exports.createShipment = onCall(
         type: "SHIPMENT_CREATED",
         status: "pending",
         channels: {
-          ...notificationChannelsToSend,
           inApp: targetUserIds.length > 0,
         },
+        customerNotifyHandled: true,
         entityType: "shipment",
         entityId: shipmentId,
         shipmentId,
@@ -296,11 +312,46 @@ exports.createShipment = onCall(
     try {
       await batch.commit();
 
+      let customerNotificationResult = null;
+      if (shouldCreateNotificationEvent) {
+        try {
+          customerNotificationResult =
+            await sendShipmentCreatedCustomerNotifications({
+              db,
+              shipmentId,
+              sender: {
+                uid: senderUid,
+                name: sender?.name || "",
+                phone: senderPhone,
+                email: sender?.email || senderCustomer?.email || null,
+              },
+              recipient: {
+                uid: recipientUid,
+                name: recipient?.name || "",
+                phone: recipientPhone,
+                email: recipient?.email || recipientCustomer?.email || null,
+              },
+              channels: notificationChannelsToSend,
+              actor: { uid, name, role },
+            });
+        } catch (notificationError) {
+          console.error(
+            "[createShipment] Customer notification failed:",
+            notificationError,
+          );
+          customerNotificationResult = {
+            success: false,
+            error: notificationError?.message || String(notificationError),
+          };
+        }
+      }
+
       return {
         success: true,
         shipmentId,
         packageBarcodes,
         shipmentMode: bundleMode ? "BUNDLE" : "PACKAGE",
+        customerNotification: customerNotificationResult,
       };
     } catch (error) {
       console.error("Transaction failure:", error);

@@ -12,43 +12,11 @@ import {
   faTimesCircle,
   faQrcode,
 } from "@fortawesome/free-solid-svg-icons";
-import {
-  doc,
-  getDoc,
-  collection,
-  query,
-  where,
-  getDocs,
-} from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { auth } from "@/lib/firebase";
+import { fetchPrintApi } from "@/lib/printFetch";
+import { onAuthStateChanged } from "firebase/auth";
 import QRCode from "react-qr-code";
 import Image from "next/image";
-
-function getPackageLoadedQty(pkg) {
-  const qty = Math.max(Number(pkg?.quantity) || 1, 1);
-  const status = String(pkg?.status || "").toUpperCase();
-  const rawLoaded = Number(pkg?.loadedQty);
-
-  if (["LOADED", "OUT_FOR_DELIVERY", "DELIVERED"].includes(status)) {
-    return qty;
-  }
-  if (status === "PARTIALLY_LOADED") {
-    const loaded =
-      Number.isFinite(rawLoaded) && rawLoaded >= 0 ? rawLoaded : 0;
-    return Math.min(loaded, qty);
-  }
-  if (Number.isFinite(rawLoaded) && rawLoaded > 0) {
-    return Math.min(rawLoaded, qty);
-  }
-  return 0;
-}
-
-function getShipmentLoadedCount(ship) {
-  if (ship.packages?.length) {
-    return ship.packages.reduce((acc, p) => acc + getPackageLoadedQty(p), 0);
-  }
-  return Number(ship.loadedCount ?? ship.totals?.loaded ?? 0);
-}
 
 // --- 1. HELPER COMPONENTS ---
 
@@ -194,96 +162,12 @@ function ManifestContent() {
     setManifest(null);
 
     try {
-      let tripId = paramValue;
-      let tripData = null;
-
-      const tripRef = doc(db, "truck_trips", tripId);
-      const tripSnap = await getDoc(tripRef);
-
-      if (!tripSnap.exists()) throw new Error("Trip not found");
-      tripData = tripSnap.data();
-
-      const q = query(
-        collection(db, "shipments"),
-        where("currentTripId", "==", tripId),
+      const data = await fetchPrintApi(
+        `/api/trips/${encodeURIComponent(paramValue)}/print-manifest`,
       );
-      const shipSnaps = await getDocs(q);
-
-      const shipments = [];
-      shipSnaps.forEach((doc) => shipments.push(doc.data()));
-
-      const groupedDestinations = {};
-      let totalPackages = 0;
-
-      shipments.forEach((ship) => {
-        const destCode = ship.destinationCode || "UNKNOWN";
-        const itemsCount = getShipmentLoadedCount(ship);
-        totalPackages += itemsCount;
-
-        const descCounts = {};
-        if (ship.packages && Array.isArray(ship.packages)) {
-          ship.packages.forEach((p) => {
-            const loadedQty = getPackageLoadedQty(p);
-            if (loadedQty <= 0) return;
-            const d = p.description ? p.description.trim() : "Standard Pkg";
-            descCounts[d] = (descCounts[d] || 0) + loadedQty;
-          });
-        }
-
-        // Convert object to array for easier rendering: [{desc: "Box", count: 2}, ...]
-        const descriptionBreakdown = Object.entries(descCounts).map(
-          ([k, v]) => ({
-            desc: k,
-            count: v,
-          }),
-        );
-
-        // ----------------------
-
-        if (!groupedDestinations[destCode]) {
-          groupedDestinations[destCode] = {
-            destination: ship.destinationCity || destCode,
-            routeCode: `${ship.originCode || "ORG"}-${destCode}`,
-            items: [],
-          };
-        }
-
-        groupedDestinations[destCode].items.push({
-          shipmentId: ship.shipmentId,
-          packageCount: itemsCount,
-          note: ship.packages?.some((p) => p.isFragile) ? "Fragile" : "",
-          descriptionBreakdown: descriptionBreakdown,
-        });
-      });
-
-      const destinationArray = Object.values(groupedDestinations);
-
-      const data = {
-        tripId: tripSnap.id,
-        tripNumber: tripData.tripId || "T-PENDING",
-        driverName: tripData.driverName || "Unassigned",
-        truckPlate: tripData.truckPlateNumber || tripData.plateNumber || "—",
-        origin: tripData.origin || "Warehouse",
-        route: tripData.route || "Direct",
-        sealedAt:
-          tripData.manifestGeneratedAt?.toDate().toISOString() ||
-          new Date().toISOString(),
-        version: tripData.manifestLocked ? "v1.0-LOCKED" : "DRAFT-PREVIEW",
-        manifestHash: tripData.manifestHash || "DRAFT-NO-HASH-GENERATED",
-        verifyUrl: `https://atlastransport.ph/verify/${tripSnap.id}`,
-        stamps: tripData.manifestLocked
-          ? ["LOCKED", "OFFICIAL_RECORD"]
-          : ["DRAFT", "UNVERIFIED"],
-        totals: {
-          shipments: shipments.length,
-          packages: totalPackages,
-          destinations: destinationArray.length,
-        },
-        destinations: destinationArray,
-      };
 
       setManifest(data);
-      tripData.manifestLocked ? setStatus("OK") : setStatus("BAD");
+      setStatus(data.stamps?.includes("LOCKED") ? "OK" : "BAD");
     } catch (err) {
       console.error(err);
       setError(err.message || "Failed to load manifest");
@@ -296,14 +180,24 @@ function ManifestContent() {
   useEffect(() => {
     const m = searchParams.get("m");
     const tripId = searchParams.get("tripId");
+    if (!m && !tripId) return;
 
-    if (m) {
-      setSearchQuery(m);
-      fetchManifestData("m", m);
-    } else if (tripId) {
-      setSearchQuery(tripId);
-      fetchManifestData("tripId", tripId);
-    }
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      if (!user) {
+        setError("Please sign in to view print documents.");
+        return;
+      }
+
+      if (m) {
+        setSearchQuery(m);
+        fetchManifestData("m", m);
+      } else if (tripId) {
+        setSearchQuery(tripId);
+        fetchManifestData("tripId", tripId);
+      }
+    });
+
+    return () => unsubscribe();
   }, [searchParams]);
 
   const handleManualLoad = () => {

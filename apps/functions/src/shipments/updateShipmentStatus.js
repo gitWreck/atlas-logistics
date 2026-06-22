@@ -4,9 +4,7 @@ const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const admin = require("firebase-admin");
 const { FieldValue } = require("firebase-admin/firestore");
 const {
-  chunk,
   requireRole,
-  unique,
   updatedBy,
 } = require("../utilities/helpers");
 const { ALLOWED_SHIPMENT_STATUSES } = require("../utilities/dataDetails");
@@ -23,170 +21,106 @@ const {
   applyPieceDelivered,
 } = require("../checker/checkerPieceOperations");
 const {
-  filterShipmentNotificationTargets,
-  getShipmentTargetUserIds,
+  assertCustodyScanStatusAllowed,
+} = require("../trips/manifestLockGuard");
+const {
+  resolveShipmentCustomerNotificationType,
+  shouldBlockCustomerNotification,
+} = require("../notifications/customerNotificationTypes");
+const {
+  sendShipmentCustomerNotification,
+  sendAutomaticShipmentLifecycleNotification,
+  CUSTOMER_NOTIFICATION_TYPES,
+} = require("../notifications/customerNotificationService");
+const {
+  normalizeNotificationChannels,
 } = require("../utilities/notificationHelpers");
 const { normalizeQty } = require("../utilities/packageHelpers");
 const { tryAutoCompleteTrip } = require("../trips/autoCompleteTrip");
 const { PACKAGE_STATUS } = require("../packages/packageStatus");
 const {
-  assertCustodyScanStatusAllowed,
-} = require("../trips/manifestLockGuard");
+  SEMAPHORE_API_KEY,
+  SEMAPHORE_SENDER_NAME,
+} = require("../../shared/sms-service");
+const { defineSecret } = require("firebase-functions/params");
+
+const SMTP_EMAIL = defineSecret("SMTP_EMAIL");
+const SMTP_PASSWORD = defineSecret("SMTP_PASSWORD");
 
 if (!admin.apps.length) admin.initializeApp();
 
 const db = admin.firestore();
 
-function formatStatusLabel(status = "") {
-  return String(status || "")
-    .replace(/_/g, " ")
-    .toLowerCase()
-    .replace(/\b\w/g, (letter) => letter.toUpperCase());
+function wasShipmentOutForDelivery(status = "") {
+  const normalized = String(status || "").toUpperCase();
+  return (
+    normalized === "OUT_FOR_DELIVERY" ||
+    normalized === "PARTIALLY_OUT_FOR_DELIVERY"
+  );
 }
 
-async function getTrackedShipmentUserIds(shipmentId) {
-  const trackingNumber = String(shipmentId || "")
-    .trim()
-    .toUpperCase();
-
-  if (!trackingNumber) return [];
-
-  const trackedUserIds = [];
-
-  try {
-    await Promise.all(
-      chunk([trackingNumber]).map(async (trackingChunk) => {
-        const trackedSnap = await db
-          .collectionGroup("tracked_shipments")
-          .where("trackingNumber", "in", trackingChunk)
-          .get();
-
-        trackedSnap.docs.forEach((doc) => {
-          const userRef = doc.ref.parent.parent;
-          if (userRef?.id) trackedUserIds.push(userRef.id);
-        });
-      }),
-    );
-  } catch (error) {
-    if (error?.code === 9 || error?.code === "failed-precondition") {
-      console.warn(
-        "[updateShipmentStatus] Skipping tracked shipment notification lookup. Firestore collection-group index may still be missing/building.",
-        error?.message || error,
-      );
-      return [];
-    }
-
-    throw error;
-  }
-
-  return unique(trackedUserIds);
+function wasShipmentDelivered(status = "") {
+  const normalized = String(status || "").toUpperCase();
+  return normalized === "DELIVERED" || normalized === "COMPLETED";
 }
 
-function buildStatusNotificationEvent({
+function buildShipmentNotificationPlan({
   shipment,
-  shipmentId,
   oldStatus,
   newStatus,
-  actor,
+  notify,
   notificationChannels,
   notifySms,
   notifyEmail,
   notifyPush,
-  notify,
+  sourceUI,
+  tripId,
 }) {
-  if (notify === false) return null;
-
-  const requestedChannels =
-    notificationChannels && typeof notificationChannels === "object"
-      ? notificationChannels
-      : null;
-
-  const channels = requestedChannels
-    ? {
-        sms: requestedChannels.sms === true,
-        email: requestedChannels.email === true,
-        push: requestedChannels.push === true,
-        inApp:
-          requestedChannels.inApp === true || requestedChannels.push === true,
-      }
-    : {
-        sms: notifySms !== false,
-        email: notifyEmail === true,
-        push: notifyPush !== false,
-        inApp: true,
-      };
-
-  const targetUserIds = getShipmentTargetUserIds(shipment);
-  const statusLabel = formatStatusLabel(newStatus);
-  const title = "Shipment status updated";
-  const body = `Shipment ${shipmentId} is now ${statusLabel}.`;
-  const smsBody = `ATLAS: Shipment ${shipmentId} is now ${statusLabel}. Track: https://atlastransport.ph/track/${shipmentId}`;
-
+  if (notify !== true) return null;
   if (
-    !channels.sms &&
-    !channels.email &&
-    !channels.push &&
-    (!channels.inApp || targetUserIds.length === 0)
+    shouldBlockCustomerNotification({
+      notify: true,
+      source: sourceUI,
+    })
   ) {
     return null;
   }
 
+  const notificationType = resolveShipmentCustomerNotificationType(
+    oldStatus,
+    newStatus,
+  );
+  if (!notificationType) return null;
+
+  const channels = normalizeNotificationChannels({
+    notificationChannels,
+    notify,
+    notifySms,
+    notifyEmail,
+    notifyPush,
+  });
+
+  if (!channels.sms && !channels.email && !channels.push) {
+    return null;
+  }
+
   return {
-    type: "SHIPMENT_STATUS_UPDATED",
-    status: "pending",
-    channels: {
-      sms: channels.sms,
-      email: channels.email,
-      push: channels.push,
-      inApp: channels.inApp && targetUserIds.length > 0,
-    },
-    entityType: "shipment",
-    entityId: shipmentId,
-    shipmentId,
-    targetUserIds,
-    targets: {
-      sender: {
-        uid: shipment.sender?.uid || shipment.senderUid || null,
-        name: shipment.sender?.name || shipment.senderName || "",
-        phone: shipment.sender?.phone || shipment.senderPhone || null,
-        email: shipment.sender?.email || shipment.senderEmail || null,
-      },
-      recipient: {
-        uid: shipment.recipient?.uid || shipment.recipientUid || null,
-        name: shipment.recipient?.name || shipment.recipientName || "",
-        phone:
-          shipment.recipient?.phone ||
-          shipment.recipientPhone ||
-          shipment.consigneePhone ||
-          shipment.customerPhone ||
-          null,
-        email: shipment.recipient?.email || shipment.recipientEmail || null,
-      },
-    },
-    title,
-    body,
-    smsBody,
-    data: {
-      screen: "tracking",
-      trackingId: shipmentId,
-      status: newStatus,
-      oldStatus,
-      origin: shipment.origin || shipment.sender?.address?.city || null,
-      destination:
-        shipment.destination || shipment.recipient?.address?.city || null,
-    },
-    actor: {
-      uid: actor.uid,
-      name: actor.name,
-      role: actor.role,
-    },
-    createdAt: FieldValue.serverTimestamp(),
-    updatedAt: FieldValue.serverTimestamp(),
+    notificationType,
+    channels,
+    tripId:
+      tripId ||
+      shipment.currentTripId ||
+      shipment.currentTruckTripId ||
+      null,
   };
 }
 
 exports.updateShipmentStatus = onCall(
-  { region: "asia-southeast1", maxInstances: 10 },
+  {
+    region: "asia-southeast1",
+    maxInstances: 10,
+    secrets: [SEMAPHORE_API_KEY, SEMAPHORE_SENDER_NAME, SMTP_EMAIL, SMTP_PASSWORD],
+  },
   async (req) => {
     if (!req.auth) {
       throw new HttpsError("unauthenticated", "Auth required.");
@@ -211,7 +145,7 @@ exports.updateShipmentStatus = onCall(
       proofOfDelivery,
       proofOfReceipt,
       paymentStatus,
-      notify = true,
+      notify = false,
       notifySms,
       notifyEmail,
       notifyPush,
@@ -248,12 +182,16 @@ exports.updateShipmentStatus = onCall(
     let checkerDeliveredPieceIds = [];
     let resultStatus = newStatus;
     let completedTripId = null;
+    let shipmentWasOutForDelivery = false;
+    let shipmentWasDelivered = false;
 
     const packageIdSet = normalizePackageIdSet(packageIds);
     const isCheckerPieceDelivery =
       isFinalDeliveryStatus && actor.role === "checker";
 
-    const notificationEvent = await db.runTransaction(async (tx) => {
+    let updatedShipmentData = null;
+
+    const notificationPlan = await db.runTransaction(async (tx) => {
       const shipmentSnap = await tx.get(shipmentRef);
 
       if (!shipmentSnap.exists) {
@@ -270,7 +208,10 @@ exports.updateShipmentStatus = onCall(
       }
 
       const currentData = shipmentSnap.data() || {};
+      updatedShipmentData = currentData;
       const oldStatus = currentData.status || null;
+      shipmentWasOutForDelivery = wasShipmentOutForDelivery(oldStatus);
+      shipmentWasDelivered = wasShipmentDelivered(oldStatus);
       const tripData = tripSnap?.exists ? tripSnap.data() : null;
       assertCustodyScanStatusAllowed(currentData, tripData, newStatus);
 
@@ -671,17 +612,17 @@ exports.updateShipmentStatus = onCall(
         timestamp: FieldValue.serverTimestamp(),
       });
 
-      return buildStatusNotificationEvent({
+      return buildShipmentNotificationPlan({
         shipment: currentData,
-        shipmentId,
         oldStatus,
         newStatus: derivedShipmentStatus,
-        actor: { uid, role, name },
+        notify,
         notificationChannels,
         notifySms,
         notifyEmail,
         notifyPush,
-        notify,
+        sourceUI,
+        tripId,
       });
     });
 
@@ -744,24 +685,83 @@ exports.updateShipmentStatus = onCall(
       );
     }
 
-    if (notificationEvent) {
-      const trackedUserIds = await getTrackedShipmentUserIds(shipmentId);
-      const candidateUserIds = unique([
-        ...(notificationEvent.targetUserIds || []),
-        ...trackedUserIds,
-      ]);
-      notificationEvent.targetUserIds = await filterShipmentNotificationTargets(
-        db,
-        { id: shipmentId, ...shipment },
-        candidateUserIds,
-      );
-      if (notificationEvent.channels?.push === true) {
-        notificationEvent.channels.inApp =
-          notificationEvent.targetUserIds.length > 0;
-      }
+    let notificationDelivered = false;
 
-      if (notificationEvent.targetUserIds.length > 0) {
-        await db.collection("notification_events").doc().set(notificationEvent);
+    if (notificationPlan) {
+      try {
+        await sendShipmentCustomerNotification({
+          db,
+          shipment: updatedShipmentData || {},
+          shipmentId,
+          notificationType: notificationPlan.notificationType,
+          channels: notificationPlan.channels,
+          tripId: notificationPlan.tripId,
+          actor: { uid, name, role },
+          source: sourceUI || "SHIPMENT_STATUS",
+        });
+        notificationDelivered = true;
+      } catch (notificationError) {
+        console.error(
+          "[updateShipmentStatus] Customer notification failed:",
+          notificationError,
+        );
+      }
+    } else if (
+      checkerPromotedOutForDelivery &&
+      !shipmentWasOutForDelivery &&
+      newStatus === "OUT_FOR_DELIVERY"
+    ) {
+      try {
+        const freshSnap = await shipmentRef.get();
+        const freshShipment = freshSnap.exists ? freshSnap.data() || {} : {};
+        await sendAutomaticShipmentLifecycleNotification({
+          db,
+          shipment: freshShipment,
+          shipmentId,
+          tripId:
+            tripId ||
+            freshShipment.currentTripId ||
+            freshShipment.currentTruckTripId ||
+            null,
+          notificationType: CUSTOMER_NOTIFICATION_TYPES.OUT_FOR_DELIVERY,
+          source: "CHECKER_OUT_FOR_DELIVERY",
+          channels: { sms: true, email: false, push: true },
+          actor: { uid, name, role },
+        });
+        notificationDelivered = true;
+      } catch (notificationError) {
+        console.error(
+          "[updateShipmentStatus] Automatic out-for-delivery notification failed:",
+          notificationError,
+        );
+      }
+    } else if (
+      !shipmentWasDelivered &&
+      wasShipmentDelivered(resultStatus)
+    ) {
+      try {
+        const freshSnap = await shipmentRef.get();
+        const freshShipment = freshSnap.exists ? freshSnap.data() || {} : {};
+        await sendAutomaticShipmentLifecycleNotification({
+          db,
+          shipment: freshShipment,
+          shipmentId,
+          tripId:
+            tripId ||
+            freshShipment.currentTripId ||
+            freshShipment.currentTruckTripId ||
+            null,
+          notificationType: CUSTOMER_NOTIFICATION_TYPES.DELIVERED,
+          source: "SHIPMENT_DELIVERED",
+          channels: { sms: true, email: false, push: true },
+          actor: { uid, name, role },
+        });
+        notificationDelivered = true;
+      } catch (notificationError) {
+        console.error(
+          "[updateShipmentStatus] Automatic delivered notification failed:",
+          notificationError,
+        );
       }
     }
 
@@ -769,7 +769,7 @@ exports.updateShipmentStatus = onCall(
       success: true,
       status: resultStatus,
       deliveredPieceIds: checkerDeliveredPieceIds,
-      notificationQueued: Boolean(notificationEvent),
+      notificationQueued: notificationDelivered,
     };
   },
 );

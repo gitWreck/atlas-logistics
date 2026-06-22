@@ -4,10 +4,12 @@ const { HttpsError } = require("firebase-functions/v2/https");
 const { FieldValue } = require("firebase-admin/firestore");
 const { isValidEventType } = require("./eventTypes");
 
-async function writeShipmentEvent({ db, event }) {
+async function writeShipmentEvent({ db, event, fieldValue = null }) {
   if (!db || typeof db.collection !== "function") {
     throw new HttpsError("internal", "Missing Firestore db instance.");
   }
+
+  const fv = fieldValue || FieldValue;
 
   const payload = event || {};
   const shipmentId = String(payload.shipmentId || "").trim();
@@ -45,7 +47,7 @@ async function writeShipmentEvent({ db, event }) {
     deliveryVehicleName: payload.deliveryVehicleName || null,
 
     location: payload.location || null,
-    timestamp: payload.timestamp || FieldValue.serverTimestamp(),
+    timestamp: payload.timestamp || fv.serverTimestamp(),
     gpsCoordinates: payload.gpsCoordinates || null,
     proofPhotoUrl: payload.proofPhotoUrl || null,
 
@@ -54,7 +56,7 @@ async function writeShipmentEvent({ db, event }) {
     remarks: payload.remarks || null,
     source: payload.source || null,
 
-    createdAt: FieldValue.serverTimestamp(),
+    createdAt: fv.serverTimestamp(),
   };
 
   await eventRef.set(doc);

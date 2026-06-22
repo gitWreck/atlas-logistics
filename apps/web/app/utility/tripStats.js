@@ -14,8 +14,12 @@ import {
   resolveHubBoardPhase,
   resolveHubTripDeliveryTotals,
 } from "./tripHubBoardStats";
+import {
+  getTripScopedPackages,
+  resolveTripScopedPieceTotal,
+} from "./tripScopedPackages";
 
-export { getShipmentTripProgressDisplay };
+export { getShipmentTripProgressDisplay, resolveTripScopedPieceTotal };
 
 export const TRIP_LOAD_SUMMARY_PHASE = Object.freeze({
   LOADING: "LOADING",
@@ -66,50 +70,18 @@ export function resolveShipmentFullPieceTotal(shipment = {}) {
   );
 }
 
-/**
- * Pieces actually on this trip (scanned onto the truck), not warehouse remainders.
- */
-export function resolveTripScopedPieceTotal(shipment = {}) {
-  const loaded = clampCount(shipment.loadedCount);
-  const received = clampCount(
-    shipment.deliveredCount ?? shipment.receivedCount,
-  );
-  const missing = clampCount(shipment.missingCount);
-  const damaged = clampCount(shipment.damagedCount);
-  const onTrip = loaded + received + missing + damaged;
-
-  const tripBarcodeCount = Array.isArray(shipment.packageBarcodes)
-    ? shipment.packageBarcodes.filter(Boolean).length
-    : 0;
-  const onTripQty = Math.max(onTrip, loaded);
-
-  if (tripBarcodeCount > 0) {
-    if (onTripQty > 0 && tripBarcodeCount > onTripQty) {
-      return onTripQty;
-    }
-    return Math.max(onTripQty, tripBarcodeCount);
-  }
-
-  if (onTrip > 0) return onTrip;
-
-  const storedTotal = clampCount(shipment.totalItems);
-  const fullShipmentTotal = resolveShipmentFullPieceTotal(shipment);
-
-  // Legacy rows: totalItems may equal full shipment while only part was loaded.
-  if (storedTotal > 0 && fullShipmentTotal > storedTotal && loaded > 0) {
-    return Math.max(loaded, onTrip);
-  }
-  if (storedTotal > 0 && loaded > 0 && storedTotal > loaded + received) {
-    return Math.max(loaded, onTrip);
-  }
-
-  return storedTotal > 0 ? storedTotal : loaded;
-}
-
-function aggregateFromTripShipments(shipments = []) {
+function aggregateFromTripShipments(shipments = [], tripId = "") {
   return shipments.reduce(
     (acc, shipment) => {
-      const tripScopedTotal = resolveTripScopedPieceTotal(shipment);
+      const scopedPackages = getTripScopedPackages(
+        shipment,
+        shipment,
+        tripId,
+      );
+      const tripScopedTotal = resolveTripScopedPieceTotal(
+        shipment,
+        scopedPackages,
+      );
       const loaded = clampCount(shipment.loadedCount);
       const received = clampCount(
         shipment.deliveredCount ?? shipment.receivedCount,
@@ -181,7 +153,10 @@ function resolveTripTotals(trip = {}) {
   let hubReceivedShipments = 0;
 
   if (shipmentCount > 0) {
-    const agg = aggregateFromTripShipments(shipments);
+    const agg = aggregateFromTripShipments(
+      shipments,
+      String(trip.id || trip.tripId || "").trim(),
+    );
     loaded = agg.loaded;
     received = Math.max(agg.received, received);
     deliveredShipments = agg.deliveredShipments;

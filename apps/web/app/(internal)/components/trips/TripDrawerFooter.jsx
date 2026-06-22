@@ -101,6 +101,8 @@ export default function TripDrawerFooter({
   const showCancelTrip = canManageLifecycle && canCancelTrip(data);
   const showArchiveTrip = canManageLifecycle && canArchiveTrip(data);
   const showLifecycleSection = showCancelTrip || showArchiveTrip || canAudit;
+  const completedTrip = String(data.status || "").toUpperCase() === "COMPLETED" ||
+    String(data.status || "").toUpperCase() === "DELIVERED";
 
   const handleUnlockSuccess = () => {
     setTimeout(() => {
@@ -108,6 +110,8 @@ export default function TripDrawerFooter({
       setUnlockReason("");
     }, 1500);
   };
+
+  if (completedTrip) return null;
 
   return (
     <div className={`p-4 border-t flex flex-col gap-3 ${theme.footerPanel}`}>
@@ -347,13 +351,13 @@ export default function TripDrawerFooter({
         </div>
       )}
 
-      <div className="flex gap-3 pt-1">
+      <div className="flex flex-wrap gap-3 pt-1">
         <button
           type="button"
           disabled={showUnlockReason}
           onClick={() =>
             window.open(
-              `/components/print/manifest?tripId=${data.tripId}`,
+              `/components/print/manifest?tripId=${tripDocId}`,
               "_blank",
             )
           }
@@ -364,6 +368,28 @@ export default function TripDrawerFooter({
           <FontAwesomeIcon icon={faPrint} />
           Print Manifest
         </button>
+
+        {data.latestAmendmentId ? (
+          <button
+            type="button"
+            disabled={showUnlockReason}
+            onClick={() =>
+              window.open(
+                `/components/print/manifest-amendment?amendmentId=${data.latestAmendmentId}`,
+                "_blank",
+              )
+            }
+            className={`${theme.secondaryActionButton} ${
+              showUnlockReason ? "opacity-30 pointer-events-none" : ""
+            }`}
+          >
+            <FontAwesomeIcon icon={faPrint} />
+            Print Addendum
+            {data.latestAmendmentVersion
+              ? ` (${data.latestAmendmentVersion})`
+              : ""}
+          </button>
+        ) : null}
 
         <ExportTripButton trip={data} user={user} />
       </div>

@@ -10,8 +10,15 @@ import {
 } from "@fortawesome/free-solid-svg-icons";
 
 export const DEFAULT_CUSTOMER_NOTIFICATION_CHANNELS = {
+  sms: false,
+  email: false,
+  push: false,
+};
+
+/** Used when creating a new shipment — customer should get a receive confirmation. */
+export const DEFAULT_SHIPMENT_CREATION_NOTIFICATION_CHANNELS = {
   sms: true,
-  email: true,
+  email: false,
   push: true,
 };
 

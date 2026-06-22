@@ -1,13 +1,15 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faTimes,
   faTruck,
   faBoxOpen,
   faWrench,
+  faSync,
 } from "@fortawesome/free-solid-svg-icons";
+import { auth } from "@/lib/firebase";
 import StatusBadge from "../ui/StatusBadge";
 import CustomerMessageWidget from "../messaging/CustomerMessageWidget";
 import PackagesTable from "./Packages/PackagesTable";
@@ -39,17 +41,56 @@ export default function ShipmentDrawer({
   canAssignRoute = false,
 }) {
   const [activeTab, setActiveTab] = useState("TIMELINE");
+  const [shipmentData, setShipmentData] = useState(null);
+  const [refreshing, setRefreshing] = useState(false);
   const theme = getDrawerThemeClasses(isDark);
 
-  useEffect(() => {
-    if (isOpen) {
-      setActiveTab("TIMELINE");
+  const fetchShipmentDetails = useCallback(async (shipmentId) => {
+    if (!shipmentId) return;
+
+    try {
+      const token = await auth.currentUser?.getIdToken();
+      const res = await fetch(`/api/shipments/${shipmentId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+        cache: "no-store",
+      });
+
+      if (!res.ok) throw new Error("Failed to load shipment");
+
+      const json = await res.json();
+      setShipmentData(json.shipment || null);
+    } catch (error) {
+      console.error("Failed to load shipment details:", error);
     }
-  }, [isOpen, data]);
+  }, []);
 
-  if (!data) return null;
+  useEffect(() => {
+    if (isOpen && data?.id) {
+      setActiveTab("TIMELINE");
+      setShipmentData(data);
+      fetchShipmentDetails(data.id);
+    } else if (!isOpen) {
+      setShipmentData(null);
+    }
+  }, [isOpen, data?.id, fetchShipmentDetails]);
 
-  const custodyLocked = isShipmentCustodyLocked(data);
+  const displayData = shipmentData || data;
+
+  if (!displayData) return null;
+
+  const custodyLocked = isShipmentCustodyLocked(displayData);
+
+  const handleRefresh = async () => {
+    if (refreshing || !displayData?.id) return;
+
+    setRefreshing(true);
+    try {
+      await fetchShipmentDetails(displayData.id);
+      onRefresh?.();
+    } finally {
+      setRefreshing(false);
+    }
+  };
 
   return (
     <>
@@ -80,26 +121,44 @@ export default function ShipmentDrawer({
             <h2
               className={`text-xl font-mono font-bold tracking-tight ${theme.title}`}
             >
-              {data.shipmentId || "Shipment #" + data.id}
+              {displayData.shipmentId || "Shipment #" + displayData.id}
             </h2>
 
             <div className="flex gap-2 mt-2 items-center">
-              <StatusBadge status={data.status} isDark={isDark} />
+              <StatusBadge status={displayData.status} isDark={isDark} />
               <span
                 className={`text-xs border-l pl-2 ml-1 ${theme.mutedText} ${theme.divider}`}
               >
-                {data.route || data.originCode + " → " + data.destinationCode}
+                {displayData.route ||
+                  displayData.originCode + " → " + displayData.destinationCode}
               </span>
             </div>
           </div>
 
-          <button
-            type="button"
-            onClick={onClose}
-            className={`p-2 rounded-lg transition-colors ${theme.closeButton}`}
-          >
-            <FontAwesomeIcon icon={faTimes} size="lg" />
-          </button>
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              type="button"
+              onClick={handleRefresh}
+              disabled={refreshing}
+              className={`p-2 rounded-lg transition-colors ${theme.closeButton}`}
+              title="Refresh shipment"
+              aria-label="Refresh shipment"
+            >
+              <FontAwesomeIcon
+                icon={faSync}
+                spin={refreshing}
+                className="w-4 h-4"
+              />
+            </button>
+            <button
+              type="button"
+              onClick={onClose}
+              className={`p-2 rounded-lg transition-colors ${theme.closeButton}`}
+              aria-label="Close drawer"
+            >
+              <FontAwesomeIcon icon={faTimes} size="lg" />
+            </button>
+          </div>
         </div>
 
         {/* TABS */}
@@ -116,7 +175,7 @@ export default function ShipmentDrawer({
             isActive={activeTab === "ITEMS"}
             onClick={() => setActiveTab("ITEMS")}
             icon={faBoxOpen}
-            label={`Items (${data.packages?.length || 0})`}
+            label={`Items (${displayData.packages?.length || 0})`}
             theme={theme}
           />
 
@@ -141,14 +200,14 @@ export default function ShipmentDrawer({
           {activeTab === "TIMELINE" && (
             <div className="space-y-6">
               <ReturnLoopCard
-                shipment={data}
+                shipment={displayData}
                 isDark={isDark}
                 canManage={canManageWarehouse}
                 onReceiveReturned={onReceiveReturned}
                 onReleaseToCheckers={onReleaseToCheckers}
               />
               <HubReconcileCard
-                shipment={data}
+                shipment={displayData}
                 isDark={isDark}
                 canManage={canManageWarehouse}
                 onReconcile={onReconcile}
@@ -164,25 +223,28 @@ export default function ShipmentDrawer({
           )}
 
           {activeTab === "ITEMS" && (
-            <PackagesTable onRefresh={onRefresh} data={data} isDark={isDark} />
+            <PackagesTable
+              onRefresh={handleRefresh}
+              data={displayData}
+              isDark={isDark}
+              profile={profile}
+            />
           )}
 
           {activeTab === "TOOLS" && (
             <div className="space-y-8 animate-in zoom-in-95 duration-200">
               <ShipmentOperations
-                shipmentId={data.id}
-                currentStatus={data.status}
+                shipmentId={displayData.id}
+                currentStatus={displayData.status}
                 isDark={isDark}
                 custodyLocked={custodyLocked}
-                onRefresh={() => {
-                  onRefresh?.();
-                }}
+                onRefresh={handleRefresh}
                 profile={profile}
               />
 
-              <CustomerMessageWidget shipment={data} isDark={isDark} />
+              <CustomerMessageWidget shipment={displayData} isDark={isDark} />
 
-              <ShipmentProofs shipment={data} isDark={isDark} />
+              <ShipmentProofs shipment={displayData} isDark={isDark} />
             </div>
           )}
         </div>

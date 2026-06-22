@@ -12,12 +12,28 @@ const {
   isHubTransferTrip,
   normalizeTripStatus,
 } = require("./manifestStatus");
+const {
+  sendAutomaticTripLifecycleNotification,
+  CUSTOMER_NOTIFICATION_TYPES,
+} = require("../notifications/customerNotificationService");
+const {
+  SEMAPHORE_API_KEY,
+  SEMAPHORE_SENDER_NAME,
+} = require("../../shared/sms-service");
+const { defineSecret } = require("firebase-functions/params");
+
+const SMTP_EMAIL = defineSecret("SMTP_EMAIL");
+const SMTP_PASSWORD = defineSecret("SMTP_PASSWORD");
 
 if (!admin.apps.length) admin.initializeApp();
 const db = admin.firestore();
 
 exports.startReceiving = onCall(
-  { region: "asia-southeast1", maxInstances: 10 },
+  {
+    region: "asia-southeast1",
+    maxInstances: 10,
+    secrets: [SEMAPHORE_API_KEY, SEMAPHORE_SENDER_NAME, SMTP_EMAIL, SMTP_PASSWORD],
+  },
   async (req) => {
     await requireRole(db, req, ["admin", "manager"]);
 
@@ -29,7 +45,7 @@ exports.startReceiving = onCall(
 
     const tripRef = db.collection("truck_trips").doc(tripId);
 
-    return db.runTransaction(async (tx) => {
+    const result = await db.runTransaction(async (tx) => {
       const tripSnap = await tx.get(tripRef);
       if (!tripSnap.exists) {
         throw new HttpsError("not-found", "Trip not found");
@@ -209,5 +225,29 @@ exports.startReceiving = onCall(
         manifestStatus: MANIFEST_STATUS.RECEIVING_IN_PROGRESS,
       };
     });
+
+    if (result.success && !result.resumed && result.status === "ARRIVED") {
+      try {
+        result.customerNotification = await sendAutomaticTripLifecycleNotification({
+          db,
+          tripId,
+          notificationType: CUSTOMER_NOTIFICATION_TYPES.ARRIVED_AT_ODIONGAN,
+          source: "START_RECEIVING",
+          channels: { sms: true, email: false, push: true },
+          actor: {
+            uid,
+            name: actorName,
+            role: req.auth.token?.role || null,
+          },
+        });
+      } catch (notificationError) {
+        console.error(
+          "[startReceiving] Customer notification failed:",
+          notificationError,
+        );
+      }
+    }
+
+    return result;
   },
 );
