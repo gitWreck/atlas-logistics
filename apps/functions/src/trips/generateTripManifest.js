@@ -24,6 +24,7 @@ const {
 } = require("../utilities/helpers");
 const { writeCustodyAuditLog } = require("../utilities/custodyAuditLog");
 const { MANIFEST_STATUS } = require("./manifestStatus");
+const { ORIGINAL_MANIFEST_VERSION } = require("./manifestAmendment");
 
 if (!admin.apps.length) admin.initializeApp();
 const db = admin.firestore();
@@ -196,6 +197,7 @@ exports.generateTripManifest = onCall(
         manifestId,
         tripId,
         status: "LOCKED",
+        version: ORIGINAL_MANIFEST_VERSION,
 
         trip: {
           tripCode: trip.tripId || null,
@@ -240,6 +242,7 @@ exports.generateTripManifest = onCall(
         manifestStatus: MANIFEST_STATUS.LOCKED,
         manifestId,
         manifestHash: hash,
+        manifestVersion: ORIGINAL_MANIFEST_VERSION,
         manifestGeneratedAt: nowTs,
         manifestGeneratedBy: uid,
         updatedAt: nowTs,

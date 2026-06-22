@@ -51,6 +51,8 @@ exports.createShipment =
   require("./src/shipments/createShipment").createShipment;
 exports.updateShipmentStatus =
   require("./src/shipments/updateShipmentStatus").updateShipmentStatus;
+exports.overrideShipmentPieceStatus =
+  require("./src/shipments/overrideShipmentPieceStatus").overrideShipmentPieceStatus;
 exports.updatePackageStatus =
   require("./src/packages/updatePackageStatus").updatePackageStatus;
 exports.updateShipmentPackages =
@@ -78,6 +80,8 @@ exports.assignShipmentToTrip =
   require("./src/trips/assignShipmentToTrip").assignShipmentToTrip;
 exports.manualAssignShipmentToTrip =
   require("./src/trips/manualAssignShipmentToTrip").manualAssignShipmentToTrip;
+exports.recoverFoundPackage =
+  require("./src/trips/recoverFoundPackage").recoverFoundPackage;
 exports.unassignShipmentFromTrip =
   require("./src/trips/unassignShipmentFromTrip").unassignShipmentFromTrip;
 exports.assignDriverToTrip =
@@ -149,8 +153,12 @@ exports.deleteShipment =
 // Manifests & Certificates
 exports.generateTripManifest =
   require("./src/trips/generateTripManifest").generateTripManifest;
+exports.generateTripDeliveryManifest =
+  require("./src/trips/generateTripDeliveryManifest").generateTripDeliveryManifest;
 exports.verifyTripManifest =
   require("./src/trips/verifyTripManifest").verifyTripManifest;
+exports.verifyManifestAmendment =
+  require("./src/trips/verifyManifestAmendment").verifyManifestAmendment;
 exports.unlockTripManifest =
   require("./src/trips/unlockTripManifest").unlockTripManifest;
 
@@ -166,6 +174,8 @@ exports.broadcastTripMessage =
   require("./src/messaging/broadcastTripMessage").broadcastTripMessage;
 exports.processNotificationEvent =
   require("./src/notifications/processNotificationEvent").processNotificationEvent;
+exports.retryCustomerNotification =
+  require("./src/notifications/retryCustomerNotification").retryCustomerNotification;
 
 // Chat
 exports.createConversation =

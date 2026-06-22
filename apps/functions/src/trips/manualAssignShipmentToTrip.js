@@ -14,6 +14,10 @@ const {
   normalizeCode,
   resolveShipmentReference,
 } = require("../shipments/resolveShipmentReference");
+const {
+  appendPendingAmendmentEntry,
+  tripRequiresAmendmentTracking,
+} = require("./manifestAmendment");
 
 if (!admin.apps.length) admin.initializeApp();
 const db = admin.firestore();
@@ -222,6 +226,18 @@ exports.manualAssignShipmentToTrip = onCall(
         },
         note: `Manual assignment to trip ${trip.tripId || tripId}.`,
       });
+
+      if (tripRequiresAmendmentTracking(trip)) {
+        appendPendingAmendmentEntry(tx, tripRef, trip, {
+          changeType: resolved.packageLabel ? "CORRECTED" : "ADDED",
+          shipmentId: tracking.shipmentId || trackingShipmentId,
+          shipmentDocId: trackingShipmentId,
+          packageId: resolved.packageLabel || null,
+          reason,
+          recordedBy: actor.actorId,
+          recordedByName: actor.actorName,
+        });
+      }
     });
 
     return {

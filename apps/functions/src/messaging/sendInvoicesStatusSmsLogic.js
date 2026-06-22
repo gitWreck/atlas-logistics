@@ -1,10 +1,28 @@
 "use strict";
 
 const admin = require("firebase-admin");
-const { sendSmsViaProvider } = require("../../shared/sms-service");
 const { calculateSmsCost } = require("../../shared/sms-cost");
 const { writeMessagingActionLog } = require("../utilities/messagingLogger");
 const { requireNormalizedPhone } = require("../utilities/phoneHelpers");
+const {
+  CUSTOMER_NOTIFICATION_TYPES,
+  NO_TRIP_SCOPE,
+  sendDirectCustomerNotification,
+} = require("../notifications/customerNotificationService");
+
+function resolveInvoiceNotificationType(status = "") {
+  const normalized = String(status || "").toUpperCase();
+  if (normalized === "ISSUED") {
+    return CUSTOMER_NOTIFICATION_TYPES.INVOICE_ISSUED;
+  }
+  if (normalized === "PAID") {
+    return CUSTOMER_NOTIFICATION_TYPES.INVOICE_PAID;
+  }
+  if (normalized === "CANCELLED") {
+    return CUSTOMER_NOTIFICATION_TYPES.INVOICE_CANCELLED;
+  }
+  return `${CUSTOMER_NOTIFICATION_TYPES.MANUAL_BROADCAST}_INVOICE_${normalized}`;
+}
 
 function buildInvoiceStatusMessage({
   invoiceId,
@@ -21,29 +39,21 @@ function buildInvoiceStatusMessage({
 
   const routeText =
     origin || destination
-      ? ` for shipment ${shipmentId} (${origin || "Unknown"} to ${destination || "Unknown"})`
-      : shipmentId
-        ? ` for shipment ${shipmentId}`
-        : "";
+      ? ` (${origin || "Unknown"} to ${destination || "Unknown"})`
+      : "";
 
-  switch (status) {
+  switch (String(status || "").toUpperCase()) {
     case "ISSUED":
-      return `ATLAS: Invoice ${invoiceId}${routeText} has been ISSUED.${billingName ? ` Bill To: ${billingName}.` : ""}`;
-
+      return `Atlas: Invoice ${invoiceId} has been issued${routeText}.`;
     case "PAID":
-      return `ATLAS: Invoice ${invoiceId}${routeText} has been marked as PAID. Thank you.${billingName ? ` Bill To: ${billingName}.` : ""}`;
-
+      return `Atlas: Invoice ${invoiceId} is paid. Thank you.`;
     case "CANCELLED":
-      return `ATLAS: Invoice ${invoiceId}${routeText} has been CANCELLED.${billingName ? ` Bill To: ${billingName}.` : ""}`;
-
+      return `Atlas: Invoice ${invoiceId} has been cancelled.`;
     default:
-      return `ATLAS: Invoice ${invoiceId}${routeText} has been updated to ${status}.${billingName ? ` Bill To: ${billingName}.` : ""}`;
+      return `Atlas: Invoice ${invoiceId} status is now ${status}.`;
   }
 }
 
-/**
- * Send invoice status SMS to sender and recipient.
- */
 async function sendInvoicesStatusSmsLogic({
   invoiceId,
   shipmentId,
@@ -60,6 +70,16 @@ async function sendInvoicesStatusSmsLogic({
 }) {
   const db = admin.firestore();
 
+  const message = buildInvoiceStatusMessage({
+    invoiceId,
+    shipmentId,
+    status,
+    billingName,
+    origin,
+    destination,
+    customMessage,
+  });
+
   const phones = new Set(
     [
       requireNormalizedPhone(senderPhone),
@@ -71,27 +91,34 @@ async function sendInvoicesStatusSmsLogic({
     return { success: false, reason: "No valid phones" };
   }
 
-  const message = buildInvoiceStatusMessage({
-    invoiceId,
-    shipmentId,
-    status,
-    billingName,
-    origin,
-    destination,
-    customMessage,
-  });
-
   const { credits } = calculateSmsCost(message);
+  const notificationType = `${resolveInvoiceNotificationType(status)}_${invoiceId}`;
 
-  const results = await Promise.allSettled(
-    Array.from(phones).map(async (phone) => {
-      await sendSmsViaProvider({ phone, message });
-      return phone;
-    }),
+  const results = await Promise.all(
+    Array.from(phones).map((phone) =>
+      sendDirectCustomerNotification({
+        db,
+        phone,
+        tripId: NO_TRIP_SCOPE,
+        shipmentId: shipmentId || null,
+        notificationType,
+        channels: { sms: true, email: false, push: false },
+        customSmsMessage: message,
+        actor: {
+          uid: actorUid || "SYSTEM",
+          name: actorName || null,
+          role: actorRole || null,
+        },
+        source: "INVOICE_STATUS",
+      }),
+    ),
   );
 
-  const successCount = results.filter((r) => r.status === "fulfilled").length;
-  const failedCount = results.length - successCount;
+  const successCount = results.reduce(
+    (sum, result) => sum + (result.sent || 0),
+    0,
+  );
+  const failedCount = phones.size - successCount;
 
   await writeMessagingActionLog({
     db,
@@ -119,6 +146,8 @@ async function sendInvoicesStatusSmsLogic({
   };
 }
 
-exports.sendInvoicesStatusSmsLogic = sendInvoicesStatusSmsLogic;
-exports.buildInvoiceStatusMessage = buildInvoiceStatusMessage;
-exports.normalizePhone = requireNormalizedPhone;
+module.exports = {
+  sendInvoicesStatusSmsLogic,
+  buildInvoiceStatusMessage,
+  normalizePhone: requireNormalizedPhone,
+};

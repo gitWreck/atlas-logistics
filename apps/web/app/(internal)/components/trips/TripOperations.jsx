@@ -58,8 +58,8 @@ export default function TripOperations({
   const [clearStatus, setClearStatus] = useState("IDLE");
   const [statusChangeStatus, setStatusChangeStatus] = useState("IDLE");
 
-  const [notifySms, setNotifySms] = useState(true);
-  const [notifyDelay, setNotifyDelay] = useState(true);
+  const [notifySms, setNotifySms] = useState(false);
+  const [notifyDelay, setNotifyDelay] = useState(false);
 
   const theme = getWidgetThemeClasses(isDark);
   const isManager = String(profile?.role || "").toLowerCase() === "manager";

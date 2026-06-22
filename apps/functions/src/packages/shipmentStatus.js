@@ -24,6 +24,7 @@ function sumQtyForStatuses(packages = [], statuses = new Set()) {
   }, 0);
 }
 
+/** Only true linehaul dispatch (IN_TRANSIT). LOADED_TO_TRIP stays LOADED until dispatchTrip. */
 function sumDispatchedInTransitQty(packages = []) {
   return sumQtyForStatuses(packages, new Set([PACKAGE_STATUS.IN_TRANSIT]));
 }
@@ -273,6 +274,15 @@ function deriveMasterShipmentStatus(packages = [], options = {}) {
       return "OUT_FOR_DELIVERY";
     }
 
+    const dispatchedTransitStatus = resolveDispatchedTransitMasterStatus({
+      packages,
+      totalQty,
+      atDivisoriaQty,
+    });
+    if (dispatchedTransitStatus) {
+      return dispatchedTransitStatus;
+    }
+
     if (releasedQty > 0 || availablePoolRows > 0) {
       if (deliveredQty > 0) return "PARTIALLY_DELIVERED";
       if (releasedQty > 0 && releasedQty < totalQty) {
@@ -290,15 +300,6 @@ function deriveMasterShipmentStatus(packages = [], options = {}) {
       totalQty,
     });
     if (lastMileStatus) return lastMileStatus;
-
-    const dispatchedTransitStatus = resolveDispatchedTransitMasterStatus({
-      packages,
-      totalQty,
-      atDivisoriaQty,
-    });
-    if (dispatchedTransitStatus) {
-      return dispatchedTransitStatus;
-    }
 
     if (totalContentQty > 0 && loadedQty >= totalContentQty) {
       const linehaulOnly = resolveLinehaulLoadedMasterStatus({
@@ -374,6 +375,15 @@ function deriveMasterShipmentStatus(packages = [], options = {}) {
     return "OUT_FOR_DELIVERY";
   }
 
+  const dispatchedTransitStatus = resolveDispatchedTransitMasterStatus({
+    packages,
+    totalQty,
+    atDivisoriaQty,
+  });
+  if (dispatchedTransitStatus) {
+    return dispatchedTransitStatus;
+  }
+
   if (releasedQty > 0 || availablePoolRows > 0) {
     if (deliveredQty > 0) return "PARTIALLY_DELIVERED";
     if (releasedQty > 0 && releasedQty < totalQty) {
@@ -391,15 +401,6 @@ function deriveMasterShipmentStatus(packages = [], options = {}) {
     totalQty,
   });
   if (lastMileStatus) return lastMileStatus;
-
-  const dispatchedTransitStatus = resolveDispatchedTransitMasterStatus({
-    packages,
-    totalQty,
-    atDivisoriaQty,
-  });
-  if (dispatchedTransitStatus) {
-    return dispatchedTransitStatus;
-  }
 
   const linehaulStatus = resolveLinehaulLoadedMasterStatus({
     packages,
@@ -497,10 +498,30 @@ function resolveShipmentAvailableForDelivery(
   return false;
 }
 
+function normalizePackagesBeforeDerive(packages = []) {
+  if (!Array.isArray(packages)) return [];
+
+  return packages.map((pkg) => {
+    const status = normalizePackageStatus(pkg);
+    if (
+      status === PACKAGE_STATUS.IN_TRANSIT ||
+      status === PACKAGE_STATUS.LOADED_TO_TRIP
+    ) {
+      const next = { ...pkg, availableForDelivery: false };
+      if (String(pkg.custodyOwnerType || "").toUpperCase() === "WAREHOUSE") {
+        next.custodyOwnerType = "TRIP";
+      }
+      return next;
+    }
+    return pkg;
+  });
+}
+
 /**
  * Canonical post-mutation snapshot: derive master + breakdown + pool flag hygiene.
  */
 function buildDerivedShipmentSnapshot(packages = [], options = {}) {
+  const normalizedInput = normalizePackagesBeforeDerive(packages);
   const {
     previousStatus = "",
     totals = null,
@@ -512,11 +533,11 @@ function buildDerivedShipmentSnapshot(packages = [], options = {}) {
   if (preserveStatuses.has(previous)) {
     return {
       status: previous,
-      packages,
-      packageBreakdown: computePackageBreakdown(packages),
+      packages: normalizedInput,
+      packageBreakdown: computePackageBreakdown(normalizedInput),
       availableForDelivery: resolveShipmentAvailableForDelivery(
         previous,
-        packages,
+        normalizedInput,
       ),
     };
   }
@@ -527,8 +548,11 @@ function buildDerivedShipmentSnapshot(packages = [], options = {}) {
     ...(totals ? { totals } : {}),
   };
 
-  let derivedStatus = deriveMasterShipmentStatus(packages, deriveOptions);
-  let normalizedPackages = stripStalePackagePoolFlags(packages, derivedStatus);
+  let derivedStatus = deriveMasterShipmentStatus(normalizedInput, deriveOptions);
+  let normalizedPackages = stripStalePackagePoolFlags(
+    normalizedInput,
+    derivedStatus,
+  );
 
   const afterStrip = deriveMasterShipmentStatus(
     normalizedPackages,

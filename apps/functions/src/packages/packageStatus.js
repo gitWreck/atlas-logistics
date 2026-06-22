@@ -252,6 +252,7 @@ function isAvailableAtWarehousePool(pkg = {}) {
 
 function isReleasedForDeliveryPool(pkg = {}) {
   const status = normalizePackageStatus(pkg);
+  if (IN_TRANSIT_STATUSES.has(status)) return false;
   if (status === PACKAGE_STATUS.RELEASED_FOR_DELIVERY) return true;
   if (status === PACKAGE_STATUS.ROUTE_ASSIGNED) return true;
   return (
@@ -299,6 +300,9 @@ function classifyPackageBucket(pkg = {}) {
   }
   if (IN_TRANSIT_STATUSES.has(status)) {
     return { bucket: "inTransit", qty };
+  }
+  if (isReleasedForDeliveryPool(pkg)) {
+    return { bucket: "releasedForDelivery", qty };
   }
   if (AT_ODIONGAN_STATUSES.has(status)) {
     return { bucket: "atOdiongan", qty };

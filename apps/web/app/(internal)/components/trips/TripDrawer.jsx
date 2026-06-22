@@ -8,6 +8,8 @@ import {
   faWrench,
   faUnlock,
   faTimes,
+  faSync,
+  faQrcode,
 } from "@fortawesome/free-solid-svg-icons";
 
 import TripTimelineTab from "./TripTimelineTab";
@@ -20,6 +22,7 @@ import DrawerTabButton from "../ui/DrawerTabButton";
 import UnassignShipmentModal from "./modals/UnassignShipmentModal";
 import BulkAssignmentModal from "./modals/BulkAssignmentModal";
 import ViewPackagesModal from "../shipments/Packages/ViewPackagesModal";
+import ScanFoundPackageModal from "./modals/ScanFoundPackageModal";
 import ShipmentScanActionModal from "../shipments/ShipmentScanner/ShipmentScanActionModal";
 import InvoiceDetailsModal from "../invoice/InvoiceDetailsModal";
 import InvoiceFormModal from "../invoice/InvoiceFormModal";
@@ -28,6 +31,7 @@ import { updateShipmentPackages } from "@/app/utility/FirebaseFunctions";
 import { getDrawerThemeClasses } from "@/app/utility/constant/theme";
 import { isManifestEditable } from "@/app/utility/manifestStatus";
 import { updatedBy } from "@/app/utility/utilities";
+import { isCompletedTrip } from "./tripHelpers";
 
 export default function TripDrawer({
   isOpen,
@@ -46,6 +50,8 @@ export default function TripDrawer({
     useState(null);
   const [isBulkModalOpen, setBulkModalOpen] = useState(false);
   const [isScanModalOpen, setScanModalOpen] = useState(false);
+  const [isFoundScanOpen, setFoundScanOpen] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
   const theme = getDrawerThemeClasses(isDark);
 
@@ -109,6 +115,16 @@ export default function TripDrawer({
 
   if (!data) return null;
 
+  const completedTrip = isCompletedTrip(data);
+  const role = String(profile?.role || "").toLowerCase();
+  const canScanFoundPackage =
+    ["admin", "manager"].includes(role) &&
+    Boolean(data?.reconciledAt) &&
+    !completedTrip;
+  const manifestTabLabel = completedTrip
+    ? `Manifests (${data.deliveryManifestId && data.manifestId ? 2 : data.manifestLocked || data.deliveryManifestId ? 1 : 0})`
+    : `Manifest (${shipments.length})`;
+
   async function fetchScannerApi(endpoint, payload) {
     const token = await user?.getIdToken();
 
@@ -153,6 +169,17 @@ export default function TripDrawer({
 
   const handleViewInvoice = async (shipment) => {
     await openInvoiceDetailsById(shipment?.invoiceId, shipment);
+  };
+
+  const handleRefresh = async () => {
+    if (!data?.tripId || refreshing) return;
+
+    setRefreshing(true);
+    try {
+      await Promise.all([fetchShipments(), onRefreshTrips?.()]);
+    } finally {
+      setRefreshing(false);
+    }
   };
 
   return (
@@ -202,7 +229,6 @@ export default function TripDrawer({
           </div>
 
           <div className="flex items-center gap-2 shrink-0">
-            {/* New Modal Button */}
             <button
               type="button"
               onClick={() => setScanModalOpen(true)}
@@ -210,7 +236,31 @@ export default function TripDrawer({
             >
               Scan
             </button>
-            {/* Close Button */}
+            {canScanFoundPackage && (
+              <button
+                type="button"
+                onClick={() => setFoundScanOpen(true)}
+                className="px-3 py-2 rounded-lg text-xs font-semibold bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 hover:bg-emerald-500/20 transition-all"
+                title="Recover a missing package found after reconciliation"
+              >
+                <FontAwesomeIcon icon={faQrcode} className="mr-1.5" />
+                Found
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={handleRefresh}
+              disabled={refreshing || loadingShips}
+              className={`p-2 rounded-lg transition-colors ${theme.closeButton}`}
+              title="Refresh trip"
+              aria-label="Refresh trip"
+            >
+              <FontAwesomeIcon
+                icon={faSync}
+                spin={refreshing || loadingShips}
+                className="w-4 h-4"
+              />
+            </button>
             <button
               type="button"
               onClick={onClose}
@@ -239,7 +289,7 @@ export default function TripDrawer({
             isActive={activeTab === "MANIFEST"}
             onClick={() => setActiveTab("MANIFEST")}
             icon={faClipboardList}
-            label={`Manifest (${shipments.length})`}
+            label={manifestTabLabel}
           />
 
           <DrawerTabButton
@@ -292,6 +342,7 @@ export default function TripDrawer({
               onViewInvoice={handleViewInvoice}
               onCreateInvoice={openCreateInvoice}
               profile={profile}
+              user={user}
             />
           )}
 
@@ -333,6 +384,8 @@ export default function TripDrawer({
           onRefreshTrips?.();
         }}
         isDark={isDark}
+        profile={profile}
+        allowShipmentStatusOverride={false}
       />
 
       <UnassignShipmentModal
@@ -357,6 +410,18 @@ export default function TripDrawer({
           onRefreshTrips?.();
         }}
         isDark={isDark}
+      />
+
+      <ScanFoundPackageModal
+        isOpen={isFoundScanOpen}
+        onClose={() => setFoundScanOpen(false)}
+        tripId={data?.id || data?.tripId}
+        tripPublicId={data?.tripId}
+        isDark={isDark}
+        onRefresh={() => {
+          fetchShipments();
+          onRefreshTrips?.();
+        }}
       />
 
       <ShipmentScanActionModal

@@ -74,7 +74,7 @@ export async function POST(request, { params }) {
     }
 
     const body = await request.json().catch(() => ({}));
-    const notify = body.notify !== false;
+    const notify = body.notify === true;
     const autoPromote = body.autoPromote !== false;
 
     const payload = await runTripHandoffReconciliation(tripId);

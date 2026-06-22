@@ -19,7 +19,6 @@ const {
   resolveDeliveryVehicleLoadedStatus,
   resolveHubUnloadStatus,
 } = require("./packageStatus");
-const { getShipmentTargetUserIds } = require("../utilities/notificationHelpers");
 const { normalizeQty } = require("../utilities/packageHelpers");
 const { tryAutoCompleteTrip } = require("../trips/autoCompleteTrip");
 const { assertCanUnloadAtHub } = require("../trips/manifestStatus");
@@ -27,111 +26,42 @@ const {
   assertCustodyStructuralEditAllowed,
   assertCustodyScanStatusAllowed,
 } = require("../trips/manifestLockGuard");
+const { packageLinkedToTrip } = require("./tripPackageOperations");
+const {
+  sendAutomaticShipmentLifecycleNotification,
+  CUSTOMER_NOTIFICATION_TYPES,
+} = require("../notifications/customerNotificationService");
+const {
+  SEMAPHORE_API_KEY,
+  SEMAPHORE_SENDER_NAME,
+} = require("../../shared/sms-service");
+const { defineSecret } = require("firebase-functions/params");
+
+const SMTP_EMAIL = defineSecret("SMTP_EMAIL");
+const SMTP_PASSWORD = defineSecret("SMTP_PASSWORD");
+
+function wasShipmentOutForDelivery(status = "") {
+  const normalized = String(status || "").toUpperCase();
+  return (
+    normalized === "OUT_FOR_DELIVERY" ||
+    normalized === "PARTIALLY_OUT_FOR_DELIVERY"
+  );
+}
+
+function wasShipmentDelivered(status = "") {
+  const normalized = String(status || "").toUpperCase();
+  return normalized === "DELIVERED" || normalized === "COMPLETED";
+}
 
 if (!admin.apps.length) admin.initializeApp();
 const db = admin.firestore();
 
-function formatStatusLabel(status = "") {
-  return String(status || "")
-    .replace(/_/g, " ")
-    .toLowerCase()
-    .replace(/\b\w/g, (letter) => letter.toUpperCase());
-}
-
-function buildShipmentStatusNotificationEvent({
-  shipment,
-  shipmentId,
-  oldStatus,
-  newStatus,
-  actor,
-  notificationChannels,
-  notifySms,
-  notifyEmail,
-  notifyPush,
-  notify,
-}) {
-  if (notify === false) return null;
-
-  const requestedChannels =
-    notificationChannels && typeof notificationChannels === "object"
-      ? notificationChannels
-      : null;
-  const channels = requestedChannels
-    ? {
-        sms: requestedChannels.sms === true,
-        email: requestedChannels.email === true,
-        push: requestedChannels.push === true,
-      }
-    : {
-        sms: notifySms !== false,
-        email: notifyEmail === true,
-        push: notifyPush !== false,
-      };
-  const targetUserIds = getShipmentTargetUserIds(shipment);
-  const statusLabel = formatStatusLabel(newStatus);
-  const title = "Shipment status updated";
-  const body = `Shipment ${shipmentId} is now ${statusLabel}.`;
-
-  if (!channels.sms && !channels.email && !channels.push) {
-    return null;
-  }
-
-  return {
-    type: "SHIPMENT_STATUS_UPDATED",
-    status: "pending",
-    channels: {
-      sms: channels.sms,
-      email: channels.email,
-      push: channels.push && targetUserIds.length > 0,
-      inApp: channels.push && targetUserIds.length > 0,
-    },
-    entityType: "shipment",
-    entityId: shipmentId,
-    shipmentId,
-    targetUserIds,
-    targets: {
-      sender: {
-        uid: shipment.sender?.uid || shipment.senderUid || null,
-        name: shipment.sender?.name || shipment.senderName || "",
-        phone: shipment.sender?.phone || shipment.senderPhone || null,
-        email: shipment.sender?.email || shipment.senderEmail || null,
-      },
-      recipient: {
-        uid: shipment.recipient?.uid || shipment.recipientUid || null,
-        name: shipment.recipient?.name || shipment.recipientName || "",
-        phone:
-          shipment.recipient?.phone ||
-          shipment.recipientPhone ||
-          shipment.consigneePhone ||
-          shipment.customerPhone ||
-          null,
-        email: shipment.recipient?.email || shipment.recipientEmail || null,
-      },
-    },
-    title,
-    body,
-    smsBody: `ATLAS: Shipment ${shipmentId} is now ${statusLabel}. Track: https://atlastransport.ph/track/${shipmentId}`,
-    data: {
-      screen: "tracking",
-      trackingId: shipmentId,
-      status: newStatus,
-      oldStatus,
-      origin: shipment.origin || shipment.sender?.address?.city || null,
-      destination:
-        shipment.destination || shipment.recipient?.address?.city || null,
-    },
-    actor: {
-      uid: actor.uid,
-      name: actor.name,
-      role: actor.role,
-    },
-    createdAt: FieldValue.serverTimestamp(),
-    updatedAt: FieldValue.serverTimestamp(),
-  };
-}
-
 exports.updateShipmentPackages = onCall(
-  { region: "asia-southeast1", maxInstances: 10 },
+  {
+    region: "asia-southeast1",
+    maxInstances: 10,
+    secrets: [SEMAPHORE_API_KEY, SEMAPHORE_SENDER_NAME, SMTP_EMAIL, SMTP_PASSWORD],
+  },
   async (req) => {
     await requireRole(db, req, ["admin", "manager", "checker"]);
 
@@ -153,7 +83,7 @@ exports.updateShipmentPackages = onCall(
       location,
       scanAction,
       tripId: scannerTripId,
-      notify = true,
+      notify = false,
       notificationChannels = null,
       notifySms,
       notifyEmail,
@@ -211,6 +141,8 @@ exports.updateShipmentPackages = onCall(
     let pendingEvent = null;
     let completedTripId = null;
     let shouldTryAutoCompleteTrip = false;
+    let outForDeliveryNotificationContext = null;
+    let deliveredNotificationContext = null;
 
     await db.runTransaction(async (tx) => {
       // -----------------------------
@@ -676,6 +608,7 @@ exports.updateShipmentPackages = onCall(
                 ? {
                     currentTripId: null,
                     loadedOnTrip: null,
+                    ...(tripId ? { hubReceivedOnTrip: tripId } : {}),
                     ...(unloadedStatus === PACKAGE_STATUS.ARRIVED_AT_ODIONGAN
                       ? {
                           custodyOwnerType: "WAREHOUSE",
@@ -685,7 +618,9 @@ exports.updateShipmentPackages = onCall(
                         }
                       : {}),
                   }
-                : {}),
+                : tripId
+                  ? { hubReceivedOnTrip: tripId }
+                  : {}),
             });
             return;
           } else if (newStatus === "LOADED") {
@@ -991,33 +926,24 @@ exports.updateShipmentPackages = onCall(
       }
       const singleCurrentTripId =
         activeTripIds.length === 1 ? activeTripIds[0] : null;
+      const scannedPackageIdSet = new Set(
+        (Array.isArray(packageIds) ? packageIds : [])
+          .filter(Boolean)
+          .map((id) => String(id).trim()),
+      );
       const tripPackages = tripId
-        ? finalPackages.filter((pkg) => {
-            const packageTripId = pkg.currentTripId || pkg.loadedOnTrip || null;
-            const packageId = getPackageIdentity(pkg);
-
-            if (packageTripId) return packageTripId === tripId;
-
-            if (!packageId || !existingTripBarcodeSet.has(packageId)) {
-              return false;
-            }
-
-            const loadedQty = normalizeQty(pkg.loadedQty, 0);
-            const receivedQty = normalizeQty(pkg.receivedQty, 0);
-            if (loadedQty > 0 || receivedQty > 0) return true;
-
-            return [
-              "LOADED",
-              "LOADED_TO_TRIP",
-              "IN_TRANSIT",
-              "OUT_FOR_DELIVERY",
-              "ARRIVED_AT_ODIONGAN",
-            ].includes(String(pkg.status || "").toUpperCase());
-          })
+        ? finalPackages.filter((pkg) =>
+            packageLinkedToTrip(pkg, tripId, existingTripBarcodeSet, {
+              scannedPackageIds: isHubReceive ? scannedPackageIdSet : new Set(),
+            }),
+          )
         : finalPackages;
-      const tripPackageBarcodes = tripPackages
-        .map((pkg) => getPackageIdentity(pkg))
-        .filter(Boolean);
+      const tripPackageBarcodes = [
+        ...new Set([
+          ...tripPackages.map((pkg) => getPackageIdentity(pkg)).filter(Boolean),
+          ...(isHubReceive ? [...scannedPackageIdSet] : []),
+        ]),
+      ];
       const tripTotalQty = sumTotalQty(tripPackages);
       const tripLoadedQty = sumLoadedQty(tripPackages);
       const tripReceivedQty = sumReceivedQty(tripPackages);
@@ -1254,27 +1180,53 @@ exports.updateShipmentPackages = onCall(
 
       if (
         isScannerUpdate &&
-        shipmentStatus &&
-        shipmentStatus !== oldShipmentStatus
+        String(newStatus || "").toUpperCase() === "OUT_FOR_DELIVERY" &&
+        !wasOutForDelivery &&
+        !wasShipmentOutForDelivery(oldShipmentStatus) &&
+        !wasShipmentOutForDelivery(oldTripShipmentStatus)
       ) {
-        const notificationEvent = buildShipmentStatusNotificationEvent({
-          shipment: oldData,
-          shipmentId,
-          oldStatus: oldData.status || null,
-          newStatus: shipmentStatus,
-          actor: { uid: uid || authUid, name, role },
-          notificationChannels,
-          notifySms,
-          notifyEmail,
-          notifyPush,
-          notify,
-        });
-
-        if (notificationEvent) {
-          const notificationRef = db.collection("notification_events").doc();
-          tx.set(notificationRef, notificationEvent);
-        }
+        outForDeliveryNotificationContext = {
+          shipment: {
+            ...oldData,
+            packages: finalPackages,
+            status: shipmentStatus,
+            packageBreakdown,
+            currentTripId: singleCurrentTripId,
+            currentTripIds: activeTripIds,
+          },
+          tripId:
+            tripId ||
+            singleCurrentTripId ||
+            oldData.currentTripId ||
+            oldData.currentTruckTripId ||
+            null,
+        };
       }
+
+      if (
+        isScannerUpdate &&
+        String(newStatus || "").toUpperCase() === "DELIVERED" &&
+        !wasShipmentDelivered(oldShipmentStatus) &&
+        wasShipmentDelivered(shipmentStatus)
+      ) {
+        deliveredNotificationContext = {
+          shipment: {
+            ...oldData,
+            packages: finalPackages,
+            status: shipmentStatus,
+            packageBreakdown,
+            currentTripId: singleCurrentTripId,
+            currentTripIds: activeTripIds,
+          },
+          tripId:
+            tripId ||
+            singleCurrentTripId ||
+            oldData.currentTripId ||
+            oldData.currentTruckTripId ||
+            null,
+        };
+      }
+
     });
 
     if (completedTripId && shouldTryAutoCompleteTrip) {
@@ -1301,6 +1253,52 @@ exports.updateShipmentPackages = onCall(
       }
     }
 
-    return { success: true };
+    let customerNotificationResult = null;
+    if (outForDeliveryNotificationContext) {
+      try {
+        customerNotificationResult =
+          await sendAutomaticShipmentLifecycleNotification({
+            db,
+            shipment: outForDeliveryNotificationContext.shipment,
+            shipmentId,
+            tripId: outForDeliveryNotificationContext.tripId,
+            notificationType: CUSTOMER_NOTIFICATION_TYPES.OUT_FOR_DELIVERY,
+            source: "SCANNER_OUT_FOR_DELIVERY",
+            channels: { sms: true, email: false, push: true },
+            actor: { uid: actorUid, name, role },
+          });
+      } catch (notificationError) {
+        console.error(
+          "[updateShipmentPackages] Out-for-delivery notification failed:",
+          notificationError,
+        );
+      }
+    }
+
+    if (deliveredNotificationContext) {
+      try {
+        const deliveredResult = await sendAutomaticShipmentLifecycleNotification({
+          db,
+          shipment: deliveredNotificationContext.shipment,
+          shipmentId,
+          tripId: deliveredNotificationContext.tripId,
+          notificationType: CUSTOMER_NOTIFICATION_TYPES.DELIVERED,
+          source: "SCANNER_DELIVERED",
+          channels: { sms: true, email: false, push: true },
+          actor: { uid: actorUid, name, role },
+        });
+        customerNotificationResult = deliveredResult;
+      } catch (notificationError) {
+        console.error(
+          "[updateShipmentPackages] Delivered notification failed:",
+          notificationError,
+        );
+      }
+    }
+
+    return {
+      success: true,
+      customerNotification: customerNotificationResult,
+    };
   },
 );

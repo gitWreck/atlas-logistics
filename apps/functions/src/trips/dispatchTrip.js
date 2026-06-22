@@ -21,12 +21,29 @@ const {
   isHubTransferTrip,
   MANIFEST_STATUS,
 } = require("./manifestStatus");
+const { sealManifestAmendment } = require("./manifestAmendment");
+const {
+  sendAutomaticTripLifecycleNotification,
+  CUSTOMER_NOTIFICATION_TYPES,
+} = require("../notifications/customerNotificationService");
+const {
+  SEMAPHORE_API_KEY,
+  SEMAPHORE_SENDER_NAME,
+} = require("../../shared/sms-service");
+const { defineSecret } = require("firebase-functions/params");
+
+const SMTP_EMAIL = defineSecret("SMTP_EMAIL");
+const SMTP_PASSWORD = defineSecret("SMTP_PASSWORD");
 
 if (!admin.apps.length) admin.initializeApp();
 const db = admin.firestore();
 
 exports.dispatchTrip = onCall(
-  { region: "asia-southeast1", maxInstances: 10 },
+  {
+    region: "asia-southeast1",
+    maxInstances: 10,
+    secrets: [SEMAPHORE_API_KEY, SEMAPHORE_SENDER_NAME, SMTP_EMAIL, SMTP_PASSWORD],
+  },
   async (req) => {
     await requireRole(db, req, ["admin", "manager"]);
 
@@ -35,7 +52,8 @@ exports.dispatchTrip = onCall(
     const uid = req.auth.uid;
 
     const userSnap = await db.collection("users").doc(uid).get();
-    const actorName = String(userSnap.data()?.name || "").trim() || "Unknown User";
+    const actorName =
+      String(userSnap.data()?.name || "").trim() || "Unknown User";
 
     const tripRef = db.collection("truck_trips").doc(tripId);
     const tripSnap = await tripRef.get();
@@ -67,6 +85,8 @@ exports.dispatchTrip = onCall(
     const timestamp = FieldValue.serverTimestamp();
 
     await db.runTransaction(async (tx) => {
+      const freshTripSnap = await tx.get(tripRef);
+      const freshTrip = freshTripSnap.data() || trip;
       const shipmentWrites = [];
 
       for (const tripShipDoc of shipQuery.docs) {
@@ -119,29 +139,32 @@ exports.dispatchTrip = onCall(
         });
       }
 
-      tx.update(tripRef, isCorrectionDispatch
-        ? {
-            status: "ARRIVED",
-            manifestStatus: MANIFEST_STATUS.LOCKED,
-            manifestLocked: true,
-            correctionDispatchedAt: timestamp,
-            correctionDispatchedBy: uid,
-            correctionDispatchedByName: actorName,
-            updatedAt: timestamp,
-            updatedBy: actorName,
-          }
-        : {
-            status: "IN_TRANSIT",
-            manifestStatus: MANIFEST_STATUS.LOCKED,
-            manifestLocked: true,
-            startedAt: timestamp,
-            dispatchedAt: timestamp,
-            dispatchedBy: uid,
-            dispatchedByName: actorName,
-            updatedAt: timestamp,
-            updatedBy: actorName,
-            startedBy: uid,
-          });
+      tx.update(
+        tripRef,
+        isCorrectionDispatch
+          ? {
+              status: "ARRIVED",
+              manifestStatus: MANIFEST_STATUS.LOCKED,
+              manifestLocked: true,
+              correctionDispatchedAt: timestamp,
+              correctionDispatchedBy: uid,
+              correctionDispatchedByName: actorName,
+              updatedAt: timestamp,
+              updatedBy: actorName,
+            }
+          : {
+              status: "IN_TRANSIT",
+              manifestStatus: MANIFEST_STATUS.LOCKED,
+              manifestLocked: true,
+              startedAt: timestamp,
+              dispatchedAt: timestamp,
+              dispatchedBy: uid,
+              dispatchedByName: actorName,
+              updatedAt: timestamp,
+              updatedBy: actorName,
+              startedBy: uid,
+            },
+      );
 
       for (const {
         tripShipRef,
@@ -192,6 +215,22 @@ exports.dispatchTrip = onCall(
           : "Trip dispatched from origin hub.",
         timestamp,
       });
+
+      if (isCorrectionDispatch) {
+        sealManifestAmendment({
+          tx,
+          db,
+          tripRef,
+          trip: freshTrip,
+          tripDocId: tripId,
+          actorId: uid,
+          actorName,
+          actorRole: req.auth.token?.role || null,
+          reason:
+            freshTrip.manifestReopenReason ||
+            "Correction dispatch — manifest addendum sealed.",
+        });
+      }
     });
 
     const tripContext = extractTripEventContext(trip, tripId);
@@ -215,6 +254,51 @@ exports.dispatchTrip = onCall(
       ),
     );
 
+    let customerNotificationResult = null;
+    if (!isCorrectionDispatch) {
+      try {
+        const manifestShipmentSnaps = await Promise.all(
+          shipQuery.docs.map((doc) =>
+            db.collection("shipments").doc(doc.id).get(),
+          ),
+        );
+        const manifestShipments = manifestShipmentSnaps
+          .filter((snap) => snap.exists)
+          .map((snap) => ({ id: snap.id, ...snap.data() }));
+
+        customerNotificationResult = await sendAutomaticTripLifecycleNotification({
+          db,
+          tripId,
+          notificationType: CUSTOMER_NOTIFICATION_TYPES.IN_TRANSIT,
+          shipments: manifestShipments,
+          source: "DISPATCH_TRIP",
+          channels: { sms: true, email: false, push: true },
+          actor: {
+            uid,
+            name: actorName,
+            role: req.auth.token?.role || null,
+          },
+        });
+
+        if (customerNotificationResult?.skipped && manifestShipments.length) {
+          console.warn(
+            "[dispatchTrip] Customer notification skipped:",
+            customerNotificationResult.reason,
+            { tripId, shipmentCount: manifestShipments.length },
+          );
+        }
+      } catch (notificationError) {
+        console.error(
+          "[dispatchTrip] Customer notification failed:",
+          notificationError,
+        );
+        customerNotificationResult = {
+          success: false,
+          error: notificationError?.message || String(notificationError),
+        };
+      }
+    }
+
     return {
       success: true,
       message: isCorrectionDispatch
@@ -223,6 +307,7 @@ exports.dispatchTrip = onCall(
       status: isCorrectionDispatch ? "ARRIVED" : "IN_TRANSIT",
       manifestStatus: MANIFEST_STATUS.LOCKED,
       correctionDispatch: isCorrectionDispatch,
+      customerNotification: customerNotificationResult,
     };
   },
 );

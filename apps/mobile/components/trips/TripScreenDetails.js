@@ -256,7 +256,7 @@ export default function TripDetailsScreen() {
             await updateTripStatus({
               tripId: trip.id,
               status: "ARRIVED",
-              notify: true,
+              notify: false,
               updatedBy: updatedBy(profile),
             });
 
@@ -287,7 +287,7 @@ export default function TripDetailsScreen() {
             await updateTripStatus({
               tripId: trip.id,
               status: "COMPLETED",
-              notify: true,
+              notify: false,
               updatedBy: updatedBy(profile),
             });
 

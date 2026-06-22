@@ -30,7 +30,7 @@ import {
 import { updatedBy } from "@/app/utility/utilities";
 import { getModalThemeClasses } from "@/app/utility/constant/theme";
 import CustomerNotificationChannels, {
-  DEFAULT_CUSTOMER_NOTIFICATION_CHANNELS,
+  DEFAULT_SHIPMENT_CREATION_NOTIFICATION_CHANNELS,
 } from "../../notifications/CustomerNotificationChannels";
 import {
   getCustodyLockMessage,
@@ -62,7 +62,7 @@ export default function UnifiedShipmentModal({
 
   // States controlled by the Modal Header/Footer, passed down to forms
   const [notificationChannels, setNotificationChannels] = useState(
-    DEFAULT_CUSTOMER_NOTIFICATION_CHANNELS,
+    DEFAULT_SHIPMENT_CREATION_NOTIFICATION_CHANNELS,
   );
   const [isPickup, setIsPickup] = useState(false);
 
@@ -117,7 +117,7 @@ export default function UnifiedShipmentModal({
       setFinalTripId(null);
       setCreatedShipmentId(null);
       setWantsTripAssignment(false);
-      setNotificationChannels(DEFAULT_CUSTOMER_NOTIFICATION_CHANNELS);
+      setNotificationChannels(DEFAULT_SHIPMENT_CREATION_NOTIFICATION_CHANNELS);
       setIsPickup(false);
     }
   }, [resetTrigger, editData]);
@@ -231,6 +231,25 @@ export default function UnifiedShipmentModal({
         payload.manualShipmentId = finalDocId; // Only pass manual ID on creation
         const shipmentRes = await createShipment(payload);
         finalDocId = shipmentRes?.data?.shipmentId || finalDocId;
+
+        const notificationResult = shipmentRes?.data?.customerNotification;
+        if (notificationResult?.results?.length) {
+          const channelIssues = notificationResult.results.flatMap((entry) =>
+            (entry.channelResults || [])
+              .filter((result) => result.sent !== true && result.queued !== true)
+              .map((result) => ({
+                channel: result.channel,
+                reason: result.reason || result.error || "unknown",
+              })),
+          );
+          const smsIssue = channelIssues.find((issue) => issue.channel === "SMS");
+          if (notificationChannels.sms && smsIssue && smsIssue.reason !== "queued") {
+            console.warn("[createShipment] SMS notification issue:", smsIssue);
+            alert(
+              `Shipment saved, but SMS was not sent (${smsIssue.reason}). Check Notification History or retry from Admin.`,
+            );
+          }
+        }
       }
 
       setCreatedShipmentId(finalDocId);
@@ -509,7 +528,7 @@ export default function UnifiedShipmentModal({
                     setWantsTripAssignment(false);
                     setShipmentDraft(null); // This triggers the 'key' reset we set up
                     setNotificationChannels(
-                      DEFAULT_CUSTOMER_NOTIFICATION_CHANNELS,
+                      DEFAULT_SHIPMENT_CREATION_NOTIFICATION_CHANNELS,
                     );
                   }}
                   className="w-full py-3 rounded-xl font-bold bg-blue-600 hover:bg-blue-500 text-white shadow-lg transition-all flex items-center justify-center gap-2"
@@ -580,7 +599,7 @@ export default function UnifiedShipmentModal({
                 setFinalTripId(null); // ✅ Clear success state
                 setCreatedShipmentId(null); // ✅ Clear success state
                 setWantsTripAssignment(false);
-                setNotificationChannels(DEFAULT_CUSTOMER_NOTIFICATION_CHANNELS);
+                setNotificationChannels(DEFAULT_SHIPMENT_CREATION_NOTIFICATION_CHANNELS);
               }}
               className="w-full bg-blue-600 hover:bg-blue-500 py-3.5 rounded-xl font-bold text-white transition-colors"
             >
