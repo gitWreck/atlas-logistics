@@ -12,7 +12,6 @@ import {
   faPen,
 } from "@fortawesome/free-solid-svg-icons";
 import PackageActionModal from "./PackageActionModal";
-import { getPackageRouteLabel } from "@/app/utility/deliveryRoutes";
 import PieceStatusOverrideModal from "./PieceStatusOverrideModal";
 import { getRowThemeClasses } from "@/app/utility/constant/theme";
 import { useAuth } from "@/app/context/AuthContext";
@@ -106,18 +105,6 @@ export default function PackageTableRow({
               </button>
             )}
           </div>
-        </td>
-
-        <td className="p-4">
-          <span
-            className={`text-xs ${
-              getPackageRouteLabel(pkg) === "Unassigned Route"
-                ? "text-amber-500 font-semibold"
-                : theme.mutedText
-            }`}
-          >
-            {getPackageRouteLabel(pkg)}
-          </span>
         </td>
 
         <td className="p-4 text-right">

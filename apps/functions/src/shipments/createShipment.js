@@ -22,6 +22,9 @@ const {
   SEMAPHORE_API_KEY,
   SEMAPHORE_SENDER_NAME,
 } = require("../../shared/sms-service");
+const {
+  canonicalMunicipalityLabel,
+} = require("../../shared/deliveryMunicipalities");
 const { defineSecret } = require("firebase-functions/params");
 
 const SMTP_EMAIL = defineSecret("SMTP_EMAIL");
@@ -64,6 +67,7 @@ exports.createShipment = onCall(
       currentLocation = null,
       customerId = null,
       visibilityUserIds = [],
+      municipality = null,
     } = request.data || {};
 
     const { uid, role, name } = updatedBy(request);
@@ -127,6 +131,28 @@ exports.createShipment = onCall(
     const originSummary = `${senderAddress.city}, ${senderAddress.province}`;
     const finalOriginCode = originCode || "GEN";
     const finalDestCode = destinationCode || "GEN";
+
+    const resolvedMunicipality =
+      canonicalMunicipalityLabel(municipality) ||
+      canonicalMunicipalityLabel(recipientAddress.city) ||
+      canonicalMunicipalityLabel(destination);
+
+    if (municipality && !resolvedMunicipality) {
+      throw new HttpsError(
+        "invalid-argument",
+        "The selected destination municipality is not recognized.",
+      );
+    }
+
+    if (
+      String(finalDestCode || "").toUpperCase() === "ODI" &&
+      !resolvedMunicipality
+    ) {
+      throw new HttpsError(
+        "invalid-argument",
+        "Destination municipality is required for Odiongan deliveries.",
+      );
+    }
 
     const timestamp = new Date();
     let shipmentId = manualShipmentId;
@@ -204,6 +230,7 @@ exports.createShipment = onCall(
       originCode: finalOriginCode,
       destination: recipientAddress.city || destination,
       destinationCode: finalDestCode,
+      ...(resolvedMunicipality ? { municipality: resolvedMunicipality } : {}),
 
       createdAt: nowAt,
       updatedAt: nowAt,

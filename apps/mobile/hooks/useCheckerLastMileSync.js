@@ -13,9 +13,13 @@ import {
 import {
   countDeliveryPoolPieces,
   getCheckerPieceActionPhase,
-  isAvailableToLoadShipment,
+  isAvailableToLoadShipmentForMunicipalities,
   isMyActiveDeliveryShipment,
 } from "../components/utilities/checkerDeliveryPool";
+import {
+  formatMunicipalityList,
+  resolveShipmentMunicipality,
+} from "../components/utilities/deliveryMunicipalities";
 
 const CLOSED_MANIFEST_STATUSES = new Set(["CLOSED", "COMPLETED", "CANCELLED"]);
 
@@ -135,6 +139,7 @@ export function useCheckerLastMileSync(checkerId) {
   const [queryShipments, setQueryShipments] = useState({});
   const [docShipments, setDocShipments] = useState({});
   const [manifests, setManifests] = useState([]);
+  const [assignedMunicipalities, setAssignedMunicipalities] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -145,6 +150,7 @@ export function useCheckerLastMileSync(checkerId) {
       setQueryShipments({});
       setDocShipments({});
       setManifests([]);
+      setAssignedMunicipalities([]);
       setLoading(false);
       return undefined;
     }
@@ -175,6 +181,19 @@ export function useCheckerLastMileSync(checkerId) {
     const manifestQuery = query(
       collection(db, "delivery_manifests"),
       where("checkerId", "==", String(checkerId)),
+    );
+
+    const unsubCheckerProfile = onSnapshot(
+      doc(db, "users", String(checkerId)),
+      (snap) => {
+        const data = snap.exists() ? snap.data() || {} : {};
+        setAssignedMunicipalities(
+          Array.isArray(data.assignedMunicipalities)
+            ? data.assignedMunicipalities
+            : [],
+        );
+      },
+      (err) => console.warn("Checker profile listener failed:", err),
     );
 
     const unsubAssigned = onSnapshot(
@@ -244,6 +263,7 @@ export function useCheckerLastMileSync(checkerId) {
       unsubAvailable();
       unsubActive();
       unsubManifests();
+      unsubCheckerProfile();
     };
   }, [checkerId]);
 
@@ -306,27 +326,48 @@ export function useCheckerLastMileSync(checkerId) {
     [queryShipments, docShipments],
   );
 
+  const municipalityLabels = useMemo(
+    () => formatMunicipalityList(assignedMunicipalities),
+    [assignedMunicipalities],
+  );
+
+  const municipalityLabel = useMemo(
+    () => (municipalityLabels.length ? municipalityLabels.join(", ") : null),
+    [municipalityLabels],
+  );
+
+  const hasMunicipalityAssignment = municipalityLabels.length > 0;
+
   const enrichShipment = (shipment) => {
     if (!shipment?.id) return shipment;
     const fresh = shipmentsById[shipment.id] || shipment;
+    const poolStats = countDeliveryPoolPieces(fresh, checkerId);
     return {
       ...fresh,
-      poolStats: countDeliveryPoolPieces(fresh, checkerId),
+      poolStats,
       displayStatus: getCheckerShipmentDisplayStatus(fresh, checkerId),
       actionPhase: getCheckerPieceActionPhase(fresh, checkerId),
+      shipmentMunicipality: resolveShipmentMunicipality(fresh),
     };
   };
 
   const availableShipments = useMemo(() => {
+    if (!hasMunicipalityAssignment) return [];
+
     return sortShipmentsNewest(
       Object.values(shipmentsById)
         .map(enrichShipment)
-        .filter(
-          (s) =>
-            isAvailableToLoadShipment(s) && (s.poolStats?.available || 0) > 0,
-        ),
+        .filter((s) =>
+          isAvailableToLoadShipmentForMunicipalities(s, assignedMunicipalities),
+        )
+        .filter((s) => (s.poolStats?.available || 0) > 0),
     );
-  }, [shipmentsById, checkerId]);
+  }, [
+    shipmentsById,
+    checkerId,
+    assignedMunicipalities.join("|"),
+    hasMunicipalityAssignment,
+  ]);
 
   const myRouteShipments = useMemo(() => {
     return sortShipmentsNewest(
@@ -419,5 +460,8 @@ export function useCheckerLastMileSync(checkerId) {
     myRouteShipments,
     summary,
     routeSummary,
+    assignedMunicipalities: municipalityLabels,
+    municipalityLabel,
+    hasMunicipalityAssignment,
   };
 }

@@ -35,7 +35,12 @@ export default function AvailableToLoadScreen() {
   const { colors } = useTheme();
   const [refreshing, setRefreshing] = useState(false);
 
-  const { availableShipments, loading } = useCheckerLastMile();
+  const {
+    availableShipments,
+    loading,
+    municipalityLabel,
+    hasMunicipalityAssignment,
+  } = useCheckerLastMile();
 
   const summary = availableShipments.reduce(
     (acc, item) => {
@@ -82,8 +87,13 @@ export default function AvailableToLoadScreen() {
           ]}
         >
           <Text style={[styles.summaryTitle, { color: colors.text }]}>
-            Available at Warehouse
+            Available to Load
           </Text>
+          {municipalityLabel ? (
+            <Text style={[styles.routeLabel, { color: colors.text }]}>
+              Your municipalities: {municipalityLabel}
+            </Text>
+          ) : null}
           <Text style={[styles.summaryText, { color: colors.textMuted }]}>
             {summary.available} piece{summary.available === 1 ? "" : "s"} ready
             across {summary.shipments} shipment
@@ -94,14 +104,19 @@ export default function AvailableToLoadScreen() {
               : ""}
           </Text>
           <Text style={[styles.hintText, { color: colors.textMuted }]}>
-            Scan each piece label under Load. Released pieces move to your
-            custody and out for delivery automatically — no separate step
-            needed.
+            Only shipments for your assigned municipalities appear here. Scan each
+            piece label under Load — released pieces move to your custody and
+            out for delivery automatically.
           </Text>
           <TouchableOpacity
-            style={[styles.scanBtn, { borderColor: colors.border }]}
+            style={[
+              styles.scanBtn,
+              { borderColor: colors.border },
+              !hasMunicipalityAssignment && styles.scanBtnDisabled,
+            ]}
             onPress={openLoadScan}
             activeOpacity={0.85}
+            disabled={!hasMunicipalityAssignment}
           >
             <FontAwesome5 name="qrcode" size={12} color={colors.text} />
             <Text style={[styles.scanBtnText, { color: colors.text }]}>
@@ -116,13 +131,23 @@ export default function AvailableToLoadScreen() {
               Loading available inventory...
             </Text>
           </View>
+        ) : !hasMunicipalityAssignment ? (
+          <View style={styles.emptyState}>
+            <Text style={[styles.emptyTitle, { color: colors.text }]}>
+              No municipalities assigned
+            </Text>
+            <Text style={[styles.emptySub, { color: colors.textMuted }]}>
+              Ask Rose or your manager to assign delivery municipalities to your
+              account before loading packages.
+            </Text>
+          </View>
         ) : availableShipments.length === 0 ? (
           <View style={styles.emptyState}>
             <Text style={[styles.emptyTitle, { color: colors.text }]}>
               Nothing available to load
             </Text>
             <Text style={[styles.emptySub, { color: colors.textMuted }]}>
-              When Rose releases a trip for delivery operations, pieces will
+              When Rose releases shipments for your municipalities, they will
               appear here. After you load everything, continue on My Route.
             </Text>
             <TouchableOpacity
@@ -184,6 +209,9 @@ export default function AvailableToLoadScreen() {
 
                 <Text style={[styles.poolLine, { color: colors.text }]}>
                   {formatPoolCountLine(shipment.poolStats)}
+                  {shipment.shipmentMunicipality
+                    ? ` · ${shipment.shipmentMunicipality}`
+                    : ""}
                 </Text>
 
                 {(shipment.destinationCode || shipment.recipient?.name) && (
@@ -239,6 +267,11 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     marginBottom: 6,
   },
+  routeLabel: {
+    fontSize: 14,
+    fontWeight: "700",
+    marginBottom: 6,
+  },
   summaryText: {
     fontSize: 13,
     lineHeight: 18,
@@ -261,6 +294,9 @@ const styles = StyleSheet.create({
   scanBtnText: {
     fontSize: 13,
     fontWeight: "700",
+  },
+  scanBtnDisabled: {
+    opacity: 0.45,
   },
   card: {
     borderWidth: 1,

@@ -10,12 +10,13 @@ export default function DeliveryCheckerTabs({
   activeTab,
   onChange,
   isDark = false,
+  headerAction = null,
 }) {
   const theme = getDeliveryCheckerTabThemeClasses(isDark);
 
   return (
     <section className={`mt-6 rounded-xl border px-4 py-4 sm:px-5 ${theme.section}`}>
-      <div className="flex items-start gap-2">
+      <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
             <h2 className={`text-sm font-bold uppercase tracking-wide ${theme.title}`}>
@@ -31,6 +32,9 @@ export default function DeliveryCheckerTabs({
             Show only items scanned and loaded into delivery trucks by checkers.
           </p>
         </div>
+        {headerAction ? (
+          <div className="shrink-0 self-center">{headerAction}</div>
+        ) : null}
       </div>
 
       <div

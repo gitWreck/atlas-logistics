@@ -206,6 +206,7 @@ export default function UnifiedShipmentModal({
         originCode: shipmentDraft.routeInfo.originCode,
         destination: shipmentDraft.routeInfo.destination,
         destinationCode: shipmentDraft.routeInfo.destinationCode,
+        municipality: shipmentDraft.municipality || null,
         items: shipmentDraft.items,
         remarks: shipmentDraft.remarks,
         notify: Object.values(notificationChannels).some(Boolean),

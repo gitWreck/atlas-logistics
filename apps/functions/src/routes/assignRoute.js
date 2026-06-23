@@ -3,7 +3,7 @@
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const admin = require("firebase-admin");
 const { FieldValue } = require("firebase-admin/firestore");
-const { updatedBy } = require("../utilities/helpers");
+const { requireDeliveryRouteAssignmentAccess } = require("../utilities/helpers");
 const { writeCustodyAuditLog } = require("../utilities/custodyAuditLog");
 const {
   buildDerivedShipmentSnapshot,
@@ -15,18 +15,22 @@ const {
 } = require("../packages/packageStatus");
 const { getPackageIdentity } = require("../warehouse/packageDeliveryOperations");
 const {
+  fetchActiveDailyAssignments,
+  resolveAssignmentDate,
+  buildDailyAssignmentDoc,
+} = require("./dailyRouteAssignmentHelpers");
+const {
   DEFAULT_WAREHOUSE_ID,
-  findRoutesForMunicipality,
+  ensureDefaultOdionganRoutes,
   normalizeMunicipality,
   normalizeString,
   normalizeStringList,
   resolveRecipientMunicipality,
+  resolveRouteSelectionForMunicipality,
 } = require("./routeHelpers");
 
 if (!admin.apps.length) admin.initializeApp();
 const db = admin.firestore();
-
-const ROUTE_ASSIGNMENT_ROLES = ["admin", "manager"];
 
 function isTerminalPiece(pkg = {}) {
   const status = normalizePackageStatus(pkg);
@@ -65,42 +69,40 @@ function pieceMatchesScope(pkg = {}, packageIdSet = null) {
   return identity ? packageIdSet.has(identity) : false;
 }
 
-async function requireRouteAssignmentRole(dbRef, req) {
-  const { uid, role, user } = updatedBy(req);
-  if (!req.auth?.uid) {
-    throw new HttpsError("unauthenticated", "Login required.");
-  }
+async function resolveShipmentDocIds(shipmentIds = []) {
+  const normalizedIds = normalizeStringList(shipmentIds);
+  if (!normalizedIds.length) return [];
 
-  const userSnap = await dbRef.collection("users").doc(uid).get();
-  if (!userSnap.exists || userSnap.data()?.active !== true) {
-    throw new HttpsError("permission-denied", "Inactive or missing user");
-  }
+  const resolved = new Set();
 
-  const userData = userSnap.data() || {};
-  const normalizedRole = String(userData.role || role || "").toLowerCase();
-  if (!ROUTE_ASSIGNMENT_ROLES.includes(normalizedRole)) {
-    throw new HttpsError(
-      "permission-denied",
-      "Only managers and admins can assign delivery routes.",
-    );
-  }
+  await Promise.all(
+    normalizedIds.map(async (id) => {
+      const directSnap = await db.collection("shipments").doc(id).get();
+      if (directSnap.exists) {
+        resolved.add(directSnap.id);
+        return;
+      }
 
-  return {
-    uid,
-    role: normalizedRole,
-    name:
-      userData.fullName ||
-      userData.name ||
-      userData.displayName ||
-      user?.name ||
-      null,
-    user: userData,
-  };
+      const byFieldSnap = await db
+        .collection("shipments")
+        .where("shipmentId", "==", id)
+        .limit(1)
+        .get();
+
+      if (!byFieldSnap.empty) {
+        resolved.add(byFieldSnap.docs[0].id);
+      }
+    }),
+  );
+
+  return [...resolved];
 }
 
 async function resolveShipmentIds({ shipmentIds, packageIds }) {
   const normalizedShipmentIds = normalizeStringList(shipmentIds);
-  if (normalizedShipmentIds.length > 0) return normalizedShipmentIds;
+  if (normalizedShipmentIds.length > 0) {
+    return resolveShipmentDocIds(normalizedShipmentIds);
+  }
 
   const normalizedPackageIds = normalizeStringList(packageIds);
   if (normalizedPackageIds.length === 0) return [];
@@ -123,6 +125,8 @@ async function resolveShipmentIds({ shipmentIds, packageIds }) {
 }
 
 async function fetchActiveRoutes(warehouseId = DEFAULT_WAREHOUSE_ID) {
+  await ensureDefaultOdionganRoutes(db, warehouseId);
+
   const snap = await db
     .collection("routes")
     .where("warehouseId", "==", warehouseId)
@@ -206,7 +210,16 @@ async function resolveTargetShipmentIds({
 function applyRouteToPiece(
   pkg = {},
   route = {},
-  { actorName, actorUid, nowIso, confirmed = true },
+  {
+    actorName,
+    actorUid,
+    nowIso,
+    confirmed = true,
+    checkerId = null,
+    checkerName = null,
+    vehicleId = null,
+    vehicleName = null,
+  },
 ) {
   const routeId = normalizeString(route.routeId) || normalizeString(route.id);
   const routeName =
@@ -220,7 +233,7 @@ function applyRouteToPiece(
     };
   }
 
-  return {
+  const next = {
     ...pkg,
     assignedRouteId: routeId,
     assignedRouteName: routeName,
@@ -232,12 +245,24 @@ function applyRouteToPiece(
     status: PACKAGE_STATUS.ROUTE_ASSIGNED,
     updatedAt: nowIso,
   };
+
+  if (checkerId) {
+    next.assignedCheckerId = checkerId;
+    next.assignedCheckerName = checkerName || null;
+    next.checkerAssignedAt = nowIso;
+  }
+  if (vehicleId) {
+    next.assignedVehicleId = vehicleId;
+    next.assignedVehicleName = vehicleName || null;
+  }
+
+  return next;
 }
 
 exports.assignRoute = onCall(
   { region: "asia-southeast1", maxInstances: 10 },
   async (req) => {
-    const actor = await requireRouteAssignmentRole(db, req);
+    const actor = await requireDeliveryRouteAssignmentAccess(db, req);
     const {
       routeId = null,
       shipmentIds = [],
@@ -246,6 +271,10 @@ exports.assignRoute = onCall(
       warehouseId = DEFAULT_WAREHOUSE_ID,
       suggestOnly = false,
       confirm = true,
+      checkerId = null,
+      vehicleId = null,
+      vehicleName = null,
+      createDailyAssignment = true,
     } = req.data || {};
 
     const normalizedWarehouse = normalizeString(warehouseId) || DEFAULT_WAREHOUSE_ID;
@@ -283,6 +312,44 @@ exports.assignRoute = onCall(
     const suggestions = [];
     const updatedShipmentIds = [];
     const errors = [];
+    const assignedRouteIds = new Set();
+
+    const normalizedCheckerId = normalizeString(checkerId);
+    let resolvedCheckerName = null;
+    let resolvedVehicleId = normalizeString(vehicleId);
+    let resolvedVehicleName = normalizeString(vehicleName);
+
+    if (normalizedCheckerId) {
+      const checkerSnap = await db
+        .collection("users")
+        .doc(normalizedCheckerId)
+        .get();
+      if (!checkerSnap.exists || checkerSnap.data()?.active !== true) {
+        throw new HttpsError("not-found", "Checker not found or inactive.");
+      }
+      const checkerData = checkerSnap.data() || {};
+      if (String(checkerData.role || "").toLowerCase() !== "checker") {
+        throw new HttpsError(
+          "failed-precondition",
+          "Selected user is not a checker.",
+        );
+      }
+      resolvedCheckerName =
+        checkerData.fullName ||
+        checkerData.name ||
+        checkerData.displayName ||
+        "Checker";
+      resolvedVehicleId =
+        resolvedVehicleId ||
+        normalizeString(checkerData.deliveryVehicleId) ||
+        normalizeString(checkerData.vehicleId) ||
+        `CHECKER_${normalizedCheckerId}`;
+      resolvedVehicleName =
+        resolvedVehicleName ||
+        normalizeString(checkerData.deliveryVehicleName) ||
+        normalizeString(checkerData.vehicleName) ||
+        `${resolvedCheckerName}'s van`;
+    }
 
     await db.runTransaction(async (tx) => {
       const shipmentSnaps = await Promise.all(
@@ -306,40 +373,56 @@ exports.assignRoute = onCall(
 
         let routeForShipment = selectedRoute;
         if (!routeForShipment && recipientMunicipality) {
-          const matches = findRoutesForMunicipality(
+          const selection = resolveRouteSelectionForMunicipality(
             activeRoutes,
             recipientMunicipality,
           );
-          if (matches.length === 1) {
-            routeForShipment = matches[0];
-          } else if (matches.length > 1) {
+          routeForShipment = selection.route;
+
+          if (!routeForShipment && selection.matches.length > 1) {
             suggestions.push({
               shipmentId,
               municipality: recipientMunicipality,
-              suggestedRoutes: matches.map((route) => ({
+              suggestedRoutes: selection.matches.map((route) => ({
                 routeId: route.routeId,
                 routeName: route.routeName,
               })),
+              reason: selection.reason,
             });
           }
         }
 
         if (!routeForShipment) {
           if (suggestOnly) {
+            const selection = resolveRouteSelectionForMunicipality(
+              activeRoutes,
+              recipientMunicipality,
+            );
             suggestions.push({
               shipmentId,
               municipality: recipientMunicipality,
-              suggestedRoutes: findRoutesForMunicipality(
-                activeRoutes,
-                recipientMunicipality,
-              ).map((route) => ({
+              suggestedRouteId: selection.route?.routeId || null,
+              suggestedRouteName: selection.route?.routeName || null,
+              suggestedRoutes: selection.matches.map((route) => ({
                 routeId: route.routeId,
                 routeName: route.routeName,
               })),
+              reason: selection.reason,
             });
           } else {
+            const selection = resolveRouteSelectionForMunicipality(
+              activeRoutes,
+              recipientMunicipality,
+            );
+            const routeNames = selection.matches
+              .map((route) => route.routeName)
+              .filter(Boolean)
+              .join(", ");
             errors.push(
-              `No route selected for shipment ${shipmentId}. Provide routeId or choose from suggestions.`,
+              selection.reason ||
+                (routeNames
+                  ? `No route selected for shipment ${shipmentId}. Matching routes: ${routeNames}. Pick one from the dropdown.`
+                  : `No route selected for shipment ${shipmentId}. Pick a route from the dropdown.`),
             );
           }
           return;
@@ -385,6 +468,10 @@ exports.assignRoute = onCall(
             actorUid: actor.uid,
             nowIso,
             confirmed: isConfirmed,
+            checkerId: normalizedCheckerId,
+            checkerName: resolvedCheckerName,
+            vehicleId: resolvedVehicleId,
+            vehicleName: resolvedVehicleName,
           });
         });
 
@@ -399,6 +486,8 @@ exports.assignRoute = onCall(
           previousStatus: shipmentData.status,
         });
 
+        assignedRouteIds.add(routeForShipment.routeId);
+
         tx.update(snap.ref, {
           packages: derivedSnapshot.packages,
           packageBreakdown: derivedSnapshot.packageBreakdown,
@@ -407,6 +496,14 @@ exports.assignRoute = onCall(
           assignedRouteName: routeForShipment.routeName,
           routeAssignedAt: nowIso,
           routeAssignedBy: actor.name || actor.uid,
+          assignedCheckerId:
+            normalizedCheckerId || shipmentData.assignedCheckerId || null,
+          assignedCheckerName:
+            resolvedCheckerName || shipmentData.assignedCheckerName || null,
+          deliveryVehicleId:
+            resolvedVehicleId || shipmentData.deliveryVehicleId || null,
+          deliveryVehicleName:
+            resolvedVehicleName || shipmentData.deliveryVehicleName || null,
           updatedAt: FieldValue.serverTimestamp(),
           updatedBy: actor.name || actor.uid,
           status: derivedSnapshot.status,
@@ -444,12 +541,44 @@ exports.assignRoute = onCall(
           actorRole: actor.role,
           newValue: {
             routeId: selectedRoute?.routeId || null,
+            checkerId: normalizedCheckerId,
             packageIds: assignedPackageIds,
             municipality: normalizeString(municipality),
           },
         }),
       ),
     );
+
+    if (normalizedCheckerId && createDailyAssignment) {
+      const routeIdsForAssignment =
+        selectedRoute?.routeId
+          ? [selectedRoute.routeId]
+          : [...assignedRouteIds];
+
+      await Promise.all(
+        routeIdsForAssignment.map(async (assignedRouteId) => {
+          const routeDoc = await fetchRouteById(
+            assignedRouteId,
+            normalizedWarehouse,
+          );
+          if (!routeDoc) return;
+
+          await db.collection("daily_route_assignments").add(
+            buildDailyAssignmentDoc({
+              warehouseId: normalizedWarehouse,
+              routeId: routeDoc.routeId,
+              routeName: routeDoc.routeName,
+              checkerId: normalizedCheckerId,
+              checkerName: resolvedCheckerName,
+              vehicleId: resolvedVehicleId,
+              vehicleName: resolvedVehicleName,
+              actorUid: actor.uid,
+              actorName: actor.name,
+            }),
+          );
+        }),
+      );
+    }
 
     return {
       success: true,

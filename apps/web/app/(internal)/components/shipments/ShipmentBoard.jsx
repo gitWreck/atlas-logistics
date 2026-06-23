@@ -18,6 +18,7 @@ import {
   faTruck,
   faTruckPickup,
   faWarehouse,
+  faMapMarkedAlt,
 } from "@fortawesome/free-solid-svg-icons";
 import ShipmentRow from "./ShipmentRow";
 import ShipmentDrawer from "./ShipmentDrawer";
@@ -26,16 +27,16 @@ import { calculateShipmentProgress } from "@/app/utility/shipmentProgress";
 import {
   shipmentMatchesDivisoriaHub,
   shipmentMatchesOdionganHub,
-  resolveShipmentPackageBreakdown,
 } from "@/app/utility/packageStatus";
 import { getBoardThemeClasses } from "@/app/utility/constant/theme";
+import { canAssignDeliveryRoutes } from "@/app/utility/deliveryRoutePermissions";
 import UnifiedShipmentModal from "./modals/UnifiedShipmentModal";
 import PickupRequestsTable from "./PickupRequestsTable";
 import TablePaginationFooter from "../ui/TablePaginationFooter";
 import ReconcileAtHubModal from "./modals/ReconcileAtHubModal";
 import ReceiveReturnedModal from "./modals/ReceiveReturnedModal";
 import ReleaseToCheckerModal from "./modals/ReleaseToCheckerModal";
-import AssignRouteModal from "./modals/AssignRouteModal";
+import AssignCheckerMunicipalitiesModal from "./modals/AssignCheckerMunicipalitiesModal";
 import BoardTabs from "../ui/BoardTabs";
 import DeliveryCheckerTabs from "./DeliveryCheckerTabs";
 import DeliveryCheckerSummaryCards from "./DeliveryCheckerSummaryCards";
@@ -45,6 +46,7 @@ import {
   buildDeliveryCheckerTabs,
   findDeliveryCheckerTab,
   shipmentHasCheckerPieces,
+  shipmentMatchesDeliveryCheckerPool,
 } from "@/app/utility/deliveryOperationsCheckers";
 
 const SHIPMENT_BOARD_TABS = {
@@ -59,13 +61,6 @@ const DELIVERY_OPERATION_STATUSES = new Set([
   "READY_FOR_DELIVERY",
   "OUT_FOR_DELIVERY",
   "DELIVERED",
-]);
-
-const DELIVERY_OPERATION_EXTENDED_STATUSES = new Set([
-  ...DELIVERY_OPERATION_STATUSES,
-  "PARTIALLY_OUT_FOR_DELIVERY",
-  "PARTIALLY_DELIVERED",
-  "FAILED_DELIVERY",
 ]);
 
 function getShipmentStatus(shipment) {
@@ -116,30 +111,39 @@ function matchesShipmentBoardTab(shipment, activeBoardTab) {
   return true;
 }
 
-function shipmentMatchesDeliveryCheckerPool(shipment) {
-  const status = getShipmentStatus(shipment);
+const SHIPMENT_TRACKING_PATTERN = /^AT-\d{8}-SHP-[A-Z0-9-]+(?:-\d{2})?$/i;
 
-  if (DELIVERY_OPERATION_EXTENDED_STATUSES.has(status)) {
-    return true;
-  }
+function mergeShipmentsById(primary = [], supplemental = []) {
+  const merged = new Map();
 
-  if (
-    Array.isArray(shipment.activeCheckerIds) &&
-    shipment.activeCheckerIds.length > 0
-  ) {
-    return true;
-  }
+  primary.forEach((shipment) => {
+    merged.set(shipment.id, shipment);
+  });
 
-  const breakdown = resolveShipmentPackageBreakdown(shipment);
-  if (
-    Number(breakdown.outForDelivery || 0) +
-      Number(breakdown.onCheckerVan || 0) >
-    0
-  ) {
-    return true;
-  }
+  supplemental.forEach((shipment) => {
+    const existing = merged.get(shipment.id);
+    merged.set(
+      shipment.id,
+      existing
+        ? {
+            ...existing,
+            ...shipment,
+            progress:
+              shipment.progress ?? existing.progress ?? calculateShipmentProgress(shipment),
+          }
+        : shipment,
+    );
+  });
 
-  return shipmentHasCheckerPieces(shipment);
+  return [...merged.values()].sort((a, b) => {
+    const aMs = a.updatedAt?._seconds
+      ? a.updatedAt._seconds * 1000
+      : new Date(a.updatedAt || 0).getTime();
+    const bMs = b.updatedAt?._seconds
+      ? b.updatedAt._seconds * 1000
+      : new Date(b.updatedAt || 0).getTime();
+    return bMs - aMs;
+  });
 }
 
 const ShipmentBoard = forwardRef(function ShipmentBoard(
@@ -156,7 +160,8 @@ const ShipmentBoard = forwardRef(function ShipmentBoard(
     useState(false);
   const [isReleaseToCheckerModalOpen, setIsReleaseToCheckerModalOpen] =
     useState(false);
-  const [isAssignRouteModalOpen, setIsAssignRouteModalOpen] = useState(false);
+  const [isAssignCheckerMunicipalitiesOpen, setIsAssignCheckerMunicipalitiesOpen] =
+    useState(false);
   const [selectedShipmentId, setSelectedShipmentId] = useState(null);
   const [editingPickup, setEditingPickup] = useState(null);
 
@@ -208,8 +213,9 @@ const ShipmentBoard = forwardRef(function ShipmentBoard(
           ? "/api/shipments/pickups"
           : `/api/shipments/pickups?limit=${pickupLimit}`;
 
-      const [shipmentsRes, pickupsRes] = await Promise.all([
+      const [shipmentsRes, deliveryOpsRes, pickupsRes] = await Promise.all([
         fetch(shipmentsUrl, requestOptions),
+        fetch("/api/shipments/delivery-operations", requestOptions),
         fetch(pickupsUrl, requestOptions),
       ]);
 
@@ -223,16 +229,21 @@ const ShipmentBoard = forwardRef(function ShipmentBoard(
         throw new Error(errorData.details || errorData.error || "Server Error");
       }
 
-      const [shipmentsData, pickupsData] = await Promise.all([
+      const [shipmentsData, deliveryOpsData, pickupsData] = await Promise.all([
         shipmentsRes.json(),
+        deliveryOpsRes.ok ? deliveryOpsRes.json() : { shipments: [] },
         pickupsRes.json(),
       ]);
 
-      const formattedShipments = (shipmentsData.shipments || []).map(
-        (shipment) => ({
+      const formattedShipments = mergeShipmentsById(
+        (shipmentsData.shipments || []).map((shipment) => ({
           ...shipment,
           progress: calculateShipmentProgress(shipment),
-        }),
+        })),
+        (deliveryOpsData.shipments || []).map((shipment) => ({
+          ...shipment,
+          progress: calculateShipmentProgress(shipment),
+        })),
       );
 
       const formattedPickups = (pickupsData.pickups || []).map((pickup) => ({
@@ -253,6 +264,49 @@ const ShipmentBoard = forwardRef(function ShipmentBoard(
   useEffect(() => {
     fetchShipments();
   }, [fetchShipments]);
+
+  useEffect(() => {
+    const trackingRef = searchQuery.trim();
+    if (!user || !SHIPMENT_TRACKING_PATTERN.test(trackingRef)) return;
+
+    const alreadyLoaded = shipments.some(
+      (shipment) =>
+        shipment.id === trackingRef || shipment.shipmentId === trackingRef,
+    );
+    if (alreadyLoaded) return;
+
+    let cancelled = false;
+
+    (async () => {
+      try {
+        const token = await user.getIdToken();
+        const res = await fetch(
+          `/api/shipments/delivery-operations?shipmentRef=${encodeURIComponent(trackingRef)}`,
+          {
+            headers: { Authorization: `Bearer ${token}` },
+            cache: "no-store",
+          },
+        );
+        if (!res.ok || cancelled) return;
+
+        const data = await res.json();
+        const extraShipments = (data.shipments || []).map((shipment) => ({
+          ...shipment,
+          progress: calculateShipmentProgress(shipment),
+        }));
+
+        if (!extraShipments.length || cancelled) return;
+
+        setShipments((current) => mergeShipmentsById(current, extraShipments));
+      } catch (err) {
+        console.warn("Delivery operations lookup unavailable:", err);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [searchQuery, shipments, user]);
 
   useEffect(() => {
     if (activeBoardTab !== SHIPMENT_BOARD_TABS.DELIVERY || !user) return;
@@ -444,7 +498,7 @@ const ShipmentBoard = forwardRef(function ShipmentBoard(
         label: "Delivery Operations",
         icon: faTruck,
         count: filteredShipments.filter((shipment) =>
-          DELIVERY_OPERATION_STATUSES.has(getShipmentStatus(shipment)),
+          shipmentMatchesDeliveryCheckerPool(shipment),
         ).length,
       },
       {
@@ -514,7 +568,15 @@ const ShipmentBoard = forwardRef(function ShipmentBoard(
   const canManageWarehouse = ["manager", "admin"].includes(
     String(profile?.role || "").toLowerCase(),
   );
-  const canAssignRoute = canManageWarehouse;
+  const canAssignMunicipalities = canAssignDeliveryRoutes(profile);
+  const modalShipmentIds = useMemo(
+    () => (selectedShipment?.id ? [selectedShipment.id] : []),
+    [selectedShipment?.id],
+  );
+  const modalShipments = useMemo(
+    () => (selectedShipment ? [selectedShipment] : []),
+    [selectedShipment],
+  );
   const handleMessageCustomer = (shipment) => {
     const phone = shipment.sender?.phone || shipment.recipient?.phone;
     alert(`Logic to SMS ${phone} for Order ${shipment.shipmentId}`);
@@ -565,22 +627,30 @@ const ShipmentBoard = forwardRef(function ShipmentBoard(
                   activeTab={activeDeliveryChecker}
                   onChange={setActiveDeliveryChecker}
                   isDark={isDark}
+                  headerAction={
+                    canAssignMunicipalities ? (
+                      <button
+                        type="button"
+                        onClick={() => setIsAssignCheckerMunicipalitiesOpen(true)}
+                        className={`inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-xs font-semibold transition-colors ${
+                          isDark
+                            ? "border-slate-600 text-slate-200 hover:border-sky-500 hover:text-sky-300 hover:bg-sky-500/10"
+                            : "border-slate-300 text-slate-700 hover:border-sky-500 hover:text-sky-700 hover:bg-sky-50"
+                        }`}
+                      >
+                        <FontAwesomeIcon icon={faMapMarkedAlt} className="text-sky-500" />
+                        <span className="hidden sm:inline">
+                          Assign checker municipalities
+                        </span>
+                        <span className="sm:hidden">Assign areas</span>
+                      </button>
+                    ) : null
+                  }
                 />
                 <DeliveryCheckerSummaryCards
                   stats={checkerDeliveryStats}
                   isDark={isDark}
                 />
-                {canAssignRoute && (
-                  <div className="mt-4 flex justify-end">
-                    <button
-                      type="button"
-                      onClick={() => setIsAssignRouteModalOpen(true)}
-                      className="rounded-lg bg-sky-600 px-4 py-2 text-xs font-semibold text-white hover:bg-sky-500"
-                    >
-                      Assign delivery route
-                    </button>
-                  </div>
-                )}
               </>
             )}
 
@@ -783,9 +853,7 @@ const ShipmentBoard = forwardRef(function ShipmentBoard(
         onReconcile={() => setIsReconcileModalOpen(true)}
         onReceiveReturned={() => setIsReceiveReturnedModalOpen(true)}
         onReleaseToCheckers={() => setIsReleaseToCheckerModalOpen(true)}
-        onAssignRoute={() => setIsAssignRouteModalOpen(true)}
         canManageWarehouse={canManageWarehouse}
-        canAssignRoute={canAssignRoute}
       />
 
       {/* <NewShipmentModal
@@ -839,21 +907,15 @@ const ShipmentBoard = forwardRef(function ShipmentBoard(
         onSuccess={fetchShipments}
         isDark={isDark}
         user={user}
-        defaultShipmentIds={
-          selectedShipment?.id ? [selectedShipment.id] : []
-        }
-        defaultShipments={selectedShipment ? [selectedShipment] : []}
+        defaultShipmentIds={modalShipmentIds}
+        defaultShipments={modalShipments}
       />
 
-      <AssignRouteModal
-        isOpen={isAssignRouteModalOpen}
-        onClose={() => setIsAssignRouteModalOpen(false)}
-        onSuccess={fetchShipments}
+      <AssignCheckerMunicipalitiesModal
+        isOpen={isAssignCheckerMunicipalitiesOpen}
+        onClose={() => setIsAssignCheckerMunicipalitiesOpen(false)}
         isDark={isDark}
-        defaultShipmentIds={
-          selectedShipment?.id ? [selectedShipment.id] : []
-        }
-        defaultShipments={selectedShipment ? [selectedShipment] : []}
+        user={user}
       />
     </div>
   );

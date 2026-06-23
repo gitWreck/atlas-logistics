@@ -5,6 +5,7 @@ const admin = require("firebase-admin");
 const { requireRole } = require("../utilities/helpers");
 const {
   DEFAULT_WAREHOUSE_ID,
+  ensureDefaultOdionganRoutes,
   normalizeString,
 } = require("./routeHelpers");
 
@@ -21,6 +22,10 @@ exports.listDeliveryRoutes = onCall(
 
     const normalizedWarehouse =
       normalizeString(warehouseId) || DEFAULT_WAREHOUSE_ID;
+
+    if (!includeInactive) {
+      await ensureDefaultOdionganRoutes(db, normalizedWarehouse);
+    }
 
     let query = db
       .collection("routes")

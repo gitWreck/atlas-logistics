@@ -136,7 +136,6 @@ export default function PackagesTable({ data, onRefresh, isDark = false, profile
                 <th className="p-4">Item Details</th>
                 <th className="p-4">Tracking No.</th>
                 <th className="p-4">Status</th>
-                <th className="p-4">Route</th>
                 <th className="p-4 text-right">Actions</th>
               </tr>
             </thead>
