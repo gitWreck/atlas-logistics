@@ -145,6 +145,12 @@ exports.returnPackagesToWarehouse =
 exports.assignRoute = require("./src/routes/assignRoute").assignRoute;
 exports.listDeliveryRoutes =
   require("./src/routes/listDeliveryRoutes").listDeliveryRoutes;
+exports.assignCheckerMunicipalities =
+  require("./src/routes/assignCheckerMunicipalities").assignCheckerMunicipalities;
+exports.assignCheckerToRoute =
+  require("./src/routes/assignCheckerToRoute").assignCheckerToRoute;
+exports.listDailyRouteAssignments =
+  require("./src/routes/listDailyRouteAssignments").listDailyRouteAssignments;
 exports.getShipmentCustodyTimeline =
   require("./src/tracking/getShipmentCustodyTimeline").getShipmentCustodyTimeline;
 exports.deleteShipment =

@@ -1,3 +1,8 @@
+import {
+  checkerCoversMunicipality,
+  resolveShipmentMunicipality,
+} from "./deliveryMunicipalities";
+
 function normalizeStatus(value) {
   return String(value || "").trim().toUpperCase();
 }
@@ -73,6 +78,7 @@ export function isCheckerPieceAvailableToLoad(pkg = {}, shipment = {}) {
 
   if (pkg.availableForDelivery === true) return true;
   if (status === "RELEASED_FOR_DELIVERY") return true;
+  if (status === "ROUTE_ASSIGNED") return true;
   if (
     ["AVAILABLE_AT_ODIONGAN_WAREHOUSE", "AVAILABLE_AT_WAREHOUSE"].includes(
       status,
@@ -137,6 +143,16 @@ function isLoadedByOtherChecker(pkg = {}, checkerUid) {
   return loadedBy !== String(checkerUid);
 }
 
+/** Shipment destination is within the checker's assigned municipalities. */
+export function isShipmentInCheckerMunicipalities(
+  shipment = {},
+  assignedMunicipalities = [],
+) {
+  const municipality = resolveShipmentMunicipality(shipment);
+  if (!municipality) return false;
+  return checkerCoversMunicipality(assignedMunicipalities, municipality);
+}
+
 /**
  * Piece counts for delivery pool UX (Step 3.7).
  */
@@ -194,6 +210,21 @@ export function shipmentHasAvailablePieces(shipment = {}) {
 /** Shipments Rose released to the checker pool (Firestore + piece rules). */
 export function isAvailableToLoadShipment(shipment = {}) {
   if (!isShipmentInDeliveryPool(shipment)) {
+    return false;
+  }
+  return shipmentHasAvailablePieces(shipment);
+}
+
+/** Available shipments limited to the checker's assigned municipalities. */
+export function isAvailableToLoadShipmentForMunicipalities(
+  shipment = {},
+  assignedMunicipalities = [],
+) {
+  if (!isShipmentInDeliveryPool(shipment)) return false;
+  if (!Array.isArray(assignedMunicipalities) || assignedMunicipalities.length === 0) {
+    return false;
+  }
+  if (!isShipmentInCheckerMunicipalities(shipment, assignedMunicipalities)) {
     return false;
   }
   return shipmentHasAvailablePieces(shipment);

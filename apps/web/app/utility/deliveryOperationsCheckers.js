@@ -2,8 +2,51 @@ import { resolveShipmentPackageBreakdown } from "@/app/utility/packageStatus";
 
 export const ALL_CHECKERS_TAB = "all";
 
+const DELIVERY_OPERATION_EXTENDED_STATUSES = new Set([
+  "READY_FOR_DELIVERY",
+  "OUT_FOR_DELIVERY",
+  "DELIVERED",
+  "COMPLETED",
+  "PARTIALLY_OUT_FOR_DELIVERY",
+  "PARTIALLY_DELIVERED",
+  "FAILED_DELIVERY",
+]);
+
 function normalizeStatus(value = "") {
   return String(value || "").trim().toUpperCase();
+}
+
+function getShipmentStatus(shipment = {}) {
+  return normalizeStatus(shipment?.status);
+}
+
+/**
+ * Shipments that belong on the Delivery Operations board (checker load scan onward).
+ */
+export function shipmentMatchesDeliveryCheckerPool(shipment = {}) {
+  const status = getShipmentStatus(shipment);
+
+  if (DELIVERY_OPERATION_EXTENDED_STATUSES.has(status)) {
+    return true;
+  }
+
+  if (
+    Array.isArray(shipment.activeCheckerIds) &&
+    shipment.activeCheckerIds.length > 0
+  ) {
+    return true;
+  }
+
+  const breakdown = resolveShipmentPackageBreakdown(shipment);
+  if (
+    Number(breakdown.outForDelivery || 0) +
+      Number(breakdown.onCheckerVan || 0) >
+    0
+  ) {
+    return true;
+  }
+
+  return shipmentHasCheckerPieces(shipment);
 }
 
 function pieceQty(pkg = {}) {
@@ -20,6 +63,11 @@ function isLikelyFirebaseUid(value = "") {
   return /^[a-zA-Z0-9]{20,}$/.test(String(value || "").trim());
 }
 
+/**
+ * Last-mile checker identity only — not linehaul `loadedByUid` / `loadedBy`.
+ * Those fields record who scanned onto the main truck at Divisoria/Odiongan,
+ * not who loaded the package onto a delivery van.
+ */
 export function resolveCheckerUid(pkg = {}) {
   const custodyIsChecker = normalizeStatus(pkg.custodyOwnerType) === "CHECKER";
   const custodyId = String(pkg.custodyOwnerId || "").trim();
@@ -27,7 +75,6 @@ export function resolveCheckerUid(pkg = {}) {
   return (
     String(pkg.loadedByCheckerId || "").trim() ||
     String(pkg.deliveredByCheckerId || "").trim() ||
-    String(pkg.loadedByUid || "").trim() ||
     (custodyIsChecker ? custodyId : "")
   );
 }
@@ -37,7 +84,6 @@ function resolveCheckerLabel(pkg = {}, checkerNameById = {}) {
   const name = String(
     pkg.loadedByCheckerName ||
       pkg.deliveredByCheckerName ||
-      pkg.loadedBy ||
       "",
   ).trim();
 
@@ -76,21 +122,44 @@ export function getCheckerIdentity(pkg = {}, checkerNameById = {}) {
   return { key, label: label || key || "Checker" };
 }
 
+function resolveCheckerMatchKeys(checkerKey = ALL_CHECKERS_TAB, checkerTab = null) {
+  if (checkerTab) {
+    return new Set([...(checkerTab.matchKeys || []), checkerTab.key]);
+  }
+  if (checkerKey === ALL_CHECKERS_TAB) return new Set();
+  return new Set([checkerKey]);
+}
+
+function checkerSelectionMatchesId(
+  checkerKey = ALL_CHECKERS_TAB,
+  checkerTab = null,
+  candidateId = "",
+) {
+  if (checkerKey === ALL_CHECKERS_TAB) return true;
+  const id = String(candidateId || "").trim();
+  if (!id) return false;
+
+  const matchKeys = resolveCheckerMatchKeys(checkerKey, checkerTab);
+  return matchKeys.has(id);
+}
+
 function packageMatchesCheckerKey(
   pkg = {},
   checkerKey = ALL_CHECKERS_TAB,
   checkerNameById = {},
+  checkerTab = null,
 ) {
   if (checkerKey === ALL_CHECKERS_TAB) return true;
-  return getCheckerIdentity(pkg, checkerNameById).key === checkerKey;
+
+  const { key } = getCheckerIdentity(pkg, checkerNameById);
+  return checkerSelectionMatchesId(checkerKey, checkerTab, key);
 }
 
 function packageMatchesCheckerTab(pkg = {}, tab = null, checkerNameById = {}) {
   if (!tab || tab.key === ALL_CHECKERS_TAB) return true;
 
   const { key } = getCheckerIdentity(pkg, checkerNameById);
-  const matchKeys = Array.isArray(tab.matchKeys) ? tab.matchKeys : [tab.key];
-  return matchKeys.includes(key);
+  return checkerSelectionMatchesId(tab.key, tab, key);
 }
 
 function addCheckerTabCount(checkerMap, { key, label, qty }) {
@@ -124,7 +193,7 @@ function countCheckerPiecesFromPackages(
     if (checkerTab) {
       if (!packageMatchesCheckerTab(pkg, checkerTab, checkerNameById)) return;
     } else if (
-      !packageMatchesCheckerKey(pkg, checkerKey, checkerNameById)
+      !packageMatchesCheckerKey(pkg, checkerKey, checkerNameById, checkerTab)
     ) {
       return;
     }
@@ -151,6 +220,7 @@ function countCheckerFallbackPieces(
   shipment = {},
   checkerKey = ALL_CHECKERS_TAB,
   checkerNameById = {},
+  checkerTab = null,
 ) {
   const packageCount = countCheckerPiecesFromPackages(
     shipment,
@@ -169,10 +239,16 @@ function countCheckerFallbackPieces(
     .map((id) => String(id || "").trim())
     .filter(Boolean);
 
-  if (activeIds.length !== 1) return 0;
-  if (checkerKey !== ALL_CHECKERS_TAB && activeIds[0] !== checkerKey) {
-    return 0;
+  if (!activeIds.length) return 0;
+
+  if (checkerKey === ALL_CHECKERS_TAB) {
+    return activeIds.length === 1 ? remainder : 0;
   }
+
+  const matchingActiveIds = activeIds.filter((id) =>
+    checkerSelectionMatchesId(checkerKey, checkerTab, id),
+  );
+  if (matchingActiveIds.length !== 1) return 0;
 
   return remainder;
 }
@@ -248,7 +324,12 @@ export function countCheckerPiecesInShipment(
       checkerTab,
       checkerNameById,
     ) +
-    countCheckerFallbackPieces(shipment, checkerKey, checkerNameById)
+    countCheckerFallbackPieces(
+      shipment,
+      checkerKey,
+      checkerNameById,
+      checkerTab,
+    )
   );
 }
 
@@ -365,7 +446,7 @@ function packageMatchesCheckerSelection(
     return packageMatchesCheckerTab(pkg, checkerTab, checkerNameById);
   }
 
-  return packageMatchesCheckerKey(pkg, checkerKey, checkerNameById);
+  return packageMatchesCheckerKey(pkg, checkerKey, checkerNameById, checkerTab);
 }
 
 export function aggregateCheckerDeliveryStats(
@@ -407,6 +488,7 @@ export function aggregateCheckerDeliveryStats(
       shipment,
       checkerKey,
       checkerNameById,
+      checkerTab,
     );
     if (fallbackQty > 0) {
       stats.total += fallbackQty;

@@ -17,8 +17,8 @@ import ShipmentOperations from "./ShipmentOperations";
 import ShipmentProofs from "./ShipmentProofs";
 import ShipmentTimelineTab from "./ShipmentTimelineTab";
 import HubReconcileCard from "./HubReconcileCard";
-import DeliveryRouteCard from "./DeliveryRouteCard";
 import ReturnLoopCard from "./ReturnLoopCard";
+import { resolveShipmentMunicipality } from "@/app/utility/deliveryMunicipalities";
 import DrawerTabButton from "../ui/DrawerTabButton";
 import { getDrawerThemeClasses } from "@/app/utility/constant/theme";
 import {
@@ -36,9 +36,7 @@ export default function ShipmentDrawer({
   onReconcile,
   onReceiveReturned,
   onReleaseToCheckers,
-  onAssignRoute,
   canManageWarehouse = false,
-  canAssignRoute = false,
 }) {
   const [activeTab, setActiveTab] = useState("TIMELINE");
   const [shipmentData, setShipmentData] = useState(null);
@@ -75,6 +73,7 @@ export default function ShipmentDrawer({
   }, [isOpen, data?.id, fetchShipmentDetails]);
 
   const displayData = shipmentData || data;
+  const destinationMunicipality = resolveShipmentMunicipality(displayData || {});
 
   if (!displayData) return null;
 
@@ -212,12 +211,30 @@ export default function ShipmentDrawer({
                 canManage={canManageWarehouse}
                 onReconcile={onReconcile}
               />
-              <DeliveryRouteCard
-                shipment={data}
-                isDark={isDark}
-                canManage={canAssignRoute}
-                onAssignRoute={onAssignRoute}
-              />
+              {destinationMunicipality ? (
+                <div
+                  className={`rounded-xl border p-4 ${
+                    isDark
+                      ? "border-slate-800 bg-slate-900/60"
+                      : "border-slate-200 bg-slate-50"
+                  }`}
+                >
+                  <p
+                    className={`text-xs font-bold uppercase tracking-wide ${
+                      isDark ? "text-slate-400" : "text-slate-600"
+                    }`}
+                  >
+                    Destination municipality
+                  </p>
+                  <p
+                    className={`mt-1 text-sm font-semibold ${
+                      isDark ? "text-white" : "text-slate-900"
+                    }`}
+                  >
+                    {destinationMunicipality}
+                  </p>
+                </div>
+              ) : null}
               <ShipmentTimelineTab data={data} isDark={isDark} />
             </div>
           )}
