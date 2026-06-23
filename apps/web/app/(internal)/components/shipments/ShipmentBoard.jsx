@@ -628,34 +628,56 @@ const ShipmentBoard = forwardRef(function ShipmentBoard(
                   onChange={setActiveDeliveryChecker}
                   isDark={isDark}
                   headerAction={
-                    canAssignMunicipalities ? (
+                    <div className="flex items-center gap-2">
                       <button
                         type="button"
-                        onClick={() => setIsAssignCheckerMunicipalitiesOpen(true)}
-                        className={`inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-xs font-semibold transition-colors ${
+                        onClick={fetchShipments}
+                        disabled={loading}
+                        className={`inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-xs font-semibold transition-colors disabled:opacity-60 ${
                           isDark
-                            ? "border-slate-600 text-slate-200 hover:border-sky-500 hover:text-sky-300 hover:bg-sky-500/10"
-                            : "border-slate-300 text-slate-700 hover:border-sky-500 hover:text-sky-700 hover:bg-sky-50"
+                            ? "border-slate-600 text-slate-200 hover:border-blue-500 hover:text-blue-300 hover:bg-blue-500/10"
+                            : "border-slate-300 text-slate-700 hover:border-blue-500 hover:text-blue-700 hover:bg-blue-50"
                         }`}
+                        title="Refresh delivery operations"
+                        aria-label="Refresh delivery operations"
                       >
-                        <FontAwesomeIcon icon={faMapMarkedAlt} className="text-sky-500" />
-                        <span className="hidden sm:inline">
-                          Assign checker municipalities
-                        </span>
-                        <span className="sm:hidden">Assign areas</span>
+                        <FontAwesomeIcon
+                          icon={faSync}
+                          spin={loading}
+                          className="text-blue-500"
+                        />
+                        <span className="hidden sm:inline">Refresh</span>
                       </button>
-                    ) : null
+                      {canAssignMunicipalities ? (
+                        <button
+                          type="button"
+                          onClick={() => setIsAssignCheckerMunicipalitiesOpen(true)}
+                          className={`inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-xs font-semibold transition-colors ${
+                            isDark
+                              ? "border-slate-600 text-slate-200 hover:border-sky-500 hover:text-sky-300 hover:bg-sky-500/10"
+                              : "border-slate-300 text-slate-700 hover:border-sky-500 hover:text-sky-700 hover:bg-sky-50"
+                          }`}
+                        >
+                          <FontAwesomeIcon icon={faMapMarkedAlt} className="text-sky-500" />
+                          <span className="hidden sm:inline">
+                            Assign checker municipalities
+                          </span>
+                          <span className="sm:hidden">Assign areas</span>
+                        </button>
+                      ) : null}
+                    </div>
                   }
-                />
-                <DeliveryCheckerSummaryCards
-                  stats={checkerDeliveryStats}
-                  isDark={isDark}
-                />
+                >
+                  <DeliveryCheckerSummaryCards
+                    stats={checkerDeliveryStats}
+                    isDark={isDark}
+                  />
+                </DeliveryCheckerTabs>
               </>
             )}
 
             <div
-              className={`mt-6 border rounded-xl overflow-hidden shadow-xl backdrop-blur-sm ${theme.board}`}
+              className={`mt-4 border rounded-xl overflow-hidden shadow-xl backdrop-blur-sm ${theme.board}`}
             >
             {/* Header */}
             <div

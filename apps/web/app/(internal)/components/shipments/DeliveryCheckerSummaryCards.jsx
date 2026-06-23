@@ -38,12 +38,15 @@ function SummaryStatCard({ palette, icon, title, value, subtitle }) {
 export default function DeliveryCheckerSummaryCards({
   stats = {},
   isDark = false,
+  className = "",
 }) {
   const palette = getStatCardTheme(isDark);
   const total = Number(stats.total || 0);
 
   return (
-    <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+    <div
+      className={`grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4 ${className}`}
+    >
       <SummaryStatCard
         palette={palette.blue}
         icon={faBox}
