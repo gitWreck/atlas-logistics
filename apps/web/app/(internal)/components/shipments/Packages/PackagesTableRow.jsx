@@ -134,7 +134,7 @@ export default function PackageTableRow({
         <tr
           className={`animate-in fade-in zoom-in-95 duration-200 ${theme.expandedRow}`}
         >
-          <td colSpan="5" className="p-4">
+          <td colSpan="6" className="p-4">
             <div
               className={`flex items-center gap-6 border rounded-xl p-4 max-w-lg mx-auto shadow-inner ${theme.expandedCard}`}
             >

@@ -164,6 +164,7 @@ export default function NewShipmentModal({
         originCode: shipmentDraft.routeInfo.originCode,
         destination: shipmentDraft.routeInfo.destination,
         destinationCode: shipmentDraft.routeInfo.destinationCode,
+        municipality: shipmentDraft.municipality || null,
         items: shipmentDraft.items,
         remarks: shipmentDraft.remarks,
         notifySms: sendSms,

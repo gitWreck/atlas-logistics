@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faCamera, faTrash, faImage } from "@fortawesome/free-solid-svg-icons";
 import RouteSection from "./RouteSection";
+import MunicipalitySection from "./MunicipalitySection";
 import ItemSection from "./ItemSection";
 import InputGroup from "./InputGroup";
 import { useAlert } from "@/app/context/AlertContext";
@@ -66,6 +67,7 @@ export default function ReceivePackageForm({
       : [{ ...DEFAULT_ITEM }],
   );
   const [remarks, setRemarks] = useState(initialData?.remarks || "");
+  const [municipality, setMunicipality] = useState(initialData?.municipality || "");
 
   // 1. NEW STATE FOR IMAGES
   // We use initialData.imageFiles if coming back from Step 2, else empty
@@ -260,6 +262,14 @@ export default function ReceivePackageForm({
       );
     }
 
+    if (!isPickupMode && routeInfo.destinationCode === "ODI" && !municipality) {
+      return showAlert(
+        "error",
+        "Municipality Required",
+        "Select the destination municipality for this delivery.",
+      );
+    }
+
     // 4. Validate Items
     if (items.some((it) => !it.description || !it.quantity)) {
       return showAlert(
@@ -285,8 +295,12 @@ export default function ReceivePackageForm({
     // "Emit" the data to the Unified Modal state
     onNext({
       routeInfo,
+      municipality,
       sender: normalizeContact(sender),
-      recipient: normalizeContact(recipient),
+      recipient: normalizeContact({
+        ...recipient,
+        city: municipality || recipient.city,
+      }),
       items,
       remarks,
       imageFiles, // <--- PASS FILES TO PARENT
@@ -310,6 +324,17 @@ export default function ReceivePackageForm({
             isPickupMode={isPickupMode}
             isDark={isDark}
           />
+
+          {!isPickupMode && routeInfo.destinationCode === "ODI" && (
+            <MunicipalitySection
+              municipality={municipality}
+              onChange={(value) => {
+                setMunicipality(value);
+                setRecipient((prev) => ({ ...prev, city: value }));
+              }}
+              isDark={isDark}
+            />
+          )}
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-8">
             <InputGroup

@@ -206,6 +206,18 @@ export function getStatCardTheme(isDark) {
         ? "bg-red-500/10 text-red-300"
         : "bg-red-100 text-red-600",
     },
+
+    violet: {
+      card: isDark
+        ? "bg-violet-950/40 border-violet-800"
+        : "bg-violet-50 border-violet-100",
+      title: isDark ? "text-violet-300" : "text-violet-700",
+      value: isDark ? "text-violet-100" : "text-violet-900",
+      subtitle: isDark ? "text-violet-400" : "text-violet-600",
+      iconWrap: isDark
+        ? "bg-violet-500/10 text-violet-300"
+        : "bg-violet-100 text-violet-600",
+    },
   };
 }
 
@@ -324,38 +336,45 @@ export function getBoardTabThemeClasses(isDark) {
   };
 }
 
-// Delivery Operations checker tabs (disabled for now)
-// export function getDeliveryCheckerTabThemeClasses(isDark) {
-//   return {
-//     section: isDark
-//       ? "border-slate-800 bg-slate-900/60"
-//       : "border-slate-200 bg-white",
-//
-//     title: isDark ? "text-white" : "text-slate-900",
-//
-//     subtitle: isDark ? "text-slate-400" : "text-slate-600",
-//
-//     infoIcon: isDark ? "text-slate-500" : "text-slate-400",
-//
-//     tabActive: isDark
-//       ? "border-blue-500 bg-slate-800/80 text-white shadow-sm shadow-blue-950/30"
-//       : "border-blue-500 bg-blue-50 text-slate-900 shadow-sm shadow-blue-100/80",
-//
-//     tabIdle: isDark
-//       ? "border-slate-700 bg-slate-800/40 text-slate-400 hover:border-slate-600 hover:text-slate-200"
-//       : "border-slate-200 bg-slate-50 text-slate-600 hover:border-slate-300 hover:text-slate-900",
-//
-//     countActive: isDark
-//       ? "bg-blue-500 text-white"
-//       : "bg-blue-600 text-white",
-//
-//     countIdle: isDark
-//       ? "bg-slate-700 text-slate-300"
-//       : "bg-slate-200 text-slate-700",
-//
-//     activeUnderline: isDark ? "bg-blue-500" : "bg-blue-600",
-//   };
-// }
+export function getDeliveryCheckerTabThemeClasses(isDark) {
+  return {
+    section: isDark
+      ? "border-slate-800 bg-slate-900/70 shadow-slate-950/20"
+      : "border-slate-200 bg-white shadow-blue-100/70",
+
+    header: isDark ? "border-slate-800" : "border-slate-200",
+
+    title: isDark ? "text-white" : "text-slate-900",
+
+    subtitle: isDark ? "text-slate-400" : "text-slate-600",
+
+    infoIcon: isDark ? "text-slate-500" : "text-slate-400",
+
+    filterBar: isDark
+      ? "border-slate-800 bg-slate-950/40"
+      : "border-slate-200 bg-slate-50/80",
+
+    filterLabel: isDark ? "text-slate-500" : "text-slate-500",
+
+    tabTrack: isDark ? "bg-slate-950/70" : "bg-blue-50/70",
+
+    tabActive: isDark
+      ? "bg-slate-800 text-white ring-1 ring-blue-500/40 shadow-lg shadow-blue-950/30"
+      : "bg-white text-slate-950 ring-1 ring-blue-200 shadow-md shadow-blue-100/80",
+
+    tabIdle: isDark
+      ? "bg-transparent text-slate-500 hover:bg-slate-800/50 hover:text-slate-200"
+      : "bg-transparent text-slate-500 hover:bg-white/70 hover:text-slate-900",
+
+    countActive: isDark
+      ? "bg-blue-500/15 text-blue-300 ring-1 ring-blue-400/20"
+      : "bg-blue-50 text-blue-700 ring-1 ring-blue-100",
+
+    countIdle: isDark
+      ? "bg-blue-500/10 text-blue-300 ring-1 ring-blue-500/20"
+      : "bg-blue-100/80 text-blue-700 ring-1 ring-blue-200",
+  };
+}
 
 export function getRowThemeClasses(isDark) {
   return {

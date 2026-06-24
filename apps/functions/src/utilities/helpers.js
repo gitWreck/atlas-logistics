@@ -278,11 +278,62 @@ async function requireRole(db, context, allowedRoles = []) {
 }
 
 const SHIPMENT_TRIP_DELETE_MANAGER_EMAIL = "roselyn@gmail.com";
+const ROSE_WAREHOUSE_EMAIL = SHIPMENT_TRIP_DELETE_MANAGER_EMAIL;
 
 function resolveActorEmail(userData = {}, context = {}) {
   return String(
     userData.email || context.auth?.token?.email || "",
   ).toLowerCase();
+}
+
+function canAssignDeliveryRoutes(role, email) {
+  const normalizedRole = String(role || "").toLowerCase();
+  const normalizedEmail = String(email || "").toLowerCase();
+
+  if (["admin", "superadmin"].includes(normalizedRole)) return true;
+  if (normalizedRole === "manager") return true;
+  if (normalizedEmail === ROSE_WAREHOUSE_EMAIL) return true;
+  return false;
+}
+
+function canOverrideDeliveryScan(role, email) {
+  return canAssignDeliveryRoutes(role, email);
+}
+
+async function requireDeliveryRouteAssignmentAccess(db, context) {
+  const uid = requireAuth(context);
+
+  const userSnap = await db.collection("users").doc(uid).get();
+
+  if (!userSnap.exists || userSnap.data()?.active !== true) {
+    throw new HttpsError("permission-denied", "Inactive or missing user");
+  }
+
+  const userData = userSnap.data() || {};
+  const role = String(userData.role || "").toLowerCase();
+  const email = resolveActorEmail(userData, context);
+
+  if (!canAssignDeliveryRoutes(role, email)) {
+    throw new HttpsError(
+      "permission-denied",
+      "You do not have permission to assign delivery routes.",
+    );
+  }
+
+  const { name: tokenName } = updatedBy(context);
+
+  return {
+    uid,
+    role,
+    email,
+    user: userData,
+    name:
+      userData.fullName ||
+      userData.name ||
+      userData.displayName ||
+      tokenName ||
+      null,
+  };
 }
 
 function canDeleteShipmentsAndTrips(role, email) {
@@ -441,7 +492,10 @@ module.exports = {
   requireAuth,
   requireRole,
   requireShipmentTripDeleteAccess,
+  requireDeliveryRouteAssignmentAccess,
   canDeleteShipmentsAndTrips,
+  canAssignDeliveryRoutes,
+  canOverrideDeliveryScan,
   assertAdminOrManager,
 
   toE164,

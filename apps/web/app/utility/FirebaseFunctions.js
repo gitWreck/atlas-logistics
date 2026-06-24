@@ -159,6 +159,10 @@ export const releaseForDeliveryOperations = httpsCallable(
   functions,
   "releaseForDeliveryOperations",
 );
+export const assignCheckerMunicipalities = httpsCallable(
+  functions,
+  "assignCheckerMunicipalities",
+);
 export const getShipmentCustodyTimeline = httpsCallable(
   functions,
   "getShipmentCustodyTimeline",
