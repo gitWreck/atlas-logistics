@@ -296,5 +296,20 @@ service cloud.firestore {
       allow read: if isAdminOrManager();
       allow write: if false;
     }
+
+    match /routes/{routeId} {
+      allow read: if isStaff();
+      allow write: if false;
+    }
+
+    match /daily_route_assignments/{assignmentId} {
+      allow read: if isStaff();
+      allow write: if false;
+    }
+
+    match /scan_audit_logs/{logId} {
+      allow read: if isAdminOrManager();
+      allow write: if false;
+    }
   }
 }

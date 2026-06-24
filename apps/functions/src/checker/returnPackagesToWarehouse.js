@@ -23,6 +23,9 @@ const {
   assertCheckerCanAccessShipment,
   shipmentHasWarehouseCustodyPieces,
 } = require("../warehouse/packageDeliveryOperations");
+const {
+  enforceMunicipalityDeliveryAccess,
+} = require("../routes/municipalityDeliveryAccess");
 
 if (!admin.apps.length) admin.initializeApp();
 const db = admin.firestore();
@@ -122,6 +125,47 @@ exports.returnPackagesToWarehouse = onCall(
     const returnedEventMeta = [];
     const returnedByManifest = new Map();
     const isChecker = !isManagerRole(actorRole);
+
+    const preReadSnaps = await Promise.all(
+      resolvedShipmentIds.map((id) => db.collection("shipments").doc(id).get()),
+    );
+
+    if (isChecker) {
+      for (let index = 0; index < preReadSnaps.length; index += 1) {
+        const snap = preReadSnaps[index];
+        const shipmentId = resolvedShipmentIds[index];
+        if (!snap.exists) continue;
+
+        const data = snap.data() || {};
+        const packages = Array.isArray(data.packages) ? data.packages : [];
+
+        for (const pkg of packages) {
+          if (
+            !shouldTargetCheckerPiece(pkg, {
+              checkerUid: actorUid,
+              shipmentData: data,
+              packageIdSet,
+              mode: "return",
+            })
+          ) {
+            continue;
+          }
+
+          await enforceMunicipalityDeliveryAccess({
+            db,
+            shipment: data,
+            shipmentId,
+            checkerUser: actorUser,
+            scannerUid: actorUid,
+            scannerName: actorName,
+            scannerRole: actorRole,
+            scanType: "RETURN",
+            pkg,
+            gps: gpsCoordinates,
+          });
+        }
+      }
+    }
 
     await db.runTransaction(async (tx) => {
       const shipmentRefs = resolvedShipmentIds.map((id) =>

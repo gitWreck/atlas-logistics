@@ -39,6 +39,9 @@ const { normalizeQty } = require("../utilities/packageHelpers");
 const { tryAutoCompleteTrip } = require("../trips/autoCompleteTrip");
 const { PACKAGE_STATUS } = require("../packages/packageStatus");
 const {
+  enforceMunicipalityDeliveryAccess,
+} = require("../routes/municipalityDeliveryAccess");
+const {
   SEMAPHORE_API_KEY,
   SEMAPHORE_SENDER_NAME,
 } = require("../../shared/sms-service");
@@ -188,6 +191,44 @@ exports.updateShipmentStatus = onCall(
     const packageIdSet = normalizePackageIdSet(packageIds);
     const isCheckerPieceDelivery =
       isFinalDeliveryStatus && actor.role === "checker";
+
+    if (isCheckerPieceDelivery) {
+      const shipmentSnap = await shipmentRef.get();
+      if (!shipmentSnap.exists) {
+        throw new HttpsError("not-found", "Shipment not found.");
+      }
+
+      const currentData = shipmentSnap.data() || {};
+      const packages = Array.isArray(currentData.packages)
+        ? currentData.packages
+        : [];
+
+      for (const pkg of packages) {
+        if (
+          !shouldTargetCheckerPiece(pkg, {
+            checkerUid: checkerAuthUid,
+            shipmentData: currentData,
+            packageIdSet,
+            mode: "deliver",
+          })
+        ) {
+          continue;
+        }
+
+        await enforceMunicipalityDeliveryAccess({
+          db,
+          shipment: currentData,
+          shipmentId,
+          checkerUser: actor.user,
+          scannerUid: checkerAuthUid,
+          scannerName: name,
+          scannerRole: role,
+          scanType: "DELIVER",
+          pkg,
+          gps: req.data?.gpsCoordinates || null,
+        });
+      }
+    }
 
     let updatedShipmentData = null;
 

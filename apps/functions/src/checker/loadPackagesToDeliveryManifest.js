@@ -27,6 +27,9 @@ const {
   SEMAPHORE_API_KEY,
   SEMAPHORE_SENDER_NAME,
 } = require("../../shared/sms-service");
+const {
+  enforceMunicipalityDeliveryAccess,
+} = require("../routes/municipalityDeliveryAccess");
 const { defineSecret } = require("firebase-functions/params");
 
 const SMTP_EMAIL = defineSecret("SMTP_EMAIL");
@@ -218,6 +221,7 @@ function packageIsEligibleForLoad(
       PACKAGE_STATUS.AVAILABLE_AT_WAREHOUSE,
       PACKAGE_STATUS.AVAILABLE_AT_ODIONGAN_WAREHOUSE,
       PACKAGE_STATUS.RELEASED_FOR_DELIVERY,
+      PACKAGE_STATUS.ROUTE_ASSIGNED,
     ].includes(status)
   ) {
     return true;
@@ -285,6 +289,69 @@ exports.loadPackagesToDeliveryManifest = onCall(
     let resolvedVehicleName = null;
     let checkerName = actorName || null;
     let outForDeliveryNotifications = [];
+
+    const shipmentRefs = resolvedShipmentIds.map((id) =>
+      db.collection("shipments").doc(id),
+    );
+    const preReadSnaps = await Promise.all(
+      shipmentRefs.map((ref) => ref.get()),
+    );
+
+    for (let index = 0; index < preReadSnaps.length; index += 1) {
+      const snap = preReadSnaps[index];
+      const shipmentId = resolvedShipmentIds[index];
+      if (!snap.exists) {
+        throw new HttpsError("not-found", `Shipment not found: ${shipmentId}`);
+      }
+
+      const shipmentData = snap.data() || {};
+      const packages = Array.isArray(shipmentData.packages)
+        ? shipmentData.packages
+        : [];
+
+      let shouldValidateMunicipality = false;
+
+      for (const pkg of packages) {
+        const identity = getPackageIdentity(pkg);
+        const inScope =
+          !hasPieceScope ||
+          (identity && normalizedPackageIds.has(identity));
+        if (!inScope) continue;
+
+        if (
+          !packageIsEligibleForLoad(
+            pkg,
+            hasPieceScope ? normalizedPackageIds : null,
+            actorUid,
+          )
+        ) {
+          if (hasPieceScope && identity && normalizedPackageIds.has(identity)) {
+            assertPieceEligibleForCheckerLoad(pkg, actorUid, identity);
+            throw new HttpsError(
+              "failed-precondition",
+              `Package ${identity} is not available to load.`,
+            );
+          }
+          continue;
+        }
+
+        shouldValidateMunicipality = true;
+      }
+
+      if (shouldValidateMunicipality) {
+        await enforceMunicipalityDeliveryAccess({
+          db,
+          shipment: shipmentData,
+          shipmentId,
+          checkerUser: actorUser,
+          scannerUid: actorUid,
+          scannerName: actorName,
+          scannerRole: actorRole,
+          scanType: "LOAD",
+          gps: gpsCoordinates,
+        });
+      }
+    }
 
     await db.runTransaction(async (tx) => {
       const actorRef = db.collection("users").doc(actorUid);
