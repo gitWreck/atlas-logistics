@@ -18,6 +18,7 @@ export default function AssignCheckerMunicipalitiesModal({
   onSuccess,
   isDark = false,
   user = null,
+  initialCheckerId = "",
 }) {
   const theme = getModalThemeClasses(isDark);
   const actions = getModalActionClasses();
@@ -53,10 +54,16 @@ export default function AssignCheckerMunicipalitiesModal({
 
   useEffect(() => {
     if (!isOpen) return;
-    setCheckerId("");
-    setSelected([]);
+    setCheckerId(initialCheckerId || "");
     setError("");
-  }, [isOpen]);
+  }, [isOpen, initialCheckerId]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    if (!initialCheckerId) {
+      setSelected([]);
+    }
+  }, [isOpen, initialCheckerId]);
 
   useEffect(() => {
     if (!checkerId) {
