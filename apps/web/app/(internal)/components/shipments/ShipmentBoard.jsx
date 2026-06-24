@@ -168,7 +168,9 @@ const ShipmentBoard = forwardRef(function ShipmentBoard(
   const [activeBoardTab, setActiveBoardTab] = useState(SHIPMENT_BOARD_TABS.ALL);
   const [activeDeliveryChecker, setActiveDeliveryChecker] =
     useState(ALL_CHECKERS_TAB);
-  const [checkerNameById, setCheckerNameById] = useState({});
+  const [checkerDirectory, setCheckerDirectory] = useState({});
+  const [assignMunicipalitiesCheckerId, setAssignMunicipalitiesCheckerId] =
+    useState("");
   const [activeFilter, setActiveFilter] = useState("ALL");
   const [searchQuery, setSearchQuery] = useState("");
   const [modeFilter, setModeFilter] = useState("ALL");
@@ -183,6 +185,47 @@ const ShipmentBoard = forwardRef(function ShipmentBoard(
   const itemsPerPage = 10;
 
   const theme = getBoardThemeClasses(isDark);
+
+  const checkerNameById = useMemo(() => {
+    return Object.fromEntries(
+      Object.entries(checkerDirectory).map(([id, checker]) => [
+        id,
+        checker.name || id,
+      ]),
+    );
+  }, [checkerDirectory]);
+
+  const fetchCheckerDirectory = useCallback(async () => {
+    if (!user) return;
+
+    try {
+      const token = await user.getIdToken();
+      const res = await fetch("/api/checkers/active", {
+        headers: { Authorization: `Bearer ${token}` },
+        cache: "no-store",
+      });
+      if (!res.ok) return;
+
+      const data = await res.json();
+      const directory = {};
+      (data.checkers || []).forEach((checker) => {
+        if (!checker?.id) return;
+        directory[checker.id] = {
+          id: checker.id,
+          name: checker.name || checker.id,
+          email: checker.email || "",
+          warehouseName: checker.warehouseName || "",
+          warehouseCode: checker.warehouseCode || "",
+          assignedMunicipalities: Array.isArray(checker.assignedMunicipalities)
+            ? checker.assignedMunicipalities
+            : [],
+        };
+      });
+      setCheckerDirectory(directory);
+    } catch (err) {
+      console.warn("Checker directory unavailable:", err);
+    }
+  }, [user]);
 
   const fetchShipments = useCallback(async () => {
     try {
@@ -310,35 +353,8 @@ const ShipmentBoard = forwardRef(function ShipmentBoard(
 
   useEffect(() => {
     if (activeBoardTab !== SHIPMENT_BOARD_TABS.DELIVERY || !user) return;
-
-    let cancelled = false;
-
-    (async () => {
-      try {
-        const token = await user.getIdToken();
-        const res = await fetch("/api/checkers/active", {
-          headers: { Authorization: `Bearer ${token}` },
-          cache: "no-store",
-        });
-        if (!res.ok || cancelled) return;
-
-        const data = await res.json();
-        const map = {};
-        (data.checkers || []).forEach((checker) => {
-          if (checker?.id) {
-            map[checker.id] = checker.name || checker.id;
-          }
-        });
-        setCheckerNameById(map);
-      } catch (err) {
-        console.warn("Checker directory unavailable:", err);
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [activeBoardTab, user]);
+    fetchCheckerDirectory();
+  }, [activeBoardTab, fetchCheckerDirectory, user]);
 
   const filteredShipments = useMemo(() => {
     return shipments.filter((shipment) => {
@@ -433,6 +449,40 @@ const ShipmentBoard = forwardRef(function ShipmentBoard(
       deliveryTabShipments,
     ],
   );
+
+  const activeCheckerProfile = useMemo(() => {
+    if (activeDeliveryChecker === ALL_CHECKERS_TAB) return null;
+
+    const checkerTab = findDeliveryCheckerTab(
+      deliveryCheckerTabs,
+      activeDeliveryChecker,
+    );
+
+    if (checkerDirectory[activeDeliveryChecker]) {
+      return checkerDirectory[activeDeliveryChecker];
+    }
+
+    const matchKeys = checkerTab?.matchKeys || [activeDeliveryChecker];
+    for (const key of matchKeys) {
+      if (checkerDirectory[key]) return checkerDirectory[key];
+    }
+
+    if (!checkerTab) return null;
+
+    return {
+      id: checkerTab.key,
+      name: checkerTab.label,
+      email: "",
+      warehouseName: "",
+      warehouseCode: "",
+      assignedMunicipalities: [],
+    };
+  }, [activeDeliveryChecker, checkerDirectory, deliveryCheckerTabs]);
+
+  const openAssignCheckerMunicipalities = useCallback((checkerId = "") => {
+    setAssignMunicipalitiesCheckerId(checkerId);
+    setIsAssignCheckerMunicipalitiesOpen(true);
+  }, []);
 
   const visibleShipments = useMemo(() => {
     if (activeBoardTab === SHIPMENT_BOARD_TABS.DELIVERY) {
@@ -627,13 +677,20 @@ const ShipmentBoard = forwardRef(function ShipmentBoard(
                   activeTab={activeDeliveryChecker}
                   onChange={setActiveDeliveryChecker}
                   isDark={isDark}
+                  checkerProfile={activeCheckerProfile}
+                  canEditCheckerAreas={canAssignMunicipalities}
+                  onEditCheckerAreas={() =>
+                    openAssignCheckerMunicipalities(
+                      activeCheckerProfile?.id || activeDeliveryChecker,
+                    )
+                  }
                   headerAction={
-                    <div className="flex items-center gap-2">
+                    <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
                       <button
                         type="button"
                         onClick={fetchShipments}
                         disabled={loading}
-                        className={`inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-xs font-semibold transition-colors disabled:opacity-60 ${
+                        className={`inline-flex w-full items-center justify-center gap-2 rounded-lg border px-3 py-2.5 text-xs font-semibold transition-colors disabled:opacity-60 sm:w-auto sm:justify-start sm:py-2 ${
                           isDark
                             ? "border-slate-600 text-slate-200 hover:border-blue-500 hover:text-blue-300 hover:bg-blue-500/10"
                             : "border-slate-300 text-slate-700 hover:border-blue-500 hover:text-blue-700 hover:bg-blue-50"
@@ -651,8 +708,8 @@ const ShipmentBoard = forwardRef(function ShipmentBoard(
                       {canAssignMunicipalities ? (
                         <button
                           type="button"
-                          onClick={() => setIsAssignCheckerMunicipalitiesOpen(true)}
-                          className={`inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-xs font-semibold transition-colors ${
+                          onClick={() => openAssignCheckerMunicipalities()}
+                          className={`inline-flex w-full items-center justify-center gap-2 rounded-lg border px-3 py-2.5 text-xs font-semibold transition-colors sm:w-auto sm:justify-start sm:py-2 ${
                             isDark
                               ? "border-slate-600 text-slate-200 hover:border-sky-500 hover:text-sky-300 hover:bg-sky-500/10"
                               : "border-slate-300 text-slate-700 hover:border-sky-500 hover:text-sky-700 hover:bg-sky-50"
@@ -935,7 +992,14 @@ const ShipmentBoard = forwardRef(function ShipmentBoard(
 
       <AssignCheckerMunicipalitiesModal
         isOpen={isAssignCheckerMunicipalitiesOpen}
-        onClose={() => setIsAssignCheckerMunicipalitiesOpen(false)}
+        onClose={() => {
+          setIsAssignCheckerMunicipalitiesOpen(false);
+          setAssignMunicipalitiesCheckerId("");
+        }}
+        onSuccess={() => {
+          fetchCheckerDirectory();
+        }}
+        initialCheckerId={assignMunicipalitiesCheckerId}
         isDark={isDark}
         user={user}
       />

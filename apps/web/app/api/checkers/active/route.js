@@ -39,6 +39,8 @@ export async function GET() {
       id: doc.id,
       name: doc.data().fullName || doc.data().name || "Unknown Checker",
       email: doc.data().email || "",
+      warehouseName: doc.data().warehouseName || "",
+      warehouseCode: doc.data().warehouseCode || "",
       assignedMunicipalities: Array.isArray(doc.data().assignedMunicipalities)
         ? doc.data().assignedMunicipalities
         : [],

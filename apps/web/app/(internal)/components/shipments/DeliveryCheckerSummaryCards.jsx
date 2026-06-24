@@ -13,22 +13,24 @@ import { formatCheckerStatPercent } from "@/app/utility/deliveryOperationsChecke
 
 function SummaryStatCard({ palette, icon, title, value, subtitle }) {
   return (
-    <div className={`rounded-2xl border p-4 ${palette.card}`}>
-      <div className="flex items-start justify-between gap-3">
+    <div className={`rounded-xl border p-3 sm:rounded-2xl sm:p-4 ${palette.card}`}>
+      <div className="flex items-start justify-between gap-2 sm:gap-3">
         <div className="min-w-0">
-          <p className={`text-[11px] font-bold uppercase tracking-wide ${palette.title}`}>
+          <p className={`text-[10px] font-bold uppercase tracking-wide sm:text-[11px] ${palette.title}`}>
             {title}
           </p>
-          <p className={`mt-3 text-3xl font-bold leading-none ${palette.value}`}>
+          <p className={`mt-2 text-2xl font-bold leading-none sm:mt-3 sm:text-3xl ${palette.value}`}>
             {value}
           </p>
-          <p className={`mt-2 text-xs ${palette.subtitle}`}>{subtitle}</p>
+          <p className={`mt-1 truncate text-[11px] sm:mt-2 sm:text-xs ${palette.subtitle}`}>
+            {subtitle}
+          </p>
         </div>
 
         <div
-          className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full ${palette.iconWrap}`}
+          className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full sm:h-11 sm:w-11 ${palette.iconWrap}`}
         >
-          <FontAwesomeIcon icon={icon} className="text-base" />
+          <FontAwesomeIcon icon={icon} className="text-sm sm:text-base" />
         </div>
       </div>
     </div>
@@ -45,7 +47,7 @@ export default function DeliveryCheckerSummaryCards({
 
   return (
     <div
-      className={`grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4 ${className}`}
+      className={`grid grid-cols-2 gap-2 sm:grid-cols-2 sm:gap-3 xl:grid-cols-4 ${className}`}
     >
       <SummaryStatCard
         palette={palette.blue}
