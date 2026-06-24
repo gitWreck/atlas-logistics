@@ -199,6 +199,7 @@ function deriveMasterShipmentStatus(packages = [], options = {}) {
     breakdown.releasedForDelivery + (breakdown.routeAssigned || 0);
   const onCheckerQty = breakdown.onCheckerVan;
   const outForDeliveryQty = breakdown.outForDelivery;
+  const loadedOnTripQty = sumLoadedOnTripQty(packages);
 
   const deliveredRows = countStatusRows(packages, PACKAGE_STATUS.DELIVERED);
   const missingRows = countStatusRows(packages, PACKAGE_STATUS.MISSING);
