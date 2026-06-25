@@ -61,6 +61,10 @@ import {
   lookupScannedShipment,
 } from "../../components/utilities/scanLookup";
 import {
+  buildShipmentMapBarcodeIndex,
+  lookupScannedShipmentOffline,
+} from "../../components/utilities/offlineScanLookup";
+import {
   appendBatchDeliveryPiece,
   assertPieceEligibleForBatchScan,
   getBatchPieceLabel,
@@ -105,6 +109,8 @@ import {
   SUCCESS_MODAL_SECONDS,
 } from "../../components/constants/scanner";
 import { useAuth } from "../../contexts/AuthContext";
+import { useCheckerLastMile } from "../../contexts/CheckerLastMileContext";
+import { useOfflineSync } from "../../contexts/OfflineSyncContext";
 import { useTheme } from "../../contexts/ThemeContext";
 
 /** Off by default — SMS/email on every scan slows the backend noticeably. */
@@ -124,6 +130,9 @@ export default function ScannerScreen() {
   const router = useRouter();
   const { colors } = useTheme();
   const { profile } = useAuth();
+  const { isOnline, enqueueOfflineOperation, effectiveShipmentsById, warmShipmentCache } =
+    useOfflineSync();
+  const { shipmentsById: routeShipments } = useCheckerLastMile();
   const [permission, requestPermission] = useCameraPermissions();
 
   const [scanned, setScanned] = useState(false);
@@ -501,6 +510,11 @@ export default function ScannerScreen() {
   }, []);
 
   useEffect(() => {
+    if (!isOnline || Object.keys(routeShipments).length === 0) return;
+    void warmShipmentCache(routeShipments);
+  }, [isOnline, routeShipments, warmShipmentCache]);
+
+  useEffect(() => {
     fetchTripScanSummary(resolvedTripId);
   }, [resolvedTripId, resolvedMode]);
 
@@ -629,6 +643,7 @@ export default function ScannerScreen() {
     quantity,
     message,
     source = "scan",
+    pendingSync = false,
   }) => {
     clearSuccessTimers();
 
@@ -640,6 +655,7 @@ export default function ScannerScreen() {
       quantity,
       message,
       source,
+      pendingSync,
     });
 
     setCountdown(SUCCESS_MODAL_SECONDS);
@@ -787,6 +803,32 @@ export default function ScannerScreen() {
           );
         }
 
+        if (!isOnline && isCheckerLastMileScan) {
+          await enqueueOfflineOperation({
+            type: "LOAD_TO_VEHICLE",
+            shipmentId,
+            barcode,
+            packageIds: loadPackageIds,
+            remarks:
+              remarks || "Loaded and marked out for delivery via checker scan.",
+            location,
+            shipmentSnapshot: shipmentDocData,
+            notificationChannels,
+          });
+          showSuccessModal({
+            barcode,
+            shipmentId,
+            shipmentStatus: "OUT_FOR_DELIVERY",
+            packageStatus: "OUT_FOR_DELIVERY",
+            quantity: qty,
+            message:
+              "Piece saved locally and marked out for delivery. Pending sync.",
+            source,
+            pendingSync: true,
+          });
+          return;
+        }
+
         await loadAssignedShipmentsToVehicle({
           shipmentIds: [shipmentId],
           packageIds: loadPackageIds,
@@ -818,6 +860,30 @@ export default function ScannerScreen() {
         if (deliveryPieceIds.length === 0) {
           throw new Error("Scan an individual piece label to report failed delivery.");
         }
+        if (!isOnline && isCheckerLastMileScan) {
+          await enqueueOfflineOperation({
+            type: "FAILED_DELIVERY",
+            shipmentId,
+            barcode,
+            packageIds: deliveryPieceIds,
+            remarks: remarks || "Failed delivery reported via scan.",
+            location,
+            reasonCode: "DELIVERY_FAILED",
+            shipmentSnapshot: shipmentDocData,
+            notificationChannels,
+          });
+          showSuccessModal({
+            barcode,
+            shipmentId,
+            shipmentStatus: shipmentDocData?.status || "FAILED_DELIVERY",
+            packageStatus: status,
+            quantity: qty,
+            message: "Failed delivery saved locally. Pending sync.",
+            source,
+            pendingSync: true,
+          });
+          return;
+        }
         await reportCheckerFailedDelivery({
           shipmentIds: [shipmentId],
           packageIds: deliveryPieceIds,
@@ -841,6 +907,29 @@ export default function ScannerScreen() {
         assertCheckerCanAccessShipment(shipmentDocData, profile?.uid);
         if (deliveryPieceIds.length === 0) {
           throw new Error("Scan an individual piece label to return to warehouse.");
+        }
+        if (!isOnline && isCheckerLastMileScan) {
+          await enqueueOfflineOperation({
+            type: "RETURNED_TO_WAREHOUSE",
+            shipmentId,
+            barcode,
+            packageIds: deliveryPieceIds,
+            remarks: remarks || "Returned to Odiongan warehouse via scan.",
+            location,
+            shipmentSnapshot: shipmentDocData,
+            notificationChannels,
+          });
+          showSuccessModal({
+            barcode,
+            shipmentId,
+            shipmentStatus: "RETURNED_TO_WAREHOUSE",
+            packageStatus: status,
+            quantity: qty,
+            message: "Return saved locally. Pending sync.",
+            source,
+            pendingSync: true,
+          });
+          return;
         }
         await returnCheckerShipmentsToWarehouse({
           shipmentIds: [shipmentId],
@@ -1368,41 +1457,8 @@ export default function ScannerScreen() {
     setProcessing(true);
 
     try {
-      const uploadedUrls = await uploadDeliveryProofPhotos(
-        pendingDelivery.shipmentId,
-        deliveryProofPhotos,
-      );
-      const proofImages = [...existingProofs, ...uploadedUrls];
-      const proofRemarks =
-        deliveryProofRemarks.trim() ||
-        `Proof of Delivery: ${proofImages.length} image${
-          proofImages.length === 1 ? "" : "s"
-        } uploaded.`;
-
       let shipmentDocData = pendingDelivery.shipmentDocData;
       let canonicalShipmentId = pendingDelivery.shipmentId;
-
-      const directShipmentSnap = await getDoc(
-        doc(db, "shipments", String(canonicalShipmentId)),
-      );
-
-      if (!directShipmentSnap.exists()) {
-        const resolvedShipmentDoc = await getShipmentDocByCode(
-          db,
-          pendingDelivery.barcode,
-        );
-
-        if (!resolvedShipmentDoc) {
-          throw new Error(
-            "Shipment not found. Scan the label again from the trip offload screen.",
-          );
-        }
-
-        canonicalShipmentId = resolvedShipmentDoc.id;
-        shipmentDocData = resolvedShipmentDoc.data();
-      } else if (!shipmentDocData) {
-        shipmentDocData = directShipmentSnap.data();
-      }
 
       const batchPackageIds = Array.isArray(pendingDelivery.packageIds)
         ? pendingDelivery.packageIds.filter(Boolean)
@@ -1426,6 +1482,86 @@ export default function ScannerScreen() {
         batchPackageIds.length > 0 ||
         resolvedMode === "offloading" ||
         deliveryScope.isPackageLevel;
+
+      if (
+        !isOnline &&
+        isCheckerLastMileScan &&
+        isPackageLevelDelivery &&
+        Array.isArray(deliveryScope.packageIds) &&
+        deliveryScope.packageIds.length > 0
+      ) {
+        assertCheckerCanAccessShipment(shipmentDocData, profile?.uid);
+        const location = await getCurrentLocationSafe();
+        const proofRemarks =
+          deliveryProofRemarks.trim() ||
+          `Proof of Delivery: ${deliveryProofPhotos.length} image${
+            deliveryProofPhotos.length === 1 ? "" : "s"
+          } captured offline.`;
+
+        await enqueueOfflineOperation({
+          type: "DELIVERED",
+          shipmentId: canonicalShipmentId,
+          barcode: pendingDelivery.barcode,
+          packageIds: deliveryScope.packageIds,
+          remarks: proofRemarks,
+          photoUris: deliveryProofPhotos,
+          location,
+          tripId: pendingDelivery.tripId || null,
+          shipmentSnapshot: shipmentDocData,
+          notificationChannels,
+        });
+
+        const pieceCount = deliveryScope.packageIds.length;
+        showSuccessModal({
+          barcode: pendingDelivery.barcode,
+          shipmentId: canonicalShipmentId,
+          shipmentStatus: "DELIVERED",
+          packageStatus: "DELIVERED",
+          quantity: pendingDelivery.qty,
+          message:
+            pieceCount > 1
+              ? `${pieceCount} pieces saved locally with proof. Pending sync.`
+              : "Piece saved locally with proof. Pending sync.",
+          source: pendingDelivery.source,
+          pendingSync: true,
+        });
+        setProcessing(false);
+        resetDeliveryProof();
+        return;
+      }
+
+      const uploadedUrls = await uploadDeliveryProofPhotos(
+        pendingDelivery.shipmentId,
+        deliveryProofPhotos,
+      );
+      const proofImages = [...existingProofs, ...uploadedUrls];
+      const proofRemarks =
+        deliveryProofRemarks.trim() ||
+        `Proof of Delivery: ${proofImages.length} image${
+          proofImages.length === 1 ? "" : "s"
+        } uploaded.`;
+
+      const directShipmentSnap = await getDoc(
+        doc(db, "shipments", String(canonicalShipmentId)),
+      );
+
+      if (!directShipmentSnap.exists()) {
+        const resolvedShipmentDoc = await getShipmentDocByCode(
+          db,
+          pendingDelivery.barcode,
+        );
+
+        if (!resolvedShipmentDoc) {
+          throw new Error(
+            "Shipment not found. Scan the label again from the trip offload screen.",
+          );
+        }
+
+        canonicalShipmentId = resolvedShipmentDoc.id;
+        shipmentDocData = resolvedShipmentDoc.data();
+      } else if (!shipmentDocData) {
+        shipmentDocData = directShipmentSnap.data();
+      }
 
       if (isCheckerLastMileScan && isPackageLevelDelivery) {
         assertCheckerCanAccessShipment(shipmentDocData, profile?.uid);
@@ -1696,14 +1832,44 @@ export default function ScannerScreen() {
         });
 
     try {
+      const checkerLastMile = isCheckerLastMileScanMode(resolvedMode, {
+        tripId: resolvedTripId,
+      });
+      let lookupResult;
+
+      if (!isOnline && checkerLastMile) {
+        if (Object.keys(effectiveShipmentsById).length === 0) {
+          throw new Error(
+            "No offline route data yet. While online, open Available and wait for your shipments to load, then try again offline.",
+          );
+        }
+        const offlineIndex = buildShipmentMapBarcodeIndex(effectiveShipmentsById);
+        lookupResult = lookupScannedShipmentOffline(
+          barcode,
+          effectiveShipmentsById,
+          offlineIndex,
+        );
+        if (!lookupResult) {
+          throw new Error(
+            `Package ${barcode} is not in your offline cache. While online, open Available and confirm this shipment appears, then go offline again.`,
+          );
+        }
+      } else {
+        lookupResult = await lookupScannedShipment(db, barcode, {
+          tripIndex: tripBarcodeIndexRef.current,
+          cache: scanLookupCacheRef.current,
+        });
+        if (checkerLastMile && lookupResult?.shipmentDoc?.id) {
+          const shipmentId = lookupResult.shipmentDoc.id;
+          const shipmentData = lookupResult.shipmentData;
+          void warmShipmentCache({
+            [shipmentId]: { id: shipmentId, ...shipmentData },
+          });
+        }
+      }
+
       const [{ shipmentDoc, shipmentData, pkg, scanType }, resolvedLocation] =
-        await Promise.all([
-          lookupScannedShipment(db, barcode, {
-            tripIndex: tripBarcodeIndexRef.current,
-            cache: scanLookupCacheRef.current,
-          }),
-          locationPromise,
-        ]);
+        await Promise.all([Promise.resolve(lookupResult), locationPromise]);
 
       if (resolvedMode === "info") {
         openInfoPreview(shipmentDoc, pkg, barcode);

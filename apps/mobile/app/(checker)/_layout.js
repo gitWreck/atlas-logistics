@@ -2,16 +2,22 @@ import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import AuthGuard from "../../components/auth/AuthGuard"; // Adjust path
 import { useTheme } from "../../contexts/ThemeContext";
+import { OfflineSyncProvider } from "../../contexts/OfflineSyncContext";
+import { CheckerLastMileProvider } from "../../contexts/CheckerLastMileContext";
+import OfflineStatusBar from "../../components/checker/OfflineStatusBar";
 
 export default function CheckerStackLayout() {
   const { colors, resolvedScheme } = useTheme();
 
   return (
     <AuthGuard role="checker" loaderColor="#3b82f6">
+      <OfflineSyncProvider>
+        <CheckerLastMileProvider>
       <StatusBar
         style={resolvedScheme === "dark" ? "light" : "dark"}
         backgroundColor={colors.bg}
       />
+      <OfflineStatusBar />
       <Stack
         screenOptions={{
           headerShown: false,
@@ -36,6 +42,8 @@ export default function CheckerStackLayout() {
           }}
         />
       </Stack>
+        </CheckerLastMileProvider>
+      </OfflineSyncProvider>
     </AuthGuard>
   );
 }

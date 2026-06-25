@@ -27,10 +27,21 @@ export default function ScanSuccessModal({
             <FontAwesome5 name="check" size={24} color="#fff" />
           </View>
 
-          <Text style={styles.title}>Success</Text>
+          <Text style={styles.title}>
+            {payload?.pendingSync ? "Saved — Pending Sync" : "Success"}
+          </Text>
           <Text style={styles.message}>
             {payload?.message || "Package processed successfully."}
           </Text>
+
+          {payload?.pendingSync ? (
+            <View style={styles.pendingBadge}>
+              <FontAwesome5 name="cloud-upload-alt" size={12} color="#b45309" />
+              <Text style={styles.pendingText}>
+                Will sync automatically when you are back online.
+              </Text>
+            </View>
+          ) : null}
 
           <View style={styles.metaBox}>
             <MetaRow label="Package" value={payload?.barcode || "-"} />
@@ -105,6 +116,23 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: "#64748b",
     textAlign: "center",
+  },
+  pendingBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    backgroundColor: "#fffbeb",
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    marginTop: 12,
+    width: "100%",
+  },
+  pendingText: {
+    flex: 1,
+    color: "#92400e",
+    fontSize: 12,
+    lineHeight: 16,
   },
   metaBox: {
     width: "100%",
