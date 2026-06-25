@@ -1,18 +1,34 @@
 import React from "react";
-import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  StyleSheet,
+  Platform,
+  StatusBar,
+} from "react-native";
 import { FontAwesome5 } from "@expo/vector-icons";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useOfflineSync } from "../../contexts/OfflineSyncContext";
 import { useTheme } from "../../contexts/ThemeContext";
 
 export default function OfflineStatusBar() {
   const { colors } = useTheme();
+  const insets = useSafeAreaInsets();
+  const topInset =
+    insets.top || (Platform.OS === "android" ? StatusBar.currentHeight || 0 : 0);
   const {
     isOnline,
     pendingCount,
+    pendingSummaries,
     syncing,
     syncNow,
     cacheSavedAt,
   } = useOfflineSync();
+
+  const failedCount = pendingSummaries.filter(
+    (item) => item.status === "failed" && item.lastError,
+  ).length;
 
   if (isOnline && pendingCount === 0 && !syncing) {
     return null;
@@ -30,6 +46,7 @@ export default function OfflineStatusBar() {
       style={[
         styles.container,
         {
+          paddingTop: topInset + 10,
           backgroundColor: isOnline ? "#fef3c7" : "#fee2e2",
           borderBottomColor: isOnline ? "#fcd34d" : "#fca5a5",
         },
@@ -47,12 +64,27 @@ export default function OfflineStatusBar() {
             {syncing
               ? "Syncing offline scans..."
               : isOnline
-                ? `${pendingCount} scan${pendingCount === 1 ? "" : "s"} pending sync`
+                ? failedCount > 0
+                  ? `${pendingCount} queued — ${failedCount} need attention`
+                  : `${pendingCount} scan${pendingCount === 1 ? "" : "s"} pending sync`
                 : "Offline mode — scans save locally"}
           </Text>
-          {!isOnline ? (
+          {pendingSummaries.length > 0 ? (
+            <View style={styles.queueList}>
+              {pendingSummaries.map((item) => (
+                <Text
+                  key={item.id}
+                  style={[styles.queueItem, { color: colors.textMuted }]}
+                  numberOfLines={2}
+                >
+                  • {item.label}
+                  {item.lastError ? ` — ${item.lastError}` : ""}
+                </Text>
+              ))}
+            </View>
+          ) : !isOnline ? (
             <Text style={[styles.subtitle, { color: colors.textMuted }]}>
-              {cacheLabel}. Reconnect to sync.
+              {cacheLabel}. Scans queue locally even for new releases; sync verifies them.
             </Text>
           ) : null}
         </View>
@@ -63,6 +95,7 @@ export default function OfflineStatusBar() {
           style={styles.retryBtn}
           onPress={() => void syncNow()}
           disabled={syncing}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
         >
           <Text style={styles.retryText}>{syncing ? "Syncing..." : "Sync now"}</Text>
         </TouchableOpacity>
@@ -74,12 +107,14 @@ export default function OfflineStatusBar() {
 const styles = StyleSheet.create({
   container: {
     paddingHorizontal: 16,
-    paddingVertical: 10,
+    paddingBottom: 10,
     borderBottomWidth: 1,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     gap: 12,
+    zIndex: 10,
+    elevation: 4,
   },
   row: {
     flexDirection: "row",
@@ -101,11 +136,22 @@ const styles = StyleSheet.create({
     fontSize: 11,
     marginTop: 2,
   },
+  queueList: {
+    marginTop: 6,
+    gap: 4,
+  },
+  queueItem: {
+    fontSize: 11,
+    lineHeight: 15,
+  },
   retryBtn: {
     backgroundColor: "#b45309",
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 8,
+    flexShrink: 0,
+    minHeight: 36,
+    justifyContent: "center",
   },
   retryText: {
     color: "#fff",

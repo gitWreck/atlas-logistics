@@ -2,12 +2,29 @@ import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { storage } from "../../firebase";
 import {
   completeCheckerDelivery,
+  getCallableErrorMessage,
   loadAssignedShipmentsToVehicle,
   reportCheckerFailedDelivery,
   returnCheckerShipmentsToWarehouse,
 } from "./checkerDelivery";
 import { deleteOfflinePhotos } from "./offlinePhotoStore";
-import { QUEUE_STATUS, updateOperation } from "./offlineQueue";
+import {
+  QUEUE_STATUS,
+  updateOperation,
+  formatOfflineOperationLabel,
+} from "./offlineQueue";
+import { resolveShipmentIdByPackageBarcode } from "./offlineShipmentResolve";
+
+async function resolveShipmentIdForOperation(operation) {
+  if (operation.shipmentId) return operation.shipmentId;
+  const packageIds = Array.isArray(operation.packageIds)
+    ? operation.packageIds
+    : [];
+  const barcode = operation.barcode;
+  const lookupCode = packageIds[0] || barcode;
+  if (!lookupCode) return null;
+  return resolveShipmentIdByPackageBarcode(lookupCode);
+}
 
 async function uploadLocalPhotos(shipmentId, localPaths = []) {
   const urls = [];
@@ -38,23 +55,46 @@ export async function replayOfflineOperation(operation, profile) {
   };
 
   if (type === "LOAD_TO_VEHICLE") {
+    const loadPackageIds =
+      packageIds.length > 0
+        ? packageIds
+        : [operation.barcode].filter(Boolean);
+    if (!shipmentId && loadPackageIds.length === 0) {
+      throw new Error("Missing package label for offline load sync.");
+    }
+
     await loadAssignedShipmentsToVehicle({
-      shipmentIds: [shipmentId],
-      packageIds,
+      shipmentIds: shipmentId ? [shipmentId] : [],
+      packageIds: loadPackageIds,
       profile,
-      remarks: remarks || "Loaded offline — synced from checker app.",
+      remarks:
+        remarks ||
+        (operation.blindQueue
+          ? "Blind offline load — verified on sync."
+          : "Loaded offline — synced from checker app."),
     });
     return;
   }
 
   if (type === "DELIVERED") {
+    const deliveryPackageIds =
+      packageIds.length > 0
+        ? packageIds
+        : [operation.barcode].filter(Boolean);
+    const resolvedShipmentId = await resolveShipmentIdForOperation(operation);
+    if (!resolvedShipmentId) {
+      throw new Error(
+        `Shipment not found for ${deliveryPackageIds[0] || "package"}.`,
+      );
+    }
+
     const photoUrls = Array.isArray(operation.localPhotoPaths)
-      ? await uploadLocalPhotos(shipmentId, operation.localPhotoPaths)
+      ? await uploadLocalPhotos(resolvedShipmentId, operation.localPhotoPaths)
       : [];
 
     await completeCheckerDelivery({
-      shipmentId,
-      packageIds,
+      shipmentId: resolvedShipmentId,
+      packageIds: deliveryPackageIds,
       profile,
       tripId: operation.tripId || null,
       location,
@@ -70,22 +110,38 @@ export async function replayOfflineOperation(operation, profile) {
   }
 
   if (type === "FAILED_DELIVERY") {
+    const failPackageIds =
+      packageIds.length > 0
+        ? packageIds
+        : [operation.barcode].filter(Boolean);
     await reportCheckerFailedDelivery({
-      shipmentIds: [shipmentId],
-      packageIds,
+      shipmentIds: shipmentId ? [shipmentId] : [],
+      packageIds: failPackageIds,
       profile,
       reasonCode: operation.reasonCode || "DELIVERY_FAILED",
-      remarks: remarks || "Failed delivery reported offline — synced from checker app.",
+      remarks:
+        remarks ||
+        (operation.blindQueue
+          ? "Blind offline failed delivery — verified on sync."
+          : "Failed delivery reported offline — synced from checker app."),
     });
     return;
   }
 
   if (type === "RETURNED_TO_WAREHOUSE") {
+    const returnPackageIds =
+      packageIds.length > 0
+        ? packageIds
+        : [operation.barcode].filter(Boolean);
     await returnCheckerShipmentsToWarehouse({
-      shipmentIds: [shipmentId],
-      packageIds,
+      shipmentIds: shipmentId ? [shipmentId] : [],
+      packageIds: returnPackageIds,
       profile,
-      remarks: remarks || "Returned offline — synced from checker app.",
+      remarks:
+        remarks ||
+        (operation.blindQueue
+          ? "Blind offline return — verified on sync."
+          : "Returned offline — synced from checker app."),
     });
     return;
   }
@@ -111,6 +167,7 @@ export async function syncPendingOperations({
 
     await updateOperation(checkerId, operation.id, {
       status: QUEUE_STATUS.SYNCING,
+      syncingStartedAt: Date.now(),
       lastError: null,
     });
     onProgress?.({ operation, phase: "syncing" });
@@ -125,14 +182,20 @@ export async function syncPendingOperations({
       results.synced += 1;
       onProgress?.({ operation, phase: "synced" });
     } catch (error) {
-      const message = String(error?.message || "Sync failed.").trim();
+      const message = getCallableErrorMessage(error, "Sync failed.");
       await updateOperation(checkerId, operation.id, {
         status: QUEUE_STATUS.FAILED,
         retryCount: (operation.retryCount || 0) + 1,
         lastError: message,
       });
       results.failed += 1;
-      results.errors.push({ operationId: operation.id, message });
+      results.errors.push({
+        operationId: operation.id,
+        type: operation.type,
+        barcode: operation.barcode,
+        label: formatOfflineOperationLabel(operation),
+        message,
+      });
       onProgress?.({ operation, phase: "failed", error: message });
     }
   }

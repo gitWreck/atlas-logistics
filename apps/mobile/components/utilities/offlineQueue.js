@@ -25,15 +25,16 @@ async function saveQueue(checkerId, items) {
   await writeJson(queueKey(checkerId), items);
 }
 
-export function isDuplicatePendingOperation(queue, { shipmentId, packageIds, type }) {
+export function isDuplicatePendingOperation(queue, { packageIds, type }) {
   const normalizedType = String(type || "").trim().toUpperCase();
   const ids = new Set(
     (Array.isArray(packageIds) ? packageIds : []).map(String),
   );
+  if (!ids.size) return false;
+
   return queue.some((op) => {
     if (op.status === QUEUE_STATUS.SYNCED) return false;
     if (String(op.type).toUpperCase() !== normalizedType) return false;
-    if (String(op.shipmentId) !== String(shipmentId)) return false;
     const opIds = Array.isArray(op.packageIds) ? op.packageIds.map(String) : [];
     return opIds.some((id) => ids.has(id));
   });
@@ -43,7 +44,6 @@ export async function enqueueOperation(checkerId, payload) {
   const queue = await loadQueue(checkerId);
   if (
     isDuplicatePendingOperation(queue, {
-      shipmentId: payload.shipmentId,
       packageIds: payload.packageIds,
       type: payload.type,
     })
@@ -99,3 +99,59 @@ export async function pruneSyncedOperations(checkerId) {
 }
 
 export { QUEUE_STATUS };
+
+const OPERATION_LABELS = {
+  LOAD_TO_VEHICLE: "Load",
+  DELIVERED: "Deliver",
+  FAILED_DELIVERY: "Failed",
+  RETURNED_TO_WAREHOUSE: "Return",
+};
+
+export function formatOfflineOperationLabel(operation = {}) {
+  const type = String(operation.type || "").trim().toUpperCase();
+  const barcode =
+    operation.barcode ||
+    (Array.isArray(operation.packageIds) ? operation.packageIds[0] : null) ||
+    "Unknown label";
+  const action = OPERATION_LABELS[type] || type || "Scan";
+  return `${action} — ${barcode}`;
+}
+
+export function summarizeQueueOperations(operations = []) {
+  return operations.map((operation) => ({
+    id: operation.id,
+    label: formatOfflineOperationLabel(operation),
+    status: operation.status,
+    lastError: operation.lastError || null,
+    createdAt: operation.createdAt,
+    type: operation.type,
+    barcode: operation.barcode,
+  }));
+}
+
+/** Reset ops left in syncing after an app crash. */
+export async function recoverStuckSyncingOperations(
+  checkerId,
+  maxAgeMs = 90_000,
+) {
+  const queue = await loadQueue(checkerId);
+  const now = Date.now();
+  let changed = false;
+
+  const next = queue.map((operation) => {
+    if (operation.status !== QUEUE_STATUS.SYNCING) return operation;
+    const startedAt = operation.syncingStartedAt || operation.createdAt || 0;
+    if (now - startedAt <= maxAgeMs) return operation;
+    changed = true;
+    return {
+      ...operation,
+      status: QUEUE_STATUS.FAILED,
+      lastError: "Sync interrupted. Tap Sync now to retry.",
+    };
+  });
+
+  if (changed) {
+    await saveQueue(checkerId, next);
+  }
+  return next;
+}

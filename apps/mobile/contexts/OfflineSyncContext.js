@@ -7,6 +7,8 @@ import React, {
   useRef,
   useState,
 } from "react";
+import { Alert } from "react-native";
+import NetInfo from "@react-native-community/netinfo";
 import { useAuth } from "./AuthContext";
 import { useNetworkStatus } from "../hooks/useNetworkStatus";
 import {
@@ -21,6 +23,8 @@ import {
   getPendingCount,
   getPendingOperations,
   pruneSyncedOperations,
+  recoverStuckSyncingOperations,
+  summarizeQueueOperations,
 } from "../components/utilities/offlineQueue";
 import { persistOfflinePhotos } from "../components/utilities/offlinePhotoStore";
 import { syncPendingOperations } from "../components/utilities/offlineSyncWorker";
@@ -48,6 +52,7 @@ export function OfflineSyncProvider({ children }) {
       setPendingCount(0);
       return;
     }
+    await recoverStuckSyncingOperations(checkerId);
     const [pending, count] = await Promise.all([
       getPendingOperations(checkerId),
       getPendingCount(checkerId),
@@ -73,7 +78,16 @@ export function OfflineSyncProvider({ children }) {
   }, [refreshCacheState, refreshQueueState]);
 
   const syncNow = useCallback(async () => {
-    if (!checkerId || !profile || syncInFlightRef.current || !isOnline) {
+    if (!checkerId || !profile || syncInFlightRef.current) {
+      return lastSyncResult;
+    }
+
+    const netState = await NetInfo.fetch();
+    if (!netState.isConnected) {
+      Alert.alert(
+        "No connection",
+        "Connect to the internet before syncing queued scans.",
+      );
       return lastSyncResult;
     }
 
@@ -81,6 +95,7 @@ export function OfflineSyncProvider({ children }) {
     setSyncing(true);
 
     try {
+      await recoverStuckSyncingOperations(checkerId);
       await pruneSyncedOperations(checkerId);
       const pending = await getPendingOperations(checkerId);
       if (!pending.length) {
@@ -90,10 +105,14 @@ export function OfflineSyncProvider({ children }) {
         return empty;
       }
 
+      const sortedPending = [...pending].sort(
+        (a, b) => (a.createdAt || 0) - (b.createdAt || 0),
+      );
+
       const result = await syncPendingOperations({
         checkerId,
         profile,
-        operations: pending,
+        operations: sortedPending,
         onProgress: () => {
           void refreshQueueState();
         },
@@ -102,12 +121,28 @@ export function OfflineSyncProvider({ children }) {
       await pruneSyncedOperations(checkerId);
       await refreshQueueState();
       setLastSyncResult(result);
+
+      if (result.failed > 0) {
+        const detail = result.errors
+          .map((entry) => `• ${entry.label}\n  ${entry.message}`)
+          .join("\n\n");
+        Alert.alert(
+          "Sync incomplete",
+          `${result.synced} synced, ${result.failed} failed.\n\n${detail}`,
+        );
+      } else if (result.synced > 0) {
+        Alert.alert(
+          "Sync complete",
+          `${result.synced} scan${result.synced === 1 ? "" : "s"} synced successfully.`,
+        );
+      }
+
       return result;
     } finally {
       syncInFlightRef.current = false;
       setSyncing(false);
     }
-  }, [checkerId, profile, refreshQueueState, isOnline]);
+  }, [checkerId, profile, refreshQueueState, lastSyncResult]);
 
   useEffect(() => {
     const wasOffline = !prevOnlineRef.current;
@@ -160,15 +195,22 @@ export function OfflineSyncProvider({ children }) {
 
       await refreshQueueState();
 
-      const shipmentsById = await applyOptimisticUpdateToCache(checkerId, {
-        shipmentId: payload.shipmentId,
-        packageIds: payload.packageIds,
-        status: payload.type,
-        checkerUid: checkerId,
-        shipmentSnapshot: payload.shipmentSnapshot || null,
-      });
+      if (
+        !payload.blindQueue &&
+        payload.shipmentId &&
+        Array.isArray(payload.packageIds) &&
+        payload.packageIds.length > 0
+      ) {
+        const shipmentsById = await applyOptimisticUpdateToCache(checkerId, {
+          shipmentId: payload.shipmentId,
+          packageIds: payload.packageIds,
+          status: payload.type,
+          checkerUid: checkerId,
+          shipmentSnapshot: payload.shipmentSnapshot || null,
+        });
+        setCachedShipmentsById(shipmentsById);
+      }
 
-      setCachedShipmentsById(shipmentsById);
       return operation;
     },
     [checkerId, refreshQueueState],
@@ -195,12 +237,18 @@ export function OfflineSyncProvider({ children }) {
     [cachedShipmentsById, pendingOperations, checkerId],
   );
 
+  const pendingSummaries = useMemo(
+    () => summarizeQueueOperations(pendingOperations),
+    [pendingOperations],
+  );
+
   const value = useMemo(
     () => ({
       isOnline,
       syncing,
       pendingCount,
       pendingOperations,
+      pendingSummaries,
       lastSyncResult,
       cachedShipmentsById,
       effectiveShipmentsById,
@@ -217,6 +265,7 @@ export function OfflineSyncProvider({ children }) {
       syncing,
       pendingCount,
       pendingOperations,
+      pendingSummaries,
       lastSyncResult,
       cachedShipmentsById,
       effectiveShipmentsById,
