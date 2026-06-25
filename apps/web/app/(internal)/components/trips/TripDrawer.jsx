@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faTruck,
@@ -45,6 +45,8 @@ export default function TripDrawer({
   const [activeTab, setActiveTab] = useState("TIMELINE");
   const [shipments, setShipments] = useState([]);
   const [loadingShips, setLoadingShips] = useState(false);
+  const [manifestTripId, setManifestTripId] = useState(null);
+  const fetchInFlightRef = useRef(null);
   const [shipmentToUnassign, setShipmentToUnassign] = useState(null);
   const [selectedShipmentForModal, setSelectedShipmentForModal] =
     useState(null);
@@ -55,34 +57,58 @@ export default function TripDrawer({
 
   const theme = getDrawerThemeClasses(isDark);
 
-  const fetchShipments = async () => {
-    if (!data?.tripId) return;
+  const fetchShipments = useCallback(
+    async ({ force = false } = {}) => {
+      if (!data?.tripId || !user) return [];
 
-    setLoadingShips(true);
+      if (!force && manifestTripId === data.tripId) {
+        return [];
+      }
 
-    try {
-      const token = await user?.getIdToken();
+      if (fetchInFlightRef.current) {
+        return fetchInFlightRef.current;
+      }
 
-      const res = await fetch(`/api/manifests/trips/${data.tripId}/shipments`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-        cache: "no-store",
-      });
+      setLoadingShips(true);
 
-      const json = await res.json();
-      setShipments(json.shipments || []);
-    } catch (error) {
-      console.error("Failed to load manifest:", error);
-    } finally {
-      setLoadingShips(false);
-    }
-  };
+      const request = (async () => {
+        try {
+          const token = await user.getIdToken();
+
+          const res = await fetch(
+            `/api/manifests/trips/${data.tripId}/shipments`,
+            {
+              headers: {
+                Authorization: `Bearer ${token}`,
+              },
+              cache: "no-store",
+            },
+          );
+
+          const json = await res.json();
+          const list = json.shipments || [];
+          setShipments(list);
+          setManifestTripId(data.tripId);
+          return list;
+        } catch (error) {
+          console.error("Failed to load manifest:", error);
+          return [];
+        } finally {
+          setLoadingShips(false);
+          fetchInFlightRef.current = null;
+        }
+      })();
+
+      fetchInFlightRef.current = request;
+      return request;
+    },
+    [data?.tripId, manifestTripId, user],
+  );
 
   const invoiceWorkflow = useInvoiceWorkflow({
     user,
     onRefresh: async () => {
-      await fetchShipments();
+      await fetchShipments({ force: true });
       onRefreshTrips?.();
     },
     onError: (message, error) => {
@@ -109,9 +135,17 @@ export default function TripDrawer({
   useEffect(() => {
     if (isOpen && data?.tripId) {
       setActiveTab("TIMELINE");
-      fetchShipments();
+      setShipments([]);
+      setManifestTripId(null);
+      fetchInFlightRef.current = null;
     }
   }, [isOpen, data?.tripId]);
+
+  useEffect(() => {
+    if (!isOpen || !data?.tripId || activeTab !== "MANIFEST") return;
+    if (manifestTripId === data.tripId) return;
+    fetchShipments();
+  }, [activeTab, data?.tripId, fetchShipments, isOpen, manifestTripId]);
 
   if (!data) return null;
 
@@ -123,7 +157,14 @@ export default function TripDrawer({
     !completedTrip;
   const manifestTabLabel = completedTrip
     ? `Manifests (${data.deliveryManifestId && data.manifestId ? 2 : data.manifestLocked || data.deliveryManifestId ? 1 : 0})`
-    : `Manifest (${shipments.length})`;
+    : manifestTripId === data.tripId
+      ? `Manifest (${shipments.length})`
+      : "Manifest";
+
+  const handleOpenScan = async () => {
+    await fetchShipments();
+    setScanModalOpen(true);
+  };
 
   async function fetchScannerApi(endpoint, payload) {
     const token = await user?.getIdToken();
@@ -176,7 +217,11 @@ export default function TripDrawer({
 
     setRefreshing(true);
     try {
-      await Promise.all([fetchShipments(), onRefreshTrips?.()]);
+      const tasks = [onRefreshTrips?.()];
+      if (manifestTripId === data.tripId || activeTab === "MANIFEST") {
+        tasks.unshift(fetchShipments({ force: true }));
+      }
+      await Promise.all(tasks);
     } finally {
       setRefreshing(false);
     }
@@ -231,7 +276,7 @@ export default function TripDrawer({
           <div className="flex items-center gap-2 shrink-0">
             <button
               type="button"
-              onClick={() => setScanModalOpen(true)}
+              onClick={handleOpenScan}
               className="px-3 py-2 rounded-lg text-xs font-semibold bg-blue-500/10 text-blue-600 border border-blue-500/20 hover:bg-blue-500/20 transition-all"
             >
               Scan
@@ -335,7 +380,7 @@ export default function TripDrawer({
               tripType={data?.tripType}
               trip={data}
               onRefresh={() => {
-                fetchShipments();
+                fetchShipments({ force: true });
                 onRefreshTrips?.();
               }}
               isDark={isDark}
@@ -350,7 +395,7 @@ export default function TripDrawer({
             <TripToolsTab
               data={data}
               onRefresh={() => {
-                fetchShipments();
+                fetchShipments({ force: true });
                 onRefreshTrips?.();
               }}
               isDark={isDark}
@@ -380,7 +425,7 @@ export default function TripDrawer({
         onClose={() => setSelectedShipmentForModal(null)}
         isLocked={data.manifestLocked}
         onRefresh={() => {
-          fetchShipments();
+          fetchShipments({ force: true });
           onRefreshTrips?.();
         }}
         isDark={isDark}
@@ -394,7 +439,7 @@ export default function TripDrawer({
         tripId={data?.id || data?.tripId}
         onClose={() => setShipmentToUnassign(null)}
         onSuccess={() => {
-          fetchShipments();
+          fetchShipments({ force: true });
           setShipmentToUnassign(null);
           onRefreshTrips?.();
         }}
@@ -406,7 +451,7 @@ export default function TripDrawer({
         onClose={() => setBulkModalOpen(false)}
         onSuccess={() => {
           setBulkModalOpen(false);
-          fetchShipments();
+          fetchShipments({ force: true });
           onRefreshTrips?.();
         }}
         isDark={isDark}
@@ -419,7 +464,7 @@ export default function TripDrawer({
         tripPublicId={data?.tripId}
         isDark={isDark}
         onRefresh={() => {
-          fetchShipments();
+          fetchShipments({ force: true });
           onRefreshTrips?.();
         }}
       />
@@ -433,7 +478,7 @@ export default function TripDrawer({
         onResolveScan={resolveScannedLabel} // Just pass the function reference
         onConfirmOperation={confirmScanAction} // No extra async wrapper needed here
         onRefresh={() => {
-          fetchShipments();
+          fetchShipments({ force: true });
           onRefreshTrips?.();
         }}
         user={user}

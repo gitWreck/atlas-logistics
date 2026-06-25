@@ -20,6 +20,7 @@ import {
   formatMunicipalityList,
   resolveShipmentMunicipality,
 } from "../components/utilities/deliveryMunicipalities";
+import { useOfflineSync } from "../contexts/OfflineSyncContext";
 
 const CLOSED_MANIFEST_STATUSES = new Set(["CLOSED", "COMPLETED", "CANCELLED"]);
 
@@ -136,6 +137,14 @@ export function deriveManifestDisplayStatus(manifest, stats, shipments = []) {
  * Single real-time feed for checker last-mile tabs (Available, My Route, My Load).
  */
 export function useCheckerLastMileSync(checkerId) {
+  const {
+    isOnline,
+    cachedShipmentsById,
+    setCachedShipmentsById,
+    pendingOperations,
+    effectiveShipmentsById,
+    warmShipmentCache,
+  } = useOfflineSync();
   const [queryShipments, setQueryShipments] = useState({});
   const [docShipments, setDocShipments] = useState({});
   const [manifests, setManifests] = useState([]);
@@ -326,6 +335,46 @@ export function useCheckerLastMileSync(checkerId) {
     [queryShipments, docShipments],
   );
 
+  const activeShipmentsById = useMemo(() => {
+    if (!isOnline) {
+      return effectiveShipmentsById;
+    }
+    if (pendingOperations.length > 0) {
+      return mergeShipmentMaps(shipmentsById, effectiveShipmentsById);
+    }
+    if (Object.keys(shipmentsById).length > 0) {
+      return shipmentsById;
+    }
+    return effectiveShipmentsById;
+  }, [
+    isOnline,
+    shipmentsById,
+    effectiveShipmentsById,
+    pendingOperations.length,
+  ]);
+
+  useEffect(() => {
+    if (!checkerId || !isOnline) return;
+    if (Object.keys(shipmentsById).length === 0) return;
+    void warmShipmentCache(shipmentsById, {
+      manifests,
+      assignedMunicipalities,
+    });
+  }, [
+    checkerId,
+    isOnline,
+    shipmentsById,
+    manifests,
+    assignedMunicipalities,
+    warmShipmentCache,
+  ]);
+
+  useEffect(() => {
+    if (!isOnline && Object.keys(cachedShipmentsById).length > 0) {
+      setLoading(false);
+    }
+  }, [isOnline, cachedShipmentsById]);
+
   const municipalityLabels = useMemo(
     () => formatMunicipalityList(assignedMunicipalities),
     [assignedMunicipalities],
@@ -340,7 +389,7 @@ export function useCheckerLastMileSync(checkerId) {
 
   const enrichShipment = (shipment) => {
     if (!shipment?.id) return shipment;
-    const fresh = shipmentsById[shipment.id] || shipment;
+    const fresh = activeShipmentsById[shipment.id] || shipment;
     const poolStats = countDeliveryPoolPieces(fresh, checkerId);
     return {
       ...fresh,
@@ -355,7 +404,7 @@ export function useCheckerLastMileSync(checkerId) {
     if (!hasMunicipalityAssignment) return [];
 
     return sortShipmentsNewest(
-      Object.values(shipmentsById)
+      Object.values(activeShipmentsById)
         .map(enrichShipment)
         .filter((s) =>
           isAvailableToLoadShipmentForMunicipalities(s, assignedMunicipalities),
@@ -363,7 +412,7 @@ export function useCheckerLastMileSync(checkerId) {
         .filter((s) => (s.poolStats?.available || 0) > 0),
     );
   }, [
-    shipmentsById,
+    activeShipmentsById,
     checkerId,
     assignedMunicipalities.join("|"),
     hasMunicipalityAssignment,
@@ -371,7 +420,7 @@ export function useCheckerLastMileSync(checkerId) {
 
   const myRouteShipments = useMemo(() => {
     return sortShipmentsNewest(
-      Object.values(shipmentsById)
+      Object.values(activeShipmentsById)
         .map(enrichShipment)
         .filter((s) => isMyActiveDeliveryShipment(s, checkerId))
         .filter(
@@ -379,7 +428,7 @@ export function useCheckerLastMileSync(checkerId) {
             Boolean(s.actionPhase) || (s.poolStats?.mine || 0) > 0,
         ),
     );
-  }, [shipmentsById, checkerId]);
+  }, [activeShipmentsById, checkerId]);
 
   const enrichedManifests = useMemo(() => {
     return manifests.map((manifest) => {
@@ -394,7 +443,7 @@ export function useCheckerLastMileSync(checkerId) {
         ),
       ];
       const shipments = shipmentIds
-        .map((id) => shipmentsById[id])
+        .map((id) => activeShipmentsById[id])
         .filter(Boolean)
         .map(enrichShipment);
       const stats = computeManifestStats(shipments, checkerId);
@@ -411,7 +460,7 @@ export function useCheckerLastMileSync(checkerId) {
         displayStatus,
       };
     });
-  }, [manifests, shipmentsById, checkerId]);
+  }, [manifests, activeShipmentsById, checkerId]);
 
   const summary = useMemo(() => {
     return enrichedManifests.reduce(
@@ -454,7 +503,8 @@ export function useCheckerLastMileSync(checkerId) {
   return {
     loading,
     error,
-    shipmentsById,
+    isOnline,
+    shipmentsById: activeShipmentsById,
     manifests: enrichedManifests,
     availableShipments,
     myRouteShipments,

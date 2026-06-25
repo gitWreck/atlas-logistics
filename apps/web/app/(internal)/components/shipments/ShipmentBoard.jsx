@@ -5,6 +5,7 @@ import React, {
   useMemo,
   useEffect,
   useCallback,
+  useRef,
   forwardRef,
   useImperativeHandle,
 } from "react";
@@ -150,9 +151,17 @@ const ShipmentBoard = forwardRef(function ShipmentBoard(
   { user, profile, isDark = false },
   ref,
 ) {
-  const [shipments, setShipments] = useState([]);
+  const [coreShipments, setCoreShipments] = useState([]);
+  const [deliveryShipments, setDeliveryShipments] = useState([]);
   const [pickups, setPickups] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadingDelivery, setLoadingDelivery] = useState(false);
+  const [deliveryOpsLoaded, setDeliveryOpsLoaded] = useState(false);
+
+  const shipments = useMemo(
+    () => mergeShipmentsById(coreShipments, deliveryShipments),
+    [coreShipments, deliveryShipments],
+  );
 
   const [isNewOrderModalOpen, setIsNewOrderModalOpen] = useState(false);
   const [isReconcileModalOpen, setIsReconcileModalOpen] = useState(false);
@@ -227,86 +236,180 @@ const ShipmentBoard = forwardRef(function ShipmentBoard(
     }
   }, [user]);
 
-  const fetchShipments = useCallback(async () => {
-    try {
-      setLoading(true);
-
-      if (!user) {
-        console.error("User is not logged in yet.");
-        return;
-      }
-
-      const token = await user.getIdToken();
-
-      const requestOptions = {
-        method: "GET",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        cache: "no-store",
-      };
-
-      const shipmentsUrl =
-        shipmentLimit === "50"
-          ? "/api/shipments"
-          : `/api/shipments?limit=${shipmentLimit}`;
-      const pickupsUrl =
-        pickupLimit === "50"
-          ? "/api/shipments/pickups"
-          : `/api/shipments/pickups?limit=${pickupLimit}`;
-
-      const [shipmentsRes, deliveryOpsRes, pickupsRes] = await Promise.all([
-        fetch(shipmentsUrl, requestOptions),
-        fetch("/api/shipments/delivery-operations", requestOptions),
-        fetch(pickupsUrl, requestOptions),
-      ]);
-
-      if (!shipmentsRes.ok) {
-        const errorData = await shipmentsRes.json();
-        throw new Error(errorData.details || errorData.error || "Server Error");
-      }
-
-      if (!pickupsRes.ok) {
-        const errorData = await pickupsRes.json();
-        throw new Error(errorData.details || errorData.error || "Server Error");
-      }
-
-      const [shipmentsData, deliveryOpsData, pickupsData] = await Promise.all([
-        shipmentsRes.json(),
-        deliveryOpsRes.ok ? deliveryOpsRes.json() : { shipments: [] },
-        pickupsRes.json(),
-      ]);
-
-      const formattedShipments = mergeShipmentsById(
-        (shipmentsData.shipments || []).map((shipment) => ({
-          ...shipment,
-          progress: calculateShipmentProgress(shipment),
-        })),
-        (deliveryOpsData.shipments || []).map((shipment) => ({
-          ...shipment,
-          progress: calculateShipmentProgress(shipment),
-        })),
-      );
-
-      const formattedPickups = (pickupsData.pickups || []).map((pickup) => ({
-        ...pickup,
-        progress: calculateProgress(pickup.status),
-      }));
-
-      setShipments(formattedShipments);
-      setPickups(formattedPickups);
-    } catch (err) {
-      console.error("FULL ERROR:", err);
-      alert(`Error: ${err.message}`);
-    } finally {
-      setLoading(false);
+  const fetchCoreBoardData = useCallback(async () => {
+    if (!user) {
+      console.error("User is not logged in yet.");
+      return;
     }
+
+    const token = await user.getIdToken();
+
+    const requestOptions = {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      cache: "no-store",
+    };
+
+    const shipmentsUrl =
+      shipmentLimit === "50"
+        ? "/api/shipments"
+        : `/api/shipments?limit=${shipmentLimit}`;
+    const pickupsUrl =
+      pickupLimit === "50"
+        ? "/api/shipments/pickups"
+        : `/api/shipments/pickups?limit=${pickupLimit}`;
+
+    const [shipmentsRes, pickupsRes] = await Promise.all([
+      fetch(shipmentsUrl, requestOptions),
+      fetch(pickupsUrl, requestOptions),
+    ]);
+
+    if (!shipmentsRes.ok) {
+      const errorData = await shipmentsRes.json();
+      throw new Error(errorData.details || errorData.error || "Server Error");
+    }
+
+    if (!pickupsRes.ok) {
+      const errorData = await pickupsRes.json();
+      throw new Error(errorData.details || errorData.error || "Server Error");
+    }
+
+    const [shipmentsData, pickupsData] = await Promise.all([
+      shipmentsRes.json(),
+      pickupsRes.json(),
+    ]);
+
+    const formattedCoreShipments = (shipmentsData.shipments || []).map(
+      (shipment) => ({
+        ...shipment,
+        progress: calculateShipmentProgress(shipment),
+      }),
+    );
+
+    const formattedPickups = (pickupsData.pickups || []).map((pickup) => ({
+      ...pickup,
+      progress: calculateProgress(pickup.status),
+    }));
+
+    setCoreShipments(formattedCoreShipments);
+    setPickups(formattedPickups);
   }, [pickupLimit, shipmentLimit, user]);
 
+  const fetchDeliveryOperationsData = useCallback(async () => {
+    if (!user) return;
+
+    const token = await user.getIdToken();
+    const res = await fetch("/api/shipments/delivery-operations", {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      cache: "no-store",
+    });
+
+    if (!res.ok) {
+      const errorData = await res.json();
+      throw new Error(errorData.details || errorData.error || "Server Error");
+    }
+
+    const data = await res.json();
+    const formattedDeliveryShipments = (data.shipments || []).map(
+      (shipment) => ({
+        ...shipment,
+        progress: calculateShipmentProgress(shipment),
+      }),
+    );
+
+    setDeliveryShipments(formattedDeliveryShipments);
+    setDeliveryOpsLoaded(true);
+  }, [user]);
+
+  const fetchShipments = useCallback(
+    async ({ includeDelivery = deliveryOpsLoaded } = {}) => {
+      try {
+        setLoading(true);
+
+        await fetchCoreBoardData();
+
+        if (
+          includeDelivery ||
+          activeBoardTab === SHIPMENT_BOARD_TABS.DELIVERY
+        ) {
+          setLoadingDelivery(true);
+          await fetchDeliveryOperationsData();
+        }
+      } catch (err) {
+        console.error("FULL ERROR:", err);
+        alert(`Error: ${err.message}`);
+      } finally {
+        setLoading(false);
+        setLoadingDelivery(false);
+      }
+    },
+    [
+      activeBoardTab,
+      deliveryOpsLoaded,
+      fetchCoreBoardData,
+      fetchDeliveryOperationsData,
+    ],
+  );
+
   useEffect(() => {
-    fetchShipments();
-  }, [fetchShipments]);
+    let cancelled = false;
+
+    (async () => {
+      try {
+        setLoading(true);
+        await fetchCoreBoardData();
+      } catch (err) {
+        if (!cancelled) {
+          console.error("FULL ERROR:", err);
+          alert(`Error: ${err.message}`);
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [fetchCoreBoardData]);
+
+  const deliveryFetchInFlightRef = useRef(false);
+
+  useEffect(() => {
+    if (activeBoardTab !== SHIPMENT_BOARD_TABS.DELIVERY || !user) return;
+    if (deliveryOpsLoaded || deliveryFetchInFlightRef.current) return;
+
+    let cancelled = false;
+    deliveryFetchInFlightRef.current = true;
+    setLoadingDelivery(true);
+
+    (async () => {
+      try {
+        await fetchDeliveryOperationsData();
+      } catch (err) {
+        if (!cancelled) {
+          console.error("Delivery operations load failed:", err);
+          alert(`Error: ${err.message}`);
+        }
+      } finally {
+        deliveryFetchInFlightRef.current = false;
+        if (!cancelled) setLoadingDelivery(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+      deliveryFetchInFlightRef.current = false;
+      setLoadingDelivery(false);
+    };
+  }, [activeBoardTab, deliveryOpsLoaded, fetchDeliveryOperationsData, user]);
 
   useEffect(() => {
     const trackingRef = searchQuery.trim();
@@ -340,7 +443,10 @@ const ShipmentBoard = forwardRef(function ShipmentBoard(
 
         if (!extraShipments.length || cancelled) return;
 
-        setShipments((current) => mergeShipmentsById(current, extraShipments));
+        setDeliveryShipments((current) =>
+          mergeShipmentsById(current, extraShipments),
+        );
+        setDeliveryOpsLoaded(true);
       } catch (err) {
         console.warn("Delivery operations lookup unavailable:", err);
       }
@@ -632,6 +738,14 @@ const ShipmentBoard = forwardRef(function ShipmentBoard(
     alert(`Logic to SMS ${phone} for Order ${shipment.shipmentId}`);
   };
 
+  const refreshBoard = useCallback(() => fetchShipments(), [fetchShipments]);
+
+  const tableLoading =
+    (loading && coreShipments.length === 0 && pickups.length === 0) ||
+    (activeBoardTab === SHIPMENT_BOARD_TABS.DELIVERY &&
+      loadingDelivery &&
+      !deliveryOpsLoaded);
+
   useImperativeHandle(
     ref,
     () => ({
@@ -661,7 +775,7 @@ const ShipmentBoard = forwardRef(function ShipmentBoard(
               pickupLimit={pickupLimit}
               onPickupLimitChange={setPickupLimit}
               onSelectPickup={setSelectedShipmentId}
-              onDeleted={fetchShipments}
+              onDeleted={refreshBoard}
               onEditPickup={(pickup) => {
                 setEditingPickup(pickup);
                 setIsNewOrderModalOpen(true);
@@ -688,8 +802,8 @@ const ShipmentBoard = forwardRef(function ShipmentBoard(
                     <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
                       <button
                         type="button"
-                        onClick={fetchShipments}
-                        disabled={loading}
+                        onClick={refreshBoard}
+                        disabled={tableLoading}
                         className={`inline-flex w-full items-center justify-center gap-2 rounded-lg border px-3 py-2.5 text-xs font-semibold transition-colors disabled:opacity-60 sm:w-auto sm:justify-start sm:py-2 ${
                           isDark
                             ? "border-slate-600 text-slate-200 hover:border-blue-500 hover:text-blue-300 hover:bg-blue-500/10"
@@ -700,7 +814,7 @@ const ShipmentBoard = forwardRef(function ShipmentBoard(
                       >
                         <FontAwesomeIcon
                           icon={faSync}
-                          spin={loading}
+                          spin={tableLoading}
                           className="text-blue-500"
                         />
                         <span className="hidden sm:inline">Refresh</span>
@@ -746,14 +860,14 @@ const ShipmentBoard = forwardRef(function ShipmentBoard(
                 Recent Orders
                 <button
                   type="button"
-                  onClick={fetchShipments}
-                  disabled={loading}
+                  onClick={refreshBoard}
+                  disabled={tableLoading}
                   className={`transition-colors p-1 rounded ${theme.refreshButton}`}
                   title="Refresh"
                 >
                   <FontAwesomeIcon
                     icon={faSync}
-                    spin={loading}
+                    spin={tableLoading}
                     className="text-xs"
                   />
                 </button>
@@ -865,7 +979,7 @@ const ShipmentBoard = forwardRef(function ShipmentBoard(
                 </div>
 
                 <div className="min-h-[300px]">
-                  {loading ? (
+                  {tableLoading ? (
                     <div
                       className={`p-10 text-center animate-pulse ${theme.emptyText}`}
                     >
@@ -887,7 +1001,7 @@ const ShipmentBoard = forwardRef(function ShipmentBoard(
                         key={shipment.id}
                         s={shipment}
                         onClick={setSelectedShipmentId}
-                        onDeleted={fetchShipments}
+                        onDeleted={refreshBoard}
                         profile={profile}
                         onMessage={() => handleMessageCustomer(shipment)}
                         isDark={isDark}
@@ -927,7 +1041,7 @@ const ShipmentBoard = forwardRef(function ShipmentBoard(
         onClose={() => setSelectedShipmentId(null)}
         data={selectedShipment}
         isDark={isDark}
-        onRefresh={fetchShipments}
+        onRefresh={refreshBoard}
         profile={profile}
         onReconcile={() => setIsReconcileModalOpen(true)}
         onReceiveReturned={() => setIsReceiveReturnedModalOpen(true)}
@@ -957,7 +1071,7 @@ const ShipmentBoard = forwardRef(function ShipmentBoard(
         isDark={isDark}
         user={user}
         onSuccess={() => {
-          fetchShipments();
+          refreshBoard();
           setEditingPickup(null);
         }}
         resetTrigger={isNewOrderModalOpen}
@@ -967,7 +1081,7 @@ const ShipmentBoard = forwardRef(function ShipmentBoard(
       <ReconcileAtHubModal
         isOpen={isReconcileModalOpen}
         onClose={() => setIsReconcileModalOpen(false)}
-        onSuccess={fetchShipments}
+        onSuccess={refreshBoard}
         isDark={isDark}
         shipment={selectedShipment}
       />
@@ -975,7 +1089,7 @@ const ShipmentBoard = forwardRef(function ShipmentBoard(
       <ReceiveReturnedModal
         isOpen={isReceiveReturnedModalOpen}
         onClose={() => setIsReceiveReturnedModalOpen(false)}
-        onSuccess={fetchShipments}
+        onSuccess={refreshBoard}
         isDark={isDark}
         shipment={selectedShipment}
       />
@@ -983,7 +1097,7 @@ const ShipmentBoard = forwardRef(function ShipmentBoard(
       <ReleaseToCheckerModal
         isOpen={isReleaseToCheckerModalOpen}
         onClose={() => setIsReleaseToCheckerModalOpen(false)}
-        onSuccess={fetchShipments}
+        onSuccess={refreshBoard}
         isDark={isDark}
         user={user}
         defaultShipmentIds={modalShipmentIds}

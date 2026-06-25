@@ -1,10 +1,12 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { onAuthStateChanged, signOut as firebaseSignOut } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { auth, db } from "../firebase";
 import { ensureUserPublicId } from "../components/utilities/FirebaseFunctions";
 
 const ALLOWED_ROLES = ["checker", "driver", "customer"];
+const profileCacheKey = (uid) => `atlas_profile_${String(uid || "").trim()}`;
 
 const AuthContext = createContext(null);
 
@@ -51,6 +53,10 @@ export function AuthProvider({ children }) {
           setRole(r);
           setProfile(fullProfile);
           setUser(fullProfile);
+          await AsyncStorage.setItem(
+            profileCacheKey(firebaseUser.uid),
+            JSON.stringify(fullProfile),
+          );
         } else {
           // Fallback if Auth exists but Firestore doc doesn't
           setUser({ uid: firebaseUser.uid, email: firebaseUser.email });
@@ -59,8 +65,25 @@ export function AuthProvider({ children }) {
         }
       } catch (err) {
         console.error("AuthContext: fetch role error", err);
-        setProfile(null);
-        setRole(null);
+        try {
+          const cached = await AsyncStorage.getItem(
+            profileCacheKey(firebaseUser.uid),
+          );
+          if (cached) {
+            const userData = JSON.parse(cached);
+            const r = (userData.role ?? "").toString().toLowerCase();
+            setRole(r);
+            setProfile(userData);
+            setUser(userData);
+          } else {
+            setProfile(null);
+            setRole(null);
+          }
+        } catch (cacheErr) {
+          console.warn("AuthContext: profile cache read failed", cacheErr);
+          setProfile(null);
+          setRole(null);
+        }
       } finally {
         setLoading(false);
         setIsReady(true);
