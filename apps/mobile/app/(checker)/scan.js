@@ -1464,6 +1464,55 @@ export default function ScannerScreen() {
         ? pendingDelivery.packageIds.filter(Boolean)
         : [];
 
+      if (
+        !isOnline &&
+        isCheckerLastMileScan &&
+        pendingDelivery.blindQueue
+      ) {
+        const packageIds =
+          batchPackageIds.length > 0
+            ? batchPackageIds
+            : [pendingDelivery.barcode].filter(Boolean);
+        const location = await getCurrentLocationSafe();
+        const proofRemarks =
+          deliveryProofRemarks.trim() ||
+          `Proof of Delivery: ${deliveryProofPhotos.length} image${
+            deliveryProofPhotos.length === 1 ? "" : "s"
+          } captured offline.`;
+
+        await enqueueOfflineOperation({
+          type: "DELIVERED",
+          shipmentId: null,
+          barcode: pendingDelivery.barcode,
+          packageIds,
+          blindQueue: true,
+          remarks: proofRemarks,
+          photoUris: deliveryProofPhotos,
+          location,
+          tripId: pendingDelivery.tripId || null,
+          shipmentSnapshot: null,
+          notificationChannels,
+        });
+
+        const pieceCount = packageIds.length;
+        showSuccessModal({
+          barcode: pendingDelivery.barcode,
+          shipmentId: pendingDelivery.barcode,
+          shipmentStatus: "DELIVERED",
+          packageStatus: "DELIVERED",
+          quantity: pendingDelivery.qty,
+          message:
+            pieceCount > 1
+              ? `${pieceCount} pieces queued with proof. Will verify when online.`
+              : "Delivery queued with proof. Will be verified when you are back online.",
+          source: pendingDelivery.source,
+          pendingSync: true,
+        });
+        setProcessing(false);
+        resetDeliveryProof();
+        return;
+      }
+
       const deliveryScope =
         batchPackageIds.length > 0
           ? { isPackageLevel: true, packageIds: batchPackageIds }
@@ -1838,20 +1887,134 @@ export default function ScannerScreen() {
       let lookupResult;
 
       if (!isOnline && checkerLastMile) {
-        if (Object.keys(effectiveShipmentsById).length === 0) {
-          throw new Error(
-            "No offline route data yet. While online, open Available and wait for your shipments to load, then try again offline.",
+        if (Object.keys(effectiveShipmentsById).length > 0) {
+          const offlineIndex = buildShipmentMapBarcodeIndex(
+            effectiveShipmentsById,
+          );
+          lookupResult = lookupScannedShipmentOffline(
+            barcode,
+            effectiveShipmentsById,
+            offlineIndex,
           );
         }
-        const offlineIndex = buildShipmentMapBarcodeIndex(effectiveShipmentsById);
-        lookupResult = lookupScannedShipmentOffline(
-          barcode,
-          effectiveShipmentsById,
-          offlineIndex,
-        );
+
         if (!lookupResult) {
+          const isLoadScanContext =
+            resolvedMode === "delivery" ||
+            String(
+              scanActionStatus ||
+                (Array.isArray(presetScanStatus)
+                  ? presetScanStatus[0]
+                  : presetScanStatus) ||
+                getDefaultScanStatus(resolvedMode, { tripId: resolvedTripId }) ||
+                "",
+            ).toUpperCase() === "LOAD_TO_VEHICLE";
+
+          if (isLoadScanContext) {
+            const resolvedLocation = await locationPromise;
+            await enqueueOfflineOperation({
+              type: "LOAD_TO_VEHICLE",
+              shipmentId: null,
+              barcode,
+              packageIds: [barcode],
+              blindQueue: true,
+              remarks:
+                "Blind offline load — package not in local cache; verify on sync.",
+              location: resolvedLocation,
+              notificationChannels,
+            });
+            showSuccessModal({
+              barcode,
+              shipmentId: barcode,
+              shipmentStatus: "PENDING_SYNC",
+              packageStatus: "LOAD_TO_VEHICLE",
+              message:
+                "Load queued. This package was not in your local list — it will be verified when you are back online.",
+              source,
+              pendingSync: true,
+            });
+            return;
+          }
+
+          const isOffloadScanContext =
+            checkerLastMile && resolvedMode === "offloading" && !resolvedTripId;
+
+          if (isOffloadScanContext) {
+            const actionStatus = String(
+              getStatusToApply() ||
+                getDefaultScanStatus(resolvedMode, { tripId: resolvedTripId }) ||
+                "DELIVERED",
+            ).toUpperCase();
+            const resolvedLocation = await locationPromise;
+
+            if (actionStatus === "DELIVERED") {
+              openDeliveryProofModal({
+                scanType: "package",
+                shipmentId: null,
+                tripId: null,
+                barcode,
+                qty: null,
+                source,
+                shipmentDocData: null,
+                packageIds: [barcode],
+                blindQueue: true,
+              });
+              return;
+            }
+
+            if (actionStatus === "FAILED_DELIVERY") {
+              await enqueueOfflineOperation({
+                type: "FAILED_DELIVERY",
+                shipmentId: null,
+                barcode,
+                packageIds: [barcode],
+                blindQueue: true,
+                reasonCode: "DELIVERY_FAILED",
+                remarks:
+                  "Blind offline failed delivery — verify on sync.",
+                location: resolvedLocation,
+                notificationChannels,
+              });
+              showSuccessModal({
+                barcode,
+                shipmentId: barcode,
+                shipmentStatus: "PENDING_SYNC",
+                packageStatus: "FAILED_DELIVERY",
+                message:
+                  "Failed delivery queued. Will be verified when you are back online.",
+                source,
+                pendingSync: true,
+              });
+              return;
+            }
+
+            if (actionStatus === "RETURNED_TO_WAREHOUSE") {
+              await enqueueOfflineOperation({
+                type: "RETURNED_TO_WAREHOUSE",
+                shipmentId: null,
+                barcode,
+                packageIds: [barcode],
+                blindQueue: true,
+                remarks: "Blind offline return — verify on sync.",
+                location: resolvedLocation,
+                notificationChannels,
+              });
+              showSuccessModal({
+                barcode,
+                shipmentId: barcode,
+                shipmentStatus: "PENDING_SYNC",
+                packageStatus: "RETURNED_TO_WAREHOUSE",
+                message:
+                  "Return queued. Will be verified when you are back online.",
+                source,
+                pendingSync: true,
+              });
+              return;
+            }
+          }
+
           throw new Error(
-            `Package ${barcode} is not in your offline cache. While online, open Available and confirm this shipment appears, then go offline again.`,
+            `Package ${barcode} is not in your offline cache. Open Available while online to refresh, or use Load/Deliver scan — those queue automatically.`,
           );
         }
       } else {
