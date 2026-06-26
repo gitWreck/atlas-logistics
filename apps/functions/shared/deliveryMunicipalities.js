@@ -1,17 +1,24 @@
 "use strict";
 
-/** Canonical last-mile municipalities for Odiongan delivery operations. */
+/** Canonical Romblon municipalities for Odiongan delivery operations. */
 const DELIVERY_MUNICIPALITIES = Object.freeze([
-  "Odiongan",
+  "Alcantara",
+  "Banton",
+  "Cajidiocan",
   "Calatrava",
+  "Concepcion",
+  "Corcuera",
+  "Ferrol",
+  "Looc",
+  "Magdiwang",
+  "Odiongan",
+  "Romblon (Capital)",
   "San Agustin",
   "San Andres",
-  "Looc",
-  "Ferrol",
-  "Alcantara",
+  "San Fernando",
+  "San Jose",
   "Santa Fe",
   "Santa Maria",
-  "Romblon",
 ]);
 
 const MUNICIPALITY_ALIASES = Object.freeze({
@@ -19,6 +26,7 @@ const MUNICIPALITY_ALIASES = Object.freeze({
   "san augustin": "San Agustin",
   "odiongan town proper": "Odiongan",
   "town proper": "Odiongan",
+  romblon: "Romblon (Capital)",
 });
 
 const WRONG_MUNICIPALITY_MESSAGE =

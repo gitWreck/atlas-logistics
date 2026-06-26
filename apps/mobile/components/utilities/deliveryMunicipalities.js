@@ -1,20 +1,28 @@
 export const DELIVERY_MUNICIPALITIES = [
-  "Odiongan",
+  "Alcantara",
+  "Banton",
+  "Cajidiocan",
   "Calatrava",
+  "Concepcion",
+  "Corcuera",
+  "Ferrol",
+  "Looc",
+  "Magdiwang",
+  "Odiongan",
+  "Romblon (Capital)",
   "San Agustin",
   "San Andres",
-  "Looc",
-  "Ferrol",
-  "Alcantara",
+  "San Fernando",
+  "San Jose",
   "Santa Fe",
   "Santa Maria",
-  "Romblon",
 ];
 
 const MUNICIPALITY_ALIASES = {
   "san andes": "San Andres",
   "san augustin": "San Agustin",
   "odiongan town proper": "Odiongan",
+  romblon: "Romblon (Capital)",
 };
 
 export function normalizeMunicipalityKey(value = "") {
