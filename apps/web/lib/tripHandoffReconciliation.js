@@ -1,6 +1,10 @@
 import { adminDb } from "@/lib/firebase-admin";
 import { evaluateTripLifecycleAfterReconciliation } from "@/app/utility/tripLifecycle";
-import { extractMissingPackagesFromRow, flattenMissingPackages } from "@/app/utility/reconciliationPieces";
+import {
+  extractMissingPackagesFromRow,
+  flattenMissingPackages,
+  resolveMissingPackagesForRow,
+} from "@/app/utility/reconciliationPieces";
 
 const toNumber = (value, fallback = 0) => {
   const num = Number(value);
@@ -81,6 +85,18 @@ function classifyTripPiece(pkg = {}, tripId = "") {
 
   if (status === "MISSING" || toNumber(pkg.missingQty, 0) > 0) {
     return { bucket: "missing", qty };
+  }
+
+  const loadedQty = toNumber(pkg.loadedQty, 0);
+  const receivedQty = toNumber(pkg.receivedQty, 0);
+
+  // Still on truck when linehaul-loaded but not hub-unloaded (stale hubReceivedAt).
+  if (
+    LOADED_ON_TRUCK_PIECE_STATUSES.has(status) &&
+    loadedQty > 0 &&
+    receivedQty === 0
+  ) {
+    return { bucket: "on_truck", qty };
   }
 
   if (
@@ -338,6 +354,7 @@ async function buildReconciliationRow(tripRef, tripId, item, shipmentDocId) {
     currentTripId: shipment.currentTripId || tripId,
     status: shipment.status || tripShipment.status || null,
     pieces: reconciliationPieces,
+    tripPackages,
     labelSummary: {
       total: loadedIntoTruck,
       received: unloadedCount,
@@ -345,14 +362,17 @@ async function buildReconciliationRow(tripRef, tripId, item, shipmentDocId) {
     },
   };
 
+  const missingPackages =
+    isMissing || loadedIntoTruck > unloadedCount || remainingLoaded > 0
+      ? resolveMissingPackagesForRow(
+          { ...rowDraft, pieces: piecesForMissingExtraction },
+          tripPackages,
+        )
+      : [];
+
   return {
     ...rowDraft,
-    missingPackages: isMissing
-      ? extractMissingPackagesFromRow({
-          ...rowDraft,
-          pieces: piecesForMissingExtraction,
-        })
-      : [],
+    missingPackages,
   };
 }
 
@@ -442,9 +462,17 @@ export async function runTripHandoffReconciliation(tripId) {
   const allRows = result.shipments || [];
   const shipments = allRows.filter((item) => item.onTrip);
   const assignedNotLoaded = allRows.filter((item) => !item.onTrip);
-  const missingShipments = shipments.filter((item) => item.missing);
+  const missingShipments = shipments.filter(
+    (item) =>
+      item.missing ||
+      item.missingPackages?.length > 0 ||
+      item.expectedCount > item.unloadedCount ||
+      item.remainingLoaded > 0,
+  );
   const missingPackages = flattenMissingPackages(missingShipments);
-  const unloadedShipments = shipments.filter((item) => !item.missing);
+  const unloadedShipments = shipments.filter(
+    (item) => !missingShipments.some((missingRow) => missingRow.id === item.id),
+  );
   const lifecycleEval = evaluateTripLifecycleAfterReconciliation(trip, shipments);
   const context = buildReconciliationContext(
     trip,

@@ -211,7 +211,9 @@ function ReadyShipmentRow({ item, theme, defaultExpanded = true }) {
                       ? "Received"
                       : piece.state === "on_truck"
                         ? "On truck"
-                        : "Missing"}
+                        : piece.state === "variance"
+                          ? "Unaccounted"
+                          : "Missing"}
                   </span>
                 </div>
               </div>
@@ -246,6 +248,12 @@ function MissingPackageRemarkCard({
           <div className="text-[11px] opacity-70">
             <span className="font-semibold">Missing Piece:</span>{" "}
             <span className="font-mono">{pkg.pieceSuffix}</span>
+          </div>
+        ) : null}
+        {pkg.packageStatus ? (
+          <div className="text-[11px] opacity-70">
+            <span className="font-semibold">Status:</span>{" "}
+            <span className="font-mono">{pkg.packageStatus}</span>
           </div>
         ) : null}
         {pkg.recipientName ? (
@@ -286,7 +294,13 @@ export function HandoffPrompt({
       ? summary.missingPackages
       : flattenMissingPackages(missingShipments);
   const unloadedShipments = summary?.unloadedShipments || [];
-  const hasMissing = missingPackages.length > 0;
+  const { manifestPieces, unloadedPieces, missingPieces } =
+    resolvePieceTotals(summary);
+  const hasMissingLabels = missingPackages.length > 0;
+  const hasMissingCount = missingPieces > 0;
+  const hasMissingShipments = missingShipments.length > 0;
+  const hasMissing =
+    hasMissingLabels || hasMissingCount || hasMissingShipments;
   const remarksComplete = areMissingPackageRemarksComplete(
     missingPackages,
     missingRemarks,
@@ -296,16 +310,14 @@ export function HandoffPrompt({
   const standardCountsReady =
     summary?.ready &&
     hasReleasableHandoffPieces(summary) &&
-    (!hasMissing || remarksComplete);
+    (!hasMissingLabels || remarksComplete);
   const adminOverrideEligible =
     isAdmin &&
     hasReleasableHandoffPieces(summary) &&
-    (!hasMissing || remarksComplete);
+    (!hasMissingLabels || remarksComplete);
   const canRelease = adminOverrideEligible
     ? true
     : standardCountsReady && (lifecycleCanRelease || summary?.ready);
-  const { manifestPieces, unloadedPieces, missingPieces } =
-    resolvePieceTotals(summary);
 
   const loadedSubtext = context.loadedScanBy
     ? `Scanned by ${context.loadedScanBy} at ${context.originWarehouse || "origin warehouse"}`
@@ -373,7 +385,7 @@ export function HandoffPrompt({
 
       {hasMissing ? (
         <div className="space-y-3 text-left">
-          {adminOverrideEligible ? (
+          {adminOverrideEligible && hasMissingLabels ? (
             <div className={`rounded-lg border p-3 ${theme.panelSurface}`}>
               <div className="text-[10px] font-bold uppercase opacity-60">
                 Missing Packages ({missingPackages.length})
@@ -388,44 +400,81 @@ export function HandoffPrompt({
               </ul>
             </div>
           ) : null}
+
+          {!hasMissingLabels && hasMissingCount ? (
+            <div
+              className={`rounded-lg border p-3 text-xs leading-relaxed ${theme.panelSurface} border-amber-500/30 text-amber-700/90`}
+            >
+              {missingPieces} piece{missingPieces === 1 ? "" : "s"} unaccounted
+              between loaded ({manifestPieces}) and unloaded ({unloadedPieces}).
+              {hasMissingShipments
+                ? " Review the shipments below and unload or mark missing labels."
+                : " Refresh reconciliation or unload remaining labels."}
+            </div>
+          ) : null}
+
+          {hasMissingShipments ? (
+            <div className="space-y-2">
+              <div className="text-[10px] font-bold uppercase opacity-60">
+                Shipments With Missing Labels
+              </div>
+              <div className="max-h-40 overflow-y-auto space-y-2 pr-1">
+                {missingShipments.map((item, index) => (
+                  <ReadyShipmentRow
+                    key={item.id}
+                    item={item}
+                    theme={theme}
+                    defaultExpanded={index === 0}
+                  />
+                ))}
+              </div>
+            </div>
+          ) : null}
+
+          {hasMissingLabels ? (
+            <>
+              <div className="text-[10px] font-bold uppercase opacity-60">
+                Missing Remarks
+              </div>
+              <div className="space-y-3 max-h-56 overflow-y-auto pr-1">
+                {missingPackages.map((pkg) => (
+                  <MissingPackageRemarkCard
+                    key={pkg.packageId}
+                    pkg={pkg}
+                    theme={theme}
+                    missingRemarks={missingRemarks}
+                    onRemarkChange={onRemarkChange}
+                  />
+                ))}
+              </div>
+            </>
+          ) : null}
+        </div>
+      ) : null}
+
+      {unloadedShipments.length > 0 ? (
+        <div className="text-left space-y-2">
           <div className="text-[10px] font-bold uppercase opacity-60">
-            Missing Remarks
+            {hasMissing ? "Verified Shipments" : "Ready Shipments"}
           </div>
-          <div className="space-y-3 max-h-56 overflow-y-auto pr-1">
-            {missingPackages.map((pkg) => (
-              <MissingPackageRemarkCard
-                key={pkg.packageId}
-                pkg={pkg}
+          <div className="max-h-56 overflow-y-auto space-y-2 pr-1">
+            {unloadedShipments.map((item, index) => (
+              <ReadyShipmentRow
+                key={item.id}
+                item={item}
                 theme={theme}
-                missingRemarks={missingRemarks}
-                onRemarkChange={onRemarkChange}
+                defaultExpanded={!hasMissing && index === 0}
               />
             ))}
           </div>
         </div>
-      ) : (
+      ) : !hasMissing ? (
         <div className="text-left space-y-2">
-          <div className="text-[10px] font-bold uppercase opacity-60">
-            Ready Shipments
-          </div>
-          <div className="max-h-56 overflow-y-auto space-y-2 pr-1">
-            {unloadedShipments.length > 0 ? (
-              unloadedShipments.map((item, index) => (
-                <ReadyShipmentRow
-                  key={item.id}
-                  item={item}
-                  theme={theme}
-                  defaultExpanded={index === 0}
-                />
-              ))
-            ) : (
-              <p className={`text-xs px-1 ${theme.panelSurface} rounded-lg border p-3`}>
-                No hub-received shipments are ready to release yet.
-              </p>
-            )}
-          </div>
+          <p className={`text-xs px-1 ${theme.panelSurface} rounded-lg border p-3`}>
+            No hub-received shipments are ready to release yet.
+          </p>
         </div>
-      )}
+      ) : null}
 
       {adminOverrideEligible && hasMissing ? (
         <p className="text-xs text-amber-500/90 text-center px-2">

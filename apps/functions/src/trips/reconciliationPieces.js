@@ -1,6 +1,13 @@
 "use strict";
 
-const MISSING_PIECE_STATES = new Set(["on_truck", "missing"]);
+const MISSING_PIECE_STATES = new Set(["on_truck", "missing", "variance"]);
+
+const LOADED_ON_TRUCK_PIECE_STATUSES = new Set([
+  "IN_TRANSIT",
+  "LOADED",
+  "LOADED_TO_TRIP",
+  "PARTIALLY_LOADED",
+]);
 
 function parsePackageIdentity(packageId, fallbackShipmentId = null) {
   const id = String(packageId || "").trim();
@@ -53,6 +60,80 @@ function extractMissingPackagesFromRow(row = {}) {
     .filter((entry) => entry.packageId);
 }
 
+function resolveMissingPackagesForRow(row = {}, tripPackages = []) {
+  const fromPieces = extractMissingPackagesFromRow(row);
+  if (fromPieces.length > 0) return fromPieces;
+
+  const gap = Math.max(
+    Number(row.expectedCount) - Number(row.unloadedCount),
+    Number(row.remainingLoaded),
+    Number(row.missingPieces),
+    0,
+  );
+  if (gap <= 0 && !row.missing) return [];
+
+  const receivedIds = new Set(
+    (row.pieces || [])
+      .filter((piece) => piece.state === "received")
+      .map((piece) => String(piece.pieceId || ""))
+      .filter(Boolean),
+  );
+
+  const entries = [];
+  const seen = new Set();
+
+  const pushPackage = (pkg = {}) => {
+    const packageId = String(
+      pkg.packageId || pkg.trackingNumber || "",
+    ).trim();
+    if (!packageId || seen.has(packageId)) return;
+    seen.add(packageId);
+
+    const parsed = parsePackageIdentity(packageId, row.shipmentId);
+    entries.push({
+      packageId: parsed.packageId,
+      shipmentId: parsed.shipmentId,
+      pieceSuffix: parsed.pieceSuffix,
+      shipmentDocId: row.id || null,
+    });
+  };
+
+  for (const pkg of tripPackages) {
+    const packageId = String(
+      pkg.packageId || pkg.trackingNumber || "",
+    ).trim();
+    if (!packageId) continue;
+
+    const status = String(pkg.status || "").toUpperCase();
+    const loadedQty = Number(pkg.loadedQty) || 0;
+    const receivedQty = Number(pkg.receivedQty) || 0;
+
+    if (status === "MISSING" || Number(pkg.missingQty) > 0) {
+      pushPackage(pkg);
+      continue;
+    }
+
+    if (
+      LOADED_ON_TRUCK_PIECE_STATUSES.has(status) &&
+      loadedQty > 0 &&
+      receivedQty === 0
+    ) {
+      pushPackage(pkg);
+      continue;
+    }
+
+    if (receivedIds.has(packageId)) continue;
+
+    if (row.missing || gap > entries.length) {
+      pushPackage(pkg);
+    }
+
+    if (gap > 0 && entries.length >= gap) break;
+  }
+
+  return entries;
+}
+
 function flattenMissingPackages(missingShipments = []) {
   const all = [];
   const seen = new Set();
@@ -61,7 +142,7 @@ function flattenMissingPackages(missingShipments = []) {
     const entries =
       Array.isArray(row.missingPackages) && row.missingPackages.length > 0
         ? row.missingPackages
-        : extractMissingPackagesFromRow(row);
+        : resolveMissingPackagesForRow(row, row.tripPackages || []);
 
     for (const entry of entries) {
       const key = entry.packageId || entry.shipmentId;
@@ -116,6 +197,7 @@ module.exports = {
   MISSING_PIECE_STATES,
   parsePackageIdentity,
   extractMissingPackagesFromRow,
+  resolveMissingPackagesForRow,
   flattenMissingPackages,
   resolveRemarkForMissingPackage,
 };

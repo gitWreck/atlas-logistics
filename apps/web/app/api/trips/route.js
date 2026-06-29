@@ -249,10 +249,6 @@ function selectLimitedTripDocs(allDocs, activeLimit, completedLimit) {
 }
 
 async function buildTripList(docs, { view = "board" } = {}) {
-  if (view === "board") {
-    return docs.map((doc) => serializeTripDoc(doc));
-  }
-
   const trips = await Promise.all(
     docs.map(async (doc) => {
       const tripData = { id: doc.id, ...doc.data() };
