@@ -150,11 +150,6 @@ export default function TripDrawer({
   if (!data) return null;
 
   const completedTrip = isCompletedTrip(data);
-  const role = String(profile?.role || "").toLowerCase();
-  const canScanFoundPackage =
-    ["admin", "manager"].includes(role) &&
-    Boolean(data?.reconciledAt) &&
-    !completedTrip;
   const manifestTabLabel = completedTrip
     ? `Manifests (${data.deliveryManifestId && data.manifestId ? 2 : data.manifestLocked || data.deliveryManifestId ? 1 : 0})`
     : manifestTripId === data.tripId
@@ -281,17 +276,15 @@ export default function TripDrawer({
             >
               Scan
             </button>
-            {canScanFoundPackage && (
-              <button
-                type="button"
-                onClick={() => setFoundScanOpen(true)}
-                className="px-3 py-2 rounded-lg text-xs font-semibold bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 hover:bg-emerald-500/20 transition-all"
-                title="Recover a missing package found after reconciliation"
-              >
-                <FontAwesomeIcon icon={faQrcode} className="mr-1.5" />
-                Found
-              </button>
-            )}
+            <button
+              type="button"
+              onClick={() => setFoundScanOpen(true)}
+              className="px-3 py-2 rounded-lg text-xs font-semibold bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 hover:bg-emerald-500/20 transition-all"
+              title="Recover a missing package found after reconciliation"
+            >
+              <FontAwesomeIcon icon={faQrcode} className="mr-1.5" />
+              Found
+            </button>
             <button
               type="button"
               onClick={handleRefresh}
