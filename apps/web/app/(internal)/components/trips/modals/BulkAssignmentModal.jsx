@@ -40,6 +40,7 @@ export default function BulkAssignmentModal({
 
   const [nextCursor, setNextCursor] = useState(null);
   const [hasMore, setHasMore] = useState(false);
+  const [lookingUp, setLookingUp] = useState(false);
 
   const modalTheme = getModalThemeClasses(isDark);
   const modalAction = getModalActionClasses();
@@ -81,6 +82,39 @@ export default function BulkAssignmentModal({
       alert("Error fetching shipments: " + error.message);
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Exact tracking-ID lookup so an Admin can add a specific missing shipment
+  // (e.g. AT-20260612-SHP-677769) that is outside the default candidate pool.
+  const handleExactLookup = async () => {
+    const term = String(searchTerm || "").trim();
+    if (!term || lookingUp) return;
+
+    setLookingUp(true);
+    try {
+      const params = new URLSearchParams({ shipmentId: term });
+      const res = await fetch(`/api/shipments/candidates?${params.toString()}`);
+      const json = await res.json();
+
+      if (!json.success) throw new Error(json.error || "Lookup failed");
+
+      if (!json.data || json.data.length === 0) {
+        alert(`No shipment found with tracking ID "${term}".`);
+        return;
+      }
+
+      // Merge into candidates (dedup by id) so it appears in the list.
+      setCandidates((prev) => {
+        const byId = new Map(prev.map((item) => [item.id, item]));
+        json.data.forEach((item) => byId.set(item.id, item));
+        return Array.from(byId.values());
+      });
+    } catch (error) {
+      console.error("Exact lookup error:", error);
+      alert("Error looking up shipment: " + error.message);
+    } finally {
+      setLookingUp(false);
     }
   };
 
@@ -276,6 +310,25 @@ export default function BulkAssignmentModal({
           {filteredList.length === 0 && !loading ? (
             <div className={`p-10 text-center italic ${tableTheme.emptyText}`}>
               No unassigned shipments found.
+              {String(searchTerm || "").trim() && (
+                <div className="mt-4 not-italic">
+                  <button
+                    type="button"
+                    onClick={handleExactLookup}
+                    disabled={lookingUp}
+                    className={`inline-flex items-center gap-2 text-xs font-bold px-4 py-2 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${modalAction.primary}`}
+                  >
+                    <FontAwesomeIcon icon={faSearch} />
+                    {lookingUp
+                      ? "Searching..."
+                      : `Look up exact tracking ID "${searchTerm.trim()}"`}
+                  </button>
+                  <p className={`mt-2 text-[11px] ${tableTheme.emptyText}`}>
+                    Use this to add a specific missing shipment that is not in
+                    the warehouse candidate pool.
+                  </p>
+                </div>
+              )}
             </div>
           ) : (
             <>
