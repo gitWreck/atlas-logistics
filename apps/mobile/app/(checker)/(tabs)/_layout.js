@@ -1,9 +1,5 @@
-import {
-  SafeAreaView,
-  StyleSheet,
-  Platform,
-  StatusBar as RNStatusBar,
-} from "react-native";
+import { StyleSheet } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { Tabs, useRouter } from "expo-router";
 import { FontAwesome5 } from "@expo/vector-icons";
 import { signOut } from "firebase/auth";
@@ -12,11 +8,14 @@ import { auth } from "../../../firebase";
 import CheckerHeader from "../../../components/checker/CheckerHeader";
 import { useAuth } from "../../../contexts/AuthContext";
 import { useTheme } from "../../../contexts/ThemeContext";
+import { useOfflineSync } from "../../../contexts/OfflineSyncContext";
 
 export default function CheckerTabsLayout() {
   const router = useRouter();
   const { user } = useAuth();
   const { colors } = useTheme();
+  const { isOnline, pendingCount, syncing } = useOfflineSync();
+  const showOfflineBar = !(isOnline && pendingCount === 0 && !syncing);
 
   const handleLogout = async () => {
     try {
@@ -28,7 +27,10 @@ export default function CheckerTabsLayout() {
   };
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.bg }]}>
+    <SafeAreaView
+      style={[styles.container, { backgroundColor: colors.bg }]}
+      edges={showOfflineBar ? ["bottom", "left", "right"] : undefined}
+    >
       {/* ✅ SHARED HEADER FOR ALL TAB SCREENS */}
       <CheckerHeader
         userName={user?.name || user?.fullName || "Checker"}
@@ -109,9 +111,5 @@ export default function CheckerTabsLayout() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#f1f5f9", // match your screens
-
-    // ✅ Fix for Android status bar overlap
-    paddingTop: Platform.OS === "android" ? RNStatusBar.currentHeight || 0 : 0,
   },
 });

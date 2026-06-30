@@ -18,7 +18,9 @@
       "bundleIdentifier": "com.atlas.tracking",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
-        "NSLocationWhenInUseUsageDescription": "Atlas uses your location to update package tracking and trip progress while you are on the road."
+        "NSLocationWhenInUseUsageDescription": "Atlas uses your location to update package tracking and trip progress while you are on the road.",
+        "NSCameraUsageDescription": "Atlas uses the camera to scan package QR codes and capture proof-of-delivery photos when you complete a shipment.",
+        "NSPhotoLibraryUsageDescription": "Atlas accesses your photos so you can attach proof-of-delivery images and shipment documents to a delivery record."
       }
     },
     "android": {
@@ -67,9 +69,16 @@
       ],
       "expo-notifications",
       [
+        "expo-camera",
+        {
+          "cameraPermission": "Atlas uses the camera to scan package QR codes and capture proof-of-delivery photos when you complete a shipment."
+        }
+      ],
+      [
         "expo-image-picker",
         {
-          "photosPermission": "Atlas accesses your camera and photos so drivers can capture and upload proof-of-delivery images and shipment documents.",
+          "cameraPermission": "Atlas uses the camera to scan package QR codes and capture proof-of-delivery photos when you complete a shipment.",
+          "photosPermission": "Atlas accesses your photos so you can attach proof-of-delivery images and shipment documents to a delivery record.",
           "colors": {
             "cropToolbarColor": "#000000"
           },

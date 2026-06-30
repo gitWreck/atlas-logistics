@@ -9,6 +9,8 @@ if (!admin.apps.length) admin.initializeApp();
 const db = admin.firestore();
 const auth = admin.auth();
 
+const SELF_DELETE_ROLES = new Set(["customer", "driver", "checker"]);
+
 async function deleteSubcollectionInBatches(userRef, subcollectionId) {
   const col = userRef.collection(subcollectionId);
   for (;;) {
@@ -44,6 +46,28 @@ async function removeUidFromShipmentVisibility(uid) {
   if (count > 0) await batch.commit();
 }
 
+async function deleteUserAccountData(uid, userRef, role) {
+  await deleteSubcollectionInBatches(userRef, "pushTokens");
+  await deleteSubcollectionInBatches(userRef, "notifications");
+
+  if (role === "customer") {
+    await deleteSubcollectionInBatches(userRef, "tracked_shipments");
+    await deleteSubcollectionInBatches(userRef, "trackedShipments");
+    await removeUidFromShipmentVisibility(uid);
+  }
+}
+
+function getDeletionLogAction(role) {
+  switch (role) {
+    case "driver":
+      return "DRIVER_DELETED_OWN_ACCOUNT";
+    case "checker":
+      return "CHECKER_DELETED_OWN_ACCOUNT";
+    default:
+      return "CUSTOMER_DELETED_OWN_ACCOUNT";
+  }
+}
+
 exports.deleteMyAccount = onCall(
   { region: "asia-southeast1", maxInstances: 5 },
   async (request) => {
@@ -59,26 +83,21 @@ exports.deleteMyAccount = onCall(
       throw new HttpsError("not-found", "Account not found.");
     }
 
-    const role = userSnap.data()?.role;
-    if (role !== "customer") {
+    const role = String(userSnap.data()?.role || "").toLowerCase();
+    if (!SELF_DELETE_ROLES.has(role)) {
       throw new HttpsError(
         "permission-denied",
-        "In-app account deletion is only available for customer accounts. Contact support for other roles.",
+        "In-app account deletion is not available for this account type.",
       );
     }
 
-    await deleteSubcollectionInBatches(userRef, "pushTokens");
-    await deleteSubcollectionInBatches(userRef, "notifications");
-    // Canonical path (addTrackedShipment); legacy camelCase for older clients
-    await deleteSubcollectionInBatches(userRef, "tracked_shipments");
-    await deleteSubcollectionInBatches(userRef, "trackedShipments");
-
-    await removeUidFromShipmentVisibility(uid);
+    await deleteUserAccountData(uid, userRef, role);
 
     await userRef.delete();
 
     await db.collection("admin_logs").add({
-      action: "CUSTOMER_DELETED_OWN_ACCOUNT",
+      action: getDeletionLogAction(role),
+      role,
       targetUid: uid,
       actorId: uid,
       createdAt: FieldValue.serverTimestamp(),

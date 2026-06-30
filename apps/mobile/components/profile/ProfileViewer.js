@@ -23,8 +23,10 @@ import {
   updateUserProfileMobile,
 } from "../utilities/FirebaseFunctions";
 import { useTheme } from "../../contexts/ThemeContext";
+import { useOfflineSyncOptional } from "../../contexts/OfflineSyncContext";
 import ShipmentDetailHeader from "../shipments/ShipmentDetailHeader";
 import DropdownModal from "../customer/RequestPickup/DropdownModal";
+import OfflineSyncQueueModal from "../checker/OfflineSyncQueueModal";
 import { PROVINCES, getCities } from "../utilities/PhilippinesData";
 
 const EMPTY_VALUE = "Not provided";
@@ -84,9 +86,12 @@ export default function ProfileViewer({ showBackButton = false }) {
   const [cities, setCities] = useState([]);
   const [showProvinceModal, setShowProvinceModal] = useState(false);
   const [showCityModal, setShowCityModal] = useState(false);
+  const [queueModalVisible, setQueueModalVisible] = useState(false);
 
+  const offlineSync = useOfflineSyncOptional();
   const isCustomer = user?.role === "customer";
-  const isStaff = user?.role === "checker" || user?.role === "driver";
+  const isChecker = user?.role === "checker";
+  const isStaff = isChecker || user?.role === "driver";
   const config = roleConfig[user?.role] || {
     icon: "user-circle",
     label: user?.role || "User",
@@ -198,7 +203,7 @@ export default function ProfileViewer({ showBackButton = false }) {
   const handleDeleteAccount = () => {
     Alert.alert(
       "Delete account",
-      "This permanently deletes your customer profile and removes your access to Atlas Transport. This cannot be undone.",
+      "This permanently deletes your Atlas Transport account, profile, and associated app data. This cannot be undone.",
       [
         { text: "Cancel", style: "cancel" },
         {
@@ -622,6 +627,81 @@ export default function ProfileViewer({ showBackButton = false }) {
           </View>
         )}
 
+        {isChecker && offlineSync && !isEditing && (
+          <View
+            style={[
+              styles.card,
+              { backgroundColor: colors.surface, borderColor: colors.border },
+            ]}
+          >
+            <SectionHeader
+              icon="cloud-upload-alt"
+              eyebrow="Offline"
+              title="Scan Sync"
+              colors={colors}
+              isDark={isDark}
+            />
+            <Text style={[styles.hintMuted, { color: colors.textMuted }]}>
+              {offlineSync.syncing
+                ? "Syncing queued scans to the server..."
+                : offlineSync.isOnline
+                  ? offlineSync.pendingCount > 0
+                    ? `${offlineSync.pendingCount} scan${offlineSync.pendingCount === 1 ? "" : "s"} waiting to sync.`
+                    : "All queued scans are synced."
+                  : "You are offline. Scans save locally until you reconnect."}
+            </Text>
+            <View style={styles.syncActionRow}>
+              {offlineSync.pendingSummaries.length > 0 ? (
+                <TouchableOpacity
+                  style={[
+                    styles.syncSecondaryBtn,
+                    {
+                      backgroundColor: colors.cardMuted,
+                      borderColor: colors.border,
+                    },
+                  ]}
+                  onPress={() => setQueueModalVisible(true)}
+                  activeOpacity={0.85}
+                >
+                  <FontAwesome5
+                    name="list"
+                    size={12}
+                    color={colors.text}
+                  />
+                  <Text style={[styles.syncSecondaryText, { color: colors.text }]}>
+                    View queue ({offlineSync.pendingSummaries.length})
+                  </Text>
+                </TouchableOpacity>
+              ) : null}
+              <TouchableOpacity
+                style={[
+                  styles.syncPrimaryBtn,
+                  (offlineSync.syncing ||
+                    !offlineSync.isOnline ||
+                    offlineSync.pendingCount === 0) &&
+                    styles.saveBtnDisabled,
+                ]}
+                onPress={() => void offlineSync.syncNow()}
+                disabled={
+                  offlineSync.syncing ||
+                  !offlineSync.isOnline ||
+                  offlineSync.pendingCount === 0
+                }
+                activeOpacity={0.85}
+              >
+                {offlineSync.syncing ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <FontAwesome5 name="sync" size={12} color="#fff" />
+                )}
+                <Text style={styles.syncPrimaryText}>
+                  {offlineSync.syncing ? "Syncing..." : "Sync now"}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
+
         {isEditing && (
           <View
             style={[
@@ -747,13 +827,13 @@ export default function ProfileViewer({ showBackButton = false }) {
                 />
               )}
               <Text style={[styles.themeSyncText, { color: colors.text }]}>
-                Save theme to account
+                Sync theme to account
               </Text>
             </TouchableOpacity>
           </View>
         )}
 
-        {isCustomer && !isEditing && (
+        {!isEditing && (
           <View
             style={[
               styles.dangerCard,
@@ -850,6 +930,16 @@ export default function ProfileViewer({ showBackButton = false }) {
         }}
         onClose={() => setShowCityModal(false)}
       />
+
+      {isChecker && offlineSync ? (
+        <OfflineSyncQueueModal
+          visible={queueModalVisible}
+          onClose={() => setQueueModalVisible(false)}
+          pendingSummaries={offlineSync.pendingSummaries}
+          syncing={offlineSync.syncing}
+          syncNow={offlineSync.syncNow}
+        />
+      ) : null}
     </SafeAreaView>
   );
 }
@@ -1112,6 +1202,39 @@ const styles = StyleSheet.create({
   themeSyncText: {
     fontSize: 13,
     fontWeight: "800",
+  },
+  syncActionRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    marginTop: 12,
+  },
+  syncSecondaryBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    minHeight: 44,
+    paddingHorizontal: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  syncSecondaryText: {
+    fontSize: 13,
+    fontWeight: "700",
+  },
+  syncPrimaryBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    minHeight: 44,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    backgroundColor: PRIMARY,
+  },
+  syncPrimaryText: {
+    color: "#ffffff",
+    fontSize: 13,
+    fontWeight: "700",
   },
   dangerCard: {
     borderRadius: 18,
