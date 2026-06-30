@@ -51,6 +51,21 @@ function resolveDispatchedTransitMasterStatus({
   return null;
 }
 
+/** Released pool wins over linehaul transit when some pieces are already at Odiongan. */
+function resolveReleasedPoolMasterStatus({
+  releasedQty = 0,
+  availablePoolRows = 0,
+  deliveredQty = 0,
+  totalQty = 0,
+}) {
+  if (releasedQty <= 0 && availablePoolRows <= 0) return null;
+  if (deliveredQty > 0) return "PARTIALLY_DELIVERED";
+  if (releasedQty > 0 && releasedQty < totalQty) {
+    return "PARTIALLY_AVAILABLE_FOR_DELIVERY";
+  }
+  return "AVAILABLE_FOR_DELIVERY";
+}
+
 const RELEASED_POOL_STATUSES = new Set([
   PACKAGE_STATUS.RELEASED_FOR_DELIVERY,
   PACKAGE_STATUS.ROUTE_ASSIGNED,
@@ -275,6 +290,14 @@ function deriveMasterShipmentStatus(packages = [], options = {}) {
       return "OUT_FOR_DELIVERY";
     }
 
+    const releasedPoolStatus = resolveReleasedPoolMasterStatus({
+      releasedQty,
+      availablePoolRows,
+      deliveredQty,
+      totalQty,
+    });
+    if (releasedPoolStatus) return releasedPoolStatus;
+
     const dispatchedTransitStatus = resolveDispatchedTransitMasterStatus({
       packages,
       totalQty,
@@ -282,14 +305,6 @@ function deriveMasterShipmentStatus(packages = [], options = {}) {
     });
     if (dispatchedTransitStatus) {
       return dispatchedTransitStatus;
-    }
-
-    if (releasedQty > 0 || availablePoolRows > 0) {
-      if (deliveredQty > 0) return "PARTIALLY_DELIVERED";
-      if (releasedQty > 0 && releasedQty < totalQty) {
-        return "PARTIALLY_AVAILABLE_FOR_DELIVERY";
-      }
-      return "AVAILABLE_FOR_DELIVERY";
     }
 
     const lastMileStatus = resolveLastMileCheckerMasterStatus({
@@ -376,6 +391,14 @@ function deriveMasterShipmentStatus(packages = [], options = {}) {
     return "OUT_FOR_DELIVERY";
   }
 
+  const releasedPoolStatus = resolveReleasedPoolMasterStatus({
+    releasedQty,
+    availablePoolRows,
+    deliveredQty,
+    totalQty,
+  });
+  if (releasedPoolStatus) return releasedPoolStatus;
+
   const dispatchedTransitStatus = resolveDispatchedTransitMasterStatus({
     packages,
     totalQty,
@@ -383,14 +406,6 @@ function deriveMasterShipmentStatus(packages = [], options = {}) {
   });
   if (dispatchedTransitStatus) {
     return dispatchedTransitStatus;
-  }
-
-  if (releasedQty > 0 || availablePoolRows > 0) {
-    if (deliveredQty > 0) return "PARTIALLY_DELIVERED";
-    if (releasedQty > 0 && releasedQty < totalQty) {
-      return "PARTIALLY_AVAILABLE_FOR_DELIVERY";
-    }
-    return "AVAILABLE_FOR_DELIVERY";
   }
 
   const lastMileStatus = resolveLastMileCheckerMasterStatus({
@@ -491,11 +506,7 @@ function resolveShipmentAvailableForDelivery(
     .toUpperCase();
   if (normalized === "COMPLETED") return false;
   if (POOL_DERIVED_MASTER_STATUSES.has(normalized)) return true;
-  if (
-    ["OUT_FOR_DELIVERY", "PARTIALLY_OUT_FOR_DELIVERY"].includes(normalized)
-  ) {
-    return shipmentHasPiecesInCheckerLoadPool(packages);
-  }
+  if (shipmentHasPiecesInCheckerLoadPool(packages)) return true;
   return false;
 }
 

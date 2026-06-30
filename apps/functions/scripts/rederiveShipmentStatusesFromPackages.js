@@ -27,6 +27,7 @@ const {
   sumDamagedQty,
   sumTotalQty,
 } = require("../src/packages/tripPackageOperations");
+const { buildDerivedShipmentSnapshot } = require("../src/packages/shipmentStatus");
 const { initAdminApp, resolveTripDocRef } = require("./initAdmin");
 
 initAdminApp();
@@ -192,11 +193,21 @@ async function repairShipment(shipmentDoc) {
     previousStatus: data.status,
     isHubReceive: true,
   });
+  const derivedSnapshot = buildDerivedShipmentSnapshot(repairedPackages, {
+    previousStatus: data.status,
+  });
 
   const oldStatus = String(data.status || "").toUpperCase();
-  const newStatus = String(snapshot.status || "").toUpperCase();
+  const newStatus = String(derivedSnapshot.status || snapshot.status || "").toUpperCase();
+  const poolFlagChanged =
+    Boolean(data.availableForDelivery) !==
+    (derivedSnapshot.availableForDelivery === true);
 
-  if (!snapshotChanged(data, snapshot, repairedPackages)) {
+  if (
+    !snapshotChanged(data, snapshot, repairedPackages) &&
+    !poolFlagChanged &&
+    oldStatus === newStatus
+  ) {
     console.log(`${shipmentDoc.id}: unchanged (${oldStatus})`);
     return { updated: false };
   }
@@ -223,9 +234,10 @@ async function repairShipment(shipmentDoc) {
 
   if (!DRY_RUN) {
     const shipmentUpdate = {
-      status: snapshot.status,
-      packages: snapshot.packages,
-      packageBreakdown: snapshot.packageBreakdown,
+      status: derivedSnapshot.status || snapshot.status,
+      packages: derivedSnapshot.packages || snapshot.packages,
+      packageBreakdown: derivedSnapshot.packageBreakdown || snapshot.packageBreakdown,
+      availableForDelivery: derivedSnapshot.availableForDelivery === true,
       currentTripIds: snapshot.currentTripIds,
       currentTripId: snapshot.currentTripId,
       "totals.totalItems": snapshot.totals.totalItems,

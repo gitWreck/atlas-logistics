@@ -19,6 +19,13 @@ const LOADED_ON_TRUCK_PIECE_STATUSES = new Set([
   "OUT_FOR_DELIVERY",
 ]);
 
+const LINEHAUL_NOT_HUB_UNLOADED_STATUSES = new Set([
+  "IN_TRANSIT",
+  "LOADED_TO_TRIP",
+  "LOADED",
+  "PARTIALLY_LOADED",
+]);
+
 const RECEIVED_AT_HUB_PIECE_STATUSES = new Set([
   "ARRIVED_AT_ODIONGAN",
   "AVAILABLE_AT_ODIONGAN_WAREHOUSE",
@@ -90,6 +97,15 @@ function classifyTripPiece(pkg = {}, tripId = "") {
   const loadedQty = toNumber(pkg.loadedQty, 0);
   const receivedQty = toNumber(pkg.receivedQty, 0);
 
+  // Trust explicit linehaul/on-truck status over stale hubReceivedAt from prior scans.
+  if (
+    LINEHAUL_NOT_HUB_UNLOADED_STATUSES.has(status) &&
+    loadedQty > 0 &&
+    receivedQty === 0
+  ) {
+    return { bucket: "on_truck", qty };
+  }
+
   // Still on truck when linehaul-loaded but not hub-unloaded (stale hubReceivedAt).
   if (
     LOADED_ON_TRUCK_PIECE_STATUSES.has(status) &&
@@ -101,7 +117,7 @@ function classifyTripPiece(pkg = {}, tripId = "") {
 
   if (
     RECEIVED_AT_HUB_PIECE_STATUSES.has(status) ||
-    pkg.hubReceivedAt ||
+    (pkg.hubReceivedAt && !LINEHAUL_NOT_HUB_UNLOADED_STATUSES.has(status)) ||
     (toNumber(pkg.receivedQty, 0) > 0 && !LOADED_ON_TRUCK_PIECE_STATUSES.has(status))
   ) {
     return { bucket: "received", qty };
@@ -303,7 +319,10 @@ async function buildReconciliationRow(tripRef, tripId, item, shipmentDocId) {
     tripLoaded + tripReceived + tripMissing,
     manifestLoadedCount,
   );
-  let unloadedCount = Math.max(pieceSummary.unloaded, tripReceived);
+  let unloadedCount = pieceSummary.unloaded;
+  if (pieceSummary.stillOnTruck === 0 && pieceSummary.missing === 0) {
+    unloadedCount = Math.max(unloadedCount, tripReceived);
+  }
   let remainingLoaded = Math.max(pieceSummary.stillOnTruck, tripLoaded);
   let missingPieces = Math.max(pieceSummary.missing, tripMissing);
 

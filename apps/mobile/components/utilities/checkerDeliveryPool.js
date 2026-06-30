@@ -10,8 +10,8 @@ function normalizeStatus(value) {
 /** Master statuses that may appear in the checker pool after Rose release. */
 const DELIVERY_POOL_MASTER_STATUSES = new Set([
   "AVAILABLE_FOR_DELIVERY",
-  "PARTIALLY_DELIVERED",
   "PARTIALLY_AVAILABLE_FOR_DELIVERY",
+  "PARTIALLY_DELIVERED",
   "PARTIALLY_LOADED",
   "LOADED",
   "READY_FOR_DELIVERY",
@@ -33,10 +33,13 @@ const DELIVERY_POOL_MASTER_STATUSES = new Set([
 export function isShipmentInDeliveryPool(shipment = {}) {
   const master = normalizeStatus(shipment.status);
   if (shipment?.availableForDelivery === true) {
-    return (
+    if (
       DELIVERY_POOL_MASTER_STATUSES.has(master) ||
       master === "PARTIALLY_OUT_FOR_DELIVERY"
-    );
+    ) {
+      return true;
+    }
+    return shipmentHasCheckerLoadPoolPieces(shipment);
   }
   return shipmentHasCheckerLoadPoolPieces(shipment);
 }
