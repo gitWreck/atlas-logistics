@@ -50,14 +50,15 @@ export async function GET(request, { params }) {
       adminDb.collection("shipments").doc(id),
     );
 
-    const rootSnaps = await adminDb.getAll(...rootRefs);
-
     const rootMap = {};
-    rootSnaps.forEach((snap) => {
-      if (snap.exists) {
-        rootMap[snap.id] = snap.data();
-      }
-    });
+    if (rootRefs.length > 0) {
+      const rootSnaps = await adminDb.getAll(...rootRefs);
+      rootSnaps.forEach((snap) => {
+        if (snap.exists) {
+          rootMap[snap.id] = snap.data();
+        }
+      });
+    }
 
     // 5. Transform Data
     const shipments = snapshot.docs.map((doc) => {
