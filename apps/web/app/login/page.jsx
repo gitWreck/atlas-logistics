@@ -91,7 +91,7 @@ export default function LoginPage() {
 
   if (authLoading || (user && dashboardPath)) {
     return (
-      <div className="min-h-screen min-h-[100dvh] flex items-center justify-center bg-slate-100">
+      <div className="min-h-screen min-h-dvh flex items-center justify-center bg-slate-100">
         <FontAwesomeIcon
           icon={faCircleNotch}
           spin
@@ -102,30 +102,39 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen min-h-[100dvh] flex items-center justify-center bg-slate-100 p-4 sm:p-6 py-8 sm:py-6 overflow-x-hidden">
-      {/* Rounded container – full width on mobile, ~43vw on larger screens */}
-      <div className="w-full max-w-[640px] sm:w-[43vw] sm:min-w-[320px] rounded-2xl border border-slate-200 overflow-hidden bg-white shadow-sm">
-        {/* Header – centered, blue title; smaller logo on mobile */}
-        <div className="pt-6 sm:pt-10 pb-4 text-center">
-          <img
-            src="/atlas-login.svg"
-            alt="Atlas Logo"
-            className="w-28 h-28 sm:w-40 sm:h-40 md:w-[200px] md:h-[200px] mx-auto object-contain"
-          />
-          <h1
-            className="text-xl sm:text-2xl font-bold mt-3 sm:mt-4"
-            style={{ color: "#0650A0" }}
-          >
-            Atlas Login
-          </h1>
-          <p className="text-xs sm:text-sm mt-1.5 sm:mt-2 text-slate-500 px-2">
-            Secure access for Admins, and Managers
-          </p>
-        </div>
+    <div className="min-h-dvh h-dvh flex justify-center bg-slate-100 overflow-x-hidden">
+      <div className="relative flex h-full w-full max-w-[640px] sm:w-[43vw] sm:min-w-[320px] flex-col overflow-hidden border-0 sm:border sm:border-slate-200 bg-white shadow-sm sm:my-6 sm:h-[calc(100dvh-3rem)] sm:min-h-0 sm:rounded-2xl">
+        <img
+          src="/login_bg.jpeg"
+          alt=""
+          className="pointer-events-none absolute inset-x-0 bottom-0 h-[min(42%,360px)] min-h-[220px] w-full object-cover object-bottom"
+          aria-hidden
+        />
+        <div
+          className="pointer-events-none absolute inset-x-0 bottom-0 h-[min(42%,360px)] min-h-[220px] bg-linear-to-t from-white/25 via-white/55 to-white"
+          aria-hidden
+        />
 
-        {/* Form – less horizontal padding on mobile */}
-        <div className="px-4 sm:px-6 pb-6 sm:pb-8">
-          <form onSubmit={handleLogin} className="space-y-4 sm:space-y-5">
+        <div className="relative z-10 flex min-h-0 flex-1 flex-col">
+          <div className="flex flex-1 flex-col justify-start px-4 sm:px-6 pt-10 sm:pt-14 pb-4">
+            <div className="pb-4 text-center">
+              <img
+                src="/atlas-login.svg"
+                alt="Atlas Logo"
+                className="w-28 h-28 sm:w-40 sm:h-40 md:w-[200px] md:h-[200px] mx-auto object-contain"
+              />
+              <h1
+                className="text-xl sm:text-2xl font-bold mt-3 sm:mt-4"
+                style={{ color: "#0650A0" }}
+              >
+                Atlas Login
+              </h1>
+              <p className="text-xs sm:text-sm mt-1.5 sm:mt-2 text-slate-500 px-2">
+                Secure access for Admins, and Managers
+              </p>
+            </div>
+
+            <form onSubmit={handleLogin} className="space-y-4 sm:space-y-5">
             {/* Email */}
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1.5">
@@ -202,10 +211,10 @@ export default function LoginPage() {
                 <>Sign In</>
               )}
             </button>
-          </form>
+            </form>
+          </div>
 
-          {/* Footer – shield.svg + single line; wraps on narrow screens */}
-          <div className="flex flex-wrap items-center justify-center gap-x-2 gap-y-1 mt-4 sm:mt-6">
+          <div className="flex flex-wrap items-center justify-center gap-x-2 gap-y-1 px-4 sm:px-6 pb-6 sm:pb-8">
             <img
               src="/shield.svg"
               alt=""
