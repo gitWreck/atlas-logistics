@@ -57,6 +57,8 @@ export function ThemeProvider({ children }) {
 
   useEffect(() => {
     if (!hydrated) return;
+    // Appearance.setColorScheme is not implemented on web (react-native-web).
+    if (typeof Appearance.setColorScheme !== "function") return;
     if (preference === "light") Appearance.setColorScheme("light");
     else if (preference === "dark") Appearance.setColorScheme("dark");
     else Appearance.setColorScheme(null);

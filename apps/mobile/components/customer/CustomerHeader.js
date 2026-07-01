@@ -41,7 +41,7 @@ export default function CustomerHeader({
         </View>
         <View>
           <Text style={[styles.greeting, { color: colors.textMuted }]}>
-            Hello,
+            Welcome,
           </Text>
           <Text style={[styles.username, { color: colors.text }]}>
             {userName || "Customer"}
