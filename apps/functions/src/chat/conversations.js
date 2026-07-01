@@ -494,9 +494,28 @@ exports.updateConversationStatus = onCall(
 exports.assignConversation = onCall(
   { region: "asia-southeast1", maxInstances: 10 },
   async (req) => {
-    const { uid, role } = await requireRole(db, req, STAFF_ROLES);
+    const { uid, role, user } = await requireRole(db, req, STAFF_ROLES);
     const conversationId = cleanText(req.data?.conversationId, "conversationId", 160);
-    const assigneeId = String(req.data?.assigneeId || uid).trim();
+    const assignerName = displayName(user, "Staff");
+    const now = FieldValue.serverTimestamp();
+
+    // An empty/absent assigneeId means "unassign" the conversation.
+    const assigneeId = String(req.data?.assigneeId ?? "").trim();
+
+    if (!assigneeId) {
+      await db.collection("conversations").doc(conversationId).update({
+        assignedTo: null,
+        assignedRole: null,
+        assignedToName: null,
+        assignedBy: uid,
+        assignedByName: assignerName,
+        assignedByRole: role,
+        assignedAt: now,
+        updatedAt: now,
+      });
+
+      return { success: true, unassigned: true };
+    }
 
     const assigneeSnap = await db.collection("users").doc(assigneeId).get();
     if (!assigneeSnap.exists) {
@@ -512,11 +531,14 @@ exports.assignConversation = onCall(
     await db.collection("conversations").doc(conversationId).update({
       assignedTo: assigneeId,
       assignedRole: assigneeRole,
+      assignedToName: displayName(assignee, "Staff"),
       participantIds: FieldValue.arrayUnion(assigneeId),
       [`participantRoles.${assigneeId}`]: assigneeRole,
-      updatedAt: FieldValue.serverTimestamp(),
+      updatedAt: now,
       assignedBy: uid,
+      assignedByName: assignerName,
       assignedByRole: role,
+      assignedAt: now,
     });
 
     return { success: true };
