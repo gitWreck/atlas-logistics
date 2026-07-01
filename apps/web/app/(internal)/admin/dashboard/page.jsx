@@ -367,7 +367,11 @@ export default function AdminDashboardPage() {
               )}
 
               {activeTab === "chat" && (
-                <ChatInbox user={user} isDark={isDark} />
+                <ChatInbox
+                  user={user}
+                  isDark={isDark}
+                  onViewCustomers={() => setActiveTab("customers")}
+                />
               )}
 
               {activeTab === "settings" && (
