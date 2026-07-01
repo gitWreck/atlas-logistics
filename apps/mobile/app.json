@@ -49,10 +49,10 @@
         "origin": false
       },
       "eas": {
-        "projectId": "3ec04372-8f0b-4964-b303-cd522153e2ae"
+        "projectId": "ec8f27c9-8cdf-4b23-9287-63a396bb6cff"
       }
     },
-    "owner": "atlas-transport",
+    "owner": "atlas-corporation",
     "plugins": [
       "expo-router",
       "expo-font",
