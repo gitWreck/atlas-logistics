@@ -11,7 +11,7 @@ const db = admin.firestore();
 const FieldValue = admin.firestore.FieldValue;
 
 const STAFF_ROLES = ["admin", "manager"];
-const VALID_STATUSES = ["open", "pending", "resolved", "closed"];
+const VALID_STATUSES = ["open", "pending", "resolved", "closed", "archived"];
 const VALID_PRIORITIES = ["normal", "urgent"];
 
 function cleanText(value, fieldName = "text", maxLength = 2000) {
