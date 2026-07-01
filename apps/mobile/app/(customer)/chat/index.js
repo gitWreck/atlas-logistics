@@ -5,11 +5,13 @@ import {
   FlatList,
   Modal,
   Platform,
+  Pressable,
   SafeAreaView,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
+  useWindowDimensions,
   View,
   StatusBar as RNStatusBar,
 } from "react-native";
@@ -30,69 +32,106 @@ import {
   markConversationRead,
 } from "../../../components/utilities/FirebaseFunctions";
 import { useTheme } from "../../../contexts/ThemeContext";
+import ChatThread from "../../../components/chat/ChatThread";
+import {
+  ConversationSkeleton,
+  SupportAvatar,
+} from "../../../components/chat/ChatComponents";
+import {
+  displayMessagePreview,
+  formatListTime,
+  getChatColors,
+  getStatusMeta,
+} from "../../../components/chat/chatUtils";
 
-function formatTime(value) {
-  const date = value?.toDate?.() || null;
-  if (!date) return "Recently";
-  return new Intl.DateTimeFormat("en-US", {
-    month: "short",
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  }).format(date);
-}
+// Breakpoint at which we switch to the Messenger-style two-panel layout
+// (conversation list on the left, active thread on the right).
+const TWO_PANEL_WIDTH = 900;
 
-function getStatusStyle(status) {
-  const normalized = String(status || "open").toLowerCase();
+function ConversationRow({ item, colors, unread, active, onPress }) {
+  const statusMeta = getStatusMeta(item.status);
+  const isYou = item.lastMessageBy === auth.currentUser?.uid;
+  const preview = displayMessagePreview({ text: item.lastMessageText });
+  const previewText = preview
+    ? `${isYou ? "You: " : ""}${preview}`
+    : "Conversation started";
 
-  if (normalized === "pending") {
-    return {
-      icon: "#d97706",
-      border: "#f59e0b",
-      soft: "#fffbeb",
-      chip: "#f59e0b",
-      text: "#92400e",
-    };
-  }
-
-  if (normalized === "resolved") {
-    return {
-      icon: "#2563eb",
-      border: "#60a5fa",
-      soft: "#eff6ff",
-      chip: "#2563eb",
-      text: "#1d4ed8",
-    };
-  }
-
-  if (normalized === "closed") {
-    return {
-      icon: "#64748b",
-      border: "#cbd5e1",
-      soft: "#f8fafc",
-      chip: "#64748b",
-      text: "#475569",
-    };
-  }
-
-  return {
-    icon: "#059669",
-    border: "#34d399",
-    soft: "#ecfdf5",
-    chip: "#059669",
-    text: "#047857",
-  };
+  return (
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.row,
+        active && { backgroundColor: colors.accentSoft },
+        pressed && !active && { backgroundColor: colors.cardMuted },
+      ]}
+      android_ripple={{ color: colors.cardMuted }}
+    >
+      <SupportAvatar size={56} online ringColor={colors.surface} />
+      <View style={styles.rowBody}>
+        <View style={styles.rowTop}>
+          <Text
+            style={[
+              styles.rowTitle,
+              { color: colors.text },
+              unread > 0 && styles.rowTitleUnread,
+            ]}
+            numberOfLines={1}
+          >
+            {item.trackingNumber || "Atlas Support"}
+          </Text>
+          <Text
+            style={[
+              styles.rowTime,
+              { color: unread > 0 ? colors.accent : colors.textMuted },
+            ]}
+          >
+            {formatListTime(item.lastMessageAt)}
+          </Text>
+        </View>
+        <View style={styles.rowBottom}>
+          <Text
+            style={[
+              styles.rowPreview,
+              { color: unread > 0 ? colors.text : colors.textMuted },
+              unread > 0 && styles.rowPreviewUnread,
+            ]}
+            numberOfLines={1}
+          >
+            {previewText}
+          </Text>
+          {unread > 0 ? (
+            <View style={[styles.badge, { backgroundColor: colors.unread }]}>
+              <Text style={styles.badgeText}>{unread > 9 ? "9+" : unread}</Text>
+            </View>
+          ) : (
+            <View
+              style={[styles.statusDotSm, { backgroundColor: statusMeta.dot }]}
+            />
+          )}
+        </View>
+      </View>
+    </Pressable>
+  );
 }
 
 export default function CustomerChatListScreen() {
   const router = useRouter();
-  const { colors, resolvedScheme } = useTheme();
+  const { colors: themeColors, resolvedScheme } = useTheme();
+  const colors = useMemo(
+    () => getChatColors(themeColors, resolvedScheme),
+    [themeColors, resolvedScheme],
+  );
+  const { width } = useWindowDimensions();
+  const twoPanel = width >= TWO_PANEL_WIDTH;
+
   const [conversations, setConversations] = useState([]);
   const [loading, setLoading] = useState(true);
   const [starting, setStarting] = useState(false);
   const [markingRead, setMarkingRead] = useState(false);
   const [composeVisible, setComposeVisible] = useState(false);
   const [initialMessage, setInitialMessage] = useState("");
+  const [search, setSearch] = useState("");
+  const [selectedId, setSelectedId] = useState(null);
 
   useEffect(() => {
     const user = auth.currentUser;
@@ -121,13 +160,51 @@ export default function CustomerChatListScreen() {
     return unsubscribe;
   }, []);
 
-  const unreadTotal = useMemo(() => {
-    const uid = auth.currentUser?.uid;
-    return conversations.reduce(
-      (sum, item) => sum + Number(item.unreadCounts?.[uid] || 0),
-      0,
-    );
-  }, [conversations]);
+  const uid = auth.currentUser?.uid;
+
+  const unreadTotal = useMemo(
+    () =>
+      conversations.reduce(
+        (sum, item) => sum + Number(item.unreadCounts?.[uid] || 0),
+        0,
+      ),
+    [conversations, uid],
+  );
+
+  const filtered = useMemo(() => {
+    const term = search.trim().toLowerCase();
+    if (!term) return conversations;
+    return conversations.filter((item) => {
+      const haystack = [
+        item.trackingNumber,
+        item.customerName,
+        item.status,
+        item.lastMessageText,
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+      return haystack.includes(term);
+    });
+  }, [conversations, search]);
+
+  // Auto-select the first conversation when the two-panel layout is active.
+  useEffect(() => {
+    if (twoPanel && !selectedId && filtered.length) {
+      setSelectedId(filtered[0].id);
+    }
+  }, [twoPanel, selectedId, filtered]);
+
+  const openConversation = (id) => {
+    if (twoPanel) {
+      setSelectedId(id);
+    } else {
+      router.push({
+        pathname: "/(customer)/chat/[conversationId]",
+        params: { conversationId: id },
+      });
+    }
+  };
 
   const handleStartGeneral = async () => {
     const message = initialMessage.trim();
@@ -143,10 +220,7 @@ export default function CustomerChatListScreen() {
       if (conversationId) {
         setInitialMessage("");
         setComposeVisible(false);
-        router.push({
-          pathname: "/(customer)/chat/[conversationId]",
-          params: { conversationId },
-        });
+        openConversation(conversationId);
       }
     } catch (error) {
       console.error("Failed to start chat:", error);
@@ -156,7 +230,6 @@ export default function CustomerChatListScreen() {
   };
 
   const handleMarkAllRead = async () => {
-    const uid = auth.currentUser?.uid;
     const unreadConversations = conversations.filter(
       (item) => Number(item.unreadCounts?.[uid] || 0) > 0,
     );
@@ -177,162 +250,165 @@ export default function CustomerChatListScreen() {
     }
   };
 
-  const renderItem = ({ item }) => {
-    const unread = Number(item.unreadCounts?.[auth.currentUser?.uid] || 0);
-    const statusStyle = getStatusStyle(item.status);
-    return (
-      <TouchableOpacity
-        style={[
-          styles.card,
-          {
-            backgroundColor: colors.surface,
-            borderColor: unread > 0 ? statusStyle.border : colors.border,
-          },
-          unread > 0 && styles.cardUnread,
-        ]}
-        activeOpacity={0.85}
-        onPress={() =>
-          router.push({
-            pathname: "/(customer)/chat/[conversationId]",
-            params: { conversationId: item.id },
-          })
-        }
-      >
-        <View style={[styles.avatar, { backgroundColor: statusStyle.soft }]}>
-          <FontAwesome5 name="headset" size={16} color={statusStyle.icon} />
-        </View>
-        <View style={styles.cardBody}>
-          <View style={styles.row}>
-            <Text style={[styles.title, { color: colors.text }]}>
-              {item.trackingNumber || "Support"}
-            </Text>
-            <Text style={[styles.time, { color: colors.textMuted }]}>
-              {formatTime(item.lastMessageAt)}
-            </Text>
-          </View>
-          <View style={styles.statusRow}>
-            <View
-              style={[styles.statusChip, { backgroundColor: statusStyle.soft }]}
-            >
-              <View
-                style={[
-                  styles.statusDot,
-                  { backgroundColor: statusStyle.chip },
-                ]}
-              />
-              <Text style={[styles.statusText, { color: statusStyle.text }]}>
-                {item.status || "open"}
-              </Text>
-            </View>
-            <Text style={[styles.subtitle, { color: colors.textMuted }]}>
-              {item.customerName || "You"}
-            </Text>
-          </View>
-          <Text
-            style={[styles.preview, { color: colors.text }]}
-            numberOfLines={1}
-          >
-            {item.lastMessageText || "Conversation started"}
-          </Text>
-        </View>
-        {unread > 0 && (
-          <View style={styles.badge}>
-            <Text style={styles.badgeText}>{unread > 9 ? "9+" : unread}</Text>
-          </View>
-        )}
-      </TouchableOpacity>
-    );
-  };
-
-  return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.bg }]}>
-      <StatusBar style={resolvedScheme === "dark" ? "light" : "dark"} />
-
-      <View
-        style={[
-          styles.header,
-          { backgroundColor: colors.surface, borderBottomColor: colors.border },
-        ]}
-      >
-        <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
-          <FontAwesome5 name="chevron-left" size={16} color={colors.text} />
+  const renderHeader = () => (
+    <View
+      style={[
+        styles.header,
+        { backgroundColor: colors.surface, borderBottomColor: colors.border },
+      ]}
+    >
+      {!twoPanel && (
+        <TouchableOpacity style={styles.iconBtn} onPress={() => router.back()}>
+          <FontAwesome5 name="chevron-left" size={18} color={colors.accent} />
         </TouchableOpacity>
-        <View style={styles.headerText}>
-          <Text style={[styles.headerTitle, { color: colors.text }]}>
-            Messages
-          </Text>
-          <Text style={[styles.headerSubtitle, { color: colors.textMuted }]}>
-            {unreadTotal} unread
-          </Text>
-        </View>
-        {unreadTotal > 0 && (
-          <TouchableOpacity
-            style={[
-              styles.markReadBtn,
-              { borderColor: colors.border, backgroundColor: colors.cardMuted },
-            ]}
-            onPress={handleMarkAllRead}
-            disabled={markingRead}
-          >
-            {markingRead ? (
-              <ActivityIndicator size="small" color={colors.textMuted} />
-            ) : (
-              <FontAwesome5
-                name="check-double"
-                size={13}
-                color={colors.textMuted}
-              />
-            )}
-          </TouchableOpacity>
-        )}
+      )}
+      <View style={styles.headerText}>
+        <Text style={[styles.headerTitle, { color: colors.text }]}>Chats</Text>
+        <Text style={[styles.headerSubtitle, { color: colors.textMuted }]}>
+          {unreadTotal > 0 ? `${unreadTotal} unread` : "All caught up"}
+        </Text>
+      </View>
+      {unreadTotal > 0 && (
         <TouchableOpacity
-          style={styles.startBtn}
-          onPress={() => setComposeVisible(true)}
-          disabled={starting}
+          style={[styles.iconBtn, { backgroundColor: colors.cardMuted }]}
+          onPress={handleMarkAllRead}
+          disabled={markingRead}
         >
-          {starting ? (
-            <ActivityIndicator size="small" color="#ffffff" />
+          {markingRead ? (
+            <ActivityIndicator size="small" color={colors.textMuted} />
           ) : (
-            <FontAwesome5 name="plus" size={14} color="#ffffff" />
+            <FontAwesome5 name="check-double" size={14} color={colors.textMuted} />
           )}
         </TouchableOpacity>
-      </View>
+      )}
+      <TouchableOpacity
+        style={[styles.composeBtn, { backgroundColor: colors.accent }]}
+        onPress={() => setComposeVisible(true)}
+        disabled={starting}
+      >
+        {starting ? (
+          <ActivityIndicator size="small" color="#ffffff" />
+        ) : (
+          <FontAwesome5 name="pen" size={14} color="#ffffff" />
+        )}
+      </TouchableOpacity>
+    </View>
+  );
 
+  const renderSearch = () => (
+    <View style={styles.searchWrap}>
+      <View
+        style={[
+          styles.searchBar,
+          { backgroundColor: colors.inputBar, borderColor: colors.border },
+        ]}
+      >
+        <FontAwesome5 name="search" size={13} color={colors.textMuted} />
+        <TextInput
+          style={[styles.searchInput, { color: colors.text }]}
+          value={search}
+          onChangeText={setSearch}
+          placeholder="Search messages"
+          placeholderTextColor={colors.textMuted}
+        />
+        {search.length > 0 && (
+          <TouchableOpacity onPress={() => setSearch("")} hitSlop={8}>
+            <FontAwesome5 name="times-circle" size={15} color={colors.textMuted} />
+          </TouchableOpacity>
+        )}
+      </View>
+    </View>
+  );
+
+  const renderList = () => (
+    <>
+      {renderSearch()}
       {loading ? (
-        <View style={styles.center}>
-          <ActivityIndicator size="large" color="#2563eb" />
+        <View>
+          {Array.from({ length: 7 }).map((_, i) => (
+            <ConversationSkeleton key={i} colors={colors} />
+          ))}
         </View>
       ) : (
         <FlatList
-          data={conversations}
+          data={filtered}
           keyExtractor={(item) => item.id}
-          renderItem={renderItem}
-          contentContainerStyle={[
-            styles.list,
-            conversations.length === 0 && styles.emptyList,
-          ]}
+          renderItem={({ item }) => (
+            <ConversationRow
+              item={item}
+              colors={colors}
+              unread={Number(item.unreadCounts?.[uid] || 0)}
+              active={twoPanel && item.id === selectedId}
+              onPress={() => openConversation(item.id)}
+            />
+          )}
+          contentContainerStyle={
+            filtered.length === 0 ? styles.emptyList : styles.list
+          }
+          keyboardShouldPersistTaps="handled"
           ListEmptyComponent={
             <View style={styles.emptyState}>
-              <FontAwesome5
-                name="comments"
-                size={34}
-                color={colors.textMuted}
-              />
+              <SupportAvatar size={72} online ringColor={colors.bg} />
               <Text style={[styles.emptyTitle, { color: colors.text }]}>
-                No messages yet
+                {search ? "No matches found" : "No messages yet"}
               </Text>
               <Text style={[styles.emptyText, { color: colors.textMuted }]}>
-                Start a support chat when you need help with a shipment.
+                {search
+                  ? "Try a different tracking number or keyword."
+                  : "Start a support chat when you need help with a shipment."}
               </Text>
-              <TouchableOpacity
-                style={styles.emptyButton}
-                onPress={() => setComposeVisible(true)}
-              >
-                <Text style={styles.emptyButtonText}>Start Chat</Text>
-              </TouchableOpacity>
+              {!search && (
+                <TouchableOpacity
+                  style={[styles.emptyButton, { backgroundColor: colors.accent }]}
+                  onPress={() => setComposeVisible(true)}
+                >
+                  <FontAwesome5 name="pen" size={13} color="#ffffff" />
+                  <Text style={styles.emptyButtonText}>Start a chat</Text>
+                </TouchableOpacity>
+              )}
             </View>
           }
         />
+      )}
+    </>
+  );
+
+  return (
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.surface }]}>
+      <StatusBar style={resolvedScheme === "dark" ? "light" : "dark"} />
+
+      {twoPanel ? (
+        <View style={styles.splitRoot}>
+          <View
+            style={[
+              styles.splitList,
+              { backgroundColor: colors.surface, borderRightColor: colors.border },
+            ]}
+          >
+            {renderHeader()}
+            {renderList()}
+          </View>
+          <View style={[styles.splitThread, { backgroundColor: colors.chatBg }]}>
+            {selectedId ? (
+              <ChatThread conversationId={selectedId} />
+            ) : (
+              <View style={styles.splitPlaceholder}>
+                <SupportAvatar size={80} online ringColor={colors.chatBg} />
+                <Text style={[styles.placeholderTitle, { color: colors.text }]}>
+                  Your messages
+                </Text>
+                <Text style={[styles.placeholderText, { color: colors.textMuted }]}>
+                  Select a conversation to start chatting with Atlas Support.
+                </Text>
+              </View>
+            )}
+          </View>
+        </View>
+      ) : (
+        <>
+          {renderHeader()}
+          {renderList()}
+        </>
       )}
 
       <Modal
@@ -359,7 +435,7 @@ export default function CustomerChatListScreen() {
                 styles.modalInput,
                 {
                   color: colors.text,
-                  backgroundColor: colors.cardMuted,
+                  backgroundColor: colors.inputBar,
                   borderColor: colors.border,
                 },
               ]}
@@ -389,6 +465,7 @@ export default function CustomerChatListScreen() {
               <TouchableOpacity
                 style={[
                   styles.modalSend,
+                  { backgroundColor: colors.accent },
                   (!initialMessage.trim() || starting) && styles.sendDisabled,
                 ]}
                 onPress={handleStartGeneral}
@@ -413,173 +490,110 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingTop: Platform.OS === "android" ? RNStatusBar.currentHeight || 0 : 0,
   },
+  splitRoot: { flex: 1, flexDirection: "row" },
+  splitList: {
+    width: 360,
+    borderRightWidth: 1,
+  },
+  splitThread: { flex: 1 },
+  splitPlaceholder: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 40,
+    gap: 10,
+  },
+  placeholderTitle: { fontSize: 20, fontWeight: "800", marginTop: 6 },
+  placeholderText: { fontSize: 14, textAlign: "center", lineHeight: 20 },
   header: {
-    minHeight: 64,
+    minHeight: 60,
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 16,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    gap: 8,
     borderBottomWidth: 1,
   },
-  backBtn: {
-    width: 40,
-    height: 40,
+  iconBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
     alignItems: "center",
     justifyContent: "center",
   },
-  headerText: {
-    flex: 1,
-    marginLeft: 4,
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: "800",
-  },
-  headerSubtitle: {
-    fontSize: 12,
-    marginTop: 2,
-  },
-  startBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+  headerText: { flex: 1, marginLeft: 2 },
+  headerTitle: { fontSize: 22, fontWeight: "800" },
+  headerSubtitle: { fontSize: 12, marginTop: 1 },
+  composeBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#2563eb",
   },
-  markReadBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+  searchWrap: { paddingHorizontal: 14, paddingTop: 10, paddingBottom: 4 },
+  searchBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    height: 38,
+    borderRadius: 19,
     borderWidth: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    marginRight: 8,
+    paddingHorizontal: 14,
   },
-  center: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  list: {
-    padding: 16,
-  },
-  emptyList: {
-    flexGrow: 1,
-    justifyContent: "center",
-  },
-  card: {
+  searchInput: { flex: 1, fontSize: 14, paddingVertical: 0 },
+  list: { paddingVertical: 4 },
+  emptyList: { flexGrow: 1, justifyContent: "center" },
+  row: {
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
-    borderWidth: 1,
-    borderRadius: 12,
-    padding: 14,
-    marginBottom: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
   },
-  cardUnread: {
-    borderWidth: 1.5,
-  },
-  avatar: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "#eff6ff",
-  },
-  cardBody: {
-    flex: 1,
-    minWidth: 0,
-  },
-  row: {
+  rowBody: { flex: 1, minWidth: 0, justifyContent: "center" },
+  rowTop: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     gap: 8,
   },
-  title: {
-    flex: 1,
-    fontSize: 14,
-    fontWeight: "800",
-  },
-  time: {
-    fontSize: 11,
-    fontWeight: "600",
-  },
-  subtitle: {
-    fontSize: 12,
-    textTransform: "capitalize",
-  },
-  statusRow: {
+  rowTitle: { flex: 1, fontSize: 15, fontWeight: "600" },
+  rowTitleUnread: { fontWeight: "800" },
+  rowTime: { fontSize: 12, fontWeight: "600" },
+  rowBottom: {
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "space-between",
     gap: 8,
-    marginTop: 6,
+    marginTop: 3,
   },
-  statusChip: {
-    height: 22,
-    borderRadius: 11,
-    paddingHorizontal: 8,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 5,
-  },
-  statusDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-  },
-  statusText: {
-    fontSize: 10,
-    fontWeight: "800",
-    textTransform: "uppercase",
-  },
-  preview: {
-    marginTop: 5,
-    fontSize: 13,
-  },
+  rowPreview: { flex: 1, fontSize: 13 },
+  rowPreviewUnread: { fontWeight: "700" },
+  statusDotSm: { width: 8, height: 8, borderRadius: 4 },
   badge: {
-    minWidth: 22,
-    height: 22,
-    borderRadius: 11,
+    minWidth: 20,
+    height: 20,
+    borderRadius: 10,
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: 6,
-    backgroundColor: "#ef4444",
   },
-  badgeText: {
-    color: "#ffffff",
-    fontSize: 10,
-    fontWeight: "800",
-  },
-  emptyState: {
-    alignItems: "center",
-    paddingHorizontal: 28,
-  },
-  emptyTitle: {
-    marginTop: 14,
-    fontSize: 17,
-    fontWeight: "800",
-  },
-  emptyText: {
-    marginTop: 6,
-    textAlign: "center",
-    fontSize: 13,
-    lineHeight: 19,
-  },
+  badgeText: { color: "#ffffff", fontSize: 11, fontWeight: "800" },
+  emptyState: { alignItems: "center", paddingHorizontal: 30, gap: 8 },
+  emptyTitle: { marginTop: 12, fontSize: 18, fontWeight: "800" },
+  emptyText: { textAlign: "center", fontSize: 13, lineHeight: 19 },
   emptyButton: {
-    marginTop: 18,
-    height: 42,
-    borderRadius: 10,
-    paddingHorizontal: 18,
+    marginTop: 16,
+    flexDirection: "row",
     alignItems: "center",
+    gap: 8,
+    height: 44,
+    borderRadius: 22,
+    paddingHorizontal: 20,
     justifyContent: "center",
-    backgroundColor: "#2563eb",
   },
-  emptyButtonText: {
-    color: "#ffffff",
-    fontWeight: "800",
-  },
+  emptyButtonText: { color: "#ffffff", fontWeight: "800" },
   modalBackdrop: {
     flex: 1,
     backgroundColor: "rgba(15, 23, 42, 0.45)",
@@ -590,19 +604,12 @@ const styles = StyleSheet.create({
   modalCard: {
     width: "100%",
     maxWidth: 420,
-    borderRadius: 16,
+    borderRadius: 18,
     borderWidth: 1,
     padding: 18,
   },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: "800",
-  },
-  modalSubtitle: {
-    marginTop: 5,
-    fontSize: 13,
-    lineHeight: 18,
-  },
+  modalTitle: { fontSize: 18, fontWeight: "800" },
+  modalSubtitle: { marginTop: 5, fontSize: 13, lineHeight: 18 },
   modalInput: {
     minHeight: 112,
     maxHeight: 180,
@@ -621,30 +628,22 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   modalCancel: {
-    height: 42,
-    borderRadius: 10,
+    height: 44,
+    borderRadius: 12,
     borderWidth: 1,
     paddingHorizontal: 16,
     alignItems: "center",
     justifyContent: "center",
   },
-  modalCancelText: {
-    fontWeight: "800",
-  },
+  modalCancelText: { fontWeight: "800" },
   modalSend: {
-    minWidth: 82,
-    height: 42,
-    borderRadius: 10,
+    minWidth: 88,
+    height: 44,
+    borderRadius: 12,
     paddingHorizontal: 18,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#2563eb",
   },
-  sendDisabled: {
-    opacity: 0.45,
-  },
-  modalSendText: {
-    color: "#ffffff",
-    fontWeight: "800",
-  },
+  sendDisabled: { opacity: 0.45 },
+  modalSendText: { color: "#ffffff", fontWeight: "800" },
 });
