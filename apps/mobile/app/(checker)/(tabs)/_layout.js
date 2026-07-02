@@ -42,62 +42,63 @@ export default function CheckerTabsLayout() {
           tabBarStyle: {
             backgroundColor: colors.surface,
             borderTopColor: colors.border,
-            height: 60,
+            borderTopWidth: StyleSheet.hairlineWidth,
+            height: 64,
             paddingBottom: 8,
             paddingTop: 8,
           },
-          tabBarActiveTintColor: "#07B9F4",
+          tabBarActiveTintColor: "#2563eb",
           tabBarInactiveTintColor: colors.textMuted,
           tabBarLabelStyle: {
-            fontSize: 10,
-            fontWeight: "600",
-            marginTop: 4,
+            fontSize: 11,
+            fontWeight: "700",
+            marginTop: 2,
           },
         }}
       >
         <Tabs.Screen
           name="index"
           options={{
-            title: "Dashboard",
+            title: "Home",
             tabBarIcon: ({ color }) => (
-              <FontAwesome5 name="th-large" size={20} color={color} />
+              <FontAwesome5 name="home" size={20} color={color} />
             ),
           }}
         />
 
         <Tabs.Screen
-          name="trips"
-          options={{
-            title: "Active Loads",
-            tabBarIcon: ({ color }) => (
-              <FontAwesome5 name="truck-loading" size={20} color={color} />
-            ),
-          }}
-        />
-        <Tabs.Screen
           name="available-to-load"
           options={{
             title: "Available",
             tabBarIcon: ({ color }) => (
-              <FontAwesome5 name="warehouse" size={20} color={color} />
+              <FontAwesome5 name="box" size={20} color={color} />
             ),
           }}
         />
         <Tabs.Screen
           name="deliveries"
           options={{
-            title: "My Route",
+            title: "Route",
             tabBarIcon: ({ color }) => (
-              <FontAwesome5 name="clipboard-list" size={20} color={color} />
+              <FontAwesome5 name="map-marker-alt" size={20} color={color} />
             ),
           }}
         />
         <Tabs.Screen
           name="delivery-load"
           options={{
-            title: "My Load",
+            title: "Load",
             tabBarIcon: ({ color }) => (
-              <FontAwesome5 name="shipping-fast" size={20} color={color} />
+              <FontAwesome5 name="truck" size={20} color={color} />
+            ),
+          }}
+        />
+        <Tabs.Screen
+          name="trips"
+          options={{
+            title: "Trips",
+            tabBarIcon: ({ color }) => (
+              <FontAwesome5 name="clipboard-list" size={20} color={color} />
             ),
           }}
         />

@@ -2267,6 +2267,14 @@ export default function ScannerScreen() {
   };
 
   const modeLabel = getModeLabel(resolvedMode);
+  const scanAccentColor = (() => {
+    const status = String(scanActionStatus || "").toUpperCase();
+    if (resolvedMode === "info") return "#7c3aed";
+    if (status === "DELIVERED") return "#16a34a";
+    if (status === "FAILED_DELIVERY") return "#dc2626";
+    if (status === "RETURNED_TO_WAREHOUSE") return "#f97316";
+    return "#2563eb"; // load / default
+  })();
   const latestTypeLabel = getLatestTypeLabel(latestScan.type);
   const progressLabel = getProgressLabel(resolvedMode);
   const hasTripContext = !!(tripSummary.tripId || resolvedTripId);
@@ -2314,6 +2322,7 @@ export default function ScannerScreen() {
         onBack={() => router.back()}
         onToggleFlash={() => setFlashEnabled((current) => !current)}
         onBarcodeScanned={onCameraScan}
+        accentColor={scanAccentColor}
       />
 
       <ScanDetailsSheet
@@ -2530,6 +2539,7 @@ export default function ScannerScreen() {
         payload={successPayload}
         countdown={countdown}
         onClose={closeSuccessModal}
+        accentColor={scanAccentColor}
       />
     </View>
   );

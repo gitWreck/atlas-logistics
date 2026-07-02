@@ -178,8 +178,8 @@ export default function DeliveryLoadScreen({ showBackButton = false }) {
       {/* Header */}
       <View style={styles.header}>
         <View style={styles.headerText}>
-          <Text style={[styles.headerTitle, { color: colors.text }]}>
-            Delivery Load
+          <Text style={[styles.headerTitle, { color: "#2563eb" }]}>
+            MY LOAD
           </Text>
           <Text style={[styles.headerSub, { color: colors.textMuted }]}>
             {summary.manifestCount} load
@@ -188,7 +188,7 @@ export default function DeliveryLoadScreen({ showBackButton = false }) {
           </Text>
         </View>
         <TouchableOpacity
-          style={[styles.scanBtn, { backgroundColor: colors.text }]}
+          style={[styles.scanBtn, { backgroundColor: "#2563eb" }]}
           onPress={() =>
             router.push({
               pathname: "/(checker)/scan",
@@ -201,8 +201,8 @@ export default function DeliveryLoadScreen({ showBackButton = false }) {
           }
           activeOpacity={0.85}
         >
-          <FontAwesome5 name="qrcode" size={13} color={colors.bg} />
-          <Text style={[styles.scanBtnText, { color: colors.bg }]}>Scan</Text>
+          <FontAwesome5 name="qrcode" size={13} color="#ffffff" />
+          <Text style={[styles.scanBtnText, { color: "#ffffff" }]}>Scan</Text>
         </TouchableOpacity>
       </View>
 
