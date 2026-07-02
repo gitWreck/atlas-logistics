@@ -353,6 +353,7 @@ export default function ManagerDashboardPage() {
               {activeTab === "chat" && (
                 <ChatInbox
                   user={user}
+                  profile={profile}
                   isDark={isDark}
                   onViewCustomers={() => setActiveTab("customers")}
                 />
