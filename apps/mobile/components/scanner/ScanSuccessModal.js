@@ -13,7 +13,19 @@ export default function ScanSuccessModal({
   payload,
   countdown,
   onClose,
+  accentColor = "#2563eb",
 }) {
+  const pending = !!payload?.pendingSync;
+  const confetti = [
+    { top: 2, left: 30, color: "#f59e0b", size: 8 },
+    { top: 10, left: 96, color: "#ec4899", size: 6 },
+    { top: 0, left: 150, color: "#3b82f6", size: 7 },
+    { top: 30, left: 8, color: "#10b981", size: 6 },
+    { top: 34, left: 176, color: "#8b5cf6", size: 8 },
+    { top: 58, left: 44, color: "#06b6d4", size: 6 },
+    { top: 62, left: 140, color: "#f43f5e", size: 7 },
+  ];
+
   return (
     <Modal
       visible={visible}
@@ -23,18 +35,53 @@ export default function ScanSuccessModal({
     >
       <View style={styles.overlay}>
         <View style={styles.card}>
-          <View style={styles.iconWrap}>
-            <FontAwesome5 name="check" size={24} color="#fff" />
+          <View style={styles.iconArea}>
+            {!pending
+              ? confetti.map((c, i) => (
+                  <View
+                    key={i}
+                    style={[
+                      styles.confetti,
+                      {
+                        top: c.top,
+                        left: c.left,
+                        width: c.size,
+                        height: c.size,
+                        backgroundColor: c.color,
+                      },
+                    ]}
+                  />
+                ))
+              : null}
+            <View
+              style={[
+                styles.iconWrap,
+                { backgroundColor: pending ? "#f59e0b" : "#16a34a" },
+              ]}
+            >
+              <FontAwesome5
+                name={pending ? "cloud-upload-alt" : "check"}
+                size={26}
+                color="#fff"
+              />
+            </View>
           </View>
 
-          <Text style={styles.title}>
-            {payload?.pendingSync ? "Saved — Pending Sync" : "Success"}
+          <Text
+            style={[
+              styles.title,
+              { color: pending ? "#b45309" : "#16a34a" },
+            ]}
+          >
+            {pending
+              ? "Saved — Pending Sync"
+              : payload?.successTitle || "Success!"}
           </Text>
           <Text style={styles.message}>
             {payload?.message || "Package processed successfully."}
           </Text>
 
-          {payload?.pendingSync ? (
+          {pending ? (
             <View style={styles.pendingBadge}>
               <FontAwesome5 name="cloud-upload-alt" size={12} color="#b45309" />
               <Text style={styles.pendingText}>
@@ -57,15 +104,26 @@ export default function ScanSuccessModal({
             />
           </View>
 
-          <Text style={styles.countdown}>Closing in {countdown}s</Text>
+          <TouchableOpacity
+            style={[styles.primaryButton, { backgroundColor: accentColor }]}
+            onPress={onClose}
+            activeOpacity={0.85}
+          >
+            <FontAwesome5 name="qrcode" size={14} color="#fff" />
+            <Text style={styles.primaryButtonText}>SCAN ANOTHER</Text>
+          </TouchableOpacity>
 
           <TouchableOpacity
-            style={styles.closeButton}
+            style={[styles.doneButton, { borderColor: accentColor }]}
             onPress={onClose}
-            activeOpacity={0.8}
+            activeOpacity={0.85}
           >
-            <Text style={styles.closeButtonText}>Close Now</Text>
+            <Text style={[styles.doneButtonText, { color: accentColor }]}>
+              DONE
+            </Text>
           </TouchableOpacity>
+
+          <Text style={styles.countdown}>Auto-closing in {countdown}s</Text>
         </View>
       </View>
     </Modal>
@@ -97,19 +155,30 @@ const styles = StyleSheet.create({
     padding: 24,
     alignItems: "center",
   },
-  iconWrap: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: "#10b981",
+  iconArea: {
+    width: 200,
+    height: 88,
     alignItems: "center",
     justifyContent: "center",
-    marginBottom: 14,
+    marginBottom: 6,
+  },
+  confetti: {
+    position: "absolute",
+    borderRadius: 2,
+    transform: [{ rotate: "20deg" }],
+  },
+  iconWrap: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: "#16a34a",
+    alignItems: "center",
+    justifyContent: "center",
   },
   title: {
     fontSize: 20,
     fontWeight: "800",
-    color: "#0f172a",
+    color: "#16a34a",
   },
   message: {
     marginTop: 8,
@@ -160,22 +229,38 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
   countdown: {
-    marginTop: 16,
+    marginTop: 14,
     fontSize: 12,
     color: "#94a3b8",
     fontWeight: "700",
   },
-  closeButton: {
-    marginTop: 14,
+  primaryButton: {
+    marginTop: 18,
     width: "100%",
-    backgroundColor: "#0f172a",
-    paddingVertical: 14,
-    borderRadius: 14,
+    flexDirection: "row",
     alignItems: "center",
+    justifyContent: "center",
+    gap: 10,
+    paddingVertical: 15,
+    borderRadius: 14,
   },
-  closeButtonText: {
+  primaryButtonText: {
     color: "#ffffff",
     fontSize: 14,
     fontWeight: "800",
+    letterSpacing: 0.5,
+  },
+  doneButton: {
+    marginTop: 10,
+    width: "100%",
+    paddingVertical: 13,
+    borderRadius: 14,
+    borderWidth: 1.5,
+    alignItems: "center",
+  },
+  doneButtonText: {
+    fontSize: 14,
+    fontWeight: "800",
+    letterSpacing: 0.5,
   },
 });

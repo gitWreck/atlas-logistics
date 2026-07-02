@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import {
   View,
   Text,
@@ -6,6 +6,7 @@ import {
   ScrollView,
   RefreshControl,
   TouchableOpacity,
+  TextInput,
   Platform,
   StatusBar,
 } from "react-native";
@@ -13,9 +14,14 @@ import { useRouter } from "expo-router";
 import { FontAwesome5 } from "@expo/vector-icons";
 import { useAuth } from "../../contexts/AuthContext";
 import { useTheme } from "../../contexts/ThemeContext";
-import StatusBadge from "../ui/StatusBadge";
 import { useCheckerLastMile } from "../../contexts/CheckerLastMileContext";
 import { formatPoolCountLine } from "../utilities/checkerDeliveryPool";
+import {
+  SectionHeader,
+  Card,
+  PrimaryButton,
+} from "./design/primitives";
+import { SECTION } from "./design/checkerTheme";
 
 function getTimeLabel(value) {
   if (!value) return "No recent update";
@@ -34,6 +40,8 @@ export default function AvailableToLoadScreen() {
   const { profile } = useAuth();
   const { colors } = useTheme();
   const [refreshing, setRefreshing] = useState(false);
+  const [search, setSearch] = useState("");
+  const accent = SECTION.available.accent;
 
   const {
     availableShipments,
@@ -53,6 +61,16 @@ export default function AvailableToLoadScreen() {
     { shipments: 0, available: 0, mine: 0, others: 0 },
   );
 
+  const filteredShipments = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return availableShipments;
+    return availableShipments.filter((s) => {
+      const id = (s.shipmentId || s.id || "").toLowerCase();
+      const name = (s.recipient?.name || "").toLowerCase();
+      return id.includes(q) || name.includes(q);
+    });
+  }, [availableShipments, search]);
+
   const openLoadScan = () => {
     router.push({
       pathname: "/(checker)/scan",
@@ -66,8 +84,17 @@ export default function AvailableToLoadScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.bg }]}>
+      <SectionHeader
+        sectionKey="available"
+        title="AVAILABLE"
+        subtitle="Packages released by warehouse ready for loading."
+        rightIcon="qrcode"
+        onRightPress={hasMunicipalityAssignment ? openLoadScan : undefined}
+      />
+
       <ScrollView
         contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -80,50 +107,40 @@ export default function AvailableToLoadScreen() {
           />
         }
       >
+        {/* Search */}
         <View
           style={[
-            styles.summaryCard,
+            styles.searchBar,
             { backgroundColor: colors.surface, borderColor: colors.border },
           ]}
         >
-          <Text style={[styles.summaryTitle, { color: colors.text }]}>
-            Available to Load
-          </Text>
-          {municipalityLabel ? (
-            <Text style={[styles.routeLabel, { color: colors.text }]}>
-              Your municipalities: {municipalityLabel}
-            </Text>
+          <FontAwesome5 name="search" size={13} color={colors.textMuted} />
+          <TextInput
+            style={[styles.searchInput, { color: colors.text }]}
+            placeholder="Search shipment or customer..."
+            placeholderTextColor={colors.textMuted}
+            value={search}
+            onChangeText={setSearch}
+            returnKeyType="search"
+          />
+          {search ? (
+            <TouchableOpacity onPress={() => setSearch("")} hitSlop={8}>
+              <FontAwesome5
+                name="times-circle"
+                size={15}
+                color={colors.textMuted}
+              />
+            </TouchableOpacity>
           ) : null}
-          <Text style={[styles.summaryText, { color: colors.textMuted }]}>
-            {summary.available} piece{summary.available === 1 ? "" : "s"} ready
-            across {summary.shipments} shipment
-            {summary.shipments === 1 ? "" : "s"}
-            {summary.mine > 0 ? ` · ${summary.mine} already on your van` : ""}
-            {summary.others > 0
-              ? ` · ${summary.others} with other checkers`
-              : ""}
-          </Text>
-          <Text style={[styles.hintText, { color: colors.textMuted }]}>
-            Only shipments for your assigned municipalities appear here. Scan each
-            piece label under Load — released pieces move to your custody and
-            out for delivery automatically.
-          </Text>
-          <TouchableOpacity
-            style={[
-              styles.scanBtn,
-              { borderColor: colors.border },
-              !hasMunicipalityAssignment && styles.scanBtnDisabled,
-            ]}
-            onPress={openLoadScan}
-            activeOpacity={0.85}
-            disabled={!hasMunicipalityAssignment}
-          >
-            <FontAwesome5 name="qrcode" size={12} color={colors.text} />
-            <Text style={[styles.scanBtnText, { color: colors.text }]}>
-              Load
-            </Text>
-          </TouchableOpacity>
         </View>
+
+        {municipalityLabel ? (
+          <Text style={[styles.routeLabel, { color: colors.textMuted }]}>
+            <FontAwesome5 name="map-marker-alt" size={11} color={accent} />{" "}
+            {municipalityLabel} · {summary.available} piece
+            {summary.available === 1 ? "" : "s"} ready
+          </Text>
+        ) : null}
 
         {loading ? (
           <View style={styles.emptyState}>
@@ -133,6 +150,9 @@ export default function AvailableToLoadScreen() {
           </View>
         ) : !hasMunicipalityAssignment ? (
           <View style={styles.emptyState}>
+            <View style={[styles.emptyIcon, { backgroundColor: `${accent}18` }]}>
+              <FontAwesome5 name="map-marked-alt" size={22} color={accent} />
+            </View>
             <Text style={[styles.emptyTitle, { color: colors.text }]}>
               No municipalities assigned
             </Text>
@@ -141,43 +161,34 @@ export default function AvailableToLoadScreen() {
               account before loading packages.
             </Text>
           </View>
-        ) : availableShipments.length === 0 ? (
+        ) : filteredShipments.length === 0 ? (
           <View style={styles.emptyState}>
+            <View style={[styles.emptyIcon, { backgroundColor: `${accent}18` }]}>
+              <FontAwesome5 name="box-open" size={22} color={accent} />
+            </View>
             <Text style={[styles.emptyTitle, { color: colors.text }]}>
-              Nothing available to load
+              {search ? "No matches found" : "Nothing available to load"}
             </Text>
             <Text style={[styles.emptySub, { color: colors.textMuted }]}>
-              When Rose releases shipments for your municipalities, they will
-              appear here. After you load everything, continue on My Route.
+              {search
+                ? "Try a different shipment ID or customer name."
+                : "When Rose releases shipments for your municipalities, they will appear here."}
             </Text>
-            <TouchableOpacity
-              style={[styles.linkBtn, { borderColor: colors.border }]}
-              onPress={() => router.push("/(checker)/(tabs)/deliveries")}
-              activeOpacity={0.85}
-            >
-              <Text style={[styles.linkBtnText, { color: colors.text }]}>
-                Open My Route
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.linkBtn, { borderColor: colors.border }]}
-              onPress={() => router.push("/(checker)/(tabs)/delivery-load")}
-              activeOpacity={0.85}
-            >
-              <Text style={[styles.linkBtnText, { color: colors.text }]}>
-                Open My Load
-              </Text>
-            </TouchableOpacity>
+            {!search ? (
+              <TouchableOpacity
+                style={[styles.linkBtn, { borderColor: colors.border }]}
+                onPress={() => router.push("/(checker)/(tabs)/deliveries")}
+                activeOpacity={0.85}
+              >
+                <Text style={[styles.linkBtnText, { color: accent }]}>
+                  Open My Route
+                </Text>
+              </TouchableOpacity>
+            ) : null}
           </View>
         ) : (
-          availableShipments.map((shipment) => (
-            <View
-              key={shipment.id}
-              style={[
-                styles.card,
-                { backgroundColor: colors.surface, borderColor: colors.border },
-              ]}
-            >
+          filteredShipments.map((shipment) => (
+            <Card key={shipment.id} style={styles.card}>
               <TouchableOpacity
                 activeOpacity={0.8}
                 onPress={() =>
@@ -189,56 +200,62 @@ export default function AvailableToLoadScreen() {
               >
                 <View style={styles.cardHeader}>
                   <View style={styles.idWrap}>
-                    <FontAwesome5
-                      name="warehouse"
-                      size={12}
-                      color={colors.textMuted}
-                    />
-                    <Text style={[styles.shipmentId, { color: colors.text }]}>
-                      {shipment.shipmentId || shipment.id}
+                    <View
+                      style={[styles.cardIcon, { backgroundColor: `${accent}18` }]}
+                    >
+                      <FontAwesome5
+                        name="clipboard-list"
+                        size={14}
+                        color={accent}
+                      />
+                    </View>
+                    <View style={styles.idText}>
+                      <Text
+                        style={[styles.shipmentId, { color: colors.text }]}
+                        numberOfLines={1}
+                      >
+                        {shipment.shipmentId || shipment.id}
+                      </Text>
+                      {shipment.recipient?.name ? (
+                        <Text
+                          style={[styles.customer, { color: colors.textMuted }]}
+                          numberOfLines={1}
+                        >
+                          {shipment.recipient.name}
+                        </Text>
+                      ) : null}
+                    </View>
+                  </View>
+                  <View style={[styles.availBadge, { backgroundColor: `${accent}18` }]}>
+                    <Text style={[styles.availBadgeText, { color: accent }]}>
+                      {shipment.poolStats?.available || 0} Available
                     </Text>
                   </View>
-                  <StatusBadge
-                    status={
-                      shipment.poolStats?.available > 0
-                        ? "AVAILABLE_FOR_DELIVERY"
-                        : shipment.status
-                    }
-                  />
                 </View>
 
-                <Text style={[styles.poolLine, { color: colors.text }]}>
-                  {formatPoolCountLine(shipment.poolStats)}
-                  {shipment.shipmentMunicipality
-                    ? ` · ${shipment.shipmentMunicipality}`
-                    : ""}
-                </Text>
-
-                {(shipment.destinationCode || shipment.recipient?.name) && (
-                  <Text style={[styles.meta, { color: colors.textMuted }]}>
-                    {shipment.destinationCode || "—"}
-                    {shipment.recipient?.name
-                      ? ` · ${shipment.recipient.name}`
+                <View
+                  style={[styles.metaRow, { borderTopColor: colors.border }]}
+                >
+                  <Text style={[styles.metaLabel, { color: colors.textMuted }]}>
+                    {formatPoolCountLine(shipment.poolStats)}
+                    {shipment.shipmentMunicipality
+                      ? ` · ${shipment.shipmentMunicipality}`
                       : ""}
                   </Text>
-                )}
-
-                <Text style={[styles.meta, { color: colors.textMuted }]}>
-                  Updated {getTimeLabel(shipment.updatedAt)}
+                </View>
+                <Text style={[styles.releasedText, { color: colors.textMuted }]}>
+                  Released {getTimeLabel(shipment.updatedAt)}
                 </Text>
               </TouchableOpacity>
 
-              <TouchableOpacity
-                style={[styles.loadBtn, { borderColor: colors.border }]}
+              <PrimaryButton
+                label="LOAD"
+                icon="dolly"
+                color={accent}
                 onPress={openLoadScan}
-                activeOpacity={0.85}
-              >
-                <FontAwesome5 name="dolly" size={12} color={colors.text} />
-                <Text style={[styles.loadBtnText, { color: colors.text }]}>
-                  Load ({shipment.poolStats.available} available)
-                </Text>
-              </TouchableOpacity>
-            </View>
+                style={{ marginTop: 14 }}
+              />
+            </Card>
           ))
         )}
       </ScrollView>
@@ -255,52 +272,28 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingBottom: 24,
   },
-  summaryCard: {
-    borderWidth: 1,
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 16,
-    marginTop: 8,
-  },
-  summaryTitle: {
-    fontSize: 18,
-    fontWeight: "800",
-    marginBottom: 6,
-  },
-  routeLabel: {
-    fontSize: 14,
-    fontWeight: "700",
-    marginBottom: 6,
-  },
-  summaryText: {
-    fontSize: 13,
-    lineHeight: 18,
-    marginBottom: 8,
-  },
-  hintText: {
-    fontSize: 12,
-    lineHeight: 17,
-    marginBottom: 12,
-  },
-  scanBtn: {
+  searchBar: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
+    gap: 10,
     borderWidth: 1,
-    borderRadius: 12,
-    paddingVertical: 10,
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    paddingVertical: Platform.OS === "ios" ? 12 : 6,
+    marginTop: 4,
+    marginBottom: 12,
   },
-  scanBtnText: {
-    fontSize: 13,
-    fontWeight: "700",
+  searchInput: {
+    flex: 1,
+    fontSize: 14,
+    padding: 0,
   },
-  scanBtnDisabled: {
-    opacity: 0.45,
+  routeLabel: {
+    fontSize: 12,
+    fontWeight: "600",
+    marginBottom: 12,
   },
   card: {
-    borderWidth: 1,
-    borderRadius: 16,
     padding: 14,
     marginBottom: 12,
   },
@@ -308,45 +301,66 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    marginBottom: 8,
+    gap: 10,
   },
   idWrap: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
+    gap: 10,
+    flex: 1,
+  },
+  cardIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: 11,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  idText: {
     flex: 1,
   },
   shipmentId: {
     fontSize: 14,
     fontWeight: "800",
-    flexShrink: 1,
   },
-  poolLine: {
-    fontSize: 13,
-    fontWeight: "700",
-    marginBottom: 6,
-  },
-  meta: {
+  customer: {
     fontSize: 12,
-    marginBottom: 4,
+    marginTop: 2,
   },
-  loadBtn: {
+  availBadge: {
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+  },
+  availBadgeText: {
+    fontSize: 11,
+    fontWeight: "800",
+  },
+  metaRow: {
     marginTop: 12,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-    borderWidth: 1,
-    borderRadius: 12,
-    paddingVertical: 10,
+    paddingTop: 10,
+    borderTopWidth: StyleSheet.hairlineWidth,
   },
-  loadBtnText: {
-    fontSize: 13,
-    fontWeight: "700",
+  metaLabel: {
+    fontSize: 12,
+    fontWeight: "600",
+    lineHeight: 17,
+  },
+  releasedText: {
+    fontSize: 11,
+    marginTop: 4,
   },
   emptyState: {
-    paddingVertical: 40,
+    paddingVertical: 48,
     alignItems: "center",
+  },
+  emptyIcon: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 14,
   },
   emptyTitle: {
     fontSize: 16,
@@ -361,16 +375,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
   },
   linkBtn: {
-    marginTop: 12,
-    borderWidth: 1,
+    marginTop: 16,
+    borderWidth: 1.5,
     borderRadius: 12,
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    alignSelf: "stretch",
+    paddingVertical: 11,
+    paddingHorizontal: 20,
   },
   linkBtnText: {
     fontSize: 13,
-    fontWeight: "700",
+    fontWeight: "800",
     textAlign: "center",
   },
 });

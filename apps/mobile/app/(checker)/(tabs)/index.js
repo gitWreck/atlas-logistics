@@ -1,6 +1,7 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import {
   View,
+  Text,
   StyleSheet,
   RefreshControl,
   StatusBar,
@@ -18,50 +19,55 @@ import {
 import { startOfDay, subDays } from "date-fns";
 import { db } from "../../../firebase";
 
-// ✅ IMPORT NEW COMPONENTS
-import StatusFilter from "../../../components/checker/StatusFilter";
-import StatusBoard from "../../../components/checker/StatusBoard";
-import OperationsGrid from "../../../components/checker/OperationsGrid";
-import { CHECKER_STATUS_BOARD_CARDS } from "../../../components/checker/StatusBoard";
 import { useTheme } from "../../../contexts/ThemeContext";
+import { useCheckerLastMile } from "../../../contexts/CheckerLastMileContext";
+import {
+  GroupLabel,
+  StatCard,
+  QuickAction,
+} from "../../../components/checker/design/primitives";
+import { SECTION } from "../../../components/checker/design/checkerTheme";
+
+function greetingForNow() {
+  const h = new Date().getHours();
+  if (h < 12) return "Good morning!";
+  if (h < 18) return "Good afternoon!";
+  return "Good evening!";
+}
 
 export default function CheckerIndex() {
   const router = useRouter();
   const { colors } = useTheme();
 
-  // STATE
-  const [filter, setFilter] = useState("TODAY"); // 'TODAY' | 'WEEK'
-  const [stats, setStats] = useState({ received: 0, loaded: 0, pending: 0 });
+  // Real-time last-mile data (source of truth for the glance cards)
+  const {
+    availableShipments = [],
+    myRouteShipments = [],
+    summary = {},
+  } = useCheckerLastMile();
+
+  const [filter] = useState("TODAY"); // preserved for facility query parity
   const [refreshing, setRefreshing] = useState(false);
 
-  // 1. NAVIGATION HANDLER
-  const goToScan = (mode, title) => {
+  // NAVIGATION HANDLERS (unchanged business flows)
+  const goToScan = (mode, title, extra = {}) => {
     router.push({
       pathname: "/(checker)/scan",
-      params: { mode, title },
+      params: { mode, title, ...extra },
     });
   };
-  // Main long-haul trip load — disabled while Load Truck uses delivery scan mode
-  // const goToTripsForLoad = () => {
-  //   Alert.alert(
-  //     "Trip Required",
-  //     "Select a trip first before loading. Open Active Loads, then scan from the trip manifest.",
-  //     [
-  //       { text: "Cancel", style: "cancel" },
-  //       {
-  //         text: "Open Active Loads",
-  //         onPress: () => router.push("/(checker)/(tabs)/trips"),
-  //       },
-  //     ],
-  //   );
-  // };
 
-  // 2. FETCH STATS (Facility View)
+  const goLoad = () =>
+    goToScan("delivery", "Load", { presetScanStatus: "LOAD_TO_VEHICLE" });
+  const goRoute = () => router.push("/(checker)/(tabs)/deliveries");
+  const goOffload = () => goToScan("offloading", "Offload Items");
+  const goInfo = () => goToScan("info", "Information");
+
+  // FETCH facility stats (preserved) — keeps the warehouse query warm
   const fetchStats = useCallback(async () => {
     try {
       const shipmentsRef = collection(db, "shipments");
       const now = new Date();
-
       const startDate =
         filter === "WEEK" ? subDays(startOfDay(now), 7) : startOfDay(now);
       const firestoreDate = Timestamp.fromDate(startDate);
@@ -71,30 +77,7 @@ export default function CheckerIndex() {
         where("status", "==", "RECEIVED"),
         where("updatedAt", ">=", firestoreDate),
       );
-
-      const loadedQ = query(
-        shipmentsRef,
-        where("status", "==", "LOADED"),
-        where("updatedAt", ">=", firestoreDate),
-      );
-
-      const totalQ = query(
-        shipmentsRef,
-        where("status", "in", ["RECEIVED", "LOADED"]),
-        where("createdAt", ">=", firestoreDate),
-      );
-
-      const [rSnap, tSnap, lSnap] = await Promise.all([
-        getCountFromServer(receivedQ),
-        getCountFromServer(totalQ),
-        getCountFromServer(loadedQ),
-      ]);
-
-      setStats({
-        received: rSnap.data().count,
-        total: tSnap.data().count,
-        loaded: lSnap.data().count,
-      });
+      await getCountFromServer(receivedQ);
     } catch (err) {
       console.error("Stats Error:", err);
     }
@@ -110,10 +93,30 @@ export default function CheckerIndex() {
     setRefreshing(false);
   };
 
+  // DERIVE glance metrics from real-time context data
+  const glance = useMemo(() => {
+    const available = availableShipments.reduce(
+      (n, s) => n + (s.poolStats?.available || 0),
+      0,
+    );
+    const onVan = myRouteShipments.reduce(
+      (n, s) => n + (s.poolStats?.mine || 0),
+      0,
+    );
+    return {
+      available,
+      onVan,
+      delivered: summary.delivered || 0,
+      failed: summary.failed || 0,
+      returned: summary.returned || 0,
+    };
+  }, [availableShipments, myRouteShipments, summary]);
+
   return (
     <View style={[styles.container, { backgroundColor: colors.bg }]}>
       <ScrollView
         contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -123,31 +126,87 @@ export default function CheckerIndex() {
           />
         }
       >
-        {/* 2. FILTER & CONTROLS */}
-        <StatusFilter activeFilter={filter} onFilterChange={setFilter} />
+        <Text style={[styles.greeting, { color: colors.textMuted }]}>
+          {greetingForNow()}
+        </Text>
 
-        {/* 3. STATS BOARD */}
-        <StatusBoard
-          stats={stats}
-          filterMode={filter}
-          cards={CHECKER_STATUS_BOARD_CARDS}
-        />
+        {/* TODAY AT A GLANCE */}
+        <GroupLabel>Today at a glance</GroupLabel>
+        <View style={styles.statGrid}>
+          <StatCard
+            value={glance.available}
+            label="Available"
+            sublabel="In Warehouse"
+            icon="box"
+            color={SECTION.available.accent}
+          />
+          <StatCard
+            value={glance.onVan}
+            label="On My Van"
+            sublabel="Out for delivery"
+            icon="truck"
+            color={SECTION.route.accent}
+          />
+          <StatCard
+            value={glance.delivered}
+            label="Delivered"
+            sublabel="Today"
+            icon="check-circle"
+            color={SECTION.delivered.accent}
+          />
+          <StatCard
+            value={glance.failed}
+            label="Failed"
+            sublabel="Today"
+            icon="exclamation-circle"
+            color={SECTION.failed.accent}
+          />
+          <StatCard
+            value={glance.returned}
+            label="Returned"
+            sublabel="To Warehouse"
+            icon="undo"
+            color={SECTION.return.accent}
+            width="100%"
+          />
+        </View>
 
-        {/* 4. OPERATIONS GRID */}
-        <OperationsGrid
-          onScanOffload={() => goToScan("offloading", "Offload Items")}
-          onScanInfo={() => goToScan("info", "Information")}
-          onScanDelivery={() =>
-            router.push({
-              pathname: "/(checker)/scan",
-              params: {
-                mode: "delivery",
-                title: "Load",
-                presetScanStatus: "LOAD_TO_VEHICLE",
-              },
-            })
-          }
-        />
+        {/* QUICK ACTIONS */}
+        <GroupLabel style={{ marginTop: 20 }}>Quick actions</GroupLabel>
+        <View style={styles.actionGrid}>
+          <View style={styles.actionRow}>
+            <QuickAction
+              title="LOAD TO VAN"
+              subtitle="Load to van"
+              icon="truck"
+              color={SECTION.load.accent}
+              onPress={goLoad}
+            />
+            <QuickAction
+              title="MY ROUTE"
+              subtitle="View route"
+              icon="map-marker-alt"
+              color={SECTION.route.accent}
+              onPress={goRoute}
+            />
+          </View>
+          <View style={styles.actionRow}>
+            <QuickAction
+              title="OFFLOAD"
+              subtitle="Deliver / Return"
+              icon="box-open"
+              color={SECTION.offload.accent}
+              onPress={goOffload}
+            />
+            <QuickAction
+              title="SCAN INFO"
+              subtitle="Package info"
+              icon="search"
+              color={SECTION.info.accent}
+              onPress={goInfo}
+            />
+          </View>
+        </View>
       </ScrollView>
     </View>
   );
@@ -160,42 +219,25 @@ const styles = StyleSheet.create({
     paddingTop: Platform.OS === "android" ? StatusBar.currentHeight || 0 : 0,
   },
   content: {
-    paddingLeft: 20,
-    paddingRight: 20,
-    // paddingBottom: 40,
-  },
-  header: {
     paddingHorizontal: 20,
-    paddingTop: 10,
-    paddingBottom: 15,
+    paddingTop: 8,
+    paddingBottom: 32,
+  },
+  greeting: {
+    fontSize: 14,
+    fontWeight: "600",
+    marginBottom: 12,
+  },
+  statGrid: {
     flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#ffffff",
-    borderBottomWidth: 1,
-    borderBottomColor: "#e2e8f0",
+    flexWrap: "wrap",
+    gap: 12,
   },
-  iconBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: "#f8fafc",
-    borderWidth: 1,
-    borderColor: "#e2e8f0",
-    alignItems: "center",
-    justifyContent: "center",
+  actionGrid: {
+    gap: 12,
   },
-  textBlock: {
-    flex: 1,
-    marginRight: 12,
-  },
-  title: {
-    color: "#0f172a",
-    fontSize: 16,
-    fontWeight: "700",
-  },
-  subtitle: {
-    color: "#64748b",
-    fontSize: 12,
-    marginTop: 2,
+  actionRow: {
+    flexDirection: "row",
+    gap: 12,
   },
 });
