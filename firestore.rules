@@ -122,17 +122,25 @@ service cloud.firestore {
     // --- CUSTOMER SUPPORT CHAT ---
 
     match /conversations/{conversationId} {
-      allow read: if isAdminOrManager()
+      allow read: if hasRole('admin')
         || (isActiveUser() && resource.data.customerId == request.auth.uid)
-        || (isActiveUser() && request.auth.uid in resource.data.get('participantIds', []));
+        || (hasRole('manager') && resource.data.assignedTo == request.auth.uid);
+
+      allow list: if hasRole('admin')
+        || (hasRole('customer') && resource.data.customerId == request.auth.uid)
+        || (hasRole('manager') && resource.data.assignedTo == request.auth.uid);
 
       allow create, update, delete: if false;
 
       match /messages/{messageId} {
-        allow read: if isAdminOrManager()
+        allow read: if hasRole('admin')
           || (
-            isActiveUser()
+            hasRole('customer')
             && get(/databases/$(database)/documents/conversations/$(conversationId)).data.customerId == request.auth.uid
+          )
+          || (
+            hasRole('manager')
+            && get(/databases/$(database)/documents/conversations/$(conversationId)).data.assignedTo == request.auth.uid
           )
           || (
             isActiveUser()

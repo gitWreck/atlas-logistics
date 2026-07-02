@@ -254,7 +254,7 @@ function Avatar({ name, size = 40, online = false }) {
   );
 }
 
-export default function ChatInbox({ user, isDark = false, onViewCustomers }) {
+export default function ChatInbox({ user, profile, isDark = false, onViewCustomers }) {
   const [conversations, setConversations] = useState([]);
   const [selectedId, setSelectedId] = useState(null);
   const [messages, setMessages] = useState([]);
@@ -271,6 +271,9 @@ export default function ChatInbox({ user, isDark = false, onViewCustomers }) {
   const [staffMembers, setStaffMembers] = useState([]);
   const [assigning, setAssigning] = useState(false);
   const [showDetails, setShowDetails] = useState(true);
+
+  const role = String(profile?.role || "").toLowerCase();
+  const canAssign = role === "admin";
   const [mediaOpen, setMediaOpen] = useState(false);
   const [lightboxUrl, setLightboxUrl] = useState(null);
   const [emojiOpen, setEmojiOpen] = useState(false);
@@ -291,21 +294,50 @@ export default function ChatInbox({ user, isDark = false, onViewCustomers }) {
   const assignMenuRef = useRef(null);
 
   useEffect(() => {
-    const q = query(
-      collection(db, "conversations"),
-      orderBy("lastMessageAt", "desc"),
-      limit(100),
-    );
+    if (!user?.uid || !profile?.role) return undefined;
+
+    let q;
+    const role = String(profile.role || "").toLowerCase();
+
+    if (role === "manager") {
+      q = query(
+        collection(db, "conversations"),
+        where("assignedTo", "==", user.uid),
+        limit(100),
+      );
+    } else if (role === "customer") {
+      q = query(
+        collection(db, "conversations"),
+        where("customerId", "==", user.uid),
+        limit(100),
+      );
+    } else {
+      q = query(
+        collection(db, "conversations"),
+        orderBy("lastMessageAt", "desc"),
+        limit(100),
+      );
+    }
 
     return onSnapshot(q, (snapshot) => {
-      const items = snapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      }));
+      const items = snapshot.docs
+        .map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+        }))
+        .sort((a, b) => {
+          const aTime = a.lastMessageAt?.toMillis?.() ?? 0;
+          const bTime = b.lastMessageAt?.toMillis?.() ?? 0;
+          return bTime - aTime;
+        });
+
       setConversations(items);
-      setSelectedId((current) => current || items[0]?.id || null);
+      setSelectedId((current) => {
+        if (current && items.some((item) => item.id === current)) return current;
+        return items[0]?.id || null;
+      });
     });
-  }, []);
+  }, [profile?.role, user?.uid]);
 
   useEffect(() => {
     if (!selectedId) {
@@ -627,6 +659,10 @@ export default function ChatInbox({ user, isDark = false, onViewCustomers }) {
   };
 
   const handleAssign = async (assigneeId) => {
+    if (!canAssign) {
+      alert("Only admins can assign conversations.");
+      return;
+    }
     if (!selectedId || assigning) return;
     setAssignMenuOpen(false);
     try {
@@ -1347,98 +1383,100 @@ export default function ChatInbox({ user, isDark = false, onViewCustomers }) {
                       </div>
                     )}
                   </div>
-                  <div className="relative" ref={assignMenuRef}>
-                    <button
-                      type="button"
-                      onClick={() => setAssignMenuOpen((open) => !open)}
-                      disabled={assigning}
-                      className={`flex w-full items-center gap-3 rounded-lg px-2 py-2 text-sm transition disabled:opacity-60 ${isDark ? "hover:bg-slate-800" : "hover:bg-slate-100"}`}
-                    >
-                      <FontAwesomeIcon
-                        icon={assigning ? faSpinner : faUserPlus}
-                        className={`text-blue-600 ${assigning ? "animate-spin" : ""}`}
-                      />
-                      <span className="flex-1 text-left">
-                        {selected.assignedTo
-                          ? "Reassign Conversation"
-                          : "Assign Conversation"}
-                      </span>
-                      <FontAwesomeIcon
-                        icon={faChevronDown}
-                        className={`text-xs transition-transform ${assignMenuOpen ? "rotate-180" : ""} ${muted}`}
-                      />
-                    </button>
-                    {assignMenuOpen && (
-                      <div
-                        className={`absolute left-0 right-0 top-full z-20 mt-1 max-h-72 overflow-y-auto rounded-lg border shadow-lg ${
-                          isDark ? "border-slate-700 bg-slate-800" : "border-slate-200 bg-white"
-                        }`}
+                  {canAssign && (
+                    <div className="relative" ref={assignMenuRef}>
+                      <button
+                        type="button"
+                        onClick={() => setAssignMenuOpen((open) => !open)}
+                        disabled={assigning}
+                        className={`flex w-full items-center gap-3 rounded-lg px-2 py-2 text-sm transition disabled:opacity-60 ${isDark ? "hover:bg-slate-800" : "hover:bg-slate-100"}`}
                       >
-                        {user?.uid && selected.assignedTo !== user.uid && (
-                          <button
-                            type="button"
-                            onClick={() => handleAssignToMe()}
-                            className={`flex w-full items-center gap-3 border-b px-3 py-2 text-sm font-medium transition ${
-                              isDark
-                                ? "border-slate-700 hover:bg-slate-700"
-                                : "border-slate-100 hover:bg-slate-100"
-                            }`}
-                          >
-                            <FontAwesomeIcon icon={faUserCheck} className="text-blue-600" />
-                            Assign to me
-                          </button>
-                        )}
-                        {staffMembers.length === 0 ? (
-                          <p className={`px-3 py-2 text-sm ${muted}`}>No staff available.</p>
-                        ) : (
-                          staffMembers.map((member) => {
-                            const active = selected.assignedTo === member.id;
-                            return (
-                              <button
-                                key={member.id}
-                                type="button"
-                                onClick={() => handleAssign(member.id)}
-                                className={`flex w-full items-center gap-3 px-3 py-2 text-sm transition ${
-                                  isDark ? "hover:bg-slate-700" : "hover:bg-slate-100"
-                                } ${active ? (isDark ? "bg-slate-700" : "bg-slate-100") : ""}`}
-                              >
-                                <Avatar name={staffDisplayName(member)} size={28} />
-                                <span className="min-w-0 flex-1 text-left">
-                                  <span className="block truncate font-medium">
-                                    {staffDisplayName(member)}
-                                    {member.id === user?.uid ? " (You)" : ""}
+                        <FontAwesomeIcon
+                          icon={assigning ? faSpinner : faUserPlus}
+                          className={`text-blue-600 ${assigning ? "animate-spin" : ""}`}
+                        />
+                        <span className="flex-1 text-left">
+                          {selected.assignedTo
+                            ? "Reassign Conversation"
+                            : "Assign Conversation"}
+                        </span>
+                        <FontAwesomeIcon
+                          icon={faChevronDown}
+                          className={`text-xs transition-transform ${assignMenuOpen ? "rotate-180" : ""} ${muted}`}
+                        />
+                      </button>
+                      {assignMenuOpen && (
+                        <div
+                          className={`absolute left-0 right-0 top-full z-20 mt-1 max-h-72 overflow-y-auto rounded-lg border shadow-lg ${
+                            isDark ? "border-slate-700 bg-slate-800" : "border-slate-200 bg-white"
+                          }`}
+                        >
+                          {user?.uid && selected.assignedTo !== user.uid && (
+                            <button
+                              type="button"
+                              onClick={() => handleAssignToMe()}
+                              className={`flex w-full items-center gap-3 border-b px-3 py-2 text-sm font-medium transition ${
+                                isDark
+                                  ? "border-slate-700 hover:bg-slate-700"
+                                  : "border-slate-100 hover:bg-slate-100"
+                              }`}
+                            >
+                              <FontAwesomeIcon icon={faUserCheck} className="text-blue-600" />
+                              Assign to me
+                            </button>
+                          )}
+                          {staffMembers.length === 0 ? (
+                            <p className={`px-3 py-2 text-sm ${muted}`}>No staff available.</p>
+                          ) : (
+                            staffMembers.map((member) => {
+                              const active = selected.assignedTo === member.id;
+                              return (
+                                <button
+                                  key={member.id}
+                                  type="button"
+                                  onClick={() => handleAssign(member.id)}
+                                  className={`flex w-full items-center gap-3 px-3 py-2 text-sm transition ${
+                                    isDark ? "hover:bg-slate-700" : "hover:bg-slate-100"
+                                  } ${active ? (isDark ? "bg-slate-700" : "bg-slate-100") : ""}`}
+                                >
+                                  <Avatar name={staffDisplayName(member)} size={28} />
+                                  <span className="min-w-0 flex-1 text-left">
+                                    <span className="block truncate font-medium">
+                                      {staffDisplayName(member)}
+                                      {member.id === user?.uid ? " (You)" : ""}
+                                    </span>
+                                    <span className={`block truncate text-xs ${muted}`}>
+                                      {getRoleLabel(member.role)}
+                                    </span>
                                   </span>
-                                  <span className={`block truncate text-xs ${muted}`}>
-                                    {getRoleLabel(member.role)}
-                                  </span>
-                                </span>
-                                {active && (
-                                  <FontAwesomeIcon
-                                    icon={faCircleCheck}
-                                    className="text-xs text-emerald-500"
-                                  />
-                                )}
-                              </button>
-                            );
-                          })
-                        )}
-                        {selected.assignedTo && (
-                          <button
-                            type="button"
-                            onClick={() => handleAssign("")}
-                            className={`flex w-full items-center gap-3 border-t px-3 py-2 text-sm font-medium text-red-600 transition ${
-                              isDark
-                                ? "border-slate-700 hover:bg-slate-700"
-                                : "border-slate-100 hover:bg-slate-100"
-                            }`}
-                          >
-                            <FontAwesomeIcon icon={faXmark} />
-                            Unassign Conversation
-                          </button>
-                        )}
-                      </div>
-                    )}
-                  </div>
+                                  {active && (
+                                    <FontAwesomeIcon
+                                      icon={faCircleCheck}
+                                      className="text-xs text-emerald-500"
+                                    />
+                                  )}
+                                </button>
+                              );
+                            })
+                          )}
+                          {selected.assignedTo && (
+                            <button
+                              type="button"
+                              onClick={() => handleAssign("")}
+                              className={`flex w-full items-center gap-3 border-t px-3 py-2 text-sm font-medium text-red-600 transition ${
+                                isDark
+                                  ? "border-slate-700 hover:bg-slate-700"
+                                  : "border-slate-100 hover:bg-slate-100"
+                              }`}
+                            >
+                              <FontAwesomeIcon icon={faXmark} />
+                              Unassign Conversation
+                            </button>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
                   <button
                     type="button"
                     onClick={() =>

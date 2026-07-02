@@ -70,14 +70,12 @@ async function getConversationForUser(conversationId, uid, role) {
   }
 
   const conversation = snap.data() || {};
-  const isStaff = STAFF_ROLES.includes(role);
+  const isAdmin = role === "admin";
+  const isManager = role === "manager";
   const isCustomer = conversation.customerId === uid;
   const isAssigned = conversation.assignedTo === uid;
-  const isParticipant = Array.isArray(conversation.participantIds)
-    ? conversation.participantIds.includes(uid)
-    : false;
 
-  if (!isStaff && !isCustomer && !isAssigned && !isParticipant) {
+  if (!(isAdmin || (isManager && isAssigned) || isCustomer)) {
     throw new HttpsError("permission-denied", "Conversation access denied.");
   }
 
@@ -478,6 +476,7 @@ exports.updateConversationStatus = onCall(
       throw new HttpsError("invalid-argument", "Invalid conversation priority.");
     }
 
+    const { ref } = await getConversationForUser(conversationId, uid, role);
     const update = {
       status,
       updatedAt: FieldValue.serverTimestamp(),
@@ -486,7 +485,7 @@ exports.updateConversationStatus = onCall(
     };
     if (priority) update.priority = priority;
 
-    await db.collection("conversations").doc(conversationId).update(update);
+    await ref.update(update);
     return { success: true };
   },
 );
@@ -494,10 +493,12 @@ exports.updateConversationStatus = onCall(
 exports.assignConversation = onCall(
   { region: "asia-southeast1", maxInstances: 10 },
   async (req) => {
-    const { uid, role, user } = await requireRole(db, req, STAFF_ROLES);
+    const { uid, role, user } = await requireRole(db, req, ["admin"]);
     const conversationId = cleanText(req.data?.conversationId, "conversationId", 160);
     const assignerName = displayName(user, "Staff");
     const now = FieldValue.serverTimestamp();
+
+    await getConversationForUser(conversationId, uid, role);
 
     // An empty/absent assigneeId means "unassign" the conversation.
     const assigneeId = String(req.data?.assigneeId ?? "").trim();
