@@ -113,17 +113,20 @@ export default function CustomerShipmentsScreen() {
         <TrackedShipmentList
           shipments={shipments}
           onShipmentPress={handleShipmentPress}
+          onCreateShipment={() => setPickupModalVisible(true)}
           activeFilter={activeFilter}
           onFilterChange={setActiveFilter}
           sortOrder={sortOrder}
         />
       </View>
 
-      <FloatingAddButton
-        onPress={() => setPickupModalVisible(true)}
-        bottom={92}
-        right={22}
-      />
+      {shipments?.length > 0 && (
+        <FloatingAddButton
+          onPress={() => setPickupModalVisible(true)}
+          bottom={92}
+          right={22}
+        />
+      )}
       <CustomerBottomNav active="shipments" unreadMessages={unreadMessages} />
 
       <RequestPickupModal

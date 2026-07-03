@@ -1,16 +1,20 @@
 import React, { useMemo, useState } from "react";
 import {
   ScrollView,
+  Image,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
 import Feather from "@expo/vector-icons/Feather";
 
 import { getFormattedTime } from "../utilities/helpers";
 import { useTheme } from "../../contexts/ThemeContext";
+
+const emptyShipmentArt = require("../../assets/customer/empty-active-shipment.png");
 
 const FILTER_OPTIONS = [
   { label: "All", value: "ALL" },
@@ -93,6 +97,7 @@ function CompactStatusBadge({ status }) {
 export default function TrackedShipmentList({
   shipments,
   onShipmentPress,
+  onCreateShipment,
   activeFilter = "ALL",
   onFilterChange,
   sortOrder = "LATEST",
@@ -241,13 +246,37 @@ export default function TrackedShipmentList({
       >
         {!shipments || shipments.length === 0 ? (
           <View style={styles.emptyState}>
-            <Feather name="package" size={34} color={colors.iconMuted} />
+            <Image
+              source={emptyShipmentArt}
+              style={styles.emptyIllustration}
+              resizeMode="contain"
+            />
             <Text style={[styles.emptyTitle, { color: colors.text }]}>
               No shipments yet
             </Text>
             <Text style={[styles.emptyText, { color: colors.textMuted }]}>
-              Create a shipment and it will appear here.
+              You don't have any shipments.{"\n"}
+              Create your first shipment to{"\n"}
+              start tracking.
             </Text>
+            {onCreateShipment ? (
+              <TouchableOpacity
+                activeOpacity={0.85}
+                onPress={onCreateShipment}
+              >
+                <LinearGradient
+                  colors={[colors.primary, colors.primaryDeep]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={styles.emptyButton}
+                >
+                  <Feather name="plus-circle" size={15} color={colors.onPrimary} />
+                  <Text style={[styles.emptyButtonText, { color: colors.onPrimary }]}>
+                    Create Shipment
+                  </Text>
+                </LinearGradient>
+              </TouchableOpacity>
+            ) : null}
           </View>
         ) : filteredShipments.length === 0 ? (
           <View style={styles.emptyState}>
@@ -388,22 +417,45 @@ const styles = StyleSheet.create({
   },
   listContent: {
     paddingBottom: 118,
+    flexGrow: 1,
   },
   emptyState: {
     alignItems: "center",
-    paddingTop: 54,
+    paddingTop: 68,
     paddingHorizontal: 24,
   },
+  emptyIllustration: {
+    width: 154,
+    height: 142,
+    marginBottom: 4,
+  },
   emptyTitle: {
-    marginTop: 12,
-    fontSize: 16,
+    marginTop: 8,
+    fontSize: 18,
     fontWeight: "700",
+    textAlign: "center",
   },
   emptyText: {
-    marginTop: 5,
-    fontSize: 13,
+    marginTop: 10,
+    fontSize: 14,
     textAlign: "center",
-    lineHeight: 18,
+    lineHeight: 22,
+    maxWidth: 280,
+  },
+  emptyButton: {
+    marginTop: 26,
+    width: 220,
+    height: 42,
+    borderRadius: 8,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+  },
+  emptyButtonText: {
+    fontSize: 14,
+    fontWeight: "700",
+    textAlign: "center",
   },
   shipmentCard: {
     borderRadius: 12,
