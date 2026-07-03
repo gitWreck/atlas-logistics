@@ -77,7 +77,10 @@ export default function FailedDeliveryReasonModal({
             </View>
           )}
 
-          <Text style={styles.sectionLabel}>Failure reason</Text>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionLabel}>SELECT REASON</Text>
+            <View style={styles.sectionDivider} />
+          </View>
           <ScrollView
             style={styles.reasonList}
             contentContainerStyle={styles.reasonContent}
@@ -109,7 +112,10 @@ export default function FailedDeliveryReasonModal({
             })}
           </ScrollView>
 
-          <Text style={styles.sectionLabel}>Notes (optional)</Text>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionLabel}>NOTES (OPTIONAL)</Text>
+            <View style={styles.sectionDivider} />
+          </View>
           <TextInput
             style={styles.remarksInput}
             value={remarks}
@@ -120,7 +126,10 @@ export default function FailedDeliveryReasonModal({
             editable={!uploading}
           />
 
-          <Text style={styles.sectionLabel}>Photo (optional)</Text>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionLabel}>PHOTO (OPTIONAL)</Text>
+            <View style={styles.sectionDivider} />
+          </View>
           <View style={styles.photoActions}>
             <TouchableOpacity
               style={[styles.photoBtn, limitReached && styles.disabled]}
@@ -233,12 +242,24 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "700",
   },
+  sectionHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginTop: 12,
+    marginBottom: 10,
+  },
   sectionLabel: {
-    color: "#334155",
-    fontSize: 12,
+    color: "#dc2626",
+    fontSize: 11,
     fontWeight: "800",
-    marginBottom: 8,
-    marginTop: 4,
+    letterSpacing: 0.8,
+    textTransform: "uppercase",
+  },
+  sectionDivider: {
+    flex: 1,
+    height: 1,
+    backgroundColor: "#fecaca",
   },
   reasonList: {
     maxHeight: 210,

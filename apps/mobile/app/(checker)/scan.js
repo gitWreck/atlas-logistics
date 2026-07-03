@@ -2446,6 +2446,7 @@ export default function ScannerScreen() {
         loading={processing}
         mode={resolvedMode}
         actionLabel={selectedScanAction?.label}
+        accentColor={scanAccentColor}
       />
 
       <ShipmentInfoModal
