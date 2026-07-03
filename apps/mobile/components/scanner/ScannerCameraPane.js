@@ -31,7 +31,7 @@ export default function ScannerCameraPane({
   const statusBarInset =
     insets.top ||
     (Platform.OS === "android" ? StatusBar.currentHeight || 0 : 0);
-  const topOffset = statusBarInset + 12;
+  const topOffset = statusBarInset + 8;
 
   // Animated glowing scan line that sweeps within the frame.
   const sweep = useRef(new Animated.Value(0)).current;
@@ -114,48 +114,51 @@ export default function ScannerCameraPane({
         <Animated.View
           style={[styles.cameraOverlay, { paddingBottom: detailsSheetHeight }]}
         >
-          <TouchableOpacity
-            style={[styles.backButton, { top: topOffset + 2 }]}
-            onPress={onBack}
-            activeOpacity={0.82}
-          >
-            <FontAwesome5 name="arrow-left" size={14} color="#ffffff" />
-            <Text style={styles.backButtonText}>Back</Text>
-          </TouchableOpacity>
-
-          <View
-            style={[
-              styles.modeBadge,
-              { top: topOffset + 2, backgroundColor: `${accentColor}E6` },
-            ]}
-          >
-            <Text style={styles.modeBadgeText}>{modeLabel}</Text>
-          </View>
-
-          <TouchableOpacity
-            style={[
-              styles.flashButton,
-              { top: topOffset + 2 },
-              flashEnabled && styles.flashButtonActive,
-            ]}
-            onPress={onToggleFlash}
-            activeOpacity={0.82}
-          >
-            <FontAwesome5
-              name={flashEnabled ? "bolt" : "lightbulb"}
-              size={16}
-              color={flashEnabled ? "#0f172a" : "#ffffff"}
-            />
-            <Text
-              style={[
-                styles.flashButtonText,
-                flashEnabled && styles.flashButtonTextActive,
-              ]}
+          <View style={[styles.topControls, { top: topOffset }]}> 
+            <TouchableOpacity
+              style={[styles.button, styles.backButton]}
+              onPress={onBack}
+              activeOpacity={0.82}
             >
-              {flashEnabled ? "Flash On" : "Flash"}
-            </Text>
-          </TouchableOpacity>
+              <FontAwesome5 name="arrow-left" size={14} color="#ffffff" />
+              <Text style={styles.backButtonText}>Back</Text>
+            </TouchableOpacity>
 
+            <View style={styles.modeWrapper} pointerEvents="none">
+              <View
+                style={[
+                  styles.modeBadge,
+                  { backgroundColor: `${accentColor}E6` },
+                ]}
+              >
+                <Text style={styles.modeBadgeText}>{modeLabel}</Text>
+              </View>
+            </View>
+
+            <TouchableOpacity
+              style={[
+                styles.button,
+                styles.flashButton,
+                flashEnabled && styles.flashButtonActive,
+              ]}
+              onPress={onToggleFlash}
+              activeOpacity={0.82}
+            >
+              <FontAwesome5
+                name={flashEnabled ? "bolt" : "lightbulb"}
+                size={16}
+                color={flashEnabled ? "#0f172a" : "#ffffff"}
+              />
+              <Text
+                style={[
+                  styles.flashButtonText,
+                  flashEnabled && styles.flashButtonTextActive,
+                ]}
+              >
+                {flashEnabled ? "Flash On" : "Flash"}
+              </Text>
+            </TouchableOpacity>
+          </View>
 
           <View style={styles.scanFrame}>
             <Corner pos="tl" />
@@ -203,9 +206,17 @@ const styles = StyleSheet.create({
     alignItems: "center",
     padding: 18,
   },
-  backButton: {
+  topControls: {
     position: "absolute",
-    left: 18,
+    left: 0,
+    right: 0,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 18,
+    zIndex: 20,
+  },
+  button: {
     minHeight: 36,
     borderRadius: 999,
     paddingHorizontal: 12,
@@ -215,7 +226,9 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(15, 23, 42, 0.88)",
     borderWidth: 1,
     borderColor: "rgba(255, 255, 255, 0.24)",
-    zIndex: 20,
+  },
+  backButton: {
+    justifyContent: "center",
   },
   backButtonText: {
     color: "#ffffff",
@@ -223,12 +236,14 @@ const styles = StyleSheet.create({
     fontWeight: "800",
   },
   modeBadge: {
-    position: "absolute",
-    alignSelf: "center",
     borderRadius: 999,
     paddingHorizontal: 16,
     paddingVertical: 7,
     zIndex: 20,
+  },
+  modeWrapper: {
+    flex: 1,
+    alignItems: "center",
   },
   modeBadgeText: {
     color: "#ffffff",
@@ -238,8 +253,6 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
   flashButton: {
-    position: "absolute",
-    right: 18,
     minHeight: 36,
     borderRadius: 999,
     paddingHorizontal: 12,
@@ -249,7 +262,6 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(15, 23, 42, 0.88)",
     borderWidth: 1,
     borderColor: "rgba(255, 255, 255, 0.24)",
-    zIndex: 20,
   },
   flashButtonActive: {
     backgroundColor: "#fbbf24",
