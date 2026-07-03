@@ -269,6 +269,7 @@ export default function ChatInbox({ user, profile, isDark = false, onViewCustome
   const [statusMenuOpen, setStatusMenuOpen] = useState(false);
   const [assignMenuOpen, setAssignMenuOpen] = useState(false);
   const [staffMembers, setStaffMembers] = useState([]);
+  const [assignSearch, setAssignSearch] = useState("");
   const [assigning, setAssigning] = useState(false);
   const [showDetails, setShowDetails] = useState(true);
 
@@ -434,6 +435,27 @@ export default function ChatInbox({ user, profile, isDark = false, onViewCustome
     (sum, item) => sum + Number(item.unreadCounts?.staff || 0),
     0,
   );
+
+  const filteredStaffMembers = useMemo(() => {
+    const term = assignSearch.trim().toLowerCase();
+    if (!term) return staffMembers;
+    return staffMembers.filter((member) => {
+      const name = staffDisplayName(member).toLowerCase();
+      const email = String(member.email || "").toLowerCase();
+      const roleLabel = getRoleLabel(member.role).toLowerCase();
+      return (
+        name.includes(term) ||
+        email.includes(term) ||
+        roleLabel.includes(term)
+      );
+    });
+  }, [assignSearch, staffMembers]);
+
+  useEffect(() => {
+    if (!assignMenuOpen) {
+      setAssignSearch("");
+    }
+  }, [assignMenuOpen]);
 
   useEffect(() => {
     if (!statusMenuOpen) return undefined;
@@ -1425,10 +1447,27 @@ export default function ChatInbox({ user, profile, isDark = false, onViewCustome
                               Assign to me
                             </button>
                           )}
+                          <div className={`px-3 py-3 ${isDark ? "border-b border-slate-700" : "border-b border-slate-100"}`}>
+                            <label className="mb-2 block text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
+                              Search users
+                            </label>
+                            <input
+                              value={assignSearch}
+                              onChange={(event) => setAssignSearch(event.target.value)}
+                              placeholder="Search admin or manager"
+                              className={`w-full rounded-xl border px-3 py-2 text-sm outline-none transition ${
+                                isDark
+                                  ? "border-slate-700 bg-slate-900 text-slate-100 placeholder:text-slate-500 focus:border-blue-500"
+                                  : "border-slate-200 bg-white text-slate-900 placeholder:text-slate-400 focus:border-blue-500"
+                              }`}
+                            />
+                          </div>
                           {staffMembers.length === 0 ? (
                             <p className={`px-3 py-2 text-sm ${muted}`}>No staff available.</p>
+                          ) : filteredStaffMembers.length === 0 ? (
+                            <p className={`px-3 py-2 text-sm ${muted}`}>No admin or manager matches your search.</p>
                           ) : (
-                            staffMembers.map((member) => {
+                            filteredStaffMembers.map((member) => {
                               const active = selected.assignedTo === member.id;
                               return (
                                 <button
