@@ -246,6 +246,25 @@ export default function ProfileViewer({ showBackButton = false }) {
     }
   };
 
+  const handleSignOut = () => {
+    Alert.alert("Sign Out", "Are you sure you want to sign out?", [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Sign Out",
+        style: "destructive",
+        onPress: async () => {
+          try {
+            await signOut();
+          } catch (err) {
+            console.log("Sign out failed:", err);
+          } finally {
+            router.replace("/(auth)/login");
+          }
+        },
+      },
+    ]);
+  };
+
   const handleSyncThemePreference = async () => {
     if (themeLoading) return;
 
@@ -753,6 +772,40 @@ export default function ProfileViewer({ showBackButton = false }) {
           </View>
         )}
 
+        {!isEditing && (
+          <View
+            style={[
+              styles.card,
+              { backgroundColor: colors.surface, borderColor: colors.border },
+            ]}
+          >
+            <SectionHeader
+              icon="sign-out-alt"
+              eyebrow="Session"
+              title="Sign Out"
+              colors={colors}
+              isDark={isDark}
+            />
+            <Text style={[styles.hintMuted, { color: colors.textMuted }]}>
+              End this session and return to the login screen.
+            </Text>
+            <TouchableOpacity
+              style={[
+                styles.signOutBtn,
+                {
+                  backgroundColor: colors.cardMuted,
+                  borderColor: colors.border,
+                },
+              ]}
+              onPress={handleSignOut}
+              activeOpacity={0.85}
+            >
+              <FontAwesome5 name="sign-out-alt" size={14} color={DANGER} />
+              <Text style={styles.signOutBtnText}>Sign Out</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
         {isCustomer && !isEditing && (
           <View
             style={[
@@ -1111,6 +1164,21 @@ const styles = StyleSheet.create({
   },
   themeSyncText: {
     fontSize: 13,
+    fontWeight: "800",
+  },
+  signOutBtn: {
+    minHeight: 48,
+    borderRadius: 14,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    flexDirection: "row",
+    gap: 8,
+    paddingHorizontal: 14,
+  },
+  signOutBtnText: {
+    color: "#dc2626",
+    fontSize: 15,
     fontWeight: "800",
   },
   dangerCard: {
