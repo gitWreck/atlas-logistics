@@ -12,6 +12,8 @@ const nextConfig = {
   turbopack: {
     root: path.join(__dirname, "..", ".."),
   },
+  // Allow network access for development (fix WebSocket HMR errors)
+  allowedDevOrigins: ["localhost", "127.0.0.1", "192.168.1.3"],
 };
 
 export default nextConfig;

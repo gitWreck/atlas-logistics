@@ -138,7 +138,6 @@ export default function DeliveryProofModal({
               textAlignVertical="top"
             />
           </View>
-          </View>
 
           <TouchableOpacity
             style={[styles.submitButton, !canSubmit && styles.disabled]}
@@ -304,7 +303,7 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     letterSpacing: 0.8,
     textTransform: "uppercase",
-  }
+  },
   remarksInput: {
     minHeight: 86,
     borderRadius: 14,
@@ -331,7 +330,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "900",
     letterSpacing: 0.5,
-  }
+  },
   disabled: {
     opacity: 0.55,
   },
