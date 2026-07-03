@@ -115,7 +115,7 @@ export default function ScannerCameraPane({
           style={[styles.cameraOverlay, { paddingBottom: detailsSheetHeight }]}
         >
           <TouchableOpacity
-            style={[styles.backButton, { top: topOffset }]}
+            style={[styles.backButton, { top: topOffset + 2 }]}
             onPress={onBack}
             activeOpacity={0.82}
           >
@@ -126,7 +126,7 @@ export default function ScannerCameraPane({
           <View
             style={[
               styles.modeBadge,
-              { top: topOffset, backgroundColor: `${accentColor}E6` },
+              { top: topOffset + 2, backgroundColor: `${accentColor}E6` },
             ]}
           >
             <Text style={styles.modeBadgeText}>{modeLabel}</Text>
@@ -135,7 +135,7 @@ export default function ScannerCameraPane({
           <TouchableOpacity
             style={[
               styles.flashButton,
-              { top: topOffset },
+              { top: topOffset + 2 },
               flashEnabled && styles.flashButtonActive,
             ]}
             onPress={onToggleFlash}
@@ -212,9 +212,10 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 7,
-    backgroundColor: "rgba(15, 23, 42, 0.78)",
+    backgroundColor: "rgba(15, 23, 42, 0.88)",
     borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.18)",
+    borderColor: "rgba(255, 255, 255, 0.24)",
+    zIndex: 20,
   },
   backButtonText: {
     color: "#ffffff",
@@ -227,6 +228,7 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     paddingHorizontal: 16,
     paddingVertical: 7,
+    zIndex: 20,
   },
   modeBadgeText: {
     color: "#ffffff",
@@ -244,9 +246,10 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 7,
-    backgroundColor: "rgba(15, 23, 42, 0.78)",
+    backgroundColor: "rgba(15, 23, 42, 0.88)",
     borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.18)",
+    borderColor: "rgba(255, 255, 255, 0.24)",
+    zIndex: 20,
   },
   flashButtonActive: {
     backgroundColor: "#fbbf24",

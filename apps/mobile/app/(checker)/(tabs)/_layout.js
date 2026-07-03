@@ -1,10 +1,6 @@
-import {
-  SafeAreaView,
-  StyleSheet,
-  Platform,
-} from "react-native";
+import { StyleSheet, Platform } from "react-native";
+import { SafeAreaView, useSafeAreaInsets as useSAInsets } from "react-native-safe-area-context";
 import { Tabs, useRouter } from "expo-router";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { FontAwesome5 } from "@expo/vector-icons";
 import { signOut } from "firebase/auth";
 import { auth } from "../../../firebase";
@@ -17,7 +13,7 @@ export default function CheckerTabsLayout() {
   const router = useRouter();
   const { user } = useAuth();
   const { colors } = useTheme();
-  const insets = useSafeAreaInsets();
+  const insets = useSAInsets();
 
   const handleLogout = async () => {
     try {
@@ -29,7 +25,12 @@ export default function CheckerTabsLayout() {
   };
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.bg }]}>
+    <SafeAreaView
+      style={[
+        styles.container,
+        { backgroundColor: colors.bg, paddingTop: insets.top },
+      ]}
+    >
       {/* ✅ SHARED HEADER FOR ALL TAB SCREENS */}
       <CheckerHeader
         userName={user?.name || user?.fullName || "Checker"}
