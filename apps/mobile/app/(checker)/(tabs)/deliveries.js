@@ -25,7 +25,6 @@ import {
   Card,
   StatPillRow,
   PrimaryButton,
-  OutlineButton,
 } from "../../../components/checker/design/primitives";
 import { SECTION } from "../../../components/checker/design/checkerTheme";
 
@@ -165,23 +164,6 @@ export default function CheckerDeliveriesTab() {
             { label: "Remaining", value: routeStats.remaining, color: "#2563eb" },
           ]}
         />
-
-        <View style={styles.shortcutRow}>
-          <OutlineButton
-            label="Load pool"
-            icon="warehouse"
-            color={SECTION.available.accent}
-            onPress={() => router.push("/(checker)/(tabs)/available-to-load")}
-            style={styles.shortcutBtn}
-          />
-          <OutlineButton
-            label="My Load"
-            icon="shipping-fast"
-            color={accent}
-            onPress={() => router.push("/(checker)/(tabs)/delivery-load")}
-            style={styles.shortcutBtn}
-          />
-        </View>
 
         {loading ? (
           <View style={styles.emptyState}>
