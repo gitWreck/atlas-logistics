@@ -4,9 +4,7 @@ import {
   Text,
   StyleSheet,
   RefreshControl,
-  StatusBar,
   ScrollView,
-  Platform,
 } from "react-native";
 import { useRouter } from "expo-router";
 import {
@@ -216,7 +214,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#f1f5f9",
-    paddingTop: Platform.OS === "android" ? StatusBar.currentHeight || 0 : 0,
   },
   content: {
     paddingHorizontal: 20,

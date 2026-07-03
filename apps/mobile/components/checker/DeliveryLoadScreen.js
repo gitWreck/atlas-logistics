@@ -6,7 +6,6 @@ import {
   ScrollView,
   RefreshControl,
   Platform,
-  StatusBar,
   TouchableOpacity,
   TextInput,
 } from "react-native";
@@ -375,7 +374,6 @@ export default function DeliveryLoadScreen({ showBackButton = false }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    paddingTop: Platform.OS === "android" ? StatusBar.currentHeight || 0 : 0,
   },
   backRow: {
     paddingHorizontal: 20,

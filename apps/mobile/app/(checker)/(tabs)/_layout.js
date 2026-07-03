@@ -2,9 +2,9 @@ import {
   SafeAreaView,
   StyleSheet,
   Platform,
-  StatusBar as RNStatusBar,
 } from "react-native";
 import { Tabs, useRouter } from "expo-router";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { FontAwesome5 } from "@expo/vector-icons";
 import { signOut } from "firebase/auth";
 import { auth } from "../../../firebase";
@@ -17,6 +17,7 @@ export default function CheckerTabsLayout() {
   const router = useRouter();
   const { user } = useAuth();
   const { colors } = useTheme();
+  const insets = useSafeAreaInsets();
 
   const handleLogout = async () => {
     try {
@@ -38,7 +39,7 @@ export default function CheckerTabsLayout() {
 
       <Tabs
         screenOptions={{
-          headerShown: false, // still false because we use custom header
+          headerShown: false,
           tabBarStyle: {
             backgroundColor: colors.surface,
             borderTopColor: colors.border,
@@ -46,9 +47,7 @@ export default function CheckerTabsLayout() {
             minHeight: 66,
             height: "auto",
             paddingHorizontal: 10,
-          },
-          tabBarSafeAreaInsets: {
-            bottom: Platform.OS === "ios" ? 12 : 10,
+            paddingBottom: Math.max(insets.bottom, 10),
           },
           tabBarActiveTintColor: "#2563eb",
           tabBarInactiveTintColor: colors.textMuted,
@@ -123,9 +122,6 @@ export default function CheckerTabsLayout() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#f1f5f9", // match your screens
-
-    // ✅ Fix for Android status bar overlap
-    paddingTop: Platform.OS === "android" ? RNStatusBar.currentHeight || 0 : 0,
+    backgroundColor: "#f1f5f9",
   },
 });
