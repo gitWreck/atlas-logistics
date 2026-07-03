@@ -6,8 +6,6 @@ import {
   ScrollView,
   RefreshControl,
   TouchableOpacity,
-  Platform,
-  StatusBar,
   Alert,
 } from "react-native";
 import { useRouter } from "expo-router";
@@ -270,24 +268,13 @@ export default function CheckerDeliveriesTab() {
                 </TouchableOpacity>
 
                 {nextAction === "deliver" && (
-                  <>
-                    <PrimaryButton
-                      label="SCAN DELIVERY"
-                      icon="qrcode"
-                      color={accent}
-                      onPress={() => goToDeliveryScan(shipment.id, "DELIVERED")}
-                      style={{ marginTop: 14 }}
-                    />
-                    <OutlineButton
-                      label="Failed delivery"
-                      icon="exclamation-circle"
-                      color="#dc2626"
-                      onPress={() =>
-                        goToDeliveryScan(shipment.id, "FAILED_DELIVERY")
-                      }
-                      style={{ marginTop: 8 }}
-                    />
-                  </>
+                  <PrimaryButton
+                    label="SCAN DELIVERY"
+                    icon="qrcode"
+                    color={accent}
+                    onPress={() => goToDeliveryScan(shipment.id, "DELIVERED")}
+                    style={{ marginTop: 14 }}
+                  />
                 )}
 
                 {nextAction === "return" && (
@@ -313,7 +300,6 @@ export default function CheckerDeliveriesTab() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    paddingTop: Platform.OS === "android" ? StatusBar.currentHeight || 0 : 0,
   },
   content: {
     paddingHorizontal: 20,

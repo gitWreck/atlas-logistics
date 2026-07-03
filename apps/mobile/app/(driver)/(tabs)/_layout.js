@@ -1,22 +1,19 @@
-import {
-  SafeAreaView,
-  StyleSheet,
-  Platform,
-  StatusBar as RNStatusBar,
-} from "react-native";
+import { SafeAreaView, StyleSheet } from "react-native";
 import { Tabs, useRouter } from "expo-router";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { FontAwesome5 } from "@expo/vector-icons";
 import { signOut } from "firebase/auth";
 import { auth } from "../../../firebase";
 
 import DriverHeader from "../../../components/driver/DriverHeader";
-import { useAuth } from "../../../contexts/AuthContext"; // adjust path if needed
+import { useAuth } from "../../../contexts/AuthContext";
 import { useTheme } from "../../../contexts/ThemeContext";
 
 export default function DriverTabsLayout() {
   const router = useRouter();
   const { user } = useAuth();
   const { colors } = useTheme();
+  const insets = useSafeAreaInsets();
 
   const handleLogout = async () => {
     try {
@@ -39,12 +36,12 @@ export default function DriverTabsLayout() {
       {/* ✅ TABS BELOW HEADER */}
       <Tabs
         screenOptions={{
-          headerShown: false, // still false because we use custom header
+          headerShown: false,
           tabBarStyle: {
             backgroundColor: colors.surface,
             borderTopColor: colors.border,
             height: 60,
-            paddingBottom: 8,
+            paddingBottom: Math.max(insets.bottom, 8),
             paddingTop: 8,
           },
           tabBarActiveTintColor: "#07B9F4",
@@ -83,9 +80,6 @@ export default function DriverTabsLayout() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#f1f5f9", // match your screens
-
-    // ✅ Fix for Android status bar overlap
-    paddingTop: Platform.OS === "android" ? RNStatusBar.currentHeight || 0 : 0,
+    backgroundColor: "#f1f5f9",
   },
 });
