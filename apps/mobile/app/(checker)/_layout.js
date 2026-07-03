@@ -15,7 +15,7 @@ export default function CheckerStackLayout() {
         <CheckerLastMileProvider>
       <StatusBar
         style={resolvedScheme === "dark" ? "light" : "dark"}
-        backgroundColor={colors.bg}
+        backgroundColor={colors.surface}
       />
       <OfflineStatusBar />
       <Stack
