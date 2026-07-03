@@ -7,14 +7,8 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const nextConfig = {
   // Add the names of your local packages here
   transpilePackages: ["@repo/ui", "@repo/utils"],
-  // Configure Turbopack to avoid Windows junction point issues
-  turbopack: {
-    root: path.resolve(__dirname, "../../"),
-    resolveAlias: {
-      // Help Turbopack resolve the workspace root correctly
-      "@": path.join(__dirname, "./"),
-    },
-  },
+  // Disable Turbopack on Windows to avoid junction point permission issues.
+  // Next will fall back to webpack dev server.
   // Allow network access for development (fix WebSocket HMR errors)
   allowedDevOrigins: ["localhost", "127.0.0.1", "192.168.1.3"],
 };
