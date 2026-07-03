@@ -50,6 +50,13 @@ function packageLinkedToTrip(
     return true;
   }
 
+  // Never match via barcode when the piece is committed to another trip.
+  const onOtherTrip =
+    (loadedOn && loadedOn !== trip) ||
+    (currentTrip && currentTrip !== trip) ||
+    (hubReceivedOn && hubReceivedOn !== trip);
+  if (onOtherTrip) return false;
+
   const packageId = getPackageIdentity(pkg);
   const scannedIds = options.scannedPackageIds || new Set();
   if (packageId && scannedIds.has(packageId)) return true;

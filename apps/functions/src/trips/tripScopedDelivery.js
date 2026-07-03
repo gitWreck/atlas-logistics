@@ -71,8 +71,71 @@ function isOriginOnlyPiece(pkg = {}) {
   return false;
 }
 
+function isPieceCommittedToOtherTrip(pkg = {}, tripId = "") {
+  const trip = String(tripId || "").trim();
+  if (!trip) return false;
+
+  const loadedOn = String(pkg.loadedOnTrip || "").trim();
+  const currentTrip = String(pkg.currentTripId || "").trim();
+  const hubOn = String(pkg.hubReceivedOnTrip || "").trim();
+
+  const onThisTrip =
+    loadedOn === trip || currentTrip === trip || hubOn === trip;
+  const onOtherTrip =
+    (loadedOn && loadedOn !== trip) ||
+    (currentTrip && currentTrip !== trip) ||
+    (hubOn && hubOn !== trip);
+
+  return onOtherTrip && !onThisTrip;
+}
+
+function isLinkedToTrip(pkg = {}, tripId = "", tripBarcodeSet = new Set()) {
+  const packageTripId = String(pkg.currentTripId || pkg.loadedOnTrip || "").trim();
+  const hubReceivedOnTrip = String(pkg.hubReceivedOnTrip || "").trim();
+  if (tripId && packageTripId === tripId) return true;
+  if (tripId && hubReceivedOnTrip === tripId) return true;
+
+  if (isPieceCommittedToOtherTrip(pkg, tripId)) return false;
+
+  const packageId = getPackageIdentity(pkg);
+  return Boolean(packageId && tripBarcodeSet.has(String(packageId)));
+}
+
 function packageWasOnTrip(pkg = {}, tripId = "", tripBarcodeSet = new Set()) {
   const status = normalizePackageStatus(pkg);
+
+  if (isOriginOnlyPiece(pkg)) return false;
+
+  const onThisTrip = isLinkedToTrip(pkg, tripId, tripBarcodeSet);
+
+  if (tripId) {
+    if (
+      (status === PACKAGE_STATUS.OUT_FOR_DELIVERY ||
+        status === PACKAGE_STATUS.LOADED_TO_DELIVERY_VEHICLE) &&
+      onThisTrip
+    ) {
+      return true;
+    }
+
+    if (!onThisTrip) return false;
+
+    if (pkg.hubReceivedAt) return true;
+
+    if (POST_HUB_DELIVERY_PIECE_STATUSES.has(status)) {
+      return Boolean(
+        pkg.loadedByCheckerId || pkg.availableForDelivery || pkg.deliveredAt,
+      );
+    }
+
+    if (RECEIVED_AT_HUB_PIECE_STATUSES.has(status)) return true;
+    if (LOADED_ON_TRUCK_PIECE_STATUSES.has(status)) return true;
+
+    const loadedQty = normalizeQty(pkg.loadedQty, 0);
+    const receivedQty = normalizeQty(pkg.receivedQty, 0);
+    if (loadedQty > 0 || receivedQty > 0) return true;
+
+    return true;
+  }
 
   if (
     status === PACKAGE_STATUS.OUT_FOR_DELIVERY ||
@@ -81,15 +144,7 @@ function packageWasOnTrip(pkg = {}, tripId = "", tripBarcodeSet = new Set()) {
     return true;
   }
 
-  if (isOriginOnlyPiece(pkg)) return false;
-
-  const packageTripId = String(pkg.currentTripId || pkg.loadedOnTrip || "").trim();
-  if (tripId && packageTripId === tripId) return true;
-
-  const packageId = getPackageIdentity(pkg);
-  const inBarcodeSet = Boolean(packageId && tripBarcodeSet.has(String(packageId)));
-  if (inBarcodeSet) return true;
-
+  if (onThisTrip) return true;
   if (pkg.hubReceivedAt) return true;
 
   if (POST_HUB_DELIVERY_PIECE_STATUSES.has(status)) {
@@ -133,6 +188,12 @@ function countTripScopedDelivered(packages = []) {
 }
 
 function resolveTripScopedPieceTotal(tripShipment = {}, scopedPackages = []) {
+  const packageTotal = scopedPackages.reduce(
+    (sum, pkg) => sum + pieceQty(pkg),
+    0,
+  );
+  if (packageTotal > 0) return packageTotal;
+
   const loaded = normalizeQty(tripShipment.loadedCount, 0);
   const received = normalizeQty(
     tripShipment.receivedCount ?? tripShipment.deliveredCount,
@@ -141,14 +202,6 @@ function resolveTripScopedPieceTotal(tripShipment = {}, scopedPackages = []) {
   const missing = normalizeQty(tripShipment.missingCount, 0);
   const damaged = normalizeQty(tripShipment.damagedCount, 0);
   const onTrip = loaded + received + missing + damaged;
-  const barcodeCount = (tripShipment.packageBarcodes || []).filter(Boolean)
-    .length;
-  const packageTotal = scopedPackages.reduce((sum, pkg) => sum + pieceQty(pkg), 0);
-
-  if (barcodeCount > 0) {
-    return Math.max(barcodeCount, onTrip > 0 ? onTrip : 0, packageTotal);
-  }
-  if (packageTotal > 0) return packageTotal;
   if (onTrip > 0) return onTrip;
 
   return normalizeQty(tripShipment.totalItems, 0);
@@ -182,4 +235,5 @@ module.exports = {
   isTripScopedPieceDelivered,
   countTripScopedDelivered,
   resolveTripScopedPieceTotal,
+  isPieceCommittedToOtherTrip,
 };

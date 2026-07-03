@@ -80,17 +80,15 @@ export function isTripShipmentDelivered(row = {}) {
 
   const tripScopedTotal = toNumber(row.tripScopedTotal, 0);
   const tripScopedDelivered = toNumber(row.tripScopedDelivered, 0);
-  if (tripScopedTotal > 0 && tripScopedDelivered >= tripScopedTotal) {
-    return true;
+  if (tripScopedTotal > 0) {
+    return tripScopedDelivered >= tripScopedTotal;
   }
 
   const totalItems = toNumber(row.totalItems, 0);
   if (totalItems <= 0) return false;
 
   const status = normalizeTripStatus(row.status);
-  if (DELIVERED_TRIP_SHIPMENT_STATUSES.has(status)) return true;
-
-  return false;
+  return DELIVERED_TRIP_SHIPMENT_STATUSES.has(status);
 }
 
 export function shouldPromoteTripToCompleted(trip = {}, tripShipmentRows = []) {

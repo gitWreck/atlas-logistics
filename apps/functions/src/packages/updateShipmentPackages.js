@@ -144,6 +144,7 @@ exports.updateShipmentPackages = onCall(
     let pendingEvent = null;
     let completedTripId = null;
     let shouldTryAutoCompleteTrip = false;
+    const autoCompleteTripIds = new Set();
     let outForDeliveryNotificationContext = null;
     let deliveredNotificationContext = null;
 
@@ -954,6 +955,18 @@ exports.updateShipmentPackages = onCall(
       const tripReceivedQty = sumReceivedQty(tripPackages);
       const tripMissingQty = sumMissingQty(tripPackages);
       const tripDamagedQty = sumDamagedQty(tripPackages);
+
+      if (String(newStatus || "").toUpperCase() === "DELIVERED") {
+        shouldTryAutoCompleteTrip = true;
+        finalPackages.forEach((pkg) => {
+          const pieceTripId =
+            pkg.hubReceivedOnTrip || pkg.loadedOnTrip || pkg.currentTripId || null;
+          if (pieceTripId) autoCompleteTripIds.add(String(pieceTripId));
+        });
+        activeTripIds.forEach((id) => autoCompleteTripIds.add(String(id)));
+        if (tripId) autoCompleteTripIds.add(String(tripId));
+      }
+
       // -----------------------------
       // 5. WRITES
       // -----------------------------
@@ -1104,6 +1117,7 @@ exports.updateShipmentPackages = onCall(
 
         completedTripId = tripId;
         shouldTryAutoCompleteTrip = true;
+        if (tripId) autoCompleteTripIds.add(String(tripId));
         tx.update(tripRef, tripUpdate);
       }
 
@@ -1234,7 +1248,23 @@ exports.updateShipmentPackages = onCall(
 
     });
 
-    if (completedTripId && shouldTryAutoCompleteTrip) {
+    if (shouldTryAutoCompleteTrip && autoCompleteTripIds.size > 0) {
+      for (const tripToComplete of autoCompleteTripIds) {
+        try {
+          await tryAutoCompleteTrip(tripToComplete, {
+            actorId: uid || authUid,
+            actorName: name,
+            actorRole: role,
+            source: "UPDATE_SHIPMENT_PACKAGES",
+          });
+        } catch (autoCompleteError) {
+          console.error(
+            `Auto-complete trip failed for ${tripToComplete}:`,
+            autoCompleteError,
+          );
+        }
+      }
+    } else if (completedTripId && shouldTryAutoCompleteTrip) {
       try {
         await tryAutoCompleteTrip(completedTripId, {
           actorId: uid || authUid,
