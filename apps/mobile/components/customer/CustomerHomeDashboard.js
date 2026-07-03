@@ -20,6 +20,14 @@ const courierMascot = require("../../assets/customer/courier-mascot.png");
 const activeShipmentTruck = require("../../assets/customer/active-shipment-truck.png");
 const emptyActiveShipment = require("../../assets/customer/empty-active-shipment.png");
 
+const INACTIVE_SHIPMENT_STATUSES = new Set([
+  "DELIVERED",
+  "COMPLETED",
+  "CANCELLED",
+  "RECEIVED",
+  "RECEIVED_AT_DIVISORIA",
+]);
+
 function getFirstName(name) {
   return String(name || "Customer").trim().split(/\s+/)[0] || "Customer";
 }
@@ -27,7 +35,7 @@ function getFirstName(name) {
 function getActiveShipment(shipments = []) {
   return shipments.find((shipment) => {
     const status = String(shipment.status || "").toUpperCase();
-    return status !== "DELIVERED" && status !== "COMPLETED" && status !== "CANCELLED";
+    return !INACTIVE_SHIPMENT_STATUSES.has(status);
   });
 }
 
@@ -203,7 +211,7 @@ export default function CustomerHomeDashboard({
               </View>
 
               <View style={styles.shipmentSummaryBlock}>
-                <View style={styles.shipmentTextColumn}>
+                <View style={styles.shipmentBodyContent}>
                   <Text
                     style={[styles.trackingNumber, { color: colors.primary }]}
                     numberOfLines={1}
@@ -565,17 +573,17 @@ const styles = StyleSheet.create({
     minHeight: 34,
   },
   shipmentSummaryBlock: {
-    minHeight: 98,
-    marginBottom: 10,
+    position: "relative",
+    minHeight: 112,
+    marginBottom: 8,
   },
-  shipmentTextColumn: {
+  shipmentBodyContent: {
     width: "58%",
-    paddingLeft: 41,
   },
   truckScene: {
     position: "absolute",
-    right: 0,
-    top: 22,
+    right: -2,
+    top: 28,
     width: 184,
     height: 68,
     alignItems: "center",
