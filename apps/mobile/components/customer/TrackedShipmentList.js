@@ -22,6 +22,14 @@ const FILTER_OPTIONS = [
 
 const normalizeStatus = (status) => String(status || "PENDING").toUpperCase();
 
+const INACTIVE_SHIPMENT_STATUSES = new Set([
+  "DELIVERED",
+  "COMPLETED",
+  "CANCELLED",
+  "RECEIVED",
+  "RECEIVED_AT_DIVISORIA",
+]);
+
 function getStatusLabel(status) {
   const current = normalizeStatus(status);
   const labels = {
@@ -29,20 +37,37 @@ function getStatusLabel(status) {
     IN_TRANSIT: "IN TRANSIT",
     OUT_FOR_DELIVERY: "OUT FOR DELIVERY",
     COMPLETED: "DELIVERED",
+    RECEIVED: "DELIVERED",
+    RECEIVED_AT_DIVISORIA: "DELIVERED",
   };
   return labels[current] || current.replace(/_/g, " ");
 }
 
 function getStatusTheme(status, colors) {
   const current = normalizeStatus(status);
-  if (current === "DELIVERED" || current === "COMPLETED") {
+  if (current === "PENDING_PICKUP") {
+    return { bg: colors.warningSoft, text: colors.warning, border: colors.warning };
+  }
+  if (current === "ACTIVE" || current === "IN_TRANSIT" || current === "OUT_FOR_DELIVERY") {
     return { bg: colors.successSoft, text: colors.success, border: colors.success };
   }
-  if (current === "IN_TRANSIT" || current === "OUT_FOR_DELIVERY") {
-    return { bg: colors.successSoft, text: colors.success, border: colors.success };
+  if (
+    current === "DELIVERED" ||
+    current === "COMPLETED" ||
+    current === "RECEIVED" ||
+    current === "RECEIVED_AT_DIVISORIA"
+  ) {
+    return {
+      bg: colors.neutralSoft,
+      text: colors.neutral,
+      border: colors.neutralBorder,
+    };
   }
   if (current === "CANCELLED" || current === "FAILED_DELIVERY") {
     return { bg: colors.dangerSoft, text: colors.danger, border: colors.danger };
+  }
+  if (current === "RETURNED" || current.startsWith("RETURNED_")) {
+    return { bg: colors.orangeSoft, text: colors.orange, border: colors.orangeBorder };
   }
   return { bg: colors.warningSoft, text: colors.warning, border: colors.warning };
 }
@@ -65,10 +90,15 @@ function CompactStatusBadge({ status }) {
   );
 }
 
-export default function TrackedShipmentList({ shipments, onShipmentPress }) {
+export default function TrackedShipmentList({
+  shipments,
+  onShipmentPress,
+  activeFilter = "ALL",
+  onFilterChange,
+  sortOrder = "LATEST",
+}) {
   const { colors } = useTheme();
   const [searchText, setSearchText] = useState("");
-  const [activeFilter, setActiveFilter] = useState("ALL");
 
   const filteredShipments = useMemo(() => {
     let filtered = shipments || [];
@@ -76,12 +106,17 @@ export default function TrackedShipmentList({ shipments, onShipmentPress }) {
     if (activeFilter === "ACTIVE") {
       filtered = filtered.filter((s) => {
         const status = normalizeStatus(s.status);
-        return status !== "DELIVERED" && status !== "COMPLETED" && status !== "CANCELLED";
+        return !INACTIVE_SHIPMENT_STATUSES.has(status);
       });
     } else if (activeFilter === "DELIVERED") {
       filtered = filtered.filter((s) => {
         const status = normalizeStatus(s.status);
-        return status === "DELIVERED" || status === "COMPLETED";
+        return (
+          status === "DELIVERED" ||
+          status === "COMPLETED" ||
+          status === "RECEIVED" ||
+          status === "RECEIVED_AT_DIVISORIA"
+        );
       });
     } else if (activeFilter === "PENDING") {
       filtered = filtered.filter((s) => normalizeStatus(s.status).includes("PENDING"));
@@ -89,6 +124,11 @@ export default function TrackedShipmentList({ shipments, onShipmentPress }) {
       filtered = filtered.filter((s) => {
         const status = normalizeStatus(s.status);
         return status === "IN_TRANSIT" || status === "OUT_FOR_DELIVERY";
+      });
+    } else if (activeFilter === "CANCELLED") {
+      filtered = filtered.filter((s) => {
+        const status = normalizeStatus(s.status);
+        return status === "CANCELLED" || status === "FAILED_DELIVERY";
       });
     }
 
@@ -117,8 +157,23 @@ export default function TrackedShipmentList({ shipments, onShipmentPress }) {
       });
     }
 
-    return filtered;
-  }, [shipments, searchText, activeFilter]);
+    const getSortTime = (shipment) => {
+      const raw =
+        shipment.rawUpdatedAt ||
+        shipment.updatedAt ||
+        shipment.rawCreatedAt ||
+        shipment.createdAt;
+      if (!raw) return 0;
+      const date = raw.toDate ? raw.toDate() : new Date(raw);
+      const time = date?.getTime?.();
+      return Number.isFinite(time) ? time : 0;
+    };
+
+    return [...filtered].sort((a, b) => {
+      const diff = getSortTime(b) - getSortTime(a);
+      return sortOrder === "OLDEST" ? -diff : diff;
+    });
+  }, [shipments, searchText, activeFilter, sortOrder]);
 
   return (
     <View style={styles.container}>
@@ -164,7 +219,7 @@ export default function TrackedShipmentList({ shipments, onShipmentPress }) {
                   borderColor: isActive ? colors.primary : colors.dashboardBorder,
                 },
               ]}
-              onPress={() => setActiveFilter(opt.value)}
+              onPress={() => onFilterChange?.(opt.value)}
               activeOpacity={0.8}
             >
               <Text
@@ -212,7 +267,10 @@ export default function TrackedShipmentList({ shipments, onShipmentPress }) {
             const recipient = item.recipient?.name || item.receiverName || "Unknown";
             const status = normalizeStatus(item.status);
             const dateLabel =
-              status === "DELIVERED" || status === "COMPLETED"
+              status === "DELIVERED" ||
+              status === "COMPLETED" ||
+              status === "RECEIVED" ||
+              status === "RECEIVED_AT_DIVISORIA"
                 ? "Delivered"
                 : item.rawUpdatedAt || item.updatedAt
                   ? "Updated"
