@@ -76,9 +76,12 @@ export default function BatchDeliverySummaryModal({
             ))}
           </ScrollView>
 
-          <Text style={[styles.totalLine, { color: accentColor }]}>
-            Total scanned: {total}
-          </Text>
+          <View style={styles.summaryRow}>
+            <Text style={styles.summaryLabel}>Total scanned:</Text>
+            <Text style={[styles.summaryValue, { color: accentColor }]}>
+              {total} piece{total === 1 ? "" : "s"}
+            </Text>
+          </View>
 
           <TouchableOpacity
             style={[
@@ -195,26 +198,39 @@ const styles = StyleSheet.create({
   removeBtn: {
     padding: 6,
   },
-  totalLine: {
-    marginTop: 8,
-    marginBottom: 12,
-    color: "#047857",
+  summaryRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginTop: 12,
+    marginBottom: 14,
+    paddingVertical: 12,
+    borderTopWidth: 1,
+    borderTopColor: "#e2e8f0",
+  },
+  summaryLabel: {
     fontSize: 13,
+    fontWeight: "700",
+    color: "#64748b",
+  },
+  summaryValue: {
+    fontSize: 16,
     fontWeight: "900",
   },
   primaryBtn: {
-    minHeight: 50,
+    minHeight: 52,
     borderRadius: 15,
     backgroundColor: "#2563eb",
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: 9,
+    gap: 10,
   },
   primaryBtnText: {
     color: "#ffffff",
     fontSize: 14,
     fontWeight: "900",
+    letterSpacing: 0.5,
   },
   secondaryBtn: {
     marginTop: 10,

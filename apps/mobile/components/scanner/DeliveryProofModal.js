@@ -122,8 +122,11 @@ export default function DeliveryProofModal({
             ))}
           </ScrollView>
 
-          <View>
-            <Text style={styles.remarksLabel}>Remarks</Text>
+          <View style={styles.remarksSection}>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.remarksLabel}>DELIVERY NOTES</Text>
+              <View style={styles.sectionDivider} />
+            </View>
             <TextInput
               style={styles.remarksInput}
               value={remarks}
@@ -134,6 +137,7 @@ export default function DeliveryProofModal({
               editable={!uploading}
               textAlignVertical="top"
             />
+          </View>
           </View>
 
           <TouchableOpacity
@@ -280,13 +284,27 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
+  remarksSection: {
+    marginTop: 10,
+  },
+  sectionHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 10,
+  },
+  sectionDivider: {
+    flex: 1,
+    height: 1,
+    backgroundColor: "#dcfce7",
+  },
   remarksLabel: {
-    color: "#64748b",
+    color: "#16a34a",
     fontSize: 11,
     fontWeight: "800",
+    letterSpacing: 0.8,
     textTransform: "uppercase",
-    marginBottom: 7,
-  },
+  }
   remarksInput: {
     minHeight: 86,
     borderRadius: 14,
@@ -300,19 +318,20 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
   submitButton: {
-    minHeight: 50,
+    minHeight: 52,
     borderRadius: 15,
     backgroundColor: "#16a34a",
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: 9,
+    gap: 10,
   },
   submitText: {
     color: "#ffffff",
     fontSize: 14,
     fontWeight: "900",
-  },
+    letterSpacing: 0.5,
+  }
   disabled: {
     opacity: 0.55,
   },
