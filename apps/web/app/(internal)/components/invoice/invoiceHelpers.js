@@ -1,3 +1,8 @@
+import {
+  getShipmentTripId,
+  getShipmentTripIdsLabel,
+} from "../shipments/shipmentHelpers";
+
 const EMPTY_INVOICE_VALUE = "-";
 
 const INVOICE_STATUSES = ["DRAFT", "ISSUED", "PAID", "CANCELLED"];
@@ -40,7 +45,8 @@ function buildInitialForm(shipment, invoice, mode) {
           destination: shipment?.destination || "Unknown",
         }),
       shipmentStatus: invoice.shipmentStatus || shipment?.status || "",
-      truckTripId: invoice.truckTripId || shipment?.currentTripId || "",
+      truckTripId:
+        invoice.truckTripId || getShipmentTripId(shipment) || "",
       totalPackages: invoice.totalPackages || shipment?.packages?.length || 0,
       totalItems: invoice.totalItems || shipment?.totals?.totalItems || 0,
       amount: invoice.amount ?? 0,
@@ -69,7 +75,7 @@ function buildInitialForm(shipment, invoice, mode) {
       destination: shipment?.destination || "Unknown",
     }),
     shipmentStatus: shipment?.status || "",
-    truckTripId: shipment?.currentTripId || "",
+    truckTripId: getShipmentTripId(shipment) || "",
     totalPackages: shipment?.packages?.length || 0,
     totalItems: shipment?.totals?.totalItems || 0,
     amount: 0,
@@ -155,6 +161,8 @@ function getInvoiceTripId(invoice = {}) {
   return (
     invoice.tripId ||
     invoice.truckTripId ||
+    getShipmentTripIdsLabel(invoice.shipment) ||
+    getShipmentTripIdsLabel(invoice.shipmentSnapshot) ||
     invoice.currentTripId ||
     invoice.shipment?.currentTripId ||
     invoice.shipmentSnapshot?.currentTripId ||

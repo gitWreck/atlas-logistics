@@ -180,15 +180,22 @@ async function loadTripManifestShipments(db, tripDocId) {
     });
   }
 
-  const snap = await db
-    .collection("shipments")
-    .where("currentTripId", "==", tripDocId)
-    .get();
+  // Multi-trip shipments have currentTripId=null, so also match the array.
+  const [byTripIdSnap, byTripIdsArraySnap] = await Promise.all([
+    db.collection("shipments").where("currentTripId", "==", tripDocId).get(),
+    db
+      .collection("shipments")
+      .where("currentTripIds", "array-contains", tripDocId)
+      .get()
+      .catch(() => ({ docs: [] })),
+  ]);
 
-  return snap.docs.map((docSnap) => ({
-    id: docSnap.id,
-    ...docSnap.data(),
-  }));
+  const shipmentMap = new Map();
+  [...byTripIdSnap.docs, ...byTripIdsArraySnap.docs].forEach((docSnap) => {
+    shipmentMap.set(docSnap.id, { id: docSnap.id, ...docSnap.data() });
+  });
+
+  return [...shipmentMap.values()];
 }
 
 async function loadShippingManifestTotals(db, shippingManifestId) {

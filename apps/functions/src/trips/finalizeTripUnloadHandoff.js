@@ -221,7 +221,8 @@ exports.finalizeTripUnloadHandoff = onCall(
         if (
           shipment.currentTripId &&
           shipment.currentTripId !== sourceTripId &&
-          shipment.currentTripId !== deliveryTripId
+          shipment.currentTripId !== deliveryTripId &&
+          !sourceTripShipmentSnap.exists
         ) {
           blockers.push(
             `Shipment ${shipmentId} belongs to another trip (${shipment.currentTripId}).`,
@@ -537,7 +538,11 @@ exports.finalizeTripUnloadReadyForDelivery = onCall(
           }
         }
 
-        if (shipment.currentTripId && shipment.currentTripId !== sourceTripId) {
+        if (
+          shipment.currentTripId &&
+          shipment.currentTripId !== sourceTripId &&
+          !sourceTripShipmentSnap.exists
+        ) {
           blockers.push(
             `Shipment ${shipmentDocId} belongs to another trip (${shipment.currentTripId}).`,
           );

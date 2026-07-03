@@ -7,21 +7,13 @@ import {
   faPlus,
   faBoxOpen,
   faPrint,
-  faCheckSquare,
-  faSquare,
-  faTruckLoading,
-  faDolly,
   faMinus,
-  faTruckFast,
-  faCheckDouble,
   faFileInvoiceDollar,
   faReceipt,
 } from "@fortawesome/free-solid-svg-icons";
-import { bulkShipmentAction } from "@/app/utility/FirebaseFunctions";
 import { getTableTheme } from "@/app/utility/constant/theme";
 import { getTableActionClasses } from "@/app/utility/constant/action";
 import { packageLabelUrl } from "@/app/utility/constant/templates";
-import { updatedBy } from "@/app/utility/utilities";
 import StatusBadge from "../ui/StatusBadge";
 import ManifestStatusBadge from "../ui/ManifestStatusBadge";
 import {
@@ -62,8 +54,6 @@ export default function TripManifestTab({
   user = null,
 }) {
   const [search, setSearch] = useState("");
-  const [selectedIds, setSelectedIds] = useState(new Set());
-  const [isBulkProcessing, setIsBulkProcessing] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [manifestLimit, setManifestLimit] = useState("50");
   const theme = getTableTheme(isDark);
@@ -182,7 +172,6 @@ export default function TripManifestTab({
   }, [shipments, search]);
 
   useEffect(() => {
-    setSelectedIds(new Set());
     setCurrentPage(1);
   }, [search, shipments]);
 
@@ -201,9 +190,6 @@ export default function TripManifestTab({
     return filteredData.slice(pageStartIndex, pageStartIndex + itemsPerPage);
   }, [filteredData, itemsPerPage, pageStartIndex]);
 
-  const isAllSelected =
-    filteredData.length > 0 && selectedIds.size === filteredData.length;
-
   const getShipmentInvoice = (shipment) => {
     const hasActiveInvoice =
       shipment.invoiceStatus !== "CANCELLED" &&
@@ -216,95 +202,6 @@ export default function TripManifestTab({
       invoiceStatus: shipment.invoiceStatus,
     };
   };
-
-  const handleSelectAll = () => {
-    if (isAllSelected) {
-      setSelectedIds(new Set());
-    } else {
-      setSelectedIds(new Set(filteredData.map((shipment) => shipment.id)));
-    }
-  };
-
-  const handleSelectOne = (id) => {
-    const next = new Set(selectedIds);
-
-    if (next.has(id)) next.delete(id);
-    else next.add(id);
-
-    setSelectedIds(next);
-  };
-
-  const handleBulkAction = async (bulkAction) => {
-    if (selectedIds.size === 0) return;
-
-    try {
-      setIsBulkProcessing(true);
-
-      await bulkShipmentAction({
-        tripId,
-        shipmentIds: Array.from(selectedIds),
-        action: bulkAction,
-        updatedBy: updatedBy(profile),
-      });
-
-      setSelectedIds(new Set());
-      onRefresh?.();
-    } catch (error) {
-      alert("Error processing: " + error.message);
-    } finally {
-      setIsBulkProcessing(false);
-    }
-  };
-
-  const renderBulkActions = () => (
-    <div className="grid grid-cols-2 sm:flex gap-2 w-full">
-      <button
-        type="button"
-        onClick={() => handleBulkAction("UNLOAD")}
-        disabled={isBulkProcessing || manifestLocked}
-        className={`px-3 py-2 border text-xs font-bold rounded-lg flex items-center justify-center gap-2 transition-colors disabled:opacity-50 whitespace-nowrap ${action.bulkNeutral}`}
-      >
-        <FontAwesomeIcon icon={faDolly} />
-        Unload
-      </button>
-
-      <button
-        type="button"
-        onClick={() => handleBulkAction("LOAD")}
-        disabled={isBulkProcessing || manifestLocked}
-        className={`px-3 py-2 text-xs font-bold rounded-lg flex items-center justify-center gap-2 transition-colors disabled:opacity-50 whitespace-nowrap ${action.bulkLoad}`}
-      >
-        {isBulkProcessing ? (
-          "Processing..."
-        ) : (
-          <>
-            <FontAwesomeIcon icon={faTruckLoading} />
-            Load
-          </>
-        )}
-      </button>
-
-      <button
-        type="button"
-        onClick={() => handleBulkAction("OUT_FOR_DELIVERY")}
-        disabled={isBulkProcessing || manifestLocked}
-        className={`px-3 py-2 text-xs font-bold rounded-lg flex items-center justify-center gap-2 transition-colors disabled:opacity-50 whitespace-nowrap ${action.bulkOut}`}
-      >
-        <FontAwesomeIcon icon={faTruckFast} />
-        Out
-      </button>
-
-      <button
-        type="button"
-        onClick={() => handleBulkAction("DELIVERED")}
-        disabled={isBulkProcessing || manifestLocked}
-        className={`px-3 py-2 text-xs font-bold rounded-lg flex items-center justify-center gap-2 transition-colors disabled:opacity-50 whitespace-nowrap ${action.bulkDelivered}`}
-      >
-        <FontAwesomeIcon icon={faCheckDouble} />
-        Delivered
-      </button>
-    </div>
-  );
 
   if (isCompletedTrip(trip)) {
     return (
@@ -382,14 +279,6 @@ export default function TripManifestTab({
                 </span> */}
                 </div>
               </div>
-
-              {selectedIds.size > 0 && (
-                <div
-                  className={`lg:hidden text-xs font-bold px-3 py-1.5 rounded-full border ${theme.selectedInfo}`}
-                >
-                  {selectedIds.size} selected
-                </div>
-              )}
             </div>
 
             {/* <div className="flex flex-col sm:flex-row gap-2 w-full lg:w-auto"> */}
@@ -442,19 +331,6 @@ export default function TripManifestTab({
           </div>
         </div>
 
-        {/* Bulk Action Bar */}
-        {selectedIds.size > 0 && (
-          <div
-            className={`p-3 rounded-2xl border flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3 animate-in slide-in-from-top-2 ${theme.bulkBar}`}
-          >
-            <div className={`text-xs font-bold ${theme.bulkBarText}`}>
-              {selectedIds.size} selected
-            </div>
-
-            {renderBulkActions()}
-          </div>
-        )}
-
         {/* Mobile Cards */}
         <div className="block lg:hidden space-y-3">
           {loading ? (
@@ -471,7 +347,6 @@ export default function TripManifestTab({
             </div>
           ) : (
             paginatedData.map((shipment, idx) => {
-              const isSelected = selectedIds.has(shipment.id);
               const loadedCount = shipment.loadedCount || 0;
               const shipmentPieceTotal =
                 shipment.shipmentPieceTotal ||
@@ -483,24 +358,9 @@ export default function TripManifestTab({
               return (
                 <div
                   key={shipment.id || idx}
-                  className={`rounded-2xl border p-4 transition-colors ${
-                    isSelected ? theme.selectedRow : theme.container
-                  }`}
+                  className={`rounded-2xl border p-4 transition-colors ${theme.container}`}
                 >
                   <div className="flex items-start justify-between gap-3">
-                    <button
-                      type="button"
-                      onClick={() => handleSelectOne(shipment.id)}
-                      className="pt-1"
-                    >
-                      <FontAwesomeIcon
-                        icon={isSelected ? faCheckSquare : faSquare}
-                        className={
-                          isSelected ? theme.checkboxActive : theme.checkboxIdle
-                        }
-                      />
-                    </button>
-
                     <div className="min-w-0 flex-1">
                       <div
                         className={`font-bold text-sm font-mono break-all ${theme.cellPrimary}`}
@@ -645,30 +505,6 @@ export default function TripManifestTab({
                 className={`uppercase font-bold text-[10px] tracking-wider ${theme.thead}`}
               >
                 <tr>
-                  <th
-                    className={`px-4 py-3 w-10 text-center ${theme.stickyHead}`}
-                  >
-                    <button
-                      type="button"
-                      onClick={handleSelectAll}
-                      disabled={filteredData.length === 0}
-                      className={
-                        isDark
-                          ? "hover:text-white transition-colors"
-                          : "hover:text-slate-900 transition-colors"
-                      }
-                    >
-                      <FontAwesomeIcon
-                        icon={isAllSelected ? faCheckSquare : faSquare}
-                        className={
-                          selectedIds.size > 0
-                            ? theme.checkboxActive
-                            : theme.checkboxIdle
-                        }
-                      />
-                    </button>
-                  </th>
-
                   <th className="px-4 py-3 w-10 text-center">#</th>
                   <th className="px-4 py-3">Tracking / Customer</th>
                   <th className="px-4 py-3">Destination</th>
@@ -684,7 +520,7 @@ export default function TripManifestTab({
                 {loading ? (
                   <tr>
                     <td
-                      colSpan="7"
+                      colSpan="6"
                       className={`px-4 py-8 text-center animate-pulse ${theme.emptyText}`}
                     >
                       Loading manifest...
@@ -693,7 +529,7 @@ export default function TripManifestTab({
                 ) : filteredData.length === 0 ? (
                   <tr>
                     <td
-                      colSpan="7"
+                      colSpan="6"
                       className={`px-4 py-8 text-center italic ${theme.emptyText}`}
                     >
                       No shipments found.
@@ -701,7 +537,6 @@ export default function TripManifestTab({
                   </tr>
                 ) : (
                   paginatedData.map((shipment, idx) => {
-                    const isSelected = selectedIds.has(shipment.id);
                     const loadedCount = shipment.loadedCount || 0;
                     const shipmentPieceTotal =
                       shipment.shipmentPieceTotal ||
@@ -714,26 +549,8 @@ export default function TripManifestTab({
                     return (
                       <tr
                         key={shipment.id || idx}
-                        className={`transition-colors ${
-                          isSelected ? theme.selectedRow : theme.rowHover
-                        }`}
+                        className={`transition-colors ${theme.rowHover}`}
                       >
-                        <td className="px-4 py-3 text-center">
-                          <button
-                            type="button"
-                            onClick={() => handleSelectOne(shipment.id)}
-                          >
-                            <FontAwesomeIcon
-                              icon={isSelected ? faCheckSquare : faSquare}
-                              className={
-                                isSelected
-                                  ? theme.checkboxActive
-                                  : theme.checkboxIdle
-                              }
-                            />
-                          </button>
-                        </td>
-
                         <td
                           className={`px-4 py-3 text-center font-mono text-xs ${theme.cellSecondary}`}
                         >

@@ -49,19 +49,29 @@ async function getShipmentDocsInBatches(shipmentIds = []) {
   const uniqueIds = [...new Set(shipmentIds.filter(Boolean))];
   if (uniqueIds.length === 0) return new Map();
 
-  const masterById = new Map();
-  const batchSize = 10;
-
+  const batchSize = 30;
+  const chunks = [];
   for (let index = 0; index < uniqueIds.length; index += batchSize) {
-    const chunk = uniqueIds.slice(index, index + batchSize);
-    const refs = chunk.map((id) => adminDb.collection("shipments").doc(id));
-    const snaps = await adminDb.getAll(...refs);
+    chunks.push(uniqueIds.slice(index, index + batchSize));
+  }
+
+  // Run all getAll batches concurrently instead of sequentially.
+  const snapsPerChunk = await Promise.all(
+    chunks.map((chunk) =>
+      adminDb.getAll(
+        ...chunk.map((id) => adminDb.collection("shipments").doc(id)),
+      ),
+    ),
+  );
+
+  const masterById = new Map();
+  snapsPerChunk.forEach((snaps) => {
     snaps.forEach((snap) => {
       if (snap.exists) {
         masterById.set(snap.id, snap.data());
       }
     });
-  }
+  });
 
   return masterById;
 }
@@ -252,8 +262,15 @@ async function buildTripList(docs, { view = "board" } = {}) {
   const trips = await Promise.all(
     docs.map(async (doc) => {
       const tripData = { id: doc.id, ...doc.data() };
+
+      // Board rows only need piece-level shipment detail for ACTIVE reconciled
+      // hub trips (in-progress "X/Y delivered" bars). Completed/cancelled/
+      // archived trips render from their sealed trip-level counters, so we skip
+      // their expensive trip_shipments subcollection reads. The `full` view
+      // (drawer/exports) always enriches.
       const needsShipmentContext =
-        view === "full" || tripNeedsDeliveryEnrichment(tripData);
+        view === "full" ||
+        (isActiveTripDoc(tripData) && tripNeedsDeliveryEnrichment(tripData));
 
       if (!needsShipmentContext) {
         return serializeTripDoc(doc);
@@ -269,6 +286,7 @@ async function buildTripList(docs, { view = "board" } = {}) {
 
 export async function GET(request) {
   try {
+    const startedAt = Date.now();
     const headersList = await headers();
     const token = headersList.get("authorization")?.split("Bearer ")[1];
     if (!token) {
@@ -277,9 +295,21 @@ export async function GET(request) {
     const decodedToken = await getAuth().verifyIdToken(token);
     const uid = decodedToken.uid;
 
-    const userDoc = await adminDb.collection("users").doc(uid).get();
-    const userData = userDoc.data();
+    const { searchParams } = new URL(request.url);
+    const activeLimit = parseLimit(searchParams, "activeLimit");
+    const completedLimit = parseLimit(searchParams, "completedLimit");
+    const view = searchParams.get("view") || "board";
 
+    // Overlap the role-check read with the (slower) trip docs query.
+    // Trip data is discarded if the role check fails, so nothing leaks.
+    const docsStartedAt = Date.now();
+    const [userDoc, allDocs] = await Promise.all([
+      adminDb.collection("users").doc(uid).get(),
+      fetchTripDocsForBoard(activeLimit, completedLimit),
+    ]);
+    const docsMs = Date.now() - docsStartedAt;
+
+    const userData = userDoc.data();
     if (
       !userData ||
       !["admin", "manager"].includes(userData.role?.toLowerCase())
@@ -290,18 +320,24 @@ export async function GET(request) {
       );
     }
 
-    const { searchParams } = new URL(request.url);
-    const activeLimit = parseLimit(searchParams, "activeLimit");
-    const completedLimit = parseLimit(searchParams, "completedLimit");
-    const view = searchParams.get("view") || "board";
-
-    const allDocs = await fetchTripDocsForBoard(activeLimit, completedLimit);
     const limitedDocs = selectLimitedTripDocs(
       allDocs,
       activeLimit,
       completedLimit,
     );
+
+    const enrichStartedAt = Date.now();
     const trips = await buildTripList(limitedDocs, { view });
+    const enrichMs = Date.now() - enrichStartedAt;
+
+    const enrichedCount = trips.filter(
+      (trip) => Array.isArray(trip.shipments) && trip.shipments.length > 0,
+    ).length;
+    console.log(
+      `[api/trips] view=${view} docs=${docsMs}ms enrich=${enrichMs}ms total=${
+        Date.now() - startedAt
+      }ms trips=${trips.length} enriched=${enrichedCount}`,
+    );
 
     return NextResponse.json({ trips });
   } catch (error) {

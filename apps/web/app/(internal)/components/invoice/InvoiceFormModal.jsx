@@ -10,7 +10,11 @@ import {
 } from "@fortawesome/free-solid-svg-icons";
 import { getModalThemeClasses } from "@/app/utility/constant/theme";
 import { getModalActionClasses } from "@/app/utility/constant/action";
-import { buildInitialForm } from "./invoiceHelpers";
+import { buildInitialForm, getInvoiceTripId } from "./invoiceHelpers";
+import {
+  getShipmentTripId,
+  getShipmentTripIdsLabel,
+} from "../shipments/shipmentHelpers";
 
 export default function InvoiceFormModal({
   isOpen = false,
@@ -51,7 +55,8 @@ export default function InvoiceFormModal({
     ${item.recipient?.name || ""}
     ${item.origin || ""}
     ${item.destination || ""}
-    ${item.currentTripId || ""}
+    ${getShipmentTripIdsLabel(item) || item.currentTripId || ""}
+    ${(item.currentTripIds || []).join(" ")}
   `
       .toLowerCase()
       .includes(keyword);
@@ -169,7 +174,10 @@ export default function InvoiceFormModal({
                                     shipmentTrackingNumber:
                                       item.trackingNumber || item.id || "",
                                     shipmentStatus: item.status || "",
-                                    truckTripId: item.currentTripId || "",
+                                    truckTripId:
+                                      getShipmentTripIdsLabel(item) ||
+                                      getShipmentTripId(item) ||
+                                      "",
                                     senderName: item.sender?.name || "",
                                     senderPhone: item.sender?.phone || "",
                                     recipientName: item.recipient?.name || "",
@@ -201,8 +209,8 @@ export default function InvoiceFormModal({
                                 <div className="opacity-50 text-[10px]">
                                   {item.origin || "Unknown"} →{" "}
                                   {item.destination || "Unknown"}
-                                  {item.currentTripId
-                                    ? ` • ${item.currentTripId}`
+                                  {getShipmentTripIdsLabel(item)
+                                    ? ` • ${getShipmentTripIdsLabel(item)}`
                                     : ""}
                                 </div>
                               </button>

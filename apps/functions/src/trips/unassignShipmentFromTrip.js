@@ -6,7 +6,7 @@ const { FieldValue } = admin.firestore;
 const { requireRole, updatedBy } = require("../utilities/helpers");
 const { writeShipmentActionLog } = require("../utilities/shipmentLogger");
 const { writeCustodyAuditLog } = require("../utilities/custodyAuditLog");
-const { normalizeQty } = require("../utilities/packageHelpers");
+const { packageOnTrip, buildShipmentSnapshot } = require("../packages/tripPackageOperations");
 
 if (!admin.apps.length) admin.initializeApp();
 const db = admin.firestore();
@@ -87,7 +87,11 @@ exports.unassignShipmentFromTrip = onCall(
           "Trip Manifest is LOCKED. Reopen it first.",
         );
       }
-      if (tracking.currentTripId && tracking.currentTripId !== tripId) {
+      if (
+        tracking.currentTripId &&
+        tracking.currentTripId !== tripId &&
+        !shipSnap.exists
+      ) {
         throw new HttpsError(
           "failed-precondition",
           `Shipment belongs to another trip (${tracking.currentTripId}).`,
@@ -148,8 +152,12 @@ exports.unassignShipmentFromTrip = onCall(
       // ======================================================
       // 3. RESET SHIPMENT & PACKAGES
       // ======================================================
-      // Unassignment removes trip progress, but it should not erase package issue quantities.
+      // Only reset packages that belonged to this trip; leave other trips untouched.
       const updatedPackages = (tracking.packages || []).map((pkg) => {
+        if (!packageOnTrip(pkg, tripId)) {
+          return pkg;
+        }
+
         const quantity = packageQty(pkg);
         const missingQty = clamp(normalizeQty(pkg.missingQty, 0), 0, quantity);
         const damagedQty = clamp(normalizeQty(pkg.damagedQty, 0), 0, quantity);
@@ -176,37 +184,32 @@ exports.unassignShipmentFromTrip = onCall(
         };
       });
 
-      const totalQty =
-        updatedPackages.reduce((sum, pkg) => sum + packageQty(pkg), 0) ||
-        normalizeQty(
-          tracking.totals?.totalContentQty ?? tracking.totals?.totalItems,
-          removeTotal,
-        );
-      const totalMissing = sumQty(updatedPackages, "missingQty");
-      const totalDamaged = sumQty(updatedPackages, "damagedQty");
-      const totalPending = Math.max(totalQty - totalMissing - totalDamaged, 0);
+      const snapshot = buildShipmentSnapshot(updatedPackages, {
+        previousStatus: tracking.status,
+      });
+      const shipmentStatus = snapshot.status;
 
-      let shipmentStatus = "RECEIVED";
-      if (totalDamaged >= totalQty && totalQty > 0) {
-        shipmentStatus = "DAMAGED";
-      } else if (totalMissing >= totalQty && totalQty > 0) {
-        shipmentStatus = "MISSING";
-      }
+      const activeTripIds = snapshot.currentTripIds || [];
+      const singleCurrentTripId = snapshot.currentTripId;
 
       tx.update(trackingRef, {
-        currentTripId: null,
-        assignedToTripAt: null,
+        currentTripId: singleCurrentTripId,
+        currentTripIds: activeTripIds,
+        assignedToTripAt: singleCurrentTripId ? tracking.assignedToTripAt || now : null,
         status: shipmentStatus,
+        packageBreakdown: snapshot.packageBreakdown,
+        availableForDelivery: snapshot.packageBreakdown?.available > 0,
 
-        // Reset trip-driven progress while preserving package issue quantities.
-        "totals.pending": totalPending,
-        "totals.loaded": 0,
-        "totals.delivered": 0,
-        "totals.received": 0,
-        "totals.missing": totalMissing,
-        "totals.damaged": totalDamaged,
+        "totals.pending": snapshot.totals.pending,
+        "totals.loaded": snapshot.totals.loaded,
+        "totals.delivered": snapshot.totals.delivered,
+        "totals.received": snapshot.totals.received,
+        "totals.missing": snapshot.totals.missing,
+        "totals.damaged": snapshot.totals.damaged,
+        "totals.totalContentQty": snapshot.totals.totalContentQty,
+        "totals.totalItems": snapshot.totals.totalItems,
 
-        packages: updatedPackages,
+        packages: snapshot.packages,
 
         updatedAt: now,
         updatedBy: name,
@@ -269,8 +272,15 @@ exports.unassignShipmentFromTrip = onCall(
         actorId: uid,
         actorName: name || null,
         actorRole: role || null,
-        previousValue: { currentTripId: tripId },
-        newValue: { currentTripId: null, resultingStatus: shipmentStatus },
+        previousValue: {
+          currentTripId: tracking.currentTripId || null,
+          currentTripIds: tracking.currentTripIds || [],
+        },
+        newValue: {
+          currentTripId: singleCurrentTripId,
+          currentTripIds: activeTripIds,
+          resultingStatus: shipmentStatus,
+        },
         note: `Shipment ${trackingShipmentId} unassigned from trip.`,
         meta: {
           removedTotal: removeTotal,

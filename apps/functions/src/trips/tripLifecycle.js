@@ -336,23 +336,8 @@ const ADMIN_OVERRIDE_RECEIVING_STATUSES = new Set([
 function validateAdminOverrideRelease({
   trip = {},
   missingPackages = [],
-  missingRemarks = {},
 } = {}) {
-  const { resolveRemarkForMissingPackage } = require("./reconciliationPieces");
   const entries = Array.isArray(missingPackages) ? missingPackages : [];
-
-  for (const entry of entries) {
-    const remark = resolveRemarkForMissingPackage(entry, missingRemarks);
-    const publicId =
-      entry?.packageId || entry?.shipmentId || entry?.shipmentDocId || "unknown";
-
-    if (!remark) {
-      return {
-        valid: false,
-        message: `Add remarks for missing package ${publicId} before admin override release.`,
-      };
-    }
-  }
 
   const status = normalizeTripStatus(trip.status);
   if (TERMINAL_TRIP_STATUSES.has(status)) {

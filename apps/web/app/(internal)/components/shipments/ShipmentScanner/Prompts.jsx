@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faTruckRampBox,
@@ -12,12 +13,15 @@ import {
   faBoxOpen,
   faChevronDown,
   faChevronUp,
+  faTimes,
 } from "@fortawesome/free-solid-svg-icons";
 import StatusButton from "../../ui/StatusButton"; // Adjust path
+import { getModalThemeClasses } from "@/app/utility/constant/theme";
 import { hasReleasableHandoffPieces } from "@/app/utility/handoffRelease";
 import {
-  flattenMissingPackages,
-  areMissingPackageRemarksComplete,
+  resolveAllMissingDisplayEntries,
+  extractMissingPackagesFromRow,
+  resolveMissingPackagesForRow,
 } from "@/app/utility/reconciliationPieces";
 
 export function InterceptorPrompt({
@@ -108,9 +112,21 @@ function ReconciliationMetricCard({
   icon,
   accentClass,
   theme,
+  onClick = null,
+  interactive = false,
 }) {
+  const Wrapper = onClick ? "button" : "div";
+
   return (
-    <div className={`rounded-xl border p-3 text-left ${theme.panelSurface}`}>
+    <Wrapper
+      type={onClick ? "button" : undefined}
+      onClick={onClick || undefined}
+      className={`rounded-xl border p-3 text-left w-full ${theme.panelSurface} ${
+        interactive
+          ? "cursor-pointer transition-colors hover:border-red-500/40 hover:bg-red-500/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/40"
+          : ""
+      }`}
+    >
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
           <div className="text-[10px] font-bold uppercase opacity-50">
@@ -126,7 +142,223 @@ function ReconciliationMetricCard({
       {subtext ? (
         <p className="mt-2 text-[10px] leading-snug opacity-60">{subtext}</p>
       ) : null}
-    </div>
+      {interactive ? (
+        <p className="mt-1 text-[10px] font-semibold text-red-500/80">
+          Tap to view missing labels
+        </p>
+      ) : null}
+    </Wrapper>
+  );
+}
+
+function resolveMissingStateLabel(entry = {}) {
+  const state = entry.state || entry.packageStatus;
+  if (state === "on_other_trip") return "On other trip";
+  if (state === "on_truck") return "On truck";
+  if (state === "variance" || entry.isUnresolved) return "Unaccounted";
+  return "Missing";
+}
+
+function MissingPackagesModal({
+  isOpen,
+  onClose,
+  missingPackages = [],
+  missingShipments = [],
+  missingPieces = 0,
+  isDark = false,
+}) {
+  const modalTheme = getModalThemeClasses(isDark);
+
+  const groupedEntries = useMemo(() => {
+    const groups = new Map();
+
+    const addEntry = (entry) => {
+      const shipmentKey = entry.shipmentId || entry.shipmentDocId || "Unknown";
+      if (!groups.has(shipmentKey)) {
+        groups.set(shipmentKey, {
+          shipmentId: shipmentKey,
+          recipientName: entry.recipientName || null,
+          destination: entry.destination || null,
+          packages: [],
+        });
+      }
+      groups.get(shipmentKey).packages.push(entry);
+    };
+
+    if (missingPackages.length > 0) {
+      missingPackages.forEach(addEntry);
+      return [...groups.values()];
+    }
+
+    for (const row of missingShipments) {
+      const entries = resolveMissingPackagesForRow(row, {
+        tripPackages: row.tripPackages || [],
+        allPackages: row.allPackages || row.tripPackages || [],
+        tripId: row.tripId || "",
+        tripShipment: { packageBarcodes: row.packageBarcodes || [] },
+      });
+      if (entries.length > 0) {
+        entries.forEach(addEntry);
+        continue;
+      }
+
+      const fromPieces = extractMissingPackagesFromRow(row);
+      if (fromPieces.length > 0) {
+        fromPieces.forEach(addEntry);
+        continue;
+      }
+
+      const pieces = (row.pieces || []).filter((piece) =>
+        ["on_truck", "missing", "variance", "on_other_trip"].includes(
+          piece.state,
+        ),
+      );
+      for (const piece of pieces) {
+        addEntry({
+          packageId: piece.pieceId,
+          shipmentId: row.shipmentId,
+          pieceSuffix: null,
+          shipmentDocId: row.id || null,
+          recipientName: row.recipientName || null,
+          destination: row.destination || null,
+          packageStatus: piece.packageStatus || piece.state || null,
+          state: piece.state,
+        });
+      }
+    }
+
+    return [...groups.values()];
+  }, [missingPackages, missingShipments]);
+
+  const totalListed = groupedEntries.reduce(
+    (sum, group) => sum + group.packages.length,
+    0,
+  );
+
+  if (!isOpen) return null;
+
+  return createPortal(
+    <div
+      className="fixed inset-0 flex items-center justify-center p-4"
+      style={{ zIndex: 100000 }}
+    >
+      <div
+        className={`fixed inset-0 ${modalTheme.overlay}`}
+        onClick={onClose}
+      />
+
+      <div
+        className={`relative flex max-h-[85vh] w-full max-w-lg flex-col overflow-hidden rounded-2xl border shadow-2xl ${modalTheme.modal}`}
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div
+          className={`flex items-center justify-between border-b px-5 py-4 ${modalTheme.header}`}
+        >
+          <div>
+            <h3 className={`text-base font-bold ${modalTheme.title}`}>
+              Missing Labels
+            </h3>
+            <p className={`mt-0.5 text-xs ${modalTheme.label}`}>
+              {totalListed > 0
+                ? `${totalListed} label${totalListed === 1 ? "" : "s"} need attention`
+                : `${missingPieces} piece${missingPieces === 1 ? "" : "s"} unaccounted`}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className={modalTheme.closeButton}
+            aria-label="Close missing labels modal"
+          >
+            <FontAwesomeIcon icon={faTimes} />
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
+          {groupedEntries.length === 0 ? (
+            <div
+              className={`rounded-xl border p-4 text-sm leading-relaxed ${modalTheme.input}`}
+            >
+              No individual missing labels were resolved yet. Review the
+              shipments below in reconciliation and unload or mark missing
+              packages.
+            </div>
+          ) : (
+            groupedEntries.map((group) => (
+              <div
+                key={group.shipmentId}
+                className={`rounded-xl border overflow-hidden ${modalTheme.input}`}
+              >
+                <div className="border-b px-3 py-2.5">
+                  <div className="text-xs font-mono font-bold break-all">
+                    {group.shipmentId}
+                  </div>
+                  {group.recipientName ? (
+                    <div className="mt-0.5 text-[11px] opacity-70 truncate">
+                      {group.recipientName}
+                      {group.destination ? ` · ${group.destination}` : ""}
+                    </div>
+                  ) : null}
+                </div>
+                <ul className="divide-y divide-white/5">
+                  {group.packages.map((entry) => (
+                    <li
+                      key={entry.packageId}
+                      className="px-3 py-2.5 flex items-start justify-between gap-3"
+                    >
+                      <div className="min-w-0">
+                        <div className="text-xs font-mono font-bold break-all">
+                          {entry.isUnresolved
+                            ? "Unresolved label"
+                            : entry.packageId}
+                        </div>
+                        {entry.pieceSuffix ? (
+                          <div className="text-[11px] opacity-60 mt-0.5">
+                            Piece {entry.pieceSuffix}
+                          </div>
+                        ) : null}
+                        {entry.otherTripId ? (
+                          <div className="text-[11px] text-amber-600 mt-0.5">
+                            Loaded on {entry.otherTripId}
+                          </div>
+                        ) : null}
+                        {entry.note ? (
+                          <div className="text-[11px] opacity-60 mt-0.5 leading-snug">
+                            {entry.note}
+                          </div>
+                        ) : null}
+                      </div>
+                      <span
+                        className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${
+                          entry.state === "on_other_trip"
+                            ? "bg-amber-500/15 text-amber-600"
+                            : entry.isUnresolved
+                              ? "bg-orange-500/15 text-orange-600"
+                              : "bg-red-500/15 text-red-500"
+                        }`}
+                      >
+                        {resolveMissingStateLabel(entry)}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))
+          )}
+        </div>
+
+        <div className={`border-t px-5 py-4 ${modalTheme.header}`}>
+          <button
+            type="button"
+            onClick={onClose}
+            className={`w-full rounded-xl border px-4 py-2.5 text-sm font-semibold ${modalTheme.input}`}
+          >
+            Close
+          </button>
+        </div>
+      </div>
+    </div>,
+    document.body,
   );
 }
 
@@ -135,6 +367,22 @@ function ReadyShipmentRow({ item, theme, defaultExpanded = true }) {
   const totalLabels = Number(item.expectedCount) || 0;
   const receivedLabels = Number(item.unloadedCount) || 0;
   const pieces = Array.isArray(item.pieces) ? item.pieces : [];
+  const missingEntries = useMemo(() => {
+    const resolved = resolveMissingPackagesForRow(item, {
+      tripPackages: item.tripPackages || [],
+      allPackages: item.allPackages || item.tripPackages || [],
+      tripId: item.tripId || "",
+      tripShipment: { packageBarcodes: item.packageBarcodes || [] },
+    });
+    if (resolved.length > 0) return resolved;
+    return Array.isArray(item.missingPackages) ? item.missingPackages : [];
+  }, [item]);
+  const pieceIds = new Set(
+    pieces.map((piece) => String(piece.pieceId || "")).filter(Boolean),
+  );
+  const extraMissing = missingEntries.filter(
+    (entry) => entry.packageId && !pieceIds.has(String(entry.packageId)),
+  );
   const isReady =
     item.labelSummary?.ready ??
     (totalLabels > 0 && receivedLabels >= totalLabels);
@@ -178,7 +426,7 @@ function ReadyShipmentRow({ item, theme, defaultExpanded = true }) {
         </div>
       </button>
 
-      {expanded && pieces.length > 0 ? (
+      {expanded && (pieces.length > 0 || extraMissing.length > 0) ? (
         <div className="border-t divide-y divide-white/5">
           {pieces.map((piece) => {
             const received = piece.state === "received";
@@ -219,6 +467,38 @@ function ReadyShipmentRow({ item, theme, defaultExpanded = true }) {
               </div>
             );
           })}
+          {extraMissing.map((entry) => (
+            <div key={entry.packageId} className="px-3 py-2.5 text-left">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="text-xs font-mono font-bold truncate">
+                    {entry.isUnresolved ? "Unresolved label" : entry.packageId}
+                  </div>
+                  {entry.otherTripId ? (
+                    <div className="text-[11px] text-amber-600 mt-0.5">
+                      Loaded on {entry.otherTripId}
+                    </div>
+                  ) : null}
+                  {entry.note ? (
+                    <div className="text-[11px] opacity-60 mt-0.5 leading-snug">
+                      {entry.note}
+                    </div>
+                  ) : null}
+                </div>
+                <span
+                  className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${
+                    entry.state === "on_other_trip"
+                      ? "bg-amber-500/15 text-amber-600"
+                      : entry.isUnresolved
+                        ? "bg-orange-500/15 text-orange-600"
+                        : "bg-red-500/15 text-red-600"
+                  }`}
+                >
+                  {resolveMissingStateLabel(entry)}
+                </span>
+              </div>
+            </div>
+          ))}
         </div>
       ) : null}
     </div>
@@ -267,7 +547,7 @@ function MissingPackageRemarkCard({
         value={missingRemarks[pkg.packageId] || ""}
         onChange={(e) => onRemarkChange(pkg.packageId, e.target.value)}
         rows={2}
-        placeholder={`Add a remark for ${pkg.packageId}...`}
+        placeholder={`Optional remark for ${pkg.packageId}...`}
         className={`mt-3 w-full rounded-lg border px-3 py-2 text-xs ${theme.input}`}
       />
     </div>
@@ -285,14 +565,16 @@ export function HandoffPrompt({
   onBack,
   btnStatus,
   isAdmin = false,
+  isDark = false,
 }) {
+  const [showMissingModal, setShowMissingModal] = useState(false);
   const totals = summary?.totals || {};
   const context = summary?.context || {};
   const missingShipments = summary?.missingShipments || [];
-  const missingPackages =
-    Array.isArray(summary?.missingPackages) && summary.missingPackages.length > 0
-      ? summary.missingPackages
-      : flattenMissingPackages(missingShipments);
+  const missingPackages = useMemo(
+    () => resolveAllMissingDisplayEntries(summary),
+    [summary],
+  );
   const unloadedShipments = summary?.unloadedShipments || [];
   const { manifestPieces, unloadedPieces, missingPieces } =
     resolvePieceTotals(summary);
@@ -301,20 +583,12 @@ export function HandoffPrompt({
   const hasMissingShipments = missingShipments.length > 0;
   const hasMissing =
     hasMissingLabels || hasMissingCount || hasMissingShipments;
-  const remarksComplete = areMissingPackageRemarksComplete(
-    missingPackages,
-    missingRemarks,
-  );
   const lifecycleCanRelease = summary?.lifecycle?.canReleaseForDelivery !== false;
   const releaseBlockReason = summary?.lifecycle?.releaseBlockReason || null;
   const standardCountsReady =
-    summary?.ready &&
-    hasReleasableHandoffPieces(summary) &&
-    (!hasMissingLabels || remarksComplete);
+    summary?.ready && hasReleasableHandoffPieces(summary);
   const adminOverrideEligible =
-    isAdmin &&
-    hasReleasableHandoffPieces(summary) &&
-    (!hasMissingLabels || remarksComplete);
+    isAdmin && hasReleasableHandoffPieces(summary) && hasMissing;
   const canRelease = adminOverrideEligible
     ? true
     : standardCountsReady && (lifecycleCanRelease || summary?.ready);
@@ -342,9 +616,9 @@ export function HandoffPrompt({
       }
       description={
         hasMissing && isAdmin
-          ? "Admin override: document remarks for each missing label, then release verified packages to delivery operations."
+          ? "Admin override: optionally add remarks for missing labels, then release verified packages to delivery operations."
           : hasMissing
-            ? "Add remarks for missing labels, then finalize reconciliation and release for delivery operations."
+            ? "Unload remaining labels or optionally add missing remarks, then release verified packages to delivery operations."
             : summary?.ready
             ? tripId
               ? lifecycleCanRelease
@@ -380,8 +654,23 @@ export function HandoffPrompt({
           icon={faTriangleExclamation}
           accentClass="text-red-500"
           theme={theme}
+          interactive={hasMissing && missingPieces > 0}
+          onClick={
+            hasMissing && missingPieces > 0
+              ? () => setShowMissingModal(true)
+              : null
+          }
         />
       </div>
+
+      <MissingPackagesModal
+        isOpen={showMissingModal}
+        onClose={() => setShowMissingModal(false)}
+        missingPackages={missingPackages}
+        missingShipments={missingShipments}
+        missingPieces={missingPieces}
+        isDark={isDark}
+      />
 
       {hasMissing ? (
         <div className="space-y-3 text-left">
@@ -434,7 +723,7 @@ export function HandoffPrompt({
           {hasMissingLabels ? (
             <>
               <div className="text-[10px] font-bold uppercase opacity-60">
-                Missing Remarks
+                Missing Remarks (optional)
               </div>
               <div className="space-y-3 max-h-56 overflow-y-auto pr-1">
                 {missingPackages.map((pkg) => (

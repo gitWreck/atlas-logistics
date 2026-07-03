@@ -193,11 +193,21 @@ exports.updateTripStatus = onCall(
       const batch = db.batch();
       let operationCount = 0;
 
-      // A. Get all shipments on this trip
-      const shipmentsSnap = await db
-        .collection("shipments")
-        .where("currentTripId", "==", tripId)
-        .get();
+      // A. Get all shipments on this trip. Multi-trip shipments have
+      // currentTripId=null, so also match the currentTripIds array.
+      const [byTripIdSnap, byTripIdsArraySnap] = await Promise.all([
+        db.collection("shipments").where("currentTripId", "==", tripId).get(),
+        db
+          .collection("shipments")
+          .where("currentTripIds", "array-contains", tripId)
+          .get()
+          .catch(() => ({ docs: [] })),
+      ]);
+
+      const shipmentRefMap = new Map();
+      [...byTripIdSnap.docs, ...byTripIdsArraySnap.docs].forEach((doc) => {
+        shipmentRefMap.set(doc.id, doc.ref);
+      });
 
       // B. Get all truck_shipments (if using a separate collection)
       const truckShipmentsSnap = await db
@@ -236,7 +246,7 @@ exports.updateTripStatus = onCall(
         operationCount++;
       };
 
-      shipmentsSnap.forEach((doc) => addToBatch(doc.ref, newStatus));
+      shipmentRefMap.forEach((ref) => addToBatch(ref, newStatus));
       truckShipmentsSnap.forEach((doc) => addToBatch(doc.ref, newStatus));
 
       if (operationCount > 0) {

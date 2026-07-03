@@ -4,7 +4,6 @@
  */
 
 import { canDeleteShipmentsAndTrips } from "./deletePermissions";
-import { resolveRemarkForMissingPackage } from "@/app/utility/reconciliationPieces";
 
 export const TRIP_STATUSES = Object.freeze({
   CREATED: "CREATED",
@@ -256,22 +255,8 @@ const ADMIN_OVERRIDE_RECEIVING_STATUSES = new Set([
 export function validateAdminOverrideRelease({
   trip = {},
   missingPackages = [],
-  missingRemarks = {},
 } = {}) {
   const entries = Array.isArray(missingPackages) ? missingPackages : [];
-
-  for (const entry of entries) {
-    const remark = resolveRemarkForMissingPackage(entry, missingRemarks);
-    const publicId =
-      entry?.packageId || entry?.shipmentId || entry?.shipmentDocId || "unknown";
-
-    if (!remark) {
-      return {
-        valid: false,
-        message: `Add remarks for missing package ${publicId} before admin override release.`,
-      };
-    }
-  }
 
   const status = normalizeTripStatus(trip.status);
   if (["COMPLETED", "CANCELLED"].includes(status)) {

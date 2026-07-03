@@ -11,6 +11,11 @@ const { getActorFromRequest } = require("../utilities/tripLogger");
 const { writeCustodyAuditLog } = require("../utilities/custodyAuditLog");
 const { buildDerivedShipmentSnapshot } = require("../packages/shipmentStatus");
 const {
+  evaluateShipmentTripAssignment,
+  buildAssignmentTripFields,
+  shipmentManifestIncludesTrip,
+} = require("../packages/tripPackageOperations");
+const {
   normalizeCode,
   resolveShipmentReference,
 } = require("../shipments/resolveShipmentReference");
@@ -80,13 +85,20 @@ exports.manualAssignShipmentToTrip = onCall(
         );
       }
 
-      if (tracking.currentTripId === tripId) {
+      if (
+        shipmentManifestIncludesTrip(
+          tracking,
+          tripId,
+          tripShipmentSnap.exists,
+        )
+      ) {
         alreadyAssigned = true;
         if (!tripShipmentSnap.exists) {
           const packages = Array.isArray(tracking.packages) ? tracking.packages : [];
           const derivedSnapshot = buildDerivedShipmentSnapshot(packages, {
             previousStatus: tracking.status,
           });
+          const tripFields = buildAssignmentTripFields(tracking, tripId);
 
           tx.set(tripShipmentRef, {
             trackingShipmentId,
@@ -113,7 +125,8 @@ exports.manualAssignShipmentToTrip = onCall(
           });
 
           tx.update(shipmentDocRef, {
-            currentTripId: tripId,
+            currentTripId: tripFields.currentTripId,
+            currentTripIds: tripFields.currentTripIds,
             assignedToTripAt: admin.firestore.FieldValue.serverTimestamp(),
             status: derivedSnapshot.status,
             packages: derivedSnapshot.packages,
@@ -127,10 +140,14 @@ exports.manualAssignShipmentToTrip = onCall(
         return;
       }
 
-      if (tracking.currentTripId && tracking.currentTripId !== tripId) {
+      const assignmentCheck = evaluateShipmentTripAssignment(tracking, tripId, {
+        tripShipmentExists: tripShipmentSnap.exists,
+      });
+      if (!assignmentCheck.allowed) {
         throw new HttpsError(
           "failed-precondition",
-          `Shipment is already assigned to another trip (${tracking.currentTripId}). Unassign it there first.`,
+          assignmentCheck.message ||
+            `Shipment cannot be assigned to trip ${tripId}.`,
         );
       }
 
@@ -139,6 +156,7 @@ exports.manualAssignShipmentToTrip = onCall(
       const derivedSnapshot = buildDerivedShipmentSnapshot(packages, {
         previousStatus: tracking.status,
       });
+      const tripFields = buildAssignmentTripFields(tracking, tripId);
 
       if (!tripShipmentSnap.exists) {
         tx.set(tripShipmentRef, {
@@ -167,7 +185,8 @@ exports.manualAssignShipmentToTrip = onCall(
       }
 
       tx.update(shipmentDocRef, {
-        currentTripId: tripId,
+        currentTripId: tripFields.currentTripId,
+        currentTripIds: tripFields.currentTripIds,
         assignedToTripAt: now,
         updatedAt: now,
         updatedBy: uid,
@@ -216,11 +235,13 @@ exports.manualAssignShipmentToTrip = onCall(
         reason,
         previousValue: {
           currentTripId: tracking.currentTripId || null,
+          currentTripIds: tracking.currentTripIds || [],
           enteredRef: shipmentRef,
           packageLabel: resolved.packageLabel,
         },
         newValue: {
-          currentTripId: tripId,
+          currentTripId: tripFields.currentTripId,
+          currentTripIds: tripFields.currentTripIds,
           shipmentId: tracking.shipmentId || trackingShipmentId,
           matchedBy: resolved.matchedBy,
         },

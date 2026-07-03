@@ -84,6 +84,88 @@ function packageEligibleForLinehaulLoad(pkg = {}) {
   ].includes(status);
 }
 
+const LINEHAUL_LOAD_BLOCKED_STATUSES = new Set([
+  PACKAGE_STATUS.RELEASED_FOR_DELIVERY,
+  PACKAGE_STATUS.AVAILABLE_AT_ODIONGAN_WAREHOUSE,
+  PACKAGE_STATUS.AVAILABLE_AT_WAREHOUSE,
+  PACKAGE_STATUS.ROUTE_ASSIGNED,
+  PACKAGE_STATUS.LOADED_TO_DELIVERY_VEHICLE,
+  PACKAGE_STATUS.READY_FOR_DELIVERY,
+  PACKAGE_STATUS.OUT_FOR_DELIVERY,
+  PACKAGE_STATUS.DELIVERED,
+  PACKAGE_STATUS.COMPLETED,
+  PACKAGE_STATUS.MISSING,
+  PACKAGE_STATUS.DAMAGED,
+  PACKAGE_STATUS.RETURNED_TO_WAREHOUSE,
+  PACKAGE_STATUS.RETURNED_RECEIVED_AT_ODIONGAN,
+  PACKAGE_STATUS.RETURNED_RECEIVED_AT_HUB,
+  PACKAGE_STATUS.FAILED_DELIVERY,
+]);
+
+const LINEHAUL_ON_TRUCK_STATUSES = new Set([
+  PACKAGE_STATUS.IN_TRANSIT,
+  PACKAGE_STATUS.LOADED_TO_TRIP,
+  PACKAGE_STATUS.LOADED,
+  PACKAGE_STATUS.PARTIALLY_LOADED,
+]);
+
+/**
+ * Returns an error message when a piece must not be linehaul-loaded onto tripId.
+ * Returns null when loading is allowed. Returns "ALREADY_LOADED" for duplicate scan.
+ */
+function evaluatePackageLinehaulLoad(pkg = {}, tripId = "", options = {}) {
+  if (options.isDeliveryTrip) return null;
+
+  const trip = String(tripId || "").trim();
+  if (!trip || !pkg) return null;
+
+  const pieceId = getPackageIdentity(pkg) || "This label";
+  const loadedOn = String(pkg.loadedOnTrip || "").trim();
+  const currentTrip = String(pkg.currentTripId || "").trim();
+  const hubOn = String(pkg.hubReceivedOnTrip || "").trim();
+  const activeTrip = loadedOn || currentTrip;
+  const status = normalizePackageStatus(pkg);
+  const qty = Math.max(normalizeQty(pkg.quantity, 1), 1);
+  const loadedQty = Math.min(normalizeQty(pkg.loadedQty, 0), qty);
+  const receivedQty = Math.min(normalizeQty(pkg.receivedQty, 0), qty);
+
+  if (activeTrip && activeTrip !== trip) {
+    return `Package ${pieceId} is already on trip ${activeTrip} and cannot be loaded onto ${trip}.`;
+  }
+
+  if (
+    hubOn &&
+    hubOn !== trip &&
+    (receivedQty > 0 || LINEHAUL_LOAD_BLOCKED_STATUSES.has(status))
+  ) {
+    return `Package ${pieceId} already completed trip ${hubOn} at the hub and cannot be loaded onto ${trip}.`;
+  }
+
+  if (LINEHAUL_LOAD_BLOCKED_STATUSES.has(status)) {
+    return `Package ${pieceId} is already ${status.replace(/_/g, " ").toLowerCase()} and cannot be loaded onto a linehaul trip.`;
+  }
+
+  if (
+    activeTrip === trip &&
+    loadedQty > 0 &&
+    (LINEHAUL_ON_TRUCK_STATUSES.has(status) || loadedQty >= qty)
+  ) {
+    const remaining = Math.max(qty - loadedQty, 0);
+    if (remaining <= 0) return "ALREADY_LOADED";
+  }
+
+  if (
+    !activeTrip &&
+    loadedQty > 0 &&
+    receivedQty === 0 &&
+    LINEHAUL_ON_TRUCK_STATUSES.has(status)
+  ) {
+    return `Package ${pieceId} is already in transit and cannot be loaded again.`;
+  }
+
+  return null;
+}
+
 function clampQty(value, min, max) {
   return Math.max(min, Math.min(max, value));
 }
@@ -259,6 +341,72 @@ function collectActiveTripIds(packages = []) {
   ];
 }
 
+function shipmentManifestIncludesTrip(shipment = {}, tripId = "", tripShipmentExists = false) {
+  const trip = String(tripId || "").trim();
+  if (!trip) return false;
+  if (tripShipmentExists) return true;
+  if (String(shipment.currentTripId || "").trim() === trip) return true;
+  const ids = Array.isArray(shipment.currentTripIds) ? shipment.currentTripIds : [];
+  return ids.map(String).includes(trip);
+}
+
+function countLoadEligiblePieces(packages = []) {
+  return packages
+    .filter((pkg) => packageEligibleForLinehaulLoad(pkg))
+    .reduce(
+      (sum, pkg) => sum + Math.max(normalizeQty(pkg.quantity, 1), 1),
+      0,
+    );
+}
+
+/**
+ * Whether a shipment may be added to a trip manifest while pieces may already
+ * be on another trip. Blocks only when every loadable piece is committed elsewhere.
+ */
+function evaluateShipmentTripAssignment(shipment = {}, tripId = "", options = {}) {
+  const trip = String(tripId || "").trim();
+  const tripShipmentExists = options.tripShipmentExists === true;
+
+  if (shipmentManifestIncludesTrip(shipment, trip, tripShipmentExists)) {
+    return { allowed: true, alreadyOnTrip: true };
+  }
+
+  const packages = Array.isArray(shipment.packages) ? shipment.packages : [];
+  const loadEligibleQty = countLoadEligiblePieces(packages);
+
+  if (loadEligibleQty > 0) {
+    return { allowed: true, loadEligibleQty };
+  }
+
+  const activeTrips = collectActiveTripIds(packages).filter((id) => id !== trip);
+  if (activeTrips.length > 0) {
+    return {
+      allowed: false,
+      alreadyOnTrip: false,
+      message: `All loadable pieces are already on trip(s) ${activeTrips.join(", ")}. No remaining pieces to assign to ${trip}.`,
+    };
+  }
+
+  return { allowed: true, loadEligibleQty: 0 };
+}
+
+function buildAssignmentTripFields(shipment = {}, tripId = "") {
+  const trip = String(tripId || "").trim();
+  const packages = Array.isArray(shipment.packages) ? shipment.packages : [];
+  const fromPackages = collectActiveTripIds(packages);
+  const existingIds = Array.isArray(shipment.currentTripIds)
+    ? shipment.currentTripIds.map(String)
+    : [];
+  const merged = [
+    ...new Set([...existingIds, ...fromPackages, trip].filter(Boolean)),
+  ];
+
+  return {
+    currentTripIds: merged,
+    currentTripId: merged.length === 1 ? merged[0] : null,
+  };
+}
+
 function buildShipmentSnapshot(packages = [], options = {}) {
   const normalizedPackages = packages.map((pkg) => {
     const row = normalizePackageRow(pkg);
@@ -317,6 +465,7 @@ module.exports = {
   packageLinkedToTrip,
   getPackageIdentity,
   packageEligibleForLinehaulLoad,
+  evaluatePackageLinehaulLoad,
   normalizePackageRow,
   sumTotalQty,
   sumLoadedQty,
@@ -330,5 +479,9 @@ module.exports = {
   applyLinehaulMissing,
   applyLinehaulDelivered,
   collectActiveTripIds,
+  shipmentManifestIncludesTrip,
+  countLoadEligiblePieces,
+  evaluateShipmentTripAssignment,
+  buildAssignmentTripFields,
   buildShipmentSnapshot,
 };

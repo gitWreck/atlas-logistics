@@ -4,6 +4,11 @@ const { requireRole, updatedBy } = require("../utilities/helpers"); // Assuming 
 const { writeShipmentActionLog } = require("../utilities/shipmentLogger");
 const { writeCustodyAuditLog } = require("../utilities/custodyAuditLog");
 const { buildDerivedShipmentSnapshot } = require("../packages/shipmentStatus");
+const {
+  evaluateShipmentTripAssignment,
+  buildAssignmentTripFields,
+  shipmentManifestIncludesTrip,
+} = require("../packages/tripPackageOperations");
 
 if (!admin.apps.length) admin.initializeApp();
 const db = admin.firestore();
@@ -67,6 +72,16 @@ exports.bulkAssignShipments = onCall(
         chunk.map((id) => db.collection("shipments").doc(id).get()),
       );
 
+      // Fetch trip_shipments for this chunk to detect existing manifest rows
+      const tripShipmentSnaps = await Promise.all(
+        chunk.map((id) =>
+          tripRef.collection("trip_shipments").doc(id).get(),
+        ),
+      );
+      const tripShipmentExistsById = new Map(
+        chunk.map((id, index) => [id, tripShipmentSnaps[index]?.exists === true]),
+      );
+
       snapshots.forEach((snap) => {
         if (!snap.exists) {
           errors.push(`Shipment ${snap.id} not found`);
@@ -75,19 +90,24 @@ exports.bulkAssignShipments = onCall(
 
         const data = snap.data();
         const ref = snap.ref;
+        const tripShipmentExists = tripShipmentExistsById.get(snap.id) === true;
 
         // 🔁 Idempotency: Skip if already on this trip
-        if (data.currentTripId === tripId) {
+        if (shipmentManifestIncludesTrip(data, tripId, tripShipmentExists)) {
           return;
         }
 
-        // 🛑 Double Assignment Check
-        if (data.currentTripId && data.currentTripId !== tripId) {
+        const assignmentCheck = evaluateShipmentTripAssignment(data, tripId, {
+          tripShipmentExists,
+        });
+        if (!assignmentCheck.allowed) {
           errors.push(
-            `Shipment ${data.shipmentId} is on another trip (${data.currentTripId})`,
+            `Shipment ${data.shipmentId}: ${assignmentCheck.message}`,
           );
           return;
         }
+
+        const tripFields = buildAssignmentTripFields(data, tripId);
 
         batchHasUpdates = true;
         successCount++;
@@ -134,7 +154,8 @@ exports.bulkAssignShipments = onCall(
 
         // --- B. Update Shipment Root (master status derived from packages) ---
         batch.update(ref, {
-          currentTripId: tripId,
+          currentTripId: tripFields.currentTripId,
+          currentTripIds: tripFields.currentTripIds,
           assignedToTripAt: now,
           status: derivedSnapshot.status,
           packages: derivedSnapshot.packages,
@@ -189,9 +210,13 @@ exports.bulkAssignShipments = onCall(
           reason:
             assignmentReason ||
             "Shipment added to trip manifest after unlock.",
-          previousValue: { currentTripId: data.currentTripId || null },
+          previousValue: {
+            currentTripId: data.currentTripId || null,
+            currentTripIds: data.currentTripIds || [],
+          },
           newValue: {
-            currentTripId: tripId,
+            currentTripId: tripFields.currentTripId,
+            currentTripIds: tripFields.currentTripIds,
             shipmentId: data.shipmentId || snap.id,
           },
           note: `Shipment ${data.shipmentId || snap.id} assigned to trip ${tripData.tripId || tripId}.`,

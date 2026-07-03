@@ -116,101 +116,104 @@ export default function LoginPage() {
         />
 
         <div className="relative z-10 flex min-h-0 flex-1 flex-col">
-          <div className="flex flex-1 flex-col justify-start px-4 sm:px-6 pt-10 sm:pt-14 pb-4">
-            <div className="pb-4 text-center">
+          <div className="flex flex-1 flex-col justify-start px-4 sm:px-6 pt-6 sm:pt-8 pb-4">
+            <div className="pb-2 text-center">
               <img
                 src="/atlas-login.svg"
                 alt="Atlas Logo"
-                className="w-28 h-28 sm:w-40 sm:h-40 md:w-[200px] md:h-[200px] mx-auto object-contain"
+                className="w-20 h-20 sm:w-28 sm:h-28 md:w-[140px] md:h-[140px] mx-auto object-contain"
               />
               <h1
-                className="text-xl sm:text-2xl font-bold mt-3 sm:mt-4"
+                className="text-xl sm:text-2xl font-bold mt-1 sm:mt-2"
                 style={{ color: "#0650A0" }}
               >
                 Atlas Login
               </h1>
-              <p className="text-xs sm:text-sm mt-1.5 sm:mt-2 text-slate-500 px-2">
+              <p className="text-xs sm:text-sm mt-1 text-slate-500 px-2">
                 Secure access for Admins, and Managers
               </p>
             </div>
 
-            <form onSubmit={handleLogin} className="space-y-4 sm:space-y-5">
-            {/* Email */}
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1.5">
-                Email
-              </label>
-              <input
-                type="email"
-                required
-                className="w-full h-12 sm:h-14 pl-5 sm:pl-6 pr-4 sm:pr-5 bg-slate-50 border border-slate-200 rounded-full text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all text-base"
-                placeholder="Enter Your Email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-              />
-            </div>
-
-            {/* Password */}
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1.5">
-                Password
-              </label>
-              <div className="relative">
+            <form onSubmit={handleLogin} className="space-y-3 sm:space-y-4">
+              {/* Email */}
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">
+                  Email
+                </label>
                 <input
-                  type={showPassword ? "text" : "password"}
+                  type="email"
                   required
-                  className="w-full h-12 sm:h-14 pl-5 sm:pl-6 pr-11 sm:pr-12 bg-slate-50 border border-slate-200 rounded-full text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all text-base"
-                  placeholder="Enter Your Password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
+                  className="w-full h-12 sm:h-14 pl-5 sm:pl-6 pr-4 sm:pr-5 bg-slate-50 border border-slate-200 rounded-full text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all text-base"
+                  placeholder="Enter Your Email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
                 />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword((p) => !p)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 p-1.5 text-slate-400 hover:text-slate-600 focus:outline-none focus:text-blue-600"
-                  aria-label={showPassword ? "Hide password" : "Show password"}
-                >
-                  <FontAwesomeIcon
-                    icon={showPassword ? faEyeSlash : faEye}
-                    className="text-lg"
+              </div>
+
+              {/* Password */}
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">
+                  Password
+                </label>
+                <div className="relative">
+                  <input
+                    type={showPassword ? "text" : "password"}
+                    required
+                    className="w-full h-12 sm:h-14 pl-5 sm:pl-6 pr-11 sm:pr-12 bg-slate-50 border border-slate-200 rounded-full text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all text-base"
+                    placeholder="Enter Your Password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
                   />
-                </button>
-              </div>
-            </div>
-
-            {/* Error Message */}
-            {error && (
-              <div className="p-3 rounded-lg bg-red-50 border border-red-100 flex items-start gap-3 text-red-600 text-sm">
-                <FontAwesomeIcon
-                  icon={faExclamationCircle}
-                  className="mt-0.5"
-                />
-                <span>{error}</span>
-              </div>
-            )}
-
-            {/* Sign In – fully rounded gradient button; touch-friendly on mobile */}
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full h-12 sm:h-[52px] rounded-full font-semibold text-white flex items-center justify-center gap-2 shadow-md disabled:opacity-70 disabled:cursor-not-allowed transition-all text-lg"
-              style={
-                loading
-                  ? { backgroundColor: "#94a3b8" }
-                  : {
-                      background: "linear-gradient(to right, #042C83, #07B9F4)",
-                      boxShadow: "0 6px 12px rgba(7, 185, 244, 0.35)",
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword((p) => !p)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 p-1.5 text-slate-400 hover:text-slate-600 focus:outline-none focus:text-blue-600"
+                    aria-label={
+                      showPassword ? "Hide password" : "Show password"
                     }
-              }
-            >
-              {loading ? (
-                <>
-                  <FontAwesomeIcon icon={faCircleNotch} spin /> Verifying...
-                </>
-              ) : (
-                <>Sign In</>
+                  >
+                    <FontAwesomeIcon
+                      icon={showPassword ? faEyeSlash : faEye}
+                      className="text-lg"
+                    />
+                  </button>
+                </div>
+              </div>
+
+              {/* Error Message */}
+              {error && (
+                <div className="p-3 rounded-lg bg-red-50 border border-red-100 flex items-start gap-3 text-red-600 text-sm">
+                  <FontAwesomeIcon
+                    icon={faExclamationCircle}
+                    className="mt-0.5"
+                  />
+                  <span>{error}</span>
+                </div>
               )}
-            </button>
+
+              {/* Sign In – fully rounded gradient button; touch-friendly on mobile */}
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full h-12 sm:h-[52px] rounded-full font-semibold text-white flex items-center justify-center gap-2 shadow-md disabled:opacity-70 disabled:cursor-not-allowed transition-all text-lg"
+                style={
+                  loading
+                    ? { backgroundColor: "#94a3b8" }
+                    : {
+                        background:
+                          "linear-gradient(to right, #042C83, #07B9F4)",
+                        boxShadow: "0 6px 12px rgba(7, 185, 244, 0.35)",
+                      }
+                }
+              >
+                {loading ? (
+                  <>
+                    <FontAwesomeIcon icon={faCircleNotch} spin /> Verifying...
+                  </>
+                ) : (
+                  <>Sign In</>
+                )}
+              </button>
             </form>
           </div>
 

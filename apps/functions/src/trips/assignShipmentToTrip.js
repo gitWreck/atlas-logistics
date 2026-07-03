@@ -6,6 +6,11 @@ const { requireRole } = require("../utilities/helpers");
 const { getActorFromRequest } = require("../utilities/tripLogger");
 const { writeCustodyAuditLog } = require("../utilities/custodyAuditLog");
 const { buildDerivedShipmentSnapshot } = require("../packages/shipmentStatus");
+const {
+  evaluateShipmentTripAssignment,
+  buildAssignmentTripFields,
+  shipmentManifestIncludesTrip,
+} = require("../packages/tripPackageOperations");
 
 if (!admin.apps.length) admin.initializeApp();
 const db = admin.firestore();
@@ -73,17 +78,28 @@ exports.assignShipmentToTrip = onCall(
       }
 
       // 🔁 Idempotency: already assigned to this trip
-      if (tracking.currentTripId === tripId) {
+      if (
+        shipmentManifestIncludesTrip(
+          tracking,
+          tripId,
+          shipSnap.exists,
+        )
+      ) {
         return;
       }
 
-      // 🛑 CRITICAL FIX: PREVENT DOUBLE ASSIGNMENT
-      if (tracking.currentTripId && tracking.currentTripId !== tripId) {
+      const assignmentCheck = evaluateShipmentTripAssignment(tracking, tripId, {
+        tripShipmentExists: shipSnap.exists,
+      });
+      if (!assignmentCheck.allowed) {
         throw new HttpsError(
           "failed-precondition",
-          `Shipment is already assigned to another trip (${tracking.currentTripId}). Please unassign it there first.`,
+          assignmentCheck.message ||
+            `Shipment cannot be assigned to trip ${tripId}.`,
         );
       }
+
+      const tripFields = buildAssignmentTripFields(tracking, tripId);
 
       const now = admin.firestore.FieldValue.serverTimestamp();
       const packages = Array.isArray(tracking.packages) ? tracking.packages : [];
@@ -124,7 +140,8 @@ exports.assignShipmentToTrip = onCall(
 
       // 🔗 Update tracking record (master status derived from packages)
       tx.update(shipmentRef, {
-        currentTripId: tripId,
+        currentTripId: tripFields.currentTripId,
+        currentTripIds: tripFields.currentTripIds,
         assignedToTripAt: now,
 
         updatedAt: now,
@@ -172,8 +189,14 @@ exports.assignShipmentToTrip = onCall(
         actorId: actor.actorId,
         actorName: actor.actorName,
         actorRole: actor.actorRole,
-        previousValue: { currentTripId: tracking.currentTripId || null },
-        newValue: { currentTripId: tripId },
+        previousValue: {
+          currentTripId: tracking.currentTripId || null,
+          currentTripIds: tracking.currentTripIds || [],
+        },
+        newValue: {
+          currentTripId: tripFields.currentTripId,
+          currentTripIds: tripFields.currentTripIds,
+        },
         note: `Shipment ${trackingShipmentId} assigned to trip.`,
       });
     });

@@ -14,8 +14,9 @@ const {
   MANIFEST_STATUS,
   resolveManifestStatus,
 } = require("../src/trips/manifestStatus");
+const { initAdminApp, resolveTripDocRef } = require("./initAdmin");
 
-if (!admin.apps.length) admin.initializeApp();
+initAdminApp();
 const db = admin.firestore();
 
 const DRY_RUN = process.env.DRY_RUN === "1";
@@ -37,11 +38,12 @@ async function main() {
   let docs = [];
 
   if (TRIP_ID) {
-    const snap = await db.collection("truck_trips").doc(TRIP_ID).get();
-    if (!snap.exists) {
+    const tripRef = await resolveTripDocRef(db, TRIP_ID);
+    if (!tripRef) {
       console.error(`Trip not found: ${TRIP_ID}`);
       process.exit(1);
     }
+    const snap = await tripRef.get();
     docs = [snap];
   } else {
     const snap = await db.collection("truck_trips").limit(LIMIT).get();

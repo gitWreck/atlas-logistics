@@ -4,6 +4,7 @@ import { headers } from "next/headers";
 import { getUnloadBlockReason } from "@/app/utility/manifestStatus";
 import {
   buildAlreadyLoadedInfo,
+  evaluateLinehaulLoadBlock,
   isPackageFullyLoadedOnTrip,
   pickLatestLoadEvent,
 } from "@/lib/scannerLoadDuplicate";
@@ -114,14 +115,39 @@ export async function POST(req) {
       }
     }
 
+    let tripData = null;
+    if (action === "LOAD" && tripId) {
+      const tripSnap = await adminDb.collection("truck_trips").doc(tripId).get();
+      tripData = tripSnap.exists ? tripSnap.data() || {} : null;
+    }
+
+    const isDeliveryTrip =
+      String(tripData?.tripType || "HUB_TRANSFER").toUpperCase() !== "HUB_TRANSFER";
+
+    if (action === "LOAD" && tripId && targetPackage) {
+      const linehaulBlock = evaluateLinehaulLoadBlock(targetPackage, tripId, {
+        isDeliveryTrip,
+      });
+
+      if (linehaulBlock && linehaulBlock !== "ALREADY_LOADED") {
+        return NextResponse.json({
+          found: false,
+          message: linehaulBlock,
+          packageId: targetPackage.packageId || cleanCode,
+          packageCurrentTripId: packageTripId,
+        });
+      }
+    }
+
     if (
       action === "LOAD" &&
       tripId &&
       targetPackage &&
-      isPackageFullyLoadedOnTrip(targetPackage, tripId)
+      (isPackageFullyLoadedOnTrip(targetPackage, tripId) ||
+        evaluateLinehaulLoadBlock(targetPackage, tripId, { isDeliveryTrip }) ===
+          "ALREADY_LOADED")
     ) {
-      const [tripSnap, eventsSnap] = await Promise.all([
-        adminDb.collection("truck_trips").doc(tripId).get(),
+      const [eventsSnap] = await Promise.all([
         adminDb
           .collection("shipment_events")
           .where("shipmentId", "==", data.shipmentId || shipmentDoc.id)
@@ -129,9 +155,8 @@ export async function POST(req) {
           .get(),
       ]);
 
-      const tripData = tripSnap.exists ? tripSnap.data() || {} : {};
       let truckData = null;
-      if (tripData.truckId) {
+      if (tripData?.truckId) {
         const resolvedTruckSnap = await adminDb
           .collection("trucks")
           .doc(tripData.truckId)
@@ -157,7 +182,7 @@ export async function POST(req) {
           packageId: targetPackage.packageId || cleanCode,
           tripId,
           shipment: data,
-          trip: tripData,
+          trip: tripData || {},
           truck: truckData,
           targetPackage,
           loadEvent,

@@ -64,14 +64,27 @@ export default function PrintLabelsBundle() {
         else if (tripId) {
           // Query all shipments assigned to this trip
           // NOTE: We query the ROOT 'shipments' collection to get full package details
-          const q = query(
-            collection(db, "shipments"),
-            where("currentTripId", "==", tripId),
-          );
-          const querySnapshot = await getDocs(q);
-          querySnapshot.forEach((doc) => {
-            shipmentsToPrint.push({ id: doc.id, ...doc.data() });
+          // Multi-trip shipments have currentTripId=null, so also match the
+          // currentTripIds array and de-dupe.
+          const [byTripIdSnap, byTripIdsArraySnap] = await Promise.all([
+            getDocs(
+              query(
+                collection(db, "shipments"),
+                where("currentTripId", "==", tripId),
+              ),
+            ),
+            getDocs(
+              query(
+                collection(db, "shipments"),
+                where("currentTripIds", "array-contains", tripId),
+              ),
+            ).catch(() => ({ docs: [] })),
+          ]);
+          const printMap = new Map();
+          [...byTripIdSnap.docs, ...byTripIdsArraySnap.docs].forEach((doc) => {
+            printMap.set(doc.id, { id: doc.id, ...doc.data() });
           });
+          shipmentsToPrint.push(...printMap.values());
         }
 
         // --- Inside fetchData effect (FLATTEN THE DATA section) ---

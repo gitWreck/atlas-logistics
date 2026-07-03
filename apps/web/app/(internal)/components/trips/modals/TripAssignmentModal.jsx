@@ -28,7 +28,6 @@ export default function TripAssignmentModal({
   user,
   profile,
 }) {
-  console.log("Rendering TripAssignmentModal with profile:", profile);
   const modalTheme = getModalThemeClasses(isDark);
   const actionClasses = getModalActionClasses();
 

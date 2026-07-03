@@ -111,28 +111,29 @@ export default function PrintManifest() {
             tripData = { id: tripSnap.id, ...tripSnap.data() };
           }
 
-          // Fetch Shipments Data
-          const q = query(
-            collection(db, "shipments"),
-            where("currentTripId", "==", tripData?.tripId || tripId),
-          );
-          const querySnapshot = await getDocs(q);
+          // Fetch Shipments Data. Multi-trip shipments have currentTripId=null,
+          // so also match the currentTripIds array and de-dupe.
+          const resolvedTripId = tripData?.tripId || tripId;
+          const [byTripIdSnap, byTripIdsArraySnap] = await Promise.all([
+            getDocs(
+              query(
+                collection(db, "shipments"),
+                where("currentTripId", "==", resolvedTripId),
+              ),
+            ),
+            getDocs(
+              query(
+                collection(db, "shipments"),
+                where("currentTripIds", "array-contains", resolvedTripId),
+              ),
+            ).catch(() => ({ docs: [] })),
+          ]);
 
-          querySnapshot.forEach((docSnap) => {
-            shipmentsData.push({ id: docSnap.id, ...docSnap.data() });
+          const manifestMap = new Map();
+          [...byTripIdSnap.docs, ...byTripIdsArraySnap.docs].forEach((docSnap) => {
+            manifestMap.set(docSnap.id, { id: docSnap.id, ...docSnap.data() });
           });
-
-          // Fallback query matching currentTruckTripId if empty
-          if (shipmentsData.length === 0) {
-            const qAlternate = query(
-              collection(db, "shipments"),
-              where("currentTripId", "==", tripData?.tripId || tripId),
-            );
-            const alternateSnap = await getDocs(qAlternate);
-            alternateSnap.forEach((docSnap) => {
-              shipmentsData.push({ id: docSnap.id, ...docSnap.data() });
-            });
-          }
+          shipmentsData.push(...manifestMap.values());
         }
 
         setTrip(

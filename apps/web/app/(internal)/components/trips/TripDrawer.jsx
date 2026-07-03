@@ -415,6 +415,7 @@ export default function TripDrawer({
       <ViewPackagesModal
         isOpen={!!selectedShipmentForModal}
         shipment={selectedShipmentForModal}
+        tripId={data?.id || data?.tripId || null}
         onClose={() => setSelectedShipmentForModal(null)}
         isLocked={data.manifestLocked}
         onRefresh={() => {

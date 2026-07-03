@@ -70,14 +70,52 @@ function getShipmentRouteLabel(shipment) {
   return origin || destination || "-";
 }
 
+function collectShipmentTripIds(shipment = {}) {
+  const ids = [];
+  const push = (value) => {
+    const trip = String(value || "").trim();
+    if (trip && !ids.includes(trip)) ids.push(trip);
+  };
+
+  push(shipment?.assignedTrip?.tripId);
+  push(shipment?.currentTripId);
+  push(shipment?.currentTruckTripId);
+  push(shipment?.truckTripId);
+
+  if (Array.isArray(shipment?.currentTripIds)) {
+    shipment.currentTripIds.forEach(push);
+  }
+
+  // Legacy field — only use when it looks like a trip code, not a shipment id.
+  const legacyTrip = String(shipment?.tripId || "").trim();
+  if (legacyTrip && /^TRIP-/i.test(legacyTrip)) {
+    push(legacyTrip);
+  }
+
+  return ids;
+}
+
+/** Primary trip id for single-value flows (forms, defaults). */
 function getShipmentTripId(shipment) {
-  return (
-    shipment?.assignedTrip?.tripId ||
-    shipment?.tripId ||
-    shipment?.currentTripId ||
-    shipment?.currentTruckTripId ||
-    shipment?.truckTripId
-  );
+  const ids = collectShipmentTripIds(shipment);
+  return ids[0] || null;
+}
+
+/** All active trip ids. */
+function getShipmentTripIds(shipment) {
+  return collectShipmentTripIds(shipment);
+}
+
+/** Comma-separated label for UI display. */
+function getShipmentTripIdsLabel(shipment) {
+  const ids = collectShipmentTripIds(shipment);
+  return ids.length > 0 ? ids.join(", ") : null;
+}
+
+function shipmentIsOnTrip(shipment, tripId) {
+  const trip = String(tripId || "").trim();
+  if (!trip) return false;
+  return collectShipmentTripIds(shipment).includes(trip);
 }
 
 function getShipmentDisplayId(shipment) {
@@ -153,6 +191,9 @@ export {
   getShipmentRemarks,
   getShipmentRouteLabel,
   getShipmentTripId,
+  getShipmentTripIds,
+  getShipmentTripIdsLabel,
+  shipmentIsOnTrip,
   isPackageLocked,
   uniqueImages,
 };

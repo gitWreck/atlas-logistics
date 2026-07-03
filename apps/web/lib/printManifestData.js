@@ -93,13 +93,23 @@ async function buildDestinationsFromLiveTrip(tripDocId) {
   let totalPackages = 0;
   let shipmentCount = 0;
 
-  const shipSnaps = await adminDb
-    .collection("shipments")
-    .where("currentTripId", "==", tripDocId)
-    .get();
+  // Multi-trip shipments have currentTripId=null, so also match the
+  // currentTripIds array and de-dupe.
+  const [byTripIdSnap, byTripIdsArraySnap] = await Promise.all([
+    adminDb.collection("shipments").where("currentTripId", "==", tripDocId).get(),
+    adminDb
+      .collection("shipments")
+      .where("currentTripIds", "array-contains", tripDocId)
+      .get()
+      .catch(() => ({ docs: [] })),
+  ]);
 
-  shipSnaps.forEach((docSnap) => {
-    const ship = docSnap.data() || {};
+  const shipMap = new Map();
+  [...byTripIdSnap.docs, ...byTripIdsArraySnap.docs].forEach((docSnap) => {
+    shipMap.set(docSnap.id, docSnap.data() || {});
+  });
+
+  shipMap.forEach((ship) => {
     const destCode = ship.destinationCode || "UNKNOWN";
     const itemsCount = getShipmentLoadedCount(ship);
     totalPackages += itemsCount;

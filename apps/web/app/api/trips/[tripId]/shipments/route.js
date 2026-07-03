@@ -67,21 +67,36 @@ export async function GET(_req, context) {
       return NextResponse.json({ error: "Trip not found" }, { status: 404 });
     }
 
-    const shipmentsSnap = await adminDb
-      .collection("shipments")
-      .where("currentTripId", "==", tripId)
-      .orderBy("updatedAt", "desc")
-      .get();
+    // Multi-trip shipments have currentTripId=null (pointer only set when on a
+    // single trip), so also match on the currentTripIds array to avoid dropping
+    // shipments split across trips.
+    const [byTripIdSnap, byTripIdsArraySnap] = await Promise.all([
+      adminDb.collection("shipments").where("currentTripId", "==", tripId).get(),
+      adminDb
+        .collection("shipments")
+        .where("currentTripIds", "array-contains", tripId)
+        .get()
+        .catch(() => ({ docs: [] })),
+    ]);
 
     const trip = {
       id: tripSnap.id,
       ...serializeFirestoreValue(tripSnap.data()),
     };
 
-    const shipments = shipmentsSnap.docs.map((doc) => ({
-      id: doc.id,
-      ...serializeFirestoreValue(doc.data()),
-    }));
+    const shipmentMap = new Map();
+    [...byTripIdSnap.docs, ...byTripIdsArraySnap.docs].forEach((doc) => {
+      shipmentMap.set(doc.id, {
+        id: doc.id,
+        ...serializeFirestoreValue(doc.data()),
+      });
+    });
+
+    const shipments = [...shipmentMap.values()].sort((a, b) => {
+      const aTime = Date.parse(a.updatedAt || "") || 0;
+      const bTime = Date.parse(b.updatedAt || "") || 0;
+      return bTime - aTime;
+    });
 
     return NextResponse.json({
       trip,

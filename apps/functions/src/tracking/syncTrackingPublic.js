@@ -242,14 +242,28 @@ exports.propagateTripUpdates = onDocumentWritten(
       .get();
 
     if (querySnap.empty) {
-      const shipmentSnap = await db
-        .collection("shipments")
-        .where("currentTripId", "==", tripId)
-        .limit(25)
-        .get();
+      // Multi-trip shipments have currentTripId=null, so also match the array.
+      const [byTripIdSnap, byTripIdsArraySnap] = await Promise.all([
+        db
+          .collection("shipments")
+          .where("currentTripId", "==", tripId)
+          .limit(25)
+          .get(),
+        db
+          .collection("shipments")
+          .where("currentTripIds", "array-contains", tripId)
+          .limit(25)
+          .get()
+          .catch(() => ({ docs: [] })),
+      ]);
+
+      const shipmentDocMap = new Map();
+      [...byTripIdSnap.docs, ...byTripIdsArraySnap.docs].forEach((docSnap) => {
+        shipmentDocMap.set(docSnap.id, docSnap);
+      });
 
       await Promise.all(
-        shipmentSnap.docs.map((docSnap) =>
+        [...shipmentDocMap.values()].map((docSnap) =>
           syncOneShipmentToPublic(docSnap.id, docSnap.data()).catch((error) => {
             console.error(`Trip propagate sync failed for ${docSnap.id}:`, error);
           }),

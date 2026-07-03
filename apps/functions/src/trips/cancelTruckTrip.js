@@ -26,32 +26,63 @@ async function detachShipmentsFromTrip(tripDocId, actorName) {
 
   tripShipSnap.docs.forEach((doc) => shipmentIds.add(doc.id));
 
-  const [byTripIdSnap, byTruckTripIdSnap] = await Promise.all([
-    db.collection("shipments").where("currentTripId", "==", tripDocId).get(),
-    db
-      .collection("shipments")
-      .where("currentTruckTripId", "==", tripDocId)
-      .get(),
-  ]);
+  // Multi-trip shipments have currentTripId=null, so also match the
+  // currentTripIds array to detach the cancelled trip from split shipments.
+  const [byTripIdSnap, byTruckTripIdSnap, byTripIdsArraySnap] =
+    await Promise.all([
+      db.collection("shipments").where("currentTripId", "==", tripDocId).get(),
+      db
+        .collection("shipments")
+        .where("currentTruckTripId", "==", tripDocId)
+        .get(),
+      db
+        .collection("shipments")
+        .where("currentTripIds", "array-contains", tripDocId)
+        .get()
+        .catch(() => ({ docs: [] })),
+    ]);
 
   byTripIdSnap.docs.forEach((doc) => shipmentIds.add(doc.id));
   byTruckTripIdSnap.docs.forEach((doc) => shipmentIds.add(doc.id));
+  byTripIdsArraySnap.docs.forEach((doc) => shipmentIds.add(doc.id));
 
   const now = FieldValue.serverTimestamp();
   const ids = Array.from(shipmentIds);
 
   for (let i = 0; i < ids.length; i += 400) {
     const chunk = ids.slice(i, i + 400);
+    const refs = chunk.map((id) => db.collection("shipments").doc(id));
+    const snaps = refs.length ? await db.getAll(...refs) : [];
     const batch = db.batch();
 
-    chunk.forEach((shipmentId) => {
-      batch.update(db.collection("shipments").doc(shipmentId), {
-        currentTripId: null,
-        currentTruckTripId: null,
-        assignedToTripAt: null,
+    snaps.forEach((snap) => {
+      if (!snap.exists) return;
+      const data = snap.data() || {};
+      const existingIds = Array.isArray(data.currentTripIds)
+        ? data.currentTripIds.map(String)
+        : data.currentTripId
+          ? [String(data.currentTripId)]
+          : [];
+      // Keep links to any other trips this shipment is still split across.
+      const remainingIds = existingIds.filter((id) => id !== tripDocId);
+      const fullyDetached = remainingIds.length === 0;
+
+      const update = {
+        currentTripIds: remainingIds,
+        currentTripId: remainingIds.length === 1 ? remainingIds[0] : null,
         updatedAt: now,
         updatedBy: actorName || "SYSTEM",
-      });
+      };
+      // Only clear the truck-trip pointer / assignment stamp when nothing
+      // remains; otherwise preserve them for the surviving trip.
+      if (String(data.currentTruckTripId || "") === tripDocId) {
+        update.currentTruckTripId = null;
+      }
+      if (fullyDetached) {
+        update.assignedToTripAt = null;
+      }
+
+      batch.update(snap.ref, update);
     });
 
     await batch.commit();

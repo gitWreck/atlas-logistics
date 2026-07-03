@@ -8,6 +8,7 @@ import {
   isEligibleForReturnReceive,
   isEligibleForReturnRelease,
 } from "@/app/utility/returnLoop";
+import { getShipmentTripIdsLabel } from "./shipmentHelpers";
 
 export default function ReturnLoopCard({
   shipment,
@@ -26,6 +27,8 @@ export default function ReturnLoopCard({
   const boxClass = isDark
     ? "border border-slate-800 bg-slate-900/60 rounded-xl p-4"
     : "border border-slate-200 bg-slate-50 rounded-xl p-4";
+
+  const tripIdsLabel = getShipmentTripIdsLabel(shipment);
 
   return (
     <div className={boxClass}>
@@ -68,11 +71,11 @@ export default function ReturnLoopCard({
         </p>
       )}
 
-      {shipment.currentTripId && (
+      {tripIdsLabel ? (
         <p className={`text-[11px] mt-2 font-mono ${isDark ? "text-slate-400" : "text-slate-600"}`}>
-          Trip: {shipment.currentTripId}
+          Trip: {tripIdsLabel}
         </p>
-      )}
+      ) : null}
 
       {received && !readyToRelease && shipment.availableForDelivery && (
         <p className="text-xs mt-2 font-semibold text-sky-500">

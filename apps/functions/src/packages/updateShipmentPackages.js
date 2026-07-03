@@ -26,7 +26,10 @@ const {
   assertCustodyStructuralEditAllowed,
   assertCustodyScanStatusAllowed,
 } = require("../trips/manifestLockGuard");
-const { packageLinkedToTrip } = require("./tripPackageOperations");
+const {
+  packageLinkedToTrip,
+  evaluatePackageLinehaulLoad,
+} = require("./tripPackageOperations");
 const {
   sendAutomaticShipmentLifecycleNotification,
   CUSTOMER_NOTIFICATION_TYPES,
@@ -633,15 +636,17 @@ exports.updateShipmentPackages = onCall(
                 : remainingQty;
 
             const packageTripId = pkg.currentTripId || pkg.loadedOnTrip || null;
-            if (
-              tripId &&
-              packageTripId &&
-              packageTripId !== tripId &&
-              requestedQty > 0
-            ) {
+
+            const linehaulBlock = evaluatePackageLinehaulLoad(pkg, tripId, {
+              isDeliveryTrip,
+            });
+            if (linehaulBlock && linehaulBlock !== "ALREADY_LOADED") {
+              throw new HttpsError("failed-precondition", linehaulBlock);
+            }
+            if (linehaulBlock === "ALREADY_LOADED") {
               throw new HttpsError(
                 "failed-precondition",
-                `Package ${getPackageIdentity(pkg)} is already assigned to trip ${packageTripId}.`,
+                `Package ${getPackageIdentity(pkg)} is already loaded on trip ${tripId}.`,
               );
             }
 

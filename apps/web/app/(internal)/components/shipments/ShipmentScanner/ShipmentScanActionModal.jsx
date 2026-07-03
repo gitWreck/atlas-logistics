@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faTimes,
@@ -91,6 +91,7 @@ export default function ShipmentScanActionModal({
   const [cameraOpen, setCameraOpen] = useState(false);
   const [scannerEngine, setScannerEngine] = useState("barcode-detector");
   const [scannerSession, setScannerSession] = useState(0);
+  const errorRef = useRef(null);
 
   const { state, actions } = useScannerLogic({
     isOpen,
@@ -102,6 +103,12 @@ export default function ShipmentScanActionModal({
     user,
     profile,
   });
+
+  useEffect(() => {
+    if (state.error && errorRef.current) {
+      errorRef.current.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+  }, [state.error]);
 
   if (!isOpen) return null;
 
@@ -354,6 +361,7 @@ export default function ShipmentScanActionModal({
               tripId={state.tripId}
               missingRemarks={state.missingRemarks}
               isAdmin={state.isAdmin}
+              isDark={isDark}
               onRemarkChange={(packageId, value) =>
                 actions.setMissingRemarks((prev) => ({
                   ...prev,
@@ -438,6 +446,7 @@ export default function ShipmentScanActionModal({
               quantities={state.quantities}
               setQuantities={actions.setQuantities}
               theme={theme}
+              tripId={state.tripId}
             />
           ) : state.action ? (
             <div className="space-y-4">
@@ -504,7 +513,10 @@ export default function ShipmentScanActionModal({
           ) : null}
 
           {state.error && (
-            <div className={`${theme.errorBox} p-3 rounded-lg text-sm`}>
+            <div
+              ref={errorRef}
+              className={`${theme.errorBox} p-3 rounded-lg text-sm`}
+            >
               <div>{state.error}</div>
               {errorGuidance && (
                 <div className="mt-2 text-xs opacity-80">

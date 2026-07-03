@@ -53,6 +53,14 @@ function packageWasOnTrip(pkg = {}, tripId = "", tripBarcodeSet = new Set()) {
   const hubReceivedOnTrip = String(pkg.hubReceivedOnTrip || "").trim();
   if (packageTripId === tripId || hubReceivedOnTrip === tripId) return true;
 
+  // A piece explicitly committed to a different trip (loaded on / hub-received on
+  // another trip) never belongs to this trip's reconciliation, so it must not be
+  // counted as on-truck or missing here — even if its barcode appears in this
+  // trip's manifest set. This is what prevents split-shipment pieces on Trip A
+  // from showing up as "missing" while reconciling Trip B.
+  if (packageTripId && packageTripId !== tripId) return false;
+  if (hubReceivedOnTrip && hubReceivedOnTrip !== tripId) return false;
+
   const packageId = getPackageIdentity(pkg);
   if (!packageId || !tripBarcodeSet.has(String(packageId))) return false;
 
@@ -274,6 +282,13 @@ function findUnlinkedVariancePackages(
 
       const hubReceivedOnTrip = String(pkg.hubReceivedOnTrip || "").trim();
       const loadedOnTrip = String(pkg.loadedOnTrip || "").trim();
+      const currentTrip = String(pkg.currentTripId || "").trim();
+
+      // Never treat a piece committed to another trip as this trip's variance.
+      if (hubReceivedOnTrip && hubReceivedOnTrip !== tripId) return false;
+      if (loadedOnTrip && loadedOnTrip !== tripId) return false;
+      if (currentTrip && currentTrip !== tripId) return false;
+
       if (hubReceivedOnTrip === tripId || loadedOnTrip === tripId) return true;
 
       if (pkg.hubReceivedAt && !tripBarcodes.has(String(pieceId))) return true;
@@ -313,17 +328,64 @@ async function buildReconciliationRow(tripRef, tripId, item, shipmentDocId) {
   );
   const tripMissing = toNumber(tripShipment.missingCount, 0);
   const manifestLoadedCount = toNumber(item.loadedCount, 0);
+  const tripTotalItems = toNumber(tripShipment.totalItems, 0);
 
-  let loadedIntoTruck = Math.max(
-    pieceSummary.loadedIntoTruck,
-    tripLoaded + tripReceived + tripMissing,
-    manifestLoadedCount,
+  // Pieces explicitly committed to a DIFFERENT trip (loaded/received on another
+  // trip) must never inflate this trip's expected count. Trip counters
+  // (totalItems / loadedCount) can still include pieces that were later moved to
+  // another trip, so subtract that confirmed quantity before trusting them.
+  const allShipmentPackages = Array.isArray(shipment.packages)
+    ? shipment.packages
+    : [];
+  const otherTripQty = allShipmentPackages.reduce((sum, pkg) => {
+    const loadedOnTrip = String(pkg.loadedOnTrip || "").trim();
+    const currentTrip = String(pkg.currentTripId || "").trim();
+    const hubOn = String(pkg.hubReceivedOnTrip || "").trim();
+    const onThisTrip =
+      loadedOnTrip === tripId || currentTrip === tripId || hubOn === tripId;
+    const onOtherTrip =
+      (loadedOnTrip && loadedOnTrip !== tripId) ||
+      (currentTrip && currentTrip !== tripId) ||
+      (hubOn && hubOn !== tripId);
+    return onOtherTrip && !onThisTrip ? sum + pieceQuantity(pkg) : sum;
+  }, 0);
+
+  // Trip-scoped package rows are authoritative for what was put on THIS truck —
+  // getTripPackages already excludes pieces committed to another trip, so its
+  // total is the correct "loaded into truck" count and never includes split
+  // pieces sitting on a different trip.
+  const tripPackagesQty = tripPackages.reduce(
+    (sum, pkg) => sum + pieceQuantity(pkg),
+    0,
   );
+
+  // Never add loadedCount + receivedCount — they overlap and inflate phantom gaps.
+  // Counters can also include pieces later moved to another trip, so only fall
+  // back to them (minus the confirmed other-trip quantity) when there are no
+  // trip-scoped piece rows to trust.
+  let loadedIntoTruck = Math.max(pieceSummary.loadedIntoTruck, tripPackagesQty);
+  if (loadedIntoTruck === 0) {
+    loadedIntoTruck = Math.max(
+      0,
+      Math.max(
+        manifestLoadedCount,
+        tripTotalItems,
+        tripLoaded,
+        tripReceived,
+        tripLoaded + tripMissing,
+      ) - otherTripQty,
+    );
+  }
   let unloadedCount = pieceSummary.unloaded;
   if (pieceSummary.stillOnTruck === 0 && pieceSummary.missing === 0) {
     unloadedCount = Math.max(unloadedCount, tripReceived);
   }
-  let remainingLoaded = Math.max(pieceSummary.stillOnTruck, tripLoaded);
+  // Prefer trip-scoped rows for what's still on the truck; only fall back to the
+  // (other-trip-adjusted) counter when no scoped rows exist.
+  let remainingLoaded =
+    tripPackages.length > 0
+      ? pieceSummary.stillOnTruck
+      : Math.max(0, tripLoaded - otherTripQty);
   let missingPieces = Math.max(pieceSummary.missing, tripMissing);
 
   const onTrip = loadedIntoTruck > 0;
@@ -374,6 +436,9 @@ async function buildReconciliationRow(tripRef, tripId, item, shipmentDocId) {
     status: shipment.status || tripShipment.status || null,
     pieces: reconciliationPieces,
     tripPackages,
+    allPackages: Array.isArray(shipment.packages) ? shipment.packages : [],
+    packageBarcodes: tripShipment.packageBarcodes || [],
+    tripId,
     labelSummary: {
       total: loadedIntoTruck,
       received: unloadedCount,
@@ -385,7 +450,12 @@ async function buildReconciliationRow(tripRef, tripId, item, shipmentDocId) {
     isMissing || loadedIntoTruck > unloadedCount || remainingLoaded > 0
       ? resolveMissingPackagesForRow(
           { ...rowDraft, pieces: piecesForMissingExtraction },
-          tripPackages,
+          {
+            tripPackages,
+            allPackages: Array.isArray(shipment.packages) ? shipment.packages : [],
+            tripId,
+            tripShipment,
+          },
         )
       : [];
 
@@ -488,7 +558,7 @@ export async function runTripHandoffReconciliation(tripId) {
       item.expectedCount > item.unloadedCount ||
       item.remainingLoaded > 0,
   );
-  const missingPackages = flattenMissingPackages(missingShipments);
+  const missingPackages = flattenMissingPackages(missingShipments, { tripId });
   const unloadedShipments = shipments.filter(
     (item) => !missingShipments.some((missingRow) => missingRow.id === item.id),
   );

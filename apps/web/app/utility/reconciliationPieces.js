@@ -43,6 +43,26 @@ export function parsePackageIdentity(packageId, fallbackShipmentId = null) {
   };
 }
 
+function getPackageIdentity(pkg = {}) {
+  return String(
+    pkg.packageId || pkg.trackingNumber || pkg.pieceId || pkg.barcode || "",
+  ).trim();
+}
+
+function dedupeMissingEntries(entries = []) {
+  const seen = new Set();
+  const result = [];
+
+  for (const entry of entries) {
+    const key = String(entry.packageId || entry.shipmentId || "").trim();
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    result.push(entry);
+  }
+
+  return result;
+}
+
 export function extractMissingPackagesFromRow(row = {}) {
   const pieces = Array.isArray(row.pieces) ? row.pieces : [];
   const fallbackShipmentId = row.shipmentId || "";
@@ -59,16 +79,135 @@ export function extractMissingPackagesFromRow(row = {}) {
         shipmentDocId,
         recipientName: row.recipientName || null,
         destination: row.destination || null,
-        packageStatus: piece.packageStatus || null,
+        packageStatus: piece.packageStatus || piece.state || null,
+        state: piece.state || "missing",
+        otherTripId: piece.otherTripId || null,
       };
     })
     .filter((entry) => entry.packageId);
 }
 
+/** Pieces still linehaul-loaded on a different trip but tied to this manifest row. */
+export function findPackagesOnOtherTrips(
+  shipment = {},
+  tripId = "",
+  tripShipment = {},
+) {
+  const trip = String(tripId || "").trim();
+  if (!trip) return [];
+
+  const tripBarcodes = new Set(
+    (tripShipment.packageBarcodes || []).filter(Boolean).map(String),
+  );
+  const packages = Array.isArray(shipment.packages) ? shipment.packages : [];
+
+  return packages
+    .filter((pkg) => {
+      const pieceId = getPackageIdentity(pkg);
+      if (!pieceId) return false;
+
+      const loadedOn = String(pkg.loadedOnTrip || pkg.currentTripId || "").trim();
+      const hubOn = String(pkg.hubReceivedOnTrip || "").trim();
+      const status = String(pkg.status || "").toUpperCase();
+      const receivedQty = Number(pkg.receivedQty) || 0;
+
+      if (!loadedOn || loadedOn === trip) return false;
+      if (receivedQty > 0) return false;
+
+      const onThisTripManifest =
+        tripBarcodes.has(pieceId) || hubOn === trip;
+
+      return (
+        onThisTripManifest ||
+        LOADED_ON_TRUCK_PIECE_STATUSES.has(status)
+      );
+    })
+    .map((pkg) => {
+      const parsed = parsePackageIdentity(
+        getPackageIdentity(pkg),
+        shipment.shipmentId,
+      );
+      return {
+        packageId: parsed.packageId,
+        shipmentId: parsed.shipmentId,
+        pieceSuffix: parsed.pieceSuffix,
+        shipmentDocId: shipment.id || null,
+        packageStatus: String(pkg.status || "").toUpperCase() || null,
+        recipientName: shipment.recipient?.name || null,
+        destination:
+          shipment.recipient?.city ||
+          shipment.destination ||
+          shipment.destinationCode ||
+          null,
+        otherTripId: String(pkg.loadedOnTrip || pkg.currentTripId || "").trim(),
+        state: "on_other_trip",
+      };
+    });
+}
+
+function buildGapPlaceholderEntries(row = {}, existingEntries = []) {
+  const gap = Math.max(
+    Number(row.expectedCount) - Number(row.unloadedCount),
+    Number(row.remainingLoaded),
+    Number(row.missingPieces),
+    0,
+  );
+  if (gap <= 0) return [];
+
+  const shortfall = Math.max(gap - existingEntries.length, 0);
+  if (shortfall <= 0) return [];
+
+  const shipmentKey = row.shipmentId || row.id || "shipment";
+
+  return Array.from({ length: shortfall }, (_, index) => ({
+    packageId: `${shipmentKey}-UNACCOUNTED-${index + 1}`,
+    shipmentId: row.shipmentId || null,
+    shipmentDocId: row.id || null,
+    pieceSuffix: null,
+    packageStatus: "UNACCOUNTED",
+    recipientName: row.recipientName || null,
+    destination: row.destination || null,
+    state: "variance",
+    isUnresolved: true,
+    note:
+      "Trip counters show a gap but the label ID could not be resolved. Unload the label, mark it missing, or check if it is on another trip.",
+  }));
+}
+
 /** Resolve missing label IDs when piece states alone do not surface every gap. */
-export function resolveMissingPackagesForRow(row = {}, tripPackages = []) {
+export function resolveMissingPackagesForRow(row = {}, options = {}) {
+  const tripPackages = Array.isArray(options.tripPackages)
+    ? options.tripPackages
+    : Array.isArray(options)
+      ? options
+      : Array.isArray(row.tripPackages)
+        ? row.tripPackages
+        : [];
+  const allPackages = Array.isArray(options.allPackages)
+    ? options.allPackages
+    : tripPackages;
+  const tripId = String(options.tripId || row.tripId || "").trim();
+  const tripShipment = options.tripShipment || {
+    packageBarcodes: row.packageBarcodes || [],
+  };
+
   const fromPieces = extractMissingPackagesFromRow(row);
-  if (fromPieces.length > 0) return fromPieces;
+  const fromOtherTrips = tripId
+    ? findPackagesOnOtherTrips(
+        {
+          id: row.id,
+          shipmentId: row.shipmentId,
+          packages: allPackages,
+          recipient: {
+            name: row.recipientName,
+            city: row.destination,
+          },
+          destination: row.destination,
+        },
+        tripId,
+        tripShipment,
+      )
+    : [];
 
   const gap = Math.max(
     Number(row.expectedCount) - Number(row.unloadedCount),
@@ -76,7 +215,6 @@ export function resolveMissingPackagesForRow(row = {}, tripPackages = []) {
     Number(row.missingPieces),
     0,
   );
-  if (gap <= 0 && !row.missing) return [];
 
   const receivedIds = new Set(
     (row.pieces || [])
@@ -85,13 +223,11 @@ export function resolveMissingPackagesForRow(row = {}, tripPackages = []) {
       .filter(Boolean),
   );
 
-  const entries = [];
-  const seen = new Set();
+  const entries = [...fromPieces, ...fromOtherTrips];
+  const seen = new Set(entries.map((entry) => entry.packageId).filter(Boolean));
 
-  const pushPackage = (pkg = {}) => {
-    const packageId = String(
-      pkg.packageId || pkg.trackingNumber || "",
-    ).trim();
+  const pushPackage = (pkg = {}, meta = {}) => {
+    const packageId = getPackageIdentity(pkg);
     if (!packageId || seen.has(packageId)) return;
     seen.add(packageId);
 
@@ -103,14 +239,19 @@ export function resolveMissingPackagesForRow(row = {}, tripPackages = []) {
       shipmentDocId: row.id || null,
       recipientName: row.recipientName || null,
       destination: row.destination || null,
-      packageStatus: String(pkg.status || "").toUpperCase() || null,
+      packageStatus:
+        meta.packageStatus || String(pkg.status || "").toUpperCase() || null,
+      state: meta.state || "on_truck",
+      otherTripId: meta.otherTripId || null,
     });
   };
 
+  if (gap <= 0 && !row.missing && entries.length === 0) {
+    return entries;
+  }
+
   for (const pkg of tripPackages) {
-    const packageId = String(
-      pkg.packageId || pkg.trackingNumber || "",
-    ).trim();
+    const packageId = getPackageIdentity(pkg);
     if (!packageId) continue;
 
     const status = String(pkg.status || "").toUpperCase();
@@ -118,7 +259,7 @@ export function resolveMissingPackagesForRow(row = {}, tripPackages = []) {
     const receivedQty = Number(pkg.receivedQty) || 0;
 
     if (status === "MISSING" || Number(pkg.missingQty) > 0) {
-      pushPackage(pkg);
+      pushPackage(pkg, { packageStatus: status, state: "missing" });
       continue;
     }
 
@@ -127,31 +268,45 @@ export function resolveMissingPackagesForRow(row = {}, tripPackages = []) {
       loadedQty > 0 &&
       receivedQty === 0
     ) {
-      pushPackage(pkg);
+      pushPackage(pkg, { packageStatus: status, state: "on_truck" });
       continue;
     }
 
     if (receivedIds.has(packageId)) continue;
 
     if (row.missing || gap > entries.length) {
-      pushPackage(pkg);
+      pushPackage(pkg, { packageStatus: status, state: "on_truck" });
     }
 
     if (gap > 0 && entries.length >= gap) break;
   }
 
-  return entries;
+  const deduped = dedupeMissingEntries(entries);
+  return [...deduped, ...buildGapPlaceholderEntries(row, deduped)];
 }
 
-export function flattenMissingPackages(missingShipments = []) {
+export function flattenMissingPackages(
+  missingShipments = [],
+  options = {},
+) {
   const all = [];
   const seen = new Set();
 
   for (const row of missingShipments) {
+    const resolved = resolveMissingPackagesForRow(row, {
+      tripPackages: row.tripPackages || [],
+      allPackages: row.allPackages || row.tripPackages || [],
+      tripId: options.tripId || row.tripId || "",
+      tripShipment: {
+        packageBarcodes: row.packageBarcodes || [],
+      },
+    });
     const entries =
-      Array.isArray(row.missingPackages) && row.missingPackages.length > 0
-        ? row.missingPackages
-        : resolveMissingPackagesForRow(row, row.tripPackages || []);
+      resolved.length > 0
+        ? resolved
+        : Array.isArray(row.missingPackages)
+          ? row.missingPackages
+          : [];
 
     for (const entry of entries) {
       const key = entry.packageId || entry.shipmentId;
@@ -167,6 +322,42 @@ export function flattenMissingPackages(missingShipments = []) {
   }
 
   return all;
+}
+
+/** Full missing list for handoff UI — always re-derives from shipment rows. */
+export function resolveAllMissingDisplayEntries(summary = {}) {
+  const missingShipments = Array.isArray(summary.missingShipments)
+    ? summary.missingShipments
+    : [];
+  const entries = flattenMissingPackages(missingShipments, {
+    tripId: summary.tripId || null,
+  });
+
+  const totals = summary.totals || {};
+  const missingPieces = Math.max(
+    Number.isFinite(Number(totals.missingPieces))
+      ? Number(totals.missingPieces)
+      : Number(totals.manifestPieces) - Number(totals.unloadedPieces),
+    0,
+  );
+  const shortfall = Math.max(missingPieces - entries.length, 0);
+  if (shortfall <= 0) return entries;
+
+  const tripKey = summary.tripId || "TRIP";
+  return [
+    ...entries,
+    ...Array.from({ length: shortfall }, (_, index) => ({
+      packageId: `${tripKey}-UNACCOUNTED-${index + 1}`,
+      shipmentId: null,
+      shipmentDocId: null,
+      pieceSuffix: null,
+      packageStatus: "UNACCOUNTED",
+      state: "variance",
+      isUnresolved: true,
+      note:
+        "Trip counters show a gap but the label ID could not be resolved. Unload the label, mark it missing, or check if it is on another trip.",
+    })),
+  ];
 }
 
 function findPieceRemarkKeyForShipment(shipmentId, missingRemarks = {}) {

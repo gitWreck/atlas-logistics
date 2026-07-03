@@ -84,9 +84,27 @@ function getShipmentTrackingId(shipment = {}, docId = null) {
 }
 
 async function getTripNotificationTargets(db, tripId) {
-  const [currentTripSnap, currentTruckTripSnap] = await Promise.all([
+  // Multi-trip shipments have currentTripId=null, so also match the
+  // currentTripIds array and the trip_shipments manifest subcollection.
+  const [
+    currentTripSnap,
+    currentTruckTripSnap,
+    tripIdsArraySnap,
+    tripShipSnap,
+  ] = await Promise.all([
     db.collection("shipments").where("currentTripId", "==", tripId).get(),
     db.collection("shipments").where("currentTruckTripId", "==", tripId).get(),
+    db
+      .collection("shipments")
+      .where("currentTripIds", "array-contains", tripId)
+      .get()
+      .catch(() => ({ docs: [] })),
+    db
+      .collection("truck_trips")
+      .doc(tripId)
+      .collection("trip_shipments")
+      .get()
+      .catch(() => ({ docs: [] })),
   ]);
 
   const shipmentMap = new Map();
@@ -96,6 +114,23 @@ async function getTripNotificationTargets(db, tripId) {
   currentTruckTripSnap.docs.forEach((doc) =>
     shipmentMap.set(doc.id, { id: doc.id, ...doc.data() }),
   );
+  tripIdsArraySnap.docs.forEach((doc) =>
+    shipmentMap.set(doc.id, { id: doc.id, ...doc.data() }),
+  );
+
+  const missingManifestIds = tripShipSnap.docs
+    .map((doc) => doc.id)
+    .filter((id) => !shipmentMap.has(id));
+  if (missingManifestIds.length) {
+    const manifestSnaps = await Promise.all(
+      missingManifestIds.map((id) =>
+        db.collection("shipments").doc(id).get(),
+      ),
+    );
+    manifestSnaps.forEach((snap) => {
+      if (snap.exists) shipmentMap.set(snap.id, { id: snap.id, ...snap.data() });
+    });
+  }
 
   const shipments = [...shipmentMap.values()];
   const trackingIds = unique(

@@ -7,6 +7,7 @@ import {
   getReturnReceiveBlockReason,
   isEligibleForReturnReceive,
 } from "@/app/utility/returnLoop";
+import { getShipmentTripIdsLabel } from "../shipmentHelpers";
 
 export default function ReceiveReturnedModal({
   isOpen,
@@ -24,6 +25,7 @@ export default function ReceiveReturnedModal({
   const eligible = Boolean(shipment) && isEligibleForReturnReceive(shipment);
   const blockReason = getReturnReceiveBlockReason(shipment);
   const summary = shipment ? formatReturnSummary(shipment) : null;
+  const tripIdsLabel = shipment ? getShipmentTripIdsLabel(shipment) : null;
 
   useEffect(() => {
     if (!isOpen) return;
@@ -70,16 +72,14 @@ export default function ReceiveReturnedModal({
             </div>
           )}
 
-          {shipment?.currentTripId && (
+          {tripIdsLabel ? (
             <div
               className={`text-xs rounded-lg px-3 py-2 ${isDark ? "bg-indigo-900/30 text-indigo-200 border border-indigo-800" : "bg-indigo-50 text-indigo-800 border border-indigo-200"}`}
             >
-              Original trip ID preserved:{" "}
-              <span className="font-mono font-semibold">
-                {shipment.currentTripId}
-              </span>
+              Active trip ID(s):{" "}
+              <span className="font-mono font-semibold">{tripIdsLabel}</span>
             </div>
-          )}
+          ) : null}
 
           {!eligible && blockReason && (
             <div

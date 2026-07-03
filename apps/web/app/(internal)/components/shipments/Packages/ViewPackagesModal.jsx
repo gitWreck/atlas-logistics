@@ -31,7 +31,10 @@ import PackageBreakdownPanel from "./PackageBreakdownPanel";
 import ShipmentOperations from "../ShipmentOperations";
 import PieceStatusOverrideModal from "./PieceStatusOverrideModal";
 import { useAuth } from "@/app/context/AuthContext";
-import { canOverrideShipmentStatus, canOverridePieceStatus } from "@/app/utility/roleAccess";
+import {
+  canOverrideShipmentStatus,
+  canOverridePieceStatus,
+} from "@/app/utility/roleAccess";
 import {
   BASIC_PACKAGING_TYPES,
   INITIAL_PACKAGE_STATE,
@@ -39,7 +42,7 @@ import {
   displayValue,
   getShipmentDisplayId,
   getShipmentRouteLabel,
-  getShipmentTripId,
+  getShipmentTripIdsLabel,
   isPackageLocked,
 } from "../shipmentHelpers";
 
@@ -66,6 +69,7 @@ export default function ViewPackagesModal({
   isOpen,
   onClose,
   shipment,
+  tripId = null,
   isLocked,
   onRefresh,
   isDark = false,
@@ -75,8 +79,7 @@ export default function ViewPackagesModal({
   const { profile: authProfile } = useAuth();
   const effectiveProfile = profile || authProfile;
   const showShipmentStatusOverride =
-    allowShipmentStatusOverride &&
-    canOverrideShipmentStatus(effectiveProfile);
+    allowShipmentStatusOverride && canOverrideShipmentStatus(effectiveProfile);
   const showPieceStatusOverride = canOverridePieceStatus(effectiveProfile);
 
   const [packages, setPackages] = useState([]);
@@ -93,6 +96,7 @@ export default function ViewPackagesModal({
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("ALL");
   const [pieceForStatusOverride, setPieceForStatusOverride] = useState(null);
+  const [scopeToTrip, setScopeToTrip] = useState(true);
 
   const modalTheme = getModalThemeClasses(isDark);
   const modalAction = getModalActionClasses();
@@ -112,6 +116,7 @@ export default function ViewPackagesModal({
       setSearch("");
       setStatusFilter("ALL");
       setPieceForStatusOverride(null);
+      setScopeToTrip(true);
     }
   }, [isOpen, shipment?.id]);
 
@@ -143,10 +148,40 @@ export default function ViewPackagesModal({
     }
   };
 
+  const packageBelongsToTrip = (pkg) => {
+    const trip = String(tripId || "").trim();
+    if (!trip) return true;
+    const loadedOn = String(pkg.loadedOnTrip || "").trim();
+    const currentTrip = String(pkg.currentTripId || "").trim();
+    const hubOn = String(pkg.hubReceivedOnTrip || "").trim();
+    const tripIds = Array.isArray(pkg.currentTripIds)
+      ? pkg.currentTripIds.map(String)
+      : [];
+    return (
+      loadedOn === trip ||
+      currentTrip === trip ||
+      hubOn === trip ||
+      tripIds.includes(trip)
+    );
+  };
+
+  const tripScopedPackages = useMemo(() => {
+    if (!tripId || !scopeToTrip) return packages;
+    const scoped = packages.filter(packageBelongsToTrip);
+    // Fall back to all pieces if none are trip-linked yet (e.g. just assigned,
+    // not yet scanned) so the list is never confusingly empty.
+    return scoped.length > 0 ? scoped : packages;
+  }, [packages, tripId, scopeToTrip]);
+
+  const tripScopeActive =
+    Boolean(tripId) &&
+    scopeToTrip &&
+    tripScopedPackages.length < packages.length;
+
   const filteredPackages = useMemo(() => {
     const keyword = search.toLowerCase().trim();
 
-    return packages.filter((pkg) => {
+    return tripScopedPackages.filter((pkg) => {
       const matchesSearch =
         !keyword ||
         (pkg.description || "").toLowerCase().includes(keyword) ||
@@ -158,7 +193,7 @@ export default function ViewPackagesModal({
 
       return matchesSearch && matchesStatus;
     });
-  }, [packages, search, statusFilter]);
+  }, [tripScopedPackages, search, statusFilter]);
 
   const totalPages = Math.max(
     1,
@@ -175,7 +210,7 @@ export default function ViewPackagesModal({
   useEffect(() => {
     setCurrentPage(1);
     setSelectedIndices(new Set());
-  }, [search, statusFilter]);
+  }, [search, statusFilter, scopeToTrip]);
 
   useEffect(() => {
     if (currentPage > totalPages) setCurrentPage(totalPages);
@@ -442,7 +477,9 @@ export default function ViewPackagesModal({
                     <div className="space-y-3">
                       <ShipmentDetailRow
                         label="Trip ID"
-                        value={displayValue(getShipmentTripId(shipmentDetails))}
+                        value={displayValue(
+                          getShipmentTripIdsLabel(shipmentDetails),
+                        )}
                         isDark={isDark}
                       />
                       <ShipmentDetailRow
@@ -555,6 +592,32 @@ export default function ViewPackagesModal({
                                 result{filteredPackages.length > 1 ? "s" : ""}
                               </span>
                             </div>
+
+                            {tripId ? (
+                              <button
+                                type="button"
+                                onClick={() => setScopeToTrip((prev) => !prev)}
+                                className={`mt-1 inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide leading-none transition-colors ${
+                                  scopeToTrip
+                                    ? "border-blue-500/40 bg-blue-500/10 text-blue-500"
+                                    : `${tableTheme.roleBadge}`
+                                }`}
+                                title={
+                                  scopeToTrip
+                                    ? "Showing only pieces on this trip. Click to show all pieces."
+                                    : "Showing all pieces. Click to show only this trip's pieces."
+                                }
+                              >
+                                <FontAwesomeIcon
+                                  icon={scopeToTrip ? faCheckSquare : faSquare}
+                                  className="text-[10px]"
+                                />
+                                {scopeToTrip ? "This trip only" : "All pieces"}
+                                {scopeToTrip && packages.length > 0
+                                  ? ` (${tripScopedPackages.length}/${packages.length})`
+                                  : ""}
+                              </button>
+                            ) : null}
                           </div>
 
                           {selectedIndices.size > 0 && (
@@ -988,11 +1051,13 @@ export default function ViewPackagesModal({
                                             }
                                             className={`w-full border rounded-lg px-3 py-2 text-sm ${modalTheme.input}`}
                                           >
-                                            {BASIC_PACKAGING_TYPES.map((type) => (
-                                              <option key={type} value={type}>
-                                                {type}
-                                              </option>
-                                            ))}
+                                            {BASIC_PACKAGING_TYPES.map(
+                                              (type) => (
+                                                <option key={type} value={type}>
+                                                  {type}
+                                                </option>
+                                              ),
+                                            )}
                                           </select>
 
                                           <input

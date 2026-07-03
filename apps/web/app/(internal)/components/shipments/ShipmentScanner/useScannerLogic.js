@@ -17,14 +17,14 @@ import { isEligibleForCheckerRelease } from "@/app/utility/checkerRelease";
 import { isTripReleaseEligible, validateAdminOverrideRelease } from "@/app/utility/tripLifecycle";
 import { getReleasableHandoffShipments, hasReleasableHandoffPieces } from "@/app/utility/handoffRelease";
 import {
-  flattenMissingPackages,
-  areMissingPackageRemarksComplete,
+  resolveAllMissingDisplayEntries,
   resolveRemarkForMissingPackage,
   buildMissingRemarksForRelease,
 } from "@/app/utility/reconciliationPieces";
 import { updatedBy } from "@/app/utility/utilities";
 import {
   buildAlreadyLoadedInfo,
+  evaluateLinehaulLoadBlock,
   isPackageFullyLoadedOnTrip,
 } from "@/lib/scannerLoadDuplicate";
 import { getTripPackageStats } from "@/app/utility/tripStats";
@@ -114,6 +114,8 @@ export default function useScannerLogic({
   profile,
 }) {
   const tripId = trip?.tripId || trip?.id || "";
+  const isDeliveryTrip =
+    String(trip?.tripType || "HUB_TRANSFER").toUpperCase() !== "HUB_TRANSFER";
 
   // Core State
   const [action, setAction] = useState(null);
@@ -242,6 +244,15 @@ export default function useScannerLogic({
           !packageTripId &&
           ON_TRUCK_PIECE_STATUSES.has(status));
 
+      if (scanAction === "LOAD") {
+        const linehaulBlock = evaluateLinehaulLoadBlock(pkg, tripId, {
+          isDeliveryTrip,
+        });
+        if (linehaulBlock && linehaulBlock !== "ALREADY_LOADED") {
+          return 0;
+        }
+      }
+
       if (scanAction === "LOAD" && packageTripId && packageTripId !== tripId) {
         return 0;
       }
@@ -275,7 +286,7 @@ export default function useScannerLogic({
       }
       return Math.max(0, loadedQty);
     },
-    [tripId],
+    [isDeliveryTrip, tripId],
   );
 
   const getPackageIdentity = useCallback(
@@ -484,11 +495,7 @@ export default function useScannerLogic({
         setHandoffSummary(summary);
         setMissingRemarks((prev) => {
           const seededRemarks = {};
-          const missingPackages =
-            Array.isArray(summary.missingPackages) &&
-            summary.missingPackages.length > 0
-              ? summary.missingPackages
-              : flattenMissingPackages(summary.missingShipments || []);
+          const missingPackages = resolveAllMissingDisplayEntries(summary);
           missingPackages.forEach((pkg) => {
             seededRemarks[pkg.packageId] = prev[pkg.packageId] || "";
           });
@@ -649,7 +656,21 @@ export default function useScannerLogic({
           await openReleaseHandoff();
           return;
         }
-        return setError(result.message || "Label not found.");
+        return setError(result?.message || "Label not found.");
+      }
+
+      if (action === "LOAD" && result.scanType === "PACKAGE") {
+        const targetPackage = findPackageByScan(
+          result.packages,
+          cleanCode,
+          result.packageId,
+        );
+        const linehaulBlock = evaluateLinehaulLoadBlock(targetPackage, tripId, {
+          isDeliveryTrip,
+        });
+        if (linehaulBlock && linehaulBlock !== "ALREADY_LOADED") {
+          return setError(linehaulBlock);
+        }
       }
 
       if (result.packageAssignmentState === "ON_OTHER_TRIP") {
@@ -745,6 +766,13 @@ export default function useScannerLogic({
               }),
             );
             return;
+          }
+
+          const linehaulBlock = evaluateLinehaulLoadBlock(targetPkg, tripId, {
+            isDeliveryTrip,
+          });
+          if (linehaulBlock && linehaulBlock !== "ALREADY_LOADED") {
+            return setError(linehaulBlock);
           }
 
           return setError("No quantity is available to load for this scan.");
@@ -1034,23 +1062,15 @@ export default function useScannerLogic({
   };
 
   const handleReleaseShipmentsFromTrip = async () => {
-    const missingPackages =
-      Array.isArray(handoffSummary?.missingPackages) &&
-      handoffSummary.missingPackages.length > 0
-        ? handoffSummary.missingPackages
-        : flattenMissingPackages(handoffSummary?.missingShipments || []);
-    const incompleteRemark = missingPackages.find(
-      (pkg) => !resolveRemarkForMissingPackage(pkg, missingRemarks),
-    );
-
-    if (incompleteRemark) {
-      return setError(`Add remarks for missing package ${incompleteRemark.packageId}.`);
-    }
+    const missingPackages = resolveAllMissingDisplayEntries(handoffSummary);
+    const hasReconciliationVariance =
+      (Number(handoffSummary?.totals?.missingPieces) || 0) > 0 ||
+      (handoffSummary?.missingShipments?.length || 0) > 0 ||
+      missingPackages.length > 0;
 
     const useAdminOverride =
       isAdmin &&
-      missingPackages.length > 0 &&
-      areMissingPackageRemarksComplete(missingPackages, missingRemarks) &&
+      hasReconciliationVariance &&
       hasReleasableHandoffPieces(handoffSummary);
 
     let summaryForRelease = handoffSummary;

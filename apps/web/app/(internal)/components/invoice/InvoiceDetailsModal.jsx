@@ -18,7 +18,7 @@ import {
 } from "@fortawesome/free-solid-svg-icons";
 import { getModalThemeClasses } from "@/app/utility/constant/theme";
 import { getModalActionClasses } from "@/app/utility/constant/action";
-import { formatAmount } from "./invoiceHelpers";
+import { formatAmount, getInvoiceTripId } from "./invoiceHelpers";
 import InvoiceStatusBadge from "../ui/InvoiceStatusBadge";
 import InfoBlock from "../ui/InfoBlock";
 import StatusButton from "../ui/StatusButton";
@@ -239,9 +239,10 @@ export default function InvoiceDetailsModal({
                     /> */}
                     <InfoBlock
                       label="Trip ID"
-                      value={
-                        invoice.truckTripId || connectedShipment?.currentTripId
-                      }
+                      value={getInvoiceTripId({
+                        ...invoice,
+                        shipment: connectedShipment,
+                      })}
                       isDark={isDark}
                     />
                   </div>

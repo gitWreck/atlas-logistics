@@ -11,6 +11,7 @@ export default function ManifestPanel({
   quantities,
   setQuantities,
   theme,
+  tripId = null,
 }) {
   const isShipment = item.scanType === "SHIPMENT";
   const getPackageKey = (pkg) => pkg?.packageId || pkg?.trackingNumber || "";
@@ -24,13 +25,37 @@ export default function ManifestPanel({
     );
   };
 
-  const displayPackages = useMemo(
-    () =>
-      isShipment
-        ? item.packages || []
-        : item.packages?.filter(isScannedPackage) || [],
-    [isShipment, item.packages, item.packageId, item.trackingNumber],
-  );
+  const packageOnThisTrip = (pkg) => {
+    const trip = String(tripId || "").trim();
+    if (!trip) return true;
+    const loadedOn = String(pkg?.loadedOnTrip || "").trim();
+    const currentTrip = String(pkg?.currentTripId || "").trim();
+    const hubOn = String(pkg?.hubReceivedOnTrip || "").trim();
+    const tripIds = Array.isArray(pkg?.currentTripIds)
+      ? pkg.currentTripIds.map(String)
+      : [];
+    return (
+      loadedOn === trip ||
+      currentTrip === trip ||
+      hubOn === trip ||
+      tripIds.includes(trip)
+    );
+  };
+
+  const displayPackages = useMemo(() => {
+    if (!isShipment) {
+      return item.packages?.filter(isScannedPackage) || [];
+    }
+
+    const all = item.packages || [];
+    if (!tripId) return all;
+
+    // Scope shipment-level manifest to pieces tied to the active trip.
+    // Fall back to all pieces if none are trip-linked yet, so the list is
+    // never confusingly empty (e.g. shipment just assigned, not scanned).
+    const scoped = all.filter(packageOnThisTrip);
+    return scoped.length > 0 ? scoped : all;
+  }, [isShipment, item.packages, item.packageId, item.trackingNumber, tripId]);
 
   const getAvailableForPkg = (pkg) => {
     const totalQty = Math.max(Number(pkg?.quantity) || 1, 1);
