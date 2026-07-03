@@ -6,12 +6,24 @@ import {
   TouchableOpacity,
   StyleSheet,
   SafeAreaView,
+  TextInput,
+  Platform,
 } from "react-native";
-import MapView, { Marker, PROVIDER_DEFAULT } from "react-native-maps";
-import { FontAwesome5 } from "@expo/vector-icons";
+import FontAwesome5 from "@expo/vector-icons/FontAwesome5";
 import { useTheme } from "../../../contexts/ThemeContext";
 
 const DEFAULT_LOCATION = { lat: 14.5995, lng: 120.9842 };
+
+let NativeMapView = null;
+let NativeMarker = null;
+let nativeMapProvider = null;
+
+if (Platform.OS !== "web") {
+  const Maps = require("react-native-maps");
+  NativeMapView = Maps.default;
+  NativeMarker = Maps.Marker;
+  nativeMapProvider = Maps.PROVIDER_DEFAULT;
+}
 
 export default function MapPickupModal({
   visible,
@@ -22,13 +34,32 @@ export default function MapPickupModal({
   const { colors } = useTheme();
   // Default to Manila if no initial location is provided
   const [tempLoc, setTempLoc] = useState(initialLocation || DEFAULT_LOCATION);
+  const [latText, setLatText] = useState(String(initialLocation?.lat || DEFAULT_LOCATION.lat));
+  const [lngText, setLngText] = useState(String(initialLocation?.lng || DEFAULT_LOCATION.lng));
 
   // Sync temp location if the user opens the modal again after already picking a spot
   useEffect(() => {
     if (visible && initialLocation) {
       setTempLoc(initialLocation);
+      setLatText(String(initialLocation.lat));
+      setLngText(String(initialLocation.lng));
     }
   }, [visible, initialLocation]);
+
+  const confirmLocation = () => {
+    if (Platform.OS === "web") {
+      const lat = Number(latText);
+      const lng = Number(lngText);
+      if (!Number.isNaN(lat) && !Number.isNaN(lng)) {
+        onConfirm({ lat, lng });
+      } else {
+        onConfirm(tempLoc);
+      }
+    } else {
+      onConfirm(tempLoc);
+    }
+    onClose();
+  };
 
   return (
     <Modal visible={visible} animationType="slide" transparent={false}>
@@ -49,29 +80,79 @@ export default function MapPickupModal({
           <View style={{ width: 40 }} />
         </View>
 
-        {/* Full Screen Map */}
-        <MapView
-          provider={PROVIDER_DEFAULT}
-          style={styles.map}
-          initialRegion={{
-            latitude: tempLoc.lat,
-            longitude: tempLoc.lng,
-            latitudeDelta: 0.01,
-            longitudeDelta: 0.01,
-          }}
-          onPress={(e) => {
-            setTempLoc({
-              lat: e.nativeEvent.coordinate.latitude,
-              lng: e.nativeEvent.coordinate.longitude,
-            });
-          }}
-        >
-          <Marker
-            coordinate={{ latitude: tempLoc.lat, longitude: tempLoc.lng }}
-            pinColor="#2563eb"
-            title="Pickup Here"
-          />
-        </MapView>
+        {Platform.OS === "web" ? (
+          <View style={[styles.webMapFallback, { backgroundColor: colors.cardMuted }]}>
+            <View
+              style={[
+                styles.webPinIcon,
+                { backgroundColor: colors.primarySoft, borderColor: colors.border },
+              ]}
+            >
+              <FontAwesome5 name="map-marker-alt" size={22} color="#2563eb" />
+            </View>
+            <Text style={[styles.webTitle, { color: colors.text }]}>
+              Enter pickup coordinates
+            </Text>
+            <Text style={[styles.webSubtitle, { color: colors.textMuted }]}>
+              Maps are available on mobile. On web, type the latitude and longitude.
+            </Text>
+            <View style={styles.webInputRow}>
+              <TextInput
+                style={[
+                  styles.webInput,
+                  {
+                    backgroundColor: colors.inputBg,
+                    borderColor: colors.border,
+                    color: colors.text,
+                  },
+                ]}
+                value={latText}
+                onChangeText={setLatText}
+                keyboardType="numeric"
+                placeholder="Latitude"
+                placeholderTextColor={colors.textMuted}
+              />
+              <TextInput
+                style={[
+                  styles.webInput,
+                  {
+                    backgroundColor: colors.inputBg,
+                    borderColor: colors.border,
+                    color: colors.text,
+                  },
+                ]}
+                value={lngText}
+                onChangeText={setLngText}
+                keyboardType="numeric"
+                placeholder="Longitude"
+                placeholderTextColor={colors.textMuted}
+              />
+            </View>
+          </View>
+        ) : (
+          <NativeMapView
+            provider={nativeMapProvider}
+            style={styles.map}
+            initialRegion={{
+              latitude: tempLoc.lat,
+              longitude: tempLoc.lng,
+              latitudeDelta: 0.01,
+              longitudeDelta: 0.01,
+            }}
+            onPress={(e) => {
+              setTempLoc({
+                lat: e.nativeEvent.coordinate.latitude,
+                lng: e.nativeEvent.coordinate.longitude,
+              });
+            }}
+          >
+            <NativeMarker
+              coordinate={{ latitude: tempLoc.lat, longitude: tempLoc.lng }}
+              pinColor="#2563eb"
+              title="Pickup Here"
+            />
+          </NativeMapView>
+        )}
 
         {/* Footer Action */}
         <View
@@ -88,10 +169,7 @@ export default function MapPickupModal({
           </View>
           <TouchableOpacity
             style={styles.confirmBtn}
-            onPress={() => {
-              onConfirm(tempLoc);
-              onClose();
-            }}
+            onPress={confirmLocation}
           >
             <Text style={styles.confirmBtnText}>Confirm Location</Text>
           </TouchableOpacity>
@@ -114,6 +192,47 @@ const styles = StyleSheet.create({
   closeBtn: { padding: 8 },
   headerTitle: { fontSize: 18, fontWeight: "700", color: "#0f172a" },
   map: { flex: 1 },
+  webMapFallback: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 24,
+  },
+  webPinIcon: {
+    width: 58,
+    height: 58,
+    borderRadius: 29,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 16,
+  },
+  webTitle: {
+    fontSize: 18,
+    fontWeight: "800",
+    marginBottom: 6,
+  },
+  webSubtitle: {
+    maxWidth: 360,
+    fontSize: 13,
+    lineHeight: 19,
+    textAlign: "center",
+    marginBottom: 18,
+  },
+  webInputRow: {
+    width: "100%",
+    maxWidth: 420,
+    flexDirection: "row",
+    gap: 10,
+  },
+  webInput: {
+    flex: 1,
+    height: 46,
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    fontSize: 14,
+  },
   footer: {
     padding: 24,
     backgroundColor: "#fff",

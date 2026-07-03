@@ -19,6 +19,7 @@ export default function CustomerLayout() {
         }}
       >
         <Stack.Screen name="index" options={{ headerShown: false }} />
+        <Stack.Screen name="shipments" options={{ headerShown: false }} />
         {/* <Stack.Screen name="tracking/index" options={{ headerShown: false }} /> */}
       </Stack>
     </AuthGuard>
