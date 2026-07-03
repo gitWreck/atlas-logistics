@@ -426,7 +426,8 @@ export function useCheckerLastMileSync(checkerId) {
         .filter(
           (s) =>
             Boolean(s.actionPhase) || (s.poolStats?.mine || 0) > 0,
-        ),
+        )
+        .filter((s) => normalizeStatus(s.status) !== "LOADED"),
     );
   }, [activeShipmentsById, checkerId]);
 
