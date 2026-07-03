@@ -156,7 +156,6 @@ export default function ScannerCameraPane({
             </Text>
           </TouchableOpacity>
 
-          <Text style={styles.scanTitle}>Scan package or shipment code</Text>
 
           <View style={styles.scanFrame}>
             <Corner pos="tl" />
@@ -261,13 +260,7 @@ const styles = StyleSheet.create({
   flashButtonTextActive: {
     color: "#0f172a",
   },
-  scanTitle: {
-    color: "#ffffff",
-    fontSize: 15,
-    fontWeight: "700",
-    textAlign: "center",
-    marginBottom: 22,
-  },
+  
   scanFrame: {
     width: FRAME_SIZE,
     height: FRAME_SIZE,
