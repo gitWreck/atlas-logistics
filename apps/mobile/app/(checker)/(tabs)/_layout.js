@@ -43,16 +43,29 @@ export default function CheckerTabsLayout() {
             backgroundColor: colors.surface,
             borderTopColor: colors.border,
             borderTopWidth: StyleSheet.hairlineWidth,
-            height: 64,
-            paddingBottom: 8,
-            paddingTop: 8,
+            minHeight: 66,
+            height: "auto",
+            paddingHorizontal: 10,
+          },
+          tabBarSafeAreaInsets: {
+            bottom: Platform.OS === "ios" ? 12 : 10,
           },
           tabBarActiveTintColor: "#2563eb",
           tabBarInactiveTintColor: colors.textMuted,
           tabBarLabelStyle: {
-            fontSize: 11,
+            fontSize: 10,
             fontWeight: "700",
-            marginTop: 2,
+            lineHeight: 14,
+            marginTop: 4,
+            paddingHorizontal: 0,
+          },
+          tabBarItemStyle: {
+            paddingVertical: 4,
+            paddingHorizontal: 4,
+            minHeight: 58,
+          },
+          tabBarIconStyle: {
+            marginBottom: 4,
           },
         }}
       >
