@@ -124,6 +124,7 @@ const STATUS_LABELS = {
   AVAILABLE_AT_ODIONGAN_WAREHOUSE: "Available at Odiongan",
   AVAILABLE_AT_WAREHOUSE: "Available at Odiongan",
   ARRIVED_AT_ODIONGAN: "Arrived at Odiongan",
+  COMPLETED: "Delivered",
 };
 
 export default function StatusBadge({ status }) {

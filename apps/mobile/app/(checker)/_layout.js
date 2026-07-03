@@ -31,7 +31,7 @@ export default function CheckerStackLayout() {
                 animation: "slide_from_right",
               }}
             >
-              {/* 1. The Tabs (Dashboard & Trips) */}
+              {/* 1. The Tabs (Dashboard, Available, Route, Load) */}
               {/* This points to app/(checker)/(tabs)/_layout.js */}
               <Stack.Screen name="(tabs)" />
 

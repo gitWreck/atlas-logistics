@@ -691,7 +691,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#f1f5f9",
-    paddingTop: Platform.OS === "android" ? RNStatusBar.currentHeight || 0 : 0,
   },
   center: { flex: 1, justifyContent: "center", alignItems: "center" },
   scrollContent: {

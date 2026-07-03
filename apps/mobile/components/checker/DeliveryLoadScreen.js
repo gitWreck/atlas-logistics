@@ -18,9 +18,8 @@ import DeliveryManifestCard from "../../components/checker/DeliveryManifestCard"
 
 const FILTER_TABS = [
   { value: "all", label: "All" },
-  { value: "pending", label: "Pending" },
-  { value: "out", label: "Out" },
-  { value: "completed", label: "Completed" },
+  { value: "out", label: "Out For Delivery" },
+  { value: "delivered", label: "Delivered" },
   { value: "failed", label: "Failed" },
 ];
 
@@ -56,15 +55,8 @@ function matchesFilter(manifest, filter) {
   if (filter === "all") return true;
   const status = normalizeStatus(manifest.displayStatus || manifest.status);
   if (filter === "out") return status === "OUT_FOR_DELIVERY";
-  if (filter === "completed") return status === "COMPLETED";
+  if (filter === "delivered") return status === "COMPLETED";
   if (filter === "failed") return status === "FAILED_DELIVERY";
-  if (filter === "pending") {
-    return (
-      status !== "OUT_FOR_DELIVERY" &&
-      status !== "COMPLETED" &&
-      status !== "FAILED_DELIVERY"
-    );
-  }
   return true;
 }
 

@@ -102,15 +102,6 @@ export default function CheckerTabsLayout() {
               ),
             }}
           />
-          <Tabs.Screen
-            name="trips"
-            options={{
-              title: "Trips",
-              tabBarIcon: ({ color }) => (
-                <FontAwesome5 name="clipboard-list" size={20} color={color} />
-              ),
-            }}
-          />
         </Tabs>
       </View>
     </View>
