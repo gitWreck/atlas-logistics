@@ -1,11 +1,5 @@
-import React, { useState, useEffect, useCallback, useMemo } from "react";
-import {
-  View,
-  Text,
-  StyleSheet,
-  RefreshControl,
-  ScrollView,
-} from "react-native";
+import React, { useState, useCallback, useEffect, useMemo } from "react";
+import { View, StyleSheet, RefreshControl, ScrollView } from "react-native";
 import { useRouter } from "expo-router";
 import {
   collection,
@@ -15,39 +9,41 @@ import {
   Timestamp,
 } from "firebase/firestore";
 import { startOfDay, subDays } from "date-fns";
-import { db } from "../../../firebase";
-
+import { signOut } from "firebase/auth";
+import { auth, db } from "../../../firebase";
+import { useAuth } from "../../../contexts/AuthContext";
 import { useTheme } from "../../../contexts/ThemeContext";
 import { useCheckerLastMile } from "../../../contexts/CheckerLastMileContext";
 import {
-  GroupLabel,
-  StatCard,
-  QuickAction,
-} from "../../../components/checker/design/primitives";
+  CheckerHomeHero,
+  DeliveredHistoryList,
+  QuickActions,
+  TodayAtGlance,
+} from "../../../components/checker/CheckerHomeDashboard";
 import { SECTION } from "../../../components/checker/design/checkerTheme";
-
-function greetingForNow() {
-  const h = new Date().getHours();
-  if (h < 12) return "Good morning!";
-  if (h < 18) return "Good afternoon!";
-  return "Good evening!";
-}
+import {
+  countDeliveredPieces,
+  countOutForDeliveryPieces,
+  getDeliveredShipments,
+  isSameLocalDay,
+} from "../../../components/checker/dashboardData";
 
 export default function CheckerIndex() {
   const router = useRouter();
   const { colors } = useTheme();
-
-  // Real-time last-mile data (source of truth for the glance cards)
+  const { user, profile } = useAuth();
   const {
     availableShipments = [],
     myRouteShipments = [],
     summary = {},
+    shipmentsById = {},
   } = useCheckerLastMile();
 
-  const [filter] = useState("TODAY"); // preserved for facility query parity
+  const [filter] = useState("TODAY");
   const [refreshing, setRefreshing] = useState(false);
+  const checkerId = profile?.uid || user?.uid;
+  const today = useMemo(() => new Date(), []);
 
-  // NAVIGATION HANDLERS (unchanged business flows)
   const goToScan = (mode, title, extra = {}) => {
     router.push({
       pathname: "/(checker)/scan",
@@ -60,8 +56,23 @@ export default function CheckerIndex() {
   const goRoute = () => router.push("/(checker)/(tabs)/deliveries");
   const goOffload = () => goToScan("offloading", "Offload Items");
   const goInfo = () => goToScan("info", "Information");
+  const goAvailable = () => router.push("/(checker)/(tabs)/available-to-load");
+  const goHistory = () => router.push("/(checker)/delivered-history");
+  const openShipment = (shipment) =>
+    router.push({
+      pathname: "/(checker)/shipment-details",
+      params: { shipmentId: shipment.id },
+    });
 
-  // FETCH facility stats (preserved) — keeps the warehouse query warm
+  const handleLogout = async () => {
+    try {
+      await signOut(auth);
+      router.replace("/(auth)/login");
+    } catch (err) {
+      console.error("Logout failed:", err);
+    }
+  };
+
   const fetchStats = useCallback(async () => {
     try {
       const shipmentsRef = collection(db, "shipments");
@@ -91,7 +102,11 @@ export default function CheckerIndex() {
     setRefreshing(false);
   };
 
-  // DERIVE glance metrics from real-time context data
+  const allKnownShipments = useMemo(
+    () => Object.values(shipmentsById || {}),
+    [shipmentsById],
+  );
+
   const glance = useMemo(() => {
     const available = availableShipments.reduce(
       (n, s) => n + (s.poolStats?.available || 0),
@@ -101,14 +116,109 @@ export default function CheckerIndex() {
       (n, s) => n + (s.poolStats?.mine || 0),
       0,
     );
+
+    const deliveredToday = allKnownShipments.reduce((sum, shipment) => {
+      const deliveredAt = shipment.deliveredAt || shipment.completedAt;
+      const hasDeliveredToday =
+        isSameLocalDay(deliveredAt, today) ||
+        (Array.isArray(shipment.packages) &&
+          shipment.packages.some((pkg) =>
+            isSameLocalDay(pkg.deliveredAt || pkg.updatedAt, today),
+          ));
+      return hasDeliveredToday
+        ? sum + countDeliveredPieces(shipment, checkerId)
+        : sum;
+    }, 0);
+
+    const outForDeliveryToday = allKnownShipments.reduce((sum, shipment) => {
+      const updatedToday =
+        isSameLocalDay(shipment.updatedAt, today) ||
+        (Array.isArray(shipment.packages) &&
+          shipment.packages.some((pkg) =>
+            isSameLocalDay(pkg.updatedAt || pkg.deliveredAt, today),
+          ));
+      return updatedToday
+        ? sum + countOutForDeliveryPieces(shipment, checkerId)
+        : sum;
+    }, 0);
+
     return {
       available,
       onVan,
-      delivered: summary.delivered || 0,
+      delivered: deliveredToday || summary.delivered || 0,
       failed: summary.failed || 0,
       returned: summary.returned || 0,
+      outForDeliveryToday,
     };
-  }, [availableShipments, myRouteShipments, summary]);
+  }, [
+    availableShipments,
+    myRouteShipments,
+    summary,
+    allKnownShipments,
+    checkerId,
+    today,
+  ]);
+
+  const recentDelivered = useMemo(
+    () => getDeliveredShipments(allKnownShipments, checkerId).slice(0, 3),
+    [allKnownShipments, checkerId],
+  );
+
+  const goal = summary.totalPackages || glance.outForDeliveryToday || 0;
+  const cards = [
+    {
+      key: "available",
+      title: "Available",
+      subtitle: "In Warehouse",
+      value: glance.available,
+      icon: "cube",
+      color: SECTION.available.accent,
+      softColor: "#eaf1ff",
+      onPress: goAvailable,
+    },
+    {
+      key: "on-van",
+      title: "On My Van",
+      subtitle: "Out for delivery",
+      value: glance.onVan,
+      icon: "truck",
+      color: SECTION.route.accent,
+      softColor: "#e8f7ee",
+      onPress: goRoute,
+    },
+    {
+      key: "delivered",
+      title: "Delivered",
+      subtitle: "Today",
+      value: glance.delivered,
+      icon: "check-circle",
+      color: SECTION.delivered.accent,
+      softColor: "#e7f8ed",
+      trend: glance.delivered > 0 ? { positive: true, label: "Live today" } : null,
+      onPress: goHistory,
+    },
+    {
+      key: "failed",
+      title: "Failed",
+      subtitle: "Today",
+      value: glance.failed,
+      icon: "exclamation-circle",
+      color: SECTION.failed.accent,
+      softColor: "#fee8e8",
+      trend: glance.failed > 0 ? { positive: false, label: "Needs action" } : null,
+      onPress: goRoute,
+    },
+    {
+      key: "returned",
+      title: "Returned",
+      subtitle: "To Warehouse",
+      value: glance.returned,
+      icon: "undo",
+      color: SECTION.return.accent,
+      softColor: "#fff1df",
+      onPress: goRoute,
+    },
+  ];
 
   return (
     <View style={[styles.container, { backgroundColor: colors.bg }]}>
@@ -119,92 +229,40 @@ export default function CheckerIndex() {
           <RefreshControl
             refreshing={refreshing}
             onRefresh={onRefresh}
-            tintColor={colors.text}
-            colors={[colors.text]}
+            tintColor="#ffffff"
+            colors={[SECTION.available.accent]}
           />
         }
       >
-        <Text style={[styles.greeting, { color: colors.textMuted }]}>
-          {greetingForNow()}
-        </Text>
+        <CheckerHomeHero
+          userName={user?.name || user?.fullName || profile?.name || "Checker"}
+          onLogout={handleLogout}
+          onProfilePress={() => router.push("/(checker)/profile")}
+          currentDate={today}
+        />
 
-        {/* TODAY AT A GLANCE */}
-        <GroupLabel>Today at a glance</GroupLabel>
-        <View style={styles.statGrid}>
-          <StatCard
-            value={glance.available}
-            label="Available"
-            sublabel="In Warehouse"
-            icon="box"
-            color={SECTION.available.accent}
-          />
-          <StatCard
-            value={glance.onVan}
-            label="On My Van"
-            sublabel="Out for delivery"
-            icon="truck"
-            color={SECTION.route.accent}
-          />
-          <StatCard
-            value={glance.delivered}
-            label="Delivered"
-            sublabel="Today"
-            icon="check-circle"
-            color={SECTION.delivered.accent}
-          />
-          <StatCard
-            value={glance.failed}
-            label="Failed"
-            sublabel="Today"
-            icon="exclamation-circle"
-            color={SECTION.failed.accent}
-          />
-          <StatCard
-            value={glance.returned}
-            label="Returned"
-            sublabel="To Warehouse"
-            icon="undo"
-            color={SECTION.return.accent}
-            width="100%"
-          />
-        </View>
+        <TodayAtGlance
+          cards={cards}
+          progress={{
+            delivered: glance.delivered,
+            total: glance.outForDeliveryToday,
+            goal,
+          }}
+          onViewAll={goAvailable}
+        />
 
-        {/* QUICK ACTIONS */}
-        <GroupLabel style={{ marginTop: 20 }}>Quick actions</GroupLabel>
-        <View style={styles.actionGrid}>
-          <View style={styles.actionRow}>
-            <QuickAction
-              title="LOAD TO VAN"
-              subtitle="Load to van"
-              icon="truck"
-              color={SECTION.load.accent}
-              onPress={goLoad}
-            />
-            <QuickAction
-              title="MY ROUTE"
-              subtitle="View route"
-              icon="map-marker-alt"
-              color={SECTION.route.accent}
-              onPress={goRoute}
-            />
-          </View>
-          <View style={styles.actionRow}>
-            <QuickAction
-              title="OFFLOAD"
-              subtitle="Deliver / Return"
-              icon="box-open"
-              color={SECTION.offload.accent}
-              onPress={goOffload}
-            />
-            <QuickAction
-              title="SCAN INFO"
-              subtitle="Package info"
-              icon="search"
-              color={SECTION.info.accent}
-              onPress={goInfo}
-            />
-          </View>
-        </View>
+        <QuickActions
+          onLoad={goLoad}
+          onRoute={goRoute}
+          onOffload={goOffload}
+          onInfo={goInfo}
+        />
+
+        <DeliveredHistoryList
+          shipments={recentDelivered}
+          onViewAll={goHistory}
+          onPressShipment={openShipment}
+        />
       </ScrollView>
     </View>
   );
@@ -213,28 +271,9 @@ export default function CheckerIndex() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#f1f5f9",
+    backgroundColor: "#f7fbff",
   },
   content: {
-    paddingHorizontal: 20,
-    paddingTop: 8,
-    paddingBottom: 32,
-  },
-  greeting: {
-    fontSize: 14,
-    fontWeight: "600",
-    marginBottom: 12,
-  },
-  statGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 12,
-  },
-  actionGrid: {
-    gap: 12,
-  },
-  actionRow: {
-    flexDirection: "row",
-    gap: 12,
+    paddingBottom: 28,
   },
 });

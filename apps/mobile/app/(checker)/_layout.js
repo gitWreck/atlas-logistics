@@ -39,6 +39,7 @@ export default function CheckerStackLayout() {
               <Stack.Screen name="trip-details" />
               <Stack.Screen name="shipment-details" />
               <Stack.Screen name="delivery-manifest" />
+              <Stack.Screen name="delivered-history" />
 
               <Stack.Screen
                 name="scan"
