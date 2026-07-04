@@ -71,7 +71,10 @@ const roleConfig = {
   },
 };
 
-export default function ProfileViewer({ showBackButton = false }) {
+export default function ProfileViewer({
+  showBackButton = false,
+  compactTop = false,
+}) {
   const router = useRouter();
   const { user, refreshUser, signOut } = useAuth();
   const { preference, setPreference, resolvedScheme, colors } = useTheme();
@@ -416,8 +419,16 @@ export default function ProfileViewer({ showBackButton = false }) {
     );
   };
 
+  const Container = compactTop ? View : SafeAreaView;
+
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.bg }]}>
+    <Container
+      style={[
+        styles.container,
+        compactTop && styles.containerCompactTop,
+        { backgroundColor: colors.bg },
+      ]}
+    >
       {showBackButton && (
         <ShipmentDetailHeader
           title="Profile"
@@ -428,7 +439,10 @@ export default function ProfileViewer({ showBackButton = false }) {
 
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[
+          styles.scrollContent,
+          compactTop && styles.scrollContentCompactTop,
+        ]}
       >
         <View
           style={[
@@ -903,7 +917,7 @@ export default function ProfileViewer({ showBackButton = false }) {
         }}
         onClose={() => setShowCityModal(false)}
       />
-    </SafeAreaView>
+    </Container>
   );
 }
 
@@ -929,11 +943,17 @@ const styles = StyleSheet.create({
     backgroundColor: "#f8fafc",
     paddingTop: Platform.OS === "android" ? RNStatusBar.currentHeight || 0 : 0,
   },
+  containerCompactTop: {
+    paddingTop: 0,
+  },
   scrollContent: {
     paddingHorizontal: 16,
     paddingTop: 16,
     paddingBottom: 40,
     gap: 14,
+  },
+  scrollContentCompactTop: {
+    paddingTop: 12,
   },
   heroCard: {
     backgroundColor: "#ffffff",
