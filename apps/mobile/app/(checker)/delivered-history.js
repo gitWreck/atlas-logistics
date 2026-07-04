@@ -163,26 +163,38 @@ export default function DeliveredHistoryPage() {
 
   const renderShipment = ({ item }) => (
     <TouchableOpacity
-      style={styles.listRow}
+      style={[
+        styles.listRow,
+        { backgroundColor: colors.surface, borderColor: colors.border },
+      ]}
       onPress={() => openShipment(item)}
       activeOpacity={0.8}
     >
-      <View style={styles.listIcon}>
+      <View style={[styles.listIcon, { backgroundColor: colors.successSoft }]}>
         <FontAwesome5 name="check-circle" size={20} color="#0aa047" />
       </View>
       <View style={styles.listMain}>
         <View style={styles.listTop}>
-          <Text style={styles.shipmentNumber} numberOfLines={1}>
+          <Text
+            style={[styles.shipmentNumber, { color: colors.text }]}
+            numberOfLines={1}
+          >
             {getShipmentNumber(item)}
           </Text>
-          <View style={styles.badge}>
+          <View style={[styles.badge, { backgroundColor: colors.successSoft }]}>
             <Text style={styles.badgeText}>Delivered</Text>
           </View>
         </View>
-        <Text style={styles.receiver} numberOfLines={1}>
+        <Text
+          style={[styles.receiver, { color: colors.text }]}
+          numberOfLines={1}
+        >
           {getReceiverName(item)}
         </Text>
-        <Text style={styles.address} numberOfLines={2}>
+        <Text
+          style={[styles.address, { color: colors.textMuted }]}
+          numberOfLines={2}
+        >
           {getDeliveryAddress(item)}
         </Text>
         <Text style={styles.time}>
@@ -191,23 +203,30 @@ export default function DeliveredHistoryPage() {
             : "Delivery time unavailable"}
         </Text>
       </View>
-      <FontAwesome5 name="chevron-right" size={15} color="#17284d" />
+      <FontAwesome5 name="chevron-right" size={15} color={colors.text} />
     </TouchableOpacity>
   );
 
   return (
     <View style={[styles.container, { backgroundColor: colors.bg }]}>
-      <View style={styles.header}>
+      <View
+        style={[
+          styles.header,
+          { backgroundColor: colors.surface, borderBottomColor: colors.border },
+        ]}
+      >
         <TouchableOpacity
-          style={styles.backButton}
+          style={[styles.backButton, { backgroundColor: colors.cardMuted }]}
           onPress={() => router.back()}
           activeOpacity={0.75}
         >
-          <FontAwesome5 name="chevron-left" size={16} color="#10224a" />
+          <FontAwesome5 name="chevron-left" size={16} color={colors.text} />
         </TouchableOpacity>
         <View style={styles.headerCopy}>
-          <Text style={styles.title}>Delivered History</Text>
-          <Text style={styles.subtitle}>
+          <Text style={[styles.title, { color: colors.text }]}>
+            Delivered History
+          </Text>
+          <Text style={[styles.subtitle, { color: colors.textMuted }]}>
             {filteredShipments.length} delivered shipment
             {filteredShipments.length === 1 ? "" : "s"}
           </Text>
@@ -215,12 +234,17 @@ export default function DeliveredHistoryPage() {
       </View>
 
       <View style={styles.controls}>
-        <View style={styles.searchBox}>
-          <FontAwesome5 name="search" size={14} color="#66758f" />
+        <View
+          style={[
+            styles.searchBox,
+            { backgroundColor: colors.surface, borderColor: colors.border },
+          ]}
+        >
+          <FontAwesome5 name="search" size={14} color={colors.textMuted} />
           <TextInput
-            style={styles.searchInput}
+            style={[styles.searchInput, { color: colors.text }]}
             placeholder="Search shipment, receiver, address"
-            placeholderTextColor="#8a97ad"
+            placeholderTextColor={colors.textMuted}
             value={search}
             onChangeText={(text) => {
               setSearch(text);
@@ -235,6 +259,10 @@ export default function DeliveredHistoryPage() {
               key={filter.key}
               style={[
                 styles.filterChip,
+                {
+                  backgroundColor: colors.surface,
+                  borderColor: colors.border,
+                },
                 dateFilter === filter.key && styles.filterChipActive,
               ]}
               onPress={() => {
@@ -246,6 +274,7 @@ export default function DeliveredHistoryPage() {
               <Text
                 style={[
                   styles.filterText,
+                  { color: colors.textMuted },
                   dateFilter === filter.key && styles.filterTextActive,
                 ]}
               >
@@ -254,7 +283,10 @@ export default function DeliveredHistoryPage() {
             </TouchableOpacity>
           ))}
           <TouchableOpacity
-            style={styles.sortChip}
+            style={[
+              styles.sortChip,
+              { backgroundColor: colors.cardMuted, borderColor: colors.border },
+            ]}
             onPress={() =>
               setSortOrder((current) =>
                 current === "NEWEST" ? "OLDEST" : "NEWEST",
@@ -273,7 +305,9 @@ export default function DeliveredHistoryPage() {
       {loading ? (
         <View style={styles.loading}>
           <ActivityIndicator size="large" color="#075de8" />
-          <Text style={styles.loadingText}>Loading delivered history...</Text>
+          <Text style={[styles.loadingText, { color: colors.textMuted }]}>
+            Loading delivered history...
+          </Text>
         </View>
       ) : (
         <FlatList
@@ -488,4 +522,3 @@ const styles = StyleSheet.create({
     fontWeight: "900",
   },
 });
-

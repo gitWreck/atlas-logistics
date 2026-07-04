@@ -11,6 +11,7 @@ import {
   View,
 } from "react-native";
 import { FontAwesome5 } from "@expo/vector-icons";
+import { useTheme } from "../../contexts/ThemeContext";
 
 export default function DeliveryProofModal({
   visible,
@@ -30,6 +31,8 @@ export default function DeliveryProofModal({
   onRemarksChange,
   onSubmit,
 }) {
+  const { colors, resolvedScheme } = useTheme();
+  const isDark = resolvedScheme === "dark";
   const limitReached = totalCount >= maxImages;
   const isBatch = batchPieceCount > 1 || batchPieces.length > 1;
 
@@ -41,65 +44,101 @@ export default function DeliveryProofModal({
       onRequestClose={onClose}
     >
       <View style={styles.overlay}>
-        <View style={styles.card}>
+        <View style={[styles.card, { backgroundColor: colors.surface }]}>
           <View style={styles.header}>
             <View>
-              <Text style={styles.eyebrow}>Proof of Delivery</Text>
-              <Text style={styles.title}>
+              <Text style={[styles.eyebrow, { color: colors.textMuted }]}>
+                Proof of Delivery
+              </Text>
+              <Text style={[styles.title, { color: colors.text }]}>
                 {isBatch ? "Confirm Delivery" : "Complete Shipment"}
               </Text>
             </View>
             <TouchableOpacity
               onPress={onClose}
               disabled={uploading}
-              style={styles.closeButton}
+              style={[
+                styles.closeButton,
+                { backgroundColor: colors.cardMuted },
+              ]}
               activeOpacity={0.8}
             >
-              <FontAwesome5 name="times" size={14} color="#64748b" />
+              <FontAwesome5 name="times" size={14} color={colors.textMuted} />
             </TouchableOpacity>
           </View>
 
-          <Text style={styles.message}>
+          <Text style={[styles.message, { color: colors.textMuted }]}>
             {isBatch
               ? `One POD photo covers all ${batchPieceCount || batchPieces.length} scanned pieces. Add at least ${minImages} photo (up to ${maxImages}).`
               : `Add at least ${minImages} delivery photo. You can attach up to ${maxImages} images before marking this shipment completed.`}
           </Text>
 
           {isBatch && batchPieces.length > 0 && (
-            <View style={styles.batchList}>
+            <View
+              style={[
+                styles.batchList,
+                {
+                  backgroundColor: colors.successSoft,
+                  borderColor: isDark ? "#166534" : "#bbf7d0",
+                },
+              ]}
+            >
               {batchPieces.map((piece) => (
-                <Text key={piece.packageId} style={styles.batchItem}>
+                <Text
+                  key={piece.packageId}
+                  style={[styles.batchItem, { color: colors.success }]}
+                >
                   ✓ {piece.label}
                 </Text>
               ))}
             </View>
           )}
 
-          <View style={styles.countPill}>
-            <Text style={styles.countText}>
+          <View
+            style={[styles.countPill, { backgroundColor: colors.successSoft }]}
+          >
+            <Text style={[styles.countText, { color: colors.success }]}>
               {totalCount}/{maxImages} images ready
             </Text>
           </View>
 
           <View style={styles.actionsRow}>
             <TouchableOpacity
-              style={[styles.actionButton, limitReached && styles.disabled]}
+              style={[
+                styles.actionButton,
+                {
+                  backgroundColor: colors.cardMuted,
+                  borderColor: colors.border,
+                },
+                limitReached && styles.disabled,
+              ]}
               onPress={onPickImage}
               disabled={uploading || limitReached}
               activeOpacity={0.82}
             >
               <FontAwesome5 name="image" size={14} color="#2563eb" />
-              <Text style={styles.actionText}>Upload Image</Text>
+              <Text style={[styles.actionText, { color: colors.primary }]}>
+                Upload Image
+              </Text>
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={[styles.actionButton, limitReached && styles.disabled]}
+              style={[
+                styles.actionButton,
+                {
+                  backgroundColor: colors.cardMuted,
+                  borderColor: colors.border,
+                },
+                limitReached && styles.disabled,
+              ]}
               onPress={onTakePhoto}
               disabled={uploading || limitReached}
               activeOpacity={0.82}
             >
               <FontAwesome5 name="camera" size={14} color="#2563eb" />
-              <Text style={styles.actionText}>Open Camera</Text>
+              <Text style={[styles.actionText, { color: colors.primary }]}>
+                Open Camera
+              </Text>
             </TouchableOpacity>
           </View>
 
@@ -109,7 +148,10 @@ export default function DeliveryProofModal({
             contentContainerStyle={styles.grid}
           >
             {photos.map((uri, index) => (
-              <View key={`${uri}-${index}`} style={styles.thumbWrap}>
+              <View
+                key={`${uri}-${index}`}
+                style={[styles.thumbWrap, { backgroundColor: colors.border }]}
+              >
                 <Image source={{ uri }} style={styles.thumb} />
                 <TouchableOpacity
                   style={styles.removeButton}
@@ -125,14 +167,26 @@ export default function DeliveryProofModal({
           <View style={styles.remarksSection}>
             <View style={styles.sectionHeader}>
               <Text style={styles.remarksLabel}>DELIVERY NOTES</Text>
-              <View style={styles.sectionDivider} />
+              <View
+                style={[
+                  styles.sectionDivider,
+                  { backgroundColor: colors.successSoft },
+                ]}
+              />
             </View>
             <TextInput
-              style={styles.remarksInput}
+              style={[
+                styles.remarksInput,
+                {
+                  backgroundColor: colors.inputBg,
+                  borderColor: colors.border,
+                  color: colors.text,
+                },
+              ]}
               value={remarks}
               onChangeText={onRemarksChange}
               placeholder="Add delivery notes or condition remarks..."
-              placeholderTextColor="#94a3b8"
+              placeholderTextColor={colors.textMuted}
               multiline
               editable={!uploading}
               textAlignVertical="top"

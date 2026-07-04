@@ -132,6 +132,10 @@ export default function ProfileViewer({
     : isStaff
       ? displayValue(warehouseSummary, `${config.label} Account`)
       : "User Account";
+  const avatarBg = isDark ? colors.cardMuted : config.bg;
+  const avatarBorder = isDark ? colors.border : config.border;
+  const roleBg = isDark ? colors.cardMuted : config.bg;
+  const roleBorder = isDark ? colors.border : config.border;
 
   const handleSave = async () => {
     if (!user?.uid) {
@@ -453,7 +457,7 @@ export default function ProfileViewer({
           <View
             style={[
               styles.avatar,
-              { backgroundColor: config.bg, borderColor: config.border },
+              { backgroundColor: avatarBg, borderColor: avatarBorder },
             ]}
           >
             <FontAwesome5 name={config.icon} size={24} color={config.color} />
@@ -464,8 +468,8 @@ export default function ProfileViewer({
               style={[
                 styles.rolePill,
                 {
-                  backgroundColor: colors.cardMuted,
-                  borderColor: colors.border,
+                  backgroundColor: roleBg,
+                  borderColor: roleBorder,
                 },
               ]}
             >
@@ -963,6 +967,11 @@ const styles = StyleSheet.create({
     borderColor: "#e2e8f0",
     flexDirection: "row",
     alignItems: "center",
+    shadowColor: "#0f172a",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 2,
   },
   avatar: {
     width: 64,
@@ -1008,6 +1017,11 @@ const styles = StyleSheet.create({
     padding: 16,
     borderWidth: 1,
     borderColor: "#e2e8f0",
+    shadowColor: "#0f172a",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 2,
   },
   cardHeader: {
     flexDirection: "row",

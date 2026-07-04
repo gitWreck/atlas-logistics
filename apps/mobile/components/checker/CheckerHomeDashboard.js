@@ -12,6 +12,7 @@ import {
 import { LinearGradient } from "expo-linear-gradient";
 import { FontAwesome5 } from "@expo/vector-icons";
 import { format } from "date-fns";
+import { useTheme } from "../../contexts/ThemeContext";
 import { cardShadow, SECTION } from "./design/checkerTheme";
 import {
   getDeliveryAddress,
@@ -44,11 +45,14 @@ function formatCount(value) {
 }
 
 function SectionTitle({ icon, title, onViewAll }) {
+  const { colors } = useTheme();
   return (
     <View style={styles.sectionTitleRow}>
       <View style={styles.sectionTitleLeft}>
         <FontAwesome5 name={icon} size={17} color={COLORS.blue} />
-        <Text style={styles.sectionTitle}>{title}</Text>
+        <Text style={[styles.sectionTitle, { color: colors.text }]}>
+          {title}
+        </Text>
       </View>
       {onViewAll ? (
         <TouchableOpacity
@@ -66,7 +70,6 @@ function SectionTitle({ icon, title, onViewAll }) {
 
 export function CheckerHomeHero({
   userName,
-  onLogout,
   onProfilePress,
   currentDate = new Date(),
   onDatePress,
@@ -75,7 +78,6 @@ export function CheckerHomeHero({
   const { width } = useWindowDimensions();
   const heroHeight = clamp(width * 0.58, 238, 292);
   const avatarSize = clamp(width * 0.14, 50, 66);
-  const logoutSize = clamp(width * 0.12, 46, 62);
   const dateWidth = clamp(width * 0.48, 190, 230);
   const artScale = clamp(width / 430, 0.78, 1);
 
@@ -119,24 +121,6 @@ export function CheckerHomeHero({
           </View>
         </TouchableOpacity>
 
-        <TouchableOpacity
-          style={[
-            styles.heroLogout,
-            {
-              width: logoutSize,
-              height: logoutSize,
-              borderRadius: clamp(logoutSize * 0.28, 14, 18),
-            },
-          ]}
-          onPress={onLogout}
-          activeOpacity={0.82}
-        >
-          <FontAwesome5
-            name="sign-out-alt"
-            size={clamp(logoutSize * 0.38, 18, 24)}
-            color="#61708c"
-          />
-        </TouchableOpacity>
       </View>
 
       <View style={styles.heroBottom}>
@@ -182,6 +166,7 @@ export function DateFilterModal({
   onSelectDate,
   onClose,
 }) {
+  const { colors } = useTheme();
   const selectedKey = format(selectedDate || new Date(), "yyyy-MM-dd");
 
   return (
@@ -196,11 +181,18 @@ export function DateFilterModal({
         activeOpacity={1}
         onPress={onClose}
       >
-        <View style={styles.dateModalCard}>
+        <View
+          style={[
+            styles.dateModalCard,
+            { backgroundColor: colors.surface, borderColor: colors.border },
+          ]}
+        >
           <View style={styles.dateModalHeader}>
-            <Text style={styles.dateModalTitle}>Select date</Text>
+            <Text style={[styles.dateModalTitle, { color: colors.text }]}>
+              Select date
+            </Text>
             <TouchableOpacity onPress={onClose} hitSlop={10}>
-              <FontAwesome5 name="times" size={16} color={COLORS.muted} />
+              <FontAwesome5 name="times" size={16} color={colors.textMuted} />
             </TouchableOpacity>
           </View>
           <ScrollView
@@ -215,6 +207,10 @@ export function DateFilterModal({
                   key={key}
                   style={[
                     styles.dateOption,
+                    {
+                      backgroundColor: colors.cardMuted,
+                      borderColor: colors.border,
+                    },
                     selected && styles.dateOptionSelected,
                   ]}
                   onPress={() => onSelectDate(date)}
@@ -224,6 +220,7 @@ export function DateFilterModal({
                     <Text
                       style={[
                         styles.dateOptionMain,
+                        { color: colors.text },
                         selected && styles.dateOptionMainSelected,
                       ]}
                     >
@@ -232,6 +229,7 @@ export function DateFilterModal({
                     <Text
                       style={[
                         styles.dateOptionSub,
+                        { color: colors.textMuted },
                         selected && styles.dateOptionSubSelected,
                       ]}
                     >
@@ -262,22 +260,31 @@ export function DashboardStatCard({
   onPress,
   style,
 }) {
+  const { colors, resolvedScheme } = useTheme();
+  const iconBg = resolvedScheme === "dark" ? colors.cardMuted : softColor;
   return (
     <TouchableOpacity
-      style={[styles.statCard, style]}
+      style={[
+        styles.statCard,
+        { backgroundColor: colors.surface, borderColor: colors.border },
+        style,
+      ]}
       onPress={onPress}
       activeOpacity={0.85}
       disabled={!onPress}
     >
       <View style={styles.statTopRow}>
-        <View style={[styles.statIcon, { backgroundColor: softColor }]}>
+        <View style={[styles.statIcon, { backgroundColor: iconBg }]}>
           <FontAwesome5 name={icon} size={21} color={color} />
         </View>
         <View style={styles.statCopy}>
-          <Text style={styles.statTitle} numberOfLines={1}>
+          <Text style={[styles.statTitle, { color: colors.text }]} numberOfLines={1}>
             {title}
           </Text>
-          <Text style={styles.statSubtitle} numberOfLines={1}>
+          <Text
+            style={[styles.statSubtitle, { color: colors.textMuted }]}
+            numberOfLines={2}
+          >
             {subtitle}
           </Text>
         </View>
@@ -291,7 +298,11 @@ export function DashboardStatCard({
             <View
               style={[
                 styles.trendPill,
-                { backgroundColor: trend.positive ? "#e0f7e9" : "#fee5e5" },
+                {
+                  backgroundColor: trend.positive
+                    ? colors.successSoft
+                    : colors.dangerSoft,
+                },
               ]}
             >
               <FontAwesome5
@@ -310,15 +321,21 @@ export function DashboardStatCard({
             </View>
           ) : null}
         </View>
-        <View style={styles.chevronCircle}>
-          <FontAwesome5 name="chevron-right" size={14} color="#112044" />
-        </View>
+      </View>
+      <View
+        style={[
+          styles.chevronCircle,
+          { backgroundColor: colors.surface, borderColor: colors.border },
+        ]}
+      >
+        <FontAwesome5 name="chevron-right" size={14} color={colors.text} />
       </View>
     </TouchableOpacity>
   );
 }
 
 export function DeliveryProgressCard({ delivered, total, goal, style }) {
+  const { colors } = useTheme();
   const { width } = useWindowDimensions();
   const cardWidth = Math.floor((width - SCREEN_PADDING * 2 - GRID_GAP) / 2);
   const ringSize = clamp(cardWidth * 0.42, 60, 76);
@@ -333,10 +350,21 @@ export function DeliveryProgressCard({ delivered, total, goal, style }) {
   )} completed`;
 
   return (
-    <View style={[styles.progressCard, style, total === 0 && styles.progressEmptyCard]}>
+    <View
+      style={[
+        styles.progressCard,
+        { backgroundColor: colors.surface, borderColor: colors.border },
+        style,
+        total === 0 && styles.progressEmptyCard,
+      ]}
+    >
       <View style={styles.progressTitleBlock}>
-        <Text style={styles.progressTitle}>Delivery Progress</Text>
-        <Text style={styles.progressSub}>Today</Text>
+        <Text style={[styles.progressTitle, { color: colors.text }]}>
+          Delivery Progress
+        </Text>
+        <Text style={[styles.progressSub, { color: colors.textMuted }]}>
+          Today
+        </Text>
       </View>
 
       {total > 0 ? (
@@ -358,6 +386,7 @@ export function DeliveryProgressCard({ delivered, total, goal, style }) {
                   width: ringSize,
                   height: ringSize,
                   borderRadius: ringSize / 2,
+                  backgroundColor: colors.dashboardBorder,
                 },
               ]}
             />
@@ -436,25 +465,35 @@ export function DeliveryProgressCard({ delivered, total, goal, style }) {
                   width: ringSize - ringStroke * 2,
                   height: ringSize - ringStroke * 2,
                   borderRadius: (ringSize - ringStroke * 2) / 2,
+                  backgroundColor: colors.surface,
                 },
               ]}
             >
-              <Text style={styles.ringPercent}>{percentage}%</Text>
-              <Text style={styles.ringLabel}>of Goal</Text>
+              <Text style={[styles.ringPercent, { color: colors.text }]}>
+                {percentage}%
+              </Text>
+              <Text style={[styles.ringLabel, { color: colors.textMuted }]}>
+                of Goal
+              </Text>
             </View>
           </View>
-          <Text style={styles.completionText} numberOfLines={1}>
+          <Text
+            style={[styles.completionText, { color: colors.textMuted }]}
+            numberOfLines={1}
+          >
             {completedText}
           </Text>
         </View>
       ) : (
         <View style={styles.progressEmpty}>
-          <View style={styles.emptyProgressIcon}>
+          <View style={[styles.emptyProgressIcon, { backgroundColor: colors.cardMuted }]}>
             <FontAwesome5 name="route" size={22} color={COLORS.blue} />
           </View>
           <View style={styles.progressEmptyCopy}>
-            <Text style={styles.emptyProgressTitle}>No deliveries yet</Text>
-            <Text style={styles.emptyProgressText}>
+            <Text style={[styles.emptyProgressTitle, { color: colors.text }]}>
+              No deliveries yet
+            </Text>
+            <Text style={[styles.emptyProgressText, { color: colors.textMuted }]}>
               Load shipments to your route to start today's progress.
             </Text>
           </View>
@@ -467,13 +506,13 @@ export function DeliveryProgressCard({ delivered, total, goal, style }) {
 export function TodayAtGlance({ cards, progress, onViewAll }) {
   const { width } = useWindowDimensions();
   const cardWidth = Math.floor((width - SCREEN_PADDING * 2 - GRID_GAP) / 2);
-  const cardHeight = clamp(cardWidth * 0.78, 148, 178);
+  const cardHeight = clamp(cardWidth * 0.82, 156, 184);
 
   return (
     <View style={styles.dashboardPanel}>
       <SectionTitle
         icon="chart-bar"
-        title="TODAY AT A GLANCE"
+        title="Today at a Glance"
         onViewAll={onViewAll}
       />
       <View style={styles.statGrid}>
@@ -503,9 +542,14 @@ export function QuickActionCard({
   softColor,
   onPress,
 }) {
+  const { colors, resolvedScheme } = useTheme();
+  const cardBg = resolvedScheme === "dark" ? colors.surface : softColor;
   return (
     <TouchableOpacity
-      style={[styles.quickCard, { borderColor: `${color}33`, backgroundColor: softColor }]}
+      style={[
+        styles.quickCard,
+        { borderColor: resolvedScheme === "dark" ? colors.border : `${color}33`, backgroundColor: cardBg },
+      ]}
       onPress={onPress}
       activeOpacity={0.84}
     >
@@ -516,7 +560,9 @@ export function QuickActionCard({
       </View>
       <View style={styles.quickCopy}>
         <Text style={[styles.quickTitle, { color }]}>{title}</Text>
-        <Text style={styles.quickSubtitle}>{subtitle}</Text>
+        <Text style={[styles.quickSubtitle, { color: colors.textMuted }]}>
+          {subtitle}
+        </Text>
       </View>
       <View style={[styles.quickArrow, { backgroundColor: color }]}>
         <FontAwesome5 name="chevron-right" size={16} color="#ffffff" />
@@ -532,7 +578,7 @@ export function QuickActions({ onLoad, onRoute, onOffload, onInfo }) {
   return (
     <View style={styles.quickSection}>
       <View style={styles.quickTitleInset}>
-        <SectionTitle icon="bolt" title="QUICK ACTIONS" />
+        <SectionTitle icon="bolt" title="Quick Actions" />
       </View>
       <ScrollView
         horizontal
@@ -541,7 +587,7 @@ export function QuickActions({ onLoad, onRoute, onOffload, onInfo }) {
       >
         <View style={[styles.quickRailItem, { width: actionWidth }]}>
           <QuickActionCard
-            title="LOAD TO VAN"
+            title="Load to Van"
             subtitle="Load shipments"
             icon="truck"
             color={SECTION.load.accent}
@@ -551,7 +597,7 @@ export function QuickActions({ onLoad, onRoute, onOffload, onInfo }) {
         </View>
         <View style={[styles.quickRailItem, { width: actionWidth }]}>
           <QuickActionCard
-            title="MY ROUTE"
+            title="My Route"
             subtitle="View your delivery route"
             icon="map-marker-alt"
             color={SECTION.route.accent}
@@ -561,7 +607,7 @@ export function QuickActions({ onLoad, onRoute, onOffload, onInfo }) {
         </View>
         <View style={[styles.quickRailItem, { width: actionWidth }]}>
           <QuickActionCard
-            title="OFFLOAD"
+            title="Offload"
             subtitle="Deliver or return items"
             icon="box-open"
             color={SECTION.offload.accent}
@@ -571,7 +617,7 @@ export function QuickActions({ onLoad, onRoute, onOffload, onInfo }) {
         </View>
         <View style={[styles.quickRailItem, { width: actionWidth }]}>
           <QuickActionCard
-            title="SCAN INFO"
+            title="Scan Info"
             subtitle="Check shipment details"
             icon="search"
             color={SECTION.info.accent}
@@ -588,20 +634,28 @@ export function DeliveredHistoryList({
   shipments,
   onViewAll,
   onPressShipment,
-  title = "HISTORY OF DELIVERED",
+  title = "History of Delivered",
   emptyMessage = "Completed deliveries will appear here automatically.",
 }) {
+  const { colors } = useTheme();
   const { width } = useWindowDimensions();
   const showAddress = width >= 430;
   const timeWidth = clamp(width * 0.16, 58, 76);
 
   return (
-    <View style={styles.historyCard}>
+    <View
+      style={[
+        styles.historyCard,
+        { backgroundColor: colors.surface, borderColor: colors.border },
+      ]}
+    >
       <SectionTitle icon="clipboard-list" title={title} onViewAll={onViewAll} />
       {shipments.length === 0 ? (
         <View style={styles.historyEmpty}>
-          <Text style={styles.historyEmptyTitle}>No delivered shipments yet</Text>
-          <Text style={styles.historyEmptySub}>
+          <Text style={[styles.historyEmptyTitle, { color: colors.text }]}>
+            No delivered shipments yet
+          </Text>
+          <Text style={[styles.historyEmptySub, { color: colors.textMuted }]}>
             {emptyMessage}
           </Text>
         </View>
@@ -611,25 +665,42 @@ export function DeliveredHistoryList({
             key={shipment.id || getShipmentNumber(shipment)}
             style={[
               styles.historyRow,
-              index < shipments.length - 1 && styles.historyDivider,
+              index < shipments.length - 1 && {
+                borderBottomWidth: 1,
+                borderBottomColor: colors.border,
+              },
             ]}
             onPress={() => onPressShipment?.(shipment)}
             activeOpacity={0.78}
           >
-            <View style={styles.historyIcon}>
+            <View style={[styles.historyIcon, { backgroundColor: colors.successSoft }]}>
               <FontAwesome5 name="check-circle" size={20} color={COLORS.green} />
             </View>
             <View style={styles.historyIdentity}>
-              <Text style={styles.historyShipment} numberOfLines={1}>
+              <Text
+                style={[styles.historyShipment, { color: colors.text }]}
+                numberOfLines={1}
+              >
                 {getShipmentNumber(shipment)}
               </Text>
-              <Text style={styles.historyName} numberOfLines={1}>
+              <Text
+                style={[styles.historyName, { color: colors.textMuted }]}
+                numberOfLines={1}
+              >
                 {getReceiverName(shipment)}
               </Text>
             </View>
-            <View style={styles.historyDetails}>
+            <View
+              style={[
+                styles.historyDetails,
+                { borderLeftColor: colors.border },
+              ]}
+            >
               <Text
-                style={[styles.historyTime, { width: timeWidth }]}
+                style={[
+                  styles.historyTime,
+                  { width: timeWidth, color: colors.text },
+                ]}
                 numberOfLines={1}
               >
                 {shipment.deliveredAtDate
@@ -637,15 +708,18 @@ export function DeliveredHistoryList({
                   : "--:--"}
               </Text>
               {showAddress ? (
-                <Text style={styles.historyAddress} numberOfLines={1}>
+                <Text
+                  style={[styles.historyAddress, { color: colors.textMuted }]}
+                  numberOfLines={1}
+                >
                   {getDeliveryAddress(shipment)}
                 </Text>
               ) : null}
             </View>
-            <View style={styles.deliveredBadge}>
+            <View style={[styles.deliveredBadge, { backgroundColor: colors.successSoft }]}>
               <Text style={styles.deliveredBadgeText}>Delivered</Text>
             </View>
-            <FontAwesome5 name="chevron-right" size={16} color="#17284d" />
+            <FontAwesome5 name="chevron-right" size={16} color={colors.text} />
           </TouchableOpacity>
         ))
       )}
@@ -687,30 +761,23 @@ const styles = StyleSheet.create({
   },
   heroHello: {
     color: "#dbe9ff",
-    fontSize: 16,
-    fontWeight: "500",
+    fontSize: 14,
+    lineHeight: 19,
+    fontWeight: "400",
   },
   heroName: {
     color: "#ffffff",
-    fontSize: 24,
-    fontWeight: "900",
+    fontSize: 23,
+    lineHeight: 30,
+    fontWeight: "700",
     letterSpacing: 0,
-    marginTop: 4,
   },
   heroMessage: {
     color: "#eef5ff",
-    fontSize: 12,
-    fontWeight: "700",
-    marginTop: 8,
-    lineHeight: 17,
-  },
-  heroLogout: {
-    width: 62,
-    height: 62,
-    borderRadius: 18,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "#ffffff",
+    fontSize: 13,
+    fontWeight: "400",
+    marginTop: 5,
+    lineHeight: 18,
   },
   heroBottom: {
     marginTop: 24,
@@ -734,12 +801,14 @@ const styles = StyleSheet.create({
   dateMain: {
     color: "#ffffff",
     fontSize: 15,
-    fontWeight: "900",
+    lineHeight: 20,
+    fontWeight: "700",
   },
   dateSub: {
     color: "#e3edff",
-    fontSize: 12,
-    fontWeight: "600",
+    fontSize: 13,
+    lineHeight: 18,
+    fontWeight: "400",
     marginTop: 3,
   },
   heroArt: {
@@ -812,7 +881,7 @@ const styles = StyleSheet.create({
   dateModalTitle: {
     color: COLORS.text,
     fontSize: 17,
-    fontWeight: "900",
+    fontWeight: "700",
   },
   dateOptions: {
     maxHeight: 360,
@@ -837,7 +906,7 @@ const styles = StyleSheet.create({
   dateOptionMain: {
     color: COLORS.text,
     fontSize: 14,
-    fontWeight: "900",
+    fontWeight: "700",
   },
   dateOptionMainSelected: {
     color: "#ffffff",
@@ -845,7 +914,7 @@ const styles = StyleSheet.create({
   dateOptionSub: {
     color: COLORS.muted,
     fontSize: 12,
-    fontWeight: "700",
+    fontWeight: "400",
     marginTop: 3,
   },
   dateOptionSubSelected: {
@@ -871,8 +940,8 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     color: "#354260",
-    fontSize: 16,
-    fontWeight: "900",
+    fontSize: 17,
+    fontWeight: "700",
     letterSpacing: 0,
   },
   viewAllButton: {
@@ -885,7 +954,7 @@ const styles = StyleSheet.create({
   viewAllText: {
     color: COLORS.blue,
     fontSize: 14,
-    fontWeight: "800",
+    fontWeight: "700",
   },
   statGrid: {
     flexDirection: "row",
@@ -899,48 +968,55 @@ const styles = StyleSheet.create({
   statCard: {
     minHeight: 148,
     borderRadius: 18,
-    padding: 16,
+    padding: 14,
     backgroundColor: "#ffffff",
     borderWidth: 1,
     borderColor: COLORS.border,
     justifyContent: "space-between",
+    position: "relative",
     ...cardShadow,
   },
   statTopRow: {
     flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
+    alignItems: "flex-start",
+    gap: 8,
   },
   statIcon: {
-    width: 46,
-    height: 46,
-    borderRadius: 14,
+    width: 40,
+    height: 40,
+    borderRadius: 13,
     alignItems: "center",
     justifyContent: "center",
   },
   statCopy: {
     flex: 1,
+    flexShrink: 1,
+    minWidth: 0,
   },
   statTitle: {
     color: COLORS.text,
-    fontSize: 14,
-    fontWeight: "900",
+    fontSize: 15,
+    lineHeight: 20,
+    fontWeight: "700",
   },
   statSubtitle: {
     color: COLORS.muted,
     fontSize: 12,
-    fontWeight: "600",
-    marginTop: 7,
+    fontWeight: "400",
+    lineHeight: 17,
+    marginTop: 4,
+    flexShrink: 1,
   },
   statBottomRow: {
     flexDirection: "row",
     alignItems: "flex-end",
     justifyContent: "space-between",
     gap: 10,
+    paddingRight: 42,
   },
   statValue: {
     fontSize: 28,
-    fontWeight: "900",
+    fontWeight: "700",
     letterSpacing: 0,
   },
   trendPill: {
@@ -955,15 +1031,19 @@ const styles = StyleSheet.create({
   },
   trendText: {
     fontSize: 12,
-    fontWeight: "800",
+    fontWeight: "700",
   },
   chevronCircle: {
+    position: "absolute",
+    right: 14,
+    bottom: 14,
     width: 34,
     height: 34,
     borderRadius: 17,
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: "#ffffff",
+    borderWidth: StyleSheet.hairlineWidth,
     ...cardShadow,
   },
   progressCard: {
@@ -987,13 +1067,14 @@ const styles = StyleSheet.create({
   },
   progressTitle: {
     color: COLORS.text,
-    fontSize: 15,
-    fontWeight: "900",
+    fontSize: 16,
+    lineHeight: 21,
+    fontWeight: "700",
   },
   progressSub: {
     color: COLORS.muted,
     fontSize: 13,
-    fontWeight: "600",
+    fontWeight: "400",
     marginTop: 4,
   },
   progressBody: {
@@ -1049,18 +1130,18 @@ const styles = StyleSheet.create({
   ringPercent: {
     color: COLORS.text,
     fontSize: 20,
-    fontWeight: "900",
+    fontWeight: "700",
     lineHeight: 24,
   },
   ringLabel: {
     color: COLORS.muted,
     fontSize: 10,
-    fontWeight: "800",
+    fontWeight: "400",
   },
   completionText: {
     color: COLORS.muted,
     fontSize: 11,
-    fontWeight: "800",
+    fontWeight: "400",
     marginTop: 8,
     maxWidth: "100%",
     textAlign: "center",
@@ -1084,12 +1165,12 @@ const styles = StyleSheet.create({
   emptyProgressTitle: {
     color: COLORS.text,
     fontSize: 14,
-    fontWeight: "900",
+    fontWeight: "700",
   },
   emptyProgressText: {
     color: COLORS.muted,
     fontSize: 12,
-    fontWeight: "600",
+    fontWeight: "400",
     lineHeight: 17,
     marginTop: 5,
     flexShrink: 1,
@@ -1135,13 +1216,14 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   quickTitle: {
-    fontSize: 13,
-    fontWeight: "900",
+    fontSize: 14,
+    lineHeight: 19,
+    fontWeight: "700",
   },
   quickSubtitle: {
     color: COLORS.muted,
     fontSize: 12,
-    fontWeight: "600",
+    fontWeight: "400",
     lineHeight: 17,
     marginTop: 8,
   },
@@ -1189,13 +1271,13 @@ const styles = StyleSheet.create({
   },
   historyShipment: {
     color: COLORS.text,
-    fontSize: 13,
-    fontWeight: "900",
+    fontSize: 14,
+    fontWeight: "700",
   },
   historyName: {
     color: COLORS.muted,
-    fontSize: 11,
-    fontWeight: "600",
+    fontSize: 12,
+    fontWeight: "400",
     marginTop: 4,
   },
   historyDetails: {
@@ -1206,14 +1288,14 @@ const styles = StyleSheet.create({
   },
   historyTime: {
     color: COLORS.text,
-    fontSize: 11,
-    fontWeight: "700",
+    fontSize: 12,
+    fontWeight: "400",
     textAlign: "left",
   },
   historyAddress: {
     color: COLORS.muted,
-    fontSize: 11,
-    fontWeight: "600",
+    fontSize: 12,
+    fontWeight: "400",
     marginTop: 5,
   },
   deliveredBadge: {
@@ -1225,7 +1307,7 @@ const styles = StyleSheet.create({
   deliveredBadgeText: {
     color: COLORS.green,
     fontSize: 11,
-    fontWeight: "800",
+    fontWeight: "700",
   },
   historyEmpty: {
     alignItems: "center",
@@ -1234,7 +1316,7 @@ const styles = StyleSheet.create({
   historyEmptyTitle: {
     color: COLORS.text,
     fontSize: 14,
-    fontWeight: "900",
+    fontWeight: "700",
   },
   historyEmptySub: {
     color: COLORS.muted,

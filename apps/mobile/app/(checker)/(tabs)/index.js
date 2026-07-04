@@ -8,8 +8,7 @@ import {
   onSnapshot,
 } from "firebase/firestore";
 import { format } from "date-fns";
-import { signOut } from "firebase/auth";
-import { auth, db } from "../../../firebase";
+import { db } from "../../../firebase";
 import { useAuth } from "../../../contexts/AuthContext";
 import { useTheme } from "../../../contexts/ThemeContext";
 import { useCheckerLastMile } from "../../../contexts/CheckerLastMileContext";
@@ -84,15 +83,6 @@ export default function CheckerIndex() {
       pathname: "/(checker)/shipment-details",
       params: { shipmentId: shipment.id },
     });
-
-  const handleLogout = async () => {
-    try {
-      await signOut(auth);
-      router.replace("/(auth)/login");
-    } catch (err) {
-      console.error("Logout failed:", err);
-    }
-  };
 
   useEffect(() => {
     if (!checkerId) {
@@ -253,7 +243,7 @@ export default function CheckerIndex() {
     {
       key: "on-van",
       title: "On My Van",
-      subtitle: "Out for delivery",
+      subtitle: "Out for Delivery",
       value: glance.onVan,
       icon: "truck",
       color: SECTION.route.accent,
@@ -310,7 +300,6 @@ export default function CheckerIndex() {
       >
         <CheckerHomeHero
           userName={user?.name || user?.fullName || profile?.name || "Checker"}
-          onLogout={handleLogout}
           onProfilePress={() => router.push("/(checker)/profile")}
           currentDate={selectedDate}
           onDatePress={() => setDatePickerVisible(true)}
