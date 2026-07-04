@@ -313,7 +313,7 @@ export function QuickActions({ onLoad, onRoute, onOffload, onInfo }) {
         <View style={styles.quickRailItem}>
           <QuickActionCard
             title="LOAD TO VAN"
-            subtitle="Load shipments to your van"
+            subtitle="Load shipments"
             icon="truck"
             color={SECTION.load.accent}
             softColor="#f4f8ff"
