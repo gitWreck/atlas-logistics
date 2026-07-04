@@ -3,8 +3,6 @@ import {
   ActivityIndicator,
   Animated,
   Easing,
-  Platform,
-  StatusBar,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -12,9 +10,9 @@ import {
 } from "react-native";
 import { CameraView } from "expo-camera";
 import { FontAwesome5 } from "@expo/vector-icons";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 const FRAME_SIZE = 250;
+const SAFE_AREA_CONTROL_TOP = 8;
 
 export default function ScannerCameraPane({
   scanned,
@@ -27,12 +25,6 @@ export default function ScannerCameraPane({
   onBarcodeScanned,
   accentColor = "#2563eb",
 }) {
-  const insets = useSafeAreaInsets();
-  const statusBarInset =
-    insets.top ||
-    (Platform.OS === "android" ? StatusBar.currentHeight || 0 : 0);
-  const topOffset = statusBarInset + 8;
-
   // Animated glowing scan line that sweeps within the frame.
   const sweep = useRef(new Animated.Value(0)).current;
   useEffect(() => {
@@ -114,7 +106,7 @@ export default function ScannerCameraPane({
         <Animated.View
           style={[styles.cameraOverlay, { paddingBottom: detailsSheetHeight }]}
         >
-          <View style={[styles.topControls, { top: topOffset }]}> 
+          <View style={[styles.topControls, { top: SAFE_AREA_CONTROL_TOP }]}>
             <TouchableOpacity
               style={[styles.button, styles.backButton]}
               onPress={onBack}

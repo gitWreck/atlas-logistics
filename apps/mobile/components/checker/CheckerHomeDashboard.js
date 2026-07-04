@@ -321,10 +321,16 @@ export function DashboardStatCard({
 export function DeliveryProgressCard({ delivered, total, goal, style }) {
   const { width } = useWindowDimensions();
   const cardWidth = Math.floor((width - SCREEN_PADDING * 2 - GRID_GAP) / 2);
-  const ringSize = clamp(cardWidth * 0.46, 66, 90);
-  const ringBorder = clamp(ringSize * 0.11, 8, 10);
-  const percentage = total > 0 ? Math.min(100, Math.round((delivered / total) * 100)) : 0;
-  const ringRotation = `${Math.round((percentage / 100) * 270)}deg`;
+  const ringSize = clamp(cardWidth * 0.42, 60, 76);
+  const ringStroke = clamp(ringSize * 0.1, 6, 8);
+  const percentage =
+    total > 0 ? clamp(Math.round((delivered / total) * 100), 0, 100) : 0;
+  const rightRotation = -180 + Math.min(percentage, 50) * 3.6;
+  const leftRotation =
+    percentage > 50 ? -180 + (percentage - 50) * 3.6 : -180;
+  const completedText = `${formatCount(delivered)} of ${formatCount(
+    goal || total,
+  )} completed`;
 
   return (
     <View style={[styles.progressCard, style, total === 0 && styles.progressEmptyCard]}>
@@ -335,11 +341,6 @@ export function DeliveryProgressCard({ delivered, total, goal, style }) {
 
       {total > 0 ? (
         <View style={styles.progressBody}>
-          <View style={[styles.confetti, styles.confettiAmber]} />
-          <View style={[styles.confetti, styles.confettiTeal]} />
-          <View style={[styles.confetti, styles.confettiBlue]} />
-          <View style={[styles.confetti, styles.confettiPink]} />
-          <View style={[styles.confetti, styles.confettiPurple]} />
           <View
             style={[
               styles.ringWrap,
@@ -352,36 +353,99 @@ export function DeliveryProgressCard({ delivered, total, goal, style }) {
           >
             <View
               style={[
-                styles.ringBase,
+                styles.ringTrack,
                 {
                   width: ringSize,
                   height: ringSize,
                   borderRadius: ringSize / 2,
-                  borderWidth: ringBorder,
                 },
               ]}
             />
             <View
               style={[
-                styles.ringArc,
+                styles.ringHalfMask,
                 {
-                  width: ringSize,
+                  left: ringSize / 2,
+                  width: ringSize / 2,
                   height: ringSize,
-                  borderRadius: ringSize / 2,
-                  borderWidth: ringBorder,
-                  transform: [{ rotate: ringRotation }],
                 },
               ]}
-            />
-            <Text style={styles.ringPercent}>{percentage}%</Text>
-            <Text style={styles.ringLabel}>of Goal</Text>
+            >
+              <View
+                style={[
+                  styles.ringRotator,
+                  {
+                    width: ringSize,
+                    height: ringSize,
+                    left: -ringSize / 2,
+                    transform: [{ rotate: `${rightRotation}deg` }],
+                  },
+                ]}
+              >
+                <View
+                  style={[
+                    styles.ringRightFill,
+                    {
+                      width: ringSize / 2,
+                      height: ringSize,
+                      borderTopRightRadius: ringSize / 2,
+                      borderBottomRightRadius: ringSize / 2,
+                    },
+                  ]}
+                />
+              </View>
+            </View>
+            <View
+              style={[
+                styles.ringHalfMask,
+                {
+                  left: 0,
+                  width: ringSize / 2,
+                  height: ringSize,
+                },
+              ]}
+            >
+              <View
+                style={[
+                  styles.ringRotator,
+                  {
+                    width: ringSize,
+                    height: ringSize,
+                    left: 0,
+                    transform: [{ rotate: `${leftRotation}deg` }],
+                  },
+                ]}
+              >
+                <View
+                  style={[
+                    styles.ringLeftFill,
+                    {
+                      width: ringSize / 2,
+                      height: ringSize,
+                      borderTopLeftRadius: ringSize / 2,
+                      borderBottomLeftRadius: ringSize / 2,
+                    },
+                  ]}
+                />
+              </View>
+            </View>
+            <View
+              style={[
+                styles.ringCenter,
+                {
+                  width: ringSize - ringStroke * 2,
+                  height: ringSize - ringStroke * 2,
+                  borderRadius: (ringSize - ringStroke * 2) / 2,
+                },
+              ]}
+            >
+              <Text style={styles.ringPercent}>{percentage}%</Text>
+              <Text style={styles.ringLabel}>of Goal</Text>
+            </View>
           </View>
-          <View style={styles.goalRow}>
-            <FontAwesome5 name="flag" size={17} color={COLORS.blue} />
-            <Text style={styles.goalText}>
-              Goal: {goal ? formatCount(goal) : formatCount(total)}
-            </Text>
-          </View>
+          <Text style={styles.completionText} numberOfLines={1}>
+            {completedText}
+          </Text>
         </View>
       ) : (
         <View style={styles.progressEmpty}>
@@ -938,7 +1002,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     position: "relative",
-    paddingTop: 2,
+    paddingTop: 4,
   },
   ringWrap: {
     width: 90,
@@ -946,81 +1010,60 @@ const styles = StyleSheet.create({
     borderRadius: 45,
     alignItems: "center",
     justifyContent: "center",
+    position: "relative",
   },
-  ringBase: {
+  ringTrack: {
     position: "absolute",
     width: 90,
     height: 90,
     borderRadius: 45,
-    borderWidth: 10,
-    borderColor: "#d6e1f2",
+    backgroundColor: "#d6e1f2",
   },
-  ringArc: {
+  ringHalfMask: {
     position: "absolute",
-    width: 90,
-    height: 90,
-    borderRadius: 45,
-    borderWidth: 10,
-    borderLeftColor: "#2c6ff3",
-    borderTopColor: "#2c6ff3",
-    borderRightColor: "transparent",
-    borderBottomColor: "transparent",
+    top: 0,
+    overflow: "hidden",
+  },
+  ringRotator: {
+    position: "absolute",
+    top: 0,
+  },
+  ringRightFill: {
+    position: "absolute",
+    right: 0,
+    top: 0,
+    backgroundColor: "#2c6ff3",
+  },
+  ringLeftFill: {
+    position: "absolute",
+    left: 0,
+    top: 0,
+    backgroundColor: "#2c6ff3",
+  },
+  ringCenter: {
+    backgroundColor: "#ffffff",
+    alignItems: "center",
+    justifyContent: "center",
+    zIndex: 2,
   },
   ringPercent: {
     color: COLORS.text,
-    fontSize: 23,
+    fontSize: 20,
     fontWeight: "900",
+    lineHeight: 24,
   },
   ringLabel: {
     color: COLORS.muted,
-    fontSize: 12,
-    fontWeight: "700",
+    fontSize: 10,
+    fontWeight: "800",
   },
-  goalRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    justifyContent: "center",
+  completionText: {
+    color: COLORS.muted,
+    fontSize: 11,
+    fontWeight: "800",
     marginTop: 8,
     maxWidth: "100%",
-  },
-  goalText: {
-    color: COLORS.blue,
-    fontSize: 14,
-    fontWeight: "800",
-    flexShrink: 1,
-  },
-  confetti: {
-    position: "absolute",
-    width: 9,
-    height: 9,
-    borderRadius: 2,
-    transform: [{ rotate: "45deg" }],
-  },
-  confettiAmber: {
-    right: 23,
-    top: 7,
-    backgroundColor: "#f8b400",
-  },
-  confettiTeal: {
-    right: 12,
-    top: 58,
-    backgroundColor: "#62bdb2",
-  },
-  confettiBlue: {
-    right: 28,
-    top: 92,
-    backgroundColor: "#66a7f5",
-  },
-  confettiPink: {
-    right: 7,
-    bottom: 27,
-    backgroundColor: "#f5b6c4",
-  },
-  confettiPurple: {
-    left: 20,
-    top: 34,
-    backgroundColor: "#d8c2f2",
+    textAlign: "center",
   },
   progressEmpty: {
     flexDirection: "row",
