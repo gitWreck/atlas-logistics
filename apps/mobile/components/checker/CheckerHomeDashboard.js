@@ -516,14 +516,20 @@ export function TodayAtGlance({ cards, progress, onViewAll }) {
         onViewAll={onViewAll}
       />
       <View style={styles.statGrid}>
-        {cards.map((card) => (
-          <View
-            key={card.key}
-            style={[styles.statGridItem, { width: cardWidth }]}
-          >
-            <DashboardStatCard {...card} style={{ height: cardHeight }} />
-          </View>
-        ))}
+        {cards.map((card) => {
+          const { key, ...cardProps } = card;
+          return (
+            <View
+              key={key}
+              style={[styles.statGridItem, { width: cardWidth }]}
+            >
+              <DashboardStatCard
+                {...cardProps}
+                style={{ height: cardHeight }}
+              />
+            </View>
+          );
+        })}
         <View
           style={[styles.statGridItem, { width: cardWidth }]}
         >
