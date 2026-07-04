@@ -1,14 +1,13 @@
-import React, { useState, useCallback, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { View, StyleSheet, RefreshControl, ScrollView } from "react-native";
 import { useRouter } from "expo-router";
 import {
   collection,
   query,
   where,
-  getCountFromServer,
-  Timestamp,
+  onSnapshot,
 } from "firebase/firestore";
-import { startOfDay, subDays } from "date-fns";
+import { format } from "date-fns";
 import { signOut } from "firebase/auth";
 import { auth, db } from "../../../firebase";
 import { useAuth } from "../../../contexts/AuthContext";
@@ -16,17 +15,38 @@ import { useTheme } from "../../../contexts/ThemeContext";
 import { useCheckerLastMile } from "../../../contexts/CheckerLastMileContext";
 import {
   CheckerHomeHero,
+  DateFilterModal,
   DeliveredHistoryList,
   QuickActions,
   TodayAtGlance,
 } from "../../../components/checker/CheckerHomeDashboard";
 import { SECTION } from "../../../components/checker/design/checkerTheme";
 import {
-  countDeliveredPieces,
-  countOutForDeliveryPieces,
-  getDeliveredShipments,
-  isSameLocalDay,
+  countAvailablePiecesForDate,
+  countDeliveredPiecesForDate,
+  countFailedPiecesForDate,
+  countOnVanPiecesForDate,
+  countReturnedPiecesForDate,
+  getDeliveredShipmentsForDate,
+  getShipmentActivityDates,
 } from "../../../components/checker/dashboardData";
+
+function mergeShipmentLists(...lists) {
+  const map = new Map();
+  lists.flat().forEach((shipment) => {
+    if (shipment?.id) map.set(shipment.id, shipment);
+  });
+  return [...map.values()];
+}
+
+function mergeDates(...dates) {
+  const map = new Map();
+  dates.flat().forEach((date) => {
+    if (!(date instanceof Date) || Number.isNaN(date.getTime())) return;
+    map.set(format(date, "yyyy-MM-dd"), date);
+  });
+  return [...map.values()].sort((a, b) => b.getTime() - a.getTime());
+}
 
 export default function CheckerIndex() {
   const router = useRouter();
@@ -35,14 +55,15 @@ export default function CheckerIndex() {
   const {
     availableShipments = [],
     myRouteShipments = [],
-    summary = {},
     shipmentsById = {},
   } = useCheckerLastMile();
 
-  const [filter] = useState("TODAY");
   const [refreshing, setRefreshing] = useState(false);
+  const [selectedDate, setSelectedDate] = useState(() => new Date());
+  const [datePickerVisible, setDatePickerVisible] = useState(false);
+  const [queriedShipments, setQueriedShipments] = useState([]);
+  const [statsLoading, setStatsLoading] = useState(true);
   const checkerId = profile?.uid || user?.uid;
-  const today = useMemo(() => new Date(), []);
 
   const goToScan = (mode, title, extra = {}) => {
     router.push({
@@ -73,98 +94,140 @@ export default function CheckerIndex() {
     }
   };
 
-  const fetchStats = useCallback(async () => {
-    try {
-      const shipmentsRef = collection(db, "shipments");
-      const now = new Date();
-      const startDate =
-        filter === "WEEK" ? subDays(startOfDay(now), 7) : startOfDay(now);
-      const firestoreDate = Timestamp.fromDate(startDate);
-
-      const receivedQ = query(
-        shipmentsRef,
-        where("status", "==", "RECEIVED"),
-        where("updatedAt", ">=", firestoreDate),
-      );
-      await getCountFromServer(receivedQ);
-    } catch (err) {
-      console.error("Stats Error:", err);
-    }
-  }, [filter]);
-
   useEffect(() => {
-    fetchStats();
-  }, [fetchStats]);
+    if (!checkerId) {
+      setQueriedShipments([]);
+      setStatsLoading(false);
+      return undefined;
+    }
+
+    setStatsLoading(true);
+    let assigned = [];
+    let active = [];
+    let assignedReady = false;
+    let activeReady = false;
+
+    const publish = () => {
+      setQueriedShipments(mergeShipmentLists(assigned, active));
+      if (assignedReady && activeReady) setStatsLoading(false);
+    };
+
+    const shipmentsRef = collection(db, "shipments");
+    const assignedQuery = query(
+      shipmentsRef,
+      where("assignedCheckerId", "==", String(checkerId)),
+    );
+    const activeQuery = query(
+      shipmentsRef,
+      where("activeCheckerIds", "array-contains", String(checkerId)),
+    );
+
+    const unsubAssigned = onSnapshot(
+      assignedQuery,
+      (snap) => {
+        assigned = snap.docs.map((docSnap) => ({
+          id: docSnap.id,
+          ...docSnap.data(),
+        }));
+        assignedReady = true;
+        publish();
+      },
+      (err) => {
+        console.warn("Checker home assigned shipment query failed:", err);
+        assignedReady = true;
+        publish();
+      },
+    );
+
+    const unsubActive = onSnapshot(
+      activeQuery,
+      (snap) => {
+        active = snap.docs.map((docSnap) => ({
+          id: docSnap.id,
+          ...docSnap.data(),
+        }));
+        activeReady = true;
+        publish();
+      },
+      (err) => {
+        console.warn("Checker home active shipment query failed:", err);
+        activeReady = true;
+        publish();
+      },
+    );
+
+    return () => {
+      unsubAssigned();
+      unsubActive();
+    };
+  }, [checkerId]);
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await fetchStats();
-    setRefreshing(false);
+    setTimeout(() => setRefreshing(false), 350);
   };
 
   const allKnownShipments = useMemo(
-    () => Object.values(shipmentsById || {}),
-    [shipmentsById],
+    () =>
+      mergeShipmentLists(
+        Object.values(shipmentsById || {}),
+        availableShipments,
+        myRouteShipments,
+        queriedShipments,
+      ),
+    [shipmentsById, availableShipments, myRouteShipments, queriedShipments],
   );
 
   const glance = useMemo(() => {
-    const available = availableShipments.reduce(
-      (n, s) => n + (s.poolStats?.available || 0),
-      0,
-    );
-    const onVan = myRouteShipments.reduce(
-      (n, s) => n + (s.poolStats?.mine || 0),
-      0,
-    );
-
-    const deliveredToday = allKnownShipments.reduce((sum, shipment) => {
-      const deliveredAt = shipment.deliveredAt || shipment.completedAt;
-      const hasDeliveredToday =
-        isSameLocalDay(deliveredAt, today) ||
-        (Array.isArray(shipment.packages) &&
-          shipment.packages.some((pkg) =>
-            isSameLocalDay(pkg.deliveredAt || pkg.updatedAt, today),
-          ));
-      return hasDeliveredToday
-        ? sum + countDeliveredPieces(shipment, checkerId)
-        : sum;
-    }, 0);
-
-    const outForDeliveryToday = allKnownShipments.reduce((sum, shipment) => {
-      const updatedToday =
-        isSameLocalDay(shipment.updatedAt, today) ||
-        (Array.isArray(shipment.packages) &&
-          shipment.packages.some((pkg) =>
-            isSameLocalDay(pkg.updatedAt || pkg.deliveredAt, today),
-          ));
-      return updatedToday
-        ? sum + countOutForDeliveryPieces(shipment, checkerId)
-        : sum;
-    }, 0);
-
     return {
-      available,
-      onVan,
-      delivered: deliveredToday || summary.delivered || 0,
-      failed: summary.failed || 0,
-      returned: summary.returned || 0,
-      outForDeliveryToday,
+      available: allKnownShipments.reduce(
+        (sum, shipment) =>
+          sum + countAvailablePiecesForDate(shipment, checkerId, selectedDate),
+        0,
+      ),
+      onVan: allKnownShipments.reduce(
+        (sum, shipment) =>
+          sum + countOnVanPiecesForDate(shipment, checkerId, selectedDate),
+        0,
+      ),
+      delivered: allKnownShipments.reduce(
+        (sum, shipment) =>
+          sum + countDeliveredPiecesForDate(shipment, checkerId, selectedDate),
+        0,
+      ),
+      failed: allKnownShipments.reduce(
+        (sum, shipment) =>
+          sum + countFailedPiecesForDate(shipment, checkerId, selectedDate),
+        0,
+      ),
+      returned: allKnownShipments.reduce(
+        (sum, shipment) =>
+          sum + countReturnedPiecesForDate(shipment, checkerId, selectedDate),
+        0,
+      ),
     };
-  }, [
-    availableShipments,
-    myRouteShipments,
-    summary,
-    allKnownShipments,
-    checkerId,
-    today,
-  ]);
+  }, [allKnownShipments, checkerId, selectedDate]);
 
   const recentDelivered = useMemo(
-    () => getDeliveredShipments(allKnownShipments, checkerId).slice(0, 3),
-    [allKnownShipments, checkerId],
+    () =>
+      getDeliveredShipmentsForDate(
+        allKnownShipments,
+        checkerId,
+        selectedDate,
+      ).slice(0, 3),
+    [allKnownShipments, checkerId, selectedDate],
   );
 
-  const goal = summary.totalPackages || glance.outForDeliveryToday || 0;
+  const availableDates = useMemo(
+    () =>
+      mergeDates(
+        [new Date(), selectedDate],
+        getShipmentActivityDates(allKnownShipments),
+      ),
+    [allKnownShipments, selectedDate],
+  );
+
+  const goal = glance.onVan;
   const cards = [
     {
       key: "available",
@@ -238,14 +301,16 @@ export default function CheckerIndex() {
           userName={user?.name || user?.fullName || profile?.name || "Checker"}
           onLogout={handleLogout}
           onProfilePress={() => router.push("/(checker)/profile")}
-          currentDate={today}
+          currentDate={selectedDate}
+          onDatePress={() => setDatePickerVisible(true)}
+          dateLoading={statsLoading}
         />
 
         <TodayAtGlance
           cards={cards}
           progress={{
             delivered: glance.delivered,
-            total: glance.outForDeliveryToday,
+            total: glance.onVan,
             goal,
           }}
           onViewAll={goAvailable}
@@ -262,6 +327,18 @@ export default function CheckerIndex() {
           shipments={recentDelivered}
           onViewAll={goHistory}
           onPressShipment={openShipment}
+          emptyMessage="No deliveries found for the selected date."
+        />
+
+        <DateFilterModal
+          visible={datePickerVisible}
+          dates={availableDates}
+          selectedDate={selectedDate}
+          onSelectDate={(date) => {
+            setSelectedDate(date);
+            setDatePickerVisible(false);
+          }}
+          onClose={() => setDatePickerVisible(false)}
         />
       </ScrollView>
     </View>

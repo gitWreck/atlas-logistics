@@ -6,6 +6,8 @@ import {
   TouchableOpacity,
   useWindowDimensions,
   ScrollView,
+  Modal,
+  ActivityIndicator,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { FontAwesome5 } from "@expo/vector-icons";
@@ -67,6 +69,8 @@ export function CheckerHomeHero({
   onLogout,
   onProfilePress,
   currentDate = new Date(),
+  onDatePress,
+  dateLoading,
 }) {
   const { width } = useWindowDimensions();
   const heroHeight = clamp(width * 0.58, 238, 292);
@@ -136,7 +140,11 @@ export function CheckerHomeHero({
       </View>
 
       <View style={styles.heroBottom}>
-        <View style={[styles.dateCard, { width: dateWidth }]}>
+        <TouchableOpacity
+          style={[styles.dateCard, { width: dateWidth }]}
+          onPress={onDatePress}
+          activeOpacity={0.82}
+        >
           <FontAwesome5 name="calendar-alt" size={18} color="#ffffff" />
           <View style={styles.dateTextBlock}>
             <Text style={styles.dateMain}>
@@ -144,8 +152,12 @@ export function CheckerHomeHero({
             </Text>
             <Text style={styles.dateSub}>{format(currentDate, "EEEE")}</Text>
           </View>
-          <FontAwesome5 name="chevron-down" size={14} color="#ffffff" />
-        </View>
+          {dateLoading ? (
+            <ActivityIndicator size="small" color="#ffffff" />
+          ) : (
+            <FontAwesome5 name="chevron-down" size={14} color="#ffffff" />
+          )}
+        </TouchableOpacity>
 
         <View style={[styles.heroArt, { transform: [{ scale: artScale }] }]}>
           <View style={styles.cityBarTall} />
@@ -160,6 +172,82 @@ export function CheckerHomeHero({
         </View>
       </View>
     </LinearGradient>
+  );
+}
+
+export function DateFilterModal({
+  visible,
+  dates,
+  selectedDate,
+  onSelectDate,
+  onClose,
+}) {
+  const selectedKey = format(selectedDate || new Date(), "yyyy-MM-dd");
+
+  return (
+    <Modal
+      visible={visible}
+      transparent
+      animationType="fade"
+      onRequestClose={onClose}
+    >
+      <TouchableOpacity
+        style={styles.modalBackdrop}
+        activeOpacity={1}
+        onPress={onClose}
+      >
+        <View style={styles.dateModalCard}>
+          <View style={styles.dateModalHeader}>
+            <Text style={styles.dateModalTitle}>Select date</Text>
+            <TouchableOpacity onPress={onClose} hitSlop={10}>
+              <FontAwesome5 name="times" size={16} color={COLORS.muted} />
+            </TouchableOpacity>
+          </View>
+          <ScrollView
+            style={styles.dateOptions}
+            showsVerticalScrollIndicator={false}
+          >
+            {dates.map((date) => {
+              const key = format(date, "yyyy-MM-dd");
+              const selected = key === selectedKey;
+              return (
+                <TouchableOpacity
+                  key={key}
+                  style={[
+                    styles.dateOption,
+                    selected && styles.dateOptionSelected,
+                  ]}
+                  onPress={() => onSelectDate(date)}
+                  activeOpacity={0.78}
+                >
+                  <View>
+                    <Text
+                      style={[
+                        styles.dateOptionMain,
+                        selected && styles.dateOptionMainSelected,
+                      ]}
+                    >
+                      {format(date, "MMM d, yyyy")}
+                    </Text>
+                    <Text
+                      style={[
+                        styles.dateOptionSub,
+                        selected && styles.dateOptionSubSelected,
+                      ]}
+                    >
+                      {format(date, "EEEE")}
+                    </Text>
+                  </View>
+                  {selected ? (
+                    <FontAwesome5 name="check" size={14} color="#ffffff" />
+                  ) : null}
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+        </View>
+      </TouchableOpacity>
+    </Modal>
   );
 }
 
@@ -437,6 +525,7 @@ export function DeliveredHistoryList({
   onViewAll,
   onPressShipment,
   title = "HISTORY OF DELIVERED",
+  emptyMessage = "Completed deliveries will appear here automatically.",
 }) {
   const { width } = useWindowDimensions();
   const showAddress = width >= 430;
@@ -449,7 +538,7 @@ export function DeliveredHistoryList({
         <View style={styles.historyEmpty}>
           <Text style={styles.historyEmptyTitle}>No delivered shipments yet</Text>
           <Text style={styles.historyEmptySub}>
-            Completed deliveries will appear here automatically.
+            {emptyMessage}
           </Text>
         </View>
       ) : (
@@ -631,6 +720,72 @@ const styles = StyleSheet.create({
     bottom: 0,
     flexDirection: "row",
     gap: 2,
+  },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(15, 23, 42, 0.35)",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 24,
+  },
+  dateModalCard: {
+    width: "100%",
+    maxWidth: 360,
+    maxHeight: "70%",
+    borderRadius: 18,
+    backgroundColor: "#ffffff",
+    padding: 16,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    ...cardShadow,
+  },
+  dateModalHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 12,
+  },
+  dateModalTitle: {
+    color: COLORS.text,
+    fontSize: 17,
+    fontWeight: "900",
+  },
+  dateOptions: {
+    maxHeight: 360,
+  },
+  dateOption: {
+    minHeight: 58,
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 8,
+    backgroundColor: "#f7fbff",
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  dateOptionSelected: {
+    backgroundColor: COLORS.blue,
+    borderColor: COLORS.blue,
+  },
+  dateOptionMain: {
+    color: COLORS.text,
+    fontSize: 14,
+    fontWeight: "900",
+  },
+  dateOptionMainSelected: {
+    color: "#ffffff",
+  },
+  dateOptionSub: {
+    color: COLORS.muted,
+    fontSize: 12,
+    fontWeight: "700",
+    marginTop: 3,
+  },
+  dateOptionSubSelected: {
+    color: "#eaf1ff",
   },
   dashboardPanel: {
     marginTop: -18,
