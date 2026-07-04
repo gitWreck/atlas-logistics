@@ -1,5 +1,6 @@
 import React from "react";
 import {
+  Image,
   View,
   Text,
   StyleSheet,
@@ -19,6 +20,8 @@ import {
   getReceiverName,
   getShipmentNumber,
 } from "./dashboardData";
+
+const customerTruckImage = require("../../assets/customer/active-shipment-truck.png");
 
 const COLORS = {
   blue: "#075de8",
@@ -76,10 +79,10 @@ export function CheckerHomeHero({
   dateLoading,
 }) {
   const { width } = useWindowDimensions();
-  const heroHeight = clamp(width * 0.58, 238, 292);
-  const avatarSize = clamp(width * 0.14, 50, 66);
-  const dateWidth = clamp(width * 0.48, 190, 230);
-  const artScale = clamp(width / 430, 0.78, 1);
+  const heroHeight = clamp(width * 0.44, 186, 218);
+  const avatarSize = clamp(width * 0.12, 44, 56);
+  const dateWidth = clamp(width * 0.46, 176, 214);
+  const artScale = clamp(width / 430, 0.68, 0.86);
 
   return (
     <LinearGradient
@@ -129,7 +132,7 @@ export function CheckerHomeHero({
           onPress={onDatePress}
           activeOpacity={0.82}
         >
-          <FontAwesome5 name="calendar-alt" size={18} color="#ffffff" />
+          <FontAwesome5 name="calendar-alt" size={16} color="#ffffff" />
           <View style={styles.dateTextBlock}>
             <Text style={styles.dateMain}>
               {format(currentDate, "MMM d, yyyy")}
@@ -139,20 +142,18 @@ export function CheckerHomeHero({
           {dateLoading ? (
             <ActivityIndicator size="small" color="#ffffff" />
           ) : (
-            <FontAwesome5 name="chevron-down" size={14} color="#ffffff" />
+            <FontAwesome5 name="chevron-down" size={13} color="#ffffff" />
           )}
         </TouchableOpacity>
 
         <View style={[styles.heroArt, { transform: [{ scale: artScale }] }]}>
           <View style={styles.cityBarTall} />
           <View style={styles.cityBar} />
-          <View style={styles.routeLine} />
-          <FontAwesome5 name="truck" size={58} color="#edf5ff" />
-          <View style={styles.boxStack}>
-            <FontAwesome5 name="box" size={21} color="#f4b65b" />
-            <FontAwesome5 name="box" size={18} color="#f4b65b" />
-          </View>
-          <FontAwesome5 name="map-marker-alt" size={40} color="#8ab7ff" />
+          <Image
+            source={customerTruckImage}
+            style={styles.heroTruckImage}
+            resizeMode="contain"
+          />
         </View>
       </View>
     </LinearGradient>
@@ -338,8 +339,8 @@ export function DeliveryProgressCard({ delivered, total, goal, style }) {
   const { colors } = useTheme();
   const { width } = useWindowDimensions();
   const cardWidth = Math.floor((width - SCREEN_PADDING * 2 - GRID_GAP) / 2);
-  const ringSize = clamp(cardWidth * 0.42, 60, 76);
-  const ringStroke = clamp(ringSize * 0.1, 6, 8);
+  const ringSize = clamp(cardWidth * 0.34, 52, 64);
+  const ringStroke = clamp(ringSize * 0.1, 5, 7);
   const percentage =
     total > 0 ? clamp(Math.round((delivered / total) * 100), 0, 100) : 0;
   const rightRotation = -180 + Math.min(percentage, 50) * 3.6;
@@ -506,7 +507,7 @@ export function DeliveryProgressCard({ delivered, total, goal, style }) {
 export function TodayAtGlance({ cards, progress, onViewAll }) {
   const { width } = useWindowDimensions();
   const cardWidth = Math.floor((width - SCREEN_PADDING * 2 - GRID_GAP) / 2);
-  const cardHeight = clamp(cardWidth * 0.82, 156, 184);
+  const cardHeight = clamp(cardWidth * 0.66, 124, 146);
 
   return (
     <View style={styles.dashboardPanel}>
@@ -545,32 +546,29 @@ export function QuickActionCard({
   subtitle,
   icon,
   color,
-  softColor,
   onPress,
 }) {
-  const { colors, resolvedScheme } = useTheme();
-  const cardBg = resolvedScheme === "dark" ? colors.surface : softColor;
   return (
     <TouchableOpacity
       style={[
         styles.quickCard,
-        { borderColor: resolvedScheme === "dark" ? colors.border : `${color}33`, backgroundColor: cardBg },
+        { borderColor: color, backgroundColor: color },
       ]}
       onPress={onPress}
       activeOpacity={0.84}
     >
       <View style={styles.quickGraphic}>
-        <View style={[styles.quickIconCircle, { backgroundColor: color }]}>
+        <View style={styles.quickIconCircle}>
           <FontAwesome5 name={icon} size={21} color="#ffffff" />
         </View>
       </View>
       <View style={styles.quickCopy}>
-        <Text style={[styles.quickTitle, { color }]}>{title}</Text>
-        <Text style={[styles.quickSubtitle, { color: colors.textMuted }]}>
+        <Text style={styles.quickTitle}>{title}</Text>
+        <Text style={styles.quickSubtitle}>
           {subtitle}
         </Text>
       </View>
-      <View style={[styles.quickArrow, { backgroundColor: color }]}>
+      <View style={styles.quickArrow}>
         <FontAwesome5 name="chevron-right" size={16} color="#ffffff" />
       </View>
     </TouchableOpacity>
@@ -579,7 +577,7 @@ export function QuickActionCard({
 
 export function QuickActions({ onLoad, onRoute, onOffload, onInfo }) {
   const { width } = useWindowDimensions();
-  const actionWidth = clamp(width * 0.56, 188, 238);
+  const actionWidth = clamp(width * 0.52, 178, 222);
 
   return (
     <View style={styles.quickSection}>
@@ -736,8 +734,8 @@ export function DeliveredHistoryList({
 const styles = StyleSheet.create({
   hero: {
     paddingHorizontal: SCREEN_PADDING,
-    paddingTop: 18,
-    paddingBottom: 24,
+    paddingTop: 14,
+    paddingBottom: 14,
     borderBottomLeftRadius: 34,
     borderBottomRightRadius: 34,
     overflow: "hidden",
@@ -752,7 +750,7 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: "row",
     alignItems: "center",
-    gap: 12,
+    gap: 10,
   },
   heroAvatar: {
     width: 74,
@@ -782,23 +780,23 @@ const styles = StyleSheet.create({
     color: "#eef5ff",
     fontSize: 13,
     fontWeight: "400",
-    marginTop: 5,
+    marginTop: 2,
     lineHeight: 18,
   },
   heroBottom: {
-    marginTop: 24,
+    marginTop: 12,
     flexDirection: "row",
     alignItems: "flex-end",
     justifyContent: "space-between",
     gap: 12,
   },
   dateCard: {
-    minHeight: 64,
+    minHeight: 52,
     borderRadius: 18,
-    paddingHorizontal: 14,
+    paddingHorizontal: 12,
     flexDirection: "row",
     alignItems: "center",
-    gap: 10,
+    gap: 8,
     backgroundColor: "rgba(2, 43, 143, 0.72)",
   },
   dateTextBlock: {
@@ -815,11 +813,11 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 18,
     fontWeight: "400",
-    marginTop: 3,
+    marginTop: 2,
   },
   heroArt: {
     flex: 1,
-    minHeight: 92,
+    minHeight: 70,
     alignItems: "center",
     justifyContent: "flex-end",
     position: "relative",
@@ -827,38 +825,26 @@ const styles = StyleSheet.create({
   cityBarTall: {
     position: "absolute",
     right: 55,
-    bottom: 28,
-    width: 22,
-    height: 92,
+    bottom: 22,
+    width: 18,
+    height: 68,
     borderRadius: 3,
     backgroundColor: "rgba(255,255,255,0.12)",
   },
   cityBar: {
     position: "absolute",
     right: 28,
-    bottom: 28,
-    width: 18,
-    height: 64,
+    bottom: 22,
+    width: 15,
+    height: 48,
     borderRadius: 3,
     backgroundColor: "rgba(255,255,255,0.1)",
   },
-  routeLine: {
-    position: "absolute",
-    right: 0,
-    bottom: 11,
-    width: 120,
-    height: 28,
-    borderBottomWidth: 5,
-    borderColor: "rgba(180,216,255,0.7)",
-    borderRadius: 70,
-    transform: [{ rotate: "-9deg" }],
-  },
-  boxStack: {
-    position: "absolute",
-    right: 58,
-    bottom: 0,
-    flexDirection: "row",
-    gap: 2,
+  heroTruckImage: {
+    width: 230,
+    height: 90,
+    marginBottom: -10,
+    transform: [{ scaleX: -1 }],
   },
   modalBackdrop: {
     flex: 1,
@@ -927,16 +913,16 @@ const styles = StyleSheet.create({
     color: "#eaf1ff",
   },
   dashboardPanel: {
-    marginTop: -18,
+    marginTop: -10,
     paddingHorizontal: SCREEN_PADDING,
-    paddingTop: 18,
+    paddingTop: 12,
   },
   sectionTitleRow: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     gap: 12,
-    marginBottom: 14,
+    marginBottom: 9,
   },
   sectionTitleLeft: {
     flexDirection: "row",
@@ -972,9 +958,9 @@ const styles = StyleSheet.create({
     flexShrink: 0,
   },
   statCard: {
-    minHeight: 148,
+    minHeight: 124,
     borderRadius: 18,
-    padding: 14,
+    padding: 11,
     backgroundColor: "#ffffff",
     borderWidth: 1,
     borderColor: COLORS.border,
@@ -985,11 +971,11 @@ const styles = StyleSheet.create({
   statTopRow: {
     flexDirection: "row",
     alignItems: "flex-start",
-    gap: 8,
+    gap: 7,
   },
   statIcon: {
-    width: 40,
-    height: 40,
+    width: 36,
+    height: 36,
     borderRadius: 13,
     alignItems: "center",
     justifyContent: "center",
@@ -1010,7 +996,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "400",
     lineHeight: 17,
-    marginTop: 4,
+    marginTop: 2,
     flexShrink: 1,
   },
   statBottomRow: {
@@ -1018,7 +1004,7 @@ const styles = StyleSheet.create({
     alignItems: "flex-end",
     justifyContent: "space-between",
     gap: 10,
-    paddingRight: 42,
+    paddingRight: 36,
   },
   statValue: {
     fontSize: 28,
@@ -1026,10 +1012,10 @@ const styles = StyleSheet.create({
     letterSpacing: 0,
   },
   trendPill: {
-    marginTop: 10,
+    marginTop: 7,
     borderRadius: 999,
-    paddingVertical: 6,
-    paddingHorizontal: 10,
+    paddingVertical: 4,
+    paddingHorizontal: 8,
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
@@ -1041,11 +1027,11 @@ const styles = StyleSheet.create({
   },
   chevronCircle: {
     position: "absolute",
-    right: 14,
-    bottom: 14,
-    width: 34,
-    height: 34,
-    borderRadius: 17,
+    right: 11,
+    bottom: 11,
+    width: 30,
+    height: 30,
+    borderRadius: 15,
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: "#ffffff",
@@ -1053,9 +1039,9 @@ const styles = StyleSheet.create({
     ...cardShadow,
   },
   progressCard: {
-    minHeight: 148,
+    minHeight: 124,
     borderRadius: 18,
-    padding: 16,
+    padding: 11,
     backgroundColor: "#ffffff",
     borderWidth: 1,
     borderColor: COLORS.border,
@@ -1081,7 +1067,7 @@ const styles = StyleSheet.create({
     color: COLORS.muted,
     fontSize: 13,
     fontWeight: "400",
-    marginTop: 4,
+    marginTop: 2,
   },
   progressBody: {
     flex: 1,
@@ -1089,7 +1075,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     position: "relative",
-    paddingTop: 4,
+    paddingTop: 2,
   },
   ringWrap: {
     width: 90,
@@ -1148,7 +1134,7 @@ const styles = StyleSheet.create({
     color: COLORS.muted,
     fontSize: 11,
     fontWeight: "400",
-    marginTop: 8,
+    marginTop: 5,
     maxWidth: "100%",
     textAlign: "center",
   },
@@ -1182,7 +1168,7 @@ const styles = StyleSheet.create({
     flexShrink: 1,
   },
   quickSection: {
-    marginTop: 20,
+    marginTop: 13,
   },
   quickTitleInset: {
     paddingHorizontal: SCREEN_PADDING,
@@ -1198,66 +1184,72 @@ const styles = StyleSheet.create({
   },
   quickCard: {
     width: "100%",
-    minHeight: 96,
+    minHeight: 74,
     borderRadius: 18,
     borderWidth: 1,
-    padding: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
     flexDirection: "row",
     alignItems: "center",
     gap: 10,
     ...cardShadow,
   },
   quickGraphic: {
-    width: 50,
+    width: 42,
     alignItems: "center",
   },
   quickIconCircle: {
-    width: 46,
-    height: 46,
-    borderRadius: 23,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     alignItems: "center",
     justifyContent: "center",
+    backgroundColor: "rgba(0, 0, 0, 0.16)",
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: "rgba(255, 255, 255, 0.28)",
   },
   quickCopy: {
     flex: 1,
   },
   quickTitle: {
+    color: "#ffffff",
     fontSize: 14,
     lineHeight: 19,
     fontWeight: "700",
   },
   quickSubtitle: {
-    color: COLORS.muted,
+    color: "rgba(255, 255, 255, 0.84)",
     fontSize: 12,
     fontWeight: "400",
     lineHeight: 17,
-    marginTop: 8,
+    marginTop: 4,
   },
   quickArrow: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
     alignItems: "center",
     justifyContent: "center",
+    backgroundColor: "rgba(0, 0, 0, 0.16)",
   },
   historyCard: {
     marginHorizontal: SCREEN_PADDING,
-    marginTop: 18,
+    marginTop: 10,
     borderRadius: 18,
     paddingHorizontal: 14,
-    paddingTop: 16,
-    paddingBottom: 8,
+    paddingTop: 12,
+    paddingBottom: 6,
     backgroundColor: "#ffffff",
     borderWidth: 1,
     borderColor: COLORS.border,
     ...cardShadow,
   },
   historyRow: {
-    minHeight: 68,
+    minHeight: 58,
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
-    paddingVertical: 11,
+    paddingVertical: 8,
   },
   historyDivider: {
     borderBottomWidth: 1,
