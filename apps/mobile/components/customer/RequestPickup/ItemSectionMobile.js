@@ -6,7 +6,7 @@ import {
   TextInput,
   StyleSheet,
 } from "react-native";
-import { FontAwesome5 } from "@expo/vector-icons";
+import FontAwesome5 from "@expo/vector-icons/FontAwesome5";
 import DropdownModal from "./DropdownModal";
 import { useTheme } from "../../../contexts/ThemeContext";
 
