@@ -174,18 +174,48 @@ export default function PackageListItem({
         {(item.isFragile || item.isPerishable) && (
           <View style={styles.badgesRow}>
             {item.isFragile && (
-              <View style={[styles.tag, styles.fragileTag]}>
+              <View
+                style={[
+                  styles.tag,
+                  styles.fragileTag,
+                  isDark && {
+                    backgroundColor: colors.dangerSoft,
+                    borderColor: colors.danger,
+                  },
+                ]}
+              >
                 <FontAwesome5 name="wine-glass-alt" size={9} color="#991b1b" />
-                <Text style={[styles.tagText, styles.fragileTagText]}>
+                <Text
+                  style={[
+                    styles.tagText,
+                    styles.fragileTagText,
+                    isDark && { color: colors.danger },
+                  ]}
+                >
                   Fragile
                 </Text>
               </View>
             )}
 
             {item.isPerishable && (
-              <View style={[styles.tag, styles.perishableTag]}>
+              <View
+                style={[
+                  styles.tag,
+                  styles.perishableTag,
+                  isDark && {
+                    backgroundColor: colors.successSoft,
+                    borderColor: colors.success,
+                  },
+                ]}
+              >
                 <FontAwesome5 name="snowflake" size={9} color="#065f46" />
-                <Text style={[styles.tagText, styles.perishableTagText]}>
+                <Text
+                  style={[
+                    styles.tagText,
+                    styles.perishableTagText,
+                    isDark && { color: colors.success },
+                  ]}
+                >
                   Perishable
                 </Text>
               </View>

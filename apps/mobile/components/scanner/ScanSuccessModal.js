@@ -7,6 +7,7 @@ import {
   View,
 } from "react-native";
 import { FontAwesome5 } from "@expo/vector-icons";
+import { useTheme } from "../../contexts/ThemeContext";
 
 export default function ScanSuccessModal({
   visible,
@@ -15,6 +16,7 @@ export default function ScanSuccessModal({
   onClose,
   accentColor = "#2563eb",
 }) {
+  const { colors } = useTheme();
   const pending = !!payload?.pendingSync;
   const confetti = [
     { top: 2, left: 30, color: "#f59e0b", size: 8 },
@@ -34,7 +36,7 @@ export default function ScanSuccessModal({
       onRequestClose={onClose}
     >
       <View style={styles.overlay}>
-        <View style={styles.card}>
+        <View style={[styles.card, { backgroundColor: colors.surface }]}>
           <View style={styles.iconArea}>
             {!pending
               ? confetti.map((c, i) => (
@@ -77,30 +79,31 @@ export default function ScanSuccessModal({
               ? "Saved — Pending Sync"
               : payload?.successTitle || "Success!"}
           </Text>
-          <Text style={styles.message}>
+          <Text style={[styles.message, { color: colors.textMuted }]}>
             {payload?.message || "Package processed successfully."}
           </Text>
 
           {pending ? (
-            <View style={styles.pendingBadge}>
+            <View style={[styles.pendingBadge, { backgroundColor: colors.warningSoft }]}>
               <FontAwesome5 name="cloud-upload-alt" size={12} color="#b45309" />
-              <Text style={styles.pendingText}>
+              <Text style={[styles.pendingText, { color: colors.warning }]}>
                 Will sync automatically when you are back online.
               </Text>
             </View>
           ) : null}
 
-          <View style={styles.metaBox}>
-            <MetaRow label="Package" value={payload?.barcode || "-"} />
-            <MetaRow label="Status" value={payload?.packageStatus || "-"} />
+          <View style={[styles.metaBox, { backgroundColor: colors.cardMuted }]}>
+            <MetaRow label="Package" value={payload?.barcode || "-"} colors={colors} />
+            <MetaRow label="Status" value={payload?.packageStatus || "-"} colors={colors} />
 
             {!!payload?.quantity && (
-              <MetaRow label="Quantity" value={payload.quantity} />
+              <MetaRow label="Quantity" value={payload.quantity} colors={colors} />
             )}
 
             <MetaRow
               label="Source"
               value={payload?.source === "manual" ? "Manual Input" : "Scan"}
+              colors={colors}
             />
           </View>
 
@@ -123,18 +126,20 @@ export default function ScanSuccessModal({
             </Text>
           </TouchableOpacity>
 
-          <Text style={styles.countdown}>Auto-closing in {countdown}s</Text>
+          <Text style={[styles.countdown, { color: colors.textMuted }]}>
+            Auto-closing in {countdown}s
+          </Text>
         </View>
       </View>
     </Modal>
   );
 }
 
-function MetaRow({ label, value }) {
+function MetaRow({ label, value, colors }) {
   return (
     <View style={styles.metaRow}>
-      <Text style={styles.metaLabel}>{label}</Text>
-      <Text style={styles.metaValue}>{value}</Text>
+      <Text style={[styles.metaLabel, { color: colors.textMuted }]}>{label}</Text>
+      <Text style={[styles.metaValue, { color: colors.text }]}>{value}</Text>
     </View>
   );
 }

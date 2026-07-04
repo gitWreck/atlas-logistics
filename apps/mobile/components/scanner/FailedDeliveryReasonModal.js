@@ -12,6 +12,7 @@ import {
 } from "react-native";
 import { FontAwesome5 } from "@expo/vector-icons";
 import { CHECKER_FAILURE_REASONS } from "../constants/failureReasons";
+import { useTheme } from "../../contexts/ThemeContext";
 
 export default function FailedDeliveryReasonModal({
   visible,
@@ -27,6 +28,8 @@ export default function FailedDeliveryReasonModal({
   onRemovePhoto,
   onConfirm,
 }) {
+  const { colors, resolvedScheme } = useTheme();
+  const isDark = resolvedScheme === "dark";
   const [reasonCode, setReasonCode] = useState(
     CHECKER_FAILURE_REASONS[0]?.code || "OTHER",
   );
@@ -48,12 +51,14 @@ export default function FailedDeliveryReasonModal({
       onRequestClose={onClose}
     >
       <View style={styles.overlay}>
-        <View style={styles.card}>
+        <View style={[styles.card, { backgroundColor: colors.surface }]}>
           <View style={styles.header}>
             <View style={{ flex: 1 }}>
               <Text style={styles.eyebrow}>Failed Delivery</Text>
-              <Text style={styles.title}>{customerName || "Customer"}</Text>
-              <Text style={styles.subtitle}>
+              <Text style={[styles.title, { color: colors.text }]}>
+                {customerName || "Customer"}
+              </Text>
+              <Text style={[styles.subtitle, { color: colors.textMuted }]}>
                 {pieceCount} piece{pieceCount === 1 ? "" : "s"} — custody stays
                 with you until returned at Odiongan
               </Text>
@@ -61,16 +66,22 @@ export default function FailedDeliveryReasonModal({
             <TouchableOpacity
               onPress={onClose}
               disabled={uploading}
-              style={styles.closeButton}
+              style={[
+                styles.closeButton,
+                { backgroundColor: colors.cardMuted },
+              ]}
             >
-              <FontAwesome5 name="times" size={14} color="#64748b" />
+              <FontAwesome5 name="times" size={14} color={colors.textMuted} />
             </TouchableOpacity>
           </View>
 
           {pieces.length > 0 && (
-            <View style={styles.pieceList}>
+            <View style={[styles.pieceList, { backgroundColor: colors.dangerSoft }]}>
               {pieces.map((piece) => (
-                <Text key={piece.packageId} style={styles.pieceLine}>
+                <Text
+                  key={piece.packageId}
+                  style={[styles.pieceLine, { color: colors.danger }]}
+                >
                   • {piece.label}
                 </Text>
               ))}
@@ -79,7 +90,12 @@ export default function FailedDeliveryReasonModal({
 
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionLabel}>SELECT REASON</Text>
-            <View style={styles.sectionDivider} />
+            <View
+              style={[
+                styles.sectionDivider,
+                { backgroundColor: colors.dangerSoft },
+              ]}
+            />
           </View>
           <ScrollView
             style={styles.reasonList}
@@ -90,19 +106,36 @@ export default function FailedDeliveryReasonModal({
               return (
                 <TouchableOpacity
                   key={reason.code}
-                  style={[styles.reasonRow, selected && styles.reasonRowActive]}
+                  style={[
+                    styles.reasonRow,
+                    {
+                      backgroundColor: colors.cardMuted,
+                      borderColor: colors.border,
+                    },
+                    selected && [
+                      styles.reasonRowActive,
+                      {
+                        backgroundColor: colors.dangerSoft,
+                        borderColor: isDark ? colors.danger : "#fecaca",
+                      },
+                    ],
+                  ]}
                   onPress={() => setReasonCode(reason.code)}
                   disabled={uploading}
                 >
                   <FontAwesome5
                     name={selected ? "dot-circle" : "circle"}
                     size={14}
-                    color={selected ? "#dc2626" : "#94a3b8"}
+                    color={selected ? colors.danger : colors.textMuted}
                   />
                   <Text
                     style={[
                       styles.reasonLabel,
-                      selected && styles.reasonLabelActive,
+                      { color: colors.text },
+                      selected && [
+                        styles.reasonLabelActive,
+                        { color: colors.danger },
+                      ],
                     ]}
                   >
                     {reason.label}
@@ -114,38 +147,73 @@ export default function FailedDeliveryReasonModal({
 
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionLabel}>NOTES (OPTIONAL)</Text>
-            <View style={styles.sectionDivider} />
+            <View
+              style={[
+                styles.sectionDivider,
+                { backgroundColor: colors.dangerSoft },
+              ]}
+            />
           </View>
           <TextInput
-            style={styles.remarksInput}
+            style={[
+              styles.remarksInput,
+              {
+                backgroundColor: colors.inputBg,
+                borderColor: colors.border,
+                color: colors.text,
+              },
+            ]}
             value={remarks}
             onChangeText={setRemarks}
             placeholder="Add details for warehouse / admin"
-            placeholderTextColor="#94a3b8"
+            placeholderTextColor={colors.textMuted}
             multiline
             editable={!uploading}
           />
 
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionLabel}>PHOTO (OPTIONAL)</Text>
-            <View style={styles.sectionDivider} />
+            <View
+              style={[
+                styles.sectionDivider,
+                { backgroundColor: colors.dangerSoft },
+              ]}
+            />
           </View>
           <View style={styles.photoActions}>
             <TouchableOpacity
-              style={[styles.photoBtn, limitReached && styles.disabled]}
+              style={[
+                styles.photoBtn,
+                {
+                  backgroundColor: colors.cardMuted,
+                  borderColor: isDark ? colors.danger : "#fecaca",
+                },
+                limitReached && styles.disabled,
+              ]}
               onPress={onTakePhoto}
               disabled={uploading || limitReached}
             >
-              <FontAwesome5 name="camera" size={14} color="#dc2626" />
-              <Text style={styles.photoBtnText}>Take photo</Text>
+              <FontAwesome5 name="camera" size={14} color={colors.danger} />
+              <Text style={[styles.photoBtnText, { color: colors.danger }]}>
+                Take photo
+              </Text>
             </TouchableOpacity>
             <TouchableOpacity
-              style={[styles.photoBtn, limitReached && styles.disabled]}
+              style={[
+                styles.photoBtn,
+                {
+                  backgroundColor: colors.cardMuted,
+                  borderColor: isDark ? colors.danger : "#fecaca",
+                },
+                limitReached && styles.disabled,
+              ]}
               onPress={onPickImage}
               disabled={uploading || limitReached}
             >
-              <FontAwesome5 name="image" size={14} color="#dc2626" />
-              <Text style={styles.photoBtnText}>Upload</Text>
+              <FontAwesome5 name="image" size={14} color={colors.danger} />
+              <Text style={[styles.photoBtnText, { color: colors.danger }]}>
+                Upload
+              </Text>
             </TouchableOpacity>
           </View>
 
