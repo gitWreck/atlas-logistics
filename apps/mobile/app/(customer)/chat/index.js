@@ -1,8 +1,9 @@
 import React, { useEffect, useMemo, useState } from "react";
 import {
-  Alert,
   ActivityIndicator,
+  Alert,
   FlatList,
+  Image,
   Modal,
   Platform,
   Pressable,
@@ -16,7 +17,8 @@ import {
   StatusBar as RNStatusBar,
 } from "react-native";
 import { StatusBar } from "expo-status-bar";
-import { FontAwesome5 } from "@expo/vector-icons";
+import Feather from "@expo/vector-icons/Feather";
+import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import {
   collection,
@@ -33,80 +35,177 @@ import {
 } from "../../../components/utilities/FirebaseFunctions";
 import { useTheme } from "../../../contexts/ThemeContext";
 import ChatThread from "../../../components/chat/ChatThread";
-import {
-  ConversationSkeleton,
-  SupportAvatar,
-} from "../../../components/chat/ChatComponents";
-import {
-  displayMessagePreview,
-  formatListTime,
-  getChatColors,
-  getStatusMeta,
-} from "../../../components/chat/chatUtils";
+import CustomerBottomNav from "../../../components/customer/CustomerBottomNav";
+import { displayMessagePreview, formatListTime } from "../../../components/chat/chatUtils";
 
-// Breakpoint at which we switch to the Messenger-style two-panel layout
-// (conversation list on the left, active thread on the right).
 const TWO_PANEL_WIDTH = 900;
+const BG = "#020b18";
+const PANEL = "#071d34";
+const TEXT = "#f1f5f9";
+const MUTED = "#aab8cf";
+const BLUE = "#0b7dff";
+const GREEN = "#2bd66f";
+const BORDER = "#143353";
 
-function ConversationRow({ item, colors, unread, active, onPress }) {
-  const statusMeta = getStatusMeta(item.status);
-  const isYou = item.lastMessageBy === auth.currentUser?.uid;
+function supportPalette(theme, scheme) {
+  const dark = scheme === "dark";
+  return {
+    bg: dark ? "#07111F" : theme.dashboardBg,
+    bg2: dark ? "#020916" : theme.dashboardBg,
+    surface: theme.surface,
+    surface2: theme.cardMuted,
+    card: dark ? theme.cardMuted : theme.surface,
+    border: theme.border,
+    text: theme.text,
+    muted: theme.textMuted,
+    primary: theme.primary,
+    primarySoft: theme.primarySoft,
+    onPrimary: theme.onPrimary,
+    success: theme.success,
+    warning: theme.warning,
+    danger: theme.danger,
+    iconMuted: theme.iconMuted,
+    navBg: dark ? "rgba(8,17,29,0.94)" : theme.surface,
+    overlay: dark ? "rgba(0,0,0,0.42)" : "rgba(15,23,42,0.18)",
+  };
+}
+
+const CONCERN_CATEGORIES = [
+  {
+    key: "delivery_status",
+    title: "Delivery Status",
+    description: "Check the current shipment status.",
+    icon: "map-pin",
+    starter: "I need help checking my delivery status.",
+  },
+  {
+    key: "delivery_concern",
+    title: "Delivery Concern",
+    description: "Report delivery issues such as delays or missing parcels.",
+    icon: "alert-triangle",
+    starter: "I need help with a delivery concern.",
+  },
+  {
+    key: "change_delivery",
+    title: "Change Delivery",
+    description: "Request a delivery schedule or address change.",
+    icon: "calendar",
+    starter: "I would like to request a delivery change.",
+  },
+  {
+    key: "other",
+    title: "Other Concerns",
+    description: "General inquiries or service concerns.",
+    icon: "message-circle",
+    starter: "I need help with another concern.",
+  },
+];
+
+function SupportAvatar({ ui, size = 52, packageIcon = false, showPresence = false }) {
+  return (
+    <View style={{ width: size, height: size }}>
+      <View
+        style={[
+          styles.avatar,
+          {
+            width: size,
+            height: size,
+            borderRadius: size / 2,
+            backgroundColor: packageIcon ? ui.surface2 : ui.primary,
+          },
+        ]}
+      >
+        <Feather
+          name={packageIcon ? "package" : "headphones"}
+          size={packageIcon ? size * 0.42 : size * 0.39}
+          color={packageIcon ? ui.warning : ui.onPrimary}
+        />
+      </View>
+      {showPresence && (
+        <>
+          <View style={[styles.presence, { right: -2, bottom: size * 0.12, backgroundColor: ui.success, borderColor: ui.bg }]} />
+        </>
+      )}
+    </View>
+  );
+}
+
+function TruckIllustration({ ui }) {
+  return (
+    <Image
+      source={require("../../../assets/customer/support-truck-3d.png")}
+      style={styles.truckImage}
+      resizeMode="contain"
+      accessibilityLabel="Atlas delivery truck"
+    />
+  );
+}
+
+function ConversationRow({ ui, item, unread, active, onPress }) {
+  const isShipment = !!item.trackingNumber;
+  const status = String(item.status || "open").toLowerCase();
+  const isResolved = ["resolved", "closed", "archived"].includes(status);
+  const title = isShipment ? `Shipment #${item.trackingNumber}` : isResolved ? "Support Ticket #0021" : "Atlas Support";
+  const statusLabel = isShipment
+    ? item.shipmentSummary?.status || (status === "pending" ? "In Transit" : "Out for Delivery")
+    : isResolved
+      ? "Resolved"
+      : "";
+  const normalizedStatus = String(statusLabel || item.shipmentSummary?.status || item.status || "").toLowerCase();
+  const statusColor = isResolved
+    ? ui.success
+    : normalizedStatus.includes("transit")
+      ? ui.warning
+      : normalizedStatus.includes("delivered")
+        ? ui.muted
+        : ui.primary;
   const preview = displayMessagePreview({ text: item.lastMessageText });
-  const previewText = preview
-    ? `${isYou ? "You: " : ""}${preview}`
-    : "Conversation started";
+  const fallback = isShipment
+    ? statusLabel === "In Transit"
+      ? "Your shipment is now in transit."
+      : "Your package is out for delivery. ETA..."
+    : isResolved
+      ? "Your issue has been resolved."
+      : "How can we help you today?";
+
+  const showPresence = active || (!isResolved && status === "open");
 
   return (
     <Pressable
       onPress={onPress}
       style={({ pressed }) => [
         styles.row,
-        active && { backgroundColor: colors.accentSoft },
-        pressed && !active && { backgroundColor: colors.cardMuted },
+        active && { backgroundColor: ui.primarySoft },
+        pressed && styles.rowPressed,
+        { borderBottomColor: ui.border },
       ]}
-      android_ripple={{ color: colors.cardMuted }}
     >
-      <SupportAvatar size={56} online ringColor={colors.surface} />
+      <SupportAvatar ui={ui} packageIcon={isShipment} showPresence={showPresence} />
       <View style={styles.rowBody}>
         <View style={styles.rowTop}>
-          <Text
-            style={[
-              styles.rowTitle,
-              { color: colors.text },
-              unread > 0 && styles.rowTitleUnread,
-            ]}
-            numberOfLines={1}
-          >
-            {item.trackingNumber || "Atlas Support"}
-          </Text>
-          <Text
-            style={[
-              styles.rowTime,
-              { color: unread > 0 ? colors.accent : colors.textMuted },
-            ]}
-          >
-            {formatListTime(item.lastMessageAt)}
-          </Text>
+          <View style={styles.titleLine}>
+            <Text style={[styles.rowTitle, { color: ui.text }]} numberOfLines={1}>{title}</Text>
+            {!isShipment && !isResolved && (
+              <View style={[styles.newPill, { backgroundColor: ui.primary }]}>
+                <Text style={[styles.newPillText, { color: ui.onPrimary }]}>New</Text>
+              </View>
+            )}
+          </View>
+          <Text style={[styles.rowTime, { color: ui.muted }]}>{formatListTime(item.lastMessageAt) || "9:41 AM"}</Text>
         </View>
-        <View style={styles.rowBottom}>
-          <Text
-            style={[
-              styles.rowPreview,
-              { color: unread > 0 ? colors.text : colors.textMuted },
-              unread > 0 && styles.rowPreviewUnread,
-            ]}
-            numberOfLines={1}
-          >
-            {previewText}
+        {!!statusLabel && (
+          <Text style={[styles.statusText, { color: statusColor }]} numberOfLines={1}>
+            {statusLabel}
           </Text>
-          {unread > 0 ? (
-            <View style={[styles.badge, { backgroundColor: colors.unread }]}>
-              <Text style={styles.badgeText}>{unread > 9 ? "9+" : unread}</Text>
+        )}
+        <View style={styles.previewLine}>
+          <Text style={[styles.previewText, { color: ui.muted }]} numberOfLines={1}>
+            {preview || fallback}
+          </Text>
+          {unread > 0 && (
+            <View style={[styles.unreadBadge, { backgroundColor: ui.primary }]}>
+              <Text style={[styles.unreadBadgeText, { color: ui.onPrimary }]}>{unread > 9 ? "9+" : unread}</Text>
             </View>
-          ) : (
-            <View
-              style={[styles.statusDotSm, { backgroundColor: statusMeta.dot }]}
-            />
           )}
         </View>
       </View>
@@ -117,8 +216,8 @@ function ConversationRow({ item, colors, unread, active, onPress }) {
 export default function CustomerChatListScreen() {
   const router = useRouter();
   const { colors: themeColors, resolvedScheme } = useTheme();
-  const colors = useMemo(
-    () => getChatColors(themeColors, resolvedScheme),
+  const ui = useMemo(
+    () => supportPalette(themeColors, resolvedScheme),
     [themeColors, resolvedScheme],
   );
   const { width } = useWindowDimensions();
@@ -130,7 +229,9 @@ export default function CustomerChatListScreen() {
   const [markingRead, setMarkingRead] = useState(false);
   const [composeVisible, setComposeVisible] = useState(false);
   const [initialMessage, setInitialMessage] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState(CONCERN_CATEGORIES[0]);
   const [search, setSearch] = useState("");
+  const [filter, setFilter] = useState("all");
   const [selectedId, setSelectedId] = useState(null);
 
   useEffect(() => {
@@ -146,9 +247,7 @@ export default function CustomerChatListScreen() {
     const unsubscribe = onSnapshot(
       q,
       (snapshot) => {
-        setConversations(
-          snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })),
-        );
+        setConversations(snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })));
         setLoading(false);
       },
       (error) => {
@@ -161,44 +260,44 @@ export default function CustomerChatListScreen() {
   }, []);
 
   const uid = auth.currentUser?.uid;
-
   const unreadTotal = useMemo(
-    () =>
-      conversations.reduce(
-        (sum, item) => sum + Number(item.unreadCounts?.[uid] || 0),
-        0,
-      ),
+    () => conversations.reduce((sum, item) => sum + Number(item.unreadCounts?.[uid] || 0), 0),
     [conversations, uid],
   );
 
+  const filterCounts = useMemo(() => {
+    const counts = { all: conversations.length, open: 0, resolved: 0 };
+    conversations.forEach((item) => {
+      const status = String(item.status || "open").toLowerCase();
+      if (["resolved", "closed", "archived"].includes(status)) counts.resolved += 1;
+      else counts.open += 1;
+    });
+    return counts;
+  }, [conversations]);
+
   const filtered = useMemo(() => {
     const term = search.trim().toLowerCase();
-    if (!term) return conversations;
     return conversations.filter((item) => {
-      const haystack = [
-        item.trackingNumber,
-        item.customerName,
-        item.status,
-        item.lastMessageText,
-      ]
+      const status = String(item.status || "open").toLowerCase();
+      const resolved = ["resolved", "closed", "archived"].includes(status);
+      if (filter === "open" && resolved) return false;
+      if (filter === "resolved" && !resolved) return false;
+      if (!term) return true;
+      return [item.trackingNumber, item.customerName, item.status, item.lastMessageText]
         .filter(Boolean)
         .join(" ")
-        .toLowerCase();
-      return haystack.includes(term);
+        .toLowerCase()
+        .includes(term);
     });
-  }, [conversations, search]);
+  }, [conversations, filter, search]);
 
-  // Auto-select the first conversation when the two-panel layout is active.
   useEffect(() => {
-    if (twoPanel && !selectedId && filtered.length) {
-      setSelectedId(filtered[0].id);
-    }
+    if (twoPanel && !selectedId && filtered.length) setSelectedId(filtered[0].id);
   }, [twoPanel, selectedId, filtered]);
 
   const openConversation = (id) => {
-    if (twoPanel) {
-      setSelectedId(id);
-    } else {
+    if (twoPanel) setSelectedId(id);
+    else {
       router.push({
         pathname: "/(customer)/chat/[conversationId]",
         params: { conversationId: id },
@@ -207,11 +306,9 @@ export default function CustomerChatListScreen() {
   };
 
   const handleStartGeneral = async () => {
-    const message = initialMessage.trim();
-    if (!message) {
-      Alert.alert("Message required", "Type a message to start a new chat.");
-      return;
-    }
+    const detail = initialMessage.trim();
+    const category = selectedCategory || CONCERN_CATEGORIES[0];
+    const message = detail ? `${category.title}: ${detail}` : `${category.title}: ${category.starter}`;
 
     try {
       setStarting(true);
@@ -219,30 +316,25 @@ export default function CustomerChatListScreen() {
       const conversationId = result?.data?.conversationId;
       if (conversationId) {
         setInitialMessage("");
+        setSelectedCategory(CONCERN_CATEGORIES[0]);
         setComposeVisible(false);
         openConversation(conversationId);
       }
     } catch (error) {
       console.error("Failed to start chat:", error);
+      Alert.alert("Unable to start conversation", "Please try again in a moment.");
     } finally {
       setStarting(false);
     }
   };
 
   const handleMarkAllRead = async () => {
-    const unreadConversations = conversations.filter(
-      (item) => Number(item.unreadCounts?.[uid] || 0) > 0,
-    );
-
+    const unreadConversations = conversations.filter((item) => Number(item.unreadCounts?.[uid] || 0) > 0);
     if (!unreadConversations.length || markingRead) return;
 
     try {
       setMarkingRead(true);
-      await Promise.all(
-        unreadConversations.map((item) =>
-          markConversationRead({ conversationId: item.id }),
-        ),
-      );
+      await Promise.all(unreadConversations.map((item) => markConversationRead({ conversationId: item.id })));
     } catch (error) {
       console.error("Failed to mark chats read:", error);
     } finally {
@@ -250,84 +342,56 @@ export default function CustomerChatListScreen() {
     }
   };
 
-  const renderHeader = () => (
-    <View
-      style={[
-        styles.header,
-        { backgroundColor: colors.surface, borderBottomColor: colors.border },
-      ]}
-    >
-      {!twoPanel && (
-        <TouchableOpacity style={styles.iconBtn} onPress={() => router.back()}>
-          <FontAwesome5 name="chevron-left" size={18} color={colors.accent} />
-        </TouchableOpacity>
-      )}
-      <View style={styles.headerText}>
-        <Text style={[styles.headerTitle, { color: colors.text }]}>Chats</Text>
-        <Text style={[styles.headerSubtitle, { color: colors.textMuted }]}>
-          {unreadTotal > 0 ? `${unreadTotal} unread` : "All caught up"}
-        </Text>
-      </View>
-      {unreadTotal > 0 && (
-        <TouchableOpacity
-          style={[styles.iconBtn, { backgroundColor: colors.cardMuted }]}
-          onPress={handleMarkAllRead}
-          disabled={markingRead}
-        >
-          {markingRead ? (
-            <ActivityIndicator size="small" color={colors.textMuted} />
-          ) : (
-            <FontAwesome5 name="check-double" size={14} color={colors.textMuted} />
-          )}
-        </TouchableOpacity>
-      )}
-      <TouchableOpacity
-        style={[styles.composeBtn, { backgroundColor: colors.accent }]}
-        onPress={() => setComposeVisible(true)}
-        disabled={starting}
-      >
-        {starting ? (
-          <ActivityIndicator size="small" color="#ffffff" />
-        ) : (
-          <FontAwesome5 name="pen" size={14} color="#ffffff" />
-        )}
-      </TouchableOpacity>
-    </View>
-  );
-
-  const renderSearch = () => (
-    <View style={styles.searchWrap}>
-      <View
-        style={[
-          styles.searchBar,
-          { backgroundColor: colors.inputBar, borderColor: colors.border },
-        ]}
-      >
-        <FontAwesome5 name="search" size={13} color={colors.textMuted} />
-        <TextInput
-          style={[styles.searchInput, { color: colors.text }]}
-          value={search}
-          onChangeText={setSearch}
-          placeholder="Search messages"
-          placeholderTextColor={colors.textMuted}
-        />
-        {search.length > 0 && (
-          <TouchableOpacity onPress={() => setSearch("")} hitSlop={8}>
-            <FontAwesome5 name="times-circle" size={15} color={colors.textMuted} />
-          </TouchableOpacity>
-        )}
-      </View>
-    </View>
-  );
-
   const renderList = () => (
-    <>
-      {renderSearch()}
+    <LinearGradient colors={[ui.bg2, ui.bg, ui.bg2]} style={styles.phone}>
+      <View style={styles.hero}>
+        <View style={styles.heroText}>
+          <Text style={[styles.brand, { color: ui.text }]}>ATLAS</Text>
+          <Text style={[styles.brandSub, { color: ui.text }]}>Customer Support</Text>
+        </View>
+        <TruckIllustration />
+      </View>
+
+      <View style={styles.searchRow}>
+        <View style={[styles.searchBar, { backgroundColor: ui.surface2 }]}>
+          <Feather name="search" size={17} color={ui.muted} />
+          <TextInput
+            style={[styles.searchInput, { color: ui.text }]}
+            value={search}
+            onChangeText={setSearch}
+            placeholder="Search conversations"
+            placeholderTextColor={ui.muted}
+          />
+        </View>
+       
+      </View>
+
+      <View style={styles.tabs}>
+        {[
+          { key: "all", label: "All", count: filterCounts.all },
+          { key: "open", label: "Open", count: filterCounts.open },
+          { key: "resolved", label: "Resolved", count: filterCounts.resolved },
+        ].map((item) => {
+          const active = filter === item.key;
+          return (
+            <TouchableOpacity
+              key={item.key}
+              style={[styles.tab, { backgroundColor: active ? ui.primary : ui.surface2 }]}
+              onPress={() => setFilter(item.key)}
+              activeOpacity={0.86}
+            >
+              <Text style={[styles.tabText, { color: active ? ui.onPrimary : ui.text }]}>{item.label}</Text>
+              <View style={[styles.tabCount, { backgroundColor: active ? "rgba(255,255,255,0.20)" : ui.surface }]}>
+                <Text style={[styles.tabCountText, { color: active ? ui.onPrimary : ui.muted }]}>{item.count}</Text>
+              </View>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+
       {loading ? (
-        <View>
-          {Array.from({ length: 7 }).map((_, i) => (
-            <ConversationSkeleton key={i} colors={colors} />
-          ))}
+        <View style={styles.loadingWrap}>
+          <ActivityIndicator color={ui.primary} />
         </View>
       ) : (
         <FlatList
@@ -335,147 +399,110 @@ export default function CustomerChatListScreen() {
           keyExtractor={(item) => item.id}
           renderItem={({ item }) => (
             <ConversationRow
+              ui={ui}
               item={item}
-              colors={colors}
               unread={Number(item.unreadCounts?.[uid] || 0)}
               active={twoPanel && item.id === selectedId}
               onPress={() => openConversation(item.id)}
             />
           )}
-          contentContainerStyle={
-            filtered.length === 0 ? styles.emptyList : styles.list
-          }
+          contentContainerStyle={styles.list}
           keyboardShouldPersistTaps="handled"
           ListEmptyComponent={
             <View style={styles.emptyState}>
-              <SupportAvatar size={72} online ringColor={colors.bg} />
-              <Text style={[styles.emptyTitle, { color: colors.text }]}>
-                {search ? "No matches found" : "No messages yet"}
+              <SupportAvatar ui={ui} size={70} />
+              <Text style={[styles.emptyTitle, { color: ui.text }]}>{search ? "No matches found" : "No messages yet"}</Text>
+              <Text style={[styles.emptyText, { color: ui.muted }]}>
+                {search ? "Try another tracking number or keyword." : "Start a support chat when you need help."}
               </Text>
-              <Text style={[styles.emptyText, { color: colors.textMuted }]}>
-                {search
-                  ? "Try a different tracking number or keyword."
-                  : "Start a support chat when you need help with a shipment."}
-              </Text>
-              {!search && (
-                <TouchableOpacity
-                  style={[styles.emptyButton, { backgroundColor: colors.accent }]}
-                  onPress={() => setComposeVisible(true)}
-                >
-                  <FontAwesome5 name="pen" size={13} color="#ffffff" />
-                  <Text style={styles.emptyButtonText}>Start a chat</Text>
-                </TouchableOpacity>
-              )}
             </View>
           }
         />
       )}
-    </>
+
+      <CustomerBottomNav active="messages" unreadMessages={unreadTotal} />
+    </LinearGradient>
   );
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.surface }]}>
+    <SafeAreaView style={[styles.container, { backgroundColor: ui.bg }]}>
       <StatusBar style={resolvedScheme === "dark" ? "light" : "dark"} />
-
       {twoPanel ? (
-        <View style={styles.splitRoot}>
-          <View
-            style={[
-              styles.splitList,
-              { backgroundColor: colors.surface, borderRightColor: colors.border },
-            ]}
-          >
-            {renderHeader()}
-            {renderList()}
-          </View>
-          <View style={[styles.splitThread, { backgroundColor: colors.chatBg }]}>
+        <View style={[styles.splitRoot, { backgroundColor: ui.bg }]}>
+          <View style={[styles.splitList, { borderRightColor: ui.border }]}>{renderList()}</View>
+          <View style={[styles.splitThread, { backgroundColor: ui.bg }]}>
             {selectedId ? (
               <ChatThread conversationId={selectedId} />
             ) : (
               <View style={styles.splitPlaceholder}>
-                <SupportAvatar size={80} online ringColor={colors.chatBg} />
-                <Text style={[styles.placeholderTitle, { color: colors.text }]}>
-                  Your messages
-                </Text>
-                <Text style={[styles.placeholderText, { color: colors.textMuted }]}>
-                  Select a conversation to start chatting with Atlas Support.
-                </Text>
+                <SupportAvatar ui={ui} size={80} />
+                <Text style={[styles.emptyTitle, { color: ui.text }]}>Your messages</Text>
+                <Text style={[styles.emptyText, { color: ui.muted }]}>Select a conversation to start chatting with Atlas Support.</Text>
               </View>
             )}
           </View>
         </View>
       ) : (
-        <>
-          {renderHeader()}
-          {renderList()}
-        </>
+        renderList()
       )}
 
-      <Modal
-        transparent
-        animationType="fade"
-        visible={composeVisible}
-        onRequestClose={() => setComposeVisible(false)}
+      <TouchableOpacity
+        style={[styles.floatingCompose, { backgroundColor: ui.primary }]}
+        onPress={() => setComposeVisible(true)}
+        disabled={starting}
+        activeOpacity={0.88}
       >
-        <View style={styles.modalBackdrop}>
-          <View
-            style={[
-              styles.modalCard,
-              { backgroundColor: colors.surface, borderColor: colors.border },
-            ]}
-          >
-            <Text style={[styles.modalTitle, { color: colors.text }]}>
-              New message
-            </Text>
-            <Text style={[styles.modalSubtitle, { color: colors.textMuted }]}>
-              The conversation appears only after you send this message.
-            </Text>
+        {starting ? <ActivityIndicator size="small" color={ui.onPrimary} /> : <Feather name="edit-3" size={23} color={ui.onPrimary} />}
+      </TouchableOpacity>
+
+      <Modal transparent animationType="slide" visible={composeVisible} onRequestClose={() => setComposeVisible(false)}>
+        <View style={[styles.modalBackdrop, { backgroundColor: ui.overlay }]}>
+          <View style={[styles.modalSheet, { backgroundColor: ui.surface }]}>
+            <View style={[styles.sheetHandle, { backgroundColor: ui.border }]} />
+            <Text style={[styles.modalTitle, { color: ui.text }]}>Quick Actions</Text>
+            <View style={styles.categoryList}>
+              {CONCERN_CATEGORIES.map((category) => {
+                const active = selectedCategory?.key === category.key;
+                return (
+                  <TouchableOpacity
+                    key={category.key}
+                    style={[styles.categoryOption, { borderBottomColor: ui.border }]}
+                    onPress={() => setSelectedCategory(category)}
+                    activeOpacity={0.84}
+                  >
+                    <View style={[styles.categoryIcon, { backgroundColor: active ? ui.primary : ui.primarySoft }]}>
+                      <Feather name={category.icon} size={18} color={active ? ui.onPrimary : ui.primary} />
+                    </View>
+                    <View style={styles.categoryText}>
+                      <Text style={[styles.categoryTitle, { color: ui.text }]}>{category.title}</Text>
+                      <Text style={[styles.categoryDescription, { color: ui.muted }]}>{category.description}</Text>
+                    </View>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
             <TextInput
-              style={[
-                styles.modalInput,
-                {
-                  color: colors.text,
-                  backgroundColor: colors.inputBar,
-                  borderColor: colors.border,
-                },
-              ]}
+              style={[styles.modalInput, { backgroundColor: ui.surface2, color: ui.text }]}
               value={initialMessage}
               onChangeText={setInitialMessage}
-              placeholder="How can Atlas help?"
-              placeholderTextColor={colors.textMuted}
+              placeholder="Add more details..."
+              placeholderTextColor={ui.muted}
               multiline
-              autoFocus
             />
             <View style={styles.modalActions}>
               <TouchableOpacity
-                style={[
-                  styles.modalCancel,
-                  { borderColor: colors.border, backgroundColor: colors.cardMuted },
-                ]}
+                style={[styles.cancelButton, { backgroundColor: ui.surface2 }]}
                 onPress={() => {
                   setComposeVisible(false);
                   setInitialMessage("");
+                  setSelectedCategory(CONCERN_CATEGORIES[0]);
                 }}
                 disabled={starting}
               >
-                <Text style={[styles.modalCancelText, { color: colors.text }]}>
-                  Cancel
-                </Text>
+                <Text style={[styles.cancelText, { color: ui.primary }]}>Cancel</Text>
               </TouchableOpacity>
-              <TouchableOpacity
-                style={[
-                  styles.modalSend,
-                  { backgroundColor: colors.accent },
-                  (!initialMessage.trim() || starting) && styles.sendDisabled,
-                ]}
-                onPress={handleStartGeneral}
-                disabled={!initialMessage.trim() || starting}
-              >
-                {starting ? (
-                  <ActivityIndicator size="small" color="#ffffff" />
-                ) : (
-                  <Text style={styles.modalSendText}>Send</Text>
-                )}
+              <TouchableOpacity style={[styles.startButton, { backgroundColor: ui.primary }]} onPress={handleStartGeneral} disabled={starting}>
+                {starting ? <ActivityIndicator size="small" color={ui.onPrimary} /> : <Text style={[styles.startText, { color: ui.onPrimary }]}>Start Conversation</Text>}
               </TouchableOpacity>
             </View>
           </View>
@@ -488,162 +515,175 @@ export default function CustomerChatListScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: BG,
     paddingTop: Platform.OS === "android" ? RNStatusBar.currentHeight || 0 : 0,
   },
-  splitRoot: { flex: 1, flexDirection: "row" },
-  splitList: {
-    width: 360,
-    borderRightWidth: 1,
-  },
-  splitThread: { flex: 1 },
-  splitPlaceholder: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: 40,
-    gap: 10,
-  },
-  placeholderTitle: { fontSize: 20, fontWeight: "800", marginTop: 6 },
-  placeholderText: { fontSize: 14, textAlign: "center", lineHeight: 20 },
-  header: {
-    minHeight: 60,
+  phone: { flex: 1 },
+  splitRoot: { flex: 1, flexDirection: "row", backgroundColor: BG },
+  splitList: { width: 396, borderRightWidth: 1, borderRightColor: BORDER },
+  splitThread: { flex: 1, backgroundColor: BG },
+  splitPlaceholder: { flex: 1, alignItems: "center", justifyContent: "center", padding: 28 },
+  hero: {
+    height: 96,
+    paddingHorizontal: 18,
+    paddingTop: 20,
+    paddingBottom: 10,
     flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    gap: 8,
-    borderBottomWidth: 1,
+    alignItems: "flex-start",
+    justifyContent: "space-between",
   },
-  iconBtn: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    alignItems: "center",
-    justifyContent: "center",
+  heroText: {
+    paddingTop: 2,
   },
-  headerText: { flex: 1, marginLeft: 2 },
-  headerTitle: { fontSize: 22, fontWeight: "800" },
-  headerSubtitle: { fontSize: 12, marginTop: 1 },
-  composeBtn: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    alignItems: "center",
-    justifyContent: "center",
+  brand: { fontSize: 24, fontWeight: "700", letterSpacing: 0 },
+  brandSub: {
+    fontSize: 14,
+    fontWeight: "400",
+    marginTop: 2,
   },
-  searchWrap: { paddingHorizontal: 14, paddingTop: 10, paddingBottom: 4 },
+  truckImage: { width: 88, height: 54 },
+  searchRow: { flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 18 },
   searchBar: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    height: 38,
-    borderRadius: 19,
-    borderWidth: 1,
-    paddingHorizontal: 14,
-  },
-  searchInput: { flex: 1, fontSize: 14, paddingVertical: 0 },
-  list: { paddingVertical: 4 },
-  emptyList: { flexGrow: 1, justifyContent: "center" },
-  row: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-  },
-  rowBody: { flex: 1, minWidth: 0, justifyContent: "center" },
-  rowTop: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 8,
-  },
-  rowTitle: { flex: 1, fontSize: 15, fontWeight: "600" },
-  rowTitleUnread: { fontWeight: "800" },
-  rowTime: { fontSize: 12, fontWeight: "600" },
-  rowBottom: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 8,
-    marginTop: 3,
-  },
-  rowPreview: { flex: 1, fontSize: 13 },
-  rowPreviewUnread: { fontWeight: "700" },
-  statusDotSm: { width: 8, height: 8, borderRadius: 4 },
-  badge: {
-    minWidth: 20,
-    height: 20,
+    flex: 1,
+    height: 35,
     borderRadius: 10,
+    backgroundColor: "rgba(28, 39, 58, 0.92)",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingHorizontal: 11,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.04)",
+  },
+  searchInput: { flex: 1, fontSize: 13, fontWeight: "400", paddingVertical: 0 },
+  filterButton: { width: 26, height: 35, alignItems: "center", justifyContent: "center" },
+  tabs: { flexDirection: "row", gap: 9, paddingHorizontal: 18, paddingTop: 16, paddingBottom: 13 },
+  tab: {
+    height: 29,
+    borderRadius: 8,
+    backgroundColor: PANEL,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingHorizontal: 12,
+  },
+  tabActive: { backgroundColor: "#075fcf" },
+  tabText: { fontSize: 12, fontWeight: "600" },
+  tabCount: {
+    minWidth: 19,
+    height: 19,
+    borderRadius: 10,
+    backgroundColor: "rgba(255,255,255,0.12)",
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: 6,
   },
-  badgeText: { color: "#ffffff", fontSize: 11, fontWeight: "800" },
-  emptyState: { alignItems: "center", paddingHorizontal: 30, gap: 8 },
-  emptyTitle: { marginTop: 12, fontSize: 18, fontWeight: "800" },
-  emptyText: { textAlign: "center", fontSize: 13, lineHeight: 19 },
-  emptyButton: {
-    marginTop: 16,
+  tabCountActive: { backgroundColor: "rgba(255,255,255,0.20)" },
+  tabCountText: { fontSize: 11, fontWeight: "600" },
+  list: { paddingHorizontal: 18, paddingBottom: 94 },
+  loadingWrap: { paddingTop: 40 },
+  row: {
+    minHeight: 83,
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
-    height: 44,
-    borderRadius: 22,
-    paddingHorizontal: 20,
-    justifyContent: "center",
+    gap: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "rgba(255,255,255,0.06)",
   },
-  emptyButtonText: { color: "#ffffff", fontWeight: "800" },
-  modalBackdrop: {
-    flex: 1,
-    backgroundColor: "rgba(15, 23, 42, 0.45)",
+  rowActive: { backgroundColor: "rgba(10,124,255,0.08)" },
+  rowPressed: { opacity: 0.78 },
+  avatar: { alignItems: "center", justifyContent: "center" },
+  presence: {
+    position: "absolute",
+    width: 11,
+    height: 11,
+    borderRadius: 6,
+    backgroundColor: GREEN,
+    borderWidth: 2,
+    borderColor: BG,
+  },
+  rowBody: { flex: 1, minWidth: 0 },
+  rowTop: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8 },
+  titleLine: { flex: 1, minWidth: 0, flexDirection: "row", alignItems: "center", gap: 8 },
+  rowTitle: { fontSize: 14, fontWeight: "600", flexShrink: 1 },
+  newPill: { backgroundColor: "#0a65ff", borderRadius: 5, paddingHorizontal: 5, paddingVertical: 2 },
+  newPillText: { fontSize: 10, fontWeight: "600" },
+  rowTime: { fontSize: 11, fontWeight: "400" },
+  statusText: { marginTop: 4, fontSize: 12, fontWeight: "500" },
+  previewLine: { marginTop: 4, flexDirection: "row", alignItems: "center", gap: 8 },
+  previewText: { flex: 1, fontSize: 12, fontWeight: "400" },
+  unreadBadge: { width: 21, height: 21, borderRadius: 11, backgroundColor: BLUE, alignItems: "center", justifyContent: "center" },
+  unreadBadgeText: { fontSize: 11, fontWeight: "600" },
+  floatingCompose: {
+    position: "absolute",
+    right: 26,
+    bottom: Platform.OS === "ios" ? 100 : 90,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: BLUE,
     alignItems: "center",
     justifyContent: "center",
-    padding: 20,
+    shadowColor: "#000000",
+    shadowOpacity: 0.28,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 8,
   },
-  modalCard: {
-    width: "100%",
-    maxWidth: 420,
-    borderRadius: 18,
-    borderWidth: 1,
-    padding: 18,
+  emptyState: { alignItems: "center", paddingTop: 70, paddingHorizontal: 30, gap: 9 },
+  emptyTitle: { fontSize: 18, fontWeight: "600" },
+  emptyText: { textAlign: "center", fontSize: 13, lineHeight: 19 },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.42)",
+    justifyContent: "flex-end",
   },
-  modalTitle: { fontSize: 18, fontWeight: "800" },
-  modalSubtitle: { marginTop: 5, fontSize: 13, lineHeight: 18 },
-  modalInput: {
-    minHeight: 112,
-    maxHeight: 180,
-    marginTop: 14,
-    borderWidth: 1,
+  modalSheet: {
+    backgroundColor: "#101b2b",
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+    paddingHorizontal: 18,
+    paddingTop: 12,
+    paddingBottom: Platform.OS === "ios" ? 28 : 18,
+  },
+  sheetHandle: { width: 34, height: 4, borderRadius: 2, backgroundColor: "#526078", alignSelf: "center", marginBottom: 16 },
+  modalTitle: { fontSize: 16, fontWeight: "600", textAlign: "center", marginBottom: 14 },
+  categoryList: { gap: 0 },
+  categoryOption: {
+    minHeight: 76,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: "rgba(255,255,255,0.06)",
+  },
+  categoryIcon: {
+    width: 48,
+    height: 48,
     borderRadius: 12,
-    paddingHorizontal: 12,
+    backgroundColor: "rgba(10,124,255,0.18)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  categoryIconActive: { backgroundColor: BLUE },
+  categoryText: { flex: 1, minWidth: 0 },
+  categoryTitle: { fontSize: 16, fontWeight: "600" },
+  categoryDescription: { fontSize: 13, marginTop: 4, lineHeight: 18 },
+  modalInput: {
+    marginTop: 14,
+    minHeight: 76,
+    maxHeight: 120,
+    borderRadius: 12,
+    backgroundColor: PANEL,
+    color: TEXT,
+    paddingHorizontal: 13,
     paddingVertical: 10,
     fontSize: 14,
     textAlignVertical: "top",
   },
-  modalActions: {
-    marginTop: 14,
-    flexDirection: "row",
-    justifyContent: "flex-end",
-    gap: 10,
-  },
-  modalCancel: {
-    height: 44,
-    borderRadius: 12,
-    borderWidth: 1,
-    paddingHorizontal: 16,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  modalCancelText: { fontWeight: "800" },
-  modalSend: {
-    minWidth: 88,
-    height: 44,
-    borderRadius: 12,
-    paddingHorizontal: 18,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  sendDisabled: { opacity: 0.45 },
-  modalSendText: { color: "#ffffff", fontWeight: "800" },
+  modalActions: { marginTop: 12, flexDirection: "row", gap: 10 },
+  cancelButton: { flex: 1, height: 48, borderRadius: 10, backgroundColor: PANEL, alignItems: "center", justifyContent: "center" },
+  cancelText: { color: BLUE, fontSize: 15, fontWeight: "800" },
+  startButton: { flex: 1, height: 48, borderRadius: 10, backgroundColor: BLUE, alignItems: "center", justifyContent: "center" },
+  startText: { color: "#ffffff", fontSize: 14, fontWeight: "900" },
 });

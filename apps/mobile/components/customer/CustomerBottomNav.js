@@ -1,7 +1,7 @@
-import React from "react";
+import React, { useCallback } from "react";
 import { Platform, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import Feather from "@expo/vector-icons/Feather";
-import { useRouter } from "expo-router";
+import { usePathname, useRouter } from "expo-router";
 import { useTheme } from "../../contexts/ThemeContext";
 
 const NAV_ITEMS = [
@@ -11,10 +11,31 @@ const NAV_ITEMS = [
   { key: "profile", label: "Profile", icon: "user", route: "/(customer)/profile" },
 ];
 
+function normalizePath(path = "") {
+  return String(path).replace(/\/+$/, "");
+}
+
 export default function CustomerBottomNav({ active = "home", unreadMessages = 0 }) {
   const router = useRouter();
+  const pathname = usePathname();
   const { colors } = useTheme();
   const messageCount = unreadMessages > 9 ? "9+" : String(unreadMessages);
+
+  const handleTabPress = useCallback(
+    (route) => {
+      const currentPath = normalizePath(pathname);
+      const targetPath = normalizePath(route);
+      const isSameRoute = currentPath === targetPath;
+      const isChatSubRoute = targetPath === "/(customer)/chat" && currentPath.startsWith(`${targetPath}/`);
+
+      if (isSameRoute || isChatSubRoute) {
+        return;
+      }
+
+      router.push(targetPath);
+    },
+    [pathname, router],
+  );
 
   return (
     <View
@@ -35,13 +56,22 @@ export default function CustomerBottomNav({ active = "home", unreadMessages = 0 
             key={item.key}
             style={styles.item}
             activeOpacity={0.75}
-            onPress={() => router.push(item.route)}
+            onPress={() => handleTabPress(item.route)}
           >
-            <View style={styles.iconWrap}>
+            <View
+              style={[
+                styles.iconWrap,
+                isActive && styles.iconWrapActive,
+                {
+                  borderColor: isActive ? colors.primary : "rgba(255,255,255,0.10)",
+                  backgroundColor: isActive ? colors.primary : "transparent",
+                },
+              ]}
+            >
               <Feather
                 name={item.icon}
-                size={29}
-                color={isActive ? colors.primary : colors.iconMuted}
+                size={24}
+                color={isActive ? colors.onPrimary : colors.iconMuted}
               />
               {isMessages && unreadMessages > 0 && (
                 <View
@@ -82,25 +112,31 @@ const styles = StyleSheet.create({
     justifyContent: "space-around",
     borderTopWidth: 1,
     paddingTop: 10,
-    paddingBottom: Platform.OS === "ios" ? 28 : 15,
+    paddingBottom: Platform.OS === "ios" ? 24 : 12,
     paddingHorizontal: 8,
   },
   item: {
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
-    gap: 5,
-    minHeight: 62,
+    gap: 4,
+    minHeight: 56,
   },
   iconWrap: {
     width: 42,
-    height: 34,
+    height: 42,
+    borderRadius: 22,
     alignItems: "center",
     justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "transparent",
+  },
+  iconWrapActive: {
+    borderWidth: 1.5,
   },
   label: {
-    fontSize: 13,
-    fontWeight: "400",
+    fontSize: 11,
+    fontWeight: "500",
   },
   badge: {
     position: "absolute",
