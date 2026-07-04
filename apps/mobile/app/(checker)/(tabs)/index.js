@@ -25,7 +25,7 @@ import {
   countAvailablePiecesForDate,
   countDeliveredPiecesForDate,
   countFailedPiecesForDate,
-  countOnVanPiecesForDate,
+  countOutForDeliveryTotalPiecesForDate,
   countReturnedPiecesForDate,
   getDeliveredShipmentsForDate,
   getShipmentActivityDates,
@@ -179,32 +179,43 @@ export default function CheckerIndex() {
   );
 
   const glance = useMemo(() => {
+    const routeTotal = allKnownShipments.reduce(
+      (sum, shipment) =>
+        sum +
+        countOutForDeliveryTotalPiecesForDate(
+          shipment,
+          checkerId,
+          selectedDate,
+        ),
+      0,
+    );
+    const delivered = allKnownShipments.reduce(
+      (sum, shipment) =>
+        sum + countDeliveredPiecesForDate(shipment, checkerId, selectedDate),
+      0,
+    );
+    const failed = allKnownShipments.reduce(
+      (sum, shipment) =>
+        sum + countFailedPiecesForDate(shipment, checkerId, selectedDate),
+      0,
+    );
+    const returned = allKnownShipments.reduce(
+      (sum, shipment) =>
+        sum + countReturnedPiecesForDate(shipment, checkerId, selectedDate),
+      0,
+    );
+
     return {
       available: allKnownShipments.reduce(
         (sum, shipment) =>
           sum + countAvailablePiecesForDate(shipment, checkerId, selectedDate),
         0,
       ),
-      onVan: allKnownShipments.reduce(
-        (sum, shipment) =>
-          sum + countOnVanPiecesForDate(shipment, checkerId, selectedDate),
-        0,
-      ),
-      delivered: allKnownShipments.reduce(
-        (sum, shipment) =>
-          sum + countDeliveredPiecesForDate(shipment, checkerId, selectedDate),
-        0,
-      ),
-      failed: allKnownShipments.reduce(
-        (sum, shipment) =>
-          sum + countFailedPiecesForDate(shipment, checkerId, selectedDate),
-        0,
-      ),
-      returned: allKnownShipments.reduce(
-        (sum, shipment) =>
-          sum + countReturnedPiecesForDate(shipment, checkerId, selectedDate),
-        0,
-      ),
+      routeTotal,
+      onVan: Math.max(routeTotal - delivered - failed - returned, 0),
+      delivered,
+      failed,
+      returned,
     };
   }, [allKnownShipments, checkerId, selectedDate]);
 
@@ -227,7 +238,7 @@ export default function CheckerIndex() {
     [allKnownShipments, selectedDate],
   );
 
-  const goal = glance.onVan;
+  const goal = glance.routeTotal;
   const cards = [
     {
       key: "available",
@@ -310,7 +321,7 @@ export default function CheckerIndex() {
           cards={cards}
           progress={{
             delivered: glance.delivered,
-            total: glance.onVan,
+            total: glance.routeTotal,
             goal,
           }}
           onViewAll={goAvailable}
