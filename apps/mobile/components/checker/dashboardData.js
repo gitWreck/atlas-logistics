@@ -30,16 +30,45 @@ function pieceQty(pkg = {}) {
   return Number.isFinite(qty) && qty > 0 ? qty : 1;
 }
 
-function isCheckerPiece(pkg = {}, checkerUid) {
+function isCheckerPiece(pkg = {}, checkerUid, shipment = {}) {
   if (!checkerUid) return false;
   const uid = String(checkerUid);
   return (
     String(pkg.deliveredByCheckerId || "") === uid ||
     String(pkg.loadedByCheckerId || "") === uid ||
+    String(pkg.failedByUid || "") === uid ||
+    String(pkg.returnedByUid || "") === uid ||
+    String(shipment.failedByUid || "") === uid ||
+    String(shipment.returnedByUid || "") === uid ||
     (normalizeStatus(pkg.custodyOwnerType) === "CHECKER" &&
       String(pkg.custodyOwnerId || "") === uid)
   );
 }
+
+const ACTIVE_ON_VAN_STATUSES = [
+  "LOADED_TO_DELIVERY_VEHICLE",
+  "LOADED",
+  "READY_FOR_DELIVERY",
+  "PARTIALLY_LOADED",
+  "OUT_FOR_DELIVERY",
+];
+
+const DELIVERED_STATUSES = ["DELIVERED", "COMPLETED"];
+
+const FAILED_STATUSES = ["FAILED_DELIVERY"];
+
+const RETURNED_STATUSES = [
+  "RETURNED_TO_WAREHOUSE",
+  "RETURNED_RECEIVED_AT_HUB",
+  "RETURNED_RECEIVED_AT_ODIONGAN",
+];
+
+const ROUTE_TOTAL_STATUSES = [
+  ...ACTIVE_ON_VAN_STATUSES,
+  ...DELIVERED_STATUSES,
+  ...FAILED_STATUSES,
+  ...RETURNED_STATUSES,
+];
 
 function statusMatches(status, targets = []) {
   return targets.includes(normalizeStatus(status));
@@ -71,7 +100,7 @@ function countPiecesForDate(
   const packages = Array.isArray(shipment.packages) ? shipment.packages : [];
   if (packages.length === 0) return predicate(shipment, null) ? 1 : 0;
   return packages.reduce((sum, pkg) => {
-    if (checkerUid && !isCheckerPiece(pkg, checkerUid)) return sum;
+    if (checkerUid && !isCheckerPiece(pkg, checkerUid, shipment)) return sum;
     if (!predicate(shipment, pkg)) return sum;
     return sum + pieceQty(pkg);
   }, 0);
@@ -123,7 +152,7 @@ export function getDeliveredAt(shipment = {}, checkerUid = null) {
   const packages = Array.isArray(shipment.packages) ? shipment.packages : [];
   const pieceTimes = packages
     .filter((pkg) => normalizeStatus(pkg.status) === "DELIVERED")
-    .filter((pkg) => !checkerUid || isCheckerPiece(pkg, checkerUid))
+    .filter((pkg) => !checkerUid || isCheckerPiece(pkg, checkerUid, shipment))
     .map((pkg) => timestampMs(pkg.deliveredAt || pkg.updatedAt))
     .filter(Boolean);
 
@@ -141,7 +170,7 @@ export function getDeliveredAtForDate(
   const packages = Array.isArray(shipment.packages) ? shipment.packages : [];
   const pieceTimes = packages
     .filter((pkg) => normalizeStatus(pkg.status) === "DELIVERED")
-    .filter((pkg) => !checkerUid || isCheckerPiece(pkg, checkerUid))
+    .filter((pkg) => !checkerUid || isCheckerPiece(pkg, checkerUid, shipment))
     .map((pkg) => pkg.deliveredAt || pkg.updatedAt)
     .filter((value) => isSameLocalDay(value, date))
     .map(timestampMs)
@@ -152,7 +181,7 @@ export function getDeliveredAtForDate(
   const deliveredAt =
     shipment.deliveredAt || shipment.completedAt || shipment.updatedAt;
   if (
-    ["DELIVERED", "COMPLETED"].includes(normalizeStatus(shipment.status)) &&
+    statusMatches(shipment.status, DELIVERED_STATUSES) &&
     isSameLocalDay(deliveredAt, date)
   ) {
     return timestampToDate(deliveredAt);
@@ -170,7 +199,7 @@ export function countDeliveredPieces(shipment = {}, checkerUid = null) {
 
   return packages.reduce((sum, pkg) => {
     if (normalizeStatus(pkg.status) !== "DELIVERED") return sum;
-    if (checkerUid && !isCheckerPiece(pkg, checkerUid)) return sum;
+    if (checkerUid && !isCheckerPiece(pkg, checkerUid, shipment)) return sum;
     return sum + pieceQty(pkg);
   }, 0);
 }
@@ -183,13 +212,13 @@ export function countDeliveredPiecesForDate(
   return countPiecesForDate(shipment, checkerUid, date, (s, pkg) => {
     if (!pkg) {
       return (
-        ["DELIVERED", "COMPLETED"].includes(normalizeStatus(s.status)) &&
+        statusMatches(s.status, DELIVERED_STATUSES) &&
         (isSameLocalDay(s.deliveredAt || s.completedAt || s.updatedAt, date) ||
-          statusEventOnDate(s, ["DELIVERED", "COMPLETED"], date))
+          statusEventOnDate(s, DELIVERED_STATUSES, date))
       );
     }
     return (
-      normalizeStatus(pkg.status) === "DELIVERED" &&
+      statusMatches(pkg.status, DELIVERED_STATUSES) &&
       pieceEventOnDate(pkg, ["deliveredAt", "updatedAt"], date)
     );
   });
@@ -244,26 +273,59 @@ export function countOnVanPiecesForDate(
   checkerUid = null,
   date = new Date(),
 ) {
-  const onVanStatuses = [
-    "LOADED_TO_DELIVERY_VEHICLE",
-    "LOADED",
-    "READY_FOR_DELIVERY",
-    "PARTIALLY_LOADED",
-    "OUT_FOR_DELIVERY",
-    "DELIVERED",
-  ];
   return countPiecesForDate(shipment, checkerUid, date, (s, pkg) => {
     if (!pkg) {
       return (
-        statusMatches(s.status, ["OUT_FOR_DELIVERY", "LOADED"]) &&
+        statusMatches(s.status, ACTIVE_ON_VAN_STATUSES) &&
         (isSameLocalDay(s.outForDeliveryAt || s.loadedAt || s.updatedAt, date) ||
           statusEventOnDate(s, ["OUT_FOR_DELIVERY", "LOADED"], date))
       );
     }
     return (
-      statusMatches(pkg.status, onVanStatuses) &&
-      (pieceEventOnDate(pkg, ["outForDeliveryAt", "loadedAt", "deliveredAt"], date) ||
+      statusMatches(pkg.status, ACTIVE_ON_VAN_STATUSES) &&
+      (pieceEventOnDate(pkg, ["outForDeliveryAt", "loadedAt"], date) ||
         statusEventOnDate(s, ["OUT_FOR_DELIVERY", "LOADED"], date))
+    );
+  });
+}
+
+export function countOutForDeliveryTotalPiecesForDate(
+  shipment = {},
+  checkerUid = null,
+  date = new Date(),
+) {
+  return countPiecesForDate(shipment, checkerUid, date, (s, pkg) => {
+    if (!pkg) {
+      return (
+        statusMatches(s.status, ROUTE_TOTAL_STATUSES) &&
+        (isSameLocalDay(
+          s.outForDeliveryAt ||
+            s.loadedAt ||
+            s.deliveredAt ||
+            s.completedAt ||
+            s.failedAt ||
+            s.returnedAt ||
+            s.updatedAt,
+          date,
+        ) ||
+          statusEventOnDate(s, ROUTE_TOTAL_STATUSES, date))
+      );
+    }
+    return (
+      statusMatches(pkg.status, ROUTE_TOTAL_STATUSES) &&
+      (pieceEventOnDate(
+        pkg,
+        [
+          "outForDeliveryAt",
+          "loadedAt",
+          "deliveredAt",
+          "failedAt",
+          "returnedAt",
+          "updatedAt",
+        ],
+        date,
+      ) ||
+        statusEventOnDate(s, ROUTE_TOTAL_STATUSES, date))
     );
   });
 }
@@ -276,13 +338,13 @@ export function countFailedPiecesForDate(
   return countPiecesForDate(shipment, checkerUid, date, (s, pkg) => {
     if (!pkg) {
       return (
-        normalizeStatus(s.status) === "FAILED_DELIVERY" &&
+        statusMatches(s.status, FAILED_STATUSES) &&
         (isSameLocalDay(s.failedAt || s.updatedAt, date) ||
-          statusEventOnDate(s, ["FAILED_DELIVERY"], date))
+          statusEventOnDate(s, FAILED_STATUSES, date))
       );
     }
     return (
-      normalizeStatus(pkg.status) === "FAILED_DELIVERY" &&
+      statusMatches(pkg.status, FAILED_STATUSES) &&
       pieceEventOnDate(pkg, ["failedAt", "updatedAt"], date)
     );
   });
@@ -293,21 +355,16 @@ export function countReturnedPiecesForDate(
   checkerUid = null,
   date = new Date(),
 ) {
-  const returnStatuses = [
-    "RETURNED_TO_WAREHOUSE",
-    "RETURNED_RECEIVED_AT_HUB",
-    "RETURNED_RECEIVED_AT_ODIONGAN",
-  ];
   return countPiecesForDate(shipment, checkerUid, date, (s, pkg) => {
     if (!pkg) {
       return (
-        statusMatches(s.status, returnStatuses) &&
+        statusMatches(s.status, RETURNED_STATUSES) &&
         (isSameLocalDay(s.returnedAt || s.updatedAt, date) ||
-          statusEventOnDate(s, returnStatuses, date))
+          statusEventOnDate(s, RETURNED_STATUSES, date))
       );
     }
     return (
-      statusMatches(pkg.status, returnStatuses) &&
+      statusMatches(pkg.status, RETURNED_STATUSES) &&
       pieceEventOnDate(pkg, ["returnedAt", "updatedAt"], date)
     );
   });
@@ -324,7 +381,7 @@ export function countOutForDeliveryPieces(shipment = {}, checkerUid = null) {
     const isRelevant =
       status === "OUT_FOR_DELIVERY" || status === "DELIVERED";
     if (!isRelevant) return sum;
-    if (checkerUid && !isCheckerPiece(pkg, checkerUid)) return sum;
+    if (checkerUid && !isCheckerPiece(pkg, checkerUid, shipment)) return sum;
     return sum + pieceQty(pkg);
   }, 0);
 }
