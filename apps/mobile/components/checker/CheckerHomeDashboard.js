@@ -1,4 +1,4 @@
-import React, { useMemo } from "react";
+import React from "react";
 import {
   View,
   Text,
@@ -28,6 +28,13 @@ const COLORS = {
   red: "#e21f26",
   orange: "#f5820b",
 };
+
+const SCREEN_PADDING = 20;
+const GRID_GAP = 12;
+
+function clamp(value, min, max) {
+  return Math.min(max, Math.max(min, value));
+}
 
 function formatCount(value) {
   const num = Number(value || 0);
@@ -61,12 +68,19 @@ export function CheckerHomeHero({
   onProfilePress,
   currentDate = new Date(),
 }) {
+  const { width } = useWindowDimensions();
+  const heroHeight = clamp(width * 0.58, 238, 292);
+  const avatarSize = clamp(width * 0.14, 50, 66);
+  const logoutSize = clamp(width * 0.12, 46, 62);
+  const dateWidth = clamp(width * 0.48, 190, 230);
+  const artScale = clamp(width / 430, 0.78, 1);
+
   return (
     <LinearGradient
       colors={["#086cff", "#0757e1", "#043eb7"]}
       start={{ x: 0, y: 0 }}
       end={{ x: 1, y: 1 }}
-      style={styles.hero}
+      style={[styles.hero, { minHeight: heroHeight }]}
     >
       <View style={styles.heroTop}>
         <TouchableOpacity
@@ -74,8 +88,21 @@ export function CheckerHomeHero({
           onPress={onProfilePress}
           activeOpacity={0.8}
         >
-          <View style={styles.heroAvatar}>
-            <FontAwesome5 name="user-check" size={28} color="#0b63ef" />
+          <View
+            style={[
+              styles.heroAvatar,
+              {
+                width: avatarSize,
+                height: avatarSize,
+                borderRadius: avatarSize / 2,
+              },
+            ]}
+          >
+            <FontAwesome5
+              name="user-check"
+              size={clamp(avatarSize * 0.38, 20, 28)}
+              color="#0b63ef"
+            />
           </View>
           <View style={styles.heroGreeting}>
             <Text style={styles.heroHello}>Hello,</Text>
@@ -89,17 +116,28 @@ export function CheckerHomeHero({
         </TouchableOpacity>
 
         <TouchableOpacity
-          style={styles.heroLogout}
+          style={[
+            styles.heroLogout,
+            {
+              width: logoutSize,
+              height: logoutSize,
+              borderRadius: clamp(logoutSize * 0.28, 14, 18),
+            },
+          ]}
           onPress={onLogout}
           activeOpacity={0.82}
         >
-          <FontAwesome5 name="sign-out-alt" size={24} color="#61708c" />
+          <FontAwesome5
+            name="sign-out-alt"
+            size={clamp(logoutSize * 0.38, 18, 24)}
+            color="#61708c"
+          />
         </TouchableOpacity>
       </View>
 
       <View style={styles.heroBottom}>
-        <View style={styles.dateCard}>
-          <FontAwesome5 name="calendar-alt" size={22} color="#ffffff" />
+        <View style={[styles.dateCard, { width: dateWidth }]}>
+          <FontAwesome5 name="calendar-alt" size={18} color="#ffffff" />
           <View style={styles.dateTextBlock}>
             <Text style={styles.dateMain}>
               {format(currentDate, "MMM d, yyyy")}
@@ -109,7 +147,7 @@ export function CheckerHomeHero({
           <FontAwesome5 name="chevron-down" size={14} color="#ffffff" />
         </View>
 
-        <View style={styles.heroArt}>
+        <View style={[styles.heroArt, { transform: [{ scale: artScale }] }]}>
           <View style={styles.cityBarTall} />
           <View style={styles.cityBar} />
           <View style={styles.routeLine} />
@@ -134,17 +172,18 @@ export function DashboardStatCard({
   softColor,
   trend,
   onPress,
+  style,
 }) {
   return (
     <TouchableOpacity
-      style={styles.statCard}
+      style={[styles.statCard, style]}
       onPress={onPress}
       activeOpacity={0.85}
       disabled={!onPress}
     >
       <View style={styles.statTopRow}>
         <View style={[styles.statIcon, { backgroundColor: softColor }]}>
-          <FontAwesome5 name={icon} size={25} color={color} />
+          <FontAwesome5 name={icon} size={21} color={color} />
         </View>
         <View style={styles.statCopy}>
           <Text style={styles.statTitle} numberOfLines={1}>
@@ -191,32 +230,66 @@ export function DashboardStatCard({
   );
 }
 
-export function DeliveryProgressCard({ delivered, total, goal }) {
+export function DeliveryProgressCard({ delivered, total, goal, style }) {
+  const { width } = useWindowDimensions();
+  const cardWidth = Math.floor((width - SCREEN_PADDING * 2 - GRID_GAP) / 2);
+  const ringSize = clamp(cardWidth * 0.46, 66, 90);
+  const ringBorder = clamp(ringSize * 0.11, 8, 10);
   const percentage = total > 0 ? Math.min(100, Math.round((delivered / total) * 100)) : 0;
   const ringRotation = `${Math.round((percentage / 100) * 270)}deg`;
 
   return (
-    <View style={[styles.progressCard, total === 0 && styles.progressEmptyCard]}>
-      <View style={styles.statTopRow}>
-        <View style={[styles.statIcon, { backgroundColor: "#eaf1ff" }]}>
-          <FontAwesome5 name="chart-pie" size={25} color={COLORS.blue} />
-        </View>
-        <View style={styles.statCopy}>
-          <Text style={styles.progressTitle}>Delivery Progress</Text>
-          <Text style={styles.progressSub}>Today</Text>
-        </View>
+    <View style={[styles.progressCard, style, total === 0 && styles.progressEmptyCard]}>
+      <View style={styles.progressTitleBlock}>
+        <Text style={styles.progressTitle}>Delivery Progress</Text>
+        <Text style={styles.progressSub}>Today</Text>
       </View>
 
       {total > 0 ? (
         <View style={styles.progressBody}>
-          <View style={styles.ringWrap}>
-            <View style={styles.ringBase} />
-            <View style={[styles.ringArc, { transform: [{ rotate: ringRotation }] }]} />
+          <View style={[styles.confetti, styles.confettiAmber]} />
+          <View style={[styles.confetti, styles.confettiTeal]} />
+          <View style={[styles.confetti, styles.confettiBlue]} />
+          <View style={[styles.confetti, styles.confettiPink]} />
+          <View style={[styles.confetti, styles.confettiPurple]} />
+          <View
+            style={[
+              styles.ringWrap,
+              {
+                width: ringSize,
+                height: ringSize,
+                borderRadius: ringSize / 2,
+              },
+            ]}
+          >
+            <View
+              style={[
+                styles.ringBase,
+                {
+                  width: ringSize,
+                  height: ringSize,
+                  borderRadius: ringSize / 2,
+                  borderWidth: ringBorder,
+                },
+              ]}
+            />
+            <View
+              style={[
+                styles.ringArc,
+                {
+                  width: ringSize,
+                  height: ringSize,
+                  borderRadius: ringSize / 2,
+                  borderWidth: ringBorder,
+                  transform: [{ rotate: ringRotation }],
+                },
+              ]}
+            />
             <Text style={styles.ringPercent}>{percentage}%</Text>
             <Text style={styles.ringLabel}>of Goal</Text>
           </View>
           <View style={styles.goalRow}>
-            <FontAwesome5 name="flag" size={15} color={COLORS.blue} />
+            <FontAwesome5 name="flag" size={17} color={COLORS.blue} />
             <Text style={styles.goalText}>
               Goal: {goal ? formatCount(goal) : formatCount(total)}
             </Text>
@@ -241,7 +314,8 @@ export function DeliveryProgressCard({ delivered, total, goal }) {
 
 export function TodayAtGlance({ cards, progress, onViewAll }) {
   const { width } = useWindowDimensions();
-  const compact = width < 390;
+  const cardWidth = Math.floor((width - SCREEN_PADDING * 2 - GRID_GAP) / 2);
+  const cardHeight = clamp(cardWidth * 0.78, 148, 178);
 
   return (
     <View style={styles.dashboardPanel}>
@@ -254,15 +328,15 @@ export function TodayAtGlance({ cards, progress, onViewAll }) {
         {cards.map((card) => (
           <View
             key={card.key}
-            style={[styles.statGridItem, compact && styles.statGridItemFull]}
+            style={[styles.statGridItem, { width: cardWidth }]}
           >
-            <DashboardStatCard {...card} />
+            <DashboardStatCard {...card} style={{ height: cardHeight }} />
           </View>
         ))}
         <View
-          style={[styles.statGridItem, compact && styles.statGridItemFull]}
+          style={[styles.statGridItem, { width: cardWidth }]}
         >
-          <DeliveryProgressCard {...progress} />
+          <DeliveryProgressCard {...progress} style={{ height: cardHeight }} />
         </View>
       </View>
     </View>
@@ -285,7 +359,7 @@ export function QuickActionCard({
     >
       <View style={styles.quickGraphic}>
         <View style={[styles.quickIconCircle, { backgroundColor: color }]}>
-          <FontAwesome5 name={icon} size={25} color="#ffffff" />
+          <FontAwesome5 name={icon} size={21} color="#ffffff" />
         </View>
       </View>
       <View style={styles.quickCopy}>
@@ -293,13 +367,16 @@ export function QuickActionCard({
         <Text style={styles.quickSubtitle}>{subtitle}</Text>
       </View>
       <View style={[styles.quickArrow, { backgroundColor: color }]}>
-        <FontAwesome5 name="chevron-right" size={18} color="#ffffff" />
+        <FontAwesome5 name="chevron-right" size={16} color="#ffffff" />
       </View>
     </TouchableOpacity>
   );
 }
 
 export function QuickActions({ onLoad, onRoute, onOffload, onInfo }) {
+  const { width } = useWindowDimensions();
+  const actionWidth = clamp(width * 0.56, 188, 238);
+
   return (
     <View style={styles.quickSection}>
       <View style={styles.quickTitleInset}>
@@ -310,7 +387,7 @@ export function QuickActions({ onLoad, onRoute, onOffload, onInfo }) {
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.quickRail}
       >
-        <View style={styles.quickRailItem}>
+        <View style={[styles.quickRailItem, { width: actionWidth }]}>
           <QuickActionCard
             title="LOAD TO VAN"
             subtitle="Load shipments"
@@ -320,7 +397,7 @@ export function QuickActions({ onLoad, onRoute, onOffload, onInfo }) {
             onPress={onLoad}
           />
         </View>
-        <View style={styles.quickRailItem}>
+        <View style={[styles.quickRailItem, { width: actionWidth }]}>
           <QuickActionCard
             title="MY ROUTE"
             subtitle="View your delivery route"
@@ -330,7 +407,7 @@ export function QuickActions({ onLoad, onRoute, onOffload, onInfo }) {
             onPress={onRoute}
           />
         </View>
-        <View style={styles.quickRailItem}>
+        <View style={[styles.quickRailItem, { width: actionWidth }]}>
           <QuickActionCard
             title="OFFLOAD"
             subtitle="Deliver or return items"
@@ -340,7 +417,7 @@ export function QuickActions({ onLoad, onRoute, onOffload, onInfo }) {
             onPress={onOffload}
           />
         </View>
-        <View style={styles.quickRailItem}>
+        <View style={[styles.quickRailItem, { width: actionWidth }]}>
           <QuickActionCard
             title="SCAN INFO"
             subtitle="Check shipment details"
@@ -361,6 +438,10 @@ export function DeliveredHistoryList({
   onPressShipment,
   title = "HISTORY OF DELIVERED",
 }) {
+  const { width } = useWindowDimensions();
+  const showAddress = width >= 430;
+  const timeWidth = clamp(width * 0.16, 58, 76);
+
   return (
     <View style={styles.historyCard}>
       <SectionTitle icon="clipboard-list" title={title} onViewAll={onViewAll} />
@@ -394,14 +475,19 @@ export function DeliveredHistoryList({
               </Text>
             </View>
             <View style={styles.historyDetails}>
-              <Text style={styles.historyTime}>
+              <Text
+                style={[styles.historyTime, { width: timeWidth }]}
+                numberOfLines={1}
+              >
                 {shipment.deliveredAtDate
                   ? format(shipment.deliveredAtDate, "hh:mm a")
                   : "--:--"}
               </Text>
-              <Text style={styles.historyAddress} numberOfLines={1}>
-                {getDeliveryAddress(shipment)}
-              </Text>
+              {showAddress ? (
+                <Text style={styles.historyAddress} numberOfLines={1}>
+                  {getDeliveryAddress(shipment)}
+                </Text>
+              ) : null}
             </View>
             <View style={styles.deliveredBadge}>
               <Text style={styles.deliveredBadgeText}>Delivered</Text>
@@ -416,10 +502,9 @@ export function DeliveredHistoryList({
 
 const styles = StyleSheet.create({
   hero: {
-    minHeight: 285,
-    paddingHorizontal: 20,
-    paddingTop: 22,
-    paddingBottom: 34,
+    paddingHorizontal: SCREEN_PADDING,
+    paddingTop: 18,
+    paddingBottom: 24,
     borderBottomLeftRadius: 34,
     borderBottomRightRadius: 34,
     overflow: "hidden",
@@ -428,13 +513,13 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    gap: 16,
+    gap: 12,
   },
   profileCluster: {
     flex: 1,
     flexDirection: "row",
     alignItems: "center",
-    gap: 14,
+    gap: 12,
   },
   heroAvatar: {
     width: 74,
@@ -449,22 +534,22 @@ const styles = StyleSheet.create({
   },
   heroHello: {
     color: "#dbe9ff",
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: "500",
   },
   heroName: {
     color: "#ffffff",
-    fontSize: 28,
+    fontSize: 24,
     fontWeight: "900",
     letterSpacing: 0,
     marginTop: 4,
   },
   heroMessage: {
     color: "#eef5ff",
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: "700",
     marginTop: 8,
-    lineHeight: 19,
+    lineHeight: 17,
   },
   heroLogout: {
     width: 62,
@@ -475,21 +560,19 @@ const styles = StyleSheet.create({
     backgroundColor: "#ffffff",
   },
   heroBottom: {
-    marginTop: 34,
+    marginTop: 24,
     flexDirection: "row",
     alignItems: "flex-end",
     justifyContent: "space-between",
     gap: 12,
   },
   dateCard: {
-    minWidth: 214,
-    maxWidth: "58%",
-    minHeight: 72,
+    minHeight: 64,
     borderRadius: 18,
-    paddingHorizontal: 18,
+    paddingHorizontal: 14,
     flexDirection: "row",
     alignItems: "center",
-    gap: 14,
+    gap: 10,
     backgroundColor: "rgba(2, 43, 143, 0.72)",
   },
   dateTextBlock: {
@@ -497,18 +580,18 @@ const styles = StyleSheet.create({
   },
   dateMain: {
     color: "#ffffff",
-    fontSize: 17,
+    fontSize: 15,
     fontWeight: "900",
   },
   dateSub: {
     color: "#e3edff",
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: "600",
     marginTop: 3,
   },
   heroArt: {
     flex: 1,
-    minHeight: 110,
+    minHeight: 92,
     alignItems: "center",
     justifyContent: "flex-end",
     position: "relative",
@@ -551,8 +634,8 @@ const styles = StyleSheet.create({
   },
   dashboardPanel: {
     marginTop: -18,
-    paddingHorizontal: 18,
-    paddingTop: 22,
+    paddingHorizontal: SCREEN_PADDING,
+    paddingTop: 18,
   },
   sectionTitleRow: {
     flexDirection: "row",
@@ -588,19 +671,16 @@ const styles = StyleSheet.create({
   statGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 14,
+    gap: GRID_GAP,
   },
   statGridItem: {
-    width: "48%",
-    flexGrow: 1,
-  },
-  statGridItemFull: {
-    width: "100%",
+    flexGrow: 0,
+    flexShrink: 0,
   },
   statCard: {
-    minHeight: 186,
+    minHeight: 148,
     borderRadius: 18,
-    padding: 18,
+    padding: 16,
     backgroundColor: "#ffffff",
     borderWidth: 1,
     borderColor: COLORS.border,
@@ -610,12 +690,12 @@ const styles = StyleSheet.create({
   statTopRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 13,
+    gap: 10,
   },
   statIcon: {
-    width: 58,
-    height: 58,
-    borderRadius: 17,
+    width: 46,
+    height: 46,
+    borderRadius: 14,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -624,12 +704,12 @@ const styles = StyleSheet.create({
   },
   statTitle: {
     color: COLORS.text,
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: "900",
   },
   statSubtitle: {
     color: COLORS.muted,
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: "600",
     marginTop: 7,
   },
@@ -640,7 +720,7 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   statValue: {
-    fontSize: 33,
+    fontSize: 28,
     fontWeight: "900",
     letterSpacing: 0,
   },
@@ -659,26 +739,32 @@ const styles = StyleSheet.create({
     fontWeight: "800",
   },
   chevronCircle: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: "#ffffff",
     ...cardShadow,
   },
   progressCard: {
-    minHeight: 186,
+    minHeight: 148,
     borderRadius: 18,
-    padding: 18,
+    padding: 16,
     backgroundColor: "#ffffff",
     borderWidth: 1,
     borderColor: COLORS.border,
-    justifyContent: "space-between",
+    alignItems: "center",
+    overflow: "hidden",
     ...cardShadow,
   },
   progressEmptyCard: {
     justifyContent: "space-between",
+  },
+  progressTitleBlock: {
+    width: "100%",
+    alignItems: "flex-start",
+    marginBottom: 2,
   },
   progressTitle: {
     color: COLORS.text,
@@ -692,32 +778,34 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   progressBody: {
-    flexDirection: "row",
-    alignItems: "flex-end",
-    justifyContent: "space-between",
-    gap: 12,
+    flex: 1,
+    width: "100%",
+    alignItems: "center",
+    justifyContent: "center",
+    position: "relative",
+    paddingTop: 2,
   },
   ringWrap: {
-    width: 92,
-    height: 92,
-    borderRadius: 46,
+    width: 90,
+    height: 90,
+    borderRadius: 45,
     alignItems: "center",
     justifyContent: "center",
   },
   ringBase: {
     position: "absolute",
-    width: 92,
-    height: 92,
-    borderRadius: 46,
-    borderWidth: 11,
+    width: 90,
+    height: 90,
+    borderRadius: 45,
+    borderWidth: 10,
     borderColor: "#d6e1f2",
   },
   ringArc: {
     position: "absolute",
-    width: 92,
-    height: 92,
-    borderRadius: 46,
-    borderWidth: 11,
+    width: 90,
+    height: 90,
+    borderRadius: 45,
+    borderWidth: 10,
     borderLeftColor: "#2c6ff3",
     borderTopColor: "#2c6ff3",
     borderRightColor: "transparent",
@@ -725,26 +813,59 @@ const styles = StyleSheet.create({
   },
   ringPercent: {
     color: COLORS.text,
-    fontSize: 22,
+    fontSize: 23,
     fontWeight: "900",
   },
   ringLabel: {
     color: COLORS.muted,
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: "700",
   },
   goalRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
-    maxWidth: 96,
-    paddingBottom: 4,
+    justifyContent: "center",
+    marginTop: 8,
+    maxWidth: "100%",
   },
   goalText: {
     color: COLORS.blue,
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: "800",
     flexShrink: 1,
+  },
+  confetti: {
+    position: "absolute",
+    width: 9,
+    height: 9,
+    borderRadius: 2,
+    transform: [{ rotate: "45deg" }],
+  },
+  confettiAmber: {
+    right: 23,
+    top: 7,
+    backgroundColor: "#f8b400",
+  },
+  confettiTeal: {
+    right: 12,
+    top: 58,
+    backgroundColor: "#62bdb2",
+  },
+  confettiBlue: {
+    right: 28,
+    top: 92,
+    backgroundColor: "#66a7f5",
+  },
+  confettiPink: {
+    right: 7,
+    bottom: 27,
+    backgroundColor: "#f5b6c4",
+  },
+  confettiPurple: {
+    left: 20,
+    top: 34,
+    backgroundColor: "#d8c2f2",
   },
   progressEmpty: {
     flexDirection: "row",
@@ -776,39 +897,39 @@ const styles = StyleSheet.create({
     flexShrink: 1,
   },
   quickSection: {
-    marginTop: 24,
+    marginTop: 20,
   },
   quickTitleInset: {
-    paddingHorizontal: 18,
+    paddingHorizontal: SCREEN_PADDING,
   },
   quickRail: {
-    paddingHorizontal: 18,
-    paddingRight: 24,
+    paddingHorizontal: SCREEN_PADDING,
+    paddingRight: SCREEN_PADDING + 6,
     flexDirection: "row",
-    gap: 14,
+    gap: GRID_GAP,
   },
   quickRailItem: {
-    width: 255,
+    flexShrink: 0,
   },
   quickCard: {
     width: "100%",
-    minHeight: 116,
+    minHeight: 96,
     borderRadius: 18,
     borderWidth: 1,
-    padding: 14,
+    padding: 12,
     flexDirection: "row",
     alignItems: "center",
-    gap: 12,
+    gap: 10,
     ...cardShadow,
   },
   quickGraphic: {
-    width: 68,
+    width: 50,
     alignItems: "center",
   },
   quickIconCircle: {
-    width: 54,
-    height: 54,
-    borderRadius: 27,
+    width: 46,
+    height: 46,
+    borderRadius: 23,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -816,28 +937,28 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   quickTitle: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: "900",
   },
   quickSubtitle: {
     color: COLORS.muted,
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: "600",
-    lineHeight: 19,
+    lineHeight: 17,
     marginTop: 8,
   },
   quickArrow: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
+    width: 38,
+    height: 38,
+    borderRadius: 19,
     alignItems: "center",
     justifyContent: "center",
   },
   historyCard: {
-    marginHorizontal: 18,
-    marginTop: 20,
+    marginHorizontal: SCREEN_PADDING,
+    marginTop: 18,
     borderRadius: 18,
-    paddingHorizontal: 18,
+    paddingHorizontal: 14,
     paddingTop: 16,
     paddingBottom: 8,
     backgroundColor: "#ffffff",
@@ -846,10 +967,10 @@ const styles = StyleSheet.create({
     ...cardShadow,
   },
   historyRow: {
-    minHeight: 72,
+    minHeight: 68,
     flexDirection: "row",
     alignItems: "center",
-    gap: 12,
+    gap: 8,
     paddingVertical: 11,
   },
   historyDivider: {
@@ -857,38 +978,39 @@ const styles = StyleSheet.create({
     borderBottomColor: "#dce5f3",
   },
   historyIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: 11,
+    width: 34,
+    height: 34,
+    borderRadius: 10,
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: "#dff6e8",
   },
   historyIdentity: {
-    flex: 1.1,
-    minWidth: 86,
+    flex: 1,
+    minWidth: 0,
   },
   historyShipment: {
     color: COLORS.text,
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: "900",
   },
   historyName: {
     color: COLORS.muted,
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: "600",
     marginTop: 4,
   },
   historyDetails: {
-    flex: 1.5,
+    flexShrink: 0,
     borderLeftWidth: 1,
     borderLeftColor: "#dce5f3",
-    paddingLeft: 18,
+    paddingLeft: 8,
   },
   historyTime: {
     color: COLORS.text,
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: "700",
+    textAlign: "left",
   },
   historyAddress: {
     color: COLORS.muted,
@@ -899,12 +1021,12 @@ const styles = StyleSheet.create({
   deliveredBadge: {
     borderRadius: 7,
     backgroundColor: "#dff5e7",
-    paddingHorizontal: 10,
+    paddingHorizontal: 8,
     paddingVertical: 6,
   },
   deliveredBadgeText: {
     color: COLORS.green,
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: "800",
   },
   historyEmpty: {
