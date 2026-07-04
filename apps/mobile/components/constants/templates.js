@@ -31,9 +31,9 @@ export const BADGE_COLORS = {
     border: "#FDE68A",
   },
   IN_TRANSIT: {
-    bg: "#EFF6FF",
-    text: "#1447E6",
-    border: "#BEDBFF",
+    bg: "#ECFDF5",
+    text: "#166534",
+    border: "#A7F3D0",
   },
   ARRIVED: {
     bg: "#F0F9FF",
@@ -65,17 +65,22 @@ export const BADGE_COLORS = {
     text: "#15803D",
     border: "#BBF7D0",
   },
+  ACTIVE: {
+    bg: "#ECFDF5",
+    text: "#166534",
+    border: "#A7F3D0",
+  },
   COMPLETED: {
-    bg: "#F0FDF4",
-    text: "#15803D",
-    border: "#BBF7D0",
+    bg: "#F8FAFC",
+    text: "#475569",
+    border: "#CBD5E1",
   },
 
   // --- LOCAL PICKUP WORKFLOW ---
   PENDING_PICKUP: {
-    bg: "rgba(249, 115, 22, 0.15)", // Orange (Needs Attention)
-    text: "#f97316",
-    border: "rgba(249, 115, 22, 0.5)",
+    bg: "#FEF3C7",
+    text: "#92400E",
+    border: "#FDE68A",
   },
   PICKED_UP: {
     bg: "#F0FDFA",
@@ -85,14 +90,14 @@ export const BADGE_COLORS = {
 
   // --- DELIVERY WORKFLOW ---
   RECEIVED: {
-    bg: "#FFF7ED",
-    text: "#C2410C",
-    border: "#FED7AA",
+    bg: "#F8FAFC",
+    text: "#475569",
+    border: "#CBD5E1",
   },
   OUT_FOR_DELIVERY: {
-    bg: "#FAF5FF",
-    text: "#7E22CE",
-    border: "#E9D5FF",
+    bg: "#ECFDF5",
+    text: "#166534",
+    border: "#A7F3D0",
   },
   PARTIALLY_DELIVERED: {
     bg: "#CCFBF1",
@@ -105,15 +110,20 @@ export const BADGE_COLORS = {
     border: "#BFDBFE",
   },
   DELIVERED: {
-    bg: "#F0FDF4",
-    text: "#15803D",
-    border: "#BBF7D0",
+    bg: "#F8FAFC",
+    text: "#475569",
+    border: "#CBD5E1",
+  },
+  RETURNED: {
+    bg: "#FFEDD5",
+    text: "#C2410C",
+    border: "#FED7AA",
   },
 
   // --- EXCEPTIONS & FAILURES (NEW) ---
   FAILED_DELIVERY: {
     bg: "rgba(239, 68, 68, 0.15)", // Red
-    text: "#ef4444",
+    text: "#b91c1c",
     border: "rgba(239, 68, 68, 0.5)",
   },
   FAILED_PICKUP: {
@@ -122,9 +132,9 @@ export const BADGE_COLORS = {
     border: "rgba(239, 68, 68, 0.5)",
   },
   CANCELLED: {
-    bg: "rgba(100, 116, 139, 0.15)", // Dark Slate
-    text: "#64748b",
-    border: "rgba(100, 116, 139, 0.5)",
+    bg: "rgba(254, 226, 226, 0.9)",
+    text: "#b91c1c",
+    border: "rgba(239, 68, 68, 0.5)",
   },
 
   // --- FALLBACK ---
@@ -156,6 +166,11 @@ export const BADGE_COLORS_DARK = {
     text: "#fbbf24",
     border: "rgba(251, 191, 36, 0.5)",
   },
+  ACTIVE: {
+    bg: "rgba(34, 197, 94, 0.2)",
+    text: "#4ade80",
+    border: "rgba(34, 197, 94, 0.5)",
+  },
   IN_TRANSIT: {
     bg: "rgba(34, 197, 94, 0.2)",
     text: "#4ade80",
@@ -167,14 +182,14 @@ export const BADGE_COLORS_DARK = {
     border: "rgba(56, 189, 248, 0.5)",
   },
   COMPLETED: {
-    bg: "rgba(34, 197, 94, 0.15)",
-    text: "#4ade80",
-    border: "rgba(34, 197, 94, 0.5)",
+    bg: "rgba(148, 163, 184, 0.15)",
+    text: "#cbd5e1",
+    border: "rgba(148, 163, 184, 0.5)",
   },
   PENDING_PICKUP: {
-    bg: "rgba(249, 115, 22, 0.15)",
+    bg: "rgba(245, 158, 11, 0.15)",
     text: "#fb923c",
-    border: "rgba(249, 115, 22, 0.5)",
+    border: "rgba(245, 158, 11, 0.5)",
   },
   PICKED_UP: {
     bg: "rgba(45, 212, 191, 0.15)",
@@ -182,14 +197,19 @@ export const BADGE_COLORS_DARK = {
     border: "rgba(45, 212, 191, 0.5)",
   },
   RECEIVED: {
-    bg: "rgba(251, 146, 60, 0.15)",
-    text: "#fb923c",
-    border: "rgba(251, 146, 60, 0.5)",
+    bg: "rgba(148, 163, 184, 0.15)",
+    text: "#cbd5e1",
+    border: "rgba(148, 163, 184, 0.5)",
+  },
+  RECEIVED_AT_DIVISORIA: {
+    bg: "rgba(148, 163, 184, 0.15)",
+    text: "#cbd5e1",
+    border: "rgba(148, 163, 184, 0.5)",
   },
   OUT_FOR_DELIVERY: {
-    bg: "rgba(192, 132, 252, 0.15)",
-    text: "#e879f9",
-    border: "rgba(192, 132, 252, 0.5)",
+    bg: "rgba(34, 197, 94, 0.2)",
+    text: "#4ade80",
+    border: "rgba(34, 197, 94, 0.5)",
   },
   PARTIALLY_DELIVERED: {
     bg: "rgba(45, 212, 191, 0.15)",
@@ -202,9 +222,14 @@ export const BADGE_COLORS_DARK = {
     border: "rgba(59, 130, 246, 0.5)",
   },
   DELIVERED: {
-    bg: "rgba(34, 197, 94, 0.15)",
-    text: "#4ade80",
-    border: "rgba(34, 197, 94, 0.5)",
+    bg: "rgba(148, 163, 184, 0.15)",
+    text: "#cbd5e1",
+    border: "rgba(148, 163, 184, 0.5)",
+  },
+  RETURNED: {
+    bg: "rgba(251, 146, 60, 0.15)",
+    text: "#fb923c",
+    border: "rgba(251, 146, 60, 0.5)",
   },
   FAILED_DELIVERY: {
     bg: "rgba(239, 68, 68, 0.15)",

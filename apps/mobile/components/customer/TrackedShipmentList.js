@@ -1,41 +1,142 @@
-import React, { useState, useMemo } from "react";
+import React, { useMemo, useState } from "react";
 import {
-  View,
-  Text,
   ScrollView,
-  TouchableOpacity,
+  Image,
   StyleSheet,
+  Text,
   TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
-import { FontAwesome5 } from "@expo/vector-icons";
-import StatusBadge from "../ui/StatusBadge";
+import { LinearGradient } from "expo-linear-gradient";
+import Feather from "@expo/vector-icons/Feather";
+
 import { getFormattedTime } from "../utilities/helpers";
 import { useTheme } from "../../contexts/ThemeContext";
+
+const emptyShipmentArt = require("../../assets/customer/empty-active-shipment.png");
 
 const FILTER_OPTIONS = [
   { label: "All", value: "ALL" },
   { label: "Active", value: "ACTIVE" },
+  { label: "Pending", value: "PENDING" },
+  { label: "In Transit", value: "IN_TRANSIT" },
   { label: "Delivered", value: "DELIVERED" },
 ];
 
-export default function TrackedShipmentList({ shipments, onShipmentPress }) {
-  const { colors, resolvedScheme } = useTheme();
+const normalizeStatus = (status) => String(status || "PENDING").toUpperCase();
+
+const INACTIVE_SHIPMENT_STATUSES = new Set([
+  "DELIVERED",
+  "COMPLETED",
+  "CANCELLED",
+  "RECEIVED",
+  "RECEIVED_AT_DIVISORIA",
+]);
+
+function getStatusLabel(status) {
+  const current = normalizeStatus(status);
+  const labels = {
+    PENDING_PICKUP: "PENDING PICKUP",
+    IN_TRANSIT: "IN TRANSIT",
+    OUT_FOR_DELIVERY: "OUT FOR DELIVERY",
+    COMPLETED: "DELIVERED",
+    RECEIVED: "DELIVERED",
+    RECEIVED_AT_DIVISORIA: "DELIVERED",
+  };
+  return labels[current] || current.replace(/_/g, " ");
+}
+
+function getStatusTheme(status, colors) {
+  const current = normalizeStatus(status);
+  if (current === "PENDING_PICKUP") {
+    return { bg: colors.warningSoft, text: colors.warning, border: colors.warning };
+  }
+  if (current === "ACTIVE" || current === "IN_TRANSIT" || current === "OUT_FOR_DELIVERY") {
+    return { bg: colors.successSoft, text: colors.success, border: colors.success };
+  }
+  if (
+    current === "DELIVERED" ||
+    current === "COMPLETED" ||
+    current === "RECEIVED" ||
+    current === "RECEIVED_AT_DIVISORIA"
+  ) {
+    return {
+      bg: colors.neutralSoft,
+      text: colors.neutral,
+      border: colors.neutralBorder,
+    };
+  }
+  if (current === "CANCELLED" || current === "FAILED_DELIVERY") {
+    return { bg: colors.dangerSoft, text: colors.danger, border: colors.danger };
+  }
+  if (current === "RETURNED" || current.startsWith("RETURNED_")) {
+    return { bg: colors.orangeSoft, text: colors.orange, border: colors.orangeBorder };
+  }
+  return { bg: colors.warningSoft, text: colors.warning, border: colors.warning };
+}
+
+function CompactStatusBadge({ status }) {
+  const { colors } = useTheme();
+  const theme = getStatusTheme(status, colors);
+
+  return (
+    <View
+      style={[
+        styles.statusBadge,
+        { backgroundColor: theme.bg, borderColor: theme.border },
+      ]}
+    >
+      <Text style={[styles.statusBadgeText, { color: theme.text }]} numberOfLines={1}>
+        {getStatusLabel(status)}
+      </Text>
+    </View>
+  );
+}
+
+export default function TrackedShipmentList({
+  shipments,
+  onShipmentPress,
+  onCreateShipment,
+  activeFilter = "ALL",
+  onFilterChange,
+  sortOrder = "LATEST",
+}) {
+  const { colors } = useTheme();
   const [searchText, setSearchText] = useState("");
-  const [activeFilter, setActiveFilter] = useState("ALL");
 
   const filteredShipments = useMemo(() => {
     let filtered = shipments || [];
 
-    // 1. Apply Filter Toggle
     if (activeFilter === "ACTIVE") {
-      filtered = filtered.filter(
-        (s) => s.status !== "DELIVERED" && s.status !== "CANCELLED",
-      );
+      filtered = filtered.filter((s) => {
+        const status = normalizeStatus(s.status);
+        return !INACTIVE_SHIPMENT_STATUSES.has(status);
+      });
     } else if (activeFilter === "DELIVERED") {
-      filtered = filtered.filter((s) => s.status === "DELIVERED");
+      filtered = filtered.filter((s) => {
+        const status = normalizeStatus(s.status);
+        return (
+          status === "DELIVERED" ||
+          status === "COMPLETED" ||
+          status === "RECEIVED" ||
+          status === "RECEIVED_AT_DIVISORIA"
+        );
+      });
+    } else if (activeFilter === "PENDING") {
+      filtered = filtered.filter((s) => normalizeStatus(s.status).includes("PENDING"));
+    } else if (activeFilter === "IN_TRANSIT") {
+      filtered = filtered.filter((s) => {
+        const status = normalizeStatus(s.status);
+        return status === "IN_TRANSIT" || status === "OUT_FOR_DELIVERY";
+      });
+    } else if (activeFilter === "CANCELLED") {
+      filtered = filtered.filter((s) => {
+        const status = normalizeStatus(s.status);
+        return status === "CANCELLED" || status === "FAILED_DELIVERY";
+      });
     }
 
-    // 2. Apply Text Search
     if (searchText.trim()) {
       const term = searchText.toLowerCase().trim();
       filtered = filtered.filter((s) => {
@@ -45,6 +146,9 @@ export default function TrackedShipmentList({ shipments, onShipmentPress }) {
         const destText = String(
           s.destination || s.recipient?.address?.city || "",
         ).toLowerCase();
+        const originText = String(
+          s.origin || s.sender?.address?.city || "",
+        ).toLowerCase();
         const nameText = String(
           s.recipient?.name || s.receiverName || "",
         ).toLowerCase();
@@ -52,212 +156,219 @@ export default function TrackedShipmentList({ shipments, onShipmentPress }) {
         return (
           trackingText.includes(term) ||
           destText.includes(term) ||
+          originText.includes(term) ||
           nameText.includes(term)
         );
       });
     }
 
-    return filtered;
-  }, [shipments, searchText, activeFilter]);
+    const getSortTime = (shipment) => {
+      const raw =
+        shipment.rawUpdatedAt ||
+        shipment.updatedAt ||
+        shipment.rawCreatedAt ||
+        shipment.createdAt;
+      if (!raw) return 0;
+      const date = raw.toDate ? raw.toDate() : new Date(raw);
+      const time = date?.getTime?.();
+      return Number.isFinite(time) ? time : 0;
+    };
 
-  // List State
+    return [...filtered].sort((a, b) => {
+      const diff = getSortTime(b) - getSortTime(a);
+      return sortOrder === "OLDEST" ? -diff : diff;
+    });
+  }, [shipments, searchText, activeFilter, sortOrder]);
+
   return (
     <View style={styles.container}>
-      <View style={styles.sectionHeaderRow}>
-        <Text style={[styles.sectionTitle, { color: colors.text }]}>
-          My Shipments
-        </Text>
+      <View
+        style={[
+          styles.searchContainer,
+          {
+            backgroundColor: colors.dashboardSurfaceMuted,
+            borderColor: colors.dashboardBorder,
+          },
+        ]}
+      >
+        <Feather name="search" size={16} color={colors.iconMuted} />
+        <TextInput
+          style={[styles.searchInput, { color: colors.text }]}
+          placeholder="Search tracking number, city, name..."
+          placeholderTextColor={colors.textMuted}
+          value={searchText}
+          onChangeText={setSearchText}
+        />
+        {searchText.length > 0 && (
+          <TouchableOpacity onPress={() => setSearchText("")}>
+            <Feather name="x-circle" size={16} color={colors.iconMuted} />
+          </TouchableOpacity>
+        )}
       </View>
 
-      {/* Search Bar */}
-      <View style={styles.searchRow}>
-        <View
-          style={[
-            styles.searchContainer,
-            { backgroundColor: colors.surface, borderColor: colors.border },
-          ]}
-        >
-          <FontAwesome5 name="search" size={14} color={colors.textMuted} />
-          <TextInput
-            style={[styles.searchInput, { color: colors.text }]}
-            placeholder="Search tracking, city, name..."
-            placeholderTextColor={colors.textMuted}
-            value={searchText}
-            onChangeText={setSearchText}
-          />
-          {searchText.length > 0 && (
-            <TouchableOpacity onPress={() => setSearchText("")}>
-              <FontAwesome5
-                name="times-circle"
-                size={14}
-                color={colors.textMuted}
-              />
-            </TouchableOpacity>
-          )}
-        </View>
-      </View>
-
-      {/* Filters Toggle */}
-      <View style={styles.tabsContainer}>
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.tabsContent}
-        >
-          {FILTER_OPTIONS.map((opt) => {
-            const isActive = activeFilter === opt.value;
-            const activeChipColors =
-              resolvedScheme === "dark"
-                ? { bg: "#0284c7", border: "#0284c7", text: "#ffffff" }
-                : { bg: "#0f172a", border: "#0f172a", text: "#ffffff" };
-
-            return (
-              <TouchableOpacity
-                key={opt.value}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.filtersContent}
+        style={styles.filtersScroll}
+      >
+        {FILTER_OPTIONS.map((opt) => {
+          const isActive = activeFilter === opt.value;
+          return (
+            <TouchableOpacity
+              key={opt.value}
+              style={[
+                styles.filterChip,
+                {
+                  backgroundColor: isActive ? colors.primary : colors.dashboardSurfaceMuted,
+                  borderColor: isActive ? colors.primary : colors.dashboardBorder,
+                },
+              ]}
+              onPress={() => onFilterChange?.(opt.value)}
+              activeOpacity={0.8}
+            >
+              <Text
                 style={[
-                  styles.tabChip,
-                  isActive
-                    ? {
-                        backgroundColor: activeChipColors.bg,
-                        borderColor: activeChipColors.border,
-                      }
-                    : {
-                        backgroundColor: colors.surface,
-                        borderColor: colors.border,
-                      },
+                  styles.filterText,
+                  { color: isActive ? colors.onPrimary : colors.textMuted },
                 ]}
-                onPress={() => setActiveFilter(opt.value)}
               >
-                <Text
-                  style={[
-                    styles.tabChipText,
-                    {
-                      color: isActive
-                        ? activeChipColors.text
-                        : colors.textMuted,
-                      fontWeight: isActive ? "700" : "600",
-                    },
-                  ]}
-                >
-                  {opt.label}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
-        </ScrollView>
-      </View>
+                {opt.label}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
+      </ScrollView>
 
-      <ScrollView contentContainerStyle={styles.listContent}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.listContent}
+      >
         {!shipments || shipments.length === 0 ? (
           <View style={styles.emptyState}>
-            <FontAwesome5
-              name="box-open"
-              size={40}
-              color={colors.textMuted}
-              style={{ marginBottom: 12 }}
+            <Image
+              source={emptyShipmentArt}
+              style={styles.emptyIllustration}
+              resizeMode="contain"
             />
-            <Text style={[styles.emptyText, { color: colors.textMuted }]}>
-              You haven’t added any shipments yet.
+            <Text style={[styles.emptyTitle, { color: colors.text }]}>
+              No shipments yet
             </Text>
+            <Text style={[styles.emptyText, { color: colors.textMuted }]}>
+              You don't have any shipments.{"\n"}
+              Create your first shipment to{"\n"}
+              start tracking.
+            </Text>
+            {onCreateShipment ? (
+              <TouchableOpacity
+                activeOpacity={0.85}
+                onPress={onCreateShipment}
+              >
+                <LinearGradient
+                  colors={[colors.primary, colors.primaryDeep]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={styles.emptyButton}
+                >
+                  <Feather name="plus-circle" size={15} color={colors.onPrimary} />
+                  <Text style={[styles.emptyButtonText, { color: colors.onPrimary }]}>
+                    Create Shipment
+                  </Text>
+                </LinearGradient>
+              </TouchableOpacity>
+            ) : null}
           </View>
         ) : filteredShipments.length === 0 ? (
           <View style={styles.emptyState}>
+            <Text style={[styles.emptyTitle, { color: colors.text }]}>
+              No matches found
+            </Text>
             <Text style={[styles.emptyText, { color: colors.textMuted }]}>
-              No shipments match your search.
+              Try another tracking number, city, or name.
             </Text>
           </View>
         ) : (
-          filteredShipments.map((item) => (
-            <TouchableOpacity
-              key={item.id}
-              style={[
-                styles.shipmentCard,
-                { backgroundColor: colors.surface, borderColor: colors.border },
-              ]}
-              activeOpacity={0.85}
-              onPress={() => onShipmentPress(item)}
-            >
-              {/* Header: Tracking Badge */}
-              <View style={styles.cardHeader}>
-                <View
-                  style={[styles.idBox, { backgroundColor: colors.cardMuted }]}
-                >
-                  <FontAwesome5 name="box" size={12} color="#067FC6" />
-                  <Text style={styles.trackingValue}>
-                    {item.trackingNumber || item.shipmentId || item.id}
-                  </Text>
-                </View>
-                <StatusBadge status={item.status} />
-              </View>
+          filteredShipments.map((item) => {
+            const trackingNumber = item.trackingNumber || item.shipmentId || item.id;
+            const origin = item.origin || item.sender?.address?.city || "Origin";
+            const destination =
+              item.destination || item.recipient?.address?.city || "Destination";
+            const recipient = item.recipient?.name || item.receiverName || "Unknown";
+            const status = normalizeStatus(item.status);
+            const dateLabel =
+              status === "DELIVERED" ||
+              status === "COMPLETED" ||
+              status === "RECEIVED" ||
+              status === "RECEIVED_AT_DIVISORIA"
+                ? "Delivered"
+                : item.rawUpdatedAt || item.updatedAt
+                  ? "Updated"
+                  : "Created";
 
-              {/* Body: High-level Route/Details */}
-              <View style={styles.cardBody}>
-                <View style={styles.infoRow}>
-                  <FontAwesome5
-                    name="map-marker-alt"
-                    size={12}
-                    color={colors.textMuted}
-                    style={styles.infoIcon}
-                  />
-                  <Text
-                    style={[styles.infoText, { color: colors.text }]}
-                    numberOfLines={1}
-                  >
-                    {item.origin || item.sender?.address?.city || "Origin"}
-                    {" ➔ "}
-                    {item.destination ||
-                      item.recipient?.address?.city ||
-                      "Destination"}
-                  </Text>
+            return (
+              <TouchableOpacity
+                key={item.id}
+                style={[
+                  styles.shipmentCard,
+                  {
+                    backgroundColor: colors.dashboardSurface,
+                    borderColor: colors.dashboardBorder,
+                    shadowColor: colors.dashboardShadow,
+                  },
+                ]}
+                activeOpacity={0.86}
+                onPress={() => onShipmentPress(item)}
+              >
+                <View style={styles.cardHeader}>
+                  <View style={styles.trackingRow}>
+                    <View style={[styles.packageIcon, { backgroundColor: colors.primary }]}>
+                      <Feather name="package" size={14} color={colors.onPrimary} />
+                    </View>
+                    <Text
+                      style={[styles.trackingValue, { color: colors.primary }]}
+                      numberOfLines={1}
+                    >
+                      {trackingNumber}
+                    </Text>
+                  </View>
+                  <CompactStatusBadge status={item.status} />
                 </View>
-                <View style={styles.infoRow}>
-                  <FontAwesome5
-                    name="user"
-                    size={12}
-                    color={colors.textMuted}
-                    style={styles.infoIcon}
-                  />
-                  <Text
-                    style={[styles.infoText, { color: colors.text }]}
-                    numberOfLines={1}
-                  >
-                    To: {item.recipient?.name || item.receiverName || "Unknown"}
-                  </Text>
-                </View>
-                {(item.totalItems > 0 || item.packageCount > 0) && (
+
+                <View style={styles.infoStack}>
                   <View style={styles.infoRow}>
-                    <FontAwesome5
-                      name="cube"
-                      size={12}
-                      color={colors.textMuted}
-                      style={styles.infoIcon}
-                    />
+                    <Feather name="map-pin" size={13} color={colors.iconMuted} />
+                    <Text
+                      style={[styles.routeText, { color: colors.text }]}
+                      numberOfLines={1}
+                    >
+                      {origin} {"\u2192"} {destination}
+                    </Text>
+                  </View>
+                  <View style={styles.infoRow}>
+                    <Feather name="user" size={13} color={colors.iconMuted} />
                     <Text
                       style={[styles.infoText, { color: colors.text }]}
                       numberOfLines={1}
                     >
-                      {item.totalItems || item.packageCount} Items
+                      To: {recipient}
                     </Text>
                   </View>
-                )}
-              </View>
+                </View>
 
-              {/* Bottom Row: Hint & Time */}
-              <View
-                style={[
-                  styles.cardBottomRow,
-                  { borderTopColor: colors.border },
-                ]}
-              >
-                <Text style={[styles.trackingHint, { color: colors.textMuted }]}>
-                  Tap to view live status...
-                </Text>
-                <Text style={[styles.timeText, { color: colors.textMuted }]}>
-                  {getFormattedTime(item.rawUpdatedAt || item.updatedAt)}
-                </Text>
-              </View>
-            </TouchableOpacity>
-          ))
+                <View style={[styles.cardFooter, { borderTopColor: colors.dashboardBorder }]}>
+                  <Text style={[styles.footerDate, { color: colors.textMuted }]} numberOfLines={1}>
+                    {dateLabel}: {getFormattedTime(item.rawUpdatedAt || item.updatedAt || item.rawCreatedAt || item.createdAt)}
+                  </Text>
+                  <View style={styles.detailsRow}>
+                    <Text style={[styles.detailsText, { color: colors.primary }]}>
+                      View Details
+                    </Text>
+                    <Feather name="chevron-right" size={15} color={colors.iconMuted} />
+                  </View>
+                </View>
+              </TouchableOpacity>
+            );
+          })
         )}
       </ScrollView>
     </View>
@@ -268,143 +379,174 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  sectionHeaderRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: 12,
-  },
-  sectionTitle: {
-    fontSize: 15,
-    fontWeight: "600",
-    color: "#0f172a",
-    marginBottom: 8,
-  },
-  searchRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 12,
-  },
   searchContainer: {
-    flex: 1,
+    height: 42,
+    borderRadius: 11,
+    borderWidth: 1,
+    paddingHorizontal: 14,
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#ffffff",
-    paddingHorizontal: 16,
-    borderRadius: 12,
-    height: 44,
-    borderWidth: 1,
-    borderColor: "#e2e8f0",
+    marginBottom: 11,
   },
   searchInput: {
     flex: 1,
-    color: "#0f172a",
     marginLeft: 10,
-    fontSize: 14,
+    fontSize: 13,
+    fontWeight: "400",
   },
-  tabsContainer: {
-    marginBottom: 16,
+  filtersScroll: {
+    flexGrow: 0,
+    marginBottom: 12,
   },
-  tabsContent: {
-    gap: 8,
+  filtersContent: {
+    gap: 9,
+    paddingRight: 6,
   },
-  tabChip: {
-    paddingHorizontal: 16,
-    height: 32,
-    borderRadius: 999,
+  filterChip: {
+    height: 31,
+    minWidth: 58,
+    borderRadius: 16,
     borderWidth: 1,
+    paddingHorizontal: 14,
     alignItems: "center",
     justifyContent: "center",
   },
-  tabChipText: {
+  filterText: {
     fontSize: 12,
-    fontWeight: "600",
+    fontWeight: "700",
+  },
+  listContent: {
+    paddingBottom: 118,
+    flexGrow: 1,
   },
   emptyState: {
     alignItems: "center",
-    marginTop: 40,
-    paddingHorizontal: 12,
+    paddingTop: 68,
+    paddingHorizontal: 24,
   },
-  emptyText: {
-    color: "#64748b",
-    fontSize: 14,
-    textAlign: "center",
+  emptyIllustration: {
+    width: 154,
+    height: 142,
     marginBottom: 4,
   },
-  emptyTextMuted: {
-    color: "#94a3b8",
-    fontSize: 13,
+  emptyTitle: {
+    marginTop: 8,
+    fontSize: 18,
+    fontWeight: "700",
     textAlign: "center",
   },
-  listContent: {
-    paddingBottom: 24,
+  emptyText: {
+    marginTop: 10,
+    fontSize: 14,
+    textAlign: "center",
+    lineHeight: 22,
+    maxWidth: 280,
+  },
+  emptyButton: {
+    marginTop: 26,
+    width: 220,
+    height: 42,
+    borderRadius: 8,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+  },
+  emptyButtonText: {
+    fontSize: 14,
+    fontWeight: "700",
+    textAlign: "center",
   },
   shipmentCard: {
-    backgroundColor: "#ffffff",
     borderRadius: 12,
-    padding: 16,
     borderWidth: 1,
-    borderColor: "#e2e8f0",
-    marginBottom: 12,
-    elevation: 2,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 3,
+    paddingHorizontal: 13,
+    paddingTop: 12,
+    paddingBottom: 10,
+    marginBottom: 10,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.08,
+    shadowRadius: 14,
+    elevation: 1,
   },
   cardHeader: {
     flexDirection: "row",
+    alignItems: "flex-start",
     justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 12,
+    gap: 10,
+    marginBottom: 10,
   },
-  idBox: {
+  trackingRow: {
+    flex: 1,
+    minWidth: 0,
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
-    backgroundColor: "#f0f9ff",
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 8,
+  },
+  packageIcon: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 8,
   },
   trackingValue: {
+    flex: 1,
     fontSize: 14,
     fontWeight: "700",
-    color: "#067FC6",
   },
-  cardBody: {
-    marginBottom: 12,
-    gap: 6,
+  statusBadge: {
+    maxWidth: 94,
+    minHeight: 24,
+    borderRadius: 6,
+    borderWidth: 1,
+    paddingHorizontal: 8,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  statusBadgeText: {
+    fontSize: 9,
+    fontWeight: "800",
+  },
+  infoStack: {
+    gap: 7,
+    marginBottom: 11,
   },
   infoRow: {
     flexDirection: "row",
     alignItems: "center",
+    gap: 8,
   },
-  infoIcon: {
-    width: 16,
-    textAlign: "center",
-    marginRight: 6,
+  routeText: {
+    flex: 1,
+    fontSize: 13,
+    fontWeight: "700",
   },
   infoText: {
-    fontSize: 13,
-    color: "#334155",
     flex: 1,
+    fontSize: 13,
+    fontWeight: "500",
   },
-  trackingHint: {
-    fontSize: 12,
-    color: "#64748b",
-  },
-  cardBottomRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
+  cardFooter: {
     borderTopWidth: 1,
-    borderTopColor: "#f1f5f9",
-    paddingTop: 12,
+    paddingTop: 10,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 8,
   },
-  timeText: {
+  footerDate: {
+    flex: 1,
     fontSize: 11,
-    color: "#94a3b8",
-    fontWeight: "600",
+    fontWeight: "500",
+  },
+  detailsRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+  detailsText: {
+    fontSize: 11,
+    fontWeight: "700",
   },
 });

@@ -12,7 +12,7 @@ import {
   ActivityIndicator,
   Alert,
 } from "react-native";
-import { FontAwesome5 } from "@expo/vector-icons";
+import FontAwesome5 from "@expo/vector-icons/FontAwesome5";
 import { auth } from "../../../firebase";
 
 // We use the logic from your Web InputGroup but adapted for React Native
@@ -301,12 +301,14 @@ export default function RequestPickupModal({
           </View>
         </KeyboardAvoidingView>
       </View>
-      <MapPickupModal
-        visible={showMapModal}
-        initialLocation={location}
-        onClose={() => setShowMapModal(false)}
-        onConfirm={(newLoc) => setLocation(newLoc)}
-      />
+      {showMapModal && (
+        <MapPickupModal
+          visible={showMapModal}
+          initialLocation={location}
+          onClose={() => setShowMapModal(false)}
+          onConfirm={(newLoc) => setLocation(newLoc)}
+        />
+      )}
     </Modal>
   );
 }
