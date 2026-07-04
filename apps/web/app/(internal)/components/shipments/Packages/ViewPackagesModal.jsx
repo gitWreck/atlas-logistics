@@ -16,8 +16,6 @@ import {
 } from "@fortawesome/free-solid-svg-icons";
 import { auth } from "@/lib/firebase";
 import { updateShipmentPackages } from "@/app/utility/FirebaseFunctions";
-import SplitShipmentModal from "./SplitShipmentModal";
-import PackageBulkActionBar from "./PackageBulkActionBar";
 import AddPackageForm from "./AddPackageForm";
 import {
   getModalThemeClasses,
@@ -86,12 +84,10 @@ export default function ViewPackagesModal({
   const [fullShipment, setFullShipment] = useState(null);
   const [loading, setLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  const [selectedIndices, setSelectedIndices] = useState(new Set());
   const [editingId, setEditingId] = useState(null);
   const [editForm, setEditForm] = useState({});
   const [isAdding, setIsAdding] = useState(false);
   const [newPackage, setNewPackage] = useState(INITIAL_PACKAGE_STATE);
-  const [isSplitModalOpen, setIsSplitModalOpen] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("ALL");
@@ -111,7 +107,6 @@ export default function ViewPackagesModal({
       setFullShipment(null);
       setEditingId(null);
       setIsAdding(false);
-      setSelectedIndices(new Set());
       setCurrentPage(1);
       setSearch("");
       setStatusFilter("ALL");
@@ -209,7 +204,6 @@ export default function ViewPackagesModal({
 
   useEffect(() => {
     setCurrentPage(1);
-    setSelectedIndices(new Set());
   }, [search, statusFilter, scopeToTrip]);
 
   useEffect(() => {
@@ -218,33 +212,6 @@ export default function ViewPackagesModal({
 
   const getActualIndex = (pkg) =>
     packages.findIndex((p) => p.packageId === pkg.packageId);
-
-  const filteredIndexes = filteredPackages
-    .map((pkg) => getActualIndex(pkg))
-    .filter((idx) => idx !== -1);
-
-  const allFilteredSelected =
-    filteredIndexes.length > 0 &&
-    filteredIndexes.every((idx) => selectedIndices.has(idx));
-
-  const handleSelectAll = () => {
-    if (allFilteredSelected) {
-      const next = new Set(selectedIndices);
-      filteredIndexes.forEach((idx) => next.delete(idx));
-      setSelectedIndices(next);
-    } else {
-      const next = new Set(selectedIndices);
-      filteredIndexes.forEach((idx) => next.add(idx));
-      setSelectedIndices(next);
-    }
-  };
-
-  const handleSelectOne = (index) => {
-    const next = new Set(selectedIndices);
-    if (next.has(index)) next.delete(index);
-    else next.add(index);
-    setSelectedIndices(next);
-  };
 
   const saveUpdates = async (updatedPackages) => {
     try {
@@ -261,7 +228,6 @@ export default function ViewPackagesModal({
       );
       setEditingId(null);
       setIsAdding(false);
-      setSelectedIndices(new Set());
       setNewPackage(INITIAL_PACKAGE_STATE);
 
       onRefresh?.();
@@ -270,17 +236,6 @@ export default function ViewPackagesModal({
     } finally {
       setIsSaving(false);
     }
-  };
-
-  const handleBulkStatusChange = (newStatus) => {
-    if (selectedIndices.size === 0) return;
-
-    const updated = packages.map((pkg, idx) => {
-      if (!selectedIndices.has(idx) || pkg.status === "DELIVERED") return pkg;
-      return { ...pkg, status: newStatus };
-    });
-
-    saveUpdates(updated);
   };
 
   const handleRemove = (idx) => {
@@ -326,16 +281,6 @@ export default function ViewPackagesModal({
 
     saveUpdates([...packages, packageToAdd]);
   };
-
-  const canSplit = useMemo(() => {
-    if (selectedIndices.size === 0) return false;
-
-    return Array.from(selectedIndices).every(
-      (idx) =>
-        packages[idx]?.status === "RECEIVED" &&
-        Number(packages[idx]?.quantity || 1) > 1,
-    );
-  }, [selectedIndices, packages]);
 
   if (!isOpen || !shipment) return null;
 
@@ -392,21 +337,6 @@ export default function ViewPackagesModal({
                 <FontAwesomeIcon icon={faTimes} size="lg" />
               </button>
             </div>
-
-            {/* BULK ACTION BAR */}
-            {selectedIndices.size > 0 && (
-              <div className="shrink-0 px-4 sm:px-6 pt-4">
-                <PackageBulkActionBar
-                  selectedCount={selectedIndices.size}
-                  canSplit={canSplit}
-                  handleSplitClick={() => setIsSplitModalOpen(true)}
-                  handleBulkStatusChange={handleBulkStatusChange}
-                  isLocked={isLocked}
-                  isSaving={isSaving}
-                  isDark={isDark}
-                />
-              </div>
-            )}
 
             {/* BODY */}
             <div className="flex-1 min-h-0 overflow-y-auto p-4 sm:p-6 custom-scrollbar">
@@ -619,20 +549,10 @@ export default function ViewPackagesModal({
                               </button>
                             ) : null}
                           </div>
-
-                          {selectedIndices.size > 0 && (
-                            <div
-                              className={`lg:hidden text-xs font-bold px-2 py-1 rounded border ${tableTheme.selectedInfo || ""}`}
-                            >
-                              {selectedIndices.size} selected
-                            </div>
-                          )}
                         </div>
 
-                        {/* <div className="grid grid-cols-1 sm:grid-cols-2 lg:flex gap-2 w-full lg:w-auto"> */}
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-[1fr_auto_auto] gap-2 w-full">
-                          {/* <div className="relative sm:col-span-2 lg:col-span-1 flex-1 lg:w-56"> */}
-                          <div className="relative col-span-1 sm:col-span-2 lg:col-span-1">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 w-full">
+                          <div className="relative col-span-1 sm:col-span-2">
                             <FontAwesomeIcon
                               icon={faSearch}
                               className={`absolute left-3 top-1/2 -translate-y-1/2 text-xs ${tableTheme.inputIcon}`}
@@ -659,25 +579,6 @@ export default function ViewPackagesModal({
                             <option value="IN_TRANSIT">In Transit</option>
                             <option value="DELIVERED">Delivered</option>
                           </select>
-
-                          <button
-                            type="button"
-                            onClick={handleSelectAll}
-                            disabled={filteredPackages.length === 0}
-                            className={`flex items-center justify-center gap-2 px-3 py-2 rounded-xl text-xs font-bold disabled:opacity-50 ${tableTheme.linkButton}`}
-                          >
-                            <FontAwesomeIcon
-                              icon={
-                                allFilteredSelected ? faCheckSquare : faSquare
-                              }
-                              className={
-                                allFilteredSelected
-                                  ? tableTheme.checkboxActive || "text-blue-500"
-                                  : tableTheme.checkboxIdle || "text-slate-400"
-                              }
-                            />
-                            Select All
-                          </button>
                         </div>
                       </div>
                     </div>
@@ -702,7 +603,6 @@ export default function ViewPackagesModal({
                       ) : (
                         paginatedPackages.map((pkg) => {
                           const actualIdx = getActualIndex(pkg);
-                          const isSelected = selectedIndices.has(actualIdx);
                           const locked =
                             isLocked || isPackageLocked(pkg.status);
                           const isEditing = editingId === actualIdx;
@@ -710,30 +610,9 @@ export default function ViewPackagesModal({
                           return (
                             <div
                               key={pkg.packageId || actualIdx}
-                              className={`rounded-2xl border p-4 transition-all ${
-                                isSelected
-                                  ? "bg-blue-50 dark:bg-blue-900/10 border-blue-500"
-                                  : tableTheme.container
-                              }`}
+                              className={`rounded-2xl border p-4 transition-all ${tableTheme.container}`}
                             >
                               <div className="flex items-start gap-3">
-                                <button
-                                  type="button"
-                                  onClick={() => handleSelectOne(actualIdx)}
-                                  className="pt-1"
-                                >
-                                  <FontAwesomeIcon
-                                    icon={isSelected ? faCheckSquare : faSquare}
-                                    className={
-                                      isSelected
-                                        ? tableTheme.checkboxActive ||
-                                          "text-blue-500"
-                                        : tableTheme.checkboxIdle ||
-                                          "text-slate-400"
-                                    }
-                                  />
-                                </button>
-
                                 <div className="min-w-0 flex-1">
                                   <div className="flex items-start justify-between gap-2">
                                     <div className="min-w-0">
@@ -973,7 +852,6 @@ export default function ViewPackagesModal({
                           ) : (
                             paginatedPackages.map((pkg) => {
                               const actualIdx = getActualIndex(pkg);
-                              const isSelected = selectedIndices.has(actualIdx);
                               const locked =
                                 isLocked || isPackageLocked(pkg.status);
                               const isEditing = editingId === actualIdx;
@@ -981,46 +859,18 @@ export default function ViewPackagesModal({
                               return (
                                 <tr
                                   key={pkg.packageId || actualIdx}
-                                  className={`transition-all ${
-                                    isSelected
-                                      ? "bg-blue-50 dark:bg-blue-900/10 border-l-4 border-blue-500"
-                                      : tableTheme.rowHover
-                                  }`}
+                                  className={`transition-all ${tableTheme.rowHover}`}
                                 >
                                   <td className="px-4 py-3 text-center">
-                                    <div className="flex items-center justify-center gap-3">
-                                      <button
-                                        type="button"
-                                        onClick={() =>
-                                          handleSelectOne(actualIdx)
-                                        }
-                                      >
-                                        <FontAwesomeIcon
-                                          icon={
-                                            isSelected
-                                              ? faCheckSquare
-                                              : faSquare
-                                          }
-                                          className={
-                                            isSelected
-                                              ? tableTheme.checkboxActive ||
-                                                "text-blue-500"
-                                              : tableTheme.checkboxIdle ||
-                                                "text-slate-400"
-                                          }
-                                        />
-                                      </button>
-
-                                      <span
-                                        className={`inline-flex items-center justify-center w-6 h-6 rounded border text-xs font-mono font-bold ${
-                                          isDark
-                                            ? "bg-slate-900 border-slate-800 text-slate-500"
-                                            : "bg-slate-100 border-slate-200 text-slate-600"
-                                        }`}
-                                      >
-                                        {pkg.sequence || actualIdx + 1}
-                                      </span>
-                                    </div>
+                                    <span
+                                      className={`inline-flex items-center justify-center w-6 h-6 rounded border text-xs font-mono font-bold ${
+                                        isDark
+                                          ? "bg-slate-900 border-slate-800 text-slate-500"
+                                          : "bg-slate-100 border-slate-200 text-slate-600"
+                                      }`}
+                                    >
+                                      {pkg.sequence || actualIdx + 1}
+                                    </span>
                                   </td>
 
                                   <td className="px-4 py-3">
@@ -1250,25 +1100,6 @@ export default function ViewPackagesModal({
           onClose={() => setPieceForStatusOverride(null)}
           isDark={isDark}
           onRefresh={handleRefreshAll}
-        />
-      )}
-
-      {isSplitModalOpen && (
-        <SplitShipmentModal
-          isOpen={isSplitModalOpen}
-          onClose={() => setIsSplitModalOpen(false)}
-          originalShipmentId={shipment.id}
-          shipmentCode={shipmentDetails.shipmentId || shipment.id}
-          allPackages={packages}
-          isDark={isDark}
-          onSuccess={() => {
-            setIsSplitModalOpen(false);
-            onClose();
-            onRefresh?.();
-          }}
-          selectedItems={Array.from(selectedIndices).map(
-            (idx) => packages[idx],
-          )}
         />
       )}
     </>

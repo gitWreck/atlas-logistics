@@ -23,7 +23,7 @@ function resolveOriginHubName(data = {}) {
   return "Origin";
 }
 
-function resolveDestinationHubName(data = {}) {
+export function resolveDestinationHubName(data = {}) {
   const hubFromCode = warehouseByCode(data.destinationCode);
   if (hubFromCode) return hubFromCode.name;
 

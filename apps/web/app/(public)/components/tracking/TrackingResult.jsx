@@ -18,6 +18,7 @@ import {
   buildPublicTrackingMilestones,
   getMilestoneStepState,
 } from "@/app/utility/publicTrackingMilestones";
+import { resolvePublicTrackingMiddleStat, resolvePublicTrackingDisplayStatus, resolvePublicTrackingStatusCode } from "@/app/utility/publicTrackingStats";
 
 function formatDate(timestamp) {
   if (!timestamp) return "Just now";
@@ -62,6 +63,15 @@ function getEstimatedArrival(data) {
   );
 }
 
+function sanitizePublicTrackingNote(note) {
+  if (!note || typeof note !== "string") return note;
+  return note.replace(/Assigned to:\s*[^•]+/gi, "Assigned to checker").trim();
+}
+
+function hasPublicCheckerAssignment(data = {}) {
+  return Boolean(data.assignedToChecker || data.assignedCheckerName);
+}
+
 // --- MAIN COMPONENT ---
 export default function TrackingResult({ data }) {
   const {
@@ -91,20 +101,18 @@ export default function TrackingResult({ data }) {
   const [showImages, setShowImages] = useState(false);
   const [lightboxSrc, setLightboxSrc] = useState(null);
 
-  // Logic
-  const safeStatus = (
-    status === "Received at Warehouse" ? "RECEIVED" : status || ""
-  )
-    .toUpperCase()
-    .replace(/ /g, "_");
-  const currentProgress = getVisualProgress(safeStatus);
+  // Logic — prefer statusCode over formatted status (formatStatus used to fall back to RECEIVED)
+  const trackingStatusCode = resolvePublicTrackingStatusCode(data);
+  const displayStatus = resolvePublicTrackingDisplayStatus(data);
+  const currentProgress = getVisualProgress(trackingStatusCode);
   const isDelayed = delayReason && !delayCleared;
   const estimatedArrival = getEstimatedArrival(data);
   const MILESTONES = buildPublicTrackingMilestones(data);
+  const middleStat = resolvePublicTrackingMiddleStat(data);
 
   let activeLineColor = "bg-blue-600";
   if (isDelayed) activeLineColor = "bg-amber-500";
-  else if (safeStatus === "DELIVERED" || safeStatus === "COMPLETED")
+  else if (trackingStatusCode === "DELIVERED" || trackingStatusCode === "COMPLETED")
     activeLineColor = "bg-emerald-500";
   else if (
     [
@@ -114,14 +122,17 @@ export default function TrackingResult({ data }) {
       "PARTIALLY_AVAILABLE_FOR_DELIVERY",
       "READY_FOR_DELIVERY",
       "AVAILABLE_AT_WAREHOUSE",
-    ].includes(safeStatus)
+      "AVAILABLE_AT_ODIONGAN_WAREHOUSE",
+      "ARRIVED_AT_ODIONGAN",
+      "RELEASED_FOR_DELIVERY",
+    ].includes(trackingStatusCode)
   )
     activeLineColor = "bg-sky-500";
-  else if (safeStatus === "OUT_FOR_DELIVERY") activeLineColor = "bg-purple-500";
-  else if (safeStatus === "PARTIALLY_DELIVERED") activeLineColor = "bg-teal-500";
+  else if (trackingStatusCode === "OUT_FOR_DELIVERY") activeLineColor = "bg-purple-500";
+  else if (trackingStatusCode === "PARTIALLY_DELIVERED") activeLineColor = "bg-teal-500";
   else if (
-    safeStatus === "RECEIVED" ||
-    safeStatus === "RECEIVED_AT_DIVISORIA"
+    trackingStatusCode === "RECEIVED" ||
+    trackingStatusCode === "RECEIVED_AT_DIVISORIA"
   )
     activeLineColor = "bg-cyan-500";
 
@@ -136,7 +147,7 @@ export default function TrackingResult({ data }) {
           </div>
 
           <StatusBadge
-            status={status}
+            status={displayStatus}
             reason={isDelayed ? delayReason : null}
           />
 
@@ -188,16 +199,15 @@ export default function TrackingResult({ data }) {
       )}
 
       {/* --- C. LAST-MILE CONTEXT --- */}
-      {(data.assignedCheckerName || data.deliveryVehicleName) && (
+      {(hasPublicCheckerAssignment(data) || data.deliveryVehicleName) && (
         <div className="px-6 py-4 border-b border-slate-200 bg-slate-50/80">
           <div className="text-[10px] text-slate-500 uppercase font-bold mb-2">
             Delivery details
           </div>
           <div className="space-y-1 text-sm text-slate-700">
-            {data.assignedCheckerName && (
+            {hasPublicCheckerAssignment(data) && (
               <p>
-                <span className="font-semibold">Assigned to:</span>{" "}
-                {data.assignedCheckerName}
+                <span className="font-semibold">Assigned to:</span> checker
               </p>
             )}
             {data.deliveryVehicleName && (
@@ -314,7 +324,9 @@ export default function TrackingResult({ data }) {
                       {entry.title || entry.status}
                     </p>
                     {entry.note && !isInTransitHistoryEntry(entry) && (
-                      <p className="text-xs text-slate-600 mt-1">{entry.note}</p>
+                      <p className="text-xs text-slate-600 mt-1">
+                        {sanitizePublicTrackingNote(entry.note)}
+                      </p>
                     )}
                   </div>
                   <span className="text-[11px] text-slate-500 shrink-0">
@@ -364,13 +376,13 @@ export default function TrackingResult({ data }) {
         <div className="mt-auto grid grid-cols-3 divide-x divide-slate-200 border-t border-slate-200 bg-slate-50">
           <StatBox label="Total Items" value={totals.totalItems || 0} />
           <StatBox
-            label="Loaded"
-            value={totals.loaded || 0}
-            color="text-blue-700"
+            label={middleStat.label}
+            value={middleStat.value}
+            color={middleStat.color}
           />
           <StatBox
             label="Pending"
-            value={(totals.totalItems || 0) - (totals.loaded || 0)}
+            value={totals.pending ?? 0}
             color="text-slate-600"
           />
         </div>

@@ -70,6 +70,9 @@ export function getVisualProgress(status) {
     case "PARTIALLY_AVAILABLE_FOR_DELIVERY":
     case "READY_FOR_DELIVERY":
     case "AVAILABLE_AT_WAREHOUSE":
+    case "AVAILABLE_AT_ODIONGAN_WAREHOUSE":
+    case "ARRIVED_AT_ODIONGAN":
+    case "RELEASED_FOR_DELIVERY":
       return 50;
     case "PARTIALLY_OUT_FOR_DELIVERY":
       return 62;

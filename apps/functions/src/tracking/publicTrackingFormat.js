@@ -102,7 +102,7 @@ function buildPublicNote(event = {}) {
 
   if (LAST_MILE_EVENT_TYPES.has(String(event.eventType || "").toUpperCase())) {
     if (event.checkerName) {
-      parts.push(`Assigned to: ${sanitizeCheckerName(event.checkerName)}`);
+      parts.push("Assigned to checker");
     }
     if (event.deliveryVehicleName) {
       parts.push(`Vehicle: ${event.deliveryVehicleName}`);
@@ -134,9 +134,7 @@ function formatPublicTimelineEntry(event = {}) {
       typeof event.location === "string"
         ? event.location
         : normalizeString(event.location) || "",
-    checkerName: LAST_MILE_EVENT_TYPES.has(eventType)
-      ? sanitizeCheckerName(event.checkerName)
-      : null,
+    checkerName: null,
     deliveryVehicleName: LAST_MILE_EVENT_TYPES.has(eventType)
       ? normalizeString(event.deliveryVehicleName)
       : null,
@@ -178,12 +176,16 @@ async function buildPublicTrackingHistory(db, shipmentId, shipmentData = {}) {
 }
 
 function resolvePublicDeliveryContext(shipmentData = {}) {
-  return {
-    assignedCheckerName: sanitizeCheckerName(
+  const hasAssignedChecker = Boolean(
+    normalizeString(
       shipmentData.assignedCheckerName ||
         shipmentData.checkerName ||
         null,
     ),
+  );
+
+  return {
+    assignedToChecker: hasAssignedChecker,
     deliveryVehicleName: normalizeString(
       shipmentData.deliveryVehicleName || null,
     ),

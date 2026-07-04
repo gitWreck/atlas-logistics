@@ -13,6 +13,7 @@ const {
   resolvePublicDeliveryContext,
 } = require("./publicTrackingFormat");
 const { extractTripEventContext } = require("./tripEventContext");
+const { computePackageBreakdown } = require("../packages/shipmentStatus");
 
 if (!admin.apps.length) admin.initializeApp();
 const db = admin.firestore();
@@ -74,12 +75,27 @@ async function syncOneShipmentToPublic(shipmentId, shipmentData) {
   ]);
 
   const totals = shipmentData.totals || {};
+  const packageBreakdown =
+    shipmentData.packageBreakdown &&
+    typeof shipmentData.packageBreakdown === "object"
+      ? shipmentData.packageBreakdown
+      : computePackageBreakdown(
+          Array.isArray(shipmentData.packages) ? shipmentData.packages : [],
+        );
   const totalItems =
-    totals.totalItems ||
     totals.totalContentQty ||
+    Number(packageBreakdown.total) ||
+    totals.totalItems ||
     totals.totalPackages ||
     (Array.isArray(shipmentData.packages) ? shipmentData.packages.length : 0);
-  const deliveredCount = totals.delivered ?? totals.received ?? 0;
+  const deliveredCount =
+    Number(packageBreakdown.delivered) ||
+    Number(totals.delivered) ||
+    0;
+  const pendingAtDivisoria = Math.max(
+    Number(packageBreakdown.atDivisoria) || 0,
+    0,
+  );
 
   const statusCode = String(shipmentData.status || "RECEIVED").toUpperCase();
   const showLastMileContext = [
@@ -110,14 +126,20 @@ async function syncOneShipmentToPublic(shipmentId, shipmentData) {
       totalItems,
       loaded: totals.loaded ?? 0,
       delivered: deliveredCount,
-      pending: Math.max(totalItems - (totals.loaded ?? 0), 0),
+      pending: pendingAtDivisoria,
+      inTransit: Number(packageBreakdown.inTransit) || 0,
+      atOdiongan: Number(packageBreakdown.atOdiongan) || 0,
+      releasedForDelivery: Number(packageBreakdown.releasedForDelivery) || 0,
+      routeAssigned: Number(packageBreakdown.routeAssigned) || 0,
+      outForDelivery: Number(packageBreakdown.outForDelivery) || 0,
+      onCheckerVan: Number(packageBreakdown.onCheckerVan) || 0,
     },
     proofOfReceipt: shipmentData.proofOfReceipt || null,
     proofOfDelivery: shipmentData.proofOfDelivery || null,
     ...tripContext,
-    assignedCheckerName: showLastMileContext
-      ? deliveryContext.assignedCheckerName
-      : null,
+    assignedToChecker: showLastMileContext
+      ? deliveryContext.assignedToChecker
+      : false,
     deliveryVehicleName: showLastMileContext
       ? deliveryContext.deliveryVehicleName
       : null,

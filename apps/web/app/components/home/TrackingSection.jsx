@@ -15,10 +15,12 @@ import {
 } from "@fortawesome/free-solid-svg-icons";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { resolvePublicTrackingMiddleStat } from "@/app/utility/publicTrackingStats";
 
 const previewShipment = {
   id: "ATL-240812-SHP",
   status: "In Transit",
+  statusCode: "IN_TRANSIT",
   updatedAt: "Updated May 13, 8:30 PM",
   originCode: "DIV",
   destinationCode: "ODI",
@@ -27,6 +29,8 @@ const previewShipment = {
   totals: {
     totalItems: 15,
     loaded: 8,
+    pending: 7,
+    inTransit: 8,
   },
 };
 
@@ -70,6 +74,7 @@ const currentProgress = 33;
 export default function TrackingSection() {
   const router = useRouter();
   const [trackingNumber, setTrackingNumber] = useState("");
+  const previewMiddleStat = resolvePublicTrackingMiddleStat(previewShipment);
 
   const handleSubmit = (event) => {
     event.preventDefault();
@@ -214,16 +219,13 @@ export default function TrackingSection() {
                 value={previewShipment.totals.totalItems}
               />
               <StatBox
-                label="Loaded"
-                value={previewShipment.totals.loaded}
-                color="text-blue-700"
+                label={previewMiddleStat.label}
+                value={previewMiddleStat.value}
+                color={previewMiddleStat.color}
               />
               <StatBox
                 label="Pending"
-                value={
-                  previewShipment.totals.totalItems -
-                  previewShipment.totals.loaded
-                }
+                value={previewShipment.totals.pending ?? 0}
                 color="text-slate-600"
               />
             </div>
