@@ -5,6 +5,12 @@ const admin = require("firebase-admin");
 const { FieldValue } = require("firebase-admin/firestore");
 const { requireString } = require("../utilities/helpers");
 const { writeCustodyAuditLog } = require("../utilities/custodyAuditLog");
+const { normalizeQty } = require("../utilities/packageHelpers");
+const {
+  packageOnTrip,
+  buildShipmentSnapshot,
+  normalizePackageRow,
+} = require("../packages/tripPackageOperations");
 const {
   requireTripLifecycleAdmin,
   snapshotTripLifecycleState,
@@ -15,14 +21,62 @@ const {
 if (!admin.apps.length) admin.initializeApp();
 const db = admin.firestore();
 
+function deriveResetPackageStatus(pkg = {}) {
+  const quantity = Math.max(normalizeQty(pkg.quantity, 1), 1);
+  const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
+  const missingQty = clamp(normalizeQty(pkg.missingQty, 0), 0, quantity);
+  const damagedQty = clamp(normalizeQty(pkg.damagedQty, 0), 0, quantity);
+
+  if (damagedQty > 0) return "DAMAGED";
+  if (missingQty > 0) return "MISSING";
+  return "RECEIVED";
+}
+
+function resetPackagesDetachedFromTrip(packages = [], tripId, actorName) {
+  return packages.map((pkg) => {
+    if (!packageOnTrip(pkg, tripId)) {
+      return pkg;
+    }
+
+    const normalized = normalizePackageRow(pkg);
+    const quantity = Math.max(normalizeQty(normalized.quantity, 1), 1);
+    const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
+    const missingQty = clamp(normalizeQty(normalized.missingQty, 0), 0, quantity);
+    const damagedQty = clamp(normalizeQty(normalized.damagedQty, 0), 0, quantity);
+    const resetPkg = {
+      ...normalized,
+      quantity,
+      loadedQty: 0,
+      receivedQty: 0,
+      missingQty,
+      damagedQty,
+      currentTripId: null,
+      loadedOnTrip: null,
+      loadedAt: null,
+      loadedBy: null,
+      loadedByRole: null,
+      loadedByUid: null,
+      loadedAtLocation: null,
+      deliveredAt: null,
+      deliveredBy: null,
+      updatedAt: new Date().toISOString(),
+      updatedBy: actorName || "SYSTEM",
+    };
+
+    return {
+      ...resetPkg,
+      status: deriveResetPackageStatus(resetPkg),
+    };
+  });
+}
+
 async function detachShipmentsFromTrip(tripDocId, actorName) {
   const shipmentIds = new Set();
+  const tripRef = db.collection("truck_trips").doc(tripDocId);
+  const tripSnap = await tripRef.get();
+  const tripData = tripSnap.exists ? tripSnap.data() || {} : {};
 
-  const tripShipSnap = await db
-    .collection("truck_trips")
-    .doc(tripDocId)
-    .collection("trip_shipments")
-    .get();
+  const tripShipSnap = await tripRef.collection("trip_shipments").get();
 
   tripShipSnap.docs.forEach((doc) => shipmentIds.add(doc.id));
 
@@ -58,21 +112,35 @@ async function detachShipmentsFromTrip(tripDocId, actorName) {
     snaps.forEach((snap) => {
       if (!snap.exists) return;
       const data = snap.data() || {};
-      const existingIds = Array.isArray(data.currentTripIds)
-        ? data.currentTripIds.map(String)
-        : data.currentTripId
-          ? [String(data.currentTripId)]
-          : [];
-      // Keep links to any other trips this shipment is still split across.
-      const remainingIds = existingIds.filter((id) => id !== tripDocId);
-      const fullyDetached = remainingIds.length === 0;
+      const updatedPackages = resetPackagesDetachedFromTrip(
+        data.packages || [],
+        tripDocId,
+        actorName,
+      );
+      const snapshot = buildShipmentSnapshot(updatedPackages, {
+        previousStatus: data.status,
+      });
+      const fullyDetached = (snapshot.currentTripIds || []).length === 0;
 
       const update = {
-        currentTripIds: remainingIds,
-        currentTripId: remainingIds.length === 1 ? remainingIds[0] : null,
+        packages: snapshot.packages,
+        status: snapshot.status,
+        packageBreakdown: snapshot.packageBreakdown,
+        availableForDelivery: snapshot.packageBreakdown?.available > 0,
+        currentTripIds: snapshot.currentTripIds,
+        currentTripId: snapshot.currentTripId,
+        "totals.pending": snapshot.totals.pending,
+        "totals.loaded": snapshot.totals.loaded,
+        "totals.delivered": snapshot.totals.delivered,
+        "totals.received": snapshot.totals.received,
+        "totals.missing": snapshot.totals.missing,
+        "totals.damaged": snapshot.totals.damaged,
+        "totals.totalContentQty": snapshot.totals.totalContentQty,
+        "totals.totalItems": snapshot.totals.totalItems,
         updatedAt: now,
         updatedBy: actorName || "SYSTEM",
       };
+
       // Only clear the truck-trip pointer / assignment stamp when nothing
       // remains; otherwise preserve them for the surviving trip.
       if (String(data.currentTruckTripId || "") === tripDocId) {
@@ -87,6 +155,34 @@ async function detachShipmentsFromTrip(tripDocId, actorName) {
 
     await batch.commit();
   }
+
+  for (let i = 0; i < tripShipSnap.docs.length; i += 400) {
+    const chunk = tripShipSnap.docs.slice(i, i + 400);
+    const batch = db.batch();
+
+    chunk.forEach((doc) => {
+      const manifest = doc.data() || {};
+      const totalItems = normalizeQty(manifest.totalItems, 0);
+      batch.update(doc.ref, {
+        status: "CANCELLED",
+        loadedCount: 0,
+        pendingCount: totalItems,
+        deliveredCount: 0,
+        receivedCount: 0,
+        updatedAt: now,
+        updatedBy: actorName || "SYSTEM",
+      });
+    });
+
+    await batch.commit();
+  }
+
+  await tripRef.update({
+    totalLoaded: 0,
+    itemPending: normalizeQty(tripData.totalItems, 0),
+    updatedAt: now,
+    updatedBy: actorName || "SYSTEM",
+  });
 
   return { detachedShipmentCount: ids.length };
 }
@@ -135,6 +231,7 @@ exports.cancelTruckTrip = onCall(
       tx.update(tripRef, {
         status: "CANCELLED",
         active: false,
+        totalLoaded: 0,
         cancellationReason: reason,
         cancelledAt: FieldValue.serverTimestamp(),
         cancelledBy: uid,

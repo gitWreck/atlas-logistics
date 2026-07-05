@@ -76,7 +76,7 @@ export default function TripDrawer({
           const token = await user.getIdToken();
 
           const res = await fetch(
-            `/api/manifests/trips/${data.tripId}/shipments`,
+            `/api/manifests/trip-shipments?tripId=${encodeURIComponent(data.tripId)}`,
             {
               headers: {
                 Authorization: `Bearer ${token}`,
@@ -84,6 +84,14 @@ export default function TripDrawer({
               cache: "no-store",
             },
           );
+
+          if (!res.ok) {
+            const message = await res
+              .json()
+              .then((json) => json.error || `Request failed (${res.status})`)
+              .catch(() => `Request failed (${res.status})`);
+            throw new Error(message);
+          }
 
           const json = await res.json();
           const list = json.shipments || [];
