@@ -1,7 +1,13 @@
 // Learn more https://docs.expo.dev/guides/customizing-metro
 const { getDefaultConfig } = require("expo/metro-config");
+const exclusionList = require("metro-config/src/defaults/exclusionList");
+const path = require("path");
 
 const config = getDefaultConfig(__dirname);
+
+config.resolver.blacklistRE = exclusionList([
+  /.*\/apps\/web\/\.next\/.*$/,
+]);
 
 // `react-native-maps` has no web support and imports native-only modules
 // (e.g. codegenNativeCommands), which breaks the entire web bundle.

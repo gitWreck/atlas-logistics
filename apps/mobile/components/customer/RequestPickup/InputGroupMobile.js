@@ -5,8 +5,6 @@ import {
   TextInput,
   TouchableOpacity,
   StyleSheet,
-  FlatList,
-  Modal,
 } from "react-native";
 import {
   PROVINCES,
@@ -35,6 +33,26 @@ export default function InputGroupMobile({
       setCities([]);
     }
   }, [values.province]);
+
+  const handleProvinceSelect = (selectedProvince) => {
+    const province =
+      typeof selectedProvince === "string"
+        ? selectedProvince
+        : selectedProvince?.name || selectedProvince?.label || "";
+
+    onChange({ ...values, province, city: "", barangay: "" });
+    setShowProvinceModal(false);
+  };
+
+  const handleCitySelect = (selectedCity) => {
+    const city =
+      typeof selectedCity === "string"
+        ? selectedCity
+        : selectedCity?.name || selectedCity?.label || "";
+
+    onChange({ ...values, city, barangay: "" });
+    setShowCityModal(false);
+  };
 
   const themeColor = color === "emerald" ? "#10b981" : "#3b82f6";
 
@@ -157,6 +175,7 @@ export default function InputGroupMobile({
             },
           ]}
           onPress={() => setShowProvinceModal(true)}
+          activeOpacity={0.78}
         >
           <Text style={{ color: values.province ? colors.text : colors.textMuted }}>
             {values.province || "Province"}
@@ -176,11 +195,14 @@ export default function InputGroupMobile({
             },
             !values.province && { opacity: 0.5 }, // Dim if disabled
           ]}
-          onPress={() => setShowCityModal(true)}
+          onPress={() => {
+            if (values.province) setShowCityModal(true);
+          }}
           disabled={!values.province}
+          activeOpacity={0.78}
         >
           <Text style={{ color: values.city ? colors.text : colors.textMuted }}>
-            {values.city || "City"}
+            {values.city || (values.province ? "Municipality/City" : "Select province first")}
           </Text>
         </TouchableOpacity>
       </View>
@@ -188,24 +210,20 @@ export default function InputGroupMobile({
       <DropdownModal
         visible={showProvinceModal}
         title="Select Province"
-        options={PROVINCES} // This is an array of objects
-        onSelect={(selectedProvince) => {
-          onChange({ ...values, province: selectedProvince.name });
-          setShowProvinceModal(false);
-        }}
+        options={PROVINCES}
+        onSelect={handleProvinceSelect}
         onClose={() => setShowProvinceModal(false)}
+        emptyMessage="No provinces found."
       />
 
       {/* --- CITY MODAL --- */}
       <DropdownModal
         visible={showCityModal}
-        title="Select City"
-        options={cities} // This is an array of objects
-        onSelect={(selectedCity) => {
-          onChange({ ...values, city: selectedCity.name });
-          setShowCityModal(false);
-        }}
+        title={`Select Municipality/City${values.province ? ` in ${values.province}` : ""}`}
+        options={cities}
+        onSelect={handleCitySelect}
         onClose={() => setShowCityModal(false)}
+        emptyMessage="No municipalities or cities found."
       />
     </View>
   );

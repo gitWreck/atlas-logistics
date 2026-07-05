@@ -4,6 +4,8 @@ const DIVISORIA_WAREHOUSE = "DIVISORIA_WAREHOUSE";
 const ODIONGAN_WAREHOUSE = "ODIONGAN_WAREHOUSE";
 
 const PACKAGE_STATUS = Object.freeze({
+  PENDING_PICKUP: "PENDING_PICKUP",
+  PICKED_UP: "PICKED_UP",
   RECEIVED_AT_DIVISORIA: "RECEIVED_AT_DIVISORIA",
   LOADED_TO_TRIP: "LOADED_TO_TRIP",
   IN_TRANSIT: "IN_TRANSIT",
@@ -31,6 +33,8 @@ const PACKAGE_STATUS = Object.freeze({
 });
 
 const PACKAGE_STATUS_LABELS = Object.freeze({
+  [PACKAGE_STATUS.PENDING_PICKUP]: "Pending pickup",
+  [PACKAGE_STATUS.PICKED_UP]: "Picked up",
   [PACKAGE_STATUS.RECEIVED_AT_DIVISORIA]: "Received at Divisoria",
   [PACKAGE_STATUS.LOADED_TO_TRIP]: "Loaded to trip",
   [PACKAGE_STATUS.IN_TRANSIT]: "In transit",
@@ -76,6 +80,10 @@ const AT_DIVISORIA_STATUSES = new Set([
   PACKAGE_STATUS.RECEIVED,
 ]);
 
+const PICKUP_PENDING_STATUSES = new Set([PACKAGE_STATUS.PENDING_PICKUP]);
+
+const PICKED_UP_STATUSES = new Set([PACKAGE_STATUS.PICKED_UP]);
+
 const IN_TRANSIT_STATUSES = new Set([
   PACKAGE_STATUS.IN_TRANSIT,
   PACKAGE_STATUS.LOADED_TO_TRIP,
@@ -112,6 +120,8 @@ const WAREHOUSE_POOL_STATUSES = new Set([
 
 /** Statuses that must not be downgraded to RECEIVED_AT_DIVISORIA when qty is zero. */
 const PRESERVED_WHEN_UNLOADED_STATUSES = new Set([
+  ...PICKUP_PENDING_STATUSES,
+  ...PICKED_UP_STATUSES,
   ...IN_TRANSIT_STATUSES,
   ...AT_ODIONGAN_STATUSES,
   ...WAREHOUSE_POOL_STATUSES,
@@ -286,6 +296,12 @@ function classifyPackageBucket(pkg = {}) {
   if (RETURNED_STATUSES.has(status)) {
     return { bucket: "returned", qty };
   }
+  if (PICKUP_PENDING_STATUSES.has(status)) {
+    return { bucket: "pendingPickup", qty };
+  }
+  if (PICKED_UP_STATUSES.has(status)) {
+    return { bucket: "pickedUp", qty };
+  }
   if (OUT_FOR_DELIVERY_STATUSES.has(status)) {
     return { bucket: "outForDelivery", qty };
   }
@@ -321,6 +337,8 @@ function classifyPackageBucket(pkg = {}) {
 function createEmptyPackageBreakdown() {
   return {
     total: 0,
+    pendingPickup: 0,
+    pickedUp: 0,
     atDivisoria: 0,
     inTransit: 0,
     atOdiongan: 0,
@@ -530,6 +548,8 @@ module.exports = {
   PACKAGE_STATUS_LABELS,
   DELIVERED_STATUSES,
   TERMINAL_STATUSES,
+  PICKUP_PENDING_STATUSES,
+  PICKED_UP_STATUSES,
   WAREHOUSE_POOL_STATUSES,
   normalizePackageStatus,
   normalizePackageStatusCode,

@@ -19,6 +19,34 @@ import {
   getOdionganHubBoardStatusLabel,
 } from "@/app/utility/packageStatus";
 
+function formatTimestampLabel(value) {
+  if (!value) return "Just now";
+  if (typeof value === "string") return value;
+  if (typeof value === "number") {
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? "Just now" : date.toLocaleString();
+  }
+
+  const date =
+    typeof value.toDate === "function"
+      ? value.toDate()
+      : value._seconds
+        ? new Date(value._seconds * 1000)
+        : null;
+
+  if (date && !Number.isNaN(date.getTime())) {
+    return date.toLocaleString();
+  }
+
+  return "Just now";
+}
+
+function formatStatusLabel(status) {
+  if (!status) return "UNKNOWN";
+  if (typeof status === "string") return status.replaceAll("_", " ");
+  return "UNKNOWN";
+}
+
 export default function ShipmentRow({
   shipmentBoard,
   warehouseTab = null,
@@ -49,13 +77,13 @@ export default function ShipmentRow({
   const trackingNumber = s.shipmentId || s.trackingNumber || "—";
   const routeCode = `${s.originCode || "N/A"} -> ${s.destinationCode || "N/A"}`;
   const routeLabel = getShipmentRouteLabel(s);
-  const updatedLabel = s.updatedAt || "Just now";
+  const updatedLabel = formatTimestampLabel(s.updatedAt);
   const boardStatusKey = isOdionganTab
     ? getOdionganHubBoardStatusKey(s)
     : s.status;
   const boardStatusLabel = isOdionganTab
     ? getOdionganHubBoardStatusLabel(s)
-    : s.status?.replaceAll("_", " ") || "UNKNOWN";
+    : formatStatusLabel(s.status);
 
   const rowStateClass = isDelayed ? theme.rowDelayed : theme.rowDefaultHover;
   const mobileDividerClass = isDark
