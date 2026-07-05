@@ -6,6 +6,7 @@ export function timestampToDate(value) {
   if (!value) return null;
   if (typeof value?.toDate === "function") return value.toDate();
   if (typeof value?.toMillis === "function") return new Date(value.toMillis());
+  if (value?.seconds) return new Date(value.seconds * 1000);
   if (value?._seconds) return new Date(value._seconds * 1000);
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? null : date;
@@ -13,6 +14,25 @@ export function timestampToDate(value) {
 
 export function timestampMs(value) {
   return timestampToDate(value)?.getTime?.() || 0;
+}
+
+function padDatePart(value) {
+  return String(value).padStart(2, "0");
+}
+
+export function getLocalDateKey(value) {
+  const date = timestampToDate(value);
+  if (!date) return "";
+  return [
+    date.getFullYear(),
+    padDatePart(date.getMonth() + 1),
+    padDatePart(date.getDate()),
+  ].join("-");
+}
+
+export function startOfLocalDay(value = new Date()) {
+  const date = timestampToDate(value) || new Date();
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate());
 }
 
 export function isSameLocalDay(value, compare = new Date()) {
@@ -423,8 +443,8 @@ export function getShipmentActivityDates(shipments = []) {
   const add = (value) => {
     const date = timestampToDate(value);
     if (!date) return;
-    const key = date.toISOString().slice(0, 10);
-    dates.set(key, date);
+    const key = getLocalDateKey(date);
+    dates.set(key, startOfLocalDay(date));
   };
 
   shipments.forEach((shipment) => {
@@ -437,6 +457,7 @@ export function getShipmentActivityDates(shipments = []) {
       shipment.completedAt,
       shipment.failedAt,
       shipment.returnedAt,
+      shipment.createdAt,
       shipment.updatedAt,
     ].forEach(add);
 
@@ -453,6 +474,7 @@ export function getShipmentActivityDates(shipments = []) {
         pkg.deliveredAt,
         pkg.failedAt,
         pkg.returnedAt,
+        pkg.createdAt,
         pkg.updatedAt,
       ].forEach(add);
     });

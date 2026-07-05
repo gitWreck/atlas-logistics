@@ -7,7 +7,6 @@ import {
   where,
   onSnapshot,
 } from "firebase/firestore";
-import { format } from "date-fns";
 import { db } from "../../../firebase";
 import { useAuth } from "../../../contexts/AuthContext";
 import { useTheme } from "../../../contexts/ThemeContext";
@@ -27,8 +26,12 @@ import {
   countOutForDeliveryTotalPiecesForDate,
   countReturnedPiecesForDate,
   getDeliveredShipmentsForDate,
+  getLocalDateKey,
   getShipmentActivityDates,
+  startOfLocalDay,
 } from "../../../components/checker/dashboardData";
+
+const RECENT_DATE_OPTION_COUNT = 7;
 
 function mergeShipmentLists(...lists) {
   const map = new Map();
@@ -42,9 +45,18 @@ function mergeDates(...dates) {
   const map = new Map();
   dates.flat().forEach((date) => {
     if (!(date instanceof Date) || Number.isNaN(date.getTime())) return;
-    map.set(format(date, "yyyy-MM-dd"), date);
+    map.set(getLocalDateKey(date), startOfLocalDay(date));
   });
   return [...map.values()].sort((a, b) => b.getTime() - a.getTime());
+}
+
+function getRecentDateOptions(referenceDate = new Date()) {
+  const start = startOfLocalDay(referenceDate);
+  return Array.from({ length: RECENT_DATE_OPTION_COUNT }, (_, index) => {
+    const date = new Date(start);
+    date.setDate(start.getDate() - index);
+    return date;
+  });
 }
 
 export default function CheckerIndex() {
@@ -222,7 +234,8 @@ export default function CheckerIndex() {
   const availableDates = useMemo(
     () =>
       mergeDates(
-        [new Date(), selectedDate],
+        getRecentDateOptions(new Date()),
+        [selectedDate],
         getShipmentActivityDates(allKnownShipments),
       ),
     [allKnownShipments, selectedDate],
