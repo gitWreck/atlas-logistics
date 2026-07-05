@@ -1227,9 +1227,9 @@ const styles = StyleSheet.create({
   },
   quickSubtitle: {
     color: "rgba(255, 255, 255, 0.84)",
-    fontSize: 11.5,
+    fontSize: 10.5,
     fontWeight: "400",
-    lineHeight: 16,
+    lineHeight: 14,
     marginTop: 4,
   },
   quickArrow: {
