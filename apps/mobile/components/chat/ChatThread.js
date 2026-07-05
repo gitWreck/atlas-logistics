@@ -10,10 +10,12 @@ import React, {
 } from "react";
 import {
   ActivityIndicator,
+  Alert,
   Animated,
   FlatList,
   KeyboardAvoidingView,
   LayoutAnimation,
+  Linking,
   Platform,
   Pressable,
   ScrollView,
@@ -26,6 +28,7 @@ import {
   Modal,
   Switch,
 } from "react-native";
+import * as Clipboard from "expo-clipboard";
 import { Image } from "expo-image";
 import { FontAwesome5 } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
@@ -309,11 +312,14 @@ function ShipmentInfoCard({ conversation, colors, onViewTracking }) {
 
 function QuickActions({ colors, hasShipment, onTrack, onConcern, onAgent }) {
   return (
-    <View
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
       style={[
         styles.quickActions,
         { backgroundColor: colors.surface, borderTopColor: colors.border },
       ]}
+      contentContainerStyle={styles.quickActionsContent}
     >
       {hasShipment && (
         <TouchableOpacity
@@ -356,7 +362,7 @@ function QuickActions({ colors, hasShipment, onTrack, onConcern, onAgent }) {
           Talk to Agent
         </Text>
       </TouchableOpacity>
-    </View>
+    </ScrollView>
   );
 }
 
@@ -536,87 +542,277 @@ function ChatInfoScreen({
   muted,
   setMuted,
   ui = UI,
+  onViewTracking,
+  onOpenMedia,
 }) {
   const media = messages
     .map((message) => getMessageAttachment(message))
-    .filter((attachment) => attachment?.type === "image")
-    .slice(-4);
+    .filter((attachment) => attachment?.type === "image");
+  const shownMedia = media.slice(-4);
+  const hasMedia = shownMedia.length > 0;
+  const supportTeam = conversation?.supportTeam || "Customer Support Team";
+  const supportDescription = conversation?.supportDescription || conversation?.supportAbout ||
+    "We're here to assist you with shipment inquiries, delivery concerns, and general questions.";
+  const supportEmail = conversation?.supportEmail || "support@atlasexpress.com";
+  const supportPhone = conversation?.supportPhone || conversation?.supportHotline || "(+63) 999 123 4567";
+  const supportWebsite = conversation?.supportWebsite || "www.atlasexpress.com";
+  const supportAddress = conversation?.supportAddress || conversation?.supportOfficeAddress ||
+    "123 Atlas Building, Logistics Ave.,\nMakati City, Metro Manila, Philippines";
+  const infoScrollRef = useRef(null);
+  const [infoScrollOffset, setInfoScrollOffset] = useState(0);
+
+  const launchUrl = async (url, fallbackMessage) => {
+    try {
+      const supported = await Linking.canOpenURL(url);
+      if (supported) {
+        await Linking.openURL(url);
+      } else {
+        Alert.alert("Unavailable", fallbackMessage);
+      }
+    } catch (err) {
+      console.error("Linking error:", err);
+      Alert.alert("Unable to open", fallbackMessage);
+    }
+  };
+
+  const copyConversationId = async () => {
+    if (!conversation?.id) return;
+    await Clipboard.setStringAsync(String(conversation.id));
+    Alert.alert("Copied!", "Conversation ID copied to clipboard.");
+  };
+
+  const openMail = (email) => launchUrl(`mailto:${email}`, "Email is not available on this device.");
+  const openPhone = (phone) => launchUrl(`tel:${phone}`, "Phone dialer is not available on this device.");
+  const openWebsite = (url) => {
+    const target = String(url || "").trim();
+    if (!target) return;
+    const normalized = target.startsWith("http") ? target : `https://${target}`;
+    launchUrl(normalized, "Unable to open the website.");
+  };
+  const openMaps = (address) => {
+    const query = encodeURIComponent(String(address || "").trim());
+    if (!query) return;
+    launchUrl(`https://www.google.com/maps/search/?api=1&query=${query}`, "Maps is not available on this device.");
+  };
+
+  useEffect(() => {
+    if (visible && infoScrollRef.current && infoScrollOffset > 0) {
+      infoScrollRef.current.scrollTo({ y: infoScrollOffset, animated: false });
+    }
+  }, [visible]);
 
   return (
     <Modal animationType="slide" visible={visible} onRequestClose={onClose}>
-      <View style={[styles.fullScreen, { backgroundColor: ui.bg }]}>
-        <View style={styles.screenHeader}>
-          <TouchableOpacity style={styles.backButton} onPress={onClose}>
+      <View style={[styles.fullScreen, { backgroundColor: ui.bg }]}> 
+        <View style={[styles.chatInfoHeader, { borderBottomColor: ui.border }]}> 
+          <TouchableOpacity style={styles.chatInfoHeaderButton} onPress={onClose}>
             <FontAwesome5 name="chevron-left" size={20} color={ui.text} />
           </TouchableOpacity>
-          <Text style={[styles.screenTitle, { color: ui.text }]}>Chat Information</Text>
-          <FontAwesome5 name="ellipsis-v" size={18} color={ui.text} />
+          <Text style={[styles.chatInfoHeaderTitle, { color: ui.text }]}>Chat Information</Text>
+          <View style={styles.chatInfoHeaderButton}>
+            <FontAwesome5 name="ellipsis-v" size={20} color={ui.text} />
+          </View>
         </View>
-        <ScrollView contentContainerStyle={styles.infoScreenContent}>
-          <View style={styles.profileBlock}>
-            <SupportAvatar size={72} online ringColor={ui.bg} />
-            <View style={styles.profileCopy}>
-              <Text style={[styles.profileName, { color: ui.text }]}>Atlas Support</Text>
-              <Text style={[styles.profileOnline, { color: ui.green }]}>Online</Text>
-              <Text style={[styles.profileReply, { color: ui.muted }]}>Usually replies within 5 minutes</Text>
+
+        <ScrollView
+          ref={infoScrollRef}
+          style={styles.infoScrollView}
+          contentContainerStyle={styles.infoScreenContent}
+          showsVerticalScrollIndicator={false}
+          scrollEventThrottle={16}
+          onScroll={({ nativeEvent }) => setInfoScrollOffset(nativeEvent.contentOffset.y)}
+        >
+          <View style={styles.chatInfoHero}>
+            <SupportAvatar size={96} online={false} ringColor={ui.bg} />
+            <Text style={[styles.chatInfoHeroName, { color: ui.text }]} numberOfLines={1}>
+              {conversation?.supportName || "Atlas Support"}
+            </Text>
+            <View style={styles.chatInfoHeroStatus}>
+              <View style={[styles.chatInfoHeroDot, { backgroundColor: ui.green }]} />
+              <Text style={[styles.chatInfoHeroStatusText, { color: ui.text }]}>
+                {conversation?.onlineStatus || "Online"}
+              </Text>
             </View>
           </View>
 
-          <View style={[styles.infoPanel, { backgroundColor: ui.surface }]}>
-            <Text style={[styles.infoPanelTitle, { color: ui.text }]}>Conversation</Text>
-            <SettingRow ui={ui} label="Shipment" value={conversation?.trackingNumber || "#ATL-240701"} />
-            <SettingRow ui={ui} label="Notifications">
+          <View style={[styles.chatInfoCard, { backgroundColor: ui.surface, borderColor: ui.cardBorder || ui.border }]}> 
+            <ChatInfoContentRow
+              ui={ui}
+              icon="info"
+              title="About Atlas Support"
+              primary={supportTeam}
+              text={supportDescription}
+            />
+            <ChatInfoContentRow
+              ui={ui}
+              icon="clock"
+              title="Support Hours"
+              primary="Monday – Sunday"
+              text="8:00 AM – 8:00 PM"
+            />
+            {hasMedia ? (
+              <ChatInfoMediaSection
+                ui={ui}
+                media={media}
+                shownMedia={shownMedia}
+                onOpenMedia={onOpenMedia}
+              />
+            ) : null}
+          </View>
+
+          <View style={[styles.chatInfoCard, { backgroundColor: ui.surface, borderColor: ui.cardBorder || ui.border }]}> 
+            <ChatInfoContactHeader ui={ui} />
+            <ChatInfoContactRow ui={ui} icon="envelope" value={supportEmail} onPress={() => openMail(supportEmail)} />
+            <ChatInfoContactRow ui={ui} icon="phone" value={supportPhone} onPress={() => openPhone(supportPhone)} />
+            <ChatInfoContactRow ui={ui} icon="globe" value={supportWebsite} onPress={() => openWebsite(supportWebsite)} chevron />
+            <ChatInfoContactRow
+              ui={ui}
+              icon="map-marker-alt"
+              title="Head Office"
+              value={supportAddress}
+              onPress={() => openMaps(supportAddress)}
+              chevron
+              last
+            />
+          </View>
+
+          <View style={[styles.chatInfoCard, { backgroundColor: ui.surface, borderColor: ui.border }]}> 
+            <View style={styles.chatInfoContactHeader}>
+              <View style={[styles.chatInfoLargeIcon, { backgroundColor: ui.surface2 }]}>
+                <FontAwesome5 name="bell" size={22} color={ui.blue} />
+              </View>
+              <Text style={[styles.chatInfoContentTitle, { color: ui.text }]}>Notifications</Text>
+            </View>
+            <View style={styles.chatInfoSettingRow}>
+              <View style={[styles.chatInfoSettingIcon, { backgroundColor: ui.surface2 }]}> 
+                <FontAwesome5 name="bell" size={22} color={ui.blue} />
+              </View>
+              <View style={styles.chatInfoSettingCopy}>
+                <Text style={[styles.chatInfoSettingTitle, { color: ui.text }]}>Receive Notifications</Text>
+                <Text style={[styles.chatInfoSettingText, { color: ui.muted }]}>Get updates about this shipment</Text>
+              </View>
               <Switch
                 value={notificationsEnabled}
                 onValueChange={setNotificationsEnabled}
                 trackColor={{ false: ui.border, true: ui.blue }}
                 thumbColor={ui.onPrimary || "#ffffff"}
               />
-            </SettingRow>
-            <SettingRow ui={ui} label="Mute">
+            </View>
+            <View style={[styles.chatInfoDivider, { backgroundColor: ui.border }]} />
+            <View style={styles.chatInfoSettingRow}>
+              <View style={[styles.chatInfoSettingIcon, { backgroundColor: ui.surface2 }]}> 
+                <FontAwesome5 name="bell-slash" size={21} color={ui.muted} />
+              </View>
+              <View style={styles.chatInfoSettingCopy}>
+                <Text style={[styles.chatInfoSettingTitle, { color: ui.text }]}>Mute Conversation</Text>
+                <Text style={[styles.chatInfoSettingText, { color: ui.muted }]}>Disable notifications for this chat</Text>
+              </View>
               <Switch
                 value={muted}
                 onValueChange={setMuted}
                 trackColor={{ false: ui.border, true: ui.blue }}
                 thumbColor={ui.onPrimary || "#ffffff"}
               />
-            </SettingRow>
-          </View>
-
-          <View style={[styles.infoPanel, { backgroundColor: ui.surface }]}>
-            <View style={styles.panelHeaderRow}>
-              <Text style={[styles.infoPanelTitle, { color: ui.text }]}>Shared Media</Text>
-              <Text style={[styles.mediaCount, { color: ui.muted }]}>{media.length || 12}</Text>
             </View>
-            <View style={styles.mediaStrip}>
-              {media.length ? (
-                media.map((attachment, index) => (
-                  <Image key={`${attachment.url}-${index}`} source={{ uri: attachment.url }} style={styles.mediaThumb} contentFit="cover" />
-                ))
-              ) : (
-                [0, 1, 2, 3].map((item) => (
-                  <View key={item} style={[styles.mediaPlaceholder, { backgroundColor: ui.surface2 }]}>
-                    <FontAwesome5 name={item % 2 ? "file-alt" : "image"} size={18} color={ui.muted} />
-                  </View>
-                ))
-              )}
-              <FontAwesome5 name="chevron-right" size={15} color={ui.muted} />
-            </View>
-          </View>
-
-          <View style={[styles.infoPanel, { backgroundColor: ui.surface }]}>
-            <Text style={[styles.infoPanelTitle, { color: ui.text }]}>Other</Text>
-            <TouchableOpacity style={styles.infoActionRow}>
-              <Text style={[styles.endConversationText, { color: ui.red }]}>End Conversation</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.infoActionRow}>
-              <Text style={[styles.settingLabel, { color: ui.text }]}>Rate this Conversation</Text>
-              <FontAwesome5 name="chevron-right" size={14} color={ui.muted} />
-            </TouchableOpacity>
           </View>
         </ScrollView>
       </View>
     </Modal>
+  );
+}
+
+function ChatInfoContentRow({ ui = UI, icon, title, primary, text }) {
+  return (
+    <View style={[styles.chatInfoContentRow, { borderBottomColor: ui.border }]}>
+      <View style={[styles.chatInfoLargeIcon, { backgroundColor: ui.surface2 }]}>
+        <FontAwesome5 name={icon} size={22} color={ui.blue} />
+      </View>
+      <View style={styles.chatInfoContentCopy}>
+        <Text style={[styles.chatInfoContentTitle, { color: ui.text }]}>{title}</Text>
+        {!!primary && <Text style={[styles.chatInfoContentPrimary, { color: ui.text }]}>{primary}</Text>}
+        {!!text && <Text style={[styles.chatInfoContentText, { color: ui.muted }]}>{text}</Text>}
+      </View>
+    </View>
+  );
+}
+
+function ChatInfoMediaSection({ ui = UI, media, shownMedia, onOpenMedia }) {
+  return (
+    <View style={styles.chatInfoContentRowLast}>
+      <View style={[styles.chatInfoLargeIcon, { backgroundColor: ui.surface2 }]}>
+        <FontAwesome5 name="image" size={22} color={ui.blue} />
+      </View>
+      <View style={styles.chatInfoContentCopy}>
+        <TouchableOpacity
+          activeOpacity={0.88}
+          onPress={() => onOpenMedia(shownMedia[0]?.url)}
+          style={styles.chatInfoMediaHeader}
+        >
+          <Text style={[styles.chatInfoContentTitle, { color: ui.text }]}>Uploaded Media</Text>
+          <View style={styles.chatInfoSectionAction}>
+            <Text style={[styles.chatInfoMediaCount, { color: ui.blue }]}>{media.length}</Text>
+            <FontAwesome5 name="chevron-right" size={18} color={ui.blue} />
+          </View>
+        </TouchableOpacity>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.chatInfoMediaStrip}
+        >
+          {shownMedia.map((attachment, index) => {
+            const moreCount = media.length - shownMedia.length;
+            const isMore = index === shownMedia.length - 1 && moreCount > 0;
+            return (
+              <TouchableOpacity
+                key={`${attachment.url}-${index}`}
+                style={styles.chatInfoMediaThumbWrap}
+                onPress={() => onOpenMedia(attachment.url)}
+                activeOpacity={0.9}
+              >
+                <Image source={{ uri: attachment.url }} style={styles.chatInfoMediaThumb} contentFit="cover" />
+                {isMore ? (
+                  <View style={styles.chatInfoMediaMoreShade}>
+                    <Text style={[styles.chatInfoMediaMoreText, { color: ui.onPrimary || "#ffffff" }]}>+{moreCount}</Text>
+                  </View>
+                ) : null}
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
+      </View>
+    </View>
+  );
+}
+
+function ChatInfoContactRow({ ui = UI, icon, title, value, onPress, chevron, last }) {
+  return (
+    <TouchableOpacity
+      activeOpacity={0.82}
+      onPress={onPress}
+      style={[styles.chatInfoContactRow, !last && { borderBottomColor: ui.border, borderBottomWidth: 1 }]}
+    >
+      <View style={[styles.chatInfoSmallIcon, { backgroundColor: ui.surface2 }]}> 
+        <FontAwesome5 name={icon} size={20} color={ui.blue} />
+      </View>
+      <View style={styles.chatInfoContactCopy}>
+        {!!title && <Text style={[styles.chatInfoContactTitle, { color: ui.text }]}>{title}</Text>}
+        <Text style={[styles.chatInfoContactValue, { color: ui.muted }]} numberOfLines={title ? undefined : 1}>
+          {value}
+        </Text>
+      </View>
+      {chevron ? <FontAwesome5 name="chevron-right" size={18} color={ui.muted} /> : null}
+    </TouchableOpacity>
+  );
+}
+
+function ChatInfoContactHeader({ ui = UI }) {
+  return (
+    <View style={styles.chatInfoContactHeader}>
+      <View style={[styles.chatInfoLargeIcon, { backgroundColor: ui.surface2 }]}> 
+        <FontAwesome5 name="user" size={22} color={ui.blue} />
+      </View>
+      <Text style={[styles.chatInfoContentTitle, { color: ui.text }]}>Support Contact</Text>
+    </View>
   );
 }
 
@@ -645,6 +841,7 @@ export default function ChatThread({ conversationId, onBack, embedded = false })
       surface2: colors.inputBar,
       card: colors.receivedBg,
       border: colors.border,
+      cardBorder: resolvedScheme === "dark" ? "rgba(255,255,255,0.07)" : "rgba(15,23,42,0.08)",
       text: colors.text,
       muted: colors.textMuted,
       blue: colors.accent,
@@ -1142,6 +1339,18 @@ export default function ChatThread({ conversationId, onBack, embedded = false })
                 color={isClosed ? colors.textMuted : colors.accent}
               />
             </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.composerIcon}
+              onPress={handlePickImage}
+              disabled={isClosed || uploading}
+              hitSlop={6}
+            >
+              <FontAwesome5
+                name="paperclip"
+                size={16}
+                color={isClosed ? colors.textMuted : colors.accent}
+              />
+            </TouchableOpacity>
 
             <View style={[styles.inputWrap, { backgroundColor: colors.inputBar }]}>
               <TextInput
@@ -1349,6 +1558,8 @@ export default function ChatThread({ conversationId, onBack, embedded = false })
         muted={muted}
         setMuted={setMuted}
         ui={supportUi}
+        onViewTracking={openTracking}
+        onOpenMedia={setLightbox}
       />
     </View>
   );
@@ -1358,23 +1569,24 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   flex: { flex: 1 },
   header: {
-    minHeight: 62,
+    minHeight: 74,
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    gap: 10,
-    borderBottomWidth: 1,
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 8,
+    gap: 9,
+    borderBottomWidth: 0,
   },
   headerBtn: {
-    width: 34,
+    width: 28,
     height: 40,
     alignItems: "center",
     justifyContent: "center",
   },
   headerText: { flex: 1, minWidth: 0 },
-  headerTitle: { fontSize: 16, fontWeight: "800" },
-  headerSubtitle: { marginTop: 2, fontSize: 12 },
+  headerTitle: { fontSize: 14, fontWeight: "800" },
+  headerSubtitle: { marginTop: 2, fontSize: 12, fontWeight: "400" },
   statusPill: {
     flexDirection: "row",
     alignItems: "center",
@@ -1386,40 +1598,41 @@ const styles = StyleSheet.create({
   statusDot: { width: 6, height: 6, borderRadius: 3 },
   statusPillText: { fontSize: 11, fontWeight: "700" },
   referenceWrap: {
-    paddingHorizontal: 18,
-    paddingTop: 10,
-    paddingBottom: 8,
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    paddingBottom: 10,
   },
   referenceBanner: {
-    minHeight: 56,
+    minHeight: 43,
     borderWidth: 1,
-    borderRadius: 12,
-    paddingHorizontal: 16,
+    borderRadius: 9,
+    paddingHorizontal: 12,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     gap: 12,
   },
-  referenceText: { flex: 1, fontSize: 16, fontWeight: "700" },
-  referenceAction: { fontSize: 15, fontWeight: "900" },
-  messages: { paddingHorizontal: 12, paddingBottom: 12, paddingTop: 4 },
+  referenceText: { flex: 1, fontSize: 13, fontWeight: "600" },
+  referenceAction: { fontSize: 12, fontWeight: "800" },
+  messages: { paddingHorizontal: 16, paddingBottom: 10, paddingTop: 0 },
   welcomeBubbleRow: {
     flexDirection: "row",
     alignItems: "flex-start",
-    gap: 12,
-    paddingTop: 18,
-    paddingBottom: 10,
+    gap: 10,
+    paddingTop: 8,
+    paddingBottom: 8,
   },
   welcomeBubble: {
-    maxWidth: "74%",
-    borderRadius: 14,
-    borderTopLeftRadius: 6,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
+    maxWidth: "70%",
+    borderRadius: 10,
+    borderTopLeftRadius: 5,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
   },
   agentCardWrap: {
-    paddingHorizontal: 64,
-    paddingBottom: 8,
+    paddingLeft: 48,
+    paddingRight: 33,
+    paddingBottom: 6,
   },
   threadIntro: {
     alignItems: "center",
@@ -1435,10 +1648,10 @@ const styles = StyleSheet.create({
   },
   shipmentCard: {
     width: "100%",
-    marginTop: 12,
+    marginTop: 4,
     borderWidth: 1,
-    borderRadius: 16,
-    padding: 12,
+    borderRadius: 10,
+    padding: 9,
     alignSelf: "stretch",
   },
   shipmentCardHeader: {
@@ -1447,47 +1660,47 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   shipmentTitleWrap: { flex: 1, minWidth: 0 },
-  shipmentEyebrow: { fontSize: 11, fontWeight: "700", textTransform: "uppercase" },
-  shipmentTitle: { marginTop: 2, fontSize: 15, fontWeight: "900" },
+  shipmentEyebrow: { fontSize: 10, fontWeight: "700", textTransform: "uppercase" },
+  shipmentTitle: { marginTop: 0, fontSize: 12, fontWeight: "800" },
   shipmentStatusPill: {
-    minHeight: 24,
-    borderRadius: 12,
-    paddingHorizontal: 9,
+    minHeight: 20,
+    borderRadius: 6,
+    paddingHorizontal: 7,
     alignItems: "center",
     justifyContent: "center",
   },
-  shipmentStatusText: { fontSize: 11, fontWeight: "900" },
+  shipmentStatusText: { fontSize: 10, fontWeight: "800" },
   shipmentRows: {
-    marginTop: 10,
-    gap: 8,
+    marginTop: 9,
+    gap: 7,
   },
   shipmentRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     gap: 12,
   },
-  shipmentLabel: { fontSize: 12, fontWeight: "700" },
-  shipmentValue: { flex: 1, textAlign: "right", fontSize: 12, fontWeight: "800" },
+  shipmentLabel: { fontSize: 11, fontWeight: "500" },
+  shipmentValue: { flex: 1, textAlign: "right", fontSize: 11, fontWeight: "700" },
   trackingButton: {
-    marginTop: 12,
-    height: 40,
-    borderRadius: 12,
+    marginTop: 10,
+    height: 34,
+    borderRadius: 7,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     gap: 8,
   },
-  trackingButtonText: { fontSize: 13, fontWeight: "900" },
+  trackingButtonText: { fontSize: 12, fontWeight: "800" },
   dayDivider: { alignItems: "center", marginVertical: 12 },
   dayText: { fontSize: 11, fontWeight: "700", textTransform: "uppercase", letterSpacing: 0.4 },
   messageRow: { flexDirection: "row", alignItems: "flex-end", gap: 8 },
   rowMine: { justifyContent: "flex-end" },
   rowTheirs: { justifyContent: "flex-start" },
   avatarSlot: { width: 28, alignItems: "center", justifyContent: "flex-end" },
-  bubbleColumn: { maxWidth: "78%" },
+  bubbleColumn: { maxWidth: "76%" },
   senderName: { fontSize: 11, fontWeight: "700", marginBottom: 3, marginLeft: 4 },
-  bubble: { paddingHorizontal: 14, paddingVertical: 9 },
-  bubbleText: { fontSize: 15, lineHeight: 20 },
+  bubble: { paddingHorizontal: 12, paddingVertical: 9 },
+  bubbleText: { fontSize: 12, lineHeight: 18 },
   metaRow: { flexDirection: "row", marginTop: 3, paddingHorizontal: 4 },
   metaTime: { fontSize: 10, fontWeight: "600" },
   receipt: {
@@ -1561,38 +1774,42 @@ const styles = StyleSheet.create({
   pendingThumb: { width: 40, height: 40, borderRadius: 8 },
   pendingName: { flex: 1, fontSize: 13 },
   quickActions: {
-    flexDirection: "row",
-    gap: 8,
-    paddingHorizontal: 12,
-    paddingTop: 10,
-    paddingBottom: 8,
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    paddingBottom: 7,
     borderTopWidth: 1,
+    flexGrow: 0,
+  },
+  quickActionsContent: {
+    flexDirection: "row",
+    gap: 7,
+    paddingRight: 16,
   },
   quickAction: {
-    flex: 1,
-    minHeight: 38,
-    borderRadius: 14,
+    minHeight: 37,
+    minWidth: 118,
+    borderRadius: 9,
     borderWidth: 1,
-    paddingHorizontal: 9,
+    paddingHorizontal: 10,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     gap: 6,
   },
-  quickActionText: { fontSize: 12, fontWeight: "800" },
+  quickActionText: { fontSize: 11, fontWeight: "600" },
   composer: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
-    paddingHorizontal: 12,
-    paddingTop: 12,
-    paddingBottom: Platform.OS === "ios" ? 14 : 12,
+    gap: 7,
+    paddingHorizontal: 16,
+    paddingTop: 7,
+    paddingBottom: Platform.OS === "ios" ? 12 : 9,
     borderTopWidth: 1,
   },
   composerIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 29,
+    height: 33,
+    borderRadius: 15,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -1601,14 +1818,14 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
-    borderRadius: 20,
-    paddingLeft: 16,
-    paddingRight: 10,
-    minHeight: 36,
+    borderRadius: 12,
+    paddingLeft: 13,
+    paddingRight: 9,
+    minHeight: 39,
   },
   input: {
     flex: 1,
-    fontSize: 14,
+    fontSize: 12,
     paddingVertical: Platform.OS === "ios" ? 8 : 4,
     maxHeight: 110,
   },
@@ -1625,6 +1842,246 @@ const styles = StyleSheet.create({
   },
   lightboxClose: { position: "absolute", top: 50, right: 24, zIndex: 2, padding: 8 },
   lightboxImage: { width: "92%", height: "80%" },
+  fullScreen: { flex: 1 },
+  infoScrollView: { flex: 1 },
+  chatInfoHeader: {
+    paddingTop: Platform.OS === "ios" ? 20 : 14,
+    paddingHorizontal: 20,
+    paddingBottom: 10,
+    flexDirection: "row",
+    alignItems: "center",
+    borderBottomWidth: 1,
+  },
+  chatInfoHeaderButton: {
+    width: 44,
+    height: 44,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  chatInfoHeaderTitle: {
+    flex: 1,
+    textAlign: "center",
+    fontSize: 16,
+    fontWeight: "700",
+    letterSpacing: 0,
+  },
+  infoScreenContent: {
+    paddingBottom: 36,
+    paddingTop: 18,
+  },
+  chatInfoHero: {
+    alignItems: "center",
+    paddingHorizontal: 20,
+    paddingBottom: 20,
+  },
+  chatInfoHeroName: {
+    marginTop: 16,
+    fontSize: 20,
+    fontWeight: "900",
+    letterSpacing: 0,
+  },
+  chatInfoHeroStatus: {
+    marginTop: 10,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 10,
+  },
+  chatInfoHeroDot: { width: 14, height: 14, borderRadius: 7 },
+  chatInfoHeroStatusText: { fontSize: 13, fontWeight: "400", lineHeight: 18, marginTop: 4 },
+  chatInfoCard: {
+    marginHorizontal: 16,
+    marginTop: 16,
+    borderRadius: 18,
+    borderWidth: 1,
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    shadowColor: "#000",
+    shadowOpacity: 0.035,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 1,
+  },
+  chatInfoCardTitle: { fontSize: 16, fontWeight: "800", marginBottom: 14 },
+  chatInfoContentRow: {
+    flexDirection: "row",
+    gap: 14,
+    paddingBottom: 16,
+    marginBottom: 16,
+    borderBottomWidth: 1,
+  },
+  chatInfoContentRowLast: {
+    flexDirection: "row",
+    gap: 14,
+  },
+  chatInfoLargeIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 16,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  chatInfoContentCopy: { flex: 1, minWidth: 0 },
+  chatInfoContentTitle: { fontSize: 16, fontWeight: "800" },
+  chatInfoContentPrimary: { marginTop: 8, fontSize: 15, fontWeight: "600", lineHeight: 22 },
+  chatInfoContentText: { marginTop: 8, fontSize: 13, lineHeight: 20 },
+  chatInfoMediaHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 10,
+  },
+  chatInfoCardHeaderRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 16,
+  },
+  chatInfoShipmentMain: {
+    marginTop: 18,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 16,
+  },
+  chatInfoPackageIcon: {
+    width: 60,
+    height: 60,
+    borderRadius: 18,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  chatInfoShipmentCopy: { flex: 1, minWidth: 0 },
+  chatInfoShipmentLabel: { fontSize: 12, fontWeight: "700", color: "#9CA3AF", textTransform: "uppercase" },
+  chatInfoShipmentTop: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    marginTop: 6,
+  },
+  chatInfoShipmentTitle: { flex: 1, fontSize: 18, fontWeight: "900" },
+  chatInfoStatusPill: {
+    minHeight: 32,
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  chatInfoStatusText: { fontSize: 14, fontWeight: "800" },
+  chatInfoShipmentMetaGrid: {
+    marginTop: 20,
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: 12,
+  },
+  chatInfoMetaCell: { flex: 1, minWidth: 0 },
+  chatInfoMetaDivider: { width: 1, height: 45, marginHorizontal: 12 },
+  chatInfoMetaLabel: { fontSize: 15, fontWeight: "500" },
+  chatInfoMetaValue: { marginTop: 11, fontSize: 16, fontWeight: "700" },
+  chatInfoSectionHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+  },
+  chatInfoSectionAction: { flexDirection: "row", alignItems: "center", gap: 12 },
+  chatInfoMediaCount: { fontSize: 15, fontWeight: "700" },
+  chatInfoMediaStrip: {
+    marginTop: 14,
+    paddingVertical: 2,
+    flexDirection: "row",
+    gap: 10,
+  },
+  chatInfoMediaThumbWrap: {
+    width: 72,
+    height: 72,
+    borderRadius: 16,
+    overflow: "hidden",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  chatInfoMediaThumb: { width: "100%", height: "100%" },
+  chatInfoMediaBadge: {
+    position: "absolute",
+    right: 6,
+    bottom: 6,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: "rgba(15,23,42,0.74)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  chatInfoSettingRow: {
+    minHeight: 60,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 14,
+  },
+  chatInfoSectionHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+  },
+  chatInfoMediaMoreShade: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(15,23,42,0.74)",
+  },
+  chatInfoMediaMoreText: { fontSize: 16, fontWeight: "900" },
+  chatInfoContactHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 16,
+    marginBottom: 14,
+  },
+  chatInfoContactRow: {
+    minHeight: 56,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 14,
+    paddingVertical: 10,
+    marginLeft: 0,
+  },
+  chatInfoSmallIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  chatInfoContactCopy: { flex: 1, minWidth: 0 },
+  chatInfoContactTitle: { fontSize: 15, fontWeight: "600", marginBottom: 2 },
+  chatInfoContactValue: { fontSize: 14, lineHeight: 20 },
+  chatInfoSettingIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  chatInfoSettingCopy: { flex: 1, minWidth: 0 },
+  chatInfoSettingTitle: { fontSize: 15, fontWeight: "600" },
+  chatInfoSettingText: { marginTop: 4, fontSize: 13, lineHeight: 19 },
+  chatInfoDivider: { height: 1, marginVertical: 10 },
+  chatInfoAboutRow: {
+    minHeight: 68,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 16,
+    paddingVertical: 12,
+  },
+  chatInfoAboutIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  chatInfoAboutCopy: { flex: 1, minWidth: 0 },
+  chatInfoAboutTitle: { fontSize: 17, fontWeight: "700" },
+  chatInfoAboutText: { marginTop: 6, fontSize: 14, lineHeight: 19 },
   infoBackdrop: {
     flex: 1,
     backgroundColor: "rgba(15, 23, 42, 0.45)",

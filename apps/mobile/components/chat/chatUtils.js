@@ -224,8 +224,8 @@ export function getChatColors(colors, scheme) {
     divider: colors.border,
     skeletonBase: dark ? "#1E293B" : "#E2E8F0",
     skeletonHighlight: dark ? "#334155" : "#EEF2F7",
-    chatBg: dark ? "#0B1220" : "#FFFFFF",
-    inputBar: dark ? "#151E2E" : "#F0F2F5",
+    chatBg: dark ? "#07111F" : "#FFFFFF",
+    inputBar: dark ? "#111C2D" : "#F0F2F5",
   };
 }
 
