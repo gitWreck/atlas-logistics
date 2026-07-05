@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebase-admin";
 import { getAuth } from "firebase-admin/auth";
 import { headers } from "next/headers";
+import { formatShipmentForBoard } from "@/app/utility/shipmentBoardFormatter";
 
 export const dynamic = "force-dynamic";
 
@@ -32,10 +33,7 @@ export async function GET(request, { params }) {
 
     // 3. Return the full data (including packages array)
     return NextResponse.json({
-      shipment: {
-        id: docSnap.id,
-        ...docSnap.data(),
-      },
+      shipment: formatShipmentForBoard(docSnap.data(), { id: docSnap.id }),
     });
   } catch (error) {
     console.error("API Error:", error);
