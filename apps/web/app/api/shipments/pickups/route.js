@@ -6,6 +6,8 @@ import { resolveShipmentDeliveryMetrics } from "@/app/utility/shipmentProgress";
 
 export const dynamic = "force-dynamic";
 
+const PICKUP_PHASE_STATUSES = new Set(["PENDING_PICKUP", "PICKED_UP"]);
+
 export async function GET(request) {
   try {
     // 1. AUTHENTICATION
@@ -53,7 +55,7 @@ export async function GET(request) {
       .orderBy("updatedAt", "desc");
 
     if (limitParam !== "all") {
-      pickupsQuery = pickupsQuery.limit(Number(limitParam));
+      pickupsQuery = pickupsQuery.limit(Number(limitParam) * 5);
     }
 
     const snapshot = await pickupsQuery.get();
@@ -90,7 +92,16 @@ export async function GET(request) {
     // ---------------------------------------------------------
     // 5. TRANSFORM & MERGE DATA
     // ---------------------------------------------------------
-    const pickups = snapshot.docs.map((doc) => {
+    const pickupDocs = snapshot.docs.filter((doc) =>
+      PICKUP_PHASE_STATUSES.has(String(doc.data().status || "").toUpperCase()),
+    );
+
+    const limitedPickupDocs =
+      limitParam === "all"
+        ? pickupDocs
+        : pickupDocs.slice(0, Number(limitParam));
+
+    const pickups = limitedPickupDocs.map((doc) => {
       const data = doc.data();
       const assignedTrip = data.currentTripId
         ? tripMap[data.currentTripId]

@@ -12,6 +12,8 @@ import ShipmentRow from "./ShipmentRow";
 import { getBoardThemeClasses } from "@/app/utility/constant/theme";
 import TablePaginationFooter from "../ui/TablePaginationFooter";
 
+const PICKUP_PHASE_STATUSES = new Set(["PENDING_PICKUP", "PICKED_UP"]);
+
 export default function PickupRequestsTable({
   pickups = [],
   loading = false,
@@ -36,7 +38,12 @@ export default function PickupRequestsTable({
   const uniqueDelayReasons = useMemo(() => {
     const reasons = new Set(
       pickups
-        .filter((pickup) => pickup.status === "DELAYED" && pickup.delayReason)
+        .filter(
+          (pickup) =>
+            PICKUP_PHASE_STATUSES.has(
+              String(pickup.status || "").toUpperCase(),
+            ) && pickup.status === "DELAYED" && pickup.delayReason,
+        )
         .map((pickup) => pickup.delayReason),
     );
 
@@ -45,6 +52,9 @@ export default function PickupRequestsTable({
 
   const filteredPickups = useMemo(() => {
     return pickups.filter((pickup) => {
+      const status = String(pickup.status || "").toUpperCase();
+      if (!PICKUP_PHASE_STATUSES.has(status)) return false;
+
       const searchContent = [
         pickup.shipmentId,
         pickup.trackingNumber,
@@ -52,7 +62,7 @@ export default function PickupRequestsTable({
         pickup.recipient?.name,
         pickup.origin,
         pickup.destination,
-        pickup.status,
+        status,
       ]
         .filter(Boolean)
         .join(" ")
@@ -79,17 +89,12 @@ export default function PickupRequestsTable({
       }
 
       if (activeFilter !== "ALL") {
-        if (activeFilter === "ACTIVE" && pickup.status === "DELIVERED") {
-          return false;
+        if (activeFilter === "ACTIVE") {
+          return true;
         }
 
-        if (activeFilter === "DELAYED") {
-          if (pickup.status !== "DELAYED") return false;
-          if (delayType !== "ALL" && pickup.delayReason !== delayType) {
-            return false;
-          }
-        } else if (activeFilter !== "ACTIVE") {
-          if (pickup.status !== activeFilter) return false;
+        if (activeFilter !== status) {
+          return false;
         }
       }
 
@@ -169,11 +174,6 @@ export default function PickupRequestsTable({
                 <option value="ACTIVE">Active Only</option>
                 <option value="PENDING_PICKUP">Pending</option>
                 <option value="PICKED_UP">Picked Up</option>
-                <option value="RECEIVED">At Hub</option>
-                <option value="IN_TRANSIT">In Transit</option>
-                <option value="DELIVERED">Completed</option>
-                <option value="DELAYED">Delayed</option>
-                <option value="CANCELLED">Cancelled</option>
               </select>
             </div>
           </div>
