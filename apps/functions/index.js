@@ -193,6 +193,10 @@ exports.updateConversationStatus =
   require("./src/chat/conversations").updateConversationStatus;
 exports.assignConversation =
   require("./src/chat/conversations").assignConversation;
+exports.startConversationCall =
+  require("./src/chat/conversations").startConversationCall;
+exports.updateConversationCallStatus =
+  require("./src/chat/conversations").updateConversationCallStatus;
 
 // Firestore Triggers
 const {

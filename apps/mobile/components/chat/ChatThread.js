@@ -110,11 +110,12 @@ function AttachmentImage({ uri, colors, onPress }) {
   );
 }
 
-function MessageBubble({ item, colors, onOpenImage, statusLabel }) {
+function MessageBubble({ item, colors, onOpenImage }) {
   const { message, mine, isFirstInGroup, isLastInGroup } = item;
   const attachment = getMessageAttachment(message);
   const text = getMessageText(message);
   const appear = useRef(new Animated.Value(0)).current;
+  const sentStatusColor = item.seenByOther ? colors.accent : colors.textMuted;
 
   useEffect(() => {
     Animated.spring(appear, {
@@ -210,11 +211,11 @@ function MessageBubble({ item, colors, onOpenImage, statusLabel }) {
           </View>
         )}
 
-        {isLastInGroup && (
+        {isLastInGroup && !mine && (
           <View
             style={[
               styles.metaRow,
-              { justifyContent: mine ? "flex-end" : "flex-start" },
+              { justifyContent: "flex-start" },
             ]}
           >
             <Text style={[styles.metaTime, { color: colors.textMuted }]}>
@@ -223,10 +224,13 @@ function MessageBubble({ item, colors, onOpenImage, statusLabel }) {
           </View>
         )}
 
-        {mine && statusLabel ? (
-          <Text style={[styles.receipt, { color: colors.textMuted }]}>
-            {statusLabel}
-          </Text>
+        {isLastInGroup && mine ? (
+          <View style={styles.sentMetaRow}>
+            <Text style={[styles.metaTime, { color: colors.textMuted }]}>
+              {formatClockTime(message.createdAt)}
+            </Text>
+            <FontAwesome5 name="check-double" size={11} color={sentStatusColor} />
+          </View>
         ) : null}
       </View>
     </Animated.View>
@@ -330,7 +334,7 @@ function QuickActions({ colors, hasShipment, onTrack, onConcern, onAgent }) {
           onPress={onTrack}
           activeOpacity={0.82}
         >
-          <FontAwesome5 name="map-marker-alt" size={13} color="#22C55E" />
+          <FontAwesome5 name="map-marker-alt" size={17} color="#22C55E" />
           <Text style={[styles.quickActionText, { color: colors.text }]}>
             Track Shipment
           </Text>
@@ -344,7 +348,7 @@ function QuickActions({ colors, hasShipment, onTrack, onConcern, onAgent }) {
         onPress={onConcern}
         activeOpacity={0.82}
       >
-        <FontAwesome5 name="truck" size={13} color={colors.accent} />
+        <FontAwesome5 name="truck" size={17} color={colors.accent} />
         <Text style={[styles.quickActionText, { color: colors.text }]}>
           Delivery Concern
         </Text>
@@ -357,7 +361,7 @@ function QuickActions({ colors, hasShipment, onTrack, onConcern, onAgent }) {
         onPress={onAgent}
         activeOpacity={0.82}
       >
-        <FontAwesome5 name="headset" size={13} color={colors.textMuted} />
+        <FontAwesome5 name="headset" size={17} color={colors.textMuted} />
         <Text style={[styles.quickActionText, { color: colors.text }]}>
           Talk to Agent
         </Text>
@@ -870,6 +874,7 @@ export default function ChatThread({ conversationId, onBack, embedded = false })
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [startingCall, setStartingCall] = useState(null);
   const [pendingImage, setPendingImage] = useState(null);
   const [emojiOpen, setEmojiOpen] = useState(false);
   const [lightbox, setLightbox] = useState(null);
@@ -956,7 +961,7 @@ export default function ChatThread({ conversationId, onBack, embedded = false })
     );
   }, [conversationId]);
 
-  const { items, lastSeenMineId, lastMineId } = useMemo(
+  const { items } = useMemo(
     () => buildMessageItems(messages, myUid),
     [messages, myUid],
   );
@@ -981,6 +986,8 @@ export default function ChatThread({ conversationId, onBack, embedded = false })
 
   const isClosed = conversation?.status === "closed";
   const hasShipment = !!(conversation?.trackingNumber || conversation?.shipmentId);
+  const canSend = !!draft.trim() || !!pendingImage;
+  const showSendButton = canSend || sending || uploading;
 
   const openTracking = useCallback(() => {
     const trackingNumber = conversation?.trackingNumber || conversation?.shipmentId;
@@ -990,6 +997,48 @@ export default function ChatThread({ conversationId, onBack, embedded = false })
       params: { trackingId: trackingNumber },
     });
   }, [conversation?.shipmentId, conversation?.trackingNumber, router]);
+
+  const startCall = useCallback(
+    async (callType) => {
+      if (!conversationId || startingCall) return;
+      if (isClosed) {
+        Alert.alert("Conversation closed", "Calls are not available for closed conversations.");
+        return;
+      }
+
+      try {
+        setStartingCall(callType);
+        const result = await startConversationCall({
+          conversationId: String(conversationId),
+          callType,
+        });
+        const callId = result?.data?.callId;
+        Alert.alert(
+          callType === "video" ? "Video call" : "Voice call",
+          callId
+            ? "Call request sent to the assigned Atlas staff."
+            : "Call request sent.",
+        );
+      } catch (error) {
+        console.error("Start call failed:", error);
+        Alert.alert(
+          "Call unavailable",
+          error?.message || "Unable to start this call. Please try again.",
+        );
+      } finally {
+        setStartingCall(null);
+      }
+    },
+    [conversationId, isClosed, startingCall],
+  );
+
+  const handleVoiceCall = useCallback(async () => {
+    await startCall("voice");
+  }, [startCall]);
+
+  const handleVideoCall = useCallback(async () => {
+    await startCall("video");
+  }, [startCall]);
 
   const doSend = useCallback(
     async (payload) => {
@@ -1099,16 +1148,11 @@ export default function ChatThread({ conversationId, onBack, embedded = false })
         </View>
       );
     }
-    let statusLabel = null;
-    if (item.mine && item.id === lastSeenMineId) statusLabel = "Seen";
-    else if (item.mine && item.id === lastMineId && lastMineId !== lastSeenMineId)
-      statusLabel = "Sent";
     return (
       <MessageBubble
         item={item}
         colors={colors}
         onOpenImage={setLightbox}
-        statusLabel={statusLabel}
       />
     );
   };
@@ -1144,6 +1188,36 @@ export default function ChatThread({ conversationId, onBack, embedded = false })
           >
             {headerSubtitle}
           </Text>
+        </View>
+        <View style={styles.headerActions}>
+          <TouchableOpacity
+            style={styles.headerActionBtn}
+            onPress={handleVoiceCall}
+            disabled={!!startingCall}
+            activeOpacity={0.72}
+            accessibilityRole="button"
+            accessibilityLabel="Voice call"
+          >
+            {startingCall === "voice" ? (
+              <ActivityIndicator size="small" color={colors.text} />
+            ) : (
+              <FontAwesome5 name="phone-alt" size={20} color={colors.text} />
+            )}
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.headerActionBtn}
+            onPress={handleVideoCall}
+            disabled={!!startingCall}
+            activeOpacity={0.72}
+            accessibilityRole="button"
+            accessibilityLabel="Video call"
+          >
+            {startingCall === "video" ? (
+              <ActivityIndicator size="small" color={colors.text} />
+            ) : (
+              <FontAwesome5 name="video" size={21} color={colors.text} />
+            )}
+          </TouchableOpacity>
         </View>
         <TouchableOpacity
           style={styles.headerBtn}
@@ -1324,7 +1398,7 @@ export default function ChatThread({ conversationId, onBack, embedded = false })
           <View
             style={[
               styles.composer,
-              { backgroundColor: colors.surface, borderTopColor: colors.border },
+              { backgroundColor: colors.chatBg, borderTopColor: colors.border },
             ]}
           >
             <TouchableOpacity
@@ -1335,8 +1409,8 @@ export default function ChatThread({ conversationId, onBack, embedded = false })
             >
               <FontAwesome5
                 name="image"
-                size={16}
-                color={isClosed ? colors.textMuted : colors.accent}
+                size={22}
+                color={isClosed ? colors.textMuted : colors.text}
               />
             </TouchableOpacity>
             <TouchableOpacity
@@ -1347,8 +1421,8 @@ export default function ChatThread({ conversationId, onBack, embedded = false })
             >
               <FontAwesome5
                 name="paperclip"
-                size={16}
-                color={isClosed ? colors.textMuted : colors.accent}
+                size={22}
+                color={isClosed ? colors.textMuted : colors.text}
               />
             </TouchableOpacity>
 
@@ -1370,29 +1444,32 @@ export default function ChatThread({ conversationId, onBack, embedded = false })
               >
                 <FontAwesome5
                   name="smile"
-                  size={17}
-                  color={colors.textMuted}
+                  size={22}
+                  color={colors.text}
                 />
               </TouchableOpacity>
             </View>
 
-            <TouchableOpacity
-              style={styles.composerIcon}
-              onPress={handleSend}
-              disabled={sending || uploading || isClosed}
-              activeOpacity={0.7}
-              hitSlop={6}
-            >
-              {sending || uploading ? (
-                <ActivityIndicator size="small" color={colors.accent} />
-              ) : (
-                <FontAwesome5
-                  name={draft.trim() || pendingImage ? "paper-plane" : "smile"}
-                  size={17}
-                  color={isClosed ? colors.textMuted : colors.accent}
-                />
-              )}
-            </TouchableOpacity>
+            {showSendButton ? (
+              <TouchableOpacity
+                style={[
+                  styles.sendButton,
+                  {
+                    backgroundColor:
+                      !canSend || isClosed ? colors.textMuted : colors.accent,
+                  },
+                ]}
+                onPress={handleSend}
+                disabled={!canSend || sending || uploading || isClosed}
+                activeOpacity={0.82}
+              >
+                {sending || uploading ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <FontAwesome5 name="paper-plane" size={17} color="#FFFFFF" />
+                )}
+              </TouchableOpacity>
+            ) : null}
           </View>
         </KeyboardAvoidingView>
       )}
@@ -1569,24 +1646,35 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   flex: { flex: 1 },
   header: {
-    minHeight: 74,
+    minHeight: 82,
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 16,
-    paddingTop: 12,
-    paddingBottom: 8,
-    gap: 9,
+    paddingHorizontal: 14,
+    paddingTop: 14,
+    paddingBottom: 10,
+    gap: 10,
     borderBottomWidth: 0,
   },
   headerBtn: {
-    width: 28,
-    height: 40,
+    width: 48,
+    height: 48,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  headerActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  headerActionBtn: {
+    width: 48,
+    height: 48,
     alignItems: "center",
     justifyContent: "center",
   },
   headerText: { flex: 1, minWidth: 0 },
-  headerTitle: { fontSize: 14, fontWeight: "800" },
-  headerSubtitle: { marginTop: 2, fontSize: 12, fontWeight: "400" },
+  headerTitle: { fontSize: 17, fontWeight: "800" },
+  headerSubtitle: { marginTop: 2, fontSize: 14, fontWeight: "400" },
   statusPill: {
     flexDirection: "row",
     alignItems: "center",
@@ -1701,14 +1789,15 @@ const styles = StyleSheet.create({
   senderName: { fontSize: 11, fontWeight: "700", marginBottom: 3, marginLeft: 4 },
   bubble: { paddingHorizontal: 12, paddingVertical: 9 },
   bubbleText: { fontSize: 12, lineHeight: 18 },
-  metaRow: { flexDirection: "row", marginTop: 3, paddingHorizontal: 4 },
-  metaTime: { fontSize: 10, fontWeight: "600" },
-  receipt: {
-    fontSize: 10,
-    fontWeight: "600",
+  metaRow: { flexDirection: "row", marginTop: 5, paddingHorizontal: 4 },
+  metaTime: { fontSize: 12, fontWeight: "600" },
+  sentMetaRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
     alignSelf: "flex-end",
-    marginTop: 2,
-    marginRight: 2,
+    marginTop: 6,
+    marginRight: 4,
   },
   attachmentImageWrap: {
     borderRadius: 16,
@@ -1774,42 +1863,42 @@ const styles = StyleSheet.create({
   pendingThumb: { width: 40, height: 40, borderRadius: 8 },
   pendingName: { flex: 1, fontSize: 13 },
   quickActions: {
-    paddingHorizontal: 16,
-    paddingTop: 8,
-    paddingBottom: 7,
+    paddingHorizontal: 18,
+    paddingTop: 10,
+    paddingBottom: 10,
     borderTopWidth: 1,
     flexGrow: 0,
   },
   quickActionsContent: {
     flexDirection: "row",
-    gap: 7,
-    paddingRight: 16,
+    gap: 9,
+    paddingRight: 18,
   },
   quickAction: {
-    minHeight: 37,
-    minWidth: 118,
-    borderRadius: 9,
+    minHeight: 42,
+    minWidth: 132,
+    borderRadius: 12,
     borderWidth: 1,
-    paddingHorizontal: 10,
+    paddingHorizontal: 12,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: 6,
+    gap: 8,
   },
-  quickActionText: { fontSize: 11, fontWeight: "600" },
+  quickActionText: { fontSize: 13, fontWeight: "600" },
   composer: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 7,
-    paddingHorizontal: 16,
-    paddingTop: 7,
-    paddingBottom: Platform.OS === "ios" ? 12 : 9,
+    gap: 8,
+    paddingHorizontal: 14,
+    paddingTop: 10,
+    paddingBottom: Platform.OS === "ios" ? 16 : 12,
     borderTopWidth: 1,
   },
   composerIcon: {
-    width: 29,
-    height: 33,
-    borderRadius: 15,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -1817,22 +1906,35 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
-    borderRadius: 12,
-    paddingLeft: 13,
-    paddingRight: 9,
-    minHeight: 39,
+    gap: 10,
+    borderRadius: 24,
+    paddingLeft: 18,
+    paddingRight: 12,
+    minHeight: 52,
   },
   input: {
     flex: 1,
-    fontSize: 12,
-    paddingVertical: Platform.OS === "ios" ? 8 : 4,
+    fontSize: 16,
+    paddingVertical: Platform.OS === "ios" ? 11 : 7,
     maxHeight: 110,
   },
   emojiToggle: {
+    width: 40,
+    height: 40,
     alignItems: "center",
     justifyContent: "center",
-    paddingVertical: 4,
+  },
+  sendButton: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: "#0A7CFF",
+    shadowOpacity: 0.32,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 5 },
+    elevation: 6,
   },
   lightbox: {
     flex: 1,

@@ -290,6 +290,14 @@ export const assignConversation = httpsCallable(
   functions,
   "assignConversation",
 );
+export const startConversationCall = httpsCallable(
+  functions,
+  "startConversationCall",
+);
+export const updateConversationCallStatus = httpsCallable(
+  functions,
+  "updateConversationCallStatus",
+);
 
 // INVOICES
 export const createInvoice = httpsCallable(functions, "createInvoice");

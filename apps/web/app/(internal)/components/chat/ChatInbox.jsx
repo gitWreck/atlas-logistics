@@ -22,6 +22,7 @@ import {
   faSearch,
   faUserCheck,
   faPhone,
+  faVideo,
   faInfoCircle,
   faPenToSquare,
   faPlus,
@@ -49,6 +50,7 @@ import {
   assignConversation,
   markConversationRead,
   sendChatMessage,
+  startConversationCall,
   updateConversationStatus,
 } from "@/app/utility/FirebaseFunctions";
 import { formatFirestoreDate } from "@/app/utility/utilities";
@@ -265,6 +267,7 @@ export default function ChatInbox({ user, profile, isDark = false, onViewCustome
   const [uploading, setUploading] = useState(false);
   const [pendingFile, setPendingFile] = useState(null);
   const [pendingPreview, setPendingPreview] = useState("");
+  const [calling, setCalling] = useState(false);
   const [mobileThreadOpen, setMobileThreadOpen] = useState(false);
   const [statusMenuOpen, setStatusMenuOpen] = useState(false);
   const [assignMenuOpen, setAssignMenuOpen] = useState(false);
@@ -300,7 +303,7 @@ export default function ChatInbox({ user, profile, isDark = false, onViewCustome
     let q;
     const role = String(profile.role || "").toLowerCase();
 
-    if (role === "manager") {
+    if (role === "employee" || role === "manager") {
       q = query(
         collection(db, "conversations"),
         where("assignedTo", "==", user.uid),
@@ -487,13 +490,13 @@ export default function ChatInbox({ user, profile, isDark = false, onViewCustome
     setAssignMenuOpen(false);
   }, [selectedId]);
 
-  // Load staff (admins + managers) that a conversation can be assigned to.
+  // Load staff that a conversation can be assigned to.
   useEffect(() => {
     let active = true;
     (async () => {
       try {
         const snap = await getDocs(
-          query(collection(db, "users"), where("role", "in", ["admin", "manager"])),
+          query(collection(db, "users"), where("role", "in", ["employee", "manager", "admin"])),
         );
         const members = snap.docs
           .map((docSnap) => ({ id: docSnap.id, ...docSnap.data() }))
@@ -703,6 +706,25 @@ export default function ChatInbox({ user, profile, isDark = false, onViewCustome
 
   const handleAssignToMe = () => handleAssign(user?.uid);
 
+  const handleStartCall = async (callType = "voice") => {
+    if (!selectedId || calling || selected?.status === "closed") return;
+    try {
+      setCalling(true);
+      const result = await startConversationCall({
+        conversationId: selectedId,
+        callType,
+      });
+      if (result?.data?.callId) {
+        alert(`${callType === "video" ? "Video" : "Voice"} call request sent.`);
+      }
+    } catch (err) {
+      console.error("Call failed:", err);
+      alert("Unable to start the call right now. Please try again.");
+    } finally {
+      setCalling(false);
+    }
+  };
+
   const handleFileUpload = async (event) => {
     const file = event.target.files?.[0];
     if (!file || !selectedId) return;
@@ -909,7 +931,29 @@ export default function ChatInbox({ user, profile, isDark = false, onViewCustome
                   </div>
                 </div>
 
-                <div className="flex items-center gap-1">
+                <div className="flex items-center gap-2">
+                  {role === "manager" && (
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => handleStartCall("voice")}
+                        disabled={calling || selected?.status === "closed"}
+                        className={`flex h-9 w-9 items-center justify-center rounded-full transition disabled:opacity-60 ${isDark ? "hover:bg-slate-800" : "hover:bg-slate-100"}`}
+                        title="Start voice call"
+                      >
+                        <FontAwesomeIcon icon={faPhone} className="text-emerald-600" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleStartCall("video")}
+                        disabled={calling || selected?.status === "closed"}
+                        className={`flex h-9 w-9 items-center justify-center rounded-full transition disabled:opacity-60 ${isDark ? "hover:bg-slate-800" : "hover:bg-slate-100"}`}
+                        title="Start video call"
+                      >
+                        <FontAwesomeIcon icon={faVideo} className="text-blue-600" />
+                      </button>
+                    </div>
+                  )}
                   <button
                     type="button"
                     onClick={() => setShowDetails((v) => !v)}
@@ -1276,6 +1320,28 @@ export default function ChatInbox({ user, profile, isDark = false, onViewCustome
               <div className="mt-6 w-full">
                 <p className="mb-3 text-sm font-bold">Quick Actions</p>
                 <div className="flex flex-col gap-1">
+                  {(["manager", "employee", "admin"].includes(String(profile?.role || "").toLowerCase()) || String(profile?.role || "").toLowerCase() === "staff") && (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => handleStartCall("voice")}
+                        disabled={calling || selected?.status === "closed"}
+                        className={`flex items-center gap-3 rounded-lg px-2 py-2 text-sm transition disabled:opacity-60 ${isDark ? "hover:bg-slate-800" : "hover:bg-slate-100"}`}
+                      >
+                        <FontAwesomeIcon icon={faPhone} className="text-emerald-600" />
+                        Start Voice Call
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleStartCall("video")}
+                        disabled={calling || selected?.status === "closed"}
+                        className={`flex items-center gap-3 rounded-lg px-2 py-2 text-sm transition disabled:opacity-60 ${isDark ? "hover:bg-slate-800" : "hover:bg-slate-100"}`}
+                      >
+                        <FontAwesomeIcon icon={faPhone} className="text-blue-600" />
+                        Start Video Call
+                      </button>
+                    </>
+                  )}
                   {selected.trackingNumber && (
                     <button
                       type="button"
@@ -1454,7 +1520,7 @@ export default function ChatInbox({ user, profile, isDark = false, onViewCustome
                             <input
                               value={assignSearch}
                               onChange={(event) => setAssignSearch(event.target.value)}
-                              placeholder="Search admin or manager"
+                              placeholder="Search staff"
                               className={`w-full rounded-xl border px-3 py-2 text-sm outline-none transition ${
                                 isDark
                                   ? "border-slate-700 bg-slate-900 text-slate-100 placeholder:text-slate-500 focus:border-blue-500"
@@ -1465,7 +1531,7 @@ export default function ChatInbox({ user, profile, isDark = false, onViewCustome
                           {staffMembers.length === 0 ? (
                             <p className={`px-3 py-2 text-sm ${muted}`}>No staff available.</p>
                           ) : filteredStaffMembers.length === 0 ? (
-                            <p className={`px-3 py-2 text-sm ${muted}`}>No admin or manager matches your search.</p>
+                            <p className={`px-3 py-2 text-sm ${muted}`}>No staff matches your search.</p>
                           ) : (
                             filteredStaffMembers.map((member) => {
                               const active = selected.assignedTo === member.id;
