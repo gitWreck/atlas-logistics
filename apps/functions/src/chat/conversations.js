@@ -4,15 +4,29 @@ const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const admin = require("firebase-admin");
 const { requireAuth, requireRole } = require("../utilities/helpers");
 const { customerOwnsShipment } = require("../utilities/customerShipmentAccess");
+const { getRtcSecretConfig } = require("./trtcConfig");
 
 if (!admin.apps.length) admin.initializeApp();
 
 const db = admin.firestore();
 const FieldValue = admin.firestore.FieldValue;
 
-const STAFF_ROLES = ["admin", "manager"];
-const VALID_STATUSES = ["open", "pending", "resolved", "closed", "archived"];
+const STAFF_ROLES = ["admin", "manager", "employee"];
+const STAFF_MONITOR_ROLES = ["admin", "manager", "employee"];
+const VALID_STATUSES = ["unassigned", "active", "closed"];
 const VALID_PRIORITIES = ["normal", "urgent"];
+const CALL_TYPES = ["voice", "video"];
+const CALL_STATUSES = [
+  "ringing",
+  "accepted",
+  "connected",
+  "declined",
+  "missed",
+  "busy",
+  "cancelled",
+  "timeout",
+  "ended",
+];
 
 function cleanText(value, fieldName = "text", maxLength = 2000) {
   const text = String(value || "").trim();
@@ -33,6 +47,14 @@ function normalizeTracking(value) {
   return trackingNumber || null;
 }
 
+function normalizeConversationStatus(value) {
+  const status = String(value || "").trim().toLowerCase();
+  if (!status) return "unassigned";
+  if (["open", "pending", "resolved", "active"].includes(status)) return "active";
+  if (["closed", "archived"].includes(status)) return "closed";
+  return status;
+}
+
 function displayName(user = {}, fallback = "User") {
   return (
     user.name ||
@@ -41,6 +63,29 @@ function displayName(user = {}, fallback = "User") {
     user.email ||
     fallback
   );
+}
+
+function assignedStaffId(conversation = {}) {
+  return conversation.assignedStaffId || conversation.assignedTo || null;
+}
+
+function assignedStaffName(conversation = {}) {
+  return conversation.assignedStaffName || conversation.assignedToName || null;
+}
+
+function assignedStaffRole(conversation = {}) {
+  return conversation.assignedStaffRole || conversation.assignedRole || null;
+}
+
+function staffAssignmentFields({ assigneeId, assigneeRole, assigneeName } = {}) {
+  return {
+    assignedStaffId: assigneeId || null,
+    assignedStaffName: assigneeName || null,
+    assignedStaffRole: assigneeRole || null,
+    assignedTo: assigneeId || null,
+    assignedToName: assigneeName || null,
+    assignedRole: assigneeRole || null,
+  };
 }
 
 async function getStaffUserIds() {
@@ -70,12 +115,14 @@ async function getConversationForUser(conversationId, uid, role) {
   }
 
   const conversation = snap.data() || {};
-  const isAdmin = role === "admin";
-  const isManager = role === "manager";
+  const normalizedRole = String(role || "").toLowerCase();
+  const isAdmin = normalizedRole === "admin";
+  const isManager = normalizedRole === "manager";
+  const isEmployee = normalizedRole === "employee";
   const isCustomer = conversation.customerId === uid;
-  const isAssigned = conversation.assignedTo === uid;
+  const isAssigned = assignedStaffId(conversation) === uid;
 
-  if (!(isAdmin || (isManager && isAssigned) || isCustomer)) {
+  if (!(isAdmin || isManager || isCustomer || (isEmployee && isAssigned))) {
     throw new HttpsError("permission-denied", "Conversation access denied.");
   }
 
@@ -145,14 +192,20 @@ async function sendExpoPush({ userIds, title, body, data }) {
 }
 
 async function notifyStaff({ conversationId, conversation, message, sender }) {
-  const staffIds = await getStaffUserIds();
-  if (!staffIds.length) return;
+  const targetUserIds = [];
+  const assignedStaffIdValue = assignedStaffId(conversation);
+  if (assignedStaffIdValue) targetUserIds.push(assignedStaffIdValue);
+
+  const staffIds = (await getStaffUserIds()).filter((uid) => uid !== assignedStaffIdValue);
+  targetUserIds.push(...staffIds);
+
+  if (!targetUserIds.length) return;
 
   const batch = db.batch();
   const now = FieldValue.serverTimestamp();
   const title = `New chat from ${conversation.customerName || "Customer"}`;
 
-  staffIds.forEach((uid) => {
+  targetUserIds.forEach((uid) => {
     const notificationRef = db
       .collection("users")
       .doc(uid)
@@ -207,7 +260,7 @@ async function notifyCustomer({ conversationId, customerId, message, sender }) {
 
   await notificationRef.set({
     type: "CHAT_MESSAGE",
-    title: `Reply from ${sender.role === "admin" ? "Admin" : "Manager"}`,
+    title: `Reply from ${sender.role === "admin" ? "Admin" : sender.role === "employee" ? "Support" : "Atlas"}`,
     body: message,
     data: {
       screen: "chat",
@@ -228,6 +281,33 @@ async function notifyCustomer({ conversationId, customerId, message, sender }) {
       screen: "chat",
       conversationId,
     },
+  });
+}
+
+async function notifyIncomingCall({ callId, conversationId, receiverId, callerName, callType }) {
+  if (!receiverId) return;
+
+  const notificationRef = db
+    .collection("users")
+    .doc(receiverId)
+    .collection("notifications")
+    .doc();
+
+  await notificationRef.set({
+    type: callType === "video" ? "INCOMING_VIDEO_CALL" : "INCOMING_VOICE_CALL",
+    title: `${callType === "video" ? "Video" : "Voice"} call request`,
+    body: `${callerName || "Atlas support"} is calling you.`,
+    data: {
+      screen: "call",
+      conversationId,
+      callId,
+      callType,
+    },
+    entityType: "call",
+    entityId: callId,
+    ownerId: receiverId,
+    read: false,
+    createdAt: FieldValue.serverTimestamp(),
   });
 }
 
@@ -285,6 +365,7 @@ exports.createConversation = onCall(
     const now = FieldValue.serverTimestamp();
 
     const conversation = {
+      conversationId: conversationRef.id,
       type: trackingNumber ? "shipment" : "customer_support",
       shipmentId: trackingNumber,
       trackingNumber,
@@ -301,17 +382,27 @@ exports.createConversation = onCall(
       customerId: uid,
       customerName,
       customerPhone: user.phoneNumber || user.phone || null,
+      assignedStaffId: null,
+      assignedStaffName: null,
+      assignedStaffRole: null,
       assignedTo: null,
+      assignedToName: null,
       assignedRole: null,
       participantIds: [uid],
       participantRoles: {
         [uid]: role,
       },
+      lastMessage: initialMessage || "Conversation started",
+      lastMessageType: "text",
+      lastMessageSender: uid,
       lastMessageText: initialMessage || "Conversation started",
       lastMessageAt: now,
       lastMessageBy: uid,
-      status: "open",
+      lastActivityAt: now,
+      status: "unassigned",
       priority: "normal",
+      unreadCustomer: 0,
+      unreadStaff: initialMessage ? 1 : 0,
       unreadCounts: {
         [uid]: 0,
         staff: initialMessage ? 1 : 0,
@@ -352,8 +443,16 @@ exports.sendChatMessage = onCall(
   { region: "asia-southeast1", maxInstances: 20 },
   async (req) => {
     const uid = requireAuth(req);
-    const text = cleanText(req.data?.text);
     const conversationId = cleanText(req.data?.conversationId, "conversationId", 160);
+    const rawText = req.data?.text;
+    const attachmentUrl = req.data?.attachmentUrl || null;
+    const attachmentType = String(req.data?.attachmentType || "").trim().toLowerCase();
+    const attachmentName = String(req.data?.attachmentName || "").trim() || null;
+    const text = rawText == null ? "" : String(rawText).trim();
+
+    if (!text && !attachmentUrl) {
+      throw new HttpsError("invalid-argument", "Message text or attachment is required.");
+    }
 
     const userSnap = await db.collection("users").doc(uid).get();
     if (!userSnap.exists || userSnap.data()?.active === false) {
@@ -375,22 +474,37 @@ exports.sendChatMessage = onCall(
     const senderName = displayName(user, role === "customer" ? "Customer" : "Staff");
     const isStaff = STAFF_ROLES.includes(role);
     const now = FieldValue.serverTimestamp();
+    const messageText = text || (attachmentType === "image" ? "Photo" : attachmentName || "Attachment");
     const updates = {
-      lastMessageText: text,
+      lastMessage: messageText,
+      lastMessageText: messageText,
+      lastActivityAt: now,
       lastMessageAt: now,
       lastMessageBy: uid,
       updatedAt: now,
-      status: conversation.status === "resolved" ? "open" : conversation.status,
+      status: normalizeConversationStatus(conversation.status) === "closed" ? "closed" : normalizeConversationStatus(conversation.status) === "unassigned" ? "active" : normalizeConversationStatus(conversation.status),
     };
 
     if (isStaff) {
       updates[`unreadCounts.${conversation.customerId}`] = FieldValue.increment(1);
+      updates.unreadCustomer = FieldValue.increment(1);
+      updates.unreadStaff = 0;
       updates["unreadCounts.staff"] = 0;
-      updates.assignedTo = conversation.assignedTo || uid;
-      updates.assignedRole = conversation.assignedRole || role;
+      if (!assignedStaffId(conversation)) {
+        Object.assign(
+          updates,
+          staffAssignmentFields({
+            assigneeId: uid,
+            assigneeRole: role,
+            assigneeName: senderName,
+          }),
+        );
+      }
       updates[`participantRoles.${uid}`] = role;
       updates.participantIds = FieldValue.arrayUnion(uid);
     } else {
+      updates.unreadStaff = FieldValue.increment(1);
+      updates.unreadCustomer = 0;
       updates["unreadCounts.staff"] = FieldValue.increment(1);
     }
 
@@ -402,14 +516,34 @@ exports.sendChatMessage = onCall(
 
       const messageRef = ref.collection("messages").doc();
       tx.set(messageRef, {
+        messageId: messageRef.id,
         senderId: uid,
         senderRole: role,
         senderName,
-        type: "text",
+        type: attachmentUrl
+          ? attachmentType === "image"
+            ? "image"
+            : "document"
+          : "text",
         text,
-        attachments: [],
+        attachments: attachmentUrl
+          ? [
+              {
+                url: attachmentUrl,
+                type: attachmentType === "image" ? "image" : "document",
+                name: attachmentName || null,
+              },
+            ]
+          : [],
+        attachmentUrl: attachmentUrl || null,
+        attachmentType: attachmentType || null,
+        attachmentName: attachmentName || null,
+        status: "sent",
         createdAt: now,
         readBy: {
+          [uid]: now,
+        },
+        seenBy: {
           [uid]: now,
         },
       });
@@ -420,14 +554,14 @@ exports.sendChatMessage = onCall(
       await notifyCustomer({
         conversationId,
         customerId: conversation.customerId,
-        message: text,
+        message: text || (attachmentType === "image" ? "Photo" : attachmentName || "Attachment"),
         sender: { uid, role, name: senderName },
       });
     } else {
       await notifyStaff({
         conversationId,
         conversation,
-        message: text,
+        message: text || (attachmentType === "image" ? "Photo" : attachmentName || "Attachment"),
         sender: { uid, role, name: senderName },
       });
     }
@@ -452,6 +586,8 @@ exports.markConversationRead = onCall(
 
     await ref.update({
       [`unreadCounts.${key}`]: 0,
+      unreadCustomer: role === "customer" ? 0 : FieldValue.increment(0),
+      unreadStaff: role === "customer" ? FieldValue.increment(0) : 0,
       updatedAt: FieldValue.serverTimestamp(),
     });
 
@@ -505,9 +641,11 @@ exports.assignConversation = onCall(
 
     if (!assigneeId) {
       await db.collection("conversations").doc(conversationId).update({
-        assignedTo: null,
-        assignedRole: null,
-        assignedToName: null,
+        ...staffAssignmentFields({
+          assigneeId: null,
+          assigneeRole: null,
+          assigneeName: null,
+        }),
         assignedBy: uid,
         assignedByName: assignerName,
         assignedByRole: role,
@@ -529,10 +667,13 @@ exports.assignConversation = onCall(
       throw new HttpsError("invalid-argument", "Assignee must be staff.");
     }
 
+    const assigneeName = displayName(assignee, "Staff");
     await db.collection("conversations").doc(conversationId).update({
-      assignedTo: assigneeId,
-      assignedRole: assigneeRole,
-      assignedToName: displayName(assignee, "Staff"),
+      ...staffAssignmentFields({
+        assigneeId,
+        assigneeRole,
+        assigneeName,
+      }),
       participantIds: FieldValue.arrayUnion(assigneeId),
       [`participantRoles.${assigneeId}`]: assigneeRole,
       updatedAt: now,
@@ -541,6 +682,199 @@ exports.assignConversation = onCall(
       assignedByRole: role,
       assignedAt: now,
     });
+
+    const notificationRef = db
+      .collection("users")
+      .doc(assigneeId)
+      .collection("notifications")
+      .doc();
+
+    await notificationRef.set({
+      type: "CHAT_ASSIGNED",
+      title: "Conversation assigned",
+      body: `${assignerName} assigned you a support conversation.`,
+      data: {
+        screen: "chat",
+        conversationId,
+      },
+      entityType: "conversation",
+      entityId: conversationId,
+      ownerId: assigneeId,
+      read: false,
+      createdAt: now,
+    });
+
+    return { success: true };
+  },
+);
+
+exports.startConversationCall = onCall(
+  { region: "asia-southeast1", maxInstances: 20 },
+  async (req) => {
+    const uid = requireAuth(req);
+    const conversationId = cleanText(req.data?.conversationId, "conversationId", 160);
+    const callType = String(req.data?.callType || "voice").trim().toLowerCase();
+
+    if (!CALL_TYPES.includes(callType)) {
+      throw new HttpsError("invalid-argument", "Invalid call type.");
+    }
+
+    const userSnap = await db.collection("users").doc(uid).get();
+    if (!userSnap.exists || userSnap.data()?.active === false) {
+      throw new HttpsError("permission-denied", "Inactive or missing user.");
+    }
+
+    const user = userSnap.data() || {};
+    const role = String(user.role || "").toLowerCase();
+    const { conversation } = await getConversationForUser(conversationId, uid, role);
+
+    if (conversation.status === "closed") {
+      throw new HttpsError("failed-precondition", "Conversation is closed.");
+    }
+
+    const staffId = assignedStaffId(conversation);
+    const receiverId = role === "customer" ? staffId : conversation.customerId;
+
+    if (!receiverId) {
+      throw new HttpsError(
+        "failed-precondition",
+        "This conversation has no assigned staff for calls.",
+      );
+    }
+    if (receiverId === uid) {
+      throw new HttpsError("failed-precondition", "Caller and receiver are the same user.");
+    }
+
+    const callRef = db.collection("calls").doc();
+    const now = FieldValue.serverTimestamp();
+    const roomId = `atlas_${callRef.id}`;
+    const callerName = displayName(user, role === "customer" ? "Customer" : "Staff");
+    const rtcConfig = getRtcSecretConfig();
+
+    await callRef.set({
+      callId: callRef.id,
+      conversationId,
+      shipmentId: conversation.shipmentId || conversation.trackingNumber || null,
+      customerId: conversation.customerId || null,
+      assignedStaffId: staffId || null,
+      assignedStaffRole: assignedStaffRole(conversation),
+      callerId: uid,
+      callerRole: role,
+      callerName,
+      receiverId,
+      type: callType,
+      status: "ringing",
+      roomId,
+      rtcProvider: "tencent",
+      rtcConfigStatus: rtcConfig.isConfigured ? "configured" : "pending-setup",
+      createdAt: now,
+      updatedAt: now,
+    });
+
+    await notifyIncomingCall({
+      callId: callRef.id,
+      conversationId,
+      receiverId,
+      callerName,
+      callType,
+    });
+
+    return {
+      success: true,
+      callId: callRef.id,
+      conversationId,
+      receiverId,
+      roomId,
+      rtcProvider: "tencent",
+    };
+  },
+);
+
+exports.updateConversationCallStatus = onCall(
+  { region: "asia-southeast1", maxInstances: 20 },
+  async (req) => {
+    const uid = requireAuth(req);
+    const callId = cleanText(req.data?.callId, "callId", 160);
+    const status = String(req.data?.status || "").trim().toLowerCase();
+    const duration = Math.max(0, Number(req.data?.duration || 0));
+
+    if (!CALL_STATUSES.includes(status)) {
+      throw new HttpsError("invalid-argument", "Invalid call status.");
+    }
+
+    const userSnap = await db.collection("users").doc(uid).get();
+    if (!userSnap.exists || userSnap.data()?.active === false) {
+      throw new HttpsError("permission-denied", "Inactive or missing user.");
+    }
+
+    const user = userSnap.data() || {};
+    const role = String(user.role || "").toLowerCase();
+    const callRef = db.collection("calls").doc(callId);
+    const callSnap = await callRef.get();
+
+    if (!callSnap.exists) {
+      throw new HttpsError("not-found", "Call not found.");
+    }
+
+    const call = callSnap.data() || {};
+    await getConversationForUser(call.conversationId, uid, role);
+
+    const isParticipant = call.callerId === uid || call.receiverId === uid;
+    if (!isParticipant && !STAFF_MONITOR_ROLES.includes(role)) {
+      throw new HttpsError("permission-denied", "Call access denied.");
+    }
+
+    const now = FieldValue.serverTimestamp();
+    const update = {
+      status,
+      updatedAt: now,
+      statusUpdatedBy: uid,
+    };
+
+    if (status === "connected") update.connectedAt = now;
+    if (["ended", "declined", "missed", "busy", "cancelled"].includes(status)) {
+      update.endedAt = now;
+      update.duration = duration;
+    }
+
+    await callRef.update(update);
+
+    if (status === "ended") {
+      const conversationRef = db.collection("conversations").doc(call.conversationId);
+      const label = call.type === "video" ? "Video Call" : "Voice Call";
+      const minutes = Math.floor(duration / 60);
+      const seconds = Math.floor(duration % 60);
+      const durationLabel = `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+      const text = `${label}\n${durationLabel}`;
+
+      const messageRef = conversationRef.collection("messages").doc();
+      await db.runTransaction(async (tx) => {
+        tx.set(messageRef, {
+          messageId: messageRef.id,
+          senderId: "system",
+          senderRole: "system",
+          senderName: "Atlas",
+          type: "call",
+          text,
+          callId,
+          callType: call.type,
+          duration,
+          attachments: [],
+          status: "sent",
+          createdAt: now,
+          readBy: {},
+          seenBy: {},
+        });
+        tx.update(conversationRef, {
+          lastMessage: label,
+          lastMessageText: text,
+          lastActivityAt: now,
+          lastMessageAt: now,
+          lastMessageBy: "system",
+          updatedAt: now,
+        });
+      });
+    }
 
     return { success: true };
   },

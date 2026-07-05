@@ -124,11 +124,13 @@ service cloud.firestore {
     match /conversations/{conversationId} {
       allow read: if hasRole('admin')
         || (isActiveUser() && resource.data.customerId == request.auth.uid)
-        || (hasRole('manager') && resource.data.assignedTo == request.auth.uid);
+        || (hasRole('manager') && (resource.data.assignedTo == request.auth.uid || resource.data.assignedStaffId == request.auth.uid))
+        || (hasRole('employee') && (resource.data.assignedTo == request.auth.uid || resource.data.assignedStaffId == request.auth.uid));
 
       allow list: if hasRole('admin')
         || (hasRole('customer') && resource.data.customerId == request.auth.uid)
-        || (hasRole('manager') && resource.data.assignedTo == request.auth.uid);
+        || (hasRole('manager') && (resource.data.assignedTo == request.auth.uid || resource.data.assignedStaffId == request.auth.uid))
+        || (hasRole('employee') && (resource.data.assignedTo == request.auth.uid || resource.data.assignedStaffId == request.auth.uid));
 
       allow create, update, delete: if false;
 
@@ -140,7 +142,11 @@ service cloud.firestore {
           )
           || (
             hasRole('manager')
-            && get(/databases/$(database)/documents/conversations/$(conversationId)).data.assignedTo == request.auth.uid
+            && (get(/databases/$(database)/documents/conversations/$(conversationId)).data.assignedTo == request.auth.uid || get(/databases/$(database)/documents/conversations/$(conversationId)).data.assignedStaffId == request.auth.uid)
+          )
+          || (
+            hasRole('employee')
+            && (get(/databases/$(database)/documents/conversations/$(conversationId)).data.assignedTo == request.auth.uid || get(/databases/$(database)/documents/conversations/$(conversationId)).data.assignedStaffId == request.auth.uid)
           )
           || (
             isActiveUser()
