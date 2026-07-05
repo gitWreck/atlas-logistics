@@ -4,6 +4,8 @@ import Feather from "@expo/vector-icons/Feather";
 import { usePathname, useRouter } from "expo-router";
 import { useTheme } from "../../contexts/ThemeContext";
 
+export const CUSTOMER_BOTTOM_NAV_HEIGHT = 56 + 10 + (Platform.OS === "ios" ? 24 : 12);
+
 const NAV_ITEMS = [
   { key: "home", label: "Home", icon: "home", route: "/(customer)" },
   { key: "shipments", label: "Shipments", icon: "grid", route: "/(customer)/shipments" },
@@ -58,20 +60,11 @@ export default function CustomerBottomNav({ active = "home", unreadMessages = 0 
             activeOpacity={0.75}
             onPress={() => handleTabPress(item.route)}
           >
-            <View
-              style={[
-                styles.iconWrap,
-                isActive && styles.iconWrapActive,
-                {
-                  borderColor: isActive ? colors.primary : "rgba(255,255,255,0.10)",
-                  backgroundColor: isActive ? colors.primary : "transparent",
-                },
-              ]}
-            >
+            <View style={styles.iconWrap}>
               <Feather
                 name={item.icon}
-                size={24}
-                color={isActive ? colors.onPrimary : colors.iconMuted}
+                size={22}
+                color={isActive ? colors.primary : colors.iconMuted}
               />
               {isMessages && unreadMessages > 0 && (
                 <View
@@ -123,20 +116,14 @@ const styles = StyleSheet.create({
     minHeight: 56,
   },
   iconWrap: {
-    width: 42,
-    height: 42,
-    borderRadius: 22,
+    width: 36,
+    height: 28,
     alignItems: "center",
     justifyContent: "center",
-    borderWidth: 1,
-    borderColor: "transparent",
-  },
-  iconWrapActive: {
-    borderWidth: 1.5,
   },
   label: {
     fontSize: 11,
-    fontWeight: "500",
+    fontWeight: "400",
   },
   badge: {
     position: "absolute",
