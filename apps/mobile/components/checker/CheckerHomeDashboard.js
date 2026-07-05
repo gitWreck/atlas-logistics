@@ -339,7 +339,7 @@ export function DeliveryProgressCard({ delivered, total, goal, style }) {
   const { colors } = useTheme();
   const { width } = useWindowDimensions();
   const cardWidth = Math.floor((width - SCREEN_PADDING * 2 - GRID_GAP) / 2);
-  const ringSize = clamp(cardWidth * 0.34, 52, 64);
+  const ringSize = clamp(cardWidth * 0.32, 50, 62);
   const ringStroke = clamp(ringSize * 0.1, 5, 7);
   const percentage =
     total > 0 ? clamp(Math.round((delivered / total) * 100), 0, 100) : 0;
@@ -348,7 +348,7 @@ export function DeliveryProgressCard({ delivered, total, goal, style }) {
     percentage > 50 ? -180 + (percentage - 50) * 3.6 : -180;
   const completedText = `${formatCount(delivered)} of ${formatCount(
     goal || total,
-  )} completed`;
+  )}\ncompleted`;
 
   return (
     <View
@@ -370,6 +370,12 @@ export function DeliveryProgressCard({ delivered, total, goal, style }) {
 
       {total > 0 ? (
         <View style={styles.progressBody}>
+          <Text
+            style={[styles.completionText, { color: colors.textMuted }]}
+            numberOfLines={2}
+          >
+            {completedText}
+          </Text>
           <View
             style={[
               styles.ringWrap,
@@ -478,12 +484,6 @@ export function DeliveryProgressCard({ delivered, total, goal, style }) {
               </Text>
             </View>
           </View>
-          <Text
-            style={[styles.completionText, { color: colors.textMuted }]}
-            numberOfLines={1}
-          >
-            {completedText}
-          </Text>
         </View>
       ) : (
         <View style={styles.progressEmpty}>
@@ -798,6 +798,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 8,
     backgroundColor: "rgba(2, 43, 143, 0.72)",
+    zIndex: 2,
+    elevation: 2,
   },
   dateTextBlock: {
     flex: 1,
@@ -821,6 +823,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "flex-end",
     position: "relative",
+    zIndex: 0,
   },
   cityBarTall: {
     position: "absolute",
@@ -1072,10 +1075,12 @@ const styles = StyleSheet.create({
   progressBody: {
     flex: 1,
     width: "100%",
+    flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     position: "relative",
-    paddingTop: 2,
+    paddingTop: 0,
+    gap: 16,
   },
   ringWrap: {
     width: 90,
@@ -1121,30 +1126,32 @@ const styles = StyleSheet.create({
   },
   ringPercent: {
     color: COLORS.text,
-    fontSize: 20,
+    fontSize: 17,
     fontWeight: "700",
-    lineHeight: 24,
+    lineHeight: 21,
   },
   ringLabel: {
     color: COLORS.muted,
-    fontSize: 10,
+    fontSize: 9,
     fontWeight: "400",
   },
   completionText: {
     color: COLORS.muted,
     fontSize: 11,
     fontWeight: "400",
-    marginTop: 5,
-    maxWidth: "100%",
+    lineHeight: 14,
+    maxWidth: "42%",
     textAlign: "center",
+    flexShrink: 1,
   },
   progressEmpty: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 12,
+    gap: 8,
   },
   progressEmptyCopy: {
     flex: 1,
+    minWidth: 0,
   },
   emptyProgressIcon: {
     width: 44,
@@ -1156,15 +1163,16 @@ const styles = StyleSheet.create({
   },
   emptyProgressTitle: {
     color: COLORS.text,
-    fontSize: 14,
+    fontSize: 12,
+    lineHeight: 15,
     fontWeight: "700",
   },
   emptyProgressText: {
     color: COLORS.muted,
-    fontSize: 12,
+    fontSize: 10,
     fontWeight: "400",
-    lineHeight: 17,
-    marginTop: 5,
+    lineHeight: 13,
+    marginTop: 3,
     flexShrink: 1,
   },
   quickSection: {
@@ -1219,9 +1227,9 @@ const styles = StyleSheet.create({
   },
   quickSubtitle: {
     color: "rgba(255, 255, 255, 0.84)",
-    fontSize: 12,
+    fontSize: 11.5,
     fontWeight: "400",
-    lineHeight: 17,
+    lineHeight: 16,
     marginTop: 4,
   },
   quickArrow: {

@@ -24,7 +24,7 @@ import { useDashboardPreferences } from "@/app/hooks/useDashboardPreferences";
 const mainNavItems = [
   { id: "overview", label: "Overview", icon: faChartPie, title: "Overview", description: "Warehouse operations dashboard" },
   { id: "checkerBoard", label: "Checker Board", icon: faClipboardCheck, title: "Checker Board", description: "Scan and manage package flows." },
-  { id: "shipments", label: "Shipments", icon: faTruck, title: "Shipment Operations", description: "Manage shipments and orders." },
+  { id: "shipments", label: "Shipments", icon: faTruck, imageIcon: "/truck-3d.png", title: "Shipment Operations", description: "Manage shipments and orders." },
 ];
 
 export default function CheckerDashboardPage() {
@@ -297,7 +297,15 @@ function SidebarContent({
                         : "bg-slate-900/5 text-slate-500"
                   }`}
                 >
-                  <FontAwesomeIcon icon={item.icon} size="sm" />
+                  {item.imageIcon ? (
+                    <img
+                      src={item.imageIcon}
+                      alt=""
+                      className="h-7 w-7 object-contain"
+                    />
+                  ) : (
+                    <FontAwesomeIcon icon={item.icon} size="sm" />
+                  )}
                 </span>
                 {!isSidebarCollapsed && <span>{item.label}</span>}
               </button>
