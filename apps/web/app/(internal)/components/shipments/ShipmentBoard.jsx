@@ -64,23 +64,14 @@ const DELIVERY_OPERATION_STATUSES = new Set([
   "DELIVERED",
 ]);
 
+const PICKUP_PHASE_STATUSES = new Set(["PENDING_PICKUP", "PICKED_UP"]);
+
 function getShipmentStatus(shipment) {
   return String(shipment?.status || "").toUpperCase();
 }
 
 function isPickupShipment(shipment) {
-  const status = getShipmentStatus(shipment);
-
-  return (
-    shipment?.isPickupRequested === true ||
-    status === "PENDING_PICKUP" ||
-    status === "PICKED_UP" ||
-    shipment?.statusHistory?.some((history) =>
-      String(history?.status || "")
-        .toUpperCase()
-        .includes("PICKUP"),
-    )
-  );
+  return PICKUP_PHASE_STATUSES.has(getShipmentStatus(shipment));
 }
 
 function matchesWarehouseTab(shipment, warehouseKey) {
