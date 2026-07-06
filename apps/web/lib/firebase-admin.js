@@ -6,6 +6,9 @@ import { getFirestore } from "firebase-admin/firestore";
 import { getAuth } from "firebase-admin/auth";
 import { admin } from "firebase-admin";
 
+let adminDbInstance = null;
+let adminAuthInstance = null;
+
 function resolveServiceAccount() {
   const rawKey = process.env.FIREBASE_SERVICE_ACCOUNT_KEY?.trim();
   if (rawKey && rawKey !== "{") {
@@ -18,7 +21,7 @@ function resolveServiceAccount() {
   if (keyPath) {
     const resolved = path.isAbsolute(keyPath)
       ? keyPath
-      : path.resolve(process.cwd(), keyPath);
+      : path.join(/* turbopackIgnore: true */ process.cwd(), keyPath);
     if (fs.existsSync(resolved)) {
       return JSON.parse(fs.readFileSync(resolved, "utf8"));
     }
@@ -27,12 +30,13 @@ function resolveServiceAccount() {
   return null;
 }
 
-const serviceAccount = resolveServiceAccount();
+function ensureInitialized() {
+  if (getApps().length > 0) return;
 
-if (getApps().length === 0) {
+  const serviceAccount = resolveServiceAccount();
   if (!serviceAccount?.project_id) {
     throw new Error(
-      "Firebase Admin credentials not configured. Set GOOGLE_APPLICATION_CREDENTIALS=./service-account.json in apps/web/.env.local",
+      "Firebase Admin credentials not configured. For Vercel, set FIREBASE_SERVICE_ACCOUNT_KEY to the full service-account JSON. For local dev, use GOOGLE_APPLICATION_CREDENTIALS=./service-account.json.",
     );
   }
 
@@ -41,6 +45,43 @@ if (getApps().length === 0) {
   });
 }
 
-const adminDb = getFirestore();
-const adminAuth = getAuth();
-export { admin, adminDb, adminAuth };
+function getAdminDb() {
+  ensureInitialized();
+  if (!adminDbInstance) {
+    adminDbInstance = getFirestore();
+  }
+  return adminDbInstance;
+}
+
+function getAdminAuth() {
+  ensureInitialized();
+  if (!adminAuthInstance) {
+    adminAuthInstance = getAuth();
+  }
+  return adminAuthInstance;
+}
+
+function bindTarget(target, prop) {
+  const value = target[prop];
+  return typeof value === "function" ? value.bind(target) : value;
+}
+
+export const adminDb = new Proxy(
+  {},
+  {
+    get(_target, prop) {
+      return bindTarget(getAdminDb(), prop);
+    },
+  },
+);
+
+export const adminAuth = new Proxy(
+  {},
+  {
+    get(_target, prop) {
+      return bindTarget(getAdminAuth(), prop);
+    },
+  },
+);
+
+export { admin };
