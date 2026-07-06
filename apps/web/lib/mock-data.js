@@ -8,7 +8,7 @@ export const MOCK_SHIPMENTS = [
     itemsTotal: 50,
     itemsLoaded: 50,
     itemsReceived: 50,
-    delayReason: "WEATHER", // Testing the "Rain" visual
+    delayReason: "WEATHER", 
     delayCleared: false,
     updatedAt: "2024-02-20T08:30:00Z",
     history: [
