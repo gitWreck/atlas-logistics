@@ -70,7 +70,6 @@ export function ShipmentStatusEmail({
             </Row>
           </Section>
 
-          {/* Greeting */}
           <Section style={contentSection}>
             <Text style={greeting}>Hi {customerName},</Text>
             <Text style={intro}>
