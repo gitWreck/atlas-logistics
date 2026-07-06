@@ -1,0 +1,34 @@
+[ ] FIX: Broken @atlas/shared Workspace Package
+    - Move "src" folder inside "packages/shared/" (as "packages/shared/src/").
+    - Resolve invalid relative paths in "packages/shared/index.js".
+    - Create a local "firebase.js" config inside the package to export Firestore ("db") and App ("app") references.
+
+[ ] FIX: Inefficient Firestore Listener Churn
+    - Modify "apps/mobile/hooks/useCheckerLastMileSync.js".
+    - Refactor the cleanup function in the useEffect hook.
+    - Unsubscribe only from documents that are no longer present in "watchedDocIds" instead of resetting docUnsubsRef.current completely.
+
+[ ] FIX: App Crash on Unresolved Auth State
+    - Modify "apps/mobile/app/(driver)/report-delay.js".
+    - Check if auth.currentUser exists before querying Firestore with auth.currentUser.uid.
+    - Render a loading indicator or redirect if the auth object is null.
+
+[ ] FIX: Driver Index Page Copy-Paste and Filtering Issues
+    - Modify "apps/mobile/app/(driver)/(tabs)/index.js".
+    - Rename component from "CheckerIndex" to "DriverIndex" or "DriverDashboard".
+    - Filter database queries using the driver's authentication ID ("driverId == user.uid") instead of fetching global status boards.
+
+[ ] FIX: Weak Suffix Generation and Key Collisions
+    - Modify "apps/functions/src/shipments/createShipment.js".
+    - Replace the Date.now().toString().slice(-6) suffix with a cryptographically secure random string (e.g. crypto.randomBytes(3).toString('hex')).
+
+[ ] FIX: Inconsistent API Endpoint Authorization Middleware
+    - Modify "apps/web/app/api/shipments/[id]/update-status/route.js".
+    - Update "authorizeStaff()" to check user claims or Firestore roles, matching the validation level in "lookup/route.js".
+
+[ ] FIX: Hardcoded Credentials and Tracked Environment Files
+    - Move Google Maps API keys from "apps/mobile/app.json" to environmental configs.
+    - Run "git rm --cached apps/mobile/.env" to remove the file from Git tracking, and update the ignore configurations.
+
+[ ] FIX: Redundant Cloud Function Exports
+    - Remove duplicate import and export definitions of "reportCheckerTrip" in "apps/functions/index.js".
