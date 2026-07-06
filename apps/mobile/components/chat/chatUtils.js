@@ -241,11 +241,16 @@ export function buildMessageItems(messages = [], myUid) {
   let lastSeenMineId = null;
   let lastMineId = null;
 
+  const normalizedMyUid = String(myUid || "").trim();
   for (let i = 0; i < messages.length; i += 1) {
     const msg = messages[i];
     const prev = messages[i - 1];
     const next = messages[i + 1];
-    const mine = msg.senderId === myUid;
+    const isCallMessage = String(msg.type || "").trim().toLowerCase() === "call";
+    const callerId = String(msg.callerId || "").trim();
+    const senderId = String(msg.senderId || "").trim();
+    const ownerId = isCallMessage ? callerId || senderId : senderId;
+    const mine = ownerId === normalizedMyUid;
 
     if (!lastDay || !isSameDay(msg.createdAt, lastDay)) {
       items.push({
@@ -256,14 +261,20 @@ export function buildMessageItems(messages = [], myUid) {
       lastDay = msg.createdAt;
     }
 
+    const prevOwnerId = prev
+      ? String(isCallMessage ? prev.callerId || prev.senderId : prev.senderId || "").trim()
+      : "";
+    const nextOwnerId = next
+      ? String(isCallMessage ? next.callerId || next.senderId : next.senderId || "").trim()
+      : "";
     const prevSameSender =
       prev &&
-      prev.senderId === msg.senderId &&
+      prevOwnerId === ownerId &&
       timeValue(msg.createdAt) - timeValue(prev.createdAt) < GROUP_WINDOW_MS &&
       isSameDay(prev.createdAt, msg.createdAt);
     const nextSameSender =
       next &&
-      next.senderId === msg.senderId &&
+      nextOwnerId === ownerId &&
       timeValue(next.createdAt) - timeValue(msg.createdAt) < GROUP_WINDOW_MS &&
       isSameDay(next.createdAt, msg.createdAt);
 

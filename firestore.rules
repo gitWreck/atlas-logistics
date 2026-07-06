@@ -157,6 +157,28 @@ service cloud.firestore {
       }
     }
 
+    // --- CALLS / SUPPORT ---
+
+    match /calls/{callId} {
+      allow get: if isSignedIn() && (
+        resource.data.receiverId == request.auth.uid ||
+        resource.data.callerId == request.auth.uid ||
+        isAdminOrManager()
+      );
+      allow list: if isSignedIn() && (
+        resource.data.receiverId == request.auth.uid ||
+        resource.data.callerId == request.auth.uid ||
+        isAdminOrManager()
+      );
+      allow create: if false;
+      allow update: if isSignedIn() && (
+        resource.data.receiverId == request.auth.uid ||
+        resource.data.callerId == request.auth.uid ||
+        isAdminOrManager()
+      );
+      allow delete: if false;
+    }
+
     // --- OPERATIONS ---
 
     match /shipments/{shipmentId} {

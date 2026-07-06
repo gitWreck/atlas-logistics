@@ -294,6 +294,14 @@ export const startConversationCall = httpsCallable(
   functions,
   "startConversationCall",
 );
+export const acceptConversationCall = httpsCallable(
+  functions,
+  "acceptConversationCall",
+);
+export const declineConversationCall = httpsCallable(
+  functions,
+  "updateConversationCallStatus",
+);
 export const updateConversationCallStatus = httpsCallable(
   functions,
   "updateConversationCallStatus",

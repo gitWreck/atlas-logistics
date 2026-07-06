@@ -20,3 +20,7 @@ export const db = getFirestore(app);
 export const auth = getAuth(app);
 export const functions = getFunctions(app, "asia-southeast1");
 export const storage = getStorage(app); // <--- 2. Export this
+
+if (typeof window !== "undefined") {
+  window.__atlasFirebaseFunctionsRegion = "asia-southeast1";
+}

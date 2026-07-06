@@ -4,14 +4,23 @@ const { setGlobalOptions } = require("firebase-functions/v2/options");
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const admin = require("firebase-admin");
 
+const allowedFunctionOrigins = [
+  "http://localhost:3000",
+  "http://localhost:3001",
+  "http://127.0.0.1:3000",
+  "http://127.0.0.1:3001",
+  "https://localhost:3000",
+  "https://localhost:3001",
+  "https://127.0.0.1:3000",
+  "https://127.0.0.1:3001",
+  "https://atlas-tracking.web.app",
+  "https://atlas-tracking.firebaseapp.com",
+  "https://atlas-trucking-platform.vercel.app",
+];
+
 setGlobalOptions({
   region: "asia-southeast1",
-  cors: [
-    "http://localhost:3000",
-    "https://atlas-tracking.web.app",
-    "https://atlas-tracking.firebaseapp.com",
-    "https://atlas-trucking-platform.vercel.app",
-  ],
+  cors: allowedFunctionOrigins,
 });
 
 if (!admin.apps.length) {
@@ -195,8 +204,12 @@ exports.assignConversation =
   require("./src/chat/conversations").assignConversation;
 exports.startConversationCall =
   require("./src/chat/conversations").startConversationCall;
+exports.acceptConversationCall =
+  require("./src/chat/conversations").acceptConversationCall;
 exports.updateConversationCallStatus =
   require("./src/chat/conversations").updateConversationCallStatus;
+exports.generateTencentUserSig =
+  require("./src/chat/generateTencentUserSig").generateTencentUserSig;
 
 // Firestore Triggers
 const {

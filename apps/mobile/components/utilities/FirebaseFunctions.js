@@ -70,6 +70,18 @@ export const markConversationRead = httpsCallable(
   functions,
   "markConversationRead",
 );
+export const startConversationCall = httpsCallable(
+  functions,
+  "startConversationCall",
+);
+export const updateConversationCallStatus = httpsCallable(
+  functions,
+  "updateConversationCallStatus",
+);
+export const acceptConversationCall = httpsCallable(
+  functions,
+  "acceptConversationCall",
+);
 
 // user actions
 export const updateUserProfileMobile = httpsCallable(

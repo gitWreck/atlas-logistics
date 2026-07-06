@@ -48,6 +48,7 @@ import { auth, db, storage } from "../../firebase";
 import {
   markConversationRead,
   sendChatMessage,
+  startConversationCall,
 } from "../utilities/FirebaseFunctions";
 import { useTheme } from "../../contexts/ThemeContext";
 import {
@@ -1002,29 +1003,17 @@ export default function ChatThread({ conversationId, onBack, embedded = false })
     async (callType) => {
       if (!conversationId || startingCall) return;
       if (isClosed) {
-        Alert.alert("Conversation closed", "Calls are not available for closed conversations.");
         return;
       }
 
       try {
         setStartingCall(callType);
-        const result = await startConversationCall({
+        await startConversationCall({
           conversationId: String(conversationId),
-          callType,
+          type: callType,
         });
-        const callId = result?.data?.callId;
-        Alert.alert(
-          callType === "video" ? "Video call" : "Voice call",
-          callId
-            ? "Call request sent to the assigned Atlas staff."
-            : "Call request sent.",
-        );
       } catch (error) {
         console.error("Start call failed:", error);
-        Alert.alert(
-          "Call unavailable",
-          error?.message || "Unable to start this call. Please try again.",
-        );
       } finally {
         setStartingCall(null);
       }

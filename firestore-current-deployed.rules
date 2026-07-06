@@ -93,7 +93,28 @@ service cloud.firestore {
       }
     }
 
-    // 3b. SHIPMENTS (internal operational records)
+    // 3b. CALLS / SUPPORT
+    match /calls/{callId} {
+      allow get: if isSignedIn() && (
+        resource.data.receiverId == request.auth.uid ||
+        resource.data.callerId == request.auth.uid ||
+        hasRole('admin') || hasRole('manager')
+      );
+      allow list: if isSignedIn() && (
+        resource.data.receiverId == request.auth.uid ||
+        resource.data.callerId == request.auth.uid ||
+        hasRole('admin') || hasRole('manager')
+      );
+      allow create: if false;
+      allow update: if isSignedIn() && (
+        resource.data.receiverId == request.auth.uid ||
+        resource.data.callerId == request.auth.uid ||
+        hasRole('admin') || hasRole('manager')
+      );
+      allow delete: if false;
+    }
+
+    // 3c. SHIPMENTS (internal operational records)
     // Mobile: staff queries + customer visibilityUserIds array-contains.
     // All writes go through Cloud Functions (Admin SDK).
     match /shipments/{shipmentId} {
@@ -101,13 +122,13 @@ service cloud.firestore {
       allow create, update, delete: if false;
     }
 
-    // 3c. CUSTODY EVENT LEDGER (append-only via Cloud Functions)
+    // 3d. CUSTODY EVENT LEDGER (append-only via Cloud Functions)
     match /shipment_events/{eventId} {
       allow read: if isStaff();
       allow create, update, delete: if false;
     }
 
-    // 3d. CHECKER DELIVERY MANIFESTS
+    // 3e. CHECKER DELIVERY MANIFESTS
     // Mobile: query where checkerId == auth.uid; managers see all.
     match /delivery_manifests/{manifestId} {
       allow read: if canReadDeliveryManifest();

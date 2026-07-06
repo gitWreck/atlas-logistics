@@ -710,16 +710,12 @@ export default function ChatInbox({ user, profile, isDark = false, onViewCustome
     if (!selectedId || calling || selected?.status === "closed") return;
     try {
       setCalling(true);
-      const result = await startConversationCall({
+      await startConversationCall({
         conversationId: selectedId,
         callType,
       });
-      if (result?.data?.callId) {
-        alert(`${callType === "video" ? "Video" : "Voice"} call request sent.`);
-      }
     } catch (err) {
       console.error("Call failed:", err);
-      alert("Unable to start the call right now. Please try again.");
     } finally {
       setCalling(false);
     }
@@ -974,10 +970,17 @@ export default function ChatInbox({ user, profile, isDark = false, onViewCustome
               <div className={`min-h-0 flex-1 overflow-y-auto px-3 py-5 sm:px-4 ${isDark ? "bg-slate-950" : "bg-white"}`}>
                 <div className="flex w-full flex-col gap-1">
                   {messages.map((message, idx) => {
-                    const mine = message.senderId === user?.uid;
+                    const isCallMessage = String(message.type || "").trim().toLowerCase() === "call";
+                    const ownerId = isCallMessage
+                      ? message.callerId || message.senderId
+                      : message.senderId;
+                    const mine = ownerId === user?.uid;
                     const attachment = getMessageAttachment(message);
                     const prev = messages[idx - 1];
-                    const showAvatar = !mine && prev?.senderId !== message.senderId;
+                    const prevOwnerId = prev
+                      ? String(prev.callerId || prev.senderId || "").trim()
+                      : "";
+                    const showAvatar = !mine && prevOwnerId !== ownerId;
                     return (
                       <div
                         key={message.id}

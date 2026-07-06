@@ -16,8 +16,10 @@ const STAFF_MONITOR_ROLES = ["admin", "manager", "employee"];
 const VALID_STATUSES = ["unassigned", "active", "closed"];
 const VALID_PRIORITIES = ["normal", "urgent"];
 const CALL_TYPES = ["voice", "video"];
+const ACTIVE_CALL_STATUSES = ["ringing", "connecting", "accepted"];
 const CALL_STATUSES = [
   "ringing",
+  "connecting",
   "accepted",
   "connected",
   "declined",
@@ -711,82 +713,281 @@ exports.assignConversation = onCall(
 exports.startConversationCall = onCall(
   { region: "asia-southeast1", maxInstances: 20 },
   async (req) => {
-    const uid = requireAuth(req);
-    const conversationId = cleanText(req.data?.conversationId, "conversationId", 160);
-    const callType = String(req.data?.callType || "voice").trim().toLowerCase();
+    try {
+      const uid = requireAuth(req);
+      const conversationId = cleanText(req.data?.conversationId, "conversationId", 160);
+      const callType = String(req.data?.type || req.data?.callType || "voice")
+        .trim()
+        .toLowerCase();
 
-    if (!CALL_TYPES.includes(callType)) {
-      throw new HttpsError("invalid-argument", "Invalid call type.");
-    }
+      if (!CALL_TYPES.includes(callType)) {
+        throw new HttpsError("invalid-argument", "Invalid call type.");
+      }
 
-    const userSnap = await db.collection("users").doc(uid).get();
-    if (!userSnap.exists || userSnap.data()?.active === false) {
-      throw new HttpsError("permission-denied", "Inactive or missing user.");
-    }
+      const userSnap = await db.collection("users").doc(uid).get();
+      if (!userSnap.exists || userSnap.data()?.active === false) {
+        throw new HttpsError("permission-denied", "Inactive or missing user.");
+      }
 
-    const user = userSnap.data() || {};
-    const role = String(user.role || "").toLowerCase();
-    const { conversation } = await getConversationForUser(conversationId, uid, role);
+      const user = userSnap.data() || {};
+      const role = String(user.role || "").toLowerCase();
+      const conversationRef = db.collection("conversations").doc(conversationId);
+      const conversationSnap = await conversationRef.get();
 
-    if (conversation.status === "closed") {
-      throw new HttpsError("failed-precondition", "Conversation is closed.");
-    }
+      if (!conversationSnap.exists) {
+        throw new HttpsError("not-found", "Conversation not found.");
+      }
 
-    const staffId = assignedStaffId(conversation);
-    const receiverId = role === "customer" ? staffId : conversation.customerId;
+      const conversation = conversationSnap.data() || {};
+      if (conversation.status === "closed") {
+        throw new HttpsError("failed-precondition", "Conversation is closed.");
+      }
 
-    if (!receiverId) {
+      const customerId = String(conversation.customerId || "").trim();
+      if (!customerId) {
+        throw new HttpsError(
+          "failed-precondition",
+          "Conversation has no associated customer.",
+        );
+      }
+
+      const customerSnap = await db.collection("customers").doc(customerId).get();
+      const customerData = customerSnap.data() || {};
+      const assignedStaffId = String(
+        customerData.primaryAssignedStaffId || conversation.assignedStaffId || conversation.assignedTo || "",
+      ).trim();
+
+      if (!assignedStaffId) {
+        throw new HttpsError(
+          "failed-precondition",
+          "The customer has no assigned support employee.",
+        );
+      }
+
+      const isCustomerCaller = role === "customer" && uid === customerId;
+      const isAdminOrManagerCaller = ["admin", "manager"].includes(role);
+      const isAssignedEmployeeCaller = role === "employee" && assignedStaffId === uid;
+      const canStartSupportCall = isAdminOrManagerCaller || isAssignedEmployeeCaller;
+
+      if (isCustomerCaller) {
+        const receiverId = assignedStaffId;
+        if (receiverId === uid) {
+          throw new HttpsError(
+            "failed-precondition",
+            "Caller and receiver are the same user.",
+          );
+        }
+
+        const [callerBusySnap, receiverBusySnap] = await Promise.all([
+          db
+            .collection("calls")
+            .where("status", "in", ACTIVE_CALL_STATUSES)
+            .where("callerId", "==", uid)
+            .limit(1)
+            .get(),
+          db
+            .collection("calls")
+            .where("status", "in", ACTIVE_CALL_STATUSES)
+            .where("receiverId", "==", receiverId)
+            .limit(1)
+            .get(),
+        ]);
+
+        if (!callerBusySnap.empty || !receiverBusySnap.empty) {
+          throw new HttpsError("already-exists", "The caller or receiver is busy.");
+        }
+
+        const callRef = db.collection("calls").doc();
+        const now = FieldValue.serverTimestamp();
+        const rtcRoomId = `atlas_${callRef.id}`;
+        const callerName = displayName(user, "Customer");
+        const rtcConfig = getRtcSecretConfig();
+
+        await callRef.set({
+          callId: callRef.id,
+          conversationId,
+          shipmentId: conversation.shipmentId || conversation.trackingNumber || null,
+          customerId,
+          assignedStaffId,
+          assignedStaffRole: assignedStaffRole(conversation),
+          callerId: uid,
+          callerRole: role,
+          callerName,
+          receiverId,
+          type: callType,
+          status: "ringing",
+          rtcRoomId,
+          roomId: rtcRoomId,
+          rtcProvider: "tencent",
+          rtcConfigStatus: rtcConfig.isConfigured ? "configured" : "pending-setup",
+          createdAt: now,
+          startedAt: now,
+          updatedAt: now,
+        });
+
+        await notifyIncomingCall({
+          callId: callRef.id,
+          conversationId,
+          receiverId,
+          callerName,
+          callType,
+        });
+
+        return {
+          success: true,
+          callId: callRef.id,
+          conversationId,
+          receiverId,
+          rtcRoomId,
+          roomId: rtcRoomId,
+          status: "ringing",
+        };
+      }
+
+      if (canStartSupportCall) {
+        const receiverId = customerId;
+        const [callerBusySnap, receiverBusySnap] = await Promise.all([
+          db
+            .collection("calls")
+            .where("status", "in", ACTIVE_CALL_STATUSES)
+            .where("callerId", "==", uid)
+            .limit(1)
+            .get(),
+          db
+            .collection("calls")
+            .where("status", "in", ACTIVE_CALL_STATUSES)
+            .where("receiverId", "==", receiverId)
+            .limit(1)
+            .get(),
+        ]);
+
+        if (!callerBusySnap.empty || !receiverBusySnap.empty) {
+          throw new HttpsError("already-exists", "The caller or receiver is busy.");
+        }
+
+        const callRef = db.collection("calls").doc();
+        const now = FieldValue.serverTimestamp();
+        const rtcRoomId = `atlas_${callRef.id}`;
+        const callerName = displayName(user, "Support");
+        const rtcConfig = getRtcSecretConfig();
+
+        await callRef.set({
+          callId: callRef.id,
+          conversationId,
+          shipmentId: conversation.shipmentId || conversation.trackingNumber || null,
+          customerId,
+          assignedStaffId,
+          assignedStaffRole: assignedStaffRole(conversation),
+          callerId: uid,
+          callerRole: role,
+          callerName,
+          receiverId,
+          type: callType,
+          status: "ringing",
+          rtcRoomId,
+          roomId: rtcRoomId,
+          rtcProvider: "tencent",
+          rtcConfigStatus: rtcConfig.isConfigured ? "configured" : "pending-setup",
+          createdAt: now,
+          startedAt: now,
+          updatedAt: now,
+        });
+
+        await notifyIncomingCall({
+          callId: callRef.id,
+          conversationId,
+          receiverId,
+          callerName,
+          callType,
+        });
+
+        return {
+          success: true,
+          callId: callRef.id,
+          conversationId,
+          receiverId,
+          rtcRoomId,
+          roomId: rtcRoomId,
+          status: "ringing",
+        };
+      }
+
       throw new HttpsError(
-        "failed-precondition",
-        "This conversation has no assigned staff for calls.",
+        "permission-denied",
+        "Only the customer or the assigned employee can start this call.",
       );
+    } catch (error) {
+      if (error instanceof HttpsError) {
+        throw error;
+      }
+
+      console.error("Conversation call start failed:", error);
+      throw new HttpsError("internal", "Failed to start the conversation call.");
     }
-    if (receiverId === uid) {
-      throw new HttpsError("failed-precondition", "Caller and receiver are the same user.");
+  },
+);
+
+exports.acceptConversationCall = onCall(
+  { region: "asia-southeast1", maxInstances: 20 },
+  async (req) => {
+    try {
+      const uid = requireAuth(req);
+      const callId = cleanText(req.data?.callId, "callId", 160);
+
+      const userSnap = await db.collection("users").doc(uid).get();
+      if (!userSnap.exists || userSnap.data()?.active === false) {
+        throw new HttpsError("permission-denied", "Inactive or missing user.");
+      }
+
+      const callRef = db.collection("calls").doc(callId);
+      const now = FieldValue.serverTimestamp();
+
+      const result = await db.runTransaction(async (tx) => {
+        const callSnap = await tx.get(callRef);
+        if (!callSnap.exists) {
+          throw new HttpsError("not-found", "Call not found.");
+        }
+
+        const call = callSnap.data() || {};
+        if (call.status === "accepted") {
+          throw new HttpsError("already-exists", "Call already accepted.");
+        }
+
+        if (call.status !== "ringing") {
+          throw new HttpsError("failed-precondition", "Call is no longer pending.");
+        }
+
+        if (call.receiverId !== uid) {
+          throw new HttpsError("permission-denied", "Only the receiver can accept this call.");
+        }
+
+        tx.update(callRef, {
+          status: "accepted",
+          answeredAt: now,
+          acceptedBy: uid,
+          updatedAt: now,
+        });
+
+        return {
+          accepted: true,
+          callId,
+          rtcRoomId: call.rtcRoomId || call.roomId || null,
+          conversationId: call.conversationId || null,
+          callerId: call.callerId || null,
+          receiverId: call.receiverId || null,
+          type: call.type || null,
+        };
+      });
+
+      return result;
+    } catch (error) {
+      if (error instanceof HttpsError) {
+        throw error;
+      }
+
+      console.error("Conversation call acceptance failed:", error);
+      throw new HttpsError("internal", "Failed to accept the conversation call.");
     }
-
-    const callRef = db.collection("calls").doc();
-    const now = FieldValue.serverTimestamp();
-    const roomId = `atlas_${callRef.id}`;
-    const callerName = displayName(user, role === "customer" ? "Customer" : "Staff");
-    const rtcConfig = getRtcSecretConfig();
-
-    await callRef.set({
-      callId: callRef.id,
-      conversationId,
-      shipmentId: conversation.shipmentId || conversation.trackingNumber || null,
-      customerId: conversation.customerId || null,
-      assignedStaffId: staffId || null,
-      assignedStaffRole: assignedStaffRole(conversation),
-      callerId: uid,
-      callerRole: role,
-      callerName,
-      receiverId,
-      type: callType,
-      status: "ringing",
-      roomId,
-      rtcProvider: "tencent",
-      rtcConfigStatus: rtcConfig.isConfigured ? "configured" : "pending-setup",
-      createdAt: now,
-      updatedAt: now,
-    });
-
-    await notifyIncomingCall({
-      callId: callRef.id,
-      conversationId,
-      receiverId,
-      callerName,
-      callType,
-    });
-
-    return {
-      success: true,
-      callId: callRef.id,
-      conversationId,
-      receiverId,
-      roomId,
-      rtcProvider: "tencent",
-    };
   },
 );
 
@@ -858,6 +1059,8 @@ exports.updateConversationCallStatus = onCall(
           text,
           callId,
           callType: call.type,
+          callerId: call.callerId || null,
+          receiverId: call.receiverId || null,
           duration,
           attachments: [],
           status: "sent",
