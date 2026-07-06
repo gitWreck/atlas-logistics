@@ -228,12 +228,22 @@ exports.startReceiving = onCall(
 
     if (result.success && !result.resumed && result.status === "ARRIVED") {
       try {
+        const tripShipSnap = await tripRef.collection("trip_shipments").get();
+        const manifestShipmentSnaps = await Promise.all(
+          tripShipSnap.docs.map((doc) =>
+            db.collection("shipments").doc(doc.id).get(),
+          ),
+        );
+        const manifestShipments = manifestShipmentSnaps
+          .filter((snap) => snap.exists)
+          .map((snap) => ({ id: snap.id, ...snap.data() }));
+
         result.customerNotification = await sendAutomaticTripLifecycleNotification({
           db,
           tripId,
           notificationType: CUSTOMER_NOTIFICATION_TYPES.ARRIVED_AT_ODIONGAN,
+          shipments: manifestShipments,
           source: "START_RECEIVING",
-          channels: { sms: true, email: false, push: true },
           actor: {
             uid,
             name: actorName,

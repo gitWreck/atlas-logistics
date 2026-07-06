@@ -92,6 +92,16 @@ function isPartialStatus(status = "") {
   return normalizeStatus(status).startsWith("PARTIALLY_");
 }
 
+function isTransitLikeStatus(status = "") {
+  const normalized = normalizeStatus(status);
+  return normalized === "IN_TRANSIT" || normalized === "PARTIALLY_IN_TRANSIT";
+}
+
+function isArrivedAtOdionganLikeStatus(status = "") {
+  const normalized = normalizeStatus(status);
+  return normalized === "ARRIVED" || normalized === "PARTIALLY_ARRIVED";
+}
+
 function resolveTripCustomerNotificationType(newStatus = "") {
   const normalized = normalizeStatus(newStatus);
   if (!normalized || INTERNAL_TRIP_STATUSES.has(normalized)) return null;
@@ -103,6 +113,21 @@ function resolveShipmentCustomerNotificationType(oldStatus = "", newStatus = "")
   const prev = normalizeStatus(oldStatus);
 
   if (!next || next === prev) return null;
+
+  if (
+    next === "PARTIALLY_IN_TRANSIT" &&
+    !isTransitLikeStatus(prev)
+  ) {
+    return CUSTOMER_NOTIFICATION_TYPES.IN_TRANSIT;
+  }
+
+  if (
+    next === "PARTIALLY_ARRIVED" &&
+    !isArrivedAtOdionganLikeStatus(prev)
+  ) {
+    return CUSTOMER_NOTIFICATION_TYPES.ARRIVED_AT_ODIONGAN;
+  }
+
   if (INTERNAL_SHIPMENT_STATUSES.has(next) || isPartialStatus(next)) {
     return null;
   }
@@ -132,6 +157,8 @@ module.exports = {
   INTERNAL_SHIPMENT_STATUSES,
   INTERNAL_TRIP_STATUSES,
   isPartialStatus,
+  isArrivedAtOdionganLikeStatus,
+  isTransitLikeStatus,
   normalizeStatus,
   resolveShipmentCustomerNotificationType,
   resolveTripCustomerNotificationType,

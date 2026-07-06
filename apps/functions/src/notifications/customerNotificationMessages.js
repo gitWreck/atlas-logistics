@@ -1,6 +1,11 @@
 "use strict";
 
+const { renderShipmentStatusEmail } = require("../../vendor/email-templates");
 const { CUSTOMER_NOTIFICATION_TYPES } = require("./customerNotificationTypes");
+const {
+  buildEmailTemplateProps,
+  loadShipmentsForEmail,
+} = require("./emailShipmentContext");
 
 function shipmentCountLabel(count = 1) {
   const safeCount = Math.max(Number(count) || 1, 1);
@@ -30,12 +35,33 @@ function buildCustomerSmsMessage(notificationType, shipmentCount = 1) {
   return message;
 }
 
-function buildCustomerEmailContent({
+async function buildCustomerEmailContent({
+  db = null,
   notificationType,
   shipmentCount = 1,
   shipmentIds = [],
   tripId = null,
+  customerName = "Customer",
+  shipments = null,
 }) {
+  let resolvedShipments = Array.isArray(shipments) ? shipments : null;
+
+  if (!resolvedShipments && db && shipmentIds.length) {
+    resolvedShipments = await loadShipmentsForEmail(db, shipmentIds);
+  }
+
+  if (resolvedShipments?.length) {
+    const templateProps = buildEmailTemplateProps({
+      notificationType,
+      customerName,
+      shipmentIds,
+      shipments: resolvedShipments,
+      tripId,
+    });
+
+    return renderShipmentStatusEmail(templateProps);
+  }
+
   const sms = buildCustomerSmsMessage(notificationType, shipmentCount);
   const trackingLines =
     shipmentIds.length > 0

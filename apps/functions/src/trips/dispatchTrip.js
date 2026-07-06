@@ -272,7 +272,6 @@ exports.dispatchTrip = onCall(
           notificationType: CUSTOMER_NOTIFICATION_TYPES.IN_TRANSIT,
           shipments: manifestShipments,
           source: "DISPATCH_TRIP",
-          channels: { sms: true, email: false, push: true },
           actor: {
             uid,
             name: actorName,

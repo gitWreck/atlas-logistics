@@ -213,6 +213,7 @@ exports.createShipment = onCall(
         userId: getPublicUserId(sender, getPublicUserId(senderCustomer)),
         name: sender?.name || "",
         phone: senderPhone,
+        email: sender?.email || senderCustomer?.email || null,
         address: senderAddress,
         formattedAddress: formatAddress(senderAddress),
       },
@@ -222,6 +223,7 @@ exports.createShipment = onCall(
         userId: getPublicUserId(recipient, getPublicUserId(recipientCustomer)),
         name: recipient?.name || "",
         phone: recipientPhone,
+        email: recipient?.email || recipientCustomer?.email || null,
         address: recipientAddress,
         formattedAddress: formatAddress(recipientAddress),
       },
@@ -252,6 +254,7 @@ exports.createShipment = onCall(
       public: true,
       archived: false,
       delayCleared: true,
+      customerNotificationChannels: notificationChannelsToSend,
 
       // shipmentMode: bundleMode ? "BUNDLE" : "PACKAGE",
 

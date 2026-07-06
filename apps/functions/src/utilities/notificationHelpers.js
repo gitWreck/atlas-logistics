@@ -32,6 +32,72 @@ function normalizeNotificationChannels({
   };
 }
 
+const DEFAULT_LIFECYCLE_CUSTOMER_CHANNELS = Object.freeze({
+  sms: true,
+  email: false,
+  push: true,
+});
+
+function resolveLifecycleCustomerChannels(shipment = {}, explicitChannels = null) {
+  const stored = shipment?.customerNotificationChannels;
+  const hasContactEmail = getShipmentTargetEmails(shipment).length > 0;
+  const base =
+    stored && typeof stored === "object"
+      ? {
+          sms: stored.sms === true,
+          email: stored.email === true,
+          push: stored.push === true,
+        }
+      : {
+          sms: true,
+          email: hasContactEmail,
+          push: true,
+        };
+
+  if (!explicitChannels || typeof explicitChannels !== "object") {
+    return base;
+  }
+
+  return {
+    sms:
+      explicitChannels.sms !== undefined
+        ? explicitChannels.sms === true
+        : base.sms,
+    email:
+      explicitChannels.email !== undefined
+        ? explicitChannels.email === true
+        : base.email,
+    push:
+      explicitChannels.push !== undefined
+        ? explicitChannels.push === true
+        : base.push,
+  };
+}
+
+function resolveAutomaticNotificationChannels(
+  shipment = {},
+  {
+    notify = false,
+    notificationChannels = null,
+    notifySms,
+    notifyEmail,
+    notifyPush,
+    explicitChannels = null,
+  } = {},
+) {
+  if (notify === true) {
+    return normalizeNotificationChannels({
+      notificationChannels,
+      notify,
+      notifySms,
+      notifyEmail,
+      notifyPush,
+    });
+  }
+
+  return resolveLifecycleCustomerChannels(shipment, explicitChannels);
+}
+
 function getShipmentTargetUserIds(shipment = {}) {
   return getShipmentOwnerUserIds(shipment);
 }
@@ -165,10 +231,13 @@ async function getTripNotificationTargets(db, tripId) {
 }
 
 module.exports = {
+  DEFAULT_LIFECYCLE_CUSTOMER_CHANNELS,
   filterShipmentNotificationTargets,
   getShipmentTargetEmails,
   getShipmentTargetUserIds,
   getShipmentTrackingId,
   getTripNotificationTargets,
   normalizeNotificationChannels,
+  resolveAutomaticNotificationChannels,
+  resolveLifecycleCustomerChannels,
 };

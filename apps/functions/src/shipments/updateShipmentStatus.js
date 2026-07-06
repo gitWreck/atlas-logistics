@@ -26,9 +26,10 @@ const {
 const {
   resolveShipmentCustomerNotificationType,
   shouldBlockCustomerNotification,
+  isTransitLikeStatus,
+  isArrivedAtOdionganLikeStatus,
 } = require("../notifications/customerNotificationTypes");
 const {
-  sendShipmentCustomerNotification,
   sendAutomaticShipmentLifecycleNotification,
   CUSTOMER_NOTIFICATION_TYPES,
 } = require("../notifications/customerNotificationService");
@@ -65,6 +66,14 @@ function wasShipmentOutForDelivery(status = "") {
 function wasShipmentDelivered(status = "") {
   const normalized = String(status || "").toUpperCase();
   return normalized === "DELIVERED" || normalized === "COMPLETED";
+}
+
+function wasShipmentInTransit(status = "") {
+  return isTransitLikeStatus(status);
+}
+
+function wasShipmentArrivedAtOdiongan(status = "") {
+  return isArrivedAtOdionganLikeStatus(status);
 }
 
 function buildShipmentNotificationPlan({
@@ -187,6 +196,8 @@ exports.updateShipmentStatus = onCall(
     let completedTripId = null;
     let shipmentWasOutForDelivery = false;
     let shipmentWasDelivered = false;
+    let shipmentWasInTransit = false;
+    let shipmentWasArrivedAtOdiongan = false;
 
     const packageIdSet = normalizePackageIdSet(packageIds);
     const isCheckerPieceDelivery =
@@ -253,6 +264,8 @@ exports.updateShipmentStatus = onCall(
       const oldStatus = currentData.status || null;
       shipmentWasOutForDelivery = wasShipmentOutForDelivery(oldStatus);
       shipmentWasDelivered = wasShipmentDelivered(oldStatus);
+      shipmentWasInTransit = wasShipmentInTransit(oldStatus);
+      shipmentWasArrivedAtOdiongan = wasShipmentArrivedAtOdiongan(oldStatus);
       const tripData = tripSnap?.exists ? tripSnap.data() : null;
       assertCustodyScanStatusAllowed(currentData, tripData, newStatus);
 
@@ -730,7 +743,7 @@ exports.updateShipmentStatus = onCall(
 
     if (notificationPlan) {
       try {
-        await sendShipmentCustomerNotification({
+        await sendAutomaticShipmentLifecycleNotification({
           db,
           shipment: updatedShipmentData || {},
           shipmentId,
@@ -744,6 +757,60 @@ exports.updateShipmentStatus = onCall(
       } catch (notificationError) {
         console.error(
           "[updateShipmentStatus] Customer notification failed:",
+          notificationError,
+        );
+      }
+    } else if (
+      !shipmentWasInTransit &&
+      isTransitLikeStatus(resultStatus)
+    ) {
+      try {
+        const freshSnap = await shipmentRef.get();
+        const freshShipment = freshSnap.exists ? freshSnap.data() || {} : {};
+        await sendAutomaticShipmentLifecycleNotification({
+          db,
+          shipment: freshShipment,
+          shipmentId,
+          tripId:
+            tripId ||
+            freshShipment.currentTripId ||
+            freshShipment.currentTruckTripId ||
+            null,
+          notificationType: CUSTOMER_NOTIFICATION_TYPES.IN_TRANSIT,
+          source: "SHIPMENT_IN_TRANSIT",
+          actor: { uid, name, role },
+        });
+        notificationDelivered = true;
+      } catch (notificationError) {
+        console.error(
+          "[updateShipmentStatus] Automatic in-transit notification failed:",
+          notificationError,
+        );
+      }
+    } else if (
+      !shipmentWasArrivedAtOdiongan &&
+      isArrivedAtOdionganLikeStatus(resultStatus)
+    ) {
+      try {
+        const freshSnap = await shipmentRef.get();
+        const freshShipment = freshSnap.exists ? freshSnap.data() || {} : {};
+        await sendAutomaticShipmentLifecycleNotification({
+          db,
+          shipment: freshShipment,
+          shipmentId,
+          tripId:
+            tripId ||
+            freshShipment.currentTripId ||
+            freshShipment.currentTruckTripId ||
+            null,
+          notificationType: CUSTOMER_NOTIFICATION_TYPES.ARRIVED_AT_ODIONGAN,
+          source: "SHIPMENT_ARRIVED_AT_ODIONGAN",
+          actor: { uid, name, role },
+        });
+        notificationDelivered = true;
+      } catch (notificationError) {
+        console.error(
+          "[updateShipmentStatus] Automatic arrived-at-Odiongan notification failed:",
           notificationError,
         );
       }
@@ -766,7 +833,6 @@ exports.updateShipmentStatus = onCall(
             null,
           notificationType: CUSTOMER_NOTIFICATION_TYPES.OUT_FOR_DELIVERY,
           source: "CHECKER_OUT_FOR_DELIVERY",
-          channels: { sms: true, email: false, push: true },
           actor: { uid, name, role },
         });
         notificationDelivered = true;
@@ -794,7 +860,6 @@ exports.updateShipmentStatus = onCall(
             null,
           notificationType: CUSTOMER_NOTIFICATION_TYPES.DELIVERED,
           source: "SHIPMENT_DELIVERED",
-          channels: { sms: true, email: false, push: true },
           actor: { uid, name, role },
         });
         notificationDelivered = true;

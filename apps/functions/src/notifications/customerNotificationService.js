@@ -9,6 +9,9 @@ const { requireNormalizedPhone } = require("../utilities/phoneHelpers");
 const { unique } = require("../utilities/helpers");
 const { getShipmentOwnerUserIds } = require("../utilities/customerShipmentAccess");
 const {
+  resolveLifecycleCustomerChannels,
+} = require("../utilities/notificationHelpers");
+const {
   CUSTOMER_NOTIFICATION_TYPES,
   resolveTripCustomerNotificationType,
   shouldBlockCustomerNotification,
@@ -90,23 +93,36 @@ function resolveCustomerIdentity(shipment = {}) {
 }
 
 async function enrichGroupContact(db, group = {}) {
-  if (!group.uid) return group;
+  let phone = group.phone || null;
+  let email = group.email || null;
 
-  const userSnap = await db.collection("users").doc(String(group.uid)).get();
-  if (!userSnap.exists) return group;
-
-  const user = userSnap.data() || {};
-  const phone =
-    group.phone ||
-    requireNormalizedPhone(user.phoneNumber || user.phone || user.mobile || "");
-  const email =
-    group.email || String(user.email || "").trim().toLowerCase() || null;
+  if (group.uid) {
+    const userSnap = await db.collection("users").doc(String(group.uid)).get();
+    if (userSnap.exists) {
+      const user = userSnap.data() || {};
+      phone =
+        phone ||
+        requireNormalizedPhone(user.phoneNumber || user.phone || user.mobile || "");
+      email =
+        email || String(user.email || "").trim().toLowerCase() || null;
+    }
+  }
 
   return {
     ...group,
     phone: phone || null,
-    email,
+    email: email || null,
   };
+}
+
+function isRetriableNotificationFailure(error = "") {
+  const text = String(error || "").toLowerCase();
+  return (
+    text.includes("no valid email") ||
+    text.includes("no valid phone") ||
+    text.includes("no push tokens") ||
+    text.includes("no sms template")
+  );
 }
 
 function groupShipmentsByCustomer(shipments = []) {
@@ -200,8 +216,13 @@ async function claimNotificationLog(db, dedupKey, payload) {
           return { claimed: false, reason: "duplicate", ref };
         }
       }
-      if (status === "failed" && payload.allowRetry !== true) {
-        return { claimed: false, reason: "failed_exists", ref };
+      if (status === "failed") {
+        const canRetry =
+          payload.allowRetry === true ||
+          isRetriableNotificationFailure(existing.error);
+        if (!canRetry) {
+          return { claimed: false, reason: "failed_exists", ref };
+        }
       }
     }
 
@@ -330,7 +351,9 @@ async function deliverChannel({
   allowRetry = false,
 }) {
   const contact =
-    channel === "SMS" ? await enrichGroupContact(db, group) : group;
+    channel === "SMS" || channel === "EMAIL"
+      ? await enrichGroupContact(db, group)
+      : group;
 
   const claim = await claimNotificationLog(db, dedupKey, {
     customerId: contact.customerId,
@@ -356,12 +379,15 @@ async function deliverChannel({
     customSmsMessage || buildCustomerSmsMessage(notificationType, shipmentCount);
   const emailContent =
     customEmail ||
-    buildCustomerEmailContent({
+    (await buildCustomerEmailContent({
+      db,
       notificationType,
       shipmentCount,
       shipmentIds: group.shipmentIds,
       tripId,
-    });
+      customerName: contact.name || group.name || "Customer",
+      shipments: group.shipments,
+    }));
   const pushBody =
     customPush ||
     buildCustomerPushBody(notificationType, shipmentCount, group.shipmentIds);
@@ -405,14 +431,14 @@ async function deliverChannel({
 
       return { channel, sent: true, providerMessageId: providerResult.messageId };
     } else if (channel === "EMAIL") {
-      if (!group.email) {
+      if (!contact.email) {
         await markNotificationLog(claim.ref, "failed", {
           error: "No valid email",
         });
         return { channel, skipped: true, reason: "no_email" };
       }
       await sendEmail({
-        to: group.email,
+        to: contact.email,
         subject: emailContent.subject,
         text: emailContent.text,
         html: emailContent.html,
@@ -680,7 +706,7 @@ async function sendAutomaticTripLifecycleNotification({
   notificationType,
   shipments = null,
   source = "TRIP_LIFECYCLE",
-  channels = { sms: true, email: false, push: true },
+  channels = null,
   actor = {},
 }) {
   if (!tripId || !notificationType) {
@@ -696,15 +722,53 @@ async function sendAutomaticTripLifecycleNotification({
     return { success: true, skipped: true, reason: "blocked_source" };
   }
 
-  return sendTripCustomerNotifications({
-    db,
-    tripId,
-    notificationType,
-    shipments,
-    channels,
-    actor,
-    source,
-  });
+  const manifestShipments =
+    Array.isArray(shipments) && shipments.length
+      ? shipments
+      : await loadTripShipments(db, tripId);
+
+  if (!manifestShipments.length) {
+    return { success: true, sent: 0, skipped: true, reason: "no_shipments" };
+  }
+
+  const results = await Promise.all(
+    manifestShipments.map((shipment) => {
+      const shipmentId = String(shipment.id || shipment.shipmentId || "").trim();
+      if (!shipmentId) {
+        return Promise.resolve({
+          success: true,
+          sent: 0,
+          skipped: true,
+          reason: "no_id",
+        });
+      }
+
+      return sendAutomaticShipmentLifecycleNotification({
+        db,
+        shipment,
+        shipmentId,
+        tripId,
+        notificationType,
+        source,
+        channels,
+        actor,
+      });
+    }),
+  );
+
+  const sent = results.reduce((sum, result) => sum + (Number(result.sent) || 0), 0);
+  const queued = results.reduce(
+    (sum, result) => sum + (Number(result.queued) || 0),
+    0,
+  );
+
+  return {
+    success: true,
+    customers: results.length,
+    sent,
+    queued,
+    results,
+  };
 }
 
 async function sendAutomaticShipmentLifecycleNotification({
@@ -714,7 +778,7 @@ async function sendAutomaticShipmentLifecycleNotification({
   notificationType,
   tripId = null,
   source = "SHIPMENT_LIFECYCLE",
-  channels = { sms: true, email: false, push: true },
+  channels = null,
   actor = {},
 }) {
   if (!shipmentId || !notificationType) {
@@ -730,71 +794,126 @@ async function sendAutomaticShipmentLifecycleNotification({
     return { success: true, skipped: true, reason: "blocked_source" };
   }
 
+  let shipmentRecord = { id: shipmentId, ...(shipment || {}) };
+  try {
+    const shipmentSnap = await db.collection("shipments").doc(shipmentId).get();
+    if (shipmentSnap.exists) {
+      shipmentRecord = { id: shipmentId, ...shipmentSnap.data() };
+    }
+  } catch (reloadError) {
+    console.warn(
+      "[sendAutomaticShipmentLifecycleNotification] Shipment reload failed:",
+      reloadError,
+    );
+  }
+
+  const resolvedChannels = resolveLifecycleCustomerChannels(
+    shipmentRecord,
+    channels,
+  );
+
   const scopedTripId =
     tripId ||
-    shipment?.currentTripId ||
-    shipment?.currentTruckTripId ||
+    shipmentRecord.currentTripId ||
+    shipmentRecord.currentTruckTripId ||
     NO_TRIP_SCOPE;
   const dedupNotificationType = `${notificationType}__${shipmentId}`;
-  const group = groupShipmentsByCustomer([
-    { id: shipmentId, ...(shipment || {}) },
-  ])[0];
+  const groups = collectShipmentCustomerGroups(shipmentRecord, shipmentId);
 
-  if (!group) {
+  if (!groups.length) {
     return { success: true, sent: 0, skipped: true, reason: "no_customer" };
   }
 
-  const shipmentCount = Math.max(group.shipmentIds.length, 1);
-  const customSmsMessage = buildCustomerSmsMessage(
-    notificationType,
-    shipmentCount,
-  );
-  const customEmail = buildCustomerEmailContent({
-    notificationType,
-    shipmentCount,
-    shipmentIds: group.shipmentIds,
-    tripId: scopedTripId === NO_TRIP_SCOPE ? null : scopedTripId,
-  });
-  const customPush = buildCustomerPushBody(
-    notificationType,
-    shipmentCount,
-    group.shipmentIds,
-  );
+  const results = [];
 
-  const channelResults = await Promise.all(
-    [
-      channels.sms === true ? "SMS" : null,
-      channels.email === true ? "EMAIL" : null,
-      channels.push === true ? "PUSH" : null,
-    ]
-      .filter(Boolean)
-      .map((channel) =>
-        deliverChannel({
-          db,
-          channel,
-          dedupKey: buildDedupKey({
-            customerId: group.customerId,
-            tripId: scopedTripId,
-            notificationType: dedupNotificationType,
+  for (const group of groups) {
+    const contact = await enrichGroupContact(db, group);
+    const groupChannels = {
+      sms: resolvedChannels.sms === true && !!contact.phone,
+      email: resolvedChannels.email === true && !!contact.email,
+      push: resolvedChannels.push === true,
+    };
+
+    if (!groupChannels.sms && !groupChannels.email && !groupChannels.push) {
+      results.push({
+        customerId: group.customerId,
+        skipped: true,
+        reason: "no_contact_for_enabled_channels",
+        channelResults: [],
+      });
+      continue;
+    }
+
+    const shipmentCount = Math.max(group.shipmentIds.length, 1);
+    const customSmsMessage = buildCustomerSmsMessage(
+      notificationType,
+      shipmentCount,
+    );
+    const customEmail = await buildCustomerEmailContent({
+      db,
+      notificationType,
+      shipmentCount,
+      shipmentIds: group.shipmentIds,
+      tripId: scopedTripId === NO_TRIP_SCOPE ? null : scopedTripId,
+      customerName: contact.name || group.name || "Customer",
+      shipments: group.shipments,
+    });
+    const customPush = buildCustomerPushBody(
+      notificationType,
+      shipmentCount,
+      group.shipmentIds,
+    );
+
+    const channelResults = await Promise.all(
+      [
+        groupChannels.sms ? "SMS" : null,
+        groupChannels.email ? "EMAIL" : null,
+        groupChannels.push ? "PUSH" : null,
+      ]
+        .filter(Boolean)
+        .map((channel) =>
+          deliverChannel({
+            db,
             channel,
+            dedupKey: buildDedupKey({
+              customerId: group.customerId,
+              tripId: scopedTripId,
+              notificationType: dedupNotificationType,
+              channel,
+            }),
+            group: contact,
+            tripId: scopedTripId,
+            notificationType,
+            customSmsMessage,
+            customEmail,
+            customPush,
+            actor,
+            source,
           }),
-          group,
-          tripId: scopedTripId,
-          notificationType,
-          customSmsMessage,
-          customEmail,
-          customPush,
-          actor,
-          source,
-        }),
-      ),
-  );
+        ),
+    );
+
+    results.push({ customerId: group.customerId, channelResults });
+  }
 
   return {
     success: true,
-    sent: channelResults.filter((result) => result.sent === true).length,
-    queued: channelResults.filter((result) => result.queued === true).length,
-    results: channelResults,
+    customers: groups.length,
+    sent: results.reduce(
+      (sum, entry) =>
+        sum +
+        (entry.channelResults || []).filter((result) => result.sent === true)
+          .length,
+      0,
+    ),
+    queued: results.reduce(
+      (sum, entry) =>
+        sum +
+        (entry.channelResults || []).filter((result) => result.queued === true)
+          .length,
+      0,
+    ),
+    results,
   };
 }
 
@@ -988,6 +1107,39 @@ function uniqueCustomerGroups(parties = [], shipmentId = null) {
   return groups;
 }
 
+function collectShipmentCustomerGroups(shipment = {}, shipmentId = null) {
+  const sender = shipment.sender || {};
+  const recipient = shipment.recipient || {};
+  const resolvedShipmentId = String(
+    shipmentId || shipment.id || shipment.shipmentId || "",
+  ).trim();
+  const shipmentRecord = {
+    ...(resolvedShipmentId ? { id: resolvedShipmentId } : {}),
+    ...shipment,
+  };
+
+  return uniqueCustomerGroups(
+    [
+      {
+        phone: sender.phone,
+        email: sender.email,
+        uid: sender.uid,
+        name: sender.name || "Customer",
+      },
+      {
+        phone: recipient.phone,
+        email: recipient.email,
+        uid: recipient.uid,
+        name: recipient.name || "Customer",
+      },
+    ],
+    resolvedShipmentId || null,
+  ).map((group) => ({
+    ...group,
+    shipments: [shipmentRecord],
+  }));
+}
+
 async function sendShipmentCreatedCustomerNotifications({
   db,
   shipmentId,
@@ -1031,11 +1183,14 @@ async function sendShipmentCreatedCustomerNotifications({
       messageNotificationType,
       shipmentCount,
     );
-    const customEmail = buildCustomerEmailContent({
+    const customEmail = await buildCustomerEmailContent({
+      db,
       notificationType: messageNotificationType,
       shipmentCount,
       shipmentIds: group.shipmentIds,
       tripId: scopedTripId === NO_TRIP_SCOPE ? null : scopedTripId,
+      customerName: group.name || "Customer",
+      shipments: group.shipments,
     });
     const customPush = buildCustomerPushBody(
       messageNotificationType,
@@ -1088,6 +1243,7 @@ module.exports = {
   NO_TRIP_SCOPE,
   buildDedupKey,
   buildCustomerGroup,
+  collectShipmentCustomerGroups,
   groupShipmentsByCustomer,
   loadTripShipments,
   resolveCustomerIdentity,

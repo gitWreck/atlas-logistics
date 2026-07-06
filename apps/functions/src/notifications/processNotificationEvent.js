@@ -4,8 +4,13 @@ const { onDocumentCreated } = require("firebase-functions/v2/firestore");
 const { defineSecret } = require("firebase-functions/params");
 const admin = require("firebase-admin");
 const { unique } = require("../utilities/helpers");
-const { CUSTOMER_NOTIFICATION_TYPES, resolveShipmentCustomerNotificationType } = require("./customerNotificationTypes");
-const { sendShipmentCustomerNotification } = require("./customerNotificationService");
+const {
+  CUSTOMER_NOTIFICATION_TYPES,
+  resolveShipmentCustomerNotificationType,
+} = require("./customerNotificationTypes");
+const {
+  sendAutomaticShipmentLifecycleNotification,
+} = require("./customerNotificationService");
 const {
   SEMAPHORE_API_KEY,
   SEMAPHORE_SENDER_NAME,
@@ -63,15 +68,13 @@ async function processShipmentCreatedEvent({ eventId, event }) {
     result.inApp = await writeInAppNotifications({ eventId, event });
   }
 
-  const shipment = {
-    sender: event.targets?.sender || {},
-    recipient: event.targets?.recipient || {},
-  };
-
   if (channels.sms === true || channels.email === true || channels.push === true) {
-    result.customer = await sendShipmentCustomerNotification({
+    result.customer = await sendAutomaticShipmentLifecycleNotification({
       db,
-      shipment,
+      shipment: {
+        sender: event.targets?.sender || {},
+        recipient: event.targets?.recipient || {},
+      },
       shipmentId: event.shipmentId,
       notificationType: CUSTOMER_NOTIFICATION_TYPES.RECEIVED_AT_DIVISORIA,
       channels: {
@@ -81,6 +84,7 @@ async function processShipmentCreatedEvent({ eventId, event }) {
       },
       actor: event.actor || {},
       source: "SHIPMENT_CREATED",
+      tripId: event.tripId || event.data?.tripId || null,
     });
   }
 
@@ -106,7 +110,7 @@ async function processShipmentStatusUpdatedEvent({ eventId, event }) {
   }
 
   if (channels.sms === true || channels.email === true || channels.push === true) {
-    result.customer = await sendShipmentCustomerNotification({
+    result.customer = await sendAutomaticShipmentLifecycleNotification({
       db,
       shipment: {
         sender: event.targets?.sender || {},

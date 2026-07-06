@@ -658,7 +658,6 @@ exports.loadPackagesToDeliveryManifest = onCall(
           tripId: entry.tripId,
           notificationType: CUSTOMER_NOTIFICATION_TYPES.OUT_FOR_DELIVERY,
           source: "CHECKER_LOAD_MANIFEST",
-          channels: { sms: true, email: false, push: true },
           actor: {
             uid: actorUid,
             name: checkerName,

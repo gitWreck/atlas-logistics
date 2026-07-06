@@ -183,7 +183,6 @@ exports.startTrip = onCall(
       notificationType: CUSTOMER_NOTIFICATION_TYPES.IN_TRANSIT,
       shipments: manifestShipments,
       source: "START_TRIP",
-      channels: { sms: true, email: false, push: true },
       actor: {
         uid,
         name: req.auth.token?.name || null,

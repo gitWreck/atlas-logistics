@@ -34,6 +34,7 @@ const {
   sendAutomaticShipmentLifecycleNotification,
   CUSTOMER_NOTIFICATION_TYPES,
 } = require("../notifications/customerNotificationService");
+const { resolveAutomaticNotificationChannels } = require("../utilities/notificationHelpers");
 const {
   SEMAPHORE_API_KEY,
   SEMAPHORE_SENDER_NAME,
@@ -54,6 +55,16 @@ function wasShipmentOutForDelivery(status = "") {
 function wasShipmentDelivered(status = "") {
   const normalized = String(status || "").toUpperCase();
   return normalized === "DELIVERED" || normalized === "COMPLETED";
+}
+
+function wasShipmentInTransit(status = "") {
+  const normalized = String(status || "").toUpperCase();
+  return normalized === "IN_TRANSIT" || normalized === "PARTIALLY_IN_TRANSIT";
+}
+
+function wasShipmentArrivedAtOdiongan(status = "") {
+  const normalized = String(status || "").toUpperCase();
+  return normalized === "ARRIVED" || normalized === "PARTIALLY_ARRIVED";
 }
 
 if (!admin.apps.length) admin.initializeApp();
@@ -147,6 +158,8 @@ exports.updateShipmentPackages = onCall(
     const autoCompleteTripIds = new Set();
     let outForDeliveryNotificationContext = null;
     let deliveredNotificationContext = null;
+    let inTransitNotificationContext = null;
+    let arrivedNotificationContext = null;
 
     await db.runTransaction(async (tx) => {
       // -----------------------------
@@ -1199,10 +1212,9 @@ exports.updateShipmentPackages = onCall(
 
       if (
         isScannerUpdate &&
-        String(newStatus || "").toUpperCase() === "OUT_FOR_DELIVERY" &&
-        !wasOutForDelivery &&
         !wasShipmentOutForDelivery(oldShipmentStatus) &&
-        !wasShipmentOutForDelivery(oldTripShipmentStatus)
+        !wasShipmentOutForDelivery(oldTripShipmentStatus) &&
+        wasShipmentOutForDelivery(shipmentStatus)
       ) {
         outForDeliveryNotificationContext = {
           shipment: {
@@ -1224,7 +1236,52 @@ exports.updateShipmentPackages = onCall(
 
       if (
         isScannerUpdate &&
-        String(newStatus || "").toUpperCase() === "DELIVERED" &&
+        !wasShipmentInTransit(oldShipmentStatus) &&
+        wasShipmentInTransit(shipmentStatus)
+      ) {
+        inTransitNotificationContext = {
+          shipment: {
+            ...oldData,
+            packages: finalPackages,
+            status: shipmentStatus,
+            packageBreakdown,
+            currentTripId: singleCurrentTripId,
+            currentTripIds: activeTripIds,
+          },
+          tripId:
+            tripId ||
+            singleCurrentTripId ||
+            oldData.currentTripId ||
+            oldData.currentTruckTripId ||
+            null,
+        };
+      }
+
+      if (
+        isScannerUpdate &&
+        !wasShipmentArrivedAtOdiongan(oldShipmentStatus) &&
+        wasShipmentArrivedAtOdiongan(shipmentStatus)
+      ) {
+        arrivedNotificationContext = {
+          shipment: {
+            ...oldData,
+            packages: finalPackages,
+            status: shipmentStatus,
+            packageBreakdown,
+            currentTripId: singleCurrentTripId,
+            currentTripIds: activeTripIds,
+          },
+          tripId:
+            tripId ||
+            singleCurrentTripId ||
+            oldData.currentTripId ||
+            oldData.currentTruckTripId ||
+            null,
+        };
+      }
+
+      if (
+        isScannerUpdate &&
         !wasShipmentDelivered(oldShipmentStatus) &&
         wasShipmentDelivered(shipmentStatus)
       ) {
@@ -1289,6 +1346,15 @@ exports.updateShipmentPackages = onCall(
     }
 
     let customerNotificationResult = null;
+    const resolveChannelsForShipment = (shipment) =>
+      resolveAutomaticNotificationChannels(shipment, {
+        notify,
+        notificationChannels,
+        notifySms,
+        notifyEmail,
+        notifyPush,
+      });
+
     if (outForDeliveryNotificationContext) {
       try {
         customerNotificationResult =
@@ -1299,12 +1365,60 @@ exports.updateShipmentPackages = onCall(
             tripId: outForDeliveryNotificationContext.tripId,
             notificationType: CUSTOMER_NOTIFICATION_TYPES.OUT_FOR_DELIVERY,
             source: "SCANNER_OUT_FOR_DELIVERY",
-            channels: { sms: true, email: false, push: true },
+            channels: resolveChannelsForShipment(
+              outForDeliveryNotificationContext.shipment,
+            ),
             actor: { uid: actorUid, name, role },
           });
       } catch (notificationError) {
         console.error(
           "[updateShipmentPackages] Out-for-delivery notification failed:",
+          notificationError,
+        );
+      }
+    }
+
+    if (inTransitNotificationContext) {
+      try {
+        customerNotificationResult =
+          await sendAutomaticShipmentLifecycleNotification({
+            db,
+            shipment: inTransitNotificationContext.shipment,
+            shipmentId,
+            tripId: inTransitNotificationContext.tripId,
+            notificationType: CUSTOMER_NOTIFICATION_TYPES.IN_TRANSIT,
+            source: "SCANNER_IN_TRANSIT",
+            channels: resolveChannelsForShipment(
+              inTransitNotificationContext.shipment,
+            ),
+            actor: { uid: actorUid, name, role },
+          });
+      } catch (notificationError) {
+        console.error(
+          "[updateShipmentPackages] In-transit notification failed:",
+          notificationError,
+        );
+      }
+    }
+
+    if (arrivedNotificationContext) {
+      try {
+        customerNotificationResult =
+          await sendAutomaticShipmentLifecycleNotification({
+            db,
+            shipment: arrivedNotificationContext.shipment,
+            shipmentId,
+            tripId: arrivedNotificationContext.tripId,
+            notificationType: CUSTOMER_NOTIFICATION_TYPES.ARRIVED_AT_ODIONGAN,
+            source: "SCANNER_ARRIVED_AT_ODIONGAN",
+            channels: resolveChannelsForShipment(
+              arrivedNotificationContext.shipment,
+            ),
+            actor: { uid: actorUid, name, role },
+          });
+      } catch (notificationError) {
+        console.error(
+          "[updateShipmentPackages] Arrived-at-Odiongan notification failed:",
           notificationError,
         );
       }
@@ -1319,7 +1433,9 @@ exports.updateShipmentPackages = onCall(
           tripId: deliveredNotificationContext.tripId,
           notificationType: CUSTOMER_NOTIFICATION_TYPES.DELIVERED,
           source: "SCANNER_DELIVERED",
-          channels: { sms: true, email: false, push: true },
+          channels: resolveChannelsForShipment(
+            deliveredNotificationContext.shipment,
+          ),
           actor: { uid: actorUid, name, role },
         });
         customerNotificationResult = deliveredResult;
