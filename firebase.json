@@ -22,7 +22,7 @@
     }
   ],
   "hosting": {
-    "public": "apps/web/public", // Or "apps/web/out" if doing static export
+    "public": "apps/web/public", 
     "ignore": ["firebase.json", "**/.*", "**/node_modules/**"]
   },
   "emulators": {
