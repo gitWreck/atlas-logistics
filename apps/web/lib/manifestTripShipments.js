@@ -84,8 +84,7 @@ export async function getManifestTripShipments(tripId) {
       : rootPackages;
     const sumQty = (field) =>
       visiblePackages.reduce(
-        (sum, pkg) =>
-          sum + Math.min(Number(pkg[field]) || 0, packageQty(pkg)),
+        (sum, pkg) => sum + Math.min(Number(pkg[field]) || 0, packageQty(pkg)),
         0,
       );
     const shipmentFullPieceTotal = Math.max(

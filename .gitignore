@@ -27,7 +27,6 @@ ios/
 .env
 .env.local
 apps/functions/service-account.json
-apps/web/service-account.json
 .env.development.local
 .env.test.local
 .env.production.local

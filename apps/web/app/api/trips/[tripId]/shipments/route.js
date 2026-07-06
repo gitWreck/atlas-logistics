@@ -71,7 +71,10 @@ export async function GET(_req, context) {
     // single trip), so also match on the currentTripIds array to avoid dropping
     // shipments split across trips.
     const [byTripIdSnap, byTripIdsArraySnap] = await Promise.all([
-      adminDb.collection("shipments").where("currentTripId", "==", tripId).get(),
+      adminDb
+        .collection("shipments")
+        .where("currentTripId", "==", tripId)
+        .get(),
       adminDb
         .collection("shipments")
         .where("currentTripIds", "array-contains", tripId)

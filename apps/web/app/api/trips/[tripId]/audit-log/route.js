@@ -44,7 +44,9 @@ function normalizeLogEntry(doc) {
       data.newValue ?? data.details?.after ?? null,
     ),
     note: data.note || null,
-    timestamp: serializeFirestoreValue(data.timestamp || data.createdAt || null),
+    timestamp: serializeFirestoreValue(
+      data.timestamp || data.createdAt || null,
+    ),
     targetCollection: data.targetCollection || null,
     targetId: data.targetId || null,
     source: "audit_logs",
@@ -67,7 +69,10 @@ export async function GET(_req, context) {
     }
 
     const decodedToken = await getAuth().verifyIdToken(token);
-    const userDoc = await adminDb.collection("users").doc(decodedToken.uid).get();
+    const userDoc = await adminDb
+      .collection("users")
+      .doc(decodedToken.uid)
+      .get();
     const userData = userDoc.data() || {};
 
     if (
