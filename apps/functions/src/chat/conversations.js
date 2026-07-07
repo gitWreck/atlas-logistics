@@ -79,6 +79,52 @@ function assignedStaffRole(conversation = {}) {
   return conversation.assignedStaffRole || conversation.assignedRole || null;
 }
 
+async function writeCallHistoryMessage({ conversationRef, conversationId, call, text, duration = 0 }) {
+  const targetRef = conversationRef || db.collection("conversations").doc(conversationId);
+  const messageText = String(text || "").trim();
+
+  if (!messageText) {
+    throw new HttpsError("invalid-argument", "Call history message text is required.");
+  }
+
+  const now = FieldValue.serverTimestamp();
+  const callData = call || {};
+  const senderId = String(callData.callerId || "").trim() || "system";
+  const senderRole = String(callData.callerRole || "").trim() || "system";
+  const senderName = String(callData.callerName || "").trim() || "Atlas";
+  const messageRef = targetRef.collection("messages").doc();
+
+  await db.runTransaction(async (tx) => {
+    tx.set(messageRef, {
+      messageId: messageRef.id,
+      senderId,
+      senderRole,
+      senderName,
+      type: "call",
+      text: messageText,
+      callId: String(callData.callId || callData.id || "").trim() || null,
+      callType: callData.type || null,
+      callerId: String(callData.callerId || "").trim() || null,
+      receiverId: String(callData.receiverId || "").trim() || null,
+      duration: Math.max(0, Number(duration || 0)),
+      attachments: [],
+      status: "sent",
+      createdAt: now,
+      readBy: {},
+      seenBy: {},
+    });
+
+    tx.update(targetRef, {
+      lastMessage: messageText,
+      lastMessageText: messageText,
+      lastActivityAt: now,
+      lastMessageAt: now,
+      lastMessageBy: senderId,
+      updatedAt: now,
+    });
+  });
+}
+
 function staffAssignmentFields({ assigneeId, assigneeRole, assigneeName } = {}) {
   return {
     assignedStaffId: assigneeId || null,
@@ -438,6 +484,48 @@ exports.createConversation = onCall(
     }
 
     return { success: true, conversationId: conversationRef.id, reused: false };
+  },
+);
+
+exports.createCallHistoryMessage = onCall(
+  { region: "asia-southeast1", maxInstances: 20 },
+  async (req) => {
+    const uid = requireAuth(req);
+    const conversationId = cleanText(req.data?.conversationId, "conversationId", 160);
+    const callId = cleanText(req.data?.callId, "callId", 160);
+    const text = cleanText(req.data?.text, "text", 2000);
+    const duration = Math.max(0, Number(req.data?.duration || 0));
+
+    const userSnap = await db.collection("users").doc(uid).get();
+    if (!userSnap.exists || userSnap.data()?.active === false) {
+      throw new HttpsError("permission-denied", "Inactive or missing user.");
+    }
+
+    const user = userSnap.data() || {};
+    const role = String(user.role || "").toLowerCase();
+    const { ref } = await getConversationForUser(conversationId, uid, role);
+
+    const callRef = db.collection("calls").doc(callId);
+    const callSnap = await callRef.get();
+    if (!callSnap.exists) {
+      throw new HttpsError("not-found", "Call not found.");
+    }
+
+    const call = callSnap.data() || {};
+    const isParticipant = String(call.callerId || "").trim() === uid || String(call.receiverId || "").trim() === uid;
+    if (!isParticipant && !STAFF_MONITOR_ROLES.includes(role)) {
+      throw new HttpsError("permission-denied", "Call access denied.");
+    }
+
+    await writeCallHistoryMessage({
+      conversationRef: ref,
+      conversationId,
+      call,
+      text,
+      duration,
+    });
+
+    return { success: true };
   },
 );
 
@@ -1048,34 +1136,12 @@ exports.updateConversationCallStatus = onCall(
       const durationLabel = `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
       const text = `${label}\n${durationLabel}`;
 
-      const messageRef = conversationRef.collection("messages").doc();
-      await db.runTransaction(async (tx) => {
-        tx.set(messageRef, {
-          messageId: messageRef.id,
-          senderId: "system",
-          senderRole: "system",
-          senderName: "Atlas",
-          type: "call",
-          text,
-          callId,
-          callType: call.type,
-          callerId: call.callerId || null,
-          receiverId: call.receiverId || null,
-          duration,
-          attachments: [],
-          status: "sent",
-          createdAt: now,
-          readBy: {},
-          seenBy: {},
-        });
-        tx.update(conversationRef, {
-          lastMessage: label,
-          lastMessageText: text,
-          lastActivityAt: now,
-          lastMessageAt: now,
-          lastMessageBy: "system",
-          updatedAt: now,
-        });
+      await writeCallHistoryMessage({
+        conversationRef,
+        conversationId: call.conversationId,
+        call,
+        text,
+        duration,
       });
     }
 

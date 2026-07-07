@@ -65,6 +65,10 @@ export const createConversation = httpsCallable(
   functions,
   "createConversation",
 );
+export const createCallHistoryMessage = httpsCallable(
+  functions,
+  "createCallHistoryMessage",
+);
 export const sendChatMessage = httpsCallable(functions, "sendChatMessage");
 export const markConversationRead = httpsCallable(
   functions,

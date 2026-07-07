@@ -14,7 +14,7 @@ import { db } from "../../firebase";
 import { useAuth } from "../../contexts/AuthContext";
 import {
   acceptConversationCall,
-  sendChatMessage,
+  createCallHistoryMessage,
   updateConversationCallStatus,
 } from "../utilities/FirebaseFunctions";
 
@@ -256,10 +256,10 @@ export default function IncomingCallListener() {
     }, 4000);
   };
 
-  const logCallEvent = async ({ conversationId, text }) => {
-    if (!conversationId) return;
+  const logCallEvent = async ({ conversationId, callId, text }) => {
+    if (!conversationId || !callId) return;
     try {
-      await sendChatMessage({ conversationId, text });
+      await createCallHistoryMessage({ conversationId, callId, text });
     } catch (error) {
       console.warn("Unable to log call event", error);
     }
@@ -317,7 +317,7 @@ export default function IncomingCallListener() {
       });
 
       if (timedOut) {
-        await logCallEvent({ conversationId: activeCall?.conversationId, text: `📞 ${activeCall?.type === "video" ? "Video" : "Voice"} Call\nMissed Call` });
+        await logCallEvent({ conversationId: activeCall?.conversationId, callId: activeCall?.id, text: `📞 ${activeCall?.type === "video" ? "Video" : "Voice"} Call\nMissed Call` });
         closeDialog();
       }
     } catch (error) {
@@ -346,7 +346,7 @@ export default function IncomingCallListener() {
         acceptedBy: user?.uid || null,
         updatedAt: serverTimestamp(),
       });
-      await logCallEvent({ conversationId: activeCall.conversationId, text: `📞 ${activeCall?.type === "video" ? "Video" : "Voice"} Call\nOngoing Call` });
+      await logCallEvent({ conversationId: activeCall.conversationId, callId: activeCall.id, text: `📞 ${activeCall?.type === "video" ? "Video" : "Voice"} Call\nOngoing Call` });
     } catch (error) {
       console.error("Incoming call accept failed:", error);
       showNotice("This call can no longer be accepted.");
@@ -373,7 +373,7 @@ export default function IncomingCallListener() {
         endedAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       });
-      await logCallEvent({ conversationId: activeCall.conversationId, text: `📞 ${activeCall?.type === "video" ? "Video" : "Voice"} Call\nMissed Call` });
+      await logCallEvent({ conversationId: activeCall.conversationId, callId: activeCall.id, text: `📞 ${activeCall?.type === "video" ? "Video" : "Voice"} Call\nMissed Call` });
       closeDialog();
     } catch (error) {
       console.error("Incoming call decline failed:", error);
@@ -394,7 +394,7 @@ export default function IncomingCallListener() {
         endedAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       });
-      await logCallEvent({ conversationId: activeCall.conversationId, text: `📞 ${activeCall?.type === "video" ? "Video" : "Voice"} Call\nCall Cancelled` });
+      await logCallEvent({ conversationId: activeCall.conversationId, callId: activeCall.id, text: `📞 ${activeCall?.type === "video" ? "Video" : "Voice"} Call\nCall Cancelled` });
       closeDialog();
     } catch (error) {
       console.error("Call cancel failed:", error);
@@ -415,7 +415,7 @@ export default function IncomingCallListener() {
         endedAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       });
-      await logCallEvent({ conversationId: activeCall.conversationId, text: `📞 ${activeCall?.type === "video" ? "Video" : "Voice"} Call\nCall Ended` });
+      await logCallEvent({ conversationId: activeCall.conversationId, callId: activeCall.id, text: `📞 ${activeCall?.type === "video" ? "Video" : "Voice"} Call\nCall Ended` });
       closeDialog();
     } catch (error) {
       console.error("Call end failed:", error);

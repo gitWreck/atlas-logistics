@@ -22,8 +22,8 @@ import { db } from "@/lib/firebase";
 import { useAuth } from "@/app/context/AuthContext";
 import {
   acceptConversationCall,
+  createCallHistoryMessage,
   declineConversationCall,
-  sendChatMessage,
   updateConversationCallStatus,
 } from "@/app/utility/FirebaseFunctions";
 
@@ -301,10 +301,10 @@ export default function IncomingCallListener() {
     }, 4000);
   };
 
-  const logCallEvent = async ({ conversationId, text }) => {
-    if (!conversationId) return;
+  const logCallEvent = async ({ conversationId, callId, text }) => {
+    if (!conversationId || !callId) return;
     try {
-      await sendChatMessage({ conversationId, text });
+      await createCallHistoryMessage({ conversationId, callId, text });
     } catch (error) {
       console.warn("Unable to log call event", error);
     }
@@ -362,7 +362,7 @@ export default function IncomingCallListener() {
       });
 
       if (timedOut) {
-        await logCallEvent({ conversationId: activeCall?.conversationId, text: `📞 ${formatCallType(activeCall?.type)} Call\nMissed Call` });
+        await logCallEvent({ conversationId: activeCall?.conversationId, callId: activeCall?.id, text: `📞 ${formatCallType(activeCall?.type)} Call\nMissed Call` });
         closeDialog();
       }
     } catch (error) {
@@ -390,7 +390,7 @@ export default function IncomingCallListener() {
         acceptedBy: user?.uid || null,
         updatedAt: serverTimestamp(),
       });
-      await logCallEvent({ conversationId: activeCall.conversationId, text: `📞 ${formatCallType(activeCall?.type)} Call\nOngoing Call` });
+      await logCallEvent({ conversationId: activeCall.conversationId, callId: activeCall.id, text: `📞 ${formatCallType(activeCall?.type)} Call\nOngoing Call` });
     } catch (error) {
       console.error("Failed to accept incoming call:", error);
       if (error?.code === "functions/failed-precondition") {
@@ -415,7 +415,7 @@ export default function IncomingCallListener() {
         endedAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       });
-      await logCallEvent({ conversationId: activeCall.conversationId, text: `📞 ${formatCallType(activeCall?.type)} Call\nMissed Call` });
+      await logCallEvent({ conversationId: activeCall.conversationId, callId: activeCall.id, text: `📞 ${formatCallType(activeCall?.type)} Call\nMissed Call` });
       closeDialog();
     } catch (error) {
       console.error("Failed to decline incoming call:", error);
@@ -436,7 +436,7 @@ export default function IncomingCallListener() {
         endedAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       });
-      await logCallEvent({ conversationId: activeCall.conversationId, text: `📞 ${formatCallType(activeCall?.type)} Call\nCall Ended` });
+      await logCallEvent({ conversationId: activeCall.conversationId, callId: activeCall.id, text: `📞 ${formatCallType(activeCall?.type)} Call\nCall Ended` });
       closeDialog();
     } catch (error) {
       console.error("Failed to end call:", error);
@@ -457,7 +457,7 @@ export default function IncomingCallListener() {
         endedAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       });
-      await logCallEvent({ conversationId: activeCall.conversationId, text: `📞 ${formatCallType(activeCall?.type)} Call\nCall Cancelled` });
+      await logCallEvent({ conversationId: activeCall.conversationId, callId: activeCall.id, text: `📞 ${formatCallType(activeCall?.type)} Call\nCall Cancelled` });
       closeDialog();
     } catch (error) {
       console.error("Failed to cancel call:", error);
