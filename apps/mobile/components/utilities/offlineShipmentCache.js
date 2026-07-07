@@ -34,12 +34,17 @@ export async function saveShipmentCache(checkerId, {
       serializeShipment(shipment),
     ]),
   );
-  await writeJson(shipmentsCacheKey(checkerId), {
-    savedAt: Date.now(),
-    shipmentsById: serialized,
-    manifests,
-    assignedMunicipalities,
-  });
+
+  try {
+    await writeJson(shipmentsCacheKey(checkerId), {
+      savedAt: Date.now(),
+      shipmentsById: serialized,
+      manifests,
+      assignedMunicipalities,
+    });
+  } catch (error) {
+    console.warn("saveShipmentCache failed, skipping offline cache", checkerId, error);
+  }
 }
 
 export async function loadShipmentCache(checkerId) {
