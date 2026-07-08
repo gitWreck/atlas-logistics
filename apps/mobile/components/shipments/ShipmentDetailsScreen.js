@@ -24,7 +24,6 @@ import { useTheme } from "../../contexts/ThemeContext";
 import { getCurrentLocationSafe, updatedBy } from "../utilities/helpers";
 import {
   updateShipmentStatus,
-  updateShipmentPackages,
   sendManualSMS,
 } from "../utilities/FirebaseFunctions";
 import {
@@ -46,7 +45,6 @@ import ReportIssueModal from "./modals/ReportIssueModal";
 import PhotoUploadSection from "./PhotoUploadSection";
 import ExistingProofsViewer from "../tracking/ExistingProofsViewer";
 
-import ShipmentPackagesPanel from "./details/ShipmentPackagesPanel";
 import CustodyTimeline from "../custody/CustodyTimeline";
 import { useShipmentCustodyTimeline } from "../../hooks/useShipmentCustodyTimeline";
 
@@ -442,49 +440,6 @@ export default function ShipmentDetailsScreen() {
     }
   };
 
-  const handlePackageAction = async ({
-    packageIds,
-    newStatus,
-    remarks = "",
-    manualQty = null,
-  }) => {
-    if (
-      FINAL_SHIPMENT_STATUSES.has(String(shipment?.status || "").toUpperCase())
-    ) {
-      Alert.alert(
-        "Shipment Completed",
-        "Package actions are disabled for completed shipments.",
-      );
-      return;
-    }
-
-    try {
-      setActionLoading(true);
-      const location = await getCurrentLocationSafe();
-
-      await updateShipmentPackages({
-        shipmentId,
-        packageIds,
-        newStatus,
-        tripId: resolvedTripId,
-        remarks,
-        location,
-        manualQty,
-        updatedBy: updatedBy(profile),
-      });
-
-      const snap = await getDoc(doc(db, "shipments", String(shipmentId)));
-      if (snap.exists()) {
-        setShipment({ id: snap.id, ...snap.data() });
-      }
-    } catch (error) {
-      console.error("Package action error:", error);
-      Alert.alert("Error", error.message || "Failed to update packages.");
-    } finally {
-      setActionLoading(false);
-    }
-  };
-
   if (loading) {
     return (
       <View style={[styles.center, { backgroundColor: colors.bg }]}>
@@ -502,7 +457,6 @@ export default function ShipmentDetailsScreen() {
     );
   }
 
-  const packages = shipment?.packages || [];
   const isShipmentFinal = FINAL_SHIPMENT_STATUSES.has(
     String(shipment?.status || "").toUpperCase(),
   );
@@ -526,11 +480,6 @@ export default function ShipmentDetailsScreen() {
     canCheckerCompleteDelivery ||
     canCheckerReturnToWarehouse;
   const needsPhotoUpload = canDriverHandlePickup;
-
-  const packagePanelEditable =
-    isCheckerLastMile &&
-    !isShipmentFinal &&
-    ["OUT_FOR_DELIVERY", "READY_FOR_DELIVERY"].includes(shipment?.status);
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.bg }]}>
@@ -651,13 +600,6 @@ export default function ShipmentDetailsScreen() {
           </View>
         )}
 
-        <ShipmentPackagesPanel
-          shipment={shipment}
-          packages={packages}
-          editable={packagePanelEditable}
-          onSubmitAction={handlePackageAction}
-          loading={actionLoading}
-        />
       </ScrollView>
 
       {showFooter && (
