@@ -11,7 +11,6 @@ const {
 const TRACKING_BASE_URL =
   process.env.ATLAS_PUBLIC_URL || "https://atlastransport.ph";
 
-const SUPPORT_PHONE = "(02) 5310-7777";
 const SUPPORT_EMAIL = "support@atlastransport.ph";
 const LOGO_URL = `${TRACKING_BASE_URL}/atlas-logo-white.png`;
 
@@ -256,7 +255,6 @@ function buildEmailTemplateProps({
     totalPackages: summary.totalPackages,
     packages,
     trackingUrl: `${TRACKING_BASE_URL}/track/${encodeURIComponent(trackingId)}`,
-    supportPhone: SUPPORT_PHONE,
     supportEmail: SUPPORT_EMAIL,
     logoUrl: LOGO_URL,
     isMultiShipment,

@@ -35,7 +35,6 @@ export function ShipmentStatusEmail({
   totalPackages = 0,
   packages = [],
   trackingUrl = "https://atlastransport.ph/track",
-  supportPhone = "(02) 5310-7777",
   supportEmail = "support@atlastransport.ph",
   logoUrl = "https://atlastransport.ph/atlas-logo-white.png",
   isMultiShipment = false,
@@ -93,19 +92,25 @@ export function ShipmentStatusEmail({
                   </Text>
                   <Text style={shipmentIdText}>{shipmentId}</Text>
                   {routeLabel ? (
-                    <Text style={metaText}>Route: {routeLabel}</Text>
+                    <Text style={metaText}>
+                      <span style={metaLabel}>Route:</span> {routeLabel}
+                    </Text>
                   ) : null}
                   {originLabel ? (
-                    <Text style={metaText}>Origin: {originLabel}</Text>
+                    <Text style={metaText}>
+                      <span style={metaLabel}>Origin:</span> {originLabel}
+                    </Text>
                   ) : null}
                   {destinationLabel ? (
                     <Text style={metaText}>
-                      Destination: {destinationLabel}
+                      <span style={metaLabel}>Destination:</span>{" "}
+                      {destinationLabel}
                     </Text>
                   ) : null}
                   {isMultiShipment && shipmentIds.length > 1 ? (
                     <Text style={metaText}>
-                      Shipments: {shipmentIds.join(", ")}
+                      <span style={metaLabel}>Shipments:</span>{" "}
+                      {shipmentIds.join(", ")}
                     </Text>
                   ) : null}
                 </Column>
@@ -357,21 +362,6 @@ export function ShipmentStatusEmail({
                       </Text>
                       <Text style={contactRow}>
                         <Link
-                          href={`tel:${supportPhone.replace(/[^\d+]/g, "")}`}
-                          style={contactLink}
-                        >
-                          <Img
-                            src={ICONS.phone}
-                            width="14"
-                            height="14"
-                            alt=""
-                            style={contactIcon}
-                          />{" "}
-                          {supportPhone}
-                        </Link>
-                      </Text>
-                      <Text style={contactRow}>
-                        <Link
                           href={`mailto:${supportEmail}`}
                           style={contactLink}
                         >
@@ -545,6 +535,11 @@ const metaText = {
   fontSize: "13px",
   lineHeight: "1.6",
   margin: "0 0 4px",
+};
+
+const metaLabel = {
+  color: colors.slate700,
+  fontWeight: "700",
 };
 
 const lastUpdatedBox = {

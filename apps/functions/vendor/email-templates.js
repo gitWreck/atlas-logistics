@@ -35930,7 +35930,6 @@ function ShipmentStatusEmail({
   totalPackages = 0,
   packages = [],
   trackingUrl = "https://atlastransport.ph/track",
-  supportPhone = "(02) 5310-7777",
   supportEmail = "support@atlastransport.ph",
   logoUrl = "https://atlastransport.ph/atlas-logo-white.png",
   isMultiShipment = false,
@@ -36203,27 +36202,6 @@ function ShipmentStatusEmail({
               /* @__PURE__ */ (0, import_jsx_runtime15.jsxs)(Column, { style: { verticalAlign: "top", paddingLeft: "4px" }, children: [
                 /* @__PURE__ */ (0, import_jsx_runtime15.jsx)(Text3, { style: blockTitle, children: "Need Help?" }),
                 /* @__PURE__ */ (0, import_jsx_runtime15.jsx)(Text3, { style: blockBodyMuted, children: "Contact our customer service team." }),
-                /* @__PURE__ */ (0, import_jsx_runtime15.jsx)(Text3, { style: contactRow, children: /* @__PURE__ */ (0, import_jsx_runtime15.jsxs)(
-                  Link,
-                  {
-                    href: `tel:${supportPhone.replace(/[^\d+]/g, "")}`,
-                    style: contactLink,
-                    children: [
-                      /* @__PURE__ */ (0, import_jsx_runtime15.jsx)(
-                        Img,
-                        {
-                          src: import_icons.ICONS.phone,
-                          width: "14",
-                          height: "14",
-                          alt: "",
-                          style: contactIcon
-                        }
-                      ),
-                      " ",
-                      supportPhone
-                    ]
-                  }
-                ) }),
                 /* @__PURE__ */ (0, import_jsx_runtime15.jsx)(Text3, { style: contactRow, children: /* @__PURE__ */ (0, import_jsx_runtime15.jsxs)(
                   Link,
                   {
@@ -36659,7 +36637,7 @@ function buildPlainText(props = {}) {
     "",
     `Track online: ${props.trackingUrl || "https://atlastransport.ph/track"}`,
     "",
-    `Need help? ${props.supportPhone || ""} \xB7 ${props.supportEmail || "support@atlastransport.ph"}`,
+    `Need help? ${props.supportEmail || "support@atlastransport.ph"}`,
     "",
     "Thank you for choosing Atlas Transportation."
   );

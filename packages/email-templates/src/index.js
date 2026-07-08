@@ -56,7 +56,7 @@ function buildPlainText(props = {}) {
     "",
     `Track online: ${props.trackingUrl || "https://atlastransport.ph/track"}`,
     "",
-    `Need help? ${props.supportPhone || ""} · ${props.supportEmail || "support@atlastransport.ph"}`,
+    `Need help? ${props.supportEmail || "support@atlastransport.ph"}`,
     "",
     "Thank you for choosing Atlas Transportation.",
   );
