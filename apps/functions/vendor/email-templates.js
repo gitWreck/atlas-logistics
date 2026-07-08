@@ -35981,19 +35981,23 @@ function ShipmentStatusEmail({
           ),
           /* @__PURE__ */ (0, import_jsx_runtime15.jsx)(Text3, { style: shipmentIdText, children: shipmentId }),
           routeLabel ? /* @__PURE__ */ (0, import_jsx_runtime15.jsxs)(Text3, { style: metaText, children: [
-            "Route: ",
+            /* @__PURE__ */ (0, import_jsx_runtime15.jsx)("span", { style: metaLabel, children: "Route:" }),
+            " ",
             routeLabel
           ] }) : null,
           originLabel ? /* @__PURE__ */ (0, import_jsx_runtime15.jsxs)(Text3, { style: metaText, children: [
-            "Origin: ",
+            /* @__PURE__ */ (0, import_jsx_runtime15.jsx)("span", { style: metaLabel, children: "Origin:" }),
+            " ",
             originLabel
           ] }) : null,
           destinationLabel ? /* @__PURE__ */ (0, import_jsx_runtime15.jsxs)(Text3, { style: metaText, children: [
-            "Destination: ",
+            /* @__PURE__ */ (0, import_jsx_runtime15.jsx)("span", { style: metaLabel, children: "Destination:" }),
+            " ",
             destinationLabel
           ] }) : null,
           isMultiShipment && shipmentIds.length > 1 ? /* @__PURE__ */ (0, import_jsx_runtime15.jsxs)(Text3, { style: metaText, children: [
-            "Shipments: ",
+            /* @__PURE__ */ (0, import_jsx_runtime15.jsx)("span", { style: metaLabel, children: "Shipments:" }),
+            " ",
             shipmentIds.join(", ")
           ] }) : null
         ] }),
@@ -36345,6 +36349,10 @@ var metaText = {
   fontSize: "13px",
   lineHeight: "1.6",
   margin: "0 0 4px"
+};
+var metaLabel = {
+  color: import_theme.colors.slate700,
+  fontWeight: "700"
 };
 var lastUpdatedBox = {
   backgroundColor: import_theme.colors.white,

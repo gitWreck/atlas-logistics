@@ -136,7 +136,7 @@ export default function TrackingSection() {
                   type="text"
                   value={trackingNumber}
                   onChange={(event) => setTrackingNumber(event.target.value)}
-                  placeholder="Enter Tracking Number"
+                  placeholder="Shipment / Package Tracking No."
                   className="h-14 w-full rounded-2xl border border-slate-300 bg-white pl-4 pr-14 text-center font-mono text-base font-black uppercase text-slate-950 outline-none transition placeholder:font-sans placeholder:font-semibold placeholder:normal-case placeholder:text-slate-400 focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
                   autoComplete="off"
                 />

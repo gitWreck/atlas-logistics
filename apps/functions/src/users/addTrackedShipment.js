@@ -5,6 +5,7 @@ const admin = require("firebase-admin");
 const { FieldValue } = require("firebase-admin/firestore");
 const { requireRole } = require("../utilities/helpers");
 const { normalizePhone } = require("../utilities/phoneHelpers");
+const { resolveShipmentReference } = require("../shipments/resolveShipmentReference");
 
 if (!admin.apps.length) admin.initializeApp();
 const db = admin.firestore();
@@ -49,14 +50,23 @@ exports.addTrackedShipment = onCall(
       .doc(normalizedTracking)
       .get();
 
-    if (!shipmentSnap.exists) {
+    let shipmentDocId = normalizedTracking;
+    let shipment = null;
+
+    if (shipmentSnap.exists) {
+      shipment = shipmentSnap.data() || {};
+    } else {
+      const resolved = await resolveShipmentReference(db, normalizedTracking);
+      shipmentDocId = resolved.shipmentDocId;
+      shipment = resolved.shipment;
+    }
+
+    if (!shipment) {
       throw new HttpsError(
         "permission-denied",
         "Shipment not found. Please check your tracking number.",
       );
     }
-
-    const shipment = shipmentSnap.data() || {};
     const user = userSnap.data() || {};
     const recipient = shipment.recipient || {};
     const sender = shipment.sender || {};
@@ -91,7 +101,7 @@ exports.addTrackedShipment = onCall(
 
     const publicSnap = await db
       .collection("tracking_public")
-      .doc(normalizedTracking)
+      .doc(shipmentDocId)
       .get();
 
     if (!publicSnap.exists) {
@@ -105,7 +115,7 @@ exports.addTrackedShipment = onCall(
       .collection("users")
       .doc(uid)
       .collection("tracked_shipments")
-      .doc(normalizedTracking);
+      .doc(shipmentDocId);
 
     const existingTracked = await trackedRef.get();
     if (existingTracked.exists) {
@@ -117,7 +127,8 @@ exports.addTrackedShipment = onCall(
 
     await trackedRef.set(
       {
-        trackingNumber: normalizedTracking,
+        trackingNumber: shipmentDocId,
+        searchedCode: normalizedTracking,
         label: label || null,
         createdAt: FieldValue.serverTimestamp(),
         lastViewedAt: null,
@@ -138,11 +149,12 @@ exports.addTrackedShipment = onCall(
       shipmentUpdates["recipient.uid"] = uid;
     }
 
-    await db.collection("shipments").doc(normalizedTracking).update(shipmentUpdates);
+    await db.collection("shipments").doc(shipmentDocId).update(shipmentUpdates);
 
     return {
       success: true,
-      trackingNumber: normalizedTracking,
+      trackingNumber: shipmentDocId,
+      searchedCode: normalizedTracking,
     };
   },
 );

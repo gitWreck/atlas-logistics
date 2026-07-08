@@ -13,6 +13,7 @@ import {
 
 // Make sure you have this component created from the previous step!
 import StatusBadge from "../ui/StatusBadge";
+import PackageSummary from "./PackageSummary";
 import { getVisualProgress } from "@/app/utility/utilities";
 import {
   buildPublicTrackingMilestones,
@@ -73,7 +74,7 @@ function hasPublicCheckerAssignment(data = {}) {
 }
 
 // --- MAIN COMPONENT ---
-export default function TrackingResult({ data }) {
+export default function TrackingResult({ data, highlightedPackageId = null }) {
   const {
     status,
     delayReason,
@@ -218,6 +219,14 @@ export default function TrackingResult({ data }) {
             )}
           </div>
         </div>
+      )}
+
+      {Array.isArray(data.packages) && data.packages.length > 0 && (
+        <PackageSummary
+          shipmentId={data.trackingNumber || data.id}
+          packages={data.packages}
+          highlightedPackageId={highlightedPackageId}
+        />
       )}
 
       {/* --- D. TIMELINE SECTION (vertical — fits narrow card, shows all 5 steps) --- */}

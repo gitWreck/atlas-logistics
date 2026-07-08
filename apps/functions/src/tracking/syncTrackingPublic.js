@@ -105,10 +105,20 @@ async function syncOneShipmentToPublic(shipmentId, shipmentData) {
     "DELIVERED",
   ].includes(statusCode);
 
+  const rawPackages = Array.isArray(shipmentData.packages)
+    ? shipmentData.packages
+    : [];
+
   const publicDoc = {
     trackingNumber: shipmentId,
     status: formatStatus(shipmentData.status),
     statusCode,
+    packages: rawPackages.map((pkg) => ({
+      packageId: pkg.packageId || pkg.trackingNumber || null,
+      sequence: pkg.sequence ?? null,
+      status: formatStatus(pkg.status),
+      statusCode: String(pkg.status || "RECEIVED").toUpperCase(),
+    })),
     origin: shipmentData.originCity || shipmentData.origin || "Origin Hub",
     originCode: shipmentData.originCode || null,
     destination:

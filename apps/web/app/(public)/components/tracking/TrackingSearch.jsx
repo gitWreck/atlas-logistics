@@ -23,7 +23,7 @@ export default function TrackingSearch({ onSearch, loading, initialValue }) {
       <form onSubmit={handleSubmit} className="relative group">
         <input
           type="text"
-          placeholder="Enter Tracking Number"
+          placeholder="Enter Shipment or Package Tracking Number"
           className="w-full bg-white border border-slate-300 rounded-xl py-4 pl-4 pr-12 text-center font-mono text-lg text-slate-950 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all placeholder:text-slate-400 uppercase"
           value={inputVal}
           onChange={(e) => setInputVal(e.target.value)}
