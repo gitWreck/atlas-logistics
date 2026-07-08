@@ -339,7 +339,7 @@ export function DeliveryProgressCard({ delivered, total, goal, style }) {
   const { colors } = useTheme();
   const { width } = useWindowDimensions();
   const cardWidth = Math.floor((width - SCREEN_PADDING * 2 - GRID_GAP) / 2);
-  const ringSize = clamp(cardWidth * 0.32, 50, 62);
+  const ringSize = clamp(cardWidth * 0.30, 48, 56);
   const ringStroke = clamp(ringSize * 0.1, 5, 7);
   const percentage =
     total > 0 ? clamp(Math.round((delivered / total) * 100), 0, 100) : 0;
@@ -507,7 +507,8 @@ export function DeliveryProgressCard({ delivered, total, goal, style }) {
 export function TodayAtGlance({ cards, progress, onViewAll }) {
   const { width } = useWindowDimensions();
   const cardWidth = Math.floor((width - SCREEN_PADDING * 2 - GRID_GAP) / 2);
-  const cardHeight = clamp(cardWidth * 0.66, 124, 146);
+  // slightly more compact cards: reduce multiplier and min/max
+  const cardHeight = clamp(cardWidth * 0.58, 100, 122);
 
   return (
     <View style={styles.dashboardPanel}>
@@ -961,9 +962,9 @@ const styles = StyleSheet.create({
     flexShrink: 0,
   },
   statCard: {
-    minHeight: 124,
+    minHeight: 104,
     borderRadius: 18,
-    padding: 11,
+    padding: 8,
     backgroundColor: "#ffffff",
     borderWidth: 1,
     borderColor: COLORS.border,
@@ -1010,7 +1011,7 @@ const styles = StyleSheet.create({
     paddingRight: 36,
   },
   statValue: {
-    fontSize: 28,
+    fontSize: 24,
     fontWeight: "700",
     letterSpacing: 0,
   },
@@ -1030,11 +1031,11 @@ const styles = StyleSheet.create({
   },
   chevronCircle: {
     position: "absolute",
-    right: 11,
-    bottom: 11,
-    width: 30,
-    height: 30,
-    borderRadius: 15,
+    right: 8,
+    bottom: 8,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: "#ffffff",
@@ -1042,9 +1043,9 @@ const styles = StyleSheet.create({
     ...cardShadow,
   },
   progressCard: {
-    minHeight: 124,
+    minHeight: 104,
     borderRadius: 18,
-    padding: 11,
+    padding: 8,
     backgroundColor: "#ffffff",
     borderWidth: 1,
     borderColor: COLORS.border,
@@ -1068,8 +1069,9 @@ const styles = StyleSheet.create({
   },
   progressSub: {
     color: COLORS.muted,
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: "400",
+    lineHeight: 16,
     marginTop: 2,
   },
   progressBody: {
@@ -1080,7 +1082,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     position: "relative",
     paddingTop: 0,
-    gap: 16,
+    gap: 18,
   },
   ringWrap: {
     width: 90,
@@ -1089,6 +1091,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     position: "relative",
+    marginTop: -10,
   },
   ringTrack: {
     position: "absolute",
@@ -1126,9 +1129,9 @@ const styles = StyleSheet.create({
   },
   ringPercent: {
     color: COLORS.text,
-    fontSize: 17,
+    fontSize: 15,
     fontWeight: "700",
-    lineHeight: 21,
+    lineHeight: 18,
   },
   ringLabel: {
     color: COLORS.muted,
@@ -1163,16 +1166,16 @@ const styles = StyleSheet.create({
   },
   emptyProgressTitle: {
     color: COLORS.text,
-    fontSize: 12,
-    lineHeight: 15,
+    fontSize: 11,
+    lineHeight: 14,
     fontWeight: "700",
   },
   emptyProgressText: {
     color: COLORS.muted,
-    fontSize: 10,
+    fontSize: 8,
     fontWeight: "400",
-    lineHeight: 13,
-    marginTop: 3,
+    lineHeight: 11,
+    marginTop: 2,
     flexShrink: 1,
   },
   quickSection: {
