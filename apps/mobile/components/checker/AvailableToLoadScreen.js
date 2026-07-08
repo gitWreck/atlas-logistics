@@ -174,14 +174,12 @@ export default function AvailableToLoadScreen() {
                 : "When Rose releases shipments for your municipalities, they will appear here."}
             </Text>
             {!search ? (
-              <TouchableOpacity
+                <TouchableOpacity
                 style={[styles.linkBtn, { borderColor: colors.border }]}
                 onPress={() => router.push("/(checker)/(tabs)/deliveries")}
                 activeOpacity={0.85}
               >
-                <Text style={[styles.linkBtnText, { color: accent }]}>
-                  Open My Route
-                </Text>
+                <Text style={[styles.linkBtnText, { color: accent }]}>Open My Deliveries</Text>
               </TouchableOpacity>
             ) : null}
           </View>

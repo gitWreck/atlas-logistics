@@ -77,7 +77,7 @@ export default function CheckerDeliveriesTab() {
           shipmentIds: [shipmentId],
           profile,
           reasonCode: "DELIVERY_FAILED",
-          remarks: "Failed delivery reported from My Route.",
+          remarks: "Failed delivery reported from My Deliveries.",
         });
         Alert.alert(
           "Failed Delivery",
@@ -90,11 +90,11 @@ export default function CheckerDeliveriesTab() {
         });
         Alert.alert(
           "Returned",
-          "Shipment returned to warehouse and removed from your route.",
+          "Shipment returned to warehouse and removed from your deliveries.",
         );
       }
     } catch (error) {
-      console.error("My Route action failed:", error);
+      console.error("My Deliveries action failed:", error);
       Alert.alert(
         "Action Failed",
         getCallableErrorMessage(error, "Could not update shipment."),
@@ -133,8 +133,8 @@ export default function CheckerDeliveriesTab() {
     <View style={[styles.container, { backgroundColor: colors.bg }]}>
       <SectionHeader
         sectionKey="route"
-        title="MY ROUTE"
-        subtitle="Deliver each loaded piece and keep your route up to date."
+        title="MY DELIVERIES"
+        subtitle="Deliver each loaded piece and keep your deliveries up to date."
         rightIcon="warehouse"
         onRightPress={() =>
           router.push("/(checker)/(tabs)/available-to-load")
@@ -168,7 +168,7 @@ export default function CheckerDeliveriesTab() {
         {loading ? (
           <View style={styles.emptyState}>
             <Text style={[styles.emptyTitle, { color: colors.text }]}>
-              Loading your route...
+              Loading your deliveries...
             </Text>
           </View>
         ) : myRouteShipments.length === 0 ? (
@@ -177,7 +177,7 @@ export default function CheckerDeliveriesTab() {
               <FontAwesome5 name="route" size={22} color={accent} />
             </View>
             <Text style={[styles.emptyTitle, { color: colors.text }]}>
-              No active route yet
+              No active deliveries yet
             </Text>
             <Text style={[styles.emptySub, { color: colors.textMuted }]}>
               Load pieces from the Available tab first. Each scan marks them out

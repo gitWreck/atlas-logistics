@@ -255,7 +255,7 @@ export default function CheckerIndex() {
     },
     {
       key: "on-van",
-      title: "On My Van",
+      title: "My Deliveries",
       subtitle: "Out for Delivery",
       value: glance.onVan,
       icon: "truck",

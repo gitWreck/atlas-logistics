@@ -127,7 +127,7 @@ export function isCheckerCustodyPiece(pkg = {}, checkerUid) {
   );
 }
 
-/** Piece statuses that count as on this checker's van (My Route / My Load). */
+/** Piece statuses that count as on this checker's van (My Deliveries / My Load). */
 const ON_VAN_PIECE_STATUSES = new Set([
   "LOADED_TO_DELIVERY_VEHICLE",
   "LOADED",

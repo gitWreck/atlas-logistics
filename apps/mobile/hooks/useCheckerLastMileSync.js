@@ -134,7 +134,7 @@ export function deriveManifestDisplayStatus(manifest, stats, shipments = []) {
 }
 
 /**
- * Single real-time feed for checker last-mile tabs (Available, My Route, My Load).
+ * Single real-time feed for checker last-mile tabs (Available, My Deliveries, My Load).
  */
 export function useCheckerLastMileSync(checkerId) {
   const {

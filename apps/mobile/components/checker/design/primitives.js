@@ -311,7 +311,7 @@ export function OutlineButton({ label, icon, onPress, color = "#2563eb", disable
 }
 
 /* ----------------------------------------------------------------- *
- * Compact stat pill row (My Route header stats)
+ * Compact stat pill row (My Deliveries header stats)
  * ----------------------------------------------------------------- */
 export function StatPillRow({ items }) {
   const { colors } = useTheme();

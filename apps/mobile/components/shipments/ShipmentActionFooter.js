@@ -109,8 +109,8 @@ export default function ShipmentActionFooter({
     buttonTitle = "Return to Warehouse";
     isFinalAction = false;
   } else if (checkerActionPhase === "deliver") {
-    buttonTitle = "Scan to Deliver";
-    isFinalAction = false;
+    // Scan-to-deliver removed: disable action when checker is in deliver phase
+    isDisabled = true;
   } else if (checkerActionPhase === "return") {
     buttonTitle = "Return to Warehouse";
     isFinalAction = false;
@@ -158,7 +158,7 @@ export default function ShipmentActionFooter({
         <View style={[styles.handleBar, { backgroundColor: colors.border }]} />
         <TouchableOpacity onPress={() => toggleDrawer(!isExpanded)}>
           <Text style={[styles.handleText, { color: colors.textMuted }]}>
-            {isExpanded ? "SWIPE DOWN TO HIDE" : "SWIPE UP FOR MESSAGING"}
+            {""}
           </Text>
         </TouchableOpacity>
       </View>

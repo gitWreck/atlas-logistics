@@ -108,25 +108,7 @@ export default function PackageListItem({
               {item.packageId || "No Package ID"}
             </Text>
 
-            {showMenu && (
-              <TouchableOpacity
-                style={[
-                  styles.menuBtn,
-                  {
-                    backgroundColor: colors.cardMuted,
-                    borderColor: colors.border,
-                  },
-                  selected && styles.menuBtnSelected,
-                ]}
-                onPress={() => onMenuPress?.(item)}
-              >
-                <FontAwesome5
-                  name="ellipsis-v"
-                  size={14}
-                  color={selected ? "#2563eb" : colors.textMuted}
-                />
-              </TouchableOpacity>
-            )}
+            {/* menu removed per design */}
           </View>
 
           {!selected && (
@@ -419,10 +401,5 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#e2e8f0",
     flexShrink: 0,
-  },
-
-  menuBtnSelected: {
-    backgroundColor: "#dbeafe",
-    borderColor: "#bfdbfe",
   },
 });

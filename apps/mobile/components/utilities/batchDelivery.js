@@ -64,7 +64,7 @@ function assertDeliverablePiece(pkg, shipmentData, { mode, checkerUid }) {
 
   if (mode === "delivery") {
     if (!checkerUid || !isCheckerCustodyPiece(pkg, checkerUid)) {
-      throw new Error("This piece is not on your route.");
+      throw new Error("This piece is not on your deliveries.");
     }
     if (
       !canApplyOffloadCompletion(pieceStatus) &&
@@ -100,7 +100,7 @@ function assertFailablePiece(pkg, { checkerUid }) {
     );
   }
   if (!checkerUid || !isCheckerCustodyPiece(pkg, checkerUid)) {
-    throw new Error("This piece is not on your route.");
+    throw new Error("This piece is not on your deliveries.");
   }
   const pieceStatus = normalizeStatus(pkg.status);
   if (!FAILABLE_PIECE_STATUSES.has(pieceStatus)) {

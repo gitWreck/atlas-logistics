@@ -26,7 +26,7 @@ export const SECTION = {
     accentDark: "#15803d",
     soft: "#f0fdf4",
     softDark: "#14532d",
-    label: "My Route",
+    label: "My Deliveries",
   },
   delivered: {
     key: "delivered",

@@ -216,7 +216,7 @@ export default function ShipmentDetailsScreen() {
         });
         Alert.alert(
           "Returned",
-          "Shipment returned to Odiongan warehouse. It is no longer on your route.",
+          "Shipment returned to Odiongan warehouse. It is no longer on your deliveries.",
         );
         router.back();
         setActionLoading(false);

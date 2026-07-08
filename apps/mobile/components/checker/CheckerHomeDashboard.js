@@ -495,7 +495,7 @@ export function DeliveryProgressCard({ delivered, total, goal, style }) {
               No deliveries yet
             </Text>
             <Text style={[styles.emptyProgressText, { color: colors.textMuted }]}>
-              Load shipments to your route to start today's progress.
+              Load shipments to your deliveries to start today's progress.
             </Text>
           </View>
         </View>
@@ -602,8 +602,8 @@ export function QuickActions({ onLoad, onRoute, onOffload, onInfo }) {
         </View>
         <View style={[styles.quickRailItem, { width: actionWidth }]}>
           <QuickActionCard
-            title="My Route"
-            subtitle="View your delivery route"
+            title="My Deliveries"
+            subtitle="View your deliveries"
             icon="map-marker-alt"
             color={SECTION.route.accent}
             softColor="#f3fff7"
