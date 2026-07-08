@@ -1,8 +1,12 @@
 import { NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebase-admin";
+import { getCheckerAccessContext, isShipmentInCheckerMunicipalities } from "../_lib/checkerAccessHelpers.mjs";
 
 export async function GET(request) {
   try {
+    const access = await getCheckerAccessContext(request);
+    if (access.error) return access.error;
+
     const { searchParams } = new URL(request.url);
     const tripId = searchParams.get("tripId");
 
@@ -13,17 +17,31 @@ export async function GET(request) {
       );
     }
 
-    // Adjust this path if you are using root 'shipments' collection query instead
     const snapshot = await adminDb
       .collection("truck_trips")
       .doc(tripId)
       .collection("trip_shipments")
       .get();
 
-    const shipments = snapshot.docs.map((doc) => ({
-      id: doc.id,
-      ...doc.data(),
-    }));
+    const shipmentIds = snapshot.docs
+      .map((doc) => doc.data()?.shipmentId || doc.id)
+      .filter(Boolean);
+
+    const shipments = [];
+
+    if (shipmentIds.length) {
+      const shipmentDocs = await Promise.all(
+        shipmentIds.map((shipmentId) => adminDb.collection("shipments").doc(shipmentId).get()),
+      );
+
+      shipmentDocs.forEach((shipmentDoc) => {
+        if (!shipmentDoc.exists) return;
+        const shipmentData = shipmentDoc.data();
+        if (isShipmentInCheckerMunicipalities(shipmentData, access.assignedMunicipalities)) {
+          shipments.push({ id: shipmentDoc.id, ...shipmentData });
+        }
+      });
+    }
 
     return NextResponse.json({ success: true, data: shipments });
   } catch (error) {

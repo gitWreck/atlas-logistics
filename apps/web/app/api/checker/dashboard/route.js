@@ -1,46 +1,53 @@
 import { NextResponse } from "next/server";
-import { db } from "@/lib/firebase"; // Ensure you have firebase-admin setup
-import { admin } from "@/lib/firebase-admin";
+import { admin, adminDb } from "@/lib/firebase-admin";
+import {
+  getCheckerAccessContext,
+  getCheckerMunicipalityFilter,
+} from "../_lib/checkerAccessHelpers.mjs";
 
 export async function GET(request) {
   try {
-    // 1. Calculate Date Range (Start of Today)
+    const access = await getCheckerAccessContext(request);
+    if (access.error) return access.error;
+
+    const { assignedMunicipalities } = access;
+    const municipalityFilter = getCheckerMunicipalityFilter(assignedMunicipalities);
+
+    if (!municipalityFilter) {
+      return NextResponse.json({ success: false, message: "No municipality assigned" }, { status: 403 });
+    }
+
     const now = new Date();
     const startOfDay = new Date(now.setHours(0, 0, 0, 0));
     const startOfDayTimestamp = admin.firestore.Timestamp.fromDate(startOfDay);
+    const shipmentsRef = adminDb.collection("shipments");
 
-    // 2. Define References
-    const shipmentsRef = db.collection("shipments"); // Assuming root collection for warehouse
-
-    // 3. Prepare Queries (Parallel Execution for Speed)
-
-    // A. Received Today (Created >= Today)
     const receivedQuery = shipmentsRef
       .where("createdAt", ">=", startOfDayTimestamp)
+      .where(municipalityFilter.field, municipalityFilter.operator, municipalityFilter.value)
       .count()
       .get();
 
-    // B. Out for delivery today (checker load scan sets this per piece)
     const outForDeliveryQuery = shipmentsRef
       .where("status", "==", "OUT_FOR_DELIVERY")
       .where("updatedAt", ">=", startOfDayTimestamp)
+      .where(municipalityFilter.field, municipalityFilter.operator, municipalityFilter.value)
       .count()
       .get();
 
-    // C. Pending / Floor (Status = RECEIVED) - Total backlog, not just today
     const pendingQuery = shipmentsRef
       .where("status", "==", "RECEIVED")
+      .where(municipalityFilter.field, municipalityFilter.operator, municipalityFilter.value)
       .count()
       .get();
 
-    // D. Recent outbound table (checker load → out for delivery)
     const historyQuery = shipmentsRef
       .where("status", "==", "OUT_FOR_DELIVERY")
+      .where(municipalityFilter.field, municipalityFilter.operator, municipalityFilter.value)
       .orderBy("updatedAt", "desc")
       .limit(10)
       .get();
 
-    // 4. Await All
     const [receivedSnap, outForDeliverySnap, pendingSnap, historySnap] =
       await Promise.all([
         receivedQuery,
@@ -49,7 +56,6 @@ export async function GET(request) {
         historyQuery,
       ]);
 
-    // 5. Format Table Data
     const recentShipments = historySnap.docs.map((doc) => {
       const d = doc.data();
       return {

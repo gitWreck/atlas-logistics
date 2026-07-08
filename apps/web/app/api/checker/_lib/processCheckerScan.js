@@ -1,4 +1,5 @@
 import { adminDb } from "@/lib/firebase-admin";
+import { canonicalMunicipalityLabel, resolveShipmentMunicipality } from "@/app/utility/deliveryMunicipalities";
 
 function findPackageInShipment(shipmentData, barcode) {
   const code = String(barcode || "").trim();
@@ -86,6 +87,7 @@ export async function processCheckerScan({
   truckTripId,
   idToken,
   newStatus = "LOADED",
+  checkerMunicipalities = [],
 }) {
   const resolved = await resolveShipmentScan(barcode);
   if (!resolved) {
@@ -95,6 +97,22 @@ export async function processCheckerScan({
   }
 
   const { shipmentId, shipmentData, packageId, pkg, scanType } = resolved;
+  const shipmentMunicipality = resolveShipmentMunicipality(shipmentData);
+  const hasMunicipalityAccess =
+    Array.isArray(checkerMunicipalities) &&
+    checkerMunicipalities.length > 0 &&
+    checkerMunicipalities
+      .map((entry) => canonicalMunicipalityLabel(entry))
+      .filter(Boolean)
+      .some((entry) => entry === shipmentMunicipality);
+
+  if (!shipmentMunicipality || !hasMunicipalityAccess) {
+    const error = new Error(
+      "This shipment is outside your assigned municipality.",
+    );
+    error.status = 403;
+    throw error;
+  }
 
   if (!truckTripId) {
     const error = new Error("Trip is required before loading packages.");
