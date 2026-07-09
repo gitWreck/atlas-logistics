@@ -77,9 +77,11 @@ export function CheckerHomeHero({
   currentDate = new Date(),
   onDatePress,
   dateLoading,
+  assignedAreas = [],
 }) {
   const { width } = useWindowDimensions();
   const heroHeight = clamp(width * 0.44, 186, 218);
+  const hasAssignedAreas = Array.isArray(assignedAreas) && assignedAreas.length > 0;
   const avatarSize = clamp(width * 0.12, 44, 56);
   const dateWidth = clamp(width * 0.46, 176, 214);
   const artScale = clamp(width / 430, 0.68, 0.86);
@@ -155,6 +157,14 @@ export function CheckerHomeHero({
             resizeMode="contain"
           />
         </View>
+      </View>
+      <View style={styles.assignedAreaRow}>
+        <FontAwesome5 name="map-marker-alt" size={13} color="#ffffff" />
+        <Text style={styles.assignedAreaText} numberOfLines={2}>
+          {hasAssignedAreas
+            ? `Area assigned: ${assignedAreas.join(", ")}`
+            : "Area assigned: No assigned areas"}
+        </Text>
       </View>
     </LinearGradient>
   );
@@ -915,6 +925,26 @@ const styles = StyleSheet.create({
   },
   dateOptionSubSelected: {
     color: "#eaf1ff",
+  },
+  assignedAreaText: {
+    color: "rgba(255, 255, 255, 0.92)",
+    fontSize: 13,
+    fontWeight: "400",
+    marginLeft: 8,
+    lineHeight: 18,
+    flex: 1,
+  },
+  assignedAreaRow: {
+    marginTop: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  assignedAreaEmpty: {
+    color: "rgba(255, 255, 255, 0.78)",
+    fontSize: 13,
+    fontWeight: "400",
+    marginTop: 12,
   },
   dashboardPanel: {
     marginTop: -10,

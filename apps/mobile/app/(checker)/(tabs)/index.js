@@ -67,6 +67,7 @@ export default function CheckerIndex() {
     availableShipments = [],
     myRouteShipments = [],
     shipmentsById = {},
+    assignedMunicipalities = [],
   } = useCheckerLastMile();
 
   const [refreshing, setRefreshing] = useState(false);
@@ -317,6 +318,7 @@ export default function CheckerIndex() {
           currentDate={selectedDate}
           onDatePress={() => setDatePickerVisible(true)}
           dateLoading={statsLoading}
+          assignedAreas={assignedMunicipalities}
         />
 
         <TodayAtGlance
