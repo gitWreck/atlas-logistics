@@ -15,7 +15,7 @@ import {
   Text,
 } from "@react-email/components";
 import { colors, getStatusBadgeStyle } from "./theme";
-import { ICONS } from "./icons.js";
+import { getIconUrls } from "./icons.js";
 
 const PACKAGES_PER_PAGE = 5;
 
@@ -37,9 +37,11 @@ export function ShipmentStatusEmail({
   trackingUrl = "https://atlastransport.ph/track",
   supportEmail = "support@atlastransport.ph",
   logoUrl = "https://atlastransport.ph/atlas-logo-white.png",
+  iconBaseUrl = "https://atlastransport.ph/email",
   isMultiShipment = false,
   shipmentIds = [],
 }) {
+  const icons = getIconUrls(iconBaseUrl);
   const badgeStyle = getStatusBadgeStyle(statusCode);
   const totalPackageRows = packages.length;
   const visiblePackages = packages.slice(0, PACKAGES_PER_PAGE);
@@ -260,7 +262,7 @@ export function ShipmentStatusEmail({
                 <Column style={{ width: "52px", verticalAlign: "top" }}>
                   <Section style={iconCircle}>
                     <Img
-                      src={ICONS.mobile}
+                      src={icons.mobile}
                       width="20"
                       height="20"
                       alt=""
@@ -316,7 +318,7 @@ export function ShipmentStatusEmail({
                     <Column style={{ width: "52px", verticalAlign: "top" }}>
                       <Section style={iconCircle}>
                         <Img
-                          src={ICONS.envelopeSm}
+                          src={icons.envelopeSm}
                           width="20"
                           height="20"
                           alt=""
@@ -347,7 +349,7 @@ export function ShipmentStatusEmail({
                     <Column style={{ width: "52px", verticalAlign: "top" }}>
                       <Section style={iconCircle}>
                         <Img
-                          src={ICONS.headset}
+                          src={icons.headset}
                           width="20"
                           height="20"
                           alt=""
@@ -366,7 +368,7 @@ export function ShipmentStatusEmail({
                           style={contactLink}
                         >
                           <Img
-                            src={ICONS.envelope}
+                            src={icons.envelope}
                             width="14"
                             height="14"
                             alt=""
@@ -389,7 +391,7 @@ export function ShipmentStatusEmail({
                 <Column style={{ width: "52px", verticalAlign: "top" }}>
                   <Section style={iconCircle}>
                     <Img
-                      src={ICONS.shield}
+                      src={icons.shield}
                       width="20"
                       height="20"
                       alt=""

@@ -10,6 +10,9 @@ const {
 
 const TRACKING_BASE_URL =
   process.env.ATLAS_PUBLIC_URL || "https://atlastransport.ph";
+const EMAIL_ICON_BASE_URL =
+  process.env.ATLAS_EMAIL_ICON_BASE_URL ||
+  "https://atlas-tracking.web.app/email";
 
 const SUPPORT_EMAIL = "support@atlastransport.ph";
 const LOGO_URL = `${TRACKING_BASE_URL}/atlas-logo-white.png`;
@@ -257,6 +260,7 @@ function buildEmailTemplateProps({
     trackingUrl: `${TRACKING_BASE_URL}/track/${encodeURIComponent(trackingId)}`,
     supportEmail: SUPPORT_EMAIL,
     logoUrl: LOGO_URL,
+    iconBaseUrl: EMAIL_ICON_BASE_URL,
     isMultiShipment,
     shipmentIds: shipmentIds.map((id) =>
       getShipmentTrackingId(
