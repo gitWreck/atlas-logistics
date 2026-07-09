@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faExclamationTriangle,
@@ -19,6 +19,7 @@ import {
   getMilestoneStepState,
 } from "@/app/utility/publicTrackingMilestones";
 import { resolvePublicTrackingMiddleStat, resolvePublicTrackingDisplayStatus, resolvePublicTrackingStatusCode } from "@/app/utility/publicTrackingStats";
+import PublicShipmentPieces from "./PublicShipmentPieces";
 
 function formatDate(timestamp) {
   if (!timestamp) return "Just now";
@@ -83,6 +84,52 @@ export default function TrackingResult({ data }) {
     proofOfDelivery, // Can be string or array
     updatedAt,
   } = data;
+
+  const [packages, setPackages] = useState(
+    Array.isArray(data.packages) ? data.packages : [],
+  );
+  const [packagesLoading, setPackagesLoading] = useState(
+    !Array.isArray(data.packages),
+  );
+
+  useEffect(() => {
+    if (Array.isArray(data.packages)) {
+      setPackages(data.packages);
+      setPackagesLoading(false);
+      return;
+    }
+
+    if (!data?.id) {
+      setPackages([]);
+      setPackagesLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    setPackagesLoading(true);
+
+    fetch(`/api/tracking/${encodeURIComponent(data.id)}/packages`)
+      .then((response) => response.json())
+      .then((json) => {
+        if (!cancelled) {
+          setPackages(Array.isArray(json.packages) ? json.packages : []);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setPackages([]);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setPackagesLoading(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [data?.id, data?.packages]);
 
   // --- 1. IMAGE LOGIC: COMBINE RECEIPT AND DELIVERY IMAGES ---
   const normalizeImages = (imgSource) => {
@@ -305,6 +352,8 @@ export default function TrackingResult({ data }) {
           })}
         </div>
       </div>
+
+      <PublicShipmentPieces packages={packages} loading={packagesLoading} />
 
       {/* --- E. ACTIVITY LOG --- */}
       {Array.isArray(data.history) && data.history.length > 0 && (
