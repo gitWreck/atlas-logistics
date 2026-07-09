@@ -12,6 +12,7 @@ import {
 // Import your new components
 import TrackingSearch from "../../components/tracking/TrackingSearch";
 import TrackingResult from "../../components/tracking/TrackingResult";
+import { getTrackingLookupCandidates } from "@/lib/publicTrackingResolve";
 
 export default function TrackingPage() {
   const params = useParams();
@@ -34,15 +35,18 @@ export default function TrackingPage() {
     setData(null);
 
     try {
-      // 1. Fetch from 'tracking_public' (Security: Read-Only for public)
-      const docRef = doc(db, "tracking_public", trackingId);
-      const snap = await getDoc(docRef);
+      // Fetch from tracking_public. Piece labels resolve to the parent shipment.
+      const candidates = getTrackingLookupCandidates(trackingId);
 
-      if (!snap.exists()) {
-        setError("Shipment not found. Please check your ID.");
-      } else {
-        setData({ id: snap.id, ...snap.data() });
+      for (const candidate of candidates) {
+        const snap = await getDoc(doc(db, "tracking_public", candidate));
+        if (snap.exists()) {
+          setData({ id: snap.id, ...snap.data() });
+          return;
+        }
       }
+
+      setError("Shipment not found. Please check your ID.");
     } catch (err) {
       console.error(err);
       setError("System offline. Please try again later.");

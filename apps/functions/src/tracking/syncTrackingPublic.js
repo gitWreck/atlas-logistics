@@ -56,6 +56,26 @@ async function loadTripContextForShipment(shipmentData = {}) {
   return base;
 }
 
+function buildPublicPackages(packages = []) {
+  return packages.map((pkg, index) => {
+    const packageId = pkg.packageId || pkg.trackingNumber || "";
+    const statusCode = String(pkg.status || "RECEIVED").trim().toUpperCase();
+
+    return {
+      packageId,
+      trackingNumber: pkg.trackingNumber || packageId,
+      description: pkg.description || "Item",
+      packagingType: pkg.packagingType || "Package",
+      quantity: Number(pkg.quantity) || 1,
+      sequence: pkg.sequence || index + 1,
+      status: formatStatus(pkg.status),
+      statusCode,
+      isFragile: Boolean(pkg.isFragile),
+      isPerishable: Boolean(pkg.isPerishable),
+    };
+  });
+}
+
 async function syncOneShipmentToPublic(shipmentId, shipmentData) {
   const publicRef = db.collection("tracking_public").doc(shipmentId);
 
@@ -144,6 +164,9 @@ async function syncOneShipmentToPublic(shipmentId, shipmentData) {
       ? deliveryContext.deliveryVehicleName
       : null,
     history,
+    packages: buildPublicPackages(
+      Array.isArray(shipmentData.packages) ? shipmentData.packages : [],
+    ),
     updatedAt: FieldValue.serverTimestamp(),
   };
 
