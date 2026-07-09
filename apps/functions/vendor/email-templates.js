@@ -2139,9 +2139,9 @@ var require_react_jsx_runtime_development = __commonJS({
         info || (parentType = getComponentNameFromType(parentType)) && (info = "\n\nCheck the top-level render call using <" + parentType + ">.");
         return info;
       }
-      var React16 = require_react(), REACT_ELEMENT_TYPE = Symbol.for("react.transitional.element"), REACT_PORTAL_TYPE = Symbol.for("react.portal"), REACT_FRAGMENT_TYPE = Symbol.for("react.fragment"), REACT_STRICT_MODE_TYPE = Symbol.for("react.strict_mode"), REACT_PROFILER_TYPE = Symbol.for("react.profiler");
+      var React15 = require_react(), REACT_ELEMENT_TYPE = Symbol.for("react.transitional.element"), REACT_PORTAL_TYPE = Symbol.for("react.portal"), REACT_FRAGMENT_TYPE = Symbol.for("react.fragment"), REACT_STRICT_MODE_TYPE = Symbol.for("react.strict_mode"), REACT_PROFILER_TYPE = Symbol.for("react.profiler");
       Symbol.for("react.provider");
-      var REACT_CONSUMER_TYPE = Symbol.for("react.consumer"), REACT_CONTEXT_TYPE = Symbol.for("react.context"), REACT_FORWARD_REF_TYPE = Symbol.for("react.forward_ref"), REACT_SUSPENSE_TYPE = Symbol.for("react.suspense"), REACT_SUSPENSE_LIST_TYPE = Symbol.for("react.suspense_list"), REACT_MEMO_TYPE = Symbol.for("react.memo"), REACT_LAZY_TYPE = Symbol.for("react.lazy"), REACT_OFFSCREEN_TYPE = Symbol.for("react.offscreen"), MAYBE_ITERATOR_SYMBOL = Symbol.iterator, REACT_CLIENT_REFERENCE$2 = Symbol.for("react.client.reference"), ReactSharedInternals = React16.__CLIENT_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE, hasOwnProperty = Object.prototype.hasOwnProperty, assign = Object.assign, REACT_CLIENT_REFERENCE$1 = Symbol.for("react.client.reference"), isArrayImpl = Array.isArray, disabledDepth = 0, prevLog, prevInfo, prevWarn, prevError, prevGroup, prevGroupCollapsed, prevGroupEnd;
+      var REACT_CONSUMER_TYPE = Symbol.for("react.consumer"), REACT_CONTEXT_TYPE = Symbol.for("react.context"), REACT_FORWARD_REF_TYPE = Symbol.for("react.forward_ref"), REACT_SUSPENSE_TYPE = Symbol.for("react.suspense"), REACT_SUSPENSE_LIST_TYPE = Symbol.for("react.suspense_list"), REACT_MEMO_TYPE = Symbol.for("react.memo"), REACT_LAZY_TYPE = Symbol.for("react.lazy"), REACT_OFFSCREEN_TYPE = Symbol.for("react.offscreen"), MAYBE_ITERATOR_SYMBOL = Symbol.iterator, REACT_CLIENT_REFERENCE$2 = Symbol.for("react.client.reference"), ReactSharedInternals = React15.__CLIENT_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE, hasOwnProperty = Object.prototype.hasOwnProperty, assign = Object.assign, REACT_CLIENT_REFERENCE$1 = Symbol.for("react.client.reference"), isArrayImpl = Array.isArray, disabledDepth = 0, prevLog, prevInfo, prevWarn, prevError, prevGroup, prevGroupCollapsed, prevGroupEnd;
       disabledLog.__reactDisabledLog = true;
       var prefix, suffix, reentry = false;
       var componentFrameCache = new ("function" === typeof WeakMap ? WeakMap : Map)();
@@ -2175,7 +2175,7 @@ var require_jsx_runtime = __commonJS({
 var require_react_dom_production = __commonJS({
   "../../node_modules/react-dom/cjs/react-dom.production.js"(exports2) {
     "use strict";
-    var React16 = require_react();
+    var React15 = require_react();
     function formatProdErrorMessage(code) {
       var url = "https://react.dev/errors/" + code;
       if (1 < arguments.length) {
@@ -2215,7 +2215,7 @@ var require_react_dom_production = __commonJS({
         implementation
       };
     }
-    var ReactSharedInternals = React16.__CLIENT_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE;
+    var ReactSharedInternals = React15.__CLIENT_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE;
     function getCrossOriginStringAs(as2, input) {
       if ("font" === as2) return "";
       if ("string" === typeof input)
@@ -2369,7 +2369,7 @@ var require_react_dom_development = __commonJS({
         return dispatcher;
       }
       "undefined" !== typeof __REACT_DEVTOOLS_GLOBAL_HOOK__ && "function" === typeof __REACT_DEVTOOLS_GLOBAL_HOOK__.registerInternalModuleStart && __REACT_DEVTOOLS_GLOBAL_HOOK__.registerInternalModuleStart(Error());
-      var React16 = require_react(), Internals = {
+      var React15 = require_react(), Internals = {
         d: {
           f: noop,
           r: function() {
@@ -2387,7 +2387,7 @@ var require_react_dom_development = __commonJS({
         },
         p: 0,
         findDOMNode: null
-      }, REACT_PORTAL_TYPE = Symbol.for("react.portal"), ReactSharedInternals = React16.__CLIENT_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE;
+      }, REACT_PORTAL_TYPE = Symbol.for("react.portal"), ReactSharedInternals = React15.__CLIENT_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE;
       "function" === typeof Map && null != Map.prototype && "function" === typeof Map.prototype.forEach && "function" === typeof Set && null != Set.prototype && "function" === typeof Set.prototype.clear && "function" === typeof Set.prototype.forEach || console.error(
         "React depends on Map and Set built-in types. Make sure that you load a polyfill in older browsers. https://reactjs.org/link/react-polyfills"
       );
@@ -2594,7 +2594,7 @@ var require_react_dom = __commonJS({
 var require_react_dom_server_legacy_node_production = __commonJS({
   "../../node_modules/react-dom/cjs/react-dom-server-legacy.node.production.js"(exports2) {
     "use strict";
-    var React16 = require_react();
+    var React15 = require_react();
     var ReactDOM = require_react_dom();
     var REACT_ELEMENT_TYPE = Symbol.for("react.transitional.element");
     var REACT_PORTAL_TYPE = Symbol.for("react.portal");
@@ -2790,7 +2790,7 @@ var require_react_dom_server_legacy_node_production = __commonJS({
     function sanitizeURL(url) {
       return isJavaScriptProtocol.test("" + url) ? "javascript:throw new Error('React has blocked a javascript: URL as a security precaution.')" : url;
     }
-    var ReactSharedInternals = React16.__CLIENT_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE;
+    var ReactSharedInternals = React15.__CLIENT_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE;
     var ReactDOMSharedInternals = ReactDOM.__DOM_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE;
     var sharedNotPendingObject = {
       pending: false,
@@ -3104,7 +3104,7 @@ var require_react_dom_server_legacy_node_production = __commonJS({
     }
     function flattenOptionChildren(children) {
       var content = "";
-      React16.Children.forEach(children, function(child) {
+      React15.Children.forEach(children, function(child) {
         null != child && (content += child);
       });
       return content;
@@ -6865,7 +6865,7 @@ var require_react_dom_server_node_production = __commonJS({
     var util = require("util");
     var crypto = require("crypto");
     var async_hooks = require("async_hooks");
-    var React16 = require_react();
+    var React15 = require_react();
     var ReactDOM = require_react_dom();
     var stream = require("stream");
     var REACT_ELEMENT_TYPE = Symbol.for("react.transitional.element");
@@ -7085,7 +7085,7 @@ var require_react_dom_server_node_production = __commonJS({
     function sanitizeURL(url) {
       return isJavaScriptProtocol.test("" + url) ? "javascript:throw new Error('React has blocked a javascript: URL as a security precaution.')" : url;
     }
-    var ReactSharedInternals = React16.__CLIENT_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE;
+    var ReactSharedInternals = React15.__CLIENT_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE;
     var ReactDOMSharedInternals = ReactDOM.__DOM_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE;
     var sharedNotPendingObject = {
       pending: false,
@@ -7610,7 +7610,7 @@ var require_react_dom_server_node_production = __commonJS({
     }
     function flattenOptionChildren(children) {
       var content = "";
-      React16.Children.forEach(children, function(child) {
+      React15.Children.forEach(children, function(child) {
         null != child && (content += child);
       });
       return content;
@@ -11372,7 +11372,7 @@ var require_react_dom_server_node_production = __commonJS({
       }
     }
     function ensureCorrectIsomorphicReactVersion() {
-      var isomorphicReactPackageVersion = React16.version;
+      var isomorphicReactPackageVersion = React15.version;
       if ("19.0.0" !== isomorphicReactPackageVersion)
         throw Error(
           'Incompatible React versions: The "react" and "react-dom" packages must have the exact same version. Instead got:\n  - react:      ' + (isomorphicReactPackageVersion + "\n  - react-dom:  19.0.0\nLearn more: https://react.dev/warnings/version-mismatch")
@@ -12473,7 +12473,7 @@ var require_react_dom_server_legacy_node_development = __commonJS({
       }
       function flattenOptionChildren(children) {
         var content = "";
-        React16.Children.forEach(children, function(child) {
+        React15.Children.forEach(children, function(child) {
           null != child && (content += child, didWarnInvalidOptionChildren || "string" === typeof child || "number" === typeof child || "bigint" === typeof child || (didWarnInvalidOptionChildren = true, console.error(
             "Cannot infer the option value of complex children. Pass a `value` prop or use a plain string as children to <option>."
           )));
@@ -16708,7 +16708,7 @@ var require_react_dom_server_legacy_node_development = __commonJS({
           );
         return result;
       }
-      var React16 = require_react(), ReactDOM = require_react_dom(), REACT_ELEMENT_TYPE = Symbol.for("react.transitional.element"), REACT_PORTAL_TYPE = Symbol.for("react.portal"), REACT_FRAGMENT_TYPE = Symbol.for("react.fragment"), REACT_STRICT_MODE_TYPE = Symbol.for("react.strict_mode"), REACT_PROFILER_TYPE = Symbol.for("react.profiler"), REACT_PROVIDER_TYPE = Symbol.for("react.provider"), REACT_CONSUMER_TYPE = Symbol.for("react.consumer"), REACT_CONTEXT_TYPE = Symbol.for("react.context"), REACT_FORWARD_REF_TYPE = Symbol.for("react.forward_ref"), REACT_SUSPENSE_TYPE = Symbol.for("react.suspense"), REACT_SUSPENSE_LIST_TYPE = Symbol.for("react.suspense_list"), REACT_MEMO_TYPE = Symbol.for("react.memo"), REACT_LAZY_TYPE = Symbol.for("react.lazy"), REACT_SCOPE_TYPE = Symbol.for("react.scope"), REACT_DEBUG_TRACING_MODE_TYPE = Symbol.for("react.debug_trace_mode"), REACT_OFFSCREEN_TYPE = Symbol.for("react.offscreen"), REACT_LEGACY_HIDDEN_TYPE = Symbol.for("react.legacy_hidden"), REACT_MEMO_CACHE_SENTINEL = Symbol.for("react.memo_cache_sentinel"), MAYBE_ITERATOR_SYMBOL = Symbol.iterator, isArrayImpl = Array.isArray, jsxPropsParents = /* @__PURE__ */ new WeakMap(), jsxChildrenParents = /* @__PURE__ */ new WeakMap(), CLIENT_REFERENCE_TAG = Symbol.for("react.client.reference"), assign = Object.assign, hasOwnProperty = Object.prototype.hasOwnProperty, VALID_ATTRIBUTE_NAME_REGEX = RegExp(
+      var React15 = require_react(), ReactDOM = require_react_dom(), REACT_ELEMENT_TYPE = Symbol.for("react.transitional.element"), REACT_PORTAL_TYPE = Symbol.for("react.portal"), REACT_FRAGMENT_TYPE = Symbol.for("react.fragment"), REACT_STRICT_MODE_TYPE = Symbol.for("react.strict_mode"), REACT_PROFILER_TYPE = Symbol.for("react.profiler"), REACT_PROVIDER_TYPE = Symbol.for("react.provider"), REACT_CONSUMER_TYPE = Symbol.for("react.consumer"), REACT_CONTEXT_TYPE = Symbol.for("react.context"), REACT_FORWARD_REF_TYPE = Symbol.for("react.forward_ref"), REACT_SUSPENSE_TYPE = Symbol.for("react.suspense"), REACT_SUSPENSE_LIST_TYPE = Symbol.for("react.suspense_list"), REACT_MEMO_TYPE = Symbol.for("react.memo"), REACT_LAZY_TYPE = Symbol.for("react.lazy"), REACT_SCOPE_TYPE = Symbol.for("react.scope"), REACT_DEBUG_TRACING_MODE_TYPE = Symbol.for("react.debug_trace_mode"), REACT_OFFSCREEN_TYPE = Symbol.for("react.offscreen"), REACT_LEGACY_HIDDEN_TYPE = Symbol.for("react.legacy_hidden"), REACT_MEMO_CACHE_SENTINEL = Symbol.for("react.memo_cache_sentinel"), MAYBE_ITERATOR_SYMBOL = Symbol.iterator, isArrayImpl = Array.isArray, jsxPropsParents = /* @__PURE__ */ new WeakMap(), jsxChildrenParents = /* @__PURE__ */ new WeakMap(), CLIENT_REFERENCE_TAG = Symbol.for("react.client.reference"), assign = Object.assign, hasOwnProperty = Object.prototype.hasOwnProperty, VALID_ATTRIBUTE_NAME_REGEX = RegExp(
         "^[:A-Z_a-z\\u00C0-\\u00D6\\u00D8-\\u00F6\\u00F8-\\u02FF\\u0370-\\u037D\\u037F-\\u1FFF\\u200C-\\u200D\\u2070-\\u218F\\u2C00-\\u2FEF\\u3001-\\uD7FF\\uF900-\\uFDCF\\uFDF0-\\uFFFD][:A-Z_a-z\\u00C0-\\u00D6\\u00D8-\\u00F6\\u00F8-\\u02FF\\u0370-\\u037D\\u037F-\\u1FFF\\u200C-\\u200D\\u2070-\\u218F\\u2C00-\\u2FEF\\u3001-\\uD7FF\\uF900-\\uFDCF\\uFDF0-\\uFFFD\\-.0-9\\u00B7\\u0300-\\u036F\\u203F-\\u2040]*$"
       ), illegalAttributeNameCache = {}, validatedAttributeNameCache = {}, unitlessNumbers = new Set(
         "animationIterationCount aspectRatio borderImageOutset borderImageSlice borderImageWidth boxFlex boxFlexGroup boxOrdinalGroup columnCount columns flex flexGrow flexPositive flexShrink flexNegative flexOrder gridArea gridRow gridRowEnd gridRowSpan gridRowStart gridColumn gridColumnEnd gridColumnSpan gridColumnStart fontWeight lineClamp lineHeight opacity order orphans scale tabSize widows zIndex zoom fillOpacity floodOpacity stopOpacity strokeDasharray strokeDashoffset strokeMiterlimit strokeOpacity strokeWidth MozAnimationIterationCount MozBoxFlex MozBoxFlexGroup MozLineClamp msAnimationIterationCount msFlex msZoom msFlexGrow msFlexNegative msFlexOrder msFlexPositive msFlexShrink msGridColumn msGridColumnSpan msGridRow msGridRowSpan WebkitAnimationIterationCount WebkitBoxFlex WebKitBoxFlexGroup WebkitBoxOrdinalGroup WebkitColumnCount WebkitColumns WebkitFlex WebkitFlexGrow WebkitFlexPositive WebkitFlexShrink WebkitLineClamp".split(
@@ -17352,7 +17352,7 @@ var require_react_dom_server_legacy_node_development = __commonJS({
         "^(aria)-[:A-Z_a-z\\u00C0-\\u00D6\\u00D8-\\u00F6\\u00F8-\\u02FF\\u0370-\\u037D\\u037F-\\u1FFF\\u200C-\\u200D\\u2070-\\u218F\\u2C00-\\u2FEF\\u3001-\\uD7FF\\uF900-\\uFDCF\\uFDF0-\\uFFFD\\-.0-9\\u00B7\\u0300-\\u036F\\u203F-\\u2040]*$"
       ), rARIACamel = RegExp(
         "^(aria)[A-Z][:A-Z_a-z\\u00C0-\\u00D6\\u00D8-\\u00F6\\u00F8-\\u02FF\\u0370-\\u037D\\u037F-\\u1FFF\\u200C-\\u200D\\u2070-\\u218F\\u2C00-\\u2FEF\\u3001-\\uD7FF\\uF900-\\uFDCF\\uFDF0-\\uFFFD\\-.0-9\\u00B7\\u0300-\\u036F\\u203F-\\u2040]*$"
-      ), badVendoredStyleNamePattern = /^(?:webkit|moz|o)[A-Z]/, msPattern$1 = /^-ms-/, hyphenPattern = /-(.)/g, badStyleValueWithSemicolonPattern = /;\s*$/, warnedStyleNames = {}, warnedStyleValues = {}, warnedForNaNValue = false, warnedForInfinityValue = false, matchHtmlRegExp = /["'&<>]/, uppercasePattern = /([A-Z])/g, msPattern = /^ms-/, isJavaScriptProtocol = /^[\u0000-\u001F ]*j[\r\n\t]*a[\r\n\t]*v[\r\n\t]*a[\r\n\t]*s[\r\n\t]*c[\r\n\t]*r[\r\n\t]*i[\r\n\t]*p[\r\n\t]*t[\r\n\t]*:/i, ReactSharedInternals = React16.__CLIENT_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE, ReactDOMSharedInternals = ReactDOM.__DOM_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE, NotPending = Object.freeze({
+      ), badVendoredStyleNamePattern = /^(?:webkit|moz|o)[A-Z]/, msPattern$1 = /^-ms-/, hyphenPattern = /-(.)/g, badStyleValueWithSemicolonPattern = /;\s*$/, warnedStyleNames = {}, warnedStyleValues = {}, warnedForNaNValue = false, warnedForInfinityValue = false, matchHtmlRegExp = /["'&<>]/, uppercasePattern = /([A-Z])/g, msPattern = /^ms-/, isJavaScriptProtocol = /^[\u0000-\u001F ]*j[\r\n\t]*a[\r\n\t]*v[\r\n\t]*a[\r\n\t]*s[\r\n\t]*c[\r\n\t]*r[\r\n\t]*i[\r\n\t]*p[\r\n\t]*t[\r\n\t]*:/i, ReactSharedInternals = React15.__CLIENT_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE, ReactDOMSharedInternals = ReactDOM.__DOM_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE, NotPending = Object.freeze({
         pending: false,
         data: null,
         method: null,
@@ -18856,7 +18856,7 @@ var require_react_dom_server_node_development = __commonJS({
       }
       function flattenOptionChildren(children) {
         var content = "";
-        React16.Children.forEach(children, function(child) {
+        React15.Children.forEach(children, function(child) {
           null != child && (content += child, didWarnInvalidOptionChildren || "string" === typeof child || "number" === typeof child || "bigint" === typeof child || (didWarnInvalidOptionChildren = true, console.error(
             "Cannot infer the option value of complex children. Pass a `value` prop or use a plain string as children to <option>."
           )));
@@ -22999,7 +22999,7 @@ var require_react_dom_server_node_development = __commonJS({
         }
       }
       function ensureCorrectIsomorphicReactVersion() {
-        var isomorphicReactPackageVersion = React16.version;
+        var isomorphicReactPackageVersion = React15.version;
         if ("19.0.0" !== isomorphicReactPackageVersion)
           throw Error(
             'Incompatible React versions: The "react" and "react-dom" packages must have the exact same version. Instead got:\n  - react:      ' + (isomorphicReactPackageVersion + "\n  - react-dom:  19.0.0\nLearn more: https://react.dev/warnings/version-mismatch")
@@ -23059,7 +23059,7 @@ var require_react_dom_server_node_development = __commonJS({
           }
         };
       }
-      var util = require("util"), crypto = require("crypto"), async_hooks = require("async_hooks"), React16 = require_react(), ReactDOM = require_react_dom(), stream = require("stream"), REACT_ELEMENT_TYPE = Symbol.for("react.transitional.element"), REACT_PORTAL_TYPE = Symbol.for("react.portal"), REACT_FRAGMENT_TYPE = Symbol.for("react.fragment"), REACT_STRICT_MODE_TYPE = Symbol.for("react.strict_mode"), REACT_PROFILER_TYPE = Symbol.for("react.profiler"), REACT_PROVIDER_TYPE = Symbol.for("react.provider"), REACT_CONSUMER_TYPE = Symbol.for("react.consumer"), REACT_CONTEXT_TYPE = Symbol.for("react.context"), REACT_FORWARD_REF_TYPE = Symbol.for("react.forward_ref"), REACT_SUSPENSE_TYPE = Symbol.for("react.suspense"), REACT_SUSPENSE_LIST_TYPE = Symbol.for("react.suspense_list"), REACT_MEMO_TYPE = Symbol.for("react.memo"), REACT_LAZY_TYPE = Symbol.for("react.lazy"), REACT_SCOPE_TYPE = Symbol.for("react.scope"), REACT_DEBUG_TRACING_MODE_TYPE = Symbol.for("react.debug_trace_mode"), REACT_OFFSCREEN_TYPE = Symbol.for("react.offscreen"), REACT_LEGACY_HIDDEN_TYPE = Symbol.for("react.legacy_hidden"), REACT_MEMO_CACHE_SENTINEL = Symbol.for("react.memo_cache_sentinel"), MAYBE_ITERATOR_SYMBOL = Symbol.iterator, isArrayImpl = Array.isArray, jsxPropsParents = /* @__PURE__ */ new WeakMap(), jsxChildrenParents = /* @__PURE__ */ new WeakMap(), CLIENT_REFERENCE_TAG = Symbol.for("react.client.reference"), scheduleMicrotask = queueMicrotask, currentView = null, writtenBytes = 0, destinationHasCapacity$1 = true, textEncoder = new util.TextEncoder(), assign = Object.assign, hasOwnProperty = Object.prototype.hasOwnProperty, VALID_ATTRIBUTE_NAME_REGEX = RegExp(
+      var util = require("util"), crypto = require("crypto"), async_hooks = require("async_hooks"), React15 = require_react(), ReactDOM = require_react_dom(), stream = require("stream"), REACT_ELEMENT_TYPE = Symbol.for("react.transitional.element"), REACT_PORTAL_TYPE = Symbol.for("react.portal"), REACT_FRAGMENT_TYPE = Symbol.for("react.fragment"), REACT_STRICT_MODE_TYPE = Symbol.for("react.strict_mode"), REACT_PROFILER_TYPE = Symbol.for("react.profiler"), REACT_PROVIDER_TYPE = Symbol.for("react.provider"), REACT_CONSUMER_TYPE = Symbol.for("react.consumer"), REACT_CONTEXT_TYPE = Symbol.for("react.context"), REACT_FORWARD_REF_TYPE = Symbol.for("react.forward_ref"), REACT_SUSPENSE_TYPE = Symbol.for("react.suspense"), REACT_SUSPENSE_LIST_TYPE = Symbol.for("react.suspense_list"), REACT_MEMO_TYPE = Symbol.for("react.memo"), REACT_LAZY_TYPE = Symbol.for("react.lazy"), REACT_SCOPE_TYPE = Symbol.for("react.scope"), REACT_DEBUG_TRACING_MODE_TYPE = Symbol.for("react.debug_trace_mode"), REACT_OFFSCREEN_TYPE = Symbol.for("react.offscreen"), REACT_LEGACY_HIDDEN_TYPE = Symbol.for("react.legacy_hidden"), REACT_MEMO_CACHE_SENTINEL = Symbol.for("react.memo_cache_sentinel"), MAYBE_ITERATOR_SYMBOL = Symbol.iterator, isArrayImpl = Array.isArray, jsxPropsParents = /* @__PURE__ */ new WeakMap(), jsxChildrenParents = /* @__PURE__ */ new WeakMap(), CLIENT_REFERENCE_TAG = Symbol.for("react.client.reference"), scheduleMicrotask = queueMicrotask, currentView = null, writtenBytes = 0, destinationHasCapacity$1 = true, textEncoder = new util.TextEncoder(), assign = Object.assign, hasOwnProperty = Object.prototype.hasOwnProperty, VALID_ATTRIBUTE_NAME_REGEX = RegExp(
         "^[:A-Z_a-z\\u00C0-\\u00D6\\u00D8-\\u00F6\\u00F8-\\u02FF\\u0370-\\u037D\\u037F-\\u1FFF\\u200C-\\u200D\\u2070-\\u218F\\u2C00-\\u2FEF\\u3001-\\uD7FF\\uF900-\\uFDCF\\uFDF0-\\uFFFD][:A-Z_a-z\\u00C0-\\u00D6\\u00D8-\\u00F6\\u00F8-\\u02FF\\u0370-\\u037D\\u037F-\\u1FFF\\u200C-\\u200D\\u2070-\\u218F\\u2C00-\\u2FEF\\u3001-\\uD7FF\\uF900-\\uFDCF\\uFDF0-\\uFFFD\\-.0-9\\u00B7\\u0300-\\u036F\\u203F-\\u2040]*$"
       ), illegalAttributeNameCache = {}, validatedAttributeNameCache = {}, unitlessNumbers = new Set(
         "animationIterationCount aspectRatio borderImageOutset borderImageSlice borderImageWidth boxFlex boxFlexGroup boxOrdinalGroup columnCount columns flex flexGrow flexPositive flexShrink flexNegative flexOrder gridArea gridRow gridRowEnd gridRowSpan gridRowStart gridColumn gridColumnEnd gridColumnSpan gridColumnStart fontWeight lineClamp lineHeight opacity order orphans scale tabSize widows zIndex zoom fillOpacity floodOpacity stopOpacity strokeDasharray strokeDashoffset strokeMiterlimit strokeOpacity strokeWidth MozAnimationIterationCount MozBoxFlex MozBoxFlexGroup MozLineClamp msAnimationIterationCount msFlex msZoom msFlexGrow msFlexNegative msFlexOrder msFlexPositive msFlexShrink msGridColumn msGridColumnSpan msGridRow msGridRowSpan WebkitAnimationIterationCount WebkitBoxFlex WebKitBoxFlexGroup WebkitBoxOrdinalGroup WebkitColumnCount WebkitColumns WebkitFlex WebkitFlexGrow WebkitFlexPositive WebkitFlexShrink WebkitLineClamp".split(
@@ -23703,7 +23703,7 @@ var require_react_dom_server_node_development = __commonJS({
         "^(aria)-[:A-Z_a-z\\u00C0-\\u00D6\\u00D8-\\u00F6\\u00F8-\\u02FF\\u0370-\\u037D\\u037F-\\u1FFF\\u200C-\\u200D\\u2070-\\u218F\\u2C00-\\u2FEF\\u3001-\\uD7FF\\uF900-\\uFDCF\\uFDF0-\\uFFFD\\-.0-9\\u00B7\\u0300-\\u036F\\u203F-\\u2040]*$"
       ), rARIACamel = RegExp(
         "^(aria)[A-Z][:A-Z_a-z\\u00C0-\\u00D6\\u00D8-\\u00F6\\u00F8-\\u02FF\\u0370-\\u037D\\u037F-\\u1FFF\\u200C-\\u200D\\u2070-\\u218F\\u2C00-\\u2FEF\\u3001-\\uD7FF\\uF900-\\uFDCF\\uFDF0-\\uFFFD\\-.0-9\\u00B7\\u0300-\\u036F\\u203F-\\u2040]*$"
-      ), badVendoredStyleNamePattern = /^(?:webkit|moz|o)[A-Z]/, msPattern$1 = /^-ms-/, hyphenPattern = /-(.)/g, badStyleValueWithSemicolonPattern = /;\s*$/, warnedStyleNames = {}, warnedStyleValues = {}, warnedForNaNValue = false, warnedForInfinityValue = false, matchHtmlRegExp = /["'&<>]/, uppercasePattern = /([A-Z])/g, msPattern = /^ms-/, isJavaScriptProtocol = /^[\u0000-\u001F ]*j[\r\n\t]*a[\r\n\t]*v[\r\n\t]*a[\r\n\t]*s[\r\n\t]*c[\r\n\t]*r[\r\n\t]*i[\r\n\t]*p[\r\n\t]*t[\r\n\t]*:/i, ReactSharedInternals = React16.__CLIENT_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE, ReactDOMSharedInternals = ReactDOM.__DOM_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE, NotPending = Object.freeze({
+      ), badVendoredStyleNamePattern = /^(?:webkit|moz|o)[A-Z]/, msPattern$1 = /^-ms-/, hyphenPattern = /-(.)/g, badStyleValueWithSemicolonPattern = /;\s*$/, warnedStyleNames = {}, warnedStyleValues = {}, warnedForNaNValue = false, warnedForInfinityValue = false, matchHtmlRegExp = /["'&<>]/, uppercasePattern = /([A-Z])/g, msPattern = /^ms-/, isJavaScriptProtocol = /^[\u0000-\u001F ]*j[\r\n\t]*a[\r\n\t]*v[\r\n\t]*a[\r\n\t]*s[\r\n\t]*c[\r\n\t]*r[\r\n\t]*i[\r\n\t]*p[\r\n\t]*t[\r\n\t]*:/i, ReactSharedInternals = React15.__CLIENT_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE, ReactDOMSharedInternals = ReactDOM.__DOM_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE, NotPending = Object.freeze({
         pending: false,
         data: null,
         method: null,
@@ -24290,7 +24290,10 @@ var require_icons = __commonJS({
         envelopeSm: `${base}/envelope-sm.png`,
         headset: `${base}/headset.png`,
         shield: `${base}/shield.png`,
-        envelope: `${base}/envelope.png`
+        envelope: `${base}/envelope.png`,
+        checkDelivered: `${base}/check-delivered.png`,
+        truckOut: `${base}/truck-out.png`,
+        packageTotal: `${base}/package-total.png`
       };
     }
     module2.exports = { DEFAULT_ICON_BASE, getIconUrls: getIconUrls2 };
@@ -35387,7 +35390,7 @@ var Head = React5.forwardRef(
 );
 Head.displayName = "Head";
 
-// ../../node_modules/@react-email/hr/dist/index.mjs
+// ../../node_modules/@react-email/html/dist/index.mjs
 var React6 = __toESM(require_react(), 1);
 var import_jsx_runtime7 = __toESM(require_jsx_runtime(), 1);
 var __defProp7 = Object.defineProperty;
@@ -35421,25 +35424,15 @@ var __objRest6 = (source, exclude) => {
     }
   return target;
 };
-var Hr3 = React6.forwardRef(
+var Html = React6.forwardRef(
   (_a3, ref) => {
-    var _b = _a3, { style } = _b, props = __objRest6(_b, ["style"]);
-    return /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(
-      "hr",
-      __spreadProps6(__spreadValues6({}, props), {
-        ref,
-        style: __spreadValues6({
-          width: "100%",
-          border: "none",
-          borderTop: "1px solid #eaeaea"
-        }, style)
-      })
-    );
+    var _b = _a3, { children, lang = "en", dir = "ltr" } = _b, props = __objRest6(_b, ["children", "lang", "dir"]);
+    return /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("html", __spreadProps6(__spreadValues6({}, props), { dir, lang, ref, children }));
   }
 );
-Hr3.displayName = "Hr";
+Html.displayName = "Html";
 
-// ../../node_modules/@react-email/html/dist/index.mjs
+// ../../node_modules/@react-email/img/dist/index.mjs
 var React7 = __toESM(require_react(), 1);
 var import_jsx_runtime8 = __toESM(require_jsx_runtime(), 1);
 var __defProp8 = Object.defineProperty;
@@ -35473,15 +35466,30 @@ var __objRest7 = (source, exclude) => {
     }
   return target;
 };
-var Html = React7.forwardRef(
+var Img = React7.forwardRef(
   (_a3, ref) => {
-    var _b = _a3, { children, lang = "en", dir = "ltr" } = _b, props = __objRest7(_b, ["children", "lang", "dir"]);
-    return /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("html", __spreadProps7(__spreadValues7({}, props), { dir, lang, ref, children }));
+    var _b = _a3, { alt, src, width, height, style } = _b, props = __objRest7(_b, ["alt", "src", "width", "height", "style"]);
+    return /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(
+      "img",
+      __spreadProps7(__spreadValues7({}, props), {
+        alt,
+        height,
+        ref,
+        src,
+        style: __spreadValues7({
+          display: "block",
+          outline: "none",
+          border: "none",
+          textDecoration: "none"
+        }, style),
+        width
+      })
+    );
   }
 );
-Html.displayName = "Html";
+Img.displayName = "Img";
 
-// ../../node_modules/@react-email/img/dist/index.mjs
+// ../../node_modules/@react-email/link/dist/index.mjs
 var React8 = __toESM(require_react(), 1);
 var import_jsx_runtime9 = __toESM(require_jsx_runtime(), 1);
 var __defProp9 = Object.defineProperty;
@@ -35515,30 +35523,26 @@ var __objRest8 = (source, exclude) => {
     }
   return target;
 };
-var Img = React8.forwardRef(
+var Link = React8.forwardRef(
   (_a3, ref) => {
-    var _b = _a3, { alt, src, width, height, style } = _b, props = __objRest8(_b, ["alt", "src", "width", "height", "style"]);
+    var _b = _a3, { target = "_blank", style } = _b, props = __objRest8(_b, ["target", "style"]);
     return /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(
-      "img",
+      "a",
       __spreadProps8(__spreadValues8({}, props), {
-        alt,
-        height,
         ref,
-        src,
         style: __spreadValues8({
-          display: "block",
-          outline: "none",
-          border: "none",
-          textDecoration: "none"
+          color: "#067df7",
+          textDecorationLine: "none"
         }, style),
-        width
+        target,
+        children: props.children
       })
     );
   }
 );
-Img.displayName = "Img";
+Link.displayName = "Link";
 
-// ../../node_modules/@react-email/link/dist/index.mjs
+// ../../node_modules/@react-email/preview/dist/index.mjs
 var React9 = __toESM(require_react(), 1);
 var import_jsx_runtime10 = __toESM(require_jsx_runtime(), 1);
 var __defProp10 = Object.defineProperty;
@@ -35572,26 +35576,42 @@ var __objRest9 = (source, exclude) => {
     }
   return target;
 };
-var Link = React9.forwardRef(
+var PREVIEW_MAX_LENGTH = 150;
+var Preview = React9.forwardRef(
   (_a3, ref) => {
-    var _b = _a3, { target = "_blank", style } = _b, props = __objRest9(_b, ["target", "style"]);
-    return /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(
-      "a",
-      __spreadProps9(__spreadValues9({}, props), {
+    var _b = _a3, { children = "" } = _b, props = __objRest9(_b, ["children"]);
+    const text = (Array.isArray(children) ? children.join("") : children).substring(0, PREVIEW_MAX_LENGTH);
+    return /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)(
+      "div",
+      __spreadProps9(__spreadValues9({
+        style: {
+          display: "none",
+          overflow: "hidden",
+          lineHeight: "1px",
+          opacity: 0,
+          maxHeight: 0,
+          maxWidth: 0
+        }
+      }, props), {
         ref,
-        style: __spreadValues9({
-          color: "#067df7",
-          textDecorationLine: "none"
-        }, style),
-        target,
-        children: props.children
+        children: [
+          text,
+          renderWhiteSpace(text)
+        ]
       })
     );
   }
 );
-Link.displayName = "Link";
+Preview.displayName = "Preview";
+var whiteSpaceCodes = "\xA0\u200C\u200B\u200D\u200E\u200F\uFEFF";
+var renderWhiteSpace = (text) => {
+  if (text.length >= PREVIEW_MAX_LENGTH) {
+    return null;
+  }
+  return /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("div", { children: whiteSpaceCodes.repeat(PREVIEW_MAX_LENGTH - text.length) });
+};
 
-// ../../node_modules/@react-email/preview/dist/index.mjs
+// ../../node_modules/@react-email/row/dist/index.mjs
 var React10 = __toESM(require_react(), 1);
 var import_jsx_runtime11 = __toESM(require_jsx_runtime(), 1);
 var __defProp11 = Object.defineProperty;
@@ -35625,42 +35645,29 @@ var __objRest10 = (source, exclude) => {
     }
   return target;
 };
-var PREVIEW_MAX_LENGTH = 150;
-var Preview = React10.forwardRef(
+var Row = React10.forwardRef(
   (_a3, ref) => {
-    var _b = _a3, { children = "" } = _b, props = __objRest10(_b, ["children"]);
-    const text = (Array.isArray(children) ? children.join("") : children).substring(0, PREVIEW_MAX_LENGTH);
-    return /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)(
-      "div",
+    var _b = _a3, { children, style } = _b, props = __objRest10(_b, ["children", "style"]);
+    return /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(
+      "table",
       __spreadProps10(__spreadValues10({
-        style: {
-          display: "none",
-          overflow: "hidden",
-          lineHeight: "1px",
-          opacity: 0,
-          maxHeight: 0,
-          maxWidth: 0
-        }
+        align: "center",
+        width: "100%",
+        border: 0,
+        cellPadding: "0",
+        cellSpacing: "0",
+        role: "presentation"
       }, props), {
         ref,
-        children: [
-          text,
-          renderWhiteSpace(text)
-        ]
+        style,
+        children: /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("tbody", { style: { width: "100%" }, children: /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("tr", { style: { width: "100%" }, children }) })
       })
     );
   }
 );
-Preview.displayName = "Preview";
-var whiteSpaceCodes = "\xA0\u200C\u200B\u200D\u200E\u200F\uFEFF";
-var renderWhiteSpace = (text) => {
-  if (text.length >= PREVIEW_MAX_LENGTH) {
-    return null;
-  }
-  return /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("div", { children: whiteSpaceCodes.repeat(PREVIEW_MAX_LENGTH - text.length) });
-};
+Row.displayName = "Row";
 
-// ../../node_modules/@react-email/row/dist/index.mjs
+// ../../node_modules/@react-email/section/dist/index.mjs
 var React11 = __toESM(require_react(), 1);
 var import_jsx_runtime12 = __toESM(require_jsx_runtime(), 1);
 var __defProp12 = Object.defineProperty;
@@ -35694,7 +35701,7 @@ var __objRest11 = (source, exclude) => {
     }
   return target;
 };
-var Row = React11.forwardRef(
+var Section = React11.forwardRef(
   (_a3, ref) => {
     var _b = _a3, { children, style } = _b, props = __objRest11(_b, ["children", "style"]);
     return /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(
@@ -35709,14 +35716,14 @@ var Row = React11.forwardRef(
       }, props), {
         ref,
         style,
-        children: /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("tbody", { style: { width: "100%" }, children: /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("tr", { style: { width: "100%" }, children }) })
+        children: /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("tbody", { children: /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("tr", { children: /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("td", { children }) }) })
       })
     );
   }
 );
-Row.displayName = "Row";
+Section.displayName = "Section";
 
-// ../../node_modules/@react-email/section/dist/index.mjs
+// ../../node_modules/@react-email/text/dist/index.mjs
 var React12 = __toESM(require_react(), 1);
 var import_jsx_runtime13 = __toESM(require_jsx_runtime(), 1);
 var __defProp13 = Object.defineProperty;
@@ -35746,62 +35753,6 @@ var __objRest12 = (source, exclude) => {
   if (source != null && __getOwnPropSymbols12)
     for (var prop of __getOwnPropSymbols12(source)) {
       if (exclude.indexOf(prop) < 0 && __propIsEnum12.call(source, prop))
-        target[prop] = source[prop];
-    }
-  return target;
-};
-var Section = React12.forwardRef(
-  (_a3, ref) => {
-    var _b = _a3, { children, style } = _b, props = __objRest12(_b, ["children", "style"]);
-    return /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(
-      "table",
-      __spreadProps12(__spreadValues12({
-        align: "center",
-        width: "100%",
-        border: 0,
-        cellPadding: "0",
-        cellSpacing: "0",
-        role: "presentation"
-      }, props), {
-        ref,
-        style,
-        children: /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("tbody", { children: /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("tr", { children: /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("td", { children }) }) })
-      })
-    );
-  }
-);
-Section.displayName = "Section";
-
-// ../../node_modules/@react-email/text/dist/index.mjs
-var React13 = __toESM(require_react(), 1);
-var import_jsx_runtime14 = __toESM(require_jsx_runtime(), 1);
-var __defProp14 = Object.defineProperty;
-var __defProps13 = Object.defineProperties;
-var __getOwnPropDescs13 = Object.getOwnPropertyDescriptors;
-var __getOwnPropSymbols13 = Object.getOwnPropertySymbols;
-var __hasOwnProp14 = Object.prototype.hasOwnProperty;
-var __propIsEnum13 = Object.prototype.propertyIsEnumerable;
-var __defNormalProp13 = (obj, key, value) => key in obj ? __defProp14(obj, key, { enumerable: true, configurable: true, writable: true, value }) : obj[key] = value;
-var __spreadValues13 = (a, b3) => {
-  for (var prop in b3 || (b3 = {}))
-    if (__hasOwnProp14.call(b3, prop))
-      __defNormalProp13(a, prop, b3[prop]);
-  if (__getOwnPropSymbols13)
-    for (var prop of __getOwnPropSymbols13(b3)) {
-      if (__propIsEnum13.call(b3, prop))
-        __defNormalProp13(a, prop, b3[prop]);
-    }
-  return a;
-};
-var __spreadProps13 = (a, b3) => __defProps13(a, __getOwnPropDescs13(b3));
-var __objRest13 = (source, exclude) => {
-  var target = {};
-  for (var prop in source)
-    if (__hasOwnProp14.call(source, prop) && exclude.indexOf(prop) < 0)
-      target[prop] = source[prop];
-  if (source != null && __getOwnPropSymbols13)
-    for (var prop of __getOwnPropSymbols13(source)) {
-      if (exclude.indexOf(prop) < 0 && __propIsEnum13.call(source, prop))
         target[prop] = source[prop];
     }
   return target;
@@ -35855,9 +35806,9 @@ function parseMargin({
   }
   return { mt: mt3, mr: mr2, mb, ml };
 }
-var Text3 = React13.forwardRef(
+var Text3 = React12.forwardRef(
   (_a3, ref) => {
-    var _b = _a3, { style } = _b, props = __objRest13(_b, ["style"]);
+    var _b = _a3, { style } = _b, props = __objRest12(_b, ["style"]);
     var _a22, _b2;
     const margins = parseMargin({
       margin: style == null ? void 0 : style.margin,
@@ -35866,11 +35817,11 @@ var Text3 = React13.forwardRef(
       marginLeft: style == null ? void 0 : style.marginLeft,
       marginRight: style == null ? void 0 : style.marginRight
     });
-    return /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(
+    return /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(
       "p",
-      __spreadProps13(__spreadValues13({}, props), {
+      __spreadProps12(__spreadValues12({}, props), {
         ref,
-        style: __spreadProps13(__spreadValues13({
+        style: __spreadProps12(__spreadValues12({
           fontSize: "14px",
           lineHeight: "24px"
         }, style), {
@@ -35888,7 +35839,7 @@ Text3.displayName = "Text";
 // emails/_components/ShipmentStatusEmail.jsx
 var import_theme = __toESM(require_theme());
 var import_icons = __toESM(require_icons());
-var import_jsx_runtime15 = __toESM(require_jsx_runtime());
+var import_jsx_runtime14 = __toESM(require_jsx_runtime());
 var PACKAGES_PER_PAGE = 5;
 function ShipmentStatusEmail({
   customerName = "Customer",
@@ -35907,7 +35858,7 @@ function ShipmentStatusEmail({
   packages = [],
   trackingUrl = "https://atlastransport.ph/track",
   supportEmail = "support@atlastransport.ph",
-  logoUrl = "https://atlastransport.ph/atlas-logo-white.png",
+  logoUrl = "https://atlas-tracking.web.app/email/atlas-logo.jpeg",
   iconBaseUrl = "https://atlastransport.ph/email",
   isMultiShipment = false,
   shipmentIds = []
@@ -35918,35 +35869,31 @@ function ShipmentStatusEmail({
   const visiblePackages = packages.slice(0, PACKAGES_PER_PAGE);
   const hasMorePackages = totalPackageRows > PACKAGES_PER_PAGE;
   const previewText = `${statusLabel} \u2014 ${shipmentId || "Atlas shipment update"}`;
-  return /* @__PURE__ */ (0, import_jsx_runtime15.jsxs)(Html, { children: [
-    /* @__PURE__ */ (0, import_jsx_runtime15.jsx)(Head, {}),
-    /* @__PURE__ */ (0, import_jsx_runtime15.jsx)(Preview, { children: previewText }),
-    /* @__PURE__ */ (0, import_jsx_runtime15.jsx)(Body, { style: main, children: /* @__PURE__ */ (0, import_jsx_runtime15.jsxs)(Container, { style: container, children: [
-      /* @__PURE__ */ (0, import_jsx_runtime15.jsx)(Section, { style: header, children: /* @__PURE__ */ (0, import_jsx_runtime15.jsx)(Row, { children: /* @__PURE__ */ (0, import_jsx_runtime15.jsxs)(Column, { children: [
-        /* @__PURE__ */ (0, import_jsx_runtime15.jsx)(
-          Img,
-          {
-            src: logoUrl,
-            width: "56",
-            height: "56",
-            alt: "Atlas Transportation",
-            style: logo
-          }
-        ),
-        /* @__PURE__ */ (0, import_jsx_runtime15.jsx)(Text3, { style: brandName, children: "ATLAS TRANSPORTATION" }),
-        /* @__PURE__ */ (0, import_jsx_runtime15.jsx)(Text3, { style: brandTagline, children: "On Time. In Full. Every Time." })
-      ] }) }) }),
-      /* @__PURE__ */ (0, import_jsx_runtime15.jsxs)(Section, { style: contentSection, children: [
-        /* @__PURE__ */ (0, import_jsx_runtime15.jsxs)(Text3, { style: greeting, children: [
+  return /* @__PURE__ */ (0, import_jsx_runtime14.jsxs)(Html, { children: [
+    /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(Head, {}),
+    /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(Preview, { children: previewText }),
+    /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(Body, { style: main, children: /* @__PURE__ */ (0, import_jsx_runtime14.jsxs)(Container, { style: container, children: [
+      /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(Section, { style: header, children: /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(Row, { children: /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(Column, { children: /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(
+        Img,
+        {
+          src: logoUrl,
+          width: "120",
+          height: "120",
+          alt: "Atlas Transportation \u2014 Fast and Easy Shipping",
+          style: logo
+        }
+      ) }) }) }),
+      /* @__PURE__ */ (0, import_jsx_runtime14.jsxs)(Section, { style: contentSection, children: [
+        /* @__PURE__ */ (0, import_jsx_runtime14.jsxs)(Text3, { style: greeting, children: [
           "Hi ",
           customerName,
           ","
         ] }),
-        /* @__PURE__ */ (0, import_jsx_runtime15.jsx)(Text3, { style: intro, children: "Here's the latest update on your shipment." })
+        /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(Text3, { style: intro, children: "Here's the latest update on your shipment." })
       ] }),
-      /* @__PURE__ */ (0, import_jsx_runtime15.jsx)(Section, { style: contentSection, children: /* @__PURE__ */ (0, import_jsx_runtime15.jsx)(Section, { style: statusCard, children: /* @__PURE__ */ (0, import_jsx_runtime15.jsxs)(Row, { children: [
-        /* @__PURE__ */ (0, import_jsx_runtime15.jsxs)(Column, { style: { width: "68%", verticalAlign: "top" }, children: [
-          /* @__PURE__ */ (0, import_jsx_runtime15.jsx)(
+      /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(Section, { style: contentSection, children: /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(Section, { style: statusCard, children: /* @__PURE__ */ (0, import_jsx_runtime14.jsxs)(Row, { children: [
+        /* @__PURE__ */ (0, import_jsx_runtime14.jsxs)(Column, { style: { width: "68%", verticalAlign: "top" }, children: [
+          /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(
             Text3,
             {
               style: {
@@ -35957,110 +35904,151 @@ function ShipmentStatusEmail({
               children: statusLabel
             }
           ),
-          /* @__PURE__ */ (0, import_jsx_runtime15.jsx)(Text3, { style: shipmentIdText, children: shipmentId }),
-          routeLabel ? /* @__PURE__ */ (0, import_jsx_runtime15.jsxs)(Text3, { style: metaText, children: [
-            /* @__PURE__ */ (0, import_jsx_runtime15.jsx)("span", { style: metaLabel, children: "Route:" }),
+          /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(Text3, { style: shipmentIdText, children: shipmentId }),
+          routeLabel ? /* @__PURE__ */ (0, import_jsx_runtime14.jsxs)(Text3, { style: metaText, children: [
+            /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("span", { style: metaLabel, children: "Route:" }),
             " ",
             routeLabel
           ] }) : null,
-          originLabel ? /* @__PURE__ */ (0, import_jsx_runtime15.jsxs)(Text3, { style: metaText, children: [
-            /* @__PURE__ */ (0, import_jsx_runtime15.jsx)("span", { style: metaLabel, children: "Origin:" }),
+          originLabel ? /* @__PURE__ */ (0, import_jsx_runtime14.jsxs)(Text3, { style: metaText, children: [
+            /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("span", { style: metaLabel, children: "Origin:" }),
             " ",
             originLabel
           ] }) : null,
-          destinationLabel ? /* @__PURE__ */ (0, import_jsx_runtime15.jsxs)(Text3, { style: metaText, children: [
-            /* @__PURE__ */ (0, import_jsx_runtime15.jsx)("span", { style: metaLabel, children: "Destination:" }),
+          destinationLabel ? /* @__PURE__ */ (0, import_jsx_runtime14.jsxs)(Text3, { style: metaText, children: [
+            /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("span", { style: metaLabel, children: "Destination:" }),
             " ",
             destinationLabel
           ] }) : null,
-          isMultiShipment && shipmentIds.length > 1 ? /* @__PURE__ */ (0, import_jsx_runtime15.jsxs)(Text3, { style: metaText, children: [
-            /* @__PURE__ */ (0, import_jsx_runtime15.jsx)("span", { style: metaLabel, children: "Shipments:" }),
+          isMultiShipment && shipmentIds.length > 1 ? /* @__PURE__ */ (0, import_jsx_runtime14.jsxs)(Text3, { style: metaText, children: [
+            /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("span", { style: metaLabel, children: "Shipments:" }),
             " ",
             shipmentIds.join(", ")
           ] }) : null
         ] }),
-        lastUpdated ? /* @__PURE__ */ (0, import_jsx_runtime15.jsx)(Column, { style: { width: "32%", verticalAlign: "top" }, children: /* @__PURE__ */ (0, import_jsx_runtime15.jsxs)(Section, { style: lastUpdatedBox, children: [
-          /* @__PURE__ */ (0, import_jsx_runtime15.jsx)(Text3, { style: lastUpdatedLabel, children: "Last Updated" }),
-          /* @__PURE__ */ (0, import_jsx_runtime15.jsx)(Text3, { style: lastUpdatedValue, children: lastUpdated })
+        lastUpdated ? /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(Column, { style: { width: "32%", verticalAlign: "top" }, children: /* @__PURE__ */ (0, import_jsx_runtime14.jsxs)(Section, { style: lastUpdatedBox, children: [
+          /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(Text3, { style: lastUpdatedLabel, children: "Last Updated" }),
+          /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(Text3, { style: lastUpdatedValue, children: lastUpdated })
         ] }) }) : null
       ] }) }) }),
-      !isMultiShipment && totalPackages > 0 ? /* @__PURE__ */ (0, import_jsx_runtime15.jsx)(Section, { style: contentSection, children: /* @__PURE__ */ (0, import_jsx_runtime15.jsxs)(Section, { style: summaryCard, children: [
-        /* @__PURE__ */ (0, import_jsx_runtime15.jsx)(Text3, { style: sectionEyebrow, children: "SHIPMENT SUMMARY" }),
-        summaryHeadline ? /* @__PURE__ */ (0, import_jsx_runtime15.jsx)(Text3, { style: summaryHeadlineStyle, children: summaryHeadline }) : null,
-        summarySubtext ? /* @__PURE__ */ (0, import_jsx_runtime15.jsx)(Text3, { style: summarySubtextStyle, children: summarySubtext }) : null,
-        /* @__PURE__ */ (0, import_jsx_runtime15.jsx)(Hr3, { style: divider }),
-        /* @__PURE__ */ (0, import_jsx_runtime15.jsxs)(Row, { style: { marginTop: "12px" }, children: [
-          /* @__PURE__ */ (0, import_jsx_runtime15.jsxs)(
-            Column,
+      !isMultiShipment && totalPackages > 0 ? /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(Section, { style: contentSection, children: /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(Section, { style: summaryCard, children: /* @__PURE__ */ (0, import_jsx_runtime14.jsxs)(Row, { children: [
+        /* @__PURE__ */ (0, import_jsx_runtime14.jsxs)(Column, { style: summaryMainColumn, children: [
+          /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(Text3, { style: sectionEyebrow, children: "SHIPMENT SUMMARY" }),
+          deliveredCount > 0 && totalPackages > 0 ? /* @__PURE__ */ (0, import_jsx_runtime14.jsxs)(Text3, { style: summaryHeadlineStyle, children: [
+            /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("span", { style: summaryHighlight, children: deliveredCount }),
+            /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("span", { style: summaryHeadlineSuffix, children: ` of ${totalPackages} package${totalPackages === 1 ? "" : "s"} delivered` })
+          ] }) : summaryHeadline ? /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(Text3, { style: summaryHeadlineStyle, children: summaryHeadline }) : null,
+          outForDeliveryCount > 0 ? /* @__PURE__ */ (0, import_jsx_runtime14.jsxs)(Text3, { style: summarySubtextStyle, children: [
+            `Your remaining package${outForDeliveryCount === 1 ? "" : "s"} ${outForDeliveryCount === 1 ? "is" : "are"} `,
+            /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(Link, { href: trackingUrl, style: summaryLink, children: "out for delivery." })
+          ] }) : summarySubtext ? /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(Text3, { style: summarySubtextStyle, children: summarySubtext }) : null
+        ] }),
+        /* @__PURE__ */ (0, import_jsx_runtime14.jsxs)(Column, { style: summaryStatColumn, children: [
+          /* @__PURE__ */ (0, import_jsx_runtime14.jsxs)(Row, { style: summaryStatHeaderRow, children: [
+            /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(Column, { style: summaryStatIconCol, children: /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(
+              Img,
+              {
+                src: icons.checkDelivered,
+                width: "18",
+                height: "18",
+                alt: "",
+                style: summaryStatIcon
+              }
+            ) }),
+            /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(Column, { style: summaryStatLabelCol, children: /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(Text3, { style: summaryStatHeaderLabel, children: "Delivered" }) })
+          ] }),
+          /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(
+            Text3,
             {
               style: {
-                width: "33.33%",
-                verticalAlign: "top",
-                padding: "0 8px"
+                ...summaryStatNumber,
+                color: import_theme.colors.green600
               },
-              children: [
-                /* @__PURE__ */ (0, import_jsx_runtime15.jsx)(Text3, { style: statLabel, children: "Delivered" }),
-                /* @__PURE__ */ (0, import_jsx_runtime15.jsx)(Text3, { style: { ...statValue, color: import_theme.colors.green600 }, children: `${deliveredCount} Package${deliveredCount === 1 ? "" : "s"}` })
-              ]
+              children: deliveredCount
             }
           ),
-          /* @__PURE__ */ (0, import_jsx_runtime15.jsxs)(
-            Column,
+          /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(Text3, { style: summaryStatUnit, children: `Package${deliveredCount === 1 ? "" : "s"}` })
+        ] }),
+        /* @__PURE__ */ (0, import_jsx_runtime14.jsxs)(Column, { style: summaryStatColumn, children: [
+          /* @__PURE__ */ (0, import_jsx_runtime14.jsxs)(Row, { style: summaryStatHeaderRow, children: [
+            /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(Column, { style: summaryStatIconCol, children: /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(
+              Img,
+              {
+                src: icons.truckOut,
+                width: "18",
+                height: "18",
+                alt: "",
+                style: summaryStatIcon
+              }
+            ) }),
+            /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(Column, { style: summaryStatLabelCol, children: /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(Text3, { style: summaryStatHeaderLabel, children: "Out for Delivery" }) })
+          ] }),
+          /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(
+            Text3,
             {
               style: {
-                width: "33.33%",
-                verticalAlign: "top",
-                padding: "0 8px"
+                ...summaryStatNumber,
+                color: import_theme.colors.purple700
               },
-              children: [
-                /* @__PURE__ */ (0, import_jsx_runtime15.jsx)(Text3, { style: statLabel, children: "Out for Delivery" }),
-                /* @__PURE__ */ (0, import_jsx_runtime15.jsx)(Text3, { style: { ...statValue, color: import_theme.colors.purple700 }, children: `${outForDeliveryCount} Package${outForDeliveryCount === 1 ? "" : "s"}` })
-              ]
+              children: outForDeliveryCount
             }
           ),
-          /* @__PURE__ */ (0, import_jsx_runtime15.jsxs)(
-            Column,
+          /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(Text3, { style: summaryStatUnit, children: `Package${outForDeliveryCount === 1 ? "" : "s"}` })
+        ] }),
+        /* @__PURE__ */ (0, import_jsx_runtime14.jsxs)(Column, { style: summaryStatColumn, children: [
+          /* @__PURE__ */ (0, import_jsx_runtime14.jsxs)(Row, { style: summaryStatHeaderRow, children: [
+            /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(Column, { style: summaryStatIconCol, children: /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(
+              Img,
+              {
+                src: icons.packageTotal,
+                width: "18",
+                height: "18",
+                alt: "",
+                style: summaryStatIcon
+              }
+            ) }),
+            /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(Column, { style: summaryStatLabelCol, children: /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(Text3, { style: summaryStatHeaderLabel, children: "Total Packages" }) })
+          ] }),
+          /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(
+            Text3,
             {
               style: {
-                width: "33.33%",
-                verticalAlign: "top",
-                padding: "0 8px"
+                ...summaryStatNumber,
+                color: import_theme.colors.navy
               },
-              children: [
-                /* @__PURE__ */ (0, import_jsx_runtime15.jsx)(Text3, { style: statLabel, children: "Total Packages" }),
-                /* @__PURE__ */ (0, import_jsx_runtime15.jsx)(Text3, { style: statValue, children: `${totalPackages} Package${totalPackages === 1 ? "" : "s"}` })
-              ]
+              children: totalPackages
             }
-          )
+          ),
+          /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(Text3, { style: summaryStatUnit, children: `Package${totalPackages === 1 ? "" : "s"}` })
         ] })
-      ] }) }) : null,
-      !isMultiShipment && visiblePackages.length > 0 ? /* @__PURE__ */ (0, import_jsx_runtime15.jsxs)(Section, { style: contentSection, children: [
-        /* @__PURE__ */ (0, import_jsx_runtime15.jsx)(Text3, { style: sectionTitle, children: "PACKAGE / ITEM DETAILS" }),
-        /* @__PURE__ */ (0, import_jsx_runtime15.jsxs)(Section, { style: tableWrapper, children: [
-          /* @__PURE__ */ (0, import_jsx_runtime15.jsxs)(Row, { style: tableHeaderRow, children: [
-            /* @__PURE__ */ (0, import_jsx_runtime15.jsx)(Column, { style: { ...tableHeaderCell, width: "6%" }, children: "#" }),
-            /* @__PURE__ */ (0, import_jsx_runtime15.jsx)(Column, { style: { ...tableHeaderCell, width: "30%" }, children: "Package / Item" }),
-            /* @__PURE__ */ (0, import_jsx_runtime15.jsx)(Column, { style: { ...tableHeaderCell, width: "24%" }, children: "Tracking No." }),
-            /* @__PURE__ */ (0, import_jsx_runtime15.jsx)(Column, { style: { ...tableHeaderCell, width: "20%" }, children: "Status" }),
-            /* @__PURE__ */ (0, import_jsx_runtime15.jsx)(Column, { style: { ...tableHeaderCell, width: "20%" }, children: "Last Updated" })
+      ] }) }) }) : null,
+      !isMultiShipment && visiblePackages.length > 0 ? /* @__PURE__ */ (0, import_jsx_runtime14.jsxs)(Section, { style: contentSection, children: [
+        /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(Text3, { style: sectionTitle, children: "PACKAGE / ITEM DETAILS" }),
+        /* @__PURE__ */ (0, import_jsx_runtime14.jsxs)(Section, { style: tableWrapper, children: [
+          /* @__PURE__ */ (0, import_jsx_runtime14.jsxs)(Row, { style: tableHeaderRow, children: [
+            /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(Column, { style: { ...tableHeaderCell, width: "6%" }, children: "#" }),
+            /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(Column, { style: { ...tableHeaderCell, width: "30%" }, children: "Package / Item" }),
+            /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(Column, { style: { ...tableHeaderCell, width: "24%" }, children: "Tracking No." }),
+            /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(Column, { style: { ...tableHeaderCell, width: "20%" }, children: "Status" }),
+            /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(Column, { style: { ...tableHeaderCell, width: "20%" }, children: "Last Updated" })
           ] }),
           visiblePackages.map((pkg, index) => {
             const pkgBadgeStyle = (0, import_theme.getStatusBadgeStyle)(pkg.statusCode);
-            return /* @__PURE__ */ (0, import_jsx_runtime15.jsxs)(
+            return /* @__PURE__ */ (0, import_jsx_runtime14.jsxs)(
               Row,
               {
                 style: index % 2 === 0 ? tableRowEven : tableRowOdd,
                 children: [
-                  /* @__PURE__ */ (0, import_jsx_runtime15.jsx)(Column, { style: { ...tableCell, width: "6%" }, children: /* @__PURE__ */ (0, import_jsx_runtime15.jsx)(Text3, { style: tableCellText, children: pkg.index }) }),
-                  /* @__PURE__ */ (0, import_jsx_runtime15.jsxs)(Column, { style: { ...tableCell, width: "30%" }, children: [
-                    /* @__PURE__ */ (0, import_jsx_runtime15.jsx)(Text3, { style: tableCellTextBold, children: pkg.description || "Package" }),
-                    /* @__PURE__ */ (0, import_jsx_runtime15.jsxs)(Text3, { style: tableCellMuted, children: [
+                  /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(Column, { style: { ...tableCell, width: "6%" }, children: /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(Text3, { style: tableCellText, children: pkg.index }) }),
+                  /* @__PURE__ */ (0, import_jsx_runtime14.jsxs)(Column, { style: { ...tableCell, width: "30%" }, children: [
+                    /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(Text3, { style: tableCellTextBold, children: pkg.description || "Package" }),
+                    /* @__PURE__ */ (0, import_jsx_runtime14.jsxs)(Text3, { style: tableCellMuted, children: [
                       pkg.packagingType || "Package",
                       pkg.quantity ? ` \xB7 ${pkg.quantity} qty` : ""
                     ] })
                   ] }),
-                  /* @__PURE__ */ (0, import_jsx_runtime15.jsx)(Column, { style: { ...tableCell, width: "24%" }, children: /* @__PURE__ */ (0, import_jsx_runtime15.jsx)(Text3, { style: tableMono, children: pkg.trackingNumber }) }),
-                  /* @__PURE__ */ (0, import_jsx_runtime15.jsx)(Column, { style: { ...tableCell, width: "20%" }, children: /* @__PURE__ */ (0, import_jsx_runtime15.jsx)(
+                  /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(Column, { style: { ...tableCell, width: "24%" }, children: /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(Text3, { style: tableMono, children: pkg.trackingNumber }) }),
+                  /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(Column, { style: { ...tableCell, width: "20%" }, children: /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(
                     Text3,
                     {
                       style: {
@@ -36071,14 +36059,14 @@ function ShipmentStatusEmail({
                       children: pkg.statusLabel
                     }
                   ) }),
-                  /* @__PURE__ */ (0, import_jsx_runtime15.jsx)(Column, { style: { ...tableCell, width: "20%" }, children: /* @__PURE__ */ (0, import_jsx_runtime15.jsx)(Text3, { style: tableCellMuted, children: pkg.lastUpdated }) })
+                  /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(Column, { style: { ...tableCell, width: "20%" }, children: /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(Text3, { style: tableCellMuted, children: pkg.lastUpdated }) })
                 ]
               },
               pkg.trackingNumber || index
             );
           })
         ] }),
-        /* @__PURE__ */ (0, import_jsx_runtime15.jsxs)(Text3, { style: tableFootnote, children: [
+        /* @__PURE__ */ (0, import_jsx_runtime14.jsxs)(Text3, { style: tableFootnote, children: [
           "Showing 1 to ",
           Math.min(totalPackageRows, PACKAGES_PER_PAGE),
           " of",
@@ -36086,14 +36074,14 @@ function ShipmentStatusEmail({
           totalPackageRows,
           " packages. Each item above represents one package."
         ] }),
-        hasMorePackages ? /* @__PURE__ */ (0, import_jsx_runtime15.jsxs)(Link, { href: trackingUrl, style: viewAllPackagesLink, children: [
+        hasMorePackages ? /* @__PURE__ */ (0, import_jsx_runtime14.jsxs)(Link, { href: trackingUrl, style: viewAllPackagesLink, children: [
           "View all ",
           totalPackageRows,
           " packages on the tracking portal \u2192"
         ] }) : null
       ] }) : null,
-      /* @__PURE__ */ (0, import_jsx_runtime15.jsx)(Section, { style: contentSection, children: /* @__PURE__ */ (0, import_jsx_runtime15.jsx)(Section, { style: softCard, children: /* @__PURE__ */ (0, import_jsx_runtime15.jsxs)(Row, { children: [
-        /* @__PURE__ */ (0, import_jsx_runtime15.jsx)(Column, { style: { width: "52px", verticalAlign: "top" }, children: /* @__PURE__ */ (0, import_jsx_runtime15.jsx)(Section, { style: iconCircle, children: /* @__PURE__ */ (0, import_jsx_runtime15.jsx)(
+      /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(Section, { style: contentSection, children: /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(Section, { style: softCard, children: /* @__PURE__ */ (0, import_jsx_runtime14.jsxs)(Row, { children: [
+        /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(Column, { style: { width: "52px", verticalAlign: "top" }, children: /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(Section, { style: iconCircle, children: /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(
           Img,
           {
             src: icons.mobile,
@@ -36103,7 +36091,7 @@ function ShipmentStatusEmail({
             style: iconImage
           }
         ) }) }),
-        /* @__PURE__ */ (0, import_jsx_runtime15.jsxs)(
+        /* @__PURE__ */ (0, import_jsx_runtime14.jsxs)(
           Column,
           {
             style: {
@@ -36113,12 +36101,12 @@ function ShipmentStatusEmail({
               paddingRight: "12px"
             },
             children: [
-              /* @__PURE__ */ (0, import_jsx_runtime15.jsx)(Text3, { style: blockTitle, children: "Track your shipment anytime" }),
-              /* @__PURE__ */ (0, import_jsx_runtime15.jsx)(Text3, { style: blockBody, children: "Track the entire shipment using your Shipment Tracking Number, or track an individual package using its Package Tracking Number." })
+              /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(Text3, { style: blockTitle, children: "Track your shipment anytime" }),
+              /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(Text3, { style: blockBody, children: "Track the entire shipment using your Shipment Tracking Number, or track an individual package using its Package Tracking Number." })
             ]
           }
         ),
-        /* @__PURE__ */ (0, import_jsx_runtime15.jsxs)(
+        /* @__PURE__ */ (0, import_jsx_runtime14.jsxs)(
           Column,
           {
             style: {
@@ -36127,14 +36115,14 @@ function ShipmentStatusEmail({
               textAlign: "center"
             },
             children: [
-              /* @__PURE__ */ (0, import_jsx_runtime15.jsx)(Button, { href: trackingUrl, style: ctaButton, children: "Track Shipment >" }),
-              /* @__PURE__ */ (0, import_jsx_runtime15.jsx)(Text3, { style: buttonHelper, children: "Opens the Atlas Tracking Portal" })
+              /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(Button, { href: trackingUrl, style: ctaButton, children: "Track Shipment >" }),
+              /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(Text3, { style: buttonHelper, children: "Opens the Atlas Tracking Portal" })
             ]
           }
         )
       ] }) }) }),
-      /* @__PURE__ */ (0, import_jsx_runtime15.jsx)(Section, { style: contentSection, children: /* @__PURE__ */ (0, import_jsx_runtime15.jsx)(Section, { style: whiteCard, children: /* @__PURE__ */ (0, import_jsx_runtime15.jsxs)(Row, { children: [
-        /* @__PURE__ */ (0, import_jsx_runtime15.jsx)(
+      /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(Section, { style: contentSection, children: /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(Section, { style: whiteCard, children: /* @__PURE__ */ (0, import_jsx_runtime14.jsxs)(Row, { children: [
+        /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(
           Column,
           {
             style: {
@@ -36142,8 +36130,8 @@ function ShipmentStatusEmail({
               verticalAlign: "top",
               paddingRight: "16px"
             },
-            children: /* @__PURE__ */ (0, import_jsx_runtime15.jsxs)(Row, { children: [
-              /* @__PURE__ */ (0, import_jsx_runtime15.jsx)(Column, { style: { width: "52px", verticalAlign: "top" }, children: /* @__PURE__ */ (0, import_jsx_runtime15.jsx)(Section, { style: iconCircle, children: /* @__PURE__ */ (0, import_jsx_runtime15.jsx)(
+            children: /* @__PURE__ */ (0, import_jsx_runtime14.jsxs)(Row, { children: [
+              /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(Column, { style: { width: "52px", verticalAlign: "top" }, children: /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(Section, { style: iconCircle, children: /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(
                 Img,
                 {
                   src: icons.envelopeSm,
@@ -36153,15 +36141,15 @@ function ShipmentStatusEmail({
                   style: iconImage
                 }
               ) }) }),
-              /* @__PURE__ */ (0, import_jsx_runtime15.jsxs)(Column, { style: { verticalAlign: "top", paddingLeft: "4px" }, children: [
-                /* @__PURE__ */ (0, import_jsx_runtime15.jsx)(Text3, { style: blockBody, children: "Thank you for choosing Atlas Transportation." }),
-                /* @__PURE__ */ (0, import_jsx_runtime15.jsx)(Text3, { style: blockBodyMuted, children: "We appreciate your trust in us." }),
-                /* @__PURE__ */ (0, import_jsx_runtime15.jsx)(Text3, { style: signature, children: "\u2014 Atlas Team" })
+              /* @__PURE__ */ (0, import_jsx_runtime14.jsxs)(Column, { style: { verticalAlign: "top", paddingLeft: "4px" }, children: [
+                /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(Text3, { style: blockBody, children: "Thank you for choosing Atlas Transportation." }),
+                /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(Text3, { style: blockBodyMuted, children: "We appreciate your trust in us." }),
+                /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(Text3, { style: signature, children: "\u2014 Atlas Team" })
               ] })
             ] })
           }
         ),
-        /* @__PURE__ */ (0, import_jsx_runtime15.jsx)(
+        /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(
           Column,
           {
             style: {
@@ -36170,8 +36158,8 @@ function ShipmentStatusEmail({
               borderLeft: `1px solid ${import_theme.colors.slate200}`,
               paddingLeft: "20px"
             },
-            children: /* @__PURE__ */ (0, import_jsx_runtime15.jsxs)(Row, { children: [
-              /* @__PURE__ */ (0, import_jsx_runtime15.jsx)(Column, { style: { width: "52px", verticalAlign: "top" }, children: /* @__PURE__ */ (0, import_jsx_runtime15.jsx)(Section, { style: iconCircle, children: /* @__PURE__ */ (0, import_jsx_runtime15.jsx)(
+            children: /* @__PURE__ */ (0, import_jsx_runtime14.jsxs)(Row, { children: [
+              /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(Column, { style: { width: "52px", verticalAlign: "top" }, children: /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(Section, { style: iconCircle, children: /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(
                 Img,
                 {
                   src: icons.headset,
@@ -36181,16 +36169,16 @@ function ShipmentStatusEmail({
                   style: iconImage
                 }
               ) }) }),
-              /* @__PURE__ */ (0, import_jsx_runtime15.jsxs)(Column, { style: { verticalAlign: "top", paddingLeft: "4px" }, children: [
-                /* @__PURE__ */ (0, import_jsx_runtime15.jsx)(Text3, { style: blockTitle, children: "Need Help?" }),
-                /* @__PURE__ */ (0, import_jsx_runtime15.jsx)(Text3, { style: blockBodyMuted, children: "Contact our customer service team." }),
-                /* @__PURE__ */ (0, import_jsx_runtime15.jsx)(Text3, { style: contactRow, children: /* @__PURE__ */ (0, import_jsx_runtime15.jsxs)(
+              /* @__PURE__ */ (0, import_jsx_runtime14.jsxs)(Column, { style: { verticalAlign: "top", paddingLeft: "4px" }, children: [
+                /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(Text3, { style: blockTitle, children: "Need Help?" }),
+                /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(Text3, { style: blockBodyMuted, children: "Contact our customer service team." }),
+                /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(Text3, { style: contactRow, children: /* @__PURE__ */ (0, import_jsx_runtime14.jsxs)(
                   Link,
                   {
                     href: `mailto:${supportEmail}`,
                     style: contactLink,
                     children: [
-                      /* @__PURE__ */ (0, import_jsx_runtime15.jsx)(
+                      /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(
                         Img,
                         {
                           src: icons.envelope,
@@ -36210,8 +36198,8 @@ function ShipmentStatusEmail({
           }
         )
       ] }) }) }),
-      /* @__PURE__ */ (0, import_jsx_runtime15.jsx)(Section, { style: contentSection, children: /* @__PURE__ */ (0, import_jsx_runtime15.jsx)(Section, { style: softCard, children: /* @__PURE__ */ (0, import_jsx_runtime15.jsxs)(Row, { children: [
-        /* @__PURE__ */ (0, import_jsx_runtime15.jsx)(Column, { style: { width: "52px", verticalAlign: "top" }, children: /* @__PURE__ */ (0, import_jsx_runtime15.jsx)(Section, { style: iconCircle, children: /* @__PURE__ */ (0, import_jsx_runtime15.jsx)(
+      /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(Section, { style: contentSection, children: /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(Section, { style: softCard, children: /* @__PURE__ */ (0, import_jsx_runtime14.jsxs)(Row, { children: [
+        /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(Column, { style: { width: "52px", verticalAlign: "top" }, children: /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(Section, { style: iconCircle, children: /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(
           Img,
           {
             src: icons.shield,
@@ -36221,15 +36209,15 @@ function ShipmentStatusEmail({
             style: iconImage
           }
         ) }) }),
-        /* @__PURE__ */ (0, import_jsx_runtime15.jsxs)(Column, { style: { verticalAlign: "top", paddingLeft: "12px" }, children: [
-          /* @__PURE__ */ (0, import_jsx_runtime15.jsx)(Text3, { style: blockTitle, children: "Important Reminder" }),
-          /* @__PURE__ */ (0, import_jsx_runtime15.jsx)(Text3, { style: blockBody, children: "Shipment statuses are updated in real-time. For the most accurate and complete information, please visit the Atlas Tracking Portal." }),
-          /* @__PURE__ */ (0, import_jsx_runtime15.jsx)(Text3, { style: blockBody, children: /* @__PURE__ */ (0, import_jsx_runtime15.jsx)(Link, { href: trackingUrl, style: contactLink, children: trackingUrl }) })
+        /* @__PURE__ */ (0, import_jsx_runtime14.jsxs)(Column, { style: { verticalAlign: "top", paddingLeft: "12px" }, children: [
+          /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(Text3, { style: blockTitle, children: "Important Reminder" }),
+          /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(Text3, { style: blockBody, children: "Shipment statuses are updated in real-time. For the most accurate and complete information, please visit the Atlas Tracking Portal." }),
+          /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(Text3, { style: blockBody, children: /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(Link, { href: trackingUrl, style: contactLink, children: trackingUrl }) })
         ] })
       ] }) }) }),
-      /* @__PURE__ */ (0, import_jsx_runtime15.jsxs)(Section, { style: footer, children: [
-        /* @__PURE__ */ (0, import_jsx_runtime15.jsx)(Text3, { style: footerCompany, children: "Atlas Transportation Corporation" }),
-        /* @__PURE__ */ (0, import_jsx_runtime15.jsx)(Text3, { style: footerTagline, children: "Delivering your business. Moving the Philippines." })
+      /* @__PURE__ */ (0, import_jsx_runtime14.jsxs)(Section, { style: footer, children: [
+        /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(Text3, { style: footerCompany, children: "Atlas Transportation Corporation" }),
+        /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(Text3, { style: footerTagline, children: "Delivering your business. Moving the Philippines." })
       ] })
     ] }) })
   ] });
@@ -36254,21 +36242,7 @@ var header = {
 };
 var logo = {
   borderRadius: "10px",
-  marginBottom: "12px"
-};
-var brandName = {
-  color: import_theme.colors.white,
-  fontSize: "18px",
-  fontWeight: "700",
-  letterSpacing: "0.08em",
-  lineHeight: "1.3",
-  margin: "0 0 4px"
-};
-var brandTagline = {
-  color: "#cbd5e1",
-  fontSize: "13px",
-  lineHeight: "1.5",
-  margin: "0"
+  marginBottom: "0"
 };
 var contentSection = {
   padding: "0 32px 24px"
@@ -36354,10 +36328,61 @@ var lastUpdatedValue = {
   margin: "0"
 };
 var summaryCard = {
-  backgroundColor: import_theme.colors.slate50,
+  backgroundColor: import_theme.colors.white,
   border: `1px solid ${import_theme.colors.slate200}`,
   borderRadius: "12px",
-  padding: "20px"
+  overflow: "hidden"
+};
+var summaryMainColumn = {
+  width: "40%",
+  verticalAlign: "middle",
+  padding: "20px 18px"
+};
+var summaryStatColumn = {
+  width: "20%",
+  verticalAlign: "middle",
+  borderLeft: `1px solid ${import_theme.colors.slate200}`,
+  padding: "18px 10px",
+  textAlign: "center"
+};
+var summaryStatHeaderRow = {
+  width: "auto",
+  margin: "0 auto"
+};
+var summaryStatIconCol = {
+  width: "20px",
+  verticalAlign: "middle"
+};
+var summaryStatLabelCol = {
+  verticalAlign: "middle",
+  paddingLeft: "4px"
+};
+var summaryStatIcon = {
+  display: "block",
+  margin: "0"
+};
+var summaryStatHeaderLabel = {
+  color: import_theme.colors.navy,
+  fontSize: "11px",
+  fontWeight: "600",
+  lineHeight: "1.3",
+  margin: "0",
+  whiteSpace: "nowrap"
+};
+var summaryStatNumber = {
+  fontSize: "28px",
+  fontWeight: "700",
+  lineHeight: "1.1",
+  margin: "10px 0 2px",
+  textAlign: "center"
+};
+var summaryStatUnit = {
+  color: import_theme.colors.slate500,
+  fontSize: "11px",
+  fontWeight: "500",
+  lineHeight: "1.3",
+  margin: "0",
+  textAlign: "center"
 };
 var sectionEyebrow = {
   color: import_theme.colors.navy,
@@ -36369,32 +36394,31 @@ var sectionEyebrow = {
 };
 var summaryHeadlineStyle = {
   color: import_theme.colors.navy,
-  fontSize: "24px",
+  fontSize: "18px",
   fontWeight: "700",
-  lineHeight: "1.3",
-  margin: "0 0 6px"
+  lineHeight: "1.35",
+  margin: "0 0 8px"
+};
+var summaryHighlight = {
+  color: import_theme.colors.green600,
+  fontSize: "28px",
+  fontWeight: "700"
+};
+var summaryHeadlineSuffix = {
+  color: import_theme.colors.navy,
+  fontSize: "18px",
+  fontWeight: "700"
 };
 var summarySubtextStyle = {
   color: import_theme.colors.slate600,
-  fontSize: "14px",
+  fontSize: "13px",
   lineHeight: "1.6",
-  margin: "0 0 8px"
-};
-var divider = {
-  borderColor: import_theme.colors.slate200,
-  margin: "16px 0 0"
-};
-var statLabel = {
-  color: import_theme.colors.slate500,
-  fontSize: "12px",
-  fontWeight: "600",
-  margin: "0 0 4px"
-};
-var statValue = {
-  fontSize: "14px",
-  fontWeight: "700",
-  lineHeight: "1.4",
   margin: "0"
+};
+var summaryLink = {
+  color: import_theme.colors.navy,
+  fontSize: "13px",
+  textDecoration: "underline"
 };
 var sectionTitle = {
   color: import_theme.colors.navy,

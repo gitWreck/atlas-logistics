@@ -15,7 +15,7 @@ const EMAIL_ICON_BASE_URL =
   "https://atlas-tracking.web.app/email";
 
 const SUPPORT_EMAIL = "support@atlastransport.ph";
-const LOGO_URL = `${TRACKING_BASE_URL}/atlas-logo-white.png`;
+const LOGO_URL = `${EMAIL_ICON_BASE_URL}/atlas-logo.jpeg`;
 
 const NOTIFICATION_SUMMARY = Object.freeze({
   RECEIVED_AT_DIVISORIA: {

@@ -36,7 +36,7 @@ export function ShipmentStatusEmail({
   packages = [],
   trackingUrl = "https://atlastransport.ph/track",
   supportEmail = "support@atlastransport.ph",
-  logoUrl = "https://atlastransport.ph/atlas-logo-white.png",
+  logoUrl = "https://atlas-tracking.web.app/email/atlas-logo.jpeg",
   iconBaseUrl = "https://atlastransport.ph/email",
   isMultiShipment = false,
   shipmentIds = [],
@@ -60,13 +60,11 @@ export function ShipmentStatusEmail({
               <Column>
                 <Img
                   src={logoUrl}
-                  width="56"
-                  height="56"
-                  alt="Atlas Transportation"
+                  width="120"
+                  height="120"
+                  alt="Atlas Transportation — Fast and Easy Shipping"
                   style={logo}
                 />
-                <Text style={brandName}>ATLAS TRANSPORTATION</Text>
-                <Text style={brandTagline}>On Time. In Full. Every Time.</Text>
               </Column>
             </Row>
           </Section>
@@ -132,49 +130,116 @@ export function ShipmentStatusEmail({
           {!isMultiShipment && totalPackages > 0 ? (
             <Section style={contentSection}>
               <Section style={summaryCard}>
-                <Text style={sectionEyebrow}>SHIPMENT SUMMARY</Text>
-                {summaryHeadline ? (
-                  <Text style={summaryHeadlineStyle}>{summaryHeadline}</Text>
-                ) : null}
-                {summarySubtext ? (
-                  <Text style={summarySubtextStyle}>{summarySubtext}</Text>
-                ) : null}
-                <Hr style={divider} />
-                <Row style={{ marginTop: "12px" }}>
-                  <Column
-                    style={{
-                      width: "33.33%",
-                      verticalAlign: "top",
-                      padding: "0 8px",
-                    }}
-                  >
-                    <Text style={statLabel}>Delivered</Text>
-                    <Text style={{ ...statValue, color: colors.green600 }}>
-                      {`${deliveredCount} Package${deliveredCount === 1 ? "" : "s"}`}
+                <Row>
+                  <Column style={summaryMainColumn}>
+                    <Text style={sectionEyebrow}>SHIPMENT SUMMARY</Text>
+                    {deliveredCount > 0 && totalPackages > 0 ? (
+                      <Text style={summaryHeadlineStyle}>
+                        <span style={summaryHighlight}>{deliveredCount}</span>
+                        <span style={summaryHeadlineSuffix}>
+                          {` of ${totalPackages} package${totalPackages === 1 ? "" : "s"} delivered`}
+                        </span>
+                      </Text>
+                    ) : summaryHeadline ? (
+                      <Text style={summaryHeadlineStyle}>{summaryHeadline}</Text>
+                    ) : null}
+                    {outForDeliveryCount > 0 ? (
+                      <Text style={summarySubtextStyle}>
+                        {`Your remaining package${outForDeliveryCount === 1 ? "" : "s"} ${outForDeliveryCount === 1 ? "is" : "are"} `}
+                        <Link href={trackingUrl} style={summaryLink}>
+                          out for delivery.
+                        </Link>
+                      </Text>
+                    ) : summarySubtext ? (
+                      <Text style={summarySubtextStyle}>{summarySubtext}</Text>
+                    ) : null}
+                  </Column>
+
+                  <Column style={summaryStatColumn}>
+                    <Row style={summaryStatHeaderRow}>
+                      <Column style={summaryStatIconCol}>
+                        <Img
+                          src={icons.checkDelivered}
+                          width="18"
+                          height="18"
+                          alt=""
+                          style={summaryStatIcon}
+                        />
+                      </Column>
+                      <Column style={summaryStatLabelCol}>
+                        <Text style={summaryStatHeaderLabel}>Delivered</Text>
+                      </Column>
+                    </Row>
+                    <Text
+                      style={{
+                        ...summaryStatNumber,
+                        color: colors.green600,
+                      }}
+                    >
+                      {deliveredCount}
+                    </Text>
+                    <Text style={summaryStatUnit}>
+                      {`Package${deliveredCount === 1 ? "" : "s"}`}
                     </Text>
                   </Column>
-                  <Column
-                    style={{
-                      width: "33.33%",
-                      verticalAlign: "top",
-                      padding: "0 8px",
-                    }}
-                  >
-                    <Text style={statLabel}>Out for Delivery</Text>
-                    <Text style={{ ...statValue, color: colors.purple700 }}>
-                      {`${outForDeliveryCount} Package${outForDeliveryCount === 1 ? "" : "s"}`}
+
+                  <Column style={summaryStatColumn}>
+                    <Row style={summaryStatHeaderRow}>
+                      <Column style={summaryStatIconCol}>
+                        <Img
+                          src={icons.truckOut}
+                          width="18"
+                          height="18"
+                          alt=""
+                          style={summaryStatIcon}
+                        />
+                      </Column>
+                      <Column style={summaryStatLabelCol}>
+                        <Text style={summaryStatHeaderLabel}>
+                          Out for Delivery
+                        </Text>
+                      </Column>
+                    </Row>
+                    <Text
+                      style={{
+                        ...summaryStatNumber,
+                        color: colors.purple700,
+                      }}
+                    >
+                      {outForDeliveryCount}
+                    </Text>
+                    <Text style={summaryStatUnit}>
+                      {`Package${outForDeliveryCount === 1 ? "" : "s"}`}
                     </Text>
                   </Column>
-                  <Column
-                    style={{
-                      width: "33.33%",
-                      verticalAlign: "top",
-                      padding: "0 8px",
-                    }}
-                  >
-                    <Text style={statLabel}>Total Packages</Text>
-                    <Text style={statValue}>
-                      {`${totalPackages} Package${totalPackages === 1 ? "" : "s"}`}
+
+                  <Column style={summaryStatColumn}>
+                    <Row style={summaryStatHeaderRow}>
+                      <Column style={summaryStatIconCol}>
+                        <Img
+                          src={icons.packageTotal}
+                          width="18"
+                          height="18"
+                          alt=""
+                          style={summaryStatIcon}
+                        />
+                      </Column>
+                      <Column style={summaryStatLabelCol}>
+                        <Text style={summaryStatHeaderLabel}>
+                          Total Packages
+                        </Text>
+                      </Column>
+                    </Row>
+                    <Text
+                      style={{
+                        ...summaryStatNumber,
+                        color: colors.navy,
+                      }}
+                    >
+                      {totalPackages}
+                    </Text>
+                    <Text style={summaryStatUnit}>
+                      {`Package${totalPackages === 1 ? "" : "s"}`}
                     </Text>
                   </Column>
                 </Row>
@@ -454,23 +519,7 @@ const header = {
 
 const logo = {
   borderRadius: "10px",
-  marginBottom: "12px",
-};
-
-const brandName = {
-  color: colors.white,
-  fontSize: "18px",
-  fontWeight: "700",
-  letterSpacing: "0.08em",
-  lineHeight: "1.3",
-  margin: "0 0 4px",
-};
-
-const brandTagline = {
-  color: "#cbd5e1",
-  fontSize: "13px",
-  lineHeight: "1.5",
-  margin: "0",
+  marginBottom: "0",
 };
 
 const contentSection = {
@@ -569,10 +618,70 @@ const lastUpdatedValue = {
 };
 
 const summaryCard = {
-  backgroundColor: colors.slate50,
+  backgroundColor: colors.white,
   border: `1px solid ${colors.slate200}`,
   borderRadius: "12px",
-  padding: "20px",
+  overflow: "hidden",
+};
+
+const summaryMainColumn = {
+  width: "40%",
+  verticalAlign: "middle",
+  padding: "20px 18px",
+};
+
+const summaryStatColumn = {
+  width: "20%",
+  verticalAlign: "middle",
+  borderLeft: `1px solid ${colors.slate200}`,
+  padding: "18px 10px",
+  textAlign: "center",
+};
+
+const summaryStatHeaderRow = {
+  width: "auto",
+  margin: "0 auto",
+};
+
+const summaryStatIconCol = {
+  width: "20px",
+  verticalAlign: "middle",
+};
+
+const summaryStatLabelCol = {
+  verticalAlign: "middle",
+  paddingLeft: "4px",
+};
+
+const summaryStatIcon = {
+  display: "block",
+  margin: "0",
+};
+
+const summaryStatHeaderLabel = {
+  color: colors.navy,
+  fontSize: "11px",
+  fontWeight: "600",
+  lineHeight: "1.3",
+  margin: "0",
+  whiteSpace: "nowrap",
+};
+
+const summaryStatNumber = {
+  fontSize: "28px",
+  fontWeight: "700",
+  lineHeight: "1.1",
+  margin: "10px 0 2px",
+  textAlign: "center",
+};
+
+const summaryStatUnit = {
+  color: colors.slate500,
+  fontSize: "11px",
+  fontWeight: "500",
+  lineHeight: "1.3",
+  margin: "0",
+  textAlign: "center",
 };
 
 const sectionEyebrow = {
@@ -586,36 +695,35 @@ const sectionEyebrow = {
 
 const summaryHeadlineStyle = {
   color: colors.navy,
-  fontSize: "24px",
+  fontSize: "18px",
   fontWeight: "700",
-  lineHeight: "1.3",
-  margin: "0 0 6px",
+  lineHeight: "1.35",
+  margin: "0 0 8px",
+};
+
+const summaryHighlight = {
+  color: colors.green600,
+  fontSize: "28px",
+  fontWeight: "700",
+};
+
+const summaryHeadlineSuffix = {
+  color: colors.navy,
+  fontSize: "18px",
+  fontWeight: "700",
 };
 
 const summarySubtextStyle = {
   color: colors.slate600,
-  fontSize: "14px",
+  fontSize: "13px",
   lineHeight: "1.6",
-  margin: "0 0 8px",
-};
-
-const divider = {
-  borderColor: colors.slate200,
-  margin: "16px 0 0",
-};
-
-const statLabel = {
-  color: colors.slate500,
-  fontSize: "12px",
-  fontWeight: "600",
-  margin: "0 0 4px",
-};
-
-const statValue = {
-  fontSize: "14px",
-  fontWeight: "700",
-  lineHeight: "1.4",
   margin: "0",
+};
+
+const summaryLink = {
+  color: colors.navy,
+  fontSize: "13px",
+  textDecoration: "underline",
 };
 
 const sectionTitle = {

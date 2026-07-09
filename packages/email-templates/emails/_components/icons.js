@@ -8,6 +8,9 @@ function getIconUrls(iconBaseUrl = DEFAULT_ICON_BASE) {
     headset: `${base}/headset.png`,
     shield: `${base}/shield.png`,
     envelope: `${base}/envelope.png`,
+    checkDelivered: `${base}/check-delivered.png`,
+    truckOut: `${base}/truck-out.png`,
+    packageTotal: `${base}/package-total.png`,
   };
 }
 
