@@ -5,7 +5,7 @@ export function normalizeTrackingCode(code = "") {
 /** Piece labels like AT-...-SHP-583090-01 → parent shipment AT-...-SHP-583090 */
 export function deriveParentShipmentCode(code = "") {
   const normalized = normalizeTrackingCode(code);
-  const match = normalized.match(/^(AT-\d{8}-SHP-\d+)-(\d{2})$/);
+  const match = normalized.match(/^(AT-\d{8}-SHP-\d+)-(\d+)$/);
   return match ? match[1] : null;
 }
 

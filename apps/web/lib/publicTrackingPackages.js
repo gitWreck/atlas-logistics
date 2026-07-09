@@ -38,7 +38,7 @@ export function sanitizePublicPackage(pkg = {}, index = 0) {
     packagingType: pkg.packagingType || "Package",
     quantity: Number(pkg.quantity) || 1,
     sequence: pkg.sequence || index + 1,
-    status: pkg.status || formatPublicPackageStatus(statusCode),
+    status: formatPublicPackageStatus(statusCode),
     statusCode,
     isFragile: Boolean(pkg.isFragile),
     isPerishable: Boolean(pkg.isPerishable),

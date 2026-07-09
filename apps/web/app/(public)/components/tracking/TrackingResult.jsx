@@ -89,11 +89,11 @@ export default function TrackingResult({ data }) {
     Array.isArray(data.packages) ? data.packages : [],
   );
   const [packagesLoading, setPackagesLoading] = useState(
-    !Array.isArray(data.packages) || data.packages.length === 0,
+    !Array.isArray(data.packages),
   );
 
   useEffect(() => {
-    if (Array.isArray(data.packages) && data.packages.length > 0) {
+    if (Array.isArray(data.packages)) {
       setPackages(data.packages);
       setPackagesLoading(false);
       return;
