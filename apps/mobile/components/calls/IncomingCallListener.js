@@ -93,7 +93,11 @@ export default function IncomingCallListener() {
     remoteViewId,
     localVideoReady,
     remoteVideoReady,
+    remoteUserId,
     mediaNotice,
+    NativeLocalVideoView,
+    NativeRemoteVideoView,
+    nativeVideoStreamType,
   } = useTencentWebCall({
     activeCall,
     userId: user?.uid,
@@ -733,6 +737,29 @@ export default function IncomingCallListener() {
                   overflow: "hidden",
                 },
               })}
+            </View>
+          ) : null}
+
+          {Platform.OS !== "web" && activeCall?.type === "video" ? (
+            <View style={styles.videoStage}>
+              {remoteUserId && remoteVideoReady && NativeRemoteVideoView ? (
+                <NativeRemoteVideoView
+                  userId={remoteUserId}
+                  streamType={nativeVideoStreamType}
+                  style={styles.remoteVideo}
+                />
+              ) : (
+                <View style={styles.remoteVideoPlaceholder}>
+                  <FontAwesome5 name="video" size={30} color="#94a3b8" />
+                  <Text style={styles.remoteVideoText}>Connecting video...</Text>
+                </View>
+              )}
+              {localVideoReady && NativeLocalVideoView ? (
+                <NativeLocalVideoView
+                  frontCamera={cameraType !== "back"}
+                  style={styles.localVideo}
+                />
+              ) : null}
             </View>
           ) : null}
 

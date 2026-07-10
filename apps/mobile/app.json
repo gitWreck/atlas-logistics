@@ -18,6 +18,8 @@
       "bundleIdentifier": "com.atlas.tracking",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
+        "NSCameraUsageDescription": "Atlas uses the camera for video calls.",
+        "NSMicrophoneUsageDescription": "Atlas uses the microphone for voice and video calls.",
         "NSLocationWhenInUseUsageDescription": "Atlas uses your location to update package tracking and trip progress while you are on the road."
       }
     },
@@ -29,6 +31,9 @@
         "android.permission.ACCESS_FINE_LOCATION",
         "android.permission.ACCESS_COARSE_LOCATION",
         "android.permission.RECORD_AUDIO",
+        "android.permission.CAMERA",
+        "android.permission.MODIFY_AUDIO_SETTINGS",
+        "android.permission.BLUETOOTH_CONNECT",
         "android.permission.POST_NOTIFICATIONS"
       ],
       "adaptiveIcon": {
