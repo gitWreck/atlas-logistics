@@ -18,7 +18,7 @@ export const DEFAULT_CUSTOMER_NOTIFICATION_CHANNELS = {
 /** Used when creating a new shipment — customer should get a receive confirmation. */
 export const DEFAULT_SHIPMENT_CREATION_NOTIFICATION_CHANNELS = {
   sms: true,
-  email: false,
+  email: true,
   push: true,
 };
 

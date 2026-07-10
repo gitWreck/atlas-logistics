@@ -168,7 +168,7 @@ export default function ReceivePackageForm({
         notifyPush: true,
         notificationChannels: {
           sms: true,
-          email: false,
+          email: true,
           push: true,
         },
       };
