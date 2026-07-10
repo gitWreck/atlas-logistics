@@ -790,6 +790,10 @@ export default function ChatInbox({ user, profile, isDark = false, onViewCustome
       });
     } catch (err) {
       console.error("Call failed:", err);
+      alert(
+        err?.message ||
+          `Unable to start the ${callType === "video" ? "video" : "voice"} call.`,
+      );
     } finally {
       setCalling(false);
     }
@@ -1012,7 +1016,7 @@ export default function ChatInbox({ user, profile, isDark = false, onViewCustome
                 </div>
 
                 <div className="flex items-center gap-2">
-                  {role === "manager" && !selectedIsDirect && (
+                  {role === "manager" && (
                     <div className="flex items-center gap-2">
                       <button
                         type="button"
@@ -1448,7 +1452,7 @@ export default function ChatInbox({ user, profile, isDark = false, onViewCustome
                         disabled={calling || selected?.status === "closed"}
                         className={`flex items-center gap-3 rounded-lg px-2 py-2 text-sm transition disabled:opacity-60 ${isDark ? "hover:bg-slate-800" : "hover:bg-slate-100"}`}
                       >
-                        <FontAwesomeIcon icon={faPhone} className="text-blue-600" />
+                        <FontAwesomeIcon icon={faVideo} className="text-blue-600" />
                         Start Video Call
                       </button>
                     </>
