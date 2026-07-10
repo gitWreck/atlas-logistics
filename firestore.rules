@@ -85,9 +85,8 @@ service cloud.firestore {
         );
     }
 
-    function canListDirectStaffConversation(conversation) {
+    function canListParticipantConversation(conversation) {
       return isActiveUser()
-        && conversation.get('type', '') == 'direct_staff'
         && request.auth.uid in conversation.get('participantIds', []);
     }
 
@@ -149,7 +148,7 @@ service cloud.firestore {
         || (hasRole('employee') && (resource.data.assignedTo == request.auth.uid || resource.data.assignedStaffId == request.auth.uid));
 
       allow list: if hasRole('admin')
-        || canListDirectStaffConversation(resource.data)
+        || canListParticipantConversation(resource.data)
         || (hasRole('customer') && resource.data.customerId == request.auth.uid)
         || (hasRole('manager') && (resource.data.assignedTo == request.auth.uid || resource.data.assignedStaffId == request.auth.uid))
         || (hasRole('employee') && (resource.data.assignedTo == request.auth.uid || resource.data.assignedStaffId == request.auth.uid));
