@@ -167,10 +167,25 @@ export default function UnifiedShipmentModal({
       }
 
       // --- Construct Base Payload ---
+      if (
+        notificationChannels.email &&
+        !shipmentDraft.sender.email &&
+        !shipmentDraft.recipient.email &&
+        !shipmentDraft.sender.uid &&
+        !shipmentDraft.recipient.uid
+      ) {
+        setLoading(false);
+        return alert(
+          "Email is enabled, but neither sender nor recipient has an email address. Add an email or pick a registered customer.",
+        );
+      }
+
       const payload = {
         sender: {
+          uid: shipmentDraft.sender.uid || null,
           name: shipmentDraft.sender.name,
           phone: shipmentDraft.sender.phone,
+          email: shipmentDraft.sender.email || null,
           address: {
             unit: shipmentDraft.sender.unit,
             street: shipmentDraft.sender.street,
@@ -180,8 +195,10 @@ export default function UnifiedShipmentModal({
           },
         },
         recipient: {
+          uid: shipmentDraft.recipient.uid || null,
           name: shipmentDraft.recipient.name,
           phone: shipmentDraft.recipient.phone,
+          email: shipmentDraft.recipient.email || null,
           address: {
             unit: shipmentDraft.recipient.unit,
             street: shipmentDraft.recipient.street,
@@ -244,10 +261,23 @@ export default function UnifiedShipmentModal({
               })),
           );
           const smsIssue = channelIssues.find((issue) => issue.channel === "SMS");
+          const emailIssue = channelIssues.find(
+            (issue) => issue.channel === "EMAIL",
+          );
           if (notificationChannels.sms && smsIssue && smsIssue.reason !== "queued") {
             console.warn("[createShipment] SMS notification issue:", smsIssue);
             alert(
               `Shipment saved, but SMS was not sent (${smsIssue.reason}). Check Notification History or retry from Admin.`,
+            );
+          }
+          if (
+            notificationChannels.email &&
+            emailIssue &&
+            emailIssue.reason !== "queued"
+          ) {
+            console.warn("[createShipment] Email notification issue:", emailIssue);
+            alert(
+              `Shipment saved, but email was not sent (${emailIssue.reason}). Add a customer email or check Notification History.`,
             );
           }
         }

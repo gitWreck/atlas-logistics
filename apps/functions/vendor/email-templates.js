@@ -35859,7 +35859,7 @@ function ShipmentStatusEmail({
   trackingUrl = "https://atlastransport.ph/track",
   supportEmail = "support@atlastransport.ph",
   logoUrl = "https://atlas-tracking.web.app/email/atlas-logo.jpeg",
-  iconBaseUrl = "https://atlastransport.ph/email",
+  iconBaseUrl = "https://atlas-tracking.web.app/email",
   isMultiShipment = false,
   shipmentIds = []
 }) {

@@ -1149,19 +1149,31 @@ async function sendShipmentCreatedCustomerNotifications({
   actor = {},
   tripId = null,
 }) {
+  let savedSender = {};
+  let savedRecipient = {};
+
+  if (shipmentId) {
+    const shipmentSnap = await db.collection("shipments").doc(String(shipmentId)).get();
+    if (shipmentSnap.exists) {
+      const saved = shipmentSnap.data() || {};
+      savedSender = saved.sender || {};
+      savedRecipient = saved.recipient || {};
+    }
+  }
+
   const groups = uniqueCustomerGroups(
     [
       {
-        phone: sender.phone,
-        email: sender.email,
-        uid: sender.uid,
-        name: sender.name,
+        phone: sender.phone || savedSender.phone,
+        email: sender.email || savedSender.email,
+        uid: sender.uid || savedSender.uid,
+        name: sender.name || savedSender.name,
       },
       {
-        phone: recipient.phone,
-        email: recipient.email,
-        uid: recipient.uid,
-        name: recipient.name,
+        phone: recipient.phone || savedRecipient.phone,
+        email: recipient.email || savedRecipient.email,
+        uid: recipient.uid || savedRecipient.uid,
+        name: recipient.name || savedRecipient.name,
       },
     ],
     shipmentId,

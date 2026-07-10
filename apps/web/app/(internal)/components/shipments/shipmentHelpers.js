@@ -22,6 +22,7 @@ const INITIAL_CONTACT = {
   userId: null,
   name: "",
   phone: "",
+  email: "",
   unit: "",
   street: "",
   barangay: "",

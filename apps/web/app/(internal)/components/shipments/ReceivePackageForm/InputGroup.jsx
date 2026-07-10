@@ -51,6 +51,8 @@ export default function InputGroup({
     const addr = customer.address || {};
     onChange({
       ...values,
+      uid: customer.uid || null,
+      email: customer.email || "",
       name: customer.name,
       phone: customer.phoneNumber || "",
       unit: addr.unit || "",
@@ -164,6 +166,14 @@ export default function InputGroup({
           }}
         />
       </div>
+
+      <input
+        placeholder="Email (optional)"
+        type="email"
+        className={inputClass}
+        value={values.email || ""}
+        onChange={(e) => handleChange("email", e.target.value)}
+      />
 
       {/* STREET INFO */}
       <div className="grid grid-cols-3 gap-3">
