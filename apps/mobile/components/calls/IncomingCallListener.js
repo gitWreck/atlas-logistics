@@ -18,6 +18,7 @@ import {
   createCallHistoryMessage,
   updateConversationCallStatus,
 } from "../utilities/FirebaseFunctions";
+import useTencentWebCall from "./useTencentWebCall";
 
 function getCallTitle(call) {
   const type = String(call?.type || "voice").toLowerCase();
@@ -87,6 +88,20 @@ export default function IncomingCallListener() {
   const peerConnectionRef = useRef(null);
   const rtcCallIdRef = useRef(null);
   const processedCandidatesRef = useRef(new Set());
+  const {
+    localViewId,
+    remoteViewId,
+    localVideoReady,
+    remoteVideoReady,
+    mediaNotice,
+  } = useTencentWebCall({
+    activeCall,
+    userId: user?.uid,
+    isMuted,
+    isSpeakerOn,
+    isCameraOn,
+    cameraType,
+  });
 
   const cleanupWebRtc = () => {
     const peer = peerConnectionRef.current;
@@ -365,35 +380,6 @@ export default function IncomingCallListener() {
   useEffect(() => {
     activeCallRef.current = activeCall;
   }, [activeCall]);
-
-  useEffect(() => {
-    if (Platform.OS !== "web") return undefined;
-
-    const status = String(activeCall?.status || "").trim().toLowerCase();
-    const isCaller = String(activeCall?.callerId || "") === user?.uid;
-    const shouldStartMedia = Boolean(
-      activeCall?.id &&
-        ((isCaller && status === "ringing") ||
-          ["accepted", "connecting", "connected", "ongoing"].includes(status)),
-    );
-
-    if (!shouldStartMedia) {
-      if (!activeCall || ["declined", "missed", "cancelled", "ended"].includes(status)) {
-        cleanupWebRtc();
-      }
-      return undefined;
-    }
-
-    void ensureWebRtc(activeCall);
-    return undefined;
-  }, [
-    activeCall?.id,
-    activeCall?.status,
-    activeCall?.rtcOffer?.sdp,
-    activeCall?.rtcAnswer?.sdp,
-    activeCall?.rtcCandidates,
-    user?.uid,
-  ]);
 
   useEffect(() => {
     const stream = localMediaStream;
@@ -725,35 +711,32 @@ export default function IncomingCallListener() {
             {conversationTitle || (activeCall?.conversationId ? `Conversation ${activeCall.conversationId}` : "Conversation call")}
           </Text>
 
-          {Platform.OS === "web" && activeCall?.type === "video" && localMediaStream ? (
+          {Platform.OS === "web" && activeCall?.type === "video" ? (
             <View style={styles.videoStage}>
-              {remoteMediaStream ? (
-                <WebMediaElement
-                  stream={remoteMediaStream}
-                  muted={!isSpeakerOn}
-                  style={styles.remoteVideo}
-                />
-              ) : (
+              {React.createElement("div", {
+                id: remoteViewId,
+                style: styles.remoteVideo,
+              })}
+              {!remoteVideoReady ? (
                 <View style={styles.remoteVideoPlaceholder}>
                   <FontAwesome5 name="video" size={30} color="#94a3b8" />
                   <Text style={styles.remoteVideoText}>
                     {isCallerRinging ? "Waiting for an answer..." : "Connecting video..."}
                   </Text>
                 </View>
-              )}
-              <WebMediaElement
-                stream={localMediaStream}
-                muted
-                style={styles.localVideo}
-              />
+              ) : null}
+              {React.createElement("div", {
+                id: localViewId,
+                style: {
+                  ...styles.localVideo,
+                  opacity: localVideoReady ? 1 : 0,
+                  overflow: "hidden",
+                },
+              })}
             </View>
           ) : null}
 
-          {Platform.OS === "web" && activeCall?.type !== "video" ? (
-            <WebMediaElement stream={remoteMediaStream} muted={!isSpeakerOn} hidden />
-          ) : null}
-
-          {rtcNotice ? <Text style={styles.rtcNotice}>{rtcNotice}</Text> : null}
+          {mediaNotice ? <Text style={styles.rtcNotice}>{mediaNotice}</Text> : null}
 
           <Text style={styles.statusText}>{statusLabel}</Text>
 
@@ -958,6 +941,9 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   remoteVideo: {
+    position: "absolute",
+    top: 0,
+    left: 0,
     width: "100%",
     height: "100%",
     objectFit: "cover",

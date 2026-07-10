@@ -1,13 +1,17 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
-import { arrayUnion, doc, serverTimestamp, updateDoc } from "firebase/firestore";
+import { useEffect, useMemo, useRef, useState } from "react";
 
-import { db } from "@/lib/firebase";
-import { updateConversationCallStatus } from "@/app/utility/FirebaseFunctions";
+import {
+  generateTencentUserSig,
+  updateConversationCallStatus,
+} from "@/app/utility/FirebaseFunctions";
 
-const MEDIA_STATUSES = ["accepted", "connecting", "connected", "ongoing"];
-const TERMINAL_STATUSES = ["declined", "missed", "cancelled", "ended"];
+const MEDIA_STATUSES = ["ringing", "accepted", "connecting", "connected", "ongoing"];
+
+function safeDomId(prefix, value) {
+  return `${prefix}-${String(value || "call").replace(/[^a-zA-Z0-9_-]/g, "-")}`;
+}
 
 export default function useWebRtcCall({
   activeCall,
@@ -17,208 +21,151 @@ export default function useWebRtcCall({
   isCameraOn,
   cameraType,
 }) {
-  const [localStream, setLocalStream] = useState(null);
-  const [remoteStream, setRemoteStream] = useState(null);
+  const [localVideoReady, setLocalVideoReady] = useState(false);
+  const [remoteVideoReady, setRemoteVideoReady] = useState(false);
   const [mediaNotice, setMediaNotice] = useState("");
-  const peerRef = useRef(null);
+  const trtcRef = useRef(null);
   const callIdRef = useRef(null);
-  const processedCandidatesRef = useRef(new Set());
+  const startingCallIdRef = useRef(null);
+  const remoteUserIdRef = useRef(null);
 
-  const cleanup = useCallback(() => {
-    const peer = peerRef.current;
-    if (peer) {
-      peer.onicecandidate = null;
-      peer.ontrack = null;
-      peer.onconnectionstatechange = null;
-      peer.close();
-    }
-    peerRef.current = null;
-    callIdRef.current = null;
-    processedCandidatesRef.current.clear();
-    setLocalStream((current) => {
-      current?.getTracks?.().forEach((track) => track.stop());
-      return null;
-    });
-    setRemoteStream(null);
-    setMediaNotice("");
-  }, []);
+  const localViewId = useMemo(() => safeDomId("atlas-local", activeCall?.id), [activeCall?.id]);
+  const remoteViewId = useMemo(() => safeDomId("atlas-remote", activeCall?.id), [activeCall?.id]);
 
-  const syncRemoteSignals = useCallback(async (call, peer, isCaller) => {
-    const remoteDescription = isCaller ? call?.rtcAnswer : call?.rtcOffer;
-    if (remoteDescription?.sdp && !peer.currentRemoteDescription) {
-      await peer.setRemoteDescription(remoteDescription);
-    }
-    if (!peer.currentRemoteDescription) return;
+  useEffect(() => {
+    const status = String(activeCall?.status || "").toLowerCase();
+    const shouldStart =
+      MEDIA_STATUSES.includes(status) &&
+      (status !== "ringing" || activeCall?.callerId === userId);
+    if (!activeCall?.id || !userId || !shouldStart) return undefined;
+    if (callIdRef.current === activeCall.id || startingCallIdRef.current === activeCall.id) return undefined;
 
-    const remoteUserId = isCaller ? call.receiverId : call.callerId;
-    for (const candidate of call?.rtcCandidates?.[remoteUserId] || []) {
-      const key = JSON.stringify(candidate);
-      if (processedCandidatesRef.current.has(key)) continue;
+    let cancelled = false;
+    startingCallIdRef.current = activeCall.id;
+
+    const start = async () => {
       try {
-        await peer.addIceCandidate(candidate);
-        processedCandidatesRef.current.add(key);
-      } catch (error) {
-        console.warn("Unable to add remote ICE candidate", error);
-      }
-    }
-  }, []);
+        const [{ default: TRTC }, signatureResult] = await Promise.all([
+          import("trtc-sdk-v5"),
+          generateTencentUserSig({}),
+        ]);
+        if (cancelled) return;
 
-  const publishAnswer = useCallback(async (call, peer) => {
-    if (
-      !call?.rtcOffer?.sdp ||
-      call?.rtcAnswer?.sdp ||
-      !peer.currentRemoteDescription ||
-      peer.currentLocalDescription
-    ) {
-      return;
-    }
-    const answer = await peer.createAnswer();
-    await peer.setLocalDescription(answer);
-    await updateDoc(doc(db, "calls", call.id), {
-      rtcAnswer: { type: answer.type, sdp: answer.sdp },
-      rtcAnswerBy: userId,
-      updatedAt: serverTimestamp(),
-    });
-  }, [userId]);
-
-  const ensureConnection = useCallback(async (call) => {
-    if (
-      !call?.id ||
-      !userId ||
-      typeof navigator === "undefined" ||
-      !navigator.mediaDevices?.getUserMedia ||
-      typeof RTCPeerConnection === "undefined"
-    ) {
-      setMediaNotice("This browser does not support audio and video calls.");
-      return;
-    }
-
-    const isCaller = String(call.callerId || "") === userId;
-    const existingPeer = peerRef.current;
-    if (existingPeer && callIdRef.current === call.id) {
-      await syncRemoteSignals(call, existingPeer, isCaller);
-      if (!isCaller) await publishAnswer(call, existingPeer);
-      return;
-    }
-    if (!existingPeer && callIdRef.current === call.id) return;
-
-    cleanup();
-    callIdRef.current = call.id;
-
-    try {
-      let stream;
-      try {
-        stream = await navigator.mediaDevices.getUserMedia({
-          audio: true,
-          video: call.type === "video" ? { facingMode: cameraType } : false,
-        });
-      } catch (mediaError) {
-        if (call.type !== "video" || mediaError?.name !== "NotReadableError") {
-          throw mediaError;
+        const signature = signatureResult?.data || signatureResult;
+        const roomId = String(activeCall.rtcRoomId || activeCall.roomId || "").trim();
+        if (!signature?.sdkAppId || !signature?.userSig || !roomId) {
+          throw new Error("Tencent RTC is not configured for this call.");
         }
-        stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
-        setMediaNotice("Camera is being used by another app. Voice will continue without video.");
-      }
-      if (callIdRef.current !== call.id) {
-        stream.getTracks().forEach((track) => track.stop());
-        return;
-      }
 
-      setLocalStream(stream);
-      const peer = new RTCPeerConnection({
-        iceServers: [
-          { urls: "stun:stun.l.google.com:19302" },
-          { urls: "stun:stun1.l.google.com:19302" },
-        ],
-      });
-      peerRef.current = peer;
-      stream.getTracks().forEach((track) => peer.addTrack(track, stream));
+        const trtc = TRTC.create();
+        trtcRef.current = trtc;
+        callIdRef.current = activeCall.id;
 
-      peer.ontrack = (event) => {
-        if (event.streams?.[0]) setRemoteStream(event.streams[0]);
-      };
-      peer.onicecandidate = (event) => {
-        if (!event.candidate) return;
-        const candidate = event.candidate.toJSON
-          ? event.candidate.toJSON()
-          : JSON.parse(JSON.stringify(event.candidate));
-        updateDoc(doc(db, "calls", call.id), {
-          [`rtcCandidates.${userId}`]: arrayUnion(candidate),
-          updatedAt: serverTimestamp(),
-        }).catch((error) => console.warn("Unable to publish ICE candidate", error));
-      };
-      peer.onconnectionstatechange = () => {
-        if (peer.connectionState === "connected") {
+        trtc.on(TRTC.EVENT.REMOTE_USER_ENTER, ({ userId: remoteUserId }) => {
+          remoteUserIdRef.current = remoteUserId;
           setMediaNotice("");
-          updateConversationCallStatus({ callId: call.id, status: "connected" }).catch(
-            (error) => console.warn("Unable to mark call connected", error),
-          );
-        } else if (["failed", "disconnected"].includes(peer.connectionState)) {
-          setMediaNotice("Media connection was interrupted.");
-        }
-      };
-
-      if (isCaller) {
-        const offer = await peer.createOffer();
-        await peer.setLocalDescription(offer);
-        await updateDoc(doc(db, "calls", call.id), {
-          rtcOffer: { type: offer.type, sdp: offer.sdp },
-          rtcOfferBy: userId,
-          updatedAt: serverTimestamp(),
+          updateConversationCallStatus({ callId: activeCall.id, status: "connected" }).catch(() => {});
         });
-      } else if (call.rtcOffer?.sdp) {
-        await peer.setRemoteDescription(call.rtcOffer);
-        await publishAnswer(call, peer);
-      } else {
-        setMediaNotice("Waiting for the caller's media connection...");
+        trtc.on(TRTC.EVENT.REMOTE_AUDIO_AVAILABLE, ({ userId: remoteUserId }) => {
+          remoteUserIdRef.current = remoteUserId;
+          setMediaNotice("");
+        });
+        trtc.on(TRTC.EVENT.REMOTE_VIDEO_AVAILABLE, async ({ userId: remoteUserId, streamType }) => {
+          remoteUserIdRef.current = remoteUserId;
+          setRemoteVideoReady(true);
+          await new Promise((resolve) => setTimeout(resolve, 0));
+          trtc.startRemoteVideo({ userId: remoteUserId, streamType, view: remoteViewId }).catch((error) => {
+            console.error("TRTC remote video failed", error);
+            setMediaNotice("Remote video could not be played.");
+          });
+        });
+        trtc.on(TRTC.EVENT.REMOTE_VIDEO_UNAVAILABLE, () => setRemoteVideoReady(false));
+        trtc.on(TRTC.EVENT.AUTOPLAY_FAILED, () => {
+          setMediaNotice("Tap the call screen once to enable remote audio.");
+        });
+        trtc.on(TRTC.EVENT.ERROR, (error) => {
+          console.error("TRTC call error", error);
+          setMediaNotice(error?.message || "The call media connection failed.");
+        });
+
+        await trtc.enterRoom({
+          sdkAppId: Number(signature.sdkAppId),
+          userId: signature.userId || userId,
+          userSig: signature.userSig,
+          strRoomId: roomId,
+          scene: TRTC.TYPE.SCENE_RTC,
+          enableAutoPlayDialog: true,
+        });
+        await trtc.startLocalAudio();
+        if (activeCall.type === "video") {
+          await trtc.startLocalVideo({
+            view: localViewId,
+            option: { useFrontCamera: cameraType !== "environment" },
+          });
+          setLocalVideoReady(true);
+        }
+      } catch (error) {
+        console.error("Tencent browser call failed", error);
+        setMediaNotice(error?.message || "Camera or microphone could not be started.");
+      } finally {
+        startingCallIdRef.current = null;
       }
+    };
 
-      await syncRemoteSignals(call, peer, isCaller);
-    } catch (error) {
-      console.error("Browser call media failed:", error);
-      const permissionDenied = ["NotAllowedError", "PermissionDeniedError"].includes(error?.name);
-      setMediaNotice(
-        permissionDenied
-          ? "Allow microphone and camera access in your browser to continue the call."
-          : "Microphone or camera could not be started.",
-      );
+    void start();
+    return () => {
+      cancelled = true;
+    };
+  }, [activeCall?.id, activeCall?.status, activeCall?.type, activeCall?.rtcRoomId, activeCall?.roomId, cameraType, localViewId, remoteViewId, userId]);
+
+  useEffect(() => {
+    trtcRef.current?.updateLocalAudio?.({ mute: isMuted }).catch(() => {});
+  }, [isMuted]);
+
+  useEffect(() => {
+    trtcRef.current?.updateLocalVideo?.({ mute: !isCameraOn }).catch(() => {});
+  }, [isCameraOn]);
+
+  useEffect(() => {
+    const remoteUserId = remoteUserIdRef.current;
+    if (remoteUserId) trtcRef.current?.muteRemoteAudio?.(remoteUserId, !isSpeakerOn).catch(() => {});
+  }, [isSpeakerOn]);
+
+  useEffect(() => {
+    trtcRef.current?.updateLocalVideo?.({
+      option: { useFrontCamera: cameraType !== "environment" },
+    }).catch(() => {});
+  }, [cameraType]);
+
+  useEffect(() => {
+    const status = String(activeCall?.status || "").toLowerCase();
+    if (activeCall && !["declined", "missed", "cancelled", "ended"].includes(status)) return;
+    const trtc = trtcRef.current;
+    trtcRef.current = null;
+    callIdRef.current = null;
+    remoteUserIdRef.current = null;
+    setLocalVideoReady(false);
+    setRemoteVideoReady(false);
+    if (trtc) {
+      Promise.allSettled([trtc.stopLocalVideo(), trtc.stopLocalAudio(), trtc.exitRoom()])
+        .finally(() => trtc.destroy());
     }
-  }, [cameraType, cleanup, publishAnswer, syncRemoteSignals, userId]);
+  }, [activeCall?.id, activeCall?.status]);
 
-  useEffect(() => {
-    const status = String(activeCall?.status || "").trim().toLowerCase();
-    const callerRinging = activeCall?.callerId === userId && status === "ringing";
-    if (activeCall?.id && (callerRinging || MEDIA_STATUSES.includes(status))) {
-      void ensureConnection(activeCall);
-    } else if (!activeCall || TERMINAL_STATUSES.includes(status)) {
-      cleanup();
+  useEffect(() => () => {
+    const trtc = trtcRef.current;
+    if (trtc) {
+      trtc.stopLocalVideo().catch(() => {});
+      trtc.stopLocalAudio().catch(() => {});
+      trtc.exitRoom().catch(() => {}).finally(() => trtc.destroy());
     }
-  }, [
-    activeCall?.id,
-    activeCall?.status,
-    activeCall?.rtcOffer?.sdp,
-    activeCall?.rtcAnswer?.sdp,
-    activeCall?.rtcCandidates,
-    cleanup,
-    ensureConnection,
-    userId,
-  ]);
+  }, []);
 
-  useEffect(() => {
-    localStream?.getAudioTracks?.().forEach((track) => {
-      track.enabled = !isMuted;
-    });
-    localStream?.getVideoTracks?.().forEach((track) => {
-      track.enabled = isCameraOn;
-    });
-  }, [isCameraOn, isMuted, localStream]);
-
-  useEffect(() => {
-    const videoTrack = localStream?.getVideoTracks?.()[0];
-    videoTrack?.applyConstraints?.({ facingMode: cameraType }).catch(() => {});
-  }, [cameraType, localStream]);
-
-  useEffect(() => cleanup, [cleanup]);
-
-  return { localStream, remoteStream, mediaNotice, remoteMuted: !isSpeakerOn };
+  return {
+    localViewId,
+    remoteViewId,
+    localVideoReady,
+    remoteVideoReady,
+    mediaNotice,
+  };
 }

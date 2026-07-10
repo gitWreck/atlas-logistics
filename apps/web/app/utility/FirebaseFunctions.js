@@ -310,6 +310,10 @@ export const updateConversationCallStatus = httpsCallable(
   functions,
   "updateConversationCallStatus",
 );
+export const generateTencentUserSig = httpsCallable(
+  functions,
+  "generateTencentUserSig",
+);
 
 // INVOICES
 export const createInvoice = httpsCallable(functions, "createInvoice");

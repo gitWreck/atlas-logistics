@@ -4,7 +4,11 @@ const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const admin = require("firebase-admin");
 const { requireAuth, requireRole } = require("../utilities/helpers");
 const { customerOwnsShipment } = require("../utilities/customerShipmentAccess");
-const { getRtcSecretConfig } = require("./trtcConfig");
+const {
+  TRTC_SDK_APP_ID,
+  TRTC_SECRET_KEY,
+  getRtcSecretConfig,
+} = require("./trtcConfig");
 const { assertDirectConversationAccess } = require("./checkerMessaging");
 
 if (!admin.apps.length) admin.initializeApp();
@@ -871,7 +875,11 @@ exports.assignConversation = onCall(
 );
 
 exports.startConversationCall = onCall(
-  { region: "asia-southeast1", maxInstances: 20 },
+  {
+    region: "asia-southeast1",
+    maxInstances: 20,
+    secrets: [TRTC_SDK_APP_ID, TRTC_SECRET_KEY],
+  },
   async (req) => {
     try {
       const uid = requireAuth(req);

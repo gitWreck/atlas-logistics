@@ -57,26 +57,6 @@ function callActivityMillis(call = {}) {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
-function MediaElement({ stream, muted = false, className = "" }) {
-  const mediaRef = useRef(null);
-
-  useEffect(() => {
-    if (!mediaRef.current) return;
-    mediaRef.current.srcObject = stream || null;
-    if (stream) mediaRef.current.play?.().catch?.(() => {});
-  }, [stream]);
-
-  return (
-    <video
-      ref={mediaRef}
-      autoPlay
-      playsInline
-      muted={muted}
-      className={className}
-    />
-  );
-}
-
 export default function IncomingCallListener() {
   const { user, loading } = useAuth();
   const [activeCall, setActiveCall] = useState(null);
@@ -94,7 +74,13 @@ export default function IncomingCallListener() {
   const activeCallRef = useRef(null);
   const timeoutRef = useRef(null);
   const noticeTimerRef = useRef(null);
-  const { localStream, remoteStream, mediaNotice, remoteMuted } = useWebRtcCall({
+  const {
+    localViewId,
+    remoteViewId,
+    localVideoReady,
+    remoteVideoReady,
+    mediaNotice,
+  } = useWebRtcCall({
     activeCall,
     userId: user?.uid,
     isMuted,
@@ -520,30 +506,20 @@ export default function IncomingCallListener() {
     if (!activeCall) return null;
 
     const mediaPanel = activeCall.type === "video" ? (
-      localStream ? (
         <div className="relative mb-5 h-64 w-full overflow-hidden rounded-xl bg-slate-950">
-          {remoteStream ? (
-            <MediaElement
-              stream={remoteStream}
-              muted={remoteMuted}
-              className="h-full w-full object-cover"
-            />
-          ) : (
+          <div id={remoteViewId} className="absolute inset-0 h-full w-full overflow-hidden" />
+          {!remoteVideoReady ? (
             <div className="flex h-full flex-col items-center justify-center gap-3 text-slate-400">
               <FontAwesomeIcon icon={faVideo} size="2x" />
               <span className="text-sm">{isCallerRinging ? "Waiting for an answer..." : "Connecting video..."}</span>
             </div>
-          )}
-          <MediaElement
-            stream={localStream}
-            muted
-            className="absolute bottom-3 right-3 h-32 w-24 rounded-lg border-2 border-white bg-slate-800 object-cover shadow-xl"
+          ) : null}
+          <div
+            id={localViewId}
+            className={`absolute bottom-3 right-3 h-32 w-24 overflow-hidden rounded-lg border-2 border-white bg-slate-800 shadow-xl ${localVideoReady ? "opacity-100" : "opacity-0"}`}
           />
         </div>
-      ) : null
-    ) : (
-      <MediaElement stream={remoteStream} muted={remoteMuted} className="absolute h-px w-px opacity-0" />
-    );
+    ) : null;
 
     if (showIncomingControls) {
       return (

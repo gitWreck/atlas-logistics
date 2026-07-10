@@ -94,6 +94,10 @@ export const acceptConversationCall = httpsCallable(
   functions,
   "acceptConversationCall",
 );
+export const generateTencentUserSig = httpsCallable(
+  functions,
+  "generateTencentUserSig",
+);
 
 // user actions
 export const updateUserProfileMobile = httpsCallable(

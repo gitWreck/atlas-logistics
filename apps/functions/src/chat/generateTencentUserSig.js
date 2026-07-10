@@ -3,7 +3,11 @@
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const { Api } = require("tls-sig-api-v2");
 const { requireAuth } = require("../utilities/helpers");
-const { getRtcSecretConfig } = require("./trtcConfig");
+const {
+  TRTC_SDK_APP_ID,
+  TRTC_SECRET_KEY,
+  getRtcSecretConfig,
+} = require("./trtcConfig");
 
 const USER_SIG_TTL_SECONDS = 86400;
 
@@ -39,6 +43,7 @@ exports.generateTencentUserSig = onCall(
     region: "asia-southeast1",
     maxInstances: 10,
     memory: "512MiB",
+    secrets: [TRTC_SDK_APP_ID, TRTC_SECRET_KEY],
   },
   async (request) => {
     try {
