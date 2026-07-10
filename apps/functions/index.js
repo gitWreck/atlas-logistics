@@ -195,6 +195,10 @@ exports.retryCustomerNotification =
 // Chat
 exports.createConversation =
   require("./src/chat/conversations").createConversation;
+exports.listCheckerChatContacts =
+  require("./src/chat/checkerMessaging").listCheckerChatContacts;
+exports.createCheckerConversation =
+  require("./src/chat/checkerMessaging").createCheckerConversation;
 exports.createCallHistoryMessage =
   require("./src/chat/conversations").createCallHistoryMessage;
 exports.sendChatMessage = require("./src/chat/conversations").sendChatMessage;

@@ -64,14 +64,14 @@ export default function CheckerTabsLayout() {
           <Tabs.Screen
             name="deliveries"
             options={{
-              title: "Call",
+              title: "My Deliveries",
               tabBarIcon: ({ color }) => (
-                <FontAwesome5 name="phone" size={20} color={color} />
+                <FontAwesome5 name="truck" size={20} color={color} />
               ),
             }}
           />
           <Tabs.Screen
-            name="delivery-load"
+            name="messages"
             options={{
               title: "Messages",
               tabBarIcon: ({ color }) => (

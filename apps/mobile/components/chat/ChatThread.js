@@ -33,6 +33,7 @@ import { Image } from "expo-image";
 import { FontAwesome5 } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import * as ImagePicker from "expo-image-picker";
+import * as DocumentPicker from "expo-document-picker";
 import { useRouter } from "expo-router";
 import {
   collection,
@@ -876,7 +877,7 @@ export default function ChatThread({ conversationId, onBack, embedded = false })
   const [sending, setSending] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [startingCall, setStartingCall] = useState(null);
-  const [pendingImage, setPendingImage] = useState(null);
+  const [pendingAttachment, setPendingAttachment] = useState(null);
   const [emojiOpen, setEmojiOpen] = useState(false);
   const [lightbox, setLightbox] = useState(null);
   const [infoOpen, setInfoOpen] = useState(false);
@@ -986,8 +987,14 @@ export default function ChatThread({ conversationId, onBack, embedded = false })
   }, []);
 
   const isClosed = conversation?.status === "closed";
+  const isDirectStaff = conversation?.type === "direct_staff";
+  const directContact = useMemo(() => {
+    if (!isDirectStaff) return null;
+    const contactId = (conversation?.participantIds || []).find((id) => id !== myUid);
+    return contactId ? conversation?.participantProfiles?.[contactId] || null : null;
+  }, [conversation, isDirectStaff, myUid]);
   const hasShipment = !!(conversation?.trackingNumber || conversation?.shipmentId);
-  const canSend = !!draft.trim() || !!pendingImage;
+  const canSend = !!draft.trim() || !!pendingAttachment;
   const showSendButton = canSend || sending || uploading;
 
   const openTracking = useCallback(() => {
@@ -1060,32 +1067,37 @@ export default function ChatThread({ conversationId, onBack, embedded = false })
 
   const handleSend = useCallback(async () => {
     const text = draft.trim();
-    if ((!text && !pendingImage) || isClosed || sending || uploading) return;
+    if ((!text && !pendingAttachment) || isClosed || sending || uploading) return;
 
-    // Upload the staged image first, matching the web attachment scheme.
-    if (pendingImage) {
+    // Upload staged images/documents first, matching the attachment scheme
+    // shared by the customer mobile chat and the web messaging console.
+    if (pendingAttachment) {
       try {
         setUploading(true);
-        const name = pendingImage.name || `photo_${Date.now()}.jpg`;
-        const response = await fetch(pendingImage.uri);
+        const attachmentType = pendingAttachment.type === "image" ? "image" : "file";
+        const fallbackName = attachmentType === "image" ? `photo_${Date.now()}.jpg` : `file_${Date.now()}`;
+        const name = pendingAttachment.name || fallbackName;
+        const safeName = name.replace(/[^a-zA-Z0-9._-]/g, "_");
+        const response = await fetch(pendingAttachment.uri);
         const blob = await response.blob();
         const storageRef = ref(
           storage,
-          `chat/${conversationId}/${Date.now()}_${name}`,
+          `chat/${conversationId}/${Date.now()}_${safeName}`,
         );
         await uploadBytes(storageRef, blob);
         const url = await getDownloadURL(storageRef);
         await doSend({
-          text: encodeTextAttachment({ url, type: "image", name }),
+          text: encodeTextAttachment({ url, type: attachmentType, name }),
           attachmentUrl: url,
-          attachmentType: "image",
+          attachmentType,
           attachmentName: name,
         });
       } catch (error) {
         console.error("Attachment upload failed:", error);
+        Alert.alert("Upload failed", "The attachment could not be sent. Please try again.");
       } finally {
         setUploading(false);
-        setPendingImage(null);
+        setPendingAttachment(null);
       }
     }
 
@@ -1093,7 +1105,7 @@ export default function ChatThread({ conversationId, onBack, embedded = false })
       setDraft("");
       await doSend({ text });
     }
-  }, [draft, pendingImage, isClosed, sending, uploading, conversationId, doSend]);
+  }, [draft, pendingAttachment, isClosed, sending, uploading, conversationId, doSend]);
 
   const handlePickImage = useCallback(async () => {
     if (isClosed) return;
@@ -1106,9 +1118,10 @@ export default function ChatThread({ conversationId, onBack, embedded = false })
       });
       if (!result.canceled && result.assets?.length) {
         const asset = result.assets[0];
-        setPendingImage({
+        setPendingAttachment({
           uri: asset.uri,
           name: asset.fileName || `photo_${Date.now()}.jpg`,
+          type: "image",
         });
         setEmojiOpen(false);
       }
@@ -1117,8 +1130,43 @@ export default function ChatThread({ conversationId, onBack, embedded = false })
     }
   }, [isClosed]);
 
+  const handlePickFile = useCallback(async () => {
+    if (isClosed) return;
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        copyToCacheDirectory: true,
+        multiple: false,
+      });
+      if (!result.canceled && result.assets?.length) {
+        const asset = result.assets[0];
+        if (Number(asset.size || 0) > 15 * 1024 * 1024) {
+          Alert.alert("File too large", "Choose a file smaller than 15 MB.");
+          return;
+        }
+        setPendingAttachment({
+          uri: asset.uri,
+          name: asset.name || `file_${Date.now()}`,
+          type: "file",
+        });
+        setEmojiOpen(false);
+      }
+    } catch (error) {
+      console.error("File pick failed:", error);
+      Alert.alert("File unavailable", "The selected file could not be opened.");
+    }
+  }, [isClosed]);
+
   const statusMeta = getStatusMeta(conversation?.status);
-  const headerSubtitle = "Online";
+  const headerTitle = isDirectStaff ? directContact?.name || "Atlas staff" : "Atlas Support";
+  const headerSubtitle = isDirectStaff
+    ? [
+        directContact?.roleLabel || directContact?.role,
+        directContact?.municipality,
+        directContact?.online ? "Online" : "Offline",
+      ]
+        .filter(Boolean)
+        .join(" · ")
+    : "Online";
 
   const handleViewDetails = useCallback(() => {
     if (hasShipment) setDetailsOpen(true);
@@ -1163,13 +1211,23 @@ export default function ChatThread({ conversationId, onBack, embedded = false })
             <FontAwesome5 name="chevron-left" size={22} color={colors.text} />
           </TouchableOpacity>
         )}
-        <SupportAvatar size={48} online ringColor={colors.chatBg} />
+        {isDirectStaff ? (
+          <PersonAvatar
+            name={headerTitle}
+            photoURL={directContact?.photoURL}
+            online={!!directContact?.online}
+            ringColor={colors.chatBg}
+            size={48}
+          />
+        ) : (
+          <SupportAvatar size={48} online ringColor={colors.chatBg} />
+        )}
         <View style={styles.headerText}>
           <Text
             style={[styles.headerTitle, { color: colors.text }]}
             numberOfLines={1}
           >
-            Atlas Support
+            {headerTitle}
           </Text>
           <Text
             style={[styles.headerSubtitle, { color: colors.textMuted }]}
@@ -1178,7 +1236,7 @@ export default function ChatThread({ conversationId, onBack, embedded = false })
             {headerSubtitle}
           </Text>
         </View>
-        <View style={styles.headerActions}>
+        {!isDirectStaff && <View style={styles.headerActions}>
           <TouchableOpacity
             style={styles.headerActionBtn}
             onPress={handleVoiceCall}
@@ -1207,14 +1265,14 @@ export default function ChatThread({ conversationId, onBack, embedded = false })
               <FontAwesome5 name="video" size={21} color={colors.text} />
             )}
           </TouchableOpacity>
-        </View>
-        <TouchableOpacity
+        </View>}
+        {!isDirectStaff && <TouchableOpacity
           style={styles.headerBtn}
           onPress={() => setInfoOpen(true)}
           hitSlop={8}
         >
           <FontAwesome5 name="ellipsis-v" size={17} color={colors.textMuted} />
-        </TouchableOpacity>
+        </TouchableOpacity>}
       </View>
 
       {hasShipment && (
@@ -1258,7 +1316,7 @@ export default function ChatThread({ conversationId, onBack, embedded = false })
                 listRef.current?.scrollToEnd({ animated: false });
               }
             }}
-            ListHeaderComponent={
+            ListHeaderComponent={!isDirectStaff ? (
               <View style={styles.welcomeBubbleRow}>
                 <SupportAvatar size={36} online={false} ringColor={colors.chatBg} />
                 <View style={[styles.welcomeBubble, { backgroundColor: colors.receivedBg }]}>
@@ -1267,7 +1325,7 @@ export default function ChatThread({ conversationId, onBack, embedded = false })
                   </Text>
                 </View>
               </View>
-            }
+            ) : null}
             ListEmptyComponent={
               <View style={styles.emptyThread}>
                 <FontAwesome5
@@ -1276,7 +1334,9 @@ export default function ChatThread({ conversationId, onBack, embedded = false })
                   color={colors.textMuted}
                 />
                 <Text style={[styles.emptyText, { color: colors.textMuted }]}>
-                  Send a message and the Atlas team will reply here.
+                  {isDirectStaff
+                    ? `Send a message to ${headerTitle}.`
+                    : "Send a message and the Atlas team will reply here."}
                 </Text>
               </View>
             }
@@ -1337,27 +1397,33 @@ export default function ChatThread({ conversationId, onBack, embedded = false })
             </View>
           )}
 
-          {/* Pending image preview */}
-          {pendingImage && (
+          {/* Pending image/file preview */}
+          {pendingAttachment && (
             <View
               style={[
                 styles.pendingBar,
                 { backgroundColor: colors.surface, borderTopColor: colors.border },
               ]}
             >
-              <Image
-                source={{ uri: pendingImage.uri }}
-                style={styles.pendingThumb}
-                contentFit="cover"
-              />
+              {pendingAttachment.type === "image" ? (
+                <Image
+                  source={{ uri: pendingAttachment.uri }}
+                  style={styles.pendingThumb}
+                  contentFit="cover"
+                />
+              ) : (
+                <View style={[styles.pendingFileIcon, { backgroundColor: colors.accentSoft }]}>
+                  <FontAwesome5 name="file-alt" size={19} color={colors.accent} />
+                </View>
+              )}
               <Text
                 style={[styles.pendingName, { color: colors.textMuted }]}
                 numberOfLines={1}
               >
-                {pendingImage.name}
+                {pendingAttachment.name}
               </Text>
               <TouchableOpacity
-                onPress={() => setPendingImage(null)}
+                onPress={() => setPendingAttachment(null)}
                 hitSlop={8}
               >
                 <FontAwesome5 name="times-circle" size={20} color={colors.textMuted} />
@@ -1375,13 +1441,35 @@ export default function ChatThread({ conversationId, onBack, embedded = false })
             </View>
           )}
 
-          <QuickActions
+          {!isDirectStaff && <QuickActions
             colors={colors}
             hasShipment={hasShipment}
             onTrack={() => setQuickOpen(true)}
             onConcern={() => setQuickOpen(true)}
             onAgent={() => setQuickOpen(true)}
-          />
+          />}
+
+          {isDirectStaff && (
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.staffQuickActions}
+              keyboardShouldPersistTaps="handled"
+            >
+              {["Shipment update: ", "Delivery status: ", "Package issue: "].map((template) => (
+                <TouchableOpacity
+                  key={template}
+                  style={[styles.staffQuickChip, { backgroundColor: colors.accentSoft }]}
+                  onPress={() => setDraft((current) => current || template)}
+                >
+                  <FontAwesome5 name="box" size={12} color={colors.accent} />
+                  <Text style={[styles.staffQuickText, { color: colors.accent }]}>
+                    {template.trim().replace(":", "")}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          )}
 
           {/* Sticky composer — styled to match the manager messaging console */}
           <View
@@ -1404,7 +1492,7 @@ export default function ChatThread({ conversationId, onBack, embedded = false })
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.composerIcon}
-              onPress={handlePickImage}
+              onPress={handlePickFile}
               disabled={isClosed || uploading}
               hitSlop={6}
             >
@@ -1597,7 +1685,7 @@ export default function ChatThread({ conversationId, onBack, embedded = false })
           </View>
         </View>
       </Modal>
-      <QuickActionsSheet
+      {!isDirectStaff && <QuickActionsSheet
         visible={quickOpen}
         onClose={() => setQuickOpen(false)}
         onTrack={openTracking}
@@ -1606,15 +1694,15 @@ export default function ChatThread({ conversationId, onBack, embedded = false })
         onChange={() => sendQuickMessage("I need to change my delivery details.")}
         onAgent={() => sendQuickMessage("Please connect me with a live support representative.")}
         ui={supportUi}
-      />
-      <ShipmentDetailsScreen
+      />}
+      {!isDirectStaff && <ShipmentDetailsScreen
         visible={detailsOpen}
         onClose={() => setDetailsOpen(false)}
         conversation={conversation}
         onTrack={openTracking}
         ui={supportUi}
-      />
-      <ChatInfoScreen
+      />}
+      {!isDirectStaff && <ChatInfoScreen
         visible={infoOpen}
         onClose={() => setInfoOpen(false)}
         conversation={conversation}
@@ -1626,7 +1714,7 @@ export default function ChatThread({ conversationId, onBack, embedded = false })
         ui={supportUi}
         onViewTracking={openTracking}
         onOpenMedia={setLightbox}
-      />
+      />}
     </View>
   );
 }
@@ -1850,7 +1938,29 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
   },
   pendingThumb: { width: 40, height: 40, borderRadius: 8 },
+  pendingFileIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   pendingName: { flex: 1, fontSize: 13 },
+  staffQuickActions: {
+    flexDirection: "row",
+    gap: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+  },
+  staffQuickChip: {
+    minHeight: 34,
+    borderRadius: 17,
+    paddingHorizontal: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 7,
+  },
+  staffQuickText: { fontSize: 12, fontWeight: "800" },
   quickActions: {
     paddingHorizontal: 18,
     paddingTop: 10,

@@ -65,6 +65,14 @@ export const createConversation = httpsCallable(
   functions,
   "createConversation",
 );
+export const listCheckerChatContacts = httpsCallable(
+  functions,
+  "listCheckerChatContacts",
+);
+export const createCheckerConversation = httpsCallable(
+  functions,
+  "createCheckerConversation",
+);
 export const createCallHistoryMessage = httpsCallable(
   functions,
   "createCallHistoryMessage",

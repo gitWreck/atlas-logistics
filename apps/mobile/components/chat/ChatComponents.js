@@ -3,6 +3,7 @@ import React, { useEffect, useRef } from "react";
 import { Animated, Easing, StyleSheet, Text, View } from "react-native";
 import { FontAwesome5 } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
+import { Image } from "expo-image";
 
 import { avatarGradient, initials } from "./chatUtils";
 
@@ -52,22 +53,37 @@ export function SupportAvatar({ size = 52, online = false, ringColor, iconName =
 }
 
 // Initials avatar (used for individual staff senders inside a thread).
-export function PersonAvatar({ name, size = 28 }) {
+export function PersonAvatar({ name, size = 28, photoURL = null, online = false, ringColor }) {
   const gradient = avatarGradient(name);
   return (
-    <LinearGradient
-      colors={gradient}
-      start={{ x: 0, y: 0 }}
-      end={{ x: 1, y: 1 }}
-      style={[
-        styles.avatar,
-        { width: size, height: size, borderRadius: size / 2 },
-      ]}
-    >
-      <Text style={[styles.initials, { fontSize: size * 0.38 }]}>
-        {initials(name)}
-      </Text>
-    </LinearGradient>
+    <View style={{ width: size, height: size }}>
+      {photoURL ? (
+        <Image
+          source={{ uri: photoURL }}
+          style={{ width: size, height: size, borderRadius: size / 2 }}
+          contentFit="cover"
+        />
+      ) : (
+        <LinearGradient
+          colors={gradient}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={[
+            styles.avatar,
+            { width: size, height: size, borderRadius: size / 2 },
+          ]}
+        >
+          <Text style={[styles.initials, { fontSize: size * 0.38 }]}>
+            {initials(name)}
+          </Text>
+        </LinearGradient>
+      )}
+      {online ? (
+        <View style={styles.presenceWrap}>
+          <PresenceDot size={size * 0.28} ringColor={ringColor} />
+        </View>
+      ) : null}
+    </View>
   );
 }
 

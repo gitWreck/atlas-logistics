@@ -67,8 +67,22 @@ service cloud.firestore {
           request.auth.uid == userId
           && (!exists(userDocPath()) || userDoc().data.get('active', true) != false)
         ) ||
-        isActiveUser() && isStaff()
+        isActiveUser() && hasAnyRole(['admin', 'manager'])
       );
+    }
+
+    function checkerChatAccessToken() {
+      return request.auth.uid + ':' + userDoc().data.get('checkerChatAccessKey', '__missing__');
+    }
+
+    function canReadDirectStaffConversation(conversation) {
+      return isActiveUser()
+        && conversation.get('type', '') == 'direct_staff'
+        && request.auth.uid in conversation.get('participantIds', [])
+        && (
+          userRole() != 'checker'
+          || checkerChatAccessToken() in conversation.get('checkerAccessTokens', [])
+        );
     }
 
     // Customer signup currently performs duplicate checks before auth.
@@ -123,11 +137,13 @@ service cloud.firestore {
 
     match /conversations/{conversationId} {
       allow read: if hasRole('admin')
+        || canReadDirectStaffConversation(resource.data)
         || (isActiveUser() && resource.data.customerId == request.auth.uid)
         || (hasRole('manager') && (resource.data.assignedTo == request.auth.uid || resource.data.assignedStaffId == request.auth.uid))
         || (hasRole('employee') && (resource.data.assignedTo == request.auth.uid || resource.data.assignedStaffId == request.auth.uid));
 
       allow list: if hasRole('admin')
+        || canReadDirectStaffConversation(resource.data)
         || (hasRole('customer') && resource.data.customerId == request.auth.uid)
         || (hasRole('manager') && (resource.data.assignedTo == request.auth.uid || resource.data.assignedStaffId == request.auth.uid))
         || (hasRole('employee') && (resource.data.assignedTo == request.auth.uid || resource.data.assignedStaffId == request.auth.uid));
@@ -136,6 +152,9 @@ service cloud.firestore {
 
       match /messages/{messageId} {
         allow read: if hasRole('admin')
+          || canReadDirectStaffConversation(
+            get(/databases/$(database)/documents/conversations/$(conversationId)).data
+          )
           || (
             hasRole('customer')
             && get(/databases/$(database)/documents/conversations/$(conversationId)).data.customerId == request.auth.uid
@@ -150,6 +169,7 @@ service cloud.firestore {
           )
           || (
             isActiveUser()
+            && get(/databases/$(database)/documents/conversations/$(conversationId)).data.get('type', '') != 'direct_staff'
             && request.auth.uid in get(/databases/$(database)/documents/conversations/$(conversationId)).data.get('participantIds', [])
           );
 

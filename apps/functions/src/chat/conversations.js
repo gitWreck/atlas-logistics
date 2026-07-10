@@ -5,6 +5,7 @@ const admin = require("firebase-admin");
 const { requireAuth, requireRole } = require("../utilities/helpers");
 const { customerOwnsShipment } = require("../utilities/customerShipmentAccess");
 const { getRtcSecretConfig } = require("./trtcConfig");
+const { assertDirectConversationAccess } = require("./checkerMessaging");
 
 if (!admin.apps.length) admin.initializeApp();
 
@@ -164,6 +165,21 @@ async function getConversationForUser(conversationId, uid, role) {
 
   const conversation = snap.data() || {};
   const normalizedRole = String(role || "").toLowerCase();
+  if (conversation.type === "direct_staff") {
+    const userSnap = await db.collection("users").doc(uid).get();
+    const allowed = await assertDirectConversationAccess(
+      conversation,
+      uid,
+      userSnap.data() || { role: normalizedRole },
+    );
+    if (!allowed) {
+      throw new HttpsError(
+        "permission-denied",
+        "This staff conversation is outside your current assignment.",
+      );
+    }
+    return { ref, snap, conversation };
+  }
   const isAdmin = normalizedRole === "admin";
   const isManager = normalizedRole === "manager";
   const isEmployee = normalizedRole === "employee";
@@ -329,6 +345,37 @@ async function notifyCustomer({ conversationId, customerId, message, sender }) {
       screen: "chat",
       conversationId,
     },
+  });
+}
+
+async function notifyDirectParticipants({ conversationId, conversation, message, sender }) {
+  const recipients = (conversation.participantIds || []).filter(
+    (participantId) => participantId && participantId !== sender.uid,
+  );
+  if (!recipients.length) return;
+
+  const batch = db.batch();
+  const now = FieldValue.serverTimestamp();
+  recipients.forEach((uid) => {
+    const notificationRef = db.collection("users").doc(uid).collection("notifications").doc();
+    batch.set(notificationRef, {
+      type: "CHAT_MESSAGE",
+      title: sender.name || "Atlas staff",
+      body: message,
+      data: { screen: "checker-chat", conversationId },
+      entityType: "conversation",
+      entityId: conversationId,
+      ownerId: uid,
+      read: false,
+      createdAt: now,
+    });
+  });
+  await batch.commit();
+  await sendExpoPush({
+    userIds: recipients,
+    title: sender.name || "Atlas staff",
+    body: message,
+    data: { screen: "checker-chat", conversationId },
   });
 }
 
@@ -563,6 +610,7 @@ exports.sendChatMessage = onCall(
 
     const senderName = displayName(user, role === "customer" ? "Customer" : "Staff");
     const isStaff = STAFF_ROLES.includes(role);
+    const isDirectStaff = conversation.type === "direct_staff";
     const now = FieldValue.serverTimestamp();
     const messageText = text || (attachmentType === "image" ? "Photo" : attachmentName || "Attachment");
     const updates = {
@@ -575,7 +623,13 @@ exports.sendChatMessage = onCall(
       status: normalizeConversationStatus(conversation.status) === "closed" ? "closed" : normalizeConversationStatus(conversation.status) === "unassigned" ? "active" : normalizeConversationStatus(conversation.status),
     };
 
-    if (isStaff) {
+    if (isDirectStaff) {
+      (conversation.participantIds || []).forEach((participantId) => {
+        updates[`unreadCounts.${participantId}`] =
+          participantId === uid ? 0 : FieldValue.increment(1);
+      });
+      updates[`participantRoles.${uid}`] = role;
+    } else if (isStaff) {
       updates[`unreadCounts.${conversation.customerId}`] = FieldValue.increment(1);
       updates.unreadCustomer = FieldValue.increment(1);
       updates.unreadStaff = 0;
@@ -640,7 +694,14 @@ exports.sendChatMessage = onCall(
       tx.update(ref, updates);
     });
 
-    if (isStaff) {
+    if (isDirectStaff) {
+      await notifyDirectParticipants({
+        conversationId,
+        conversation,
+        message: text || (attachmentType === "image" ? "Photo" : attachmentName || "Attachment"),
+        sender: { uid, role, name: senderName },
+      });
+    } else if (isStaff) {
       await notifyCustomer({
         conversationId,
         customerId: conversation.customerId,
@@ -671,15 +732,20 @@ exports.markConversationRead = onCall(
     }
 
     const role = String(userSnap.data()?.role || "").toLowerCase();
-    const { ref } = await getConversationForUser(conversationId, uid, role);
-    const key = STAFF_ROLES.includes(role) ? "staff" : uid;
+    const { ref, conversation } = await getConversationForUser(conversationId, uid, role);
+    const directStaff = conversation.type === "direct_staff";
+    const key = directStaff ? uid : STAFF_ROLES.includes(role) ? "staff" : uid;
 
-    await ref.update({
+    const updates = {
       [`unreadCounts.${key}`]: 0,
-      unreadCustomer: role === "customer" ? 0 : FieldValue.increment(0),
-      unreadStaff: role === "customer" ? FieldValue.increment(0) : 0,
       updatedAt: FieldValue.serverTimestamp(),
-    });
+    };
+    if (!directStaff) {
+      updates.unreadCustomer = role === "customer" ? 0 : FieldValue.increment(0);
+      updates.unreadStaff = role === "customer" ? FieldValue.increment(0) : 0;
+    }
+
+    await ref.update(updates);
 
     return { success: true };
   },
