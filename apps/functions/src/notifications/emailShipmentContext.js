@@ -14,7 +14,7 @@ const EMAIL_ICON_BASE_URL =
   process.env.ATLAS_EMAIL_ICON_BASE_URL || `${TRACKING_BASE_URL}/email`;
 
 const SUPPORT_EMAIL = "support@atlastransport.ph";
-const LOGO_URL = `${EMAIL_ICON_BASE_URL}/atlas-logo.jpeg`;
+const BANNER_URL = `${EMAIL_ICON_BASE_URL}/atlas-banner.jpeg`;
 
 const NOTIFICATION_SUMMARY = Object.freeze({
   RECEIVED_AT_DIVISORIA: {
@@ -258,7 +258,7 @@ function buildEmailTemplateProps({
     packages,
     trackingUrl: `${TRACKING_BASE_URL}/track/${encodeURIComponent(trackingId)}`,
     supportEmail: SUPPORT_EMAIL,
-    logoUrl: LOGO_URL,
+    bannerUrl: BANNER_URL,
     iconBaseUrl: EMAIL_ICON_BASE_URL,
     isMultiShipment,
     shipmentIds: shipmentIds.map((id) =>

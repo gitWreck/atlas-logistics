@@ -1,7 +1,7 @@
 const DEFAULT_ICON_BASE = "https://atlastransport.ph/email";
 
 const EMBEDDED_ICON_URLS = {
-  logo: "cid:atlas-email-logo",
+  banner: "cid:atlas-email-banner",
   mobile: "cid:atlas-email-mobile",
   envelopeSm: "cid:atlas-email-envelope-sm",
   headset: "cid:atlas-email-headset",
@@ -20,7 +20,7 @@ function getIconUrls(iconBaseUrl = DEFAULT_ICON_BASE, options = {}) {
 
   const base = String(iconBaseUrl || DEFAULT_ICON_BASE).replace(/\/$/, "");
   return {
-    logo: `${base}/atlas-logo.jpeg`,
+    banner: `${base}/atlas-banner.jpeg`,
     mobile: `${base}/mobile.png`,
     envelopeSm: `${base}/envelope-sm.png`,
     headset: `${base}/headset.png`,

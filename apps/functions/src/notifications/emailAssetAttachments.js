@@ -6,7 +6,7 @@ const path = require("path");
 const ASSET_DIR = path.join(__dirname, "../../assets/email");
 
 const EMAIL_ASSET_FILES = Object.freeze([
-  { file: "atlas-logo.jpeg", cid: "atlas-email-logo" },
+  { file: "atlas-banner.jpeg", cid: "atlas-email-banner" },
   { file: "mobile.png", cid: "atlas-email-mobile" },
   { file: "envelope-sm.png", cid: "atlas-email-envelope-sm" },
   { file: "headset.png", cid: "atlas-email-headset" },

@@ -3849,8 +3849,8 @@ var require_react_dom_server_legacy_node_production = __commonJS({
               resumableState.imageResources[key$jscomp$0] = PRELOAD_NO_CREDS;
               var input = props.crossOrigin;
               var JSCompiler_inline_result$jscomp$8 = "string" === typeof input ? "use-credentials" === input ? input : "" : void 0;
-              var headers = renderState.headers, header2;
-              headers && 0 < headers.remainingCapacity && ("high" === props.fetchPriority || 500 > headers.highImagePreloads.length) && (header2 = getPreloadAsHeader(src, "image", {
+              var headers = renderState.headers, header;
+              headers && 0 < headers.remainingCapacity && ("high" === props.fetchPriority || 500 > headers.highImagePreloads.length) && (header = getPreloadAsHeader(src, "image", {
                 imageSrcSet: props.srcSet,
                 imageSizes: props.sizes,
                 crossOrigin: JSCompiler_inline_result$jscomp$8,
@@ -3859,7 +3859,7 @@ var require_react_dom_server_legacy_node_production = __commonJS({
                 type: props.type,
                 fetchPriority: props.fetchPriority,
                 referrerPolicy: props.refererPolicy
-              }), 0 <= (headers.remainingCapacity -= header2.length + 2)) ? (renderState.resets.image[key$jscomp$0] = PRELOAD_NO_CREDS, headers.highImagePreloads && (headers.highImagePreloads += ", "), headers.highImagePreloads += header2) : (resource$jscomp$1 = [], pushLinkImpl(resource$jscomp$1, {
+              }), 0 <= (headers.remainingCapacity -= header.length + 2)) ? (renderState.resets.image[key$jscomp$0] = PRELOAD_NO_CREDS, headers.highImagePreloads && (headers.highImagePreloads += ", "), headers.highImagePreloads += header) : (resource$jscomp$1 = [], pushLinkImpl(resource$jscomp$1, {
                 rel: "preload",
                 as: "image",
                 href: srcSet ? void 0 : src,
@@ -4266,13 +4266,13 @@ var require_react_dom_server_legacy_node_production = __commonJS({
           if (!resumableState.dnsResources.hasOwnProperty(href)) {
             resumableState.dnsResources[href] = null;
             resumableState = renderState.headers;
-            var header2, JSCompiler_temp;
+            var header, JSCompiler_temp;
             if (JSCompiler_temp = resumableState && 0 < resumableState.remainingCapacity)
-              JSCompiler_temp = (header2 = "<" + ("" + href).replace(
+              JSCompiler_temp = (header = "<" + ("" + href).replace(
                 regexForHrefInLinkHeaderURLContext,
                 escapeHrefForLinkHeaderURLContextReplacer
-              ) + ">; rel=dns-prefetch", 0 <= (resumableState.remainingCapacity -= header2.length + 2));
-            JSCompiler_temp ? (renderState.resets.dns[href] = null, resumableState.preconnects && (resumableState.preconnects += ", "), resumableState.preconnects += header2) : (header2 = [], pushLinkImpl(header2, { href, rel: "dns-prefetch" }), renderState.preconnects.add(header2));
+              ) + ">; rel=dns-prefetch", 0 <= (resumableState.remainingCapacity -= header.length + 2));
+            JSCompiler_temp ? (renderState.resets.dns[href] = null, resumableState.preconnects && (resumableState.preconnects += ", "), resumableState.preconnects += header) : (header = [], pushLinkImpl(header, { href, rel: "dns-prefetch" }), renderState.preconnects.add(header));
           }
           enqueueFlush(request);
         }
@@ -4287,7 +4287,7 @@ var require_react_dom_server_legacy_node_production = __commonJS({
           if (!resumableState.connectResources[bucket].hasOwnProperty(href)) {
             resumableState.connectResources[bucket][href] = null;
             resumableState = renderState.headers;
-            var header2, JSCompiler_temp;
+            var header, JSCompiler_temp;
             if (JSCompiler_temp = resumableState && 0 < resumableState.remainingCapacity) {
               JSCompiler_temp = "<" + ("" + href).replace(
                 regexForHrefInLinkHeaderURLContext,
@@ -4300,9 +4300,9 @@ var require_react_dom_server_legacy_node_production = __commonJS({
                 );
                 JSCompiler_temp += '; crossorigin="' + escapedCrossOrigin + '"';
               }
-              JSCompiler_temp = (header2 = JSCompiler_temp, 0 <= (resumableState.remainingCapacity -= header2.length + 2));
+              JSCompiler_temp = (header = JSCompiler_temp, 0 <= (resumableState.remainingCapacity -= header.length + 2));
             }
-            JSCompiler_temp ? (renderState.resets.connect[bucket][href] = null, resumableState.preconnects && (resumableState.preconnects += ", "), resumableState.preconnects += header2) : (bucket = [], pushLinkImpl(bucket, {
+            JSCompiler_temp ? (renderState.resets.connect[bucket][href] = null, resumableState.preconnects && (resumableState.preconnects += ", "), resumableState.preconnects += header) : (bucket = [], pushLinkImpl(bucket, {
               rel: "preconnect",
               href,
               crossOrigin
@@ -4328,8 +4328,8 @@ var require_react_dom_server_legacy_node_production = __commonJS({
               if (resumableState.imageResources.hasOwnProperty(key)) return;
               resumableState.imageResources[key] = PRELOAD_NO_CREDS;
               resumableState = renderState.headers;
-              var header2;
-              resumableState && 0 < resumableState.remainingCapacity && "high" === fetchPriority && (header2 = getPreloadAsHeader(href, as2, options), 0 <= (resumableState.remainingCapacity -= header2.length + 2)) ? (renderState.resets.image[key] = PRELOAD_NO_CREDS, resumableState.highImagePreloads && (resumableState.highImagePreloads += ", "), resumableState.highImagePreloads += header2) : (resumableState = [], pushLinkImpl(
+              var header;
+              resumableState && 0 < resumableState.remainingCapacity && "high" === fetchPriority && (header = getPreloadAsHeader(href, as2, options), 0 <= (resumableState.remainingCapacity -= header.length + 2)) ? (renderState.resets.image[key] = PRELOAD_NO_CREDS, resumableState.highImagePreloads && (resumableState.highImagePreloads += ", "), resumableState.highImagePreloads += header) : (resumableState = [], pushLinkImpl(
                 resumableState,
                 assign(
                   { rel: "preload", href: imageSrcSet ? void 0 : href, as: as2 },
@@ -6282,7 +6282,7 @@ var require_react_dom_server_legacy_node_production = __commonJS({
               var queueIter = renderState.styles.values(), queueStep = queueIter.next();
               b: for (; 0 < headers.remainingCapacity && !queueStep.done; queueStep = queueIter.next())
                 for (var sheetIter = queueStep.value.sheets.values(), sheetStep = sheetIter.next(); 0 < headers.remainingCapacity && !sheetStep.done; sheetStep = sheetIter.next()) {
-                  var sheet = sheetStep.value, props = sheet.props, key = props.href, props$jscomp$0 = sheet.props, header2 = getPreloadAsHeader(props$jscomp$0.href, "style", {
+                  var sheet = sheetStep.value, props = sheet.props, key = props.href, props$jscomp$0 = sheet.props, header = getPreloadAsHeader(props$jscomp$0.href, "style", {
                     crossOrigin: props$jscomp$0.crossOrigin,
                     integrity: props$jscomp$0.integrity,
                     nonce: props$jscomp$0.nonce,
@@ -6291,8 +6291,8 @@ var require_react_dom_server_legacy_node_production = __commonJS({
                     referrerPolicy: props$jscomp$0.referrerPolicy,
                     media: props$jscomp$0.media
                   });
-                  if (0 <= (headers.remainingCapacity -= header2.length + 2))
-                    renderState.resets.style[key] = PRELOAD_NO_CREDS, linkHeader && (linkHeader += ", "), linkHeader += header2, renderState.resets.style[key] = "string" === typeof props.crossOrigin || "string" === typeof props.integrity ? [props.crossOrigin, props.integrity] : PRELOAD_NO_CREDS;
+                  if (0 <= (headers.remainingCapacity -= header.length + 2))
+                    renderState.resets.style[key] = PRELOAD_NO_CREDS, linkHeader && (linkHeader += ", "), linkHeader += header, renderState.resets.style[key] = "string" === typeof props.crossOrigin || "string" === typeof props.integrity ? [props.crossOrigin, props.integrity] : PRELOAD_NO_CREDS;
                   else break b;
                 }
             }
@@ -8363,8 +8363,8 @@ var require_react_dom_server_node_production = __commonJS({
               resumableState.imageResources[key$jscomp$0] = PRELOAD_NO_CREDS;
               var input = props.crossOrigin;
               var JSCompiler_inline_result$jscomp$8 = "string" === typeof input ? "use-credentials" === input ? input : "" : void 0;
-              var headers = renderState.headers, header2;
-              headers && 0 < headers.remainingCapacity && ("high" === props.fetchPriority || 500 > headers.highImagePreloads.length) && (header2 = getPreloadAsHeader(src, "image", {
+              var headers = renderState.headers, header;
+              headers && 0 < headers.remainingCapacity && ("high" === props.fetchPriority || 500 > headers.highImagePreloads.length) && (header = getPreloadAsHeader(src, "image", {
                 imageSrcSet: props.srcSet,
                 imageSizes: props.sizes,
                 crossOrigin: JSCompiler_inline_result$jscomp$8,
@@ -8373,7 +8373,7 @@ var require_react_dom_server_node_production = __commonJS({
                 type: props.type,
                 fetchPriority: props.fetchPriority,
                 referrerPolicy: props.refererPolicy
-              }), 0 <= (headers.remainingCapacity -= header2.length + 2)) ? (renderState.resets.image[key$jscomp$0] = PRELOAD_NO_CREDS, headers.highImagePreloads && (headers.highImagePreloads += ", "), headers.highImagePreloads += header2) : (resource$jscomp$1 = [], pushLinkImpl(resource$jscomp$1, {
+              }), 0 <= (headers.remainingCapacity -= header.length + 2)) ? (renderState.resets.image[key$jscomp$0] = PRELOAD_NO_CREDS, headers.highImagePreloads && (headers.highImagePreloads += ", "), headers.highImagePreloads += header) : (resource$jscomp$1 = [], pushLinkImpl(resource$jscomp$1, {
                 rel: "preload",
                 as: "image",
                 href: srcSet ? void 0 : src,
@@ -8884,13 +8884,13 @@ var require_react_dom_server_node_production = __commonJS({
           if (!resumableState.dnsResources.hasOwnProperty(href)) {
             resumableState.dnsResources[href] = null;
             resumableState = renderState.headers;
-            var header2, JSCompiler_temp;
+            var header, JSCompiler_temp;
             if (JSCompiler_temp = resumableState && 0 < resumableState.remainingCapacity)
-              JSCompiler_temp = (header2 = "<" + ("" + href).replace(
+              JSCompiler_temp = (header = "<" + ("" + href).replace(
                 regexForHrefInLinkHeaderURLContext,
                 escapeHrefForLinkHeaderURLContextReplacer
-              ) + ">; rel=dns-prefetch", 0 <= (resumableState.remainingCapacity -= header2.length + 2));
-            JSCompiler_temp ? (renderState.resets.dns[href] = null, resumableState.preconnects && (resumableState.preconnects += ", "), resumableState.preconnects += header2) : (header2 = [], pushLinkImpl(header2, { href, rel: "dns-prefetch" }), renderState.preconnects.add(header2));
+              ) + ">; rel=dns-prefetch", 0 <= (resumableState.remainingCapacity -= header.length + 2));
+            JSCompiler_temp ? (renderState.resets.dns[href] = null, resumableState.preconnects && (resumableState.preconnects += ", "), resumableState.preconnects += header) : (header = [], pushLinkImpl(header, { href, rel: "dns-prefetch" }), renderState.preconnects.add(header));
           }
           enqueueFlush(request);
         }
@@ -8905,7 +8905,7 @@ var require_react_dom_server_node_production = __commonJS({
           if (!resumableState.connectResources[bucket].hasOwnProperty(href)) {
             resumableState.connectResources[bucket][href] = null;
             resumableState = renderState.headers;
-            var header2, JSCompiler_temp;
+            var header, JSCompiler_temp;
             if (JSCompiler_temp = resumableState && 0 < resumableState.remainingCapacity) {
               JSCompiler_temp = "<" + ("" + href).replace(
                 regexForHrefInLinkHeaderURLContext,
@@ -8918,9 +8918,9 @@ var require_react_dom_server_node_production = __commonJS({
                 );
                 JSCompiler_temp += '; crossorigin="' + escapedCrossOrigin + '"';
               }
-              JSCompiler_temp = (header2 = JSCompiler_temp, 0 <= (resumableState.remainingCapacity -= header2.length + 2));
+              JSCompiler_temp = (header = JSCompiler_temp, 0 <= (resumableState.remainingCapacity -= header.length + 2));
             }
-            JSCompiler_temp ? (renderState.resets.connect[bucket][href] = null, resumableState.preconnects && (resumableState.preconnects += ", "), resumableState.preconnects += header2) : (bucket = [], pushLinkImpl(bucket, {
+            JSCompiler_temp ? (renderState.resets.connect[bucket][href] = null, resumableState.preconnects && (resumableState.preconnects += ", "), resumableState.preconnects += header) : (bucket = [], pushLinkImpl(bucket, {
               rel: "preconnect",
               href,
               crossOrigin
@@ -8946,8 +8946,8 @@ var require_react_dom_server_node_production = __commonJS({
               if (resumableState.imageResources.hasOwnProperty(key)) return;
               resumableState.imageResources[key] = PRELOAD_NO_CREDS;
               resumableState = renderState.headers;
-              var header2;
-              resumableState && 0 < resumableState.remainingCapacity && "high" === fetchPriority && (header2 = getPreloadAsHeader(href, as2, options), 0 <= (resumableState.remainingCapacity -= header2.length + 2)) ? (renderState.resets.image[key] = PRELOAD_NO_CREDS, resumableState.highImagePreloads && (resumableState.highImagePreloads += ", "), resumableState.highImagePreloads += header2) : (resumableState = [], pushLinkImpl(
+              var header;
+              resumableState && 0 < resumableState.remainingCapacity && "high" === fetchPriority && (header = getPreloadAsHeader(href, as2, options), 0 <= (resumableState.remainingCapacity -= header.length + 2)) ? (renderState.resets.image[key] = PRELOAD_NO_CREDS, resumableState.highImagePreloads && (resumableState.highImagePreloads += ", "), resumableState.highImagePreloads += header) : (resumableState = [], pushLinkImpl(
                 resumableState,
                 assign(
                   { rel: "preload", href: imageSrcSet ? void 0 : href, as: as2 },
@@ -10846,7 +10846,7 @@ var require_react_dom_server_node_production = __commonJS({
               var queueIter = renderState.styles.values(), queueStep = queueIter.next();
               b: for (; 0 < headers.remainingCapacity && !queueStep.done; queueStep = queueIter.next())
                 for (var sheetIter = queueStep.value.sheets.values(), sheetStep = sheetIter.next(); 0 < headers.remainingCapacity && !sheetStep.done; sheetStep = sheetIter.next()) {
-                  var sheet = sheetStep.value, props = sheet.props, key = props.href, props$jscomp$0 = sheet.props, header2 = getPreloadAsHeader(props$jscomp$0.href, "style", {
+                  var sheet = sheetStep.value, props = sheet.props, key = props.href, props$jscomp$0 = sheet.props, header = getPreloadAsHeader(props$jscomp$0.href, "style", {
                     crossOrigin: props$jscomp$0.crossOrigin,
                     integrity: props$jscomp$0.integrity,
                     nonce: props$jscomp$0.nonce,
@@ -10855,8 +10855,8 @@ var require_react_dom_server_node_production = __commonJS({
                     referrerPolicy: props$jscomp$0.referrerPolicy,
                     media: props$jscomp$0.media
                   });
-                  if (0 <= (headers.remainingCapacity -= header2.length + 2))
-                    renderState.resets.style[key] = PRELOAD_NO_CREDS, linkHeader && (linkHeader += ", "), linkHeader += header2, renderState.resets.style[key] = "string" === typeof props.crossOrigin || "string" === typeof props.integrity ? [props.crossOrigin, props.integrity] : PRELOAD_NO_CREDS;
+                  if (0 <= (headers.remainingCapacity -= header.length + 2))
+                    renderState.resets.style[key] = PRELOAD_NO_CREDS, linkHeader && (linkHeader += ", "), linkHeader += header, renderState.resets.style[key] = "string" === typeof props.crossOrigin || "string" === typeof props.integrity ? [props.crossOrigin, props.integrity] : PRELOAD_NO_CREDS;
                   else break b;
                 }
             }
@@ -13372,8 +13372,8 @@ var require_react_dom_server_legacy_node_development = __commonJS({
                 resumableState.imageResources[key$jscomp$0] = PRELOAD_NO_CREDS;
                 var input = props.crossOrigin;
                 var crossOrigin = "string" === typeof input ? "use-credentials" === input ? input : "" : void 0;
-                var headers = renderState.headers, header2;
-                headers && 0 < headers.remainingCapacity && ("high" === props.fetchPriority || 500 > headers.highImagePreloads.length) && (header2 = getPreloadAsHeader(src, "image", {
+                var headers = renderState.headers, header;
+                headers && 0 < headers.remainingCapacity && ("high" === props.fetchPriority || 500 > headers.highImagePreloads.length) && (header = getPreloadAsHeader(src, "image", {
                   imageSrcSet: props.srcSet,
                   imageSizes: props.sizes,
                   crossOrigin,
@@ -13382,7 +13382,7 @@ var require_react_dom_server_legacy_node_development = __commonJS({
                   type: props.type,
                   fetchPriority: props.fetchPriority,
                   referrerPolicy: props.refererPolicy
-                }), 0 <= (headers.remainingCapacity -= header2.length + 2)) ? (renderState.resets.image[key$jscomp$0] = PRELOAD_NO_CREDS, headers.highImagePreloads && (headers.highImagePreloads += ", "), headers.highImagePreloads += header2) : (resource$jscomp$1 = [], pushLinkImpl(resource$jscomp$1, {
+                }), 0 <= (headers.remainingCapacity -= header.length + 2)) ? (renderState.resets.image[key$jscomp$0] = PRELOAD_NO_CREDS, headers.highImagePreloads && (headers.highImagePreloads += ", "), headers.highImagePreloads += header) : (resource$jscomp$1 = [], pushLinkImpl(resource$jscomp$1, {
                   rel: "preload",
                   as: "image",
                   href: srcSet ? void 0 : src,
@@ -16070,7 +16070,7 @@ var require_react_dom_server_legacy_node_development = __commonJS({
                 b: for (; 0 < headers.remainingCapacity && !queueStep.done; queueStep = queueIter.next())
                   for (var sheetIter = queueStep.value.sheets.values(), sheetStep = sheetIter.next(); 0 < headers.remainingCapacity && !sheetStep.done; sheetStep = sheetIter.next()) {
                     var sheet = sheetStep.value, props = sheet.props, key = props.href, props$jscomp$0 = sheet.props;
-                    var header2 = getPreloadAsHeader(
+                    var header = getPreloadAsHeader(
                       props$jscomp$0.href,
                       "style",
                       {
@@ -16083,8 +16083,8 @@ var require_react_dom_server_legacy_node_development = __commonJS({
                         media: props$jscomp$0.media
                       }
                     );
-                    if (0 <= (headers.remainingCapacity -= header2.length + 2))
-                      renderState.resets.style[key] = PRELOAD_NO_CREDS, linkHeader && (linkHeader += ", "), linkHeader += header2, renderState.resets.style[key] = "string" === typeof props.crossOrigin || "string" === typeof props.integrity ? [props.crossOrigin, props.integrity] : PRELOAD_NO_CREDS;
+                    if (0 <= (headers.remainingCapacity -= header.length + 2))
+                      renderState.resets.style[key] = PRELOAD_NO_CREDS, linkHeader && (linkHeader += ", "), linkHeader += header, renderState.resets.style[key] = "string" === typeof props.crossOrigin || "string" === typeof props.integrity ? [props.crossOrigin, props.integrity] : PRELOAD_NO_CREDS;
                     else break b;
                   }
               }
@@ -17369,10 +17369,10 @@ var require_react_dom_server_legacy_node_development = __commonJS({
               if (!resumableState.dnsResources.hasOwnProperty(href)) {
                 resumableState.dnsResources[href] = EXISTS;
                 resumableState = renderState.headers;
-                var header2, JSCompiler_temp;
+                var header, JSCompiler_temp;
                 if (JSCompiler_temp = resumableState && 0 < resumableState.remainingCapacity)
-                  JSCompiler_temp = (header2 = "<" + escapeHrefForLinkHeaderURLContext(href) + ">; rel=dns-prefetch", 0 <= (resumableState.remainingCapacity -= header2.length + 2));
-                JSCompiler_temp ? (renderState.resets.dns[href] = EXISTS, resumableState.preconnects && (resumableState.preconnects += ", "), resumableState.preconnects += header2) : (header2 = [], pushLinkImpl(header2, { href, rel: "dns-prefetch" }), renderState.preconnects.add(header2));
+                  JSCompiler_temp = (header = "<" + escapeHrefForLinkHeaderURLContext(href) + ">; rel=dns-prefetch", 0 <= (resumableState.remainingCapacity -= header.length + 2));
+                JSCompiler_temp ? (renderState.resets.dns[href] = EXISTS, resumableState.preconnects && (resumableState.preconnects += ", "), resumableState.preconnects += header) : (header = [], pushLinkImpl(header, { href, rel: "dns-prefetch" }), renderState.preconnects.add(header));
               }
               enqueueFlush(request);
             }
@@ -17387,7 +17387,7 @@ var require_react_dom_server_legacy_node_development = __commonJS({
               if (!resumableState.connectResources[bucket].hasOwnProperty(href)) {
                 resumableState.connectResources[bucket][href] = EXISTS;
                 resumableState = renderState.headers;
-                var header2, JSCompiler_temp;
+                var header, JSCompiler_temp;
                 if (JSCompiler_temp = resumableState && 0 < resumableState.remainingCapacity) {
                   JSCompiler_temp = "<" + escapeHrefForLinkHeaderURLContext(href) + ">; rel=preconnect";
                   if ("string" === typeof crossOrigin) {
@@ -17397,9 +17397,9 @@ var require_react_dom_server_legacy_node_development = __commonJS({
                     );
                     JSCompiler_temp += '; crossorigin="' + escapedCrossOrigin + '"';
                   }
-                  JSCompiler_temp = (header2 = JSCompiler_temp, 0 <= (resumableState.remainingCapacity -= header2.length + 2));
+                  JSCompiler_temp = (header = JSCompiler_temp, 0 <= (resumableState.remainingCapacity -= header.length + 2));
                 }
-                JSCompiler_temp ? (renderState.resets.connect[bucket][href] = EXISTS, resumableState.preconnects && (resumableState.preconnects += ", "), resumableState.preconnects += header2) : (bucket = [], pushLinkImpl(bucket, {
+                JSCompiler_temp ? (renderState.resets.connect[bucket][href] = EXISTS, resumableState.preconnects && (resumableState.preconnects += ", "), resumableState.preconnects += header) : (bucket = [], pushLinkImpl(bucket, {
                   rel: "preconnect",
                   href,
                   crossOrigin
@@ -17425,8 +17425,8 @@ var require_react_dom_server_legacy_node_development = __commonJS({
                   if (resumableState.imageResources.hasOwnProperty(key)) return;
                   resumableState.imageResources[key] = PRELOAD_NO_CREDS;
                   resumableState = renderState.headers;
-                  var header2;
-                  resumableState && 0 < resumableState.remainingCapacity && "high" === fetchPriority && (header2 = getPreloadAsHeader(href, as2, options), 0 <= (resumableState.remainingCapacity -= header2.length + 2)) ? (renderState.resets.image[key] = PRELOAD_NO_CREDS, resumableState.highImagePreloads && (resumableState.highImagePreloads += ", "), resumableState.highImagePreloads += header2) : (resumableState = [], pushLinkImpl(
+                  var header;
+                  resumableState && 0 < resumableState.remainingCapacity && "high" === fetchPriority && (header = getPreloadAsHeader(href, as2, options), 0 <= (resumableState.remainingCapacity -= header.length + 2)) ? (renderState.resets.image[key] = PRELOAD_NO_CREDS, resumableState.highImagePreloads && (resumableState.highImagePreloads += ", "), resumableState.highImagePreloads += header) : (resumableState = [], pushLinkImpl(
                     resumableState,
                     assign(
                       {
@@ -19755,8 +19755,8 @@ var require_react_dom_server_node_development = __commonJS({
                 resumableState.imageResources[key$jscomp$0] = PRELOAD_NO_CREDS;
                 var input = props.crossOrigin;
                 var crossOrigin = "string" === typeof input ? "use-credentials" === input ? input : "" : void 0;
-                var headers = renderState.headers, header2;
-                headers && 0 < headers.remainingCapacity && ("high" === props.fetchPriority || 500 > headers.highImagePreloads.length) && (header2 = getPreloadAsHeader(src, "image", {
+                var headers = renderState.headers, header;
+                headers && 0 < headers.remainingCapacity && ("high" === props.fetchPriority || 500 > headers.highImagePreloads.length) && (header = getPreloadAsHeader(src, "image", {
                   imageSrcSet: props.srcSet,
                   imageSizes: props.sizes,
                   crossOrigin,
@@ -19765,7 +19765,7 @@ var require_react_dom_server_node_development = __commonJS({
                   type: props.type,
                   fetchPriority: props.fetchPriority,
                   referrerPolicy: props.refererPolicy
-                }), 0 <= (headers.remainingCapacity -= header2.length + 2)) ? (renderState.resets.image[key$jscomp$0] = PRELOAD_NO_CREDS, headers.highImagePreloads && (headers.highImagePreloads += ", "), headers.highImagePreloads += header2) : (resource$jscomp$1 = [], pushLinkImpl(resource$jscomp$1, {
+                }), 0 <= (headers.remainingCapacity -= header.length + 2)) ? (renderState.resets.image[key$jscomp$0] = PRELOAD_NO_CREDS, headers.highImagePreloads && (headers.highImagePreloads += ", "), headers.highImagePreloads += header) : (resource$jscomp$1 = [], pushLinkImpl(resource$jscomp$1, {
                   rel: "preload",
                   as: "image",
                   href: srcSet ? void 0 : src,
@@ -22375,7 +22375,7 @@ var require_react_dom_server_node_development = __commonJS({
                 b: for (; 0 < headers.remainingCapacity && !queueStep.done; queueStep = queueIter.next())
                   for (var sheetIter = queueStep.value.sheets.values(), sheetStep = sheetIter.next(); 0 < headers.remainingCapacity && !sheetStep.done; sheetStep = sheetIter.next()) {
                     var sheet = sheetStep.value, props = sheet.props, key = props.href, props$jscomp$0 = sheet.props;
-                    var header2 = getPreloadAsHeader(
+                    var header = getPreloadAsHeader(
                       props$jscomp$0.href,
                       "style",
                       {
@@ -22388,8 +22388,8 @@ var require_react_dom_server_node_development = __commonJS({
                         media: props$jscomp$0.media
                       }
                     );
-                    if (0 <= (headers.remainingCapacity -= header2.length + 2))
-                      renderState.resets.style[key] = PRELOAD_NO_CREDS, linkHeader && (linkHeader += ", "), linkHeader += header2, renderState.resets.style[key] = "string" === typeof props.crossOrigin || "string" === typeof props.integrity ? [props.crossOrigin, props.integrity] : PRELOAD_NO_CREDS;
+                    if (0 <= (headers.remainingCapacity -= header.length + 2))
+                      renderState.resets.style[key] = PRELOAD_NO_CREDS, linkHeader && (linkHeader += ", "), linkHeader += header, renderState.resets.style[key] = "string" === typeof props.crossOrigin || "string" === typeof props.integrity ? [props.crossOrigin, props.integrity] : PRELOAD_NO_CREDS;
                     else break b;
                   }
               }
@@ -23720,10 +23720,10 @@ var require_react_dom_server_node_development = __commonJS({
               if (!resumableState.dnsResources.hasOwnProperty(href)) {
                 resumableState.dnsResources[href] = EXISTS;
                 resumableState = renderState.headers;
-                var header2, JSCompiler_temp;
+                var header, JSCompiler_temp;
                 if (JSCompiler_temp = resumableState && 0 < resumableState.remainingCapacity)
-                  JSCompiler_temp = (header2 = "<" + escapeHrefForLinkHeaderURLContext(href) + ">; rel=dns-prefetch", 0 <= (resumableState.remainingCapacity -= header2.length + 2));
-                JSCompiler_temp ? (renderState.resets.dns[href] = EXISTS, resumableState.preconnects && (resumableState.preconnects += ", "), resumableState.preconnects += header2) : (header2 = [], pushLinkImpl(header2, { href, rel: "dns-prefetch" }), renderState.preconnects.add(header2));
+                  JSCompiler_temp = (header = "<" + escapeHrefForLinkHeaderURLContext(href) + ">; rel=dns-prefetch", 0 <= (resumableState.remainingCapacity -= header.length + 2));
+                JSCompiler_temp ? (renderState.resets.dns[href] = EXISTS, resumableState.preconnects && (resumableState.preconnects += ", "), resumableState.preconnects += header) : (header = [], pushLinkImpl(header, { href, rel: "dns-prefetch" }), renderState.preconnects.add(header));
               }
               enqueueFlush(request);
             }
@@ -23738,7 +23738,7 @@ var require_react_dom_server_node_development = __commonJS({
               if (!resumableState.connectResources[bucket].hasOwnProperty(href)) {
                 resumableState.connectResources[bucket][href] = EXISTS;
                 resumableState = renderState.headers;
-                var header2, JSCompiler_temp;
+                var header, JSCompiler_temp;
                 if (JSCompiler_temp = resumableState && 0 < resumableState.remainingCapacity) {
                   JSCompiler_temp = "<" + escapeHrefForLinkHeaderURLContext(href) + ">; rel=preconnect";
                   if ("string" === typeof crossOrigin) {
@@ -23748,9 +23748,9 @@ var require_react_dom_server_node_development = __commonJS({
                     );
                     JSCompiler_temp += '; crossorigin="' + escapedCrossOrigin + '"';
                   }
-                  JSCompiler_temp = (header2 = JSCompiler_temp, 0 <= (resumableState.remainingCapacity -= header2.length + 2));
+                  JSCompiler_temp = (header = JSCompiler_temp, 0 <= (resumableState.remainingCapacity -= header.length + 2));
                 }
-                JSCompiler_temp ? (renderState.resets.connect[bucket][href] = EXISTS, resumableState.preconnects && (resumableState.preconnects += ", "), resumableState.preconnects += header2) : (bucket = [], pushLinkImpl(bucket, {
+                JSCompiler_temp ? (renderState.resets.connect[bucket][href] = EXISTS, resumableState.preconnects && (resumableState.preconnects += ", "), resumableState.preconnects += header) : (bucket = [], pushLinkImpl(bucket, {
                   rel: "preconnect",
                   href,
                   crossOrigin
@@ -23776,8 +23776,8 @@ var require_react_dom_server_node_development = __commonJS({
                   if (resumableState.imageResources.hasOwnProperty(key)) return;
                   resumableState.imageResources[key] = PRELOAD_NO_CREDS;
                   resumableState = renderState.headers;
-                  var header2;
-                  resumableState && 0 < resumableState.remainingCapacity && "high" === fetchPriority && (header2 = getPreloadAsHeader(href, as2, options), 0 <= (resumableState.remainingCapacity -= header2.length + 2)) ? (renderState.resets.image[key] = PRELOAD_NO_CREDS, resumableState.highImagePreloads && (resumableState.highImagePreloads += ", "), resumableState.highImagePreloads += header2) : (resumableState = [], pushLinkImpl(
+                  var header;
+                  resumableState && 0 < resumableState.remainingCapacity && "high" === fetchPriority && (header = getPreloadAsHeader(href, as2, options), 0 <= (resumableState.remainingCapacity -= header.length + 2)) ? (renderState.resets.image[key] = PRELOAD_NO_CREDS, resumableState.highImagePreloads && (resumableState.highImagePreloads += ", "), resumableState.highImagePreloads += header) : (resumableState = [], pushLinkImpl(
                     resumableState,
                     assign(
                       {
@@ -24284,7 +24284,7 @@ var require_icons = __commonJS({
   "emails/_components/icons.js"(exports2, module2) {
     var DEFAULT_ICON_BASE = "https://atlastransport.ph/email";
     var EMBEDDED_ICON_URLS = {
-      logo: "cid:atlas-email-logo",
+      banner: "cid:atlas-email-banner",
       mobile: "cid:atlas-email-mobile",
       envelopeSm: "cid:atlas-email-envelope-sm",
       headset: "cid:atlas-email-headset",
@@ -24301,7 +24301,7 @@ var require_icons = __commonJS({
       }
       const base = String(iconBaseUrl || DEFAULT_ICON_BASE).replace(/\/$/, "");
       return {
-        logo: `${base}/atlas-logo.jpeg`,
+        banner: `${base}/atlas-banner.jpeg`,
         mobile: `${base}/mobile.png`,
         envelopeSm: `${base}/envelope-sm.png`,
         headset: `${base}/headset.png`,
@@ -35874,14 +35874,14 @@ function ShipmentStatusEmail({
   packages = [],
   trackingUrl = "https://atlastransport.ph/track",
   supportEmail = "support@atlastransport.ph",
-  logoUrl = "https://atlastransport.ph/email/atlas-logo.jpeg",
+  bannerUrl = "https://atlastransport.ph/email/atlas-banner.jpeg",
   iconBaseUrl = "https://atlastransport.ph/email",
   embedIcons = false,
   isMultiShipment = false,
   shipmentIds = []
 }) {
   const icons = (0, import_icons.getIconUrls)(iconBaseUrl, { embedded: embedIcons });
-  const resolvedLogoUrl = embedIcons ? icons.logo : logoUrl;
+  const resolvedBannerUrl = embedIcons ? icons.banner : bannerUrl;
   const badgeStyle = (0, import_theme.getStatusBadgeStyle)(statusCode);
   const totalPackageRows = packages.length;
   const visiblePackages = packages.slice(0, PACKAGES_PER_PAGE);
@@ -35891,19 +35891,16 @@ function ShipmentStatusEmail({
     /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(Head, {}),
     /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(Preview, { children: previewText }),
     /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(Body, { style: main, children: /* @__PURE__ */ (0, import_jsx_runtime14.jsxs)(Container, { style: container, children: [
-      /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(Section, { style: header, children: /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(Row, { children: /* @__PURE__ */ (0, import_jsx_runtime14.jsxs)(Column, { children: [
-        /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(
-          Img,
-          {
-            src: resolvedLogoUrl,
-            width: "120",
-            height: "120",
-            alt: "Atlas Transportation",
-            style: logo
-          }
-        ),
-        /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(Text3, { style: brandTagline, children: "Fast and Easy Shipping" })
-      ] }) }) }),
+      /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(Section, { style: headerBanner, children: /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(
+        Img,
+        {
+          src: resolvedBannerUrl,
+          width: "640",
+          height: "198",
+          alt: "Atlas Transportation \u2014 Fast and Easy Shipping",
+          style: bannerImage
+        }
+      ) }),
       /* @__PURE__ */ (0, import_jsx_runtime14.jsxs)(Section, { style: contentSection, children: [
         /* @__PURE__ */ (0, import_jsx_runtime14.jsxs)(Text3, { style: greeting, children: [
           "Hi ",
@@ -36238,7 +36235,7 @@ function ShipmentStatusEmail({
       ] }) }) }),
       /* @__PURE__ */ (0, import_jsx_runtime14.jsxs)(Section, { style: footer, children: [
         /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(Text3, { style: footerCompany, children: "Atlas Transportation Corporation" }),
-        /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(Text3, { style: footerTagline, children: "Delivering your business. Moving the Philippines." })
+        /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(Text3, { style: footerTagline, children: "Moving Cargo. Connecting Communities." })
       ] })
     ] }) })
   ] });
@@ -36257,21 +36254,18 @@ var container = {
   maxWidth: "640px",
   overflow: "hidden"
 };
-var header = {
-  backgroundColor: import_theme.colors.navyDark,
-  padding: "28px 32px"
+var headerBanner = {
+  lineHeight: "0",
+  margin: "0",
+  padding: "0"
 };
-var logo = {
-  borderRadius: "10px",
-  marginBottom: "8px"
-};
-var brandTagline = {
-  color: "#cbd5e1",
-  fontSize: "13px",
-  fontWeight: "600",
-  letterSpacing: "0.04em",
-  lineHeight: "1.5",
-  margin: "0"
+var bannerImage = {
+  border: "0",
+  display: "block",
+  height: "auto",
+  margin: "0",
+  maxWidth: "100%",
+  width: "100%"
 };
 var contentSection = {
   padding: "0 32px 24px"

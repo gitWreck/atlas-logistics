@@ -36,14 +36,14 @@ export function ShipmentStatusEmail({
   packages = [],
   trackingUrl = "https://atlastransport.ph/track",
   supportEmail = "support@atlastransport.ph",
-  logoUrl = "https://atlastransport.ph/email/atlas-logo.jpeg",
+  bannerUrl = "https://atlastransport.ph/email/atlas-banner.jpeg",
   iconBaseUrl = "https://atlastransport.ph/email",
   embedIcons = false,
   isMultiShipment = false,
   shipmentIds = [],
 }) {
   const icons = getIconUrls(iconBaseUrl, { embedded: embedIcons });
-  const resolvedLogoUrl = embedIcons ? icons.logo : logoUrl;
+  const resolvedBannerUrl = embedIcons ? icons.banner : bannerUrl;
   const badgeStyle = getStatusBadgeStyle(statusCode);
   const totalPackageRows = packages.length;
   const visiblePackages = packages.slice(0, PACKAGES_PER_PAGE);
@@ -56,20 +56,15 @@ export function ShipmentStatusEmail({
       <Preview>{previewText}</Preview>
       <Body style={main}>
         <Container style={container}>
-          {/* Header */}
-          <Section style={header}>
-            <Row>
-              <Column>
-                <Img
-                  src={resolvedLogoUrl}
-                  width="120"
-                  height="120"
-                  alt="Atlas Transportation"
-                  style={logo}
-                />
-                <Text style={brandTagline}>Fast and Easy Shipping</Text>
-              </Column>
-            </Row>
+          {/* Header banner */}
+          <Section style={headerBanner}>
+            <Img
+              src={resolvedBannerUrl}
+              width="640"
+              height="198"
+              alt="Atlas Transportation — Fast and Easy Shipping"
+              style={bannerImage}
+            />
           </Section>
 
           <Section style={contentSection}>
@@ -487,7 +482,7 @@ export function ShipmentStatusEmail({
           <Section style={footer}>
             <Text style={footerCompany}>Atlas Transportation Corporation</Text>
             <Text style={footerTagline}>
-              Delivering your business. Moving the Philippines.
+              Moving Cargo. Connecting Communities.
             </Text>
           </Section>
         </Container>
@@ -515,23 +510,19 @@ const container = {
   overflow: "hidden",
 };
 
-const header = {
-  backgroundColor: colors.navyDark,
-  padding: "28px 32px",
-};
-
-const logo = {
-  borderRadius: "10px",
-  marginBottom: "8px",
-};
-
-const brandTagline = {
-  color: "#cbd5e1",
-  fontSize: "13px",
-  fontWeight: "600",
-  letterSpacing: "0.04em",
-  lineHeight: "1.5",
+const headerBanner = {
+  lineHeight: "0",
   margin: "0",
+  padding: "0",
+};
+
+const bannerImage = {
+  border: "0",
+  display: "block",
+  height: "auto",
+  margin: "0",
+  maxWidth: "100%",
+  width: "100%",
 };
 
 const contentSection = {

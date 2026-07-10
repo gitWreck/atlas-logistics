@@ -36,7 +36,7 @@ console.log(`[buildEmailTemplates] Copied bundle to ${vendorFile}`);
 const publicEmailDir = path.join(repoRoot, "apps", "web", "public", "email");
 const functionsAssetDir = path.join(functionsDir, "assets", "email");
 const assetFiles = [
-  "atlas-logo.jpeg",
+  "atlas-banner.jpeg",
   "mobile.png",
   "envelope-sm.png",
   "headset.png",
