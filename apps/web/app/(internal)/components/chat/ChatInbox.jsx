@@ -119,6 +119,34 @@ function staffDisplayName(member = {}) {
   );
 }
 
+function isDirectStaffConversation(conversation = {}) {
+  return String(conversation.type || "") === "direct_staff";
+}
+
+function getDirectPeer(conversation = {}, uid = "") {
+  if (!isDirectStaffConversation(conversation)) return null;
+  const peerId = (conversation.participantIds || []).find((id) => id !== uid);
+  return peerId ? conversation.participantProfiles?.[peerId] || null : null;
+}
+
+function conversationDisplayName(conversation = {}, uid = "") {
+  return getDirectPeer(conversation, uid)?.name || conversation.customerName || "Customer";
+}
+
+function conversationUnreadCount(conversation = {}, uid = "") {
+  return Number(
+    conversation.unreadCounts?.[
+      isDirectStaffConversation(conversation) ? uid : "staff"
+    ] || 0,
+  );
+}
+
+function conversationFilterStatus(conversation = {}) {
+  const status = String(conversation.status || "open").toLowerCase();
+  if (isDirectStaffConversation(conversation) && status === "active") return "open";
+  return status;
+}
+
 function getAddressLine(address = {}) {
   if (!address || typeof address !== "object") return "";
   return [
@@ -300,47 +328,85 @@ export default function ChatInbox({ user, profile, isDark = false, onViewCustome
   useEffect(() => {
     if (!user?.uid || !profile?.role) return undefined;
 
-    let q;
     const role = String(profile.role || "").toLowerCase();
-
-    if (role === "employee" || role === "manager") {
-      q = query(
-        collection(db, "conversations"),
-        where("assignedTo", "==", user.uid),
-        limit(100),
-      );
-    } else if (role === "customer") {
-      q = query(
-        collection(db, "conversations"),
-        where("customerId", "==", user.uid),
-        limit(100),
-      );
-    } else {
-      q = query(
-        collection(db, "conversations"),
-        orderBy("lastMessageAt", "desc"),
-        limit(100),
-      );
-    }
-
-    return onSnapshot(q, (snapshot) => {
-      const items = snapshot.docs
-        .map((doc) => ({
-          id: doc.id,
-          ...doc.data(),
-        }))
+    const sources = new Map();
+    const publish = () => {
+      const merged = new Map();
+      sources.forEach((items) => items.forEach((item) => merged.set(item.id, item)));
+      const items = [...merged.values()]
         .sort((a, b) => {
           const aTime = a.lastMessageAt?.toMillis?.() ?? 0;
           const bTime = b.lastMessageAt?.toMillis?.() ?? 0;
           return bTime - aTime;
         });
-
       setConversations(items);
       setSelectedId((current) => {
         if (current && items.some((item) => item.id === current)) return current;
         return items[0]?.id || null;
       });
-    });
+    };
+
+    const subscribe = (key, targetQuery) =>
+      onSnapshot(
+        targetQuery,
+        (snapshot) => {
+          sources.set(
+            key,
+            snapshot.docs.map((conversation) => ({
+              id: conversation.id,
+              ...conversation.data(),
+            })),
+          );
+          publish();
+        },
+        (error) => console.error(`Chat subscription failed (${key}):`, error),
+      );
+
+    const unsubscribers = [];
+    if (role === "employee" || role === "manager") {
+      unsubscribers.push(
+        subscribe(
+          "assigned",
+          query(
+            collection(db, "conversations"),
+            where("assignedTo", "==", user.uid),
+            limit(100),
+          ),
+        ),
+        subscribe(
+          "direct",
+          query(
+            collection(db, "conversations"),
+            where("participantIds", "array-contains", user.uid),
+            limit(100),
+          ),
+        ),
+      );
+    } else if (role === "customer") {
+      unsubscribers.push(
+        subscribe(
+          "customer",
+          query(
+            collection(db, "conversations"),
+            where("customerId", "==", user.uid),
+            limit(100),
+          ),
+        ),
+      );
+    } else {
+      unsubscribers.push(
+        subscribe(
+          "all",
+          query(
+            collection(db, "conversations"),
+            orderBy("lastMessageAt", "desc"),
+            limit(100),
+          ),
+        ),
+      );
+    }
+
+    return () => unsubscribers.forEach((unsubscribe) => unsubscribe());
   }, [profile?.role, user?.uid]);
 
   useEffect(() => {
@@ -390,6 +456,12 @@ export default function ChatInbox({ user, profile, isDark = false, onViewCustome
     () => conversations.find((item) => item.id === selectedId) || null,
     [conversations, selectedId],
   );
+  const selectedDirectPeer = useMemo(
+    () => getDirectPeer(selected || {}, user?.uid),
+    [selected, user?.uid],
+  );
+  const selectedName = conversationDisplayName(selected || {}, user?.uid);
+  const selectedIsDirect = isDirectStaffConversation(selected || {});
 
   const assignedMember = useMemo(
     () =>
@@ -402,8 +474,8 @@ export default function ChatInbox({ user, profile, isDark = false, onViewCustome
   const filteredConversations = useMemo(() => {
     const term = search.trim().toLowerCase();
     return conversations.filter((item) => {
-      const status = String(item.status || "open").toLowerCase();
-      const unread = Number(item.unreadCounts?.staff || 0);
+      const status = conversationFilterStatus(item);
+      const unread = conversationUnreadCount(item, user?.uid);
       let matchesFilter = true;
       if (statusFilter === "all") matchesFilter = status !== "closed";
       else if (statusFilter === "unread") matchesFilter = unread > 0 && status !== "closed";
@@ -411,7 +483,9 @@ export default function ChatInbox({ user, profile, isDark = false, onViewCustome
       else if (statusFilter === "archived")
         matchesFilter = status === "closed";
       const haystack = [
-        item.customerName,
+        conversationDisplayName(item, user?.uid),
+        getDirectPeer(item, user?.uid)?.roleLabel,
+        getDirectPeer(item, user?.uid)?.municipality,
         item.customerPhone,
         item.trackingNumber,
         displayMessagePreview(item.lastMessageText),
@@ -422,7 +496,7 @@ export default function ChatInbox({ user, profile, isDark = false, onViewCustome
 
       return matchesFilter && (!term || haystack.includes(term));
     });
-  }, [conversations, search, statusFilter]);
+  }, [conversations, search, statusFilter, user?.uid]);
 
   const sharedPhotos = useMemo(
     () =>
@@ -435,7 +509,7 @@ export default function ChatInbox({ user, profile, isDark = false, onViewCustome
   );
 
   const unreadTotal = conversations.reduce(
-    (sum, item) => sum + Number(item.unreadCounts?.staff || 0),
+    (sum, item) => sum + conversationUnreadCount(item, user?.uid),
     0,
   );
 
@@ -834,8 +908,12 @@ export default function ChatInbox({ user, profile, isDark = false, onViewCustome
             ) : (
               filteredConversations.map((item) => {
                 const isSelected = item.id === selectedId;
-                const unread = Number(item.unreadCounts?.staff || 0);
-                const isOnline = String(item.status || "").toLowerCase() === "open";
+                const unread = conversationUnreadCount(item, user?.uid);
+                const peer = getDirectPeer(item, user?.uid);
+                const displayName = conversationDisplayName(item, user?.uid);
+                const isOnline = isDirectStaffConversation(item)
+                  ? !!peer?.online
+                  : String(item.status || "").toLowerCase() === "open";
 
                 return (
                   <button
@@ -855,11 +933,11 @@ export default function ChatInbox({ user, profile, isDark = false, onViewCustome
                           : "hover:bg-slate-100"
                     }`}
                   >
-                    <Avatar name={item.customerName} size={52} online={isOnline} />
+                    <Avatar name={displayName} size={52} online={isOnline} />
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center justify-between gap-2">
                         <p className="truncate text-sm font-semibold">
-                          {item.customerName || "Customer"}
+                          {displayName}
                         </p>
                         <span className={`shrink-0 text-[11px] ${muted}`}>
                           {formatFirestoreDate(item.lastMessageAt) || ""}
@@ -909,16 +987,22 @@ export default function ChatInbox({ user, profile, isDark = false, onViewCustome
                     <FontAwesomeIcon icon={faChevronLeft} />
                   </button>
                   <Avatar
-                    name={selected.customerName}
+                    name={selectedName}
                     size={40}
-                    online={selected.status === "open"}
+                    online={selectedIsDirect ? !!selectedDirectPeer?.online : selected.status === "open"}
                   />
                   <div className="min-w-0">
                     <h2 className="truncate text-sm font-bold">
-                      {selected.customerName || "Customer"}
+                      {selectedName}
                     </h2>
                     <p className={`truncate text-xs ${muted}`}>
-                      {selected.status === "open" ? (
+                      {selectedIsDirect ? (
+                        <span>
+                          {[selectedDirectPeer?.roleLabel, selectedDirectPeer?.municipality]
+                            .filter(Boolean)
+                            .join(" · ") || "Atlas staff"}
+                        </span>
+                      ) : selected.status === "open" ? (
                         <span className="text-emerald-500">Active now</span>
                       ) : (
                         <span className="capitalize">{selected.status || "open"}</span>
@@ -928,7 +1012,7 @@ export default function ChatInbox({ user, profile, isDark = false, onViewCustome
                 </div>
 
                 <div className="flex items-center gap-2">
-                  {role === "manager" && (
+                  {role === "manager" && !selectedIsDirect && (
                     <div className="flex items-center gap-2">
                       <button
                         type="button"
@@ -1192,15 +1276,21 @@ export default function ChatInbox({ user, profile, isDark = false, onViewCustome
           {selected ? (
             <div className="flex flex-col items-center px-5 py-6">
               <Avatar
-                name={selected.customerName}
+                name={selectedName}
                 size={80}
-                online={selected.status === "open"}
+                online={selectedIsDirect ? !!selectedDirectPeer?.online : selected.status === "open"}
               />
               <h3 className="mt-3 text-lg font-bold">
-                {selected.customerName || "Customer"}
+                {selectedName}
               </h3>
               <p className={`text-xs ${muted}`}>
-                {selected.status === "open" ? (
+                {selectedIsDirect ? (
+                  <span>
+                    {[selectedDirectPeer?.roleLabel, selectedDirectPeer?.municipality]
+                      .filter(Boolean)
+                      .join(" · ") || "Atlas staff"}
+                  </span>
+                ) : selected.status === "open" ? (
                   <span className="text-emerald-500">Active now</span>
                 ) : (
                   <span className="capitalize">{selected.status || "open"}</span>
@@ -1210,7 +1300,25 @@ export default function ChatInbox({ user, profile, isDark = false, onViewCustome
               <div className="mt-6 w-full">
                 <p className="mb-3 text-sm font-bold">About</p>
                 <div className="flex flex-col gap-3">
-                  {[
+                  {(selectedIsDirect
+                    ? [
+                        {
+                          icon: faUser,
+                          label: "Role",
+                          value: selectedDirectPeer?.roleLabel || getRoleLabel(selectedDirectPeer?.role),
+                        },
+                        {
+                          icon: faLocationDot,
+                          label: "Municipality",
+                          value: selectedDirectPeer?.municipality || "Warehouse-wide",
+                        },
+                        {
+                          icon: faBoxOpen,
+                          label: "Warehouse",
+                          value: selectedDirectPeer?.warehouseName || "Assigned warehouse",
+                        },
+                      ]
+                    : [
                     {
                       icon: faPhone,
                       label: "Phone",
@@ -1238,7 +1346,7 @@ export default function ChatInbox({ user, profile, isDark = false, onViewCustome
                         selected.customerLocation ||
                         "—",
                     },
-                  ].map((row) => (
+                  ]).map((row) => (
                     <div key={row.label} className="flex items-start gap-3">
                       <span className={`mt-0.5 ${muted}`}>
                         <FontAwesomeIcon icon={row.icon} size="sm" />

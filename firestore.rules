@@ -85,6 +85,12 @@ service cloud.firestore {
         );
     }
 
+    function canListDirectStaffConversation(conversation) {
+      return isActiveUser()
+        && conversation.get('type', '') == 'direct_staff'
+        && request.auth.uid in conversation.get('participantIds', []);
+    }
+
     // Customer signup currently performs duplicate checks before auth.
     // Keep this tightly limited; moving this check behind a callable/API is safer.
     function isCustomerSignupDuplicateQuery() {
@@ -136,14 +142,14 @@ service cloud.firestore {
     // --- CUSTOMER SUPPORT CHAT ---
 
     match /conversations/{conversationId} {
-      allow read: if hasRole('admin')
+      allow get: if hasRole('admin')
         || canReadDirectStaffConversation(resource.data)
         || (isActiveUser() && resource.data.customerId == request.auth.uid)
         || (hasRole('manager') && (resource.data.assignedTo == request.auth.uid || resource.data.assignedStaffId == request.auth.uid))
         || (hasRole('employee') && (resource.data.assignedTo == request.auth.uid || resource.data.assignedStaffId == request.auth.uid));
 
       allow list: if hasRole('admin')
-        || canReadDirectStaffConversation(resource.data)
+        || canListDirectStaffConversation(resource.data)
         || (hasRole('customer') && resource.data.customerId == request.auth.uid)
         || (hasRole('manager') && (resource.data.assignedTo == request.auth.uid || resource.data.assignedStaffId == request.auth.uid))
         || (hasRole('employee') && (resource.data.assignedTo == request.auth.uid || resource.data.assignedStaffId == request.auth.uid));

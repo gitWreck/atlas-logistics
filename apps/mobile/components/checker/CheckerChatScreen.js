@@ -127,6 +127,7 @@ export default function CheckerChatScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [openingId, setOpeningId] = useState(null);
   const [selectedId, setSelectedId] = useState(null);
+  const uid = auth.currentUser?.uid;
 
   const loadContacts = useCallback(async ({ refresh = false } = {}) => {
     try {
@@ -182,10 +183,10 @@ export default function CheckerChatScreen() {
   }, [loadContacts]);
 
   useEffect(() => {
-    if (!accessToken) return undefined;
+    if (!accessToken || !uid) return undefined;
     const conversationsQuery = query(
       collection(db, "conversations"),
-      where("checkerAccessTokens", "array-contains", accessToken),
+      where("participantIds", "array-contains", uid),
     );
     return onSnapshot(
       conversationsQuery,
@@ -202,9 +203,8 @@ export default function CheckerChatScreen() {
       },
       (error) => console.error("Checker conversations subscription failed:", error),
     );
-  }, [accessToken]);
+  }, [accessToken, uid]);
 
-  const uid = auth.currentUser?.uid;
   const conversationByContact = useMemo(() => {
     const result = new Map();
     conversations.forEach((conversation) => {

@@ -242,7 +242,7 @@ async function assertDirectConversationAccess(conversation, uid, user) {
 }
 
 exports.listCheckerChatContacts = onCall(
-  { region: "asia-southeast1", maxInstances: 20 },
+  { region: "asia-southeast1", maxInstances: 20, invoker: "public" },
   async (req) => {
     const { uid, checker, accessKey, contacts } = await getCheckerAndContacts(req);
     return {
@@ -256,7 +256,7 @@ exports.listCheckerChatContacts = onCall(
 );
 
 exports.createCheckerConversation = onCall(
-  { region: "asia-southeast1", maxInstances: 20 },
+  { region: "asia-southeast1", maxInstances: 20, invoker: "public" },
   async (req) => {
     const contactId = String(req.data?.contactId || "").trim();
     if (!contactId) throw new HttpsError("invalid-argument", "contactId is required.");
