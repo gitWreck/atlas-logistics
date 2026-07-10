@@ -43,6 +43,7 @@ async function buildCustomerEmailContent({
   tripId = null,
   customerName = "Customer",
   shipments = null,
+  embedIcons = true,
 }) {
   let resolvedShipments = Array.isArray(shipments) ? shipments : null;
 
@@ -59,7 +60,10 @@ async function buildCustomerEmailContent({
       tripId,
     });
 
-    return renderShipmentStatusEmail(templateProps);
+    return renderShipmentStatusEmail({
+      ...templateProps,
+      embedIcons,
+    });
   }
 
   const sms = buildCustomerSmsMessage(notificationType, shipmentCount);

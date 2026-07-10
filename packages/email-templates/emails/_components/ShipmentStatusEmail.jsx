@@ -36,12 +36,14 @@ export function ShipmentStatusEmail({
   packages = [],
   trackingUrl = "https://atlastransport.ph/track",
   supportEmail = "support@atlastransport.ph",
-  logoUrl = "https://atlas-tracking.web.app/email/atlas-logo.jpeg",
-  iconBaseUrl = "https://atlas-tracking.web.app/email",
+  logoUrl = "https://atlastransport.ph/email/atlas-logo.jpeg",
+  iconBaseUrl = "https://atlastransport.ph/email",
+  embedIcons = false,
   isMultiShipment = false,
   shipmentIds = [],
 }) {
-  const icons = getIconUrls(iconBaseUrl);
+  const icons = getIconUrls(iconBaseUrl, { embedded: embedIcons });
+  const resolvedLogoUrl = embedIcons ? icons.logo : logoUrl;
   const badgeStyle = getStatusBadgeStyle(statusCode);
   const totalPackageRows = packages.length;
   const visiblePackages = packages.slice(0, PACKAGES_PER_PAGE);
@@ -59,12 +61,13 @@ export function ShipmentStatusEmail({
             <Row>
               <Column>
                 <Img
-                  src={logoUrl}
+                  src={resolvedLogoUrl}
                   width="120"
                   height="120"
-                  alt="Atlas Transportation — Fast and Easy Shipping"
+                  alt="Atlas Transportation"
                   style={logo}
                 />
+                <Text style={brandTagline}>Fast and Easy Shipping</Text>
               </Column>
             </Row>
           </Section>
@@ -519,7 +522,16 @@ const header = {
 
 const logo = {
   borderRadius: "10px",
-  marginBottom: "0",
+  marginBottom: "8px",
+};
+
+const brandTagline = {
+  color: "#cbd5e1",
+  fontSize: "13px",
+  fontWeight: "600",
+  letterSpacing: "0.04em",
+  lineHeight: "1.5",
+  margin: "0",
 };
 
 const contentSection = {

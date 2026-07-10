@@ -24282,10 +24282,26 @@ var require_theme = __commonJS({
 // emails/_components/icons.js
 var require_icons = __commonJS({
   "emails/_components/icons.js"(exports2, module2) {
-    var DEFAULT_ICON_BASE = "https://atlas-tracking.web.app/email";
-    function getIconUrls2(iconBaseUrl = DEFAULT_ICON_BASE) {
+    var DEFAULT_ICON_BASE = "https://atlastransport.ph/email";
+    var EMBEDDED_ICON_URLS = {
+      logo: "cid:atlas-email-logo",
+      mobile: "cid:atlas-email-mobile",
+      envelopeSm: "cid:atlas-email-envelope-sm",
+      headset: "cid:atlas-email-headset",
+      shield: "cid:atlas-email-shield",
+      envelope: "cid:atlas-email-envelope",
+      checkDelivered: "cid:atlas-email-check-delivered",
+      truckOut: "cid:atlas-email-truck-out",
+      packageTotal: "cid:atlas-email-package-total"
+    };
+    function getIconUrls2(iconBaseUrl = DEFAULT_ICON_BASE, options = {}) {
+      const embedded = options.embedded === true;
+      if (embedded) {
+        return { ...EMBEDDED_ICON_URLS };
+      }
       const base = String(iconBaseUrl || DEFAULT_ICON_BASE).replace(/\/$/, "");
       return {
+        logo: `${base}/atlas-logo.jpeg`,
         mobile: `${base}/mobile.png`,
         envelopeSm: `${base}/envelope-sm.png`,
         headset: `${base}/headset.png`,
@@ -24296,7 +24312,7 @@ var require_icons = __commonJS({
         packageTotal: `${base}/package-total.png`
       };
     }
-    module2.exports = { DEFAULT_ICON_BASE, getIconUrls: getIconUrls2 };
+    module2.exports = { DEFAULT_ICON_BASE, EMBEDDED_ICON_URLS, getIconUrls: getIconUrls2 };
   }
 });
 
@@ -35858,12 +35874,14 @@ function ShipmentStatusEmail({
   packages = [],
   trackingUrl = "https://atlastransport.ph/track",
   supportEmail = "support@atlastransport.ph",
-  logoUrl = "https://atlas-tracking.web.app/email/atlas-logo.jpeg",
-  iconBaseUrl = "https://atlas-tracking.web.app/email",
+  logoUrl = "https://atlastransport.ph/email/atlas-logo.jpeg",
+  iconBaseUrl = "https://atlastransport.ph/email",
+  embedIcons = false,
   isMultiShipment = false,
   shipmentIds = []
 }) {
-  const icons = (0, import_icons.getIconUrls)(iconBaseUrl);
+  const icons = (0, import_icons.getIconUrls)(iconBaseUrl, { embedded: embedIcons });
+  const resolvedLogoUrl = embedIcons ? icons.logo : logoUrl;
   const badgeStyle = (0, import_theme.getStatusBadgeStyle)(statusCode);
   const totalPackageRows = packages.length;
   const visiblePackages = packages.slice(0, PACKAGES_PER_PAGE);
@@ -35873,16 +35891,19 @@ function ShipmentStatusEmail({
     /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(Head, {}),
     /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(Preview, { children: previewText }),
     /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(Body, { style: main, children: /* @__PURE__ */ (0, import_jsx_runtime14.jsxs)(Container, { style: container, children: [
-      /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(Section, { style: header, children: /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(Row, { children: /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(Column, { children: /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(
-        Img,
-        {
-          src: logoUrl,
-          width: "120",
-          height: "120",
-          alt: "Atlas Transportation \u2014 Fast and Easy Shipping",
-          style: logo
-        }
-      ) }) }) }),
+      /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(Section, { style: header, children: /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(Row, { children: /* @__PURE__ */ (0, import_jsx_runtime14.jsxs)(Column, { children: [
+        /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(
+          Img,
+          {
+            src: resolvedLogoUrl,
+            width: "120",
+            height: "120",
+            alt: "Atlas Transportation",
+            style: logo
+          }
+        ),
+        /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(Text3, { style: brandTagline, children: "Fast and Easy Shipping" })
+      ] }) }) }),
       /* @__PURE__ */ (0, import_jsx_runtime14.jsxs)(Section, { style: contentSection, children: [
         /* @__PURE__ */ (0, import_jsx_runtime14.jsxs)(Text3, { style: greeting, children: [
           "Hi ",
@@ -36242,7 +36263,15 @@ var header = {
 };
 var logo = {
   borderRadius: "10px",
-  marginBottom: "0"
+  marginBottom: "8px"
+};
+var brandTagline = {
+  color: "#cbd5e1",
+  fontSize: "13px",
+  fontWeight: "600",
+  letterSpacing: "0.04em",
+  lineHeight: "1.5",
+  margin: "0"
 };
 var contentSection = {
   padding: "0 32px 24px"

@@ -21,6 +21,7 @@ const {
   buildCustomerPushBody,
   buildCustomerSmsMessage,
 } = require("./customerNotificationMessages");
+const { getEmailAssetAttachments } = require("./emailAssetAttachments");
 
 const SMTP_EMAIL = defineSecret("SMTP_EMAIL");
 const SMTP_PASSWORD = defineSecret("SMTP_PASSWORD");
@@ -323,7 +324,7 @@ async function sendExpoPush({ tokens, title, body, data = {} }) {
   return { sent: tokens.length };
 }
 
-async function sendEmail({ to, subject, text, html }) {
+async function sendEmail({ to, subject, text, html, attachments = [] }) {
   const transporter = nodemailer.createTransport({
     service: "gmail",
     auth: {
@@ -332,7 +333,13 @@ async function sendEmail({ to, subject, text, html }) {
     },
   });
 
-  await transporter.sendMail({ to, subject, text, html });
+  await transporter.sendMail({
+    to,
+    subject,
+    text,
+    html,
+    attachments,
+  });
   return { sent: 1 };
 }
 
@@ -442,6 +449,7 @@ async function deliverChannel({
         subject: emailContent.subject,
         text: emailContent.text,
         html: emailContent.html,
+        attachments: getEmailAssetAttachments(),
       });
     } else if (channel === "PUSH") {
       const targetUserIds = unique([

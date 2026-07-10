@@ -32,3 +32,27 @@ if (!fs.existsSync(builtFile)) {
 fs.mkdirSync(vendorDir, { recursive: true });
 fs.copyFileSync(builtFile, vendorFile);
 console.log(`[buildEmailTemplates] Copied bundle to ${vendorFile}`);
+
+const publicEmailDir = path.join(repoRoot, "apps", "web", "public", "email");
+const functionsAssetDir = path.join(functionsDir, "assets", "email");
+const assetFiles = [
+  "atlas-logo.jpeg",
+  "mobile.png",
+  "envelope-sm.png",
+  "headset.png",
+  "shield.png",
+  "envelope.png",
+  "check-delivered.png",
+  "truck-out.png",
+  "package-total.png",
+];
+
+if (fs.existsSync(publicEmailDir)) {
+  fs.mkdirSync(functionsAssetDir, { recursive: true });
+  assetFiles.forEach((fileName) => {
+    const source = path.join(publicEmailDir, fileName);
+    if (!fs.existsSync(source)) return;
+    fs.copyFileSync(source, path.join(functionsAssetDir, fileName));
+  });
+  console.log(`[buildEmailTemplates] Copied email assets to ${functionsAssetDir}`);
+}

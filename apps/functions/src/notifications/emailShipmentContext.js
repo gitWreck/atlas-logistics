@@ -11,8 +11,7 @@ const {
 const TRACKING_BASE_URL =
   process.env.ATLAS_PUBLIC_URL || "https://atlastransport.ph";
 const EMAIL_ICON_BASE_URL =
-  process.env.ATLAS_EMAIL_ICON_BASE_URL ||
-  "https://atlas-tracking.web.app/email";
+  process.env.ATLAS_EMAIL_ICON_BASE_URL || `${TRACKING_BASE_URL}/email`;
 
 const SUPPORT_EMAIL = "support@atlastransport.ph";
 const LOGO_URL = `${EMAIL_ICON_BASE_URL}/atlas-logo.jpeg`;
