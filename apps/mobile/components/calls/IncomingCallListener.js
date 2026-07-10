@@ -33,6 +33,13 @@ function getInitials(name = "") {
     .join("") || "A";
 }
 
+function callActivityMillis(call = {}) {
+  const timestamp = call.updatedAt || call.createdAt || call.startedAt;
+  if (typeof timestamp?.toMillis === "function") return timestamp.toMillis();
+  const parsed = new Date(timestamp || 0).getTime();
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
 function WebMediaElement({ stream, muted = false, hidden = false, style }) {
   const elementRef = useRef(null);
 
@@ -281,7 +288,8 @@ export default function IncomingCallListener() {
         .filter((call) => {
           const status = String(call?.status || "").trim().toLowerCase();
           return ["ringing", "accepted", "connecting", "connected", "ongoing", "declined", "missed", "cancelled", "ended"].includes(status);
-        });
+        })
+        .sort((left, right) => callActivityMillis(right) - callActivityMillis(left));
 
       const preferred = entries.find((call) => ["connected", "ongoing", "accepted", "connecting"].includes(String(call?.status || "").trim().toLowerCase()));
       const ringingCall = entries.find((call) => String(call?.callerId || "").trim() === uid && String(call?.status || "").trim().toLowerCase() === "ringing") || entries.find((call) => String(call?.receiverId || "").trim() === uid && String(call?.status || "").trim().toLowerCase() === "ringing");
@@ -679,10 +687,9 @@ export default function IncomingCallListener() {
   const isIncoming = Boolean(activeCall && String(activeCall?.receiverId || "").trim() === user?.uid && status === "ringing");
   const isCallerRinging = Boolean(activeCall && String(activeCall?.callerId || "").trim() === user?.uid && status === "ringing");
   const isActiveCall = Boolean(activeCall && ["accepted", "connecting", "connected", "ongoing"].includes(status));
-  const isConnectingState = Boolean(activeCall && ["accepted", "connecting"].includes(status));
   const showIncomingControls = isIncoming && status === "ringing";
-  const title = isIncoming ? "Incoming Call" : isCallerRinging ? "Calling Atlas Staff..." : isConnectingState ? "Connecting..." : isActiveCall ? "Ongoing Call" : "Call";
-  const statusLabel = isIncoming ? "Waiting for answer" : isCallerRinging ? "Ringing..." : isConnectingState ? "Connecting..." : status === "connected" ? "Connected" : isActiveCall ? "Ongoing Call" : "Connected";
+  const title = isIncoming ? "Incoming Call" : isCallerRinging ? "Calling Atlas Staff..." : status === "connected" ? "Ongoing Call" : isActiveCall ? "Connecting..." : "Call";
+  const statusLabel = isIncoming ? "Waiting for answer" : isCallerRinging ? "Ringing..." : status === "connected" ? "Connected" : isActiveCall ? "Connecting media..." : "Connected";
 
   if (!activeCall && !notice) {
     return null;
@@ -795,7 +802,7 @@ export default function IncomingCallListener() {
               </View>
             ) : isActiveCall ? (
               <View style={styles.activeStateBox}>
-                <Text style={styles.activeStateText}>{["ongoing", "connected"].includes(status) ? "The call is now active." : "The call is being connected."}</Text>
+                <Text style={styles.activeStateText}>{status === "connected" ? "The call is now active." : "The audio and video are being connected."}</Text>
                 <Text style={styles.timerText}>Duration: {formatDuration(callDurationSeconds)}</Text>
                 <View style={styles.controlRow}>
                   <TouchableOpacity
