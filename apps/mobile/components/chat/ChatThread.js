@@ -993,6 +993,7 @@ export default function ChatThread({ conversationId, onBack, embedded = false })
     const contactId = (conversation?.participantIds || []).find((id) => id !== myUid);
     return contactId ? conversation?.participantProfiles?.[contactId] || null : null;
   }, [conversation, isDirectStaff, myUid]);
+  const headerTitle = isDirectStaff ? directContact?.name || "Atlas staff" : "Atlas Support";
   const hasShipment = !!(conversation?.trackingNumber || conversation?.shipmentId);
   const canSend = !!draft.trim() || !!pendingAttachment;
   const showSendButton = canSend || sending || uploading;
@@ -1021,11 +1022,18 @@ export default function ChatThread({ conversationId, onBack, embedded = false })
         });
       } catch (error) {
         console.error("Start call failed:", error);
+        const fallbackMessage = isDirectStaff
+          ? `Unable to call ${headerTitle} right now.`
+          : "Unable to call Atlas Support right now.";
+        Alert.alert(
+          callType === "video" ? "Video call unavailable" : "Voice call unavailable",
+          String(error?.message || fallbackMessage).replace(/^Firebase:\s*/i, ""),
+        );
       } finally {
         setStartingCall(null);
       }
     },
-    [conversationId, isClosed, startingCall],
+    [conversationId, headerTitle, isClosed, isDirectStaff, startingCall],
   );
 
   const handleVoiceCall = useCallback(async () => {
@@ -1157,7 +1165,6 @@ export default function ChatThread({ conversationId, onBack, embedded = false })
   }, [isClosed]);
 
   const statusMeta = getStatusMeta(conversation?.status);
-  const headerTitle = isDirectStaff ? directContact?.name || "Atlas staff" : "Atlas Support";
   const headerSubtitle = isDirectStaff
     ? [
         directContact?.roleLabel || directContact?.role,
@@ -1236,7 +1243,7 @@ export default function ChatThread({ conversationId, onBack, embedded = false })
             {headerSubtitle}
           </Text>
         </View>
-        {!isDirectStaff && <View style={styles.headerActions}>
+        <View style={styles.headerActions}>
           <TouchableOpacity
             style={styles.headerActionBtn}
             onPress={handleVoiceCall}
@@ -1265,7 +1272,7 @@ export default function ChatThread({ conversationId, onBack, embedded = false })
               <FontAwesome5 name="video" size={21} color={colors.text} />
             )}
           </TouchableOpacity>
-        </View>}
+        </View>
         {!isDirectStaff && <TouchableOpacity
           style={styles.headerBtn}
           onPress={() => setInfoOpen(true)}
@@ -1729,11 +1736,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingTop: 14,
     paddingBottom: 10,
-    gap: 10,
+    gap: 8,
     borderBottomWidth: 0,
   },
   headerBtn: {
-    width: 48,
+    width: 44,
     height: 48,
     alignItems: "center",
     justifyContent: "center",
@@ -1741,10 +1748,10 @@ const styles = StyleSheet.create({
   headerActions: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
+    gap: 2,
   },
   headerActionBtn: {
-    width: 48,
+    width: 42,
     height: 48,
     alignItems: "center",
     justifyContent: "center",

@@ -17,7 +17,13 @@ const STAFF_MONITOR_ROLES = ["admin", "manager", "employee"];
 const VALID_STATUSES = ["unassigned", "active", "closed"];
 const VALID_PRIORITIES = ["normal", "urgent"];
 const CALL_TYPES = ["voice", "video"];
-const ACTIVE_CALL_STATUSES = ["ringing", "connecting", "accepted"];
+const ACTIVE_CALL_STATUSES = [
+  "ringing",
+  "connecting",
+  "accepted",
+  "connected",
+  "ongoing",
+];
 const CALL_STATUSES = [
   "ringing",
   "connecting",
@@ -895,6 +901,93 @@ exports.startConversationCall = onCall(
       const conversation = conversationSnap.data() || {};
       if (conversation.status === "closed") {
         throw new HttpsError("failed-precondition", "Conversation is closed.");
+      }
+
+      if (conversation.type === "direct_staff") {
+        await getConversationForUser(conversationId, uid, role);
+
+        const participantIds = [...new Set(
+          (conversation.participantIds || [])
+            .map((participantId) => String(participantId || "").trim())
+            .filter(Boolean),
+        )];
+        const receiverId = participantIds.find((participantId) => participantId !== uid);
+
+        if (!participantIds.includes(uid) || !receiverId) {
+          throw new HttpsError(
+            "failed-precondition",
+            "This conversation has no available call recipient.",
+          );
+        }
+
+        const receiverSnap = await db.collection("users").doc(receiverId).get();
+        if (!receiverSnap.exists || receiverSnap.data()?.active === false) {
+          throw new HttpsError(
+            "failed-precondition",
+            "The other participant is not available for calls.",
+          );
+        }
+
+        const [callerAsCallerSnap, callerAsReceiverSnap, receiverAsCallerSnap, receiverAsReceiverSnap] =
+          await Promise.all([
+            db.collection("calls").where("status", "in", ACTIVE_CALL_STATUSES).where("callerId", "==", uid).limit(1).get(),
+            db.collection("calls").where("status", "in", ACTIVE_CALL_STATUSES).where("receiverId", "==", uid).limit(1).get(),
+            db.collection("calls").where("status", "in", ACTIVE_CALL_STATUSES).where("callerId", "==", receiverId).limit(1).get(),
+            db.collection("calls").where("status", "in", ACTIVE_CALL_STATUSES).where("receiverId", "==", receiverId).limit(1).get(),
+          ]);
+
+        if (
+          !callerAsCallerSnap.empty ||
+          !callerAsReceiverSnap.empty ||
+          !receiverAsCallerSnap.empty ||
+          !receiverAsReceiverSnap.empty
+        ) {
+          throw new HttpsError("already-exists", "One of you is already on another call.");
+        }
+
+        const callRef = db.collection("calls").doc();
+        const now = FieldValue.serverTimestamp();
+        const rtcRoomId = `atlas_${callRef.id}`;
+        const callerName = displayName(user, "Atlas staff");
+        const rtcConfig = getRtcSecretConfig();
+
+        await callRef.set({
+          callId: callRef.id,
+          conversationId,
+          callerId: uid,
+          callerRole: role,
+          callerName,
+          receiverId,
+          receiverRole: String(receiverSnap.data()?.role || "staff").toLowerCase(),
+          participantIds,
+          type: callType,
+          status: "ringing",
+          rtcRoomId,
+          roomId: rtcRoomId,
+          rtcProvider: "tencent",
+          rtcConfigStatus: rtcConfig.isConfigured ? "configured" : "pending-setup",
+          createdAt: now,
+          startedAt: now,
+          updatedAt: now,
+        });
+
+        await notifyIncomingCall({
+          callId: callRef.id,
+          conversationId,
+          receiverId,
+          callerName,
+          callType,
+        });
+
+        return {
+          success: true,
+          callId: callRef.id,
+          conversationId,
+          receiverId,
+          rtcRoomId,
+          roomId: rtcRoomId,
+          status: "ringing",
+        };
       }
 
       const customerId = String(conversation.customerId || "").trim();

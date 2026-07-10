@@ -2,13 +2,14 @@ import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Modal,
+  Platform,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from "react-native";
 import { FontAwesome5 } from "@expo/vector-icons";
-import { collection, doc, getDoc, onSnapshot, query, runTransaction, serverTimestamp, updateDoc, where } from "firebase/firestore";
+import { arrayUnion, collection, doc, getDoc, onSnapshot, query, runTransaction, serverTimestamp, updateDoc, where } from "firebase/firestore";
 
 import { db } from "../../firebase";
 import { useAuth } from "../../contexts/AuthContext";
@@ -32,6 +33,31 @@ function getInitials(name = "") {
     .join("") || "A";
 }
 
+function WebMediaElement({ stream, muted = false, hidden = false, style }) {
+  const elementRef = useRef(null);
+
+  useEffect(() => {
+    if (Platform.OS !== "web" || !elementRef.current) return;
+    elementRef.current.srcObject = stream || null;
+    if (stream) {
+      const playAttempt = elementRef.current.play?.();
+      playAttempt?.catch?.(() => {});
+    }
+  }, [stream]);
+
+  if (Platform.OS !== "web") return null;
+
+  return React.createElement("video", {
+    ref: elementRef,
+    autoPlay: true,
+    playsInline: true,
+    muted,
+    style: hidden
+      ? { position: "absolute", width: 1, height: 1, opacity: 0 }
+      : style,
+  });
+}
+
 export default function IncomingCallListener() {
   const { user, loading, isReady } = useAuth();
   const [activeCall, setActiveCall] = useState(null);
@@ -43,11 +69,188 @@ export default function IncomingCallListener() {
   const [isSpeakerOn, setIsSpeakerOn] = useState(true);
   const [isCameraOn, setIsCameraOn] = useState(true);
   const [cameraType, setCameraType] = useState("front");
+  const [localMediaStream, setLocalMediaStream] = useState(null);
+  const [remoteMediaStream, setRemoteMediaStream] = useState(null);
+  const [rtcNotice, setRtcNotice] = useState("");
   const callMapRef = useRef(new Map());
   const prevCallStatusRef = useRef(new Map());
   const activeCallRef = useRef(null);
   const timeoutRef = useRef(null);
   const noticeTimerRef = useRef(null);
+  const peerConnectionRef = useRef(null);
+  const rtcCallIdRef = useRef(null);
+  const processedCandidatesRef = useRef(new Set());
+
+  const cleanupWebRtc = () => {
+    const peer = peerConnectionRef.current;
+    if (peer) {
+      peer.onicecandidate = null;
+      peer.ontrack = null;
+      peer.onconnectionstatechange = null;
+      peer.close();
+    }
+    peerConnectionRef.current = null;
+    rtcCallIdRef.current = null;
+    processedCandidatesRef.current.clear();
+
+    setLocalMediaStream((current) => {
+      current?.getTracks?.().forEach((track) => track.stop());
+      return null;
+    });
+    setRemoteMediaStream(null);
+    setRtcNotice("");
+  };
+
+  const syncRemoteSignals = async (call, peer, isCaller) => {
+    if (!peer || !call) return;
+
+    const remoteDescription = isCaller ? call.rtcAnswer : call.rtcOffer;
+    if (remoteDescription?.sdp && !peer.currentRemoteDescription) {
+      await peer.setRemoteDescription(remoteDescription);
+    }
+
+    if (!peer.currentRemoteDescription) return;
+
+    const remoteUserId = isCaller ? call.receiverId : call.callerId;
+    const candidates = call.rtcCandidates?.[remoteUserId] || [];
+    for (const candidate of candidates) {
+      const candidateKey = JSON.stringify(candidate);
+      if (processedCandidatesRef.current.has(candidateKey)) continue;
+      try {
+        await peer.addIceCandidate(candidate);
+        processedCandidatesRef.current.add(candidateKey);
+      } catch (error) {
+        console.warn("Unable to add remote ICE candidate", error);
+      }
+    }
+  };
+
+  const ensureWebRtc = async (call) => {
+    if (
+      Platform.OS !== "web" ||
+      !call?.id ||
+      !user?.uid ||
+      typeof navigator === "undefined" ||
+      !navigator.mediaDevices?.getUserMedia ||
+      typeof RTCPeerConnection === "undefined"
+    ) {
+      return;
+    }
+
+    const isCaller = String(call.callerId || "") === user.uid;
+    const existingPeer = peerConnectionRef.current;
+    if (existingPeer && rtcCallIdRef.current === call.id) {
+      await syncRemoteSignals(call, existingPeer, isCaller);
+      if (
+        !isCaller &&
+        call.rtcOffer?.sdp &&
+        !call.rtcAnswer?.sdp &&
+        existingPeer.currentRemoteDescription &&
+        !existingPeer.currentLocalDescription
+      ) {
+        const answer = await existingPeer.createAnswer();
+        await existingPeer.setLocalDescription(answer);
+        await updateDoc(doc(db, "calls", call.id), {
+          rtcAnswer: { type: answer.type, sdp: answer.sdp },
+          rtcAnswerBy: user.uid,
+          updatedAt: serverTimestamp(),
+        });
+      }
+      return;
+    }
+    if (!existingPeer && rtcCallIdRef.current === call.id) return;
+
+    cleanupWebRtc();
+    rtcCallIdRef.current = call.id;
+
+    try {
+      let stream;
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          audio: true,
+          video: call.type === "video" ? { facingMode: cameraType } : false,
+        });
+      } catch (mediaError) {
+        if (call.type !== "video" || mediaError?.name !== "NotReadableError") {
+          throw mediaError;
+        }
+        stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+        setRtcNotice("Camera is being used by another app. Voice will continue without video.");
+      }
+      if (rtcCallIdRef.current !== call.id) {
+        stream.getTracks().forEach((track) => track.stop());
+        return;
+      }
+
+      setLocalMediaStream(stream);
+      const peer = new RTCPeerConnection({
+        iceServers: [
+          { urls: "stun:stun.l.google.com:19302" },
+          { urls: "stun:stun1.l.google.com:19302" },
+        ],
+      });
+      peerConnectionRef.current = peer;
+      stream.getTracks().forEach((track) => peer.addTrack(track, stream));
+
+      peer.ontrack = (event) => {
+        const remoteStream = event.streams?.[0];
+        if (remoteStream) setRemoteMediaStream(remoteStream);
+      };
+      peer.onicecandidate = (event) => {
+        if (!event.candidate) return;
+        const candidate = event.candidate.toJSON
+          ? event.candidate.toJSON()
+          : JSON.parse(JSON.stringify(event.candidate));
+        updateDoc(doc(db, "calls", call.id), {
+          [`rtcCandidates.${user.uid}`]: arrayUnion(candidate),
+          updatedAt: serverTimestamp(),
+        }).catch((error) => console.warn("Unable to publish ICE candidate", error));
+      };
+      peer.onconnectionstatechange = () => {
+        if (peer.connectionState === "connected") {
+          setRtcNotice("");
+          updateConversationCallStatus({ callId: call.id, status: "connected" }).catch(
+            (error) => console.warn("Unable to mark call connected", error),
+          );
+        } else if (["failed", "disconnected"].includes(peer.connectionState)) {
+          setRtcNotice("Media connection was interrupted.");
+        }
+      };
+
+      if (isCaller) {
+        const offer = await peer.createOffer();
+        await peer.setLocalDescription(offer);
+        await updateDoc(doc(db, "calls", call.id), {
+          rtcOffer: { type: offer.type, sdp: offer.sdp },
+          rtcOfferBy: user.uid,
+          updatedAt: serverTimestamp(),
+        });
+      } else {
+        if (!call.rtcOffer?.sdp) {
+          setRtcNotice("Waiting for the caller's media connection...");
+          return;
+        }
+        await peer.setRemoteDescription(call.rtcOffer);
+        const answer = await peer.createAnswer();
+        await peer.setLocalDescription(answer);
+        await updateDoc(doc(db, "calls", call.id), {
+          rtcAnswer: { type: answer.type, sdp: answer.sdp },
+          rtcAnswerBy: user.uid,
+          updatedAt: serverTimestamp(),
+        });
+      }
+
+      await syncRemoteSignals(call, peer, isCaller);
+    } catch (error) {
+      console.error("Browser call media failed:", error);
+      const permissionDenied = ["NotAllowedError", "PermissionDeniedError"].includes(error?.name);
+      setRtcNotice(
+        permissionDenied
+          ? "Allow microphone and camera access in your browser to continue the call."
+          : "Microphone or camera could not be started.",
+      );
+    }
+  };
 
   useEffect(() => {
     if (!user?.uid || loading || !isReady) {
@@ -154,6 +357,54 @@ export default function IncomingCallListener() {
   useEffect(() => {
     activeCallRef.current = activeCall;
   }, [activeCall]);
+
+  useEffect(() => {
+    if (Platform.OS !== "web") return undefined;
+
+    const status = String(activeCall?.status || "").trim().toLowerCase();
+    const isCaller = String(activeCall?.callerId || "") === user?.uid;
+    const shouldStartMedia = Boolean(
+      activeCall?.id &&
+        ((isCaller && status === "ringing") ||
+          ["accepted", "connecting", "connected", "ongoing"].includes(status)),
+    );
+
+    if (!shouldStartMedia) {
+      if (!activeCall || ["declined", "missed", "cancelled", "ended"].includes(status)) {
+        cleanupWebRtc();
+      }
+      return undefined;
+    }
+
+    void ensureWebRtc(activeCall);
+    return undefined;
+  }, [
+    activeCall?.id,
+    activeCall?.status,
+    activeCall?.rtcOffer?.sdp,
+    activeCall?.rtcAnswer?.sdp,
+    activeCall?.rtcCandidates,
+    user?.uid,
+  ]);
+
+  useEffect(() => {
+    const stream = localMediaStream;
+    if (!stream) return;
+    stream.getAudioTracks().forEach((track) => {
+      track.enabled = !isMuted;
+    });
+    stream.getVideoTracks().forEach((track) => {
+      track.enabled = isCameraOn;
+    });
+  }, [isCameraOn, isMuted, localMediaStream]);
+
+  useEffect(() => {
+    if (Platform.OS !== "web" || !localMediaStream) return;
+    const videoTrack = localMediaStream.getVideoTracks()[0];
+    videoTrack?.applyConstraints?.({ facingMode: cameraType }).catch(() => {});
+  }, [cameraType, localMediaStream]);
+
+  useEffect(() => () => cleanupWebRtc(), []);
 
   useEffect(() => {
     if (!activeCall?.conversationId) {
@@ -340,7 +591,6 @@ export default function IncomingCallListener() {
       }
 
       await updateDoc(doc(db, "calls", activeCall.id), {
-        status: "ongoing",
         startedAt: serverTimestamp(),
         answeredAt: serverTimestamp(),
         acceptedBy: user?.uid || null,
@@ -429,10 +679,10 @@ export default function IncomingCallListener() {
   const isIncoming = Boolean(activeCall && String(activeCall?.receiverId || "").trim() === user?.uid && status === "ringing");
   const isCallerRinging = Boolean(activeCall && String(activeCall?.callerId || "").trim() === user?.uid && status === "ringing");
   const isActiveCall = Boolean(activeCall && ["accepted", "connecting", "connected", "ongoing"].includes(status));
-  const isConnectingState = Boolean(activeCall && ["accepted", "connecting", "connected"].includes(status));
+  const isConnectingState = Boolean(activeCall && ["accepted", "connecting"].includes(status));
   const showIncomingControls = isIncoming && status === "ringing";
   const title = isIncoming ? "Incoming Call" : isCallerRinging ? "Calling Atlas Staff..." : isConnectingState ? "Connecting..." : isActiveCall ? "Ongoing Call" : "Call";
-  const statusLabel = isIncoming ? "Waiting for answer" : isCallerRinging ? "Ringing..." : isConnectingState ? "Connecting..." : isActiveCall ? "Ongoing Call" : "Connected";
+  const statusLabel = isIncoming ? "Waiting for answer" : isCallerRinging ? "Ringing..." : isConnectingState ? "Connecting..." : status === "connected" ? "Connected" : isActiveCall ? "Ongoing Call" : "Connected";
 
   if (!activeCall && !notice) {
     return null;
@@ -467,6 +717,36 @@ export default function IncomingCallListener() {
           <Text style={styles.meta}>
             {conversationTitle || (activeCall?.conversationId ? `Conversation ${activeCall.conversationId}` : "Conversation call")}
           </Text>
+
+          {Platform.OS === "web" && activeCall?.type === "video" && localMediaStream ? (
+            <View style={styles.videoStage}>
+              {remoteMediaStream ? (
+                <WebMediaElement
+                  stream={remoteMediaStream}
+                  muted={!isSpeakerOn}
+                  style={styles.remoteVideo}
+                />
+              ) : (
+                <View style={styles.remoteVideoPlaceholder}>
+                  <FontAwesome5 name="video" size={30} color="#94a3b8" />
+                  <Text style={styles.remoteVideoText}>
+                    {isCallerRinging ? "Waiting for an answer..." : "Connecting video..."}
+                  </Text>
+                </View>
+              )}
+              <WebMediaElement
+                stream={localMediaStream}
+                muted
+                style={styles.localVideo}
+              />
+            </View>
+          ) : null}
+
+          {Platform.OS === "web" && activeCall?.type !== "video" ? (
+            <WebMediaElement stream={remoteMediaStream} muted={!isSpeakerOn} hidden />
+          ) : null}
+
+          {rtcNotice ? <Text style={styles.rtcNotice}>{rtcNotice}</Text> : null}
 
           <Text style={styles.statusText}>{statusLabel}</Text>
 
@@ -515,7 +795,7 @@ export default function IncomingCallListener() {
               </View>
             ) : isActiveCall ? (
               <View style={styles.activeStateBox}>
-                <Text style={styles.activeStateText}>{status === "ongoing" ? "The call is now active." : "The call is being connected."}</Text>
+                <Text style={styles.activeStateText}>{["ongoing", "connected"].includes(status) ? "The call is now active." : "The call is being connected."}</Text>
                 <Text style={styles.timerText}>Duration: {formatDuration(callDurationSeconds)}</Text>
                 <View style={styles.controlRow}>
                   <TouchableOpacity
@@ -660,6 +940,58 @@ const styles = StyleSheet.create({
     marginTop: 8,
     marginBottom: 12,
     textAlign: "center",
+  },
+  videoStage: {
+    width: "100%",
+    height: 230,
+    borderRadius: 12,
+    overflow: "hidden",
+    backgroundColor: "#0f172a",
+    position: "relative",
+    marginBottom: 10,
+  },
+  remoteVideo: {
+    width: "100%",
+    height: "100%",
+    objectFit: "cover",
+    backgroundColor: "#0f172a",
+  },
+  remoteVideoPlaceholder: {
+    width: "100%",
+    height: "100%",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 10,
+  },
+  remoteVideoText: {
+    color: "#cbd5e1",
+    fontSize: 13,
+    fontWeight: "600",
+  },
+  localVideo: {
+    position: "absolute",
+    right: 10,
+    bottom: 10,
+    width: 92,
+    height: 122,
+    borderRadius: 8,
+    objectFit: "cover",
+    backgroundColor: "#1e293b",
+    borderWidth: 2,
+    borderStyle: "solid",
+    borderColor: "#ffffff",
+  },
+  rtcNotice: {
+    width: "100%",
+    color: "#b91c1c",
+    backgroundColor: "#fef2f2",
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    fontSize: 12,
+    lineHeight: 17,
+    textAlign: "center",
+    marginBottom: 4,
   },
   activeStateBox: {
     width: "100%",

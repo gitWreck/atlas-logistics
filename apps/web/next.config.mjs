@@ -5,6 +5,10 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  outputFileTracingRoot: path.resolve(__dirname, "../.."),
+  turbopack: {
+    root: path.resolve(__dirname, "../.."),
+  },
   // Add the names of your local packages here
   transpilePackages: ["@repo/ui", "@repo/utils"],
   // Disable Turbopack on Windows to avoid junction point permission issues.

@@ -26,6 +26,7 @@ import {
   declineConversationCall,
   updateConversationCallStatus,
 } from "@/app/utility/FirebaseFunctions";
+import useWebRtcCall from "./useWebRtcCall";
 
 function formatCallType(callType) {
   const value = String(callType || "voice").toLowerCase();
@@ -49,6 +50,26 @@ function formatConversationInfo(call, conversationTitle) {
   return parts.join(" • ");
 }
 
+function MediaElement({ stream, muted = false, className = "" }) {
+  const mediaRef = useRef(null);
+
+  useEffect(() => {
+    if (!mediaRef.current) return;
+    mediaRef.current.srcObject = stream || null;
+    if (stream) mediaRef.current.play?.().catch?.(() => {});
+  }, [stream]);
+
+  return (
+    <video
+      ref={mediaRef}
+      autoPlay
+      playsInline
+      muted={muted}
+      className={className}
+    />
+  );
+}
+
 export default function IncomingCallListener() {
   const { user, loading } = useAuth();
   const [activeCall, setActiveCall] = useState(null);
@@ -60,11 +81,20 @@ export default function IncomingCallListener() {
   const [isMuted, setIsMuted] = useState(false);
   const [isSpeakerOn, setIsSpeakerOn] = useState(true);
   const [isCameraOn, setIsCameraOn] = useState(true);
+  const [cameraType, setCameraType] = useState("user");
   const callMapRef = useRef(new Map());
   const prevCallStatusRef = useRef(new Map());
   const activeCallRef = useRef(null);
   const timeoutRef = useRef(null);
   const noticeTimerRef = useRef(null);
+  const { localStream, remoteStream, mediaNotice, remoteMuted } = useWebRtcCall({
+    activeCall,
+    userId: user?.uid,
+    isMuted,
+    isSpeakerOn,
+    isCameraOn,
+    cameraType,
+  });
 
   useEffect(() => {
     setMounted(true);
@@ -288,6 +318,7 @@ export default function IncomingCallListener() {
   const toggleCamera = () => setIsCameraOn((current) => !current);
   const switchCamera = () => {
     setIsCameraOn(true);
+    setCameraType((current) => (current === "user" ? "environment" : "user"));
   };
 
   const showNotice = (message) => {
@@ -384,7 +415,6 @@ export default function IncomingCallListener() {
       }
 
       await updateDoc(doc(db, "calls", activeCall.id), {
-        status: "ongoing",
         startedAt: serverTimestamp(),
         answeredAt: serverTimestamp(),
         acceptedBy: user?.uid || null,
@@ -472,15 +502,41 @@ export default function IncomingCallListener() {
   const isIncoming = Boolean(activeCall && String(activeCall?.receiverId || "").trim() === user?.uid && status === "ringing");
   const isCallerRinging = Boolean(activeCall && String(activeCall?.callerId || "").trim() === user?.uid && status === "ringing");
   const isActiveCall = Boolean(activeCall && ["accepted", "connecting", "connected", "ongoing"].includes(status));
-  const isConnectingState = Boolean(activeCall && ["accepted", "connecting", "connected"].includes(status));
+  const isConnectingState = Boolean(activeCall && ["accepted", "connecting"].includes(status));
   const showIncomingControls = isIncoming && status === "ringing";
   const title = isIncoming ? "Incoming Call" : isCallerRinging ? "Calling Atlas Staff..." : isConnectingState ? "Connecting..." : isActiveCall ? "Ongoing Call" : "Call";
-  const statusLabel = isIncoming ? "Waiting for answer" : isCallerRinging ? "Ringing..." : isConnectingState ? "Connecting..." : isActiveCall ? "Ongoing Call" : "Connected";
+  const statusLabel = isIncoming ? "Waiting for answer" : isCallerRinging ? "Ringing..." : isConnectingState ? "Connecting..." : status === "connected" ? "Connected" : isActiveCall ? "Ongoing Call" : "Connected";
 
   if (!mounted || (!activeCall && !notice)) return null;
 
   const renderCallSurface = () => {
     if (!activeCall) return null;
+
+    const mediaPanel = activeCall.type === "video" ? (
+      localStream ? (
+        <div className="relative mb-5 h-64 w-full overflow-hidden rounded-xl bg-slate-950">
+          {remoteStream ? (
+            <MediaElement
+              stream={remoteStream}
+              muted={remoteMuted}
+              className="h-full w-full object-cover"
+            />
+          ) : (
+            <div className="flex h-full flex-col items-center justify-center gap-3 text-slate-400">
+              <FontAwesomeIcon icon={faVideo} size="2x" />
+              <span className="text-sm">{isCallerRinging ? "Waiting for an answer..." : "Connecting video..."}</span>
+            </div>
+          )}
+          <MediaElement
+            stream={localStream}
+            muted
+            className="absolute bottom-3 right-3 h-32 w-24 rounded-lg border-2 border-white bg-slate-800 object-cover shadow-xl"
+          />
+        </div>
+      ) : null
+    ) : (
+      <MediaElement stream={remoteStream} muted={remoteMuted} className="absolute h-px w-px opacity-0" />
+    );
 
     if (showIncomingControls) {
       return (
@@ -556,6 +612,7 @@ export default function IncomingCallListener() {
               <h3 className="mt-1 text-xl font-bold text-white">{activeCall?.callerName || "Atlas support"}</h3>
             </div>
             <div className="px-6 py-6 text-center">
+              {mediaPanel}
               <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-slate-800 text-lg font-semibold text-white">
                 {getInitials(activeCall?.callerName || "Atlas")}
               </div>
@@ -589,6 +646,7 @@ export default function IncomingCallListener() {
               <h3 className="mt-1 text-xl font-bold text-white">{activeCall?.callerName || "Atlas support"}</h3>
             </div>
             <div className="px-6 py-6 text-center">
+              {mediaPanel}
               <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-sky-500/20 text-sky-400">
                 {activeCall?.type === "video" ? (
                   <FontAwesomeIcon icon={faVideo} size="2x" />
@@ -597,8 +655,13 @@ export default function IncomingCallListener() {
                 )}
               </div>
               <p className="text-sm text-slate-400">{formatConversationInfo(activeCall, conversationTitle)}</p>
+              {mediaNotice ? (
+                <p className="mt-3 rounded-lg bg-rose-500/10 px-3 py-2 text-xs font-medium text-rose-200">
+                  {mediaNotice}
+                </p>
+              ) : null}
               <div className="mt-5 flex items-center justify-center gap-2 text-sm text-slate-400">
-                <FontAwesomeIcon icon={faCircle} className={status === "ongoing" ? "text-emerald-500" : "text-amber-400"} />
+                <FontAwesomeIcon icon={faCircle} className={["ongoing", "connected"].includes(status) ? "text-emerald-500" : "text-amber-400"} />
                 <span>{statusLabel}</span>
               </div>
               <div className="mt-4 flex flex-col gap-3">
