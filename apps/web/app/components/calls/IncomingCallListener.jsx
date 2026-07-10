@@ -16,6 +16,7 @@ import {
   faVolumeUp,
   faVolumeMute,
   faRepeat,
+  faPhoneSlash,
 } from "@fortawesome/free-solid-svg-icons";
 
 import { db } from "@/lib/firebase";
@@ -506,7 +507,7 @@ export default function IncomingCallListener() {
     if (!activeCall) return null;
 
     const mediaPanel = activeCall.type === "video" ? (
-        <div className="relative mb-5 h-64 w-full overflow-hidden rounded-xl bg-slate-950">
+        <div className="relative mb-4 h-[42vh] min-h-56 w-full max-w-4xl overflow-hidden rounded-2xl bg-slate-950">
           <div id={remoteViewId} className="absolute inset-0 h-full w-full overflow-hidden" />
           {!remoteVideoReady ? (
             <div className="flex h-full flex-col items-center justify-center gap-3 text-slate-400">
@@ -523,8 +524,8 @@ export default function IncomingCallListener() {
 
     if (showIncomingControls) {
       return (
-        <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-slate-950/80 p-4">
-          <div className="w-full max-w-md rounded-3xl border border-slate-700 bg-slate-900 shadow-2xl">
+        <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-slate-950">
+          <div className="flex h-full w-full flex-col bg-slate-900">
             <div className="flex items-start justify-between border-b border-slate-800 px-6 py-4">
               <div>
                 <p className="text-sm font-semibold uppercase tracking-[0.2em] text-sky-400">{title}</p>
@@ -540,7 +541,7 @@ export default function IncomingCallListener() {
               </button>
             </div>
 
-            <div className="px-6 py-6 text-center">
+            <div className="flex flex-1 flex-col items-center justify-center px-6 py-8 text-center">
               <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-sky-500/20 text-sky-400">
                 {activeCall?.type === "video" ? (
                   <FontAwesomeIcon icon={faVideo} size="2x" />
@@ -562,22 +563,22 @@ export default function IncomingCallListener() {
                 <span>{statusLabel}</span>
               </div>
 
-              <div className="mt-6 flex gap-3">
+              <div className="mt-10 flex justify-center gap-10">
                 <button
                   type="button"
                   onClick={() => handleDecline("declined")}
                   disabled={processing}
-                  className="flex-1 rounded-xl border border-rose-500/40 bg-rose-500/10 px-4 py-3 font-semibold text-rose-300 transition hover:bg-rose-500/20 disabled:cursor-not-allowed disabled:opacity-60"
+                  className="flex h-20 w-20 flex-col items-center justify-center gap-1 rounded-full bg-rose-600 text-xs font-semibold text-white transition hover:bg-rose-500 disabled:cursor-not-allowed disabled:opacity-60"
                 >
-                  {processing ? <FontAwesomeIcon icon={faSpinner} spin /> : "Decline"}
+                  {processing ? <FontAwesomeIcon icon={faSpinner} spin /> : <><FontAwesomeIcon icon={faPhoneSlash} className="text-xl" /><span>Decline</span></>}
                 </button>
                 <button
                   type="button"
                   onClick={handleAccept}
                   disabled={processing}
-                  className="flex-1 rounded-xl bg-sky-600 px-4 py-3 font-semibold text-white transition hover:bg-sky-500 disabled:cursor-not-allowed disabled:opacity-60"
+                  className="flex h-20 w-20 flex-col items-center justify-center gap-1 rounded-full bg-emerald-500 text-xs font-semibold text-white transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-60"
                 >
-                  {processing ? <FontAwesomeIcon icon={faSpinner} spin /> : "Accept"}
+                  {processing ? <FontAwesomeIcon icon={faSpinner} spin /> : <><FontAwesomeIcon icon={faPhone} className="text-xl" /><span>Accept</span></>}
                 </button>
               </div>
             </div>
@@ -588,13 +589,13 @@ export default function IncomingCallListener() {
 
     if (isCallerRinging) {
       return (
-        <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-slate-950/80 p-4">
-          <div className="w-full max-w-md rounded-3xl border border-slate-700 bg-slate-900 shadow-2xl">
+        <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-slate-950">
+          <div className="flex h-full w-full flex-col bg-slate-900">
             <div className="border-b border-slate-800 px-6 py-4 text-center">
               <p className="text-sm font-semibold uppercase tracking-[0.2em] text-sky-400">{title}</p>
               <h3 className="mt-1 text-xl font-bold text-white">{activeCall?.callerName || "Atlas support"}</h3>
             </div>
-            <div className="px-6 py-6 text-center">
+            <div className="flex flex-1 flex-col items-center justify-center px-6 py-8 text-center">
               {mediaPanel}
               <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-slate-800 text-lg font-semibold text-white">
                 {getInitials(activeCall?.callerName || "Atlas")}
@@ -609,9 +610,9 @@ export default function IncomingCallListener() {
                   type="button"
                   onClick={() => handleCancelCall()}
                   disabled={processing}
-                  className="w-full rounded-xl border border-slate-700 bg-slate-800 px-4 py-3 font-semibold text-slate-200 transition hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-60"
+                  className="flex h-20 w-20 flex-col items-center justify-center gap-1 rounded-full bg-rose-600 text-xs font-semibold text-white transition hover:bg-rose-500 disabled:cursor-not-allowed disabled:opacity-60"
                 >
-                  {processing ? <FontAwesomeIcon icon={faSpinner} spin /> : "Cancel call"}
+                  {processing ? <FontAwesomeIcon icon={faSpinner} spin /> : <><FontAwesomeIcon icon={faPhoneSlash} className="text-xl" /><span>Cancel</span></>}
                 </button>
               </div>
             </div>
@@ -622,13 +623,13 @@ export default function IncomingCallListener() {
 
     if (isActiveCall) {
       return (
-        <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-slate-950/80 p-4">
-          <div className="w-full max-w-md rounded-3xl border border-slate-700 bg-slate-900 shadow-2xl">
+        <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-slate-950">
+          <div className="flex h-full w-full flex-col bg-slate-900">
             <div className="border-b border-slate-800 px-6 py-4 text-center">
               <p className="text-sm font-semibold uppercase tracking-[0.2em] text-sky-400">{title}</p>
               <h3 className="mt-1 text-xl font-bold text-white">{activeCall?.callerName || "Atlas support"}</h3>
             </div>
-            <div className="px-6 py-6 text-center">
+            <div className="flex min-h-0 flex-1 flex-col items-center px-4 py-4 text-center sm:px-8">
               {mediaPanel}
               <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-sky-500/20 text-sky-400">
                 {activeCall?.type === "video" ? (
@@ -648,30 +649,30 @@ export default function IncomingCallListener() {
                 <span>{statusLabel}</span>
               </div>
               <div className="mt-4 flex flex-col gap-3">
-                <div className="flex items-center justify-center gap-3">
+                <div className="flex items-center justify-center gap-4">
                   <button
                     type="button"
                     onClick={toggleMute}
-                    className={`rounded-2xl border px-4 py-3 text-sm font-semibold transition ${isMuted ? "border-rose-400 bg-rose-500/10 text-rose-200" : "border-slate-700 bg-slate-800 text-slate-100 hover:bg-slate-700"}`}
+                    className={`flex h-16 w-16 flex-col items-center justify-center gap-1 rounded-full text-[11px] font-semibold transition ${isMuted ? "bg-white text-slate-950" : "bg-slate-700 text-white hover:bg-slate-600"}`}
                   >
-                    <FontAwesomeIcon icon={isMuted ? faMicrophoneSlash : faMicrophone} className="mr-2" />
+                    <FontAwesomeIcon icon={isMuted ? faMicrophoneSlash : faMicrophone} />
                     {isMuted ? "Muted" : "Mute"}
                   </button>
                   <button
                     type="button"
                     onClick={toggleSpeaker}
-                    className={`rounded-2xl border px-4 py-3 text-sm font-semibold transition ${isSpeakerOn ? "border-emerald-400 bg-emerald-500/10 text-emerald-200" : "border-slate-700 bg-slate-800 text-slate-100 hover:bg-slate-700"}`}
+                    className={`flex h-16 w-16 flex-col items-center justify-center gap-1 rounded-full text-[11px] font-semibold transition ${isSpeakerOn ? "bg-blue-600 text-white" : "bg-slate-700 text-white hover:bg-slate-600"}`}
                   >
-                    <FontAwesomeIcon icon={isSpeakerOn ? faVolumeUp : faVolumeMute} className="mr-2" />
+                    <FontAwesomeIcon icon={isSpeakerOn ? faVolumeUp : faVolumeMute} />
                     {isSpeakerOn ? "Speaker" : "Earpiece"}
                   </button>
                   {activeCall?.type === "video" ? (
                     <button
                       type="button"
                       onClick={toggleCamera}
-                      className={`rounded-2xl border px-4 py-3 text-sm font-semibold transition ${isCameraOn ? "border-sky-400 bg-sky-500/10 text-sky-200" : "border-slate-700 bg-slate-800 text-slate-100 hover:bg-slate-700"}`}
+                      className={`flex h-16 w-16 flex-col items-center justify-center gap-1 rounded-full text-[11px] font-semibold transition ${isCameraOn ? "bg-blue-600 text-white" : "bg-white text-slate-950"}`}
                     >
-                      <FontAwesomeIcon icon={isCameraOn ? faVideo : faVideoSlash} className="mr-2" />
+                      <FontAwesomeIcon icon={isCameraOn ? faVideo : faVideoSlash} />
                       {isCameraOn ? "Camera" : "Camera Off"}
                     </button>
                   ) : null}
@@ -681,10 +682,10 @@ export default function IncomingCallListener() {
                     <button
                       type="button"
                       onClick={switchCamera}
-                      className="rounded-2xl border border-slate-700 bg-slate-800 px-4 py-3 text-sm font-semibold text-slate-100 transition hover:bg-slate-700"
+                      className="flex h-16 w-16 flex-col items-center justify-center gap-1 rounded-full bg-slate-700 text-[10px] font-semibold text-white transition hover:bg-slate-600"
                     >
-                      <FontAwesomeIcon icon={faRepeat} className="mr-2" />
-                      Switch camera
+                      <FontAwesomeIcon icon={faRepeat} />
+                      Switch
                     </button>
                   </div>
                 ) : null}
@@ -696,9 +697,9 @@ export default function IncomingCallListener() {
                     type="button"
                     onClick={() => handleEndCall()}
                     disabled={processing}
-                    className="w-full rounded-xl bg-rose-600 px-4 py-3 font-semibold text-white transition hover:bg-rose-500 disabled:cursor-not-allowed disabled:opacity-60"
+                    className="mx-auto flex h-16 w-16 flex-col items-center justify-center gap-1 rounded-full bg-rose-600 text-[11px] font-semibold text-white transition hover:bg-rose-500 disabled:cursor-not-allowed disabled:opacity-60"
                   >
-                    {processing ? <FontAwesomeIcon icon={faSpinner} spin /> : "End Call"}
+                    {processing ? <FontAwesomeIcon icon={faSpinner} spin /> : <><FontAwesomeIcon icon={faPhoneSlash} /><span>End</span></>}
                   </button>
                 </div>
               </div>

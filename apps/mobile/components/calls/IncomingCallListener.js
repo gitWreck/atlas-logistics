@@ -778,7 +778,10 @@ export default function IncomingCallListener() {
                   {isProcessing ? (
                     <ActivityIndicator color="#fff" />
                   ) : (
-                    <Text style={styles.declineText}>Decline</Text>
+                    <>
+                      <FontAwesome5 name="phone-slash" size={22} color="#fff" />
+                      <Text style={styles.declineText}>Decline</Text>
+                    </>
                   )}
                 </TouchableOpacity>
 
@@ -790,7 +793,10 @@ export default function IncomingCallListener() {
                   {isProcessing ? (
                     <ActivityIndicator color="#fff" />
                   ) : (
-                    <Text style={styles.acceptText}>Accept</Text>
+                    <>
+                      <FontAwesome5 name="phone-alt" size={22} color="#fff" />
+                      <Text style={styles.acceptText}>Accept</Text>
+                    </>
                   )}
                 </TouchableOpacity>
               </>
@@ -806,7 +812,10 @@ export default function IncomingCallListener() {
                   {isProcessing ? (
                     <ActivityIndicator color="#fff" />
                   ) : (
-                    <Text style={styles.declineText}>Cancel call</Text>
+                    <>
+                      <FontAwesome5 name="phone-slash" size={22} color="#fff" />
+                      <Text style={styles.declineText}>Cancel</Text>
+                    </>
                   )}
                 </TouchableOpacity>
               </View>
@@ -866,6 +875,20 @@ export default function IncomingCallListener() {
                     </TouchableOpacity>
                   </View>
                 ) : null}
+                <View style={styles.controlRowCentered}>
+                  <TouchableOpacity
+                    style={[styles.controlButton, styles.endCallButton]}
+                    onPress={handleEndCall}
+                    disabled={isProcessing}
+                  >
+                    {isProcessing ? (
+                      <ActivityIndicator color="#fff" />
+                    ) : (
+                      <FontAwesome5 name="phone-slash" size={20} color="#fff" />
+                    )}
+                    <Text style={styles.controlLabel}>End</Text>
+                  </TouchableOpacity>
+                </View>
               </View>
             ) : null}
           </View>
@@ -880,23 +903,16 @@ export default function IncomingCallListener() {
 const styles = StyleSheet.create({
   backdrop: {
     flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: "rgba(2, 8, 23, 0.72)",
-    padding: 24,
+    backgroundColor: "#111827",
   },
   card: {
     width: "100%",
-    maxWidth: 380,
-    borderRadius: 24,
-    padding: 24,
-    backgroundColor: "#ffffff",
+    height: "100%",
+    paddingHorizontal: 20,
+    paddingTop: Platform.OS === "ios" ? 64 : 36,
+    paddingBottom: Platform.OS === "ios" ? 34 : 24,
+    backgroundColor: "#111827",
     alignItems: "center",
-    shadowColor: "#000",
-    shadowOpacity: 0.24,
-    shadowRadius: 18,
-    shadowOffset: { width: 0, height: 8 },
-    elevation: 8,
   },
   iconWrap: {
     width: 60,
@@ -905,7 +921,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     backgroundColor: "#0f8cff",
-    marginBottom: 14,
+    marginBottom: 18,
   },
   avatarBadge: {
     width: 56,
@@ -913,46 +929,49 @@ const styles = StyleSheet.create({
     borderRadius: 28,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "#e2e8f0",
-    marginBottom: 10,
+    backgroundColor: "#263449",
+    marginBottom: 14,
   },
   avatarText: {
-    color: "#0f172a",
+    color: "#ffffff",
     fontWeight: "700",
     fontSize: 18,
   },
   title: {
     fontSize: 22,
     fontWeight: "700",
-    color: "#07111e",
+    color: "#ffffff",
     marginBottom: 6,
     textAlign: "center",
   },
   caller: {
-    fontSize: 16,
-    color: "#334155",
+    fontSize: 18,
+    fontWeight: "700",
+    color: "#ffffff",
     textAlign: "center",
     marginBottom: 2,
   },
   role: {
     fontSize: 13,
-    color: "#64748b",
+    color: "#a9b4c5",
     marginBottom: 6,
     textAlign: "center",
   },
   meta: {
     fontSize: 13,
-    color: "#64748b",
-    marginBottom: 18,
+    color: "#8390a3",
+    marginBottom: 14,
     textAlign: "center",
   },
   actions: {
     width: "100%",
     flexDirection: "row",
-    gap: 12,
+    justifyContent: "center",
+    gap: 32,
+    marginTop: "auto",
   },
   statusText: {
-    color: "#64748b",
+    color: "#cbd5e1",
     fontSize: 13,
     marginTop: 8,
     marginBottom: 12,
@@ -960,12 +979,14 @@ const styles = StyleSheet.create({
   },
   videoStage: {
     width: "100%",
-    height: 230,
-    borderRadius: 12,
+    flex: 1,
+    minHeight: 280,
+    maxHeight: 520,
+    borderRadius: 18,
     overflow: "hidden",
     backgroundColor: "#0f172a",
     position: "relative",
-    marginBottom: 10,
+    marginBottom: 8,
   },
   remoteVideo: {
     position: "absolute",
@@ -992,9 +1013,9 @@ const styles = StyleSheet.create({
     position: "absolute",
     right: 10,
     bottom: 10,
-    width: 92,
-    height: 122,
-    borderRadius: 8,
+    width: 104,
+    height: 142,
+    borderRadius: 14,
     objectFit: "cover",
     backgroundColor: "#1e293b",
     borderWidth: 2,
@@ -1003,8 +1024,8 @@ const styles = StyleSheet.create({
   },
   rtcNotice: {
     width: "100%",
-    color: "#b91c1c",
-    backgroundColor: "#fef2f2",
+    color: "#fecaca",
+    backgroundColor: "rgba(127, 29, 29, 0.45)",
     borderRadius: 8,
     paddingHorizontal: 10,
     paddingVertical: 8,
@@ -1015,26 +1036,22 @@ const styles = StyleSheet.create({
   },
   activeStateBox: {
     width: "100%",
-    marginTop: 8,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderRadius: 12,
-    backgroundColor: "#f8fafc",
-    borderWidth: 1,
-    borderColor: "#e2e8f0",
+    paddingTop: 6,
+    backgroundColor: "transparent",
   },
   activeStateText: {
-    color: "#334155",
+    color: "#cbd5e1",
     fontSize: 14,
     fontWeight: "600",
     textAlign: "center",
   },
   button: {
-    flex: 1,
-    borderRadius: 999,
-    paddingVertical: 12,
+    width: 82,
+    height: 82,
+    borderRadius: 41,
     alignItems: "center",
     justifyContent: "center",
+    gap: 5,
   },
   declineButton: {
     backgroundColor: "#ef4444",
@@ -1045,13 +1062,15 @@ const styles = StyleSheet.create({
   declineText: {
     color: "#ffffff",
     fontWeight: "700",
+    fontSize: 11,
   },
   acceptText: {
     color: "#ffffff",
     fontWeight: "700",
+    fontSize: 11,
   },
   timerText: {
-    color: "#334155",
+    color: "#ffffff",
     fontSize: 14,
     fontWeight: "700",
     marginTop: 12,
@@ -1061,27 +1080,35 @@ const styles = StyleSheet.create({
     width: "100%",
     flexDirection: "row",
     justifyContent: "space-between",
-    gap: 8,
+    justifyContent: "center",
+    gap: 14,
     marginTop: 12,
   },
   controlButton: {
-    flex: 1,
-    minHeight: 48,
-    borderRadius: 16,
-    backgroundColor: "#0f172a",
+    width: 68,
+    height: 68,
+    borderRadius: 34,
+    backgroundColor: "#263449",
     justifyContent: "center",
     alignItems: "center",
-    paddingHorizontal: 12,
-    paddingVertical: 10,
   },
   controlButtonActive: {
-    backgroundColor: "#0f8cff",
+    backgroundColor: "#1877f2",
   },
   controlLabel: {
     color: "#ffffff",
-    fontSize: 12,
+    fontSize: 10,
     marginTop: 4,
     fontWeight: "700",
     textAlign: "center",
+  },
+  controlRowCentered: {
+    width: "100%",
+    flexDirection: "row",
+    justifyContent: "center",
+    marginTop: 16,
+  },
+  endCallButton: {
+    backgroundColor: "#ef4444",
   },
 });
