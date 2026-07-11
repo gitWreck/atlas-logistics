@@ -119,7 +119,7 @@ export default function PrintLabelsClient() {
     );
 
   return (
-    <div className="bg-gray-100 min-h-screen p-8 print:p-0 print:bg-white text-black font-sans">
+    <div className="label-print-root bg-gray-100 min-h-screen p-8 print:m-0 print:min-h-0 print:p-0 print:bg-white text-black font-sans">
       {/* INSTRUCTIONS (Hidden when printing) */}
       <div className="max-w-md mx-auto mb-8 print:hidden text-center space-y-4">
         <h1 className="text-2xl font-bold text-slate-800">
@@ -145,6 +145,17 @@ export default function PrintLabelsClient() {
           <p className="mt-3 text-xs text-gray-400 border-t pt-2">
             Format: 100mm x 150mm (Thermal)
           </p>
+          <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-left text-xs text-amber-900">
+            <p className="font-bold uppercase">Before printing</p>
+            <ul className="mt-2 list-disc space-y-1 pl-4">
+              <li>Paper size: <strong>100mm x 150mm</strong></li>
+              <li>Margins: <strong>None</strong></li>
+              <li>
+                Scale: <strong>100%</strong> (turn off{" "}
+                <strong>Fit to printable area</strong>)
+              </li>
+            </ul>
+          </div>
         </div>
 
         <button
@@ -156,19 +167,19 @@ export default function PrintLabelsClient() {
       </div>
 
       {/* LABEL LIST */}
-      <div className="flex flex-col items-center print:block">
+      <div className="flex flex-col items-center print:m-0 print:block print:p-0">
         {printItems.map((item) => (
-          <div key={item.uniqueKey} className="label-container mb-8 print:mb-0">
-            <StandardLabel
-              shipment={item.shipment}
-              pkg={item.pkg}
-              index={item.index}
-              total={item.totalInShipment}
-            />
-
-            {/* Force page break after every label */}
+          <React.Fragment key={item.uniqueKey}>
+            <div className="label-container mb-8 print:mb-0">
+              <StandardLabel
+                shipment={item.shipment}
+                pkg={item.pkg}
+                index={item.index}
+                total={item.totalInShipment}
+              />
+            </div>
             <div className="page-break" />
-          </div>
+          </React.Fragment>
         ))}
       </div>
 
@@ -182,14 +193,30 @@ export default function PrintLabelsClient() {
           html,
           body {
             width: 100mm !important;
-            height: 150mm !important;
             margin: 0 !important;
             padding: 0 !important;
             background: white !important;
           }
 
+          .label-print-root,
+          .label-print-root * {
+            box-sizing: border-box;
+          }
+
+          .label-print-root {
+            width: 100mm !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            min-height: 0 !important;
+            background: white !important;
+          }
+
           .page-break {
+            break-after: page;
             page-break-after: always;
+            height: 0;
+            margin: 0;
+            padding: 0;
           }
 
           .label-container {
@@ -200,7 +227,17 @@ export default function PrintLabelsClient() {
             margin: 0 !important;
             padding: 0 !important;
             break-inside: avoid;
+            page-break-inside: avoid;
             overflow: hidden;
+          }
+
+          .label-sheet {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100mm !important;
+            height: 150mm !important;
+            margin: 0 !important;
           }
         }
       `}</style>
@@ -220,7 +257,7 @@ function StandardLabel({ shipment, pkg, index, total }) {
 
   return (
     <div
-      className="w-[100mm] h-[150mm] bg-white border-2 border-black p-[3mm]
+      className="label-sheet w-[100mm] h-[150mm] bg-white border-2 border-black p-[3mm]
   print:border-0
   flex flex-col justify-between relative overflow-hidden box-border
   m-0 print:m-0 print:shadow-none"
@@ -236,9 +273,11 @@ function StandardLabel({ shipment, pkg, index, total }) {
               className="h-8 w-auto object-contain"
             />
           </div>
-          <div className="text-right flex flex-row items-end gap-1">
-            <div className="text-xl font-bold text-dark uppercase">ATLAS: </div>
-            <div className="text-xl font-medium text-gray-600">
+          <div className="text-right flex min-w-0 flex-1 flex-col items-end gap-0.5 pl-1">
+            <div className="text-sm font-bold text-dark uppercase leading-none">
+              ATLAS:
+            </div>
+            <div className="text-[10px] font-medium text-gray-600 leading-tight text-right">
               Fast & Easy Shipping
             </div>
           </div>
@@ -291,7 +330,7 @@ function StandardLabel({ shipment, pkg, index, total }) {
         </div>
 
         {/* RIGHT: DELIVERY / RETURN ATTEMPTS */}
-        <div className="w-[1.2in] flex flex-col justify-start text-[10px]">
+        <div className="w-[32mm] shrink-0 flex flex-col justify-start text-[10px]">
           <div className="font-bold uppercase text-gray-500">
             Package Details
           </div>
