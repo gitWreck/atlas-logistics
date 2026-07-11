@@ -174,6 +174,18 @@ function assignedStaffRole(conversation = {}) {
   return conversation.assignedStaffRole || conversation.assignedRole || null;
 }
 
+function isRedundantCompletedCallStatus(call = {}, text = "") {
+  if (String(call.status || "").trim().toLowerCase() !== "ended") return false;
+
+  const normalizedText = String(text || "")
+    .replace(/[^a-z\s]/gi, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toLowerCase();
+
+  return /^(?:(?:voice|video) call )?(?:call )?ended$/.test(normalizedText);
+}
+
 async function writeCallHistoryMessage({ conversationRef, conversationId, call, text, duration = 0 }) {
   const targetRef = conversationRef || db.collection("conversations").doc(conversationId);
   const messageText = String(text || "").trim();
@@ -656,6 +668,13 @@ exports.createCallHistoryMessage = onCall(
     const isParticipant = String(call.callerId || "").trim() === uid || String(call.receiverId || "").trim() === uid;
     if (!isParticipant && !STAFF_MONITOR_ROLES.includes(role)) {
       throw new HttpsError("permission-denied", "Call access denied.");
+    }
+
+    // Completed calls are recorded once by updateConversationCallStatus as
+    // "Voice/Video Call\nMM:SS". Ignore the legacy follow-up status write so
+    // every role pair uses the same single completed-call bubble.
+    if (isRedundantCompletedCallStatus(call, text)) {
+      return { success: true, skipped: true };
     }
 
     await writeCallHistoryMessage({
