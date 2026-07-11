@@ -181,7 +181,7 @@ export default function PrintLabelsBundle() {
             </div>
           </div>
           <p className="mt-3 text-xs text-gray-400 border-t pt-2">
-            Format: 4" x 6" (Thermal) or A4 Portrait
+            Format: 100mm x 150mm (Thermal)
           </p>
         </div>
 
@@ -216,24 +216,34 @@ export default function PrintLabelsBundle() {
       </div>
 
       <style jsx global>{`
+        @page {
+          size: 100mm 150mm;
+          margin: 0;
+        }
+
         @media print {
-          @page {
-            margin: 0;
-            size: 4in 6in;
-          }
+          html,
           body {
-            background: white;
+            width: 100mm !important;
+            height: 150mm !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            background: white !important;
           }
+
           .page-break {
             page-break-after: always;
           }
+
           .label-container {
+            position: relative;
+            display: block;
+            width: 100mm !important;
+            height: 150mm !important;
+            margin: 0 !important;
+            padding: 0 !important;
             break-inside: avoid;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 6in;
-            width: 4in;
+            overflow: hidden;
           }
         }
       `}</style>
@@ -255,7 +265,7 @@ function StandardLabel({
   const qrValue = shipment.shipmentId || "NO_ID";
 
   return (
-    <div className="w-[4in] h-[6in] bg-white border-2 border-black p-4 flex flex-col justify-between relative mx-auto shadow-2xl print:shadow-none">
+    <div className="w-[100mm] h-[150mm] bg-white border-2 border-black p-[3mm] print:border-0 flex flex-col justify-between relative overflow-hidden box-border m-0 print:m-0 print:shadow-none">
       {/* 1. HEADER (Original) */}
       <div className="border-b-4 border-black pb-2 mb-2">
         <div className="flex justify-between items-center">

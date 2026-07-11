@@ -204,7 +204,7 @@ export default function PrintManifest() {
             key={`page-${pageIndex}`}
             className="label-container mb-8 print:mb-0"
           >
-            <div className="w-[4in] h-[6in] bg-white p-4 print:p-4 print:shadow-none shadow-lg border-2 border-black print:border-none box-border flex flex-col overflow-hidden">
+            <div className="w-[100mm] h-[150mm] bg-white p-[3mm] print:p-[3mm] print:shadow-none shadow-lg border-2 border-black print:border-0 box-border flex flex-col overflow-hidden m-0 print:m-0">
               <div className="mb-4 border-b-2 border-black pb-2">
                 <div className="flex justify-between items-center mb-4">
                   <div className="flex items-center gap-3">
@@ -339,24 +339,34 @@ export default function PrintManifest() {
         ))}
       </div>
       <style jsx global>{`
+        @page {
+          size: 100mm 150mm;
+          margin: 0;
+        }
+
         @media print {
-          @page {
-            margin: 0;
-            size: 4in 6in;
-          }
+          html,
           body {
-            background: white;
+            width: 100mm !important;
+            height: 150mm !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            background: white !important;
           }
+
           .page-break {
             page-break-after: always;
           }
+
           .label-container {
+            position: relative;
+            display: block;
+            width: 100mm !important;
+            height: 150mm !important;
+            margin: 0 !important;
+            padding: 0 !important;
             break-inside: avoid;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 6in;
-            width: 4in;
+            overflow: hidden;
           }
         }
       `}</style>
