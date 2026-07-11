@@ -760,6 +760,9 @@ export default function IncomingCallListener() {
   const isCallerRinging = Boolean(activeCall && String(activeCall?.callerId || "").trim() === user?.uid && status === "ringing");
   const isActiveCall = Boolean(activeCall && ["accepted", "connecting", "connected", "ongoing"].includes(status));
   const showIncomingControls = isIncoming && status === "ringing";
+  const peerName = String(activeCall?.callerId || "") === String(user?.uid || "")
+    ? activeCall?.receiverName || activeCall?.receiverDisplayName || "Atlas staff"
+    : activeCall?.callerName || "Atlas support";
   const title = isIncoming ? "Incoming Call" : isCallerRinging ? "Calling Atlas Staff..." : status === "connected" ? "Ongoing Call" : isActiveCall ? "Connecting..." : "Call";
   const statusLabel = isIncoming ? "Waiting for answer" : isCallerRinging ? "Ringing..." : status === "connected" ? "Connected" : isActiveCall ? "Connecting media..." : "Connected";
 
@@ -830,12 +833,18 @@ export default function IncomingCallListener() {
 
             {activeCall?.type === "video" && isActiveCall ? (
               <View style={styles.videoTopOverlay} pointerEvents="none">
-                <Text style={styles.videoContactName}>{activeCall?.callerName || "Atlas support"}</Text>
-                <View style={styles.videoStatusRow}>
-                  <View style={[styles.videoStatusDot, status === "connected" && styles.videoStatusDotConnected]} />
-                  <Text style={styles.videoCallStatus}>
-                    {status === "connected" ? formatDuration(callDurationSeconds) : statusLabel}
-                  </Text>
+                <View style={styles.videoTopIdentity}>
+                  <FontAwesome5 name="expand-alt" size={21} color="#fff" />
+                  <View style={styles.videoTopCopy}>
+                    <Text style={styles.videoContactName} numberOfLines={1}>{peerName}</Text>
+                    <Text style={styles.videoCallStatus}>
+                      {status === "connected" ? formatDuration(callDurationSeconds) : statusLabel}
+                    </Text>
+                  </View>
+                </View>
+                <View style={styles.videoTopActions}>
+                  <FontAwesome5 name="user-plus" size={22} color="#fff" />
+                  <FontAwesome5 name="ellipsis-v" size={23} color="#fff" />
                 </View>
               </View>
             ) : null}
@@ -906,48 +915,33 @@ export default function IncomingCallListener() {
             {/* Controls overlay for active calls - bottom bar */}
             {isActiveCall ? (
               <View style={styles.messengerControlsBar}>
+                {activeCall?.type === "video" ? (
+                  <TouchableOpacity
+                    style={[styles.messengerControlBtn, styles.messengerCameraBtn]}
+                    onPress={toggleCamera}
+                  >
+                    <FontAwesome5 name={isCameraOn ? "video" : "video-slash"} size={23} color="#050505" />
+                  </TouchableOpacity>
+                ) : null}
+
                 <TouchableOpacity
                   style={[styles.messengerControlBtn, isMuted && styles.messengerControlBtnInactive]}
                   onPress={toggleMute}
                 >
-                  <FontAwesome5
-                    name={isMuted ? "microphone-slash" : "microphone"}
-                    size={24}
-                    color="#fff"
-                  />
+                  <FontAwesome5 name={isMuted ? "microphone-slash" : "microphone"} size={24} color="#fff" />
                 </TouchableOpacity>
 
                 <TouchableOpacity
-                  style={[styles.messengerControlBtn, isSpeakerOn && styles.messengerControlBtnActive]}
+                  style={[styles.messengerControlBtn, isSpeakerOn && styles.messengerControlBtnSelected]}
                   onPress={toggleSpeaker}
                 >
-                  <FontAwesome5
-                    name={isSpeakerOn ? "volume-up" : "volume-mute"}
-                    size={24}
-                    color="#fff"
-                  />
+                  <FontAwesome5 name={isSpeakerOn ? "volume-up" : "volume-mute"} size={22} color="#fff" />
                 </TouchableOpacity>
 
                 {activeCall?.type === "video" ? (
-                  <>
-                    <TouchableOpacity
-                      style={[styles.messengerControlBtn, isCameraOn && styles.messengerControlBtnActive]}
-                      onPress={toggleCamera}
-                    >
-                      <FontAwesome5
-                        name={isCameraOn ? "video" : "video-slash"}
-                        size={24}
-                        color="#fff"
-                      />
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
-                      style={styles.messengerControlBtn}
-                      onPress={switchCamera}
-                    >
-                      <FontAwesome5 name="sync-alt" size={24} color="#fff" />
-                    </TouchableOpacity>
-                  </>
+                  <TouchableOpacity style={styles.messengerControlBtn} onPress={switchCamera}>
+                    <FontAwesome5 name="sync-alt" size={23} color="#fff" />
+                  </TouchableOpacity>
                 ) : null}
 
                 <TouchableOpacity
@@ -1208,13 +1202,12 @@ const styles = StyleSheet.create({
   },
   localVideoOverlay: {
     position: "absolute",
-    top: Platform.OS === "ios" ? 92 : 68,
-    right: 16,
-    width: 104,
-    height: 148,
-    borderRadius: 18,
-    borderWidth: 2,
-    borderColor: "#fff",
+    bottom: Platform.OS === "ios" ? 142 : 126,
+    right: 20,
+    width: 112,
+    height: 184,
+    borderRadius: 28,
+    borderWidth: 0,
     overflow: "hidden",
     backgroundColor: "#1e293b",
   },
@@ -1240,10 +1233,16 @@ const styles = StyleSheet.create({
   videoWaitingAvatarText: { color: "#fff", fontSize: 32, fontWeight: "800" },
   videoTopOverlay: {
     position: "absolute",
-    top: Platform.OS === "ios" ? 52 : 30,
-    left: 20,
-    right: 138,
+    top: Platform.OS === "ios" ? 54 : 30,
+    left: 26,
+    right: 26,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
   },
+  videoTopIdentity: { flex: 1, minWidth: 0, flexDirection: "row", alignItems: "center", gap: 20 },
+  videoTopCopy: { flex: 1, minWidth: 0 },
+  videoTopActions: { flexDirection: "row", alignItems: "center", gap: 28, marginLeft: 20 },
   videoContactName: {
     color: "#fff",
     fontSize: 19,
@@ -1252,9 +1251,6 @@ const styles = StyleSheet.create({
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 5,
   },
-  videoStatusRow: { marginTop: 5, flexDirection: "row", alignItems: "center", gap: 7 },
-  videoStatusDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: "#f59e0b" },
-  videoStatusDotConnected: { backgroundColor: "#22c55e" },
   videoCallStatus: {
     color: "rgba(255,255,255,0.92)",
     fontSize: 13,
@@ -1344,29 +1340,33 @@ const styles = StyleSheet.create({
   },
   messengerControlsBar: {
     position: "absolute",
-    bottom: Platform.OS === "ios" ? 22 : 14,
-    left: 12,
-    right: 12,
-    backgroundColor: "rgba(15, 23, 42, 0.88)",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.12)",
-    borderRadius: 34,
+    bottom: Platform.OS === "ios" ? 32 : 22,
+    left: 22,
+    right: 22,
+    backgroundColor: "transparent",
+    borderWidth: 0,
     flexDirection: "row",
     justifyContent: "space-around",
     alignItems: "center",
-    paddingHorizontal: 8,
-    paddingVertical: 8,
+    paddingHorizontal: 0,
+    paddingVertical: 0,
   },
   messengerControlBtn: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: "rgba(71, 85, 105, 0.92)",
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: "rgba(0, 0, 0, 0.76)",
     alignItems: "center",
     justifyContent: "center",
   },
   messengerControlBtnActive: {
     backgroundColor: "#0f8cff",
+  },
+  messengerControlBtnSelected: {
+    backgroundColor: "rgba(0, 0, 0, 0.76)",
+  },
+  messengerCameraBtn: {
+    backgroundColor: "#ffffff",
   },
   messengerControlBtnInactive: {
     backgroundColor: "#ef4444",
