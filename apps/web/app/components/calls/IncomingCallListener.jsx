@@ -178,8 +178,14 @@ export default function IncomingCallListener() {
         const prevStatus = prevCallStatusRef.current.get(callId);
         const terminalNotice = getTerminalNotice(nextStatus);
 
-        if (prevStatus !== undefined && prevStatus !== nextStatus && terminalNotice && currentActiveCallId === callId) {
+        // If the call reached a terminal status for the current active call, close UI and cleanup
+        if (prevStatus !== nextStatus && terminalNotice && currentActiveCallId === callId) {
           showNotice(terminalNotice);
+          try {
+            cleanupWebRtc();
+          } catch (err) {
+            console.warn("cleanupWebRtc error on terminal status:", err);
+          }
           closeDialog();
         }
 
@@ -221,6 +227,24 @@ export default function IncomingCallListener() {
   useEffect(() => {
     activeCallRef.current = activeCall;
   }, [activeCall]);
+
+  // Also listen directly to the active call document so terminal updates tear down immediately
+  useEffect(() => {
+    if (!activeCall?.id) return undefined;
+    const callRef = doc(db, "calls", activeCall.id);
+    const unsub = onSnapshot(callRef, (snap) => {
+      const data = snap.data() || {};
+      const status = String(data.status || "").trim().toLowerCase();
+      if (["declined", "missed", "cancelled", "ended"].includes(status)) {
+        const terminalNotice = getTerminalNotice(status);
+        if (terminalNotice) showNotice(terminalNotice);
+        try { cleanupWebRtc(); } catch (err) { console.warn("cleanupWebRtc error on doc listener:", err); }
+        closeDialog();
+      }
+    }, (err) => console.warn("active call doc listener error:", err));
+
+    return () => unsub();
+  }, [activeCall?.id]);
 
   useEffect(() => {
     if (!activeCall?.conversationId) {
