@@ -224,7 +224,7 @@ export default function TrackingSection() {
                 color={previewMiddleStat.color}
               />
               <StatBox
-                label="Pending"
+                label="At divisoria"
                 value={previewShipment.totals.pending ?? 0}
                 color="text-slate-600"
               />

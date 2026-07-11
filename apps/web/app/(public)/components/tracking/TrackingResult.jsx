@@ -430,7 +430,7 @@ export default function TrackingResult({ data }) {
             color={middleStat.color}
           />
           <StatBox
-            label="Pending"
+            label="At divisoria"
             value={totals.pending ?? 0}
             color="text-slate-600"
           />
