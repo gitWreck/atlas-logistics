@@ -313,7 +313,15 @@ export default function IncomingCallListener() {
       const preferred = entries.find((call) => ["connected", "ongoing", "accepted", "connecting"].includes(String(call?.status || "").trim().toLowerCase()));
       const ringingCall = entries.find((call) => String(call?.callerId || "").trim() === uid && String(call?.status || "").trim().toLowerCase() === "ringing") || entries.find((call) => String(call?.receiverId || "").trim() === uid && String(call?.status || "").trim().toLowerCase() === "ringing");
       const nextCall = preferred || ringingCall || null;
-      setActiveCall(nextCall);
+      // update both state and ref synchronously so snapshot handlers can respond immediately
+      if (!nextCall) {
+        if (activeCallRef.current?.id) setConversationTitle("");
+        activeCallRef.current = null;
+        setActiveCall(null);
+      } else {
+        activeCallRef.current = nextCall;
+        setActiveCall(nextCall);
+      }
     };
 
     const getTerminalNotice = (status) => {
@@ -334,7 +342,7 @@ export default function IncomingCallListener() {
     const applySnapshot = (snap) => {
       const docs = snap.docs || [];
       const nextIds = new Set();
-      const currentActiveCallId = activeCallRef.current?.id;
+      const prevStatusMap = new Map();
 
       docs.forEach((docSnap) => {
         const data = docSnap.data() || {};
@@ -343,31 +351,7 @@ export default function IncomingCallListener() {
 
         const nextStatus = String(data.status || "").trim().toLowerCase();
         const prevStatus = prevCallStatusRef.current.get(callId);
-        const terminalNotice = (function (s) {
-          switch (s) {
-            case "declined":
-              return "Staff declined the call.";
-            case "missed":
-              return "No answer from staff.";
-            case "cancelled":
-              return "The call was cancelled.";
-            case "ended":
-              return "The call has ended.";
-            default:
-              return null;
-          }
-        })(nextStatus);
-
-        // If call reached a terminal status for the current active call, close UI and cleanup
-        if (prevStatus !== nextStatus && terminalNotice && currentActiveCallId === callId) {
-          showNotice(terminalNotice);
-          try {
-            cleanupWebRtc();
-          } catch (err) {
-            console.warn("cleanupWebRtc error on terminal status:", err);
-          }
-          closeDialog();
-        }
+        prevStatusMap.set(callId, prevStatus);
 
         prevCallStatusRef.current.set(callId, nextStatus);
         callMapRef.current.set(callId, { id: callId, ...data });
@@ -379,7 +363,33 @@ export default function IncomingCallListener() {
         }
       });
 
+      // update active call synchronously
       syncActiveCall();
+
+      const currentActiveCallId = activeCallRef.current?.id;
+      if (currentActiveCallId) {
+        const prev = prevStatusMap.get(currentActiveCallId);
+        const current = String(callMapRef.current.get(currentActiveCallId)?.status || "").trim().toLowerCase();
+        if (prev !== current && ["declined", "missed", "cancelled", "ended"].includes(current)) {
+          const terminalNotice = (function (s) {
+            switch (s) {
+              case "declined":
+                return "Staff declined the call.";
+              case "missed":
+                return "No answer from staff.";
+              case "cancelled":
+                return "The call was cancelled.";
+              case "ended":
+                return "The call has ended.";
+              default:
+                return null;
+            }
+          })(current);
+          if (terminalNotice) showNotice(terminalNotice);
+          try { cleanupWebRtc(); } catch (err) { console.warn("cleanupWebRtc error on terminal status:", err); }
+          closeDialog();
+        }
+      }
     };
 
     const unsubscribeReceiver = onSnapshot(receiverQuery, applySnapshot, (error) => {
