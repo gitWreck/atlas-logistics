@@ -21,7 +21,7 @@ export default function CustomerChatThreadScreen() {
       <StatusBar style={resolvedScheme === "dark" ? "light" : "dark"} />
       <ChatThread
         conversationId={conversationId ? String(conversationId) : null}
-        onBack={() => router.back()}
+        onBack={() => router.replace("/(customer)/chat")}
       />
     </SafeAreaView>
   );

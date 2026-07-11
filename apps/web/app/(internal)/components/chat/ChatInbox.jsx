@@ -265,6 +265,54 @@ function displayMessagePreview(text = "") {
   return text || "Conversation started";
 }
 
+function getCallHistoryView(message = {}) {
+  const text = String(message.text || "").replace(/ðŸ“ž|📞/g, "").trim();
+  const lower = text.toLowerCase();
+  const type = String(message.callType || "").toLowerCase() === "video" || lower.includes("video") ? "video" : "voice";
+  const durationMatch = text.match(/\b\d{1,2}:\d{2}\b/);
+  const seconds = Math.max(0, Number(message.duration || 0));
+  const duration = durationMatch?.[0] || (seconds > 0
+    ? `${String(Math.floor(seconds / 60)).padStart(2, "0")}:${String(Math.floor(seconds % 60)).padStart(2, "0")}`
+    : null);
+  let status = "Call ended";
+  if (lower.includes("missed") || lower.includes("unanswered") || lower.includes("no answer")) status = "Missed";
+  else if (lower.includes("declined")) status = "Declined";
+  else if (lower.includes("cancel")) status = "Cancelled";
+  else if (lower.includes("ongoing")) status = "Ongoing";
+  const exceptional = ["Missed", "Declined", "Cancelled"].includes(status);
+  return {
+    type,
+    duration,
+    status,
+    exceptional,
+    title: exceptional ? `${status} ${type} call` : `${type === "video" ? "Video" : "Voice"} call`,
+  };
+}
+
+function WebCallHistoryCard({ message, mine, isDark, onCall }) {
+  const call = getCallHistoryView(message);
+  return (
+    <div className="w-[min(17rem,70vw)] space-y-3">
+      <div className="flex items-start gap-3">
+        <span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full ${call.exceptional ? "bg-rose-500 text-white" : mine ? "bg-blue-950/35 text-white" : isDark ? "bg-slate-700 text-slate-100" : "bg-white text-slate-700 shadow-sm"}`}>
+          <FontAwesomeIcon icon={call.type === "video" ? faVideo : faPhone} />
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="font-extrabold capitalize leading-5">{call.title}</p>
+          <p className={`mt-0.5 text-xs font-medium ${mine ? "text-blue-100" : isDark ? "text-slate-300" : "text-slate-500"}`}>{call.status}</p>
+          {call.duration ? <p className="mt-1.5 text-xs font-bold">Duration {call.duration}</p> : null}
+        </div>
+      </div>
+      {call.exceptional ? (
+        <button type="button" onClick={() => onCall(call.type)} className={`flex h-9 w-full items-center justify-center gap-2 rounded-xl text-xs font-extrabold transition ${mine ? "bg-white/15 text-white hover:bg-white/25" : isDark ? "bg-white/10 text-white hover:bg-white/15" : "bg-white text-slate-800 shadow-sm hover:bg-slate-50"}`}>
+          <FontAwesomeIcon icon={call.type === "video" ? faVideo : faPhone} />
+          {mine ? "Call again" : "Call back"}
+        </button>
+      ) : null}
+    </div>
+  );
+}
+
 function Avatar({ name, photoURL, size = 40, online = false }) {
   return (
     <div className="relative shrink-0" style={{ width: size, height: size }}>
@@ -424,16 +472,18 @@ export default function ChatInbox({ user, profile, isDark = false, onViewCustome
 
     const q = query(
       collection(db, "conversations", selectedId, "messages"),
-      orderBy("createdAt", "asc"),
+      orderBy("createdAt", "desc"),
       limit(200),
     );
 
     return onSnapshot(q, (snapshot) => {
       setMessages(
-        snapshot.docs.map((doc) => ({
-          id: doc.id,
-          ...doc.data(),
-        })),
+        snapshot.docs
+          .map((doc) => ({
+            id: doc.id,
+            ...doc.data(),
+          }))
+          .reverse(),
       );
     });
   }, [selectedId]);
@@ -1146,7 +1196,7 @@ export default function ChatInbox({ user, profile, isDark = false, onViewCustome
                             />
                           ) : (
                             <div
-                              className={`max-w-full rounded-2xl px-3.5 py-2 text-sm leading-relaxed ${
+                              className={`max-w-full rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed shadow-sm ${
                                 mine
                                   ? "rounded-br-md bg-blue-600 text-white"
                                   : isDark
@@ -1154,7 +1204,16 @@ export default function ChatInbox({ user, profile, isDark = false, onViewCustome
                                     : "rounded-bl-md bg-slate-100 text-slate-900"
                               }`}
                             >
-                              <p className="whitespace-pre-wrap break-words [overflow-wrap:anywhere]">{message.text}</p>
+                              {isCallMessage ? (
+                                <WebCallHistoryCard
+                                  message={message}
+                                  mine={mine}
+                                  isDark={isDark}
+                                  onCall={(type) => handleStartCall(type, selectedId)}
+                                />
+                              ) : (
+                                <p className="whitespace-pre-wrap break-words [overflow-wrap:anywhere]">{message.text}</p>
+                              )}
                             </div>
                           )}
                           <div className={`mt-0.5 flex items-center gap-1 px-1 text-[10px] ${muted}`}>

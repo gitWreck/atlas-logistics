@@ -113,7 +113,59 @@ function AttachmentImage({ uri, colors, onPress }) {
   );
 }
 
-function MessageBubble({ item, colors, onOpenImage }) {
+function getCallHistoryView(message = {}) {
+  const text = String(message.text || "").replace(/ðŸ“ž|📞/g, "").trim();
+  const lower = text.toLowerCase();
+  const type = String(message.callType || "").toLowerCase() === "video" || lower.includes("video")
+    ? "video"
+    : "voice";
+  const durationMatch = text.match(/\b\d{1,2}:\d{2}\b/);
+  const seconds = Math.max(0, Number(message.duration || 0));
+  const duration = durationMatch?.[0] || (seconds > 0
+    ? `${String(Math.floor(seconds / 60)).padStart(2, "0")}:${String(Math.floor(seconds % 60)).padStart(2, "0")}`
+    : null);
+  let status = duration ? "Call ended" : "Call ended";
+  if (lower.includes("missed") || lower.includes("unanswered") || lower.includes("no answer")) status = "Missed";
+  else if (lower.includes("declined")) status = "Declined";
+  else if (lower.includes("cancel")) status = "Cancelled";
+  else if (lower.includes("ongoing")) status = "Ongoing";
+  const exceptional = ["Missed", "Declined", "Cancelled"].includes(status);
+  return {
+    type,
+    duration,
+    status,
+    exceptional,
+    title: exceptional ? `${status} ${type} call` : `${type === "video" ? "Video" : "Voice"} call`,
+  };
+}
+
+function CallHistoryCard({ message, mine, colors, onCall }) {
+  const call = getCallHistoryView(message);
+  const primaryColor = mine ? colors.sentText : colors.receivedText;
+  const secondaryColor = mine ? "rgba(255,255,255,0.78)" : colors.textMuted;
+  return (
+    <View style={styles.callHistoryCard}>
+      <View style={styles.callHistoryTop}>
+        <View style={[styles.callHistoryIcon, { backgroundColor: call.exceptional ? colors.danger : mine ? "rgba(255,255,255,0.16)" : colors.surface }]}>
+          <FontAwesome5 name={call.type === "video" ? "video" : "phone-alt"} size={18} color={call.exceptional || mine ? "#FFFFFF" : colors.text} />
+        </View>
+        <View style={styles.callHistoryCopy}>
+          <Text style={[styles.callHistoryTitle, { color: primaryColor }]}>{call.title}</Text>
+          <Text style={[styles.callHistoryStatus, { color: secondaryColor }]}>{call.status}</Text>
+          {call.duration ? <Text style={[styles.callHistoryDuration, { color: primaryColor }]}>Duration {call.duration}</Text> : null}
+        </View>
+      </View>
+      {call.exceptional && onCall ? (
+        <TouchableOpacity style={[styles.callHistoryAction, { backgroundColor: mine ? "rgba(255,255,255,0.14)" : colors.surface }]} onPress={() => onCall(call.type)}>
+          <FontAwesome5 name={call.type === "video" ? "video" : "phone-alt"} size={13} color={primaryColor} />
+          <Text style={[styles.callHistoryActionText, { color: primaryColor }]}>{mine ? "Call again" : "Call back"}</Text>
+        </TouchableOpacity>
+      ) : null}
+    </View>
+  );
+}
+
+function MessageBubble({ item, colors, onOpenImage, onCall }) {
   const { message, mine, isFirstInGroup, isLastInGroup } = item;
   const attachment = getMessageAttachment(message);
   const text = getMessageText(message);
@@ -138,6 +190,7 @@ function MessageBubble({ item, colors, onOpenImage }) {
 
   const isImage = attachment?.type === "image";
   const isFile = attachment?.type === "file";
+  const isCall = String(message.type || "").trim().toLowerCase() === "call";
 
   return (
     <Animated.View
@@ -188,7 +241,9 @@ function MessageBubble({ item, colors, onOpenImage }) {
             end={{ x: 1, y: 1 }}
             style={[styles.bubble, bubbleRadius]}
           >
-            {isFile ? (
+            {isCall ? (
+              <CallHistoryCard message={message} mine colors={colors} onCall={onCall} />
+            ) : isFile ? (
               <FileChip attachment={attachment} tint="#FFFFFF" mine />
             ) : (
               <Text style={[styles.bubbleText, { color: colors.sentText }]}>
@@ -204,7 +259,9 @@ function MessageBubble({ item, colors, onOpenImage }) {
               { backgroundColor: colors.receivedBg },
             ]}
           >
-            {isFile ? (
+            {isCall ? (
+              <CallHistoryCard message={message} mine={false} colors={colors} onCall={onCall} />
+            ) : isFile ? (
               <FileChip attachment={attachment} tint={colors.accent} />
             ) : (
               <Text style={[styles.bubbleText, { color: colors.receivedText }]}>
@@ -214,7 +271,7 @@ function MessageBubble({ item, colors, onOpenImage }) {
           </View>
         )}
 
-        {isLastInGroup && !mine && (
+        {(isCall || isLastInGroup) && !mine && (
           <View
             style={[
               styles.metaRow,
@@ -227,7 +284,7 @@ function MessageBubble({ item, colors, onOpenImage }) {
           </View>
         )}
 
-        {isLastInGroup && mine ? (
+        {(isCall || isLastInGroup) && mine ? (
           <View style={styles.sentMetaRow}>
             <Text style={[styles.metaTime, { color: colors.textMuted }]}>
               {formatClockTime(message.createdAt)}
@@ -995,13 +1052,15 @@ export default function ChatThread({ conversationId, onBack, embedded = false })
     if (!conversationId) return undefined;
     const q = query(
       collection(db, "conversations", String(conversationId), "messages"),
-      orderBy("createdAt", "asc"),
+      orderBy("createdAt", "desc"),
       limit(200),
     );
     return onSnapshot(
       q,
       (snap) => {
-        const next = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+        const next = snap.docs
+          .map((d) => ({ id: d.id, ...d.data() }))
+          .reverse();
         LayoutAnimation.configureNext(
           LayoutAnimation.create(220, "easeInEaseOut", "opacity"),
         );
@@ -1279,6 +1338,7 @@ export default function ChatThread({ conversationId, onBack, embedded = false })
         item={item}
         colors={colors}
         onOpenImage={setLightbox}
+        onCall={startCall}
       />
     );
   };
@@ -1974,6 +2034,28 @@ const styles = StyleSheet.create({
   senderName: { fontSize: 11, fontWeight: "700", marginBottom: 3, marginLeft: 4 },
   bubble: { paddingHorizontal: 12, paddingVertical: 9 },
   bubbleText: { fontSize: 12, lineHeight: 18 },
+  callHistoryCard: { width: 216, maxWidth: "100%", gap: 12 },
+  callHistoryTop: { flexDirection: "row", alignItems: "flex-start", gap: 11 },
+  callHistoryIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  callHistoryCopy: { flex: 1, minWidth: 0, paddingTop: 1 },
+  callHistoryTitle: { fontSize: 14, lineHeight: 18, fontWeight: "900", textTransform: "capitalize" },
+  callHistoryStatus: { marginTop: 2, fontSize: 12, lineHeight: 16, fontWeight: "600" },
+  callHistoryDuration: { marginTop: 5, fontSize: 12, lineHeight: 16, fontWeight: "700" },
+  callHistoryAction: {
+    minHeight: 38,
+    borderRadius: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+  },
+  callHistoryActionText: { fontSize: 13, fontWeight: "900" },
   metaRow: { flexDirection: "row", marginTop: 5, paddingHorizontal: 4 },
   metaTime: { fontSize: 12, fontWeight: "600" },
   sentMetaRow: {
