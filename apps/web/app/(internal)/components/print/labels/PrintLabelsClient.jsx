@@ -148,8 +148,12 @@ export default function PrintLabelsClient() {
           <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-left text-xs text-amber-900">
             <p className="font-bold uppercase">Before printing</p>
             <ul className="mt-2 list-disc space-y-1 pl-4">
-              <li>Paper size: <strong>100mm x 150mm</strong></li>
-              <li>Margins: <strong>None</strong></li>
+              <li>
+                Paper size: <strong>100mm x 150mm</strong>
+              </li>
+              <li>
+                Margins: <strong>None</strong>
+              </li>
               <li>
                 Scale: <strong>100%</strong> (turn off{" "}
                 <strong>Fit to printable area</strong>)
@@ -270,7 +274,7 @@ function StandardLabel({ shipment, pkg, index, total }) {
             <img
               src="/atlas-logo.png"
               alt="Atlas"
-              className="h-8 w-auto object-contain"
+              className="h-16 w-auto object-contain"
             />
           </div>
           <div className="text-right flex min-w-0 flex-1 flex-col items-end gap-0.5 pl-1">

@@ -309,7 +309,7 @@ function StandardLabel({
             <img
               src="/atlas-logo.png"
               alt="Atlas"
-              className="h-8 w-auto object-contain"
+              className="h-16 w-auto object-contain"
             />
           </div>
           <div className="text-right">
