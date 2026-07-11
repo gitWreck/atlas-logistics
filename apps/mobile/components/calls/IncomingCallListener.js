@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  AppState,
   Modal,
   Platform,
   StyleSheet,
@@ -85,6 +86,7 @@ export default function IncomingCallListener() {
   const activeCallRef = useRef(null);
   const timeoutRef = useRef(null);
   const noticeTimerRef = useRef(null);
+  const callDurationRef = useRef(0);
   const peerConnectionRef = useRef(null);
   const rtcCallIdRef = useRef(null);
   const processedCandidatesRef = useRef(new Set());
@@ -363,9 +365,7 @@ export default function IncomingCallListener() {
         }
       });
 
-      // update active call synchronously
-      syncActiveCall();
-
+      // Inspect the previous active call before syncActiveCall removes terminal calls.
       const currentActiveCallId = activeCallRef.current?.id;
       if (currentActiveCallId) {
         const prev = prevStatusMap.get(currentActiveCallId);
@@ -388,8 +388,10 @@ export default function IncomingCallListener() {
           if (terminalNotice) showNotice(terminalNotice);
           try { cleanupWebRtc(); } catch (err) { console.warn("cleanupWebRtc error on terminal status:", err); }
           closeDialog();
+          return;
         }
       }
+      syncActiveCall();
     };
 
     const unsubscribeReceiver = onSnapshot(receiverQuery, applySnapshot, (error) => {
@@ -413,6 +415,26 @@ export default function IncomingCallListener() {
   useEffect(() => {
     activeCallRef.current = activeCall;
   }, [activeCall]);
+
+  useEffect(() => {
+    callDurationRef.current = callDurationSeconds;
+  }, [callDurationSeconds]);
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener("change", (nextState) => {
+      if (nextState === "active") return;
+      const call = activeCallRef.current;
+      const currentStatus = String(call?.status || "").toLowerCase();
+      if (!call?.id || !["ringing", "accepted", "connecting", "connected", "ongoing"].includes(currentStatus)) return;
+      updateConversationCallStatus({
+        callId: call.id,
+        status: currentStatus === "ringing" ? "cancelled" : "ended",
+        duration: callDurationRef.current,
+        endReason: "app_backgrounded",
+      }).catch(() => {});
+    });
+    return () => subscription.remove();
+  }, []);
 
   // Also listen directly to the active call document so terminal updates tear down immediately
   useEffect(() => {
@@ -723,13 +745,7 @@ export default function IncomingCallListener() {
 
     setIsProcessing(true);
     try {
-      await updateConversationCallStatus({ callId: activeCall.id, status: "ended" });
-      await updateDoc(doc(db, "calls", activeCall.id), {
-        endedReason: "completed",
-        endedAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-      });
-      await logCallEvent({ conversationId: activeCall.conversationId, callId: activeCall.id, text: `📞 ${activeCall?.type === "video" ? "Video" : "Voice"} Call\nCall Ended` });
+      await updateConversationCallStatus({ callId: activeCall.id, status: "ended", duration: callDurationSeconds, endReason: "hangup" });
       closeDialog();
     } catch (error) {
       console.error("Call end failed:", error);

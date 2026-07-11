@@ -40,6 +40,7 @@ const CALL_STATUSES = [
   "timeout",
   "ended",
 ];
+const TERMINAL_CALL_STATUSES = ["ended", "declined", "missed", "busy", "cancelled", "timeout"];
 
 function cleanText(value, fieldName = "text", maxLength = 2000) {
   const text = String(value || "").trim();
@@ -1253,6 +1254,10 @@ exports.updateConversationCallStatus = onCall(
     const callId = cleanText(req.data?.callId, "callId", 160);
     const status = String(req.data?.status || "").trim().toLowerCase();
     const duration = Math.max(0, Number(req.data?.duration || 0));
+    const endReason = String(req.data?.endReason || (status === "ended" ? "hangup" : status))
+      .trim()
+      .toLowerCase()
+      .slice(0, 80);
 
     if (!CALL_STATUSES.includes(status)) {
       throw new HttpsError("invalid-argument", "Invalid call status.");
@@ -1266,36 +1271,54 @@ exports.updateConversationCallStatus = onCall(
     const user = userSnap.data() || {};
     const role = String(user.role || "").toLowerCase();
     const callRef = db.collection("calls").doc(callId);
-    const callSnap = await callRef.get();
+    const initialSnap = await callRef.get();
+    if (!initialSnap.exists) throw new HttpsError("not-found", "Call not found.");
+    const initialCall = initialSnap.data() || {};
+    await getConversationForUser(initialCall.conversationId, uid, role);
 
-    if (!callSnap.exists) {
-      throw new HttpsError("not-found", "Call not found.");
-    }
-
-    const call = callSnap.data() || {};
-    await getConversationForUser(call.conversationId, uid, role);
-
-    const isParticipant = call.callerId === uid || call.receiverId === uid;
+    const isParticipant = initialCall.callerId === uid || initialCall.receiverId === uid;
     if (!isParticipant && !STAFF_MONITOR_ROLES.includes(role)) {
       throw new HttpsError("permission-denied", "Call access denied.");
     }
 
-    const now = FieldValue.serverTimestamp();
-    const update = {
-      status,
-      updatedAt: now,
-      statusUpdatedBy: uid,
-    };
+    const transition = await db.runTransaction(async (tx) => {
+      const snap = await tx.get(callRef);
+      if (!snap.exists) throw new HttpsError("not-found", "Call not found.");
+      const call = snap.data() || {};
+      const currentStatus = String(call.status || "").trim().toLowerCase();
 
-    if (status === "connected") update.connectedAt = now;
-    if (["ended", "declined", "missed", "busy", "cancelled"].includes(status)) {
-      update.endedAt = now;
-      update.duration = duration;
-    }
+      if (status === "connected" && TERMINAL_CALL_STATUSES.includes(currentStatus)) {
+        throw new HttpsError("failed-precondition", "Call has already ended.");
+      }
+      // A terminal call is immutable. Repeated hangups are successful no-ops.
+      if (TERMINAL_CALL_STATUSES.includes(currentStatus)) {
+        return { changed: false, call, status: currentStatus };
+      }
 
-    await callRef.update(update);
+      const now = FieldValue.serverTimestamp();
+      const update = { status, updatedAt: now, statusUpdatedBy: uid };
+      if (status === "connected") update.connectedAt = now;
+      if (TERMINAL_CALL_STATUSES.includes(status)) {
+        update.endedAt = now;
+        update.endedBy = uid;
+        update.endedReason = endReason || status;
+        update.duration = duration;
+        update.signalingEvent = "call_ended";
+        update.termination = {
+          event: "call_ended",
+          callId,
+          endedBy: uid,
+          reason: endReason || status,
+          participantIds: [call.callerId, call.receiverId].filter(Boolean),
+          timestamp: now,
+        };
+      }
+      tx.update(callRef, update);
+      return { changed: true, call, status };
+    });
 
-    if (status === "ended") {
+    if (transition.changed && status === "ended") {
+      const call = transition.call;
       const conversationRef = db.collection("conversations").doc(call.conversationId);
       const label = call.type === "video" ? "Video Call" : "Voice Call";
       const minutes = Math.floor(duration / 60);
@@ -1312,6 +1335,12 @@ exports.updateConversationCallStatus = onCall(
       });
     }
 
-    return { success: true };
+    return {
+      success: true,
+      changed: transition.changed,
+      callId,
+      status: transition.status,
+      event: TERMINAL_CALL_STATUSES.includes(transition.status) ? "call_ended" : null,
+    };
   },
 );

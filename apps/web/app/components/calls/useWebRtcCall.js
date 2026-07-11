@@ -100,12 +100,27 @@ export default function useWebRtcCall({
           }
         });
         trtc.on(TRTC.EVENT.REMOTE_VIDEO_UNAVAILABLE, () => setRemoteVideoReady(false));
+        trtc.on(TRTC.EVENT.REMOTE_USER_EXIT, () => {
+          remoteUserIdRef.current = null;
+          setRemoteVideoReady(false);
+          setMediaNotice("Call ended");
+          updateConversationCallStatus({
+            callId: activeCall.id,
+            status: "ended",
+            endReason: "peer_left",
+          }).catch(() => {});
+        });
         trtc.on(TRTC.EVENT.AUTOPLAY_FAILED, () => {
           setMediaNotice("Tap the call screen once to enable remote audio.");
         });
         trtc.on(TRTC.EVENT.ERROR, (error) => {
           console.error("TRTC call error", error);
           setMediaNotice(error?.message || "The call media connection failed.");
+          updateConversationCallStatus({
+            callId: activeCall.id,
+            status: "ended",
+            endReason: "media_connection_failed",
+          }).catch(() => {});
         });
 
         await trtc.enterRoom({
