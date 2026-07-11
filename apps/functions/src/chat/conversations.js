@@ -41,6 +41,89 @@ const CALL_STATUSES = [
   "ended",
 ];
 
+async function assertUsersAvailableForCall(callerId, receiverId) {
+  const lookups = [];
+  for (const participantId of [callerId, receiverId]) {
+    lookups.push(
+      db
+        .collection("calls")
+        .where("status", "in", ACTIVE_CALL_STATUSES)
+        .where("callerId", "==", participantId)
+        .limit(1)
+        .get(),
+      db
+        .collection("calls")
+        .where("status", "in", ACTIVE_CALL_STATUSES)
+        .where("receiverId", "==", participantId)
+        .limit(1)
+        .get(),
+    );
+  }
+
+  const snapshots = await Promise.all(lookups);
+  if (snapshots.some((snapshot) => !snapshot.empty)) {
+    throw new HttpsError("already-exists", "One of you is already on another call.");
+  }
+}
+
+async function createRingingConversationCall({
+  conversationId,
+  callType,
+  callerId,
+  callerRole,
+  callerName,
+  receiverId,
+  receiverRole,
+  participantIds,
+  extraFields = {},
+}) {
+  await assertUsersAvailableForCall(callerId, receiverId);
+
+  const callRef = db.collection("calls").doc();
+  const now = FieldValue.serverTimestamp();
+  const rtcRoomId = `atlas_${callRef.id}`;
+  const rtcConfig = getRtcSecretConfig();
+
+  await callRef.set({
+    callId: callRef.id,
+    conversationId,
+    callerId,
+    callerRole,
+    callerName,
+    receiverId,
+    receiverRole,
+    participantIds: [...new Set(participantIds || [callerId, receiverId])],
+    type: callType,
+    status: "ringing",
+    rtcRoomId,
+    roomId: rtcRoomId,
+    rtcProvider: "tencent",
+    rtcConfigStatus: rtcConfig.isConfigured ? "configured" : "pending-setup",
+    createdAt: now,
+    startedAt: now,
+    updatedAt: now,
+    ...extraFields,
+  });
+
+  await notifyIncomingCall({
+    callId: callRef.id,
+    conversationId,
+    receiverId,
+    callerName,
+    callType,
+  });
+
+  return {
+    success: true,
+    callId: callRef.id,
+    conversationId,
+    receiverId,
+    rtcRoomId,
+    roomId: rtcRoomId,
+    status: "ringing",
+  };
+}
+
 function cleanText(value, fieldName = "text", maxLength = 2000) {
   const text = String(value || "").trim();
   if (!text) {
@@ -935,67 +1018,17 @@ exports.startConversationCall = onCall(
             "The other participant is not available for calls.",
           );
         }
-
-        const [callerAsCallerSnap, callerAsReceiverSnap, receiverAsCallerSnap, receiverAsReceiverSnap] =
-          await Promise.all([
-            db.collection("calls").where("status", "in", ACTIVE_CALL_STATUSES).where("callerId", "==", uid).limit(1).get(),
-            db.collection("calls").where("status", "in", ACTIVE_CALL_STATUSES).where("receiverId", "==", uid).limit(1).get(),
-            db.collection("calls").where("status", "in", ACTIVE_CALL_STATUSES).where("callerId", "==", receiverId).limit(1).get(),
-            db.collection("calls").where("status", "in", ACTIVE_CALL_STATUSES).where("receiverId", "==", receiverId).limit(1).get(),
-          ]);
-
-        if (
-          !callerAsCallerSnap.empty ||
-          !callerAsReceiverSnap.empty ||
-          !receiverAsCallerSnap.empty ||
-          !receiverAsReceiverSnap.empty
-        ) {
-          throw new HttpsError("already-exists", "One of you is already on another call.");
-        }
-
-        const callRef = db.collection("calls").doc();
-        const now = FieldValue.serverTimestamp();
-        const rtcRoomId = `atlas_${callRef.id}`;
         const callerName = displayName(user, "Atlas staff");
-        const rtcConfig = getRtcSecretConfig();
-
-        await callRef.set({
-          callId: callRef.id,
+        return createRingingConversationCall({
           conversationId,
+          callType,
           callerId: uid,
           callerRole: role,
           callerName,
           receiverId,
           receiverRole: String(receiverSnap.data()?.role || "staff").toLowerCase(),
           participantIds,
-          type: callType,
-          status: "ringing",
-          rtcRoomId,
-          roomId: rtcRoomId,
-          rtcProvider: "tencent",
-          rtcConfigStatus: rtcConfig.isConfigured ? "configured" : "pending-setup",
-          createdAt: now,
-          startedAt: now,
-          updatedAt: now,
         });
-
-        await notifyIncomingCall({
-          callId: callRef.id,
-          conversationId,
-          receiverId,
-          callerName,
-          callType,
-        });
-
-        return {
-          success: true,
-          callId: callRef.id,
-          conversationId,
-          receiverId,
-          rtcRoomId,
-          roomId: rtcRoomId,
-          status: "ringing",
-        };
       }
 
       const customerId = String(conversation.customerId || "").trim();
@@ -1007,170 +1040,61 @@ exports.startConversationCall = onCall(
       }
 
       const customerSnap = await db.collection("customers").doc(customerId).get();
+      if (!customerSnap.exists) {
+        throw new HttpsError("not-found", "Customer profile not found.");
+      }
       const customerData = customerSnap.data() || {};
-      const assignedStaffId = String(
-        customerData.primaryAssignedStaffId || conversation.assignedStaffId || conversation.assignedTo || "",
-      ).trim();
+      const assignedManagerId = String(customerData.primaryAssignedStaffId || "").trim();
 
-      if (!assignedStaffId) {
+      if (!assignedManagerId) {
         throw new HttpsError(
           "failed-precondition",
-          "The customer has no assigned support employee.",
+          "The customer has no assigned manager.",
         );
       }
 
       const isCustomerCaller = role === "customer" && uid === customerId;
-      const isAdminOrManagerCaller = ["admin", "manager"].includes(role);
-      const isAssignedEmployeeCaller = role === "employee" && assignedStaffId === uid;
-      const canStartSupportCall = isAdminOrManagerCaller || isAssignedEmployeeCaller;
-
-      if (isCustomerCaller) {
-        const receiverId = assignedStaffId;
-        if (receiverId === uid) {
-          throw new HttpsError(
-            "failed-precondition",
-            "Caller and receiver are the same user.",
-          );
-        }
-
-        const [callerBusySnap, receiverBusySnap] = await Promise.all([
-          db
-            .collection("calls")
-            .where("status", "in", ACTIVE_CALL_STATUSES)
-            .where("callerId", "==", uid)
-            .limit(1)
-            .get(),
-          db
-            .collection("calls")
-            .where("status", "in", ACTIVE_CALL_STATUSES)
-            .where("receiverId", "==", receiverId)
-            .limit(1)
-            .get(),
-        ]);
-
-        if (!callerBusySnap.empty || !receiverBusySnap.empty) {
-          throw new HttpsError("already-exists", "The caller or receiver is busy.");
-        }
-
-        const callRef = db.collection("calls").doc();
-        const now = FieldValue.serverTimestamp();
-        const rtcRoomId = `atlas_${callRef.id}`;
-        const callerName = displayName(user, "Customer");
-        const rtcConfig = getRtcSecretConfig();
-
-        await callRef.set({
-          callId: callRef.id,
-          conversationId,
-          shipmentId: conversation.shipmentId || conversation.trackingNumber || null,
-          customerId,
-          assignedStaffId,
-          assignedStaffRole: assignedStaffRole(conversation),
-          callerId: uid,
-          callerRole: role,
-          callerName,
-          receiverId,
-          type: callType,
-          status: "ringing",
-          rtcRoomId,
-          roomId: rtcRoomId,
-          rtcProvider: "tencent",
-          rtcConfigStatus: rtcConfig.isConfigured ? "configured" : "pending-setup",
-          createdAt: now,
-          startedAt: now,
-          updatedAt: now,
-        });
-
-        await notifyIncomingCall({
-          callId: callRef.id,
-          conversationId,
-          receiverId,
-          callerName,
-          callType,
-        });
-
-        return {
-          success: true,
-          callId: callRef.id,
-          conversationId,
-          receiverId,
-          rtcRoomId,
-          roomId: rtcRoomId,
-          status: "ringing",
-        };
+      const isManagerCaller = role === "manager";
+      if (!isCustomerCaller && !isManagerCaller) {
+        throw new HttpsError(
+          "permission-denied",
+          "Only the customer or a manager can start this call.",
+        );
       }
 
-      if (canStartSupportCall) {
-        const receiverId = customerId;
-        const [callerBusySnap, receiverBusySnap] = await Promise.all([
-          db
-            .collection("calls")
-            .where("status", "in", ACTIVE_CALL_STATUSES)
-            .where("callerId", "==", uid)
-            .limit(1)
-            .get(),
-          db
-            .collection("calls")
-            .where("status", "in", ACTIVE_CALL_STATUSES)
-            .where("receiverId", "==", receiverId)
-            .limit(1)
-            .get(),
-        ]);
+      await getConversationForUser(conversationId, uid, role);
 
-        if (!callerBusySnap.empty || !receiverBusySnap.empty) {
-          throw new HttpsError("already-exists", "The caller or receiver is busy.");
-        }
-
-        const callRef = db.collection("calls").doc();
-        const now = FieldValue.serverTimestamp();
-        const rtcRoomId = `atlas_${callRef.id}`;
-        const callerName = displayName(user, "Support");
-        const rtcConfig = getRtcSecretConfig();
-
-        await callRef.set({
-          callId: callRef.id,
-          conversationId,
-          shipmentId: conversation.shipmentId || conversation.trackingNumber || null,
-          customerId,
-          assignedStaffId,
-          assignedStaffRole: assignedStaffRole(conversation),
-          callerId: uid,
-          callerRole: role,
-          callerName,
-          receiverId,
-          type: callType,
-          status: "ringing",
-          rtcRoomId,
-          roomId: rtcRoomId,
-          rtcProvider: "tencent",
-          rtcConfigStatus: rtcConfig.isConfigured ? "configured" : "pending-setup",
-          createdAt: now,
-          startedAt: now,
-          updatedAt: now,
-        });
-
-        await notifyIncomingCall({
-          callId: callRef.id,
-          conversationId,
-          receiverId,
-          callerName,
-          callType,
-        });
-
-        return {
-          success: true,
-          callId: callRef.id,
-          conversationId,
-          receiverId,
-          rtcRoomId,
-          roomId: rtcRoomId,
-          status: "ringing",
-        };
+      const receiverId = isCustomerCaller ? assignedManagerId : customerId;
+      const receiverSnap = await db.collection("users").doc(receiverId).get();
+      if (!receiverSnap.exists || receiverSnap.data()?.active === false) {
+        throw new HttpsError("failed-precondition", "The other participant is not available for calls.");
       }
 
-      throw new HttpsError(
-        "permission-denied",
-        "Only the customer or the assigned employee can start this call.",
-      );
+      const receiverRole = String(receiverSnap.data()?.role || "").trim().toLowerCase();
+      const expectedReceiverRole = isCustomerCaller ? "manager" : "customer";
+      if (receiverRole !== expectedReceiverRole) {
+        throw new HttpsError(
+          "failed-precondition",
+          `The call recipient must be a ${expectedReceiverRole}.`,
+        );
+      }
+
+      return createRingingConversationCall({
+        conversationId,
+        callType,
+        callerId: uid,
+        callerRole: role,
+        callerName: displayName(user, isCustomerCaller ? "Customer" : "Manager"),
+        receiverId,
+        receiverRole,
+        participantIds: [uid, receiverId],
+        extraFields: {
+          shipmentId: conversation.shipmentId || conversation.trackingNumber || null,
+          customerId,
+          assignedStaffId: assignedManagerId,
+          assignedStaffRole: "manager",
+        },
+      });
     } catch (error) {
       if (error instanceof HttpsError) {
         throw error;
