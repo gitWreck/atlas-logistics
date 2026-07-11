@@ -75,6 +75,7 @@ export default function IncomingCallListener() {
   const activeCallRef = useRef(null);
   const timeoutRef = useRef(null);
   const noticeTimerRef = useRef(null);
+  const callDurationRef = useRef(0);
   const {
     localViewId,
     remoteViewId,
@@ -183,10 +184,7 @@ export default function IncomingCallListener() {
         }
       });
 
-      // update active call synchronously so we can evaluate terminal transitions reliably
-      syncActiveCall();
-
-      // If the newly-determined active call reached a terminal status during this snapshot, tear down now
+      // Inspect the previous active call before syncActiveCall removes terminal calls.
       const currentActiveCallId = activeCallRef.current?.id;
       if (currentActiveCallId) {
         const prev = prevStatusMap.get(currentActiveCallId);
@@ -209,8 +207,10 @@ export default function IncomingCallListener() {
           if (terminalNotice) showNotice(terminalNotice);
           try { cleanupWebRtc(); } catch (err) { console.warn("cleanupWebRtc error on terminal status:", err); }
           closeDialog();
+          return;
         }
       }
+      syncActiveCall();
     };
 
     const unsubscribeReceiver = onSnapshot(receiverQuery, applySnapshot, (error) => {
@@ -238,6 +238,32 @@ export default function IncomingCallListener() {
   useEffect(() => {
     activeCallRef.current = activeCall;
   }, [activeCall]);
+
+  useEffect(() => {
+    callDurationRef.current = callDurationSeconds;
+  }, [callDurationSeconds]);
+
+  useEffect(() => {
+    const endCurrentCall = (reason) => {
+      const call = activeCallRef.current;
+      const currentStatus = String(call?.status || "").toLowerCase();
+      if (!call?.id || !["ringing", "accepted", "connecting", "connected", "ongoing"].includes(currentStatus)) return;
+      updateConversationCallStatus({
+        callId: call.id,
+        status: currentStatus === "ringing" ? "cancelled" : "ended",
+        duration: callDurationRef.current,
+        endReason: reason,
+      }).catch(() => {});
+    };
+    const handlePageHide = () => endCurrentCall("browser_closed");
+    const handleOffline = () => endCurrentCall("network_lost");
+    window.addEventListener("pagehide", handlePageHide);
+    window.addEventListener("offline", handleOffline);
+    return () => {
+      window.removeEventListener("pagehide", handlePageHide);
+      window.removeEventListener("offline", handleOffline);
+    };
+  }, []);
 
   // Also listen directly to the active call document so terminal updates tear down immediately
   useEffect(() => {
@@ -509,13 +535,7 @@ export default function IncomingCallListener() {
 
     setProcessing(true);
     try {
-      await updateConversationCallStatus({ callId: activeCall.id, status: "ended" });
-      await updateDoc(doc(db, "calls", activeCall.id), {
-        endedReason: "completed",
-        endedAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-      });
-      await logCallEvent({ conversationId: activeCall.conversationId, callId: activeCall.id, text: `📞 ${formatCallType(activeCall?.type)} Call\nCall Ended` });
+      await updateConversationCallStatus({ callId: activeCall.id, status: "ended", duration: callDurationSeconds, endReason: "hangup" });
       closeDialog();
     } catch (error) {
       console.error("Failed to end call:", error);

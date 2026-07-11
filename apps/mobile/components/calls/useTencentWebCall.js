@@ -73,6 +73,11 @@ export default function useTencentWebCall({
           if (type === TRTCCloudListener.onError) {
             console.error("Native TRTC error", params);
             setMediaNotice(params.errMsg || "The call media connection failed.");
+            updateConversationCallStatus({
+              callId: activeCall.id,
+              status: "ended",
+              endReason: "media_connection_failed",
+            }).catch(() => {});
           }
           if (type === TRTCCloudListener.onEnterRoom) {
             if (Number(params.result) < 0) {
@@ -98,6 +103,12 @@ export default function useTencentWebCall({
           if (type === TRTCCloudListener.onRemoteUserLeaveRoom) {
             setRemoteVideoReady(false);
             setRemoteUserId(null);
+            setMediaNotice("Call ended");
+            updateConversationCallStatus({
+              callId: activeCall.id,
+              status: "ended",
+              endReason: "peer_left",
+            }).catch(() => {});
           }
         };
         listenerRef.current = listener;
