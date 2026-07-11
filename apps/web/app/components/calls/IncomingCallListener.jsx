@@ -5,18 +5,16 @@ import { createPortal } from "react-dom";
 import { collection, doc, getDoc, onSnapshot, query, runTransaction, serverTimestamp, updateDoc, where } from "firebase/firestore";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
-  faCircle,
   faPhone,
   faSpinner,
-  faTimes,
   faVideo,
   faVideoSlash,
   faMicrophone,
   faMicrophoneSlash,
   faVolumeUp,
   faVolumeMute,
-  faRepeat,
   faPhoneSlash,
+  faLock,
 } from "@fortawesome/free-solid-svg-icons";
 
 import { db } from "@/lib/firebase";
@@ -572,6 +570,9 @@ export default function IncomingCallListener() {
   const isCallerRinging = Boolean(activeCall && String(activeCall?.callerId || "").trim() === user?.uid && status === "ringing");
   const isActiveCall = Boolean(activeCall && ["accepted", "connecting", "connected", "ongoing"].includes(status));
   const showIncomingControls = isIncoming && status === "ringing";
+  const displayCallName = String(activeCall?.callerId || "") === String(user?.uid || "")
+    ? conversationTitle || "Atlas staff"
+    : activeCall?.callerName || conversationTitle || "Atlas support";
   const title = isIncoming ? "Incoming Call" : isCallerRinging ? "Calling Atlas Staff..." : status === "connected" ? "Ongoing Call" : isActiveCall ? "Connecting..." : "Call";
   const statusLabel = isIncoming ? "Waiting for answer" : isCallerRinging ? "Ringing..." : status === "connected" ? "Connected" : isActiveCall ? "Connecting media..." : "Connected";
 
@@ -620,22 +621,40 @@ export default function IncomingCallListener() {
       // Caller ringing - show avatar with cancel option
       if (isCallerRinging) {
         return (
-          <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-black">
-            <div className="flex w-full flex-col items-center justify-center gap-8 px-4 py-12">
-              <div className="flex h-24 w-24 items-center justify-center rounded-full bg-slate-700 text-4xl font-bold text-white shadow-lg">
-                {getInitials(activeCall?.callerName || "Atlas")}
+          <div className="fixed inset-0 z-[99999] overflow-hidden bg-black text-white">
+            <div className="absolute left-5 top-5 z-10 flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-violet-600 text-sm font-bold shadow-lg">
+                {getInitials(displayCallName)}
               </div>
-              <div className="text-center">
-                <h2 className="text-2xl font-bold text-white">{activeCall?.callerName || "Atlas support"}</h2>
-                <p className="mt-1 text-sm text-slate-400">{statusLabel}</p>
+              <div>
+                <p className="text-sm font-bold leading-tight">{displayCallName}</p>
+                <p className="mt-1 flex items-center gap-1.5 text-xs text-white/75">
+                  <FontAwesomeIcon icon={faLock} className="text-[9px]" />
+                  End-to-end encrypted
+                </p>
               </div>
-              <button
-                type="button"
-                onClick={() => handleCancelCall()}
-                disabled={processing}
-                className="flex h-16 w-16 items-center justify-center rounded-full bg-rose-600 text-white shadow-lg transition hover:bg-rose-500 disabled:opacity-60"
-              >
-                {processing ? <FontAwesomeIcon icon={faSpinner} spin /> : <FontAwesomeIcon icon={faPhoneSlash} size="lg" />}
+            </div>
+
+            <div className="absolute inset-0 flex flex-col items-center justify-center pb-20">
+              <div className="flex h-24 w-24 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-violet-600 text-3xl font-bold shadow-2xl">
+                {getInitials(displayCallName)}
+              </div>
+              <h2 className="mt-4 text-2xl font-bold">{displayCallName}</h2>
+              <p className="mt-1 text-sm text-white/70">Calling...</p>
+            </div>
+
+            <div className="absolute bottom-10 left-1/2 flex -translate-x-1/2 items-center gap-5">
+              <button type="button" onClick={toggleSpeaker} className="flex h-12 w-12 items-center justify-center rounded-full bg-white/20 text-white hover:bg-white/30" title="Speaker">
+                <FontAwesomeIcon icon={isSpeakerOn ? faVolumeUp : faVolumeMute} />
+              </button>
+              <button type="button" onClick={toggleCamera} className="flex h-12 w-12 items-center justify-center rounded-full bg-white/20 text-white hover:bg-white/30" title="Camera">
+                <FontAwesomeIcon icon={isCameraOn ? faVideo : faVideoSlash} />
+              </button>
+              <button type="button" onClick={toggleMute} className="flex h-12 w-12 items-center justify-center rounded-full bg-white/20 text-white hover:bg-white/30" title="Microphone">
+                <FontAwesomeIcon icon={isMuted ? faMicrophoneSlash : faMicrophone} />
+              </button>
+              <button type="button" onClick={() => handleCancelCall()} disabled={processing} className="flex h-12 w-12 items-center justify-center rounded-full bg-red-600 text-white hover:bg-red-500 disabled:opacity-60" title="Cancel call">
+                {processing ? <FontAwesomeIcon icon={faSpinner} spin /> : <FontAwesomeIcon icon={faPhone} className="rotate-[135deg]" />}
               </button>
             </div>
           </div>
@@ -647,34 +666,35 @@ export default function IncomingCallListener() {
         return (
           <div className="fixed inset-0 z-[99999] flex flex-col bg-black">
             {/* Header with participant name and status */}
-            <div className="flex items-center justify-between border-b border-slate-800 px-6 py-3">
+            <div className="flex h-16 shrink-0 items-center justify-between border-b border-white/10 bg-black px-6">
               <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-700 text-sm font-semibold text-white">
-                  {getInitials(activeCall?.callerName || "Atlas")}
+                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-violet-600 text-sm font-semibold text-white shadow-lg">
+                  {getInitials(displayCallName)}
                 </div>
                 <div>
-                  <h3 className="font-semibold text-white">{activeCall?.callerName || "Atlas support"}</h3>
-                  <p className="text-xs text-slate-400">{statusLabel}</p>
+                  <h3 className="font-semibold leading-tight text-white">{displayCallName}</h3>
+                  <p className="mt-0.5 text-xs text-emerald-400">{status === "connected" ? "Connected" : statusLabel}</p>
                 </div>
               </div>
-              <div className="text-sm font-semibold text-slate-300">
-                {formatDuration(callDurationSeconds)}
-              </div>
+              <p className="text-sm font-semibold text-white">{formatDuration(callDurationSeconds)}</p>
             </div>
 
             {/* Main video area */}
             <div className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden bg-black">
-              <div id={remoteViewId} className="absolute inset-0 h-full w-full" />
+              <div
+                id={remoteViewId}
+                className="relative h-full max-h-full w-auto max-w-full aspect-[9/16] overflow-hidden bg-black [&_*]:!h-full [&_*]:!w-full [&_video]:!object-cover"
+              />
               
               {/* Local video preview - bottom right corner */}
               <div
                 id={localViewId}
-                className={`absolute bottom-6 right-6 h-40 w-32 overflow-hidden rounded-lg border-2 border-white shadow-xl ${localVideoReady ? "opacity-100" : "opacity-0"}`}
+                className={`absolute bottom-5 right-5 aspect-[9/16] h-40 overflow-hidden rounded-xl border-2 border-white shadow-2xl [&_*]:!h-full [&_*]:!w-full [&_video]:!object-cover ${localVideoReady ? "opacity-100" : "opacity-0"}`}
               />
 
               {/* Placeholder when video not ready */}
               {!remoteVideoReady && (
-                <div className="flex flex-col items-center justify-center gap-3 text-slate-400">
+                <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 text-slate-400">
                   <FontAwesomeIcon icon={faVideo} size="3x" />
                   <span className="text-sm">Connecting video...</span>
                 </div>
@@ -689,11 +709,11 @@ export default function IncomingCallListener() {
             </div>
 
             {/* Bottom control bar - compact and centered */}
-            <div className="flex items-center justify-center gap-6 border-t border-slate-800 bg-black/80 px-6 py-4 backdrop-blur-sm">
+            <div className="flex h-20 shrink-0 items-center justify-center gap-6 border-t border-white/10 bg-black px-6">
               <button
                 type="button"
                 onClick={toggleMute}
-                className={`flex h-12 w-12 items-center justify-center rounded-full transition ${isMuted ? "bg-white text-black" : "bg-slate-700 text-white hover:bg-slate-600"}`}
+                className={`flex h-12 w-12 items-center justify-center rounded-full transition ${isMuted ? "bg-white text-black" : "bg-white/20 text-white hover:bg-white/30"}`}
                 title={isMuted ? "Unmute" : "Mute"}
               >
                 <FontAwesomeIcon icon={isMuted ? faMicrophoneSlash : faMicrophone} />
@@ -701,7 +721,7 @@ export default function IncomingCallListener() {
               <button
                 type="button"
                 onClick={toggleSpeaker}
-                className={`flex h-12 w-12 items-center justify-center rounded-full transition ${isSpeakerOn ? "bg-blue-600 text-white hover:bg-blue-500" : "bg-slate-700 text-white hover:bg-slate-600"}`}
+                className="flex h-12 w-12 items-center justify-center rounded-full bg-white/20 text-white transition hover:bg-white/30"
                 title={isSpeakerOn ? "Speaker on" : "Speaker off"}
               >
                 <FontAwesomeIcon icon={isSpeakerOn ? faVolumeUp : faVolumeMute} />
@@ -709,29 +729,19 @@ export default function IncomingCallListener() {
               <button
                 type="button"
                 onClick={toggleCamera}
-                className={`flex h-12 w-12 items-center justify-center rounded-full transition ${isCameraOn ? "bg-blue-600 text-white hover:bg-blue-500" : "bg-white text-black hover:bg-gray-200"}`}
+                className={`flex h-12 w-12 items-center justify-center rounded-full transition ${isCameraOn ? "bg-white/20 text-white hover:bg-white/30" : "bg-white text-black hover:bg-gray-200"}`}
                 title={isCameraOn ? "Camera on" : "Camera off"}
               >
                 <FontAwesomeIcon icon={isCameraOn ? faVideo : faVideoSlash} />
               </button>
-              {activeCall?.type === "video" ? (
-                <button
-                  type="button"
-                  onClick={switchCamera}
-                  className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-700 text-white transition hover:bg-slate-600"
-                  title="Switch camera"
-                >
-                  <FontAwesomeIcon icon={faRepeat} size="sm" />
-                </button>
-              ) : null}
               <button
                 type="button"
                 onClick={() => handleEndCall()}
                 disabled={processing}
-                className="flex h-12 w-12 items-center justify-center rounded-full bg-rose-600 text-white transition hover:bg-rose-500 disabled:opacity-60"
+                className="flex h-12 w-12 items-center justify-center rounded-full bg-red-600 text-white transition hover:bg-red-500 disabled:opacity-60"
                 title="End call"
               >
-                {processing ? <FontAwesomeIcon icon={faSpinner} spin /> : <FontAwesomeIcon icon={faPhoneSlash} />}
+                {processing ? <FontAwesomeIcon icon={faSpinner} spin /> : <FontAwesomeIcon icon={faPhone} className="rotate-[135deg]" />}
               </button>
             </div>
           </div>
