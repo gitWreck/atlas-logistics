@@ -74,6 +74,9 @@ export default function IncomingCallListener() {
   const timeoutRef = useRef(null);
   const noticeTimerRef = useRef(null);
   const callDurationRef = useRef(0);
+  const videoStageRef = useRef(null);
+  const previewDragRef = useRef(null);
+  const [localPreviewPosition, setLocalPreviewPosition] = useState(null);
   const {
     localViewId,
     remoteViewId,
@@ -236,6 +239,51 @@ export default function IncomingCallListener() {
   useEffect(() => {
     activeCallRef.current = activeCall;
   }, [activeCall]);
+
+  useEffect(() => {
+    setLocalPreviewPosition(null);
+    previewDragRef.current = null;
+  }, [activeCall?.id]);
+
+  const handlePreviewPointerDown = (event) => {
+    const stage = videoStageRef.current;
+    if (!stage) return;
+    const stageRect = stage.getBoundingClientRect();
+    const previewRect = event.currentTarget.getBoundingClientRect();
+    previewDragRef.current = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      left: previewRect.left - stageRect.left,
+      top: previewRect.top - stageRect.top,
+      width: previewRect.width,
+      height: previewRect.height,
+    };
+    event.currentTarget.setPointerCapture?.(event.pointerId);
+    event.preventDefault();
+  };
+
+  const handlePreviewPointerMove = (event) => {
+    const drag = previewDragRef.current;
+    const stage = videoStageRef.current;
+    if (!drag || drag.pointerId !== event.pointerId || !stage) return;
+    const stageRect = stage.getBoundingClientRect();
+    const nextLeft = Math.min(
+      Math.max(0, drag.left + event.clientX - drag.startX),
+      Math.max(0, stageRect.width - drag.width),
+    );
+    const nextTop = Math.min(
+      Math.max(0, drag.top + event.clientY - drag.startY),
+      Math.max(0, stageRect.height - drag.height),
+    );
+    setLocalPreviewPosition({ left: nextLeft, top: nextTop });
+  };
+
+  const handlePreviewPointerUp = (event) => {
+    if (previewDragRef.current?.pointerId !== event.pointerId) return;
+    previewDragRef.current = null;
+    event.currentTarget.releasePointerCapture?.(event.pointerId);
+  };
 
   useEffect(() => {
     callDurationRef.current = callDurationSeconds;
@@ -680,16 +728,29 @@ export default function IncomingCallListener() {
             </div>
 
             {/* Main video area */}
-            <div className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden bg-black">
+            <div ref={videoStageRef} className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden bg-black">
               <div
                 id={remoteViewId}
-                className="relative h-full max-h-full w-auto max-w-full aspect-[9/16] overflow-hidden bg-black [&_*]:!h-full [&_*]:!w-full [&_video]:!object-cover"
+                data-call-orientation="portrait"
+                className="relative h-full max-h-full max-w-full shrink-0 overflow-hidden bg-black [&_*]:!h-full [&_*]:!w-full [&_*]:!max-w-full [&_video]:!object-cover"
+                style={{ aspectRatio: "9 / 16" }}
               />
               
               {/* Local video preview - bottom right corner */}
               <div
                 id={localViewId}
-                className={`absolute bottom-5 right-5 aspect-[9/16] h-40 overflow-hidden rounded-xl border-2 border-white shadow-2xl [&_*]:!h-full [&_*]:!w-full [&_video]:!object-cover ${localVideoReady ? "opacity-100" : "opacity-0"}`}
+                data-call-orientation="portrait"
+                onPointerDown={handlePreviewPointerDown}
+                onPointerMove={handlePreviewPointerMove}
+                onPointerUp={handlePreviewPointerUp}
+                onPointerCancel={handlePreviewPointerUp}
+                className={`absolute h-40 touch-none select-none overflow-hidden rounded-xl border-2 border-white shadow-2xl transition-opacity [&_*]:!pointer-events-none [&_*]:!h-full [&_*]:!w-full [&_video]:!object-cover ${localPreviewPosition ? "cursor-grabbing" : "cursor-grab"} ${localVideoReady ? "opacity-100" : "pointer-events-none opacity-0"}`}
+                style={{
+                  aspectRatio: "9 / 16",
+                  ...(localPreviewPosition
+                    ? { left: localPreviewPosition.left, top: localPreviewPosition.top }
+                    : { right: 20, bottom: 20 }),
+                }}
               />
 
               {/* Placeholder when video not ready */}
