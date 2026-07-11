@@ -16,6 +16,7 @@ import { arrayUnion, collection, doc, getDoc, onSnapshot, query, runTransaction,
 
 import { db } from "../../firebase";
 import { useAuth } from "../../contexts/AuthContext";
+import { useTheme } from "../../contexts/ThemeContext";
 import {
   acceptConversationCall,
   createCallHistoryMessage,
@@ -71,7 +72,13 @@ function WebMediaElement({ stream, muted = false, hidden = false, style }) {
 
 export default function IncomingCallListener() {
   const { user, loading, isReady } = useAuth();
+  const { resolvedScheme } = useTheme();
+  const isDarkCallTheme = resolvedScheme === "dark";
+  const callPalette = isDarkCallTheme
+    ? { background: "#07111F", surface: "#172337", text: "#FFFFFF", muted: "#94A3B8" }
+    : { background: "#EEF4FC", surface: "#FFFFFF", text: "#0F172A", muted: "#64748B" };
   const [activeCall, setActiveCall] = useState(null);
+  const [isCallMinimized, setIsCallMinimized] = useState(false);
   const [conversationTitle, setConversationTitle] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
   const [notice, setNotice] = useState("");
@@ -93,10 +100,33 @@ export default function IncomingCallListener() {
   const nativePreviewPositionRef = useRef({ x: 0, y: 0 });
   const nativePreviewDragStartRef = useRef({ x: 0, y: 0 });
   const nativePreviewPan = useRef(new Animated.ValueXY({ x: 0, y: 0 })).current;
+  const ringingPulse = useRef(new Animated.Value(0)).current;
   const nativePreviewSize = { width: 112, height: 184 };
   const peerConnectionRef = useRef(null);
   const rtcCallIdRef = useRef(null);
   const processedCandidatesRef = useRef(new Set());
+
+  useEffect(() => {
+    const isRinging = String(activeCall?.status || "").trim().toLowerCase() === "ringing";
+    if (!isRinging) {
+      ringingPulse.stopAnimation();
+      ringingPulse.setValue(0);
+      return undefined;
+    }
+
+    const animation = Animated.loop(
+      Animated.sequence([
+        Animated.timing(ringingPulse, { toValue: 1, duration: 1100, useNativeDriver: true }),
+        Animated.timing(ringingPulse, { toValue: 0, duration: 1100, useNativeDriver: true }),
+      ]),
+    );
+    animation.start();
+    return () => animation.stop();
+  }, [activeCall?.status, ringingPulse]);
+
+  useEffect(() => {
+    setIsCallMinimized(false);
+  }, [activeCall?.id]);
   const {
     localViewId,
     remoteViewId,
@@ -601,6 +631,7 @@ export default function IncomingCallListener() {
       console.warn("cleanupWebRtc failed:", e);
     }
     setActiveCall(null);
+    setIsCallMinimized(false);
     setConversationTitle("");
     setCallDurationSeconds(0);
     setIsMuted(false);
@@ -820,8 +851,16 @@ export default function IncomingCallListener() {
   const peerName = String(activeCall?.callerId || "") === String(user?.uid || "")
     ? activeCall?.receiverName || activeCall?.receiverDisplayName || "Atlas staff"
     : activeCall?.callerName || "Atlas support";
-  const title = isIncoming ? "Incoming Call" : isCallerRinging ? "Calling Atlas Staff..." : status === "connected" ? "Ongoing Call" : isActiveCall ? "Connecting..." : "Call";
-  const statusLabel = isIncoming ? "Waiting for answer" : isCallerRinging ? "Ringing..." : status === "connected" ? "Connected" : isActiveCall ? "Connecting media..." : "Connected";
+  const callTypeLabel = activeCall?.type === "video" ? "Video Call" : "Voice Call";
+  const statusLabel = isIncoming
+    ? `Incoming ${callTypeLabel}`
+    : isCallerRinging
+      ? "Ringing"
+      : status === "connected"
+        ? "In Call"
+        : isActiveCall
+          ? "Connecting"
+          : "Call";
 
   if (!activeCall && !notice) {
     return null;
@@ -834,9 +873,66 @@ export default function IncomingCallListener() {
           <Text style={styles.noticeText}>{notice}</Text>
         </View>
       ) : null}
+      {activeCall && isActiveCall && isCallMinimized ? (
+        <View pointerEvents="box-none" style={styles.miniCallLayer}>
+          <TouchableOpacity
+            activeOpacity={0.92}
+            onPress={() => setIsCallMinimized(false)}
+            style={[styles.miniCallWidget, { backgroundColor: callPalette.surface }]}
+            accessibilityRole="button"
+            accessibilityLabel={`Return to ${callTypeLabel.toLowerCase()} with ${peerName}`}
+          >
+            <View style={styles.miniAvatar}>
+              <Text style={styles.miniAvatarText}>{getInitials(peerName)}</Text>
+            </View>
+            <View style={styles.miniCallCopy}>
+              <Text style={[styles.miniCallName, { color: callPalette.text }]} numberOfLines={1}>{peerName}</Text>
+              <View style={styles.miniStatusRow}>
+                <View style={styles.connectionDot} />
+                <Text style={[styles.miniCallStatus, { color: callPalette.muted }]}>In Call · {formatDuration(callDurationSeconds)}</Text>
+              </View>
+            </View>
+            <TouchableOpacity
+              onPress={(event) => { event.stopPropagation?.(); toggleMute(); }}
+              style={[styles.miniActionButton, isMuted && styles.miniActionButtonMuted]}
+              accessibilityLabel={isMuted ? "Unmute call" : "Mute call"}
+            >
+              <FontAwesome5 name={isMuted ? "microphone-slash" : "microphone"} size={16} color="#fff" />
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={(event) => { event.stopPropagation?.(); void handleEndCall(); }}
+              disabled={isProcessing}
+              style={[styles.miniActionButton, styles.miniEndButton]}
+              accessibilityLabel="End call"
+            >
+              {isProcessing ? <ActivityIndicator size="small" color="#fff" /> : <FontAwesome5 name="phone-slash" size={16} color="#fff" />}
+            </TouchableOpacity>
+          </TouchableOpacity>
+        </View>
+      ) : null}
       {activeCall ? (
-        <Modal visible transparent animationType="fade" onRequestClose={() => handleDecline("declined")}>
-          <View style={styles.messengerBackdrop}>
+        <Modal
+          visible={!isCallMinimized}
+          transparent
+          animationType="fade"
+          onRequestClose={() => {
+            if (isActiveCall) setIsCallMinimized(true);
+            else void handleDecline("declined");
+          }}
+        >
+          <View style={[styles.messengerBackdrop, { backgroundColor: callPalette.background }]}>
+            <View pointerEvents="none" style={styles.backgroundGlowTop} />
+            <View pointerEvents="none" style={styles.backgroundGlowBottom} />
+            {isActiveCall ? (
+              <TouchableOpacity
+                onPress={() => setIsCallMinimized(true)}
+                style={styles.minimizeCallButton}
+                accessibilityRole="button"
+                accessibilityLabel="Minimize call"
+              >
+                <FontAwesome5 name="chevron-down" size={19} color="#fff" />
+              </TouchableOpacity>
+            ) : null}
             {/* Video display for active video calls */}
             {activeCall?.type === "video" && isActiveCall ? (
               <>
@@ -909,18 +1005,15 @@ export default function IncomingCallListener() {
 
             {activeCall?.type === "video" && isActiveCall ? (
               <View style={styles.videoTopOverlay} pointerEvents="none">
-                <View style={styles.videoTopIdentity}>
-                  <FontAwesome5 name="expand-alt" size={21} color="#fff" />
-                  <View style={styles.videoTopCopy}>
-                    <Text style={styles.videoContactName} numberOfLines={1}>{peerName}</Text>
-                    <Text style={styles.videoCallStatus}>
-                      {status === "connected" ? formatDuration(callDurationSeconds) : statusLabel}
-                    </Text>
+                <View style={styles.videoTopCopy}>
+                  <Text style={styles.videoTimer}>
+                    {status === "connected" ? formatDuration(callDurationSeconds) : "Connecting..."}
+                  </Text>
+                  <Text style={styles.videoContactName} numberOfLines={1}>{peerName}</Text>
+                  <View style={styles.connectionRow}>
+                    <View style={styles.connectionDot} />
+                    <Text style={styles.videoCallStatus}>{statusLabel}</Text>
                   </View>
-                </View>
-                <View style={styles.videoTopActions}>
-                  <FontAwesome5 name="user-plus" size={22} color="#fff" />
-                  <FontAwesome5 name="ellipsis-v" size={23} color="#fff" />
                 </View>
               </View>
             ) : null}
@@ -928,16 +1021,23 @@ export default function IncomingCallListener() {
             {/* Messenger-style centered content when no video or not active */}
             {!isActiveCall || activeCall?.type !== "video" ? (
               <View style={styles.messengerContent}>
-                {/* Large profile circle - Messenger style */}
-                <View style={styles.largeAvatar}>
-                  <Text style={styles.largeAvatarText}>{getInitials(activeCall?.callerName || "Atlas")}</Text>
+                <Text style={[styles.callEyebrow, { color: callPalette.muted }]}>
+                  {isIncoming ? peerName : isCallerRinging ? "Calling..." : status === "connected" ? formatDuration(callDurationSeconds) : "Connecting..."}
+                </Text>
+                <Text style={[styles.messengerName, { color: callPalette.text }]}>{peerName}</Text>
+                <Text style={[styles.callTypeText, { color: callPalette.text }]}>{callTypeLabel}</Text>
+                <View style={styles.connectionRow}>
+                  {isActiveCall ? <View style={styles.connectionDot} /> : null}
+                  <Text style={[styles.messengerStatus, { color: callPalette.muted }]}>{statusLabel}</Text>
                 </View>
 
-                {/* Contact name - prominent */}
-                <Text style={styles.messengerName}>{activeCall?.callerName || "Atlas support"}</Text>
-
-                {/* Status text - minimal */}
-                <Text style={styles.messengerStatus}>{statusLabel}</Text>
+                <Animated.View style={[styles.avatarPulseOuter, (isIncoming || isCallerRinging) && styles.avatarPulseActive, (isIncoming || isCallerRinging) && { transform: [{ scale: ringingPulse.interpolate({ inputRange: [0, 1], outputRange: [1, 1.045] }) }] }]}>
+                  <View style={styles.avatarPulseMiddle}>
+                    <View style={styles.largeAvatar}>
+                      <Text style={styles.largeAvatarText}>{getInitials(peerName)}</Text>
+                    </View>
+                  </View>
+                </Animated.View>
 
                 {/* Media notice if present */}
                 {mediaNotice ? (
@@ -948,41 +1048,40 @@ export default function IncomingCallListener() {
                 <View style={styles.messengerActions}>
                   {showIncomingControls ? (
                     <>
-                      <TouchableOpacity
-                        style={styles.messengerDeclineBtn}
-                        onPress={() => handleDecline("declined")}
-                        disabled={isProcessing}
-                      >
-                        {isProcessing ? (
-                          <ActivityIndicator color="#fff" />
-                        ) : (
-                          <FontAwesome5 name="phone-slash" size={28} color="#fff" />
-                        )}
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        style={styles.messengerAcceptBtn}
-                        onPress={handleAccept}
-                        disabled={isProcessing}
-                      >
-                        {isProcessing ? (
-                          <ActivityIndicator color="#fff" />
-                        ) : (
-                          <FontAwesome5 name="phone-alt" size={28} color="#fff" />
-                        )}
-                      </TouchableOpacity>
+                      <View style={styles.labeledAction}>
+                        <TouchableOpacity style={styles.messengerDeclineBtn} onPress={() => handleDecline("declined")} disabled={isProcessing}>
+                          {isProcessing ? <ActivityIndicator color="#fff" /> : <FontAwesome5 name="phone-slash" size={25} color="#fff" />}
+                        </TouchableOpacity>
+                        <Text style={[styles.actionLabel, { color: callPalette.text }]}>Decline</Text>
+                      </View>
+                      <View style={styles.labeledAction}>
+                        <TouchableOpacity style={styles.messengerAcceptBtn} onPress={handleAccept} disabled={isProcessing}>
+                          {isProcessing ? <ActivityIndicator color="#fff" /> : <FontAwesome5 name="phone-alt" size={25} color="#fff" />}
+                        </TouchableOpacity>
+                        <Text style={[styles.actionLabel, { color: callPalette.text }]}>Accept</Text>
+                      </View>
                     </>
                   ) : isCallerRinging ? (
-                    <TouchableOpacity
-                      style={styles.messengerDeclineBtn}
-                      onPress={() => handleDecline("cancelled")}
-                      disabled={isProcessing}
-                    >
-                      {isProcessing ? (
-                        <ActivityIndicator color="#fff" />
-                      ) : (
-                        <FontAwesome5 name="phone-slash" size={28} color="#fff" />
-                      )}
-                    </TouchableOpacity>
+                    <View style={styles.ringingControls}>
+                      <View style={styles.compactControlRow}>
+                        <View style={styles.labeledAction}>
+                          <TouchableOpacity style={[styles.secondaryCallButton, { backgroundColor: callPalette.surface }]} onPress={toggleMute}>
+                            <FontAwesome5 name={isMuted ? "microphone-slash" : "microphone"} size={20} color={callPalette.text} />
+                          </TouchableOpacity>
+                          <Text style={[styles.actionLabel, { color: callPalette.text }]}>Mute</Text>
+                        </View>
+                        <View style={styles.labeledAction}>
+                          <TouchableOpacity style={[styles.secondaryCallButton, { backgroundColor: callPalette.surface }]} onPress={toggleSpeaker}>
+                            <FontAwesome5 name={isSpeakerOn ? "volume-up" : "volume-mute"} size={20} color={callPalette.text} />
+                          </TouchableOpacity>
+                          <Text style={[styles.actionLabel, { color: callPalette.text }]}>Speaker</Text>
+                        </View>
+                      </View>
+                      <TouchableOpacity style={styles.cancelCallPill} onPress={() => handleDecline("cancelled")} disabled={isProcessing}>
+                        {isProcessing ? <ActivityIndicator color="#fff" /> : <FontAwesome5 name="phone-slash" size={18} color="#fff" />}
+                        <Text style={styles.cancelCallText}>Cancel Call</Text>
+                      </TouchableOpacity>
+                    </View>
                   ) : null}
                 </View>
               </View>
@@ -992,45 +1091,18 @@ export default function IncomingCallListener() {
             {isActiveCall ? (
               <View style={styles.messengerControlsBar}>
                 {activeCall?.type === "video" ? (
-                  <TouchableOpacity
-                    style={[styles.messengerControlBtn, styles.messengerCameraBtn]}
-                    onPress={toggleCamera}
-                  >
-                    <FontAwesome5 name={isCameraOn ? "video" : "video-slash"} size={23} color="#050505" />
-                  </TouchableOpacity>
+                  <View style={styles.labeledAction}><TouchableOpacity style={styles.messengerControlBtn} onPress={toggleCamera}><FontAwesome5 name={isCameraOn ? "video" : "video-slash"} size={20} color="#fff" /></TouchableOpacity><Text style={styles.actionLabel}>Camera</Text></View>
                 ) : null}
 
-                <TouchableOpacity
-                  style={[styles.messengerControlBtn, isMuted && styles.messengerControlBtnInactive]}
-                  onPress={toggleMute}
-                >
-                  <FontAwesome5 name={isMuted ? "microphone-slash" : "microphone"} size={24} color="#fff" />
-                </TouchableOpacity>
+                <View style={styles.labeledAction}><TouchableOpacity style={[styles.messengerControlBtn, isMuted && styles.messengerControlBtnInactive]} onPress={toggleMute}><FontAwesome5 name={isMuted ? "microphone-slash" : "microphone"} size={20} color="#fff" /></TouchableOpacity><Text style={styles.actionLabel}>Mute</Text></View>
 
-                <TouchableOpacity
-                  style={[styles.messengerControlBtn, isSpeakerOn && styles.messengerControlBtnSelected]}
-                  onPress={toggleSpeaker}
-                >
-                  <FontAwesome5 name={isSpeakerOn ? "volume-up" : "volume-mute"} size={22} color="#fff" />
-                </TouchableOpacity>
+                <View style={styles.labeledAction}><TouchableOpacity style={styles.messengerControlBtn} onPress={toggleSpeaker}><FontAwesome5 name={isSpeakerOn ? "volume-up" : "volume-mute"} size={20} color="#fff" /></TouchableOpacity><Text style={styles.actionLabel}>Speaker</Text></View>
 
                 {activeCall?.type === "video" ? (
-                  <TouchableOpacity style={styles.messengerControlBtn} onPress={switchCamera}>
-                    <FontAwesome5 name="sync-alt" size={23} color="#fff" />
-                  </TouchableOpacity>
+                  <View style={styles.labeledAction}><TouchableOpacity style={styles.messengerControlBtn} onPress={switchCamera}><FontAwesome5 name="sync-alt" size={20} color="#fff" /></TouchableOpacity><Text style={styles.actionLabel}>Switch</Text></View>
                 ) : null}
 
-                <TouchableOpacity
-                  style={[styles.messengerControlBtn, styles.messengerEndCallBtn]}
-                  onPress={handleEndCall}
-                  disabled={isProcessing}
-                >
-                  {isProcessing ? (
-                    <ActivityIndicator color="#fff" />
-                  ) : (
-                    <FontAwesome5 name="phone-slash" size={24} color="#fff" />
-                  )}
-                </TouchableOpacity>
+                <View style={styles.labeledAction}><TouchableOpacity style={[styles.messengerControlBtn, styles.messengerEndCallBtn]} onPress={handleEndCall} disabled={isProcessing}>{isProcessing ? <ActivityIndicator color="#fff" /> : <FontAwesome5 name="phone-slash" size={20} color="#fff" />}</TouchableOpacity><Text style={styles.actionLabel}>End Call</Text></View>
               </View>
             ) : null}
           </View>
@@ -1255,7 +1327,95 @@ const styles = StyleSheet.create({
   /* Messenger-like styles */
   messengerBackdrop: {
     flex: 1,
-    backgroundColor: "#000",
+    backgroundColor: "#07111F",
+    overflow: "hidden",
+  },
+  minimizeCallButton: {
+    position: "absolute",
+    top: Platform.OS === "ios" ? 52 : 24,
+    left: 18,
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(15,23,42,0.72)",
+    zIndex: 100,
+    elevation: 100,
+    shadowColor: "#000",
+    shadowOpacity: 0.24,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
+  },
+  miniCallLayer: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 10000,
+    elevation: 10000,
+    alignItems: "center",
+    justifyContent: "flex-start",
+    paddingTop: Platform.OS === "ios" ? 56 : 18,
+    paddingHorizontal: 12,
+  },
+  miniCallWidget: {
+    width: "100%",
+    maxWidth: 460,
+    minHeight: 68,
+    borderRadius: 20,
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    gap: 10,
+    borderWidth: 1,
+    borderColor: "rgba(148,163,184,0.24)",
+    shadowColor: "#020617",
+    shadowOpacity: 0.28,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 18,
+  },
+  miniAvatar: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#2563EB",
+    borderWidth: 2,
+    borderColor: "rgba(255,255,255,0.86)",
+  },
+  miniAvatarText: { color: "#FFFFFF", fontSize: 15, fontWeight: "900" },
+  miniCallCopy: { flex: 1, minWidth: 0 },
+  miniCallName: { fontSize: 14, fontWeight: "800" },
+  miniStatusRow: { marginTop: 4, flexDirection: "row", alignItems: "center", gap: 6 },
+  miniCallStatus: { fontSize: 11, fontWeight: "600" },
+  miniActionButton: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#334155",
+  },
+  miniActionButtonMuted: { backgroundColor: "#F59E0B" },
+  miniEndButton: { backgroundColor: "#EF4444" },
+  backgroundGlowTop: {
+    position: "absolute",
+    width: 440,
+    height: 440,
+    borderRadius: 220,
+    top: -210,
+    right: -170,
+    backgroundColor: "rgba(37,99,235,0.14)",
+  },
+  backgroundGlowBottom: {
+    position: "absolute",
+    width: 520,
+    height: 520,
+    borderRadius: 260,
+    bottom: -330,
+    left: -230,
+    backgroundColor: "rgba(29,78,216,0.12)",
   },
   webVideoContainer: {
     flex: 1,
@@ -1342,21 +1502,29 @@ const styles = StyleSheet.create({
   videoTopOverlay: {
     position: "absolute",
     top: Platform.OS === "ios" ? 54 : 30,
-    left: 26,
-    right: 26,
-    flexDirection: "row",
+    left: 72,
+    right: 72,
     alignItems: "center",
-    justifyContent: "space-between",
     zIndex: 40,
     elevation: 40,
   },
-  videoTopIdentity: { flex: 1, minWidth: 0, flexDirection: "row", alignItems: "center", gap: 20 },
-  videoTopCopy: { flex: 1, minWidth: 0 },
-  videoTopActions: { flexDirection: "row", alignItems: "center", gap: 28, marginLeft: 20 },
+  videoTopCopy: { alignItems: "center", minWidth: 0 },
+  videoTimer: {
+    color: "#FFFFFF",
+    fontSize: 12,
+    fontWeight: "800",
+    backgroundColor: "rgba(15,23,42,0.68)",
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+    overflow: "hidden",
+    marginBottom: 6,
+  },
   videoContactName: {
     color: "#fff",
     fontSize: 19,
     fontWeight: "800",
+    textAlign: "center",
     textShadowColor: "rgba(0,0,0,0.7)",
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 5,
@@ -1369,6 +1537,8 @@ const styles = StyleSheet.create({
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 4,
   },
+  connectionRow: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6 },
+  connectionDot: { width: 9, height: 9, borderRadius: 5, backgroundColor: "#22C55E" },
   videoPlaceholder: {
     flex: 1,
     alignItems: "center",
@@ -1384,18 +1554,59 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
-    paddingBottom: Platform.OS === "ios" ? 40 : 24,
+    paddingHorizontal: 24,
+    paddingTop: Platform.OS === "ios" ? 52 : 28,
+    paddingBottom: Platform.OS === "ios" ? 44 : 30,
   },
-  largeAvatar: {
-    width: 140,
-    height: 140,
-    borderRadius: 70,
-    backgroundColor: "#1e293b",
+  callEyebrow: {
+    fontSize: 13,
+    fontWeight: "600",
+    letterSpacing: 0.2,
+    marginBottom: 7,
+  },
+  callTypeText: {
+    fontSize: 14,
+    fontWeight: "600",
+    marginBottom: 7,
+  },
+  avatarPulseOuter: {
+    width: 190,
+    height: 190,
+    borderRadius: 95,
     alignItems: "center",
     justifyContent: "center",
+    marginTop: 28,
     marginBottom: 24,
+    borderWidth: 1,
+    borderColor: "rgba(37,99,235,0.14)",
+  },
+  avatarPulseActive: {
+    borderColor: "rgba(37,99,235,0.42)",
+    backgroundColor: "rgba(37,99,235,0.05)",
+  },
+  avatarPulseMiddle: {
+    width: 164,
+    height: 164,
+    borderRadius: 82,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "rgba(37,99,235,0.55)",
+  },
+  largeAvatar: {
+    width: 142,
+    height: 142,
+    borderRadius: 71,
+    backgroundColor: "#172337",
+    alignItems: "center",
+    justifyContent: "center",
     borderWidth: 3,
-    borderColor: "#334155",
+    borderColor: "#2563EB",
+    shadowColor: "#2563EB",
+    shadowOpacity: 0.34,
+    shadowRadius: 22,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 12,
   },
   largeAvatarText: {
     color: "#ffffff",
@@ -1403,17 +1614,17 @@ const styles = StyleSheet.create({
     fontSize: 48,
   },
   messengerName: {
-    fontSize: 28,
-    fontWeight: "700",
+    fontSize: 24,
+    fontWeight: "800",
     color: "#ffffff",
     textAlign: "center",
-    marginBottom: 8,
+    marginBottom: 7,
   },
   messengerStatus: {
     fontSize: 14,
     color: "#94a3b8",
     textAlign: "center",
-    marginBottom: 16,
+    fontWeight: "600",
   },
   mediaNoticeText: {
     color: "#fecaca",
@@ -1429,45 +1640,83 @@ const styles = StyleSheet.create({
   },
   messengerActions: {
     flexDirection: "row",
-    gap: 24,
-    marginTop: 32,
+    justifyContent: "center",
+    gap: 84,
+    marginTop: 26,
+    width: "100%",
   },
+  labeledAction: { alignItems: "center", minWidth: 52, gap: 8 },
+  actionLabel: { color: "#FFFFFF", fontSize: 11, fontWeight: "600" },
+  ringingControls: { width: "100%", alignItems: "center", gap: 22 },
+  compactControlRow: { flexDirection: "row", justifyContent: "center", gap: 64 },
+  secondaryCallButton: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: "#172337",
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: "#000",
+    shadowOpacity: 0.2,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 5 },
+    elevation: 5,
+  },
+  cancelCallPill: {
+    width: "100%",
+    maxWidth: 310,
+    minHeight: 54,
+    borderRadius: 28,
+    backgroundColor: "#EF3340",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 10,
+    shadowColor: "#EF4444",
+    shadowOpacity: 0.3,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 7 },
+    elevation: 8,
+  },
+  cancelCallText: { color: "#FFFFFF", fontSize: 14, fontWeight: "800" },
   messengerDeclineBtn: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
+    width: 58,
+    height: 58,
+    borderRadius: 29,
     backgroundColor: "#ef4444",
     alignItems: "center",
     justifyContent: "center",
   },
   messengerAcceptBtn: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    backgroundColor: "#10b981",
+    width: 58,
+    height: 58,
+    borderRadius: 29,
+    backgroundColor: "#22C55E",
     alignItems: "center",
     justifyContent: "center",
   },
   messengerControlsBar: {
     position: "absolute",
-    bottom: Platform.OS === "ios" ? 32 : 22,
-    left: 22,
-    right: 22,
-    backgroundColor: "transparent",
-    borderWidth: 0,
+    bottom: Platform.OS === "ios" ? 24 : 16,
+    left: 12,
+    right: 12,
+    backgroundColor: "rgba(7,17,31,0.78)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.1)",
+    borderRadius: 28,
     flexDirection: "row",
     justifyContent: "space-around",
     alignItems: "center",
-    paddingHorizontal: 0,
-    paddingVertical: 0,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
     zIndex: 40,
     elevation: 40,
   },
   messengerControlBtn: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: "rgba(0, 0, 0, 0.76)",
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: "rgba(51,65,85,0.86)",
     alignItems: "center",
     justifyContent: "center",
   },

@@ -15,6 +15,11 @@ import {
   faVolumeMute,
   faPhoneSlash,
   faLock,
+  faRepeat,
+  faMinus,
+  faExpand,
+  faCompress,
+  faXmark,
 } from "@fortawesome/free-solid-svg-icons";
 
 import { db } from "@/lib/firebase";
@@ -76,7 +81,10 @@ export default function IncomingCallListener() {
   const callDurationRef = useRef(0);
   const videoStageRef = useRef(null);
   const previewDragRef = useRef(null);
+  const callWindowDragRef = useRef(null);
   const [localPreviewPosition, setLocalPreviewPosition] = useState(null);
+  const [callWindowPosition, setCallWindowPosition] = useState({ left: null, top: 72 });
+  const [callWindowMode, setCallWindowMode] = useState("normal");
   const {
     localViewId,
     remoteViewId,
@@ -243,6 +251,7 @@ export default function IncomingCallListener() {
   useEffect(() => {
     setLocalPreviewPosition(null);
     previewDragRef.current = null;
+    setCallWindowMode("normal");
   }, [activeCall?.id]);
 
   const handlePreviewPointerDown = (event) => {
@@ -282,6 +291,37 @@ export default function IncomingCallListener() {
   const handlePreviewPointerUp = (event) => {
     if (previewDragRef.current?.pointerId !== event.pointerId) return;
     previewDragRef.current = null;
+    event.currentTarget.releasePointerCapture?.(event.pointerId);
+  };
+
+  const handleCallWindowPointerDown = (event) => {
+    if (callWindowMode !== "normal") return;
+    const windowElement = event.currentTarget.parentElement;
+    if (!windowElement) return;
+    const rect = windowElement.getBoundingClientRect();
+    callWindowDragRef.current = {
+      pointerId: event.pointerId,
+      offsetX: event.clientX - rect.left,
+      offsetY: event.clientY - rect.top,
+      width: rect.width,
+      height: rect.height,
+    };
+    event.currentTarget.setPointerCapture?.(event.pointerId);
+    event.preventDefault();
+  };
+
+  const handleCallWindowPointerMove = (event) => {
+    const drag = callWindowDragRef.current;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+    setCallWindowPosition({
+      left: Math.min(Math.max(8, event.clientX - drag.offsetX), Math.max(8, window.innerWidth - drag.width - 8)),
+      top: Math.min(Math.max(8, event.clientY - drag.offsetY), Math.max(8, window.innerHeight - drag.height - 8)),
+    });
+  };
+
+  const handleCallWindowPointerUp = (event) => {
+    if (callWindowDragRef.current?.pointerId !== event.pointerId) return;
+    callWindowDragRef.current = null;
     event.currentTarget.releasePointerCapture?.(event.pointerId);
   };
 
@@ -626,6 +666,13 @@ export default function IncomingCallListener() {
 
   if (!mounted || (!activeCall && !notice)) return null;
 
+  const handleFloatingWindowClose = () => {
+    if (showIncomingControls) void handleDecline("declined");
+    else if (isCallerRinging) void handleCancelCall();
+    else if (isActiveCall) void handleEndCall();
+    else closeDialog();
+  };
+
   const renderCallSurface = () => {
     if (!activeCall) return null;
 
@@ -634,14 +681,14 @@ export default function IncomingCallListener() {
       if (showIncomingControls) {
         // Incoming call - show avatar and accept/decline buttons
         return (
-          <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-black">
-            <div className="flex w-full flex-col items-center justify-center gap-8 px-4 py-12">
-              <div className="flex h-24 w-24 items-center justify-center rounded-full bg-slate-700 text-4xl font-bold text-white shadow-lg">
+          <div className="flex h-full w-full items-center justify-center overflow-hidden bg-gradient-to-br from-slate-100 via-blue-50 to-slate-200 text-slate-950 dark:from-[#07111f] dark:via-[#0b1b31] dark:to-[#07111f] dark:text-white">
+            <div className="flex min-h-full w-full max-w-xl flex-col items-center justify-center gap-8 px-6 py-12">
+              <div className="flex h-36 w-36 items-center justify-center rounded-full border-[3px] border-blue-600 bg-gradient-to-br from-blue-500 to-indigo-700 text-5xl font-bold text-white shadow-[0_0_0_14px_rgba(37,99,235,0.10),0_22px_60px_rgba(37,99,235,0.30)]">
                 {getInitials(activeCall?.callerName || "Atlas")}
               </div>
               <div className="text-center">
-                <h2 className="text-2xl font-bold text-white">{activeCall?.callerName || "Atlas support"}</h2>
-                <p className="mt-1 text-sm text-slate-400">{statusLabel}</p>
+                <h2 className="text-2xl font-extrabold">{activeCall?.callerName || "Atlas support"}</h2>
+                <p className="mt-2 text-sm font-medium text-slate-500 dark:text-slate-300">Incoming Video Call</p>
               </div>
               <div className="flex gap-8">
                 <button
@@ -669,7 +716,7 @@ export default function IncomingCallListener() {
       // Caller ringing - show avatar with cancel option
       if (isCallerRinging) {
         return (
-          <div className="fixed inset-0 z-[99999] overflow-hidden bg-black text-white">
+          <div className="relative h-full w-full overflow-hidden bg-gradient-to-br from-slate-100 via-blue-50 to-slate-200 text-slate-950 dark:from-[#07111f] dark:via-[#0b1b31] dark:to-[#07111f] dark:text-white">
             <div className="absolute left-5 top-5 z-10 flex items-center gap-3">
               <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-violet-600 text-sm font-bold shadow-lg">
                 {getInitials(displayCallName)}
@@ -684,11 +731,11 @@ export default function IncomingCallListener() {
             </div>
 
             <div className="absolute inset-0 flex flex-col items-center justify-center pb-20">
-              <div className="flex h-24 w-24 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-violet-600 text-3xl font-bold shadow-2xl">
+              <div className="flex h-36 w-36 items-center justify-center rounded-full border-[3px] border-blue-600 bg-gradient-to-br from-blue-500 to-violet-600 text-4xl font-bold text-white shadow-[0_0_0_14px_rgba(37,99,235,0.10),0_22px_60px_rgba(37,99,235,0.30)]">
                 {getInitials(displayCallName)}
               </div>
               <h2 className="mt-4 text-2xl font-bold">{displayCallName}</h2>
-              <p className="mt-1 text-sm text-white/70">Calling...</p>
+              <p className="mt-2 text-sm text-slate-500 dark:text-white/70">Connecting video...</p>
             </div>
 
             <div className="absolute bottom-10 left-1/2 flex -translate-x-1/2 items-center gap-5">
@@ -712,28 +759,23 @@ export default function IncomingCallListener() {
       // Active call - Facebook-like layout with large video and floating local preview
       if (isActiveCall) {
         return (
-          <div className="fixed inset-0 z-[99999] flex flex-col bg-black">
+          <div className="relative h-full w-full overflow-hidden bg-black text-white">
             {/* Header with participant name and status */}
-            <div className="flex h-16 shrink-0 items-center justify-between border-b border-white/10 bg-black px-6">
-              <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-violet-600 text-sm font-semibold text-white shadow-lg">
-                  {getInitials(displayCallName)}
-                </div>
-                <div>
-                  <h3 className="font-semibold leading-tight text-white">{displayCallName}</h3>
-                  <p className="mt-0.5 text-xs text-emerald-400">{status === "connected" ? "Connected" : statusLabel}</p>
-                </div>
+            <div className="absolute inset-x-0 top-0 z-30 flex flex-col items-center bg-gradient-to-b from-black/70 to-transparent px-6 pb-12 pt-5 text-center">
+              <p className="rounded-full bg-black/45 px-3 py-1 text-xs font-bold backdrop-blur-md">{formatDuration(callDurationSeconds)}</p>
+              <h3 className="mt-2 text-lg font-extrabold leading-tight text-white">{displayCallName}</h3>
+              <div className="mt-1 flex items-center gap-1.5 text-xs text-white/90">
+                <span className="h-2 w-2 rounded-full bg-emerald-400" />
+                {status === "connected" ? "In Call" : statusLabel}
               </div>
-              <p className="text-sm font-semibold text-white">{formatDuration(callDurationSeconds)}</p>
             </div>
 
             {/* Main video area */}
-            <div ref={videoStageRef} className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden bg-black">
+            <div ref={videoStageRef} className="absolute inset-0 overflow-hidden bg-black">
               <div
                 id={remoteViewId}
                 data-call-orientation="portrait"
-                className="relative h-full max-h-full max-w-full shrink-0 overflow-hidden bg-black [&_*]:!h-full [&_*]:!w-full [&_*]:!max-w-full [&_video]:!object-cover"
-                style={{ aspectRatio: "9 / 16" }}
+                className="absolute inset-0 h-full w-full overflow-hidden bg-black [&_*]:!h-full [&_*]:!w-full [&_video]:!object-cover"
               />
               
               {/* Local video preview - bottom right corner */}
@@ -749,15 +791,16 @@ export default function IncomingCallListener() {
                   aspectRatio: "9 / 16",
                   ...(localPreviewPosition
                     ? { left: localPreviewPosition.left, top: localPreviewPosition.top }
-                    : { right: 20, bottom: 20 }),
+                    : { right: 20, bottom: 116 }),
                 }}
               />
 
               {/* Placeholder when video not ready */}
               {!remoteVideoReady && (
-                <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 text-slate-400">
-                  <FontAwesomeIcon icon={faVideo} size="3x" />
-                  <span className="text-sm">Connecting video...</span>
+                <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-gradient-to-br from-[#07111f] via-[#0b1b31] to-[#07111f] text-white">
+                  <div className="flex h-32 w-32 items-center justify-center rounded-full border-[3px] border-blue-600 bg-gradient-to-br from-blue-500 to-indigo-700 text-4xl font-bold shadow-[0_0_0_14px_rgba(37,99,235,0.10),0_22px_60px_rgba(37,99,235,0.30)]">{getInitials(displayCallName)}</div>
+                  <p className="text-xl font-extrabold">{displayCallName}</p>
+                  <span className="flex items-center gap-2 text-sm text-slate-300"><span className="h-2 w-2 animate-pulse rounded-full bg-emerald-400" />Connecting video...</span>
                 </div>
               )}
 
@@ -770,7 +813,8 @@ export default function IncomingCallListener() {
             </div>
 
             {/* Bottom control bar - compact and centered */}
-            <div className="flex h-20 shrink-0 items-center justify-center gap-6 border-t border-white/10 bg-black px-6">
+            <div className="absolute bottom-5 left-1/2 z-30 flex -translate-x-1/2 items-start justify-center gap-4 rounded-[28px] border border-white/10 bg-slate-950/70 px-5 py-3 shadow-2xl backdrop-blur-xl">
+              <div className="flex flex-col items-center gap-1.5"><span className="text-[10px] font-medium text-white/80">Mute</span>
               <button
                 type="button"
                 onClick={toggleMute}
@@ -779,6 +823,8 @@ export default function IncomingCallListener() {
               >
                 <FontAwesomeIcon icon={isMuted ? faMicrophoneSlash : faMicrophone} />
               </button>
+              </div>
+              <div className="flex flex-col items-center gap-1.5"><span className="text-[10px] font-medium text-white/80">Speaker</span>
               <button
                 type="button"
                 onClick={toggleSpeaker}
@@ -787,6 +833,8 @@ export default function IncomingCallListener() {
               >
                 <FontAwesomeIcon icon={isSpeakerOn ? faVolumeUp : faVolumeMute} />
               </button>
+              </div>
+              <div className="flex flex-col items-center gap-1.5"><span className="text-[10px] font-medium text-white/80">Camera</span>
               <button
                 type="button"
                 onClick={toggleCamera}
@@ -795,6 +843,9 @@ export default function IncomingCallListener() {
               >
                 <FontAwesomeIcon icon={isCameraOn ? faVideo : faVideoSlash} />
               </button>
+              </div>
+              <div className="flex flex-col items-center gap-1.5"><span className="text-[10px] font-medium text-white/80">Switch</span><button type="button" onClick={switchCamera} className="flex h-12 w-12 items-center justify-center rounded-full bg-white/20 text-white transition hover:bg-white/30" title="Switch camera"><FontAwesomeIcon icon={faRepeat} /></button></div>
+              <div className="flex flex-col items-center gap-1.5"><span className="text-[10px] font-medium text-white/80">End Call</span>
               <button
                 type="button"
                 onClick={() => handleEndCall()}
@@ -804,6 +855,7 @@ export default function IncomingCallListener() {
               >
                 {processing ? <FontAwesomeIcon icon={faSpinner} spin /> : <FontAwesomeIcon icon={faPhone} className="rotate-[135deg]" />}
               </button>
+              </div>
             </div>
           </div>
         );
@@ -813,16 +865,17 @@ export default function IncomingCallListener() {
     // Voice calls - simplified layout with avatar and controls
     if (showIncomingControls) {
       return (
-        <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-black">
-          <div className="flex w-full flex-col items-center justify-center gap-8 px-4 py-12">
-            <div className="flex h-24 w-24 items-center justify-center rounded-full bg-slate-700 text-4xl font-bold text-white shadow-lg">
+        <div className="flex h-full w-full items-center justify-center overflow-hidden bg-gradient-to-br from-slate-100 via-blue-50 to-slate-200 text-slate-950 dark:from-[#07111f] dark:via-[#0b1b31] dark:to-[#07111f] dark:text-white">
+          <div className="flex min-h-full w-full max-w-xl flex-col items-center justify-center gap-8 px-6 py-12">
+            <div className="flex h-36 w-36 items-center justify-center rounded-full border-[3px] border-blue-600 bg-gradient-to-br from-blue-500 to-indigo-700 text-5xl font-bold text-white shadow-[0_0_0_14px_rgba(37,99,235,0.10),0_22px_60px_rgba(37,99,235,0.30)]">
               {getInitials(activeCall?.callerName || "Atlas")}
             </div>
             <div className="text-center">
-              <h2 className="text-2xl font-bold text-white">{activeCall?.callerName || "Atlas support"}</h2>
-              <p className="mt-1 text-sm text-slate-400">{statusLabel}</p>
+              <h2 className="text-2xl font-extrabold">{activeCall?.callerName || "Atlas support"}</h2>
+              <p className="mt-2 text-sm font-medium text-slate-500 dark:text-slate-300">Incoming Voice Call</p>
             </div>
             <div className="flex gap-8">
+              <div className="flex flex-col items-center gap-2">
               <button
                 type="button"
                 onClick={() => handleDecline("declined")}
@@ -831,6 +884,9 @@ export default function IncomingCallListener() {
               >
                 {processing ? <FontAwesomeIcon icon={faSpinner} spin /> : <FontAwesomeIcon icon={faPhoneSlash} size="lg" />}
               </button>
+              <span className="text-xs font-semibold">Decline</span>
+              </div>
+              <div className="flex flex-col items-center gap-2">
               <button
                 type="button"
                 onClick={handleAccept}
@@ -839,6 +895,8 @@ export default function IncomingCallListener() {
               >
                 {processing ? <FontAwesomeIcon icon={faSpinner} spin /> : <FontAwesomeIcon icon={faPhone} size="lg" />}
               </button>
+              <span className="text-xs font-semibold">Accept</span>
+              </div>
             </div>
           </div>
         </div>
@@ -847,23 +905,23 @@ export default function IncomingCallListener() {
 
     if (isCallerRinging) {
       return (
-        <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-black">
-          <div className="flex w-full flex-col items-center justify-center gap-8 px-4 py-12">
-            <div className="flex h-24 w-24 items-center justify-center rounded-full bg-slate-700 text-4xl font-bold text-white shadow-lg">
+        <div className="flex h-full w-full items-center justify-center overflow-hidden bg-gradient-to-br from-slate-100 via-blue-50 to-slate-200 text-slate-950 dark:from-[#07111f] dark:via-[#0b1b31] dark:to-[#07111f] dark:text-white">
+          <div className="flex min-h-full w-full max-w-xl flex-col items-center justify-center gap-8 px-6 py-12">
+            <div className="flex h-36 w-36 items-center justify-center rounded-full border-[3px] border-blue-600 bg-gradient-to-br from-blue-500 to-indigo-700 text-5xl font-bold text-white shadow-[0_0_0_14px_rgba(37,99,235,0.10),0_22px_60px_rgba(37,99,235,0.30)]">
               {getInitials(activeCall?.callerName || "Atlas")}
             </div>
             <div className="text-center">
-              <h2 className="text-2xl font-bold text-white">{activeCall?.callerName || "Atlas support"}</h2>
-              <p className="mt-1 text-sm text-slate-400">{statusLabel}</p>
+              <p className="mb-2 text-sm font-medium text-slate-500 dark:text-slate-300">Calling...</p>
+              <h2 className="text-2xl font-extrabold">{displayCallName}</h2>
+              <p className="mt-2 text-sm font-medium text-slate-500 dark:text-slate-300">Voice Call · Ringing</p>
             </div>
-            <button
-              type="button"
-              onClick={() => handleCancelCall()}
-              disabled={processing}
-              className="flex h-16 w-16 items-center justify-center rounded-full bg-rose-600 text-white shadow-lg transition hover:bg-rose-500 disabled:opacity-60"
-            >
-              {processing ? <FontAwesomeIcon icon={faSpinner} spin /> : <FontAwesomeIcon icon={faPhoneSlash} size="lg" />}
-            </button>
+            <div className="flex w-full flex-col items-center gap-6">
+              <div className="flex gap-14">
+                <div className="flex flex-col items-center gap-2"><button type="button" onClick={toggleMute} className="flex h-14 w-14 items-center justify-center rounded-full bg-white text-slate-900 shadow-lg dark:bg-slate-800 dark:text-white"><FontAwesomeIcon icon={isMuted ? faMicrophoneSlash : faMicrophone} /></button><span className="text-xs font-semibold">Mute</span></div>
+                <div className="flex flex-col items-center gap-2"><button type="button" onClick={toggleSpeaker} className="flex h-14 w-14 items-center justify-center rounded-full bg-white text-slate-900 shadow-lg dark:bg-slate-800 dark:text-white"><FontAwesomeIcon icon={isSpeakerOn ? faVolumeUp : faVolumeMute} /></button><span className="text-xs font-semibold">Speaker</span></div>
+              </div>
+              <button type="button" onClick={() => handleCancelCall()} disabled={processing} className="flex h-14 w-full max-w-xs items-center justify-center gap-3 rounded-full bg-rose-600 font-bold text-white shadow-lg transition hover:bg-rose-500 disabled:opacity-60">{processing ? <FontAwesomeIcon icon={faSpinner} spin /> : <FontAwesomeIcon icon={faPhoneSlash} />}Cancel Call</button>
+            </div>
           </div>
         </div>
       );
@@ -871,27 +929,27 @@ export default function IncomingCallListener() {
 
     if (isActiveCall) {
       return (
-        <div className="fixed inset-0 z-[99999] flex flex-col bg-black">
+        <div className="flex h-full w-full flex-col bg-gradient-to-br from-slate-100 via-blue-50 to-slate-200 text-slate-950 dark:from-[#07111f] dark:via-[#0b1b31] dark:to-[#07111f] dark:text-white">
           {/* Header */}
-          <div className="flex items-center justify-between border-b border-slate-800 px-6 py-3">
+          <div className="flex items-center justify-between border-b border-slate-200/70 px-6 py-3 dark:border-white/10">
             <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-700 text-sm font-semibold text-white">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-indigo-700 text-sm font-semibold text-white">
                 {getInitials(activeCall?.callerName || "Atlas")}
               </div>
               <div>
-                <h3 className="font-semibold text-white">{activeCall?.callerName || "Atlas support"}</h3>
-                <p className="text-xs text-slate-400">{statusLabel}</p>
+                <h3 className="font-semibold">{displayCallName}</h3>
+                <p className="flex items-center gap-1.5 text-xs text-emerald-500"><span className="h-2 w-2 rounded-full bg-emerald-500" />In Call</p>
               </div>
             </div>
-            <div className="text-sm font-semibold text-slate-300">
+            <div className="text-sm font-semibold text-slate-600 dark:text-slate-200">
               {formatDuration(callDurationSeconds)}
             </div>
           </div>
 
           {/* Main content - centered with controls */}
           <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-8 px-4 py-8">
-            <div className="flex h-32 w-32 items-center justify-center rounded-full bg-gradient-to-br from-slate-700 to-slate-800 text-5xl font-bold text-white shadow-lg">
-              {getInitials(activeCall?.callerName || "Atlas")}
+            <div className="flex h-40 w-40 items-center justify-center rounded-full border-[3px] border-blue-600 bg-gradient-to-br from-blue-500 to-indigo-700 text-5xl font-bold text-white shadow-[0_0_0_14px_rgba(37,99,235,0.10),0_22px_60px_rgba(37,99,235,0.30)]">
+              {getInitials(displayCallName)}
             </div>
 
             {mediaNotice && (
@@ -901,7 +959,7 @@ export default function IncomingCallListener() {
             )}
 
             {/* Bottom control bar - Facebook-like compact */}
-            <div className="flex items-center justify-center gap-6">
+            <div className="flex items-center justify-center gap-6 rounded-[28px] border border-slate-200 bg-white/75 px-6 py-4 shadow-xl backdrop-blur-xl dark:border-white/10 dark:bg-slate-950/60">
               <button
                 type="button"
                 onClick={toggleMute}
@@ -943,7 +1001,49 @@ export default function IncomingCallListener() {
           {notice}
         </div>
       ) : null}
-      {renderCallSurface()}
+      {activeCall ? (
+        <section
+          aria-label={`${formatCallType(activeCall.type)} call with ${displayCallName}`}
+          className={`fixed z-[99999] overflow-hidden border border-slate-300/80 bg-white shadow-[0_28px_80px_rgba(15,23,42,0.38)] transition-[width,height,top,left] duration-200 dark:border-white/10 dark:bg-[#07111f] ${callWindowMode === "maximized" ? "inset-3 rounded-2xl" : "rounded-2xl"} ${callWindowMode === "normal" ? "resize" : ""}`}
+          style={
+            callWindowMode === "maximized"
+              ? undefined
+              : callWindowMode === "minimized"
+                ? { right: 20, bottom: 20, width: 320, height: 48 }
+                : {
+                    left: callWindowPosition.left ?? undefined,
+                    right: callWindowPosition.left == null ? 24 : undefined,
+                    top: callWindowPosition.top,
+                    width: activeCall.type === "video" ? 460 : 400,
+                    height: activeCall.type === "video" ? 700 : 600,
+                    minWidth: 340,
+                    minHeight: 420,
+                    maxWidth: "calc(100vw - 16px)",
+                    maxHeight: "calc(100vh - 16px)",
+                  }
+          }
+        >
+          <header
+            onPointerDown={handleCallWindowPointerDown}
+            onPointerMove={handleCallWindowPointerMove}
+            onPointerUp={handleCallWindowPointerUp}
+            onPointerCancel={handleCallWindowPointerUp}
+            className="flex h-12 touch-none select-none items-center justify-between border-b border-slate-200 bg-white/95 px-3 text-slate-900 backdrop-blur-xl dark:border-white/10 dark:bg-slate-950/95 dark:text-white"
+          >
+            <div className="flex min-w-0 items-center gap-2">
+              <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${isActiveCall ? "bg-emerald-500" : "animate-pulse bg-blue-500"}`} />
+              <span className="truncate text-sm font-bold">{displayCallName}</span>
+              <span className="shrink-0 text-xs text-slate-500 dark:text-slate-400">{formatCallType(activeCall.type)} call</span>
+            </div>
+            <div className="flex items-center gap-1" onPointerDown={(event) => event.stopPropagation()}>
+              <button type="button" onClick={() => setCallWindowMode((current) => current === "minimized" ? "normal" : "minimized")} className="flex h-8 w-8 items-center justify-center rounded-lg hover:bg-slate-100 dark:hover:bg-white/10" aria-label={callWindowMode === "minimized" ? "Restore call window" : "Minimize call"}><FontAwesomeIcon icon={callWindowMode === "minimized" ? faExpand : faMinus} /></button>
+              <button type="button" onClick={() => setCallWindowMode((current) => current === "maximized" ? "normal" : "maximized")} className="flex h-8 w-8 items-center justify-center rounded-lg hover:bg-slate-100 dark:hover:bg-white/10" aria-label={callWindowMode === "maximized" ? "Restore call window" : "Maximize call window"}><FontAwesomeIcon icon={callWindowMode === "maximized" ? faCompress : faExpand} /></button>
+              <button type="button" onClick={handleFloatingWindowClose} className="flex h-8 w-8 items-center justify-center rounded-lg text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-500/15" aria-label="Close and end call"><FontAwesomeIcon icon={faXmark} /></button>
+            </div>
+          </header>
+          {callWindowMode !== "minimized" ? <div className="min-h-0" style={{ height: "calc(100% - 3rem)" }}>{renderCallSurface()}</div> : null}
+        </section>
+      ) : null}
     </>,
     document.body,
   );
