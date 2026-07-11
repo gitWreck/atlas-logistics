@@ -85,20 +85,10 @@ export default function TrackingResult({ data }) {
     updatedAt,
   } = data;
 
-  const [packages, setPackages] = useState(
-    Array.isArray(data.packages) ? data.packages : [],
-  );
-  const [packagesLoading, setPackagesLoading] = useState(
-    !Array.isArray(data.packages),
-  );
+  const [packages, setPackages] = useState([]);
+  const [packagesLoading, setPackagesLoading] = useState(true);
 
   useEffect(() => {
-    if (Array.isArray(data.packages)) {
-      setPackages(data.packages);
-      setPackagesLoading(false);
-      return;
-    }
-
     if (!data?.id) {
       setPackages([]);
       setPackagesLoading(false);
@@ -129,7 +119,7 @@ export default function TrackingResult({ data }) {
     return () => {
       cancelled = true;
     };
-  }, [data?.id, data?.packages]);
+  }, [data?.id]);
 
   // --- 1. IMAGE LOGIC: COMBINE RECEIPT AND DELIVERY IMAGES ---
   const normalizeImages = (imgSource) => {

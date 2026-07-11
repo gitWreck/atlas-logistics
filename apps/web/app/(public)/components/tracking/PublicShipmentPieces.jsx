@@ -9,12 +9,17 @@ import {
   faWineGlass,
 } from "@fortawesome/free-solid-svg-icons";
 import StatusBadge from "../ui/StatusBadge";
+import { resolvePublicPackageDescription } from "@/lib/publicTrackingPackages";
 
 const ITEMS_PER_PAGE = 5;
 
 function PieceRow({ pkg, rowNumber }) {
   const trackingNo = pkg.trackingNumber || pkg.packageId || "—";
-  const description = pkg.description || "Item";
+  const description =
+    resolvePublicPackageDescription(pkg) ||
+    pkg.trackingNumber ||
+    pkg.packageId ||
+    "—";
   const packagingType = pkg.packagingType || "Package";
   const quantityLabel = pkg.quantity ? `${pkg.quantity} qty` : "1 qty";
 
@@ -61,7 +66,11 @@ function PieceRow({ pkg, rowNumber }) {
 
 function PieceCard({ pkg, rowNumber }) {
   const trackingNo = pkg.trackingNumber || pkg.packageId || "—";
-  const description = pkg.description || "Item";
+  const description =
+    resolvePublicPackageDescription(pkg) ||
+    pkg.trackingNumber ||
+    pkg.packageId ||
+    "—";
   const packagingType = pkg.packagingType || "Package";
   const quantityLabel = pkg.quantity ? `${pkg.quantity} qty` : "1 qty";
 

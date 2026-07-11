@@ -60,12 +60,15 @@ function buildPublicPackages(packages = []) {
   return packages.map((pkg, index) => {
     const packageId = pkg.packageId || pkg.trackingNumber || "";
     const statusCode = String(pkg.status || "RECEIVED").trim().toUpperCase();
+    const description =
+      String(pkg.description || pkg.itemDescription || pkg.name || "").trim() ||
+      "Standard Package";
 
     return {
       packageId,
       trackingNumber: pkg.trackingNumber || packageId,
-      description: pkg.description || "Item",
-      packagingType: pkg.packagingType || "Package",
+      description,
+      packagingType: pkg.packagingType || pkg.packaging || "Package",
       quantity: Number(pkg.quantity) || 1,
       sequence: pkg.sequence || index + 1,
       status: formatStatus(pkg.status),

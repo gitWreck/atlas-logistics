@@ -5,6 +5,31 @@ import { getTrackingLookupCandidates } from "@/lib/publicTrackingResolve";
 
 export const dynamic = "force-dynamic";
 
+async function findPublicShipment(candidates = []) {
+  for (const candidate of candidates) {
+    const shipmentSnap = await adminDb
+      .collection("shipments")
+      .doc(candidate)
+      .get();
+
+    if (!shipmentSnap.exists) {
+      continue;
+    }
+
+    const shipmentData = shipmentSnap.data() || {};
+    if (
+      shipmentData.isPubliclyVisible === false ||
+      shipmentData.public === false
+    ) {
+      continue;
+    }
+
+    return { shipmentSnap, shipmentData };
+  }
+
+  return null;
+}
+
 export async function GET(_request, { params }) {
   try {
     const { shipmentId: rawId } = await params;
@@ -14,6 +39,22 @@ export async function GET(_request, { params }) {
     }
 
     const candidates = getTrackingLookupCandidates(shipmentId);
+    const resolved = await findPublicShipment(candidates);
+
+    if (!resolved) {
+      return NextResponse.json({ packages: [] }, { status: 404 });
+    }
+
+    const { shipmentData } = resolved;
+    const shipmentPackages = Array.isArray(shipmentData.packages)
+      ? shipmentData.packages
+      : [];
+
+    if (shipmentPackages.length > 0) {
+      return NextResponse.json({
+        packages: sanitizePublicPackages(shipmentPackages),
+      });
+    }
 
     for (const candidate of candidates) {
       const publicSnap = await adminDb
@@ -21,40 +62,19 @@ export async function GET(_request, { params }) {
         .doc(candidate)
         .get();
 
-      if (publicSnap.exists) {
-        const publicPackages = publicSnap.data()?.packages;
-        if (Array.isArray(publicPackages) && publicPackages.length > 0) {
-          return NextResponse.json({
-            packages: sanitizePublicPackages(publicPackages),
-          });
-        }
-      }
-    }
-
-    for (const candidate of candidates) {
-      const shipmentSnap = await adminDb
-        .collection("shipments")
-        .doc(candidate)
-        .get();
-
-      if (!shipmentSnap.exists) {
+      if (!publicSnap.exists) {
         continue;
       }
 
-      const shipmentData = shipmentSnap.data() || {};
-      if (
-        shipmentData.isPubliclyVisible === false ||
-        shipmentData.public === false
-      ) {
-        continue;
+      const publicPackages = publicSnap.data()?.packages;
+      if (Array.isArray(publicPackages) && publicPackages.length > 0) {
+        return NextResponse.json({
+          packages: sanitizePublicPackages(publicPackages),
+        });
       }
-
-      return NextResponse.json({
-        packages: sanitizePublicPackages(shipmentData.packages || []),
-      });
     }
 
-    return NextResponse.json({ packages: [] }, { status: 404 });
+    return NextResponse.json({ packages: [] });
   } catch (error) {
     console.error("Public tracking packages error:", error);
     return NextResponse.json(
