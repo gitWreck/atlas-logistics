@@ -8,24 +8,30 @@ import {
   faPhone,
 } from "@fortawesome/free-solid-svg-icons";
 
+const SUPPORT_PHONE = "+639125453219";
+
 const supportCards = [
   {
     label: "Live Chat",
     value: "Message the operations desk",
     icon: faComments,
     tone: "blue",
+    href: `https://wa.me/${SUPPORT_PHONE.replace("+", "")}?text=${encodeURIComponent("Hello Atlas Support, I need help with my shipment.")}`,
+    external: true,
   },
   {
     label: "Call Support",
     value: "+63 912 545 3219",
     icon: faPhone,
     tone: "emerald",
+    href: `tel:${SUPPORT_PHONE}`,
   },
   {
     label: "Email Support",
     value: "support@atlastransport.ph",
     icon: faEnvelope,
     tone: "amber",
+    href: "mailto:support@atlastransport.ph",
   },
   {
     label: "Help Center",
@@ -91,11 +97,11 @@ function SupportCard({ card, index }) {
     slate: "bg-slate-100 text-slate-700",
   };
 
-  return (
-    <article
-      className="atlas-motion-card atlas-stagger rounded-3xl border border-slate-700 bg-slate-900 p-5 shadow-lg shadow-slate-950/20"
-      style={{ "--atlas-delay": `${index * 80}ms` }}
-    >
+  const className =
+    "atlas-motion-card atlas-stagger rounded-3xl border border-slate-700 bg-slate-900 p-5 shadow-lg shadow-slate-950/20";
+
+  const content = (
+    <>
       <span
         className={`mb-5 flex h-11 w-11 items-center justify-center rounded-2xl ${tones[card.tone]}`}
       >
@@ -105,6 +111,29 @@ function SupportCard({ card, index }) {
       <p className="mt-2 break-words text-sm leading-6 text-slate-300">
         {card.value}
       </p>
-    </article>
+    </>
+  );
+
+  if (!card.href) {
+    return (
+      <article
+        className={className}
+        style={{ "--atlas-delay": `${index * 80}ms` }}
+      >
+        {content}
+      </article>
+    );
+  }
+
+  return (
+    <a
+      href={card.href}
+      target={card.external ? "_blank" : undefined}
+      rel={card.external ? "noopener noreferrer" : undefined}
+      className={`${className} block transition hover:-translate-y-0.5 hover:border-slate-500 hover:bg-slate-800 focus:outline-none focus:ring-4 focus:ring-white/20`}
+      style={{ "--atlas-delay": `${index * 80}ms` }}
+    >
+      {content}
+    </a>
   );
 }
