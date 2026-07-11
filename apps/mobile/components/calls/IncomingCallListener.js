@@ -793,6 +793,14 @@ export default function IncomingCallListener() {
                         opacity: localVideoReady ? 1 : 0,
                       },
                     })}
+                    {!remoteVideoReady ? (
+                      <View style={styles.videoPlaceholderOverlay}>
+                        <View style={styles.videoWaitingAvatar}>
+                          <Text style={styles.videoWaitingAvatarText}>{getInitials(activeCall?.callerName || "Atlas")}</Text>
+                        </View>
+                        <Text style={styles.videoPlaceholderText}>Connecting video…</Text>
+                      </View>
+                    ) : null}
                   </View>
                 )}
                 {Platform.OS !== "web" && (
@@ -818,6 +826,18 @@ export default function IncomingCallListener() {
                   </View>
                 )}
               </>
+            ) : null}
+
+            {activeCall?.type === "video" && isActiveCall ? (
+              <View style={styles.videoTopOverlay} pointerEvents="none">
+                <Text style={styles.videoContactName}>{activeCall?.callerName || "Atlas support"}</Text>
+                <View style={styles.videoStatusRow}>
+                  <View style={[styles.videoStatusDot, status === "connected" && styles.videoStatusDotConnected]} />
+                  <Text style={styles.videoCallStatus}>
+                    {status === "connected" ? formatDuration(callDurationSeconds) : statusLabel}
+                  </Text>
+                </View>
+              </View>
             ) : null}
 
             {/* Messenger-style centered content when no video or not active */}
@@ -1184,18 +1204,64 @@ const styles = StyleSheet.create({
     width: "100%",
     height: "100%",
     backgroundColor: "#000",
+    overflow: "hidden",
   },
   localVideoOverlay: {
     position: "absolute",
-    bottom: Platform.OS === "ios" ? 40 : 24,
+    top: Platform.OS === "ios" ? 92 : 68,
     right: 16,
-    width: 100,
-    height: 140,
-    borderRadius: 12,
+    width: 104,
+    height: 148,
+    borderRadius: 18,
     borderWidth: 2,
     borderColor: "#fff",
     overflow: "hidden",
     backgroundColor: "#1e293b",
+  },
+  videoPlaceholderOverlay: {
+    position: "absolute",
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#111827",
+    gap: 14,
+  },
+  videoWaitingAvatar: {
+    width: 96,
+    height: 96,
+    borderRadius: 48,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#2563eb",
+  },
+  videoWaitingAvatarText: { color: "#fff", fontSize: 32, fontWeight: "800" },
+  videoTopOverlay: {
+    position: "absolute",
+    top: Platform.OS === "ios" ? 52 : 30,
+    left: 20,
+    right: 138,
+  },
+  videoContactName: {
+    color: "#fff",
+    fontSize: 19,
+    fontWeight: "800",
+    textShadowColor: "rgba(0,0,0,0.7)",
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 5,
+  },
+  videoStatusRow: { marginTop: 5, flexDirection: "row", alignItems: "center", gap: 7 },
+  videoStatusDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: "#f59e0b" },
+  videoStatusDotConnected: { backgroundColor: "#22c55e" },
+  videoCallStatus: {
+    color: "rgba(255,255,255,0.92)",
+    fontSize: 13,
+    fontWeight: "600",
+    textShadowColor: "rgba(0,0,0,0.7)",
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 4,
   },
   videoPlaceholder: {
     flex: 1,
@@ -1278,23 +1344,24 @@ const styles = StyleSheet.create({
   },
   messengerControlsBar: {
     position: "absolute",
-    bottom: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: "#0f172a",
-    borderTopWidth: 1,
-    borderTopColor: "#334155",
+    bottom: Platform.OS === "ios" ? 22 : 14,
+    left: 12,
+    right: 12,
+    backgroundColor: "rgba(15, 23, 42, 0.88)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.12)",
+    borderRadius: 34,
     flexDirection: "row",
     justifyContent: "space-around",
     alignItems: "center",
-    paddingVertical: 12,
-    paddingBottom: Platform.OS === "ios" ? 24 : 12,
+    paddingHorizontal: 8,
+    paddingVertical: 8,
   },
   messengerControlBtn: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: "#334155",
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: "rgba(71, 85, 105, 0.92)",
     alignItems: "center",
     justifyContent: "center",
   },

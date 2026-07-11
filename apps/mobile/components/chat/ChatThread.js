@@ -12,6 +12,7 @@ import {
   ActivityIndicator,
   Alert,
   Animated,
+  Dimensions,
   FlatList,
   KeyboardAvoidingView,
   LayoutAnimation,
@@ -727,6 +728,87 @@ function ChatInfoScreen({
   );
 }
 
+function DirectStaffInfoScreen({ visible, onClose, contact, messages, ui = UI, onOpenMedia }) {
+  const [rendered, setRendered] = useState(visible);
+  const translateX = useRef(new Animated.Value(Dimensions.get("window").width)).current;
+  const media = messages
+    .map((message) => getMessageAttachment(message))
+    .filter((attachment) => attachment?.type === "image")
+    .slice(-4);
+  const location = contact?.municipality || contact?.warehouseName || "Assigned warehouse";
+
+  useEffect(() => {
+    if (!visible) return;
+    setRendered(true);
+    translateX.setValue(Dimensions.get("window").width);
+    Animated.timing(translateX, {
+      toValue: 0,
+      duration: 260,
+      useNativeDriver: true,
+    }).start();
+  }, [translateX, visible]);
+
+  const closeFromRight = useCallback(() => {
+    Animated.timing(translateX, {
+      toValue: Dimensions.get("window").width,
+      duration: 220,
+      useNativeDriver: true,
+    }).start(({ finished }) => {
+      if (finished) {
+        setRendered(false);
+        onClose();
+      }
+    });
+  }, [onClose, translateX]);
+
+  if (!rendered) return null;
+
+  return (
+    <Modal animationType="none" visible={rendered} onRequestClose={closeFromRight} transparent>
+      <Animated.View style={[styles.fullScreen, { backgroundColor: ui.bg, transform: [{ translateX }] }]}>
+        <View style={[styles.chatInfoHeader, { borderBottomColor: ui.border }]}>
+          <TouchableOpacity style={styles.chatInfoHeaderButton} onPress={closeFromRight}>
+            <FontAwesome5 name="chevron-left" size={20} color={ui.text} />
+          </TouchableOpacity>
+          <Text style={[styles.chatInfoHeaderTitle, { color: ui.text }]}>Chat Information</Text>
+          <View style={styles.chatInfoHeaderButton} />
+        </View>
+        <ScrollView contentContainerStyle={styles.infoScreenContent} showsVerticalScrollIndicator={false}>
+          <View style={styles.chatInfoHero}>
+            <PersonAvatar
+              name={contact?.name || "Atlas staff"}
+              photoURL={contact?.photoURL}
+              online={!!contact?.online}
+              ringColor={ui.bg}
+              size={96}
+            />
+            <Text style={[styles.chatInfoHeroName, { color: ui.text }]} numberOfLines={1}>
+              {contact?.name || "Atlas staff"}
+            </Text>
+            <View style={styles.chatInfoHeroStatus}>
+              <View style={[styles.chatInfoHeroDot, { backgroundColor: contact?.online ? ui.green : ui.muted }]} />
+              <Text style={[styles.chatInfoHeroStatusText, { color: ui.text }]}>
+                {contact?.online ? "Active now" : contact?.lastActiveLabel || "Offline"}
+              </Text>
+            </View>
+          </View>
+
+          <View style={[styles.chatInfoCard, { backgroundColor: ui.surface, borderColor: ui.cardBorder || ui.border }]}>
+            <ChatInfoContentRow ui={ui} icon="user" title="Role" primary={contact?.roleLabel || contact?.role || "Atlas staff"} />
+            <ChatInfoContentRow ui={ui} icon="map-marker-alt" title="Assigned location" primary={location} />
+            {contact?.warehouseName && contact?.warehouseName !== location ? (
+              <ChatInfoContentRow ui={ui} icon="warehouse" title="Warehouse" primary={contact.warehouseName} />
+            ) : null}
+            {media.length ? (
+              <ChatInfoMediaSection ui={ui} media={media} shownMedia={media} onOpenMedia={onOpenMedia} />
+            ) : null}
+          </View>
+        </ScrollView>
+      </Animated.View>
+    </Modal>
+  );
+}
+
 function ChatInfoContentRow({ ui = UI, icon, title, primary, text }) {
   return (
     <View style={[styles.chatInfoContentRow, { borderBottomColor: ui.border }]}>
@@ -1253,9 +1335,9 @@ export default function ChatThread({ conversationId, onBack, embedded = false })
             accessibilityLabel="Voice call"
           >
             {startingCall === "voice" ? (
-              <ActivityIndicator size="small" color={colors.text} />
+              <ActivityIndicator size="small" color={colors.online} />
             ) : (
-              <FontAwesome5 name="phone-alt" size={20} color={colors.text} />
+              <FontAwesome5 name="phone-alt" size={20} color={colors.online} />
             )}
           </TouchableOpacity>
           <TouchableOpacity
@@ -1267,19 +1349,21 @@ export default function ChatThread({ conversationId, onBack, embedded = false })
             accessibilityLabel="Video call"
           >
             {startingCall === "video" ? (
-              <ActivityIndicator size="small" color={colors.text} />
+              <ActivityIndicator size="small" color={colors.accent} />
             ) : (
-              <FontAwesome5 name="video" size={21} color={colors.text} />
+              <FontAwesome5 name="video" size={21} color={colors.accent} />
             )}
           </TouchableOpacity>
         </View>
-        {!isDirectStaff && <TouchableOpacity
-          style={styles.headerBtn}
+        <TouchableOpacity
+          style={[styles.headerBtn, styles.headerInfoBtn, { backgroundColor: colors.accentSoft }]}
           onPress={() => setInfoOpen(true)}
           hitSlop={8}
+          accessibilityRole="button"
+          accessibilityLabel="Chat information"
         >
-          <FontAwesome5 name="ellipsis-v" size={17} color={colors.textMuted} />
-        </TouchableOpacity>}
+          <FontAwesome5 name="info-circle" size={17} color={colors.accent} />
+        </TouchableOpacity>
       </View>
 
       {hasShipment && (
@@ -1722,6 +1806,14 @@ export default function ChatThread({ conversationId, onBack, embedded = false })
         onViewTracking={openTracking}
         onOpenMedia={setLightbox}
       />}
+      {isDirectStaff && <DirectStaffInfoScreen
+        visible={infoOpen}
+        onClose={() => setInfoOpen(false)}
+        contact={directContact}
+        messages={messages}
+        ui={supportUi}
+        onOpenMedia={setLightbox}
+      />}
     </View>
   );
 }
@@ -1749,6 +1841,15 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 2,
+  },
+  headerInfoBtn: {
+    width: 36,
+    height: 36,
+    minWidth: 36,
+    minHeight: 36,
+    borderRadius: 18,
+    marginLeft: 2,
+    overflow: "hidden",
   },
   headerActionBtn: {
     width: 42,
