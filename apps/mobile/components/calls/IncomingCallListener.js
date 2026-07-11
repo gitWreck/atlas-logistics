@@ -343,7 +343,20 @@ export default function IncomingCallListener() {
 
         const nextStatus = String(data.status || "").trim().toLowerCase();
         const prevStatus = prevCallStatusRef.current.get(callId);
-        const terminalNotice = getTerminalNotice(nextStatus);
+        const terminalNotice = (function (s) {
+          switch (s) {
+            case "declined":
+              return "Staff declined the call.";
+            case "missed":
+              return "No answer from staff.";
+            case "cancelled":
+              return "The call was cancelled.";
+            case "ended":
+              return "The call has ended.";
+            default:
+              return null;
+          }
+        })(nextStatus);
 
         // If call reached a terminal status for the current active call, close UI and cleanup
         if (prevStatus !== nextStatus && terminalNotice && currentActiveCallId === callId) {
@@ -399,7 +412,20 @@ export default function IncomingCallListener() {
       const data = snap.data() || {};
       const status = String(data.status || "").trim().toLowerCase();
       if (["declined", "missed", "cancelled", "ended"].includes(status)) {
-        const terminalNotice = getTerminalNotice(status);
+        const terminalNotice = (function (s) {
+          switch (s) {
+            case "declined":
+              return "Staff declined the call.";
+            case "missed":
+              return "No answer from staff.";
+            case "cancelled":
+              return "The call was cancelled.";
+            case "ended":
+              return "The call has ended.";
+            default:
+              return null;
+          }
+        })(status);
         if (terminalNotice) showNotice(terminalNotice);
         try { cleanupWebRtc(); } catch (err) { console.warn("cleanupWebRtc error on doc listener:", err); }
         closeDialog();
