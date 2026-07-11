@@ -74,10 +74,13 @@ export default function useWebRtcCall({
           remoteUserIdRef.current = remoteUserId;
           setRemoteVideoReady(true);
           await new Promise((resolve) => setTimeout(resolve, 0));
-          trtc.startRemoteVideo({ userId: remoteUserId, streamType, view: remoteViewId }).catch((error) => {
+          try {
+            const remoteEl = typeof document !== "undefined" ? document.getElementById(remoteViewId) : null;
+            await trtc.startRemoteVideo({ userId: remoteUserId, streamType, view: remoteEl || remoteViewId });
+          } catch (error) {
             console.error("TRTC remote video failed", error);
             setMediaNotice("Remote video could not be played.");
-          });
+          }
         });
         trtc.on(TRTC.EVENT.REMOTE_VIDEO_UNAVAILABLE, () => setRemoteVideoReady(false));
         trtc.on(TRTC.EVENT.AUTOPLAY_FAILED, () => {
@@ -98,11 +101,15 @@ export default function useWebRtcCall({
         });
         await trtc.startLocalAudio();
         if (activeCall.type === "video") {
-          await trtc.startLocalVideo({
-            view: localViewId,
-            option: { useFrontCamera: cameraType !== "environment" },
-          });
-          setLocalVideoReady(true);
+          try {
+            await new Promise((resolve) => setTimeout(resolve, 0));
+            const localEl = typeof document !== "undefined" ? document.getElementById(localViewId) : null;
+            await trtc.startLocalVideo({ view: localEl || localViewId, option: { useFrontCamera: cameraType !== "environment" } });
+            setLocalVideoReady(true);
+          } catch (error) {
+            console.error("TRTC local video failed to start", error);
+            setMediaNotice(error?.message || "Camera could not be started.");
+          }
         }
       } catch (error) {
         console.error("Tencent browser call failed", error);
