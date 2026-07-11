@@ -455,6 +455,12 @@ export default function IncomingCallListener() {
   }, [activeCall?.id, activeCall?.status, activeCall?.receiverId, user?.uid]);
 
   const closeDialog = () => {
+    // ensure any active WebRTC peer and media tracks are cleaned up
+    try {
+      cleanupWebRtc();
+    } catch (e) {
+      console.warn("cleanupWebRtc failed:", e);
+    }
     setActiveCall(null);
     setConversationTitle("");
     setCallDurationSeconds(0);
@@ -694,207 +700,175 @@ export default function IncomingCallListener() {
       ) : null}
       {activeCall ? (
         <Modal visible transparent animationType="fade" onRequestClose={() => handleDecline("declined")}>
-      <View style={styles.backdrop}>
-        <View style={styles.card}>
-          <View style={styles.iconWrap}>
-            <FontAwesome5
-              name={activeCall?.type === "video" ? "video" : "phone-alt"}
-              size={24}
-              color="#fff"
-            />
-          </View>
-
-          <View style={styles.avatarBadge}>
-            <Text style={styles.avatarText}>{getInitials(activeCall?.callerName || "Atlas")}</Text>
-          </View>
-
-          <Text style={styles.title}>{title}</Text>
-          <Text style={styles.caller}>{activeCall?.callerName || "Atlas support"}</Text>
-          <Text style={styles.role}>{activeCall?.callerRole || "Support"}</Text>
-          <Text style={styles.meta}>
-            {conversationTitle || (activeCall?.conversationId ? `Conversation ${activeCall.conversationId}` : "Conversation call")}
-          </Text>
-
-          {Platform.OS === "web" && activeCall?.type === "video" ? (
-            <View style={styles.videoStage}>
-              {React.createElement("div", {
-                id: remoteViewId,
-                style: styles.remoteVideo,
-              })}
-              {!remoteVideoReady ? (
-                <View style={styles.remoteVideoPlaceholder}>
-                  <FontAwesome5 name="video" size={30} color="#94a3b8" />
-                  <Text style={styles.remoteVideoText}>
-                    {isCallerRinging ? "Waiting for an answer..." : "Connecting video..."}
-                  </Text>
-                </View>
-              ) : null}
-              {React.createElement("div", {
-                id: localViewId,
-                style: {
-                  ...styles.localVideo,
-                  opacity: localVideoReady ? 1 : 0,
-                  overflow: "hidden",
-                },
-              })}
-            </View>
-          ) : null}
-
-          {Platform.OS !== "web" && activeCall?.type === "video" ? (
-            <View style={styles.videoStage}>
-              {remoteUserId && remoteVideoReady && NativeRemoteVideoView ? (
-                <NativeRemoteVideoView
-                  userId={remoteUserId}
-                  streamType={nativeVideoStreamType}
-                  style={styles.remoteVideo}
-                />
-              ) : (
-                <View style={styles.remoteVideoPlaceholder}>
-                  <FontAwesome5 name="video" size={30} color="#94a3b8" />
-                  <Text style={styles.remoteVideoText}>Connecting video...</Text>
-                </View>
-              )}
-              {localVideoReady && NativeLocalVideoView ? (
-                <NativeLocalVideoView
-                  frontCamera={cameraType !== "back"}
-                  style={styles.localVideo}
-                />
-              ) : null}
-            </View>
-          ) : null}
-
-          {mediaNotice ? <Text style={styles.rtcNotice}>{mediaNotice}</Text> : null}
-
-          <Text style={styles.statusText}>{statusLabel}</Text>
-
-          <View style={styles.actions}>
-            {showIncomingControls ? (
+          <View style={styles.messengerBackdrop}>
+            {/* Video display for active video calls */}
+            {activeCall?.type === "video" && isActiveCall ? (
               <>
-                <TouchableOpacity
-                  style={[styles.button, styles.declineButton]}
-                  onPress={() => handleDecline("declined")}
-                  disabled={isProcessing}
-                >
-                  {isProcessing ? (
-                    <ActivityIndicator color="#fff" />
-                  ) : (
+                {Platform.OS === "web" && (
+                  <View style={styles.webVideoContainer}>
+                    {React.createElement("div", {
+                      id: remoteViewId,
+                      style: styles.remoteVideoFull,
+                    })}
+                    {React.createElement("div", {
+                      id: localViewId,
+                      style: {
+                        ...styles.localVideoOverlay,
+                        opacity: localVideoReady ? 1 : 0,
+                      },
+                    })}
+                  </View>
+                )}
+                {Platform.OS !== "web" && (
+                  <View style={styles.nativeVideoContainer}>
+                    {remoteUserId && remoteVideoReady && NativeRemoteVideoView ? (
+                      <NativeRemoteVideoView
+                        userId={remoteUserId}
+                        streamType={nativeVideoStreamType}
+                        style={styles.remoteVideoFull}
+                      />
+                    ) : (
+                      <View style={styles.videoPlaceholder}>
+                        <FontAwesome5 name="video" size={50} color="#64748b" />
+                        <Text style={styles.videoPlaceholderText}>Connecting video...</Text>
+                      </View>
+                    )}
+                    {localVideoReady && NativeLocalVideoView ? (
+                      <NativeLocalVideoView
+                        frontCamera={cameraType !== "back"}
+                        style={styles.localVideoOverlay}
+                      />
+                    ) : null}
+                  </View>
+                )}
+              </>
+            ) : null}
+
+            {/* Messenger-style centered content when no video or not active */}
+            {!isActiveCall || activeCall?.type !== "video" ? (
+              <View style={styles.messengerContent}>
+                {/* Large profile circle - Messenger style */}
+                <View style={styles.largeAvatar}>
+                  <Text style={styles.largeAvatarText}>{getInitials(activeCall?.callerName || "Atlas")}</Text>
+                </View>
+
+                {/* Contact name - prominent */}
+                <Text style={styles.messengerName}>{activeCall?.callerName || "Atlas support"}</Text>
+
+                {/* Status text - minimal */}
+                <Text style={styles.messengerStatus}>{statusLabel}</Text>
+
+                {/* Media notice if present */}
+                {mediaNotice ? (
+                  <Text style={styles.mediaNoticeText}>{mediaNotice}</Text>
+                ) : null}
+
+                {/* Action buttons */}
+                <View style={styles.messengerActions}>
+                  {showIncomingControls ? (
                     <>
-                      <FontAwesome5 name="phone-slash" size={22} color="#fff" />
-                      <Text style={styles.declineText}>Decline</Text>
+                      <TouchableOpacity
+                        style={styles.messengerDeclineBtn}
+                        onPress={() => handleDecline("declined")}
+                        disabled={isProcessing}
+                      >
+                        {isProcessing ? (
+                          <ActivityIndicator color="#fff" />
+                        ) : (
+                          <FontAwesome5 name="phone-slash" size={28} color="#fff" />
+                        )}
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={styles.messengerAcceptBtn}
+                        onPress={handleAccept}
+                        disabled={isProcessing}
+                      >
+                        {isProcessing ? (
+                          <ActivityIndicator color="#fff" />
+                        ) : (
+                          <FontAwesome5 name="phone-alt" size={28} color="#fff" />
+                        )}
+                      </TouchableOpacity>
                     </>
-                  )}
+                  ) : isCallerRinging ? (
+                    <TouchableOpacity
+                      style={styles.messengerDeclineBtn}
+                      onPress={() => handleDecline("cancelled")}
+                      disabled={isProcessing}
+                    >
+                      {isProcessing ? (
+                        <ActivityIndicator color="#fff" />
+                      ) : (
+                        <FontAwesome5 name="phone-slash" size={28} color="#fff" />
+                      )}
+                    </TouchableOpacity>
+                  ) : null}
+                </View>
+              </View>
+            ) : null}
+
+            {/* Controls overlay for active calls - bottom bar */}
+            {isActiveCall ? (
+              <View style={styles.messengerControlsBar}>
+                <TouchableOpacity
+                  style={[styles.messengerControlBtn, isMuted && styles.messengerControlBtnInactive]}
+                  onPress={toggleMute}
+                >
+                  <FontAwesome5
+                    name={isMuted ? "microphone-slash" : "microphone"}
+                    size={24}
+                    color="#fff"
+                  />
                 </TouchableOpacity>
 
                 <TouchableOpacity
-                  style={[styles.button, styles.acceptButton]}
-                  onPress={handleAccept}
-                  disabled={isProcessing}
+                  style={[styles.messengerControlBtn, isSpeakerOn && styles.messengerControlBtnActive]}
+                  onPress={toggleSpeaker}
                 >
-                  {isProcessing ? (
-                    <ActivityIndicator color="#fff" />
-                  ) : (
-                    <>
-                      <FontAwesome5 name="phone-alt" size={22} color="#fff" />
-                      <Text style={styles.acceptText}>Accept</Text>
-                    </>
-                  )}
+                  <FontAwesome5
+                    name={isSpeakerOn ? "volume-up" : "volume-mute"}
+                    size={24}
+                    color="#fff"
+                  />
                 </TouchableOpacity>
-              </>
-            ) : isCallerRinging ? (
-              <View style={styles.callerStateBox}>
-                <Text style={styles.callerStateText}>Calling Atlas Staff...</Text>
-                <Text style={styles.callerStateSubtext}>Ringing...</Text>
-                <TouchableOpacity
-                  style={[styles.button, styles.declineButton]}
-                  onPress={() => handleDecline("cancelled")}
-                  disabled={isProcessing}
-                >
-                  {isProcessing ? (
-                    <ActivityIndicator color="#fff" />
-                  ) : (
-                    <>
-                      <FontAwesome5 name="phone-slash" size={22} color="#fff" />
-                      <Text style={styles.declineText}>Cancel</Text>
-                    </>
-                  )}
-                </TouchableOpacity>
-              </View>
-            ) : isActiveCall ? (
-              <View style={styles.activeStateBox}>
-                <Text style={styles.activeStateText}>{status === "connected" ? "The call is now active." : "The audio and video are being connected."}</Text>
-                <Text style={styles.timerText}>Duration: {formatDuration(callDurationSeconds)}</Text>
-                <View style={styles.controlRow}>
-                  <TouchableOpacity
-                    style={[styles.controlButton, isMuted ? styles.controlButtonActive : null]}
-                    onPress={toggleMute}
-                  >
-                    <FontAwesome5
-                      name={isMuted ? "microphone-slash" : "microphone"}
-                      size={18}
-                      color="#fff"
-                    />
-                    <Text style={styles.controlLabel}>{isMuted ? "Muted" : "Mute"}</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[styles.controlButton, isSpeakerOn ? styles.controlButtonActive : null]}
-                    onPress={toggleSpeaker}
-                  >
-                    <FontAwesome5
-                      name={isSpeakerOn ? "volume-up" : "volume-mute"}
-                      size={18}
-                      color="#fff"
-                    />
-                    <Text style={styles.controlLabel}>{isSpeakerOn ? "Speaker" : "Earpiece"}</Text>
-                  </TouchableOpacity>
-                  {activeCall?.type === "video" ? (
+
+                {activeCall?.type === "video" ? (
+                  <>
                     <TouchableOpacity
-                      style={[styles.controlButton, isCameraOn ? styles.controlButtonActive : null]}
+                      style={[styles.messengerControlBtn, isCameraOn && styles.messengerControlBtnActive]}
                       onPress={toggleCamera}
                     >
                       <FontAwesome5
                         name={isCameraOn ? "video" : "video-slash"}
-                        size={18}
+                        size={24}
                         color="#fff"
                       />
-                      <Text style={styles.controlLabel}>{isCameraOn ? "Camera" : "Video Off"}</Text>
                     </TouchableOpacity>
-                  ) : null}
-                </View>
-                {activeCall?.type === "video" ? (
-                  <View style={styles.controlRow}>
+
                     <TouchableOpacity
-                      style={styles.controlButton}
+                      style={styles.messengerControlBtn}
                       onPress={switchCamera}
                     >
-                      <FontAwesome5
-                        name="sync-alt"
-                        size={18}
-                        color="#fff"
-                      />
-                      <Text style={styles.controlLabel}>Switch {cameraType}</Text>
+                      <FontAwesome5 name="sync-alt" size={24} color="#fff" />
                     </TouchableOpacity>
-                  </View>
+                  </>
                 ) : null}
-                <View style={styles.controlRowCentered}>
-                  <TouchableOpacity
-                    style={[styles.controlButton, styles.endCallButton]}
-                    onPress={handleEndCall}
-                    disabled={isProcessing}
-                  >
-                    {isProcessing ? (
-                      <ActivityIndicator color="#fff" />
-                    ) : (
-                      <FontAwesome5 name="phone-slash" size={20} color="#fff" />
-                    )}
-                    <Text style={styles.controlLabel}>End</Text>
-                  </TouchableOpacity>
-                </View>
+
+                <TouchableOpacity
+                  style={[styles.messengerControlBtn, styles.messengerEndCallBtn]}
+                  onPress={handleEndCall}
+                  disabled={isProcessing}
+                >
+                  {isProcessing ? (
+                    <ActivityIndicator color="#fff" />
+                  ) : (
+                    <FontAwesome5 name="phone-slash" size={24} color="#fff" />
+                  )}
+                </TouchableOpacity>
               </View>
             ) : null}
           </View>
-        </View>
-      </View>
-    </Modal>
+        </Modal>
       ) : null}
     </>
   );
@@ -1109,6 +1083,152 @@ const styles = StyleSheet.create({
     marginTop: 16,
   },
   endCallButton: {
+    backgroundColor: "#ef4444",
+  },
+
+  /* Messenger-like styles */
+  messengerBackdrop: {
+    flex: 1,
+    backgroundColor: "#000",
+  },
+  webVideoContainer: {
+    flex: 1,
+    position: "relative",
+    backgroundColor: "#000",
+  },
+  nativeVideoContainer: {
+    flex: 1,
+    position: "relative",
+    backgroundColor: "#000",
+  },
+  remoteVideoFull: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    width: "100%",
+    height: "100%",
+    backgroundColor: "#000",
+  },
+  localVideoOverlay: {
+    position: "absolute",
+    bottom: Platform.OS === "ios" ? 40 : 24,
+    right: 16,
+    width: 100,
+    height: 140,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: "#fff",
+    overflow: "hidden",
+    backgroundColor: "#1e293b",
+  },
+  videoPlaceholder: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 12,
+  },
+  videoPlaceholderText: {
+    color: "#cbd5e1",
+    fontSize: 13,
+    fontWeight: "600",
+  },
+  messengerContent: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingBottom: Platform.OS === "ios" ? 40 : 24,
+  },
+  largeAvatar: {
+    width: 140,
+    height: 140,
+    borderRadius: 70,
+    backgroundColor: "#1e293b",
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 24,
+    borderWidth: 3,
+    borderColor: "#334155",
+  },
+  largeAvatarText: {
+    color: "#ffffff",
+    fontWeight: "700",
+    fontSize: 48,
+  },
+  messengerName: {
+    fontSize: 28,
+    fontWeight: "700",
+    color: "#ffffff",
+    textAlign: "center",
+    marginBottom: 8,
+  },
+  messengerStatus: {
+    fontSize: 14,
+    color: "#94a3b8",
+    textAlign: "center",
+    marginBottom: 16,
+  },
+  mediaNoticeText: {
+    color: "#fecaca",
+    backgroundColor: "rgba(127, 29, 29, 0.45)",
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    fontSize: 12,
+    lineHeight: 17,
+    textAlign: "center",
+    marginBottom: 24,
+    marginHorizontal: 16,
+  },
+  messengerActions: {
+    flexDirection: "row",
+    gap: 24,
+    marginTop: 32,
+  },
+  messengerDeclineBtn: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: "#ef4444",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  messengerAcceptBtn: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: "#10b981",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  messengerControlsBar: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: "#0f172a",
+    borderTopWidth: 1,
+    borderTopColor: "#334155",
+    flexDirection: "row",
+    justifyContent: "space-around",
+    alignItems: "center",
+    paddingVertical: 12,
+    paddingBottom: Platform.OS === "ios" ? 24 : 12,
+  },
+  messengerControlBtn: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: "#334155",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  messengerControlBtnActive: {
+    backgroundColor: "#0f8cff",
+  },
+  messengerControlBtnInactive: {
+    backgroundColor: "#ef4444",
+  },
+  messengerEndCallBtn: {
     backgroundColor: "#ef4444",
   },
 });

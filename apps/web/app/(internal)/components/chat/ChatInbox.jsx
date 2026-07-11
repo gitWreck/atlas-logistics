@@ -265,15 +265,19 @@ function displayMessagePreview(text = "") {
   return text || "Conversation started";
 }
 
-function Avatar({ name, size = 40, online = false }) {
+function Avatar({ name, photoURL, size = 40, online = false }) {
   return (
     <div className="relative shrink-0" style={{ width: size, height: size }}>
-      <div
-        className="flex h-full w-full items-center justify-center rounded-full font-bold text-white"
-        style={{ background: avatarColor(name), fontSize: size * 0.38 }}
-      >
-        {getInitials(name)}
-      </div>
+      {photoURL ? (
+        <img src={photoURL} alt={`${name} profile`} className="h-full w-full rounded-full object-cover" />
+      ) : (
+        <div
+          className="flex h-full w-full items-center justify-center rounded-full font-bold text-white"
+          style={{ background: avatarColor(name), fontSize: size * 0.38 }}
+        >
+          {getInitials(name)}
+        </div>
+      )}
       {online && (
         <span
           className="absolute bottom-0 right-0 rounded-full border-2 border-white bg-emerald-500"
@@ -303,6 +307,7 @@ export default function ChatInbox({ user, profile, isDark = false, onViewCustome
   const [assignSearch, setAssignSearch] = useState("");
   const [assigning, setAssigning] = useState(false);
   const [showDetails, setShowDetails] = useState(true);
+  const [inboxMode, setInboxMode] = useState("chats");
 
   const role = String(profile?.role || "").toLowerCase();
   const canAssign = role === "admin";
@@ -474,6 +479,7 @@ export default function ChatInbox({ user, profile, isDark = false, onViewCustome
   const filteredConversations = useMemo(() => {
     const term = search.trim().toLowerCase();
     return conversations.filter((item) => {
+      if (inboxMode === "calls" && !isDirectStaffConversation(item)) return false;
       const status = conversationFilterStatus(item);
       const unread = conversationUnreadCount(item, user?.uid);
       let matchesFilter = true;
@@ -496,7 +502,7 @@ export default function ChatInbox({ user, profile, isDark = false, onViewCustome
 
       return matchesFilter && (!term || haystack.includes(term));
     });
-  }, [conversations, search, statusFilter, user?.uid]);
+  }, [conversations, inboxMode, search, statusFilter, user?.uid]);
 
   const sharedPhotos = useMemo(
     () =>
@@ -780,12 +786,13 @@ export default function ChatInbox({ user, profile, isDark = false, onViewCustome
 
   const handleAssignToMe = () => handleAssign(user?.uid);
 
-  const handleStartCall = async (callType = "voice") => {
-    if (!selectedId || calling || selected?.status === "closed") return;
+  const handleStartCall = async (callType = "voice", conversationId = selectedId) => {
+    const target = conversations.find((item) => item.id === conversationId);
+    if (!conversationId || calling || target?.status === "closed") return;
     try {
       setCalling(true);
       await startConversationCall({
-        conversationId: selectedId,
+        conversationId,
         callType,
       });
     } catch (err) {
@@ -860,7 +867,7 @@ export default function ChatInbox({ user, profile, isDark = false, onViewCustome
         >
           <div className="p-4">
             <div className="flex items-center justify-between">
-              <h2 className="text-2xl font-extrabold tracking-tight">Chats</h2>
+              <h2 className="text-2xl font-extrabold tracking-tight">{inboxMode === "calls" ? "Calls" : "Chats"}</h2>
               <button
                 type="button"
                 className="flex h-9 w-9 items-center justify-center rounded-full text-blue-600 transition hover:bg-blue-50"
@@ -880,11 +887,28 @@ export default function ChatInbox({ user, profile, isDark = false, onViewCustome
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
                 className="min-w-0 flex-1 bg-transparent text-sm outline-none"
-                placeholder="Search Messenger"
+                placeholder={inboxMode === "calls" ? "Search people, roles or locations" : "Search Messenger"}
               />
             </div>
 
-            <div className="mt-3 flex flex-wrap gap-2">
+            <div className={`mt-3 grid grid-cols-2 rounded-xl p-1 ${isDark ? "bg-slate-800" : "bg-slate-100"}`}>
+              {[{ id: "chats", label: "Chats" }, { id: "calls", label: "Calls" }].map((mode) => (
+                <button
+                  key={mode.id}
+                  type="button"
+                  onClick={() => setInboxMode(mode.id)}
+                  className={`rounded-lg px-3 py-2 text-sm font-bold transition ${
+                    inboxMode === mode.id
+                      ? isDark ? "bg-slate-700 text-white shadow" : "bg-white text-blue-600 shadow-sm"
+                      : muted
+                  }`}
+                >
+                  {mode.label}
+                </button>
+              ))}
+            </div>
+
+            <div className={`${inboxMode === "calls" ? "hidden" : "mt-3 flex flex-wrap gap-2"}`}>
               {FILTERS.map((f) => (
                 <button
                   key={f.id}
@@ -905,6 +929,12 @@ export default function ChatInbox({ user, profile, isDark = false, onViewCustome
           </div>
 
           <div className="min-h-0 flex-1 overflow-y-auto px-2 pb-3">
+            {inboxMode === "calls" && filteredConversations.length > 0 && (
+              <div className="flex items-center justify-between px-2 pb-2 pt-1">
+                <p className="text-xs font-extrabold uppercase tracking-wider">Recent calls</p>
+                <p className={`text-[11px] ${muted}`}>Authorized contacts</p>
+              </div>
+            )}
             {filteredConversations.length === 0 ? (
               <div className={`p-6 text-center text-sm ${muted}`}>
                 No conversations found.
@@ -920,12 +950,19 @@ export default function ChatInbox({ user, profile, isDark = false, onViewCustome
                   : String(item.status || "").toLowerCase() === "open";
 
                 return (
-                  <button
+                  <div
                     key={item.id}
-                    type="button"
                     onClick={() => {
                       setSelectedId(item.id);
                       setMobileThreadOpen(true);
+                    }}
+                    role="button"
+                    tabIndex={0}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter" || event.key === " ") {
+                        setSelectedId(item.id);
+                        setMobileThreadOpen(true);
+                      }
                     }}
                     className={`flex w-full items-center gap-3 rounded-xl p-2.5 text-left transition ${
                       isSelected
@@ -937,7 +974,7 @@ export default function ChatInbox({ user, profile, isDark = false, onViewCustome
                           : "hover:bg-slate-100"
                     }`}
                   >
-                    <Avatar name={displayName} size={52} online={isOnline} />
+                    <Avatar name={displayName} photoURL={peer?.photoURL} size={52} online={isOnline} />
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center justify-between gap-2">
                         <p className="truncate text-sm font-semibold">
@@ -953,7 +990,9 @@ export default function ChatInbox({ user, profile, isDark = false, onViewCustome
                             unread > 0 ? "font-semibold text-current" : muted
                           }`}
                         >
-                          {displayMessagePreview(item.lastMessageText)}
+                          {inboxMode === "calls"
+                            ? [peer?.roleLabel || "Atlas staff", peer?.municipality || peer?.warehouseName].filter(Boolean).join(" · ")
+                            : displayMessagePreview(item.lastMessageText)}
                         </p>
                         {unread > 0 && (
                           <span className="flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-blue-600 px-1.5 text-[10px] font-bold text-white">
@@ -962,7 +1001,23 @@ export default function ChatInbox({ user, profile, isDark = false, onViewCustome
                         )}
                       </div>
                     </div>
-                  </button>
+                    {inboxMode === "calls" && role === "manager" && (
+                      <div className="flex shrink-0 gap-1">
+                        <button
+                          type="button"
+                          onClick={(event) => { event.stopPropagation(); setSelectedId(item.id); void handleStartCall("voice", item.id); }}
+                          className={`flex h-9 w-9 items-center justify-center rounded-full text-blue-600 transition ${isDark ? "hover:bg-slate-700" : "hover:bg-blue-100"}`}
+                          aria-label={`Voice call ${displayName}`}
+                        ><FontAwesomeIcon icon={faPhone} /></button>
+                        <button
+                          type="button"
+                          onClick={(event) => { event.stopPropagation(); setSelectedId(item.id); void handleStartCall("video", item.id); }}
+                          className={`flex h-9 w-9 items-center justify-center rounded-full text-blue-600 transition ${isDark ? "hover:bg-slate-700" : "hover:bg-blue-100"}`}
+                          aria-label={`Video call ${displayName}`}
+                        ><FontAwesomeIcon icon={faVideo} /></button>
+                      </div>
+                    )}
+                  </div>
                 );
               })
             )}
@@ -992,6 +1047,7 @@ export default function ChatInbox({ user, profile, isDark = false, onViewCustome
                   </button>
                   <Avatar
                     name={selectedName}
+                    photoURL={selectedDirectPeer?.photoURL}
                     size={40}
                     online={selectedIsDirect ? !!selectedDirectPeer?.online : selected.status === "open"}
                   />

@@ -273,6 +273,12 @@ export default function IncomingCallListener() {
   }, [activeCall?.id, activeCall?.status, activeCall?.receiverId, user?.uid]);
 
   const closeDialog = () => {
+    // ensure any active WebRTC peer and media tracks are cleaned up on close
+    try {
+      cleanupWebRtc();
+    } catch (e) {
+      console.warn("cleanupWebRtc failed:", e);
+    }
     setActiveCall(null);
     setConversationTitle("");
     setCallDurationSeconds(0);
@@ -506,81 +512,194 @@ export default function IncomingCallListener() {
   const renderCallSurface = () => {
     if (!activeCall) return null;
 
-    const mediaPanel = activeCall.type === "video" ? (
-        <div className="relative mb-4 h-[42vh] min-h-56 w-full max-w-4xl overflow-hidden rounded-2xl bg-slate-950">
-          <div id={remoteViewId} className="absolute inset-0 h-full w-full overflow-hidden" />
-          {!remoteVideoReady ? (
-            <div className="flex h-full flex-col items-center justify-center gap-3 text-slate-400">
-              <FontAwesomeIcon icon={faVideo} size="2x" />
-              <span className="text-sm">{isCallerRinging ? "Waiting for an answer..." : "Connecting video..."}</span>
-            </div>
-          ) : null}
-          <div
-            id={localViewId}
-            className={`absolute bottom-3 right-3 h-32 w-24 overflow-hidden rounded-lg border-2 border-white bg-slate-800 shadow-xl ${localVideoReady ? "opacity-100" : "opacity-0"}`}
-          />
-        </div>
-    ) : null;
-
-    if (showIncomingControls) {
-      return (
-        <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-slate-950">
-          <div className="flex h-full w-full flex-col bg-slate-900">
-            <div className="flex items-start justify-between border-b border-slate-800 px-6 py-4">
-              <div>
-                <p className="text-sm font-semibold uppercase tracking-[0.2em] text-sky-400">{title}</p>
-                <h3 className="mt-1 text-xl font-bold text-white">{activeCall?.callerName || "Atlas support"}</h3>
-              </div>
-              <button
-                type="button"
-                onClick={() => handleDecline("declined")}
-                className="rounded-full border border-slate-700 p-2 text-slate-300 transition hover:bg-slate-800 hover:text-white"
-                aria-label="Close call"
-              >
-                <FontAwesomeIcon icon={faTimes} />
-              </button>
-            </div>
-
-            <div className="flex flex-1 flex-col items-center justify-center px-6 py-8 text-center">
-              <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-sky-500/20 text-sky-400">
-                {activeCall?.type === "video" ? (
-                  <FontAwesomeIcon icon={faVideo} size="2x" />
-                ) : (
-                  <FontAwesomeIcon icon={faPhone} size="2x" />
-                )}
-              </div>
-
-              <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-slate-800 text-lg font-semibold text-white">
+    // Facebook-like layout: Large remote video as main content
+    if (activeCall.type === "video") {
+      if (showIncomingControls) {
+        // Incoming call - show avatar and accept/decline buttons
+        return (
+          <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-black">
+            <div className="flex w-full flex-col items-center justify-center gap-8 px-4 py-12">
+              <div className="flex h-24 w-24 items-center justify-center rounded-full bg-slate-700 text-4xl font-bold text-white shadow-lg">
                 {getInitials(activeCall?.callerName || "Atlas")}
               </div>
-
-              <p className="text-lg font-semibold text-white">{activeCall?.callerName || "Atlas support"}</p>
-              <p className="mt-1 text-sm text-slate-400">{activeCall?.callerRole || "Support"}</p>
-              <p className="mt-3 text-sm text-slate-400">{formatConversationInfo(activeCall, conversationTitle)}</p>
-
-              <div className="mt-5 flex items-center justify-center gap-2 text-sm text-slate-400">
-                <FontAwesomeIcon icon={faCircle} className={isCallerRinging ? "text-amber-400" : "text-emerald-500"} />
-                <span>{statusLabel}</span>
+              <div className="text-center">
+                <h2 className="text-2xl font-bold text-white">{activeCall?.callerName || "Atlas support"}</h2>
+                <p className="mt-1 text-sm text-slate-400">{statusLabel}</p>
               </div>
-
-              <div className="mt-10 flex justify-center gap-10">
+              <div className="flex gap-8">
                 <button
                   type="button"
                   onClick={() => handleDecline("declined")}
                   disabled={processing}
-                  className="flex h-20 w-20 flex-col items-center justify-center gap-1 rounded-full bg-rose-600 text-xs font-semibold text-white transition hover:bg-rose-500 disabled:cursor-not-allowed disabled:opacity-60"
+                  className="flex h-16 w-16 items-center justify-center rounded-full bg-rose-600 text-white shadow-lg transition hover:bg-rose-500 disabled:opacity-60"
                 >
-                  {processing ? <FontAwesomeIcon icon={faSpinner} spin /> : <><FontAwesomeIcon icon={faPhoneSlash} className="text-xl" /><span>Decline</span></>}
+                  {processing ? <FontAwesomeIcon icon={faSpinner} spin /> : <FontAwesomeIcon icon={faPhoneSlash} size="lg" />}
                 </button>
                 <button
                   type="button"
                   onClick={handleAccept}
                   disabled={processing}
-                  className="flex h-20 w-20 flex-col items-center justify-center gap-1 rounded-full bg-emerald-500 text-xs font-semibold text-white transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-60"
+                  className="flex h-16 w-16 items-center justify-center rounded-full bg-emerald-500 text-white shadow-lg transition hover:bg-emerald-400 disabled:opacity-60"
                 >
-                  {processing ? <FontAwesomeIcon icon={faSpinner} spin /> : <><FontAwesomeIcon icon={faPhone} className="text-xl" /><span>Accept</span></>}
+                  {processing ? <FontAwesomeIcon icon={faSpinner} spin /> : <FontAwesomeIcon icon={faPhone} size="lg" />}
                 </button>
               </div>
+            </div>
+          </div>
+        );
+      }
+
+      // Caller ringing - show avatar with cancel option
+      if (isCallerRinging) {
+        return (
+          <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-black">
+            <div className="flex w-full flex-col items-center justify-center gap-8 px-4 py-12">
+              <div className="flex h-24 w-24 items-center justify-center rounded-full bg-slate-700 text-4xl font-bold text-white shadow-lg">
+                {getInitials(activeCall?.callerName || "Atlas")}
+              </div>
+              <div className="text-center">
+                <h2 className="text-2xl font-bold text-white">{activeCall?.callerName || "Atlas support"}</h2>
+                <p className="mt-1 text-sm text-slate-400">{statusLabel}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => handleCancelCall()}
+                disabled={processing}
+                className="flex h-16 w-16 items-center justify-center rounded-full bg-rose-600 text-white shadow-lg transition hover:bg-rose-500 disabled:opacity-60"
+              >
+                {processing ? <FontAwesomeIcon icon={faSpinner} spin /> : <FontAwesomeIcon icon={faPhoneSlash} size="lg" />}
+              </button>
+            </div>
+          </div>
+        );
+      }
+
+      // Active call - Facebook-like layout with large video and floating local preview
+      if (isActiveCall) {
+        return (
+          <div className="fixed inset-0 z-[99999] flex flex-col bg-black">
+            {/* Header with participant name and status */}
+            <div className="flex items-center justify-between border-b border-slate-800 px-6 py-3">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-700 text-sm font-semibold text-white">
+                  {getInitials(activeCall?.callerName || "Atlas")}
+                </div>
+                <div>
+                  <h3 className="font-semibold text-white">{activeCall?.callerName || "Atlas support"}</h3>
+                  <p className="text-xs text-slate-400">{statusLabel}</p>
+                </div>
+              </div>
+              <div className="text-sm font-semibold text-slate-300">
+                {formatDuration(callDurationSeconds)}
+              </div>
+            </div>
+
+            {/* Main video area */}
+            <div className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden bg-black">
+              <div id={remoteViewId} className="absolute inset-0 h-full w-full" />
+              
+              {/* Local video preview - bottom right corner */}
+              <div
+                id={localViewId}
+                className={`absolute bottom-6 right-6 h-40 w-32 overflow-hidden rounded-lg border-2 border-white shadow-xl ${localVideoReady ? "opacity-100" : "opacity-0"}`}
+              />
+
+              {/* Placeholder when video not ready */}
+              {!remoteVideoReady && (
+                <div className="flex flex-col items-center justify-center gap-3 text-slate-400">
+                  <FontAwesomeIcon icon={faVideo} size="3x" />
+                  <span className="text-sm">Connecting video...</span>
+                </div>
+              )}
+
+              {/* Media error notice */}
+              {mediaNotice && (
+                <div className="absolute top-4 left-4 max-w-xs rounded-lg bg-rose-500/20 px-4 py-2 text-sm text-rose-200">
+                  {mediaNotice}
+                </div>
+              )}
+            </div>
+
+            {/* Bottom control bar - compact and centered */}
+            <div className="flex items-center justify-center gap-6 border-t border-slate-800 bg-black/80 px-6 py-4 backdrop-blur-sm">
+              <button
+                type="button"
+                onClick={toggleMute}
+                className={`flex h-12 w-12 items-center justify-center rounded-full transition ${isMuted ? "bg-white text-black" : "bg-slate-700 text-white hover:bg-slate-600"}`}
+                title={isMuted ? "Unmute" : "Mute"}
+              >
+                <FontAwesomeIcon icon={isMuted ? faMicrophoneSlash : faMicrophone} />
+              </button>
+              <button
+                type="button"
+                onClick={toggleSpeaker}
+                className={`flex h-12 w-12 items-center justify-center rounded-full transition ${isSpeakerOn ? "bg-blue-600 text-white hover:bg-blue-500" : "bg-slate-700 text-white hover:bg-slate-600"}`}
+                title={isSpeakerOn ? "Speaker on" : "Speaker off"}
+              >
+                <FontAwesomeIcon icon={isSpeakerOn ? faVolumeUp : faVolumeMute} />
+              </button>
+              <button
+                type="button"
+                onClick={toggleCamera}
+                className={`flex h-12 w-12 items-center justify-center rounded-full transition ${isCameraOn ? "bg-blue-600 text-white hover:bg-blue-500" : "bg-white text-black hover:bg-gray-200"}`}
+                title={isCameraOn ? "Camera on" : "Camera off"}
+              >
+                <FontAwesomeIcon icon={isCameraOn ? faVideo : faVideoSlash} />
+              </button>
+              {activeCall?.type === "video" ? (
+                <button
+                  type="button"
+                  onClick={switchCamera}
+                  className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-700 text-white transition hover:bg-slate-600"
+                  title="Switch camera"
+                >
+                  <FontAwesomeIcon icon={faRepeat} size="sm" />
+                </button>
+              ) : null}
+              <button
+                type="button"
+                onClick={() => handleEndCall()}
+                disabled={processing}
+                className="flex h-12 w-12 items-center justify-center rounded-full bg-rose-600 text-white transition hover:bg-rose-500 disabled:opacity-60"
+                title="End call"
+              >
+                {processing ? <FontAwesomeIcon icon={faSpinner} spin /> : <FontAwesomeIcon icon={faPhoneSlash} />}
+              </button>
+            </div>
+          </div>
+        );
+      }
+    }
+
+    // Voice calls - simplified layout with avatar and controls
+    if (showIncomingControls) {
+      return (
+        <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-black">
+          <div className="flex w-full flex-col items-center justify-center gap-8 px-4 py-12">
+            <div className="flex h-24 w-24 items-center justify-center rounded-full bg-slate-700 text-4xl font-bold text-white shadow-lg">
+              {getInitials(activeCall?.callerName || "Atlas")}
+            </div>
+            <div className="text-center">
+              <h2 className="text-2xl font-bold text-white">{activeCall?.callerName || "Atlas support"}</h2>
+              <p className="mt-1 text-sm text-slate-400">{statusLabel}</p>
+            </div>
+            <div className="flex gap-8">
+              <button
+                type="button"
+                onClick={() => handleDecline("declined")}
+                disabled={processing}
+                className="flex h-16 w-16 items-center justify-center rounded-full bg-rose-600 text-white shadow-lg transition hover:bg-rose-500 disabled:opacity-60"
+              >
+                {processing ? <FontAwesomeIcon icon={faSpinner} spin /> : <FontAwesomeIcon icon={faPhoneSlash} size="lg" />}
+              </button>
+              <button
+                type="button"
+                onClick={handleAccept}
+                disabled={processing}
+                className="flex h-16 w-16 items-center justify-center rounded-full bg-emerald-500 text-white shadow-lg transition hover:bg-emerald-400 disabled:opacity-60"
+              >
+                {processing ? <FontAwesomeIcon icon={faSpinner} spin /> : <FontAwesomeIcon icon={faPhone} size="lg" />}
+              </button>
             </div>
           </div>
         </div>
@@ -589,33 +708,23 @@ export default function IncomingCallListener() {
 
     if (isCallerRinging) {
       return (
-        <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-slate-950">
-          <div className="flex h-full w-full flex-col bg-slate-900">
-            <div className="border-b border-slate-800 px-6 py-4 text-center">
-              <p className="text-sm font-semibold uppercase tracking-[0.2em] text-sky-400">{title}</p>
-              <h3 className="mt-1 text-xl font-bold text-white">{activeCall?.callerName || "Atlas support"}</h3>
+        <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-black">
+          <div className="flex w-full flex-col items-center justify-center gap-8 px-4 py-12">
+            <div className="flex h-24 w-24 items-center justify-center rounded-full bg-slate-700 text-4xl font-bold text-white shadow-lg">
+              {getInitials(activeCall?.callerName || "Atlas")}
             </div>
-            <div className="flex flex-1 flex-col items-center justify-center px-6 py-8 text-center">
-              {mediaPanel}
-              <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-slate-800 text-lg font-semibold text-white">
-                {getInitials(activeCall?.callerName || "Atlas")}
-              </div>
-              <p className="text-sm text-slate-400">{formatConversationInfo(activeCall, conversationTitle)}</p>
-              <div className="mt-5 flex items-center justify-center gap-2 text-sm text-slate-400">
-                <FontAwesomeIcon icon={faCircle} className="text-amber-400" />
-                <span>{statusLabel}</span>
-              </div>
-              <div className="mt-6">
-                <button
-                  type="button"
-                  onClick={() => handleCancelCall()}
-                  disabled={processing}
-                  className="flex h-20 w-20 flex-col items-center justify-center gap-1 rounded-full bg-rose-600 text-xs font-semibold text-white transition hover:bg-rose-500 disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  {processing ? <FontAwesomeIcon icon={faSpinner} spin /> : <><FontAwesomeIcon icon={faPhoneSlash} className="text-xl" /><span>Cancel</span></>}
-                </button>
-              </div>
+            <div className="text-center">
+              <h2 className="text-2xl font-bold text-white">{activeCall?.callerName || "Atlas support"}</h2>
+              <p className="mt-1 text-sm text-slate-400">{statusLabel}</p>
             </div>
+            <button
+              type="button"
+              onClick={() => handleCancelCall()}
+              disabled={processing}
+              className="flex h-16 w-16 items-center justify-center rounded-full bg-rose-600 text-white shadow-lg transition hover:bg-rose-500 disabled:opacity-60"
+            >
+              {processing ? <FontAwesomeIcon icon={faSpinner} spin /> : <FontAwesomeIcon icon={faPhoneSlash} size="lg" />}
+            </button>
           </div>
         </div>
       );
@@ -623,86 +732,62 @@ export default function IncomingCallListener() {
 
     if (isActiveCall) {
       return (
-        <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-slate-950">
-          <div className="flex h-full w-full flex-col bg-slate-900">
-            <div className="border-b border-slate-800 px-6 py-4 text-center">
-              <p className="text-sm font-semibold uppercase tracking-[0.2em] text-sky-400">{title}</p>
-              <h3 className="mt-1 text-xl font-bold text-white">{activeCall?.callerName || "Atlas support"}</h3>
+        <div className="fixed inset-0 z-[99999] flex flex-col bg-black">
+          {/* Header */}
+          <div className="flex items-center justify-between border-b border-slate-800 px-6 py-3">
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-700 text-sm font-semibold text-white">
+                {getInitials(activeCall?.callerName || "Atlas")}
+              </div>
+              <div>
+                <h3 className="font-semibold text-white">{activeCall?.callerName || "Atlas support"}</h3>
+                <p className="text-xs text-slate-400">{statusLabel}</p>
+              </div>
             </div>
-            <div className="flex min-h-0 flex-1 flex-col items-center px-4 py-4 text-center sm:px-8">
-              {mediaPanel}
-              <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-sky-500/20 text-sky-400">
-                {activeCall?.type === "video" ? (
-                  <FontAwesomeIcon icon={faVideo} size="2x" />
-                ) : (
-                  <FontAwesomeIcon icon={faPhone} size="2x" />
-                )}
+            <div className="text-sm font-semibold text-slate-300">
+              {formatDuration(callDurationSeconds)}
+            </div>
+          </div>
+
+          {/* Main content - centered with controls */}
+          <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-8 px-4 py-8">
+            <div className="flex h-32 w-32 items-center justify-center rounded-full bg-gradient-to-br from-slate-700 to-slate-800 text-5xl font-bold text-white shadow-lg">
+              {getInitials(activeCall?.callerName || "Atlas")}
+            </div>
+
+            {mediaNotice && (
+              <div className="rounded-lg bg-rose-500/20 px-4 py-2 text-sm text-rose-200">
+                {mediaNotice}
               </div>
-              <p className="text-sm text-slate-400">{formatConversationInfo(activeCall, conversationTitle)}</p>
-              {mediaNotice ? (
-                <p className="mt-3 rounded-lg bg-rose-500/10 px-3 py-2 text-xs font-medium text-rose-200">
-                  {mediaNotice}
-                </p>
-              ) : null}
-              <div className="mt-5 flex items-center justify-center gap-2 text-sm text-slate-400">
-                <FontAwesomeIcon icon={faCircle} className={["ongoing", "connected"].includes(status) ? "text-emerald-500" : "text-amber-400"} />
-                <span>{statusLabel}</span>
-              </div>
-              <div className="mt-4 flex flex-col gap-3">
-                <div className="flex items-center justify-center gap-4">
-                  <button
-                    type="button"
-                    onClick={toggleMute}
-                    className={`flex h-16 w-16 flex-col items-center justify-center gap-1 rounded-full text-[11px] font-semibold transition ${isMuted ? "bg-white text-slate-950" : "bg-slate-700 text-white hover:bg-slate-600"}`}
-                  >
-                    <FontAwesomeIcon icon={isMuted ? faMicrophoneSlash : faMicrophone} />
-                    {isMuted ? "Muted" : "Mute"}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={toggleSpeaker}
-                    className={`flex h-16 w-16 flex-col items-center justify-center gap-1 rounded-full text-[11px] font-semibold transition ${isSpeakerOn ? "bg-blue-600 text-white" : "bg-slate-700 text-white hover:bg-slate-600"}`}
-                  >
-                    <FontAwesomeIcon icon={isSpeakerOn ? faVolumeUp : faVolumeMute} />
-                    {isSpeakerOn ? "Speaker" : "Earpiece"}
-                  </button>
-                  {activeCall?.type === "video" ? (
-                    <button
-                      type="button"
-                      onClick={toggleCamera}
-                      className={`flex h-16 w-16 flex-col items-center justify-center gap-1 rounded-full text-[11px] font-semibold transition ${isCameraOn ? "bg-blue-600 text-white" : "bg-white text-slate-950"}`}
-                    >
-                      <FontAwesomeIcon icon={isCameraOn ? faVideo : faVideoSlash} />
-                      {isCameraOn ? "Camera" : "Camera Off"}
-                    </button>
-                  ) : null}
-                </div>
-                {activeCall?.type === "video" ? (
-                  <div className="flex items-center justify-center gap-3">
-                    <button
-                      type="button"
-                      onClick={switchCamera}
-                      className="flex h-16 w-16 flex-col items-center justify-center gap-1 rounded-full bg-slate-700 text-[10px] font-semibold text-white transition hover:bg-slate-600"
-                    >
-                      <FontAwesomeIcon icon={faRepeat} />
-                      Switch
-                    </button>
-                  </div>
-                ) : null}
-                <div className="rounded-2xl bg-slate-800 px-4 py-3 text-sm font-semibold text-slate-100">
-                  Call duration: {formatDuration(callDurationSeconds)}
-                </div>
-                <div>
-                  <button
-                    type="button"
-                    onClick={() => handleEndCall()}
-                    disabled={processing}
-                    className="mx-auto flex h-16 w-16 flex-col items-center justify-center gap-1 rounded-full bg-rose-600 text-[11px] font-semibold text-white transition hover:bg-rose-500 disabled:cursor-not-allowed disabled:opacity-60"
-                  >
-                    {processing ? <FontAwesomeIcon icon={faSpinner} spin /> : <><FontAwesomeIcon icon={faPhoneSlash} /><span>End</span></>}
-                  </button>
-                </div>
-              </div>
+            )}
+
+            {/* Bottom control bar - Facebook-like compact */}
+            <div className="flex items-center justify-center gap-6">
+              <button
+                type="button"
+                onClick={toggleMute}
+                className={`flex h-12 w-12 items-center justify-center rounded-full transition ${isMuted ? "bg-white text-black" : "bg-slate-700 text-white hover:bg-slate-600"}`}
+                title={isMuted ? "Unmute" : "Mute"}
+              >
+                <FontAwesomeIcon icon={isMuted ? faMicrophoneSlash : faMicrophone} />
+              </button>
+              <button
+                type="button"
+                onClick={toggleSpeaker}
+                className={`flex h-12 w-12 items-center justify-center rounded-full transition ${isSpeakerOn ? "bg-blue-600 text-white hover:bg-blue-500" : "bg-slate-700 text-white hover:bg-slate-600"}`}
+                title={isSpeakerOn ? "Speaker on" : "Speaker off"}
+              >
+                <FontAwesomeIcon icon={isSpeakerOn ? faVolumeUp : faVolumeMute} />
+              </button>
+              <button
+                type="button"
+                onClick={() => handleEndCall()}
+                disabled={processing}
+                className="flex h-12 w-12 items-center justify-center rounded-full bg-rose-600 text-white transition hover:bg-rose-500 disabled:opacity-60"
+                title="End call"
+              >
+                {processing ? <FontAwesomeIcon icon={faSpinner} spin /> : <FontAwesomeIcon icon={faPhoneSlash} />}
+              </button>
             </div>
           </div>
         </div>

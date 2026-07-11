@@ -22,6 +22,7 @@ import { auth, db } from "../../firebase";
 import {
   createCheckerConversation,
   listCheckerChatContacts,
+  startConversationCall,
 } from "../utilities/FirebaseFunctions";
 import { useTheme } from "../../contexts/ThemeContext";
 import ChatThread from "../chat/ChatThread";
@@ -58,7 +59,7 @@ function ContactAvatar({ contact, colors, size = 54 }) {
   );
 }
 
-function ContactRow({ contact, conversation, unread, active, colors, onPress }) {
+function ContactRow({ contact, conversation, unread, active, colors, onPress, onCall, calling }) {
   const preview = conversation?.lastMessageText
     ? displayMessagePreview({ text: conversation.lastMessageText })
     : `${contact.roleLabel} · ${contact.municipality}`;
@@ -84,7 +85,7 @@ function ContactRow({ contact, conversation, unread, active, colors, onPress }) 
           </Text>
         </View>
         <Text style={[styles.role, { color: colors.accent }]} numberOfLines={1}>
-          {contact.roleLabel}
+          {[contact.roleLabel, contact.municipality || contact.warehouseName].filter(Boolean).join(" · ")}
         </Text>
         <View style={styles.previewLine}>
           <Text
@@ -103,6 +104,24 @@ function ContactRow({ contact, conversation, unread, active, colors, onPress }) 
             </View>
           ) : null}
         </View>
+      </View>
+      <View style={styles.callActions}>
+        <TouchableOpacity
+          style={[styles.callButton, { backgroundColor: colors.accentSoft }]}
+          onPress={() => onCall("voice")}
+          disabled={!!calling}
+          accessibilityLabel={`Voice call ${contact.name}`}
+        >
+          {calling === "voice" ? <ActivityIndicator size="small" color={colors.accent} /> : <Feather name="phone" size={19} color={colors.accent} />}
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.callButton, { backgroundColor: colors.accentSoft }]}
+          onPress={() => onCall("video")}
+          disabled={!!calling}
+          accessibilityLabel={`Video call ${contact.name}`}
+        >
+          {calling === "video" ? <ActivityIndicator size="small" color={colors.accent} /> : <Feather name="video" size={19} color={colors.accent} />}
+        </TouchableOpacity>
       </View>
     </Pressable>
   );
@@ -127,6 +146,7 @@ export default function CheckerChatScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [openingId, setOpeningId] = useState(null);
   const [selectedId, setSelectedId] = useState(null);
+  const [callingContact, setCallingContact] = useState(null);
   const uid = auth.currentUser?.uid;
 
   const loadContacts = useCallback(async ({ refresh = false } = {}) => {
@@ -260,6 +280,25 @@ export default function CheckerChatScreen() {
     [loadContacts, openingId, router, twoPanel],
   );
 
+  const callContact = useCallback(async (contact, callType) => {
+    if (callingContact) return;
+    try {
+      setCallingContact(`${contact.id}:${callType}`);
+      const result = await createCheckerConversation({ contactId: contact.id });
+      const conversationId = result?.data?.conversationId;
+      if (!conversationId) throw new Error("Conversation was not created.");
+      await startConversationCall({ conversationId, callType });
+    } catch (error) {
+      console.error("Checker call failed:", error);
+      Alert.alert(
+        callType === "video" ? "Video call unavailable" : "Voice call unavailable",
+        error?.message || `Unable to call ${contact.name} right now.`,
+      );
+    } finally {
+      setCallingContact(null);
+    }
+  }, [callingContact]);
+
   const scopeLabel = [scope.warehouseName, scope.municipalities.join(", ")]
     .filter(Boolean)
     .join(" · ");
@@ -276,13 +315,13 @@ export default function CheckerChatScreen() {
       <View style={styles.header}>
         <View>
           <Text style={[styles.eyebrow, { color: colors.accent }]}>CHECKER</Text>
-          <Text style={[styles.title, { color: colors.text }]}>Messages</Text>
+          <Text style={[styles.title, { color: colors.text }]}>Calls</Text>
           <Text style={[styles.scope, { color: colors.textMuted }]} numberOfLines={1}>
             {scopeLabel || "No warehouse or municipality assigned"}
           </Text>
         </View>
         <View style={[styles.headerIcon, { backgroundColor: colors.accentSoft }]}>
-          <Feather name="message-circle" size={26} color={colors.accent} />
+          <Feather name="phone-call" size={25} color={colors.accent} />
         </View>
       </View>
 
@@ -291,7 +330,7 @@ export default function CheckerChatScreen() {
         <TextInput
           value={search}
           onChangeText={setSearch}
-          placeholder="Search authorized contacts"
+          placeholder="Search people"
           placeholderTextColor={colors.textMuted}
           style={[styles.searchInput, { color: colors.text }]}
           returnKeyType="search"
@@ -302,6 +341,13 @@ export default function CheckerChatScreen() {
           </TouchableOpacity>
         ) : null}
       </View>
+
+      {!loading && !search && conversations.length > 0 ? (
+        <View style={styles.sectionHeader}>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>Recent calls</Text>
+          <Text style={[styles.sectionMeta, { color: colors.textMuted }]}>Tap a button to call again</Text>
+        </View>
+      ) : null}
 
       {loading ? (
         <View style={styles.center}>
@@ -330,6 +376,8 @@ export default function CheckerChatScreen() {
                 active={twoPanel && conversation?.id === selectedId}
                 colors={colors}
                 onPress={() => openContact(item)}
+                onCall={(type) => callContact(item, type)}
+                calling={callingContact?.startsWith(`${item.id}:`) ? callingContact.split(":")[1] : null}
               />
             );
           }}
@@ -433,6 +481,11 @@ const styles = StyleSheet.create({
   previewLine: { marginTop: 4, flexDirection: "row", alignItems: "center", gap: 8 },
   preview: { flex: 1, minWidth: 0, fontSize: 13 },
   previewUnread: { fontWeight: "800" },
+  callActions: { flexDirection: "row", alignItems: "center", gap: 7 },
+  callButton: { width: 40, height: 40, borderRadius: 20, alignItems: "center", justifyContent: "center" },
+  sectionHeader: { paddingHorizontal: 18, paddingTop: 8, paddingBottom: 6, flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  sectionTitle: { fontSize: 15, fontWeight: "900" },
+  sectionMeta: { fontSize: 11, fontWeight: "600" },
   unread: {
     minWidth: 20,
     height: 20,
