@@ -3,6 +3,7 @@ import {
   ActivityIndicator,
   AppState,
   Modal,
+  PanResponder,
   Platform,
   StyleSheet,
   Text,
@@ -87,6 +88,11 @@ export default function IncomingCallListener() {
   const timeoutRef = useRef(null);
   const noticeTimerRef = useRef(null);
   const callDurationRef = useRef(0);
+  const nativeVideoStageRef = useRef({ width: 0, height: 0 });
+  const nativePreviewPositionRef = useRef({ x: 0, y: 0 });
+  const nativePreviewDragStartRef = useRef({ x: 0, y: 0 });
+  const nativePreviewPan = useRef(new Animated.ValueXY({ x: 0, y: 0 })).current;
+  const nativePreviewSize = { width: 112, height: 184 };
   const peerConnectionRef = useRef(null);
   const rtcCallIdRef = useRef(null);
   const processedCandidatesRef = useRef(new Set());
@@ -100,6 +106,7 @@ export default function IncomingCallListener() {
     NativeLocalVideoView,
     NativeRemoteVideoView,
     nativeVideoStreamType,
+    nativeVideoViewType,
   } = useTencentWebCall({
     activeCall,
     userId: user?.uid,
@@ -108,6 +115,51 @@ export default function IncomingCallListener() {
     isCameraOn,
     cameraType,
   });
+
+  const positionNativePreview = (x, y) => {
+    const stage = nativeVideoStageRef.current;
+    const maxX = Math.max(0, stage.width - nativePreviewSize.width);
+    const maxY = Math.max(0, stage.height - nativePreviewSize.height);
+    const next = {
+      x: Math.min(Math.max(0, x), maxX),
+      y: Math.min(Math.max(0, y), maxY),
+    };
+    nativePreviewPositionRef.current = next;
+    nativePreviewPan.setValue(next);
+  };
+
+  const resetNativePreview = () => {
+    const stage = nativeVideoStageRef.current;
+    positionNativePreview(
+      Math.max(0, stage.width - nativePreviewSize.width - 20),
+      Math.max(0, stage.height - nativePreviewSize.height - 126),
+    );
+  };
+
+  const nativePreviewPanResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onStartShouldSetPanResponderCapture: () => true,
+      onMoveShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponderCapture: () => true,
+      onPanResponderGrant: () => {
+        nativePreviewDragStartRef.current = { ...nativePreviewPositionRef.current };
+      },
+      onPanResponderMove: (_event, gesture) => {
+        const start = nativePreviewDragStartRef.current;
+        const stage = nativeVideoStageRef.current;
+        const maxX = Math.max(0, stage.width - 112);
+        const maxY = Math.max(0, stage.height - 184);
+        const next = {
+          x: Math.min(Math.max(0, start.x + gesture.dx), maxX),
+          y: Math.min(Math.max(0, start.y + gesture.dy), maxY),
+        };
+        nativePreviewPositionRef.current = next;
+        nativePreviewPan.setValue(next);
+      },
+      onPanResponderTerminationRequest: () => false,
+    }),
+  ).current;
 
   const cleanupWebRtc = () => {
     const peer = peerConnectionRef.current;
@@ -415,6 +467,10 @@ export default function IncomingCallListener() {
   useEffect(() => {
     activeCallRef.current = activeCall;
   }, [activeCall]);
+
+  useEffect(() => {
+    resetNativePreview();
+  }, [activeCall?.id]);
 
   useEffect(() => {
     callDurationRef.current = callDurationSeconds;
@@ -807,11 +863,18 @@ export default function IncomingCallListener() {
                   </View>
                 )}
                 {Platform.OS !== "web" && (
-                  <View style={styles.nativeVideoContainer}>
+                  <View
+                    style={styles.nativeVideoContainer}
+                    onLayout={({ nativeEvent }) => {
+                      nativeVideoStageRef.current = nativeEvent.layout;
+                      resetNativePreview();
+                    }}
+                  >
                     {remoteUserId && remoteVideoReady && NativeRemoteVideoView ? (
                       <NativeRemoteVideoView
                         userId={remoteUserId}
                         streamType={nativeVideoStreamType}
+                        viewType={nativeVideoViewType}
                         style={styles.remoteVideoFull}
                       />
                     ) : (
@@ -821,10 +884,22 @@ export default function IncomingCallListener() {
                       </View>
                     )}
                     {localVideoReady && NativeLocalVideoView ? (
-                      <NativeLocalVideoView
-                        frontCamera={cameraType !== "back"}
-                        style={styles.localVideoOverlay}
-                      />
+                      <Animated.View
+                        {...nativePreviewPanResponder.panHandlers}
+                        style={[
+                          styles.nativeLocalPreview,
+                          { transform: nativePreviewPan.getTranslateTransform() },
+                        ]}
+                      >
+                        <NativeLocalVideoView
+                          frontCamera={cameraType !== "back"}
+                          viewType={nativeVideoViewType}
+                          style={styles.nativeLocalVideoFill}
+                        />
+                        <View pointerEvents="none" style={styles.previewDragHandle}>
+                          <FontAwesome5 name="grip-lines" size={13} color="#fff" />
+                        </View>
+                      </Animated.View>
                     ) : null}
                   </View>
                 )}
@@ -1199,6 +1274,7 @@ const styles = StyleSheet.create({
     height: "100%",
     backgroundColor: "#000",
     overflow: "hidden",
+    zIndex: 1,
   },
   localVideoOverlay: {
     position: "absolute",
@@ -1210,6 +1286,37 @@ const styles = StyleSheet.create({
     borderWidth: 0,
     overflow: "hidden",
     backgroundColor: "#1e293b",
+    zIndex: 30,
+    elevation: 30,
+  },
+  nativeLocalPreview: {
+    position: "absolute",
+    left: 0,
+    top: 0,
+    width: 112,
+    height: 184,
+    borderRadius: 28,
+    borderWidth: 2,
+    borderColor: "rgba(255,255,255,0.9)",
+    overflow: "hidden",
+    backgroundColor: "#1e293b",
+    zIndex: 30,
+    elevation: 30,
+  },
+  nativeLocalVideoFill: {
+    width: "100%",
+    height: "100%",
+  },
+  previewDragHandle: {
+    position: "absolute",
+    top: 7,
+    alignSelf: "center",
+    minWidth: 30,
+    height: 20,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(0,0,0,0.48)",
   },
   videoPlaceholderOverlay: {
     position: "absolute",
@@ -1239,6 +1346,8 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
+    zIndex: 40,
+    elevation: 40,
   },
   videoTopIdentity: { flex: 1, minWidth: 0, flexDirection: "row", alignItems: "center", gap: 20 },
   videoTopCopy: { flex: 1, minWidth: 0 },
@@ -1350,6 +1459,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingHorizontal: 0,
     paddingVertical: 0,
+    zIndex: 40,
+    elevation: 40,
   },
   messengerControlBtn: {
     width: 60,

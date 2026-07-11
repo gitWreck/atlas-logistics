@@ -204,5 +204,6 @@ export default function useTencentWebCall({
     NativeLocalVideoView: TXVideoView.LocalView,
     NativeRemoteVideoView: TXVideoView.RemoteView,
     nativeVideoStreamType: TRTCCloudDef.TRTC_VIDEO_STREAM_TYPE_BIG,
+    nativeVideoViewType: TRTCCloudDef.TRTC_VideoView_TextureView,
   };
 }
