@@ -54,6 +54,8 @@ export const requestShipmentPickup = httpsCallable(
   functions,
   "requestShipmentPickup",
 );
+export const getMyInvoices = httpsCallable(functions, "getMyInvoices");
+export const getMySchedules = httpsCallable(functions, "getMySchedules");
 export const bulkShipmentAction = httpsCallable(
   functions,
   "bulkShipmentAction",

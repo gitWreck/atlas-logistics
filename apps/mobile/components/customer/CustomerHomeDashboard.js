@@ -88,24 +88,37 @@ export default function CustomerHomeDashboard({
   );
 
   const quickActions = [
-    { label: "Create\nShipment", icon: "plus", color: colors.primary, onPress: onRequestPickup },
     {
-      label: "My\nShipments",
-      icon: "package",
-      color: colors.success,
+      label: "Pickup",
+      description: "Request pickup",
+      icon: "truck",
+      iconColor: colors.primary,
+      iconBackground: colors.primarySoft,
+      onPress: onRequestPickup,
+    },
+    {
+      label: "Track Shipment",
+      description: "Track any shipment",
+      icon: "map-pin",
+      iconColor: colors.primaryDeep,
+      iconBackground: colors.primarySoft,
       onPress: () => router.push("/(customer)/shipments"),
     },
     {
-      label: "Track\nShipment",
-      icon: "map-pin",
-      color: colors.primaryDeep,
-      onPress: () => activeShipment && onShipmentPress(activeShipment),
+      label: "Invoice",
+      description: "View invoices",
+      icon: "file-text",
+      iconColor: colors.success,
+      iconBackground: colors.successSoft,
+      onPress: () => router.push("/(customer)/invoices"),
     },
     {
-      label: "Customer\nSupport",
-      icon: "headphones",
-      color: colors.warning,
-      onPress: () => router.push("/(customer)/chat"),
+      label: "Schedule",
+      description: "View trip schedules",
+      icon: "calendar",
+      iconColor: colors.warning,
+      iconBackground: colors.warningSoft,
+      onPress: () => router.push("/(customer)/schedules"),
     },
   ];
 
@@ -329,12 +342,31 @@ export default function CustomerHomeDashboard({
               ]}
               activeOpacity={0.82}
               onPress={action.onPress}
-              disabled={action.label.startsWith("Track") && !activeShipment}
+              disabled={action.disabled}
+              accessibilityRole="button"
+              accessibilityLabel={`${action.label}. ${action.description}`}
+              accessibilityState={{ disabled: Boolean(action.disabled) }}
             >
-              <View style={[styles.quickIcon, { backgroundColor: action.color }]}>
-                <Feather name={action.icon} size={30} color={colors.onPrimary} />
+              <View
+                style={[
+                  styles.quickIcon,
+                  { backgroundColor: action.iconBackground },
+                ]}
+              >
+                <Feather name={action.icon} size={26} color={action.iconColor} />
               </View>
-              <Text style={[styles.quickLabel, { color: colors.text }]}>{action.label}</Text>
+              <Text
+                style={[styles.quickLabel, { color: colors.text }]}
+                numberOfLines={2}
+              >
+                {action.label}
+              </Text>
+              <Text
+                style={[styles.quickDescription, { color: colors.textMuted }]}
+                numberOfLines={2}
+              >
+                {action.description}
+              </Text>
             </TouchableOpacity>
           ))}
         </View>
@@ -650,34 +682,43 @@ const styles = StyleSheet.create({
   quickGrid: {
     flexDirection: "row",
     flexWrap: "nowrap",
-    gap: 10,
+    justifyContent: "space-between",
+    gap: 8,
     marginBottom: 28,
   },
   quickCard: {
     flex: 1,
-    minHeight: 96,
-    borderRadius: 18,
+    maxWidth: 180,
+    minHeight: 132,
+    borderRadius: 12,
     borderWidth: 1,
     alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: 8,
-    paddingVertical: 14,
+    justifyContent: "flex-start",
+    paddingHorizontal: 6,
+    paddingVertical: 10,
     shadowOffset: { width: 0, height: 10 },
     shadowOpacity: 0.08,
     shadowRadius: 18,
     elevation: 1,
   },
   quickIcon: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     alignItems: "center",
     justifyContent: "center",
-    marginBottom: 13,
+    marginBottom: 8,
   },
   quickLabel: {
-    fontSize: 13,
-    lineHeight: 18,
+    minHeight: 32,
+    fontSize: 12,
+    lineHeight: 15,
+    fontWeight: "700",
+    textAlign: "center",
+  },
+  quickDescription: {
+    fontSize: 10,
+    lineHeight: 13,
     fontWeight: "400",
     textAlign: "center",
   },

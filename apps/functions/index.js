@@ -7,8 +7,10 @@ const admin = require("firebase-admin");
 const allowedFunctionOrigins = [
   "http://localhost:3000",
   "http://localhost:3001",
+  "http://localhost:8081",
   "http://127.0.0.1:3000",
   "http://127.0.0.1:3001",
+  "http://127.0.0.1:8081",
   "https://localhost:3000",
   "https://localhost:3001",
   "https://127.0.0.1:3000",
@@ -40,6 +42,10 @@ exports.addTrackedShipment =
   require("./src/users/addTrackedShipment").addTrackedShipment;
 exports.requestShipmentPickup =
   require("./src/users/requestShipmentPickup").requestShipmentPickup;
+exports.getMyInvoices =
+  require("./src/customers/getCustomerOperations").getMyInvoices;
+exports.getMySchedules =
+  require("./src/customers/getCustomerOperations").getMySchedules;
 exports.resolveDelayReport =
   require("./src/trips/resolveDelayReport").resolveDelayReport;
 
