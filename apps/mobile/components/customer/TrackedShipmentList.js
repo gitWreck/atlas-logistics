@@ -206,12 +206,7 @@ export default function TrackedShipmentList({
         )}
       </View>
 
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.filtersContent}
-        style={styles.filtersScroll}
-      >
+      <View style={styles.filtersContent}>
         {FILTER_OPTIONS.map((opt) => {
           const isActive = activeFilter === opt.value;
           return (
@@ -228,6 +223,9 @@ export default function TrackedShipmentList({
               activeOpacity={0.8}
             >
               <Text
+                numberOfLines={1}
+                adjustsFontSizeToFit
+                minimumFontScale={0.8}
                 style={[
                   styles.filterText,
                   { color: isActive ? colors.onPrimary : colors.textMuted },
@@ -238,7 +236,7 @@ export default function TrackedShipmentList({
             </TouchableOpacity>
           );
         })}
-      </ScrollView>
+      </View>
 
       <ScrollView
         showsVerticalScrollIndicator={false}
@@ -394,25 +392,23 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: "400",
   },
-  filtersScroll: {
-    flexGrow: 0,
+  filtersContent: {
+    flexDirection: "row",
+    gap: 5,
     marginBottom: 12,
   },
-  filtersContent: {
-    gap: 9,
-    paddingRight: 6,
-  },
   filterChip: {
+    flex: 1,
     height: 31,
-    minWidth: 58,
+    minWidth: 0,
     borderRadius: 16,
     borderWidth: 1,
-    paddingHorizontal: 14,
+    paddingHorizontal: 4,
     alignItems: "center",
     justifyContent: "center",
   },
   filterText: {
-    fontSize: 12,
+    fontSize: 10,
     fontWeight: "700",
   },
   listContent: {
