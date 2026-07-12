@@ -374,62 +374,6 @@ function ShipmentInfoCard({ conversation, colors, onViewTracking }) {
   );
 }
 
-function QuickActions({ colors, hasShipment, onTrack, onConcern, onAgent }) {
-  return (
-    <ScrollView
-      horizontal
-      showsHorizontalScrollIndicator={false}
-      style={[
-        styles.quickActions,
-        { backgroundColor: colors.surface, borderTopColor: colors.border },
-      ]}
-      contentContainerStyle={styles.quickActionsContent}
-    >
-      {hasShipment && (
-        <TouchableOpacity
-          style={[
-            styles.quickAction,
-            { backgroundColor: colors.inputBar, borderColor: colors.border },
-          ]}
-          onPress={onTrack}
-          activeOpacity={0.82}
-        >
-          <FontAwesome5 name="map-marker-alt" size={17} color="#22C55E" />
-          <Text style={[styles.quickActionText, { color: colors.text }]}>
-            Track Shipment
-          </Text>
-        </TouchableOpacity>
-      )}
-      <TouchableOpacity
-        style={[
-          styles.quickAction,
-          { backgroundColor: colors.inputBar, borderColor: colors.border },
-        ]}
-        onPress={onConcern}
-        activeOpacity={0.82}
-      >
-        <FontAwesome5 name="truck" size={17} color={colors.accent} />
-        <Text style={[styles.quickActionText, { color: colors.text }]}>
-          Delivery Concern
-        </Text>
-      </TouchableOpacity>
-      <TouchableOpacity
-        style={[
-          styles.quickAction,
-          { backgroundColor: colors.inputBar, borderColor: colors.border },
-        ]}
-        onPress={onAgent}
-        activeOpacity={0.82}
-      >
-        <FontAwesome5 name="headset" size={17} color={colors.textMuted} />
-        <Text style={[styles.quickActionText, { color: colors.text }]}>
-          Talk to Agent
-        </Text>
-      </TouchableOpacity>
-    </ScrollView>
-  );
-}
-
 function QuickActionsSheet({ visible, onClose, onTrack, onDetails, onProblem, onChange, onAgent, ui = UI }) {
   const actions = [
     {
@@ -1592,14 +1536,6 @@ export default function ChatThread({ conversationId, onBack, embedded = false })
             </View>
           )}
 
-          {!isDirectStaff && <QuickActions
-            colors={colors}
-            hasShipment={hasShipment}
-            onTrack={() => setQuickOpen(true)}
-            onConcern={() => setQuickOpen(true)}
-            onAgent={() => setQuickOpen(true)}
-          />}
-
           {isDirectStaff && (
             <ScrollView
               horizontal
@@ -2151,30 +2087,6 @@ const styles = StyleSheet.create({
     gap: 7,
   },
   staffQuickText: { fontSize: 12, fontWeight: "800" },
-  quickActions: {
-    paddingHorizontal: 18,
-    paddingTop: 10,
-    paddingBottom: 10,
-    borderTopWidth: 1,
-    flexGrow: 0,
-  },
-  quickActionsContent: {
-    flexDirection: "row",
-    gap: 9,
-    paddingRight: 18,
-  },
-  quickAction: {
-    minHeight: 42,
-    minWidth: 132,
-    borderRadius: 12,
-    borderWidth: 1,
-    paddingHorizontal: 12,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-  },
-  quickActionText: { fontSize: 13, fontWeight: "600" },
   composer: {
     flexDirection: "row",
     alignItems: "center",

@@ -26,6 +26,7 @@
     "android": {
       "package": "com.atlas.atlastracking",
       "versionCode": 23,
+      "softwareKeyboardLayoutMode": "resize",
       "googleServicesFile": "./google-services.json",
       "permissions": [
         "android.permission.ACCESS_FINE_LOCATION",

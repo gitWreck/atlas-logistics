@@ -1,13 +1,15 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
   FlatList,
   Image,
+  KeyboardAvoidingView,
   Modal,
   Platform,
   Pressable,
   SafeAreaView,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -228,6 +230,7 @@ export default function CustomerChatListScreen() {
   const [starting, setStarting] = useState(false);
   const [markingRead, setMarkingRead] = useState(false);
   const [composeVisible, setComposeVisible] = useState(false);
+  const composeScrollRef = useRef(null);
   const [initialMessage, setInitialMessage] = useState("");
   const [selectedCategory, setSelectedCategory] = useState(CONCERN_CATEGORIES[0]);
   const [search, setSearch] = useState("");
@@ -456,57 +459,76 @@ export default function CustomerChatListScreen() {
       </TouchableOpacity>
 
       <Modal transparent animationType="slide" visible={composeVisible} onRequestClose={() => setComposeVisible(false)}>
-        <View style={[styles.modalBackdrop, { backgroundColor: ui.overlay }]}>
-          <View style={[styles.modalSheet, { backgroundColor: ui.surface }]}>
-            <View style={[styles.sheetHandle, { backgroundColor: ui.border }]} />
-            <Text style={[styles.modalTitle, { color: ui.text }]}>Quick Actions</Text>
-            <View style={styles.categoryList}>
-              {CONCERN_CATEGORIES.map((category) => {
-                const active = selectedCategory?.key === category.key;
-                return (
-                  <TouchableOpacity
-                    key={category.key}
-                    style={[styles.categoryOption, { borderBottomColor: ui.border }]}
-                    onPress={() => setSelectedCategory(category)}
-                    activeOpacity={0.84}
-                  >
-                    <View style={[styles.categoryIcon, { backgroundColor: active ? ui.primary : ui.primarySoft }]}>
-                      <Feather name={category.icon} size={18} color={active ? ui.onPrimary : ui.primary} />
-                    </View>
-                    <View style={styles.categoryText}>
-                      <Text style={[styles.categoryTitle, { color: ui.text }]}>{category.title}</Text>
-                      <Text style={[styles.categoryDescription, { color: ui.muted }]}>{category.description}</Text>
-                    </View>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-            <TextInput
-              style={[styles.modalInput, { backgroundColor: ui.surface2, color: ui.text }]}
-              value={initialMessage}
-              onChangeText={setInitialMessage}
-              placeholder="Add more details..."
-              placeholderTextColor={ui.muted}
-              multiline
-            />
-            <View style={styles.modalActions}>
-              <TouchableOpacity
-                style={[styles.cancelButton, { backgroundColor: ui.surface2 }]}
-                onPress={() => {
-                  setComposeVisible(false);
-                  setInitialMessage("");
-                  setSelectedCategory(CONCERN_CATEGORIES[0]);
-                }}
-                disabled={starting}
+        <KeyboardAvoidingView
+          style={styles.keyboardAvoider}
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+        >
+          <View style={[styles.modalBackdrop, { backgroundColor: ui.overlay }]}>
+            <View style={[styles.modalSheet, { backgroundColor: ui.surface }]}>
+              <ScrollView
+                ref={composeScrollRef}
+                style={styles.modalScroll}
+                keyboardShouldPersistTaps="handled"
+                contentContainerStyle={styles.modalScrollContent}
+                automaticallyAdjustKeyboardInsets
+                showsVerticalScrollIndicator={false}
               >
-                <Text style={[styles.cancelText, { color: ui.primary }]}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={[styles.startButton, { backgroundColor: ui.primary }]} onPress={handleStartGeneral} disabled={starting}>
-                {starting ? <ActivityIndicator size="small" color={ui.onPrimary} /> : <Text style={[styles.startText, { color: ui.onPrimary }]}>Start Conversation</Text>}
-              </TouchableOpacity>
+                <View style={[styles.sheetHandle, { backgroundColor: ui.border }]} />
+                <Text style={[styles.modalTitle, { color: ui.text }]}>Quick Actions</Text>
+                <View style={styles.categoryList}>
+                  {CONCERN_CATEGORIES.map((category) => {
+                    const active = selectedCategory?.key === category.key;
+                    return (
+                      <TouchableOpacity
+                        key={category.key}
+                        style={[styles.categoryOption, { borderBottomColor: ui.border }]}
+                        onPress={() => setSelectedCategory(category)}
+                        activeOpacity={0.84}
+                      >
+                        <View style={[styles.categoryIcon, { backgroundColor: active ? ui.primary : ui.primarySoft }]}>
+                          <Feather name={category.icon} size={18} color={active ? ui.onPrimary : ui.primary} />
+                        </View>
+                        <View style={styles.categoryText}>
+                          <Text style={[styles.categoryTitle, { color: ui.text }]}>{category.title}</Text>
+                          <Text style={[styles.categoryDescription, { color: ui.muted }]}>{category.description}</Text>
+                        </View>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+                <TextInput
+                  style={[styles.modalInput, { backgroundColor: ui.surface2, color: ui.text }]}
+                  value={initialMessage}
+                  onChangeText={setInitialMessage}
+                  onFocus={() => {
+                    setTimeout(() => composeScrollRef.current?.scrollToEnd({ animated: true }), 100);
+                  }}
+                  placeholder="Add more details..."
+                  placeholderTextColor={ui.muted}
+                  multiline
+                  scrollEnabled
+                  textAlignVertical="top"
+                />
+                <View style={styles.modalActions}>
+                  <TouchableOpacity
+                    style={[styles.cancelButton, { backgroundColor: ui.surface2 }]}
+                    onPress={() => {
+                      setComposeVisible(false);
+                      setInitialMessage("");
+                      setSelectedCategory(CONCERN_CATEGORIES[0]);
+                    }}
+                    disabled={starting}
+                  >
+                    <Text style={[styles.cancelText, { color: ui.primary }]}>Cancel</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={[styles.startButton, { backgroundColor: ui.primary }]} onPress={handleStartGeneral} disabled={starting}>
+                    {starting ? <ActivityIndicator size="small" color={ui.onPrimary} /> : <Text style={[styles.startText, { color: ui.onPrimary }]}>Start Conversation</Text>}
+                  </TouchableOpacity>
+                </View>
+              </ScrollView>
             </View>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
     </SafeAreaView>
   );
@@ -638,6 +660,7 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(0,0,0,0.42)",
     justifyContent: "flex-end",
   },
+  keyboardAvoider: { flex: 1 },
   modalSheet: {
     backgroundColor: "#101b2b",
     borderTopLeftRadius: 16,
@@ -645,7 +668,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 18,
     paddingTop: 12,
     paddingBottom: Platform.OS === "ios" ? 28 : 18,
+    maxHeight: "100%",
   },
+  modalScroll: { flexShrink: 1 },
+  modalScrollContent: { flexGrow: 1 },
   sheetHandle: { width: 34, height: 4, borderRadius: 2, backgroundColor: "#526078", alignSelf: "center", marginBottom: 16 },
   modalTitle: { fontSize: 16, fontWeight: "600", textAlign: "center", marginBottom: 14 },
   categoryList: { gap: 0 },
