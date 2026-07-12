@@ -128,7 +128,7 @@ export default function CustomerHomeDashboard({
       subtitle: "Get answers to common questions",
       icon: "help-circle",
       color: colors.primary,
-      onPress: () => Alert.alert("FAQ", "Frequently asked questions will be available soon."),
+      onPress: () => router.push("/(customer)/faq"),
     },
     {
       title: "Contact Customer Support",
