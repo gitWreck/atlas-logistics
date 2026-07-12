@@ -159,7 +159,7 @@ function InvoiceCard({ invoice, colors }) {
   );
 }
 
-function ScheduleCard({ schedule, colors }) {
+function ScheduleCard({ schedule, colors, onPress }) {
   const isPickup = String(schedule.tripType || "").toUpperCase().includes("PICKUP");
   const accent = isPickup ? colors.primary : colors.warning;
   const accentBg = isPickup ? colors.primarySoft : colors.warningSoft;
@@ -169,6 +169,9 @@ function ScheduleCard({ schedule, colors }) {
   return (
     <TouchableOpacity
       activeOpacity={0.82}
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel="Open shipment tracking details"
       style={[styles.card, styles.scheduleCard, { backgroundColor: colors.dashboardSurface, borderColor: colors.dashboardBorder }]}
     >
       <View style={styles.scheduleTimeColumn}>
@@ -266,6 +269,18 @@ export default function CustomerOperationsList({ type, loadRecords }) {
   }, [filtered]);
 
   const onTrack = () => router.push("/(customer)/shipments");
+  const onSchedulePress = (schedule) => {
+    const trackingId = schedule.shipmentId;
+
+    if (!trackingId) {
+      return;
+    }
+
+    router.push({
+      pathname: "/(customer)/tracking/",
+      params: { trackingId, source: "schedules" },
+    });
+  };
 
   return (
     <SafeAreaView style={[styles.screen, { backgroundColor: colors.dashboardBg }]}>
@@ -343,7 +358,14 @@ export default function CustomerOperationsList({ type, loadRecords }) {
                         <Feather name="calendar" size={15} color={colors.primary} />
                         <Text style={[styles.groupTitle, { color: colors.primary }]}>{group.date ? formatDate(group.date) : "Date unavailable"}</Text>
                       </View>
-                      {group.records.map((record) => <ScheduleCard key={record.id} schedule={record} colors={colors} />)}
+                      {group.records.map((record) => (
+                        <ScheduleCard
+                          key={record.scheduleId || record.id}
+                          schedule={record}
+                          colors={colors}
+                          onPress={() => onSchedulePress(record)}
+                        />
+                      ))}
                     </View>
                   ))}
               {filtered.length === 0 && <Text style={[styles.noMatches, { color: colors.textMuted }]}>No matching records.</Text>}

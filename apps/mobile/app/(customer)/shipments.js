@@ -112,7 +112,9 @@ export default function CustomerShipmentsScreen() {
       <View style={styles.body}>
         <TrackedShipmentList
           shipments={shipments}
-          onShipmentPress={handleShipmentPress}
+          onShipmentPress={(shipment) =>
+            handleShipmentPress(shipment, "shipments")
+          }
           onCreateShipment={() => setPickupModalVisible(true)}
           activeFilter={activeFilter}
           onFilterChange={setActiveFilter}

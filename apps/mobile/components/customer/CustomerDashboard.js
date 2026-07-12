@@ -122,7 +122,9 @@ export default function CustomerDashboard() {
   const handleShipmentPress = (item) => {
     router.push({
       pathname: "/(customer)/tracking/",
-      params: { trackingId: item.trackingNumber || item.id },
+      params: {
+        trackingId: item.trackingNumber || item.id,
+      },
     });
   };
 

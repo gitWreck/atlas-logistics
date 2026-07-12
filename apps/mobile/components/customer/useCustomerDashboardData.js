@@ -155,10 +155,13 @@ export default function useCustomerDashboardData() {
     ]);
   };
 
-  const handleShipmentPress = (item) => {
+  const handleShipmentPress = (item, source) => {
     router.push({
       pathname: "/(customer)/tracking/",
-      params: { trackingId: item.trackingNumber || item.id },
+      params: {
+        trackingId: item.trackingNumber || item.id,
+        ...(source ? { source } : {}),
+      },
     });
   };
 

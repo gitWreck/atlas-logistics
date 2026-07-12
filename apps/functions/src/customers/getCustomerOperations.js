@@ -66,11 +66,29 @@ exports.getMySchedules = onCall(options, async (req) => {
     });
   });
 
-  const schedules = await Promise.all(
+  const tripEntries = await Promise.all(
     [...tripIds].map(async (tripId) => {
       const snapshot = await db.collection("truck_trips").doc(tripId).get();
-      return snapshot.exists ? { id: snapshot.id, ...snapshot.data() } : null;
+      return snapshot.exists
+        ? [tripId, { id: snapshot.id, ...snapshot.data() }]
+        : null;
     }),
   );
-  return { schedules: schedules.filter(Boolean) };
+  const tripsById = new Map(tripEntries.filter(Boolean));
+  const schedules = shipments.flatMap((shipment) => {
+    const tripId = [
+      shipment.currentTripId,
+      shipment.currentTruckTripId,
+      shipment.tripId,
+    ].find(Boolean);
+    const trip = tripId ? tripsById.get(String(tripId)) : null;
+    if (!trip) return [];
+
+    return [{
+      ...trip,
+      scheduleId: `${trip.id}:${shipment.id}`,
+      shipmentId: shipment.id,
+    }];
+  });
+  return { schedules };
 });
