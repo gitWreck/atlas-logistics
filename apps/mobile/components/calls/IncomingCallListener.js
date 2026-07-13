@@ -25,6 +25,11 @@ import {
 } from "../utilities/FirebaseFunctions";
 import { getCallSessionId } from "./callSession";
 import useTencentWebCall from "./useTencentWebCall";
+import {
+  CallControls,
+  VideoCallHeader,
+  VideoPlaceholder,
+} from "./CallPresentation";
 
 function getCallTitle(call) {
   const type = String(call?.type || "voice").toLowerCase();
@@ -45,6 +50,21 @@ function callActivityMillis(call = {}) {
   if (typeof timestamp?.toMillis === "function") return timestamp.toMillis();
   const parsed = new Date(timestamp || 0).getTime();
   return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function terminalCallToast(status) {
+  switch (String(status || "").trim().toLowerCase()) {
+    case "declined":
+      return "Call declined";
+    case "missed":
+      return "Missed call";
+    case "cancelled":
+      return "Call cancelled";
+    case "ended":
+      return "Call ended";
+    default:
+      return "";
+  }
 }
 
 const ACTIVE_CALL_STATUSES_FOR_CLIENT = ["ringing", "connecting", "accepted", "connected", "ongoing"];
@@ -100,9 +120,10 @@ export default function IncomingCallListener() {
     : { background: "#EEF4FC", surface: "#FFFFFF", text: "#0F172A", muted: "#64748B" };
   const [activeCall, setActiveCall] = useState(null);
   const [isCallMinimized, setIsCallMinimized] = useState(false);
+  const [isCallFullscreen, setIsCallFullscreen] = useState(false);
   const [conversationTitle, setConversationTitle] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
-  const [notice, setNotice] = useState("");
+  const [callToast, setCallToast] = useState("");
   const [callDurationSeconds, setCallDurationSeconds] = useState(0);
   const [isMuted, setIsMuted] = useState(false);
   const [isSpeakerOn, setIsSpeakerOn] = useState(true);
@@ -116,7 +137,9 @@ export default function IncomingCallListener() {
   const prevCallStatusRef = useRef(new Map());
   const activeCallRef = useRef(null);
   const timeoutRef = useRef(null);
-  const noticeTimerRef = useRef(null);
+  const toastTimerRef = useRef(null);
+  const toastOpacity = useRef(new Animated.Value(0)).current;
+  const toastTranslateY = useRef(new Animated.Value(12)).current;
   const callDurationRef = useRef(0);
   const nativeVideoStageRef = useRef({ width: 0, height: 0 });
   const nativePreviewPositionRef = useRef({ x: 0, y: 0 });
@@ -128,6 +151,7 @@ export default function IncomingCallListener() {
   const rtcCallIdRef = useRef(null);
   const processedCandidatesRef = useRef(new Set());
   const remoteTimeoutEndingRef = useRef(false);
+  const callSurfaceRef = useRef(null);
 
   useEffect(() => {
     let mounted = true;
@@ -157,7 +181,15 @@ export default function IncomingCallListener() {
 
   useEffect(() => {
     setIsCallMinimized(false);
+    setIsCallFullscreen(false);
   }, [activeCall?.id]);
+
+  useEffect(() => {
+    if (Platform.OS !== "web" || typeof document === "undefined") return undefined;
+    const syncFullscreen = () => setIsCallFullscreen(Boolean(document.fullscreenElement));
+    document.addEventListener("fullscreenchange", syncFullscreen);
+    return () => document.removeEventListener("fullscreenchange", syncFullscreen);
+  }, []);
   const {
     localViewId,
     remoteViewId,
@@ -401,14 +433,16 @@ export default function IncomingCallListener() {
       activeCallRef.current = null;
       setActiveCall(null);
       setConversationTitle("");
-      setNotice("");
+      setCallToast("");
+      toastOpacity.setValue(0);
+      toastTranslateY.setValue(12);
       if (timeoutRef.current) {
         clearTimeout(timeoutRef.current);
         timeoutRef.current = null;
       }
-      if (noticeTimerRef.current) {
-        clearTimeout(noticeTimerRef.current);
-        noticeTimerRef.current = null;
+      if (toastTimerRef.current) {
+        clearTimeout(toastTimerRef.current);
+        toastTimerRef.current = null;
       }
       return undefined;
     }
@@ -438,21 +472,6 @@ export default function IncomingCallListener() {
       } else {
         activeCallRef.current = nextCall;
         setActiveCall(nextCall);
-      }
-    };
-
-    const getTerminalNotice = (status) => {
-      switch (status) {
-        case "declined":
-          return "Staff declined the call.";
-        case "missed":
-          return "No answer from staff.";
-        case "cancelled":
-          return "The call was cancelled.";
-        case "ended":
-          return "The call has ended.";
-        default:
-          return null;
       }
     };
 
@@ -486,21 +505,8 @@ export default function IncomingCallListener() {
         const prev = prevStatusMap.get(currentActiveCallId);
         const current = String(callMapRef.current.get(currentActiveCallId)?.status || "").trim().toLowerCase();
         if (prev !== current && ["declined", "missed", "cancelled", "ended"].includes(current)) {
-          const terminalNotice = (function (s) {
-            switch (s) {
-              case "declined":
-                return "Staff declined the call.";
-              case "missed":
-                return "No answer from staff.";
-              case "cancelled":
-                return "The call was cancelled.";
-              case "ended":
-                return "The call has ended.";
-              default:
-                return null;
-            }
-          })(current);
-          if (terminalNotice) showNotice(terminalNotice);
+          const toastMessage = terminalCallToast(current);
+          if (toastMessage) showCallToast(toastMessage);
           try { cleanupWebRtc(); } catch (err) { console.warn("cleanupWebRtc error on terminal status:", err); }
           closeDialog();
           return;
@@ -621,21 +627,8 @@ export default function IncomingCallListener() {
       const data = snap.data() || {};
       const status = String(data.status || "").trim().toLowerCase();
       if (["declined", "missed", "cancelled", "ended"].includes(status)) {
-        const terminalNotice = (function (s) {
-          switch (s) {
-            case "declined":
-              return "Staff declined the call.";
-            case "missed":
-              return "No answer from staff.";
-            case "cancelled":
-              return "The call was cancelled.";
-            case "ended":
-              return "The call has ended.";
-            default:
-              return null;
-          }
-        })(status);
-        if (terminalNotice) showNotice(terminalNotice);
+        const toastMessage = terminalCallToast(status);
+        if (toastMessage) showCallToast(toastMessage);
         try { cleanupWebRtc(); } catch (err) { console.warn("cleanupWebRtc error on doc listener:", err); }
         closeDialog();
       }
@@ -661,7 +654,13 @@ export default function IncomingCallListener() {
     videoTrack?.applyConstraints?.({ facingMode: cameraType }).catch(() => {});
   }, [cameraType, localMediaStream]);
 
-  useEffect(() => () => cleanupWebRtc(), []);
+  useEffect(() => () => {
+    cleanupWebRtc();
+    if (toastTimerRef.current) {
+      clearTimeout(toastTimerRef.current);
+      toastTimerRef.current = null;
+    }
+  }, []);
 
   useEffect(() => {
     if (!activeCall?.conversationId) {
@@ -738,14 +737,19 @@ export default function IncomingCallListener() {
 
   useEffect(() => {
     const status = String(activeCall?.status || "").trim().toLowerCase();
-    const isActive = Boolean(activeCall && ["accepted", "connecting", "connected", "ongoing"].includes(status));
+    const bothParticipantsJoined = Boolean(
+      activeCall && ["connected", "ongoing"].includes(status),
+    );
 
-    if (!isActive) {
+    if (!bothParticipantsJoined) {
       setCallDurationSeconds(0);
       return undefined;
     }
 
-    const initialSeconds = activeCall?.startedAt?.toMillis ? Math.max(0, Math.floor((Date.now() - activeCall.startedAt.toMillis()) / 1000)) : 0;
+    const connectedAt = activeCall?.connectedAt;
+    const initialSeconds = connectedAt?.toMillis
+      ? Math.max(0, Math.floor((Date.now() - connectedAt.toMillis()) / 1000))
+      : 0;
     setCallDurationSeconds(initialSeconds);
 
     const intervalId = setInterval(() => {
@@ -753,22 +757,67 @@ export default function IncomingCallListener() {
     }, 1000);
 
     return () => clearInterval(intervalId);
-  }, [activeCall?.id, activeCall?.status, activeCall?.startedAt]);
+  }, [activeCall?.id, activeCall?.status, activeCall?.connectedAt]);
 
   const toggleMute = () => setIsMuted((current) => !current);
   const toggleSpeaker = () => setIsSpeakerOn((current) => !current);
   const toggleCamera = () => setIsCameraOn((current) => !current);
   const switchCamera = () => setCameraType((current) => (current === "front" ? "back" : "front"));
 
-  const showNotice = (message) => {
-    setNotice(message);
-    if (noticeTimerRef.current) {
-      clearTimeout(noticeTimerRef.current);
+  const toggleCallFullscreen = async () => {
+    if (Platform.OS !== "web" || typeof document === "undefined") return;
+    try {
+      if (document.fullscreenElement) {
+        await document.exitFullscreen?.();
+      } else {
+        await callSurfaceRef.current?.requestFullscreen?.();
+      }
+    } catch (error) {
+      console.warn("Unable to toggle call fullscreen", error);
     }
-    noticeTimerRef.current = setTimeout(() => {
-      setNotice("");
-      noticeTimerRef.current = null;
-    }, 4000);
+  };
+
+  const showCallToast = (message) => {
+    if (!message) return;
+
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    toastOpacity.stopAnimation();
+    toastTranslateY.stopAnimation();
+    setCallToast(message);
+    toastOpacity.setValue(0);
+    toastTranslateY.setValue(12);
+
+    Animated.parallel([
+      Animated.timing(toastOpacity, {
+        toValue: 1,
+        duration: 180,
+        useNativeDriver: Platform.OS !== "web",
+      }),
+      Animated.spring(toastTranslateY, {
+        toValue: 0,
+        speed: 24,
+        bounciness: 3,
+        useNativeDriver: Platform.OS !== "web",
+      }),
+    ]).start();
+
+    toastTimerRef.current = setTimeout(() => {
+      toastTimerRef.current = null;
+      Animated.parallel([
+        Animated.timing(toastOpacity, {
+          toValue: 0,
+          duration: 180,
+          useNativeDriver: Platform.OS !== "web",
+        }),
+        Animated.timing(toastTranslateY, {
+          toValue: 8,
+          duration: 180,
+          useNativeDriver: Platform.OS !== "web",
+        }),
+      ]).start(({ finished }) => {
+        if (finished) setCallToast("");
+      });
+    }, 2400);
   };
 
   const logCallEvent = async ({ conversationId, callId, text }) => {
@@ -831,7 +880,7 @@ export default function IncomingCallListener() {
       await logCallEvent({ conversationId: activeCall.conversationId, callId: activeCall.id, text: `📞 ${activeCall?.type === "video" ? "Video" : "Voice"} Call\nOngoing Call` });
     } catch (error) {
       console.error("Incoming call accept failed:", error);
-      showNotice("This call can no longer be accepted.");
+      showCallToast("This call can no longer be accepted");
       closeDialog();
     } finally {
       setIsProcessing(false);
@@ -910,25 +959,50 @@ export default function IncomingCallListener() {
     ? activeCall?.receiverName || activeCall?.receiverDisplayName || "Atlas staff"
     : activeCall?.callerName || "Atlas support";
   const callTypeLabel = activeCall?.type === "video" ? "Video Call" : "Voice Call";
+  const mediaFailed = Boolean(mediaNotice && /failed|unable|could not|permission/i.test(mediaNotice));
   const statusLabel = isIncoming
     ? `Incoming ${callTypeLabel}`
     : isCallerRinging
       ? "Ringing"
-      : status === "connected"
-        ? "In Call"
+      : status === "reconnecting"
+        ? "Reconnecting"
+        : mediaFailed
+          ? "Failed"
+          : ["connected", "ongoing"].includes(status)
+            ? "Connected"
         : isActiveCall
           ? "Connecting"
-          : "Call";
+          : status === "declined"
+            ? "Declined"
+            : status === "missed"
+              ? "Missed"
+              : status === "cancelled"
+                ? "Cancelled"
+                : status === "ended"
+                  ? "Call Ended"
+                  : "Calling";
 
-  if (!activeCall && !notice) {
+  if (!activeCall && !callToast) {
     return null;
   }
 
   return (
     <>
-      {notice ? (
-        <View style={styles.noticeBanner}>
-          <Text style={styles.noticeText}>{notice}</Text>
+      {callToast ? (
+        <View style={[styles.callToastLayer, { pointerEvents: "none" }]}>
+          <Animated.View
+            accessibilityLiveRegion="polite"
+            style={[
+              styles.callToast,
+              {
+                opacity: toastOpacity,
+                transform: [{ translateY: toastTranslateY }],
+              },
+            ]}
+          >
+            <FontAwesome5 name="phone-slash" size={13} color="#FFFFFF" />
+            <Text style={styles.callToastText}>{callToast}</Text>
+          </Animated.View>
         </View>
       ) : null}
       {activeCall && isActiveCall && isCallMinimized ? (
@@ -978,10 +1052,13 @@ export default function IncomingCallListener() {
             else void handleDecline("declined");
           }}
         >
-          <View style={[styles.messengerBackdrop, { backgroundColor: callPalette.background }]}>
+          <View
+            ref={callSurfaceRef}
+            style={[styles.messengerBackdrop, { backgroundColor: callPalette.background }]}
+          >
             <View pointerEvents="none" style={styles.backgroundGlowTop} />
             <View pointerEvents="none" style={styles.backgroundGlowBottom} />
-            {isActiveCall ? (
+            {isActiveCall && activeCall?.type !== "video" ? (
               <TouchableOpacity
                 onPress={() => setIsCallMinimized(true)}
                 style={styles.minimizeCallButton}
@@ -995,18 +1072,46 @@ export default function IncomingCallListener() {
             {activeCall?.type === "video" && isActiveCall ? (
               <>
                 {Platform.OS === "web" && (
-                  <View style={styles.webVideoContainer}>
+                  <View
+                    style={styles.webVideoContainer}
+                    onLayout={({ nativeEvent }) => {
+                      nativeVideoStageRef.current = nativeEvent.layout;
+                      resetNativePreview();
+                    }}
+                  >
+                    {React.createElement(
+                      "style",
+                      null,
+                      `#${remoteViewId}, #${remoteViewId} > *, #${remoteViewId} video, #${localViewId}, #${localViewId} > *, #${localViewId} video { width: 100% !important; height: 100% !important; } #${remoteViewId} video, #${localViewId} video { object-fit: cover !important; }`,
+                    )}
                     {React.createElement("div", {
                       id: remoteViewId,
                       style: styles.remoteVideoFull,
                     })}
-                    {React.createElement("div", {
-                      id: localViewId,
-                      style: {
-                        ...styles.localVideoOverlay,
-                        opacity: localVideoReady ? 1 : 0,
-                      },
-                    })}
+                    <Animated.View
+                      {...nativePreviewPanResponder.panHandlers}
+                      style={[
+                        styles.nativeLocalPreview,
+                        { transform: nativePreviewPan.getTranslateTransform() },
+                      ]}
+                    >
+                      {React.createElement("div", {
+                        id: localViewId,
+                        style: {
+                          ...styles.webLocalVideoFill,
+                          opacity: localVideoReady ? 1 : 0,
+                          transform: cameraType === "back" ? "none" : "scaleX(-1)",
+                        },
+                      })}
+                      {!localVideoReady ? (
+                        <View style={styles.localPreviewPlaceholder}>
+                          <ActivityIndicator size="small" color="#FFFFFF" />
+                        </View>
+                      ) : null}
+                      <View style={[styles.previewDragHandle, { pointerEvents: "none" }]}>
+                        <FontAwesome5 name="grip-lines" size={13} color="#fff" />
+                      </View>
+                    </Animated.View>
                     {!remoteVideoReady ? (
                       <View style={styles.videoPlaceholderOverlay}>
                         <View style={styles.videoWaitingAvatar}>
@@ -1033,47 +1138,45 @@ export default function IncomingCallListener() {
                         style={styles.remoteVideoFull}
                       />
                     ) : (
-                      <View style={styles.videoPlaceholder}>
-                        <FontAwesome5 name="video" size={50} color="#64748b" />
-                        <Text style={styles.videoPlaceholderText}>Connecting video...</Text>
-                      </View>
+                      <VideoPlaceholder name={peerName} status={statusLabel} />
                     )}
-                    {localVideoReady && NativeLocalVideoView ? (
-                      <Animated.View
-                        {...nativePreviewPanResponder.panHandlers}
-                        style={[
-                          styles.nativeLocalPreview,
-                          { transform: nativePreviewPan.getTranslateTransform() },
-                        ]}
-                      >
+                    <Animated.View
+                      {...nativePreviewPanResponder.panHandlers}
+                      style={[
+                        styles.nativeLocalPreview,
+                        { transform: nativePreviewPan.getTranslateTransform() },
+                      ]}
+                    >
+                      {localVideoReady && NativeLocalVideoView ? (
                         <NativeLocalVideoView
                           frontCamera={cameraType !== "back"}
+                          mirror={cameraType !== "back"}
                           viewType={nativeVideoViewType}
                           style={styles.nativeLocalVideoFill}
                         />
-                        <View pointerEvents="none" style={styles.previewDragHandle}>
-                          <FontAwesome5 name="grip-lines" size={13} color="#fff" />
+                      ) : (
+                        <View style={styles.localPreviewPlaceholder}>
+                          <ActivityIndicator size="small" color="#FFFFFF" />
                         </View>
-                      </Animated.View>
-                    ) : null}
+                      )}
+                      <View style={[styles.previewDragHandle, { pointerEvents: "none" }]}>
+                        <FontAwesome5 name="grip-lines" size={13} color="#fff" />
+                      </View>
+                    </Animated.View>
                   </View>
                 )}
               </>
             ) : null}
 
             {activeCall?.type === "video" && isActiveCall ? (
-              <View style={styles.videoTopOverlay} pointerEvents="none">
-                <View style={styles.videoTopCopy}>
-                  <Text style={styles.videoTimer}>
-                    {status === "connected" ? formatDuration(callDurationSeconds) : "Connecting..."}
-                  </Text>
-                  <Text style={styles.videoContactName} numberOfLines={1}>{peerName}</Text>
-                  <View style={styles.connectionRow}>
-                    <View style={styles.connectionDot} />
-                    <Text style={styles.videoCallStatus}>{statusLabel}</Text>
-                  </View>
-                </View>
-              </View>
+              <VideoCallHeader
+                name={peerName}
+                status={statusLabel}
+                timer={formatDuration(callDurationSeconds)}
+                fullscreen={isCallFullscreen}
+                onMinimize={() => setIsCallMinimized(true)}
+                onToggleFullscreen={toggleCallFullscreen}
+              />
             ) : null}
 
             {/* Messenger-style centered content when no video or not active */}
@@ -1147,21 +1250,18 @@ export default function IncomingCallListener() {
 
             {/* Controls overlay for active calls - bottom bar */}
             {isActiveCall ? (
-              <View style={styles.messengerControlsBar}>
-                {activeCall?.type === "video" ? (
-                  <View style={styles.labeledAction}><TouchableOpacity style={styles.messengerControlBtn} onPress={toggleCamera}><FontAwesome5 name={isCameraOn ? "video" : "video-slash"} size={20} color="#fff" /></TouchableOpacity><Text style={styles.actionLabel}>Camera</Text></View>
-                ) : null}
-
-                <View style={styles.labeledAction}><TouchableOpacity style={[styles.messengerControlBtn, isMuted && styles.messengerControlBtnInactive]} onPress={toggleMute}><FontAwesome5 name={isMuted ? "microphone-slash" : "microphone"} size={20} color="#fff" /></TouchableOpacity><Text style={styles.actionLabel}>Mute</Text></View>
-
-                <View style={styles.labeledAction}><TouchableOpacity style={styles.messengerControlBtn} onPress={toggleSpeaker}><FontAwesome5 name={isSpeakerOn ? "volume-up" : "volume-mute"} size={20} color="#fff" /></TouchableOpacity><Text style={styles.actionLabel}>Speaker</Text></View>
-
-                {activeCall?.type === "video" ? (
-                  <View style={styles.labeledAction}><TouchableOpacity style={styles.messengerControlBtn} onPress={switchCamera}><FontAwesome5 name="sync-alt" size={20} color="#fff" /></TouchableOpacity><Text style={styles.actionLabel}>Switch</Text></View>
-                ) : null}
-
-                <View style={styles.labeledAction}><TouchableOpacity style={[styles.messengerControlBtn, styles.messengerEndCallBtn]} onPress={handleEndCall} disabled={isProcessing}>{isProcessing ? <ActivityIndicator color="#fff" /> : <FontAwesome5 name="phone-slash" size={20} color="#fff" />}</TouchableOpacity><Text style={styles.actionLabel}>End Call</Text></View>
-              </View>
+              <CallControls
+                video={activeCall?.type === "video"}
+                muted={isMuted}
+                speakerOn={isSpeakerOn}
+                cameraOn={isCameraOn}
+                processing={isProcessing}
+                onMute={toggleMute}
+                onSpeaker={toggleSpeaker}
+                onCamera={toggleCamera}
+                onSwitchCamera={switchCamera}
+                onEnd={handleEndCall}
+              />
             ) : null}
           </View>
         </Modal>
@@ -1171,6 +1271,42 @@ export default function IncomingCallListener() {
 }
 
 const styles = StyleSheet.create({
+  callToastLayer: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: Platform.OS === "ios" ? 42 : 28,
+    zIndex: 20000,
+    elevation: 20000,
+    alignItems: "center",
+    paddingHorizontal: 20,
+  },
+  callToast: {
+    maxWidth: 420,
+    minHeight: 44,
+    paddingHorizontal: 18,
+    paddingVertical: 11,
+    borderRadius: 24,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 9,
+    backgroundColor: "rgba(17, 24, 39, 0.96)",
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.12)",
+    shadowColor: "#000000",
+    shadowOpacity: 0.28,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 7 },
+    elevation: 12,
+  },
+  callToastText: {
+    color: "#FFFFFF",
+    fontSize: 14,
+    lineHeight: 19,
+    fontWeight: "700",
+    textAlign: "center",
+  },
   backdrop: {
     flex: 1,
     backgroundColor: "#111827",
@@ -1495,19 +1631,6 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     zIndex: 1,
   },
-  localVideoOverlay: {
-    position: "absolute",
-    bottom: Platform.OS === "ios" ? 142 : 126,
-    right: 20,
-    width: 112,
-    height: 184,
-    borderRadius: 28,
-    borderWidth: 0,
-    overflow: "hidden",
-    backgroundColor: "#1e293b",
-    zIndex: 30,
-    elevation: 30,
-  },
   nativeLocalPreview: {
     position: "absolute",
     left: 0,
@@ -1525,6 +1648,21 @@ const styles = StyleSheet.create({
   nativeLocalVideoFill: {
     width: "100%",
     height: "100%",
+  },
+  webLocalVideoFill: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    width: "100%",
+    height: "100%",
+    overflow: "hidden",
+    backgroundColor: "#1E293B",
+  },
+  localPreviewPlaceholder: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#1E293B",
   },
   previewDragHandle: {
     position: "absolute",
@@ -1557,44 +1695,6 @@ const styles = StyleSheet.create({
     backgroundColor: "#2563eb",
   },
   videoWaitingAvatarText: { color: "#fff", fontSize: 32, fontWeight: "800" },
-  videoTopOverlay: {
-    position: "absolute",
-    top: Platform.OS === "ios" ? 54 : 30,
-    left: 72,
-    right: 72,
-    alignItems: "center",
-    zIndex: 40,
-    elevation: 40,
-  },
-  videoTopCopy: { alignItems: "center", minWidth: 0 },
-  videoTimer: {
-    color: "#FFFFFF",
-    fontSize: 12,
-    fontWeight: "800",
-    backgroundColor: "rgba(15,23,42,0.68)",
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
-    overflow: "hidden",
-    marginBottom: 6,
-  },
-  videoContactName: {
-    color: "#fff",
-    fontSize: 19,
-    fontWeight: "800",
-    textAlign: "center",
-    textShadowColor: "rgba(0,0,0,0.7)",
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 5,
-  },
-  videoCallStatus: {
-    color: "rgba(255,255,255,0.92)",
-    fontSize: 13,
-    fontWeight: "600",
-    textShadowColor: "rgba(0,0,0,0.7)",
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 4,
-  },
   connectionRow: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6 },
   connectionDot: { width: 9, height: 9, borderRadius: 5, backgroundColor: "#22C55E" },
   videoPlaceholder: {
@@ -1752,45 +1852,5 @@ const styles = StyleSheet.create({
     backgroundColor: "#22C55E",
     alignItems: "center",
     justifyContent: "center",
-  },
-  messengerControlsBar: {
-    position: "absolute",
-    bottom: Platform.OS === "ios" ? 24 : 16,
-    left: 12,
-    right: 12,
-    backgroundColor: "rgba(7,17,31,0.78)",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.1)",
-    borderRadius: 28,
-    flexDirection: "row",
-    justifyContent: "space-around",
-    alignItems: "center",
-    paddingHorizontal: 12,
-    paddingVertical: 12,
-    zIndex: 40,
-    elevation: 40,
-  },
-  messengerControlBtn: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: "rgba(51,65,85,0.86)",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  messengerControlBtnActive: {
-    backgroundColor: "#0f8cff",
-  },
-  messengerControlBtnSelected: {
-    backgroundColor: "rgba(0, 0, 0, 0.76)",
-  },
-  messengerCameraBtn: {
-    backgroundColor: "#ffffff",
-  },
-  messengerControlBtnInactive: {
-    backgroundColor: "#ef4444",
-  },
-  messengerEndCallBtn: {
-    backgroundColor: "#ef4444",
   },
 });

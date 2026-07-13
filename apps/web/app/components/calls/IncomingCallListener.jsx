@@ -538,14 +538,19 @@ export default function IncomingCallListener() {
 
   useEffect(() => {
     const status = String(activeCall?.status || "").trim().toLowerCase();
-    const isActive = Boolean(activeCall && ["accepted", "connecting", "connected", "ongoing"].includes(status));
+    const bothParticipantsJoined = Boolean(
+      activeCall && ["connected", "ongoing"].includes(status),
+    );
 
-    if (!isActive) {
+    if (!bothParticipantsJoined) {
       setCallDurationSeconds(0);
       return undefined;
     }
 
-    const initialSeconds = activeCall?.startedAt?.toMillis ? Math.max(0, Math.floor((Date.now() - activeCall.startedAt.toMillis()) / 1000)) : 0;
+    const connectedAt = activeCall?.connectedAt;
+    const initialSeconds = connectedAt?.toMillis
+      ? Math.max(0, Math.floor((Date.now() - connectedAt.toMillis()) / 1000))
+      : 0;
     setCallDurationSeconds(initialSeconds);
 
     const intervalId = window.setInterval(() => {
@@ -555,7 +560,7 @@ export default function IncomingCallListener() {
     return () => {
       window.clearInterval(intervalId);
     };
-  }, [activeCall?.id, activeCall?.status, activeCall?.startedAt]);
+  }, [activeCall?.id, activeCall?.status, activeCall?.connectedAt]);
 
   const toggleMute = () => setIsMuted((current) => !current);
   const toggleSpeaker = () => setIsSpeakerOn((current) => !current);
@@ -713,7 +718,20 @@ export default function IncomingCallListener() {
     ? conversationTitle || "Atlas staff"
     : activeCall?.callerName || conversationTitle || "Atlas support";
   const title = isIncoming ? "Incoming Call" : isCallerRinging ? "Calling Atlas Staff..." : status === "connected" ? "Ongoing Call" : isActiveCall ? "Connecting..." : "Call";
-  const statusLabel = isIncoming ? "Waiting for answer" : isCallerRinging ? "Ringing..." : status === "connected" ? "Connected" : isActiveCall ? "Connecting media..." : "Connected";
+  const mediaFailed = Boolean(mediaNotice && /failed|unable|could not|permission/i.test(mediaNotice));
+  const statusLabel = isIncoming
+    ? "Waiting for answer"
+    : isCallerRinging
+      ? "Ringing..."
+      : status === "reconnecting"
+        ? "Reconnecting"
+        : mediaFailed
+          ? "Failed"
+          : ["connected", "ongoing"].includes(status)
+            ? "Connected"
+            : isActiveCall
+              ? "Connecting media..."
+              : "Connected";
 
   if (!mounted || (!activeCall && !notice)) return null;
 
