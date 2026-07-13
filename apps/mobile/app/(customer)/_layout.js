@@ -23,6 +23,8 @@ export default function CustomerLayout() {
         <Tabs.Screen name="invoices" options={{ headerShown: false }} />
         <Tabs.Screen name="schedules" options={{ headerShown: false }} />
         <Tabs.Screen name="faq" options={{ headerShown: false }} />
+        <Tabs.Screen name="branch-locations" options={{ headerShown: false }} />
+        <Tabs.Screen name="branch" options={{ headerShown: false }} />
         <Tabs.Screen name="chat" options={{ headerShown: false }} />
         <Tabs.Screen name="profile" options={{ headerShown: false }} />
       </Tabs>

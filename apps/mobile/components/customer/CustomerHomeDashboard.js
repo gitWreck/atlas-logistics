@@ -1,6 +1,5 @@
 import React, { useMemo } from "react";
 import {
-  Alert,
   Image,
   ScrollView,
   StyleSheet,
@@ -142,7 +141,7 @@ export default function CustomerHomeDashboard({
       subtitle: "Find Atlas branches near you",
       icon: "map-pin",
       color: colors.warning,
-      onPress: () => Alert.alert("Branch Locations", "Branch locator will be available soon."),
+      onPress: () => router.push("/(customer)/branch-locations"),
     },
   ];
 

@@ -16,6 +16,9 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.atlas.tracking",
+      "config": {
+        "googleMapsApiKey": "AIzaSyD2-cgUlA9g4PyV9Zwrx17L5EFyQoTDkQo"
+      },
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
         "NSCameraUsageDescription": "Atlas uses the camera for video calls.",
