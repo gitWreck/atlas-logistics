@@ -257,7 +257,9 @@ export default function ChatInbox({ user, isDark = false }) {
                           </span>
                         </div>
                         <p className={`mt-1 truncate text-xs ${muted}`}>
-                          {item.trackingNumber || "General support"}
+                          {item.isGuest
+                            ? "Website guest"
+                            : item.trackingNumber || "General support"}
                         </p>
                         <p className="mt-1 truncate text-sm">
                           {item.lastMessageText || "Conversation started"}
@@ -325,7 +327,10 @@ export default function ChatInbox({ user, isDark = false }) {
                         />
                       </div>
                       <p className={`mt-1 truncate text-xs sm:text-sm ${muted}`}>
-                        {selected.customerPhone || "No phone"} ·{" "}
+                        {selected.isGuest
+                          ? "Website guest"
+                          : selected.customerPhone || "No phone"}{" "}
+                        ·{" "}
                         {selected.trackingNumber || "General support"}
                       </p>
                     </div>

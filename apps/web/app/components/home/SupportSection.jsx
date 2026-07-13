@@ -1,3 +1,5 @@
+"use client";
+
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faArrowRight,
@@ -7,6 +9,7 @@ import {
   faHeadset,
   faPhone,
 } from "@fortawesome/free-solid-svg-icons";
+import { useGuestChat } from "../chat/GuestChatProvider";
 
 const SUPPORT_PHONE = "+639125453219";
 
@@ -16,8 +19,7 @@ const supportCards = [
     value: "Message the operations desk",
     icon: faComments,
     tone: "blue",
-    href: `https://wa.me/${SUPPORT_PHONE.replace("+", "")}?text=${encodeURIComponent("Hello Atlas Support, I need help with my shipment.")}`,
-    external: true,
+    action: "chat",
   },
   {
     label: "Call Support",
@@ -42,6 +44,8 @@ const supportCards = [
 ];
 
 export default function SupportSection() {
+  const { openChat } = useGuestChat();
+
   return (
     <section className="atlas-section-enter atlas-section-3 overflow-hidden rounded-[2rem] border border-slate-800 bg-slate-950 text-white shadow-[0_24px_70px_rgba(15,23,42,0.28)]">
       <div className="relative p-5 sm:p-7 lg:p-8">
@@ -80,7 +84,12 @@ export default function SupportSection() {
 
           <div className="grid gap-3 sm:grid-cols-2">
             {supportCards.map((card, index) => (
-              <SupportCard key={card.label} card={card} index={index} />
+              <SupportCard
+                key={card.label}
+                card={card}
+                index={index}
+                onOpenChat={openChat}
+              />
             ))}
           </div>
         </div>
@@ -89,7 +98,7 @@ export default function SupportSection() {
   );
 }
 
-function SupportCard({ card, index }) {
+function SupportCard({ card, index, onOpenChat }) {
   const tones = {
     blue: "bg-blue-50 text-blue-700",
     emerald: "bg-emerald-50 text-emerald-700",
@@ -113,6 +122,19 @@ function SupportCard({ card, index }) {
       </p>
     </>
   );
+
+  if (card.action === "chat") {
+    return (
+      <button
+        type="button"
+        onClick={onOpenChat}
+        className={`${className} block w-full text-left transition hover:-translate-y-0.5 hover:border-slate-500 hover:bg-slate-800 focus:outline-none focus:ring-4 focus:ring-white/20`}
+        style={{ "--atlas-delay": `${index * 80}ms` }}
+      >
+        {content}
+      </button>
+    );
+  }
 
   if (!card.href) {
     return (

@@ -42,6 +42,15 @@ service cloud.firestore {
       return hasAnyRole(['admin', 'manager']);
     }
 
+    function isAnonymousUser() {
+      return isSignedIn()
+        && request.auth.token.firebase.sign_in_provider == 'anonymous';
+    }
+
+    function ownsConversation(conversation) {
+      return conversation.customerId == request.auth.uid;
+    }
+
     function isAssignedDriver() {
       return resource.data.driverId == request.auth.uid ||
         resource.data.assignedDriverId == request.auth.uid;
@@ -123,8 +132,9 @@ service cloud.firestore {
 
     match /conversations/{conversationId} {
       allow read: if isAdminOrManager()
-        || (isActiveUser() && resource.data.customerId == request.auth.uid)
-        || (isActiveUser() && request.auth.uid in resource.data.get('participantIds', []));
+        || (isActiveUser() && ownsConversation(resource.data))
+        || (isActiveUser() && request.auth.uid in resource.data.get('participantIds', []))
+        || (isAnonymousUser() && ownsConversation(resource.data));
 
       allow create, update, delete: if false;
 
@@ -132,11 +142,19 @@ service cloud.firestore {
         allow read: if isAdminOrManager()
           || (
             isActiveUser()
-            && get(/databases/$(database)/documents/conversations/$(conversationId)).data.customerId == request.auth.uid
+            && ownsConversation(
+              get(/databases/$(database)/documents/conversations/$(conversationId)).data
+            )
           )
           || (
             isActiveUser()
             && request.auth.uid in get(/databases/$(database)/documents/conversations/$(conversationId)).data.get('participantIds', [])
+          )
+          || (
+            isAnonymousUser()
+            && ownsConversation(
+              get(/databases/$(database)/documents/conversations/$(conversationId)).data
+            )
           );
 
         allow create, update, delete: if false;

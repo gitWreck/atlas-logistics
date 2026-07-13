@@ -2,7 +2,11 @@
 
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const admin = require("firebase-admin");
-const { requireAuth, requireRole } = require("../utilities/helpers");
+const {
+  requireAuth,
+  isAnonymousAuth,
+  requireRole,
+} = require("../utilities/helpers");
 const { customerOwnsShipment } = require("../utilities/customerShipmentAccess");
 
 if (!admin.apps.length) admin.initializeApp();
@@ -233,11 +237,54 @@ async function notifyCustomer({ conversationId, customerId, message, sender }) {
   });
 }
 
+async function findOpenWebSupportConversation(uid) {
+  const existingSnap = await db
+    .collection("conversations")
+    .where("customerId", "==", uid)
+    .orderBy("lastMessageAt", "desc")
+    .limit(10)
+    .get();
+
+  return existingSnap.docs.find((doc) => {
+    const data = doc.data() || {};
+    const status = String(data.status || "open").toLowerCase();
+    if (status === "closed") return false;
+    if (data.type === "guest_support") return true;
+    return data.type === "customer_support" && !data.trackingNumber;
+  });
+}
+
 exports.createConversation = onCall(
   { region: "asia-southeast1", maxInstances: 10 },
   async (req) => {
-    const { uid, role, user } = await requireRole(db, req, ["customer"]);
-    const trackingNumber = normalizeTracking(req.data?.trackingNumber);
+    const guest = isAnonymousAuth(req);
+    const source = String(req.data?.source || "").trim().toLowerCase();
+    const isWebSupport = source === "web";
+    let uid;
+    let role;
+    let user;
+
+    if (guest) {
+      uid = requireAuth(req);
+      role = "guest";
+      user = {};
+    } else {
+      uid = requireAuth(req);
+      const userSnap = await db.collection("users").doc(uid).get();
+      if (!userSnap.exists || userSnap.data()?.active === false) {
+        throw new HttpsError("permission-denied", "Inactive or missing user.");
+      }
+
+      user = userSnap.data() || {};
+      role = String(user.role || "").toLowerCase();
+
+      if (role !== "customer" && !isWebSupport) {
+        throw new HttpsError("permission-denied", "Insufficient role");
+      }
+    }
+
+    const trackingNumber =
+      guest || isWebSupport ? null : normalizeTracking(req.data?.trackingNumber);
     const initialMessage = String(req.data?.message || "").trim();
 
     let shipmentData = null;
@@ -256,7 +303,12 @@ exports.createConversation = onCall(
       }
     }
 
-    if (trackingNumber) {
+    if (guest || isWebSupport) {
+      const existing = await findOpenWebSupportConversation(uid);
+      if (existing) {
+        return { success: true, conversationId: existing.id, reused: true };
+      }
+    } else if (trackingNumber) {
       const existingSnap = await db
         .collection("conversations")
         .where("customerId", "==", uid)
@@ -283,11 +335,17 @@ exports.createConversation = onCall(
     }
 
     const conversationRef = db.collection("conversations").doc();
-    const customerName = displayName(user, "Customer");
+    const customerName = guest ? "Guest" : displayName(user, "Customer");
     const now = FieldValue.serverTimestamp();
 
     const conversation = {
-      type: trackingNumber ? "shipment" : "customer_support",
+      type: guest
+        ? "guest_support"
+        : trackingNumber
+          ? "shipment"
+          : "customer_support",
+      isGuest: guest,
+      source: guest || isWebSupport ? "web" : null,
       shipmentId: trackingNumber,
       trackingNumber,
       shipmentSummary: shipmentData
@@ -354,16 +412,22 @@ exports.sendChatMessage = onCall(
   { region: "asia-southeast1", maxInstances: 20 },
   async (req) => {
     const uid = requireAuth(req);
+    const guest = isAnonymousAuth(req);
     const text = cleanText(req.data?.text);
     const conversationId = cleanText(req.data?.conversationId, "conversationId", 160);
 
-    const userSnap = await db.collection("users").doc(uid).get();
-    if (!userSnap.exists || userSnap.data()?.active === false) {
-      throw new HttpsError("permission-denied", "Inactive or missing user.");
-    }
+    let user = {};
+    let role = "guest";
 
-    const user = userSnap.data() || {};
-    const role = String(user.role || "").toLowerCase();
+    if (!guest) {
+      const userSnap = await db.collection("users").doc(uid).get();
+      if (!userSnap.exists || userSnap.data()?.active === false) {
+        throw new HttpsError("permission-denied", "Inactive or missing user.");
+      }
+
+      user = userSnap.data() || {};
+      role = String(user.role || "").toLowerCase();
+    }
     const { ref, conversation } = await getConversationForUser(
       conversationId,
       uid,
@@ -374,8 +438,21 @@ exports.sendChatMessage = onCall(
       throw new HttpsError("failed-precondition", "Conversation is closed.");
     }
 
-    const senderName = displayName(user, role === "customer" ? "Customer" : "Staff");
-    const isStaff = STAFF_ROLES.includes(role);
+    const isRequester = conversation.customerId === uid;
+    const isStaff =
+      STAFF_ROLES.includes(role) && !isRequester;
+    const senderName = guest
+      ? "Guest"
+      : displayName(
+          user,
+          isRequester ? "Customer" : isStaff ? "Staff" : "Customer",
+        );
+    const senderRole =
+      guest || isRequester
+        ? guest
+          ? "guest"
+          : "customer"
+        : role;
     const now = FieldValue.serverTimestamp();
     const updates = {
       lastMessageText: text,
@@ -405,7 +482,7 @@ exports.sendChatMessage = onCall(
       const messageRef = ref.collection("messages").doc();
       tx.set(messageRef, {
         senderId: uid,
-        senderRole: role,
+        senderRole,
         senderName,
         type: "text",
         text,
@@ -419,12 +496,14 @@ exports.sendChatMessage = onCall(
     });
 
     if (isStaff) {
-      await notifyCustomer({
-        conversationId,
-        customerId: conversation.customerId,
-        message: text,
-        sender: { uid, role, name: senderName },
-      });
+      if (!conversation.isGuest) {
+        await notifyCustomer({
+          conversationId,
+          customerId: conversation.customerId,
+          message: text,
+          sender: { uid, role, name: senderName },
+        });
+      }
     } else {
       await notifyStaff({
         conversationId,
@@ -442,13 +521,17 @@ exports.markConversationRead = onCall(
   { region: "asia-southeast1", maxInstances: 20 },
   async (req) => {
     const uid = requireAuth(req);
+    const guest = isAnonymousAuth(req);
     const conversationId = cleanText(req.data?.conversationId, "conversationId", 160);
-    const userSnap = await db.collection("users").doc(uid).get();
-    if (!userSnap.exists) {
-      throw new HttpsError("permission-denied", "User profile missing.");
-    }
 
-    const role = String(userSnap.data()?.role || "").toLowerCase();
+    let role = "guest";
+    if (!guest) {
+      const userSnap = await db.collection("users").doc(uid).get();
+      if (!userSnap.exists) {
+        throw new HttpsError("permission-denied", "User profile missing.");
+      }
+      role = String(userSnap.data()?.role || "").toLowerCase();
+    }
     const { ref } = await getConversationForUser(conversationId, uid, role);
     const key = STAFF_ROLES.includes(role) ? "staff" : uid;
 

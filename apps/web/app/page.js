@@ -5,10 +5,12 @@ import ScheduleSection from "./components/home/ScheduleSection";
 import SupportSection from "./components/home/SupportSection";
 import TrackingSection from "./components/home/TrackingSection";
 import WarehousesSection from "./components/home/WarehousesSection";
+import { GuestChatProvider } from "./components/chat/GuestChatProvider";
 
 export default function Home() {
   return (
-    <main className="relative isolate min-h-screen overflow-hidden bg-slate-50 text-slate-950">
+    <GuestChatProvider>
+      <main className="relative isolate min-h-screen overflow-hidden bg-slate-50 text-slate-950">
       <div
         aria-hidden="true"
         className="fixed inset-0 -z-10 bg-cover bg-center bg-no-repeat"
@@ -37,5 +39,6 @@ export default function Home() {
         </footer>
       </div>
     </main>
+    </GuestChatProvider>
   );
 }
