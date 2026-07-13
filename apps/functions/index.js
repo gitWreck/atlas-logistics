@@ -224,8 +224,6 @@ exports.heartbeatConversationCall =
   require("./src/chat/conversations").heartbeatConversationCall;
 exports.endCurrentCallSession =
   require("./src/chat/conversations").endCurrentCallSession;
-exports.cleanupStaleConversationCalls =
-  require("./src/chat/conversations").cleanupStaleConversationCalls;
 exports.generateTencentUserSig =
   require("./src/chat/generateTencentUserSig").generateTencentUserSig;
 

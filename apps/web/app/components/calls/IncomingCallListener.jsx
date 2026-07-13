@@ -64,6 +64,15 @@ function callActivityMillis(call = {}) {
 }
 
 const ACTIVE_CALL_STATUSES_FOR_CLIENT = ["ringing", "connecting", "accepted", "connected", "ongoing"];
+const REMOTE_HEARTBEAT_STALE_MS = 90_000;
+
+function heartbeatMillis(value) {
+  if (typeof value?.toMillis === "function") return value.toMillis();
+  const seconds = Number(value?.seconds || value?._seconds || 0);
+  if (seconds > 0) return seconds * 1000;
+  const parsed = new Date(value || 0).getTime();
+  return Number.isFinite(parsed) ? parsed : 0;
+}
 
 function belongsToCallSession(call, userId, sessionId) {
   const isCaller = String(call?.callerId || "") === String(userId || "");
@@ -95,6 +104,7 @@ export default function IncomingCallListener() {
   const videoStageRef = useRef(null);
   const previewDragRef = useRef(null);
   const callWindowDragRef = useRef(null);
+  const remoteTimeoutEndingRef = useRef(false);
   const [localPreviewPosition, setLocalPreviewPosition] = useState(null);
   const [callWindowPosition, setCallWindowPosition] = useState({ left: null, top: 72 });
   const [callWindowMode, setCallWindowMode] = useState("normal");
@@ -264,6 +274,10 @@ export default function IncomingCallListener() {
   }, [activeCall]);
 
   useEffect(() => {
+    remoteTimeoutEndingRef.current = false;
+  }, [activeCall?.id]);
+
+  useEffect(() => {
     const status = String(activeCall?.status || "").trim().toLowerCase();
     const isCaller = String(activeCall?.callerId || "") === String(user?.uid || "");
     const shouldHeartbeat = Boolean(
@@ -279,6 +293,43 @@ export default function IncomingCallListener() {
     const interval = window.setInterval(pulse, 20_000);
     return () => window.clearInterval(interval);
   }, [activeCall?.id, activeCall?.status, activeCall?.callerId, callSessionId, user?.uid]);
+
+  useEffect(() => {
+    const status = String(activeCall?.status || "").trim().toLowerCase();
+    if (!activeCall?.id || !["accepted", "connecting", "connected", "ongoing"].includes(status)) {
+      return undefined;
+    }
+
+    const checkRemoteHeartbeat = async () => {
+      if (remoteTimeoutEndingRef.current) return;
+      try {
+        const snap = await getDoc(doc(db, "calls", activeCall.id));
+        if (!snap.exists()) return;
+        const call = snap.data() || {};
+        const latestStatus = String(call.status || "").trim().toLowerCase();
+        if (!["accepted", "connecting", "connected", "ongoing"].includes(latestStatus)) return;
+        const isCaller = String(call.callerId || "") === String(user?.uid || "");
+        const remoteHeartbeat = heartbeatMillis(
+          isCaller ? call.receiverLastHeartbeatAt : call.callerLastHeartbeatAt,
+        );
+        if (!remoteHeartbeat || Date.now() - remoteHeartbeat <= REMOTE_HEARTBEAT_STALE_MS) return;
+
+        remoteTimeoutEndingRef.current = true;
+        await updateConversationCallStatus({
+          callId: activeCall.id,
+          status: "ended",
+          duration: callDurationRef.current,
+          endReason: "remote_heartbeat_timeout",
+        });
+      } catch (error) {
+        remoteTimeoutEndingRef.current = false;
+        console.warn("Remote call heartbeat check failed", error);
+      }
+    };
+
+    const interval = window.setInterval(checkRemoteHeartbeat, 15_000);
+    return () => window.clearInterval(interval);
+  }, [activeCall?.id, activeCall?.status, user?.uid]);
 
   useEffect(() => {
     setLocalPreviewPosition(null);

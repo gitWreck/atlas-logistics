@@ -1,7 +1,6 @@
 "use strict";
 
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
-const { onSchedule } = require("firebase-functions/v2/scheduler");
 const admin = require("firebase-admin");
 const { requireAuth, requireRole } = require("../utilities/helpers");
 const { customerOwnsShipment } = require("../utilities/customerShipmentAccess");
@@ -1740,85 +1739,5 @@ exports.endCurrentCallSession = onCall(
     }
 
     return { success: true, ended: Boolean(ended), callId: ended?.callId || null };
-  },
-);
-
-exports.cleanupStaleConversationCalls = onSchedule(
-  {
-    region: "asia-southeast1",
-    schedule: "every 1 minutes",
-    timeoutSeconds: 120,
-  },
-  async () => {
-    const activeCallsSnap = await db
-      .collection("calls")
-      .where("status", "in", ACTIVE_CALL_STATUSES)
-      .limit(250)
-      .get();
-
-    let endedCount = 0;
-    for (const candidateSnap of activeCallsSnap.docs) {
-      if (!isCallStale(candidateSnap.data() || {})) continue;
-
-      const result = await db.runTransaction(async (tx) => {
-        const callRef = candidateSnap.ref;
-        const callSnap = await tx.get(callRef);
-        if (!callSnap.exists) return null;
-        const call = callSnap.data() || {};
-        if (!isCallStale(call)) return null;
-
-        const callerLockRef = db.collection(CALL_LOCK_COLLECTION).doc(call.callerId);
-        const receiverLockRef = db.collection(CALL_LOCK_COLLECTION).doc(call.receiverId);
-        const callerLockSnap = await tx.get(callerLockRef);
-        const receiverLockSnap = await tx.get(receiverLockRef);
-        const now = FieldValue.serverTimestamp();
-        const connectedAtMillis = timestampMillis(call.connectedAt || call.answeredAt || call.startedAt);
-        const duration = connectedAtMillis
-          ? Math.max(0, Math.floor((Date.now() - connectedAtMillis) / 1000))
-          : 0;
-
-        tx.update(callRef, {
-          status: "ended",
-          endedAt: now,
-          endedBy: "system",
-          endedReason: "stale_heartbeat",
-          duration,
-          updatedAt: now,
-          signalingEvent: "call_ended",
-          termination: {
-            event: "call_ended",
-            callId: callSnap.id,
-            endedBy: "system",
-            reason: "stale_heartbeat",
-            participantIds: [call.callerId, call.receiverId].filter(Boolean),
-            timestamp: now,
-          },
-        });
-        if (String(callerLockSnap.data()?.activeCallId || "") === callSnap.id) {
-          tx.delete(callerLockRef);
-        }
-        if (String(receiverLockSnap.data()?.activeCallId || "") === callSnap.id) {
-          tx.delete(receiverLockRef);
-        }
-        return { ...call, id: callSnap.id, callId: callSnap.id, duration };
-      });
-
-      if (!result) continue;
-      endedCount += 1;
-      try {
-        const minutes = Math.floor(result.duration / 60);
-        const seconds = Math.floor(result.duration % 60);
-        await writeCallHistoryMessage({
-          conversationId: result.conversationId,
-          call: result,
-          text: `${result.type === "video" ? "Video Call" : "Voice Call"}\n${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`,
-          duration: result.duration,
-        });
-      } catch (error) {
-        console.error("Unable to write stale call history:", result.callId, error);
-      }
-    }
-
-    console.log(`[CALL_CLEANUP] Ended ${endedCount} stale call(s).`);
   },
 );
