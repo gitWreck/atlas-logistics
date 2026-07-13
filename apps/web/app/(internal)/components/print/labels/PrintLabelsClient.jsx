@@ -255,9 +255,10 @@ function StandardLabel({ shipment, pkg, index, total }) {
   const address = recipient.address || {};
   const addressText = formatAddress(address);
   const qrValue = pkg.packageId || "NO_ID";
-
-  console.log("Rendering label for pkg:", pkg);
-  // console.log("Rendering label for package:", pkg);
+  const QR_SIZE_MM = 56;
+  const QR_SIZE = Math.round((QR_SIZE_MM * 96) / 25.4);
+  const LOGO_SIZE = Math.round(QR_SIZE * 0.17);
+  const LOGO_PAD = Math.round(QR_SIZE * 0.045);
 
   return (
     <div
@@ -266,39 +267,16 @@ function StandardLabel({ shipment, pkg, index, total }) {
   flex flex-col justify-between relative overflow-hidden box-border
   m-0 print:m-0 print:shadow-none"
     >
-      {/* 1. TOP HEADER (Dest & Weight) */}
+      {/* 1. TOP HEADER */}
       <div className="border-b-4 border-black pb-2 mb-2">
-        <div className="flex justify-between items-center">
-          {/* LOGO */}
-          <div className="flex items-center gap-2">
-            <img
-              src="/atlas-logo.png"
-              alt="Atlas"
-              className="h-16 w-auto object-contain"
-            />
+        <div className="flex flex-col items-center text-center">
+          <div className="text-[35px] font-bold text-dark uppercase leading-none">
+            ATLAS
           </div>
-          <div className="text-right flex min-w-0 flex-1 flex-col items-end gap-0.5 pl-1">
-            <div className="text-sm font-bold text-dark uppercase leading-none">
-              ATLAS:
-            </div>
-            <div className="text-[10px] font-medium text-gray-600 leading-tight text-right">
-              Fast & Easy Shipping
-            </div>
+          <div className="text-[17px] font-medium text-gray-700 leading-tight">
+            Fast & Easy Shipping
           </div>
-
-          {/* WEIGHT */}
-          {/* <div className="text-right">
-            <div className="text-[10px] font-bold text-gray-500 uppercase">
-              Weight
-            </div>
-            <div className="text-xl font-bold">{pkg.weight} KG</div>
-          </div> */}
         </div>
-
-        {/* DESTINATION */}
-        {/* <div className="text-5xl font-extrabold tracking-tighter uppercase leading-none truncate mt-1">
-          {shipment.destinationCode || "DEST"}
-        </div> */}
       </div>
       <div className="my-1 flex-1 flex justify-between gap-3">
         {/* LEFT: RECIPIENT + PACKAGE INFO */}
@@ -307,12 +285,12 @@ function StandardLabel({ shipment, pkg, index, total }) {
             Ship To:
           </div>
 
-          <div className="text-lg font-bold uppercase leading-tight line-clamp-2">
+          <div className="text-xl font-bold uppercase leading-tight line-clamp-2">
             {recipient.name || "Unknown"}
           </div>
           <div className="text-sm font-mono mt-0.5">{recipient.phone}</div>
 
-          <div className="text-[10px] leading-tight mt-2 font-medium uppercase text-gray-800">
+          <div className="text-[10px] leading-tight mt-2 font-bold uppercase text-gray-800">
             {addressText || "No address provided"}
           </div>
 
@@ -350,20 +328,38 @@ function StandardLabel({ shipment, pkg, index, total }) {
         </div>
       </div>
 
-      {/* QR CODE - WITH SAFETY CHECK */}
-      <div className="flex flex-col items-center justify-center border-4 border-black rounded-xl pt-3 pb-2 my-1">
-        <QRCode
-          value={qrValue}
-          size={180}
-          level="M"
-          bgColor="#ffffff"
-          fgColor="#000000"
-          className="bg-white p-2"
-        />
-        <div className="text-xs font-mono font-bold mt-2 tracking-widest text-center">
+      {/* QR CODE */}
+      <div className="flex w-full min-h-[80mm] flex-col items-center justify-center border-4 border-black rounded-xl px-[2mm] py-[2mm] my-1">
+        <div
+          className="relative shrink-0"
+          style={{ width: `${QR_SIZE_MM}mm`, height: `${QR_SIZE_MM}mm` }}
+        >
+          <QRCode
+            value={qrValue}
+            size={QR_SIZE}
+            level="H"
+            bgColor="#ffffff"
+            fgColor="#000000"
+            className="h-full w-full"
+          />
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+            <div
+              className="flex items-center justify-center bg-white"
+              style={{ padding: LOGO_PAD }}
+            >
+              <img
+                src="/atlas-logo.png"
+                alt="Atlas"
+                className="object-contain"
+                style={{ width: LOGO_SIZE, height: LOGO_SIZE }}
+              />
+            </div>
+          </div>
+        </div>
+        <div className="mt-2 w-full text-[13px] font-mono font-bold tracking-tight text-center uppercase">
           {pkg.packageId || "NO ID"}
         </div>
-        <div className="text-xs font-mono  mt-2 tracking-widest text-center">
+        <div className="mt-1 text-[12px] font-mono tracking-widest text-center">
           ATLAS PACKAGE ID
         </div>
       </div>
