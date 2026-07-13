@@ -1,5 +1,6 @@
 import { getFunctions, httpsCallable } from "firebase/functions";
 import { app } from "../../firebase";
+import { getCallIdentity } from "../calls/callSession";
 
 const functions = getFunctions(app, "asia-southeast1");
 
@@ -84,18 +85,26 @@ export const markConversationRead = httpsCallable(
   functions,
   "markConversationRead",
 );
-export const startConversationCall = httpsCallable(
-  functions,
-  "startConversationCall",
-);
-export const updateConversationCallStatus = httpsCallable(
-  functions,
-  "updateConversationCallStatus",
-);
-export const acceptConversationCall = httpsCallable(
-  functions,
-  "acceptConversationCall",
-);
+const startConversationCallCallable = httpsCallable(functions, "startConversationCall");
+const updateConversationCallStatusCallable = httpsCallable(functions, "updateConversationCallStatus");
+const acceptConversationCallCallable = httpsCallable(functions, "acceptConversationCall");
+const heartbeatConversationCallCallable = httpsCallable(functions, "heartbeatConversationCall");
+const endCurrentCallSessionCallable = httpsCallable(functions, "endCurrentCallSession");
+
+async function withCallIdentity(payload = {}) {
+  return { ...payload, ...(await getCallIdentity()) };
+}
+
+export const startConversationCall = async (payload) =>
+  startConversationCallCallable(await withCallIdentity(payload));
+export const updateConversationCallStatus = async (payload) =>
+  updateConversationCallStatusCallable(await withCallIdentity(payload));
+export const acceptConversationCall = async (payload) =>
+  acceptConversationCallCallable(await withCallIdentity(payload));
+export const heartbeatConversationCall = async (payload) =>
+  heartbeatConversationCallCallable(await withCallIdentity(payload));
+export const endCurrentCallSession = async (payload = {}) =>
+  endCurrentCallSessionCallable(await withCallIdentity(payload));
 export const generateTencentUserSig = httpsCallable(
   functions,
   "generateTencentUserSig",

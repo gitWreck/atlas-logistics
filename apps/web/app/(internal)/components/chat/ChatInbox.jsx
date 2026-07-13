@@ -847,9 +847,16 @@ export default function ChatInbox({ user, profile, isDark = false, onViewCustome
       });
     } catch (err) {
       console.error("Call failed:", err);
+      const busyReason = err?.details?.reason || err?.customData?.details?.reason;
+      const message = busyReason === "caller-busy"
+        ? "This account is currently in an active call on another device."
+        : busyReason === "both-busy"
+          ? "You and this contact currently have active calls."
+          : String(err?.message || `Unable to start the ${callType === "video" ? "video" : "voice"} call.`)
+            .replace(/^Firebase:\s*/i, "")
+            .replace(/^\[functions\/[\w-]+\]\s*/i, "");
       alert(
-        err?.message ||
-          `Unable to start the ${callType === "video" ? "video" : "voice"} call.`,
+        message,
       );
     } finally {
       setCalling(false);

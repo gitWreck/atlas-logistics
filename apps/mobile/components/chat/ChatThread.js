@@ -1110,9 +1110,19 @@ export default function ChatThread({ conversationId, onBack, embedded = false })
         const fallbackMessage = isDirectStaff
           ? `Unable to call ${headerTitle} right now.`
           : "Unable to call Atlas Support right now.";
+        const busyReason = error?.details?.reason || error?.customData?.details?.reason;
+        const errorMessage = busyReason === "caller-busy"
+          ? "This account is currently in an active call on another device."
+          : busyReason === "receiver-busy"
+            ? `${headerTitle} is currently on another call.`
+            : busyReason === "both-busy"
+              ? "You and this contact currently have active calls."
+              : String(error?.message || fallbackMessage)
+                .replace(/^Firebase:\s*/i, "")
+                .replace(/^\[functions\/[\w-]+\]\s*/i, "");
         Alert.alert(
           callType === "video" ? "Video call unavailable" : "Voice call unavailable",
-          String(error?.message || fallbackMessage).replace(/^Firebase:\s*/i, ""),
+          errorMessage,
         );
       } finally {
         setStartingCall(null);

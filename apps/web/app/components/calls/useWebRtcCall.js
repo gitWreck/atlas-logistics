@@ -13,19 +13,6 @@ function safeDomId(prefix, value) {
   return `${prefix}-${String(value || "call").replace(/[^a-zA-Z0-9_-]/g, "-")}`;
 }
 
-async function waitForElement(id, timeout = 1000, interval = 50) {
-  if (typeof document === "undefined") return null;
-  const start = Date.now();
-  while (Date.now() - start < timeout) {
-    const el = document.getElementById(id);
-    if (el) return el;
-    // small delay
-    // eslint-disable-next-line no-await-in-loop
-    await new Promise((r) => setTimeout(r, interval));
-  }
-  return document.getElementById(id);
-}
-
 export default function useWebRtcCall({
   activeCall,
   userId,
@@ -86,41 +73,22 @@ export default function useWebRtcCall({
         trtc.on(TRTC.EVENT.REMOTE_VIDEO_AVAILABLE, async ({ userId: remoteUserId, streamType }) => {
           remoteUserIdRef.current = remoteUserId;
           setRemoteVideoReady(true);
+          await new Promise((resolve) => setTimeout(resolve, 0));
           try {
-            const remoteEl = await waitForElement(remoteViewId, 1000, 50);
-            if (!remoteEl) {
-              console.warn("TRTC remote video skipped: remote view not found", remoteViewId);
-              setMediaNotice("Remote video element not ready.");
-              return;
-            }
-            await trtc.startRemoteVideo({ userId: remoteUserId, streamType, view: remoteEl });
+            const remoteEl = typeof document !== "undefined" ? document.getElementById(remoteViewId) : null;
+            await trtc.startRemoteVideo({ userId: remoteUserId, streamType, view: remoteEl || remoteViewId });
           } catch (error) {
             console.error("TRTC remote video failed", error);
             setMediaNotice("Remote video could not be played.");
           }
         });
         trtc.on(TRTC.EVENT.REMOTE_VIDEO_UNAVAILABLE, () => setRemoteVideoReady(false));
-        trtc.on(TRTC.EVENT.REMOTE_USER_EXIT, () => {
-          remoteUserIdRef.current = null;
-          setRemoteVideoReady(false);
-          setMediaNotice("Call ended");
-          updateConversationCallStatus({
-            callId: activeCall.id,
-            status: "ended",
-            endReason: "peer_left",
-          }).catch(() => {});
-        });
         trtc.on(TRTC.EVENT.AUTOPLAY_FAILED, () => {
           setMediaNotice("Tap the call screen once to enable remote audio.");
         });
         trtc.on(TRTC.EVENT.ERROR, (error) => {
           console.error("TRTC call error", error);
           setMediaNotice(error?.message || "The call media connection failed.");
-          updateConversationCallStatus({
-            callId: activeCall.id,
-            status: "ended",
-            endReason: "media_connection_failed",
-          }).catch(() => {});
         });
 
         await trtc.enterRoom({
@@ -134,14 +102,10 @@ export default function useWebRtcCall({
         await trtc.startLocalAudio();
         if (activeCall.type === "video") {
           try {
-            const localEl = await waitForElement(localViewId, 1000, 50);
-            if (!localEl) {
-              console.warn("TRTC local video skipped: local view not found", localViewId);
-              setMediaNotice("Camera view not ready.");
-            } else {
-              await trtc.startLocalVideo({ view: localEl, option: { useFrontCamera: cameraType !== "environment" } });
-              setLocalVideoReady(true);
-            }
+            await new Promise((resolve) => setTimeout(resolve, 0));
+            const localEl = typeof document !== "undefined" ? document.getElementById(localViewId) : null;
+            await trtc.startLocalVideo({ view: localEl || localViewId, option: { useFrontCamera: cameraType !== "environment" } });
+            setLocalVideoReady(true);
           } catch (error) {
             console.error("TRTC local video failed to start", error);
             setMediaNotice(error?.message || "Camera could not be started.");

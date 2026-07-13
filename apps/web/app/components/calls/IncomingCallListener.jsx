@@ -2,7 +2,7 @@
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { collection, doc, getDoc, onSnapshot, query, runTransaction, serverTimestamp, updateDoc, where } from "firebase/firestore";
+import { collection, doc, getDoc, onSnapshot, query, serverTimestamp, updateDoc, where } from "firebase/firestore";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faPhone,
@@ -28,8 +28,10 @@ import {
   acceptConversationCall,
   createCallHistoryMessage,
   declineConversationCall,
+  heartbeatConversationCall,
   updateConversationCallStatus,
 } from "@/app/utility/FirebaseFunctions";
+import { getCallSessionId } from "@/app/utility/callSession";
 import useWebRtcCall from "./useWebRtcCall";
 
 function formatCallType(callType) {
@@ -61,6 +63,16 @@ function callActivityMillis(call = {}) {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
+const ACTIVE_CALL_STATUSES_FOR_CLIENT = ["ringing", "connecting", "accepted", "connected", "ongoing"];
+
+function belongsToCallSession(call, userId, sessionId) {
+  const isCaller = String(call?.callerId || "") === String(userId || "");
+  const status = String(call?.status || "").trim().toLowerCase();
+  if (status === "ringing" && !isCaller) return true;
+  const boundSessionId = isCaller ? call?.callerSessionId : call?.receiverSessionId;
+  return !boundSessionId || String(boundSessionId) === String(sessionId || "");
+}
+
 export default function IncomingCallListener() {
   const { user, loading } = useAuth();
   const [activeCall, setActiveCall] = useState(null);
@@ -73,6 +85,7 @@ export default function IncomingCallListener() {
   const [isSpeakerOn, setIsSpeakerOn] = useState(true);
   const [isCameraOn, setIsCameraOn] = useState(true);
   const [cameraType, setCameraType] = useState("user");
+  const [callSessionId, setCallSessionId] = useState("");
   const callMapRef = useRef(new Map());
   const prevCallStatusRef = useRef(new Map());
   const activeCallRef = useRef(null);
@@ -102,10 +115,11 @@ export default function IncomingCallListener() {
 
   useEffect(() => {
     setMounted(true);
+    setCallSessionId(getCallSessionId());
   }, []);
 
   useEffect(() => {
-    if (!user?.uid || loading) {
+    if (!user?.uid || loading || !callSessionId) {
       callMapRef.current.clear();
       prevCallStatusRef.current.clear();
       activeCallRef.current = null;
@@ -130,6 +144,7 @@ export default function IncomingCallListener() {
     const syncActiveCall = () => {
       const entries = [...callMapRef.current.values()]
         .filter((call) => String(call?.receiverId || "").trim() === uid || String(call?.callerId || "").trim() === uid)
+        .filter((call) => belongsToCallSession(call, uid, callSessionId))
         .filter((call) => {
           const status = String(call?.status || "").trim().toLowerCase();
           return ["ringing", "accepted", "connecting", "connected", "ongoing", "declined", "missed", "cancelled", "ended"].includes(status);
@@ -242,11 +257,28 @@ export default function IncomingCallListener() {
         noticeTimerRef.current = null;
       }
     };
-  }, [loading, user?.uid]);
+  }, [loading, user?.uid, callSessionId]);
 
   useEffect(() => {
     activeCallRef.current = activeCall;
   }, [activeCall]);
+
+  useEffect(() => {
+    const status = String(activeCall?.status || "").trim().toLowerCase();
+    const isCaller = String(activeCall?.callerId || "") === String(user?.uid || "");
+    const shouldHeartbeat = Boolean(
+      activeCall?.id &&
+      callSessionId &&
+      ACTIVE_CALL_STATUSES_FOR_CLIENT.includes(status) &&
+      (status !== "ringing" || isCaller),
+    );
+    if (!shouldHeartbeat) return undefined;
+
+    const pulse = () => heartbeatConversationCall({ callId: activeCall.id }).catch(() => {});
+    pulse();
+    const interval = window.setInterval(pulse, 20_000);
+    return () => window.clearInterval(interval);
+  }, [activeCall?.id, activeCall?.status, activeCall?.callerId, callSessionId, user?.uid]);
 
   useEffect(() => {
     setLocalPreviewPosition(null);
@@ -514,44 +546,12 @@ export default function IncomingCallListener() {
     if (!callId) return;
 
     try {
-      let timedOut = false;
-      const callRef = doc(db, "calls", callId);
-
-      await runTransaction(db, async (tx) => {
-        const callSnap = await tx.get(callRef);
-        if (!callSnap.exists) {
-          console.info("[call-timeout] skipped because the call document no longer exists", {
-            source: "web",
-            callId,
-          });
-          return;
-        }
-
-        const latestCall = callSnap.data() || {};
-        const latestStatus = String(latestCall.status || "").trim().toLowerCase();
-        console.info("[call-timeout] current Firestore status", {
-          source: "web",
-          callId,
-          status: latestStatus,
-        });
-
-        if (latestStatus !== "ringing") {
-          console.info("[call-timeout] skipping update because the call is no longer ringing", {
-            source: "web",
-            callId,
-            status: latestStatus,
-          });
-          return;
-        }
-
-        tx.update(callRef, {
-          status: "missed",
-          endedReason: "timeout",
-          endedAt: serverTimestamp(),
-          updatedAt: serverTimestamp(),
-        });
-        timedOut = true;
+      const result = await updateConversationCallStatus({
+        callId,
+        status: "missed",
+        endReason: "timeout",
       });
+      const timedOut = result?.data?.changed === true || result?.changed === true;
 
       if (timedOut) {
         await logCallEvent({ conversationId: activeCall?.conversationId, callId: activeCall?.id, text: `📞 ${formatCallType(activeCall?.type)} Call\nMissed Call` });

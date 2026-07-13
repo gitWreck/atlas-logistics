@@ -12,7 +12,7 @@ import {
   View,
 } from "react-native";
 import { FontAwesome5 } from "@expo/vector-icons";
-import { arrayUnion, collection, doc, getDoc, onSnapshot, query, runTransaction, serverTimestamp, updateDoc, where } from "firebase/firestore";
+import { arrayUnion, collection, doc, getDoc, onSnapshot, query, serverTimestamp, updateDoc, where } from "firebase/firestore";
 
 import { db } from "../../firebase";
 import { useAuth } from "../../contexts/AuthContext";
@@ -20,8 +20,10 @@ import { useTheme } from "../../contexts/ThemeContext";
 import {
   acceptConversationCall,
   createCallHistoryMessage,
+  heartbeatConversationCall,
   updateConversationCallStatus,
 } from "../utilities/FirebaseFunctions";
+import { getCallSessionId } from "./callSession";
 import useTencentWebCall from "./useTencentWebCall";
 
 function getCallTitle(call) {
@@ -43,6 +45,16 @@ function callActivityMillis(call = {}) {
   if (typeof timestamp?.toMillis === "function") return timestamp.toMillis();
   const parsed = new Date(timestamp || 0).getTime();
   return Number.isFinite(parsed) ? parsed : 0;
+}
+
+const ACTIVE_CALL_STATUSES_FOR_CLIENT = ["ringing", "connecting", "accepted", "connected", "ongoing"];
+
+function belongsToCallSession(call, userId, sessionId) {
+  const isCaller = String(call?.callerId || "") === String(userId || "");
+  const status = String(call?.status || "").trim().toLowerCase();
+  if (status === "ringing" && !isCaller) return true;
+  const boundSessionId = isCaller ? call?.callerSessionId : call?.receiverSessionId;
+  return !boundSessionId || String(boundSessionId) === String(sessionId || "");
 }
 
 function WebMediaElement({ stream, muted = false, hidden = false, style }) {
@@ -87,6 +99,7 @@ export default function IncomingCallListener() {
   const [isSpeakerOn, setIsSpeakerOn] = useState(true);
   const [isCameraOn, setIsCameraOn] = useState(true);
   const [cameraType, setCameraType] = useState("front");
+  const [callSessionId, setCallSessionId] = useState("");
   const [localMediaStream, setLocalMediaStream] = useState(null);
   const [remoteMediaStream, setRemoteMediaStream] = useState(null);
   const [rtcNotice, setRtcNotice] = useState("");
@@ -105,6 +118,14 @@ export default function IncomingCallListener() {
   const peerConnectionRef = useRef(null);
   const rtcCallIdRef = useRef(null);
   const processedCandidatesRef = useRef(new Set());
+
+  useEffect(() => {
+    let mounted = true;
+    getCallSessionId().then((value) => {
+      if (mounted) setCallSessionId(value);
+    }).catch((error) => console.warn("Unable to initialize call session", error));
+    return () => { mounted = false; };
+  }, []);
 
   useEffect(() => {
     const isRinging = String(activeCall?.status || "").trim().toLowerCase() === "ringing";
@@ -364,7 +385,7 @@ export default function IncomingCallListener() {
   };
 
   useEffect(() => {
-    if (!user?.uid || loading || !isReady) {
+    if (!user?.uid || loading || !isReady || !callSessionId) {
       callMapRef.current.clear();
       prevCallStatusRef.current.clear();
       activeCallRef.current = null;
@@ -389,6 +410,7 @@ export default function IncomingCallListener() {
     const syncActiveCall = () => {
       const entries = [...callMapRef.current.values()]
         .filter((call) => String(call?.receiverId || "").trim() === uid || String(call?.callerId || "").trim() === uid)
+        .filter((call) => belongsToCallSession(call, uid, callSessionId))
         .filter((call) => {
           const status = String(call?.status || "").trim().toLowerCase();
           return ["ringing", "accepted", "connecting", "connected", "ongoing", "declined", "missed", "cancelled", "ended"].includes(status);
@@ -493,11 +515,28 @@ export default function IncomingCallListener() {
         timeoutRef.current = null;
       }
     };
-  }, [user?.uid, loading, isReady]);
+  }, [user?.uid, loading, isReady, callSessionId]);
 
   useEffect(() => {
     activeCallRef.current = activeCall;
   }, [activeCall]);
+
+  useEffect(() => {
+    const status = String(activeCall?.status || "").trim().toLowerCase();
+    const isCaller = String(activeCall?.callerId || "") === String(user?.uid || "");
+    const shouldHeartbeat = Boolean(
+      activeCall?.id &&
+      callSessionId &&
+      ACTIVE_CALL_STATUSES_FOR_CLIENT.includes(status) &&
+      (status !== "ringing" || isCaller),
+    );
+    if (!shouldHeartbeat) return undefined;
+
+    const pulse = () => heartbeatConversationCall({ callId: activeCall.id }).catch(() => {});
+    pulse();
+    const interval = setInterval(pulse, 20_000);
+    return () => clearInterval(interval);
+  }, [activeCall?.id, activeCall?.status, activeCall?.callerId, callSessionId, user?.uid]);
 
   useEffect(() => {
     resetNativePreview();
@@ -702,44 +741,12 @@ export default function IncomingCallListener() {
     if (!callId) return;
 
     try {
-      let timedOut = false;
-      const callRef = doc(db, "calls", callId);
-
-      await runTransaction(db, async (tx) => {
-        const callSnap = await tx.get(callRef);
-        if (!callSnap.exists) {
-          console.info("[call-timeout] skipped because the call document no longer exists", {
-            source: "mobile",
-            callId,
-          });
-          return;
-        }
-
-        const latestCall = callSnap.data() || {};
-        const latestStatus = String(latestCall.status || "").trim().toLowerCase();
-        console.info("[call-timeout] current Firestore status", {
-          source: "mobile",
-          callId,
-          status: latestStatus,
-        });
-
-        if (latestStatus !== "ringing") {
-          console.info("[call-timeout] skipping update because the call is no longer ringing", {
-            source: "mobile",
-            callId,
-            status: latestStatus,
-          });
-          return;
-        }
-
-        tx.update(callRef, {
-          status: "missed",
-          endedReason: "timeout",
-          endedAt: serverTimestamp(),
-          updatedAt: serverTimestamp(),
-        });
-        timedOut = true;
+      const result = await updateConversationCallStatus({
+        callId,
+        status: "missed",
+        endReason: "timeout",
       });
+      const timedOut = result?.data?.changed === true || result?.changed === true;
 
       if (timedOut) {
         await logCallEvent({ conversationId: activeCall?.conversationId, callId: activeCall?.id, text: `📞 ${activeCall?.type === "video" ? "Video" : "Voice"} Call\nMissed Call` });

@@ -1,6 +1,7 @@
 "use strict";
 
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
+const { onSchedule } = require("firebase-functions/v2/scheduler");
 const admin = require("firebase-admin");
 const { requireAuth, requireRole } = require("../utilities/helpers");
 const { customerOwnsShipment } = require("../utilities/customerShipmentAccess");
@@ -41,30 +42,94 @@ const CALL_STATUSES = [
   "ended",
 ];
 const TERMINAL_CALL_STATUSES = ["ended", "declined", "missed", "busy", "cancelled", "timeout"];
+const CALL_LOCK_COLLECTION = "callAccountLocks";
+const CALL_HEARTBEAT_STALE_MS = 90 * 1000;
+const RINGING_CALL_STALE_MS = 75 * 1000;
 
-async function assertUsersAvailableForCall(callerId, receiverId) {
+function cleanCallIdentity(value, fallback = null) {
+  const normalized = String(value || "")
+    .trim()
+    .replace(/[^a-zA-Z0-9._:-]/g, "")
+    .slice(0, 160);
+  return normalized || fallback;
+}
+
+function timestampMillis(value) {
+  if (!value) return 0;
+  if (typeof value.toMillis === "function") return value.toMillis();
+  if (value instanceof Date) return value.getTime();
+  const seconds = Number(value.seconds || value._seconds || 0);
+  return seconds > 0 ? seconds * 1000 : 0;
+}
+
+function isCallStale(call = {}, nowMillis = Date.now()) {
+  const status = String(call.status || "").trim().toLowerCase();
+  if (!ACTIVE_CALL_STATUSES.includes(status)) return false;
+
+  const fallbackHeartbeat = timestampMillis(
+    call.lastHeartbeat || call.updatedAt || call.startedAt || call.createdAt,
+  );
+  if (!fallbackHeartbeat) return false;
+
+  if (status === "ringing") {
+    return nowMillis - fallbackHeartbeat > RINGING_CALL_STALE_MS;
+  }
+
+  const callerHeartbeat = timestampMillis(call.callerLastHeartbeatAt) || fallbackHeartbeat;
+  const receiverHeartbeat = timestampMillis(call.receiverLastHeartbeatAt) || fallbackHeartbeat;
+  return (
+    nowMillis - callerHeartbeat > CALL_HEARTBEAT_STALE_MS ||
+    nowMillis - receiverHeartbeat > CALL_HEARTBEAT_STALE_MS
+  );
+}
+
+function callBusyError({ callerBusy, receiverBusy, receiverName }) {
+  if (callerBusy && receiverBusy) {
+    return new HttpsError(
+      "already-exists",
+      "You and this contact currently have active calls.",
+      { reason: "both-busy" },
+    );
+  }
+  if (callerBusy) {
+    return new HttpsError(
+      "already-exists",
+      "This account is currently in an active call on another device.",
+      { reason: "caller-busy" },
+    );
+  }
+  return new HttpsError(
+    "already-exists",
+    `${String(receiverName || "This contact").trim()} is currently on another call.`,
+    { reason: "receiver-busy" },
+  );
+}
+
+async function findActiveCallCandidates(participantIds) {
   const lookups = [];
-  for (const participantId of [callerId, receiverId]) {
+  for (const participantId of participantIds) {
     lookups.push(
       db
         .collection("calls")
         .where("status", "in", ACTIVE_CALL_STATUSES)
         .where("callerId", "==", participantId)
-        .limit(1)
+        .limit(2)
         .get(),
       db
         .collection("calls")
         .where("status", "in", ACTIVE_CALL_STATUSES)
         .where("receiverId", "==", participantId)
-        .limit(1)
+        .limit(2)
         .get(),
     );
   }
 
   const snapshots = await Promise.all(lookups);
-  if (snapshots.some((snapshot) => !snapshot.empty)) {
-    throw new HttpsError("already-exists", "One of you is already on another call.");
-  }
+  const candidateIds = new Set();
+  snapshots.forEach((snapshot) => {
+    snapshot.docs.forEach((docSnap) => candidateIds.add(docSnap.id));
+  });
+  return candidateIds;
 }
 
 async function createRingingConversationCall({
@@ -73,38 +138,162 @@ async function createRingingConversationCall({
   callerId,
   callerRole,
   callerName,
+  callerSessionId,
+  callerDeviceId,
   receiverId,
   receiverRole,
+  receiverName,
   participantIds,
   extraFields = {},
 }) {
-  await assertUsersAvailableForCall(callerId, receiverId);
-
   const callRef = db.collection("calls").doc();
+  const callerLockRef = db.collection(CALL_LOCK_COLLECTION).doc(callerId);
+  const receiverLockRef = db.collection(CALL_LOCK_COLLECTION).doc(receiverId);
+  const candidateIds = await findActiveCallCandidates([callerId, receiverId]);
   const now = FieldValue.serverTimestamp();
   const rtcRoomId = `atlas_${callRef.id}`;
   const rtcConfig = getRtcSecretConfig();
 
-  await callRef.set({
-    callId: callRef.id,
-    conversationId,
-    callerId,
-    callerRole,
-    callerName,
-    receiverId,
-    receiverRole,
-    participantIds: [...new Set(participantIds || [callerId, receiverId])],
-    type: callType,
-    status: "ringing",
-    rtcRoomId,
-    roomId: rtcRoomId,
-    rtcProvider: "tencent",
-    rtcConfigStatus: rtcConfig.isConfigured ? "configured" : "pending-setup",
-    createdAt: now,
-    startedAt: now,
-    updatedAt: now,
-    ...extraFields,
+  const staleEndedCalls = await db.runTransaction(async (tx) => {
+    const callerLockSnap = await tx.get(callerLockRef);
+    const receiverLockSnap = await tx.get(receiverLockRef);
+    const lockedCallIds = [callerLockSnap, receiverLockSnap]
+      .map((snap) => String(snap.data()?.activeCallId || "").trim())
+      .filter(Boolean);
+    lockedCallIds.forEach((callId) => candidateIds.add(callId));
+
+    const candidateSnaps = [];
+    for (const callId of candidateIds) {
+      candidateSnaps.push(await tx.get(db.collection("calls").doc(callId)));
+    }
+
+    let callerBusy = false;
+    let receiverBusy = false;
+    const staleCalls = new Map();
+    const liveCallIds = new Set();
+    const nowMillis = Date.now();
+
+    candidateSnaps.forEach((snap) => {
+      if (!snap.exists) return;
+      const call = snap.data() || {};
+      const status = String(call.status || "").trim().toLowerCase();
+      if (!ACTIVE_CALL_STATUSES.includes(status)) return;
+      if (isCallStale(call, nowMillis)) {
+        staleCalls.set(snap.id, call);
+        return;
+      }
+      liveCallIds.add(snap.id);
+      if (call.callerId === callerId || call.receiverId === callerId) callerBusy = true;
+      if (call.callerId === receiverId || call.receiverId === receiverId) receiverBusy = true;
+    });
+
+    const callerLockCallId = String(callerLockSnap.data()?.activeCallId || "").trim();
+    const receiverLockCallId = String(receiverLockSnap.data()?.activeCallId || "").trim();
+    if (callerLockCallId && liveCallIds.has(callerLockCallId)) callerBusy = true;
+    if (receiverLockCallId && liveCallIds.has(receiverLockCallId)) receiverBusy = true;
+
+    if (callerBusy || receiverBusy) {
+      throw callBusyError({ callerBusy, receiverBusy, receiverName });
+    }
+
+    staleCalls.forEach((call, callId) => {
+      const connectedAtMillis = timestampMillis(call.connectedAt || call.answeredAt || call.startedAt);
+      const staleDuration = connectedAtMillis
+        ? Math.max(0, Math.floor((Date.now() - connectedAtMillis) / 1000))
+        : 0;
+      tx.update(db.collection("calls").doc(callId), {
+        status: "ended",
+        endedAt: now,
+        endedBy: "system",
+        endedReason: "stale_heartbeat",
+        duration: staleDuration,
+        updatedAt: now,
+        signalingEvent: "call_ended",
+        termination: {
+          event: "call_ended",
+          callId,
+          endedBy: "system",
+          reason: "stale_heartbeat",
+          participantIds: [call.callerId, call.receiverId].filter(Boolean),
+          timestamp: now,
+        },
+      });
+    });
+
+    const callData = {
+      callId: callRef.id,
+      conversationId,
+      callerId,
+      callerRole,
+      callerName,
+      callerSessionId,
+      callerDeviceId,
+      callerLastHeartbeatAt: now,
+      receiverId,
+      receiverRole,
+      receiverName: receiverName || null,
+      receiverSessionId: null,
+      receiverDeviceId: null,
+      receiverLastHeartbeatAt: now,
+      participantIds: [...new Set(participantIds || [callerId, receiverId])],
+      type: callType,
+      status: "ringing",
+      rtcRoomId,
+      roomId: rtcRoomId,
+      rtcProvider: "tencent",
+      rtcConfigStatus: rtcConfig.isConfigured ? "configured" : "pending-setup",
+      createdAt: now,
+      startedAt: now,
+      lastHeartbeat: now,
+      updatedAt: now,
+      ...extraFields,
+    };
+    tx.set(callRef, callData);
+    tx.set(callerLockRef, {
+      userId: callerId,
+      activeCallId: callRef.id,
+      participantRole: "caller",
+      sessionId: callerSessionId,
+      deviceId: callerDeviceId,
+      status: "ringing",
+      lastHeartbeatAt: now,
+      updatedAt: now,
+    });
+    tx.set(receiverLockRef, {
+      userId: receiverId,
+      activeCallId: callRef.id,
+      participantRole: "receiver",
+      sessionId: null,
+      deviceId: null,
+      status: "ringing",
+      lastHeartbeatAt: now,
+      updatedAt: now,
+    });
+    return [...staleCalls.entries()].map(([callId, call]) => ({
+      ...call,
+      id: callId,
+      callId,
+      duration: Math.max(
+        0,
+        Math.floor((Date.now() - (timestampMillis(call.connectedAt || call.answeredAt || call.startedAt) || Date.now())) / 1000),
+      ),
+    }));
   });
+
+  for (const staleCall of staleEndedCalls) {
+    const minutes = Math.floor(staleCall.duration / 60);
+    const seconds = Math.floor(staleCall.duration % 60);
+    try {
+      await writeCallHistoryMessage({
+        conversationId: staleCall.conversationId,
+        call: staleCall,
+        text: `${staleCall.type === "video" ? "Video Call" : "Voice Call"}\n${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`,
+        duration: staleCall.duration,
+      });
+    } catch (error) {
+      console.error("Unable to write recovered stale call history:", staleCall.callId, error);
+    }
+  }
 
   await notifyIncomingCall({
     callId: callRef.id,
@@ -987,6 +1176,8 @@ exports.startConversationCall = onCall(
     try {
       const uid = requireAuth(req);
       const conversationId = cleanText(req.data?.conversationId, "conversationId", 160);
+      const callerSessionId = cleanCallIdentity(req.data?.sessionId, `legacy:${uid}`);
+      const callerDeviceId = cleanCallIdentity(req.data?.deviceId, callerSessionId);
       const callType = String(req.data?.type || req.data?.callType || "voice")
         .trim()
         .toLowerCase();
@@ -1038,6 +1229,7 @@ exports.startConversationCall = onCall(
             "The other participant is not available for calls.",
           );
         }
+        const receiver = receiverSnap.data() || {};
         const callerName = displayName(user, "Atlas staff");
         return createRingingConversationCall({
           conversationId,
@@ -1045,8 +1237,11 @@ exports.startConversationCall = onCall(
           callerId: uid,
           callerRole: role,
           callerName,
+          callerSessionId,
+          callerDeviceId,
           receiverId,
-          receiverRole: String(receiverSnap.data()?.role || "staff").toLowerCase(),
+          receiverRole: String(receiver.role || "staff").toLowerCase(),
+          receiverName: displayName(receiver, "This contact"),
           participantIds,
         });
       }
@@ -1105,8 +1300,11 @@ exports.startConversationCall = onCall(
         callerId: uid,
         callerRole: role,
         callerName: displayName(user, isCustomerCaller ? "Customer" : "Manager"),
+        callerSessionId,
+        callerDeviceId,
         receiverId,
         receiverRole,
+        receiverName: displayName(receiverSnap.data() || {}, "This contact"),
         participantIds: [uid, receiverId],
         extraFields: {
           shipmentId: conversation.shipmentId || conversation.trackingNumber || null,
@@ -1132,6 +1330,8 @@ exports.acceptConversationCall = onCall(
     try {
       const uid = requireAuth(req);
       const callId = cleanText(req.data?.callId, "callId", 160);
+      const sessionId = cleanCallIdentity(req.data?.sessionId, `legacy:${uid}`);
+      const deviceId = cleanCallIdentity(req.data?.deviceId, sessionId);
 
       const userSnap = await db.collection("users").doc(uid).get();
       if (!userSnap.exists || userSnap.data()?.active === false) {
@@ -1148,22 +1348,64 @@ exports.acceptConversationCall = onCall(
         }
 
         const call = callSnap.data() || {};
-        if (call.status === "accepted") {
-          throw new HttpsError("already-exists", "Call already accepted.");
+        if (call.receiverId !== uid) {
+          throw new HttpsError("permission-denied", "Only the receiver can accept this call.");
+        }
+
+        const boundSessionId = cleanCallIdentity(call.receiverSessionId);
+        if (boundSessionId && boundSessionId !== sessionId) {
+          throw new HttpsError(
+            "already-exists",
+            "This call was answered on another device.",
+            { reason: "answered-on-another-device" },
+          );
+        }
+
+        if (call.status === "accepted" && boundSessionId === sessionId) {
+          return {
+            accepted: true,
+            callId,
+            rtcRoomId: call.rtcRoomId || call.roomId || null,
+            conversationId: call.conversationId || null,
+            callerId: call.callerId || null,
+            receiverId: call.receiverId || null,
+            type: call.type || null,
+          };
         }
 
         if (call.status !== "ringing") {
           throw new HttpsError("failed-precondition", "Call is no longer pending.");
         }
 
-        if (call.receiverId !== uid) {
-          throw new HttpsError("permission-denied", "Only the receiver can accept this call.");
+        const receiverLockRef = db.collection(CALL_LOCK_COLLECTION).doc(uid);
+        const receiverLockSnap = await tx.get(receiverLockRef);
+        const lockedCallId = String(receiverLockSnap.data()?.activeCallId || "").trim();
+        if (lockedCallId && lockedCallId !== callId) {
+          throw new HttpsError(
+            "already-exists",
+            "This account is currently in an active call on another device.",
+            { reason: "caller-busy" },
+          );
         }
 
         tx.update(callRef, {
           status: "accepted",
           answeredAt: now,
           acceptedBy: uid,
+          receiverSessionId: sessionId,
+          receiverDeviceId: deviceId,
+          receiverLastHeartbeatAt: now,
+          lastHeartbeat: now,
+          updatedAt: now,
+        });
+        tx.set(receiverLockRef, {
+          userId: uid,
+          activeCallId: callId,
+          participantRole: "receiver",
+          sessionId,
+          deviceId,
+          status: "accepted",
+          lastHeartbeatAt: now,
           updatedAt: now,
         });
 
@@ -1195,6 +1437,8 @@ exports.updateConversationCallStatus = onCall(
   async (req) => {
     const uid = requireAuth(req);
     const callId = cleanText(req.data?.callId, "callId", 160);
+    const sessionId = cleanCallIdentity(req.data?.sessionId, `legacy:${uid}`);
+    const deviceId = cleanCallIdentity(req.data?.deviceId, sessionId);
     const status = String(req.data?.status || "").trim().toLowerCase();
     const duration = Math.max(0, Number(req.data?.duration || 0));
     const endReason = String(req.data?.endReason || (status === "ended" ? "hangup" : status))
@@ -1229,17 +1473,56 @@ exports.updateConversationCallStatus = onCall(
       if (!snap.exists) throw new HttpsError("not-found", "Call not found.");
       const call = snap.data() || {};
       const currentStatus = String(call.status || "").trim().toLowerCase();
+      const callerLockRef = db.collection(CALL_LOCK_COLLECTION).doc(call.callerId);
+      const receiverLockRef = db.collection(CALL_LOCK_COLLECTION).doc(call.receiverId);
+      const callerLockSnap = await tx.get(callerLockRef);
+      const receiverLockSnap = await tx.get(receiverLockRef);
+      const participantRole = call.callerId === uid
+        ? "caller"
+        : call.receiverId === uid
+          ? "receiver"
+          : null;
+      const boundSessionId = participantRole
+        ? cleanCallIdentity(call[`${participantRole}SessionId`])
+        : null;
+
+      if (participantRole && boundSessionId && boundSessionId !== sessionId) {
+        throw new HttpsError(
+          "failed-precondition",
+          "This call is active on another device.",
+          { reason: "session-mismatch" },
+        );
+      }
 
       if (status === "connected" && TERMINAL_CALL_STATUSES.includes(currentStatus)) {
         throw new HttpsError("failed-precondition", "Call has already ended.");
       }
       // A terminal call is immutable. Repeated hangups are successful no-ops.
       if (TERMINAL_CALL_STATUSES.includes(currentStatus)) {
+        if (String(callerLockSnap.data()?.activeCallId || "") === callId) {
+          tx.delete(callerLockRef);
+        }
+        if (String(receiverLockSnap.data()?.activeCallId || "") === callId) {
+          tx.delete(receiverLockRef);
+        }
+        return { changed: false, call, status: currentStatus };
+      }
+      if (["declined", "missed", "busy", "cancelled", "timeout"].includes(status) && currentStatus !== "ringing") {
         return { changed: false, call, status: currentStatus };
       }
 
       const now = FieldValue.serverTimestamp();
-      const update = { status, updatedAt: now, statusUpdatedBy: uid };
+      const update = {
+        status,
+        updatedAt: now,
+        statusUpdatedBy: uid,
+        lastHeartbeat: now,
+      };
+      if (participantRole) {
+        update[`${participantRole}SessionId`] = sessionId;
+        update[`${participantRole}DeviceId`] = deviceId;
+        update[`${participantRole}LastHeartbeatAt`] = now;
+      }
       if (status === "connected") update.connectedAt = now;
       if (TERMINAL_CALL_STATUSES.includes(status)) {
         update.endedAt = now;
@@ -1255,6 +1538,24 @@ exports.updateConversationCallStatus = onCall(
           participantIds: [call.callerId, call.receiverId].filter(Boolean),
           timestamp: now,
         };
+        if (String(callerLockSnap.data()?.activeCallId || "") === callId) {
+          tx.delete(callerLockRef);
+        }
+        if (String(receiverLockSnap.data()?.activeCallId || "") === callId) {
+          tx.delete(receiverLockRef);
+        }
+      } else if (participantRole) {
+        const participantLockRef = participantRole === "caller" ? callerLockRef : receiverLockRef;
+        tx.set(participantLockRef, {
+          userId: uid,
+          activeCallId: callId,
+          participantRole,
+          sessionId,
+          deviceId,
+          status,
+          lastHeartbeatAt: now,
+          updatedAt: now,
+        });
       }
       tx.update(callRef, update);
       return { changed: true, call, status };
@@ -1285,5 +1586,239 @@ exports.updateConversationCallStatus = onCall(
       status: transition.status,
       event: TERMINAL_CALL_STATUSES.includes(transition.status) ? "call_ended" : null,
     };
+  },
+);
+
+exports.heartbeatConversationCall = onCall(
+  { region: "asia-southeast1", maxInstances: 40 },
+  async (req) => {
+    const uid = requireAuth(req);
+    const callId = cleanText(req.data?.callId, "callId", 160);
+    const sessionId = cleanCallIdentity(req.data?.sessionId, `legacy:${uid}`);
+    const deviceId = cleanCallIdentity(req.data?.deviceId, sessionId);
+    const callRef = db.collection("calls").doc(callId);
+
+    return db.runTransaction(async (tx) => {
+      const callSnap = await tx.get(callRef);
+      if (!callSnap.exists) throw new HttpsError("not-found", "Call not found.");
+
+      const call = callSnap.data() || {};
+      const status = String(call.status || "").trim().toLowerCase();
+      if (TERMINAL_CALL_STATUSES.includes(status)) {
+        return { success: true, active: false, status };
+      }
+      if (!ACTIVE_CALL_STATUSES.includes(status)) {
+        throw new HttpsError("failed-precondition", "Call is not active.");
+      }
+
+      const participantRole = call.callerId === uid
+        ? "caller"
+        : call.receiverId === uid
+          ? "receiver"
+          : null;
+      if (!participantRole) {
+        throw new HttpsError("permission-denied", "Call access denied.");
+      }
+
+      const boundSessionId = cleanCallIdentity(call[`${participantRole}SessionId`]);
+      if (boundSessionId && boundSessionId !== sessionId) {
+        throw new HttpsError(
+          "failed-precondition",
+          "This call is active on another device.",
+          { reason: "session-mismatch" },
+        );
+      }
+
+      const lockRef = db.collection(CALL_LOCK_COLLECTION).doc(uid);
+      const lockSnap = await tx.get(lockRef);
+      const lockedCallId = String(lockSnap.data()?.activeCallId || "").trim();
+      if (lockedCallId && lockedCallId !== callId) {
+        throw new HttpsError(
+          "already-exists",
+          "This account is currently in an active call on another device.",
+          { reason: "caller-busy" },
+        );
+      }
+
+      const now = FieldValue.serverTimestamp();
+      tx.update(callRef, {
+        [`${participantRole}SessionId`]: sessionId,
+        [`${participantRole}DeviceId`]: deviceId,
+        [`${participantRole}LastHeartbeatAt`]: now,
+        lastHeartbeat: now,
+      });
+      tx.set(lockRef, {
+        userId: uid,
+        activeCallId: callId,
+        participantRole,
+        sessionId,
+        deviceId,
+        status,
+        lastHeartbeatAt: now,
+        updatedAt: now,
+      });
+
+      return { success: true, active: true, callId, status };
+    });
+  },
+);
+
+exports.endCurrentCallSession = onCall(
+  { region: "asia-southeast1", maxInstances: 20 },
+  async (req) => {
+    const uid = requireAuth(req);
+    const sessionId = cleanCallIdentity(req.data?.sessionId, `legacy:${uid}`);
+    const lockRef = db.collection(CALL_LOCK_COLLECTION).doc(uid);
+
+    const ended = await db.runTransaction(async (tx) => {
+      const lockSnap = await tx.get(lockRef);
+      if (!lockSnap.exists) return null;
+      const lock = lockSnap.data() || {};
+      if (cleanCallIdentity(lock.sessionId) !== sessionId) return null;
+
+      const callId = String(lock.activeCallId || "").trim();
+      if (!callId) {
+        tx.delete(lockRef);
+        return null;
+      }
+
+      const callRef = db.collection("calls").doc(callId);
+      const callSnap = await tx.get(callRef);
+      if (!callSnap.exists) {
+        tx.delete(lockRef);
+        return null;
+      }
+      const call = callSnap.data() || {};
+      const status = String(call.status || "").trim().toLowerCase();
+      const callerLockRef = db.collection(CALL_LOCK_COLLECTION).doc(call.callerId);
+      const receiverLockRef = db.collection(CALL_LOCK_COLLECTION).doc(call.receiverId);
+      const callerLockSnap = call.callerId === uid ? lockSnap : await tx.get(callerLockRef);
+      const receiverLockSnap = call.receiverId === uid ? lockSnap : await tx.get(receiverLockRef);
+
+      if (TERMINAL_CALL_STATUSES.includes(status)) {
+        if (String(callerLockSnap.data()?.activeCallId || "") === callId) tx.delete(callerLockRef);
+        if (String(receiverLockSnap.data()?.activeCallId || "") === callId) tx.delete(receiverLockRef);
+        return null;
+      }
+
+      const now = FieldValue.serverTimestamp();
+      const connectedAtMillis = timestampMillis(call.connectedAt || call.answeredAt || call.startedAt);
+      const duration = connectedAtMillis
+        ? Math.max(0, Math.floor((Date.now() - connectedAtMillis) / 1000))
+        : 0;
+      tx.update(callRef, {
+        status: "ended",
+        endedAt: now,
+        endedBy: uid,
+        endedReason: String(req.data?.reason || "logout").slice(0, 80),
+        duration,
+        updatedAt: now,
+        signalingEvent: "call_ended",
+        termination: {
+          event: "call_ended",
+          callId,
+          endedBy: uid,
+          reason: String(req.data?.reason || "logout").slice(0, 80),
+          participantIds: [call.callerId, call.receiverId].filter(Boolean),
+          timestamp: now,
+        },
+      });
+      if (String(callerLockSnap.data()?.activeCallId || "") === callId) tx.delete(callerLockRef);
+      if (String(receiverLockSnap.data()?.activeCallId || "") === callId) tx.delete(receiverLockRef);
+      return { ...call, id: callId, callId, duration };
+    });
+
+    if (ended) {
+      const minutes = Math.floor(ended.duration / 60);
+      const seconds = Math.floor(ended.duration % 60);
+      await writeCallHistoryMessage({
+        conversationId: ended.conversationId,
+        call: ended,
+        text: `${ended.type === "video" ? "Video Call" : "Voice Call"}\n${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`,
+        duration: ended.duration,
+      });
+    }
+
+    return { success: true, ended: Boolean(ended), callId: ended?.callId || null };
+  },
+);
+
+exports.cleanupStaleConversationCalls = onSchedule(
+  {
+    region: "asia-southeast1",
+    schedule: "every 1 minutes",
+    timeoutSeconds: 120,
+  },
+  async () => {
+    const activeCallsSnap = await db
+      .collection("calls")
+      .where("status", "in", ACTIVE_CALL_STATUSES)
+      .limit(250)
+      .get();
+
+    let endedCount = 0;
+    for (const candidateSnap of activeCallsSnap.docs) {
+      if (!isCallStale(candidateSnap.data() || {})) continue;
+
+      const result = await db.runTransaction(async (tx) => {
+        const callRef = candidateSnap.ref;
+        const callSnap = await tx.get(callRef);
+        if (!callSnap.exists) return null;
+        const call = callSnap.data() || {};
+        if (!isCallStale(call)) return null;
+
+        const callerLockRef = db.collection(CALL_LOCK_COLLECTION).doc(call.callerId);
+        const receiverLockRef = db.collection(CALL_LOCK_COLLECTION).doc(call.receiverId);
+        const callerLockSnap = await tx.get(callerLockRef);
+        const receiverLockSnap = await tx.get(receiverLockRef);
+        const now = FieldValue.serverTimestamp();
+        const connectedAtMillis = timestampMillis(call.connectedAt || call.answeredAt || call.startedAt);
+        const duration = connectedAtMillis
+          ? Math.max(0, Math.floor((Date.now() - connectedAtMillis) / 1000))
+          : 0;
+
+        tx.update(callRef, {
+          status: "ended",
+          endedAt: now,
+          endedBy: "system",
+          endedReason: "stale_heartbeat",
+          duration,
+          updatedAt: now,
+          signalingEvent: "call_ended",
+          termination: {
+            event: "call_ended",
+            callId: callSnap.id,
+            endedBy: "system",
+            reason: "stale_heartbeat",
+            participantIds: [call.callerId, call.receiverId].filter(Boolean),
+            timestamp: now,
+          },
+        });
+        if (String(callerLockSnap.data()?.activeCallId || "") === callSnap.id) {
+          tx.delete(callerLockRef);
+        }
+        if (String(receiverLockSnap.data()?.activeCallId || "") === callSnap.id) {
+          tx.delete(receiverLockRef);
+        }
+        return { ...call, id: callSnap.id, callId: callSnap.id, duration };
+      });
+
+      if (!result) continue;
+      endedCount += 1;
+      try {
+        const minutes = Math.floor(result.duration / 60);
+        const seconds = Math.floor(result.duration % 60);
+        await writeCallHistoryMessage({
+          conversationId: result.conversationId,
+          call: result,
+          text: `${result.type === "video" ? "Video Call" : "Voice Call"}\n${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`,
+          duration: result.duration,
+        });
+      } catch (error) {
+        console.error("Unable to write stale call history:", result.callId, error);
+      }
+    }
+
+    console.log(`[CALL_CLEANUP] Ended ${endedCount} stale call(s).`);
   },
 );
