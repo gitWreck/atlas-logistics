@@ -13,6 +13,16 @@ function safeDomId(prefix, value) {
   return `${prefix}-${String(value || "call").replace(/[^a-zA-Z0-9_-]/g, "-")}`;
 }
 
+async function waitForDomView(viewId, shouldCancel, timeoutMs = 10000) {
+  const startedAt = Date.now();
+  while (!shouldCancel() && Date.now() - startedAt < timeoutMs) {
+    const element = typeof document !== "undefined" ? document.getElementById(viewId) : null;
+    if (element?.isConnected) return element;
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
+  return null;
+}
+
 export default function useWebRtcCall({
   activeCall,
   userId,
@@ -24,20 +34,26 @@ export default function useWebRtcCall({
   const [localVideoReady, setLocalVideoReady] = useState(false);
   const [remoteVideoReady, setRemoteVideoReady] = useState(false);
   const [mediaNotice, setMediaNotice] = useState("");
+  const [rtcReadyVersion, setRtcReadyVersion] = useState(0);
+  const [remoteVideoRequestVersion, setRemoteVideoRequestVersion] = useState(0);
   const trtcRef = useRef(null);
   const callIdRef = useRef(null);
   const startingCallIdRef = useRef(null);
   const remoteUserIdRef = useRef(null);
+  const localVideoStartedRef = useRef(false);
+  const pendingRemoteVideoRef = useRef(null);
+  const isMutedRef = useRef(isMuted);
+  const isCameraOnRef = useRef(isCameraOn);
 
   const localViewId = useMemo(() => safeDomId("atlas-local", activeCall?.id), [activeCall?.id]);
   const remoteViewId = useMemo(() => safeDomId("atlas-remote", activeCall?.id), [activeCall?.id]);
+  const mediaStatus = String(activeCall?.status || "").toLowerCase();
+  const shouldInitializeMedia =
+    MEDIA_STATUSES.includes(mediaStatus) &&
+    (mediaStatus !== "ringing" || activeCall?.callerId === userId);
 
   useEffect(() => {
-    const status = String(activeCall?.status || "").toLowerCase();
-    const shouldStart =
-      MEDIA_STATUSES.includes(status) &&
-      (status !== "ringing" || activeCall?.callerId === userId);
-    if (!activeCall?.id || !userId || !shouldStart) return undefined;
+    if (!activeCall?.id || !userId || !shouldInitializeMedia) return undefined;
     if (callIdRef.current === activeCall.id || startingCallIdRef.current === activeCall.id) return undefined;
 
     let cancelled = false;
@@ -70,19 +86,15 @@ export default function useWebRtcCall({
           remoteUserIdRef.current = remoteUserId;
           setMediaNotice("");
         });
-        trtc.on(TRTC.EVENT.REMOTE_VIDEO_AVAILABLE, async ({ userId: remoteUserId, streamType }) => {
+        trtc.on(TRTC.EVENT.REMOTE_VIDEO_AVAILABLE, ({ userId: remoteUserId, streamType }) => {
           remoteUserIdRef.current = remoteUserId;
-          setRemoteVideoReady(true);
-          await new Promise((resolve) => setTimeout(resolve, 0));
-          try {
-            const remoteEl = typeof document !== "undefined" ? document.getElementById(remoteViewId) : null;
-            await trtc.startRemoteVideo({ userId: remoteUserId, streamType, view: remoteEl || remoteViewId });
-          } catch (error) {
-            console.error("TRTC remote video failed", error);
-            setMediaNotice("Remote video could not be played.");
-          }
+          pendingRemoteVideoRef.current = { userId: remoteUserId, streamType };
+          setRemoteVideoRequestVersion((version) => version + 1);
         });
-        trtc.on(TRTC.EVENT.REMOTE_VIDEO_UNAVAILABLE, () => setRemoteVideoReady(false));
+        trtc.on(TRTC.EVENT.REMOTE_VIDEO_UNAVAILABLE, () => {
+          pendingRemoteVideoRef.current = null;
+          setRemoteVideoReady(false);
+        });
         trtc.on(TRTC.EVENT.AUTOPLAY_FAILED, () => {
           setMediaNotice("Tap the call screen once to enable remote audio.");
         });
@@ -100,17 +112,8 @@ export default function useWebRtcCall({
           enableAutoPlayDialog: true,
         });
         await trtc.startLocalAudio();
-        if (activeCall.type === "video") {
-          try {
-            await new Promise((resolve) => setTimeout(resolve, 0));
-            const localEl = typeof document !== "undefined" ? document.getElementById(localViewId) : null;
-            await trtc.startLocalVideo({ view: localEl || localViewId, option: { useFrontCamera: cameraType !== "environment" } });
-            setLocalVideoReady(true);
-          } catch (error) {
-            console.error("TRTC local video failed to start", error);
-            setMediaNotice(error?.message || "Camera could not be started.");
-          }
-        }
+        await trtc.updateLocalAudio?.({ mute: isMutedRef.current });
+        setRtcReadyVersion((version) => version + 1);
       } catch (error) {
         console.error("Tencent browser call failed", error);
         setMediaNotice(error?.message || "Camera or microphone could not be started.");
@@ -123,13 +126,77 @@ export default function useWebRtcCall({
     return () => {
       cancelled = true;
     };
-  }, [activeCall?.id, activeCall?.status, activeCall?.type, activeCall?.rtcRoomId, activeCall?.roomId, cameraType, localViewId, remoteViewId, userId]);
+  }, [activeCall?.id, activeCall?.type, activeCall?.rtcRoomId, activeCall?.roomId, shouldInitializeMedia, userId]);
 
   useEffect(() => {
+    const trtc = trtcRef.current;
+    if (!trtc || activeCall?.type !== "video" || localVideoStartedRef.current) return undefined;
+
+    let cancelled = false;
+    const startLocalVideo = async () => {
+      const localView = await waitForDomView(
+        localViewId,
+        () => cancelled || trtcRef.current !== trtc,
+      );
+      if (!localView || cancelled || trtcRef.current !== trtc) return;
+
+      try {
+        await trtc.startLocalVideo({
+          view: localView,
+          option: { useFrontCamera: cameraType !== "environment" },
+        });
+        await trtc.updateLocalVideo?.({ mute: !isCameraOnRef.current });
+        localVideoStartedRef.current = true;
+        setLocalVideoReady(true);
+        setMediaNotice("");
+      } catch (error) {
+        console.error("TRTC local video failed to start", error);
+        setMediaNotice(error?.message || "Camera could not be started.");
+      }
+    };
+
+    void startLocalVideo();
+    return () => { cancelled = true; };
+  }, [activeCall?.id, activeCall?.status, activeCall?.type, cameraType, localViewId, rtcReadyVersion]);
+
+  useEffect(() => {
+    const trtc = trtcRef.current;
+    const request = pendingRemoteVideoRef.current;
+    if (!trtc || !request || activeCall?.type !== "video") return undefined;
+
+    let cancelled = false;
+    const startRemoteVideo = async () => {
+      const remoteView = await waitForDomView(
+        remoteViewId,
+        () => cancelled || trtcRef.current !== trtc,
+      );
+      if (!remoteView || cancelled || trtcRef.current !== trtc) return;
+
+      try {
+        await trtc.startRemoteVideo({
+          userId: request.userId,
+          streamType: request.streamType,
+          view: remoteView,
+        });
+        setRemoteVideoReady(true);
+        setMediaNotice("");
+      } catch (error) {
+        console.error("TRTC remote video failed", error);
+        setMediaNotice("Remote video could not be played.");
+      }
+    };
+
+    void startRemoteVideo();
+    return () => { cancelled = true; };
+  }, [activeCall?.id, activeCall?.status, activeCall?.type, remoteVideoRequestVersion, remoteViewId, rtcReadyVersion]);
+
+  useEffect(() => {
+    isMutedRef.current = isMuted;
     trtcRef.current?.updateLocalAudio?.({ mute: isMuted }).catch(() => {});
   }, [isMuted]);
 
   useEffect(() => {
+    isCameraOnRef.current = isCameraOn;
     trtcRef.current?.updateLocalVideo?.({ mute: !isCameraOn }).catch(() => {});
   }, [isCameraOn]);
 
@@ -151,6 +218,8 @@ export default function useWebRtcCall({
     trtcRef.current = null;
     callIdRef.current = null;
     remoteUserIdRef.current = null;
+    localVideoStartedRef.current = false;
+    pendingRemoteVideoRef.current = null;
     setLocalVideoReady(false);
     setRemoteVideoReady(false);
     if (trtc) {
