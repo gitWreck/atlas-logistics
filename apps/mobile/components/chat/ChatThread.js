@@ -19,6 +19,7 @@ import {
   Linking,
   Platform,
   Pressable,
+  SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
@@ -456,7 +457,9 @@ function QuickActionsSheet({ visible, onClose, onTrack, onDetails, onProblem, on
 
 function ShipmentDetailsScreen({ visible, onClose, conversation, onTrack, ui = UI }) {
   const trackingNumber = conversation?.trackingNumber || conversation?.shipmentId || "#ATL-240701";
-  const status = conversation?.shipmentSummary?.status || "Out for Delivery";
+  const summary = conversation?.shipmentSummary || {};
+  const status = summary.status || "Out for Delivery";
+  const receiver = summary.recipientName || summary.recipient?.name || "Not available";
   const timeline = [
     ["Order Confirmed", "Jun 28, 8:30 AM", true],
     ["Picked Up", "Jun 28, 10:15 AM", true],
@@ -467,35 +470,52 @@ function ShipmentDetailsScreen({ visible, onClose, conversation, onTrack, ui = U
 
   return (
     <Modal animationType="slide" visible={visible} onRequestClose={onClose}>
-      <View style={[styles.fullScreen, { backgroundColor: ui.bg }]}>
+      <SafeAreaView style={[styles.fullScreen, { backgroundColor: ui.bg }]}>
         <View style={styles.screenHeader}>
           <TouchableOpacity style={styles.backButton} onPress={onClose}>
             <FontAwesome5 name="chevron-left" size={20} color={ui.text} />
           </TouchableOpacity>
-          <Text style={[styles.screenTitle, { color: ui.text }]}>Shipment Details</Text>
-          <FontAwesome5 name="ellipsis-v" size={18} color={ui.text} />
+          <View style={styles.screenHeaderCopy}>
+            <Text style={[styles.screenTitle, { color: ui.text }]}>Shipment Details</Text>
+            <Text style={[styles.screenSubtitle, { color: ui.muted }]} numberOfLines={1}>
+              {trackingNumber.replace("#", "")}
+            </Text>
+          </View>
+          <View style={styles.screenHeaderAction} />
         </View>
         <ScrollView contentContainerStyle={styles.detailsContent} showsVerticalScrollIndicator={false}>
-          <View style={[styles.detailsCard, { backgroundColor: ui.surface }]}>
+          <View style={[styles.detailsCard, { backgroundColor: ui.surface, borderColor: ui.border }]}>
             <View style={styles.detailsTop}>
-              <View style={[styles.detailsIcon, { backgroundColor: ui.blue }]}>
-                <FontAwesome5 name="cube" size={22} color={ui.onPrimary || "#ffffff"} />
+              <View style={[styles.detailsIcon, { backgroundColor: ui.primarySoft || ui.surface2 }]}>
+                <FontAwesome5 name="cube" size={21} color={ui.blue} />
               </View>
-              <View>
-                <Text style={[styles.detailsShipment, { color: ui.text }]}>Shipment {trackingNumber}</Text>
+              <View style={styles.detailsHeading}>
+                <Text style={[styles.detailsEyebrow, { color: ui.muted }]}>SHIPMENT ID</Text>
+                <Text style={[styles.detailsShipment, { color: ui.text }]} numberOfLines={1}>{trackingNumber.replace("#", "")}</Text>
+              </View>
+              <View style={[styles.detailsStatusBadge, { backgroundColor: ui.successSoft || ui.surface2 }]}>
+                <View style={[styles.detailsStatusDot, { backgroundColor: ui.green }]} />
                 <Text style={[styles.detailsStatus, { color: ui.green }]}>{status}</Text>
               </View>
             </View>
-            <InfoLine ui={ui} icon="clipboard-list" label="Tracking Number" value={trackingNumber.replace("#", "")} />
-            <InfoLine ui={ui} icon="circle" label="Status" value={status} valueColor={ui.text} dotColor={ui.green} />
+            <View style={[styles.detailsDivider, { backgroundColor: ui.border }]} />
+            <InfoLine ui={ui} icon="clock" label="Estimated Arrival" value="Today, 3:30 PM" />
             <InfoLine ui={ui} icon="user" label="Driver" value="Juan Dela Cruz" actionIcon="phone-alt" />
             <InfoLine ui={ui} icon="truck" label="Vehicle" value="ABC-1234" />
-            <InfoLine ui={ui} icon="clock" label="Estimated Arrival" value="Today, 3:30 PM" />
+            <InfoLine ui={ui} icon="user-check" label="Receiver" value={receiver} />
             <InfoLine ui={ui} icon="map-marker-alt" label="Delivery Address" value="123 Rizal St, Cebu City, Cebu 6000" actionIcon="map" />
           </View>
 
-          <View style={[styles.progressCard, { backgroundColor: ui.surface }]}>
-            <Text style={[styles.progressTitle, { color: ui.text }]}>Delivery Progress</Text>
+          <View style={[styles.progressCard, { backgroundColor: ui.surface, borderColor: ui.border }]}>
+            <View style={styles.progressHeading}>
+              <View style={[styles.progressIcon, { backgroundColor: ui.primarySoft || ui.surface2 }]}>
+                <FontAwesome5 name="route" size={16} color={ui.blue} />
+              </View>
+              <View>
+                <Text style={[styles.progressTitle, { color: ui.text }]}>Delivery Progress</Text>
+                <Text style={[styles.progressSubtitle, { color: ui.muted }]}>Your shipment journey</Text>
+              </View>
+            </View>
             {timeline.map(([title, time, done, current], index) => (
               <View key={title} style={styles.timelineRow}>
                 <View style={styles.timelineRail}>
@@ -508,23 +528,42 @@ function ShipmentDetailsScreen({ visible, onClose, conversation, onTrack, ui = U
                     ]}
                   >
                     {done && !current ? <FontAwesome5 name="check" size={9} color={ui.onPrimary || "#ffffff"} /> : null}
+                    {current ? <View style={[styles.currentDot, { backgroundColor: ui.onPrimary || "#ffffff" }]} /> : null}
                   </View>
-                  {index < timeline.length - 1 && <View style={[styles.timelineLine, { backgroundColor: ui.border }]} />}
+                  {index < timeline.length - 1 && (
+                    <View
+                      style={[
+                        styles.timelineLine,
+                        { backgroundColor: done && !current ? ui.green : ui.border },
+                      ]}
+                    />
+                  )}
                 </View>
                 <View style={styles.timelineCopy}>
-                  <Text style={[styles.timelineTitle, { color: ui.text }]}>{title}</Text>
+                  <Text style={[styles.timelineTitle, { color: current ? ui.blue : done ? ui.text : ui.muted }]}>{title}</Text>
                   {!!time && <Text style={[styles.timelineTime, { color: ui.muted }]}>{time}</Text>}
                 </View>
               </View>
             ))}
           </View>
+
+          <View style={styles.detailsActions}>
+            <TouchableOpacity
+              style={[styles.detailsSecondaryAction, { backgroundColor: ui.surface, borderColor: ui.border }]}
+              onPress={onClose}
+              activeOpacity={0.84}
+            >
+              <FontAwesome5 name="headset" size={16} color={ui.blue} />
+              <Text style={[styles.detailsSecondaryText, { color: ui.text }]}>Contact Support</Text>
+            </TouchableOpacity>
+          </View>
         </ScrollView>
-      </View>
+      </SafeAreaView>
     </Modal>
   );
 }
 
-function InfoLine({ ui = UI, icon, label, value, actionIcon, valueColor = UI.text, dotColor }) {
+function InfoLine({ ui = UI, icon, label, value, actionIcon, valueColor, dotColor }) {
   return (
     <View style={styles.infoLine}>
       <View style={styles.infoLineLabel}>
@@ -533,7 +572,7 @@ function InfoLine({ ui = UI, icon, label, value, actionIcon, valueColor = UI.tex
       </View>
       <View style={styles.infoLineValueWrap}>
         {dotColor && <View style={[styles.smallDot, { backgroundColor: dotColor }]} />}
-        <Text style={[styles.infoLineValue, { color: valueColor }]} numberOfLines={2}>{value}</Text>
+        <Text style={[styles.infoLineValue, { color: valueColor || ui.text }]} numberOfLines={2}>{value}</Text>
         {actionIcon && <FontAwesome5 name={actionIcon} size={12} color={ui.blue} />}
       </View>
     </View>
@@ -2156,6 +2195,220 @@ const styles = StyleSheet.create({
   lightboxClose: { position: "absolute", top: 50, right: 24, zIndex: 2, padding: 8 },
   lightboxImage: { width: "92%", height: "80%" },
   fullScreen: { flex: 1 },
+  screenHeader: {
+    minHeight: 62,
+    paddingHorizontal: 16,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  backButton: {
+    width: 42,
+    height: 42,
+    alignItems: "flex-start",
+    justifyContent: "center",
+  },
+  screenTitle: {
+    textAlign: "center",
+    fontSize: 17,
+    fontWeight: "800",
+  },
+  screenHeaderCopy: { flex: 1, minWidth: 0, alignItems: "center" },
+  screenSubtitle: { marginTop: 3, maxWidth: "100%", fontSize: 11, fontWeight: "600" },
+  screenHeaderAction: {
+    width: 42,
+    height: 42,
+    alignItems: "flex-end",
+    justifyContent: "center",
+  },
+  detailsContent: {
+    width: "100%",
+    maxWidth: 720,
+    alignSelf: "center",
+    paddingHorizontal: 16,
+    paddingTop: 10,
+    paddingBottom: 36,
+    gap: 16,
+  },
+  detailsCard: {
+    borderWidth: 1,
+    borderRadius: 18,
+    paddingHorizontal: 18,
+    paddingVertical: 18,
+    shadowColor: "#000000",
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.16,
+    shadowRadius: 18,
+    elevation: 4,
+  },
+  detailsTop: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 13,
+    marginBottom: 18,
+  },
+  detailsIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  detailsHeading: { flex: 1, minWidth: 0 },
+  detailsEyebrow: { fontSize: 10, lineHeight: 14, fontWeight: "800", letterSpacing: 0.7 },
+  detailsShipment: {
+    fontSize: 15,
+    lineHeight: 20,
+    fontWeight: "800",
+  },
+  detailsStatus: {
+    fontSize: 9,
+    lineHeight: 12,
+    fontWeight: "800",
+    textTransform: "uppercase",
+  },
+  detailsStatusBadge: {
+    maxWidth: "42%",
+    minHeight: 28,
+    borderRadius: 14,
+    paddingHorizontal: 10,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+  },
+  detailsStatusDot: { width: 6, height: 6, borderRadius: 3 },
+  detailsDivider: { height: 1, marginBottom: 3 },
+  infoLine: {
+    minHeight: 55,
+    paddingVertical: 10,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 18,
+  },
+  infoLineLabel: {
+    flex: 0.8,
+    minWidth: 0,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 9,
+  },
+  infoLineLabelText: {
+    flex: 1,
+    fontSize: 12,
+    lineHeight: 17,
+    fontWeight: "600",
+  },
+  infoLineValueWrap: {
+    flex: 1.2,
+    minWidth: 0,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "flex-end",
+    gap: 8,
+  },
+  smallDot: { width: 7, height: 7, borderRadius: 4 },
+  infoLineValue: {
+    flexShrink: 1,
+    textAlign: "right",
+    fontSize: 13,
+    lineHeight: 18,
+    fontWeight: "700",
+  },
+  progressCard: {
+    borderWidth: 1,
+    borderRadius: 18,
+    paddingHorizontal: 18,
+    paddingTop: 18,
+    paddingBottom: 8,
+    shadowColor: "#000000",
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.14,
+    shadowRadius: 18,
+    elevation: 3,
+  },
+  progressTitle: {
+    fontSize: 16,
+    lineHeight: 22,
+    fontWeight: "800",
+  },
+  progressHeading: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    marginBottom: 24,
+  },
+  progressIcon: {
+    width: 40,
+    height: 40,
+    flexGrow: 0,
+    flexShrink: 0,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  progressSubtitle: { marginTop: 1, fontSize: 11, lineHeight: 15, fontWeight: "500" },
+  timelineRow: {
+    minHeight: 66,
+    flexDirection: "row",
+    alignItems: "stretch",
+  },
+  timelineRail: {
+    width: 28,
+    alignItems: "center",
+  },
+  timelineDot: {
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    borderWidth: 2,
+    alignItems: "center",
+    justifyContent: "center",
+    zIndex: 1,
+  },
+  timelineLine: {
+    position: "absolute",
+    top: 18,
+    bottom: -1,
+    width: 2,
+  },
+  timelineCopy: {
+    flex: 1,
+    paddingLeft: 10,
+    paddingBottom: 18,
+  },
+  timelineTitle: {
+    fontSize: 14,
+    lineHeight: 19,
+    fontWeight: "700",
+  },
+  timelineTime: {
+    marginTop: 4,
+    fontSize: 12,
+    lineHeight: 17,
+    fontWeight: "500",
+  },
+  currentDot: { width: 6, height: 6, borderRadius: 3 },
+  detailsActions: {
+    width: "100%",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  detailsSecondaryAction: {
+    flex: 1,
+    minWidth: 0,
+    minHeight: 50,
+    borderWidth: 1,
+    borderRadius: 16,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 9,
+    paddingHorizontal: 12,
+  },
+  detailsSecondaryText: { flexShrink: 1, fontSize: 12, fontWeight: "800", textAlign: "center" },
   infoScrollView: { flex: 1 },
   chatInfoHeader: {
     paddingTop: Platform.OS === "ios" ? 20 : 14,
