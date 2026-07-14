@@ -68,7 +68,10 @@ function terminalCallToast(status) {
 }
 
 const ACTIVE_CALL_STATUSES_FOR_CLIENT = ["ringing", "connecting", "accepted", "connected", "ongoing"];
-const REMOTE_HEARTBEAT_STALE_MS = 90_000;
+// Backgrounded browsers and mobile apps can suspend timers. A missed
+// heartbeat is therefore a reconnect signal, not evidence that either person
+// intentionally ended the call.
+const REMOTE_HEARTBEAT_STALE_MS = 10 * 60_000;
 
 function heartbeatMillis(value) {
   if (typeof value?.toMillis === "function") return value.toMillis();
@@ -128,6 +131,7 @@ export default function IncomingCallListener() {
   const [isMuted, setIsMuted] = useState(false);
   const [isSpeakerOn, setIsSpeakerOn] = useState(true);
   const [isCameraOn, setIsCameraOn] = useState(true);
+  const [isReconnecting, setIsReconnecting] = useState(false);
   const [cameraType, setCameraType] = useState("front");
   const [callSessionId, setCallSessionId] = useState("");
   const [localMediaStream, setLocalMediaStream] = useState(null);
@@ -150,7 +154,8 @@ export default function IncomingCallListener() {
   const peerConnectionRef = useRef(null);
   const rtcCallIdRef = useRef(null);
   const processedCandidatesRef = useRef(new Set());
-  const remoteTimeoutEndingRef = useRef(false);
+  const remoteHeartbeatStaleRef = useRef(false);
+  const lifecycleBackgroundedRef = useRef(false);
   const callSurfaceRef = useRef(null);
 
   useEffect(() => {
@@ -547,7 +552,8 @@ export default function IncomingCallListener() {
   }, [activeCall]);
 
   useEffect(() => {
-    remoteTimeoutEndingRef.current = false;
+    remoteHeartbeatStaleRef.current = false;
+    setIsReconnecting(false);
   }, [activeCall?.id]);
 
   useEffect(() => {
@@ -574,7 +580,6 @@ export default function IncomingCallListener() {
     }
 
     const checkRemoteHeartbeat = async () => {
-      if (remoteTimeoutEndingRef.current) return;
       try {
         const snap = await getDoc(doc(db, "calls", activeCall.id));
         if (!snap.exists()) return;
@@ -585,17 +590,23 @@ export default function IncomingCallListener() {
         const remoteHeartbeat = heartbeatMillis(
           isCaller ? call.receiverLastHeartbeatAt : call.callerLastHeartbeatAt,
         );
-        if (!remoteHeartbeat || Date.now() - remoteHeartbeat <= REMOTE_HEARTBEAT_STALE_MS) return;
+        const isStale = Boolean(remoteHeartbeat) && Date.now() - remoteHeartbeat > REMOTE_HEARTBEAT_STALE_MS;
+        if (isStale) {
+          if (!remoteHeartbeatStaleRef.current) {
+            console.log("[Heartbeat] timeout triggered");
+            console.log("[Heartbeat] reconnecting");
+          }
+          remoteHeartbeatStaleRef.current = true;
+          setIsReconnecting(true);
+          return;
+        }
 
-        remoteTimeoutEndingRef.current = true;
-        await updateConversationCallStatus({
-          callId: activeCall.id,
-          status: "ended",
-          duration: callDurationRef.current,
-          endReason: "remote_heartbeat_timeout",
-        });
+        if (remoteHeartbeatStaleRef.current) {
+          console.log("[Heartbeat] remote heartbeat restored");
+        }
+        remoteHeartbeatStaleRef.current = false;
+        if (!lifecycleBackgroundedRef.current) setIsReconnecting(false);
       } catch (error) {
-        remoteTimeoutEndingRef.current = false;
         console.warn("Remote call heartbeat check failed", error);
       }
     };
@@ -614,18 +625,63 @@ export default function IncomingCallListener() {
 
   useEffect(() => {
     const subscription = AppState.addEventListener("change", (nextState) => {
-      if (nextState === "active") return;
       const call = activeCallRef.current;
+      console.log("[Lifecycle] AppState:", nextState);
+      if (Platform.OS === "web" && typeof document !== "undefined") {
+        console.log("[Lifecycle] visibility:", document.visibilityState);
+      }
+      console.log("[Call] status:", call?.status);
+      console.log("[Call] currentCall:", call?.id);
+      const pc = peerConnectionRef.current;
+      console.log("[WebRTC] connection:", pc?.connectionState);
+      console.log("[WebRTC] ICE:", pc?.iceConnectionState);
+      if (nextState === "active") {
+        lifecycleBackgroundedRef.current = false;
+        if (call?.id) {
+          console.log("[Call] restoring active call");
+          setIsReconnecting(false);
+          heartbeatConversationCall({ callId: call.id }).catch((error) => {
+            console.warn("Unable to refresh call heartbeat after foregrounding", error);
+            setIsReconnecting(true);
+          });
+        }
+        return;
+      }
+
+      lifecycleBackgroundedRef.current = true;
       const currentStatus = String(call?.status || "").toLowerCase();
-      if (!call?.id || !["ringing", "accepted", "connecting", "connected", "ongoing"].includes(currentStatus)) return;
-      updateConversationCallStatus({
-        callId: call.id,
-        status: currentStatus === "ringing" ? "cancelled" : "ended",
-        duration: callDurationRef.current,
-        endReason: "app_backgrounded",
-      }).catch(() => {});
+      if (["accepted", "connecting", "connected", "ongoing"].includes(currentStatus)) {
+        console.log("[Heartbeat] reconnecting");
+        setIsReconnecting(true);
+      }
     });
     return () => subscription.remove();
+  }, []);
+
+  // React Native Web receives tab visibility changes through AppState. A
+  // pagehide event is also emitted for reloads, so it cannot safely be used
+  // as a hangup signal.
+  useEffect(() => {
+    if (Platform.OS !== "web" || typeof window === "undefined") return undefined;
+    const handlePageHide = () => {
+      console.log("[Lifecycle] pagehide");
+      lifecycleBackgroundedRef.current = true;
+      if (activeCallRef.current?.id) setIsReconnecting(true);
+    };
+    const handlePageShow = () => {
+      const call = activeCallRef.current;
+      lifecycleBackgroundedRef.current = false;
+      if (!call?.id) return;
+      console.log("[Call] restoring active call");
+      setIsReconnecting(false);
+      heartbeatConversationCall({ callId: call.id }).catch(() => setIsReconnecting(true));
+    };
+    window.addEventListener("pagehide", handlePageHide);
+    window.addEventListener("pageshow", handlePageShow);
+    return () => {
+      window.removeEventListener("pagehide", handlePageHide);
+      window.removeEventListener("pageshow", handlePageShow);
+    };
   }, []);
 
   // Also listen directly to the active call document so terminal updates tear down immediately
@@ -969,11 +1025,12 @@ export default function IncomingCallListener() {
     : activeCall?.callerName || "Atlas support";
   const callTypeLabel = activeCall?.type === "video" ? "Video Call" : "Voice Call";
   const mediaFailed = Boolean(mediaNotice && /failed|unable|could not|permission/i.test(mediaNotice));
+  const mediaReconnecting = Boolean(mediaNotice && /reconnect/i.test(mediaNotice));
   const statusLabel = isIncoming
     ? `Incoming ${callTypeLabel}`
     : isCallerRinging
       ? "Ringing"
-      : status === "reconnecting"
+      : isReconnecting || mediaReconnecting || status === "reconnecting"
         ? "Reconnecting"
         : mediaFailed
           ? "Failed"
@@ -1192,7 +1249,7 @@ export default function IncomingCallListener() {
             {!isActiveCall || activeCall?.type !== "video" ? (
               <View style={styles.messengerContent}>
                 <Text style={[styles.callEyebrow, { color: callPalette.muted }]}>
-                  {isIncoming ? peerName : isCallerRinging ? "Calling..." : status === "connected" ? formatDuration(callDurationSeconds) : "Connecting..."}
+                  {isIncoming ? peerName : isCallerRinging ? "Calling..." : isReconnecting ? "Reconnecting..." : status === "connected" ? formatDuration(callDurationSeconds) : "Connecting..."}
                 </Text>
                 <Text style={[styles.messengerName, { color: callPalette.text }]}>{peerName}</Text>
                 <Text style={[styles.callTypeText, { color: callPalette.text }]}>{callTypeLabel}</Text>

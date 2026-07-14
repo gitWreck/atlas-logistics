@@ -79,6 +79,8 @@ export default function useWebRtcCall({
 
         trtc.on(TRTC.EVENT.REMOTE_USER_ENTER, ({ userId: remoteUserId }) => {
           remoteUserIdRef.current = remoteUserId;
+          console.log("[WebRTC] connection:", "TRTC room connected");
+          console.log("[WebRTC] ICE:", "managed by Tencent TRTC");
           setMediaNotice("");
           updateConversationCallStatus({ callId: activeCall.id, status: "connected" }).catch(() => {});
         });
@@ -99,6 +101,8 @@ export default function useWebRtcCall({
           setMediaNotice("Tap the call screen once to enable remote audio.");
         });
         trtc.on(TRTC.EVENT.ERROR, (error) => {
+          console.log("[WebRTC] connection:", "TRTC error");
+          console.log("[WebRTC] ICE:", "managed by Tencent TRTC");
           console.error("TRTC call error", error);
           setMediaNotice(error?.message || "The call media connection failed.");
         });
