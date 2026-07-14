@@ -134,17 +134,21 @@ export default function useWebRtcCall({
 
     let cancelled = false;
     const startLocalVideo = async () => {
+      console.log("[Video] Starting local video");
+      console.log("[Video] Call status:", mediaStatus);
       const localView = await waitForDomView(
         localViewId,
         () => cancelled || trtcRef.current !== trtc,
       );
+      console.log("[Video] Local element:", localView);
       if (!localView || cancelled || trtcRef.current !== trtc) return;
 
       try {
-        await trtc.startLocalVideo({
+        const stream = await trtc.startLocalVideo({
           view: localView,
           option: { useFrontCamera: cameraType !== "environment" },
         });
+        console.log("[Video] Local stream:", stream);
         await trtc.updateLocalVideo?.({ mute: !isCameraOnRef.current });
         localVideoStartedRef.current = true;
         setLocalVideoReady(true);
@@ -166,10 +170,13 @@ export default function useWebRtcCall({
 
     let cancelled = false;
     const startRemoteVideo = async () => {
+      console.log("[Video] Starting remote video");
+      console.log("[Video] Call status:", mediaStatus);
       const remoteView = await waitForDomView(
         remoteViewId,
         () => cancelled || trtcRef.current !== trtc,
       );
+      console.log("[Video] Remote element:", remoteView);
       if (!remoteView || cancelled || trtcRef.current !== trtc) return;
 
       try {

@@ -261,6 +261,7 @@ export default function IncomingCallListener() {
       peer.onicecandidate = null;
       peer.ontrack = null;
       peer.onconnectionstatechange = null;
+      peer.oniceconnectionstatechange = null;
       peer.close();
     }
     peerConnectionRef.current = null;
@@ -381,6 +382,9 @@ export default function IncomingCallListener() {
         }).catch((error) => console.warn("Unable to publish ICE candidate", error));
       };
       peer.onconnectionstatechange = () => {
+        console.log("[WebRTC] Connection state:", peer?.connectionState);
+        console.log("[WebRTC] ICE state:", peer?.iceConnectionState);
+        console.log("[WebRTC] Signaling state:", peer?.signalingState);
         if (peer.connectionState === "connected") {
           setRtcNotice("");
           updateConversationCallStatus({ callId: call.id, status: "connected" }).catch(
@@ -389,6 +393,11 @@ export default function IncomingCallListener() {
         } else if (["failed", "disconnected"].includes(peer.connectionState)) {
           setRtcNotice("Media connection was interrupted.");
         }
+      };
+      peer.oniceconnectionstatechange = () => {
+        console.log("[WebRTC] Connection state:", peer?.connectionState);
+        console.log("[WebRTC] ICE state:", peer?.iceConnectionState);
+        console.log("[WebRTC] Signaling state:", peer?.signalingState);
       };
 
       if (isCaller) {

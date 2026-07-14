@@ -37,6 +37,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import * as ImagePicker from "expo-image-picker";
 import * as DocumentPicker from "expo-document-picker";
 import { useRouter } from "expo-router";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   collection,
   doc,
@@ -954,6 +955,7 @@ function SettingRow({ ui = UI, label, value, children }) {
 }
 
 export default function ChatThread({ conversationId, onBack, embedded = false }) {
+  const insets = useSafeAreaInsets();
   const router = useRouter();
   const { colors: themeColors, resolvedScheme } = useTheme();
   const colors = useMemo(
@@ -1445,7 +1447,9 @@ export default function ChatThread({ conversationId, onBack, embedded = false })
         <KeyboardAvoidingView
           style={styles.flex}
           behavior={Platform.OS === "ios" ? "padding" : undefined}
-          keyboardVerticalOffset={Platform.OS === "ios" ? (embedded ? 0 : 8) : 0}
+          keyboardVerticalOffset={
+            Platform.OS === "ios" && !embedded ? -insets.bottom : 0
+          }
         >
           <FlatList
             ref={listRef}

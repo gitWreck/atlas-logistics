@@ -11,6 +11,18 @@ function safeDomId(prefix, value) {
   return `${prefix}-${String(value || "call").replace(/[^a-zA-Z0-9_-]/g, "-")}`;
 }
 
+async function waitForElement(id, timeout = 2000, interval = 50) {
+  if (typeof document === "undefined") return null;
+  const startedAt = Date.now();
+  while (Date.now() - startedAt < timeout) {
+    const element = document.getElementById(id);
+    if (element) return element;
+    // eslint-disable-next-line no-await-in-loop
+    await new Promise((resolve) => setTimeout(resolve, interval));
+  }
+  return document.getElementById(id);
+}
+
 export default function useTencentWebCall({
   activeCall,
   userId,
@@ -32,9 +44,10 @@ export default function useTencentWebCall({
 
   useEffect(() => {
     const status = String(activeCall?.status || "").toLowerCase();
+    const isVideoCall = activeCall?.type === "video";
     const shouldStart =
       MEDIA_STATUSES.includes(status) &&
-      (status !== "ringing" || activeCall?.callerId === userId);
+      (status !== "ringing" || (!isVideoCall && activeCall?.callerId === userId));
     if (!activeCall?.id || !userId || !shouldStart) return undefined;
     if (callIdRef.current === activeCall.id || startingCallIdRef.current === activeCall.id) return undefined;
 
@@ -60,6 +73,7 @@ export default function useTencentWebCall({
         callIdRef.current = activeCall.id;
 
         trtc.on(TRTC.EVENT.REMOTE_USER_ENTER, ({ userId: remoteUserId }) => {
+          console.log("Connection state:", "connected");
           remoteUserIdRef.current = remoteUserId;
           setMediaNotice("");
           updateConversationCallStatus({ callId: activeCall.id, status: "connected" }).catch(() => {});
@@ -70,12 +84,19 @@ export default function useTencentWebCall({
         });
         trtc.on(TRTC.EVENT.REMOTE_VIDEO_AVAILABLE, async ({ userId: remoteUserId, streamType }) => {
           remoteUserIdRef.current = remoteUserId;
-          setRemoteVideoReady(true);
-          await new Promise((resolve) => setTimeout(resolve, 0));
           try {
-            const remoteEl = typeof document !== "undefined" ? document.getElementById(remoteViewId) : null;
-            await trtc.startRemoteVideo({ userId: remoteUserId, streamType, view: remoteEl || remoteViewId });
+            console.log("[Video] Starting remote video");
+            console.log("[Video] Call status:", status);
+            const remoteEl = await waitForElement(remoteViewId);
+            console.log("[Video] Remote element:", remoteEl);
+            if (!remoteEl) {
+              throw new Error(`Remote video element #${remoteViewId} is not mounted.`);
+            }
+            await trtc.startRemoteVideo({ userId: remoteUserId, streamType, view: remoteEl });
+            setRemoteVideoReady(true);
+            setMediaNotice("");
           } catch (error) {
+            setRemoteVideoReady(false);
             console.error("TRTC remote video failed", error);
             setMediaNotice("Remote video could not be played.");
           }
@@ -85,6 +106,7 @@ export default function useTencentWebCall({
           setMediaNotice("Tap the call screen once to enable remote audio.");
         });
         trtc.on(TRTC.EVENT.ERROR, (error) => {
+          console.log("Connection state:", "failed");
           console.error("TRTC call error", error);
           setMediaNotice(error?.message || "The call media connection failed.");
         });
@@ -100,9 +122,18 @@ export default function useTencentWebCall({
         await trtc.startLocalAudio();
         if (activeCall.type === "video") {
           try {
-            await new Promise((resolve) => setTimeout(resolve, 0));
-            const localEl = typeof document !== "undefined" ? document.getElementById(localViewId) : null;
-            await trtc.startLocalVideo({ view: localEl || localViewId, option: { useFrontCamera: cameraType !== "back" } });
+            console.log("[Video] Starting local video");
+            console.log("[Video] Call status:", status);
+            const localEl = await waitForElement(localViewId);
+            console.log("[Video] Local element:", localEl);
+            if (!localEl) {
+              throw new Error(`Local video element #${localViewId} is not mounted.`);
+            }
+            const stream = await trtc.startLocalVideo({
+              view: localEl,
+              option: { useFrontCamera: cameraType !== "back" },
+            });
+            console.log("[Video] Local stream:", stream);
             setLocalVideoReady(true);
           } catch (error) {
             console.error("TRTC local video failed to start", error);
