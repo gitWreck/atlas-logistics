@@ -517,14 +517,20 @@ export default function ChatInbox({ user, profile, isDark = false, onViewCustome
   );
   const selectedName = conversationDisplayName(selected || {}, user?.uid);
   const selectedIsDirect = isDirectStaffConversation(selected || {});
+  const assignedStaffId = selected?.assignedStaffId || selected?.assignedTo || null;
+  const assignedStaffName = selected?.assignedStaffName || selected?.assignedToName || "";
+  const assignedStaffRole = selected?.assignedStaffRole || selected?.assignedRole || "";
 
   const assignedMember = useMemo(
     () =>
-      selected?.assignedTo
-        ? staffMembers.find((member) => member.id === selected.assignedTo) || null
+      assignedStaffId
+        ? staffMembers.find((member) => member.id === assignedStaffId) || null
         : null,
-    [staffMembers, selected?.assignedTo],
+    [assignedStaffId, staffMembers],
   );
+  const currentAssigneeName = assignedStaffName || staffDisplayName(assignedMember || {});
+  const currentAssigneeRole = assignedStaffRole || assignedMember?.role || "";
+  const hasCurrentAssignee = Boolean(assignedStaffId || assignedStaffName);
 
   const filteredConversations = useMemo(() => {
     const term = search.trim().toLowerCase();
@@ -1602,7 +1608,7 @@ export default function ChatInbox({ user, profile, isDark = false, onViewCustome
 
               <div className="mt-6 w-full">
                 <p className="mb-3 text-sm font-bold">Assigned To</p>
-                {selected.assignedTo ? (
+                {hasCurrentAssignee ? (
                   <div
                     className={`rounded-xl border p-3 ${
                       isDark ? "border-slate-800 bg-slate-900/60" : "border-slate-200 bg-slate-50"
@@ -1610,17 +1616,18 @@ export default function ChatInbox({ user, profile, isDark = false, onViewCustome
                   >
                     <div className="flex items-center gap-3">
                       <Avatar
-                        name={selected.assignedToName || staffDisplayName(assignedMember || {})}
+                        name={currentAssigneeName}
                         size={40}
                       />
                       <div className="min-w-0 flex-1">
                         <p className="truncate text-sm font-semibold">
-                          {selected.assignedToName ||
-                            staffDisplayName(assignedMember || {})}
+                          {currentAssigneeName}
                         </p>
-                        <p className={`truncate text-xs ${muted}`}>
-                          {getRoleLabel(selected.assignedRole || assignedMember?.role)}
-                        </p>
+                        {currentAssigneeRole && (
+                          <p className={`truncate text-xs ${muted}`}>
+                            {getRoleLabel(currentAssigneeRole)}
+                          </p>
+                        )}
                       </div>
                     </div>
                     <div
@@ -1628,6 +1635,16 @@ export default function ChatInbox({ user, profile, isDark = false, onViewCustome
                         isDark ? "border-slate-800" : "border-slate-200"
                       }`}
                     >
+                      {selected.assignmentSource && (
+                        <div className="flex items-center justify-between gap-2">
+                          <span className={muted}>Assignment</span>
+                          <span className="font-medium">
+                            {selected.assignmentSource === "automatic_round_robin"
+                              ? "Auto Assigned"
+                              : "Assigned by Admin"}
+                          </span>
+                        </div>
+                      )}
                       {selected.assignedByName && (
                         <div className="flex items-center justify-between gap-2">
                           <span className={muted}>Assigned By</span>

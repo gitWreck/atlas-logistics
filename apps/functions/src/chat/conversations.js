@@ -43,6 +43,7 @@ const CALL_STATUSES = [
 const TERMINAL_CALL_STATUSES = ["ended", "declined", "missed", "busy", "cancelled", "timeout"];
 const CALL_LOCK_COLLECTION = "callAccountLocks";
 const CALL_HEARTBEAT_STALE_MS = 90 * 1000;
+const BACKGROUND_CALL_HEARTBEAT_STALE_MS = 10 * 60 * 1000;
 const RINGING_CALL_STALE_MS = 45 * 1000;
 
 function cleanCallIdentity(value, fallback = null) {
@@ -85,9 +86,18 @@ function isCallStale(call = {}, nowMillis = Date.now()) {
 
   const callerHeartbeat = timestampMillis(call.callerLastHeartbeatAt) || fallbackHeartbeat;
   const receiverHeartbeat = timestampMillis(call.receiverLastHeartbeatAt) || fallbackHeartbeat;
+  const participantHeartbeatIsStale = (participantRole, heartbeat) => {
+    const lifecycleState = String(call[`${participantRole}LifecycleState`] || "foreground")
+      .trim()
+      .toLowerCase();
+    const staleAfter = lifecycleState === "background"
+      ? BACKGROUND_CALL_HEARTBEAT_STALE_MS
+      : CALL_HEARTBEAT_STALE_MS;
+    return nowMillis - heartbeat > staleAfter;
+  };
   return (
-    nowMillis - callerHeartbeat > CALL_HEARTBEAT_STALE_MS ||
-    nowMillis - receiverHeartbeat > CALL_HEARTBEAT_STALE_MS
+    participantHeartbeatIsStale("caller", callerHeartbeat) ||
+    participantHeartbeatIsStale("receiver", receiverHeartbeat)
   );
 }
 
@@ -762,7 +772,7 @@ exports.createConversation = onCall(
     const customerName = displayName(user, "Customer");
     const now = FieldValue.serverTimestamp();
 
-    const conversation = {
+    let conversation = {
       conversationId: conversationRef.id,
       type: trackingNumber ? "shipment" : "customer_support",
       shipmentId: trackingNumber,
@@ -809,7 +819,102 @@ exports.createConversation = onCall(
       updatedAt: now,
     };
 
-    await conversationRef.set(conversation);
+    if (conversation.type === "customer_support") {
+      const supportStaffIds = [
+        String(process.env.AUTO_SUPPORT_ROSE_UID || "").trim(),
+        String(process.env.AUTO_SUPPORT_LEAN_UID || "").trim(),
+      ];
+
+      if (
+        supportStaffIds.some((staffId) => !staffId) ||
+        new Set(supportStaffIds).size !== supportStaffIds.length
+      ) {
+        throw new HttpsError(
+          "failed-precondition",
+          "Automatic support assignment is not configured.",
+        );
+      }
+
+      const assignmentStateRef = db
+        .collection("supportAssignmentState")
+        .doc("customer_support");
+      const presenceCutoffMillis = Date.now() - (2 * 60 * 1000);
+
+      conversation = await db.runTransaction(async (tx) => {
+        const assignmentStateSnap = await tx.get(assignmentStateRef);
+        const staffSnaps = [];
+        for (const staffId of supportStaffIds) {
+          staffSnaps.push(await tx.get(db.collection("users").doc(staffId)));
+        }
+
+        const rawNextIndex = Number(assignmentStateSnap.data()?.nextIndex || 0);
+        const nextIndex = Number.isInteger(rawNextIndex)
+          ? ((rawNextIndex % supportStaffIds.length) + supportStaffIds.length) % supportStaffIds.length
+          : 0;
+
+        const orderedCandidates = [];
+        for (let offset = 0; offset < supportStaffIds.length; offset += 1) {
+          const rosterIndex = (nextIndex + offset) % supportStaffIds.length;
+          const staffSnap = staffSnaps[rosterIndex];
+          const staff = staffSnap.data() || {};
+          const staffRole = String(staff.role || "").trim().toLowerCase();
+          if (staffSnap.exists && STAFF_ROLES.includes(staffRole)) {
+            const presence = staff.presence || {};
+            const presenceUpdatedAtMillis = timestampMillis(
+              presence.lastHeartbeatAt || presence.updatedAt,
+            );
+            orderedCandidates.push({
+              id: staffSnap.id,
+              name: displayName(staff, "Staff"),
+              role: staffRole,
+              rosterIndex,
+              reliablyOnline:
+                staff.active !== false &&
+                presence.online === true &&
+                presenceUpdatedAtMillis >= presenceCutoffMillis,
+            });
+          }
+        }
+
+        const assignee =
+          orderedCandidates.find((candidate) => candidate.reliablyOnline) ||
+          orderedCandidates[0];
+
+        if (!assignee) {
+          throw new HttpsError(
+            "failed-precondition",
+            "Automatic support assignees are not configured as valid staff users.",
+          );
+        }
+
+        const assignedConversation = {
+          ...conversation,
+          ...staffAssignmentFields({
+            assigneeId: assignee.id,
+            assigneeRole: assignee.role,
+            assigneeName: assignee.name,
+          }),
+          status: "active",
+          assignedAt: now,
+          assignmentSource: "automatic_round_robin",
+        };
+
+        tx.set(conversationRef, assignedConversation);
+        tx.set(
+          assignmentStateRef,
+          {
+            nextIndex: (assignee.rosterIndex + 1) % supportStaffIds.length,
+            lastAssignedStaffId: assignee.id,
+            updatedAt: now,
+          },
+          { merge: true },
+        );
+
+        return assignedConversation;
+      });
+    } else {
+      await conversationRef.set(conversation);
+    }
 
     if (initialMessage) {
       await conversationRef.collection("messages").add({
@@ -1457,6 +1562,11 @@ exports.updateConversationCallStatus = onCall(
     const callId = cleanText(req.data?.callId, "callId", 160);
     const sessionId = cleanCallIdentity(req.data?.sessionId, `legacy:${uid}`);
     const deviceId = cleanCallIdentity(req.data?.deviceId, sessionId);
+    const lifecycleState = String(req.data?.lifecycleState || "foreground")
+      .trim()
+      .toLowerCase() === "background"
+      ? "background"
+      : "foreground";
     const status = String(req.data?.status || "").trim().toLowerCase();
     const duration = Math.max(0, Number(req.data?.duration || 0));
     const endReason = String(req.data?.endReason || (status === "ended" ? "hangup" : status))
@@ -1663,6 +1773,8 @@ exports.heartbeatConversationCall = onCall(
         [`${participantRole}SessionId`]: sessionId,
         [`${participantRole}DeviceId`]: deviceId,
         [`${participantRole}LastHeartbeatAt`]: now,
+        [`${participantRole}LifecycleState`]: lifecycleState,
+        [`${participantRole}LifecycleAt`]: now,
         lastHeartbeat: now,
       });
       tx.set(lockRef, {
