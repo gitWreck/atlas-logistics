@@ -64,9 +64,7 @@ function callActivityMillis(call = {}) {
 }
 
 const ACTIVE_CALL_STATUSES_FOR_CLIENT = ["ringing", "connecting", "accepted", "connected", "ongoing"];
-// A hidden tab can have timers suspended. Treat a delayed heartbeat as a
-// reconnect condition instead of ending an otherwise active call.
-const REMOTE_HEARTBEAT_STALE_MS = 10 * 60_000;
+const REMOTE_HEARTBEAT_STALE_MS = 90_000;
 
 function heartbeatMillis(value) {
   if (typeof value?.toMillis === "function") return value.toMillis();
@@ -95,7 +93,6 @@ export default function IncomingCallListener() {
   const [isMuted, setIsMuted] = useState(false);
   const [isSpeakerOn, setIsSpeakerOn] = useState(true);
   const [isCameraOn, setIsCameraOn] = useState(true);
-  const [isReconnecting, setIsReconnecting] = useState(false);
   const [cameraType, setCameraType] = useState("user");
   const [callSessionId, setCallSessionId] = useState("");
   const callMapRef = useRef(new Map());
@@ -107,8 +104,7 @@ export default function IncomingCallListener() {
   const videoStageRef = useRef(null);
   const previewDragRef = useRef(null);
   const callWindowDragRef = useRef(null);
-  const remoteHeartbeatStaleRef = useRef(false);
-  const lifecycleBackgroundedRef = useRef(false);
+  const remoteTimeoutEndingRef = useRef(false);
   const [localPreviewPosition, setLocalPreviewPosition] = useState(null);
   const [callWindowPosition, setCallWindowPosition] = useState({ left: null, top: 72 });
   const [callWindowMode, setCallWindowMode] = useState("normal");
@@ -278,8 +274,7 @@ export default function IncomingCallListener() {
   }, [activeCall]);
 
   useEffect(() => {
-    remoteHeartbeatStaleRef.current = false;
-    setIsReconnecting(false);
+    remoteTimeoutEndingRef.current = false;
   }, [activeCall?.id]);
 
   useEffect(() => {
@@ -306,6 +301,7 @@ export default function IncomingCallListener() {
     }
 
     const checkRemoteHeartbeat = async () => {
+      if (remoteTimeoutEndingRef.current) return;
       try {
         const snap = await getDoc(doc(db, "calls", activeCall.id));
         if (!snap.exists()) return;
@@ -316,23 +312,17 @@ export default function IncomingCallListener() {
         const remoteHeartbeat = heartbeatMillis(
           isCaller ? call.receiverLastHeartbeatAt : call.callerLastHeartbeatAt,
         );
-        const isStale = Boolean(remoteHeartbeat) && Date.now() - remoteHeartbeat > REMOTE_HEARTBEAT_STALE_MS;
-        if (isStale) {
-          if (!remoteHeartbeatStaleRef.current) {
-            console.log("[Heartbeat] timeout triggered");
-            console.log("[Heartbeat] reconnecting");
-          }
-          remoteHeartbeatStaleRef.current = true;
-          setIsReconnecting(true);
-          return;
-        }
+        if (!remoteHeartbeat || Date.now() - remoteHeartbeat <= REMOTE_HEARTBEAT_STALE_MS) return;
 
-        if (remoteHeartbeatStaleRef.current) {
-          console.log("[Heartbeat] remote heartbeat restored");
-        }
-        remoteHeartbeatStaleRef.current = false;
-        if (!lifecycleBackgroundedRef.current) setIsReconnecting(false);
+        remoteTimeoutEndingRef.current = true;
+        await updateConversationCallStatus({
+          callId: activeCall.id,
+          status: "ended",
+          duration: callDurationRef.current,
+          endReason: "remote_heartbeat_timeout",
+        });
       } catch (error) {
+        remoteTimeoutEndingRef.current = false;
         console.warn("Remote call heartbeat check failed", error);
       }
     };
@@ -423,58 +413,24 @@ export default function IncomingCallListener() {
   }, [callDurationSeconds]);
 
   useEffect(() => {
-    const restoreActiveCall = () => {
+    const endCurrentCall = (reason) => {
       const call = activeCallRef.current;
-      console.log("[Call] status:", call?.status);
-      console.log("[Call] currentCall:", call?.id);
-      if (!call?.id) return;
-      console.log("[Call] restoring active call");
-      lifecycleBackgroundedRef.current = false;
-      setIsReconnecting(false);
-      heartbeatConversationCall({ callId: call.id }).catch((error) => {
-        console.warn("Unable to refresh call heartbeat after foregrounding", error);
-        setIsReconnecting(true);
-      });
+      const currentStatus = String(call?.status || "").toLowerCase();
+      if (!call?.id || !["ringing", "accepted", "connecting", "connected", "ongoing"].includes(currentStatus)) return;
+      updateConversationCallStatus({
+        callId: call.id,
+        status: currentStatus === "ringing" ? "cancelled" : "ended",
+        duration: callDurationRef.current,
+        endReason: reason,
+      }).catch(() => {});
     };
-    const handleVisibilityChange = () => {
-      console.log("[Lifecycle] visibility:", document.visibilityState);
-      if (document.visibilityState === "visible") {
-        restoreActiveCall();
-        return;
-      }
-      lifecycleBackgroundedRef.current = true;
-      const call = activeCallRef.current;
-      if (call?.id) {
-        console.log("[Heartbeat] reconnecting");
-        setIsReconnecting(true);
-      }
-    };
-    const handlePageHide = () => {
-      // pagehide fires for reloads as well as real closes. Keeping the call
-      // active lets the fresh page restore it from the existing call document.
-      console.log("[Lifecycle] pagehide");
-      lifecycleBackgroundedRef.current = true;
-      setIsReconnecting(Boolean(activeCallRef.current?.id));
-    };
-    const handleOffline = () => {
-      console.log("[Lifecycle] offline");
-      if (activeCallRef.current?.id) {
-        console.log("[Heartbeat] reconnecting");
-        setIsReconnecting(true);
-      }
-    };
-    const handleOnline = () => restoreActiveCall();
-    document.addEventListener("visibilitychange", handleVisibilityChange);
+    const handlePageHide = () => endCurrentCall("browser_closed");
+    const handleOffline = () => endCurrentCall("network_lost");
     window.addEventListener("pagehide", handlePageHide);
-    window.addEventListener("pageshow", restoreActiveCall);
     window.addEventListener("offline", handleOffline);
-    window.addEventListener("online", handleOnline);
     return () => {
-      document.removeEventListener("visibilitychange", handleVisibilityChange);
       window.removeEventListener("pagehide", handlePageHide);
-      window.removeEventListener("pageshow", restoreActiveCall);
       window.removeEventListener("offline", handleOffline);
-      window.removeEventListener("online", handleOnline);
     };
   }, []);
 
@@ -767,7 +723,7 @@ export default function IncomingCallListener() {
     ? "Waiting for answer"
     : isCallerRinging
       ? "Ringing..."
-      : isReconnecting || status === "reconnecting"
+      : status === "reconnecting"
         ? "Reconnecting"
         : mediaFailed
           ? "Failed"
@@ -879,7 +835,7 @@ export default function IncomingCallListener() {
               <h3 className="mt-2 text-lg font-extrabold leading-tight text-white">{displayCallName}</h3>
               <div className="mt-1 flex items-center gap-1.5 text-xs text-white/90">
                 <span className="h-2 w-2 rounded-full bg-emerald-400" />
-                {isReconnecting ? "Reconnecting" : status === "connected" ? "In Call" : statusLabel}
+                {status === "connected" ? "In Call" : statusLabel}
               </div>
             </div>
 
