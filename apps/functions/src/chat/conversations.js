@@ -56,9 +56,13 @@ function cleanCallIdentity(value, fallback = null) {
 function timestampMillis(value) {
   if (!value) return 0;
   if (typeof value.toMillis === "function") return value.toMillis();
+  if (typeof value.toDate === "function") return value.toDate().getTime();
   if (value instanceof Date) return value.getTime();
+  if (typeof value === "number") return Number.isFinite(value) ? value : 0;
   const seconds = Number(value.seconds || value._seconds || 0);
-  return seconds > 0 ? seconds * 1000 : 0;
+  if (seconds > 0) return seconds * 1000;
+  const parsed = new Date(value).getTime();
+  return Number.isFinite(parsed) ? parsed : 0;
 }
 
 function isCallStale(call = {}, nowMillis = Date.now()) {
@@ -69,13 +73,15 @@ function isCallStale(call = {}, nowMillis = Date.now()) {
   // unanswered call and both participant locks alive indefinitely.
   if (status === "ringing") {
     const ringingStartedAt = timestampMillis(call.createdAt || call.startedAt);
-    return Boolean(ringingStartedAt && nowMillis - ringingStartedAt > RINGING_CALL_STALE_MS);
+    return !ringingStartedAt || nowMillis - ringingStartedAt > RINGING_CALL_STALE_MS;
   }
 
   const fallbackHeartbeat = timestampMillis(
     call.lastHeartbeat || call.updatedAt || call.startedAt || call.createdAt,
   );
-  if (!fallbackHeartbeat) return false;
+  // Legacy/failed call documents without a usable timestamp must never keep
+  // an account locked permanently.
+  if (!fallbackHeartbeat) return true;
 
   const callerHeartbeat = timestampMillis(call.callerLastHeartbeatAt) || fallbackHeartbeat;
   const receiverHeartbeat = timestampMillis(call.receiverLastHeartbeatAt) || fallbackHeartbeat;
@@ -115,13 +121,13 @@ async function findActiveCallCandidates(participantIds) {
         .collection("calls")
         .where("status", "in", ACTIVE_CALL_STATUSES)
         .where("callerId", "==", participantId)
-        .limit(2)
+        .limit(20)
         .get(),
       db
         .collection("calls")
         .where("status", "in", ACTIVE_CALL_STATUSES)
         .where("receiverId", "==", participantId)
-        .limit(2)
+        .limit(20)
         .get(),
     );
   }
