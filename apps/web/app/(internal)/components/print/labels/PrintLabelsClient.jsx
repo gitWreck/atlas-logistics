@@ -257,8 +257,8 @@ function StandardLabel({ shipment, pkg, index, total }) {
   const qrValue = pkg.packageId || "NO_ID";
   const QR_SIZE_MM = 56;
   const QR_SIZE = Math.round((QR_SIZE_MM * 96) / 25.4);
-  const LOGO_SIZE = Math.round(QR_SIZE * 0.17);
-  const LOGO_PAD = Math.round(QR_SIZE * 0.045);
+  const LOGO_SIZE = Math.round(QR_SIZE * 0.26);
+  const LOGO_PAD = Math.round(QR_SIZE * 0.018);
 
   return (
     <div
