@@ -42,11 +42,7 @@ const CALL_STATUSES = [
 ];
 const TERMINAL_CALL_STATUSES = ["ended", "declined", "missed", "busy", "cancelled", "timeout"];
 const CALL_LOCK_COLLECTION = "callAccountLocks";
-// Browsers and mobile operating systems may suspend a backgrounded call for a
-// few minutes without the participant having hung up.  Keep the call lock for
-// a reasonable reconnect window; clients surface a reconnecting state instead
-// of treating a missed heartbeat as a hangup.
-const CALL_HEARTBEAT_STALE_MS = 10 * 60 * 1000;
+const CALL_HEARTBEAT_STALE_MS = 90 * 1000;
 const RINGING_CALL_STALE_MS = 75 * 1000;
 
 function cleanCallIdentity(value, fallback = null) {
