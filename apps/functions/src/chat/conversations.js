@@ -42,12 +42,8 @@ const CALL_STATUSES = [
 ];
 const TERMINAL_CALL_STATUSES = ["ended", "declined", "missed", "busy", "cancelled", "timeout"];
 const CALL_LOCK_COLLECTION = "callAccountLocks";
-// Browsers and mobile operating systems may suspend a backgrounded call for a
-// few minutes without the participant having hung up.  Keep the call lock for
-// a reasonable reconnect window; clients surface a reconnecting state instead
-// of treating a missed heartbeat as a hangup.
-const CALL_HEARTBEAT_STALE_MS = 10 * 60 * 1000;
-const RINGING_CALL_STALE_MS = 75 * 1000;
+const CALL_HEARTBEAT_STALE_MS = 90 * 1000;
+const RINGING_CALL_STALE_MS = 45 * 1000;
 
 function cleanCallIdentity(value, fallback = null) {
   const normalized = String(value || "")
@@ -69,14 +65,17 @@ function isCallStale(call = {}, nowMillis = Date.now()) {
   const status = String(call.status || "").trim().toLowerCase();
   if (!ACTIVE_CALL_STATUSES.includes(status)) return false;
 
+  // A ringing call has a fixed lifetime. Caller heartbeats must not keep an
+  // unanswered call and both participant locks alive indefinitely.
+  if (status === "ringing") {
+    const ringingStartedAt = timestampMillis(call.createdAt || call.startedAt);
+    return Boolean(ringingStartedAt && nowMillis - ringingStartedAt > RINGING_CALL_STALE_MS);
+  }
+
   const fallbackHeartbeat = timestampMillis(
     call.lastHeartbeat || call.updatedAt || call.startedAt || call.createdAt,
   );
   if (!fallbackHeartbeat) return false;
-
-  if (status === "ringing") {
-    return nowMillis - fallbackHeartbeat > RINGING_CALL_STALE_MS;
-  }
 
   const callerHeartbeat = timestampMillis(call.callerLastHeartbeatAt) || fallbackHeartbeat;
   const receiverHeartbeat = timestampMillis(call.receiverLastHeartbeatAt) || fallbackHeartbeat;
@@ -1257,20 +1256,6 @@ exports.startConversationCall = onCall(
         );
       }
 
-      const customerSnap = await db.collection("customers").doc(customerId).get();
-      if (!customerSnap.exists) {
-        throw new HttpsError("not-found", "Customer profile not found.");
-      }
-      const customerData = customerSnap.data() || {};
-      const assignedManagerId = String(customerData.primaryAssignedStaffId || "").trim();
-
-      if (!assignedManagerId) {
-        throw new HttpsError(
-          "failed-precondition",
-          "The customer has no assigned manager.",
-        );
-      }
-
       const isCustomerCaller = role === "customer" && uid === customerId;
       const isManagerCaller = role === "manager";
       if (!isCustomerCaller && !isManagerCaller) {
@@ -1281,6 +1266,30 @@ exports.startConversationCall = onCall(
       }
 
       await getConversationForUser(conversationId, uid, role);
+
+      // Customer accounts are stored in users/{uid}; the account creation
+      // flow does not create a parallel customers/{uid} document.
+      const customerSnap = await db.collection("users").doc(customerId).get();
+      const customerData = customerSnap.data() || {};
+      if (
+        !customerSnap.exists ||
+        String(customerData.role || "").trim().toLowerCase() !== "customer"
+      ) {
+        throw new HttpsError("not-found", "Customer account not found.");
+      }
+
+      const assignedManagerId = String(
+        assignedStaffId(conversation) ||
+          customerData.primaryAssignedStaffId ||
+          (isManagerCaller ? uid : ""),
+      ).trim();
+
+      if (!assignedManagerId) {
+        throw new HttpsError(
+          "failed-precondition",
+          "This conversation has no assigned manager.",
+        );
+      }
 
       const receiverId = isCustomerCaller ? assignedManagerId : customerId;
       const receiverSnap = await db.collection("users").doc(receiverId).get();
