@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import {
   generateTencentUserSig,
@@ -244,11 +244,55 @@ export default function useWebRtcCall({
     }
   }, []);
 
+  const restoreMedia = useCallback(async () => {
+    const trtc = trtcRef.current;
+    if (!trtc || !activeCall?.id) return false;
+
+    console.log("[Call] restoring video UI");
+    console.log("[Media] local video readyState:", localVideoReady ? "live" : "unavailable");
+    console.log("[Media] remote video readyState:", remoteVideoReady ? "live" : "unavailable");
+    console.log("[Media] local video muted:", !isCameraOnRef.current);
+    console.log("[Media] remote video muted:", false);
+    console.log("[WebRTC] connection:", "TRTC managed");
+    console.log("[WebRTC] ICE:", "TRTC managed");
+
+    try {
+      await trtc.startLocalAudio();
+      await trtc.updateLocalAudio?.({ mute: isMutedRef.current });
+      if (activeCall.type === "video") {
+        const localView = await waitForDomView(localViewId, () => trtcRef.current !== trtc);
+        if (localView) {
+          await trtc.startLocalVideo({
+            view: localView,
+            option: { useFrontCamera: cameraType !== "environment" },
+          });
+          await trtc.updateLocalVideo?.({ mute: !isCameraOnRef.current });
+          localVideoStartedRef.current = true;
+          setLocalVideoReady(true);
+        }
+
+        const request = pendingRemoteVideoRef.current;
+        const remoteView = await waitForDomView(remoteViewId, () => trtcRef.current !== trtc);
+        if (request && remoteView) {
+          await trtc.startRemoteVideo({ ...request, view: remoteView });
+          setRemoteVideoReady(true);
+        }
+      }
+      setMediaNotice("");
+      return true;
+    } catch (error) {
+      console.warn("Unable to restore browser call media", error);
+      setMediaNotice("Restoring the call media connection...");
+      return false;
+    }
+  }, [activeCall?.id, activeCall?.type, cameraType, localVideoReady, localViewId, remoteVideoReady, remoteViewId]);
+
   return {
     localViewId,
     remoteViewId,
     localVideoReady,
     remoteVideoReady,
     mediaNotice,
+    restoreMedia,
   };
 }

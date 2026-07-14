@@ -64,7 +64,8 @@ function callActivityMillis(call = {}) {
 }
 
 const ACTIVE_CALL_STATUSES_FOR_CLIENT = ["ringing", "connecting", "accepted", "connected", "ongoing"];
-const REMOTE_HEARTBEAT_STALE_MS = 90_000;
+const REMOTE_HEARTBEAT_STALE_MS = 3 * 60_000;
+const BACKGROUND_HEARTBEAT_STALE_MS = 10 * 60_000;
 
 function heartbeatMillis(value) {
   if (typeof value?.toMillis === "function") return value.toMillis();
@@ -95,6 +96,7 @@ export default function IncomingCallListener() {
   const [isCameraOn, setIsCameraOn] = useState(true);
   const [cameraType, setCameraType] = useState("user");
   const [callSessionId, setCallSessionId] = useState("");
+  const [isReconnecting, setIsReconnecting] = useState(false);
   const callMapRef = useRef(new Map());
   const prevCallStatusRef = useRef(new Map());
   const activeCallRef = useRef(null);
@@ -114,6 +116,7 @@ export default function IncomingCallListener() {
     localVideoReady,
     remoteVideoReady,
     mediaNotice,
+    restoreMedia,
   } = useWebRtcCall({
     activeCall,
     userId: user?.uid,
@@ -275,6 +278,7 @@ export default function IncomingCallListener() {
 
   useEffect(() => {
     remoteTimeoutEndingRef.current = false;
+    setIsReconnecting(false);
   }, [activeCall?.id]);
 
   useEffect(() => {
@@ -288,7 +292,10 @@ export default function IncomingCallListener() {
     );
     if (!shouldHeartbeat) return undefined;
 
-    const pulse = () => heartbeatConversationCall({ callId: activeCall.id }).catch(() => {});
+    const pulse = () => heartbeatConversationCall({
+      callId: activeCall.id,
+      lifecycleState: document.visibilityState === "hidden" ? "background" : "foreground",
+    }).catch(() => {});
     pulse();
     const interval = window.setInterval(pulse, 20_000);
     return () => window.clearInterval(interval);
@@ -312,7 +319,21 @@ export default function IncomingCallListener() {
         const remoteHeartbeat = heartbeatMillis(
           isCaller ? call.receiverLastHeartbeatAt : call.callerLastHeartbeatAt,
         );
-        if (!remoteHeartbeat || Date.now() - remoteHeartbeat <= REMOTE_HEARTBEAT_STALE_MS) return;
+        const remoteRole = isCaller ? "receiver" : "caller";
+        const remoteLifecycleState = String(call[`${remoteRole}LifecycleState`] || "foreground");
+        const staleAfter = remoteLifecycleState === "background"
+          ? BACKGROUND_HEARTBEAT_STALE_MS
+          : REMOTE_HEARTBEAT_STALE_MS;
+        const heartbeatAge = remoteHeartbeat ? Date.now() - remoteHeartbeat : 0;
+        if (!remoteHeartbeat || heartbeatAge <= staleAfter) {
+          setIsReconnecting(false);
+          return;
+        }
+
+        console.log("[Heartbeat] timeout triggered");
+        console.log("[Heartbeat] reconnecting");
+        setIsReconnecting(true);
+        if (heartbeatAge <= BACKGROUND_HEARTBEAT_STALE_MS) return;
 
         remoteTimeoutEndingRef.current = true;
         await updateConversationCallStatus({
@@ -413,26 +434,52 @@ export default function IncomingCallListener() {
   }, [callDurationSeconds]);
 
   useEffect(() => {
-    const endCurrentCall = (reason) => {
-      const call = activeCallRef.current;
+    const restoreActiveCall = async () => {
+      const call = activeCallRef.current || [...callMapRef.current.values()]
+        .filter((candidate) => ACTIVE_CALL_STATUSES_FOR_CLIENT.includes(
+          String(candidate?.status || "").trim().toLowerCase(),
+        ))
+        .sort((left, right) => callActivityMillis(right) - callActivityMillis(left))[0];
       const currentStatus = String(call?.status || "").toLowerCase();
       if (!call?.id || !["ringing", "accepted", "connecting", "connected", "ongoing"].includes(currentStatus)) return;
-      updateConversationCallStatus({
-        callId: call.id,
-        status: currentStatus === "ringing" ? "cancelled" : "ended",
-        duration: callDurationRef.current,
-        endReason: reason,
-      }).catch(() => {});
+      console.log("[Call] status:", call?.status);
+      console.log("[Call] currentCall:", call?.id);
+      console.log("[Call] restoring active call");
+      const snap = await getDoc(doc(db, "calls", call.id));
+      if (!snap.exists()) return;
+      const restoredCall = { id: snap.id, ...snap.data() };
+      const restoredStatus = String(restoredCall.status || "").toLowerCase();
+      if (!ACTIVE_CALL_STATUSES_FOR_CLIENT.includes(restoredStatus)) return;
+      activeCallRef.current = restoredCall;
+      setActiveCall(restoredCall);
+      setIsReconnecting(false);
+      await heartbeatConversationCall({ callId: call.id, lifecycleState: "foreground" }).catch(() => {});
+      window.requestAnimationFrame(() => { void restoreMedia(); });
     };
-    const handlePageHide = () => endCurrentCall("browser_closed");
-    const handleOffline = () => endCurrentCall("network_lost");
-    window.addEventListener("pagehide", handlePageHide);
+    const handleVisibilityChange = () => {
+      console.log("[Lifecycle] visibility:", document.visibilityState);
+      if (document.visibilityState === "visible") {
+        void restoreActiveCall();
+        return;
+      }
+      const call = activeCallRef.current;
+      if (!call?.id) return;
+      heartbeatConversationCall({ callId: call.id, lifecycleState: "background" }).catch(() => {});
+    };
+    const handleOffline = () => {
+      console.log("[Heartbeat] reconnecting");
+      setIsReconnecting(true);
+    };
+    const handleOnline = () => { void restoreActiveCall(); };
+    document.addEventListener("visibilitychange", handleVisibilityChange);
     window.addEventListener("offline", handleOffline);
+    window.addEventListener("online", handleOnline);
     return () => {
-      window.removeEventListener("pagehide", handlePageHide);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
       window.removeEventListener("offline", handleOffline);
+      window.removeEventListener("online", handleOnline);
     };
-  }, []);
+  }, [restoreMedia]);
 
   // Also listen directly to the active call document so terminal updates tear down immediately
   useEffect(() => {
@@ -528,6 +575,7 @@ export default function IncomingCallListener() {
     setIsMuted(false);
     setIsSpeakerOn(true);
     setIsCameraOn(true);
+    setIsReconnecting(false);
   };
 
   const formatDuration = (seconds) => {
@@ -724,6 +772,8 @@ export default function IncomingCallListener() {
     : isCallerRinging
       ? "Ringing..."
       : status === "reconnecting"
+        ? "Reconnecting"
+      : isReconnecting
         ? "Reconnecting"
         : mediaFailed
           ? "Failed"

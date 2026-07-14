@@ -1562,11 +1562,6 @@ exports.updateConversationCallStatus = onCall(
     const callId = cleanText(req.data?.callId, "callId", 160);
     const sessionId = cleanCallIdentity(req.data?.sessionId, `legacy:${uid}`);
     const deviceId = cleanCallIdentity(req.data?.deviceId, sessionId);
-    const lifecycleState = String(req.data?.lifecycleState || "foreground")
-      .trim()
-      .toLowerCase() === "background"
-      ? "background"
-      : "foreground";
     const status = String(req.data?.status || "").trim().toLowerCase();
     const duration = Math.max(0, Number(req.data?.duration || 0));
     const endReason = String(req.data?.endReason || (status === "ended" ? "hangup" : status))
@@ -1724,6 +1719,11 @@ exports.heartbeatConversationCall = onCall(
     const callId = cleanText(req.data?.callId, "callId", 160);
     const sessionId = cleanCallIdentity(req.data?.sessionId, `legacy:${uid}`);
     const deviceId = cleanCallIdentity(req.data?.deviceId, sessionId);
+    const lifecycleState = String(req.data?.lifecycleState || "foreground")
+      .trim()
+      .toLowerCase() === "background"
+      ? "background"
+      : "foreground";
     const callRef = db.collection("calls").doc(callId);
 
     return db.runTransaction(async (tx) => {

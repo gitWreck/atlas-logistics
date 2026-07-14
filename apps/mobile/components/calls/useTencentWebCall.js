@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { PermissionsAndroid, Platform } from "react-native";
 import TRTCCloud, {
   TRTCCloudDef,
@@ -72,12 +72,7 @@ export default function useTencentWebCall({
         const listener = (type, params = {}) => {
           if (type === TRTCCloudListener.onError) {
             console.error("Native TRTC error", params);
-            setMediaNotice(params.errMsg || "The call media connection failed.");
-            updateConversationCallStatus({
-              callId: activeCall.id,
-              status: "ended",
-              endReason: "media_connection_failed",
-            }).catch(() => {});
+            setMediaNotice(params.errMsg || "Restoring the call media connection...");
           }
           if (type === TRTCCloudListener.onEnterRoom) {
             if (Number(params.result) < 0) {
@@ -103,12 +98,7 @@ export default function useTencentWebCall({
           if (type === TRTCCloudListener.onRemoteUserLeaveRoom) {
             setRemoteVideoReady(false);
             setRemoteUserId(null);
-            setMediaNotice("Call ended");
-            updateConversationCallStatus({
-              callId: activeCall.id,
-              status: "ended",
-              endReason: "peer_left",
-            }).catch(() => {});
+            setMediaNotice("Restoring the call media connection...");
           }
         };
         listenerRef.current = listener;
@@ -194,6 +184,33 @@ export default function useTencentWebCall({
     }
   }, []);
 
+  const restoreMedia = useCallback(async () => {
+    const cloud = cloudRef.current;
+    if (!cloud || !activeCall?.id) return false;
+    console.log("[Call] restoring video UI");
+    console.log("[Media] local video readyState:", localVideoReady ? "live" : "unavailable");
+    console.log("[Media] remote video readyState:", remoteVideoReady ? "live" : "unavailable");
+    console.log("[Media] local video muted:", !isCameraOn);
+    console.log("[Media] remote video muted:", false);
+    try {
+      await cloud.startLocalAudio(TRTCCloudDef.TRTC_AUDIO_QUALITY_SPEECH);
+      await cloud.muteLocalAudio(isMuted);
+      await cloud.muteLocalVideo(!isCameraOn);
+      await cloud.setAudioRoute(
+        isSpeakerOn
+          ? TRTCCloudDef.TRTC_AUDIO_ROUTE_SPEAKER
+          : TRTCCloudDef.TRTC_AUDIO_ROUTE_EARPIECE,
+      );
+      if (activeCall.type === "video") setLocalVideoReady(true);
+      setMediaNotice("");
+      return true;
+    } catch (error) {
+      console.warn("Unable to restore native call media", error);
+      setMediaNotice("Restoring the call media connection...");
+      return false;
+    }
+  }, [activeCall?.id, activeCall?.type, isCameraOn, isMuted, isSpeakerOn, localVideoReady, remoteVideoReady]);
+
   return {
     localViewId: null,
     remoteViewId: null,
@@ -205,5 +222,6 @@ export default function useTencentWebCall({
     NativeRemoteVideoView: TXVideoView.RemoteView,
     nativeVideoStreamType: TRTCCloudDef.TRTC_VIDEO_STREAM_TYPE_BIG,
     nativeVideoViewType: TRTCCloudDef.TRTC_VideoView_TextureView,
+    restoreMedia,
   };
 }

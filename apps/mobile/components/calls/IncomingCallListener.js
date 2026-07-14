@@ -68,7 +68,8 @@ function terminalCallToast(status) {
 }
 
 const ACTIVE_CALL_STATUSES_FOR_CLIENT = ["ringing", "connecting", "accepted", "connected", "ongoing"];
-const REMOTE_HEARTBEAT_STALE_MS = 90_000;
+const REMOTE_HEARTBEAT_STALE_MS = 3 * 60_000;
+const BACKGROUND_HEARTBEAT_STALE_MS = 10 * 60_000;
 
 function heartbeatMillis(value) {
   if (typeof value?.toMillis === "function") return value.toMillis();
@@ -96,6 +97,17 @@ function WebMediaElement({ stream, muted = false, hidden = false, style }) {
       const playAttempt = elementRef.current.play?.();
       playAttempt?.catch?.(() => {});
     }
+  }, [stream]);
+
+  useEffect(() => {
+    if (Platform.OS !== "web" || typeof document === "undefined") return undefined;
+    const restorePlayback = () => {
+      if (document.visibilityState !== "visible" || !elementRef.current || !stream) return;
+      elementRef.current.srcObject = stream;
+      elementRef.current.play?.().catch?.(() => {});
+    };
+    document.addEventListener("visibilitychange", restorePlayback);
+    return () => document.removeEventListener("visibilitychange", restorePlayback);
   }, [stream]);
 
   if (Platform.OS !== "web") return null;
@@ -133,6 +145,7 @@ export default function IncomingCallListener() {
   const [localMediaStream, setLocalMediaStream] = useState(null);
   const [remoteMediaStream, setRemoteMediaStream] = useState(null);
   const [rtcNotice, setRtcNotice] = useState("");
+  const [isReconnecting, setIsReconnecting] = useState(false);
   const callMapRef = useRef(new Map());
   const prevCallStatusRef = useRef(new Map());
   const activeCallRef = useRef(null);
@@ -152,6 +165,7 @@ export default function IncomingCallListener() {
   const processedCandidatesRef = useRef(new Set());
   const remoteTimeoutEndingRef = useRef(false);
   const callSurfaceRef = useRef(null);
+  const appStateRef = useRef(AppState.currentState);
 
   useEffect(() => {
     let mounted = true;
@@ -201,6 +215,7 @@ export default function IncomingCallListener() {
     NativeRemoteVideoView,
     nativeVideoStreamType,
     nativeVideoViewType,
+    restoreMedia,
   } = useTencentWebCall({
     activeCall,
     userId: user?.uid,
@@ -548,6 +563,7 @@ export default function IncomingCallListener() {
 
   useEffect(() => {
     remoteTimeoutEndingRef.current = false;
+    setIsReconnecting(false);
   }, [activeCall?.id]);
 
   useEffect(() => {
@@ -561,7 +577,10 @@ export default function IncomingCallListener() {
     );
     if (!shouldHeartbeat) return undefined;
 
-    const pulse = () => heartbeatConversationCall({ callId: activeCall.id }).catch(() => {});
+    const pulse = () => heartbeatConversationCall({
+      callId: activeCall.id,
+      lifecycleState: appStateRef.current === "active" ? "foreground" : "background",
+    }).catch(() => {});
     pulse();
     const interval = setInterval(pulse, 20_000);
     return () => clearInterval(interval);
@@ -585,7 +604,21 @@ export default function IncomingCallListener() {
         const remoteHeartbeat = heartbeatMillis(
           isCaller ? call.receiverLastHeartbeatAt : call.callerLastHeartbeatAt,
         );
-        if (!remoteHeartbeat || Date.now() - remoteHeartbeat <= REMOTE_HEARTBEAT_STALE_MS) return;
+        const remoteRole = isCaller ? "receiver" : "caller";
+        const remoteLifecycleState = String(call[`${remoteRole}LifecycleState`] || "foreground");
+        const staleAfter = remoteLifecycleState === "background"
+          ? BACKGROUND_HEARTBEAT_STALE_MS
+          : REMOTE_HEARTBEAT_STALE_MS;
+        const heartbeatAge = remoteHeartbeat ? Date.now() - remoteHeartbeat : 0;
+        if (!remoteHeartbeat || heartbeatAge <= staleAfter) {
+          setIsReconnecting(false);
+          return;
+        }
+
+        console.log("[Heartbeat] timeout triggered");
+        console.log("[Heartbeat] reconnecting");
+        setIsReconnecting(true);
+        if (heartbeatAge <= BACKGROUND_HEARTBEAT_STALE_MS) return;
 
         remoteTimeoutEndingRef.current = true;
         await updateConversationCallStatus({
@@ -614,19 +647,55 @@ export default function IncomingCallListener() {
 
   useEffect(() => {
     const subscription = AppState.addEventListener("change", (nextState) => {
-      if (nextState === "active") return;
-      const call = activeCallRef.current;
+      console.log("[Lifecycle] AppState:", nextState);
+      appStateRef.current = nextState;
+      const call = activeCallRef.current || [...callMapRef.current.values()]
+        .filter((candidate) => ACTIVE_CALL_STATUSES_FOR_CLIENT.includes(
+          String(candidate?.status || "").trim().toLowerCase(),
+        ))
+        .sort((left, right) => callActivityMillis(right) - callActivityMillis(left))[0];
       const currentStatus = String(call?.status || "").toLowerCase();
       if (!call?.id || !["ringing", "accepted", "connecting", "connected", "ongoing"].includes(currentStatus)) return;
-      updateConversationCallStatus({
-        callId: call.id,
-        status: currentStatus === "ringing" ? "cancelled" : "ended",
-        duration: callDurationRef.current,
-        endReason: "app_backgrounded",
-      }).catch(() => {});
+      if (nextState !== "active") {
+        heartbeatConversationCall({ callId: call.id, lifecycleState: "background" }).catch(() => {});
+        return;
+      }
+
+      void (async () => {
+        console.log("[Call] status:", call?.status);
+        console.log("[Call] currentCall:", call?.id);
+        console.log("[Call] restoring active call");
+        const snap = await getDoc(doc(db, "calls", call.id));
+        if (!snap.exists()) return;
+        const restoredCall = { id: snap.id, ...snap.data() };
+        const restoredStatus = String(restoredCall.status || "").toLowerCase();
+        if (!ACTIVE_CALL_STATUSES_FOR_CLIENT.includes(restoredStatus)) return;
+        activeCallRef.current = restoredCall;
+        setActiveCall(restoredCall);
+        setIsReconnecting(false);
+        await heartbeatConversationCall({ callId: call.id, lifecycleState: "foreground" }).catch(() => {});
+
+        const localVideoTrack = localMediaStream?.getVideoTracks?.()[0];
+        const remoteVideoTrack = remoteMediaStream?.getVideoTracks?.()[0];
+        const peer = peerConnectionRef.current;
+        console.log("[Media] local video readyState:", localVideoTrack?.readyState);
+        console.log("[Media] remote video readyState:", remoteVideoTrack?.readyState);
+        console.log("[Media] local video muted:", localVideoTrack?.muted);
+        console.log("[Media] remote video muted:", remoteVideoTrack?.muted);
+        console.log("[WebRTC] connection:", peer?.connectionState);
+        console.log("[WebRTC] ICE:", peer?.iceConnectionState);
+        const needsWebRtcRestart = Platform.OS === "web" && (
+          !peer ||
+          ["failed", "closed"].includes(peer.connectionState) ||
+          localMediaStream?.getTracks?.().some((track) => track.readyState === "ended")
+        );
+        if (needsWebRtcRestart) cleanupWebRtc();
+        if (Platform.OS === "web") await ensureWebRtc(restoredCall);
+        await restoreMedia();
+      })().catch((error) => console.warn("Unable to restore active call", error));
     });
     return () => subscription.remove();
-  }, []);
+  }, [localMediaStream, remoteMediaStream, restoreMedia]);
 
   // Also listen directly to the active call document so terminal updates tear down immediately
   useEffect(() => {
@@ -736,6 +805,7 @@ export default function IncomingCallListener() {
     setIsSpeakerOn(true);
     setIsCameraOn(true);
     setCameraType("front");
+    setIsReconnecting(false);
   };
 
   const formatDuration = (seconds) => {
@@ -973,7 +1043,7 @@ export default function IncomingCallListener() {
     ? `Incoming ${callTypeLabel}`
     : isCallerRinging
       ? "Ringing"
-      : status === "reconnecting"
+      : status === "reconnecting" || isReconnecting
         ? "Reconnecting"
         : mediaFailed
           ? "Failed"
