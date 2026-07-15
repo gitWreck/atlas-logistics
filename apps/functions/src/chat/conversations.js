@@ -451,26 +451,15 @@ exports.createConversation = onCall(
 exports.sendChatMessage = onCall(
   { region: "asia-southeast1", maxInstances: 20 },
   async (req) => {
-    const uid = requireAuth(req);
-    const guest = isAnonymousAuth(req);
+    const {
+      uid,
+      role,
+      user,
+      guest,
+      profileMissing,
+    } = await resolveChatActor(db, req, { requireProfile: false });
     const text = cleanText(req.data?.text);
     const conversationId = cleanText(req.data?.conversationId, "conversationId", 160);
-
-    let user = {};
-    let role = "guest";
-    let profileMissing = false;
-
-    if (!guest) {
-      const userSnap = await db.collection("users").doc(uid).get();
-      if (!userSnap.exists || userSnap.data()?.active === false) {
-        profileMissing = true;
-        user = { name: authTokenName(req, "Guest") };
-        role = "guest";
-      } else {
-        user = userSnap.data() || {};
-        role = String(user.role || "").toLowerCase();
-      }
-    }
 
     const { ref, conversation } = await getConversationForUser(
       conversationId,
@@ -568,21 +557,10 @@ exports.sendChatMessage = onCall(
 exports.markConversationRead = onCall(
   { region: "asia-southeast1", maxInstances: 20 },
   async (req) => {
-    const uid = requireAuth(req);
-    const guest = isAnonymousAuth(req);
+    const { uid, role, profileMissing } = await resolveChatActor(db, req, {
+      requireProfile: false,
+    });
     const conversationId = cleanText(req.data?.conversationId, "conversationId", 160);
-
-    let role = "guest";
-    let profileMissing = false;
-    if (!guest) {
-      const userSnap = await db.collection("users").doc(uid).get();
-      if (!userSnap.exists || userSnap.data()?.active === false) {
-        profileMissing = true;
-        role = "guest";
-      } else {
-        role = String(userSnap.data()?.role || "").toLowerCase();
-      }
-    }
 
     const { ref, conversation } = await getConversationForUser(
       conversationId,

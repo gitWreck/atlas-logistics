@@ -14,6 +14,7 @@ import {
   collection,
   getDocs,
   limit,
+  limitToLast,
   onSnapshot,
   orderBy,
   query,
@@ -173,7 +174,7 @@ export function GuestChatProvider({ children }) {
     const q = query(
       collection(db, "conversations", conversationId, "messages"),
       orderBy("createdAt", "asc"),
-      limit(200),
+      limitToLast(200),
     );
 
     return onSnapshot(
