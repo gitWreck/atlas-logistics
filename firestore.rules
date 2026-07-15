@@ -51,6 +51,12 @@ service cloud.firestore {
       return conversation.customerId == request.auth.uid;
     }
 
+    // Website live chat: any signed-in user (including anonymous / missing profile)
+    // can read conversations they own. Writes still go through Cloud Functions.
+    function canReadOwnedConversation(conversation) {
+      return isSignedIn() && ownsConversation(conversation);
+    }
+
     function isAssignedDriver() {
       return resource.data.driverId == request.auth.uid ||
         resource.data.assignedDriverId == request.auth.uid;
@@ -132,29 +138,19 @@ service cloud.firestore {
 
     match /conversations/{conversationId} {
       allow read: if isAdminOrManager()
-        || (isActiveUser() && ownsConversation(resource.data))
-        || (isActiveUser() && request.auth.uid in resource.data.get('participantIds', []))
-        || (isAnonymousUser() && ownsConversation(resource.data));
+        || canReadOwnedConversation(resource.data)
+        || (isActiveUser() && request.auth.uid in resource.data.get('participantIds', []));
 
       allow create, update, delete: if false;
 
       match /messages/{messageId} {
         allow read: if isAdminOrManager()
-          || (
-            isActiveUser()
-            && ownsConversation(
-              get(/databases/$(database)/documents/conversations/$(conversationId)).data
-            )
+          || canReadOwnedConversation(
+            get(/databases/$(database)/documents/conversations/$(conversationId)).data
           )
           || (
             isActiveUser()
             && request.auth.uid in get(/databases/$(database)/documents/conversations/$(conversationId)).data.get('participantIds', [])
-          )
-          || (
-            isAnonymousUser()
-            && ownsConversation(
-              get(/databases/$(database)/documents/conversations/$(conversationId)).data
-            )
           );
 
         allow create, update, delete: if false;

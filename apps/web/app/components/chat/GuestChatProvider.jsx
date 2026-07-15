@@ -9,7 +9,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { signInAnonymously } from "firebase/auth";
+import { onAuthStateChanged, signInAnonymously } from "firebase/auth";
 import {
   collection,
   getDocs,
@@ -38,33 +38,46 @@ export function useGuestChat() {
 }
 
 async function ensureChatSession() {
-  if (auth.currentUser) {
-    return auth.currentUser.uid;
+  let user = auth.currentUser;
+
+  if (!user) {
+    const credential = await signInAnonymously(auth);
+    user = credential.user;
   }
 
-  const credential = await signInAnonymously(auth);
-  return credential.user.uid;
+  // Make sure Firestore has a fresh token before any client queries.
+  await user.getIdToken(true);
+  return user.uid;
 }
 
 async function findOpenWebChatConversation(uid) {
-  const snapshot = await getDocs(
-    query(
-      collection(db, "conversations"),
-      where("customerId", "==", uid),
-      orderBy("lastMessageAt", "desc"),
-      limit(10),
-    ),
-  );
+  try {
+    const snapshot = await getDocs(
+      query(
+        collection(db, "conversations"),
+        where("customerId", "==", uid),
+        orderBy("lastMessageAt", "desc"),
+        limit(10),
+      ),
+    );
 
-  const match = snapshot.docs.find((doc) => {
-    const data = doc.data() || {};
-    const status = String(data.status || "open").toLowerCase();
-    if (status === "closed") return false;
-    if (data.type === "guest_support") return true;
-    return data.type === "customer_support" && !data.trackingNumber;
-  });
+    const match = snapshot.docs.find((doc) => {
+      const data = doc.data() || {};
+      const status = String(data.status || "open").toLowerCase();
+      if (status === "closed") return false;
+      if (data.type === "guest_support") return true;
+      return data.type === "customer_support" && !data.trackingNumber;
+    });
 
-  return match?.id || null;
+    return match?.id || null;
+  } catch (error) {
+    // Permission denied after logout is common while rules/session settle —
+    // first send still recovers via createConversation (admin SDK).
+    if (error?.code !== "permission-denied") {
+      console.warn("Could not load existing chat conversation:", error);
+    }
+    return null;
+  }
 }
 
 export function GuestChatProvider({ children }) {
@@ -77,12 +90,41 @@ export function GuestChatProvider({ children }) {
   const [sending, setSending] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const initRef = useRef(false);
+  const chatUidRef = useRef(null);
+
+  const resetChatSession = useCallback(() => {
+    initRef.current = false;
+    chatUidRef.current = null;
+    setChatUid(null);
+    setConversationId(null);
+    setMessages([]);
+    setDraft("");
+    setErrorMessage("");
+  }, []);
+
+  // Keep chat session tied to the current auth user (logout / login swap).
+  useEffect(() => {
+    return onAuthStateChanged(auth, (user) => {
+      const nextUid = user?.uid || null;
+      const previousUid = chatUidRef.current;
+
+      if (!nextUid) {
+        resetChatSession();
+        return;
+      }
+
+      if (previousUid && previousUid !== nextUid) {
+        resetChatSession();
+      }
+    });
+  }, [resetChatSession]);
 
   const openChat = useCallback(async () => {
     setIsOpen(true);
     setErrorMessage("");
 
-    if (initRef.current && chatUid) {
+    const currentUid = auth.currentUser?.uid || null;
+    if (initRef.current && chatUidRef.current && currentUid === chatUidRef.current) {
       return;
     }
 
@@ -91,11 +133,12 @@ export function GuestChatProvider({ children }) {
     try {
       const uid = await ensureChatSession();
 
-      if (chatUid && chatUid !== uid) {
+      if (chatUidRef.current && chatUidRef.current !== uid) {
         setConversationId(null);
-        initRef.current = false;
+        setMessages([]);
       }
 
+      chatUidRef.current = uid;
       setChatUid(uid);
 
       const existingId = await findOpenWebChatConversation(uid);
@@ -107,19 +150,23 @@ export function GuestChatProvider({ children }) {
       }
     } catch (error) {
       console.error("Failed to start live chat:", error);
+      initRef.current = false;
       setErrorMessage("Unable to start chat right now. Please try again.");
     } finally {
       setLoading(false);
     }
-  }, [chatUid]);
+  }, []);
 
   const closeChat = useCallback(() => {
     setIsOpen(false);
   }, []);
 
   useEffect(() => {
-    if (!conversationId || !isOpen) {
-      setMessages([]);
+    const uid = auth.currentUser?.uid;
+    if (!conversationId || !isOpen || !uid || uid !== chatUid) {
+      if (!conversationId || !isOpen) {
+        setMessages([]);
+      }
       return undefined;
     }
 
@@ -141,11 +188,17 @@ export function GuestChatProvider({ children }) {
         markConversationRead({ conversationId }).catch(() => {});
       },
       (error) => {
+        if (error?.code === "permission-denied") {
+          // Stale conversation from a previous logged-in session.
+          setConversationId(null);
+          setMessages([]);
+          return;
+        }
         console.error("Live chat messages subscription error:", error);
         setErrorMessage("Unable to load messages. Please refresh and try again.");
       },
     );
-  }, [conversationId, isOpen]);
+  }, [chatUid, conversationId, isOpen]);
 
   const handleSend = useCallback(async () => {
     const text = draft.trim();
@@ -154,6 +207,10 @@ export function GuestChatProvider({ children }) {
     try {
       setSending(true);
       setErrorMessage("");
+
+      const uid = await ensureChatSession();
+      chatUidRef.current = uid;
+      setChatUid(uid);
 
       if (!conversationId) {
         const result = await createConversation({
@@ -172,6 +229,7 @@ export function GuestChatProvider({ children }) {
         }
 
         setConversationId(nextConversationId);
+        initRef.current = true;
       } else {
         await sendChatMessage({ conversationId, text });
       }
