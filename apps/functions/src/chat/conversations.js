@@ -2,7 +2,11 @@
 
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const admin = require("firebase-admin");
-const { requireAuth, requireRole } = require("../utilities/helpers");
+const {
+  requireAuth,
+  isAnonymousAuth,
+  requireRole,
+} = require("../utilities/helpers");
 const { customerOwnsShipment } = require("../utilities/customerShipmentAccess");
 
 if (!admin.apps.length) admin.initializeApp();
@@ -233,11 +237,91 @@ async function notifyCustomer({ conversationId, customerId, message, sender }) {
   });
 }
 
+function authTokenName(req, fallback = "Guest") {
+  const token = req?.auth?.token || {};
+  if (typeof token.name === "string" && token.name.trim()) {
+    return token.name.trim();
+  }
+  if (typeof token.email === "string" && token.email.trim()) {
+    return token.email.split("@")[0];
+  }
+  return fallback;
+}
+
+async function resolveChatActor(db, req, { requireProfile = true } = {}) {
+  const uid = requireAuth(req);
+  const guest = isAnonymousAuth(req);
+
+  if (guest) {
+    return { uid, role: "guest", user: {}, guest: true, profileMissing: false };
+  }
+
+  const userSnap = await db.collection("users").doc(uid).get();
+  const missingOrInactive =
+    !userSnap.exists || userSnap.data()?.active === false;
+
+  if (missingOrInactive) {
+    if (requireProfile) {
+      throw new HttpsError("permission-denied", "Inactive or missing user.");
+    }
+
+    return {
+      uid,
+      role: "guest",
+      user: { name: authTokenName(req, "Guest") },
+      guest: false,
+      profileMissing: true,
+    };
+  }
+
+  const user = userSnap.data() || {};
+  return {
+    uid,
+    role: String(user.role || "").toLowerCase(),
+    user,
+    guest: false,
+    profileMissing: false,
+  };
+}
+
+async function findOpenWebSupportConversation(uid) {
+  const existingSnap = await db
+    .collection("conversations")
+    .where("customerId", "==", uid)
+    .orderBy("lastMessageAt", "desc")
+    .limit(10)
+    .get();
+
+  return existingSnap.docs.find((doc) => {
+    const data = doc.data() || {};
+    const status = String(data.status || "open").toLowerCase();
+    if (status === "closed") return false;
+    if (data.type === "guest_support") return true;
+    return data.type === "customer_support" && !data.trackingNumber;
+  });
+}
+
 exports.createConversation = onCall(
   { region: "asia-southeast1", maxInstances: 10 },
   async (req) => {
-    const { uid, role, user } = await requireRole(db, req, ["customer"]);
-    const trackingNumber = normalizeTracking(req.data?.trackingNumber);
+    const source = String(req.data?.source || "").trim().toLowerCase();
+    const isWebSupport = source === "web";
+    const {
+      uid,
+      role,
+      user,
+      guest,
+      profileMissing,
+    } = await resolveChatActor(db, req, {
+      requireProfile: !isWebSupport,
+    });
+
+    if (role !== "customer" && role !== "guest" && !isWebSupport) {
+      throw new HttpsError("permission-denied", "Insufficient role");
+    }
+
+    const trackingNumber =
+      guest || isWebSupport ? null : normalizeTracking(req.data?.trackingNumber);
     const initialMessage = String(req.data?.message || "").trim();
 
     let shipmentData = null;
@@ -256,7 +340,12 @@ exports.createConversation = onCall(
       }
     }
 
-    if (trackingNumber) {
+    if (guest || isWebSupport) {
+      const existing = await findOpenWebSupportConversation(uid);
+      if (existing) {
+        return { success: true, conversationId: existing.id, reused: true };
+      }
+    } else if (trackingNumber) {
       const existingSnap = await db
         .collection("conversations")
         .where("customerId", "==", uid)
@@ -283,11 +372,20 @@ exports.createConversation = onCall(
     }
 
     const conversationRef = db.collection("conversations").doc();
-    const customerName = displayName(user, "Customer");
+    const treatAsGuest = guest || profileMissing;
+    const customerName = treatAsGuest
+      ? displayName(user, authTokenName(req, "Guest"))
+      : displayName(user, "Customer");
     const now = FieldValue.serverTimestamp();
 
     const conversation = {
-      type: trackingNumber ? "shipment" : "customer_support",
+      type: treatAsGuest
+        ? "guest_support"
+        : trackingNumber
+          ? "shipment"
+          : "customer_support",
+      isGuest: treatAsGuest,
+      source: guest || isWebSupport ? "web" : null,
       shipmentId: trackingNumber,
       trackingNumber,
       shipmentSummary: shipmentData
@@ -353,29 +451,45 @@ exports.createConversation = onCall(
 exports.sendChatMessage = onCall(
   { region: "asia-southeast1", maxInstances: 20 },
   async (req) => {
-    const uid = requireAuth(req);
+    const {
+      uid,
+      role,
+      user,
+      guest,
+      profileMissing,
+    } = await resolveChatActor(db, req, { requireProfile: false });
     const text = cleanText(req.data?.text);
     const conversationId = cleanText(req.data?.conversationId, "conversationId", 160);
 
-    const userSnap = await db.collection("users").doc(uid).get();
-    if (!userSnap.exists || userSnap.data()?.active === false) {
-      throw new HttpsError("permission-denied", "Inactive or missing user.");
-    }
-
-    const user = userSnap.data() || {};
-    const role = String(user.role || "").toLowerCase();
     const { ref, conversation } = await getConversationForUser(
       conversationId,
       uid,
       role,
     );
 
+    if (profileMissing && conversation.customerId !== uid) {
+      throw new HttpsError("permission-denied", "Inactive or missing user.");
+    }
+
     if (conversation.status === "closed") {
       throw new HttpsError("failed-precondition", "Conversation is closed.");
     }
 
-    const senderName = displayName(user, role === "customer" ? "Customer" : "Staff");
-    const isStaff = STAFF_ROLES.includes(role);
+    const isRequester = conversation.customerId === uid;
+    const isStaff = STAFF_ROLES.includes(role) && !isRequester;
+    const senderName =
+      guest || profileMissing
+        ? displayName(user, authTokenName(req, "Guest"))
+        : displayName(
+            user,
+            isRequester ? "Customer" : isStaff ? "Staff" : "Customer",
+          );
+    const senderRole =
+      guest || profileMissing || isRequester
+        ? guest || profileMissing
+          ? "guest"
+          : "customer"
+        : role;
     const now = FieldValue.serverTimestamp();
     const updates = {
       lastMessageText: text,
@@ -405,7 +519,7 @@ exports.sendChatMessage = onCall(
       const messageRef = ref.collection("messages").doc();
       tx.set(messageRef, {
         senderId: uid,
-        senderRole: role,
+        senderRole,
         senderName,
         type: "text",
         text,
@@ -419,12 +533,14 @@ exports.sendChatMessage = onCall(
     });
 
     if (isStaff) {
-      await notifyCustomer({
-        conversationId,
-        customerId: conversation.customerId,
-        message: text,
-        sender: { uid, role, name: senderName },
-      });
+      if (!conversation.isGuest) {
+        await notifyCustomer({
+          conversationId,
+          customerId: conversation.customerId,
+          message: text,
+          sender: { uid, role, name: senderName },
+        });
+      }
     } else {
       await notifyStaff({
         conversationId,
@@ -441,16 +557,24 @@ exports.sendChatMessage = onCall(
 exports.markConversationRead = onCall(
   { region: "asia-southeast1", maxInstances: 20 },
   async (req) => {
-    const uid = requireAuth(req);
+    const { uid, role, profileMissing } = await resolveChatActor(db, req, {
+      requireProfile: false,
+    });
     const conversationId = cleanText(req.data?.conversationId, "conversationId", 160);
-    const userSnap = await db.collection("users").doc(uid).get();
-    if (!userSnap.exists) {
+
+    const { ref, conversation } = await getConversationForUser(
+      conversationId,
+      uid,
+      role,
+    );
+
+    if (profileMissing && conversation.customerId !== uid) {
       throw new HttpsError("permission-denied", "User profile missing.");
     }
 
-    const role = String(userSnap.data()?.role || "").toLowerCase();
-    const { ref } = await getConversationForUser(conversationId, uid, role);
-    const key = STAFF_ROLES.includes(role) ? "staff" : uid;
+    const key = STAFF_ROLES.includes(role) && conversation.customerId !== uid
+      ? "staff"
+      : uid;
 
     await ref.update({
       [`unreadCounts.${key}`]: 0,

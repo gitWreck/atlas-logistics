@@ -270,6 +270,12 @@ function requireAuth(context) {
   return context.auth.uid;
 }
 
+function isAnonymousAuth(context) {
+  return (
+    context?.auth?.token?.firebase?.sign_in_provider === "anonymous"
+  );
+}
+
 async function requireRole(db, context, allowedRoles = []) {
   const uid = requireAuth(context);
 
@@ -506,6 +512,7 @@ module.exports = {
   sha256Hex,
 
   requireAuth,
+  isAnonymousAuth,
   requireRole,
   requireShipmentTripDeleteAccess,
   requireDeliveryRouteAssignmentAccess,

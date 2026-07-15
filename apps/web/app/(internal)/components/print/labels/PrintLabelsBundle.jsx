@@ -234,7 +234,7 @@ export default function PrintLabelsBundle() {
           size: 100mm 150mm;
           margin: 0;
         }
-
+ 
         @media print {
           html,
           body {
