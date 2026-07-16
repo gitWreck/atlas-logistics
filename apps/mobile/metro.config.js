@@ -23,6 +23,18 @@ config.resolver.resolveRequest = (context, moduleName, platform) => {
     return { type: "empty" };
   }
 
+  // Prefer compiled build: Metro following package "react-native" -> src/
+  // breaks on relative TS imports inside react-native-svg on Windows.
+  if (moduleName === "react-native-svg") {
+    return {
+      type: "sourceFile",
+      filePath: path.resolve(
+        __dirname,
+        "../../node_modules/react-native-svg/lib/commonjs/index.js",
+      ),
+    };
+  }
+
   if (originalResolveRequest) {
     return originalResolveRequest(context, moduleName, platform);
   }
