@@ -1,7 +1,6 @@
 {
   "projects": {
-    "default": "atlas-tracking",
-    "atlas-tracking": "atlas-tracking"
+    "default": "atlas-tracking"
   },
   "targets": {},
   "etags": {}

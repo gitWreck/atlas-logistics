@@ -2,7 +2,7 @@
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { collection, doc, getDoc, onSnapshot, query, serverTimestamp, updateDoc, where } from "firebase/firestore";
+import { collection, doc, getDoc, onSnapshot, query, where } from "firebase/firestore";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faPhone,
@@ -116,6 +116,9 @@ export default function IncomingCallListener() {
     localVideoReady,
     remoteVideoReady,
     mediaNotice,
+    requiresAudioGesture,
+    resumeRemoteAudio,
+    stopMedia,
     restoreMedia,
   } = useWebRtcCall({
     activeCall,
@@ -198,27 +201,27 @@ export default function IncomingCallListener() {
     };
 
     const applySnapshot = (snap) => {
-      const docs = snap.docs || [];
-      const nextIds = new Set();
       const prevStatusMap = new Map();
 
-      docs.forEach((docSnap) => {
+      // The caller and receiver are two different queries. Treating either
+      // snapshot as the complete call list made an empty second query erase
+      // the call received from the first query.
+      snap.docChanges().forEach((change) => {
+        const docSnap = change.doc;
         const data = docSnap.data() || {};
         const callId = docSnap.id;
-        nextIds.add(callId);
-
-        const nextStatus = String(data.status || "").trim().toLowerCase();
         const prevStatus = prevCallStatusRef.current.get(callId);
         prevStatusMap.set(callId, prevStatus);
 
+        if (change.type === "removed") {
+          prevCallStatusRef.current.delete(callId);
+          callMapRef.current.delete(callId);
+          return;
+        }
+
+        const nextStatus = String(data.status || "").trim().toLowerCase();
         prevCallStatusRef.current.set(callId, nextStatus);
         callMapRef.current.set(callId, { id: callId, ...data });
-      });
-
-      Array.from(prevCallStatusRef.current.keys()).forEach((callId) => {
-        if (!nextIds.has(callId)) {
-          prevCallStatusRef.current.delete(callId);
-        }
       });
 
       // Inspect the previous active call before syncActiveCall removes terminal calls.
@@ -242,7 +245,7 @@ export default function IncomingCallListener() {
             }
           })(current);
           if (terminalNotice) showNotice(terminalNotice);
-          try { cleanupWebRtc(); } catch (err) { console.warn("cleanupWebRtc error on terminal status:", err); }
+          void stopMedia().catch((err) => console.warn("Unable to stop call media:", err));
           closeDialog();
           return;
         }
@@ -270,7 +273,7 @@ export default function IncomingCallListener() {
         noticeTimerRef.current = null;
       }
     };
-  }, [loading, user?.uid, callSessionId]);
+  }, [loading, user?.uid, callSessionId, stopMedia]);
 
   useEffect(() => {
     activeCallRef.current = activeCall;
@@ -504,13 +507,13 @@ export default function IncomingCallListener() {
           }
         })(status);
         if (terminalNotice) showNotice(terminalNotice);
-        try { cleanupWebRtc(); } catch (err) { console.warn("cleanupWebRtc error on doc listener:", err); }
+        void stopMedia().catch((err) => console.warn("Unable to stop call media:", err));
         closeDialog();
       }
     }, (err) => console.warn("active call doc listener error:", err));
 
     return () => unsub();
-  }, [activeCall?.id]);
+  }, [activeCall?.id, stopMedia]);
 
   useEffect(() => {
     if (!activeCall?.conversationId) {
@@ -563,12 +566,7 @@ export default function IncomingCallListener() {
   }, [activeCall?.id, activeCall?.status, activeCall?.receiverId, user?.uid]);
 
   const closeDialog = () => {
-    // ensure any active WebRTC peer and media tracks are cleaned up on close
-    try {
-      cleanupWebRtc();
-    } catch (e) {
-      console.warn("cleanupWebRtc failed:", e);
-    }
+    void stopMedia().catch((error) => console.warn("Unable to stop call media:", error));
     setActiveCall(null);
     setConversationTitle("");
     setCallDurationSeconds(0);
@@ -616,6 +614,13 @@ export default function IncomingCallListener() {
   const switchCamera = () => {
     setIsCameraOn(true);
     setCameraType((current) => (current === "user" ? "environment" : "user"));
+  };
+
+  const handleEnableAudio = async () => {
+    const resumed = await resumeRemoteAudio();
+    if (!resumed) {
+      showNotice("Audio could not be enabled. Allow sound for this site, then try again.");
+    }
   };
 
   const showNotice = (message) => {
@@ -679,12 +684,6 @@ export default function IncomingCallListener() {
         throw new Error("The call could not be accepted.");
       }
 
-      await updateDoc(doc(db, "calls", activeCall.id), {
-        startedAt: serverTimestamp(),
-        answeredAt: serverTimestamp(),
-        acceptedBy: user?.uid || null,
-        updatedAt: serverTimestamp(),
-      });
       await logCallEvent({ conversationId: activeCall.conversationId, callId: activeCall.id, text: `📞 ${formatCallType(activeCall?.type)} Call\nOngoing Call` });
     } catch (error) {
       console.error("Failed to accept incoming call:", error);
@@ -704,12 +703,7 @@ export default function IncomingCallListener() {
 
     setProcessing(true);
     try {
-      await declineConversationCall({ callId: activeCall.id, status: "declined" });
-      await updateDoc(doc(db, "calls", activeCall.id), {
-        endedReason: reason,
-        endedAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-      });
+      await declineConversationCall({ callId: activeCall.id, status: "declined", endReason: reason });
       await logCallEvent({ conversationId: activeCall.conversationId, callId: activeCall.id, text: `📞 ${formatCallType(activeCall?.type)} Call\nMissed Call` });
       closeDialog();
     } catch (error) {
@@ -741,11 +735,6 @@ export default function IncomingCallListener() {
     setProcessing(true);
     try {
       await updateConversationCallStatus({ callId: activeCall.id, status: "cancelled" });
-      await updateDoc(doc(db, "calls", activeCall.id), {
-        endedReason: "cancelled",
-        endedAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-      });
       await logCallEvent({ conversationId: activeCall.conversationId, callId: activeCall.id, text: `📞 ${formatCallType(activeCall?.type)} Call\nCall Cancelled` });
       closeDialog();
     } catch (error) {
@@ -926,7 +915,12 @@ export default function IncomingCallListener() {
               {/* Media error notice */}
               {mediaNotice && (
                 <div className="absolute top-4 left-4 max-w-xs rounded-lg bg-rose-500/20 px-4 py-2 text-sm text-rose-200">
-                  {mediaNotice}
+                  <p>{mediaNotice}</p>
+                  {requiresAudioGesture ? (
+                    <button type="button" onClick={handleEnableAudio} className="mt-2 rounded-md bg-white px-3 py-1.5 text-xs font-bold text-slate-900 hover:bg-slate-100">
+                      Enable audio
+                    </button>
+                  ) : null}
                 </div>
               )}
             </div>
@@ -1073,7 +1067,12 @@ export default function IncomingCallListener() {
 
             {mediaNotice && (
               <div className="rounded-lg bg-rose-500/20 px-4 py-2 text-sm text-rose-200">
-                {mediaNotice}
+                <p>{mediaNotice}</p>
+                {requiresAudioGesture ? (
+                  <button type="button" onClick={handleEnableAudio} className="mt-2 rounded-md bg-white px-3 py-1.5 text-xs font-bold text-slate-900 hover:bg-slate-100">
+                    Enable audio
+                  </button>
+                ) : null}
               </div>
             )}
 

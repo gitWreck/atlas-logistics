@@ -22,6 +22,7 @@ export default function NotificationBell({ isDark = false }) {
   const [alerts, setAlerts] = useState([]);
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef(null);
+  const initialSnapshotRef = useRef(true);
 
   // 1. Listen for Real-time Alerts
   useEffect(() => {
@@ -40,13 +41,17 @@ export default function NotificationBell({ isDark = false }) {
       }));
       setAlerts(newAlerts);
 
-      // Play sound only if a NEW alert appeared
-      snapshot.docChanges().forEach((change) => {
-        if (change.type === "added") {
-          const audio = new Audio("/sounds/alert1.mp3");
-          audio.play().catch((e) => console.log("Audio blocked"));
-        }
-      });
+      // The first Firestore snapshot reports every existing alert as "added".
+      // Do not try to autoplay an alert sound for that historical data.
+      if (!initialSnapshotRef.current) {
+        snapshot.docChanges().forEach((change) => {
+          if (change.type === "added") {
+            const audio = new Audio("/sounds/alert1.mp3");
+            audio.play().catch(() => {});
+          }
+        });
+      }
+      initialSnapshotRef.current = false;
     });
 
     return () => unsubscribe();

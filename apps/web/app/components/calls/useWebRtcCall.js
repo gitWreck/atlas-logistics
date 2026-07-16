@@ -34,6 +34,7 @@ export default function useWebRtcCall({
   const [localVideoReady, setLocalVideoReady] = useState(false);
   const [remoteVideoReady, setRemoteVideoReady] = useState(false);
   const [mediaNotice, setMediaNotice] = useState("");
+  const [requiresAudioGesture, setRequiresAudioGesture] = useState(false);
   const [rtcReadyVersion, setRtcReadyVersion] = useState(0);
   const [remoteVideoRequestVersion, setRemoteVideoRequestVersion] = useState(0);
   const trtcRef = useRef(null);
@@ -44,6 +45,7 @@ export default function useWebRtcCall({
   const pendingRemoteVideoRef = useRef(null);
   const isMutedRef = useRef(isMuted);
   const isCameraOnRef = useRef(isCameraOn);
+  const audioResumeRef = useRef(null);
 
   const localViewId = useMemo(() => safeDomId("atlas-local", activeCall?.id), [activeCall?.id]);
   const remoteViewId = useMemo(() => safeDomId("atlas-remote", activeCall?.id), [activeCall?.id]);
@@ -84,7 +86,7 @@ export default function useWebRtcCall({
         });
         trtc.on(TRTC.EVENT.REMOTE_AUDIO_AVAILABLE, ({ userId: remoteUserId }) => {
           remoteUserIdRef.current = remoteUserId;
-          setMediaNotice("");
+          if (!audioResumeRef.current) setMediaNotice("");
         });
         trtc.on(TRTC.EVENT.REMOTE_VIDEO_AVAILABLE, ({ userId: remoteUserId, streamType }) => {
           remoteUserIdRef.current = remoteUserId;
@@ -95,8 +97,12 @@ export default function useWebRtcCall({
           pendingRemoteVideoRef.current = null;
           setRemoteVideoReady(false);
         });
-        trtc.on(TRTC.EVENT.AUTOPLAY_FAILED, () => {
-          setMediaNotice("Tap the call screen once to enable remote audio.");
+        trtc.on(TRTC.EVENT.AUTOPLAY_FAILED, (event = {}) => {
+          // Browsers intentionally block remote audio until a user gesture. The
+          // SDK gives us a one-shot resume callback that must run from that click.
+          audioResumeRef.current = typeof event.resume === "function" ? event.resume : null;
+          setRequiresAudioGesture(true);
+          setMediaNotice("Remote audio is ready. Click Enable audio to hear the caller.");
         });
         trtc.on(TRTC.EVENT.ERROR, (error) => {
           console.error("TRTC call error", error);
@@ -109,7 +115,7 @@ export default function useWebRtcCall({
           userSig: signature.userSig,
           strRoomId: roomId,
           scene: TRTC.TYPE.SCENE_RTC,
-          enableAutoPlayDialog: true,
+          enableAutoPlayDialog: false,
         });
         await trtc.startLocalAudio();
         await trtc.updateLocalAudio?.({ mute: isMutedRef.current });
@@ -227,8 +233,10 @@ export default function useWebRtcCall({
     remoteUserIdRef.current = null;
     localVideoStartedRef.current = false;
     pendingRemoteVideoRef.current = null;
+    audioResumeRef.current = null;
     setLocalVideoReady(false);
     setRemoteVideoReady(false);
+    setRequiresAudioGesture(false);
     if (trtc) {
       Promise.allSettled([trtc.stopLocalVideo(), trtc.stopLocalAudio(), trtc.exitRoom()])
         .finally(() => trtc.destroy());
@@ -241,6 +249,42 @@ export default function useWebRtcCall({
       trtc.stopLocalVideo().catch(() => {});
       trtc.stopLocalAudio().catch(() => {});
       trtc.exitRoom().catch(() => {}).finally(() => trtc.destroy());
+    }
+  }, []);
+
+  const stopMedia = useCallback(async () => {
+    const trtc = trtcRef.current;
+    trtcRef.current = null;
+    callIdRef.current = null;
+    remoteUserIdRef.current = null;
+    localVideoStartedRef.current = false;
+    pendingRemoteVideoRef.current = null;
+    audioResumeRef.current = null;
+    setLocalVideoReady(false);
+    setRemoteVideoReady(false);
+    setRequiresAudioGesture(false);
+    if (!trtc) return;
+    await Promise.allSettled([
+      trtc.stopLocalVideo(),
+      trtc.stopLocalAudio(),
+      trtc.exitRoom(),
+    ]);
+    trtc.destroy();
+  }, []);
+
+  const resumeRemoteAudio = useCallback(async () => {
+    const resume = audioResumeRef.current;
+    if (!resume) return false;
+    try {
+      await resume();
+      audioResumeRef.current = null;
+      setRequiresAudioGesture(false);
+      setMediaNotice("");
+      return true;
+    } catch (error) {
+      console.warn("Unable to resume remote call audio", error);
+      setMediaNotice("Audio is still blocked. Check this tab's sound permission and try again.");
+      return false;
     }
   }, []);
 
@@ -293,6 +337,9 @@ export default function useWebRtcCall({
     localVideoReady,
     remoteVideoReady,
     mediaNotice,
+    requiresAudioGesture,
+    resumeRemoteAudio,
+    stopMedia,
     restoreMedia,
   };
 }

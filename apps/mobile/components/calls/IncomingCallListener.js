@@ -500,27 +500,27 @@ export default function IncomingCallListener() {
     };
 
     const applySnapshot = (snap) => {
-      const docs = snap.docs || [];
-      const nextIds = new Set();
       const prevStatusMap = new Map();
 
-      docs.forEach((docSnap) => {
+      // Caller and receiver snapshots are independent. Updating the shared
+      // map from the complete result of one query erased calls returned by
+      // the other query whenever that other query was empty.
+      snap.docChanges().forEach((change) => {
+        const docSnap = change.doc;
         const data = docSnap.data() || {};
         const callId = docSnap.id;
-        nextIds.add(callId);
-
-        const nextStatus = String(data.status || "").trim().toLowerCase();
         const prevStatus = prevCallStatusRef.current.get(callId);
         prevStatusMap.set(callId, prevStatus);
 
+        if (change.type === "removed") {
+          prevCallStatusRef.current.delete(callId);
+          callMapRef.current.delete(callId);
+          return;
+        }
+
+        const nextStatus = String(data.status || "").trim().toLowerCase();
         prevCallStatusRef.current.set(callId, nextStatus);
         callMapRef.current.set(callId, { id: callId, ...data });
-      });
-
-      Array.from(prevCallStatusRef.current.keys()).forEach((callId) => {
-        if (!nextIds.has(callId)) {
-          prevCallStatusRef.current.delete(callId);
-        }
       });
 
       // Inspect the previous active call before syncActiveCall removes terminal calls.
@@ -675,27 +675,14 @@ export default function IncomingCallListener() {
         setIsReconnecting(false);
         await heartbeatConversationCall({ callId: call.id, lifecycleState: "foreground" }).catch(() => {});
 
-        const localVideoTrack = localMediaStream?.getVideoTracks?.()[0];
-        const remoteVideoTrack = remoteMediaStream?.getVideoTracks?.()[0];
-        const peer = peerConnectionRef.current;
-        console.log("[Media] local video readyState:", localVideoTrack?.readyState);
-        console.log("[Media] remote video readyState:", remoteVideoTrack?.readyState);
-        console.log("[Media] local video muted:", localVideoTrack?.muted);
-        console.log("[Media] remote video muted:", remoteVideoTrack?.muted);
-        console.log("[WebRTC] connection:", peer?.connectionState);
-        console.log("[WebRTC] ICE:", peer?.iceConnectionState);
-        const needsWebRtcRestart = Platform.OS === "web" && (
-          !peer ||
-          ["failed", "closed"].includes(peer.connectionState) ||
-          localMediaStream?.getTracks?.().some((track) => track.readyState === "ended")
-        );
-        if (needsWebRtcRestart) cleanupWebRtc();
-        if (Platform.OS === "web") await ensureWebRtc(restoredCall);
-        await restoreMedia();
+        // Tencent RTC owns the browser media session. Starting a second raw
+        // RTCPeerConnection on foregrounding races for the same microphone
+        // and camera and leaves calls with no audio/video.
+        await restoreMedia?.();
       })().catch((error) => console.warn("Unable to restore active call", error));
     });
     return () => subscription.remove();
-  }, [localMediaStream, remoteMediaStream, restoreMedia]);
+  }, [restoreMedia]);
 
   // Also listen directly to the active call document so terminal updates tear down immediately
   useEffect(() => {
@@ -950,12 +937,6 @@ export default function IncomingCallListener() {
         throw new Error("The call could not be accepted.");
       }
 
-      await updateDoc(doc(db, "calls", activeCall.id), {
-        startedAt: serverTimestamp(),
-        answeredAt: serverTimestamp(),
-        acceptedBy: user?.uid || null,
-        updatedAt: serverTimestamp(),
-      });
       await logCallEvent({ conversationId: activeCall.conversationId, callId: activeCall.id, text: `📞 ${activeCall?.type === "video" ? "Video" : "Voice"} Call\nOngoing Call` });
     } catch (error) {
       console.error("Incoming call accept failed:", error);
@@ -977,11 +958,7 @@ export default function IncomingCallListener() {
       await updateConversationCallStatus({
         callId: activeCall.id,
         status: "declined",
-      });
-      await updateDoc(doc(db, "calls", activeCall.id), {
-        endedReason: reason,
-        endedAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
+        endReason: reason,
       });
       await logCallEvent({ conversationId: activeCall.conversationId, callId: activeCall.id, text: `📞 ${activeCall?.type === "video" ? "Video" : "Voice"} Call\nMissed Call` });
       closeDialog();
@@ -999,11 +976,6 @@ export default function IncomingCallListener() {
     setIsProcessing(true);
     try {
       await updateConversationCallStatus({ callId: activeCall.id, status: "cancelled" });
-      await updateDoc(doc(db, "calls", activeCall.id), {
-        endedReason: "cancelled",
-        endedAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-      });
       await logCallEvent({ conversationId: activeCall.conversationId, callId: activeCall.id, text: `📞 ${activeCall?.type === "video" ? "Video" : "Voice"} Call\nCall Cancelled` });
       closeDialog();
     } catch (error) {

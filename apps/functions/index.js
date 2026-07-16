@@ -18,6 +18,9 @@ const allowedFunctionOrigins = [
   "https://atlas-tracking.web.app",
   "https://atlas-tracking.firebaseapp.com",
   "https://atlas-trucking-platform.vercel.app",
+  "https://atlastransport.ph",
+  "https://www.atlastransport.ph",
+  "https://beta.atlastransport.ph",
 ];
 
 setGlobalOptions({
