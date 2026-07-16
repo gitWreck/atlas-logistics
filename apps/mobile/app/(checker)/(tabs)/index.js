@@ -1,152 +1,359 @@
-import React, { useState, useEffect, useCallback } from "react";
-import {
-  View,
-  StyleSheet,
-  RefreshControl,
-  StatusBar,
-  ScrollView,
-  Platform,
-} from "react-native";
+import React, { useState, useEffect, useMemo } from "react";
+import { View, StyleSheet, RefreshControl, ScrollView } from "react-native";
 import { useRouter } from "expo-router";
 import {
   collection,
   query,
   where,
-  getCountFromServer,
-  Timestamp,
+  onSnapshot,
 } from "firebase/firestore";
-import { startOfDay, subDays } from "date-fns";
 import { db } from "../../../firebase";
-
-// ✅ IMPORT NEW COMPONENTS
-import StatusFilter from "../../../components/checker/StatusFilter";
-import StatusBoard from "../../../components/checker/StatusBoard";
-import OperationsGrid from "../../../components/checker/OperationsGrid";
-import { CHECKER_STATUS_BOARD_CARDS } from "../../../components/checker/StatusBoard";
+import { useAuth } from "../../../contexts/AuthContext";
 import { useTheme } from "../../../contexts/ThemeContext";
+import { useCheckerLastMile } from "../../../contexts/CheckerLastMileContext";
+import {
+  CheckerHomeHero,
+  DateFilterModal,
+  DeliveredHistoryList,
+  QuickActions,
+  TodayAtGlance,
+} from "../../../components/checker/CheckerHomeDashboard";
+import { SECTION } from "../../../components/checker/design/checkerTheme";
+import {
+  countAvailablePiecesForDate,
+  countDeliveredPiecesForDate,
+  countFailedPiecesForDate,
+  countOutForDeliveryTotalPiecesForDate,
+  countReturnedPiecesForDate,
+  getDeliveredShipmentsForDate,
+  getLocalDateKey,
+  getShipmentActivityDates,
+  startOfLocalDay,
+} from "../../../components/checker/dashboardData";
+
+const RECENT_DATE_OPTION_COUNT = 7;
+
+function mergeShipmentLists(...lists) {
+  const map = new Map();
+  lists.flat().forEach((shipment) => {
+    if (shipment?.id) map.set(shipment.id, shipment);
+  });
+  return [...map.values()];
+}
+
+function mergeDates(...dates) {
+  const map = new Map();
+  dates.flat().forEach((date) => {
+    if (!(date instanceof Date) || Number.isNaN(date.getTime())) return;
+    map.set(getLocalDateKey(date), startOfLocalDay(date));
+  });
+  return [...map.values()].sort((a, b) => b.getTime() - a.getTime());
+}
+
+function getRecentDateOptions(referenceDate = new Date()) {
+  const start = startOfLocalDay(referenceDate);
+  return Array.from({ length: RECENT_DATE_OPTION_COUNT }, (_, index) => {
+    const date = new Date(start);
+    date.setDate(start.getDate() - index);
+    return date;
+  });
+}
 
 export default function CheckerIndex() {
   const router = useRouter();
   const { colors } = useTheme();
+  const { user, profile } = useAuth();
+  const {
+    availableShipments = [],
+    myRouteShipments = [],
+    shipmentsById = {},
+    assignedMunicipalities = [],
+  } = useCheckerLastMile();
 
-  // STATE
-  const [filter, setFilter] = useState("TODAY"); // 'TODAY' | 'WEEK'
-  const [stats, setStats] = useState({ received: 0, loaded: 0, pending: 0 });
   const [refreshing, setRefreshing] = useState(false);
+  const [selectedDate, setSelectedDate] = useState(() => new Date());
+  const [datePickerVisible, setDatePickerVisible] = useState(false);
+  const [queriedShipments, setQueriedShipments] = useState([]);
+  const [statsLoading, setStatsLoading] = useState(true);
+  const checkerId = profile?.uid || user?.uid;
 
-  // 1. NAVIGATION HANDLER
-  const goToScan = (mode, title) => {
+  const goToScan = (mode, title, extra = {}) => {
     router.push({
       pathname: "/(checker)/scan",
-      params: { mode, title },
+      params: { mode, title, ...extra },
     });
   };
-  // Main long-haul trip load — disabled while Load Truck uses delivery scan mode
-  // const goToTripsForLoad = () => {
-  //   Alert.alert(
-  //     "Trip Required",
-  //     "Select a trip first before loading. Open Active Loads, then scan from the trip manifest.",
-  //     [
-  //       { text: "Cancel", style: "cancel" },
-  //       {
-  //         text: "Open Active Loads",
-  //         onPress: () => router.push("/(checker)/(tabs)/trips"),
-  //       },
-  //     ],
-  //   );
-  // };
 
-  // 2. FETCH STATS (Facility View)
-  const fetchStats = useCallback(async () => {
-    try {
-      const shipmentsRef = collection(db, "shipments");
-      const now = new Date();
-
-      const startDate =
-        filter === "WEEK" ? subDays(startOfDay(now), 7) : startOfDay(now);
-      const firestoreDate = Timestamp.fromDate(startDate);
-
-      const receivedQ = query(
-        shipmentsRef,
-        where("status", "==", "RECEIVED"),
-        where("updatedAt", ">=", firestoreDate),
-      );
-
-      const loadedQ = query(
-        shipmentsRef,
-        where("status", "==", "LOADED"),
-        where("updatedAt", ">=", firestoreDate),
-      );
-
-      const totalQ = query(
-        shipmentsRef,
-        where("status", "in", ["RECEIVED", "LOADED"]),
-        where("createdAt", ">=", firestoreDate),
-      );
-
-      const [rSnap, tSnap, lSnap] = await Promise.all([
-        getCountFromServer(receivedQ),
-        getCountFromServer(totalQ),
-        getCountFromServer(loadedQ),
-      ]);
-
-      setStats({
-        received: rSnap.data().count,
-        total: tSnap.data().count,
-        loaded: lSnap.data().count,
-      });
-    } catch (err) {
-      console.error("Stats Error:", err);
-    }
-  }, [filter]);
+  const goLoad = () =>
+    goToScan("delivery", "Load", { presetScanStatus: "LOAD_TO_VEHICLE" });
+  const goRoute = () => router.push("/(checker)/(tabs)/deliveries");
+  const goOffload = () => goToScan("offloading", "Offload Items");
+  const goInfo = () => goToScan("info", "Information");
+  const goAvailable = () => router.push("/(checker)/(tabs)/available-to-load");
+  const goHistory = () => router.push("/(checker)/delivered-history");
+  const openShipment = (shipment) =>
+    router.push({
+      pathname: "/(checker)/shipment-details",
+      params: { shipmentId: shipment.id },
+    });
 
   useEffect(() => {
-    fetchStats();
-  }, [fetchStats]);
+    if (!checkerId) {
+      setQueriedShipments([]);
+      setStatsLoading(false);
+      return undefined;
+    }
+
+    setStatsLoading(true);
+    let assigned = [];
+    let active = [];
+    let assignedReady = false;
+    let activeReady = false;
+
+    const publish = () => {
+      setQueriedShipments(mergeShipmentLists(assigned, active));
+      if (assignedReady && activeReady) setStatsLoading(false);
+    };
+
+    const shipmentsRef = collection(db, "shipments");
+    const assignedQuery = query(
+      shipmentsRef,
+      where("assignedCheckerId", "==", String(checkerId)),
+    );
+    const activeQuery = query(
+      shipmentsRef,
+      where("activeCheckerIds", "array-contains", String(checkerId)),
+    );
+
+    const unsubAssigned = onSnapshot(
+      assignedQuery,
+      (snap) => {
+        assigned = snap.docs.map((docSnap) => ({
+          id: docSnap.id,
+          ...docSnap.data(),
+        }));
+        assignedReady = true;
+        publish();
+      },
+      (err) => {
+        console.warn("Checker home assigned shipment query failed:", err);
+        assignedReady = true;
+        publish();
+      },
+    );
+
+    const unsubActive = onSnapshot(
+      activeQuery,
+      (snap) => {
+        active = snap.docs.map((docSnap) => ({
+          id: docSnap.id,
+          ...docSnap.data(),
+        }));
+        activeReady = true;
+        publish();
+      },
+      (err) => {
+        console.warn("Checker home active shipment query failed:", err);
+        activeReady = true;
+        publish();
+      },
+    );
+
+    return () => {
+      unsubAssigned();
+      unsubActive();
+    };
+  }, [checkerId]);
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await fetchStats();
-    setRefreshing(false);
+    setTimeout(() => setRefreshing(false), 350);
   };
+
+  const allKnownShipments = useMemo(
+    () =>
+      mergeShipmentLists(
+        Object.values(shipmentsById || {}),
+        availableShipments,
+        myRouteShipments,
+        queriedShipments,
+      ),
+    [shipmentsById, availableShipments, myRouteShipments, queriedShipments],
+  );
+
+  const glance = useMemo(() => {
+    const routeTotal = allKnownShipments.reduce(
+      (sum, shipment) =>
+        sum +
+        countOutForDeliveryTotalPiecesForDate(
+          shipment,
+          checkerId,
+          selectedDate,
+        ),
+      0,
+    );
+    const delivered = allKnownShipments.reduce(
+      (sum, shipment) =>
+        sum + countDeliveredPiecesForDate(shipment, checkerId, selectedDate),
+      0,
+    );
+    const failed = allKnownShipments.reduce(
+      (sum, shipment) =>
+        sum + countFailedPiecesForDate(shipment, checkerId, selectedDate),
+      0,
+    );
+    const returned = allKnownShipments.reduce(
+      (sum, shipment) =>
+        sum + countReturnedPiecesForDate(shipment, checkerId, selectedDate),
+      0,
+    );
+
+    return {
+      available: allKnownShipments.reduce(
+        (sum, shipment) =>
+          sum + countAvailablePiecesForDate(shipment, checkerId, selectedDate),
+        0,
+      ),
+      routeTotal,
+      onVan: Math.max(routeTotal - delivered - failed - returned, 0),
+      delivered,
+      failed,
+      returned,
+    };
+  }, [allKnownShipments, checkerId, selectedDate]);
+
+  const recentDelivered = useMemo(
+    () =>
+      getDeliveredShipmentsForDate(
+        allKnownShipments,
+        checkerId,
+        selectedDate,
+      ).slice(0, 3),
+    [allKnownShipments, checkerId, selectedDate],
+  );
+
+  const availableDates = useMemo(
+    () =>
+      mergeDates(
+        getRecentDateOptions(new Date()),
+        [selectedDate],
+        getShipmentActivityDates(allKnownShipments),
+      ),
+    [allKnownShipments, selectedDate],
+  );
+
+  const goal = glance.routeTotal;
+  const cards = [
+    {
+      key: "available",
+      title: "Available",
+      subtitle: "In Warehouse",
+      value: glance.available,
+      icon: "cube",
+      color: SECTION.available.accent,
+      softColor: "#eaf1ff",
+      onPress: goAvailable,
+    },
+    {
+      key: "on-van",
+      title: "My Deliveries",
+      subtitle: "Out for Delivery",
+      value: glance.onVan,
+      icon: "truck",
+      color: SECTION.route.accent,
+      softColor: "#e8f7ee",
+      onPress: goRoute,
+    },
+    {
+      key: "delivered",
+      title: "Delivered",
+      subtitle: "Today",
+      value: glance.delivered,
+      icon: "check-circle",
+      color: SECTION.delivered.accent,
+      softColor: "#e7f8ed",
+      trend: glance.delivered > 0 ? { positive: true, label: "Live today" } : null,
+      onPress: goHistory,
+    },
+    {
+      key: "failed",
+      title: "Failed",
+      subtitle: "Today",
+      value: glance.failed,
+      icon: "exclamation-circle",
+      color: SECTION.failed.accent,
+      softColor: "#fee8e8",
+      trend: glance.failed > 0 ? { positive: false, label: "Needs action" } : null,
+      onPress: goRoute,
+    },
+    {
+      key: "returned",
+      title: "Returned",
+      subtitle: "To Warehouse",
+      value: glance.returned,
+      icon: "undo",
+      color: SECTION.return.accent,
+      softColor: "#fff1df",
+      onPress: goRoute,
+    },
+  ];
 
   return (
     <View style={[styles.container, { backgroundColor: colors.bg }]}>
       <ScrollView
         contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
             onRefresh={onRefresh}
-            tintColor={colors.text}
-            colors={[colors.text]}
+            tintColor="#ffffff"
+            colors={[SECTION.available.accent]}
           />
         }
       >
-        {/* 2. FILTER & CONTROLS */}
-        <StatusFilter activeFilter={filter} onFilterChange={setFilter} />
-
-        {/* 3. STATS BOARD */}
-        <StatusBoard
-          stats={stats}
-          filterMode={filter}
-          cards={CHECKER_STATUS_BOARD_CARDS}
+        <CheckerHomeHero
+          userName={user?.name || user?.fullName || profile?.name || "Checker"}
+          onProfilePress={() => router.push("/(checker)/profile")}
+          currentDate={selectedDate}
+          onDatePress={() => setDatePickerVisible(true)}
+          dateLoading={statsLoading}
+          assignedAreas={assignedMunicipalities}
         />
 
-        {/* 4. OPERATIONS GRID */}
-        <OperationsGrid
-          onScanOffload={() => goToScan("offloading", "Offload Items")}
-          onScanInfo={() => goToScan("info", "Information")}
-          onScanDelivery={() =>
-            router.push({
-              pathname: "/(checker)/scan",
-              params: {
-                mode: "delivery",
-                title: "Load",
-                presetScanStatus: "LOAD_TO_VEHICLE",
-              },
-            })
-          }
+        <TodayAtGlance
+          cards={cards}
+          progress={{
+            delivered: glance.delivered,
+            total: glance.routeTotal,
+            goal,
+          }}
+          onViewAll={goAvailable}
+        />
+
+        <QuickActions
+          onLoad={goLoad}
+          onRoute={goRoute}
+          onOffload={goOffload}
+          onInfo={goInfo}
+        />
+
+        <DeliveredHistoryList
+          shipments={recentDelivered}
+          onViewAll={goHistory}
+          onPressShipment={openShipment}
+          emptyMessage="No deliveries found for the selected date."
+        />
+
+        <DateFilterModal
+          visible={datePickerVisible}
+          dates={availableDates}
+          selectedDate={selectedDate}
+          onSelectDate={(date) => {
+            setSelectedDate(date);
+            setDatePickerVisible(false);
+          }}
+          onClose={() => setDatePickerVisible(false)}
         />
       </ScrollView>
     </View>
@@ -156,46 +363,9 @@ export default function CheckerIndex() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#f1f5f9",
-    paddingTop: Platform.OS === "android" ? StatusBar.currentHeight || 0 : 0,
+    backgroundColor: "#f7fbff",
   },
   content: {
-    paddingLeft: 20,
-    paddingRight: 20,
-    // paddingBottom: 40,
-  },
-  header: {
-    paddingHorizontal: 20,
-    paddingTop: 10,
-    paddingBottom: 15,
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#ffffff",
-    borderBottomWidth: 1,
-    borderBottomColor: "#e2e8f0",
-  },
-  iconBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: "#f8fafc",
-    borderWidth: 1,
-    borderColor: "#e2e8f0",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  textBlock: {
-    flex: 1,
-    marginRight: 12,
-  },
-  title: {
-    color: "#0f172a",
-    fontSize: 16,
-    fontWeight: "700",
-  },
-  subtitle: {
-    color: "#64748b",
-    fontSize: 12,
-    marginTop: 2,
+    paddingBottom: 28,
   },
 });

@@ -1,4 +1,4 @@
-{
+﻿{
   "cli": {
     "version": ">= 16.28.0",
     "appVersionSource": "remote"
@@ -10,9 +10,7 @@
     },
     "preview": {
       "distribution": "internal",
-      "android": {
-        "buildType": "apk"
-      },
+      
       "env": {
         "EXPO_PUBLIC_FIREBASE_API_KEY": "AIzaSyD2-cgUlA9g4PyV9Zwrx17L5EFyQoTDkQo",
         "EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN": "atlas-tracking.firebaseapp.com",
@@ -26,9 +24,7 @@
     "production": {
       "autoIncrement": true,
       "distribution": "store",
-      "android": {
-        "buildType": "app-bundle"
-      },
+      
       "channel": "production",
       "env": {
         "EXPO_PUBLIC_FIREBASE_API_KEY": "AIzaSyD2-cgUlA9g4PyV9Zwrx17L5EFyQoTDkQo",

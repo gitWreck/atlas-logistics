@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { headers } from "next/headers";
-import { adminAuth } from "@/lib/firebase-admin";
+import { adminAuth, adminDb } from "@/lib/firebase-admin";
 import { invokeCallable } from "@/lib/invokeCallable";
+import { formatShipmentForBoard } from "@/app/utility/shipmentBoardFormatter";
 
 export const dynamic = "force-dynamic";
 
@@ -44,7 +45,25 @@ export async function POST(request, { params }) {
       auth.token,
     );
 
-    return NextResponse.json(result);
+    const refreshedSnap = await adminDb
+      .collection("shipments")
+      .doc(shipmentId)
+      .get();
+    const refreshedShipment = refreshedSnap.exists
+      ? formatShipmentForBoard(refreshedSnap.data(), { id: refreshedSnap.id })
+      : null;
+
+    return NextResponse.json(
+      {
+        ...result,
+        shipment: refreshedShipment,
+      },
+      {
+        headers: {
+          "Cache-Control": "no-store, max-age=0",
+        },
+      },
+    );
   } catch (error) {
     console.error("update-shipment-status error:", error);
     return NextResponse.json(

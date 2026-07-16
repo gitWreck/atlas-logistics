@@ -1,14 +1,10 @@
 import React from "react";
 import { View, Text, StyleSheet } from "react-native";
+import { useTheme } from "../../contexts/ThemeContext";
 
 // Color Palette for Dark Theme
 const COLORS = {
   // ✅ ADDED: Active Trip Statuses
-  IN_TRANSIT: {
-    bg: "rgba(34, 197, 94, 0.2)", // Green background
-    text: "#4ade80", // Green text
-    border: "#4ade80", // Green border
-  },
   ASSIGNED: {
     bg: "rgba(59, 130, 246, 0.2)", // Blue
     text: "#60a5fa",
@@ -51,51 +47,46 @@ const COLORS = {
   },
 
   // Existing Package Statuses
-  DELIVERED: {
+  PENDING_PICKUP: {
+    bg: "rgba(245, 158, 11, 0.15)",
+    text: "#d97706",
+    border: "rgba(245, 158, 11, 0.5)",
+  },
+  ACTIVE: {
     bg: "rgba(34, 197, 94, 0.15)",
-    text: "#4ade80",
+    text: "#15803d",
     border: "rgba(34, 197, 94, 0.5)",
   },
-  COMPLETED: {
-    // Map COMPLETED to DELIVERED style
+  IN_TRANSIT: {
     bg: "rgba(34, 197, 94, 0.15)",
-    text: "#4ade80",
+    text: "#15803d",
     border: "rgba(34, 197, 94, 0.5)",
   },
   OUT_FOR_DELIVERY: {
-    bg: "rgba(192, 132, 252, 0.15)",
-    text: "#e879f9",
-    border: "rgba(192, 132, 252, 0.5)",
+    bg: "rgba(34, 197, 94, 0.15)",
+    text: "#15803d",
+    border: "rgba(34, 197, 94, 0.5)",
   },
-  PARTIALLY_DELIVERED: {
-    bg: "rgba(45, 212, 191, 0.15)",
-    text: "#2dd4bf",
-    border: "rgba(45, 212, 191, 0.5)",
+  DELIVERED: {
+    bg: "rgba(243, 244, 246, 0.85)",
+    text: "#475569",
+    border: "rgba(203, 213, 225, 0.75)",
   },
-  READY_FOR_DELIVERY: {
-    bg: "rgba(59, 130, 246, 0.15)",
-    text: "#60a5fa",
-    border: "rgba(59, 130, 246, 0.5)",
-  },
-  LOADED: {
-    bg: "rgba(251, 191, 36, 0.15)", // Changed to Amber/Orange for visibility
-    text: "#fbbf24",
-    border: "rgba(251, 191, 36, 0.5)",
-  },
-  AVAILABLE_FOR_DELIVERY: {
-    bg: "rgba(59, 130, 246, 0.15)",
-    text: "#60a5fa",
-    border: "rgba(59, 130, 246, 0.5)",
-  },
-  AVAILABLE_AT_WAREHOUSE: {
-    bg: "rgba(59, 130, 246, 0.15)",
-    text: "#60a5fa",
-    border: "rgba(59, 130, 246, 0.5)",
+  COMPLETED: {
+    // Map COMPLETED to DELIVERED style
+    bg: "rgba(243, 244, 246, 0.85)",
+    text: "#475569",
+    border: "rgba(203, 213, 225, 0.75)",
   },
   RECEIVED: {
-    bg: "rgba(251, 146, 60, 0.15)",
-    text: "#fb923c",
-    border: "rgba(251, 146, 60, 0.5)",
+    bg: "rgba(243, 244, 246, 0.85)",
+    text: "#475569",
+    border: "rgba(203, 213, 225, 0.75)",
+  },
+  RETURNED: {
+    bg: "rgba(249, 115, 22, 0.15)",
+    text: "#b45309",
+    border: "rgba(249, 115, 22, 0.5)",
   },
   RELEASED: {
     bg: "rgba(59, 130, 246, 0.15)",
@@ -104,12 +95,17 @@ const COLORS = {
   },
   FAILED_DELIVERY: {
     bg: "rgba(239, 68, 68, 0.15)",
-    text: "#f87171",
+    text: "#b91c1c",
+    border: "rgba(239, 68, 68, 0.5)",
+  },
+  CANCELLED: {
+    bg: "rgba(254, 226, 226, 0.9)",
+    text: "#b91c1c",
     border: "rgba(239, 68, 68, 0.5)",
   },
   PENDING: {
     bg: "rgba(148, 163, 184, 0.15)",
-    text: "#94a3b8",
+    text: "#475569",
     border: "rgba(148, 163, 184, 0.5)",
   },
 };
@@ -124,14 +120,44 @@ const STATUS_LABELS = {
   AVAILABLE_AT_ODIONGAN_WAREHOUSE: "Available at Odiongan",
   AVAILABLE_AT_WAREHOUSE: "Available at Odiongan",
   ARRIVED_AT_ODIONGAN: "Arrived at Odiongan",
+  COMPLETED: "Delivered",
 };
 
+function getSemanticStatusTheme(status, colors) {
+  if (status === "PENDING_PICKUP") {
+    return { bg: colors.warningSoft, text: colors.warning, border: colors.warning };
+  }
+  if (status === "ACTIVE" || status === "IN_TRANSIT" || status === "OUT_FOR_DELIVERY") {
+    return { bg: colors.successSoft, text: colors.success, border: colors.success };
+  }
+  if (
+    status === "DELIVERED" ||
+    status === "COMPLETED" ||
+    status === "RECEIVED" ||
+    status === "RECEIVED_AT_DIVISORIA"
+  ) {
+    return {
+      bg: colors.neutralSoft,
+      text: colors.neutral,
+      border: colors.neutralBorder,
+    };
+  }
+  if (status === "CANCELLED" || status === "FAILED_DELIVERY") {
+    return { bg: colors.dangerSoft, text: colors.danger, border: colors.danger };
+  }
+  if (status === "RETURNED" || status.startsWith("RETURNED_")) {
+    return { bg: colors.orangeSoft, text: colors.orange, border: colors.orangeBorder };
+  }
+  return null;
+}
+
 export default function StatusBadge({ status }) {
+  const { colors } = useTheme();
   // 1. Normalize Status
   const currentStatus = (status || "PENDING").toUpperCase();
 
   // 2. Get Colors (Fallback to PENDING if undefined)
-  const theme = COLORS[currentStatus] || COLORS.PENDING;
+  const theme = getSemanticStatusTheme(currentStatus, colors) || COLORS[currentStatus] || COLORS.PENDING;
 
   // 3. Format Text
   const label =

@@ -17,7 +17,10 @@
     "lint": "turbo run lint",
     "format": "prettier --write \"**/*.{ts,tsx,md}\"",
     "android": "expo run:android",
-    "ios": "expo run:ios"
+    "ios": "expo run:ios",
+    "functions:check": "npm run lint --workspace=apps/functions",
+    "deploy:functions": "firebase deploy --only functions",
+    "deploy:functions:manifest": "firebase deploy --only functions:unlockTripManifest,functions:manualAssignShipmentToTrip,functions:bulkAssignShipments,functions:assignShipmentToTrip,functions:generateTripManifest"
   },
   "devDependencies": {
     "turbo": "latest"

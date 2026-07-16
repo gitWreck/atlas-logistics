@@ -3,7 +3,10 @@ import { onAuthStateChanged, signOut as firebaseSignOut } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { auth, db } from "../firebase";
-import { ensureUserPublicId } from "../components/utilities/FirebaseFunctions";
+import {
+  endCurrentCallSession,
+  ensureUserPublicId,
+} from "../components/utilities/FirebaseFunctions";
 
 const ALLOWED_ROLES = ["checker", "driver", "customer"];
 const profileCacheKey = (uid) => `atlas_profile_${String(uid || "").trim()}`;
@@ -113,6 +116,11 @@ export function AuthProvider({ children }) {
 
   const signOut = async () => {
     try {
+      if (auth.currentUser) {
+        await endCurrentCallSession({ reason: "logout" }).catch((error) => {
+          console.warn("AuthContext: active call cleanup skipped", error);
+        });
+      }
       await firebaseSignOut(auth);
     } catch (e) {
       console.error("AuthContext: signOut error", e);

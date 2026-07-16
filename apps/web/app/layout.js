@@ -6,6 +6,7 @@ config.autoAddCss = false; // <--- THIS LINE IS CRITICAL
 
 import "./globals.css";
 import { AlertProvider } from "./context/AlertContext";
+import IncomingCallListener from "./components/calls/IncomingCallListener";
 
 export default function RootLayout({ children }) {
   return (
@@ -18,7 +19,10 @@ export default function RootLayout({ children }) {
       </head>
       <body suppressHydrationWarning={true}>
         <AlertProvider>
-          <AuthProvider>{children}</AuthProvider>
+          <AuthProvider>
+            <IncomingCallListener />
+            {children}
+          </AuthProvider>
         </AlertProvider>
       </body>
     </html>

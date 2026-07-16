@@ -4,14 +4,28 @@ const { setGlobalOptions } = require("firebase-functions/v2/options");
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const admin = require("firebase-admin");
 
+const allowedFunctionOrigins = [
+  "http://localhost:3000",
+  "http://localhost:3001",
+  "http://localhost:8081",
+  "http://127.0.0.1:3000",
+  "http://127.0.0.1:3001",
+  "http://127.0.0.1:8081",
+  "https://localhost:3000",
+  "https://localhost:3001",
+  "https://127.0.0.1:3000",
+  "https://127.0.0.1:3001",
+  "https://atlas-tracking.web.app",
+  "https://atlas-tracking.firebaseapp.com",
+  "https://atlas-trucking-platform.vercel.app",
+  "https://atlastransport.ph",
+  "https://www.atlastransport.ph",
+  "https://beta.atlastransport.ph",
+];
+
 setGlobalOptions({
   region: "asia-southeast1",
-  cors: [
-    "http://localhost:3000",
-    "https://atlas-tracking.web.app",
-    "https://atlas-tracking.firebaseapp.com",
-    "https://atlas-trucking-platform.vercel.app",
-  ],
+  cors: allowedFunctionOrigins,
 });
 
 if (!admin.apps.length) {
@@ -31,6 +45,10 @@ exports.addTrackedShipment =
   require("./src/users/addTrackedShipment").addTrackedShipment;
 exports.requestShipmentPickup =
   require("./src/users/requestShipmentPickup").requestShipmentPickup;
+exports.getMyInvoices =
+  require("./src/customers/getCustomerOperations").getMyInvoices;
+exports.getMySchedules =
+  require("./src/customers/getCustomerOperations").getMySchedules;
 exports.resolveDelayReport =
   require("./src/trips/resolveDelayReport").resolveDelayReport;
 
@@ -186,6 +204,12 @@ exports.retryCustomerNotification =
 // Chat
 exports.createConversation =
   require("./src/chat/conversations").createConversation;
+exports.listCheckerChatContacts =
+  require("./src/chat/checkerMessaging").listCheckerChatContacts;
+exports.createCheckerConversation =
+  require("./src/chat/checkerMessaging").createCheckerConversation;
+exports.createCallHistoryMessage =
+  require("./src/chat/conversations").createCallHistoryMessage;
 exports.sendChatMessage = require("./src/chat/conversations").sendChatMessage;
 exports.markConversationRead =
   require("./src/chat/conversations").markConversationRead;
@@ -193,6 +217,18 @@ exports.updateConversationStatus =
   require("./src/chat/conversations").updateConversationStatus;
 exports.assignConversation =
   require("./src/chat/conversations").assignConversation;
+exports.startConversationCall =
+  require("./src/chat/conversations").startConversationCall;
+exports.acceptConversationCall =
+  require("./src/chat/conversations").acceptConversationCall;
+exports.updateConversationCallStatus =
+  require("./src/chat/conversations").updateConversationCallStatus;
+exports.heartbeatConversationCall =
+  require("./src/chat/conversations").heartbeatConversationCall;
+exports.endCurrentCallSession =
+  require("./src/chat/conversations").endCurrentCallSession;
+exports.generateTencentUserSig =
+  require("./src/chat/generateTencentUserSig").generateTencentUserSig;
 
 // Firestore Triggers
 const {

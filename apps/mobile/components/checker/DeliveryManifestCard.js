@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import {
   View,
   Text,
@@ -44,7 +44,10 @@ export default function DeliveryManifestCard({
   colors,
   onPressShipment,
   onPressCard,
+  defaultExpanded = false,
 }) {
+  const [expanded, setExpanded] = useState(defaultExpanded);
+
   const vehicleLabel =
     manifest.deliveryVehicleName ||
     manifest.deliveryVehicleId ||
@@ -53,109 +56,198 @@ export default function DeliveryManifestCard({
   const releasedBy = manifest.releasedByName || "Warehouse manager";
   const loadedBy = manifest.updatedBy || checkerLabel;
 
+  const stats = manifest.stats || {};
+  const total = stats.total || 0;
+  const delivered = stats.delivered || 0;
+  const progress = total > 0 ? Math.min(1, delivered / total) : 0;
+  const progressPct = Math.round(progress * 100);
+
+  const handlePress = () => {
+    if (onPressCard) {
+      onPressCard();
+      return;
+    }
+    setExpanded((prev) => !prev);
+  };
+
   return (
-    <TouchableOpacity
-      activeOpacity={onPressCard ? 0.85 : 1}
-      onPress={onPressCard}
+    <View
       style={[
         styles.card,
         { backgroundColor: colors.surface, borderColor: colors.border },
       ]}
     >
-      <View style={styles.cardHeader}>
-        <View style={styles.titleWrap}>
-          <FontAwesome5 name="shipping-fast" size={14} color="#07B9F4" />
-          <Text style={[styles.cardTitle, { color: colors.text }]}>
-            {checkerLabel} · {vehicleLabel}
-          </Text>
-        </View>
-        <StatusBadge status={manifest.displayStatus || manifest.status} />
-      </View>
-
-      <View style={styles.statsRow}>
-        <StatPill label="Total" value={manifest.stats.total} colors={colors} />
-        <StatPill
-          label="Out"
-          value={manifest.stats.outForDelivery}
-          colors={colors}
-          accent="#e879f9"
-        />
-        <StatPill
-          label="Done"
-          value={manifest.stats.delivered}
-          colors={colors}
-          accent="#4ade80"
-        />
-        <StatPill
-          label="Failed"
-          value={manifest.stats.failed}
-          colors={colors}
-          accent="#f87171"
-        />
-        <StatPill
-          label="Left"
-          value={manifest.stats.remaining}
-          colors={colors}
-          accent="#60a5fa"
-        />
-      </View>
-
-      <MetaRow
-        icon="warehouse"
-        label="Released by"
-        value={releasedBy}
-        colors={colors}
-      />
-      <MetaRow
-        icon="user-check"
-        label="Loaded by"
-        value={loadedBy}
-        colors={colors}
-      />
-      <MetaRow
-        icon="clock"
-        label="Time loaded"
-        value={getTimeLabel(manifest.loadedAt || manifest.releasedAt)}
-        colors={colors}
-      />
-
-      <Text style={[styles.packageHeading, { color: colors.text }]}>
-        Loaded packages
-      </Text>
-
-      {manifest.shipments.length === 0 ? (
-        <Text style={[styles.emptyPackages, { color: colors.textMuted }]}>
-          {Array.isArray(manifest.shipmentIds) && manifest.shipmentIds.length > 0
-            ? "Loading package details..."
-            : "No packages on this manifest yet."}
-        </Text>
-      ) : (
-        manifest.shipments.map((shipment) => (
-          <TouchableOpacity
-            key={shipment.id}
-            style={[
-              styles.packageRow,
-              { borderColor: colors.border, backgroundColor: colors.cardMuted },
-            ]}
-            onPress={() => onPressShipment?.(shipment.id)}
-            activeOpacity={0.8}
-          >
-            <View style={styles.packageMain}>
-              <FontAwesome5 name="box" size={11} color={colors.textMuted} />
+      {/* Header — always visible essentials */}
+      <TouchableOpacity
+        activeOpacity={0.8}
+        onPress={handlePress}
+        style={styles.headerTouch}
+      >
+        <View style={styles.cardHeader}>
+          <View style={styles.titleWrap}>
+            <View style={styles.titleTextWrap}>
               <Text
-                style={[styles.packageId, { color: colors.text }]}
+                style={[styles.cardTitle, { color: colors.text }]}
                 numberOfLines={1}
               >
-                {shipment.id}
+                {checkerLabel}
               </Text>
+              <View style={styles.vehicleRow}>
+                <FontAwesome5 name="truck" size={10} color={colors.textMuted} />
+                <Text
+                  style={[styles.vehicleText, { color: colors.textMuted }]}
+                  numberOfLines={1}
+                >
+                  {vehicleLabel}
+                </Text>
+              </View>
             </View>
-            <StatusBadge
-              status={shipment.displayStatus || shipment.status || "ASSIGNED"}
+          </View>
+          <StatusBadge status={manifest.displayStatus || manifest.status} />
+        </View>
+
+        {/* Compact progress summary */}
+        <View style={styles.progressWrap}>
+          <View style={styles.progressLabelRow}>
+            <Text style={[styles.progressLabel, { color: colors.textMuted }]}>
+              {delivered} of {total} delivered
+            </Text>
+            <View style={styles.miniStatsRow}>
+              {stats.outForDelivery > 0 && (
+                <Text style={[styles.miniStat, { color: "#e879f9" }]}>
+                  {stats.outForDelivery} out
+                </Text>
+              )}
+              {stats.failed > 0 && (
+                <Text style={[styles.miniStat, { color: "#f87171" }]}>
+                  {stats.failed} failed
+                </Text>
+              )}
+              {stats.remaining > 0 && (
+                <Text style={[styles.miniStat, { color: "#60a5fa" }]}>
+                  {stats.remaining} left
+                </Text>
+              )}
+            </View>
+          </View>
+          <View
+            style={[
+              styles.progressTrack,
+              { backgroundColor: colors.cardMuted, borderColor: colors.border },
+            ]}
+          >
+            <View style={[styles.progressFill, { width: `${progressPct}%` }]} />
+          </View>
+        </View>
+
+        {/* Expand affordance */}
+        <View style={styles.expandRow}>
+          <Text style={[styles.expandText, { color: colors.textMuted }]}>
+            {expanded ? "Hide details" : "View details"}
+          </Text>
+          <FontAwesome5
+            name={expanded ? "chevron-up" : "chevron-down"}
+            size={11}
+            color={colors.textMuted}
+          />
+        </View>
+      </TouchableOpacity>
+
+      {/* Expandable details */}
+      {expanded && (
+        <View style={styles.details}>
+          <View style={styles.statsRow}>
+            <StatPill label="Total" value={stats.total || 0} colors={colors} />
+            <StatPill
+              label="Out"
+              value={stats.outForDelivery || 0}
+              colors={colors}
+              accent="#e879f9"
             />
-          </TouchableOpacity>
-        ))
+            <StatPill
+              label="Done"
+              value={stats.delivered || 0}
+              colors={colors}
+              accent="#4ade80"
+            />
+            <StatPill
+              label="Failed"
+              value={stats.failed || 0}
+              colors={colors}
+              accent="#f87171"
+            />
+            <StatPill
+              label="Left"
+              value={stats.remaining || 0}
+              colors={colors}
+              accent="#60a5fa"
+            />
+          </View>
+
+          <MetaRow
+            icon="warehouse"
+            label="Released by"
+            value={releasedBy}
+            colors={colors}
+          />
+          <MetaRow
+            icon="user-check"
+            label="Loaded by"
+            value={loadedBy}
+            colors={colors}
+          />
+          <MetaRow
+            icon="clock"
+            label="Time loaded"
+            value={getTimeLabel(manifest.loadedAt || manifest.releasedAt)}
+            colors={colors}
+          />
+
+          <Text style={[styles.packageHeading, { color: colors.text }]}>
+            Loaded packages
+          </Text>
+
+          {manifest.shipments.length === 0 ? (
+            <Text style={[styles.emptyPackages, { color: colors.textMuted }]}>
+              {Array.isArray(manifest.shipmentIds) &&
+              manifest.shipmentIds.length > 0
+                ? "Loading package details..."
+                : "No packages on this manifest yet."}
+            </Text>
+          ) : (
+            manifest.shipments.map((shipment) => (
+              <TouchableOpacity
+                key={shipment.id}
+                style={[
+                  styles.packageRow,
+                  {
+                    borderColor: colors.border,
+                    backgroundColor: colors.cardMuted,
+                  },
+                ]}
+                onPress={() => onPressShipment?.(shipment.id)}
+                activeOpacity={0.8}
+              >
+                <View style={styles.packageMain}>
+                  <FontAwesome5 name="box" size={11} color={colors.textMuted} />
+                  <Text
+                    style={[styles.packageId, { color: colors.text }]}
+                    numberOfLines={1}
+                  >
+                    {shipment.id}
+                  </Text>
+                </View>
+                <StatusBadge
+                  status={
+                    shipment.displayStatus || shipment.status || "ASSIGNED"
+                  }
+                />
+              </TouchableOpacity>
+            ))
+          )}
+        </View>
       )}
-    </TouchableOpacity>
+    </View>
   );
 }
 
@@ -182,7 +274,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: 16,
     padding: 14,
-    gap: 8,
+  },
+  headerTouch: {
+    gap: 12,
   },
   cardHeader: {
     flexDirection: "row",
@@ -196,15 +290,76 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 8,
   },
-  cardTitle: {
+  titleTextWrap: {
     flex: 1,
+    gap: 3,
+  },
+  cardTitle: {
     fontSize: 15,
     fontWeight: "800",
+  },
+  vehicleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  vehicleText: {
+    flex: 1,
+    fontSize: 12,
+    fontWeight: "600",
+  },
+  progressWrap: {
+    gap: 6,
+  },
+  progressLabelRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    gap: 8,
+  },
+  progressLabel: {
+    fontSize: 12,
+    fontWeight: "700",
+  },
+  miniStatsRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    flexShrink: 1,
+  },
+  miniStat: {
+    fontSize: 11,
+    fontWeight: "700",
+  },
+  progressTrack: {
+    height: 6,
+    borderRadius: 999,
+    borderWidth: StyleSheet.hairlineWidth,
+    overflow: "hidden",
+  },
+  progressFill: {
+    height: "100%",
+    borderRadius: 999,
+    backgroundColor: "#4ade80",
+  },
+  expandRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    paddingTop: 2,
+  },
+  expandText: {
+    fontSize: 12,
+    fontWeight: "700",
+  },
+  details: {
+    marginTop: 12,
+    gap: 8,
   },
   statsRow: {
     flexDirection: "row",
     gap: 8,
-    marginTop: 4,
     marginBottom: 4,
   },
   statPill: {

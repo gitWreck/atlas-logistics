@@ -22,6 +22,8 @@ import UnifiedShipmentModal from "./modals/UnifiedShipmentModal";
 import { calculateProgress } from "@/app/utility/utilities";
 import { getBoardThemeClasses } from "@/app/utility/constant/theme";
 
+const PICKUP_PHASE_STATUSES = new Set(["PENDING_PICKUP", "PICKED_UP"]);
+
 const PickupBoard = forwardRef(function PickupBoard(
   { user, profile, isDark = false },
   ref,
@@ -91,6 +93,9 @@ const PickupBoard = forwardRef(function PickupBoard(
 
   const filteredPickups = useMemo(() => {
     return pickups.filter((pickup) => {
+      const status = String(pickup.status || "").toUpperCase();
+      if (!PICKUP_PHASE_STATUSES.has(status)) return false;
+
       const searchContent = [
         pickup.trackingNumber,
         pickup.sender?.name,
@@ -121,17 +126,12 @@ const PickupBoard = forwardRef(function PickupBoard(
       }
 
       if (activeFilter !== "ALL") {
-        if (activeFilter === "ACTIVE" && pickup.status === "DELIVERED") {
-          return false;
+        if (activeFilter === "ACTIVE") {
+          return true;
         }
 
-        if (activeFilter === "DELAYED") {
-          if (pickup.status !== "DELAYED") return false;
-          if (delayType !== "ALL" && pickup.delayReason !== delayType) {
-            return false;
-          }
-        } else if (activeFilter !== "ACTIVE") {
-          if (pickup.status !== activeFilter) return false;
+        if (activeFilter !== status) {
+          return false;
         }
       }
 
@@ -256,11 +256,6 @@ const PickupBoard = forwardRef(function PickupBoard(
                     <option value="ACTIVE">Active Only</option>
                     <option value="PENDING_PICKUP">Pending</option>
                     <option value="PICKED_UP">Picked Up</option>
-                    <option value="RECEIVED">At Hub</option>
-                    <option value="IN_TRANSIT">In Transit</option>
-                    <option value="DELIVERED">Completed</option>
-                    <option value="DELAYED">Delayed</option>
-                    <option value="CANCELLED">Cancelled</option>
                   </select>
                 </div>
               </div>

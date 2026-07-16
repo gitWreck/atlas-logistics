@@ -19,6 +19,7 @@ export default function ShipmentOperations({
   currentStatus,
   isDark = false,
   onRefresh,
+  onStatusUpdated,
   profile,
   custodyLocked = false,
 }) {
@@ -122,9 +123,12 @@ export default function ShipmentOperations({
                   notifyPush: notifyCustomers,
                   sourceUI: "SHIPMENT_STATUS_OVERRIDE",
                 }),
-              () => {
+              (result) => {
                 setStatusSelect("");
                 setNotifyCustomers(false);
+                if (result?.shipment) {
+                  onStatusUpdated?.(result.shipment);
+                }
                 onRefresh?.();
               },
             )

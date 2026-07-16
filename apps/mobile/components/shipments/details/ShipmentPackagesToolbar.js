@@ -1,6 +1,5 @@
 import React from "react";
 import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
-import ShipmentSearch from "../../checker/shipment-details/ShipmentSearch";
 import { useTheme } from "../../../contexts/ThemeContext";
 
 export default function ShipmentPackagesToolbar({
@@ -15,23 +14,7 @@ export default function ShipmentPackagesToolbar({
 
   return (
     <View style={[styles.container, { backgroundColor: colors.bg }]}>
-      <ShipmentSearch value={search} onChange={onChangeSearch} />
-
-      {editable && (
-        <View style={styles.selectionBar}>
-          <TouchableOpacity onPress={onToggleSelectAll}>
-            <Text style={styles.linkText}>
-              {selectedCount > 0 && selectedCount === totalFiltered
-                ? "Deselect All"
-                : "Select All"}
-            </Text>
-          </TouchableOpacity>
-
-          <Text style={[styles.selectionCount, { color: colors.textMuted }]}>
-            {selectedCount} Selected
-          </Text>
-        </View>
-      )}
+      {/* selection controls removed per design */}
     </View>
   );
 }
@@ -53,8 +36,5 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     fontSize: 13,
   },
-  selectionCount: {
-    color: "#64748B",
-    fontSize: 12,
-  },
+  // selectionCount style removed with selection UI
 });

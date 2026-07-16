@@ -1,4 +1,6 @@
 const PACKAGE_STATUS_LABELS = {
+  PENDING_PICKUP: "Pending pickup",
+  PICKED_UP: "Picked up",
   RECEIVED_AT_DIVISORIA: "Received at Divisoria",
   LOADED_TO_TRIP: "Loaded to trip",
   IN_TRANSIT: "In transit",
@@ -31,6 +33,8 @@ const PACKAGE_STATUS_LABELS = {
 };
 
 const BREAKDOWN_LABELS = [
+  { key: "pendingPickup", label: "Pending pickup" },
+  { key: "pickedUp", label: "Picked up" },
   { key: "atDivisoria", label: "At Divisoria" },
   { key: "inTransit", label: "In transit" },
   { key: "atOdiongan", label: "At Odiongan" },
@@ -45,10 +49,33 @@ const BREAKDOWN_LABELS = [
   { key: "failed", label: "Failed delivery" },
 ];
 
+const STATUS_ALIASES = {
+  PENDINGPICKUP: "PENDING_PICKUP",
+  PICKEDUP: "PICKED_UP",
+  RECEIVEDATDIVISORIA: "RECEIVED_AT_DIVISORIA",
+  LOADEDTOTRIP: "LOADED_TO_TRIP",
+  INTRANSIT: "IN_TRANSIT",
+  ARRIVEDATODIONGAN: "ARRIVED_AT_ODIONGAN",
+  AVAILABLEATODIONGANWAREHOUSE: "AVAILABLE_AT_ODIONGAN_WAREHOUSE",
+  RELEASEDFORDELIVERY: "RELEASED_FOR_DELIVERY",
+  ROUTEASSIGNED: "ROUTE_ASSIGNED",
+  LOADEDTODELIVERYVEHICLE: "LOADED_TO_DELIVERY_VEHICLE",
+  READYFORDELIVERY: "READY_FOR_DELIVERY",
+  OUTFORDELIVERY: "OUT_FOR_DELIVERY",
+  FAILEDDELIVERY: "FAILED_DELIVERY",
+  RETURNED: "RETURNED_TO_WAREHOUSE",
+  RETURNEDTOWAREHOUSE: "RETURNED_TO_WAREHOUSE",
+  RETURNEDRECEIVEDATODIONGAN: "RETURNED_RECEIVED_AT_ODIONGAN",
+  RETURNEDRECEIVEDATHUB: "RETURNED_RECEIVED_AT_HUB",
+};
+
 function normalizeStatus(value = "") {
-  return String(value || "")
+  const raw = String(value || "")
     .trim()
     .toUpperCase();
+  if (!raw) return "";
+  const compact = raw.replace(/[^A-Z0-9]/g, "");
+  return STATUS_ALIASES[compact] || raw;
 }
 
 export function getPackageStatusLabel(statusOrPkg, pkgMaybe = null) {
@@ -86,6 +113,8 @@ function classifyPackageBucket(pkg = {}) {
   if (status === "MISSING") return { bucket: "missing", qty };
   if (status === "DAMAGED") return { bucket: "damaged", qty };
   if (status === "FAILED_DELIVERY") return { bucket: "failed", qty };
+  if (status === "PENDING_PICKUP") return { bucket: "pendingPickup", qty };
+  if (status === "PICKED_UP") return { bucket: "pickedUp", qty };
   if (
     [
       "RETURNED_TO_WAREHOUSE",
@@ -101,14 +130,17 @@ function classifyPackageBucket(pkg = {}) {
   ) {
     return { bucket: "outForDelivery", qty };
   }
+  if (status === "LOADED" && normalizeStatus(pkg.custodyOwnerType) === "CHECKER") {
+    return { bucket: "onCheckerVan", qty };
+  }
   if (
-    ["LOADED", "READY_FOR_DELIVERY", "PARTIALLY_LOADED"].includes(status) ||
+    ["READY_FOR_DELIVERY", "PARTIALLY_LOADED"].includes(status) ||
     (normalizeStatus(pkg.custodyOwnerType) === "CHECKER" &&
       !["DELIVERED", "COMPLETED", "OUT_FOR_DELIVERY"].includes(status))
   ) {
     return { bucket: "onCheckerVan", qty };
   }
-  if (["IN_TRANSIT", "LOADED_TO_TRIP"].includes(status)) {
+  if (["IN_TRANSIT", "LOADED_TO_TRIP", "LOADED"].includes(status)) {
     return { bucket: "inTransit", qty };
   }
   if (status === "ROUTE_ASSIGNED") {
@@ -145,6 +177,8 @@ function classifyPackageBucket(pkg = {}) {
 export function computePackageBreakdown(packages = []) {
   const breakdown = {
     total: 0,
+    pendingPickup: 0,
+    pickedUp: 0,
     atDivisoria: 0,
     inTransit: 0,
     atOdiongan: 0,

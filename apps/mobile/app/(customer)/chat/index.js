@@ -1,20 +1,26 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
-  Alert,
   ActivityIndicator,
+  Alert,
   FlatList,
+  Image,
+  KeyboardAvoidingView,
   Modal,
   Platform,
+  Pressable,
   SafeAreaView,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
+  useWindowDimensions,
   View,
   StatusBar as RNStatusBar,
 } from "react-native";
 import { StatusBar } from "expo-status-bar";
-import { FontAwesome5 } from "@expo/vector-icons";
+import Feather from "@expo/vector-icons/Feather";
+import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import {
   collection,
@@ -30,69 +36,206 @@ import {
   markConversationRead,
 } from "../../../components/utilities/FirebaseFunctions";
 import { useTheme } from "../../../contexts/ThemeContext";
+import ChatThread from "../../../components/chat/ChatThread";
+import CustomerBottomNav from "../../../components/customer/CustomerBottomNav";
+import { displayMessagePreview, formatListTime } from "../../../components/chat/chatUtils";
 
-function formatTime(value) {
-  const date = value?.toDate?.() || null;
-  if (!date) return "Recently";
-  return new Intl.DateTimeFormat("en-US", {
-    month: "short",
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  }).format(date);
+const TWO_PANEL_WIDTH = 900;
+const BG = "#020b18";
+const PANEL = "#071d34";
+const TEXT = "#f1f5f9";
+const MUTED = "#aab8cf";
+const BLUE = "#0b7dff";
+const GREEN = "#2bd66f";
+const BORDER = "#143353";
+
+function supportPalette(theme, scheme) {
+  const dark = scheme === "dark";
+  return {
+    bg: dark ? "#07111F" : theme.dashboardBg,
+    bg2: dark ? "#020916" : theme.dashboardBg,
+    surface: theme.surface,
+    surface2: theme.cardMuted,
+    card: dark ? theme.cardMuted : theme.surface,
+    border: theme.border,
+    text: theme.text,
+    muted: theme.textMuted,
+    primary: theme.primary,
+    primarySoft: theme.primarySoft,
+    onPrimary: theme.onPrimary,
+    success: theme.success,
+    warning: theme.warning,
+    danger: theme.danger,
+    iconMuted: theme.iconMuted,
+    navBg: dark ? "rgba(8,17,29,0.94)" : theme.surface,
+    overlay: dark ? "rgba(0,0,0,0.42)" : "rgba(15,23,42,0.18)",
+  };
 }
 
-function getStatusStyle(status) {
-  const normalized = String(status || "open").toLowerCase();
+const CONCERN_CATEGORIES = [
+  {
+    key: "delivery_status",
+    title: "Delivery Status",
+    description: "Check the current shipment status.",
+    icon: "map-pin",
+    starter: "I need help checking my delivery status.",
+  },
+  {
+    key: "delivery_concern",
+    title: "Delivery Concern",
+    description: "Report delivery issues such as delays or missing parcels.",
+    icon: "alert-triangle",
+    starter: "I need help with a delivery concern.",
+  },
+  {
+    key: "change_delivery",
+    title: "Change Delivery",
+    description: "Request a delivery schedule or address change.",
+    icon: "calendar",
+    starter: "I would like to request a delivery change.",
+  },
+  {
+    key: "other",
+    title: "Other Concerns",
+    description: "General inquiries or service concerns.",
+    icon: "message-circle",
+    starter: "I need help with another concern.",
+  },
+];
 
-  if (normalized === "pending") {
-    return {
-      icon: "#d97706",
-      border: "#f59e0b",
-      soft: "#fffbeb",
-      chip: "#f59e0b",
-      text: "#92400e",
-    };
-  }
+function SupportAvatar({ ui, size = 52, packageIcon = false, showPresence = false }) {
+  return (
+    <View style={{ width: size, height: size }}>
+      <View
+        style={[
+          styles.avatar,
+          {
+            width: size,
+            height: size,
+            borderRadius: size / 2,
+            backgroundColor: packageIcon ? ui.surface2 : ui.primary,
+          },
+        ]}
+      >
+        <Feather
+          name={packageIcon ? "package" : "headphones"}
+          size={packageIcon ? size * 0.42 : size * 0.39}
+          color={packageIcon ? ui.warning : ui.onPrimary}
+        />
+      </View>
+      {showPresence && (
+        <>
+          <View style={[styles.presence, { right: -2, bottom: size * 0.12, backgroundColor: ui.success, borderColor: ui.bg }]} />
+        </>
+      )}
+    </View>
+  );
+}
 
-  if (normalized === "resolved") {
-    return {
-      icon: "#2563eb",
-      border: "#60a5fa",
-      soft: "#eff6ff",
-      chip: "#2563eb",
-      text: "#1d4ed8",
-    };
-  }
+function TruckIllustration({ ui }) {
+  return (
+    <Image
+      source={require("../../../assets/customer/support-truck-3d.png")}
+      style={styles.truckImage}
+      resizeMode="contain"
+      accessibilityLabel="Atlas delivery truck"
+    />
+  );
+}
 
-  if (normalized === "closed") {
-    return {
-      icon: "#64748b",
-      border: "#cbd5e1",
-      soft: "#f8fafc",
-      chip: "#64748b",
-      text: "#475569",
-    };
-  }
+function ConversationRow({ ui, item, unread, active, onPress }) {
+  const isShipment = !!item.trackingNumber;
+  const status = String(item.status || "open").toLowerCase();
+  const isResolved = ["resolved", "closed", "archived"].includes(status);
+  const title = isShipment ? `Shipment #${item.trackingNumber}` : isResolved ? "Support Ticket #0021" : "Atlas Support";
+  const statusLabel = isShipment
+    ? item.shipmentSummary?.status || (status === "pending" ? "In Transit" : "Out for Delivery")
+    : isResolved
+      ? "Resolved"
+      : "";
+  const normalizedStatus = String(statusLabel || item.shipmentSummary?.status || item.status || "").toLowerCase();
+  const statusColor = isResolved
+    ? ui.success
+    : normalizedStatus.includes("transit")
+      ? ui.warning
+      : normalizedStatus.includes("delivered")
+        ? ui.muted
+        : ui.primary;
+  const preview = displayMessagePreview({ text: item.lastMessageText });
+  const fallback = isShipment
+    ? statusLabel === "In Transit"
+      ? "Your shipment is now in transit."
+      : "Your package is out for delivery. ETA..."
+    : isResolved
+      ? "Your issue has been resolved."
+      : "How can we help you today?";
 
-  return {
-    icon: "#059669",
-    border: "#34d399",
-    soft: "#ecfdf5",
-    chip: "#059669",
-    text: "#047857",
-  };
+  const showPresence = active || (!isResolved && status === "open");
+
+  return (
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.row,
+        active && { backgroundColor: ui.primarySoft },
+        pressed && styles.rowPressed,
+        { borderBottomColor: ui.border },
+      ]}
+    >
+      <SupportAvatar ui={ui} packageIcon={isShipment} showPresence={showPresence} />
+      <View style={styles.rowBody}>
+        <View style={styles.rowTop}>
+          <View style={styles.titleLine}>
+            <Text style={[styles.rowTitle, { color: ui.text }]} numberOfLines={1}>{title}</Text>
+            {!isShipment && !isResolved && (
+              <View style={[styles.newPill, { backgroundColor: ui.primary }]}>
+                <Text style={[styles.newPillText, { color: ui.onPrimary }]}>New</Text>
+              </View>
+            )}
+          </View>
+          <Text style={[styles.rowTime, { color: ui.muted }]}>{formatListTime(item.lastMessageAt) || "9:41 AM"}</Text>
+        </View>
+        {!!statusLabel && (
+          <Text style={[styles.statusText, { color: statusColor }]} numberOfLines={1}>
+            {statusLabel}
+          </Text>
+        )}
+        <View style={styles.previewLine}>
+          <Text style={[styles.previewText, { color: ui.muted }]} numberOfLines={1}>
+            {preview || fallback}
+          </Text>
+          {unread > 0 && (
+            <View style={[styles.unreadBadge, { backgroundColor: ui.primary }]}>
+              <Text style={[styles.unreadBadgeText, { color: ui.onPrimary }]}>{unread > 9 ? "9+" : unread}</Text>
+            </View>
+          )}
+        </View>
+      </View>
+    </Pressable>
+  );
 }
 
 export default function CustomerChatListScreen() {
   const router = useRouter();
-  const { colors, resolvedScheme } = useTheme();
+  const { colors: themeColors, resolvedScheme } = useTheme();
+  const ui = useMemo(
+    () => supportPalette(themeColors, resolvedScheme),
+    [themeColors, resolvedScheme],
+  );
+  const { width } = useWindowDimensions();
+  const twoPanel = width >= TWO_PANEL_WIDTH;
+
   const [conversations, setConversations] = useState([]);
   const [loading, setLoading] = useState(true);
   const [starting, setStarting] = useState(false);
   const [markingRead, setMarkingRead] = useState(false);
   const [composeVisible, setComposeVisible] = useState(false);
+  const composeScrollRef = useRef(null);
   const [initialMessage, setInitialMessage] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState(CONCERN_CATEGORIES[0]);
+  const [search, setSearch] = useState("");
+  const [filter, setFilter] = useState("all");
+  const [selectedId, setSelectedId] = useState(null);
 
   useEffect(() => {
     const user = auth.currentUser;
@@ -107,9 +250,7 @@ export default function CustomerChatListScreen() {
     const unsubscribe = onSnapshot(
       q,
       (snapshot) => {
-        setConversations(
-          snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })),
-        );
+        setConversations(snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })));
         setLoading(false);
       },
       (error) => {
@@ -121,20 +262,56 @@ export default function CustomerChatListScreen() {
     return unsubscribe;
   }, []);
 
-  const unreadTotal = useMemo(() => {
-    const uid = auth.currentUser?.uid;
-    return conversations.reduce(
-      (sum, item) => sum + Number(item.unreadCounts?.[uid] || 0),
-      0,
-    );
+  const uid = auth.currentUser?.uid;
+  const unreadTotal = useMemo(
+    () => conversations.reduce((sum, item) => sum + Number(item.unreadCounts?.[uid] || 0), 0),
+    [conversations, uid],
+  );
+
+  const filterCounts = useMemo(() => {
+    const counts = { all: conversations.length, open: 0, resolved: 0 };
+    conversations.forEach((item) => {
+      const status = String(item.status || "open").toLowerCase();
+      if (["resolved", "closed", "archived"].includes(status)) counts.resolved += 1;
+      else counts.open += 1;
+    });
+    return counts;
   }, [conversations]);
 
-  const handleStartGeneral = async () => {
-    const message = initialMessage.trim();
-    if (!message) {
-      Alert.alert("Message required", "Type a message to start a new chat.");
-      return;
+  const filtered = useMemo(() => {
+    const term = search.trim().toLowerCase();
+    return conversations.filter((item) => {
+      const status = String(item.status || "open").toLowerCase();
+      const resolved = ["resolved", "closed", "archived"].includes(status);
+      if (filter === "open" && resolved) return false;
+      if (filter === "resolved" && !resolved) return false;
+      if (!term) return true;
+      return [item.trackingNumber, item.customerName, item.status, item.lastMessageText]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase()
+        .includes(term);
+    });
+  }, [conversations, filter, search]);
+
+  useEffect(() => {
+    if (twoPanel && !selectedId && filtered.length) setSelectedId(filtered[0].id);
+  }, [twoPanel, selectedId, filtered]);
+
+  const openConversation = (id) => {
+    if (twoPanel) setSelectedId(id);
+    else {
+      router.push({
+        pathname: "/(customer)/chat/[conversationId]",
+        params: { conversationId: id },
+      });
     }
+  };
+
+  const handleStartGeneral = async () => {
+    const detail = initialMessage.trim();
+    const category = selectedCategory || CONCERN_CATEGORIES[0];
+    const message = detail ? `${category.title}: ${detail}` : `${category.title}: ${category.starter}`;
 
     try {
       setStarting(true);
@@ -142,34 +319,25 @@ export default function CustomerChatListScreen() {
       const conversationId = result?.data?.conversationId;
       if (conversationId) {
         setInitialMessage("");
+        setSelectedCategory(CONCERN_CATEGORIES[0]);
         setComposeVisible(false);
-        router.push({
-          pathname: "/(customer)/chat/[conversationId]",
-          params: { conversationId },
-        });
+        openConversation(conversationId);
       }
     } catch (error) {
       console.error("Failed to start chat:", error);
+      Alert.alert("Unable to start conversation", "Please try again in a moment.");
     } finally {
       setStarting(false);
     }
   };
 
   const handleMarkAllRead = async () => {
-    const uid = auth.currentUser?.uid;
-    const unreadConversations = conversations.filter(
-      (item) => Number(item.unreadCounts?.[uid] || 0) > 0,
-    );
-
+    const unreadConversations = conversations.filter((item) => Number(item.unreadCounts?.[uid] || 0) > 0);
     if (!unreadConversations.length || markingRead) return;
 
     try {
       setMarkingRead(true);
-      await Promise.all(
-        unreadConversations.map((item) =>
-          markConversationRead({ conversationId: item.id }),
-        ),
-      );
+      await Promise.all(unreadConversations.map((item) => markConversationRead({ conversationId: item.id })));
     } catch (error) {
       console.error("Failed to mark chats read:", error);
     } finally {
@@ -177,232 +345,190 @@ export default function CustomerChatListScreen() {
     }
   };
 
-  const renderItem = ({ item }) => {
-    const unread = Number(item.unreadCounts?.[auth.currentUser?.uid] || 0);
-    const statusStyle = getStatusStyle(item.status);
-    return (
-      <TouchableOpacity
-        style={[
-          styles.card,
-          {
-            backgroundColor: colors.surface,
-            borderColor: unread > 0 ? statusStyle.border : colors.border,
-          },
-          unread > 0 && styles.cardUnread,
-        ]}
-        activeOpacity={0.85}
-        onPress={() =>
-          router.push({
-            pathname: "/(customer)/chat/[conversationId]",
-            params: { conversationId: item.id },
-          })
-        }
-      >
-        <View style={[styles.avatar, { backgroundColor: statusStyle.soft }]}>
-          <FontAwesome5 name="headset" size={16} color={statusStyle.icon} />
+  const renderList = () => (
+    <LinearGradient colors={[ui.bg2, ui.bg, ui.bg2]} style={styles.phone}>
+      <View style={styles.hero}>
+        <View style={styles.heroText}>
+          <Text style={[styles.brand, { color: ui.text }]}>ATLAS</Text>
+          <Text style={[styles.brandSub, { color: ui.text }]}>Customer Support</Text>
         </View>
-        <View style={styles.cardBody}>
-          <View style={styles.row}>
-            <Text style={[styles.title, { color: colors.text }]}>
-              {item.trackingNumber || "Support"}
-            </Text>
-            <Text style={[styles.time, { color: colors.textMuted }]}>
-              {formatTime(item.lastMessageAt)}
-            </Text>
-          </View>
-          <View style={styles.statusRow}>
-            <View
-              style={[styles.statusChip, { backgroundColor: statusStyle.soft }]}
+        <TruckIllustration />
+      </View>
+
+      <View style={styles.searchRow}>
+        <View style={[styles.searchBar, { backgroundColor: ui.surface2 }]}>
+          <Feather name="search" size={17} color={ui.muted} />
+          <TextInput
+            style={[styles.searchInput, { color: ui.text }]}
+            value={search}
+            onChangeText={setSearch}
+            placeholder="Search conversations"
+            placeholderTextColor={ui.muted}
+          />
+        </View>
+       
+      </View>
+
+      <View style={styles.tabs}>
+        {[
+          { key: "all", label: "All", count: filterCounts.all },
+          { key: "open", label: "Open", count: filterCounts.open },
+          { key: "resolved", label: "Resolved", count: filterCounts.resolved },
+        ].map((item) => {
+          const active = filter === item.key;
+          return (
+            <TouchableOpacity
+              key={item.key}
+              style={[styles.tab, { backgroundColor: active ? ui.primary : ui.surface2 }]}
+              onPress={() => setFilter(item.key)}
+              activeOpacity={0.86}
             >
-              <View
-                style={[
-                  styles.statusDot,
-                  { backgroundColor: statusStyle.chip },
-                ]}
-              />
-              <Text style={[styles.statusText, { color: statusStyle.text }]}>
-                {item.status || "open"}
-              </Text>
-            </View>
-            <Text style={[styles.subtitle, { color: colors.textMuted }]}>
-              {item.customerName || "You"}
-            </Text>
-          </View>
-          <Text
-            style={[styles.preview, { color: colors.text }]}
-            numberOfLines={1}
-          >
-            {item.lastMessageText || "Conversation started"}
-          </Text>
-        </View>
-        {unread > 0 && (
-          <View style={styles.badge}>
-            <Text style={styles.badgeText}>{unread > 9 ? "9+" : unread}</Text>
-          </View>
-        )}
-      </TouchableOpacity>
-    );
-  };
-
-  return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.bg }]}>
-      <StatusBar style={resolvedScheme === "dark" ? "light" : "dark"} />
-
-      <View
-        style={[
-          styles.header,
-          { backgroundColor: colors.surface, borderBottomColor: colors.border },
-        ]}
-      >
-        <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
-          <FontAwesome5 name="chevron-left" size={16} color={colors.text} />
-        </TouchableOpacity>
-        <View style={styles.headerText}>
-          <Text style={[styles.headerTitle, { color: colors.text }]}>
-            Messages
-          </Text>
-          <Text style={[styles.headerSubtitle, { color: colors.textMuted }]}>
-            {unreadTotal} unread
-          </Text>
-        </View>
-        {unreadTotal > 0 && (
-          <TouchableOpacity
-            style={[
-              styles.markReadBtn,
-              { borderColor: colors.border, backgroundColor: colors.cardMuted },
-            ]}
-            onPress={handleMarkAllRead}
-            disabled={markingRead}
-          >
-            {markingRead ? (
-              <ActivityIndicator size="small" color={colors.textMuted} />
-            ) : (
-              <FontAwesome5
-                name="check-double"
-                size={13}
-                color={colors.textMuted}
-              />
-            )}
-          </TouchableOpacity>
-        )}
-        <TouchableOpacity
-          style={styles.startBtn}
-          onPress={() => setComposeVisible(true)}
-          disabled={starting}
-        >
-          {starting ? (
-            <ActivityIndicator size="small" color="#ffffff" />
-          ) : (
-            <FontAwesome5 name="plus" size={14} color="#ffffff" />
-          )}
-        </TouchableOpacity>
+              <Text style={[styles.tabText, { color: active ? ui.onPrimary : ui.text }]}>{item.label}</Text>
+              <View style={[styles.tabCount, { backgroundColor: active ? "rgba(255,255,255,0.20)" : ui.surface }]}>
+                <Text style={[styles.tabCountText, { color: active ? ui.onPrimary : ui.muted }]}>{item.count}</Text>
+              </View>
+            </TouchableOpacity>
+          );
+        })}
       </View>
 
       {loading ? (
-        <View style={styles.center}>
-          <ActivityIndicator size="large" color="#2563eb" />
+        <View style={styles.loadingWrap}>
+          <ActivityIndicator color={ui.primary} />
         </View>
       ) : (
         <FlatList
-          data={conversations}
+          data={filtered}
           keyExtractor={(item) => item.id}
-          renderItem={renderItem}
-          contentContainerStyle={[
-            styles.list,
-            conversations.length === 0 && styles.emptyList,
-          ]}
+          renderItem={({ item }) => (
+            <ConversationRow
+              ui={ui}
+              item={item}
+              unread={Number(item.unreadCounts?.[uid] || 0)}
+              active={twoPanel && item.id === selectedId}
+              onPress={() => openConversation(item.id)}
+            />
+          )}
+          contentContainerStyle={styles.list}
+          keyboardShouldPersistTaps="handled"
           ListEmptyComponent={
             <View style={styles.emptyState}>
-              <FontAwesome5
-                name="comments"
-                size={34}
-                color={colors.textMuted}
-              />
-              <Text style={[styles.emptyTitle, { color: colors.text }]}>
-                No messages yet
+              <SupportAvatar ui={ui} size={70} />
+              <Text style={[styles.emptyTitle, { color: ui.text }]}>{search ? "No matches found" : "No messages yet"}</Text>
+              <Text style={[styles.emptyText, { color: ui.muted }]}>
+                {search ? "Try another tracking number or keyword." : "Start a support chat when you need help."}
               </Text>
-              <Text style={[styles.emptyText, { color: colors.textMuted }]}>
-                Start a support chat when you need help with a shipment.
-              </Text>
-              <TouchableOpacity
-                style={styles.emptyButton}
-                onPress={() => setComposeVisible(true)}
-              >
-                <Text style={styles.emptyButtonText}>Start Chat</Text>
-              </TouchableOpacity>
             </View>
           }
         />
       )}
 
-      <Modal
-        transparent
-        animationType="fade"
-        visible={composeVisible}
-        onRequestClose={() => setComposeVisible(false)}
-      >
-        <View style={styles.modalBackdrop}>
-          <View
-            style={[
-              styles.modalCard,
-              { backgroundColor: colors.surface, borderColor: colors.border },
-            ]}
-          >
-            <Text style={[styles.modalTitle, { color: colors.text }]}>
-              New message
-            </Text>
-            <Text style={[styles.modalSubtitle, { color: colors.textMuted }]}>
-              The conversation appears only after you send this message.
-            </Text>
-            <TextInput
-              style={[
-                styles.modalInput,
-                {
-                  color: colors.text,
-                  backgroundColor: colors.cardMuted,
-                  borderColor: colors.border,
-                },
-              ]}
-              value={initialMessage}
-              onChangeText={setInitialMessage}
-              placeholder="How can Atlas help?"
-              placeholderTextColor={colors.textMuted}
-              multiline
-              autoFocus
-            />
-            <View style={styles.modalActions}>
-              <TouchableOpacity
-                style={[
-                  styles.modalCancel,
-                  { borderColor: colors.border, backgroundColor: colors.cardMuted },
-                ]}
-                onPress={() => {
-                  setComposeVisible(false);
-                  setInitialMessage("");
-                }}
-                disabled={starting}
-              >
-                <Text style={[styles.modalCancelText, { color: colors.text }]}>
-                  Cancel
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[
-                  styles.modalSend,
-                  (!initialMessage.trim() || starting) && styles.sendDisabled,
-                ]}
-                onPress={handleStartGeneral}
-                disabled={!initialMessage.trim() || starting}
-              >
-                {starting ? (
-                  <ActivityIndicator size="small" color="#ffffff" />
-                ) : (
-                  <Text style={styles.modalSendText}>Send</Text>
-                )}
-              </TouchableOpacity>
-            </View>
+      <CustomerBottomNav active="messages" unreadMessages={unreadTotal} />
+    </LinearGradient>
+  );
+
+  return (
+    <SafeAreaView style={[styles.container, { backgroundColor: ui.bg }]}>
+      <StatusBar style={resolvedScheme === "dark" ? "light" : "dark"} />
+      {twoPanel ? (
+        <View style={[styles.splitRoot, { backgroundColor: ui.bg }]}>
+          <View style={[styles.splitList, { borderRightColor: ui.border }]}>{renderList()}</View>
+          <View style={[styles.splitThread, { backgroundColor: ui.bg }]}>
+            {selectedId ? (
+              <ChatThread conversationId={selectedId} />
+            ) : (
+              <View style={styles.splitPlaceholder}>
+                <SupportAvatar ui={ui} size={80} />
+                <Text style={[styles.emptyTitle, { color: ui.text }]}>Your messages</Text>
+                <Text style={[styles.emptyText, { color: ui.muted }]}>Select a conversation to start chatting with Atlas Support.</Text>
+              </View>
+            )}
           </View>
         </View>
+      ) : (
+        renderList()
+      )}
+
+      <TouchableOpacity
+        style={[styles.floatingCompose, { backgroundColor: ui.primary }]}
+        onPress={() => setComposeVisible(true)}
+        disabled={starting}
+        activeOpacity={0.88}
+      >
+        {starting ? <ActivityIndicator size="small" color={ui.onPrimary} /> : <Feather name="edit-3" size={23} color={ui.onPrimary} />}
+      </TouchableOpacity>
+
+      <Modal transparent animationType="slide" visible={composeVisible} onRequestClose={() => setComposeVisible(false)}>
+        <KeyboardAvoidingView
+          style={styles.keyboardAvoider}
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+        >
+          <View style={[styles.modalBackdrop, { backgroundColor: ui.overlay }]}>
+            <View style={[styles.modalSheet, { backgroundColor: ui.surface }]}>
+              <ScrollView
+                ref={composeScrollRef}
+                style={styles.modalScroll}
+                keyboardShouldPersistTaps="handled"
+                contentContainerStyle={styles.modalScrollContent}
+                automaticallyAdjustKeyboardInsets
+                showsVerticalScrollIndicator={false}
+              >
+                <View style={[styles.sheetHandle, { backgroundColor: ui.border }]} />
+                <Text style={[styles.modalTitle, { color: ui.text }]}>Quick Actions</Text>
+                <View style={styles.categoryList}>
+                  {CONCERN_CATEGORIES.map((category) => {
+                    const active = selectedCategory?.key === category.key;
+                    return (
+                      <TouchableOpacity
+                        key={category.key}
+                        style={[styles.categoryOption, { borderBottomColor: ui.border }]}
+                        onPress={() => setSelectedCategory(category)}
+                        activeOpacity={0.84}
+                      >
+                        <View style={[styles.categoryIcon, { backgroundColor: active ? ui.primary : ui.primarySoft }]}>
+                          <Feather name={category.icon} size={18} color={active ? ui.onPrimary : ui.primary} />
+                        </View>
+                        <View style={styles.categoryText}>
+                          <Text style={[styles.categoryTitle, { color: ui.text }]}>{category.title}</Text>
+                          <Text style={[styles.categoryDescription, { color: ui.muted }]}>{category.description}</Text>
+                        </View>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+                <TextInput
+                  style={[styles.modalInput, { backgroundColor: ui.surface2, color: ui.text }]}
+                  value={initialMessage}
+                  onChangeText={setInitialMessage}
+                  onFocus={() => {
+                    setTimeout(() => composeScrollRef.current?.scrollToEnd({ animated: true }), 100);
+                  }}
+                  placeholder="Add more details..."
+                  placeholderTextColor={ui.muted}
+                  multiline
+                  scrollEnabled
+                  textAlignVertical="top"
+                />
+                <View style={styles.modalActions}>
+                  <TouchableOpacity
+                    style={[styles.cancelButton, { backgroundColor: ui.surface2 }]}
+                    onPress={() => {
+                      setComposeVisible(false);
+                      setInitialMessage("");
+                      setSelectedCategory(CONCERN_CATEGORIES[0]);
+                    }}
+                    disabled={starting}
+                  >
+                    <Text style={[styles.cancelText, { color: ui.primary }]}>Cancel</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={[styles.startButton, { backgroundColor: ui.primary }]} onPress={handleStartGeneral} disabled={starting}>
+                    {starting ? <ActivityIndicator size="small" color={ui.onPrimary} /> : <Text style={[styles.startText, { color: ui.onPrimary }]}>Start Conversation</Text>}
+                  </TouchableOpacity>
+                </View>
+              </ScrollView>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
       </Modal>
     </SafeAreaView>
   );
@@ -411,240 +537,179 @@ export default function CustomerChatListScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: BG,
     paddingTop: Platform.OS === "android" ? RNStatusBar.currentHeight || 0 : 0,
   },
-  header: {
-    minHeight: 64,
+  phone: { flex: 1 },
+  splitRoot: { flex: 1, flexDirection: "row", backgroundColor: BG },
+  splitList: { width: 396, borderRightWidth: 1, borderRightColor: BORDER },
+  splitThread: { flex: 1, backgroundColor: BG },
+  splitPlaceholder: { flex: 1, alignItems: "center", justifyContent: "center", padding: 28 },
+  hero: {
+    height: 96,
+    paddingHorizontal: 18,
+    paddingTop: 20,
+    paddingBottom: 10,
     flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 16,
-    borderBottomWidth: 1,
+    alignItems: "flex-start",
+    justifyContent: "space-between",
   },
-  backBtn: {
-    width: 40,
-    height: 40,
-    alignItems: "center",
-    justifyContent: "center",
+  heroText: {
+    paddingTop: 2,
   },
-  headerText: {
-    flex: 1,
-    marginLeft: 4,
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: "800",
-  },
-  headerSubtitle: {
-    fontSize: 12,
+  brand: { fontSize: 24, fontWeight: "700", letterSpacing: 0 },
+  brandSub: {
+    fontSize: 14,
+    fontWeight: "400",
     marginTop: 2,
   },
-  startBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "#2563eb",
-  },
-  markReadBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    borderWidth: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    marginRight: 8,
-  },
-  center: {
+  truckImage: { width: 88, height: 54 },
+  searchRow: { flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 18 },
+  searchBar: {
     flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  list: {
-    padding: 16,
-  },
-  emptyList: {
-    flexGrow: 1,
-    justifyContent: "center",
-  },
-  card: {
+    height: 35,
+    borderRadius: 10,
+    backgroundColor: "rgba(28, 39, 58, 0.92)",
     flexDirection: "row",
     alignItems: "center",
-    gap: 12,
+    gap: 10,
+    paddingHorizontal: 11,
     borderWidth: 1,
-    borderRadius: 12,
-    padding: 14,
-    marginBottom: 12,
+    borderColor: "rgba(255,255,255,0.04)",
   },
-  cardUnread: {
-    borderWidth: 1.5,
-  },
-  avatar: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "#eff6ff",
-  },
-  cardBody: {
-    flex: 1,
-    minWidth: 0,
-  },
-  row: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 8,
-  },
-  title: {
-    flex: 1,
-    fontSize: 14,
-    fontWeight: "800",
-  },
-  time: {
-    fontSize: 11,
-    fontWeight: "600",
-  },
-  subtitle: {
-    fontSize: 12,
-    textTransform: "capitalize",
-  },
-  statusRow: {
+  searchInput: { flex: 1, fontSize: 13, fontWeight: "400", paddingVertical: 0 },
+  filterButton: { width: 26, height: 35, alignItems: "center", justifyContent: "center" },
+  tabs: { flexDirection: "row", gap: 9, paddingHorizontal: 18, paddingTop: 16, paddingBottom: 13 },
+  tab: {
+    height: 29,
+    borderRadius: 8,
+    backgroundColor: PANEL,
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
-    marginTop: 6,
+    paddingHorizontal: 12,
   },
-  statusChip: {
-    height: 22,
-    borderRadius: 11,
-    paddingHorizontal: 8,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 5,
-  },
-  statusDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-  },
-  statusText: {
-    fontSize: 10,
-    fontWeight: "800",
-    textTransform: "uppercase",
-  },
-  preview: {
-    marginTop: 5,
-    fontSize: 13,
-  },
-  badge: {
-    minWidth: 22,
-    height: 22,
-    borderRadius: 11,
+  tabActive: { backgroundColor: "#075fcf" },
+  tabText: { fontSize: 12, fontWeight: "600" },
+  tabCount: {
+    minWidth: 19,
+    height: 19,
+    borderRadius: 10,
+    backgroundColor: "rgba(255,255,255,0.12)",
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: 6,
-    backgroundColor: "#ef4444",
   },
-  badgeText: {
-    color: "#ffffff",
-    fontSize: 10,
-    fontWeight: "800",
-  },
-  emptyState: {
+  tabCountActive: { backgroundColor: "rgba(255,255,255,0.20)" },
+  tabCountText: { fontSize: 11, fontWeight: "600" },
+  list: { paddingHorizontal: 18, paddingBottom: 94 },
+  loadingWrap: { paddingTop: 40 },
+  row: {
+    minHeight: 83,
+    flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 28,
+    gap: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "rgba(255,255,255,0.06)",
   },
-  emptyTitle: {
-    marginTop: 14,
-    fontSize: 17,
-    fontWeight: "800",
+  rowActive: { backgroundColor: "rgba(10,124,255,0.08)" },
+  rowPressed: { opacity: 0.78 },
+  avatar: { alignItems: "center", justifyContent: "center" },
+  presence: {
+    position: "absolute",
+    width: 11,
+    height: 11,
+    borderRadius: 6,
+    backgroundColor: GREEN,
+    borderWidth: 2,
+    borderColor: BG,
   },
-  emptyText: {
-    marginTop: 6,
-    textAlign: "center",
-    fontSize: 13,
-    lineHeight: 19,
-  },
-  emptyButton: {
-    marginTop: 18,
-    height: 42,
-    borderRadius: 10,
-    paddingHorizontal: 18,
+  rowBody: { flex: 1, minWidth: 0 },
+  rowTop: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8 },
+  titleLine: { flex: 1, minWidth: 0, flexDirection: "row", alignItems: "center", gap: 8 },
+  rowTitle: { fontSize: 14, fontWeight: "600", flexShrink: 1 },
+  newPill: { backgroundColor: "#0a65ff", borderRadius: 5, paddingHorizontal: 5, paddingVertical: 2 },
+  newPillText: { fontSize: 10, fontWeight: "600" },
+  rowTime: { fontSize: 11, fontWeight: "400" },
+  statusText: { marginTop: 4, fontSize: 12, fontWeight: "500" },
+  previewLine: { marginTop: 4, flexDirection: "row", alignItems: "center", gap: 8 },
+  previewText: { flex: 1, fontSize: 12, fontWeight: "400" },
+  unreadBadge: { width: 21, height: 21, borderRadius: 11, backgroundColor: BLUE, alignItems: "center", justifyContent: "center" },
+  unreadBadgeText: { fontSize: 11, fontWeight: "600" },
+  floatingCompose: {
+    position: "absolute",
+    right: 26,
+    bottom: Platform.OS === "ios" ? 100 : 90,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: BLUE,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#2563eb",
+    shadowColor: "#000000",
+    shadowOpacity: 0.28,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 8,
   },
-  emptyButtonText: {
-    color: "#ffffff",
-    fontWeight: "800",
-  },
+  emptyState: { alignItems: "center", paddingTop: 70, paddingHorizontal: 30, gap: 9 },
+  emptyTitle: { fontSize: 18, fontWeight: "600" },
+  emptyText: { textAlign: "center", fontSize: 13, lineHeight: 19 },
   modalBackdrop: {
     flex: 1,
-    backgroundColor: "rgba(15, 23, 42, 0.45)",
+    backgroundColor: "rgba(0,0,0,0.42)",
+    justifyContent: "flex-end",
+  },
+  keyboardAvoider: { flex: 1 },
+  modalSheet: {
+    backgroundColor: "#101b2b",
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+    paddingHorizontal: 18,
+    paddingTop: 12,
+    paddingBottom: Platform.OS === "ios" ? 28 : 18,
+    maxHeight: "100%",
+  },
+  modalScroll: { flexShrink: 1 },
+  modalScrollContent: { flexGrow: 1 },
+  sheetHandle: { width: 34, height: 4, borderRadius: 2, backgroundColor: "#526078", alignSelf: "center", marginBottom: 16 },
+  modalTitle: { fontSize: 16, fontWeight: "600", textAlign: "center", marginBottom: 14 },
+  categoryList: { gap: 0 },
+  categoryOption: {
+    minHeight: 76,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: "rgba(255,255,255,0.06)",
+  },
+  categoryIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 12,
+    backgroundColor: "rgba(10,124,255,0.18)",
     alignItems: "center",
     justifyContent: "center",
-    padding: 20,
   },
-  modalCard: {
-    width: "100%",
-    maxWidth: 420,
-    borderRadius: 16,
-    borderWidth: 1,
-    padding: 18,
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: "800",
-  },
-  modalSubtitle: {
-    marginTop: 5,
-    fontSize: 13,
-    lineHeight: 18,
-  },
+  categoryIconActive: { backgroundColor: BLUE },
+  categoryText: { flex: 1, minWidth: 0 },
+  categoryTitle: { fontSize: 16, fontWeight: "600" },
+  categoryDescription: { fontSize: 13, marginTop: 4, lineHeight: 18 },
   modalInput: {
-    minHeight: 112,
-    maxHeight: 180,
     marginTop: 14,
-    borderWidth: 1,
+    minHeight: 76,
+    maxHeight: 120,
     borderRadius: 12,
-    paddingHorizontal: 12,
+    backgroundColor: PANEL,
+    color: TEXT,
+    paddingHorizontal: 13,
     paddingVertical: 10,
     fontSize: 14,
     textAlignVertical: "top",
   },
-  modalActions: {
-    marginTop: 14,
-    flexDirection: "row",
-    justifyContent: "flex-end",
-    gap: 10,
-  },
-  modalCancel: {
-    height: 42,
-    borderRadius: 10,
-    borderWidth: 1,
-    paddingHorizontal: 16,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  modalCancelText: {
-    fontWeight: "800",
-  },
-  modalSend: {
-    minWidth: 82,
-    height: 42,
-    borderRadius: 10,
-    paddingHorizontal: 18,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "#2563eb",
-  },
-  sendDisabled: {
-    opacity: 0.45,
-  },
-  modalSendText: {
-    color: "#ffffff",
-    fontWeight: "800",
-  },
+  modalActions: { marginTop: 12, flexDirection: "row", gap: 10 },
+  cancelButton: { flex: 1, height: 48, borderRadius: 10, backgroundColor: PANEL, alignItems: "center", justifyContent: "center" },
+  cancelText: { color: BLUE, fontSize: 15, fontWeight: "800" },
+  startButton: { flex: 1, height: 48, borderRadius: 10, backgroundColor: BLUE, alignItems: "center", justifyContent: "center" },
+  startText: { color: "#ffffff", fontSize: 14, fontWeight: "900" },
 });

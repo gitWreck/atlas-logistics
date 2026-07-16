@@ -8,10 +8,10 @@ export default function ShipmentPackagesStats({ shipment }) {
   const isDark = resolvedScheme === "dark";
   const totals = shipment?.totals || {};
   const loaded = totals.loaded || 0;
-  const missing = totals.missing || 0;
+  const delivered = totals.delivered || totals.totalDelivered || totals.received || 0;
   const totalItems = totals.totalContentQty || totals.totalItems || 0;
 
-  const processed = loaded + missing;
+  const processed = loaded + delivered;
   const percent = totalItems > 0 ? (processed / totalItems) * 100 : 0;
 
   return (
@@ -67,39 +67,42 @@ export default function ShipmentPackagesStats({ shipment }) {
         <View
           style={[
             styles.statCard,
-            { backgroundColor: isDark ? "#450a0a" : "#fef2f2" },
+            { backgroundColor: isDark ? "#052e16" : "#ecfdf5" },
           ]}
         >
           <View
             style={[
               styles.iconWrap,
               {
-                backgroundColor: isDark ? "#7f1d1d" : "#fee2e2",
+                backgroundColor: isDark ? "#064e3b" : "#bbf7d0",
               },
             ]}
           >
-            <FontAwesome5 name="exclamation-circle" size={14} color="#dc2626" />
+            <FontAwesome5 name="check-circle" size={14} color="#059669" />
           </View>
-          <Text style={[styles.statValue, { color: "#dc2626" }]}>
-            {missing}
+          <Text style={[styles.statValue, { color: "#059669" }]}>
+            {delivered}
           </Text>
           <Text style={[styles.statLabel, { color: colors.textMuted }]}>
-            Missing
+            Delivered
           </Text>
         </View>
 
-        <View style={[styles.statCard, { backgroundColor: colors.cardMuted }]}>
+        <View
+          style={[
+            styles.statCard,
+            { backgroundColor: isDark ? "#0b1220" : "#e6f0ff" },
+          ]}
+        >
           <View
-            style={[styles.iconWrap, { backgroundColor: colors.border }]}
+            style={[styles.iconWrap, { backgroundColor: isDark ? "#0f172a" : "#dbeafe" }]}
           >
-            <FontAwesome5 name="boxes" size={14} color={colors.text} />
+            <FontAwesome5 name="boxes" size={14} color={isDark ? "#f8fafc" : "#0b1220"} />
           </View>
-          <Text style={[styles.statValue, { color: colors.text }]}>
+          <Text style={[styles.statValue, { color: isDark ? "#f8fafc" : "#0b1220" }]}>
             {totalItems}
           </Text>
-          <Text style={[styles.statLabel, { color: colors.textMuted }]}>
-            Total
-          </Text>
+          <Text style={[styles.statLabel, { color: colors.textMuted }]}>Total</Text>
         </View>
       </View>
 

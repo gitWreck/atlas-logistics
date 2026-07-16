@@ -45,6 +45,13 @@ function ensureAdminApp() {
   initializeApp({
     credential: cert(serviceAccount),
   });
+} else if (getApps().length === 0) {
+  // For development without service account, initialize without credentials
+  // This allows the app to run but API calls that need admin privileges will fail gracefully
+  console.warn("⚠️  Firebase Admin SDK not initialized - service account credentials missing");
+  initializeApp({
+    projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || "atlas-tracking",
+  });
 }
 
 function createLazyAdminProxy(getInstance) {

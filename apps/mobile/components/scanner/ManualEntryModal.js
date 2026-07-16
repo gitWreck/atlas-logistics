@@ -21,6 +21,7 @@ export default function ManualEntryModal({
   loading = false,
   mode = "loading",
   actionLabel = "",
+  accentColor = "#2563eb",
 }) {
   const { colors } = useTheme();
   const [code, setCode] = useState("");
@@ -75,12 +76,12 @@ export default function ManualEntryModal({
               style={[
                 styles.iconWrap,
                 {
-                  backgroundColor: colors.cardMuted,
-                  borderColor: colors.border,
+                  backgroundColor: `${accentColor}15`,
+                  borderColor: accentColor,
                 },
               ]}
             >
-              <FontAwesome5 name="keyboard" size={18} color="#2563eb" />
+              <FontAwesome5 name="keyboard" size={18} color={accentColor} />
             </View>
 
             <View style={styles.headerTextWrap}>
@@ -159,6 +160,7 @@ export default function ManualEntryModal({
               style={[
                 styles.button,
                 styles.submitButton,
+                { backgroundColor: accentColor },
                 (!code.trim() || loading) && styles.submitButtonDisabled,
               ]}
               onPress={handleSubmit}
@@ -297,7 +299,7 @@ const styles = StyleSheet.create({
     borderColor: "#cbd5e1",
   },
   submitButton: {
-    backgroundColor: "#2563eb",
+    flex: 1,
   },
   submitButtonDisabled: {
     opacity: 0.55,

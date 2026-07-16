@@ -33,7 +33,7 @@ import ExistingProofsViewer from "../../../components/tracking/ExistingProofsVie
 import { useTheme } from "../../../contexts/ThemeContext";
 
 export default function CustomerTrackingDetailsScreen() {
-  const { trackingId } = useLocalSearchParams();
+  const { trackingId, source } = useLocalSearchParams();
   const router = useRouter();
   const { profile } = useAuth();
   const { colors, resolvedScheme } = useTheme();
@@ -45,6 +45,22 @@ export default function CustomerTrackingDetailsScreen() {
   const [startingChat, setStartingChat] = useState(false);
   const [supportModalVisible, setSupportModalVisible] = useState(false);
   const [supportMessage, setSupportMessage] = useState("");
+
+  const handleBack = useCallback(() => {
+    const navigationSource = Array.isArray(source) ? source[0] : source;
+
+    if (navigationSource === "schedules") {
+      router.replace("/(customer)/schedules");
+      return;
+    }
+
+    if (navigationSource === "shipments") {
+      router.replace("/(customer)/shipments");
+      return;
+    }
+
+    router.back();
+  }, [router, source]);
 
   const normalizedTracking = useMemo(
     () =>
@@ -210,7 +226,7 @@ export default function CustomerTrackingDetailsScreen() {
         <ShipmentDetailHeader
           title="Tracking Details"
           subtitle="Shipment lookup"
-          onBack={() => router.back()}
+          onBack={handleBack}
         />
 
         <View style={styles.emptyState}>
@@ -234,7 +250,7 @@ export default function CustomerTrackingDetailsScreen() {
               styles.backGhostBtn,
               { backgroundColor: colors.surface, borderColor: colors.border },
             ]}
-            onPress={() => router.back()}
+            onPress={handleBack}
           >
             <Text style={[styles.backGhostBtnText, { color: colors.text }]}>
               Go Back
@@ -252,7 +268,7 @@ export default function CustomerTrackingDetailsScreen() {
       <ShipmentDetailHeader
         title="Tracking Details"
         subtitle={shipment.id || normalizedTracking}
-        onBack={() => router.back()}
+        onBack={handleBack}
       />
 
       <ScrollView

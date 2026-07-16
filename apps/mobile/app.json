@@ -16,21 +16,29 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.atlas.tracking",
+      "config": {
+        "googleMapsApiKey": "AIzaSyD2-cgUlA9g4PyV9Zwrx17L5EFyQoTDkQo"
+      },
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
+        "NSCameraUsageDescription": "Atlas uses the camera to scan package QR codes, capture proof-of-delivery photos, and support video calls.",
+        "NSMicrophoneUsageDescription": "Atlas uses the microphone for voice and video calls.",
         "NSLocationWhenInUseUsageDescription": "Atlas uses your location to update package tracking and trip progress while you are on the road.",
-        "NSCameraUsageDescription": "Atlas uses the camera to scan package QR codes and capture proof-of-delivery photos when you complete a shipment.",
         "NSPhotoLibraryUsageDescription": "Atlas accesses your photos so you can attach proof-of-delivery images and shipment documents to a delivery record."
       }
     },
     "android": {
       "package": "com.atlas.atlastracking",
       "versionCode": 23,
+      "softwareKeyboardLayoutMode": "resize",
       "googleServicesFile": "./google-services.json",
       "permissions": [
         "android.permission.ACCESS_FINE_LOCATION",
         "android.permission.ACCESS_COARSE_LOCATION",
         "android.permission.RECORD_AUDIO",
+        "android.permission.CAMERA",
+        "android.permission.MODIFY_AUDIO_SETTINGS",
+        "android.permission.BLUETOOTH_CONNECT",
         "android.permission.POST_NOTIFICATIONS"
       ],
       "adaptiveIcon": {
@@ -51,10 +59,10 @@
         "origin": false
       },
       "eas": {
-        "projectId": "3ec04372-8f0b-4964-b303-cd522153e2ae"
+        "projectId": "ec8f27c9-8cdf-4b23-9287-63a396bb6cff"
       }
     },
-    "owner": "atlas-transport",
+    "owner": "atlas-corporation",
     "plugins": [
       "expo-router",
       "expo-font",
