@@ -27,9 +27,6 @@ import {
   faPenToSquare,
   faPlus,
   faImage,
-  faCamera,
-  faFileLines,
-  faMicrophone,
   faFaceSmile,
   faThumbsUp,
   faUser,
@@ -87,14 +84,6 @@ const EMOJIS = [
 ];
 
 const TEXT_ATTACHMENT_PREFIX = "ATLAS_ATTACHMENT:";
-
-const ATTACHMENT_ACTIONS = [
-  { id: "photos", label: "Photos", icon: faImage, accept: "image/*" },
-  { id: "camera", label: "Camera", icon: faCamera, accept: "image/*", capture: "environment" },
-  { id: "documents", label: "Documents", icon: faFileLines, accept: "application/pdf,.doc,.docx,.txt" },
-  { id: "videos", label: "Videos", icon: faVideo, accept: "video/*" },
-  { id: "audio", label: "Audio", icon: faMicrophone, accept: "audio/*" },
-];
 
 const STATUS_OPTIONS = [
   { id: "open", label: "Open", dot: "bg-emerald-500", text: "text-emerald-600" },
@@ -367,7 +356,6 @@ export default function ChatInbox({ user, profile, isDark = false, onViewCustome
   const [assigning, setAssigning] = useState(false);
   const [showDetails, setShowDetails] = useState(true);
   const [inboxMode, setInboxMode] = useState("chats");
-  const [attachmentSheetOpen, setAttachmentSheetOpen] = useState(false);
 
   const role = String(profile?.role || "").toLowerCase();
   const canAssign = role === "admin";
@@ -385,7 +373,7 @@ export default function ChatInbox({ user, profile, isDark = false, onViewCustome
   const [trackError, setTrackError] = useState("");
   const [trackData, setTrackData] = useState(null);
   const listEndRef = useRef(null);
-  const attachmentInputRefs = useRef({});
+  const fileInputRef = useRef(null);
   const emojiRef = useRef(null);
   const statusMenuRef = useRef(null);
   const assignMenuRef = useRef(null);
@@ -886,7 +874,7 @@ export default function ChatInbox({ user, profile, isDark = false, onViewCustome
     if (!file || !selectedId) return;
     if (file.size > 10 * 1024 * 1024) {
       alert("File size must be under 10 MB.");
-      event.target.value = "";
+      if (fileInputRef.current) fileInputRef.current.value = "";
       return;
     }
     // Stage the file for preview; it is uploaded when the user hits send.
@@ -895,12 +883,7 @@ export default function ChatInbox({ user, profile, isDark = false, onViewCustome
     setPendingPreview(
       file.type.startsWith("image/") ? URL.createObjectURL(file) : "",
     );
-    event.target.value = "";
-  };
-
-  const openAttachmentPicker = (actionId) => {
-    setAttachmentSheetOpen(false);
-    attachmentInputRefs.current[actionId]?.click();
+    if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
   const clearPendingFile = () => {
@@ -927,67 +910,13 @@ export default function ChatInbox({ user, profile, isDark = false, onViewCustome
 
   return (
     <div className={`h-full min-h-0 ${surface}`}>
-      {ATTACHMENT_ACTIONS.map((action) => (
-        <input
-          key={action.id}
-          ref={(element) => { attachmentInputRefs.current[action.id] = element; }}
-          type="file"
-          accept={action.accept}
-          capture={action.capture}
-          className="hidden"
-          onChange={handleFileUpload}
-        />
-      ))}
-      {attachmentSheetOpen && (
-        <div
-          className="fixed inset-0 z-[140] flex items-end justify-center bg-slate-950/45 p-3 sm:p-5"
-          role="presentation"
-          onMouseDown={() => setAttachmentSheetOpen(false)}
-        >
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-label="Attach"
-            className={`w-full max-w-md overflow-hidden rounded-2xl border shadow-2xl ${
-              isDark ? "border-slate-700 bg-slate-900" : "border-slate-200 bg-white"
-            }`}
-            onMouseDown={(event) => event.stopPropagation()}
-          >
-            <div className={`border-b px-5 py-4 ${isDark ? "border-slate-800" : "border-slate-100"}`}>
-              <div className={`mx-auto mb-3 h-1 w-10 rounded-full ${isDark ? "bg-slate-700" : "bg-slate-300"}`} />
-              <p className="text-base font-bold">Attach</p>
-            </div>
-            <div className="grid grid-cols-5 gap-1 px-3 py-4">
-              {ATTACHMENT_ACTIONS.map((action) => (
-                <button
-                  key={action.id}
-                  type="button"
-                  onClick={() => openAttachmentPicker(action.id)}
-                  className={`flex min-w-0 flex-col items-center gap-2 rounded-xl px-1 py-3 text-xs font-medium transition ${
-                    isDark ? "hover:bg-slate-800" : "hover:bg-slate-100"
-                  }`}
-                >
-                  <span className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-600/10 text-blue-600">
-                    <FontAwesomeIcon icon={action.icon} />
-                  </span>
-                  <span className="max-w-full truncate">{action.label}</span>
-                </button>
-              ))}
-            </div>
-            <div className={`border-t p-3 ${isDark ? "border-slate-800" : "border-slate-100"}`}>
-              <button
-                type="button"
-                onClick={() => setAttachmentSheetOpen(false)}
-                className={`w-full rounded-xl px-4 py-2.5 text-sm font-semibold transition ${
-                  isDark ? "bg-slate-800 hover:bg-slate-700" : "bg-slate-100 hover:bg-slate-200"
-                }`}
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*,application/pdf,.doc,.docx,.txt"
+        className="hidden"
+        onChange={handleFileUpload}
+      />
       <div
         className={`grid h-full grid-cols-1 lg:grid-cols-[340px_minmax(0,1fr)] ${
           showDetails ? "xl:grid-cols-[340px_minmax(0,1fr)_320px]" : ""
@@ -1349,16 +1278,16 @@ export default function ChatInbox({ user, profile, isDark = false, onViewCustome
                 <div className="flex w-full items-center gap-2">
                   <button
                     type="button"
-                    onClick={() => setAttachmentSheetOpen(true)}
+                    onClick={() => fileInputRef.current?.click()}
                     disabled={uploading}
                     className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-blue-600 transition hover:bg-blue-50 disabled:opacity-50"
-                    aria-label="Attach"
+                    aria-label="Attach file"
                   >
                     <FontAwesomeIcon icon={faPlus} />
                   </button>
                   <button
                     type="button"
-                    onClick={() => openAttachmentPicker("photos")}
+                    onClick={() => fileInputRef.current?.click()}
                     disabled={uploading}
                     className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-blue-600 transition hover:bg-blue-50 disabled:opacity-50"
                     aria-label="Send photo"
