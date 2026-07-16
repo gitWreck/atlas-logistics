@@ -792,6 +792,8 @@ exports.createConversation = onCall(
   async (req) => {
     const source = String(req.data?.source || "").trim().toLowerCase();
     const isWebSupport = source === "web";
+    // Web live chat (incl. post-logout anonymous) must not require a users/{uid}
+    // profile. Mobile customer chat still requires an active customer profile.
     const {
       uid,
       role,
@@ -917,7 +919,10 @@ exports.createConversation = onCall(
       updatedAt: now,
     };
 
-    if (conversation.type === "customer_support") {
+    if (
+      conversation.type === "customer_support" ||
+      conversation.type === "guest_support"
+    ) {
       const supportStaffIds = [
         String(process.env.AUTO_SUPPORT_ROSE_UID || "").trim(),
         String(process.env.AUTO_SUPPORT_LEAN_UID || "").trim(),

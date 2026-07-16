@@ -156,24 +156,25 @@ service cloud.firestore {
     // --- CUSTOMER SUPPORT CHAT ---
 
     match /conversations/{conversationId} {
-      allow get: if hasRole('admin')
+      // Admins/managers can see the full support inbox (including unassigned
+      // website guest chats). Guests/customers can read conversations they own.
+      // Direct staff threads stay scoped to participants.
+      allow get: if isAdminOrManager()
         || canReadDirectStaffConversation(resource.data)
         || canReadOwnedConversation(resource.data)
-        || (isActiveUser() && resource.data.customerId == request.auth.uid)
-        || (hasRole('manager') && (resource.data.assignedTo == request.auth.uid || resource.data.assignedStaffId == request.auth.uid))
-        || (hasRole('employee') && (resource.data.assignedTo == request.auth.uid || resource.data.assignedStaffId == request.auth.uid));
+        || (hasRole('employee') && (resource.data.assignedTo == request.auth.uid || resource.data.assignedStaffId == request.auth.uid))
+        || (isActiveUser() && resource.data.customerId == request.auth.uid);
 
-      allow list: if hasRole('admin')
+      allow list: if isAdminOrManager()
         || canListParticipantConversation(resource.data)
         || canReadOwnedConversation(resource.data)
-        || (hasRole('customer') && resource.data.customerId == request.auth.uid)
-        || (hasRole('manager') && (resource.data.assignedTo == request.auth.uid || resource.data.assignedStaffId == request.auth.uid))
-        || (hasRole('employee') && (resource.data.assignedTo == request.auth.uid || resource.data.assignedStaffId == request.auth.uid));
+        || (hasRole('employee') && (resource.data.assignedTo == request.auth.uid || resource.data.assignedStaffId == request.auth.uid))
+        || (hasRole('customer') && resource.data.customerId == request.auth.uid);
 
       allow create, update, delete: if false;
 
       match /messages/{messageId} {
-        allow read: if hasRole('admin')
+        allow read: if isAdminOrManager()
           || canReadDirectStaffConversation(
             get(/databases/$(database)/documents/conversations/$(conversationId)).data
           )
@@ -183,10 +184,6 @@ service cloud.firestore {
           || (
             hasRole('customer')
             && get(/databases/$(database)/documents/conversations/$(conversationId)).data.customerId == request.auth.uid
-          )
-          || (
-            hasRole('manager')
-            && (get(/databases/$(database)/documents/conversations/$(conversationId)).data.assignedTo == request.auth.uid || get(/databases/$(database)/documents/conversations/$(conversationId)).data.assignedStaffId == request.auth.uid)
           )
           || (
             hasRole('employee')

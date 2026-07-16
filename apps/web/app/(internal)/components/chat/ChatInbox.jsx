@@ -443,6 +443,14 @@ export default function ChatInbox({ user, profile, isDark = false, onViewCustome
           ),
         ),
         subscribe(
+          "assignedStaff",
+          query(
+            collection(db, "conversations"),
+            where("assignedStaffId", "==", user.uid),
+            limit(100),
+          ),
+        ),
+        subscribe(
           "direct",
           query(
             collection(db, "conversations"),
@@ -451,6 +459,21 @@ export default function ChatInbox({ user, profile, isDark = false, onViewCustome
           ),
         ),
       );
+
+      if (role === "manager") {
+        // Managers can read the full support inbox; surface unassigned website
+        // guest chats even before auto-assignment lands.
+        unsubscribers.push(
+          subscribe(
+            "unassignedSupport",
+            query(
+              collection(db, "conversations"),
+              where("status", "==", "unassigned"),
+              limit(100),
+            ),
+          ),
+        );
+      }
     } else if (role === "customer") {
       unsubscribers.push(
         subscribe(
