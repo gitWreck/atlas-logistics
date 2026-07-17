@@ -300,8 +300,16 @@ export async function GET(request) {
     const view = searchParams.get("view") || "board";
 
     const allDocs = await fetchTripDocsForBoard(activeLimit, completedLimit);
+    
+    // Filter trips: admins see all, managers see only trips they created
+    const normalizedRole = userData.role?.toLowerCase() || "";
+    const isAdmin = ["admin", "administrator"].includes(normalizedRole);
+    const filteredDocs = isAdmin 
+      ? allDocs 
+      : allDocs.filter((doc) => doc.data().createdBy === uid);
+    
     const limitedDocs = selectLimitedTripDocs(
-      allDocs,
+      filteredDocs,
       activeLimit,
       completedLimit,
     );
