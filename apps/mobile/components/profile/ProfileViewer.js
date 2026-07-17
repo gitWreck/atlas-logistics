@@ -74,6 +74,8 @@ const roleConfig = {
 export default function ProfileViewer({
   showBackButton = false,
   compactTop = false,
+  minimalStaff = false,
+  driverAssignment = {},
 }) {
   const router = useRouter();
   const { user, refreshUser, signOut } = useAuth();
@@ -89,6 +91,7 @@ export default function ProfileViewer({
   const [showCityModal, setShowCityModal] = useState(false);
 
   const isCustomer = user?.role === "customer";
+  const isDriver = user?.role === "driver";
   const isStaff = user?.role === "checker" || user?.role === "driver";
   const config = roleConfig[user?.role] || {
     icon: "user-circle",
@@ -126,6 +129,12 @@ export default function ProfileViewer({
   const warehouseSummary = [user?.warehouseName, user?.warehouseCode]
     .filter(Boolean)
     .join(" - ");
+  const driverMunicipality = driverAssignment.municipality || user?.assignedMunicipality || user?.municipality || (Array.isArray(user?.assignedMunicipalities) ? user.assignedMunicipalities.join(", ") : null);
+  const driverVehicle = driverAssignment.vehicle || [user?.vehiclePlate, user?.vehicleType].filter(Boolean).join(" · ");
+  const driverPlate = driverAssignment.plateNumber || user?.vehiclePlate || user?.plateNumber;
+  const driverRoute = driverAssignment.route || user?.assignedRoute || user?.routeName || user?.route;
+  const driverLicense = user?.licenseNumber || user?.licenseNo || user?.driverLicenseNumber;
+  const employmentStatus = user?.employmentStatus || user?.status || (user?.active === false ? "Inactive" : "Active");
 
   const profileSubtitle = isCustomer
     ? displayValue(addressSummary, "Customer Account")
@@ -656,6 +665,48 @@ export default function ProfileViewer({
               icon: "id-badge",
               editable: false,
             })}
+            {isDriver && renderField({
+              label: "Assigned Municipality",
+              value: driverMunicipality,
+              stateKey: "driverMunicipality",
+              icon: "map-marker-alt",
+              editable: false,
+            })}
+            {isDriver && renderField({
+              label: "Assigned Vehicle",
+              value: driverVehicle,
+              stateKey: "driverVehicle",
+              icon: "truck",
+              editable: false,
+            })}
+            {isDriver && renderField({
+              label: "Plate Number",
+              value: driverPlate,
+              stateKey: "driverPlate",
+              icon: "credit-card",
+              editable: false,
+            })}
+            {isDriver && renderField({
+              label: "Assigned Route",
+              value: driverRoute,
+              stateKey: "driverRoute",
+              icon: "route",
+              editable: false,
+            })}
+            {isDriver && renderField({
+              label: "License Number",
+              value: driverLicense,
+              stateKey: "driverLicense",
+              icon: "id-card",
+              editable: false,
+            })}
+            {isDriver && renderField({
+              label: "Employment Status",
+              value: employmentStatus,
+              stateKey: "employmentStatus",
+              icon: "user-check",
+              editable: false,
+            })}
           </View>
         )}
 
@@ -707,7 +758,7 @@ export default function ProfileViewer({
           </View>
         )}
 
-        {!isEditing && (
+        {!isEditing && !minimalStaff && (
           <View
             style={[
               styles.card,
@@ -790,7 +841,21 @@ export default function ProfileViewer({
           </View>
         )}
 
-        {!isEditing && (
+        {!isEditing && minimalStaff && (
+          <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <SectionHeader icon="shield-alt" eyebrow="Account" title="Security" colors={colors} isDark={isDark} />
+            <TouchableOpacity style={[styles.signOutBtn, { backgroundColor: colors.cardMuted, borderColor: colors.border, marginBottom: 10 }]} onPress={() => setIsEditing(true)} activeOpacity={0.85}>
+              <FontAwesome5 name="lock" size={14} color={PRIMARY} />
+              <Text style={[styles.signOutBtnText, { color: PRIMARY }]}>Change Password</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.signOutBtn, { backgroundColor: colors.cardMuted, borderColor: colors.border }]} onPress={handleSignOut} activeOpacity={0.85}>
+              <FontAwesome5 name="sign-out-alt" size={14} color={DANGER} />
+              <Text style={styles.signOutBtnText}>Logout</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {!isEditing && !minimalStaff && (
           <View
             style={[
               styles.card,

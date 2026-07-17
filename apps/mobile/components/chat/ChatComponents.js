@@ -53,8 +53,8 @@ export function SupportAvatar({ size = 52, online = false, ringColor, iconName =
 }
 
 // Initials avatar (used for individual staff senders inside a thread).
-export function PersonAvatar({ name, size = 28, photoURL = null, online = false, ringColor }) {
-  const gradient = avatarGradient(name);
+export function PersonAvatar({ name, avatarSeed, size = 28, photoURL = null, online = false, ringColor }) {
+  const gradient = avatarGradient(avatarSeed || name);
   return (
     <View style={{ width: size, height: size }}>
       {photoURL ? (

@@ -1,11 +1,13 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
   FlatList,
   Image,
+  Modal,
   Pressable,
   RefreshControl,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -21,9 +23,12 @@ import { collection, doc, onSnapshot, query, where } from "firebase/firestore";
 import { auth, db } from "../../firebase";
 import {
   createCheckerConversation,
+  createDriverConversation,
   listCheckerChatContacts,
+  listDriverChatContacts,
 } from "../utilities/FirebaseFunctions";
 import { useTheme } from "../../contexts/ThemeContext";
+import { useAuth } from "../../contexts/AuthContext";
 import ChatThread from "../chat/ChatThread";
 import { PersonAvatar } from "../chat/ChatComponents";
 import {
@@ -44,7 +49,7 @@ function ContactAvatar({ contact, colors, size = 54 }) {
           accessibilityLabel={`${contact.name} profile picture`}
         />
       ) : (
-        <PersonAvatar name={contact.name} size={size} />
+        <PersonAvatar name={contact.name} avatarSeed={contact.id || contact.name} size={size} />
       )}
       {contact.online ? (
         <View
@@ -58,16 +63,19 @@ function ContactAvatar({ contact, colors, size = 54 }) {
   );
 }
 
-function ContactRow({ contact, conversation, unread, active, colors, onPress }) {
+function ContactRow({ contact, conversation, unread, active, colors, onPress, messenger = false }) {
   const preview = conversation?.lastMessageText
     ? displayMessagePreview({ text: conversation.lastMessageText })
-    : `${contact.roleLabel} · ${contact.municipality}`;
+    : messenger
+      ? "Start a conversation"
+      : `${contact.roleLabel} · ${contact.municipality}`;
 
   return (
     <Pressable
       onPress={onPress}
       style={({ pressed }) => [
         styles.row,
+        messenger && styles.messengerRow,
         { borderBottomColor: colors.border },
         active && { backgroundColor: colors.accentSoft },
         pressed && styles.rowPressed,
@@ -76,14 +84,14 @@ function ContactRow({ contact, conversation, unread, active, colors, onPress }) 
       <ContactAvatar contact={contact} colors={colors} />
       <View style={styles.rowBody}>
         <View style={styles.rowTop}>
-          <Text style={[styles.rowTitle, { color: colors.text }]} numberOfLines={1}>
+          <Text style={[styles.rowTitle, { color: colors.text }]} numberOfLines={2}>
             {contact.name}
           </Text>
           <Text style={[styles.rowTime, { color: colors.textMuted }]}>
             {formatListTime(conversation?.lastMessageAt)}
           </Text>
         </View>
-        <Text style={[styles.role, { color: colors.accent }]} numberOfLines={1}>
+        <Text style={[styles.role, messenger && styles.messengerRole, { color: messenger ? colors.textMuted : colors.accent }]} numberOfLines={1}>
           {[contact.roleLabel, contact.municipality || contact.warehouseName].filter(Boolean).join(" · ")}
         </Text>
         <View style={styles.previewLine}>
@@ -98,9 +106,13 @@ function ContactRow({ contact, conversation, unread, active, colors, onPress }) 
             {preview}
           </Text>
           {unread > 0 ? (
-            <View style={[styles.unread, { backgroundColor: colors.unread }]}>
-              <Text style={styles.unreadText}>{unread > 99 ? "99+" : unread}</Text>
-            </View>
+            messenger ? (
+              <View style={[styles.messengerUnreadDot, { backgroundColor: colors.unread }]} />
+            ) : (
+              <View style={[styles.unread, { backgroundColor: colors.unread }]}>
+                <Text style={styles.unreadText}>{unread > 99 ? "99+" : unread}</Text>
+              </View>
+            )
           ) : null}
         </View>
       </View>
@@ -108,11 +120,12 @@ function ContactRow({ contact, conversation, unread, active, colors, onPress }) 
   );
 }
 
-export default function CheckerChatScreen() {
+export default function CheckerChatScreen({ accountType = "checker" }) {
   const router = useRouter();
   const { width } = useWindowDimensions();
   const twoPanel = width >= TWO_PANEL_WIDTH;
   const { colors: themeColors, resolvedScheme } = useTheme();
+  const { user } = useAuth();
   const colors = useMemo(
     () => getChatColors(themeColors, resolvedScheme),
     [themeColors, resolvedScheme],
@@ -127,12 +140,18 @@ export default function CheckerChatScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [openingId, setOpeningId] = useState(null);
   const [selectedId, setSelectedId] = useState(null);
+  const [messageFilter, setMessageFilter] = useState("all");
+  const [roleMenuOpen, setRoleMenuOpen] = useState(false);
+  const [roleMenuAnchor, setRoleMenuAnchor] = useState({ top: 220, right: 72 });
+  const searchInputRef = useRef(null);
+  const roleFilterButtonRef = useRef(null);
   const uid = auth.currentUser?.uid;
+  const isDriver = accountType === "driver";
 
   const loadContacts = useCallback(async ({ refresh = false } = {}) => {
     try {
       if (refresh) setRefreshing(true);
-      const result = await listCheckerChatContacts();
+      const result = await (isDriver ? listDriverChatContacts() : listCheckerChatContacts());
       const data = result?.data || {};
       setContacts(Array.isArray(data.contacts) ? data.contacts : []);
       setAccessToken(data.accessToken || null);
@@ -141,13 +160,13 @@ export default function CheckerChatScreen() {
         municipalities: Array.isArray(data.municipalities) ? data.municipalities : [],
       });
     } catch (error) {
-      console.error("Checker contacts load failed:", error);
+      console.error(`${isDriver ? "Driver" : "Checker"} contacts load failed:`, error);
       Alert.alert("Messages unavailable", "Authorized contacts could not be loaded. Please try again.");
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, []);
+  }, [isDriver]);
 
   useEffect(() => {
     const uid = auth.currentUser?.uid;
@@ -186,14 +205,23 @@ export default function CheckerChatScreen() {
     if (!accessToken || !uid) return undefined;
     const conversationsQuery = query(
       collection(db, "conversations"),
-      where("participantIds", "array-contains", uid),
+      where(isDriver ? "driverAccessTokens" : "participantIds", "array-contains", isDriver ? accessToken : uid),
+      where("type", "==", "direct_staff"),
     );
     return onSnapshot(
       conversationsQuery,
       (snapshot) => {
+        const authorizedContactIds = new Set(contacts.map((contact) => contact.id));
         const next = snapshot.docs
           .map((conversation) => ({ id: conversation.id, ...conversation.data() }))
-          .filter((conversation) => conversation.type === "direct_staff")
+          .filter((conversation) => {
+            if (conversation.type !== "direct_staff") return false;
+            if (!isDriver) return true;
+            const contactId = (conversation.participantIds || []).find(
+              (participantId) => participantId !== uid,
+            );
+            return Boolean(contactId && authorizedContactIds.has(contactId));
+          })
           .sort((a, b) => {
             const left = a.lastMessageAt?.toMillis?.() || 0;
             const right = b.lastMessageAt?.toMillis?.() || 0;
@@ -203,7 +231,7 @@ export default function CheckerChatScreen() {
       },
       (error) => console.error("Checker conversations subscription failed:", error),
     );
-  }, [accessToken, uid]);
+  }, [accessToken, contacts, isDriver, uid]);
 
   const conversationByContact = useMemo(() => {
     const result = new Map();
@@ -223,26 +251,43 @@ export default function CheckerChatScreen() {
         .join(" ")
         .toLowerCase()
         .includes(term);
+    }).filter((contact) => {
+      if (!isDriver || messageFilter === "all") return true;
+      const conversation = conversationByContact.get(contact.id);
+      if (messageFilter === "unread") {
+        return Number(conversation?.unreadCounts?.[uid] || 0) > 0;
+      }
+      const role = String(contact.role || "").toLowerCase();
+      const type = String(contact.contactType || "").toLowerCase();
+      if (messageFilter === "admin") {
+        return role === "admin" || type === "administrator";
+      }
+      if (messageFilter === "manager") {
+        return role === "manager" || ["warehouse_manager", "operations_manager"].includes(type);
+      }
+      if (messageFilter === "checker") return role === "checker" || type === "checker";
+      if (messageFilter === "driver") return role === "driver";
+      return true;
     });
     return visible.sort((a, b) => {
       const left = conversationByContact.get(a.id)?.lastMessageAt?.toMillis?.() || 0;
       const right = conversationByContact.get(b.id)?.lastMessageAt?.toMillis?.() || 0;
       return right - left || a.name.localeCompare(b.name);
     });
-  }, [contacts, conversationByContact, search]);
+  }, [contacts, conversationByContact, isDriver, messageFilter, search, uid]);
 
   const openContact = useCallback(
     async (contact) => {
       if (openingId) return;
       try {
         setOpeningId(contact.id);
-        const result = await createCheckerConversation({ contactId: contact.id });
+        const result = await (isDriver ? createDriverConversation({ contactId: contact.id }) : createCheckerConversation({ contactId: contact.id }));
         const conversationId = result?.data?.conversationId;
         if (!conversationId) throw new Error("Conversation was not created.");
         if (twoPanel) setSelectedId(conversationId);
         else {
           router.push({
-            pathname: "/(checker)/chat/[conversationId]",
+            pathname: isDriver ? "/(driver)/chat/[conversationId]" : "/(checker)/chat/[conversationId]",
             params: { conversationId },
           });
         }
@@ -257,38 +302,164 @@ export default function CheckerChatScreen() {
         setOpeningId(null);
       }
     },
-    [loadContacts, openingId, router, twoPanel],
+    [isDriver, loadContacts, openingId, router, twoPanel],
   );
 
   const scopeLabel = [scope.warehouseName, scope.municipalities.join(", ")]
     .filter(Boolean)
     .join(" · ");
 
+  const activeContacts = useMemo(
+    () => [...contacts]
+      .sort((a, b) => {
+        const left = conversationByContact.get(a.id)?.lastMessageAt?.toMillis?.() || 0;
+        const right = conversationByContact.get(b.id)?.lastMessageAt?.toMillis?.() || 0;
+        return right - left || a.name.localeCompare(b.name);
+      })
+      .slice(0, 8),
+    [contacts, conversationByContact],
+  );
+
+  const toggleRoleMenu = useCallback(() => {
+    if (roleMenuOpen) {
+      setRoleMenuOpen(false);
+      return;
+    }
+    const button = roleFilterButtonRef.current;
+    if (button?.measureInWindow) {
+      button.measureInWindow((x, y, buttonWidth, buttonHeight) => {
+        setRoleMenuAnchor({
+          top: y + buttonHeight + 4,
+          right: 72,
+        });
+        setRoleMenuOpen(true);
+      });
+      return;
+    }
+    setRoleMenuOpen(true);
+  }, [roleMenuOpen]);
+
+  const messengerHeader = (
+    <>
+      <View style={styles.messengerHeader}>
+        <TouchableOpacity
+          style={styles.messengerProfileButton}
+          onPress={() => router.navigate("/(driver)/(tabs)/profile")}
+          accessibilityLabel="Open Driver profile"
+        >
+          <ContactAvatar
+            contact={{
+              id: user?.uid || auth.currentUser?.uid,
+              name: user?.name || user?.fullName || user?.displayName || auth.currentUser?.displayName || "Driver",
+              photoURL: user?.photoURL || user?.profilePhotoURL || user?.profilePicture || user?.avatarUrl || auth.currentUser?.photoURL || null,
+              online: false,
+            }}
+            colors={colors}
+            size={40}
+          />
+        </TouchableOpacity>
+        <Text style={[styles.messengerTitle, { color: colors.text }]}>Chats</Text>
+        <View style={styles.messengerActions}>
+          <TouchableOpacity
+            style={[styles.messengerActionButton, { backgroundColor: colors.inputBar }]}
+            onPress={() => searchInputRef.current?.focus()}
+            accessibilityLabel="Start a new conversation"
+          >
+            <Feather name="edit" size={20} color={colors.text} />
+          </TouchableOpacity>
+        </View>
+      </View>
+    </>
+  );
+
+  const driverFilterHeader = !loading && !search ? (
+    <View style={styles.filterArea}>
+      <View style={styles.messageFilters}>
+        <TouchableOpacity
+          style={[styles.filterPill, messageFilter === "all" && { backgroundColor: colors.accentSoft }]}
+          onPress={() => { setMessageFilter("all"); setRoleMenuOpen(false); }}
+        >
+          <Text style={[styles.filterText, { color: messageFilter === "all" ? colors.accent : colors.textMuted }]}>All</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.filterPill, messageFilter === "unread" && { backgroundColor: colors.accentSoft }]}
+          onPress={() => { setMessageFilter("unread"); setRoleMenuOpen(false); }}
+        >
+          <Text style={[styles.filterText, { color: messageFilter === "unread" ? colors.accent : colors.textMuted }]}>Unread</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          ref={roleFilterButtonRef}
+          style={[styles.moreFilterButton, { backgroundColor: colors.inputBar }]}
+          onPress={toggleRoleMenu}
+          accessibilityLabel="Filter contacts by role"
+        >
+          <Feather name="more-horizontal" size={21} color={["admin", "manager", "checker", "driver"].includes(messageFilter) ? colors.accent : colors.text} />
+        </TouchableOpacity>
+      </View>
+      <Modal
+        visible={roleMenuOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setRoleMenuOpen(false)}
+      >
+        <View style={styles.roleMenuModal}>
+          <Pressable style={StyleSheet.absoluteFill} onPress={() => setRoleMenuOpen(false)} />
+          <View
+            style={[
+              styles.roleMenu,
+              roleMenuAnchor,
+              { backgroundColor: colors.chatBg, borderColor: colors.border },
+            ]}
+          >
+            {[
+              ["admin", "Administrator"],
+              ["manager", "Manager"],
+              ["checker", "Checker"],
+              ["driver", "Driver"],
+            ].map(([value, label]) => (
+              <TouchableOpacity
+                key={value}
+                style={[styles.roleMenuItem, messageFilter === value && { backgroundColor: colors.accentSoft }]}
+                onPress={() => { setMessageFilter(value); setRoleMenuOpen(false); }}
+              >
+                <Text style={[styles.roleMenuText, { color: messageFilter === value ? colors.accent : colors.text }]}>{label}</Text>
+                {messageFilter === value ? <Feather name="check" size={16} color={colors.accent} /> : null}
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+      </Modal>
+    </View>
+  ) : null;
+
   const renderList = () => (
     <LinearGradient
       colors={
-        resolvedScheme === "dark"
+        isDriver
+          ? [colors.chatBg, colors.chatBg]
+          : resolvedScheme === "dark"
           ? ["#07111F", "#020916", "#07111F"]
           : [themeColors.dashboardBg, colors.chatBg, themeColors.dashboardBg]
       }
       style={styles.listPanel}
     >
-      <View style={styles.header}>
+      {isDriver ? messengerHeader : <View style={styles.header}>
         <View>
-          <Text style={[styles.eyebrow, { color: colors.accent }]}>CHECKER</Text>
-          <Text style={[styles.title, { color: colors.text }]}>Calls</Text>
+          <Text style={[styles.eyebrow, { color: colors.accent }]}>{isDriver ? "DRIVER" : "CHECKER"}</Text>
+          <Text style={[styles.title, { color: colors.text }]}>Messages</Text>
           <Text style={[styles.scope, { color: colors.textMuted }]} numberOfLines={1}>
             {scopeLabel || "No warehouse or municipality assigned"}
           </Text>
         </View>
-      </View>
+      </View>}
 
       <View style={[styles.search, { backgroundColor: colors.inputBar }]}>
         <Feather name="search" size={18} color={colors.textMuted} />
         <TextInput
+          ref={searchInputRef}
           value={search}
           onChangeText={setSearch}
-          placeholder="Search people"
+          placeholder={isDriver ? "Search" : "Search people"}
           placeholderTextColor={colors.textMuted}
           style={[styles.searchInput, { color: colors.text }]}
           returnKeyType="search"
@@ -300,10 +471,33 @@ export default function CheckerChatScreen() {
         ) : null}
       </View>
 
-      {!loading && !search && conversations.length > 0 ? (
+      {isDriver && !loading && !search && activeContacts.length > 0 ? (
+        <ScrollView
+          horizontal
+          style={styles.activeContactsScroller}
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.activeContacts}
+        >
+          {activeContacts.map((contact) => (
+            <TouchableOpacity
+              key={contact.id}
+              style={styles.activeContact}
+              onPress={() => openContact(contact)}
+              activeOpacity={0.75}
+            >
+              <ContactAvatar contact={contact} colors={colors} size={56} />
+              <Text style={[styles.activeContactName, { color: colors.text }]} numberOfLines={1}>
+                {String(contact.name || "Contact").trim().split(/\s+/)[0]}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      ) : null}
+
+      {!loading && !search && !isDriver && conversations.length > 0 ? (
         <View style={styles.sectionHeader}>
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>Recent calls</Text>
-          <Text style={[styles.sectionMeta, { color: colors.textMuted }]}>Tap a button to call again</Text>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>Recent conversations</Text>
+          <Text style={[styles.sectionMeta, { color: colors.textMuted }]}>Calling is available inside chat</Text>
         </View>
       ) : null}
 
@@ -317,6 +511,8 @@ export default function CheckerChatScreen() {
           data={filteredContacts}
           keyExtractor={(item) => item.id}
           keyboardShouldPersistTaps="handled"
+          removeClippedSubviews={false}
+          ListHeaderComponent={isDriver ? driverFilterHeader : null}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
@@ -333,6 +529,7 @@ export default function CheckerChatScreen() {
                 unread={Number(conversation?.unreadCounts?.[uid] || 0)}
                 active={twoPanel && conversation?.id === selectedId}
                 colors={colors}
+                messenger={isDriver}
                 onPress={() => openContact(item)}
               />
             );
@@ -343,13 +540,23 @@ export default function CheckerChatScreen() {
               <View style={[styles.emptyIcon, { backgroundColor: colors.accentSoft }]}>
                 <Feather name={search ? "search" : "users"} size={30} color={colors.accent} />
               </View>
-              <Text style={[styles.emptyTitle, { color: colors.text }]}>
-                {search ? "No authorized matches" : "No authorized contacts"}
+              <Text style={[styles.emptyTitle, { color: colors.text }]}> 
+                {search
+                  ? "No matches"
+                  : messageFilter === "unread"
+                    ? "No unread messages"
+                    : messageFilter !== "all"
+                      ? `No ${messageFilter} contacts`
+                      : "No contacts"}
               </Text>
-              <Text style={[styles.emptyText, { color: colors.textMuted }]}>
+              <Text style={[styles.emptyText, { color: colors.textMuted }]}> 
                 {search
                   ? "Try searching by name, role, or municipality."
-                  : "Contacts will appear automatically when warehouse and municipality assignments match yours."}
+                  : messageFilter === "unread"
+                    ? "New unread conversations will appear here."
+                    : messageFilter !== "all"
+                      ? "Choose another role or select All to view everyone."
+                      : "Active personnel will appear here automatically."}
               </Text>
             </View>
           }
@@ -387,6 +594,17 @@ const styles = StyleSheet.create({
   splitList: { width: 410, borderRightWidth: StyleSheet.hairlineWidth },
   splitThread: { flex: 1 },
   listPanel: { flex: 1 },
+  messengerHeader: {
+    minHeight: 64,
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  messengerProfileButton: { width: 44, height: 44, justifyContent: "center" },
+  messengerTitle: { flex: 1, marginLeft: 8, fontSize: 30, lineHeight: 36, fontWeight: "800", letterSpacing: -0.8 },
+  messengerActions: { flexDirection: "row", alignItems: "center", gap: 10 },
+  messengerActionButton: { width: 40, height: 40, borderRadius: 20, alignItems: "center", justifyContent: "center" },
   header: {
     minHeight: 112,
     paddingHorizontal: 20,
@@ -403,6 +621,7 @@ const styles = StyleSheet.create({
   search: {
     minHeight: 46,
     marginHorizontal: 16,
+    marginTop: 8,
     marginBottom: 10,
     paddingHorizontal: 14,
     borderRadius: 23,
@@ -411,7 +630,7 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   searchInput: { flex: 1, minWidth: 0, fontSize: 15, paddingVertical: 10 },
-  rows: { paddingBottom: 90 },
+  rows: { paddingBottom: 90, zIndex: 0 },
   row: {
     minHeight: 86,
     paddingHorizontal: 16,
@@ -422,14 +641,36 @@ const styles = StyleSheet.create({
     gap: 13,
   },
   rowPressed: { opacity: 0.72 },
+  messengerRow: { minHeight: 82, paddingVertical: 10, borderBottomWidth: 0 },
   rowBody: { flex: 1, minWidth: 0 },
   rowTop: { flexDirection: "row", alignItems: "center", gap: 8 },
   rowTitle: { flex: 1, minWidth: 0, fontSize: 16, fontWeight: "800" },
   rowTime: { fontSize: 11, fontWeight: "700" },
   role: { marginTop: 3, fontSize: 12, fontWeight: "700" },
+  messengerRole: { fontWeight: "500" },
   previewLine: { marginTop: 4, flexDirection: "row", alignItems: "center", gap: 8 },
   preview: { flex: 1, minWidth: 0, fontSize: 13 },
   previewUnread: { fontWeight: "800" },
+  filterArea: { position: "relative", paddingHorizontal: 16, paddingTop: 4, paddingBottom: 6 },
+  messageFilters: { minHeight: 38, flexDirection: "row", alignItems: "center", gap: 8 },
+  filterPill: { height: 34, paddingHorizontal: 16, borderRadius: 17, alignItems: "center", justifyContent: "center" },
+  filterText: { fontSize: 13, fontWeight: "800" },
+  moreFilterButton: { width: 36, height: 36, borderRadius: 18, alignItems: "center", justifyContent: "center" },
+  roleMenuModal: { flex: 1 },
+  roleMenu: {
+    position: "absolute",
+    width: 190,
+    paddingVertical: 6,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: 14,
+    elevation: 8,
+    shadowColor: "#000000",
+    shadowOpacity: 0.16,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
+  },
+  roleMenuItem: { height: 42, paddingHorizontal: 14, borderRadius: 10, flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  roleMenuText: { fontSize: 14, fontWeight: "700" },
   sectionHeader: { paddingHorizontal: 18, paddingTop: 8, paddingBottom: 6, flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   sectionTitle: { fontSize: 15, fontWeight: "900" },
   sectionMeta: { fontSize: 11, fontWeight: "600" },
@@ -442,6 +683,24 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   unreadText: { color: "#FFFFFF", fontSize: 10, fontWeight: "900" },
+  messengerUnreadDot: { width: 12, height: 12, borderRadius: 6 },
+  activeContactsScroller: {
+    flexGrow: 0,
+    flexShrink: 0,
+    height: 94,
+    minHeight: 94,
+    maxHeight: 94,
+  },
+  activeContacts: {
+    minHeight: 94,
+    paddingHorizontal: 12,
+    paddingTop: 6,
+    paddingBottom: 3,
+    alignItems: "flex-start",
+    gap: 8,
+  },
+  activeContact: { width: 72, alignItems: "center" },
+  activeContactName: { width: 72, marginTop: 7, fontSize: 12, lineHeight: 15, textAlign: "center" },
   presence: {
     position: "absolute",
     right: -1,

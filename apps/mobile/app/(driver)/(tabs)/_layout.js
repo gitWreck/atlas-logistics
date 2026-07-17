@@ -1,85 +1,71 @@
-import { SafeAreaView, StyleSheet } from "react-native";
-import { Tabs, useRouter } from "expo-router";
+import { StyleSheet, View } from "react-native";
+import { Tabs } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { FontAwesome5 } from "@expo/vector-icons";
-import { signOut } from "firebase/auth";
-import { auth } from "../../../firebase";
+import Feather from "@expo/vector-icons/Feather";
 
-import DriverHeader from "../../../components/driver/DriverHeader";
-import { useAuth } from "../../../contexts/AuthContext";
 import { useTheme } from "../../../contexts/ThemeContext";
 
 export default function DriverTabsLayout() {
-  const router = useRouter();
-  const { user } = useAuth();
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
 
-  const handleLogout = async () => {
-    try {
-      await signOut(auth);
-      router.replace("/(auth)/login");
-    } catch (err) {
-      console.error("Logout failed:", err);
-    }
-  };
-
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.bg }]}>
-      {/* ✅ SHARED HEADER FOR ALL TAB SCREENS */}
-      <DriverHeader
-        userName={user?.name || user?.fullName || "Driver"}
-        onLogout={handleLogout}
-        onProfilePress={() => router.push("/(driver)/profile")}
-      />
-
-      {/* ✅ TABS BELOW HEADER */}
+    <View style={[styles.container, { backgroundColor: colors.dashboardBg, paddingTop: insets.top }]}>
       <Tabs
         screenOptions={{
           headerShown: false,
+          tabBarHideOnKeyboard: true,
           tabBarStyle: {
-            backgroundColor: colors.surface,
-            borderTopColor: colors.border,
-            height: 60,
-            paddingBottom: Math.max(insets.bottom, 8),
-            paddingTop: 8,
+            backgroundColor: colors.dashboardBg,
+            borderTopColor: colors.dashboardBorder,
+            borderTopWidth: 1,
+            height: 78 + insets.bottom,
+            paddingBottom: Math.max(insets.bottom, 12),
+            paddingTop: 10,
+            elevation: 0,
           },
-          tabBarActiveTintColor: "#07B9F4",
+          tabBarActiveTintColor: colors.primary,
           tabBarInactiveTintColor: colors.textMuted,
           tabBarLabelStyle: {
-            fontSize: 10,
-            fontWeight: "600",
+            fontSize: 11,
+            lineHeight: 15,
+            fontWeight: "400",
             marginTop: 4,
           },
+          tabBarItemStyle: { minHeight: 56 },
         }}
       >
         <Tabs.Screen
           name="index"
           options={{
-            title: "Dashboard",
-            tabBarIcon: ({ color }) => (
-              <FontAwesome5 name="th-large" size={20} color={color} />
-            ),
+            title: "Home",
+            tabBarIcon: ({ color }) => <Feather name="home" size={22} color={color} />,
           }}
         />
-
         <Tabs.Screen
-          name="trips"
+          name="deliveries"
           options={{
-            title: "Active Loads",
-            tabBarIcon: ({ color }) => (
-              <FontAwesome5 name="truck-loading" size={20} color={color} />
-            ),
+            title: "Trips",
+            tabBarIcon: ({ color }) => <Feather name="truck" size={22} color={color} />,
+          }}
+        />
+        <Tabs.Screen
+          name="messages"
+          options={{
+            title: "Messages",
+            tabBarIcon: ({ color }) => <Feather name="message-square" size={22} color={color} />,
+          }}
+        />
+        <Tabs.Screen
+          name="profile"
+          options={{
+            title: "Profile",
+            tabBarIcon: ({ color }) => <Feather name="user" size={22} color={color} />,
           }}
         />
       </Tabs>
-    </SafeAreaView>
+    </View>
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#f1f5f9",
-  },
-});
+const styles = StyleSheet.create({ container: { flex: 1 } });

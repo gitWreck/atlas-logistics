@@ -47,6 +47,17 @@ service cloud.firestore {
         resource.data.assignedDriverId == request.auth.uid;
     }
 
+    function driverCanReadShipmentData(shipment) {
+      return hasRole('driver') && (
+        shipment.get('driverId', null) == request.auth.uid ||
+        shipment.get('assignedDriverId', null) == request.auth.uid ||
+        (
+          shipment.get('currentTripId', null) != null &&
+          get(/databases/$(database)/documents/truck_trips/$(shipment.get('currentTripId', ''))).data.get('driverId', null) == request.auth.uid
+        )
+      );
+    }
+
     function customerOwnsShipment() {
       return hasRole('customer') && (
         resource.data.get('sender', {}).get('uid', null) == request.auth.uid ||
@@ -75,6 +86,10 @@ service cloud.firestore {
       return request.auth.uid + ':' + userDoc().data.get('checkerChatAccessKey', '__missing__');
     }
 
+    function driverChatAccessToken() {
+      return request.auth.uid + ':' + userDoc().data.get('driverChatAccessKey', '__missing__');
+    }
+
     function canReadDirectStaffConversation(conversation) {
       return isActiveUser()
         && conversation.get('type', '') == 'direct_staff'
@@ -82,12 +97,37 @@ service cloud.firestore {
         && (
           userRole() != 'checker'
           || checkerChatAccessToken() in conversation.get('checkerAccessTokens', [])
+        )
+        && (
+          userRole() != 'driver'
+          || driverChatAccessToken() in conversation.get('driverAccessTokens', [])
         );
     }
 
     function canListParticipantConversation(conversation) {
-      return isActiveUser()
-        && request.auth.uid in conversation.get('participantIds', []);
+      return isActiveUser() && (
+        (
+          conversation.get('type', '') == 'direct_staff'
+          && userRole() == 'driver'
+          && driverChatAccessToken() in conversation.get('driverAccessTokens', [])
+        )
+        || (
+          request.auth.uid in conversation.get('participantIds', [])
+          && (
+            conversation.get('type', '') != 'direct_staff'
+            || canReadDirectStaffConversation(conversation)
+          )
+        )
+      );
+    }
+
+    function callDriverAssignmentIsCurrent(call) {
+      let driverId = call.get('driverId', '');
+      return driverId == '' || (
+        exists(/databases/$(database)/documents/users/$(driverId))
+        && driverId + ':' + get(/databases/$(database)/documents/users/$(driverId)).data.get('driverChatAccessKey', '__missing__')
+          in call.get('driverAccessTokens', [])
+      );
     }
 
     // Customer signup currently performs duplicate checks before auth.
@@ -185,21 +225,20 @@ service cloud.firestore {
     // --- CALLS / SUPPORT ---
 
     match /calls/{callId} {
-      allow get: if isSignedIn() && (
+      allow get: if isSignedIn() && callDriverAssignmentIsCurrent(resource.data) && (
         resource.data.receiverId == request.auth.uid ||
         resource.data.callerId == request.auth.uid ||
         isAdminOrManager()
       );
-      allow list: if isSignedIn() && (
+      allow list: if isSignedIn() && callDriverAssignmentIsCurrent(resource.data) && (
         resource.data.receiverId == request.auth.uid ||
         resource.data.callerId == request.auth.uid ||
         isAdminOrManager()
       );
       allow create: if false;
-      allow update: if isSignedIn() && (
+      allow update: if isSignedIn() && callDriverAssignmentIsCurrent(resource.data) && (
         resource.data.receiverId == request.auth.uid ||
-        resource.data.callerId == request.auth.uid ||
-        isAdminOrManager()
+        resource.data.callerId == request.auth.uid
       );
       allow delete: if false;
     }
@@ -207,8 +246,8 @@ service cloud.firestore {
     // --- OPERATIONS ---
 
     match /shipments/{shipmentId} {
-      allow get: if isStaff() || customerOwnsShipment();
-      allow list: if isStaff()
+      allow get: if isAdminOrManager() || hasRole('checker') || driverCanReadShipmentData(resource.data) || customerOwnsShipment();
+      allow list: if isAdminOrManager() || hasRole('checker') || driverCanReadShipmentData(resource.data)
         || customerOwnsShipment()
         || (
           hasRole('customer')
@@ -217,13 +256,19 @@ service cloud.firestore {
       allow create, update, delete: if false;
 
       match /status_events/{statusId} {
-        allow read: if isStaff();
+        allow read: if isAdminOrManager() || hasRole('checker') || driverCanReadShipmentData(
+          get(/databases/$(database)/documents/shipments/$(shipmentId)).data
+        );
         allow create, update, delete: if false;
       }
 
       match /packages/{packageId} {
-        allow get: if isStaff() || customerOwnsShipment();
-        allow list: if isStaff()
+        allow get: if isAdminOrManager() || hasRole('checker') || driverCanReadShipmentData(
+          get(/databases/$(database)/documents/shipments/$(shipmentId)).data
+        ) || customerOwnsShipment();
+        allow list: if isAdminOrManager() || hasRole('checker') || driverCanReadShipmentData(
+          get(/databases/$(database)/documents/shipments/$(shipmentId)).data
+        )
           || customerOwnsShipment()
           || (
             hasRole('customer')
@@ -233,18 +278,22 @@ service cloud.firestore {
       }
 
       match /invoices/{invoiceId} {
-        allow get: if isStaff() || customerOwnsShipment();
-        allow list: if isStaff() || customerOwnsShipment() || isAdminOrManager();
+        allow get: if isAdminOrManager() || hasRole('checker') || driverCanReadShipmentData(
+          get(/databases/$(database)/documents/shipments/$(shipmentId)).data
+        ) || customerOwnsShipment();
+        allow list: if isAdminOrManager() || hasRole('checker') || driverCanReadShipmentData(
+          get(/databases/$(database)/documents/shipments/$(shipmentId)).data
+        ) || customerOwnsShipment();
         allow create, update, delete: if false;
       }
     }
 
     match /tracking_records/{trackingNumber} {
-      allow read: if isStaff();
+      allow read: if isAdminOrManager() || hasRole('checker');
       allow write: if false;
 
       match /status_events/{statusId} {
-        allow read: if isStaff();
+        allow read: if isAdminOrManager() || hasRole('checker');
         allow write: if false;
       }
     }
@@ -256,12 +305,18 @@ service cloud.firestore {
       allow create, update, delete: if false;
 
       match /trip_shipments/{shipmentId} {
-        allow read: if isStaff();
+        allow read: if isAdminOrManager() || hasRole('checker') || (
+          hasRole('driver') &&
+          get(/databases/$(database)/documents/truck_trips/$(tripId)).data.get('driverId', null) == request.auth.uid
+        );
         allow create, update, delete: if false;
       }
 
       match /trip_packages/{packageId} {
-        allow read: if isStaff();
+        allow read: if isAdminOrManager() || hasRole('checker') || (
+          hasRole('driver') &&
+          get(/databases/$(database)/documents/truck_trips/$(tripId)).data.get('driverId', null) == request.auth.uid
+        );
         allow create, update, delete: if false;
       }
 
@@ -278,7 +333,13 @@ service cloud.firestore {
 
     // Custody event ledger (append-only via Cloud Functions)
     match /shipment_events/{eventId} {
-      allow read: if isStaff();
+      allow read: if isAdminOrManager() || hasRole('checker') || (
+        hasRole('driver')
+        && resource.data.get('shipmentId', '') != ''
+        && driverCanReadShipmentData(
+          get(/databases/$(database)/documents/shipments/$(resource.data.shipmentId)).data
+        )
+      );
       allow create, update, delete: if false;
     }
 
@@ -301,7 +362,7 @@ service cloud.firestore {
     // --- BILLING ---
 
     match /invoices/{invoiceId} {
-      allow read: if isStaff();
+      allow read: if isAdminOrManager() || hasRole('checker');
       allow create, update, delete: if false;
     }
 
@@ -359,12 +420,12 @@ service cloud.firestore {
     }
 
     match /routes/{routeId} {
-      allow read: if isStaff();
+      allow read: if isAdminOrManager() || hasRole('checker');
       allow write: if false;
     }
 
     match /daily_route_assignments/{assignmentId} {
-      allow read: if isStaff();
+      allow read: if isAdminOrManager() || hasRole('checker');
       allow write: if false;
     }
 

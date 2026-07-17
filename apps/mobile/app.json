@@ -76,6 +76,12 @@
       ],
       "expo-notifications",
       [
+        "expo-audio",
+        {
+          "microphonePermission": "Allow Atlas Transport to access your microphone so you can record voice messages."
+        }
+      ],
+      [
         "expo-image-picker",
         {
           "photosPermission": "Atlas accesses your camera and photos so drivers can capture and upload proof-of-delivery images and shipment documents.",

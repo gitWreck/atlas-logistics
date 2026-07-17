@@ -87,6 +87,10 @@ exports.startReceiving = require("./src/trips/startReceiving").startReceiving;
 exports.dispatchTrip = require("./src/trips/dispatchTrip").dispatchTrip;
 exports.reportTripDelay =
   require("./src/trips/reportTripDelay").reportTripDelay;
+exports.confirmDriverArrival =
+  require("./src/trips/driverTripActions").confirmDriverArrival;
+exports.reportDriverTripIssue =
+  require("./src/trips/driverTripActions").reportDriverTripIssue;
 exports.setTruckDelay = require("./src/trips/setTruckDelay").setTruckDelay;
 exports.clearTruckDelay =
   require("./src/trips/clearTruckDelay").clearTruckDelay;
@@ -208,6 +212,10 @@ exports.listCheckerChatContacts =
   require("./src/chat/checkerMessaging").listCheckerChatContacts;
 exports.createCheckerConversation =
   require("./src/chat/checkerMessaging").createCheckerConversation;
+exports.listDriverChatContacts =
+  require("./src/chat/checkerMessaging").listDriverChatContacts;
+exports.createDriverConversation =
+  require("./src/chat/checkerMessaging").createDriverConversation;
 exports.createCallHistoryMessage =
   require("./src/chat/conversations").createCallHistoryMessage;
 exports.sendChatMessage = require("./src/chat/conversations").sendChatMessage;

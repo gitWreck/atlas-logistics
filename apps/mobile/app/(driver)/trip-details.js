@@ -1,6 +1,2 @@
-import React from "react";
-import TripDetailsScreen from "../../components/trips/TripScreenDetails";
-
-export default function DriverTripDetailsPage() {
-  return <TripDetailsScreen />;
-}
+import DriverTripDetailsScreen from "../../components/driver/DriverTripDetailsScreen";
+export default function DriverTripDetailsPage() { return <DriverTripDetailsScreen />; }

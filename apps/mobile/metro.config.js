@@ -15,6 +15,17 @@ config.resolver.blacklistRE = exclusionList([
 const originalResolveRequest = config.resolver.resolveRequest;
 
 config.resolver.resolveRequest = (context, moduleName, platform) => {
+  // Keep React DOM aligned with the mobile workspace's React version. In this
+  // monorepo the web app hoists a newer react-dom at the repository root,
+  // which Metro would otherwise resolve for Expo's web runtime.
+  if (moduleName === "react-dom" || moduleName.startsWith("react-dom/")) {
+    const mobileReactDomModule = require.resolve(moduleName, {
+      paths: [__dirname],
+    });
+
+    return context.resolveRequest(context, mobileReactDomModule, platform);
+  }
+
   if (
     platform === "web" &&
     (moduleName === "react-native-maps" ||
