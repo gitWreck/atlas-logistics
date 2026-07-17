@@ -479,13 +479,10 @@ async function getConversationForUser(conversationId, uid, role) {
   const conversation = snap.data() || {};
   const normalizedRole = String(role || "").toLowerCase();
   if (conversation.type === "direct_staff") {
-    const userSnap = await db.collection("users").doc(uid).get();
-    const allowed = await assertDirectConversationAccess(
-      conversation,
-      uid,
-      userSnap.data() || { role: normalizedRole },
-    );
-    if (!allowed) {
+    const participantIds = Array.isArray(conversation.participantIds)
+      ? conversation.participantIds
+      : [];
+    if (!participantIds.includes(uid)) {
       throw new HttpsError(
         "permission-denied",
         "This staff conversation is outside your current assignment.",
