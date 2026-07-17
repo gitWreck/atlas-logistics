@@ -16,7 +16,7 @@ if (!admin.apps.length) admin.initializeApp();
 const db = admin.firestore();
 const FieldValue = admin.firestore.FieldValue;
 
-const STAFF_ROLES = ["admin", "manager", "employee"];
+const STAFF_ROLES = ["admin", "manager", "employee", "checker"];
 const STAFF_MONITOR_ROLES = ["admin", "manager", "employee"];
 const VALID_STATUSES = ["unassigned", "active", "closed"];
 const VALID_PRIORITIES = ["normal", "urgent"];
@@ -482,18 +482,18 @@ async function getConversationForUser(conversationId, uid, role) {
     const participantIds = Array.isArray(conversation.participantIds)
       ? conversation.participantIds
       : [];
-    const isStaffMember = STAFF_ROLES.includes(normalizedRole);
     const isParticipant = participantIds.includes(uid);
     
-    // Allow access if user is a participant or is a staff member able to access direct conversations
-    if (!isParticipant && !isStaffMember) {
-      throw new HttpsError(
-        "permission-denied",
-        "This staff conversation is outside your current assignment.",
-      );
+    // Staff members (admin, manager, employee, checker) can always access direct_staff conversations
+    // OR the user must be an explicit participant
+    if (STAFF_ROLES.includes(normalizedRole) || isParticipant) {
+      return { ref, snap, conversation };
     }
     
-    return { ref, snap, conversation };
+    throw new HttpsError(
+      "permission-denied",
+      "This staff conversation is outside your current assignment.",
+    );
   }
   const isAdmin = normalizedRole === "admin";
   const isManager = normalizedRole === "manager";
