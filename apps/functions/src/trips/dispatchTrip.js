@@ -83,6 +83,7 @@ exports.dispatchTrip = onCall(
     const shipmentCount = shipQuery.size;
     const nowIso = new Date().toISOString();
     const timestamp = FieldValue.serverTimestamp();
+    const writtenShipmentIds = [];
 
     await db.runTransaction(async (tx) => {
       const freshTripSnap = await tx.get(tripRef);
@@ -106,16 +107,24 @@ exports.dispatchTrip = onCall(
         );
         if (!hasTripPackages) continue;
 
+        let packagesChanged = false;
         const updatedPackages = oldPackages.map((pkg) => {
           if (!packageOnTrip(pkg, tripId)) return pkg;
 
           if (isCorrectionDispatch) {
             const pkgStatus = String(pkg.status || "").toUpperCase();
+            // Correction dispatch only advances newly loaded pieces. Leave
+            // already-unloaded / released / OFD packages untouched.
             if (pkgStatus !== PACKAGE_STATUS.LOADED_TO_TRIP) return pkg;
           }
 
+          packagesChanged = true;
           return applyLinehaulInTransit(pkg, { tripId, nowIso });
         });
+
+        // Do not rewrite sibling shipments whose packages did not change.
+        // Rebuilding snapshots demotes post-hub delivery statuses (e.g. OFD → Arrived).
+        if (isCorrectionDispatch && !packagesChanged) continue;
 
         const snapshot = buildShipmentSnapshot(updatedPackages, {
           previousStatus: shipmentData.status,
@@ -134,6 +143,7 @@ exports.dispatchTrip = onCall(
         shipmentWrites.push({
           tripShipRef: tripShipDoc.ref,
           shipmentRef,
+          shipmentId,
           snapshot,
           historyEntry,
         });
@@ -169,6 +179,7 @@ exports.dispatchTrip = onCall(
       for (const {
         tripShipRef,
         shipmentRef,
+        shipmentId,
         snapshot,
         historyEntry,
       } of shipmentWrites) {
@@ -187,6 +198,7 @@ exports.dispatchTrip = onCall(
           statusHistory: FieldValue.arrayUnion(historyEntry),
           ...(location ? { lastLocation: location } : {}),
         });
+        writtenShipmentIds.push(shipmentId);
       }
 
       writeTripActionLog({
@@ -205,7 +217,8 @@ exports.dispatchTrip = onCall(
           plateNumber: trip.truckPlateNumber || trip.plateNumber || "N/A",
           driverName: trip.driverName || null,
           driverId: trip.driverId || null,
-          packagesUpdated: shipmentCount,
+          packagesUpdated: shipmentWrites.length,
+          shipmentCount,
           previousStatus: trip.status || "LOADED",
           newStatus: isCorrectionDispatch ? "ARRIVED" : "IN_TRANSIT",
           correctionDispatch: isCorrectionDispatch,
@@ -235,21 +248,25 @@ exports.dispatchTrip = onCall(
 
     const tripContext = extractTripEventContext(trip, tripId);
     await Promise.all(
-      shipQuery.docs.map((doc) =>
+      writtenShipmentIds.map((shipmentId) =>
         writeShipmentEvent({
           db,
           event: {
-            shipmentId: doc.id,
+            shipmentId,
             eventType: EVENT_TYPES.IN_TRANSIT,
             ...tripContext,
             location: location || null,
             createdBy: uid,
             createdByRole: req.auth.token?.role || null,
-            remarks: `Trip ${tripContext.tripId || tripId} dispatched`,
-            source: "DISPATCH_TRIP",
+            remarks: isCorrectionDispatch
+              ? `Trip ${tripContext.tripId || tripId} correction dispatch`
+              : `Trip ${tripContext.tripId || tripId} dispatched`,
+            source: isCorrectionDispatch
+              ? "DISPATCH_CORRECTION"
+              : "DISPATCH_TRIP",
           },
         }).catch((error) => {
-          console.error(`IN_TRANSIT event write failed for ${doc.id}:`, error);
+          console.error(`IN_TRANSIT event write failed for ${shipmentId}:`, error);
         }),
       ),
     );
@@ -301,11 +318,12 @@ exports.dispatchTrip = onCall(
     return {
       success: true,
       message: isCorrectionDispatch
-        ? `Correction dispatch complete. Newly loaded package(s) marked in transit.`
-        : `Trip dispatched. ${shipmentCount} shipment(s) marked in transit.`,
+        ? `Correction dispatch complete. ${writtenShipmentIds.length} shipment(s) with newly loaded package(s) marked in transit.`
+        : `Trip dispatched. ${writtenShipmentIds.length} shipment(s) marked in transit.`,
       status: isCorrectionDispatch ? "ARRIVED" : "IN_TRANSIT",
       manifestStatus: MANIFEST_STATUS.LOCKED,
       correctionDispatch: isCorrectionDispatch,
+      shipmentsUpdated: writtenShipmentIds.length,
       customerNotification: customerNotificationResult,
     };
   },

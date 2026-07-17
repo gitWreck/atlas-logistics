@@ -401,6 +401,21 @@ function isHubReceiveComplete(pkg = {}, options = {}) {
 }
 
 /**
+ * Post-hub delivery lifecycle statuses. Hub unload leaves receivedQty=full;
+ * later qty-based re-derives must not demote these back to ARRIVED_AT_ODIONGAN
+ * (e.g. correction-dispatch snapshots rewriting OFD siblings).
+ */
+const PRESERVE_WHEN_FULLY_RECEIVED_STATUSES = new Set([
+  PACKAGE_STATUS.OUT_FOR_DELIVERY,
+  PACKAGE_STATUS.READY_FOR_DELIVERY,
+  PACKAGE_STATUS.LOADED_TO_DELIVERY_VEHICLE,
+  PACKAGE_STATUS.ROUTE_ASSIGNED,
+  PACKAGE_STATUS.RELEASED_FOR_DELIVERY,
+  PACKAGE_STATUS.FAILED_DELIVERY,
+  PACKAGE_STATUS.RETURNED_TO_WAREHOUSE,
+]);
+
+/**
  * Full receivedQty means customer delivery on last-mile trips,
  * but hub offload at Odiongan — not delivered to consignee.
  */
@@ -410,6 +425,11 @@ function resolveFullyReceivedStatus(pkg = {}, options = {}) {
   if (isCustomerDeliveryComplete(pkg, options)) {
     return PACKAGE_STATUS.DELIVERED;
   }
+
+  if (PRESERVE_WHEN_FULLY_RECEIVED_STATUSES.has(storedStatus)) {
+    return storedStatus;
+  }
+
   if (isHubReceiveComplete(pkg, options)) {
     if (
       pkg.availableForDelivery === true ||
