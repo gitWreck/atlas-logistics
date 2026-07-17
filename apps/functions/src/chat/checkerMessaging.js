@@ -122,6 +122,32 @@ async function ensureCheckerAccessKey(uid, checker, ref = db.collection("users")
   return accessKey;
 }
 
+function driverAccessKey(driver = {}) {
+  const payload = JSON.stringify({
+    warehouse: warehouseKeys(driver).sort(),
+    municipalities: municipalityLabels(driver).map(normalized).sort(),
+  });
+  return crypto.createHash("sha256").update(payload).digest("hex").slice(0, 32);
+}
+
+function driverAccessToken(uid, accessKey) {
+  return `${uid}:${accessKey}`;
+}
+
+async function ensureDriverAccessKey(uid, driver, ref = db.collection("users").doc(uid)) {
+  const accessKey = driverAccessKey(driver);
+  if (driver.driverChatAccessKey !== accessKey) {
+    await ref.set(
+      {
+        driverChatAccessKey: accessKey,
+        driverChatAccessUpdatedAt: FieldValue.serverTimestamp(),
+      },
+      { merge: true },
+    );
+  }
+  return accessKey;
+}
+
 async function routeCoverageById() {
   const snap = await db.collection("routes").where("active", "==", true).get();
   const result = new Map();
@@ -421,6 +447,11 @@ exports.createDriverConversation = onCall(
     const ref = db.collection("conversations").doc(conversationId);
     const now = FieldValue.serverTimestamp();
     const accessTokens = [];
+    const driverAccessTokens = [];
+
+    // Generate driver access token
+    const driverAccessKey = await ensureDriverAccessKey(uid, driver);
+    driverAccessTokens.push(driverAccessToken(uid, driverAccessKey));
 
     if (String(contact.role || "").toLowerCase() === "checker") {
       const contactAccessKey = await ensureCheckerAccessKey(contactId, contact, contactRef);
@@ -444,6 +475,7 @@ exports.createDriverConversation = onCall(
             [contactId]: String(contact.role || "staff").toLowerCase(),
           },
           participantProfiles,
+          driverAccessTokens,
           checkerAccessTokens: accessTokens,
           status: "active",
           lastMessage: "",
@@ -467,6 +499,12 @@ exports.createDriverConversation = onCall(
       }
       tx.update(ref, {
         participantProfiles,
+        driverAccessTokens: uniqueStrings([
+          ...(existing.driverAccessTokens || []).filter(
+            (token) => !token.startsWith(`${uid}:`),
+          ),
+          ...driverAccessTokens,
+        ]),
         checkerAccessTokens: uniqueStrings([
           ...(existing.checkerAccessTokens || []).filter(
             (token) => !token.startsWith(`${contactId}:`),
