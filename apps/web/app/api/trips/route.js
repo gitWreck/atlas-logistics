@@ -301,12 +301,9 @@ export async function GET(request) {
 
     const allDocs = await fetchTripDocsForBoard(activeLimit, completedLimit);
     
-    // Filter trips: admins see all, managers see only trips they created
-    const normalizedRole = userData.role?.toLowerCase() || "";
-    const isAdmin = ["admin", "administrator"].includes(normalizedRole);
-    const filteredDocs = isAdmin 
-      ? allDocs 
-      : allDocs.filter((doc) => doc.data().createdBy === uid);
+    // Allow both admins and managers to view board trips.
+    // Client-side filters will handle warehouse/origin visibility.
+    const filteredDocs = allDocs;
     
     const limitedDocs = selectLimitedTripDocs(
       filteredDocs,
