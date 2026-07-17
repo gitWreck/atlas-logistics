@@ -11,12 +11,11 @@ import { LinearGradient } from "expo-linear-gradient";
 import Feather from "@expo/vector-icons/Feather";
 import { useRouter } from "expo-router";
 
-import StatusBadge from "../ui/StatusBadge";
 import { getFormattedTime } from "../utilities/helpers";
 import { useTheme } from "../../contexts/ThemeContext";
 
 const courierMascot = require("../../assets/customer/courier-mascot.png");
-const activeShipmentTruck = require("../../assets/customer/active-shipment-truck.png");
+const activeShipmentTruck = require("../../assets/customer/ActiveShipment.png");
 const emptyActiveShipment = require("../../assets/customer/empty-active-shipment.png");
 
 const INACTIVE_SHIPMENT_STATUSES = new Set([
@@ -36,18 +35,6 @@ function getActiveShipment(shipments = []) {
     const status = String(shipment.status || "").toUpperCase();
     return !INACTIVE_SHIPMENT_STATUSES.has(status);
   });
-}
-
-function ShipmentTruckArt() {
-  return (
-    <View style={styles.truckScene}>
-      <Image
-        source={activeShipmentTruck}
-        style={styles.truckImage}
-        resizeMode="contain"
-      />
-    </View>
-  );
 }
 
 export default function CustomerHomeDashboard({
@@ -167,7 +154,7 @@ export default function CustomerHomeDashboard({
           </TouchableOpacity>
 
           <View style={styles.greetingWrap}>
-            <Text style={[styles.greeting, { color: colors.text }]}>Good Morning,</Text>
+            <Text style={[styles.greeting, { color: colors.textMuted }]}>Good Morning,</Text>
             <Text style={[styles.name, { color: colors.text }]}>{name}</Text>
           </View>
 
@@ -197,8 +184,8 @@ export default function CustomerHomeDashboard({
             styles.activeCard,
             !activeShipment && styles.emptyActiveCard,
             {
-              backgroundColor: colors.dashboardSurface,
-              borderColor: colors.dashboardBorder,
+              backgroundColor: activeShipment ? "#031A2D" : colors.dashboardSurface,
+              borderColor: activeShipment ? "#143A5A" : colors.dashboardBorder,
               shadowColor: colors.dashboardShadow,
             },
           ]}
@@ -207,62 +194,94 @@ export default function CustomerHomeDashboard({
             <>
               <View style={styles.cardTopRow}>
                 <View style={styles.activeTitleRow}>
-                  <View style={[styles.activeIcon, { backgroundColor: colors.primary }]}>
-                    <Feather name="package" size={18} color={colors.onPrimary} />
+                  <View style={styles.activeIcon}>
+                    <Feather name="box" size={18} color="#FFFFFF" />
                   </View>
-                  <Text style={[styles.cardTitle, { color: colors.text }]}>Active Shipment</Text>
+                  <Text style={styles.cardTitle}>Active Shipment</Text>
                 </View>
                 <TouchableOpacity
                   style={styles.detailsLink}
                   activeOpacity={0.75}
                   onPress={() => onShipmentPress(activeShipment)}
                 >
-                  <Text style={[styles.detailsText, { color: colors.primary }]}>View Details</Text>
-                  <Feather name="chevron-right" size={22} color={colors.iconMuted} />
+                  <Text style={styles.detailsText}>View Details</Text>
+                  <Feather name="chevron-right" size={20} color="#91A4B8" />
                 </TouchableOpacity>
               </View>
 
               <View style={styles.shipmentSummaryBlock}>
+                <Image
+                  source={activeShipmentTruck}
+                  style={styles.shipmentHeroImage}
+                  resizeMode="cover"
+                />
+                <LinearGradient
+                  pointerEvents="none"
+                  colors={["#031A2D", "rgba(3,26,45,0.88)", "rgba(3,26,45,0.08)"]}
+                  locations={[0, 0.42, 1]}
+                  start={{ x: 0, y: 0.5 }}
+                  end={{ x: 1, y: 0.5 }}
+                  style={styles.shipmentImageFade}
+                />
+                <LinearGradient
+                  pointerEvents="none"
+                  colors={["rgba(3,26,45,0)", "#031A2D"]}
+                  style={styles.shipmentImageBottomFade}
+                />
+                <LinearGradient
+                  pointerEvents="none"
+                  colors={["#031A2D", "rgba(3,26,45,0)"]}
+                  style={styles.shipmentImageTopFade}
+                />
+                <LinearGradient
+                  pointerEvents="none"
+                  colors={["rgba(3,26,45,0)", "#031A2D"]}
+                  start={{ x: 0, y: 0.5 }}
+                  end={{ x: 1, y: 0.5 }}
+                  style={styles.shipmentImageRightFade}
+                />
                 <View style={styles.shipmentBodyContent}>
                   <Text
-                    style={[styles.trackingNumber, { color: colors.primary }]}
+                    style={styles.trackingNumber}
                     numberOfLines={1}
                   >
                     {trackingNumber}
                   </Text>
                   <Text
-                    style={[styles.routeText, { color: colors.text }]}
+                    style={styles.routeText}
                     numberOfLines={1}
                   >
                     {origin} {"\u2192"} {destination}
                   </Text>
                   <View style={styles.statusRow}>
-                    <StatusBadge status={activeShipment.status || "PENDING"} />
+                    <View style={styles.statusPill}>
+                      <Text style={styles.statusPillText}>
+                        {String(activeShipment.status || "PENDING").replaceAll("_", " ")}
+                      </Text>
+                    </View>
                   </View>
                 </View>
-                <ShipmentTruckArt />
               </View>
 
               <View style={styles.estimateRow}>
                 <View style={styles.estimateItem}>
-                  <Text style={[styles.estimateLabel, { color: colors.textMuted }]}>
+                  <Text style={styles.estimateLabel}>
                     Estimated Pickup
                   </Text>
                   <View style={styles.estimateValueRow}>
-                    <Feather name="calendar" size={16} color={colors.primary} />
-                    <Text style={[styles.estimateValue, { color: colors.text }]} numberOfLines={1}>
+                    <Feather name="calendar" size={15} color="#087CFF" />
+                    <Text style={styles.estimateValue} numberOfLines={1}>
                       {pickupTime}
                     </Text>
                   </View>
                 </View>
-                <View style={[styles.estimateDivider, { backgroundColor: colors.dashboardBorder }]} />
                 <View style={styles.estimateItem}>
-                  <Text style={[styles.estimateLabel, { color: colors.textMuted }]}>
+                  <Text style={styles.estimateLabel}>
                     Est. Delivery
                   </Text>
                   <View style={styles.estimateValueRow}>
-                    <Feather name="calendar" size={16} color={colors.primary} />
-                    <Text style={[styles.estimateValue, { color: colors.text }]} numberOfLines={1}>
+                    <Feather name="calendar" size={15} color="#087CFF" />
+                    <Text style={styles.estimateValue} numberOfLines={1}>
                       {deliveryTime}
                     </Text>
                   </View>
@@ -274,13 +293,13 @@ export default function CustomerHomeDashboard({
                 onPress={() => onShipmentPress(activeShipment)}
               >
                 <LinearGradient
-                  colors={[colors.primary, colors.primaryDeep]}
+                  colors={["#087CFF", "#075BFF"]}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 0 }}
                   style={styles.trackButton}
                 >
-                  <Feather name="map-pin" size={20} color={colors.onPrimary} />
-                  <Text style={[styles.trackButtonText, { color: colors.onPrimary }]}>
+                  <Feather name="map-pin" size={20} color="#FFFFFF" />
+                  <Text style={styles.trackButtonText}>
                     Track Shipment
                   </Text>
                 </LinearGradient>
@@ -501,10 +520,10 @@ const styles = StyleSheet.create({
   activeCard: {
     position: "relative",
     borderWidth: 1,
-    borderRadius: 20,
-    paddingHorizontal: 14,
-    paddingTop: 14,
-    paddingBottom: 14,
+    borderRadius: 18,
+    paddingHorizontal: 12,
+    paddingTop: 12,
+    paddingBottom: 10,
     marginBottom: 24,
     shadowOffset: { width: 0, height: 14 },
     shadowOpacity: 0.12,
@@ -560,7 +579,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    marginBottom: 18,
+    marginBottom: 8,
     gap: 12,
   },
   activeTitleRow: {
@@ -569,15 +588,17 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   activeIcon: {
-    width: 31,
-    height: 31,
-    borderRadius: 16,
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: "#087CFF",
     alignItems: "center",
     justifyContent: "center",
     marginRight: 10,
   },
   cardTitle: {
-    fontSize: 16,
+    color: "#FFFFFF",
+    fontSize: 15,
     fontWeight: "700",
   },
   detailsLink: {
@@ -586,56 +607,106 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   detailsText: {
-    fontSize: 14,
+    color: "#087CFF",
+    fontSize: 12,
     fontWeight: "700",
   },
   trackingNumber: {
-    fontSize: 14,
-    fontWeight: "500",
-    marginBottom: 7,
+    color: "#087CFF",
+    fontSize: 12,
+    lineHeight: 17,
+    fontWeight: "700",
+    marginBottom: 5,
   },
   routeText: {
-    fontSize: 14,
-    lineHeight: 19,
-    marginBottom: 11,
+    color: "#FFFFFF",
+    fontSize: 12,
+    lineHeight: 17,
+    marginBottom: 10,
     fontWeight: "400",
   },
   statusRow: {
-    minHeight: 34,
+    minHeight: 28,
+  },
+  statusPill: {
+    alignSelf: "flex-start",
+    minHeight: 25,
+    borderRadius: 6,
+    paddingHorizontal: 11,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(120, 143, 162, 0.18)",
+  },
+  statusPillText: {
+    color: "#71869A",
+    fontSize: 10,
+    lineHeight: 14,
+    fontWeight: "800",
+    letterSpacing: 0.8,
   },
   shipmentSummaryBlock: {
     position: "relative",
-    minHeight: 112,
-    marginBottom: 8,
+    minHeight: 210,
+    marginHorizontal: -12,
+    overflow: "hidden",
   },
   shipmentBodyContent: {
-    width: "58%",
+    position: "relative",
+    zIndex: 3,
+    width: "61%",
+    paddingLeft: 12,
+    paddingTop: 7,
   },
-  truckScene: {
+  shipmentHeroImage: {
     position: "absolute",
-    right: -2,
-    top: 28,
-    width: 184,
-    height: 68,
-    alignItems: "center",
-    justifyContent: "center",
+    top: 0,
+    right: 0,
+    width: "76%",
+    height: 210,
   },
-  truckImage: {
-    width: "100%",
+  shipmentImageFade: {
+    position: "absolute",
+    top: 0,
+    right: 0,
+    width: "76%",
+    height: "100%",
+  },
+  shipmentImageBottomFade: {
+    position: "absolute",
+    left: "34%",
+    right: 0,
+    bottom: 0,
+    height: 48,
+  },
+  shipmentImageTopFade: {
+    position: "absolute",
+    top: 0,
+    left: "34%",
+    right: 0,
+    height: 28,
+  },
+  shipmentImageRightFade: {
+    position: "absolute",
+    top: 0,
+    right: 0,
+    width: 28,
     height: "100%",
   },
   estimateRow: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 18,
+    gap: 18,
+    paddingTop: 9,
+    marginBottom: 12,
   },
   estimateItem: {
     flex: 1,
   },
   estimateLabel: {
-    fontSize: 12,
-    lineHeight: 17,
-    marginBottom: 7,
+    color: "#91A4B8",
+    fontSize: 10,
+    lineHeight: 14,
+    marginBottom: 4,
   },
   estimateValueRow: {
     flexDirection: "row",
@@ -644,24 +715,22 @@ const styles = StyleSheet.create({
   },
   estimateValue: {
     flex: 1,
-    fontSize: 13,
-    fontWeight: "400",
-  },
-  estimateDivider: {
-    width: 1,
-    height: 40,
-    marginHorizontal: 16,
+    color: "#FFFFFF",
+    fontSize: 10,
+    lineHeight: 14,
+    fontWeight: "500",
   },
   trackButton: {
-    height: 48,
-    borderRadius: 10,
+    height: 42,
+    borderRadius: 7,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     gap: 10,
   },
   trackButtonText: {
-    fontSize: 15,
+    color: "#FFFFFF",
+    fontSize: 14,
     fontWeight: "700",
   },
   sectionTitleRow: {
