@@ -9,7 +9,8 @@ if (!admin.apps.length) admin.initializeApp();
 
 const db = admin.firestore();
 const FieldValue = admin.firestore.FieldValue;
-const CONTACT_ROLES = ["driver", "checker", "manager", "admin", "employee"];
+// Include all variations of staff roles to ensure no one is filtered out
+const CONTACT_ROLES = ["driver", "checker", "manager", "admin", "employee", "administrator", "staff", "support"];
 const INACTIVE_TRIP_STATUSES = new Set([
   "completed",
   "cancelled",
@@ -58,7 +59,12 @@ function overlaps(left = [], right = []) {
 function sharesWarehouse(checker = {}, contact = {}) {
   const checkerKeys = warehouseKeys(checker);
   const contactKeys = new Set(warehouseKeys(contact));
-  return checkerKeys.length > 0 && checkerKeys.some((key) => contactKeys.has(key));
+  // If either user has no warehouse info, allow the contact (no warehouse restriction)
+  if (checkerKeys.length === 0 || contactKeys.size === 0) {
+    return true;
+  }
+  // Both have warehouse info, so they must match
+  return checkerKeys.some((key) => contactKeys.has(key));
 }
 
 function displayName(user = {}, fallback = "Atlas staff") {
@@ -199,12 +205,13 @@ function contactIsAuthorized(checker, contact, contactMunicipalities = municipal
 
   const checkerMunicipalities = municipalityLabels(checker);
   if (role === "driver" || role === "checker") {
-    return checkerMunicipalities.length > 0 && overlaps(checkerMunicipalities, contactMunicipalities);
+    // Allow if either has no municipality restriction, or if they overlap
+    return checkerMunicipalities.length === 0 || contactMunicipalities.length === 0 || overlaps(checkerMunicipalities, contactMunicipalities);
   }
 
   // Area-scoped support employees must overlap. Warehouse-wide management and
   // operations contacts remain available when they do not declare an area.
-  return !contactMunicipalities.length || overlaps(checkerMunicipalities, contactMunicipalities);
+  return !contactMunicipalities.length || checkerMunicipalities.length === 0 || overlaps(checkerMunicipalities, contactMunicipalities);
 }
 
 function serializeContact(id, user, municipalities = municipalityLabels(user)) {
@@ -268,19 +275,27 @@ async function authorizedContactsForDriver(uid, driver) {
       if (
         !contact ||
         contact.active === false ||
-        String(contact.status || "").toLowerCase() === "inactive" ||
-        !sharesWarehouse(driver, contact)
+        String(contact.status || "").toLowerCase() === "inactive"
       ) {
         return false;
       }
 
       const role = String(contact.role || "").toLowerCase();
       if (!CONTACT_ROLES.includes(role) || role === "driver") return false;
+      
+      // Allow warehouse check to be lenient (done in sharesWarehouse now)
+      if (!sharesWarehouse(driver, contact)) {
+        return false;
+      }
+
+      // Allow municipality/coverage matching to be optional for staff
       const contactMunicipalities = municipalityLabels(contact);
       if (role === "checker") {
-        return municipalities.length > 0 && overlaps(municipalities, contactMunicipalities);
+        // For checkers, allow if either has no municipality restriction, or if they overlap
+        return municipalities.length === 0 || contactMunicipalities.length === 0 || overlaps(municipalities, contactMunicipalities);
       }
-      return !contactMunicipalities.length || overlaps(municipalities, contactMunicipalities);
+      // For other staff, always allow (they can contact anyone in their warehouse)
+      return true;
     })
     .map((contact) => serializeContact(contact.id, contact))
     .sort((a, b) => a.name.localeCompare(b.name));

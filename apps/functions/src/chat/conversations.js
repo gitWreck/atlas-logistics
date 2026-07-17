@@ -16,8 +16,8 @@ if (!admin.apps.length) admin.initializeApp();
 const db = admin.firestore();
 const FieldValue = admin.firestore.FieldValue;
 
-const STAFF_ROLES = ["admin", "manager", "employee", "checker"];
-const STAFF_MONITOR_ROLES = ["admin", "manager", "employee"];
+const STAFF_ROLES = ["admin", "manager", "employee", "checker", "administrator", "staff", "support"];
+const STAFF_MONITOR_ROLES = ["admin", "manager", "employee", "administrator", "staff", "support"];
 const VALID_STATUSES = ["unassigned", "active", "closed"];
 const VALID_PRIORITIES = ["normal", "urgent"];
 const CALL_TYPES = ["voice", "video"];
