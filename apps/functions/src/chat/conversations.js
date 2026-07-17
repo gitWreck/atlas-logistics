@@ -482,12 +482,17 @@ async function getConversationForUser(conversationId, uid, role) {
     const participantIds = Array.isArray(conversation.participantIds)
       ? conversation.participantIds
       : [];
-    if (!participantIds.includes(uid)) {
+    const isStaffMember = STAFF_ROLES.includes(normalizedRole);
+    const isParticipant = participantIds.includes(uid);
+    
+    // Allow access if user is a participant or is a staff member able to access direct conversations
+    if (!isParticipant && !isStaffMember) {
       throw new HttpsError(
         "permission-denied",
         "This staff conversation is outside your current assignment.",
       );
     }
+    
     return { ref, snap, conversation };
   }
   const isAdmin = normalizedRole === "admin";
