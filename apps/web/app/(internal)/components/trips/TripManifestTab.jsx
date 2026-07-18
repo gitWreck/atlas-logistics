@@ -83,6 +83,10 @@ export default function TripManifestTab({
       },
     );
   const manifestLocked = !manifestEditable;
+  const actorRole = String(profile?.role || "").toLowerCase();
+  const canRemoveShipment =
+    actorRole === "admin" ||
+    (actorRole === "manager" && manifestLocked === false);
 
   const isManifestReconciled = manifestStatus === MANIFEST_STATUS.RECONCILED;
 
@@ -207,6 +211,8 @@ export default function TripManifestTab({
     return (
       <TripCompletedManifestsView
         trip={trip}
+        shipments={shipments}
+        onUnassign={onUnassign}
         user={user}
         profile={profile}
         isDark={isDark}
@@ -461,8 +467,13 @@ export default function TripManifestTab({
                     <button
                       type="button"
                       onClick={() => onUnassign(shipment)}
-                      className={`text-xs border px-3 py-2 rounded-xl transition-all flex items-center justify-center gap-2 disabled:opacity-50 ${rowAction.remove}`}
-                      disabled={manifestLocked}
+                      disabled={!canRemoveShipment}
+                      className={`text-xs border px-3 py-2 rounded-xl transition-all flex items-center justify-center gap-2 disabled:cursor-not-allowed disabled:opacity-40 ${rowAction.remove}`}
+                      title={
+                        canRemoveShipment
+                          ? "Remove Shipment"
+                          : "Only an Admin can remove from a locked manifest"
+                      }
                     >
                       <FontAwesomeIcon icon={faMinus} />
                       Remove
@@ -653,9 +664,13 @@ export default function TripManifestTab({
                             <button
                               type="button"
                               onClick={() => onUnassign(shipment)}
-                              className={`w-8 h-8 text-xs border px-3 py-1.5 rounded transition-all flex items-center justify-center disabled:opacity-50 ${rowAction.remove}`}
-                              disabled={manifestLocked}
-                              title="Remove Shipment"
+                              disabled={!canRemoveShipment}
+                              className={`w-8 h-8 text-xs border px-3 py-1.5 rounded transition-all flex items-center justify-center disabled:cursor-not-allowed disabled:opacity-40 ${rowAction.remove}`}
+                              title={
+                                canRemoveShipment
+                                  ? "Remove Shipment"
+                                  : "Only an Admin can remove from a locked manifest"
+                              }
                             >
                               <FontAwesomeIcon icon={faMinus} />
                             </button>

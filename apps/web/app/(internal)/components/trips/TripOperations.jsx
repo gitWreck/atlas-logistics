@@ -140,7 +140,7 @@ export default function TripOperations({
   }, [assignId, formatLooksValid, tripId, user]);
 
   const canSubmitAssign =
-    manifestEditable &&
+    isAdmin &&
     formatLooksValid &&
     lookupState.valid &&
     !lookupState.loading &&
@@ -192,7 +192,7 @@ export default function TripOperations({
 
         <p className={`text-xs mb-3 ${theme.bodyText}`}>
           {manifestLocked
-            ? "Enter a shipment ID or package label to add it to this trip."
+            ? "Admin correction: add a missed shipment or package directly to this locked trip."
             : "Add a shipment by ID or package label (e.g. AT-20260612-SHP-677769-09)."}
         </p>
 
@@ -204,9 +204,8 @@ export default function TripOperations({
           >
             <FontAwesomeIcon icon={faLock} className="shrink-0 opacity-80" />
             <span>
-              Manifest is locked — use{" "}
-              <span className="font-semibold">Unlock Manifest</span> in the trip
-              footer first.
+              Manifest is locked. Admin manual additions are allowed and will
+              be recorded as a manifest amendment.
             </span>
           </p>
         ) : null}
@@ -217,7 +216,7 @@ export default function TripOperations({
             onChange={(e) => setAssignId(e.target.value.trim())}
             placeholder="Shipment ID or package label..."
             className={`flex-1 border rounded-lg px-3 py-2.5 text-sm focus:border-blue-500 outline-none disabled:opacity-50 ${theme.input}`}
-            disabled={manifestLocked}
+            disabled={!isAdmin}
             onKeyDown={(e) => {
               if (e.key === "Enter" && canSubmitAssign) {
                 e.preventDefault();
@@ -255,7 +254,7 @@ export default function TripOperations({
           </div>
         )}
 
-        {requiresAssignReason && manifestEditable && (
+        {requiresAssignReason && (
           <div className="mt-3">
             <label className={`block text-[11px] font-bold mb-1.5 ${theme.bodyText}`}>
               Reason for manual assignment
@@ -265,7 +264,7 @@ export default function TripOperations({
               onChange={(e) => setAssignReason(e.target.value)}
               placeholder="e.g. Missing piece was on truck but not on manifest"
               className={`w-full border rounded-lg px-3 py-2 text-xs min-h-[72px] outline-none focus:border-blue-500 disabled:opacity-50 ${theme.input}`}
-              disabled={manifestLocked}
+              disabled={!isAdmin}
             />
           </div>
         )}
@@ -278,9 +277,9 @@ export default function TripOperations({
             className="text-slate-600 mt-0.5"
           />
           <span>
-            Package labels assign the parent shipment. After adding, scan Load
-            then Unload for each missing piece. Assignment is logged in the
-            trip audit trail.
+            A shipment ID adds its eligible pieces; a package label adds only
+            that piece. Added cargo is synchronized to the trip&apos;s current
+            stage and logged in the trip audit trail.
           </span>
         </div>
       </div>

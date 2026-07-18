@@ -76,7 +76,6 @@ function isPieceHubReceivedAtOdiongan(pkg = {}) {
   const loadedQty = normalizeQty(pkg.loadedQty, 0);
   const receivedQty = normalizeQty(pkg.receivedQty, 0);
 
-  if (loadedQty > 0) return false;
   if (
     status === PACKAGE_STATUS.RECEIVED_AT_DIVISORIA ||
     STILL_ON_LINEHAUL_STATUSES.has(status)
@@ -87,6 +86,8 @@ function isPieceHubReceivedAtOdiongan(pkg = {}) {
   if (DELIVERY_RELEASE_ELIGIBLE_PIECE_STATUSES.has(status)) {
     return receivedQty >= quantity || Boolean(pkg.hubReceivedAt);
   }
+
+  if (loadedQty > 0) return false;
 
   return Boolean(pkg.hubReceivedAt) && receivedQty > 0;
 }

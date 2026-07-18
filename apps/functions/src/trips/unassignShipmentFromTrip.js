@@ -4,12 +4,100 @@ const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const admin = require("firebase-admin");
 const { FieldValue } = admin.firestore;
 const { requireRole, updatedBy } = require("../utilities/helpers");
+const { normalizeQty } = require("../utilities/packageHelpers");
 const { writeShipmentActionLog } = require("../utilities/shipmentLogger");
 const { writeCustodyAuditLog } = require("../utilities/custodyAuditLog");
-const { packageOnTrip, buildShipmentSnapshot } = require("../packages/tripPackageOperations");
+const {
+  packageLinkedToTrip,
+  getPackageIdentity,
+  buildShipmentSnapshot,
+} = require("../packages/tripPackageOperations");
+const {
+  PACKAGE_STATUS,
+  DIVISORIA_WAREHOUSE,
+  normalizePackageStatus,
+} = require("../packages/packageStatus");
+const { appendPendingAmendmentEntry } = require("./manifestAmendment");
+const {
+  classifyPieceForTripCounters,
+} = require("./tripShipmentCounters");
 
 if (!admin.apps.length) admin.initializeApp();
 const db = admin.firestore();
+
+function resetPackageToDivisoria(pkg = {}, actorName = null, nowIso) {
+  return {
+    ...pkg,
+    status: PACKAGE_STATUS.RECEIVED_AT_DIVISORIA,
+    loadedQty: 0,
+    receivedQty: 0,
+    missingQty: 0,
+    damagedQty: 0,
+    availableForDelivery: false,
+
+    currentTripId: null,
+    loadedOnTrip: null,
+    loadedAt: null,
+    loadedAtLocation: null,
+    loadedBy: null,
+    loadedByUid: null,
+    loadedByRole: null,
+
+    hubReceivedAt: null,
+    hubReceivedOnTrip: null,
+    hubReceivedByName: null,
+    receivedBy: null,
+    releasedToDeliveryOpsAt: null,
+
+    custodyOwnerType: "WAREHOUSE",
+    custodyOwnerId: DIVISORIA_WAREHOUSE,
+    currentLocationState: "RECEIVED_AT_DIVISORIA",
+
+    assignedRouteId: null,
+    assignedRouteName: null,
+    suggestedRouteId: null,
+    suggestedRouteName: null,
+    routeAssignedAt: null,
+    routeAssignedBy: null,
+    assignedCheckerId: null,
+    assignedCheckerName: null,
+    checkerAssignedAt: null,
+    assignedVehicleId: null,
+    assignedVehicleName: null,
+    loadedByCheckerId: null,
+    loadedByCheckerName: null,
+    outForDeliveryAt: null,
+    deliveryManifestId: null,
+    deliveryVehicleId: null,
+    deliveryVehicleName: null,
+
+    deliveredAt: null,
+    deliveredBy: null,
+    deliveredByCheckerId: null,
+    deliveredByCheckerName: null,
+    failedDeliveryAt: null,
+    failedDeliveryReason: null,
+    proofPhotoUrl: null,
+    podPhotoUrl: null,
+    podUrl: null,
+
+    updatedAt: nowIso,
+    updatedBy: actorName,
+  };
+}
+
+function remainingValue(packages = [], field) {
+  return (
+    packages
+      .map((pkg) => pkg?.[field])
+      .find((value) => value !== null && value !== undefined && value !== "") ||
+    null
+  );
+}
+
+function subtractCounter(trip = {}, field, amount) {
+  return Math.max(normalizeQty(trip[field], 0) - normalizeQty(amount, 0), 0);
+}
 
 /* ======================================================
    UNASSIGN SHIPMENT FROM TRUCK TRIP (OPTION B — CANONICAL)
@@ -17,11 +105,12 @@ const db = admin.firestore();
 exports.unassignShipmentFromTrip = onCall(
   { region: "asia-southeast1", maxInstances: 10 },
   async (req) => {
-    await requireRole(db, req, ["admin", "manager"]);
+    const actor = await requireRole(db, req, ["admin", "manager"]);
 
     const {
       trackingShipmentId,
       tripId,
+      packageId: requestedPackageIdRaw,
       // updatedBy
     } = req.data || {};
     if (!trackingShipmentId || typeof trackingShipmentId !== "string") {
@@ -30,6 +119,7 @@ exports.unassignShipmentFromTrip = onCall(
     if (!tripId || typeof tripId !== "string") {
       throw new HttpsError("invalid-argument", "tripId required");
     }
+    const requestedPackageId = String(requestedPackageIdRaw || "").trim();
 
     const { uid, role, name } = updatedBy(req);
 
@@ -44,6 +134,7 @@ exports.unassignShipmentFromTrip = onCall(
     const shipRef = tripRef
       .collection("trip_shipments")
       .doc(trackingShipmentId);
+    let manifestRemoved = false;
 
     await db.runTransaction(async (tx) => {
       const [trackingSnap, tripSnap, shipSnap] = await Promise.all([
@@ -73,78 +164,113 @@ exports.unassignShipmentFromTrip = onCall(
       const tracking = trackingSnap.data() || {};
       const trip = tripSnap.data() || {};
       const tripShipment = shipSnap.data() || {};
+      const protectedTrip =
+        trip.manifestLocked === true ||
+        trip.active === false ||
+        ["COMPLETED", "DELIVERED"].includes(
+          String(trip.status || "").toUpperCase(),
+        );
 
-      // 🔒 LOCK CHECKS
-      if (trip.active === false || trip.status === "COMPLETED") {
+      if (protectedTrip && actor.role !== "admin") {
         throw new HttpsError(
-          "failed-precondition",
-          "Cannot unassign from a completed or inactive trip.",
+          "permission-denied",
+          "Only an Admin can remove shipments from a locked, inactive, or completed trip.",
         );
       }
-      if (trip.manifestLocked === true) {
-        throw new HttpsError(
-          "failed-precondition",
-          "Trip Manifest is LOCKED. Reopen it first.",
-        );
+
+      const packageBarcodes = new Set(
+        Array.isArray(tripShipment.packageBarcodes)
+          ? tripShipment.packageBarcodes.map(String)
+          : [],
+      );
+      const scannedPackageIds = new Set(
+        Array.isArray(tripShipment.scannedPackageIds)
+          ? tripShipment.scannedPackageIds.map(String)
+          : [],
+      );
+      const targetPackage = requestedPackageId
+        ? (tracking.packages || []).find(
+            (pkg) => getPackageIdentity(pkg) === requestedPackageId,
+          )
+        : null;
+
+      if (requestedPackageId && !targetPackage) {
+        throw new HttpsError("not-found", "Package not found in shipment");
       }
       if (
-        tracking.currentTripId &&
-        tracking.currentTripId !== tripId &&
-        !shipSnap.exists
+        targetPackage &&
+        !packageLinkedToTrip(targetPackage, tripId, packageBarcodes, {
+          scannedPackageIds,
+        })
       ) {
         throw new HttpsError(
           "failed-precondition",
-          `Shipment belongs to another trip (${tracking.currentTripId}).`,
+          "Package is not linked to this trip.",
         );
       }
-
-      const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
-      const packageQty = (pkg = {}) =>
-        Math.max(normalizeQty(pkg.quantity, 1), 1);
-      const sumQty = (packages = [], field) =>
-        packages.reduce(
-          (sum, pkg) =>
-            sum + clamp(normalizeQty(pkg[field], 0), 0, packageQty(pkg)),
-          0,
-        );
-      const deriveResetPackageStatus = (pkg = {}) => {
-        const quantity = packageQty(pkg);
-        const missingQty = clamp(normalizeQty(pkg.missingQty, 0), 0, quantity);
-        const damagedQty = clamp(normalizeQty(pkg.damagedQty, 0), 0, quantity);
-
-        if (damagedQty > 0) return "DAMAGED";
-        if (missingQty > 0) return "MISSING";
-        return "RECEIVED";
-      };
 
       // ======================================================
       // 1. CALCULATE VALUES TO REMOVE (The Subtraction Logic)
       // ======================================================
-      const removeTotal = normalizeQty(tripShipment.totalItems, 0);
-      const removePending = normalizeQty(tripShipment.pendingCount, 0);
-      const removeLoaded = normalizeQty(tripShipment.loadedCount, 0);
-      // Fallback to receivedCount if deliveredCount isn't explicitly used
-      const removeDelivered = normalizeQty(
-        tripShipment.deliveredCount || tripShipment.receivedCount || 0,
+      const pieceCounter = targetPackage
+        ? classifyPieceForTripCounters(targetPackage)
+        : null;
+      const pieceQty = targetPackage
+        ? Math.max(normalizeQty(targetPackage.quantity, 1), 1)
+        : 0;
+      const removeTotal = targetPackage
+        ? pieceQty
+        : normalizeQty(tripShipment.totalItems, 0);
+      const removePending = targetPackage
+        ? pieceCounter.bucket === "unknown"
+          ? pieceQty
+          : 0
+        : normalizeQty(tripShipment.pendingCount, 0);
+      const removeLoaded = targetPackage
+        ? pieceCounter.bucket === "loaded"
+          ? pieceCounter.qty
+          : 0
+        : normalizeQty(tripShipment.loadedCount, 0);
+      const removeDelivered = targetPackage
+        ? pieceCounter.bucket === "received"
+          ? pieceCounter.qty
+          : 0
+        : normalizeQty(
+            tripShipment.deliveredCount ?? tripShipment.receivedCount ?? 0,
+          );
+      const removeMissing = targetPackage
+        ? pieceCounter.bucket === "missing"
+          ? pieceCounter.qty
+          : 0
+        : normalizeQty(tripShipment.missingCount, 0);
+      const removeDamaged = targetPackage
+        ? pieceCounter.bucket === "damaged"
+          ? pieceCounter.qty
+          : 0
+        : normalizeQty(tripShipment.damagedCount, 0);
+      const remainingManifestTotal = Math.max(
+        normalizeQty(tripShipment.totalItems, 0) - removeTotal,
+        0,
       );
-      const removeMissing = normalizeQty(tripShipment.missingCount, 0);
-      const removeDamaged = normalizeQty(tripShipment.damagedCount, 0);
+      const pieceRemovalKeepsManifest =
+        Boolean(requestedPackageId) && remainingManifestTotal > 0;
 
       const now = FieldValue.serverTimestamp();
       const nowTs = admin.firestore.Timestamp.now();
+      const nowIso = new Date().toISOString();
 
       // ======================================================
       // 2. UPDATE TRUCK TRIP (Subtract Everything)
       // ======================================================
       // We subtract ALL counters that this shipment contributed to the trip
       tx.update(tripRef, {
-        totalItems: FieldValue.increment(-removeTotal),
-        itemPending: FieldValue.increment(-removePending),
-        totalLoaded: FieldValue.increment(-removeLoaded),
-        totalDelivered: FieldValue.increment(-removeDelivered),
-        totalArrived: FieldValue.increment(-removeDelivered), // Ensures sync if you use Arrived metric
-        totalMissing: FieldValue.increment(-removeMissing),
-        totalDamaged: FieldValue.increment(-removeDamaged),
+        totalItems: subtractCounter(trip, "totalItems", removeTotal),
+        itemPending: subtractCounter(trip, "itemPending", removePending),
+        totalLoaded: subtractCounter(trip, "totalLoaded", removeLoaded),
+        totalDelivered: subtractCounter(trip, "totalDelivered", removeDelivered),
+        totalArrived: subtractCounter(trip, "totalArrived", removeDelivered),
+        totalMissing: subtractCounter(trip, "totalMissing", removeMissing),
+        totalDamaged: subtractCounter(trip, "totalDamaged", removeDamaged),
         updatedAt: now,
         updatedBy: name,
       });
@@ -152,45 +278,69 @@ exports.unassignShipmentFromTrip = onCall(
       // ======================================================
       // 3. RESET SHIPMENT & PACKAGES
       // ======================================================
-      // Only reset packages that belonged to this trip; leave other trips untouched.
+      const resetPackageIds = [];
+      let resetPackageCount = 0;
+      const resetDeliveryManifestIds = new Set();
+      const resetPackageIdsByManifest = new Map();
+
+      // Only reset pieces represented by this trip; pieces on other trips stay intact.
       const updatedPackages = (tracking.packages || []).map((pkg) => {
-        if (!packageOnTrip(pkg, tripId)) {
+        const packageId = getPackageIdentity(pkg);
+        const shouldReset = requestedPackageId
+          ? packageId === requestedPackageId
+          : packageLinkedToTrip(pkg, tripId, packageBarcodes, {
+              scannedPackageIds,
+            });
+        if (!shouldReset) {
           return pkg;
         }
 
-        const quantity = packageQty(pkg);
-        const missingQty = clamp(normalizeQty(pkg.missingQty, 0), 0, quantity);
-        const damagedQty = clamp(normalizeQty(pkg.damagedQty, 0), 0, quantity);
-
-        const resetPkg = {
-          ...pkg,
-          quantity,
-          loadedQty: 0,
-          receivedQty: 0,
-          missingQty,
-          damagedQty,
-          loadedAt: null,
-          loadedBy: null,
-          loadedOnTrip: null,
-          deliveredAt: null,
-          deliveredBy: null,
-          updatedAt: new Date().toISOString(),
-          updatedBy: name,
-        };
-
-        return {
-          ...resetPkg,
-          status: deriveResetPackageStatus(resetPkg),
-        };
+        resetPackageCount += 1;
+        if (packageId) resetPackageIds.push(packageId);
+        if (pkg.deliveryManifestId) {
+          const manifestId = String(pkg.deliveryManifestId);
+          resetDeliveryManifestIds.add(manifestId);
+          if (!resetPackageIdsByManifest.has(manifestId)) {
+            resetPackageIdsByManifest.set(manifestId, []);
+          }
+          if (packageId) {
+            resetPackageIdsByManifest.get(manifestId).push(packageId);
+          }
+        }
+        return resetPackageToDivisoria(pkg, name, nowIso);
       });
 
+      if (tracking.deliveryManifestId && resetPackageIds.length > 0) {
+        const rootManifestId = String(tracking.deliveryManifestId);
+        resetDeliveryManifestIds.add(rootManifestId);
+        if (!resetPackageIdsByManifest.has(rootManifestId)) {
+          resetPackageIdsByManifest.set(rootManifestId, [...resetPackageIds]);
+        }
+      }
+
       const snapshot = buildShipmentSnapshot(updatedPackages, {
-        previousStatus: tracking.status,
+        previousStatus: "",
       });
       const shipmentStatus = snapshot.status;
 
-      const activeTripIds = snapshot.currentTripIds || [];
-      const singleCurrentTripId = snapshot.currentTripId;
+      const activeTripIds = pieceRemovalKeepsManifest
+        ? [
+            ...new Set([
+              ...(snapshot.currentTripIds || []),
+              String(tripId),
+            ]),
+          ]
+        : snapshot.currentTripIds || [];
+      const singleCurrentTripId =
+        activeTripIds.length === 1 ? activeTripIds[0] : null;
+      const hasDeliveredPieces = snapshot.packages.some((pkg) =>
+        ["DELIVERED", "COMPLETED"].includes(normalizePackageStatus(pkg)),
+      );
+      const hasNonDivisoriaPieces = snapshot.packages.some(
+        (pkg) =>
+          normalizePackageStatus(pkg) !==
+          PACKAGE_STATUS.RECEIVED_AT_DIVISORIA,
+      );
 
       tx.update(trackingRef, {
         currentTripId: singleCurrentTripId,
@@ -211,6 +361,50 @@ exports.unassignShipmentFromTrip = onCall(
 
         packages: snapshot.packages,
 
+        assignedRouteId: remainingValue(snapshot.packages, "assignedRouteId"),
+        assignedRouteName: remainingValue(snapshot.packages, "assignedRouteName"),
+        suggestedRouteId: remainingValue(snapshot.packages, "suggestedRouteId"),
+        suggestedRouteName: remainingValue(snapshot.packages, "suggestedRouteName"),
+        routeAssignedAt: remainingValue(snapshot.packages, "routeAssignedAt"),
+        routeAssignedBy: remainingValue(snapshot.packages, "routeAssignedBy"),
+        assignedCheckerId: remainingValue(snapshot.packages, "assignedCheckerId"),
+        assignedCheckerName: remainingValue(snapshot.packages, "assignedCheckerName"),
+        assignedVehicleId: remainingValue(snapshot.packages, "assignedVehicleId"),
+        assignedVehicleName: remainingValue(snapshot.packages, "assignedVehicleName"),
+        deliveryManifestId: remainingValue(snapshot.packages, "deliveryManifestId"),
+        deliveryVehicleId: remainingValue(snapshot.packages, "deliveryVehicleId"),
+        deliveryVehicleName: remainingValue(snapshot.packages, "deliveryVehicleName"),
+        custodyOwnerType: hasNonDivisoriaPieces
+          ? tracking.custodyOwnerType || null
+          : "WAREHOUSE",
+        custodyOwnerId: hasNonDivisoriaPieces
+          ? tracking.custodyOwnerId || null
+          : DIVISORIA_WAREHOUSE,
+        currentLocationState: hasNonDivisoriaPieces
+          ? tracking.currentLocationState || null
+          : "RECEIVED_AT_DIVISORIA",
+        releasedAt: hasNonDivisoriaPieces ? tracking.releasedAt || null : null,
+        releasedByUid: hasNonDivisoriaPieces
+          ? tracking.releasedByUid || null
+          : null,
+        releasedByName: hasNonDivisoriaPieces
+          ? tracking.releasedByName || null
+          : null,
+        outForDeliveryAt: hasNonDivisoriaPieces
+          ? tracking.outForDeliveryAt || null
+          : null,
+        deliveredAt: hasDeliveredPieces ? tracking.deliveredAt || null : null,
+        deliveredBy: hasDeliveredPieces ? tracking.deliveredBy || null : null,
+        failedDeliveryAt: hasNonDivisoriaPieces
+          ? tracking.failedDeliveryAt || null
+          : null,
+        failedDeliveryReason: hasNonDivisoriaPieces
+          ? tracking.failedDeliveryReason || null
+          : null,
+        proofOfDelivery: hasDeliveredPieces
+          ? tracking.proofOfDelivery || null
+          : null,
+
         updatedAt: now,
         updatedBy: name,
         updatedRole: role,
@@ -224,14 +418,102 @@ exports.unassignShipmentFromTrip = onCall(
         }),
       });
 
+      for (const manifestId of resetDeliveryManifestIds) {
+        const manifestRef = db.collection("delivery_manifests").doc(manifestId);
+        const manifestPackageIds = resetPackageIdsByManifest.get(manifestId) || [];
+        const shipmentStillOnManifest =
+          snapshot.packages.some(
+            (pkg) => String(pkg.deliveryManifestId || "") === manifestId,
+          ) ||
+          (String(tracking.deliveryManifestId || "") === manifestId &&
+            resetPackageCount < snapshot.packages.length);
+        tx.set(
+          manifestRef,
+          {
+            ...(!shipmentStillOnManifest
+              ? { shipmentIds: FieldValue.arrayRemove(trackingShipmentId) }
+              : {}),
+            ...(manifestPackageIds.length > 0
+              ? { packageIds: FieldValue.arrayRemove(...manifestPackageIds) }
+              : {}),
+            updatedAt: now,
+            updatedBy: name,
+          },
+          { merge: true },
+        );
+      }
+
       // ======================================================
       // 4. CLEANUP & LOGS
       // ======================================================
-      tx.delete(shipRef);
+      if (requestedPackageId && remainingManifestTotal > 0) {
+        tx.update(shipRef, {
+          totalItems: remainingManifestTotal,
+          pendingCount: subtractCounter(
+            tripShipment,
+            "pendingCount",
+            removePending,
+          ),
+          loadedCount: subtractCounter(
+            tripShipment,
+            "loadedCount",
+            removeLoaded,
+          ),
+          deliveredCount: subtractCounter(
+            tripShipment,
+            "deliveredCount",
+            removeDelivered,
+          ),
+          receivedCount: subtractCounter(
+            tripShipment,
+            "receivedCount",
+            removeDelivered,
+          ),
+          missingCount: subtractCounter(
+            tripShipment,
+            "missingCount",
+            removeMissing,
+          ),
+          damagedCount: subtractCounter(
+            tripShipment,
+            "damagedCount",
+            removeDamaged,
+          ),
+          packageBarcodes: FieldValue.arrayRemove(requestedPackageId),
+          scannedPackageIds: FieldValue.arrayRemove(requestedPackageId),
+          updatedAt: now,
+          updatedBy: name,
+        });
+      } else {
+        tx.delete(shipRef);
+        manifestRemoved = true;
+      }
+
+      appendPendingAmendmentEntry(
+        tx,
+        tripRef,
+        trip,
+        {
+          changeType: "REMOVED",
+          shipmentId: tracking.shipmentId || trackingShipmentId,
+          shipmentDocId: trackingShipmentId,
+          packageId: requestedPackageId || null,
+          reason: requestedPackageId
+            ? `Package ${requestedPackageId} removed from trip and reset to Received at Divisoria.`
+            : "Shipment removed from trip and reset to Received at Divisoria.",
+          recordedBy: uid,
+          recordedByName: name || null,
+        },
+        FieldValue,
+      );
 
       tx.set(trackingRef.collection("status_events").doc(), {
-        type: "UNASSIGN_FROM_TRIP",
-        message: `Unassigned from trip ${trip.tripId || tripId}`,
+        type: requestedPackageId
+          ? "UNASSIGN_PACKAGE_FROM_TRIP"
+          : "UNASSIGN_FROM_TRIP",
+        message: requestedPackageId
+          ? `Package ${requestedPackageId} removed from trip ${trip.tripId || tripId}`
+          : `Unassigned from trip ${trip.tripId || tripId}`,
         tripId,
         createdAt: now,
         createdBy: uid,
@@ -242,7 +524,9 @@ exports.unassignShipmentFromTrip = onCall(
       writeShipmentActionLog({
         db,
         tx,
-        action: "UNASSIGN_SHIPMENT_FROM_TRIP",
+        action: requestedPackageId
+          ? "UNASSIGN_PACKAGE_FROM_TRIP"
+          : "UNASSIGN_SHIPMENT_FROM_TRIP",
         shipmentDocId: trackingShipmentId,
         shipmentId: tracking.shipmentId || trackingShipmentId,
         tripId,
@@ -257,6 +541,11 @@ exports.unassignShipmentFromTrip = onCall(
           removedMissing: removeMissing,
           removedDamaged: removeDamaged,
           resultingStatus: shipmentStatus,
+          resetTo: PACKAGE_STATUS.RECEIVED_AT_DIVISORIA,
+          resetPackageIds,
+          requestedPackageId: requestedPackageId || null,
+          tripWasLocked: trip.manifestLocked === true,
+          tripStatus: trip.status || null,
         },
         createdAt: now,
       });
@@ -280,15 +569,27 @@ exports.unassignShipmentFromTrip = onCall(
           currentTripId: singleCurrentTripId,
           currentTripIds: activeTripIds,
           resultingStatus: shipmentStatus,
+          resetTo: PACKAGE_STATUS.RECEIVED_AT_DIVISORIA,
         },
-        note: `Shipment ${trackingShipmentId} unassigned from trip.`,
+        note: requestedPackageId
+          ? `Package ${requestedPackageId} removed from trip and reset to Divisoria intake.`
+          : `Shipment ${trackingShipmentId} unassigned from trip and reset to Divisoria intake.`,
         meta: {
           removedTotal: removeTotal,
           removedLoaded: removeLoaded,
+          resetPackageIds,
+          tripWasLocked: trip.manifestLocked === true,
+          tripStatus: trip.status || null,
         },
       });
     });
 
-    return { success: true, trackingShipmentId, tripId };
+    return {
+      success: true,
+      trackingShipmentId,
+      tripId,
+      packageId: requestedPackageId || null,
+      manifestRemoved,
+    };
   },
 );

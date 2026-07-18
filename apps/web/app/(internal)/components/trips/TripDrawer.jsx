@@ -445,6 +445,7 @@ export default function TripDrawer({
           setShipmentToUnassign(null);
           onRefreshTrips?.();
         }}
+        isDark={isDark}
       />
 
       <BulkAssignmentModal
