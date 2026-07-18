@@ -39,6 +39,7 @@ function getActiveShipment(shipments = []) {
 
 export default function CustomerHomeDashboard({
   userName,
+  photoURL,
   shipments,
   unreadNotifications,
   onNotificationsPress,
@@ -149,7 +150,11 @@ export default function CustomerHomeDashboard({
                 },
               ]}
             >
-              <Feather name="user" size={24} color={colors.text} />
+              {photoURL ? (
+                <Image source={{ uri: photoURL }} style={styles.avatarImage} />
+              ) : (
+                <Feather name="user" size={24} color={colors.text} />
+              )}
             </View>
           </TouchableOpacity>
 
@@ -480,7 +485,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     alignItems: "center",
     justifyContent: "center",
+    overflow: "hidden",
   },
+  avatarImage: { width: "100%", height: "100%" },
   greetingWrap: {
     flex: 1,
     marginLeft: 14,

@@ -3,7 +3,6 @@ import {
   ActivityIndicator,
   Alert,
   FlatList,
-  Image,
   Modal,
   Pressable,
   RefreshControl,
@@ -42,15 +41,12 @@ const TWO_PANEL_WIDTH = 900;
 function ContactAvatar({ contact, colors, size = 54 }) {
   return (
     <View style={{ width: size, height: size }}>
-      {contact.photoURL ? (
-        <Image
-          source={{ uri: contact.photoURL }}
-          style={{ width: size, height: size, borderRadius: size / 2 }}
-          accessibilityLabel={`${contact.name} profile picture`}
-        />
-      ) : (
-        <PersonAvatar name={contact.name} avatarSeed={contact.id || contact.name} size={size} />
-      )}
+      <PersonAvatar
+        name={contact.name}
+        avatarSeed={contact.id || contact.name}
+        photoURL={contact.photoURL}
+        size={size}
+      />
       {contact.online ? (
         <View
           style={[

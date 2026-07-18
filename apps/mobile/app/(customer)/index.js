@@ -9,10 +9,12 @@ import RequestPickupModal from "../../components/customer/RequestPickup/RequestP
 import useCustomerDashboardData from "../../components/customer/useCustomerDashboardData";
 import { requestShipmentPickup } from "../../components/utilities/FirebaseFunctions";
 import { useTheme } from "../../contexts/ThemeContext";
+import { useAuth } from "../../contexts/AuthContext";
 
 export default function CustomerDashboard() {
   const router = useRouter();
   const { colors, resolvedScheme } = useTheme();
+  const { profile } = useAuth();
   const [pickupModalVisible, setPickupModalVisible] = useState(false);
   const [requesting, setRequesting] = useState(false);
   const {
@@ -48,6 +50,7 @@ export default function CustomerDashboard() {
 
       <CustomerHomeDashboard
         userName={userName}
+        photoURL={profile?.photoURL || userData?.photoURL}
         shipments={shipments}
         unreadNotifications={unreadNotifications}
         unreadMessages={unreadMessages}
