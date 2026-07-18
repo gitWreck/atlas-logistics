@@ -9,12 +9,17 @@ import {
   ActivityIndicator,
   SafeAreaView,
   Platform,
+  Image,
+  Modal,
+  Pressable,
   StatusBar as RNStatusBar,
   Linking,
   TextInput,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { FontAwesome5 } from "@expo/vector-icons";
+import * as ImagePicker from "expo-image-picker";
+import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
 import { normalizePhoneNumber } from "../utilities/helpers";
 import { useAuth } from "../../contexts/AuthContext";
 import {
@@ -23,6 +28,7 @@ import {
   updateUserProfileMobile,
 } from "../utilities/FirebaseFunctions";
 import { useTheme } from "../../contexts/ThemeContext";
+import { storage } from "../../firebase";
 import ShipmentDetailHeader from "../shipments/ShipmentDetailHeader";
 import DropdownModal from "../customer/RequestPickup/DropdownModal";
 import { PROVINCES, getCities } from "../utilities/PhilippinesData";
@@ -89,10 +95,14 @@ export default function ProfileViewer({
   const [cities, setCities] = useState([]);
   const [showProvinceModal, setShowProvinceModal] = useState(false);
   const [showCityModal, setShowCityModal] = useState(false);
+  const [photoActionVisible, setPhotoActionVisible] = useState(false);
+  const [selectedPhoto, setSelectedPhoto] = useState(null);
+  const [photoUploading, setPhotoUploading] = useState(false);
 
   const isCustomer = user?.role === "customer";
   const isDriver = user?.role === "driver";
   const isStaff = user?.role === "checker" || user?.role === "driver";
+  const profilePhotoURL = String(user?.photoURL || "").trim();
   const config = roleConfig[user?.role] || {
     icon: "user-circle",
     label: user?.role || "User",
@@ -121,6 +131,77 @@ export default function ProfileViewer({
     return cleaned || fallback;
   };
   const isDark = resolvedScheme === "dark";
+
+  const selectProfilePhoto = async (source) => {
+    try {
+      const permission = source === "camera"
+        ? await ImagePicker.requestCameraPermissionsAsync()
+        : await ImagePicker.requestMediaLibraryPermissionsAsync();
+
+      if (!permission.granted) {
+        Alert.alert(
+          "Permission needed",
+          source === "camera"
+            ? "Allow camera access to take a profile photo."
+            : "Allow photo library access to choose a profile photo.",
+        );
+        return;
+      }
+
+      const options = {
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+      };
+      const result = source === "camera"
+        ? await ImagePicker.launchCameraAsync(options)
+        : await ImagePicker.launchImageLibraryAsync(options);
+
+      if (!result.canceled && result.assets?.[0]?.uri) {
+        setPhotoActionVisible(false);
+        setSelectedPhoto(result.assets[0]);
+      }
+    } catch (error) {
+      console.error("Profile photo selection failed:", error);
+      Alert.alert("Unable to select photo", "Please try again.");
+    }
+  };
+
+  const uploadProfilePhoto = async () => {
+    if (!selectedPhoto?.uri || !user?.uid || photoUploading) return;
+
+    setPhotoUploading(true);
+    try {
+      const response = await fetch(selectedPhoto.uri);
+      const blob = await response.blob();
+      const avatarRef = ref(storage, `users/${user.uid}/profile/avatar.jpg`);
+
+      await uploadBytes(avatarRef, blob, {
+        contentType: selectedPhoto.mimeType || "image/jpeg",
+      });
+      const photoURL = await getDownloadURL(avatarRef);
+
+      await updateUserProfileMobile({ targetUid: user.uid, photoURL });
+      await refreshUser();
+
+      setSelectedPhoto(null);
+      Alert.alert("Profile photo updated", "Your new profile photo is saved.");
+    } catch (error) {
+      console.error("Profile photo upload failed:", error);
+      const message = /network|internet|offline|failed to fetch/i.test(
+        String(error?.message || ""),
+      )
+        ? "No internet connection. Check your connection and try again."
+        : "We could not upload your profile photo. Please try again.";
+      Alert.alert("Upload failed", message, [
+        { text: "Cancel", style: "cancel" },
+        { text: "Retry", onPress: uploadProfilePhoto },
+      ]);
+    } finally {
+      setPhotoUploading(false);
+    }
+  };
 
   const addressSummary = [user?.address?.city, user?.address?.province]
     .filter(Boolean)
@@ -463,14 +544,23 @@ export default function ProfileViewer({
             { backgroundColor: colors.surface, borderColor: colors.border },
           ]}
         >
-          <View
+          <TouchableOpacity
             style={[
               styles.avatar,
+              profilePhotoURL && styles.photoAvatar,
               { backgroundColor: avatarBg, borderColor: avatarBorder },
             ]}
+            onPress={() => setPhotoActionVisible(true)}
+            activeOpacity={0.8}
+            accessibilityRole="button"
+            accessibilityLabel="Change profile photo"
           >
-            <FontAwesome5 name={config.icon} size={24} color={config.color} />
-          </View>
+            {profilePhotoURL ? (
+              <Image source={{ uri: profilePhotoURL }} style={styles.avatarImage} />
+            ) : (
+              <FontAwesome5 name={config.icon} size={24} color={config.color} />
+            )}
+          </TouchableOpacity>
 
           <View style={styles.heroTextBlock}>
             <View
@@ -986,6 +1076,66 @@ export default function ProfileViewer({
         }}
         onClose={() => setShowCityModal(false)}
       />
+
+      <Modal
+        visible={photoActionVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setPhotoActionVisible(false)}
+      >
+        <Pressable
+          style={styles.photoSheetBackdrop}
+          onPress={() => setPhotoActionVisible(false)}
+        >
+          <Pressable
+            style={[styles.photoSheet, { backgroundColor: colors.surface }]}
+            onPress={(event) => event.stopPropagation()}
+          >
+            <Text style={[styles.photoSheetTitle, { color: colors.text }]}>Profile photo</Text>
+            <TouchableOpacity style={styles.photoSheetAction} onPress={() => selectProfilePhoto("camera")}>
+              <FontAwesome5 name="camera" size={18} color={PRIMARY} />
+              <Text style={[styles.photoSheetActionText, { color: colors.text }]}>Take Photo</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.photoSheetAction} onPress={() => selectProfilePhoto("library")}>
+              <FontAwesome5 name="images" size={18} color={PRIMARY} />
+              <Text style={[styles.photoSheetActionText, { color: colors.text }]}>Choose from Gallery</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.photoSheetCancel} onPress={() => setPhotoActionVisible(false)}>
+              <Text style={[styles.photoSheetCancelText, { color: colors.textMuted }]}>Cancel</Text>
+            </TouchableOpacity>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      <Modal
+        visible={Boolean(selectedPhoto)}
+        transparent
+        animationType="fade"
+        onRequestClose={() => !photoUploading && setSelectedPhoto(null)}
+      >
+        <View style={styles.photoPreviewBackdrop}>
+          <View style={[styles.photoPreviewCard, { backgroundColor: colors.surface }]}>
+            <Text style={[styles.photoSheetTitle, { color: colors.text }]}>Preview profile photo</Text>
+            {selectedPhoto?.uri ? <Image source={{ uri: selectedPhoto.uri }} style={styles.photoPreviewImage} /> : null}
+            <View style={styles.photoPreviewActions}>
+              <TouchableOpacity
+                disabled={photoUploading}
+                style={[styles.photoPreviewButton, { borderColor: colors.border }]}
+                onPress={() => setSelectedPhoto(null)}
+              >
+                <Text style={[styles.photoPreviewCancelText, { color: colors.textMuted }]}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                disabled={photoUploading}
+                style={[styles.photoPreviewButton, styles.photoUploadButton]}
+                onPress={uploadProfilePhoto}
+              >
+                {photoUploading ? <ActivityIndicator color="#fff" /> : <Text style={styles.photoUploadText}>Upload</Text>}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </Container>
   );
 }
@@ -1045,7 +1195,51 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     alignItems: "center",
     justifyContent: "center",
+    overflow: "hidden",
   },
+  avatarImage: {
+    width: "100%",
+    height: "100%",
+  },
+  photoAvatar: {
+    borderRadius: 32,
+  },
+  photoSheetBackdrop: {
+    flex: 1,
+    justifyContent: "flex-end",
+    backgroundColor: "rgba(15, 23, 42, 0.45)",
+  },
+  photoSheet: {
+    padding: 20,
+    paddingBottom: 32,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    gap: 4,
+  },
+  photoSheetTitle: { fontSize: 17, fontWeight: "700", marginBottom: 8 },
+  photoSheetAction: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 14,
+    paddingVertical: 15,
+  },
+  photoSheetActionText: { fontSize: 16, fontWeight: "600" },
+  photoSheetCancel: { alignItems: "center", paddingTop: 16, paddingBottom: 4 },
+  photoSheetCancelText: { fontSize: 16, fontWeight: "600" },
+  photoPreviewBackdrop: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 24,
+    backgroundColor: "rgba(15, 23, 42, 0.55)",
+  },
+  photoPreviewCard: { width: "100%", maxWidth: 360, borderRadius: 20, padding: 20 },
+  photoPreviewImage: { width: "100%", aspectRatio: 1, borderRadius: 14, backgroundColor: "#e2e8f0" },
+  photoPreviewActions: { flexDirection: "row", gap: 12, marginTop: 18 },
+  photoPreviewButton: { flex: 1, minHeight: 46, borderWidth: 1, borderRadius: 10, alignItems: "center", justifyContent: "center" },
+  photoPreviewCancelText: { fontWeight: "700" },
+  photoUploadButton: { backgroundColor: PRIMARY, borderColor: PRIMARY },
+  photoUploadText: { color: "#fff", fontWeight: "700" },
   heroTextBlock: {
     flex: 1,
     marginLeft: 14,
