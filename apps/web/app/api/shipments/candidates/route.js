@@ -1,7 +1,31 @@
 import { NextResponse } from "next/server";
-import { adminDb } from "@/lib/firebase-admin";
+import { headers } from "next/headers";
+import { adminAuth, adminDb } from "@/lib/firebase-admin";
 
 export const dynamic = "force-dynamic"; // Prevent caching of candidate lookups
+
+async function authorizeAdminExactLookup() {
+  const headersList = await headers();
+  const token = headersList.get("authorization")?.split("Bearer ")[1];
+
+  if (!token) {
+    return {
+      error: NextResponse.json({ error: "Unauthorized" }, { status: 401 }),
+    };
+  }
+
+  const decoded = await adminAuth.verifyIdToken(token);
+  const userSnap = await adminDb.collection("users").doc(decoded.uid).get();
+  const role = String(userSnap.data()?.role || "").toLowerCase();
+
+  if (role !== "admin") {
+    return {
+      error: NextResponse.json({ error: "Forbidden" }, { status: 403 }),
+    };
+  }
+
+  return { role };
+}
 
 // Master statuses that may still have warehouse pieces available to load.
 // RECEIVED = nothing loaded yet; PARTIALLY_LOADED = split across trip(s) with a
@@ -59,6 +83,9 @@ export async function GET(request) {
     // Exact tracking-id lookup so Admins can add a specific missing shipment/piece
     // even when it is outside the default candidate pool.
     if (shipmentId) {
+      const auth = await authorizeAdminExactLookup();
+      if (auth.error) return auth.error;
+
       const trimmed = shipmentId.trim();
       if (!trimmed) {
         return NextResponse.json({

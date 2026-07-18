@@ -8,6 +8,7 @@ import {
   faTimes,
   faCheckCircle,
 } from "@fortawesome/free-solid-svg-icons";
+import { auth } from "@/lib/firebase";
 import { bulkAssignShipments } from "@/app/utility/FirebaseFunctions";
 import TablePaginationFooter from "../../ui/TablePaginationFooter";
 import {
@@ -93,10 +94,21 @@ export default function BulkAssignmentModal({
 
     setLookingUp(true);
     try {
-      const params = new URLSearchParams({ shipmentId: term });
-      const res = await fetch(`/api/shipments/candidates?${params.toString()}`);
-      const json = await res.json();
+      const token = await auth.currentUser?.getIdToken();
+      if (!token) {
+        throw new Error("You must be signed in to look up a shipment.");
+      }
 
+      const params = new URLSearchParams({ shipmentId: term });
+      const res = await fetch(`/api/shipments/candidates?${params.toString()}`, {
+        headers: { Authorization: `Bearer ${token}` },
+        cache: "no-store",
+      });
+      const json = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        throw new Error(json.error || "Lookup failed");
+      }
       if (!json.success) throw new Error(json.error || "Lookup failed");
 
       if (!json.data || json.data.length === 0) {
