@@ -55,6 +55,36 @@ const HERO_APPEARANCES = {
   night: { gradient: ["rgba(1, 13, 39, 0.64)", "rgba(7, 47, 99, 0.59)"], imageOpacity: 0.9 },
 };
 
+const TRIP_STATE_VISUALS = {
+  PENDING_ASSIGNMENT: { label: "Pending", progress: 0, description: "Waiting for assignment", color: "#94A3B8", glow: 0, marker: null, dotted: true },
+  ASSIGNED: { label: "Assigned", progress: 10, description: "Assigned and waiting to start", color: "#1677FF", glow: 0.12, marker: null },
+  READY_TO_START: { label: "Ready to Start", progress: 10, description: "Ready to start trip", color: "#F59E0B", glow: 0.2, marker: "headlight" },
+  IN_TRANSIT: { label: "In Transit", progress: 72, description: "En route to destination", color: "#1677FF", glow: 0.22, marker: null },
+  ARRIVING: { label: "Arriving", progress: 90, description: "Almost at destination", color: "#22C55E", glow: 0.22, marker: "map-marker-alt" },
+  COMPLETED: { label: "Completed", progress: 100, description: "Trip completed successfully", color: "#22C55E", glow: 0.24, marker: "check" },
+  DELAYED: { label: "Delayed", progress: 60, description: "Trip delayed", color: "#F59E0B", glow: 0.2, marker: "exclamation-triangle" },
+  ISSUE_REPORTED: { label: "Issue Reported", progress: 40, description: "Issue reported during trip", color: "#EF4444", glow: 0.2, marker: "exclamation" },
+  CANCELLED: { label: "Cancelled", progress: 0, description: "Trip cancelled", color: "#94A3B8", glow: 0, marker: "times" },
+};
+
+function tripVisualState(trip = {}) {
+  const state = statusKey(trip.status);
+  if (state.includes("CANCEL")) return "CANCELLED";
+  if (state.includes("ISSUE") || trip.hasIssue || Number(trip.issueCount || 0) > 0 || trip.lastIssueType) return "ISSUE_REPORTED";
+  if (state.includes("DELAY") || trip.delayCleared === false || trip.lastDelayReason || trip.delayReason) return "DELAYED";
+  if (state.includes("COMPLETE")) return "COMPLETED";
+  if (state === "ARRIVING" || state === "ARRIVED") return "ARRIVING";
+  if (state === "IN_TRANSIT") return "IN_TRANSIT";
+  if (["READY", "LOADED", "READY_TO_START"].includes(state)) return "READY_TO_START";
+  if (state === "ASSIGNED") return "ASSIGNED";
+  return "PENDING_ASSIGNMENT";
+}
+
+function tripProgressValue(trip, fallback) {
+  const value = Number(trip.progressPercent ?? trip.progressPercentage ?? trip.progress);
+  return Number.isFinite(value) ? Math.max(0, Math.min(100, Math.round(value))) : fallback;
+}
+
 function heroTimePeriod(date = new Date()) {
   const hour = date.getHours();
   if (hour >= 5 && hour < 12) return "morning";
@@ -361,54 +391,55 @@ function DriverHeader({ colors, name, status, unread, onNotifications }) {
 }
 
 function CurrentTripCard({ trip, colors }) {
-  const statusTheme = tripStatusTone(trip.status, colors);
   const departure = trip.plannedDeparture || trip.scheduledDeparture || trip.departureTime || trip.scheduledDate || trip.departureDate;
   const arrival = trip.estimatedArrival || trip.arrivalEta || trip.eta;
   const arrivedAt = trip.arrivedAt || trip.actualArrival || trip.completedAt || arrival;
-  const arrivalLabel = ["ARRIVED", "COMPLETED"].includes(statusKey(trip.status)) ? "Date Arrived" : "Est. Arrival";
+  const visual = TRIP_STATE_VISUALS[tripVisualState(trip)];
+  const progress = tripProgressValue(trip, visual.progress);
+  const dateValue = visual.label === "Completed" && arrivedAt ? formatTripDateTime(arrivedAt) : "—";
 
   return (
     <DriverCard style={[styles.tripCard, softCard(colors)]}>
       <View style={styles.tripTop}>
         <Text style={[styles.tripNo, { color: colors.text }]} numberOfLines={1}>{tripNumber(trip)}</Text>
-        <View style={[styles.status, { backgroundColor: statusTheme.bg, borderColor: alpha(statusTheme.color, 0.16) }]}>
-          <Text style={[styles.statusText, { color: statusTheme.color }]}>{statusLabel(trip.status)}</Text>
+        <View style={[styles.status, { backgroundColor: alpha(visual.color, 0.15), borderColor: alpha(visual.color, 0.44) }]}>
+          <Text style={[styles.statusText, { color: visual.color }]}>{visual.label}</Text>
         </View>
       </View>
 
-      <View style={[styles.tripDivider, { backgroundColor: softBorder(colors) }]} />
+      <View style={styles.tripProgressBlock}>
+        <View style={styles.tripProgressHeader}>
+          <Text style={[styles.tripProgressLabel, { color: secondaryText(colors) }]}>Trip Progress</Text>
+          <Text style={[styles.tripProgressValue, { color: visual.color }]}>{progress}%</Text>
+        </View>
+        <View style={[styles.progressTrack, { backgroundColor: alpha(visual.color, 0.14) }]}>
+          <LinearGradient colors={[alpha(visual.color, 0.84), visual.color]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={[styles.progressFill, { width: `${progress}%` }]} />
+        </View>
+        <Text style={[styles.tripProgressText, { color: secondaryText(colors) }]} numberOfLines={1}>{visual.description}</Text>
+      </View>
 
-      <View style={styles.tripMain}>
-        <View style={styles.timeline}>
-          <RouteStop
-            colors={colors}
-            tone="primary"
-            label="Pickup"
-            title={tripOrigin(trip)}
-            time={formatTime(departure, "Time pending")}
-            first
-          />
-          <View style={styles.timelineConnector}>
-            <View style={[styles.timelineLine, { backgroundColor: softBorder(colors) }]} />
+      <View style={styles.tripRouteArea}>
+        <View style={[styles.tripTruckOrb, { borderColor: alpha(visual.color, visual.dotted ? 0.64 : 0.76), borderStyle: visual.dotted ? "dashed" : "solid" }]}>
+          {visual.glow ? <View style={[styles.tripTruckGlow, { backgroundColor: alpha(visual.color, visual.glow) }]} /> : null}
+          <Image source={require("../../assets/driver-card-truck.png")} resizeMode="contain" style={[styles.tripTruckImage, (visual.label === "Cancelled" || visual.label === "Pending") && styles.tripTruckImageMuted]} />
+          {visual.marker === "headlight" ? <View style={[styles.tripHeadlightGlow, { backgroundColor: alpha("#F8FAFC", 0.8) }]} /> : null}
+          {visual.marker && visual.marker !== "headlight" ? <View style={[styles.tripStateMarker, { backgroundColor: visual.color }]}><FontAwesome5 name={visual.marker} size={11} color="#FFFFFF" /></View> : null}
+        </View>
+        <View style={styles.routeLocations}>
+          <View style={[styles.routeVerticalLine, { borderLeftColor: alpha(colors.text, 0.45) }]} />
+          <View style={styles.routeDashRow}>
+            <View style={[styles.routeDashLine, { borderTopColor: alpha(colors.text, 0.42) }]} />
+            {visual.label !== "Cancelled" ? <FontAwesome5 name="caret-right" size={15} color={visual.color} /> : null}
           </View>
-          <RouteStop
-            colors={colors}
-            tone="success"
-            label="Destination"
-            title={tripDestination(trip)}
-            time={formatTime(arrival, "ETA pending")}
-          />
+          <RouteLocation icon="map-marker-alt" tone="primary" label="Pickup" title={tripOrigin(trip)} time={formatTime(departure, "Time pending")} colors={colors} />
+          <RouteLocation icon="map-marker-alt" tone="success" label="Destination" title={tripDestination(trip)} time={formatTime(arrival, "ETA pending")} colors={colors} />
         </View>
-      </View>
-
-      <View style={styles.truckIllustration}>
-        <FontAwesome5 name="truck" size={38} color={primaryAccent(colors, 0.92)} />
       </View>
 
       <View style={[styles.tripFacts, { borderTopColor: softBorder(colors) }]}>
-        <Fact label="Truck" value={trip.truckName || trip.truckType || "Assigned truck"} colors={colors} />
-        <Fact label="Plate Number" value={tripPlate(trip)} colors={colors} />
-        <Fact label={arrivalLabel} value={formatTripDateTime(arrivedAt)} colors={colors} />
+        <Fact icon="truck" label="Assigned Truck" value={trip.truckName || trip.truckType || "Assigned truck"} colors={colors} />
+        <Fact icon="id-card" label="Plate Number" value={tripPlate(trip)} colors={colors} divider />
+        <Fact icon="clock" label="Date Arrived" value={dateValue} colors={colors} divider />
       </View>
     </DriverCard>
   );
@@ -447,28 +478,40 @@ function SummarySection({ counts, colors, todayLabel }) {
 }
 
 function QuickActionsSection({ actions, colors }) {
+  const subtitles = {
+    "Start Trip": "Begin your assigned delivery route.",
+    "View Trip": "Review trip details and progress.",
+    "Report Issue": "Report delays, incidents, or problems.",
+    "Contact Checker": "Contact your assigned checker.",
+  };
+  const accents = { "Start Trip": "#2563EB", "View Trip": "#3B82F6", "Report Issue": "#EF4444", "Contact Checker": "#14B8A6" };
   return (
     <View style={styles.quickActionsSection}>
       <SectionTitle title="Quick Actions" colors={colors} compact />
       <View style={styles.actionGrid}>
         {actions.map((item) => {
           const color = toneColor(item.tone, colors);
-          const soft = toneSoft(item.tone, colors);
+          const accent = accents[item.label] || color;
           return (
             <Pressable
               key={item.label}
               onPress={item.action}
               disabled={item.loading}
               style={({ pressed }) => [
-                styles.actionItem,
+                styles.actionCard,
+                softCard(colors),
                 pressed && styles.pressed,
                 item.loading && styles.disabled,
               ]}
             >
-              <View style={[styles.actionIcon, softCard(colors), { backgroundColor: soft }]}>
-                {item.loading ? <ActivityIndicator size="small" color={color} /> : <FontAwesome5 name={item.icon} size={19} color={color} />}
+              <View style={[styles.actionIcon, { backgroundColor: alpha(accent, 0.18) }]}>
+                {item.loading ? <ActivityIndicator size="small" color={accent} /> : <FontAwesome5 name={item.icon} size={18} color={accent} />}
               </View>
-              <Text style={[styles.actionTitle, { color: colors.text }]} numberOfLines={2}>{item.label}</Text>
+              <View style={styles.actionCopy}>
+                <Text style={[styles.actionTitle, { color: colors.text }]}>{item.label}</Text>
+                <Text style={[styles.actionSubtitle, { color: secondaryText(colors) }]} numberOfLines={1}>{subtitles[item.label]}</Text>
+              </View>
+              <Feather name="chevron-right" size={22} color={captionText(colors)} />
             </Pressable>
           );
         })}
@@ -510,8 +553,21 @@ function RouteStop({ colors, tone, label, title, time, first }) {
   );
 }
 
-function Fact({ label, value, colors }) {
-  return <View style={styles.fact}><Text style={[styles.factLabel, { color: captionText(colors) }]}>{label}</Text><Text style={[styles.factValue, { color: colors.text }]} numberOfLines={2}>{value}</Text></View>;
+function RouteLocation({ icon, tone, label, title, time, colors, align }) {
+  const color = toneColor(tone, colors);
+  return <View style={[styles.routeLocation, align === "right" && styles.routeLocationRight]}>
+    <View style={[styles.routeLocationIcon, { backgroundColor: alpha(color, 0.16) }]}><FontAwesome5 name={icon} size={14} color={color} /></View>
+    <Text style={[styles.routeLocationTitle, { color: colors.text }]} numberOfLines={1}>{title}</Text>
+    <Text style={[styles.routeLocationLabel, { color }]}>{label}</Text>
+    <Text style={[styles.routeLocationTime, { color: captionText(colors) }]}>{time}</Text>
+  </View>;
+}
+
+function Fact({ icon, label, value, colors, divider }) {
+  return <View style={[styles.fact, divider && { borderLeftColor: softBorder(colors), borderLeftWidth: StyleSheet.hairlineWidth }]}>
+    <View style={[styles.factIcon, { backgroundColor: alpha(colors.primary, 0.12) }]}><FontAwesome5 name={icon} size={12} color={primaryAccent(colors, 1)} /></View>
+    <View style={styles.factCopy}><Text style={[styles.factLabel, { color: captionText(colors) }]}>{label}</Text><Text style={[styles.factValue, { color: colors.text }]} numberOfLines={2}>{value}</Text></View>
+  </View>;
 }
 
 function FadeIn({ children, delay = 0 }) {
@@ -652,10 +708,10 @@ const styles = StyleSheet.create({
   loadingCard: { minHeight: 150, alignItems: "center", justifyContent: "center", borderRadius: 12 },
   emptyCard: { borderRadius: 12 },
   tripCard: {
-    paddingHorizontal: 13,
-    paddingTop: 12,
-    paddingBottom: 13,
-    borderRadius: 11,
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 15,
+    borderRadius: 19,
     overflow: "hidden",
     shadowOffset: { width: 0, height: 10 },
     shadowOpacity: 0.07,
@@ -664,9 +720,33 @@ const styles = StyleSheet.create({
   },
   tripTop: { flexDirection: "row", alignItems: "center", gap: 8 },
   tripDivider: { height: StyleSheet.hairlineWidth, marginTop: 12 },
-  tripNo: { flex: 1, fontSize: 10, lineHeight: 13, fontWeight: "800" },
-  status: { borderRadius: 9, borderWidth: StyleSheet.hairlineWidth, paddingHorizontal: 8, paddingVertical: 4 },
-  statusText: { fontSize: 8, fontWeight: "800" },
+  tripNo: { flex: 1, fontSize: 15, lineHeight: 20, fontWeight: "600" },
+  status: { borderRadius: 16, borderWidth: StyleSheet.hairlineWidth, paddingHorizontal: 11, paddingVertical: 6 },
+  statusText: { fontSize: 10, fontWeight: "600" },
+  tripProgressBlock: { marginTop: 20 },
+  tripProgressHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 8 },
+  tripProgressLabel: { fontSize: 13, lineHeight: 17, fontWeight: "400" },
+  tripProgressValue: { fontSize: 15, lineHeight: 18, fontWeight: "600" },
+  progressTrack: { height: 7, borderRadius: 4, overflow: "hidden" },
+  progressFill: { height: "100%", borderRadius: 4 },
+  tripProgressText: { marginTop: 8, fontSize: 12, lineHeight: 16, fontWeight: "400" },
+  tripRouteArea: { minHeight: 126, marginTop: 19, paddingRight: 93, justifyContent: "center" },
+  tripTruckOrb: { position: "absolute", right: 0, top: 4, width: 82, height: 82, borderRadius: 41, borderWidth: 1, alignItems: "center", justifyContent: "center", overflow: "visible" },
+  tripTruckGlow: { position: "absolute", width: 82, height: 82, borderRadius: 41 },
+  tripTruckImage: { width: 68, height: 58, zIndex: 1 },
+  tripTruckImageMuted: { opacity: 0.5 },
+  tripHeadlightGlow: { position: "absolute", right: 9, bottom: 19, width: 18, height: 6, borderRadius: 4 },
+  tripStateMarker: { position: "absolute", right: -7, bottom: -4, width: 28, height: 28, borderRadius: 14, borderWidth: 2, borderColor: "#071A2D", alignItems: "center", justifyContent: "center" },
+  routeLocations: { gap: 12, justifyContent: "center", position: "relative" },
+  routeLocation: { minHeight: 50, minWidth: 0, paddingLeft: 37, position: "relative", zIndex: 1 },
+  routeLocationRight: { alignItems: "flex-end" },
+  routeLocationIcon: { position: "absolute", left: 0, top: 1, width: 26, height: 26, borderRadius: 13, alignItems: "center", justifyContent: "center" },
+  routeLocationTitle: { fontSize: 13, lineHeight: 17, fontWeight: "600", maxWidth: "100%" },
+  routeLocationLabel: { marginTop: 3, fontSize: 10, lineHeight: 13, fontWeight: "400" },
+  routeLocationTime: { marginTop: 3, fontSize: 10, lineHeight: 13, fontWeight: "400" },
+  routeVerticalLine: { position: "absolute", left: 13, top: 14, height: 62, borderLeftWidth: 1, borderStyle: "dashed", zIndex: 0 },
+  routeDashRow: { position: "absolute", left: 112, right: 2, top: 62, flexDirection: "row", alignItems: "center", gap: 5, zIndex: 0 },
+  routeDashLine: { flex: 1, borderTopWidth: 1, borderStyle: "dashed" },
   tripMain: { marginTop: 13, minHeight: 112, flexDirection: "row", alignItems: "flex-start", gap: 12, paddingLeft: 4, paddingRight: 94 },
   timeline: { flex: 1, minWidth: 0 },
   routeStop: { flexDirection: "row", alignItems: "flex-start", gap: 10 },
@@ -689,15 +769,17 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   tripFacts: {
-    marginTop: 8,
-    paddingTop: 10,
+    marginTop: 7,
+    paddingTop: 14,
     borderTopWidth: StyleSheet.hairlineWidth,
     flexDirection: "row",
     gap: 0,
   },
-  fact: { flex: 1, minWidth: 0, paddingRight: 6 },
-  factLabel: { fontSize: 8, lineHeight: 10, fontWeight: "700" },
-  factValue: { marginTop: 3, fontSize: 8, lineHeight: 11, fontWeight: "800" },
+  fact: { flex: 1, minWidth: 0, paddingHorizontal: 7, flexDirection: "row", gap: 6, alignItems: "flex-start" },
+  factIcon: { width: 25, height: 25, borderRadius: 8, alignItems: "center", justifyContent: "center" },
+  factCopy: { flex: 1, minWidth: 0 },
+  factLabel: { fontSize: 8, lineHeight: 10, fontWeight: "400" },
+  factValue: { marginTop: 4, fontSize: 9, lineHeight: 12, fontWeight: "500" },
   overviewSection: { marginTop: 22 },
   overviewHeader: {
     minHeight: 22,
@@ -723,16 +805,13 @@ const styles = StyleSheet.create({
   statIcon: { width: 24, height: 24, borderRadius: 7, alignItems: "center", justifyContent: "center" },
   statLabel: { marginTop: 9, fontSize: 8, lineHeight: 10, fontWeight: "700" },
   statValue: { marginTop: 8, fontSize: 18, lineHeight: 22, fontWeight: "800" },
-  actionGrid: { flexDirection: "row", justifyContent: "space-between", gap: 12 },
+  actionGrid: { gap: 9 },
   quickActionsSection: { marginTop: 22 },
-  actionItem: {
-    flex: 1,
-    alignItems: "center",
-  },
+  actionCard: { minHeight: 69, borderRadius: 15, paddingHorizontal: 14, paddingVertical: 10, flexDirection: "row", alignItems: "center", gap: 12, shadowOffset: { width: 0, height: 7 }, shadowOpacity: 0.05, shadowRadius: 12, elevation: 1 },
   actionIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 9,
+    width: 42,
+    height: 42,
+    borderRadius: 21,
     alignItems: "center",
     justifyContent: "center",
     shadowOffset: { width: 0, height: 8 },
@@ -740,7 +819,9 @@ const styles = StyleSheet.create({
     shadowRadius: 14,
     elevation: 2,
   },
-  actionTitle: { marginTop: 7, fontSize: 8, lineHeight: 11, textAlign: "center", fontWeight: "700" },
+  actionCopy: { flex: 1, minWidth: 0 },
+  actionTitle: { fontSize: 14, lineHeight: 18, fontWeight: "600" },
+  actionSubtitle: { marginTop: 3, fontSize: 10, lineHeight: 13, fontWeight: "400" },
   pressed: { transform: [{ scale: 0.98 }] },
   disabled: { opacity: 0.64 },
   notificationPage: { flex: 1 },
