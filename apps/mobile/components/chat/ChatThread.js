@@ -50,6 +50,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   collection,
   doc,
+  getDoc,
   limit,
   onSnapshot,
   orderBy,
@@ -176,7 +177,7 @@ function CallHistoryCard({ message, mine, colors, onCall }) {
   );
 }
 
-function MessageBubble({ item, colors, onOpenImage, onCall }) {
+function MessageBubble({ item, colors, onOpenImage, onCall, isCustomerSupport, senderPhotoURL }) {
   const { message, mine, isFirstInGroup, isLastInGroup } = item;
   const attachment = getMessageAttachment(message);
   const text = getMessageText(message);
@@ -203,6 +204,8 @@ function MessageBubble({ item, colors, onOpenImage, onCall }) {
   const isFile = attachment?.type === "file";
   const isAudio = attachment?.type === "audio";
   const isCall = String(message.type || "").trim().toLowerCase() === "call";
+  const isSupportSender = String(message.senderRole || "").trim().toLowerCase() !== "customer";
+  const isCustomerSupportMessageFromSupport = isCustomerSupport && !mine && isSupportSender;
 
   return (
     <Animated.View
@@ -226,7 +229,16 @@ function MessageBubble({ item, colors, onOpenImage, onCall }) {
       {!mine && (
         <View style={styles.avatarSlot}>
           {isLastInGroup ? (
-            <PersonAvatar name={message.senderName || "Atlas Support"} size={28} />
+            isCustomerSupportMessageFromSupport ? (
+              <SupportAvatar size={28} online={false} ringColor={colors.chatBg} />
+            ) : (
+              <PersonAvatar
+                name={message.senderName || "Atlas Support"}
+                avatarSeed={message.senderId || message.senderName}
+                photoURL={senderPhotoURL}
+                size={28}
+              />
+            )
           ) : (
             <View style={{ width: 28 }} />
           )}
@@ -1038,6 +1050,7 @@ export default function ChatThread({ conversationId, onBack, embedded = false })
 
   const [conversation, setConversation] = useState(null);
   const [messages, setMessages] = useState([]);
+  const [senderPhotoURLs, setSenderPhotoURLs] = useState({});
   const [draft, setDraft] = useState("");
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
@@ -1056,6 +1069,34 @@ export default function ChatThread({ conversationId, onBack, embedded = false })
   const [newCount, setNewCount] = useState(0);
 
   const myUid = auth.currentUser?.uid;
+  const senderPhotoIds = useMemo(
+    () => [...new Set(messages.map((message) => String(message?.senderId || "").trim()).filter(Boolean))].sort(),
+    [messages],
+  );
+  const senderPhotoIdsKey = senderPhotoIds.join(",");
+
+  useEffect(() => {
+    let active = true;
+    if (!senderPhotoIds.length) {
+      setSenderPhotoURLs({});
+      return undefined;
+    }
+
+    Promise.all(
+      senderPhotoIds.map(async (uid) => {
+        const snapshot = await getDoc(doc(db, "users", uid));
+        return [uid, snapshot.exists() ? String(snapshot.data()?.photoURL || "").trim() : ""];
+      }),
+    )
+      .then((entries) => {
+        if (active) setSenderPhotoURLs(Object.fromEntries(entries));
+      })
+      .catch((error) => console.warn("Chat sender photo lookup skipped:", error));
+
+    return () => {
+      active = false;
+    };
+  }, [senderPhotoIdsKey]);
 
   // Conversation metadata subscription.
   useEffect(() => {
@@ -1157,6 +1198,7 @@ export default function ChatThread({ conversationId, onBack, embedded = false })
 
   const isClosed = conversation?.status === "closed";
   const isDirectStaff = conversation?.type === "direct_staff";
+  const isCustomerSupport = conversation?.type === "customer_support";
   const directContact = useMemo(() => {
     if (!isDirectStaff) return null;
     const contactId = (conversation?.participantIds || []).find((id) => id !== myUid);
@@ -1437,6 +1479,8 @@ export default function ChatThread({ conversationId, onBack, embedded = false })
         colors={colors}
         onOpenImage={setLightbox}
         onCall={startCall}
+        isCustomerSupport={isCustomerSupport}
+        senderPhotoURL={senderPhotoURLs[String(item.message?.senderId || "").trim()] || null}
       />
     );
   };

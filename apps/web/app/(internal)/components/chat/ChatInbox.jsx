@@ -44,6 +44,7 @@ import {
   faXmark,
   faSpinner,
   faPaperclip,
+  faHeadset,
 } from "@fortawesome/free-solid-svg-icons";
 import { db, storage, auth } from "@/lib/firebase";
 import {
@@ -336,6 +337,18 @@ function Avatar({ name, photoURL, size = 40, online = false }) {
   );
 }
 
+function AtlasSupportAvatar({ size = 40 }) {
+  return (
+    <div
+      className="flex shrink-0 items-center justify-center rounded-full bg-blue-600 text-white"
+      style={{ width: size, height: size, fontSize: size * 0.42 }}
+      aria-label="Atlas Support"
+    >
+      <FontAwesomeIcon icon={faHeadset} />
+    </div>
+  );
+}
+
 export default function ChatInbox({ user, profile, isDark = false, onViewCustomers }) {
   const [conversations, setConversations] = useState([]);
   const [selectedId, setSelectedId] = useState(null);
@@ -387,8 +400,11 @@ export default function ChatInbox({ user, profile, isDark = false, onViewCustome
         if (id) ids.add(String(id));
       });
     });
+    messages.forEach((message) => {
+      if (message.senderId) ids.add(String(message.senderId));
+    });
     return [...ids].sort();
-  }, [conversations]);
+  }, [conversations, messages]);
   const profilePhotoUserIdsKey = profilePhotoUserIds.join(",");
 
   useEffect(() => {
@@ -560,6 +576,7 @@ export default function ChatInbox({ user, profile, isDark = false, onViewCustome
   );
   const selectedName = conversationDisplayName(selected || {}, user?.uid);
   const selectedIsDirect = isDirectStaffConversation(selected || {});
+  const selectedIsCustomerSupport = selected?.type === "customer_support";
   const assignedStaffId = selected?.assignedStaffId || selected?.assignedTo || null;
   const assignedStaffName = selected?.assignedStaffName || selected?.assignedToName || "";
   const assignedStaffRole = selected?.assignedStaffRole || selected?.assignedRole || "";
@@ -1157,15 +1174,19 @@ export default function ChatInbox({ user, profile, isDark = false, onViewCustome
                   >
                     <FontAwesomeIcon icon={faChevronLeft} />
                   </button>
-                  <Avatar
-                    name={selectedName}
-                    photoURL={profilePhotoFor(
-                      selectedDirectPeer?.id || selected?.customerId,
-                      selectedDirectPeer?.photoURL || customerProfile?.photoURL,
-                    )}
-                    size={40}
-                    online={selectedIsDirect ? !!selectedDirectPeer?.online : selected.status === "open"}
-                  />
+                  {selectedIsCustomerSupport ? (
+                    <AtlasSupportAvatar size={40} />
+                  ) : (
+                    <Avatar
+                      name={selectedName}
+                      photoURL={profilePhotoFor(
+                        selectedDirectPeer?.id || selected?.customerId,
+                        selectedDirectPeer?.photoURL || customerProfile?.photoURL,
+                      )}
+                      size={40}
+                      online={selectedIsDirect ? !!selectedDirectPeer?.online : selected.status === "open"}
+                    />
+                  )}
                   <div className="min-w-0">
                     <h2 className="truncate text-sm font-bold">
                       {selectedName}
@@ -1240,6 +1261,9 @@ export default function ChatInbox({ user, profile, isDark = false, onViewCustome
                       ? String(prev.callerId || prev.senderId || "").trim()
                       : "";
                     const showAvatar = !mine && prevOwnerId !== ownerId;
+                    const senderRole = String(message.senderRole || "").trim().toLowerCase();
+                    const isCustomerSupportMessageFromSupport =
+                      selectedIsCustomerSupport && !mine && senderRole !== "customer";
                     return (
                       <div
                         key={message.id}
@@ -1247,7 +1271,15 @@ export default function ChatInbox({ user, profile, isDark = false, onViewCustome
                       >
                         {!mine &&
                           (showAvatar ? (
-                            <Avatar name={message.senderName} size={28} />
+                            isCustomerSupportMessageFromSupport ? (
+                              <AtlasSupportAvatar size={28} />
+                            ) : (
+                              <Avatar
+                                name={message.senderName}
+                                photoURL={profilePhotoFor(ownerId)}
+                                size={28}
+                              />
+                            )
                           ) : (
                             <div className="w-7 shrink-0" />
                           ))}
