@@ -201,7 +201,11 @@ export default function CheckerChatScreen({ accountType = "checker" }) {
     if (!accessToken || !uid) return undefined;
     const conversationsQuery = query(
       collection(db, "conversations"),
-      where(isDriver ? "driverAccessTokens" : "participantIds", "array-contains", isDriver ? accessToken : uid),
+      where(
+        isDriver ? "driverAccessTokens" : "checkerAccessTokens",
+        "array-contains",
+        accessToken,
+      ),
       where("type", "==", "direct_staff"),
     );
     return onSnapshot(
@@ -568,7 +572,7 @@ export default function CheckerChatScreen({ accountType = "checker" }) {
       <View style={[styles.splitList, { borderRightColor: colors.border }]}>{renderList()}</View>
       <View style={styles.splitThread}>
         {selectedId ? (
-          <ChatThread conversationId={selectedId} embedded />
+          <ChatThread conversationId={selectedId} embedded showSenderProfilePhotos />
         ) : (
           <View style={styles.empty}>
             <View style={[styles.emptyIcon, { backgroundColor: colors.accentSoft }]}>

@@ -50,7 +50,6 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   collection,
   doc,
-  getDoc,
   limit,
   onSnapshot,
   orderBy,
@@ -177,7 +176,7 @@ function CallHistoryCard({ message, mine, colors, onCall }) {
   );
 }
 
-function MessageBubble({ item, colors, onOpenImage, onCall, isCustomerSupport, senderPhotoURL }) {
+function MessageBubble({ item, colors, onOpenImage, onCall, isCustomerSupport, senderPhotoURL, showSenderProfilePhotos }) {
   const { message, mine, isFirstInGroup, isLastInGroup } = item;
   const attachment = getMessageAttachment(message);
   const text = getMessageText(message);
@@ -205,7 +204,8 @@ function MessageBubble({ item, colors, onOpenImage, onCall, isCustomerSupport, s
   const isAudio = attachment?.type === "audio";
   const isCall = String(message.type || "").trim().toLowerCase() === "call";
   const isSupportSender = String(message.senderRole || "").trim().toLowerCase() !== "customer";
-  const isCustomerSupportMessageFromSupport = isCustomerSupport && !mine && isSupportSender;
+  const isCustomerSupportMessageFromSupport =
+    isCustomerSupport && !showSenderProfilePhotos && !mine && isSupportSender;
 
   return (
     <Animated.View
@@ -1006,7 +1006,12 @@ function SettingRow({ ui = UI, label, value, children }) {
   );
 }
 
-export default function ChatThread({ conversationId, onBack, embedded = false }) {
+export default function ChatThread({
+  conversationId,
+  onBack,
+  embedded = false,
+  showSenderProfilePhotos = false,
+}) {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { colors: themeColors, resolvedScheme } = useTheme();
@@ -1050,7 +1055,6 @@ export default function ChatThread({ conversationId, onBack, embedded = false })
 
   const [conversation, setConversation] = useState(null);
   const [messages, setMessages] = useState([]);
-  const [senderPhotoURLs, setSenderPhotoURLs] = useState({});
   const [draft, setDraft] = useState("");
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
@@ -1069,34 +1073,15 @@ export default function ChatThread({ conversationId, onBack, embedded = false })
   const [newCount, setNewCount] = useState(0);
 
   const myUid = auth.currentUser?.uid;
-  const senderPhotoIds = useMemo(
-    () => [...new Set(messages.map((message) => String(message?.senderId || "").trim()).filter(Boolean))].sort(),
-    [messages],
+  const senderPhotoURLs = useMemo(
+    () => Object.fromEntries(
+      Object.entries(conversation?.participantProfiles || {}).map(([uid, profile]) => [
+        uid,
+        String(profile?.photoURL || "").trim(),
+      ]),
+    ),
+    [conversation?.participantProfiles],
   );
-  const senderPhotoIdsKey = senderPhotoIds.join(",");
-
-  useEffect(() => {
-    let active = true;
-    if (!senderPhotoIds.length) {
-      setSenderPhotoURLs({});
-      return undefined;
-    }
-
-    Promise.all(
-      senderPhotoIds.map(async (uid) => {
-        const snapshot = await getDoc(doc(db, "users", uid));
-        return [uid, snapshot.exists() ? String(snapshot.data()?.photoURL || "").trim() : ""];
-      }),
-    )
-      .then((entries) => {
-        if (active) setSenderPhotoURLs(Object.fromEntries(entries));
-      })
-      .catch((error) => console.warn("Chat sender photo lookup skipped:", error));
-
-    return () => {
-      active = false;
-    };
-  }, [senderPhotoIdsKey]);
 
   // Conversation metadata subscription.
   useEffect(() => {
@@ -1480,7 +1465,10 @@ export default function ChatThread({ conversationId, onBack, embedded = false })
         onOpenImage={setLightbox}
         onCall={startCall}
         isCustomerSupport={isCustomerSupport}
-        senderPhotoURL={senderPhotoURLs[String(item.message?.senderId || "").trim()] || null}
+        senderPhotoURL={showSenderProfilePhotos
+          ? senderPhotoURLs[String(item.message?.senderId || "").trim()] || null
+          : null}
+        showSenderProfilePhotos={showSenderProfilePhotos}
       />
     );
   };

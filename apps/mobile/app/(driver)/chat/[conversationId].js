@@ -19,6 +19,7 @@ export default function DriverChatThreadPage() {
       <ChatThread
         conversationId={String(conversationId || "")}
         onBack={handleBack}
+        showSenderProfilePhotos
       />
     </View>
   );

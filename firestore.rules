@@ -112,6 +112,11 @@ service cloud.firestore {
           && driverChatAccessToken() in conversation.get('driverAccessTokens', [])
         )
         || (
+          conversation.get('type', '') == 'direct_staff'
+          && userRole() == 'checker'
+          && checkerChatAccessToken() in conversation.get('checkerAccessTokens', [])
+        )
+        || (
           request.auth.uid in conversation.get('participantIds', [])
           && (
             conversation.get('type', '') != 'direct_staff'

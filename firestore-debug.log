@@ -22,3 +22,9 @@ Jul 19, 2026 3:25:27 AM io.grpc.netty.TcpMetrics loadEpollInfo
 INFO: Epoll available during static init of TcpMetrics:false
 Jul 19, 2026 3:25:27 AM io.gapi.emulators.netty.HttpVersionRoutingHandler channelRead
 INFO: Detected HTTP/2 connection.
+Jul 19, 2026 4:32:12 AM io.gapi.emulators.netty.HttpVersionRoutingHandler channelRead
+INFO: Detected non-HTTP/2 connection.
+Jul 19, 2026 4:32:12 AM io.gapi.emulators.netty.HttpVersionRoutingHandler channelRead
+INFO: Detected non-HTTP/2 connection.
+Jul 19, 2026 4:32:13 AM io.gapi.emulators.netty.HttpVersionRoutingHandler channelRead
+INFO: Detected HTTP/2 connection.
