@@ -73,7 +73,10 @@ const roleConfig = {
   },
 };
 
-export default function ProfileViewer({ showBackButton = false }) {
+export default function ProfileViewer({
+  showBackButton = false,
+  compactTop = false,
+}) {
   const router = useRouter();
   const { user, refreshUser, signOut } = useAuth();
   const { preference, setPreference, resolvedScheme, colors } = useTheme();
@@ -134,6 +137,10 @@ export default function ProfileViewer({ showBackButton = false }) {
     : isStaff
       ? displayValue(warehouseSummary, `${config.label} Account`)
       : "User Account";
+  const avatarBg = isDark ? colors.cardMuted : config.bg;
+  const avatarBorder = isDark ? colors.border : config.border;
+  const roleBg = isDark ? colors.cardMuted : config.bg;
+  const roleBorder = isDark ? colors.border : config.border;
 
   const handleSave = async () => {
     if (!user?.uid) {
@@ -249,6 +256,25 @@ export default function ProfileViewer({ showBackButton = false }) {
         error?.message || "Please try changing your theme again.",
       );
     }
+  };
+
+  const handleSignOut = () => {
+    Alert.alert("Sign Out", "Are you sure you want to sign out?", [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Sign Out",
+        style: "destructive",
+        onPress: async () => {
+          try {
+            await signOut();
+          } catch (err) {
+            console.log("Sign out failed:", err);
+          } finally {
+            router.replace("/(auth)/login");
+          }
+        },
+      },
+    ]);
   };
 
   const handleSyncThemePreference = async () => {
@@ -402,8 +428,16 @@ export default function ProfileViewer({ showBackButton = false }) {
     );
   };
 
+  const Container = compactTop ? View : SafeAreaView;
+
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.bg }]}>
+    <Container
+      style={[
+        styles.container,
+        compactTop && styles.containerCompactTop,
+        { backgroundColor: colors.bg },
+      ]}
+    >
       {showBackButton && (
         <ShipmentDetailHeader
           title="Profile"
@@ -414,7 +448,10 @@ export default function ProfileViewer({ showBackButton = false }) {
 
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[
+          styles.scrollContent,
+          compactTop && styles.scrollContentCompactTop,
+        ]}
       >
         <View
           style={[
@@ -425,7 +462,7 @@ export default function ProfileViewer({ showBackButton = false }) {
           <View
             style={[
               styles.avatar,
-              { backgroundColor: config.bg, borderColor: config.border },
+              { backgroundColor: avatarBg, borderColor: avatarBorder },
             ]}
           >
             <FontAwesome5 name={config.icon} size={24} color={config.color} />
@@ -436,8 +473,8 @@ export default function ProfileViewer({ showBackButton = false }) {
               style={[
                 styles.rolePill,
                 {
-                  backgroundColor: colors.cardMuted,
-                  borderColor: colors.border,
+                  backgroundColor: roleBg,
+                  borderColor: roleBorder,
                 },
               ]}
             >
@@ -836,6 +873,40 @@ export default function ProfileViewer({ showBackButton = false }) {
         {!isEditing && (
           <View
             style={[
+              styles.card,
+              { backgroundColor: colors.surface, borderColor: colors.border },
+            ]}
+          >
+            <SectionHeader
+              icon="sign-out-alt"
+              eyebrow="Session"
+              title="Sign Out"
+              colors={colors}
+              isDark={isDark}
+            />
+            <Text style={[styles.hintMuted, { color: colors.textMuted }]}>
+              End this session and return to the login screen.
+            </Text>
+            <TouchableOpacity
+              style={[
+                styles.signOutBtn,
+                {
+                  backgroundColor: colors.cardMuted,
+                  borderColor: colors.border,
+                },
+              ]}
+              onPress={handleSignOut}
+              activeOpacity={0.85}
+            >
+              <FontAwesome5 name="sign-out-alt" size={14} color={DANGER} />
+              <Text style={styles.signOutBtnText}>Sign Out</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {isCustomer && !isEditing && (
+          <View
+            style={[
               styles.dangerCard,
               {
                 backgroundColor: isDark ? "#2a1518" : "#fff7f7",
@@ -940,7 +1011,7 @@ export default function ProfileViewer({ showBackButton = false }) {
           syncNow={offlineSync.syncNow}
         />
       ) : null}
-    </SafeAreaView>
+    </Container>
   );
 }
 
@@ -966,11 +1037,17 @@ const styles = StyleSheet.create({
     backgroundColor: "#f8fafc",
     paddingTop: Platform.OS === "android" ? RNStatusBar.currentHeight || 0 : 0,
   },
+  containerCompactTop: {
+    paddingTop: 0,
+  },
   scrollContent: {
     paddingHorizontal: 16,
     paddingTop: 16,
     paddingBottom: 40,
     gap: 14,
+  },
+  scrollContentCompactTop: {
+    paddingTop: 12,
   },
   heroCard: {
     backgroundColor: "#ffffff",
@@ -980,6 +1057,11 @@ const styles = StyleSheet.create({
     borderColor: "#e2e8f0",
     flexDirection: "row",
     alignItems: "center",
+    shadowColor: "#0f172a",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 2,
   },
   avatar: {
     width: 64,
@@ -1025,6 +1107,11 @@ const styles = StyleSheet.create({
     padding: 16,
     borderWidth: 1,
     borderColor: "#e2e8f0",
+    shadowColor: "#0f172a",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 2,
   },
   cardHeader: {
     flexDirection: "row",
@@ -1235,6 +1322,21 @@ const styles = StyleSheet.create({
     color: "#ffffff",
     fontSize: 13,
     fontWeight: "700",
+  },
+  signOutBtn: {
+    minHeight: 48,
+    borderRadius: 14,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    flexDirection: "row",
+    gap: 8,
+    paddingHorizontal: 14,
+  },
+  signOutBtnText: {
+    color: "#dc2626",
+    fontSize: 15,
+    fontWeight: "800",
   },
   dangerCard: {
     borderRadius: 18,

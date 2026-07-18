@@ -12,7 +12,7 @@ import {
   ActivityIndicator,
   Alert,
 } from "react-native";
-import { FontAwesome5 } from "@expo/vector-icons";
+import FontAwesome5 from "@expo/vector-icons/FontAwesome5";
 import { auth } from "../../../firebase";
 
 // We use the logic from your Web InputGroup but adapted for React Native
@@ -104,18 +104,34 @@ export default function RequestPickupModal({
   };
 
   const handleFormSubmit = () => {
+    const missingAddressFields = [];
+    if (!sender.province?.trim()) missingAddressFields.push("sender province");
+    if (!sender.city?.trim()) missingAddressFields.push("sender municipality/city");
+    if (!recipient.province?.trim()) missingAddressFields.push("recipient province");
+    if (!recipient.city?.trim()) {
+      missingAddressFields.push("recipient municipality/city");
+    }
+
+    if (missingAddressFields.length > 0) {
+      Alert.alert(
+        "Missing Address",
+        `Please select ${missingAddressFields.join(", ")} before submitting.`,
+      );
+      return;
+    }
+
     const hasSender =
-      sender.name &&
-      sender.phone &&
-      sender.street &&
-      sender.province &&
-      sender.city;
+      sender.name?.trim() &&
+      sender.phone?.trim() &&
+      sender.street?.trim() &&
+      sender.province?.trim() &&
+      sender.city?.trim();
     const hasRecipient =
-      recipient.name &&
-      recipient.phone &&
-      recipient.street &&
-      recipient.province &&
-      recipient.city;
+      recipient.name?.trim() &&
+      recipient.phone?.trim() &&
+      recipient.street?.trim() &&
+      recipient.province?.trim() &&
+      recipient.city?.trim();
     const hasValidItems = items.every(
       (item) => item.description && Number(item.quantity) > 0,
     );
@@ -301,12 +317,14 @@ export default function RequestPickupModal({
           </View>
         </KeyboardAvoidingView>
       </View>
-      <MapPickupModal
-        visible={showMapModal}
-        initialLocation={location}
-        onClose={() => setShowMapModal(false)}
-        onConfirm={(newLoc) => setLocation(newLoc)}
-      />
+      {showMapModal && (
+        <MapPickupModal
+          visible={showMapModal}
+          initialLocation={location}
+          onClose={() => setShowMapModal(false)}
+          onConfirm={(newLoc) => setLocation(newLoc)}
+        />
+      )}
     </Modal>
   );
 }

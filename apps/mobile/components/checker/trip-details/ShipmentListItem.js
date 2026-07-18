@@ -38,13 +38,7 @@ export default function ShipmentListItem({ item, onPress, onMenuPress }) {
         </View>
       </TouchableOpacity>
 
-      {/* 3-Dot Menu */}
-      <TouchableOpacity
-        style={styles.menuBtn}
-        onPress={() => onMenuPress(item)}
-      >
-        <FontAwesome5 name="ellipsis-v" size={20} color="#94a3b8" />
-      </TouchableOpacity>
+      {/* menu removed per design */}
     </View>
   );
 }

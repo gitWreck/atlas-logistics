@@ -15,8 +15,44 @@ export async function readJson(key, fallback = null) {
   }
 }
 
+const MAX_SAFE_STORAGE_BYTES = 4_000_000;
+
+function isStorageQuotaError(error) {
+  const message = String(error?.message || "").toLowerCase();
+  return [
+    "quota",
+    "quotaexceeded",
+    "exceeded",
+    "domexception",
+    "diskquota",
+  ].some((term) => message.includes(term));
+}
+
 export async function writeJson(key, value) {
-  await AsyncStorage.setItem(key, JSON.stringify(value));
+  const json = JSON.stringify(value);
+  if (json.length > MAX_SAFE_STORAGE_BYTES) {
+    console.warn(
+      "offlineStorage write skipped because payload exceeds safe quota:",
+      key,
+      json.length,
+    );
+    return;
+  }
+
+  try {
+    await AsyncStorage.setItem(key, json);
+  } catch (error) {
+    if (isStorageQuotaError(error)) {
+      console.warn("offlineStorage write quota exceeded for", key, error);
+      try {
+        await AsyncStorage.removeItem(key);
+      } catch (cleanupError) {
+        console.warn("offlineStorage cleanup failed for", key, cleanupError);
+      }
+      return;
+    }
+    throw error;
+  }
 }
 
 export function generateOperationId() {

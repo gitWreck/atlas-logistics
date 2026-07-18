@@ -271,9 +271,13 @@ function requireAuth(context) {
 }
 
 function isAnonymousAuth(context) {
-  return (
-    context?.auth?.token?.firebase?.sign_in_provider === "anonymous"
-  );
+  const token = context?.auth?.token || {};
+  const provider =
+    token?.firebase?.sign_in_provider ||
+    token?.sign_in_provider ||
+    token?.provider_id ||
+    "";
+  return String(provider).toLowerCase() === "anonymous";
 }
 
 async function requireRole(db, context, allowedRoles = []) {

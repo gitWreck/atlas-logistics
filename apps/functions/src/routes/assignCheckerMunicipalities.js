@@ -55,6 +55,7 @@ exports.assignCheckerMunicipalities = onCall(
     await checkerRef.set(
       {
         assignedMunicipalities: normalizedMunicipalities,
+        checkerChatAccessKey: FieldValue.delete(),
         municipalitiesAssignedAt: FieldValue.serverTimestamp(),
         municipalitiesAssignedBy: actor.name || actor.uid,
         updatedAt: FieldValue.serverTimestamp(),

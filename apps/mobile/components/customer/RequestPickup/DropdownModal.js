@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   FlatList,
   StyleSheet,
+  TextInput,
 } from "react-native";
 import { useTheme } from "../../../contexts/ThemeContext";
 
@@ -15,8 +16,29 @@ export default function DropdownModal({
   options,
   onSelect,
   onClose,
+  searchable = true,
+  emptyMessage = "No options found.",
 }) {
   const { colors } = useTheme();
+  const [search, setSearch] = React.useState("");
+
+  React.useEffect(() => {
+    if (!visible) setSearch("");
+  }, [visible]);
+
+  const getLabel = React.useCallback((item) => {
+    if (item && typeof item === "object") {
+      return String(item.name || item.label || item.value || "");
+    }
+    return String(item || "");
+  }, []);
+
+  const filteredOptions = React.useMemo(() => {
+    const list = Array.isArray(options) ? options : [];
+    const term = search.trim().toLowerCase();
+    if (!term) return list;
+    return list.filter((item) => getLabel(item).toLowerCase().includes(term));
+  }, [getLabel, options, search]);
 
   return (
     <Modal visible={visible} transparent animationType="slide">
@@ -28,15 +50,38 @@ export default function DropdownModal({
             </Text>
           )}
 
+          {searchable && (
+            <TextInput
+              style={[
+                styles.searchInput,
+                {
+                  backgroundColor: colors.inputBg,
+                  borderColor: colors.border,
+                  color: colors.text,
+                },
+              ]}
+              value={search}
+              onChangeText={setSearch}
+              placeholder="Search..."
+              placeholderTextColor={colors.textMuted}
+              autoCorrect={false}
+            />
+          )}
+
           <FlatList
-            data={options}
+            data={filteredOptions}
             // Ensures a unique key whether the item is a string or an object
             keyExtractor={(item, index) =>
-              String(item.id || item.name || item) + index
+              String(item?.id || item?.code || getLabel(item)) + index
+            }
+            ListEmptyComponent={
+              <Text style={[styles.emptyText, { color: colors.textMuted }]}>
+                {emptyMessage}
+              </Text>
             }
             renderItem={({ item }) => {
               // Automatically grabs the display name whether it's an object {name: "Cebu"} or string "Box"
-              const displayLabel = item.name || item.label || item;
+              const displayLabel = getLabel(item);
 
               return (
                 <TouchableOpacity
@@ -85,8 +130,22 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "800",
     color: "#0f172a",
-    marginBottom: 16,
+    marginBottom: 12,
     textAlign: "center",
+  },
+  searchInput: {
+    borderWidth: 1,
+    borderColor: "#e2e8f0",
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    fontSize: 14,
+    marginBottom: 10,
+  },
+  emptyText: {
+    textAlign: "center",
+    paddingVertical: 24,
+    fontSize: 14,
   },
   modalItem: {
     paddingVertical: 16,

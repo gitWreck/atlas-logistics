@@ -8,6 +8,7 @@ import {
   View,
 } from "react-native";
 import { FontAwesome5 } from "@expo/vector-icons";
+import { useTheme } from "../../contexts/ThemeContext";
 
 export default function BatchDeliverySummaryModal({
   visible,
@@ -22,6 +23,7 @@ export default function BatchDeliverySummaryModal({
   onCompleteScan,
   onCancel,
 }) {
+  const { colors } = useTheme();
   const total = pieces.length;
 
   return (
@@ -32,23 +34,30 @@ export default function BatchDeliverySummaryModal({
       onRequestClose={onCancel}
     >
       <View style={styles.overlay}>
-        <View style={styles.card}>
+        <View style={[styles.card, { backgroundColor: colors.surface }]}>
           <View style={styles.header}>
             <View style={{ flex: 1 }}>
               <Text style={[styles.eyebrow, { color: accentColor }]}>
                 {eyebrow}
               </Text>
-              <Text style={styles.title}>{customerName || "Customer"}</Text>
+              <Text style={[styles.title, { color: colors.text }]}>
+                {customerName || "Customer"}
+              </Text>
               {!!shipmentLabel && (
-                <Text style={styles.subtitle}>{shipmentLabel}</Text>
+                <Text style={[styles.subtitle, { color: colors.textMuted }]}>
+                  {shipmentLabel}
+                </Text>
               )}
             </View>
             <TouchableOpacity
               onPress={onCancel}
-              style={styles.closeButton}
+              style={[
+                styles.closeButton,
+                { backgroundColor: colors.cardMuted },
+              ]}
               activeOpacity={0.8}
             >
-              <FontAwesome5 name="times" size={14} color="#64748b" />
+              <FontAwesome5 name="times" size={14} color={colors.textMuted} />
             </TouchableOpacity>
           </View>
 
@@ -57,12 +66,25 @@ export default function BatchDeliverySummaryModal({
             contentContainerStyle={styles.listContent}
           >
             {pieces.map((piece) => (
-              <View key={piece.packageId} style={styles.row}>
+              <View
+                key={piece.packageId}
+                style={[
+                  styles.row,
+                  {
+                    backgroundColor: colors.cardMuted,
+                    borderColor: colors.border,
+                  },
+                ]}
+              >
                 <View style={styles.rowLeft}>
                   <FontAwesome5 name={iconName} size={14} color={accentColor} />
                   <View style={styles.rowText}>
-                    <Text style={styles.rowLabel}>{piece.label}</Text>
-                    <Text style={styles.rowCode}>{piece.packageId}</Text>
+                    <Text style={[styles.rowLabel, { color: colors.text }]}>
+                      {piece.label}
+                    </Text>
+                    <Text style={[styles.rowCode, { color: colors.textMuted }]}>
+                      {piece.packageId}
+                    </Text>
                   </View>
                 </View>
                 <TouchableOpacity
@@ -70,15 +92,20 @@ export default function BatchDeliverySummaryModal({
                   style={styles.removeBtn}
                   activeOpacity={0.8}
                 >
-                  <FontAwesome5 name="times" size={12} color="#94a3b8" />
+                  <FontAwesome5 name="times" size={12} color={colors.textMuted} />
                 </TouchableOpacity>
               </View>
             ))}
           </ScrollView>
 
-          <Text style={[styles.totalLine, { color: accentColor }]}>
-            Total scanned: {total}
-          </Text>
+          <View style={[styles.summaryRow, { borderTopColor: colors.border }]}>
+            <Text style={[styles.summaryLabel, { color: colors.textMuted }]}>
+              Total scanned:
+            </Text>
+            <Text style={[styles.summaryValue, { color: accentColor }]}>
+              {total} piece{total === 1 ? "" : "s"}
+            </Text>
+          </View>
 
           <TouchableOpacity
             style={[
@@ -101,7 +128,9 @@ export default function BatchDeliverySummaryModal({
           </TouchableOpacity>
 
           <TouchableOpacity onPress={onCancel} style={styles.secondaryBtn}>
-            <Text style={styles.secondaryBtnText}>Scan more pieces</Text>
+            <Text style={[styles.secondaryBtnText, { color: colors.textMuted }]}>
+              Scan more pieces
+            </Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -195,26 +224,39 @@ const styles = StyleSheet.create({
   removeBtn: {
     padding: 6,
   },
-  totalLine: {
-    marginTop: 8,
-    marginBottom: 12,
-    color: "#047857",
+  summaryRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginTop: 12,
+    marginBottom: 14,
+    paddingVertical: 12,
+    borderTopWidth: 1,
+    borderTopColor: "#e2e8f0",
+  },
+  summaryLabel: {
     fontSize: 13,
+    fontWeight: "700",
+    color: "#64748b",
+  },
+  summaryValue: {
+    fontSize: 16,
     fontWeight: "900",
   },
   primaryBtn: {
-    minHeight: 50,
+    minHeight: 52,
     borderRadius: 15,
     backgroundColor: "#2563eb",
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: 9,
+    gap: 10,
   },
   primaryBtnText: {
     color: "#ffffff",
     fontSize: 14,
     fontWeight: "900",
+    letterSpacing: 0.5,
   },
   secondaryBtn: {
     marginTop: 10,

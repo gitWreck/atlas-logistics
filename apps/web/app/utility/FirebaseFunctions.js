@@ -1,5 +1,6 @@
 import { getFunctions, httpsCallable } from "firebase/functions";
 import { app as mainApp, auth } from "@/lib/firebase";
+import { getCallIdentity } from "./callSession";
 
 // ⚠️ Make sure this matches your deployed region!
 const functions = getFunctions(mainApp, "asia-southeast1");
@@ -277,6 +278,10 @@ export const createConversation = httpsCallable(
   functions,
   "createConversation",
 );
+export const createCallHistoryMessage = httpsCallable(
+  functions,
+  "createCallHistoryMessage",
+);
 export const sendChatMessage = httpsCallable(functions, "sendChatMessage");
 export const markConversationRead = httpsCallable(
   functions,
@@ -289,6 +294,30 @@ export const updateConversationStatus = httpsCallable(
 export const assignConversation = httpsCallable(
   functions,
   "assignConversation",
+);
+const startConversationCallCallable = httpsCallable(functions, "startConversationCall");
+const acceptConversationCallCallable = httpsCallable(functions, "acceptConversationCall");
+const updateConversationCallStatusCallable = httpsCallable(functions, "updateConversationCallStatus");
+const heartbeatConversationCallCallable = httpsCallable(functions, "heartbeatConversationCall");
+const endCurrentCallSessionCallable = httpsCallable(functions, "endCurrentCallSession");
+
+const withCallIdentity = (payload = {}) => ({ ...payload, ...getCallIdentity() });
+
+export const startConversationCall = (payload) =>
+  startConversationCallCallable(withCallIdentity(payload));
+export const acceptConversationCall = (payload) =>
+  acceptConversationCallCallable(withCallIdentity(payload));
+export const declineConversationCall = (payload) =>
+  updateConversationCallStatusCallable(withCallIdentity(payload));
+export const updateConversationCallStatus = (payload) =>
+  updateConversationCallStatusCallable(withCallIdentity(payload));
+export const heartbeatConversationCall = (payload) =>
+  heartbeatConversationCallCallable(withCallIdentity(payload));
+export const endCurrentCallSession = (payload = {}) =>
+  endCurrentCallSessionCallable(withCallIdentity(payload));
+export const generateTencentUserSig = httpsCallable(
+  functions,
+  "generateTencentUserSig",
 );
 
 // INVOICES

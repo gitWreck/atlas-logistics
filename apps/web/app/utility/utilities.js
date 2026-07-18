@@ -1,4 +1,5 @@
 import { signOut } from "firebase/auth";
+import { endCurrentCallSession } from "./FirebaseFunctions";
 
 export function calculateProgress(status) {
   switch (status) {
@@ -124,6 +125,11 @@ export function formatFirestoreDate(value) {
 
 export const handleLogout = async (auth, router) => {
   try {
+    if (auth.currentUser) {
+      await endCurrentCallSession({ reason: "logout" }).catch((error) => {
+        console.warn("Active call cleanup skipped during logout:", error);
+      });
+    }
     await signOut(auth);
   } catch (error) {
     console.warn("Logout error (likely emulator stale token):", error);

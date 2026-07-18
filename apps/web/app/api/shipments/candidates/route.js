@@ -1,5 +1,31 @@
 import { NextResponse } from "next/server";
-import { adminDb } from "@/lib/firebase-admin";
+import { headers } from "next/headers";
+import { adminAuth, adminDb } from "@/lib/firebase-admin";
+
+export const dynamic = "force-dynamic"; // Prevent caching of candidate lookups
+
+async function authorizeAdminExactLookup() {
+  const headersList = await headers();
+  const token = headersList.get("authorization")?.split("Bearer ")[1];
+
+  if (!token) {
+    return {
+      error: NextResponse.json({ error: "Unauthorized" }, { status: 401 }),
+    };
+  }
+
+  const decoded = await adminAuth.verifyIdToken(token);
+  const userSnap = await adminDb.collection("users").doc(decoded.uid).get();
+  const role = String(userSnap.data()?.role || "").toLowerCase();
+
+  if (role !== "admin") {
+    return {
+      error: NextResponse.json({ error: "Forbidden" }, { status: 403 }),
+    };
+  }
+
+  return { role };
+}
 
 // Master statuses that may still have warehouse pieces available to load.
 // RECEIVED = nothing loaded yet; PARTIALLY_LOADED = split across trip(s) with a
@@ -35,12 +61,61 @@ function shipmentHasLoadEligiblePieces(data) {
   return packages.some(pieceLoadEligible);
 }
 
+function serializeShipmentDoc(doc) {
+  const data = doc.data();
+  return {
+    id: doc.id,
+    ...data,
+    createdAt: data.createdAt?.toDate
+      ? data.createdAt.toDate().toISOString()
+      : new Date().toISOString(),
+  };
+}
+
 export async function GET(request) {
   try {
     const { searchParams } = new URL(request.url);
     const origin = searchParams.get("origin");
     const cursor = searchParams.get("cursor"); // The 'createdAt' of the last item
+    const shipmentId = searchParams.get("shipmentId");
     const limitSize = 50;
+
+    // Exact tracking-id lookup so Admins can add a specific missing shipment/piece
+    // even when it is outside the default candidate pool.
+    if (shipmentId) {
+      const auth = await authorizeAdminExactLookup();
+      if (auth.error) return auth.error;
+
+      const trimmed = shipmentId.trim();
+      if (!trimmed) {
+        return NextResponse.json({
+          success: true,
+          data: [],
+          nextCursor: null,
+          hasMore: false,
+          exactLookup: true,
+        });
+      }
+
+      const snap = await adminDb.collection("shipments").doc(trimmed).get();
+      if (!snap.exists) {
+        return NextResponse.json({
+          success: true,
+          data: [],
+          nextCursor: null,
+          hasMore: false,
+          exactLookup: true,
+        });
+      }
+
+      return NextResponse.json({
+        success: true,
+        data: [serializeShipmentDoc(snap)],
+        nextCursor: null,
+        hasMore: false,
+        exactLookup: true,
+      });
+    }
 
     if (!origin) {
       return NextResponse.json(

@@ -1,27 +1,34 @@
 import React from "react";
 import { TouchableOpacity, StyleSheet } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
-import { FontAwesome5 } from "@expo/vector-icons";
+import Feather from "@expo/vector-icons/Feather";
 import { useTheme } from "../../contexts/ThemeContext";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { CUSTOMER_BOTTOM_NAV_HEIGHT } from "./CustomerBottomNav";
 
-export default function FloatingAddButton({ onPress }) {
-  const { resolvedScheme } = useTheme();
-  const gradient =
-    resolvedScheme === "dark" ? ["#1d4ed8", "#0891b2"] : ["#042C83", "#07B9F4"];
+export default function FloatingAddButton({ onPress, bottom = 32, right = 24 }) {
+  const { colors } = useTheme();
+  const insets = useSafeAreaInsets();
+
+  // Keep the FAB above the bottom nav + safe area on all screen sizes.
+  const safeBottom = Math.max(
+    bottom,
+    (insets.bottom || 0) + CUSTOMER_BOTTOM_NAV_HEIGHT + 12,
+  );
 
   return (
     <TouchableOpacity
-      style={styles.fabWrapper}
+      style={[styles.fabWrapper, { bottom: safeBottom, right }]}
       onPress={onPress}
       activeOpacity={0.85}
     >
       <LinearGradient
-        colors={gradient}
+        colors={[colors.primaryDeep, colors.primary]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 0 }}
         style={styles.fab}
       >
-        <FontAwesome5 name="plus" size={18} color="#ffffff" />
+        <Feather name="plus" size={30} color={colors.onPrimary} />
       </LinearGradient>
     </TouchableOpacity>
   );
@@ -30,14 +37,18 @@ export default function FloatingAddButton({ onPress }) {
 const styles = StyleSheet.create({
   fabWrapper: {
     position: "absolute",
-    right: 24,
-    bottom: 32,
+    zIndex: 20,
+    elevation: 8,
   },
   fab: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+    width: 54,
+    height: 54,
+    borderRadius: 27,
     alignItems: "center",
     justifyContent: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.22,
+    shadowRadius: 14,
   },
 });

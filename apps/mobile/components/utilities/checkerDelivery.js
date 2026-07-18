@@ -51,7 +51,7 @@ function normalizeStatus(value) {
 }
 
 /**
- * Next action for checker last-mile (My Route / shipment details).
+ * Next action for checker last-mile (My Deliveries / shipment details).
  * @param {object} shipment
  * @param {string} [checkerUid] — required for pool model (2.7); uses piece counts
  */

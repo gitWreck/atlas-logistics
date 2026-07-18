@@ -121,9 +121,7 @@ export default function ShipmentActionFooter({
       <View {...panResponder.panHandlers} style={styles.handleContainer}>
         <View style={styles.handleBar} />
         <TouchableOpacity onPress={() => toggleDrawer(!isExpanded)}>
-          <Text style={styles.handleText}>
-            {isExpanded ? "SWIPE DOWN TO HIDE" : "SWIPE UP FOR MESSAGING"}
-          </Text>
+          <Text style={styles.handleText}>{""}</Text>
         </TouchableOpacity>
       </View>
 

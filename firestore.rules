@@ -82,8 +82,27 @@ service cloud.firestore {
           request.auth.uid == userId
           && (!exists(userDocPath()) || userDoc().data.get('active', true) != false)
         ) ||
-        isActiveUser() && isStaff()
+        isActiveUser() && hasAnyRole(['admin', 'manager'])
       );
+    }
+
+    function checkerChatAccessToken() {
+      return request.auth.uid + ':' + userDoc().data.get('checkerChatAccessKey', '__missing__');
+    }
+
+    function canReadDirectStaffConversation(conversation) {
+      return isActiveUser()
+        && conversation.get('type', '') == 'direct_staff'
+        && request.auth.uid in conversation.get('participantIds', [])
+        && (
+          userRole() != 'checker'
+          || checkerChatAccessToken() in conversation.get('checkerAccessTokens', [])
+        );
+    }
+
+    function canListParticipantConversation(conversation) {
+      return isActiveUser()
+        && request.auth.uid in conversation.get('participantIds', []);
     }
 
     // Customer signup currently performs duplicate checks before auth.
@@ -137,24 +156,69 @@ service cloud.firestore {
     // --- CUSTOMER SUPPORT CHAT ---
 
     match /conversations/{conversationId} {
-      allow read: if isAdminOrManager()
+      // Admins/managers can see the full support inbox (including unassigned
+      // website guest chats). Guests/customers can read conversations they own.
+      // Direct staff threads stay scoped to participants.
+      allow get: if isAdminOrManager()
+        || canReadDirectStaffConversation(resource.data)
         || canReadOwnedConversation(resource.data)
-        || (isActiveUser() && request.auth.uid in resource.data.get('participantIds', []));
+        || (hasRole('employee') && (resource.data.assignedTo == request.auth.uid || resource.data.assignedStaffId == request.auth.uid))
+        || (isActiveUser() && resource.data.customerId == request.auth.uid);
+
+      allow list: if isAdminOrManager()
+        || canListParticipantConversation(resource.data)
+        || canReadOwnedConversation(resource.data)
+        || (hasRole('employee') && (resource.data.assignedTo == request.auth.uid || resource.data.assignedStaffId == request.auth.uid))
+        || (hasRole('customer') && resource.data.customerId == request.auth.uid);
 
       allow create, update, delete: if false;
 
       match /messages/{messageId} {
         allow read: if isAdminOrManager()
+          || canReadDirectStaffConversation(
+            get(/databases/$(database)/documents/conversations/$(conversationId)).data
+          )
           || canReadOwnedConversation(
             get(/databases/$(database)/documents/conversations/$(conversationId)).data
           )
           || (
+            hasRole('customer')
+            && get(/databases/$(database)/documents/conversations/$(conversationId)).data.customerId == request.auth.uid
+          )
+          || (
+            hasRole('employee')
+            && (get(/databases/$(database)/documents/conversations/$(conversationId)).data.assignedTo == request.auth.uid || get(/databases/$(database)/documents/conversations/$(conversationId)).data.assignedStaffId == request.auth.uid)
+          )
+          || (
             isActiveUser()
+            && get(/databases/$(database)/documents/conversations/$(conversationId)).data.get('type', '') != 'direct_staff'
             && request.auth.uid in get(/databases/$(database)/documents/conversations/$(conversationId)).data.get('participantIds', [])
           );
 
         allow create, update, delete: if false;
       }
+    }
+
+    // --- CALLS / SUPPORT ---
+
+    match /calls/{callId} {
+      allow get: if isSignedIn() && (
+        resource.data.receiverId == request.auth.uid ||
+        resource.data.callerId == request.auth.uid ||
+        isAdminOrManager()
+      );
+      allow list: if isSignedIn() && (
+        resource.data.receiverId == request.auth.uid ||
+        resource.data.callerId == request.auth.uid ||
+        isAdminOrManager()
+      );
+      allow create: if false;
+      allow update: if isSignedIn() && (
+        resource.data.receiverId == request.auth.uid ||
+        resource.data.callerId == request.auth.uid ||
+        isAdminOrManager()
+      );
+      allow delete: if false;
     }
 
     // --- OPERATIONS ---

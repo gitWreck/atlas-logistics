@@ -13,6 +13,7 @@ import {
   faEye,
   faLink,
   faArchive,
+  faMinusCircle,
 } from "@fortawesome/free-solid-svg-icons";
 import QRCode from "react-qr-code";
 import TripAuditLogModal from "./TripAuditLogModal";
@@ -300,6 +301,8 @@ function CustodyMilestone({ milestone, isLast, isDark }) {
 
 export default function TripCompletedManifestsView({
   trip,
+  shipments = [],
+  onUnassign,
   user,
   profile,
   isDark = false,
@@ -316,6 +319,8 @@ export default function TripCompletedManifestsView({
   const theme = getDrawerThemeClasses(isDark);
   const tripDocId = trip?.id || trip?.tripId;
   const canArchive = canManageTripLifecycle(profile, user) && canArchiveTrip(trip);
+  const canCorrectShipments =
+    String(profile?.role || "").toLowerCase() === "admin";
 
   useEffect(() => {
     if (!tripDocId || !user) return;
@@ -449,6 +454,51 @@ export default function TripCompletedManifestsView({
           )}
         </div>
       </div>
+
+      {canCorrectShipments && shipments.length > 0 && (
+        <div className={`rounded-xl border p-4 ${theme.footerPanel}`}>
+          <div className="mb-3">
+            <p className="text-[10px] font-bold uppercase tracking-wider opacity-50">
+              Shipment corrections
+            </p>
+            <p className={`text-xs mt-1 ${theme.mutedText}`}>
+              Removing a shipment keeps the sealed manifests for audit and
+              returns its linked pieces to Received at Divisoria.
+            </p>
+          </div>
+
+          <div className="space-y-2 max-h-72 overflow-y-auto">
+            {shipments.map((shipment) => (
+              <div
+                key={shipment.id}
+                className={`flex items-center gap-3 rounded-lg border px-3 py-2 ${
+                  isDark
+                    ? "border-slate-700 bg-slate-900/40"
+                    : "border-slate-200 bg-white"
+                }`}
+              >
+                <div className="min-w-0 flex-1">
+                  <p className="font-mono text-xs font-semibold truncate">
+                    {shipment.shipmentId || shipment.id}
+                  </p>
+                  <p className={`text-[10px] ${theme.mutedText}`}>
+                    {shipment.status || "Unknown status"}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => onUnassign?.(shipment)}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs font-semibold text-red-500 hover:bg-red-500/20"
+                  title="Remove shipment and reset linked pieces to Divisoria"
+                >
+                  <FontAwesomeIcon icon={faMinusCircle} />
+                  Remove
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className={`rounded-xl border p-4 ${theme.footerPanel}`}>
         <div className="flex items-center justify-between gap-3 mb-4">

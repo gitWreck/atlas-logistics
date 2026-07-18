@@ -22,7 +22,11 @@ export async function loadQueue(checkerId) {
 }
 
 async function saveQueue(checkerId, items) {
-  await writeJson(queueKey(checkerId), items);
+  try {
+    await writeJson(queueKey(checkerId), items);
+  } catch (error) {
+    console.warn("saveQueue failed, skipping offline queue cache", checkerId, error);
+  }
 }
 
 export function isDuplicatePendingOperation(queue, { packageIds, type }) {

@@ -93,8 +93,10 @@ export default function UnassignShipmentModal({
                 >
                   {shipment.shipmentId || "Shipment #" + shipment.id}
                 </span>{" "}
-                from this trip. It will be returned to{" "}
-                <b>Received / Warehouse</b> status.
+                from this trip. Every linked piece will restart at{" "}
+                <b>Received at Divisoria</b>. Trip counters and active delivery
+                assignments will be corrected, and the action will remain in
+                the audit history.
               </div>
             </div>
           </div>

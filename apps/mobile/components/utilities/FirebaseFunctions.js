@@ -1,5 +1,6 @@
 import { getFunctions, httpsCallable } from "firebase/functions";
 import { app } from "../../firebase";
+import { getCallIdentity } from "../calls/callSession";
 
 const functions = getFunctions(app, "asia-southeast1");
 
@@ -54,6 +55,8 @@ export const requestShipmentPickup = httpsCallable(
   functions,
   "requestShipmentPickup",
 );
+export const getMyInvoices = httpsCallable(functions, "getMyInvoices");
+export const getMySchedules = httpsCallable(functions, "getMySchedules");
 export const bulkShipmentAction = httpsCallable(
   functions,
   "bulkShipmentAction",
@@ -65,10 +68,46 @@ export const createConversation = httpsCallable(
   functions,
   "createConversation",
 );
+export const listCheckerChatContacts = httpsCallable(
+  functions,
+  "listCheckerChatContacts",
+);
+export const createCheckerConversation = httpsCallable(
+  functions,
+  "createCheckerConversation",
+);
+export const createCallHistoryMessage = httpsCallable(
+  functions,
+  "createCallHistoryMessage",
+);
 export const sendChatMessage = httpsCallable(functions, "sendChatMessage");
 export const markConversationRead = httpsCallable(
   functions,
   "markConversationRead",
+);
+const startConversationCallCallable = httpsCallable(functions, "startConversationCall");
+const updateConversationCallStatusCallable = httpsCallable(functions, "updateConversationCallStatus");
+const acceptConversationCallCallable = httpsCallable(functions, "acceptConversationCall");
+const heartbeatConversationCallCallable = httpsCallable(functions, "heartbeatConversationCall");
+const endCurrentCallSessionCallable = httpsCallable(functions, "endCurrentCallSession");
+
+async function withCallIdentity(payload = {}) {
+  return { ...payload, ...(await getCallIdentity()) };
+}
+
+export const startConversationCall = async (payload) =>
+  startConversationCallCallable(await withCallIdentity(payload));
+export const updateConversationCallStatus = async (payload) =>
+  updateConversationCallStatusCallable(await withCallIdentity(payload));
+export const acceptConversationCall = async (payload) =>
+  acceptConversationCallCallable(await withCallIdentity(payload));
+export const heartbeatConversationCall = async (payload) =>
+  heartbeatConversationCallCallable(await withCallIdentity(payload));
+export const endCurrentCallSession = async (payload = {}) =>
+  endCurrentCallSessionCallable(await withCallIdentity(payload));
+export const generateTencentUserSig = httpsCallable(
+  functions,
+  "generateTencentUserSig",
 );
 
 // user actions

@@ -28,6 +28,7 @@ import TablePaginationFooter from "../../ui/TablePaginationFooter";
 import PackageBreakdownPanel from "./PackageBreakdownPanel";
 import ShipmentOperations from "../ShipmentOperations";
 import PieceStatusOverrideModal from "./PieceStatusOverrideModal";
+import RemovePackageFromTripModal from "./RemovePackageFromTripModal";
 import { useAuth } from "@/app/context/AuthContext";
 import {
   canOverrideShipmentStatus,
@@ -79,6 +80,9 @@ export default function ViewPackagesModal({
   const showShipmentStatusOverride =
     allowShipmentStatusOverride && canOverrideShipmentStatus(effectiveProfile);
   const showPieceStatusOverride = canOverridePieceStatus(effectiveProfile);
+  const actorRole = String(effectiveProfile?.role || "").toLowerCase();
+  const canRemovePieceFromTrip =
+    actorRole === "admin" || (actorRole === "manager" && isLocked !== true);
 
   const [packages, setPackages] = useState([]);
   const [fullShipment, setFullShipment] = useState(null);
@@ -92,6 +96,7 @@ export default function ViewPackagesModal({
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("ALL");
   const [pieceForStatusOverride, setPieceForStatusOverride] = useState(null);
+  const [packageToRemove, setPackageToRemove] = useState(null);
   const [scopeToTrip, setScopeToTrip] = useState(true);
 
   const modalTheme = getModalThemeClasses(isDark);
@@ -111,6 +116,7 @@ export default function ViewPackagesModal({
       setSearch("");
       setStatusFilter("ALL");
       setPieceForStatusOverride(null);
+      setPackageToRemove(null);
       setScopeToTrip(true);
     }
   }, [isOpen, shipment?.id]);
@@ -239,8 +245,33 @@ export default function ViewPackagesModal({
   };
 
   const handleRemove = (idx) => {
-    if (!confirm("Remove this package?")) return;
+    const pkg = packages[idx];
+    if (!pkg) return;
+
+    if (tripId) {
+      const packageId = String(
+        pkg.packageId || pkg.trackingNumber || "",
+      ).trim();
+      if (!packageId) {
+        alert("This package has no tracking ID and cannot be removed safely.");
+        return;
+      }
+      setPackageToRemove(pkg);
+      return;
+    }
+
+    if (!confirm("Permanently remove this package from the shipment?")) return;
     saveUpdates(packages.filter((_, i) => i !== idx));
+  };
+
+  const handleRemoveFromTripSuccess = async (result = {}) => {
+    setPackageToRemove(null);
+    if (result.manifestRemoved) {
+      onRefresh?.();
+      onClose?.();
+      return;
+    }
+    await handleRefreshAll();
   };
 
   const handleEditStart = (pkg, idx) => {
@@ -605,6 +636,9 @@ export default function ViewPackagesModal({
                           const actualIdx = getActualIndex(pkg);
                           const locked =
                             isLocked || isPackageLocked(pkg.status);
+                          const removeDisabled =
+                            isSaving ||
+                            (tripId ? !canRemovePieceFromTrip : locked);
                           const isEditing = editingId === actualIdx;
 
                           return (
@@ -783,7 +817,12 @@ export default function ViewPackagesModal({
                                       <button
                                         type="button"
                                         onClick={() => handleRemove(actualIdx)}
-                                        disabled={locked}
+                                        disabled={removeDisabled}
+                                        title={
+                                          tripId && !canRemovePieceFromTrip
+                                            ? "Only an Admin can remove a piece from a locked trip"
+                                            : "Remove piece"
+                                        }
                                         className={`h-10 rounded-xl flex items-center justify-center gap-2 text-xs font-bold ${
                                           isDark
                                             ? "bg-slate-800 hover:bg-red-900/30 text-slate-400 hover:text-red-400"
@@ -854,6 +893,9 @@ export default function ViewPackagesModal({
                               const actualIdx = getActualIndex(pkg);
                               const locked =
                                 isLocked || isPackageLocked(pkg.status);
+                              const removeDisabled =
+                                isSaving ||
+                                (tripId ? !canRemovePieceFromTrip : locked);
                               const isEditing = editingId === actualIdx;
 
                               return (
@@ -1041,7 +1083,12 @@ export default function ViewPackagesModal({
                                             onClick={() =>
                                               handleRemove(actualIdx)
                                             }
-                                            disabled={locked}
+                                            disabled={removeDisabled}
+                                            title={
+                                              tripId && !canRemovePieceFromTrip
+                                                ? "Only an Admin can remove a piece from a locked trip"
+                                                : "Remove piece"
+                                            }
                                             className={`h-8 w-8 rounded flex items-center justify-center ${
                                               isDark
                                                 ? "bg-slate-800 hover:bg-red-900/30 text-slate-400 hover:text-red-400"
@@ -1102,6 +1149,16 @@ export default function ViewPackagesModal({
           onRefresh={handleRefreshAll}
         />
       )}
+
+      <RemovePackageFromTripModal
+        isOpen={!!packageToRemove}
+        pkg={packageToRemove}
+        shipment={shipment}
+        tripId={tripId}
+        onClose={() => setPackageToRemove(null)}
+        onSuccess={handleRemoveFromTripSuccess}
+        isDark={isDark}
+      />
     </>
   );
 }

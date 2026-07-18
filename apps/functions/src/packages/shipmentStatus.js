@@ -5,6 +5,8 @@ const {
   allPiecesDelivered,
   computePackageBreakdown,
   PACKAGE_STATUS,
+  PICKUP_PENDING_STATUSES,
+  PICKED_UP_STATUSES,
   pieceQty,
 } = require("./packageStatus");
 
@@ -203,6 +205,8 @@ function deriveMasterShipmentStatus(packages = [], options = {}) {
   const totalQty = breakdown.total || totalRows;
 
   const deliveredQty = breakdown.delivered;
+  const pendingPickupQty = breakdown.pendingPickup || 0;
+  const pickedUpQty = breakdown.pickedUp || 0;
   const missingQty = breakdown.missing;
   const damagedQty = breakdown.damaged;
   const failedQty = breakdown.failed;
@@ -220,6 +224,8 @@ function deriveMasterShipmentStatus(packages = [], options = {}) {
   const missingRows = countStatusRows(packages, PACKAGE_STATUS.MISSING);
   const damagedRows = countStatusRows(packages, PACKAGE_STATUS.DAMAGED);
   const failedRows = countStatusRows(packages, PACKAGE_STATUS.FAILED_DELIVERY);
+  const pendingPickupRows = countStatusRows(packages, PICKUP_PENDING_STATUSES);
+  const pickedUpRows = countStatusRows(packages, PICKED_UP_STATUSES);
   const outForDeliveryRows = countStatusRows(
     packages,
     OUT_FOR_DELIVERY_STATUSES,
@@ -248,6 +254,20 @@ function deriveMasterShipmentStatus(packages = [], options = {}) {
       PACKAGE_STATUS.RETURNED_RECEIVED_AT_HUB,
     ].includes(status),
   );
+
+  const pickupPhaseQty = pendingPickupQty + pickedUpQty;
+  if (pickupPhaseQty >= totalQty && totalQty > 0) {
+    if (pickedUpQty >= totalQty || pickedUpRows === totalRows) {
+      return "PICKED_UP";
+    }
+    return "PENDING_PICKUP";
+  }
+  if (pendingPickupRows === totalRows && totalRows > 0) {
+    return "PENDING_PICKUP";
+  }
+  if (pickedUpRows === totalRows && totalRows > 0) {
+    return "PICKED_UP";
+  }
 
   if (totals) {
     const totalContentQty = Number(totals.totalQty) || 0;
@@ -462,7 +482,6 @@ const POOL_DERIVED_MASTER_STATUSES = new Set([
 ]);
 
 const MASTER_STATUSES_SKIP_PACKAGE_DERIVE = new Set([
-  "PENDING_PICKUP",
   "CANCELLED",
   "pending",
 ]);

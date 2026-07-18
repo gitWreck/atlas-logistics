@@ -71,6 +71,9 @@ exports.updateUserProfile = onCall(
         warehouseCode: role === "customer" ? null : warehouseCode || null,
         status: status,
         active: status === "active",
+        // Force checker chat authorization to be recalculated whenever an
+        // admin changes a user's role or warehouse assignment.
+        checkerChatAccessKey: FieldValue.delete(),
         updatedAt: FieldValue.serverTimestamp(),
       };
 

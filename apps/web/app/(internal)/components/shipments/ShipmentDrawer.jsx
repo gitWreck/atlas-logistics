@@ -36,6 +36,7 @@ export default function ShipmentDrawer({
   onReconcile,
   onReceiveReturned,
   onReleaseToCheckers,
+  onShipmentUpdated,
   canManageWarehouse = false,
 }) {
   const [activeTab, setActiveTab] = useState("TIMELINE");
@@ -85,10 +86,20 @@ export default function ShipmentDrawer({
     setRefreshing(true);
     try {
       await fetchShipmentDetails(displayData.id);
-      onRefresh?.();
+      await onRefresh?.();
     } finally {
       setRefreshing(false);
     }
+  };
+
+  const handleShipmentUpdated = (updatedShipment) => {
+    if (!updatedShipment?.id) return;
+
+    setShipmentData((current) => ({
+      ...(current || displayData || {}),
+      ...updatedShipment,
+    }));
+    onShipmentUpdated?.(updatedShipment);
   };
 
   return (
@@ -235,7 +246,7 @@ export default function ShipmentDrawer({
                   </p>
                 </div>
               ) : null}
-              <ShipmentTimelineTab data={data} isDark={isDark} />
+              <ShipmentTimelineTab data={displayData} isDark={isDark} />
             </div>
           )}
 
@@ -256,6 +267,7 @@ export default function ShipmentDrawer({
                 isDark={isDark}
                 custodyLocked={custodyLocked}
                 onRefresh={handleRefresh}
+                onStatusUpdated={handleShipmentUpdated}
                 profile={profile}
               />
 

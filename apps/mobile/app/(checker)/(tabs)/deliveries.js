@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import {
   View,
   Text,
@@ -6,10 +6,7 @@ import {
   ScrollView,
   RefreshControl,
   TouchableOpacity,
-  Platform,
-  StatusBar,
   Alert,
-  ActivityIndicator,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { FontAwesome5 } from "@expo/vector-icons";
@@ -23,7 +20,13 @@ import {
   returnCheckerShipmentsToWarehouse,
 } from "../../../components/utilities/checkerDelivery";
 import { useCheckerLastMile } from "../../../contexts/CheckerLastMileContext";
-import { formatPoolCountLine } from "../../../components/utilities/checkerDeliveryPool";
+import {
+  SectionHeader,
+  Card,
+  StatPillRow,
+  PrimaryButton,
+} from "../../../components/checker/design/primitives";
+import { SECTION } from "../../../components/checker/design/checkerTheme";
 
 function getTimeLabel(value) {
   if (!value) return "No recent update";
@@ -45,7 +48,23 @@ export default function CheckerDeliveriesTab() {
   const [actionShipmentId, setActionShipmentId] = useState(null);
 
   const checkerId = profile?.uid;
-  const { myRouteShipments, routeSummary, loading } = useCheckerLastMile();
+  const { myRouteShipments, summary, loading } = useCheckerLastMile();
+
+  const routeStats = useMemo(() => {
+    let onVan = 0;
+    let delivered = 0;
+    myRouteShipments.forEach((s) => {
+      onVan += s.poolStats?.mine || 0;
+      delivered += s.poolStats?.delivered || 0;
+    });
+    const failed = summary?.failed || 0;
+    return {
+      onVan: onVan + delivered + failed,
+      delivered,
+      failed,
+      remaining: onVan,
+    };
+  }, [myRouteShipments, summary]);
 
   const runShipmentAction = async (shipmentId, action) => {
     if (actionShipmentId) return;
@@ -58,7 +77,7 @@ export default function CheckerDeliveriesTab() {
           shipmentIds: [shipmentId],
           profile,
           reasonCode: "DELIVERY_FAILED",
-          remarks: "Failed delivery reported from My Route.",
+          remarks: "Failed delivery reported from My Deliveries.",
         });
         Alert.alert(
           "Failed Delivery",
@@ -71,11 +90,11 @@ export default function CheckerDeliveriesTab() {
         });
         Alert.alert(
           "Returned",
-          "Shipment returned to warehouse and removed from your route.",
+          "Shipment returned to warehouse and removed from your deliveries.",
         );
       }
     } catch (error) {
-      console.error("My Route action failed:", error);
+      console.error("My Deliveries action failed:", error);
       Alert.alert(
         "Action Failed",
         getCallableErrorMessage(error, "Could not update shipment."),
@@ -108,10 +127,23 @@ export default function CheckerDeliveriesTab() {
     });
   };
 
+  const accent = SECTION.route.accent;
+
   return (
     <View style={[styles.container, { backgroundColor: colors.bg }]}>
+      <SectionHeader
+        sectionKey="route"
+        title="MY DELIVERIES"
+        subtitle="Deliver each loaded piece and keep your deliveries up to date."
+        rightIcon="warehouse"
+        onRightPress={() =>
+          router.push("/(checker)/(tabs)/available-to-load")
+        }
+      />
+
       <ScrollView
         contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -124,61 +156,28 @@ export default function CheckerDeliveriesTab() {
           />
         }
       >
-        <View
-          style={[
-            styles.summaryCard,
-            { backgroundColor: colors.surface, borderColor: colors.border },
+        <StatPillRow
+          items={[
+            { label: "On Van", value: routeStats.onVan, color: colors.text },
+            { label: "Delivered", value: routeStats.delivered, color: "#16a34a" },
+            { label: "Failed", value: routeStats.failed, color: "#dc2626" },
+            { label: "Remaining", value: routeStats.remaining, color: "#2563eb" },
           ]}
-        >
-          <Text style={[styles.summaryTitle, { color: colors.text }]}>
-            My Route
-          </Text>
-          <Text style={[styles.summaryText, { color: colors.textMuted }]}>
-            {routeSummary.total} active · {routeSummary.outForDelivery} out for
-            delivery · {routeSummary.onVan} on van
-          </Text>
-          <TouchableOpacity
-            style={[styles.loadBtn, { borderColor: colors.border }]}
-            onPress={() => router.push("/(checker)/(tabs)/available-to-load")}
-            activeOpacity={0.85}
-          >
-            <FontAwesome5 name="warehouse" size={12} color={colors.text} />
-            <Text style={[styles.scanBtnText, { color: colors.text }]}>
-              Load from warehouse pool
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.scanBtn, { borderColor: colors.border }]}
-            onPress={() => goToDeliveryScan(null, "DELIVERED")}
-            activeOpacity={0.85}
-          >
-            <FontAwesome5 name="qrcode" size={12} color={colors.text} />
-            <Text style={[styles.scanBtnText, { color: colors.text }]}>
-              Scan last-mile delivery
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.loadBtn, { borderColor: colors.border }]}
-            onPress={() => router.push("/(checker)/(tabs)/delivery-load")}
-            activeOpacity={0.85}
-          >
-            <FontAwesome5 name="shipping-fast" size={12} color={colors.text} />
-            <Text style={[styles.scanBtnText, { color: colors.text }]}>
-              Open My Load
-            </Text>
-          </TouchableOpacity>
-        </View>
+        />
 
         {loading ? (
           <View style={styles.emptyState}>
             <Text style={[styles.emptyTitle, { color: colors.text }]}>
-              Loading your route...
+              Loading your deliveries...
             </Text>
           </View>
         ) : myRouteShipments.length === 0 ? (
-          <View style={styles.emptyState}>
+          <View style={styles.emptyStateCentered}>
+            <View style={[styles.emptyIcon, { backgroundColor: `${accent}18` }]}>
+              <FontAwesome5 name="route" size={22} color={accent} />
+            </View>
             <Text style={[styles.emptyTitle, { color: colors.text }]}>
-              No active route yet
+              No active deliveries yet
             </Text>
             <Text style={[styles.emptySub, { color: colors.textMuted }]}>
               Load pieces from the Available tab first. Each scan marks them out
@@ -191,18 +190,11 @@ export default function CheckerDeliveriesTab() {
               shipment,
               checkerId,
             );
+            const mine = shipment.poolStats?.mine || 0;
+            const delivered = shipment.poolStats?.delivered || 0;
 
             return (
-              <View
-                key={shipment.id}
-                style={[
-                  styles.card,
-                  {
-                    backgroundColor: colors.surface,
-                    borderColor: colors.border,
-                  },
-                ]}
-              >
+              <Card key={shipment.id} style={styles.card}>
                 <TouchableOpacity
                   activeOpacity={0.8}
                   onPress={() =>
@@ -213,24 +205,24 @@ export default function CheckerDeliveriesTab() {
                   }
                 >
                   <View style={styles.cardHeader}>
-                    <View style={styles.idWrap}>
-                      <FontAwesome5
-                        name="box"
-                        size={12}
-                        color={colors.textMuted}
-                      />
-                      <Text style={[styles.shipmentId, { color: colors.text }]}>
-                        {shipment.shipmentId || shipment.id}
-                      </Text>
-                    </View>
+                    <Text
+                      style={[styles.shipmentId, { color: colors.text }]}
+                      numberOfLines={1}
+                    >
+                      {shipment.shipmentId || shipment.id}
+                    </Text>
+                    <FontAwesome5
+                      name="chevron-right"
+                      size={13}
+                      color={colors.textMuted}
+                    />
+                  </View>
+
+                  <View style={styles.badgeRow}>
                     <StatusBadge
                       status={shipment.displayStatus || shipment.status}
                     />
                   </View>
-
-                  <Text style={[styles.poolLine, { color: colors.text }]}>
-                    {formatPoolCountLine(shipment.poolStats)}
-                  </Text>
 
                   <Text style={[styles.customer, { color: colors.text }]}>
                     {shipment.recipient?.name ||
@@ -238,53 +230,47 @@ export default function CheckerDeliveriesTab() {
                       "Unknown recipient"}
                   </Text>
 
-                  <Text style={[styles.metaText, { color: colors.textMuted }]}>
-                    Vehicle: {shipment.deliveryVehicleName || "—"}
-                  </Text>
+                  <View style={styles.pieceRow}>
+                    <FontAwesome5
+                      name="users"
+                      size={11}
+                      color={colors.textMuted}
+                    />
+                    <Text
+                      style={[styles.pieceText, { color: colors.textMuted }]}
+                    >
+                      {mine} on van · {delivered} delivered
+                    </Text>
+                  </View>
 
-                  <Text style={[styles.timeText, { color: colors.textMuted }]}>
-                    Updated: {getTimeLabel(shipment.updatedAt)}
+                  <Text style={[styles.metaText, { color: colors.textMuted }]}>
+                    Vehicle: {shipment.deliveryVehicleName || "—"} · Updated{" "}
+                    {getTimeLabel(shipment.updatedAt)}
                   </Text>
                 </TouchableOpacity>
 
                 {nextAction === "deliver" && (
-                  <>
-                    <TouchableOpacity
-                      style={[styles.actionBtn, { backgroundColor: "#16a34a" }]}
-                      onPress={() =>
-                        goToDeliveryScan(shipment.id, "DELIVERED")
-                      }
-                    >
-                      <Text style={styles.actionBtnText}>Scan to deliver</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={[styles.actionBtn, styles.actionBtnSecondary]}
-                      onPress={() =>
-                        goToDeliveryScan(shipment.id, "FAILED_DELIVERY")
-                      }
-                    >
-                      <Text style={styles.actionBtnText}>
-                        Scan failed delivery
-                      </Text>
-                    </TouchableOpacity>
-                  </>
+                  <PrimaryButton
+                    label="SCAN DELIVERY"
+                    icon="qrcode"
+                    color={accent}
+                    onPress={() => goToDeliveryScan(shipment.id, "DELIVERED")}
+                    style={{ marginTop: 14 }}
+                  />
                 )}
 
                 {nextAction === "return" && (
-                  <>
-                  <TouchableOpacity
-                    style={[styles.actionBtn, { backgroundColor: "#dc2626" }]}
+                  <PrimaryButton
+                    label="SCAN RETURN TO WAREHOUSE"
+                    icon="undo"
+                    color={SECTION.return.accent}
                     onPress={() =>
                       goToDeliveryScan(shipment.id, "RETURNED_TO_WAREHOUSE")
                     }
-                  >
-                    <Text style={styles.actionBtnText}>
-                      Scan return to warehouse
-                    </Text>
-                    </TouchableOpacity>
-                  </>
+                    style={{ marginTop: 14 }}
+                  />
                 )}
-              </View>
+              </Card>
             );
           })
         )}
@@ -296,124 +282,84 @@ export default function CheckerDeliveriesTab() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    paddingTop: Platform.OS === "android" ? StatusBar.currentHeight || 0 : 0,
   },
   content: {
     paddingHorizontal: 20,
     paddingBottom: 24,
     gap: 12,
   },
-  summaryCard: {
-    marginTop: 8,
-    borderWidth: 1,
-    borderRadius: 14,
-    padding: 14,
-  },
-  summaryTitle: {
-    fontSize: 16,
-    fontWeight: "700",
-  },
-  summaryText: {
-    marginTop: 4,
-    fontSize: 12,
-    fontWeight: "500",
-  },
-  poolLine: {
-    fontSize: 13,
-    fontWeight: "600",
-    marginBottom: 8,
-  },
-  scanBtn: {
-    marginTop: 12,
-    borderWidth: 1,
-    borderRadius: 10,
-    paddingVertical: 10,
-    paddingHorizontal: 12,
+  shortcutRow: {
     flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
+    gap: 12,
   },
-  loadBtn: {
-    marginTop: 8,
-    borderWidth: 1,
-    borderRadius: 10,
+  shortcutBtn: {
+    flex: 1,
     paddingVertical: 10,
-    paddingHorizontal: 12,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-  },
-  scanBtnText: {
-    fontSize: 13,
-    fontWeight: "700",
-  },
-  actionBtn: {
-    marginTop: 12,
-    borderRadius: 10,
-    paddingVertical: 11,
-    alignItems: "center",
-    justifyContent: "center",
-    minHeight: 42,
-  },
-  actionBtnText: {
-    color: "#fff",
-    fontSize: 13,
-    fontWeight: "800",
-  },
-  actionBtnSecondary: {
-    marginTop: 8,
-    backgroundColor: "#b45309",
   },
   card: {
-    borderWidth: 1,
-    borderRadius: 14,
-    padding: 14,
+    padding: 16,
   },
   cardHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
     gap: 12,
-    marginBottom: 8,
-  },
-  idWrap: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    flex: 1,
   },
   shipmentId: {
-    fontSize: 13,
-    fontWeight: "700",
+    fontSize: 15,
+    fontWeight: "800",
+    flex: 1,
+  },
+  badgeRow: {
+    flexDirection: "row",
+    marginTop: 10,
   },
   customer: {
-    fontSize: 15,
-    fontWeight: "700",
-    marginBottom: 8,
+    fontSize: 16,
+    fontWeight: "800",
+    marginTop: 10,
+  },
+  pieceRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 7,
+    marginTop: 6,
+  },
+  pieceText: {
+    fontSize: 13,
+    fontWeight: "600",
   },
   metaText: {
-    fontSize: 12,
-    fontWeight: "500",
-  },
-  timeText: {
-    marginTop: 8,
     fontSize: 11,
-    fontStyle: "italic",
+    marginTop: 8,
   },
   emptyState: {
     marginTop: 18,
     borderRadius: 14,
     padding: 16,
   },
+  emptyStateCentered: {
+    marginTop: 40,
+    alignItems: "center",
+    paddingHorizontal: 12,
+  },
+  emptyIcon: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 14,
+  },
   emptyTitle: {
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: "700",
-    marginBottom: 6,
+    marginBottom: 8,
+    textAlign: "center",
   },
   emptySub: {
-    fontSize: 12,
+    fontSize: 13,
     lineHeight: 18,
+    textAlign: "center",
   },
 });

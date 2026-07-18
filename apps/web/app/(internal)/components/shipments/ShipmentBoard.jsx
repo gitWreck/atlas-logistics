@@ -23,8 +23,8 @@ import {
 } from "@fortawesome/free-solid-svg-icons";
 import ShipmentRow from "./ShipmentRow";
 import ShipmentDrawer from "./ShipmentDrawer";
-import { calculateProgress } from "@/app/utility/utilities";
 import { calculateShipmentProgress } from "@/app/utility/shipmentProgress";
+import { formatShipmentForBoard } from "@/app/utility/shipmentBoardFormatter";
 import {
   shipmentMatchesDivisoriaHub,
   shipmentMatchesOdionganHub,
@@ -64,23 +64,14 @@ const DELIVERY_OPERATION_STATUSES = new Set([
   "DELIVERED",
 ]);
 
+const PICKUP_PHASE_STATUSES = new Set(["PENDING_PICKUP", "PICKED_UP"]);
+
 function getShipmentStatus(shipment) {
   return String(shipment?.status || "").toUpperCase();
 }
 
 function isPickupShipment(shipment) {
-  const status = getShipmentStatus(shipment);
-
-  return (
-    shipment?.isPickupRequested === true ||
-    status === "PENDING_PICKUP" ||
-    status === "PICKED_UP" ||
-    shipment?.statusHistory?.some((history) =>
-      String(history?.status || "")
-        .toUpperCase()
-        .includes("PICKUP"),
-    )
-  );
+  return PICKUP_PHASE_STATUSES.has(getShipmentStatus(shipment));
 }
 
 function matchesWarehouseTab(shipment, warehouseKey) {
@@ -147,6 +138,44 @@ function mergeShipmentsById(primary = [], supplemental = []) {
   });
 }
 
+function sameShipment(left = {}, right = {}) {
+  const leftIds = [left.id, left.shipmentId].filter(Boolean).map(String);
+  const rightIds = [right.id, right.shipmentId].filter(Boolean).map(String);
+  return leftIds.some((id) => rightIds.includes(id));
+}
+
+function hydrateBoardShipment(shipment = {}) {
+  return formatShipmentForBoard(shipment);
+}
+
+function patchShipmentList(
+  list = [],
+  updatedShipment = null,
+  { include = true } = {},
+) {
+  if (!updatedShipment?.id && !updatedShipment?.shipmentId) return list;
+
+  let changed = false;
+  const next = list.reduce((items, shipment) => {
+    if (!sameShipment(shipment, updatedShipment)) {
+      items.push(shipment);
+      return items;
+    }
+
+    changed = true;
+    if (!include) return items;
+
+    items.push(hydrateBoardShipment({
+      ...shipment,
+      ...updatedShipment,
+    }));
+    return items;
+  }, []);
+
+  if (changed) return next;
+  return include ? [hydrateBoardShipment(updatedShipment), ...list] : list;
+}
+
 const ShipmentBoard = forwardRef(function ShipmentBoard(
   { user, profile, isDark = false },
   ref,
@@ -161,6 +190,11 @@ const ShipmentBoard = forwardRef(function ShipmentBoard(
   const shipments = useMemo(
     () => mergeShipmentsById(coreShipments, deliveryShipments),
     [coreShipments, deliveryShipments],
+  );
+
+  const shipmentsWithPickups = useMemo(
+    () => mergeShipmentsById(shipments, pickups),
+    [pickups, shipments],
   );
 
   const [isNewOrderModalOpen, setIsNewOrderModalOpen] = useState(false);
@@ -289,10 +323,9 @@ const ShipmentBoard = forwardRef(function ShipmentBoard(
       }),
     );
 
-    const formattedPickups = (pickupsData.pickups || []).map((pickup) => ({
-      ...pickup,
-      progress: calculateProgress(pickup.status),
-    }));
+    const formattedPickups = (pickupsData.pickups || []).map(
+      hydrateBoardShipment,
+    );
 
     setCoreShipments(formattedCoreShipments);
     setPickups(formattedPickups);
@@ -463,7 +496,7 @@ const ShipmentBoard = forwardRef(function ShipmentBoard(
   }, [activeBoardTab, fetchCheckerDirectory, user]);
 
   const filteredShipments = useMemo(() => {
-    return shipments.filter((shipment) => {
+    return shipmentsWithPickups.filter((shipment) => {
       const searchContent = [
         shipment.shipmentId,
         shipment.sender?.name,
@@ -518,7 +551,7 @@ const ShipmentBoard = forwardRef(function ShipmentBoard(
       return true;
     });
   }, [
-    shipments,
+    shipmentsWithPickups,
     searchQuery,
     startDate,
     endDate,
@@ -739,6 +772,32 @@ const ShipmentBoard = forwardRef(function ShipmentBoard(
   };
 
   const refreshBoard = useCallback(() => fetchShipments(), [fetchShipments]);
+
+  const handleShipmentUpdated = useCallback((updatedShipment) => {
+    if (!updatedShipment?.id && !updatedShipment?.shipmentId) return;
+
+    const hydrated = hydrateBoardShipment(updatedShipment);
+    const isPickup = isPickupShipment(hydrated);
+    const isDelivery = shipmentMatchesDeliveryCheckerPool(hydrated);
+
+    setCoreShipments((current) =>
+      patchShipmentList(current, hydrated, { include: !isPickup }),
+    );
+    setDeliveryShipments((current) =>
+      patchShipmentList(current, hydrated, { include: isDelivery }),
+    );
+    setPickups((current) =>
+      patchShipmentList(current, hydrated, { include: isPickup }),
+    );
+
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(
+        new CustomEvent("atlas:shipment-updated", {
+          detail: { shipment: hydrated },
+        }),
+      );
+    }
+  }, []);
 
   const tableLoading =
     (loading && coreShipments.length === 0 && pickups.length === 0) ||
@@ -1046,6 +1105,7 @@ const ShipmentBoard = forwardRef(function ShipmentBoard(
         onReconcile={() => setIsReconcileModalOpen(true)}
         onReceiveReturned={() => setIsReceiveReturnedModalOpen(true)}
         onReleaseToCheckers={() => setIsReleaseToCheckerModalOpen(true)}
+        onShipmentUpdated={handleShipmentUpdated}
         canManageWarehouse={canManageWarehouse}
       />
 

@@ -1,23 +1,13 @@
 import { NextResponse } from "next/server";
-import { headers } from "next/headers";
-import { getAuth } from "firebase-admin/auth";
 import { processCheckerScan } from "../_lib/processCheckerScan";
+import { getCheckerAccessContext } from "../_lib/checkerAccessHelpers.mjs";
 
 export const dynamic = "force-dynamic";
 
 export async function POST(request) {
   try {
-    const headersList = await headers();
-    const token = headersList.get("authorization")?.split("Bearer ")[1];
-
-    if (!token) {
-      return NextResponse.json(
-        { success: false, message: "Unauthorized" },
-        { status: 401 },
-      );
-    }
-
-    await getAuth().verifyIdToken(token);
+    const access = await getCheckerAccessContext(request);
+    if (access.error) return access.error;
 
     const body = await request.json();
     const barcode = body?.barcode || body?.packageId;
@@ -27,8 +17,9 @@ export async function POST(request) {
     const result = await processCheckerScan({
       barcode,
       truckTripId,
-      idToken: token,
+      idToken: request.headers.get("authorization")?.replace(/^Bearer\s+/i, "").trim(),
       newStatus,
+      checkerMunicipalities: access.assignedMunicipalities,
     });
 
     return NextResponse.json(result);

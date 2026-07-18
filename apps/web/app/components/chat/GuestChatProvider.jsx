@@ -39,14 +39,22 @@ export function useGuestChat() {
 }
 
 async function ensureChatSession() {
+  // Wait for logout/login to settle so we don't reuse a stale signed-in token.
+  if (typeof auth.authStateReady === "function") {
+    await auth.authStateReady();
+  }
+
   let user = auth.currentUser;
 
+  // Public live chat must run as Firebase anonymous after logout.
+  // A previous email/password session has a users/{uid} profile requirement
+  // on some callables; anonymous guests intentionally do not.
   if (!user) {
     const credential = await signInAnonymously(auth);
     user = credential.user;
   }
 
-  // Make sure Firestore has a fresh token before any client queries.
+  // Make sure callable + Firestore get a fresh token (anonymous claim included).
   await user.getIdToken(true);
   return user.uid;
 }
@@ -190,9 +198,10 @@ export function GuestChatProvider({ children }) {
       },
       (error) => {
         if (error?.code === "permission-denied") {
-          // Stale conversation from a previous logged-in session.
-          setConversationId(null);
-          setMessages([]);
+          console.error("Live chat messages permission denied:", error);
+          setErrorMessage(
+            "Unable to load messages (permission denied). Please refresh and try again.",
+          );
           return;
         }
         console.error("Live chat messages subscription error:", error);
@@ -238,7 +247,12 @@ export function GuestChatProvider({ children }) {
       setDraft("");
     } catch (error) {
       console.error("Failed to send live chat message:", error);
-      setErrorMessage("Message failed to send. Please try again.");
+      const details = String(error?.message || error?.code || "").trim();
+      setErrorMessage(
+        details
+          ? `Message failed to send: ${details}`
+          : "Message failed to send. Please try again.",
+      );
     } finally {
       setSending(false);
     }
