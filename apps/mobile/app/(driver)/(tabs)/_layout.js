@@ -8,6 +8,7 @@ import { useTheme } from "../../../contexts/ThemeContext";
 export default function DriverTabsLayout() {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
+  const softBorder = withAlpha(colors.text, 0.08);
 
   return (
     <View style={[styles.container, { backgroundColor: colors.dashboardBg, paddingTop: insets.top }]}>
@@ -16,51 +17,58 @@ export default function DriverTabsLayout() {
           headerShown: false,
           tabBarHideOnKeyboard: true,
           tabBarStyle: {
-            backgroundColor: colors.dashboardBg,
-            borderTopColor: colors.dashboardBorder,
-            borderTopWidth: 1,
             height: 78 + insets.bottom,
-            paddingBottom: Math.max(insets.bottom, 12),
             paddingTop: 10,
+            paddingBottom: Math.max(insets.bottom, 12),
+            backgroundColor: colors.dashboardBg,
+            borderTopColor: softBorder,
+            borderTopWidth: StyleSheet.hairlineWidth,
+            borderLeftWidth: 0,
+            borderRightWidth: 0,
+            borderBottomWidth: 0,
             elevation: 0,
           },
           tabBarActiveTintColor: colors.primary,
           tabBarInactiveTintColor: colors.textMuted,
           tabBarLabelStyle: {
             fontSize: 11,
-            lineHeight: 15,
+            lineHeight: 14,
             fontWeight: "400",
             marginTop: 4,
           },
-          tabBarItemStyle: { minHeight: 56 },
+          tabBarItemStyle: {
+            minHeight: 56,
+            alignItems: "center",
+            justifyContent: "center",
+          },
         }}
       >
         <Tabs.Screen
           name="index"
           options={{
             title: "Home",
-            tabBarIcon: ({ color }) => <Feather name="home" size={22} color={color} />,
+            tabBarIcon: ({ color }) => <Feather name="home" size={25} color={color} />,
           }}
         />
         <Tabs.Screen
           name="deliveries"
           options={{
             title: "Trips",
-            tabBarIcon: ({ color }) => <Feather name="truck" size={22} color={color} />,
+            tabBarIcon: ({ color }) => <Feather name="truck" size={25} color={color} />,
           }}
         />
         <Tabs.Screen
           name="messages"
           options={{
             title: "Messages",
-            tabBarIcon: ({ color }) => <Feather name="message-square" size={22} color={color} />,
+            tabBarIcon: ({ color }) => <Feather name="message-square" size={25} color={color} />,
           }}
         />
         <Tabs.Screen
           name="profile"
           options={{
             title: "Profile",
-            tabBarIcon: ({ color }) => <Feather name="user" size={22} color={color} />,
+            tabBarIcon: ({ color }) => <Feather name="user" size={25} color={color} />,
           }}
         />
       </Tabs>
@@ -68,4 +76,15 @@ export default function DriverTabsLayout() {
   );
 }
 
-const styles = StyleSheet.create({ container: { flex: 1 } });
+function withAlpha(color, opacity) {
+  const raw = String(color || "").replace("#", "");
+  if (raw.length !== 6) return color;
+  const r = parseInt(raw.slice(0, 2), 16);
+  const g = parseInt(raw.slice(2, 4), 16);
+  const b = parseInt(raw.slice(4, 6), 16);
+  return `rgba(${r}, ${g}, ${b}, ${opacity})`;
+}
+
+const styles = StyleSheet.create({
+  container: { flex: 1 },
+});
