@@ -23,6 +23,7 @@ import NotificationBell from "../../components/notifications/NotificationBell";
 import TruckBoard from "../../components/trucks/TruckBoard";
 import CustomerBoard from "../../components/customers/CustomerBoard";
 import ChatInbox from "../../components/chat/ChatInbox";
+import WebProfileMenu from "../../components/profile/WebProfileMenu";
 
 import { getDashboardThemeClasses } from "@/app/utility/constant/theme";
 import { mainNavItems } from "@/app/utility/constant/templates";
@@ -36,8 +37,12 @@ export default function ManagerDashboardPage() {
     useDashboardPreferences("manager", tabIds);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+  const [profilePhotoOverride, setProfilePhotoOverride] = useState(null);
 
   const { user, profile, loading } = useAuth();
+  const displayProfile = profilePhotoOverride
+    ? { ...profile, photoURL: profilePhotoOverride }
+    : profile;
 
   const tripBoardRef = useRef(null);
   const shipmentBoardRef = useRef(null);
@@ -265,19 +270,13 @@ export default function ManagerDashboardPage() {
 
             <NotificationBell />
 
-            <div className="hidden sm:flex items-center gap-3">
-              <div className="text-right">
-                <div className="text-xs font-medium">
-                  {profile?.name || "Manager"}
-                </div>
-                <div className="text-[11px] uppercase tracking-wide text-slate-400">
-                  {profile?.role || "manager"}
-                </div>
-              </div>
-              <div className="h-9 w-9 rounded-full bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center text-xs font-semibold text-white">
-                {profile?.name?.[0]?.toUpperCase() || "M"}
-              </div>
-            </div>
+            <WebProfileMenu
+              user={user}
+              profile={displayProfile}
+              onProfileUpdated={(nextProfile) => setProfilePhotoOverride(nextProfile.photoURL)}
+              onLogout={() => handleLogout(auth, router)}
+              gradientClass="bg-gradient-to-br from-emerald-500 to-teal-600"
+            />
           </div>
         </header>
 
