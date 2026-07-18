@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { Animated, Easing, Image, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { Animated, Easing, Image, Modal, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import Feather from "@expo/vector-icons/Feather";
 import FontAwesome5 from "@expo/vector-icons/FontAwesome5";
 import { useRouter } from "expo-router";
@@ -75,6 +75,12 @@ function tripShortDate(value) {
   return new Intl.DateTimeFormat("en-US", { timeZone: "Asia/Manila", month: "short", day: "numeric", year: "numeric" }).format(date);
 }
 
+function tripDateKey(value) {
+  const date = toDate(value);
+  if (!date) return null;
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Manila", year: "numeric", month: "2-digit", day: "2-digit" }).format(date);
+}
+
 function tripEndLabel(trip) {
   const key = statusKey(trip.status);
   if (key.includes("CANCEL")) return "Cancelled On";
@@ -95,17 +101,27 @@ export default function DriverTripsScreen() {
   const data = useDriverOperations(manilaDateKey());
   const [filter, setFilter] = useState("ALL");
   const [searchText, setSearchText] = useState("");
+  const [selectedDate, setSelectedDate] = useState(null);
+  const [activeSheet, setActiveSheet] = useState(null);
+  const dateOptions = useMemo(() => [...new Map(data.trips
+    .map((trip) => {
+      const departure = tripDate(trip);
+      const key = tripDateKey(departure);
+      return key ? [key, { key, label: tripShortDate(departure) }] : null;
+    })
+    .filter(Boolean)).values()], [data.trips]);
   const trips = useMemo(() => [...data.trips]
     .filter((trip) => matches(trip, filter))
     .filter((trip) => matchesSearch(trip, searchText))
-    .sort((a, b) => (b.updatedAt?.toMillis?.() || 0) - (a.updatedAt?.toMillis?.() || 0)), [data.trips, filter, searchText]);
+    .filter((trip) => !selectedDate || tripDateKey(tripDate(trip)) === selectedDate)
+    .sort((a, b) => (b.updatedAt?.toMillis?.() || 0) - (a.updatedAt?.toMillis?.() || 0)), [data.trips, filter, searchText, selectedDate]);
 
   const openTrip = (trip) => router.push({ pathname: "/(driver)/trip-details", params: { tripId: trip.id } });
 
   return (
     <SafeAreaView style={[styles.screen, { backgroundColor: colors.dashboardBg }]}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
-        <TripsHeader colors={colors} />
+        <TripsHeader colors={colors} onCalendarPress={() => setActiveSheet("date")} />
         <TripFilters filter={filter} setFilter={setFilter} colors={colors} />
         <TripSearchBar value={searchText} onChangeText={setSearchText} colors={colors} />
         {data.loading ? (
@@ -118,19 +134,27 @@ export default function DriverTripsScreen() {
           </View>
         )}
       </ScrollView>
+      <TripFilterSheet
+        type={activeSheet}
+        onClose={() => setActiveSheet(null)}
+        selectedDate={selectedDate}
+        setSelectedDate={setSelectedDate}
+        dateOptions={dateOptions}
+        colors={colors}
+      />
     </SafeAreaView>
   );
 }
 
-function TripsHeader({ colors }) {
+function TripsHeader({ colors, onCalendarPress }) {
   return (
     <View style={styles.header}>
       <View style={styles.headerCopy}>
         <Text style={[styles.title, { color: colors.text }]}>Trips</Text>
         <Text style={[styles.subtitle, { color: colors.textMuted }]}>Track and manage your deliveries</Text>
       </View>
-      <Pressable style={({ pressed }) => [styles.calendarButton, { backgroundColor: colors.dashboardSurface, borderColor: colors.dashboardBorder }, pressed && styles.pressed]} accessibilityRole="button">
-        <Feather name="calendar" size={23} color={colors.text} />
+      <Pressable onPress={onCalendarPress} style={({ pressed }) => [styles.calendarButton, { backgroundColor: colors.dashboardSurface, borderColor: colors.dashboardBorder }, pressed && styles.pressed]} accessibilityRole="button" accessibilityLabel="Filter trips by date">
+        <Feather name="calendar" size={18} color={colors.text} />
       </Pressable>
     </View>
   );
@@ -173,10 +197,45 @@ function TripSearchBar({ value, onChangeText, colors }) {
         />
         {value ? <Pressable onPress={() => onChangeText("")} hitSlop={8}><Feather name="x-circle" size={18} color={colors.textMuted} /></Pressable> : null}
       </View>
-      <Pressable style={({ pressed }) => [styles.filterButton, { backgroundColor: colors.dashboardSurface, borderColor: colors.dashboardBorder, shadowColor: colors.dashboardShadow }, pressed && styles.pressed]} accessibilityRole="button">
-        <Feather name="filter" size={24} color={colors.text} />
-      </Pressable>
     </View>
+  );
+}
+
+function TripFilterSheet({ type, onClose, selectedDate, setSelectedDate, dateOptions, colors }) {
+  const options = [{ key: null, label: "All dates" }, ...dateOptions];
+
+  return (
+    <Modal visible={Boolean(type)} transparent animationType="fade" onRequestClose={onClose}>
+      <Pressable style={styles.sheetBackdrop} onPress={onClose}>
+        <Pressable onPress={(event) => event.stopPropagation()} style={[styles.sheet, { backgroundColor: colors.dashboardSurface, borderColor: colors.dashboardBorder }]} accessibilityViewIsModal>
+          <View style={styles.sheetHeader}>
+            <Text style={[styles.sheetTitle, { color: colors.text }]}>Filter by date</Text>
+            <Pressable onPress={onClose} hitSlop={10} accessibilityRole="button" accessibilityLabel="Close filters">
+              <Feather name="x" size={18} color={colors.textMuted} />
+            </Pressable>
+          </View>
+          {options.map((option) => {
+            const selected = selectedDate === option.key;
+            return (
+              <Pressable
+                key={option.key || "all-dates"}
+                onPress={() => {
+                  setSelectedDate(option.key);
+                  onClose();
+                }}
+                style={({ pressed }) => [styles.sheetOption, selected && { backgroundColor: colors.primarySoft }, pressed && styles.pressed]}
+                accessibilityRole="button"
+                accessibilityState={{ selected }}
+              >
+                <Feather name="calendar" size={16} color={selected ? colors.primary : colors.iconMuted} />
+                <Text style={[styles.sheetOptionText, { color: selected ? colors.primary : colors.text }]}>{option.label}</Text>
+                {selected ? <Feather name="check" size={16} color={colors.primary} /> : null}
+              </Pressable>
+            );
+          })}
+        </Pressable>
+      </Pressable>
+    </Modal>
   );
 }
 
@@ -329,7 +388,12 @@ const styles = StyleSheet.create({
   searchRow: { marginTop: 10, flexDirection: "row", gap: 7 },
   searchBox: { flex: 1, minHeight: 31, borderRadius: 8, borderWidth: StyleSheet.hairlineWidth, paddingHorizontal: 10, flexDirection: "row", alignItems: "center", gap: 7, shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.06, shadowRadius: 12, elevation: 1 },
   searchInput: { flex: 1, minWidth: 0, fontSize: 10, lineHeight: 13, fontWeight: "500", paddingVertical: 0 },
-  filterButton: { width: 38, height: 31, borderRadius: 8, borderWidth: StyleSheet.hairlineWidth, alignItems: "center", justifyContent: "center", shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.06, shadowRadius: 12, elevation: 1 },
+  sheetBackdrop: { flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(0, 0, 0, 0.45)", padding: 12 },
+  sheet: { borderRadius: 16, borderWidth: StyleSheet.hairlineWidth, padding: 12, shadowOffset: { width: 0, height: -8 }, shadowOpacity: 0.18, shadowRadius: 24, elevation: 8 },
+  sheetHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 7, paddingHorizontal: 3 },
+  sheetTitle: { fontSize: 14, lineHeight: 18, fontWeight: "700" },
+  sheetOption: { minHeight: 42, borderRadius: 10, paddingHorizontal: 10, flexDirection: "row", alignItems: "center", gap: 10 },
+  sheetOptionText: { flex: 1, fontSize: 12, lineHeight: 15, fontWeight: "600" },
   list: { marginTop: 10, gap: 9 },
   tripCard: { borderRadius: 13, borderWidth: StyleSheet.hairlineWidth, padding: 11, shadowOffset: { width: 0, height: 12 }, shadowOpacity: 0.1, shadowRadius: 18, elevation: 3 },
   cardPressed: { transform: [{ scale: 0.985 }] },
