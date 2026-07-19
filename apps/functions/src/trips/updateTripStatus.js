@@ -40,7 +40,7 @@ exports.updateTripStatus = onCall(
   },
   async (req) => {
     // 1. Auth & Role Check
-    await requireRole(db, req, ["admin", "manager", "driver", "checker"]);
+    const actor = await requireRole(db, req, ["admin", "manager", "driver", "checker"]);
     // const uid = req.auth.uid;
 
     const tripId = requireString(req.data?.tripId, "tripId");
@@ -51,7 +51,25 @@ exports.updateTripStatus = onCall(
 
     // Validate Status Enum
 
-    const { uid, role, name } = updatedBy(req);
+    const actorMeta = updatedBy(req);
+    const uid = actor.uid;
+    const name = actor.user?.name || actor.user?.fullName || actorMeta.name || uid;
+    const role = actor.role;
+
+    if (role === "driver") {
+      if (!["IN_TRANSIT", "ARRIVED", "COMPLETED"].includes(newStatus)) {
+        throw new HttpsError(
+          "permission-denied",
+          "Drivers cannot perform loading, unloading, warehouse, or assignment trip actions.",
+        );
+      }
+      if (markReconciled || promotionSource) {
+        throw new HttpsError(
+          "permission-denied",
+          "Drivers cannot reconcile or override trip manifests.",
+        );
+      }
+    }
 
     if (!VALID_TRIP_STATUSES.includes(newStatus)) {
       throw new HttpsError(
@@ -68,6 +86,13 @@ exports.updateTripStatus = onCall(
     await db.runTransaction(async (tx) => {
       const tripSnap = await tx.get(tripRef);
       if (!tripSnap.exists) throw new HttpsError("not-found", "Trip not found");
+
+      if (
+        role === "driver" &&
+        String(tripSnap.data().driverId || "") !== String(actor.uid)
+      ) {
+        throw new HttpsError("permission-denied", "This trip is not assigned to your Driver account.");
+      }
 
       const oldStatus = tripSnap.data().status;
       oldTripStatus = oldStatus;

@@ -314,6 +314,7 @@ export default function CheckerIndex() {
       >
         <CheckerHomeHero
           userName={user?.name || user?.fullName || profile?.name || "Checker"}
+          photoURL={profile?.photoURL || user?.photoURL}
           onProfilePress={() => router.push("/(checker)/profile")}
           currentDate={selectedDate}
           onDatePress={() => setDatePickerVisible(true)}

@@ -15,6 +15,7 @@ export default function CheckerChatThreadScreen() {
       <ChatThread
         conversationId={conversationId ? String(conversationId) : null}
         onBack={() => router.back()}
+        showSenderProfilePhotos
       />
     </View>
   );

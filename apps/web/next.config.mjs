@@ -8,11 +8,10 @@ const nextConfig = {
   outputFileTracingRoot: path.resolve(__dirname, "../.."),
   turbopack: {
     root: path.resolve(__dirname, "../.."),
+    resolveExtensions: ['.ts', '.tsx', '.js', '.jsx', '.json'],
   },
   // Add the names of your local packages here
-  transpilePackages: ["@repo/ui", "@repo/utils"],
-  // Disable Turbopack on Windows to avoid junction point permission issues.
-  // Next will fall back to webpack dev server.
+  transpilePackages: ["@repo/ui", "@repo/utils", "@atlas/shared"],
   // Allow network access for development (fix WebSocket HMR errors)
   allowedDevOrigins: ["localhost", "127.0.0.1", "192.168.1.3"],
 };

@@ -15,37 +15,24 @@ export default function DriverLayout() {
 
       <Stack
         screenOptions={{
-          headerShown: false, // We use custom headers in our screens
+          headerShown: false,
           contentStyle: { backgroundColor: colors.bg },
-          animation: "slide_from_right", // Smooth transitions
+          animation: "slide_from_right",
         }}
       >
-        {/* 1. The Tab Bar (Main Dashboard) */}
-        {/* This points to app/(driver)/(tabs)/_layout.js */}
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-
-        {/* 2. Full Screen Pages (These cover the tabs) */}
-        <Stack.Screen
-          name="trip-details"
-          options={{
-            headerShown: false,
-            presentation: "card",
-          }}
-        />
-
-        <Stack.Screen
-          name="shipments"
-          options={{
-            headerShown: false,
-            presentation: "card",
-          }}
-        />
+        <Stack.Screen name="delivery-info" options={{ headerShown: false, presentation: "card" }} />
+        <Stack.Screen name="delivery-scan" options={{ headerShown: false, presentation: "card" }} />
+        <Stack.Screen name="trip-details" options={{ headerShown: false, presentation: "card" }} />
+        <Stack.Screen name="confirm-arrival" options={{ headerShown: false, presentation: "card" }} />
+        <Stack.Screen name="report-issue" options={{ headerShown: false, presentation: "card" }} />
+        <Stack.Screen name="chat/[conversationId]" options={{ headerShown: false, presentation: "card" }} />
 
         <Stack.Screen
           name="report-delay"
           options={{
             headerShown: false,
-            presentation: "modal", // Modals look nice for reporting issues
+            presentation: "modal",
           }}
         />
       </Stack>

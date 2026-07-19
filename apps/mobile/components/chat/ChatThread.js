@@ -36,6 +36,15 @@ import { FontAwesome5 } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import * as ImagePicker from "expo-image-picker";
 import * as DocumentPicker from "expo-document-picker";
+import {
+  RecordingPresets,
+  requestRecordingPermissionsAsync,
+  setAudioModeAsync,
+  useAudioPlayer,
+  useAudioPlayerStatus,
+  useAudioRecorder,
+  useAudioRecorderState,
+} from "expo-audio";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
@@ -167,7 +176,7 @@ function CallHistoryCard({ message, mine, colors, onCall }) {
   );
 }
 
-function MessageBubble({ item, colors, onOpenImage, onCall }) {
+function MessageBubble({ item, colors, onOpenImage, onCall, isCustomerSupport, senderPhotoURL, showSenderProfilePhotos }) {
   const { message, mine, isFirstInGroup, isLastInGroup } = item;
   const attachment = getMessageAttachment(message);
   const text = getMessageText(message);
@@ -192,7 +201,11 @@ function MessageBubble({ item, colors, onOpenImage, onCall }) {
 
   const isImage = attachment?.type === "image";
   const isFile = attachment?.type === "file";
+  const isAudio = attachment?.type === "audio";
   const isCall = String(message.type || "").trim().toLowerCase() === "call";
+  const isSupportSender = String(message.senderRole || "").trim().toLowerCase() !== "customer";
+  const isCustomerSupportMessageFromSupport =
+    isCustomerSupport && !showSenderProfilePhotos && !mine && isSupportSender;
 
   return (
     <Animated.View
@@ -216,7 +229,16 @@ function MessageBubble({ item, colors, onOpenImage, onCall }) {
       {!mine && (
         <View style={styles.avatarSlot}>
           {isLastInGroup ? (
-            <PersonAvatar name={message.senderName || "Atlas Support"} size={28} />
+            isCustomerSupportMessageFromSupport ? (
+              <SupportAvatar size={28} online={false} ringColor={colors.chatBg} />
+            ) : (
+              <PersonAvatar
+                name={message.senderName || "Atlas Support"}
+                avatarSeed={message.senderId || message.senderName}
+                photoURL={senderPhotoURL}
+                size={28}
+              />
+            )
           ) : (
             <View style={{ width: 28 }} />
           )}
@@ -245,6 +267,8 @@ function MessageBubble({ item, colors, onOpenImage, onCall }) {
           >
             {isCall ? (
               <CallHistoryCard message={message} mine colors={colors} onCall={onCall} />
+            ) : isAudio ? (
+              <AudioChip attachment={attachment} tint="#FFFFFF" mine />
             ) : isFile ? (
               <FileChip attachment={attachment} tint="#FFFFFF" mine />
             ) : (
@@ -263,6 +287,8 @@ function MessageBubble({ item, colors, onOpenImage, onCall }) {
           >
             {isCall ? (
               <CallHistoryCard message={message} mine={false} colors={colors} onCall={onCall} />
+            ) : isAudio ? (
+              <AudioChip attachment={attachment} tint={colors.accent} mine={false} />
             ) : isFile ? (
               <FileChip attachment={attachment} tint={colors.accent} />
             ) : (
@@ -313,6 +339,32 @@ function FileChip({ attachment, tint, mine }) {
         {attachment.name || "File"}
       </Text>
     </View>
+  );
+}
+
+function AudioChip({ attachment, tint, mine }) {
+  const player = useAudioPlayer(attachment?.url || null, 250);
+  const status = useAudioPlayerStatus(player);
+  const duration = Math.max(0, Number(status?.duration || 0));
+  const current = Math.max(0, Number(status?.currentTime || 0));
+  const label = `${Math.floor(current / 60)}:${String(Math.floor(current % 60)).padStart(2, "0")}`;
+  const toggle = async () => {
+    if (status?.playing) return player.pause();
+    if (duration > 0 && current >= duration - 0.1) await player.seekTo(0);
+    player.play();
+  };
+  return (
+    <TouchableOpacity style={styles.audioChip} onPress={toggle} activeOpacity={0.8}>
+      <View style={[styles.audioPlay, { backgroundColor: mine ? "rgba(255,255,255,0.18)" : "rgba(10,124,255,0.12)" }]}> 
+        <FontAwesome5 name={status?.playing ? "pause" : "play"} size={14} color={mine ? "#FFFFFF" : tint} />
+      </View>
+      <View style={styles.audioWave}>
+        {[8, 15, 11, 20, 13, 18, 9, 16, 12, 19, 10, 14].map((height, index) => (
+          <View key={`${height}-${index}`} style={[styles.audioWaveBar, { height, backgroundColor: mine ? "rgba(255,255,255,0.9)" : tint }]} />
+        ))}
+      </View>
+      <Text style={[styles.audioTime, { color: mine ? "#FFFFFF" : tint }]}>{label}</Text>
+    </TouchableOpacity>
   );
 }
 
@@ -954,7 +1006,12 @@ function SettingRow({ ui = UI, label, value, children }) {
   );
 }
 
-export default function ChatThread({ conversationId, onBack, embedded = false }) {
+export default function ChatThread({
+  conversationId,
+  onBack,
+  embedded = false,
+  showSenderProfilePhotos = false,
+}) {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { colors: themeColors, resolvedScheme } = useTheme();
@@ -993,6 +1050,8 @@ export default function ChatThread({ conversationId, onBack, embedded = false })
   const listRef = useRef(null);
   const shouldAutoScroll = useRef(true);
   const lastReadRef = useRef(null);
+  const audioRecorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
+  const recorderState = useAudioRecorderState(audioRecorder, 250);
 
   const [conversation, setConversation] = useState(null);
   const [messages, setMessages] = useState([]);
@@ -1000,6 +1059,7 @@ export default function ChatThread({ conversationId, onBack, embedded = false })
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [recordingStarting, setRecordingStarting] = useState(false);
   const [startingCall, setStartingCall] = useState(null);
   const [pendingAttachment, setPendingAttachment] = useState(null);
   const [emojiOpen, setEmojiOpen] = useState(false);
@@ -1013,6 +1073,15 @@ export default function ChatThread({ conversationId, onBack, embedded = false })
   const [newCount, setNewCount] = useState(0);
 
   const myUid = auth.currentUser?.uid;
+  const senderPhotoURLs = useMemo(
+    () => Object.fromEntries(
+      Object.entries(conversation?.participantProfiles || {}).map(([uid, profile]) => [
+        uid,
+        String(profile?.photoURL || "").trim(),
+      ]),
+    ),
+    [conversation?.participantProfiles],
+  );
 
   // Conversation metadata subscription.
   useEffect(() => {
@@ -1114,11 +1183,13 @@ export default function ChatThread({ conversationId, onBack, embedded = false })
 
   const isClosed = conversation?.status === "closed";
   const isDirectStaff = conversation?.type === "direct_staff";
+  const isCustomerSupport = conversation?.type === "customer_support";
   const directContact = useMemo(() => {
     if (!isDirectStaff) return null;
     const contactId = (conversation?.participantIds || []).find((id) => id !== myUid);
     return contactId ? conversation?.participantProfiles?.[contactId] || null : null;
   }, [conversation, isDirectStaff, myUid]);
+  const isDriver = String(conversation?.participantRoles?.[myUid] || "").toLowerCase() === "driver";
   const headerTitle = isDirectStaff ? directContact?.name || "Atlas staff" : "Atlas Support";
   const hasShipment = !!(conversation?.trackingNumber || conversation?.shipmentId);
   const canSend = !!draft.trim() || !!pendingAttachment;
@@ -1218,8 +1289,8 @@ export default function ChatThread({ conversationId, onBack, embedded = false })
     if (pendingAttachment) {
       try {
         setUploading(true);
-        const attachmentType = pendingAttachment.type === "image" ? "image" : "file";
-        const fallbackName = attachmentType === "image" ? `photo_${Date.now()}.jpg` : `file_${Date.now()}`;
+        const attachmentType = pendingAttachment.type === "image" ? "image" : pendingAttachment.type === "audio" ? "audio" : "file";
+        const fallbackName = attachmentType === "image" ? `photo_${Date.now()}.jpg` : attachmentType === "audio" ? `voice_${Date.now()}.${Platform.OS === "web" ? "webm" : "m4a"}` : `file_${Date.now()}`;
         const name = pendingAttachment.name || fallbackName;
         const safeName = name.replace(/[^a-zA-Z0-9._-]/g, "_");
         const response = await fetch(pendingAttachment.uri);
@@ -1273,6 +1344,65 @@ export default function ChatThread({ conversationId, onBack, embedded = false })
       console.error("Image pick failed:", error);
     }
   }, [isClosed]);
+
+  const handleTakePhoto = useCallback(async () => {
+    if (isClosed) return;
+    try {
+      const permission = await ImagePicker.requestCameraPermissionsAsync();
+      if (!permission.granted) {
+        Alert.alert("Camera permission required", "Allow camera access to take a photo in chat.");
+        return;
+      }
+      const result = await ImagePicker.launchCameraAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        quality: 0.7,
+      });
+      if (!result.canceled && result.assets?.length) {
+        const asset = result.assets[0];
+        setPendingAttachment({ uri: asset.uri, name: asset.fileName || `camera_${Date.now()}.jpg`, type: "image" });
+        setEmojiOpen(false);
+      }
+    } catch (error) {
+      console.error("Camera capture failed:", error);
+      Alert.alert("Camera unavailable", "The camera could not be opened.");
+    }
+  }, [isClosed]);
+
+  const toggleVoiceRecording = useCallback(async () => {
+    if (isClosed || uploading || sending || recordingStarting) return;
+    try {
+      if (recorderState.isRecording) {
+        await audioRecorder.stop();
+        await setAudioModeAsync({ allowsRecording: false });
+        const uri = audioRecorder.uri || recorderState.url;
+        if (uri) {
+          setPendingAttachment({
+            uri,
+            name: `voice_${Date.now()}.${Platform.OS === "web" ? "webm" : "m4a"}`,
+            type: "audio",
+            durationMillis: recorderState.durationMillis || 0,
+          });
+        }
+        return;
+      }
+      setRecordingStarting(true);
+      const permission = await requestRecordingPermissionsAsync();
+      if (!permission.granted) {
+        Alert.alert("Microphone permission required", "Allow microphone access to record a voice message.");
+        return;
+      }
+      setPendingAttachment(null);
+      setEmojiOpen(false);
+      await setAudioModeAsync({ allowsRecording: true, playsInSilentMode: true, shouldPlayInBackground: false });
+      await audioRecorder.prepareToRecordAsync();
+      audioRecorder.record();
+    } catch (error) {
+      console.error("Voice recording failed:", error);
+      Alert.alert("Recording unavailable", "A voice message could not be recorded.");
+    } finally {
+      setRecordingStarting(false);
+    }
+  }, [audioRecorder, isClosed, recorderState, recordingStarting, sending, uploading]);
 
   const handlePickFile = useCallback(async () => {
     if (isClosed) return;
@@ -1334,6 +1464,11 @@ export default function ChatThread({ conversationId, onBack, embedded = false })
         colors={colors}
         onOpenImage={setLightbox}
         onCall={startCall}
+        isCustomerSupport={isCustomerSupport}
+        senderPhotoURL={showSenderProfilePhotos
+          ? senderPhotoURLs[String(item.message?.senderId || "").trim()] || null
+          : null}
+        showSenderProfilePhotos={showSenderProfilePhotos}
       />
     );
   };
@@ -1358,6 +1493,7 @@ export default function ChatThread({ conversationId, onBack, embedded = false })
         {isDirectStaff ? (
           <PersonAvatar
             name={headerTitle}
+            avatarSeed={directContact?.id || headerTitle}
             photoURL={directContact?.photoURL}
             online={!!directContact?.online}
             ringColor={colors.chatBg}
@@ -1390,9 +1526,9 @@ export default function ChatThread({ conversationId, onBack, embedded = false })
             accessibilityLabel="Voice call"
           >
             {startingCall === "voice" ? (
-              <ActivityIndicator size="small" color={colors.online} />
+              <ActivityIndicator size="small" color={colors.accent} />
             ) : (
-              <FontAwesome5 name="phone-alt" size={20} color={colors.online} />
+              <FontAwesome5 name="phone-alt" size={20} color={colors.accent} />
             )}
           </TouchableOpacity>
           <TouchableOpacity
@@ -1559,6 +1695,10 @@ export default function ChatThread({ conversationId, onBack, embedded = false })
                   style={styles.pendingThumb}
                   contentFit="cover"
                 />
+              ) : pendingAttachment.type === "audio" ? (
+                <View style={[styles.pendingFileIcon, { backgroundColor: colors.accentSoft }]}> 
+                  <FontAwesome5 name="microphone" size={19} color={colors.accent} />
+                </View>
               ) : (
                 <View style={[styles.pendingFileIcon, { backgroundColor: colors.accentSoft }]}>
                   <FontAwesome5 name="file-alt" size={19} color={colors.accent} />
@@ -1568,7 +1708,7 @@ export default function ChatThread({ conversationId, onBack, embedded = false })
                 style={[styles.pendingName, { color: colors.textMuted }]}
                 numberOfLines={1}
               >
-                {pendingAttachment.name}
+                {pendingAttachment.type === "audio" ? "Voice message" : pendingAttachment.name}
               </Text>
               <TouchableOpacity
                 onPress={() => setPendingAttachment(null)}
@@ -1589,27 +1729,7 @@ export default function ChatThread({ conversationId, onBack, embedded = false })
             </View>
           )}
 
-          {isDirectStaff && (
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.staffQuickActions}
-              keyboardShouldPersistTaps="handled"
-            >
-              {["Shipment update: ", "Delivery status: ", "Package issue: "].map((template) => (
-                <TouchableOpacity
-                  key={template}
-                  style={[styles.staffQuickChip, { backgroundColor: colors.accentSoft }]}
-                  onPress={() => setDraft((current) => current || template)}
-                >
-                  <FontAwesome5 name="box" size={12} color={colors.accent} />
-                  <Text style={[styles.staffQuickText, { color: colors.accent }]}>
-                    {template.trim().replace(":", "")}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-          )}
+
 
           {/* Sticky composer — styled to match the manager messaging console */}
           <View
@@ -1620,27 +1740,43 @@ export default function ChatThread({ conversationId, onBack, embedded = false })
           >
             <TouchableOpacity
               style={styles.composerIcon}
-              onPress={handlePickImage}
+              onPress={handlePickFile}
               disabled={isClosed || uploading}
               hitSlop={6}
+              accessibilityLabel="Add a file"
             >
               <FontAwesome5
-                name="image"
-                size={22}
-                color={isClosed ? colors.textMuted : colors.text}
+                name="plus-circle"
+                size={25}
+                color={isClosed ? colors.textMuted : colors.accent}
               />
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.composerIcon}
-              onPress={handlePickFile}
+              onPress={handleTakePhoto}
               disabled={isClosed || uploading}
               hitSlop={6}
+              accessibilityLabel="Open camera"
             >
               <FontAwesome5
-                name="paperclip"
+                name="camera"
                 size={22}
-                color={isClosed ? colors.textMuted : colors.text}
+                color={isClosed ? colors.textMuted : colors.accent}
               />
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.composerIcon} onPress={handlePickImage} disabled={isClosed || uploading} hitSlop={6} accessibilityLabel="Choose a picture">
+              <FontAwesome5 name="image" size={22} color={isClosed ? colors.textMuted : colors.accent} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.composerIcon, recorderState.isRecording && { backgroundColor: colors.dangerSoft || "rgba(255,59,48,0.12)" }]}
+              onPress={toggleVoiceRecording}
+              disabled={isClosed || uploading || sending || recordingStarting}
+              hitSlop={6}
+              accessibilityLabel={recorderState.isRecording ? "Stop voice recording" : "Record a voice message"}
+            >
+              {recordingStarting ? <ActivityIndicator size="small" color={colors.accent} /> : (
+                <FontAwesome5 name={recorderState.isRecording ? "stop-circle" : "microphone"} size={22} color={isClosed ? colors.textMuted : recorderState.isRecording ? colors.danger : colors.accent} />
+              )}
             </TouchableOpacity>
 
             <View style={[styles.inputWrap, { backgroundColor: colors.inputBar }]}>
@@ -1648,45 +1784,57 @@ export default function ChatThread({ conversationId, onBack, embedded = false })
                 style={[styles.input, { color: colors.text }]}
                 value={draft}
                 onChangeText={setDraft}
-                placeholder={isClosed ? "Conversation is closed" : "Type your message..."}
-                placeholderTextColor={colors.textMuted}
-                editable={!isClosed}
-                multiline
+                placeholder={isClosed ? "Conversation is closed" : recorderState.isRecording ? `Recording ${Math.floor((recorderState.durationMillis || 0) / 60000)}:${String(Math.floor(((recorderState.durationMillis || 0) % 60000) / 1000)).padStart(2, "0")}` : "Message"}
+                placeholderTextColor={recorderState.isRecording ? colors.danger : colors.textMuted}
+                editable={!isClosed && !recorderState.isRecording}
+                multiline={false}
+                returnKeyType="send"
+                onSubmitEditing={handleSend}
               />
               <TouchableOpacity
                 style={styles.emojiToggle}
                 onPress={() => setEmojiOpen((v) => !v)}
-                disabled={isClosed}
+                disabled={isClosed || recorderState.isRecording}
                 hitSlop={6}
               >
                 <FontAwesome5
                   name="smile"
                   size={22}
-                  color={colors.text}
+                  color={colors.accent}
                 />
               </TouchableOpacity>
             </View>
 
             {showSendButton ? (
               <TouchableOpacity
-                style={[
-                  styles.sendButton,
-                  {
-                    backgroundColor:
-                      !canSend || isClosed ? colors.textMuted : colors.accent,
-                  },
-                ]}
+                style={styles.sendButton}
                 onPress={handleSend}
                 disabled={!canSend || sending || uploading || isClosed}
                 activeOpacity={0.82}
+                accessibilityLabel="Send message"
               >
                 {sending || uploading ? (
-                  <ActivityIndicator size="small" color="#FFFFFF" />
+                  <ActivityIndicator size="small" color={colors.accent} />
                 ) : (
-                  <FontAwesome5 name="paper-plane" size={17} color="#FFFFFF" />
+                  <FontAwesome5 name="paper-plane" size={20} color={colors.accent} />
                 )}
               </TouchableOpacity>
-            ) : null}
+            ) : (
+              <TouchableOpacity
+                style={styles.sendButton}
+                onPress={() => sendQuickMessage("👍")}
+                disabled={isClosed || sending || uploading || recorderState.isRecording}
+                activeOpacity={0.82}
+                accessibilityLabel="Send thumbs up"
+              >
+                <FontAwesome5
+                  name="thumbs-up"
+                  size={23}
+                  color={isDriver ? colors.accent : (isClosed ? colors.textMuted : colors.accent)}
+                  solid={isDriver}
+                />
+              </TouchableOpacity>
+            )}
           </View>
         </KeyboardAvoidingView>
       )}
@@ -1936,7 +2084,7 @@ const styles = StyleSheet.create({
   },
   referenceText: { flex: 1, fontSize: 13, fontWeight: "600" },
   referenceAction: { fontSize: 12, fontWeight: "800" },
-  messages: { paddingHorizontal: 16, paddingBottom: 10, paddingTop: 0 },
+  messages: { flexGrow: 1, paddingHorizontal: 16, paddingBottom: 10, paddingTop: 0 },
   welcomeBubbleRow: {
     flexDirection: "row",
     alignItems: "flex-start",
@@ -2023,12 +2171,12 @@ const styles = StyleSheet.create({
   senderName: { fontSize: 11, fontWeight: "700", marginBottom: 3, marginLeft: 4 },
   bubble: { paddingHorizontal: 12, paddingVertical: 9 },
   bubbleText: { fontSize: 12, lineHeight: 18 },
-  callHistoryCard: { width: 216, maxWidth: "100%", gap: 12 },
-  callHistoryTop: { flexDirection: "row", alignItems: "flex-start", gap: 11 },
+  callHistoryCard: { width: 196, maxWidth: "100%", gap: 9 },
+  callHistoryTop: { flexDirection: "row", alignItems: "center", gap: 9 },
   callHistoryIcon: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -2037,8 +2185,8 @@ const styles = StyleSheet.create({
   callHistoryStatus: { marginTop: 2, fontSize: 12, lineHeight: 16, fontWeight: "600" },
   callHistoryDuration: { marginTop: 5, fontSize: 12, lineHeight: 16, fontWeight: "700" },
   callHistoryAction: {
-    minHeight: 38,
-    borderRadius: 12,
+    minHeight: 34,
+    borderRadius: 10,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
@@ -2062,7 +2210,7 @@ const styles = StyleSheet.create({
   attachmentImage: { width: 210, height: 210, borderRadius: 16 },
   fileChip: { flexDirection: "row", alignItems: "center", gap: 8, maxWidth: 220 },
   fileName: { fontSize: 14, fontWeight: "600", flexShrink: 1 },
-  emptyThread: { alignItems: "center", paddingTop: 40, paddingHorizontal: 30, gap: 12 },
+  emptyThread: { flex: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: 30, gap: 12 },
   emptyText: { textAlign: "center", fontSize: 13, lineHeight: 19 },
   sendingRow: { paddingHorizontal: 20, paddingBottom: 4, alignItems: "flex-end" },
   sendingBubble: {
@@ -2125,34 +2273,19 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   pendingName: { flex: 1, fontSize: 13 },
-  staffQuickActions: {
-    flexDirection: "row",
-    gap: 8,
-    paddingHorizontal: 14,
-    paddingVertical: 9,
-  },
-  staffQuickChip: {
-    minHeight: 34,
-    borderRadius: 17,
-    paddingHorizontal: 12,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 7,
-  },
-  staffQuickText: { fontSize: 12, fontWeight: "800" },
   composer: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
-    paddingHorizontal: 14,
-    paddingTop: 10,
-    paddingBottom: Platform.OS === "ios" ? 16 : 12,
+    gap: 2,
+    paddingHorizontal: 8,
+    paddingTop: 8,
+    paddingBottom: Platform.OS === "ios" ? 14 : 9,
     borderTopWidth: 1,
   },
   composerIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: 36,
+    height: 40,
+    borderRadius: 20,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -2160,36 +2293,40 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: "row",
     alignItems: "center",
+    transform: [{ translateY: 2 }],
     gap: 10,
-    borderRadius: 24,
-    paddingLeft: 18,
-    paddingRight: 12,
-    minHeight: 52,
+    borderRadius: 22,
+    paddingLeft: 14,
+    paddingRight: 4,
+    minHeight: 44,
   },
   input: {
     flex: 1,
-    fontSize: 16,
-    paddingVertical: Platform.OS === "ios" ? 11 : 7,
-    maxHeight: 110,
+    height: 44,
+    fontSize: 15,
+    lineHeight: 20,
+    paddingTop: 0,
+    paddingBottom: 0,
+    textAlignVertical: "center",
   },
   emojiToggle: {
-    width: 40,
-    height: 40,
+    width: 36,
+    height: 36,
     alignItems: "center",
     justifyContent: "center",
   },
   sendButton: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: 38,
+    height: 40,
+    borderRadius: 20,
     alignItems: "center",
     justifyContent: "center",
-    shadowColor: "#0A7CFF",
-    shadowOpacity: 0.32,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 5 },
-    elevation: 6,
   },
+  audioChip: { minWidth: 210, flexDirection: "row", alignItems: "center", gap: 10 },
+  audioPlay: { width: 34, height: 34, borderRadius: 17, alignItems: "center", justifyContent: "center" },
+  audioWave: { flex: 1, height: 24, flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 2 },
+  audioWaveBar: { width: 3, borderRadius: 2, opacity: 0.9 },
+  audioTime: { minWidth: 30, fontSize: 11, fontWeight: "700" },
   lightbox: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.92)",

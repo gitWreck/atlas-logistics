@@ -55,6 +55,7 @@ export function getMessageText(message = {}) {
 // Short preview shown in the conversation list.
 export function displayMessagePreview(message = {}) {
   const attachment = getMessageAttachment(message);
+  if (attachment?.type === "audio") return "Voice message";
   if (attachment?.type === "image") return "📷 Photo";
   if (attachment?.type === "file") return `📎 ${attachment.name || "File"}`;
   const raw = String(message?.text || "");

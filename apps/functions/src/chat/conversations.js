@@ -20,8 +20,8 @@ if (!admin.apps.length) admin.initializeApp();
 const db = admin.firestore();
 const FieldValue = admin.firestore.FieldValue;
 
-const STAFF_ROLES = ["admin", "manager", "employee"];
-const STAFF_MONITOR_ROLES = ["admin", "manager", "employee"];
+const STAFF_ROLES = ["admin", "manager", "employee", "checker", "administrator", "staff", "support"];
+const STAFF_MONITOR_ROLES = ["admin", "manager", "employee", "administrator", "staff", "support"];
 const VALID_STATUSES = ["unassigned", "active", "closed"];
 const VALID_PRIORITIES = ["normal", "urgent"];
 const CALL_TYPES = ["voice", "video"];
@@ -483,19 +483,21 @@ async function getConversationForUser(conversationId, uid, role) {
   const conversation = snap.data() || {};
   const normalizedRole = String(role || "").toLowerCase();
   if (conversation.type === "direct_staff") {
-    const userSnap = await db.collection("users").doc(uid).get();
-    const allowed = await assertDirectConversationAccess(
-      conversation,
-      uid,
-      userSnap.data() || { role: normalizedRole },
-    );
-    if (!allowed) {
-      throw new HttpsError(
-        "permission-denied",
-        "This staff conversation is outside your current assignment.",
-      );
+    const participantIds = Array.isArray(conversation.participantIds)
+      ? conversation.participantIds
+      : [];
+    const isParticipant = participantIds.includes(uid);
+    
+    // Staff members (admin, manager, employee, checker) can always access direct_staff conversations
+    // OR the user must be an explicit participant
+    if (STAFF_ROLES.includes(normalizedRole) || isParticipant) {
+      return { ref, snap, conversation };
     }
-    return { ref, snap, conversation };
+    
+    throw new HttpsError(
+      "permission-denied",
+      "This staff conversation is outside your current assignment.",
+    );
   }
   const isAdmin = normalizedRole === "admin";
   const isManager = normalizedRole === "manager";
@@ -508,6 +510,25 @@ async function getConversationForUser(conversationId, uid, role) {
   }
 
   return { ref, snap, conversation };
+}
+
+async function getAuthorizedCallForUser(callRef, uid, user) {
+  const callSnap = await callRef.get();
+  if (!callSnap.exists) throw new HttpsError("not-found", "Call not found.");
+  const call = callSnap.data() || {};
+  if (call.callerId !== uid && call.receiverId !== uid) {
+    throw new HttpsError("permission-denied", "Call access denied.");
+  }
+  const conversationId = String(call.conversationId || "").trim();
+  if (!conversationId) {
+    throw new HttpsError("failed-precondition", "Call has no conversation.");
+  }
+  await getConversationForUser(
+    conversationId,
+    uid,
+    String(user?.role || "").toLowerCase(),
+  );
+  return { callSnap, call };
 }
 
 async function getExpoPushTokens(userIds = []) {
@@ -1146,7 +1167,13 @@ exports.sendChatMessage = onCall(
           : "customer"
         : role;
     const now = FieldValue.serverTimestamp();
-    const messageText = text || (attachmentType === "image" ? "Photo" : attachmentName || "Attachment");
+    const messageText = text || (
+      attachmentType === "image"
+        ? "Photo"
+        : attachmentType === "audio"
+          ? "Voice message"
+          : attachmentName || "Attachment"
+    );
     const updates = {
       lastMessage: messageText,
       lastMessageText: messageText,
@@ -1201,14 +1228,16 @@ exports.sendChatMessage = onCall(
         type: attachmentUrl
           ? attachmentType === "image"
             ? "image"
-            : "document"
+            : attachmentType === "audio"
+              ? "audio"
+              : "document"
           : "text",
         text,
         attachments: attachmentUrl
           ? [
               {
                 url: attachmentUrl,
-                type: attachmentType === "image" ? "image" : "document",
+                type: attachmentType === "image" ? "image" : attachmentType === "audio" ? "audio" : "document",
                 name: attachmentName || null,
               },
             ]
@@ -1232,7 +1261,7 @@ exports.sendChatMessage = onCall(
       await notifyDirectParticipants({
         conversationId,
         conversation,
-        message: text || (attachmentType === "image" ? "Photo" : attachmentName || "Attachment"),
+        message: messageText,
         sender: { uid, role, name: senderName },
       });
     } else if (isStaff) {
@@ -1240,7 +1269,7 @@ exports.sendChatMessage = onCall(
         await notifyCustomer({
           conversationId,
           customerId: conversation.customerId,
-          message: text || (attachmentType === "image" ? "Photo" : attachmentName || "Attachment"),
+          message: messageText,
           sender: { uid, role, name: senderName },
         });
       }
@@ -1248,7 +1277,7 @@ exports.sendChatMessage = onCall(
       await notifyStaff({
         conversationId,
         conversation,
-        message: text || (attachmentType === "image" ? "Photo" : attachmentName || "Attachment"),
+        message: messageText,
         sender: { uid, role, name: senderName },
       });
     }
@@ -1475,6 +1504,10 @@ exports.startConversationCall = onCall(
         }
         const receiver = receiverSnap.data() || {};
         const callerName = displayName(user, "Atlas staff");
+        const driverId = participantIds.find(
+          (participantId) =>
+            String(conversation.participantRoles?.[participantId] || "").toLowerCase() === "driver",
+        ) || null;
         return createRingingConversationCall({
           conversationId,
           callType,
@@ -1487,6 +1520,11 @@ exports.startConversationCall = onCall(
           receiverRole: String(receiver.role || "staff").toLowerCase(),
           receiverName: displayName(receiver, "This contact"),
           participantIds,
+          extraFields: {
+            driverId,
+            driverAccessTokens: conversation.driverAccessTokens || [],
+            checkerAccessTokens: conversation.checkerAccessTokens || [],
+          },
         });
       }
 
@@ -1593,6 +1631,7 @@ exports.acceptConversationCall = onCall(
       }
 
       const callRef = db.collection("calls").doc(callId);
+      await getAuthorizedCallForUser(callRef, uid, userSnap.data() || {});
       const now = FieldValue.serverTimestamp();
 
       const result = await db.runTransaction(async (tx) => {
@@ -1856,6 +1895,12 @@ exports.heartbeatConversationCall = onCall(
       ? "background"
       : "foreground";
     const callRef = db.collection("calls").doc(callId);
+
+    const userSnap = await db.collection("users").doc(uid).get();
+    if (!userSnap.exists || userSnap.data()?.active === false) {
+      throw new HttpsError("permission-denied", "Inactive or missing user.");
+    }
+    await getAuthorizedCallForUser(callRef, uid, userSnap.data() || {});
 
     return db.runTransaction(async (tx) => {
       const callSnap = await tx.get(callRef);

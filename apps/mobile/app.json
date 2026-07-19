@@ -84,6 +84,12 @@
         }
       ],
       [
+        "expo-audio",
+        {
+          "microphonePermission": "Allow Atlas Transport to access your microphone so you can record voice messages."
+        }
+      ],
+      [
         "expo-image-picker",
         {
           "cameraPermission": "Atlas uses the camera to scan package QR codes and capture proof-of-delivery photos when you complete a shipment.",

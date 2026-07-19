@@ -27,6 +27,7 @@ import TruckBoard from "../../components/trucks/TruckBoard";
 import InvoiceBoard from "../../components/invoice/InvoiceBoard";
 import CustomerBoard from "../../components/customers/CustomerBoard";
 import ChatInbox from "../../components/chat/ChatInbox";
+import WebProfileMenu from "../../components/profile/WebProfileMenu";
 import { mainNavItems } from "@/app/utility/constant/templates";
 
 import {
@@ -49,8 +50,12 @@ export default function AdminDashboardPage() {
     useDashboardPreferences("admin", tabIds);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+  const [profilePhotoOverride, setProfilePhotoOverride] = useState(null);
 
   const { user, profile, loading } = useAuth();
+  const displayProfile = profilePhotoOverride
+    ? { ...profile, photoURL: profilePhotoOverride }
+    : profile;
 
   const tripBoardRef = useRef(null);
   // const tripScheduleRef = useRef(null);
@@ -280,19 +285,12 @@ export default function AdminDashboardPage() {
 
             <NotificationBell />
 
-            <div className="hidden sm:flex items-center gap-3">
-              <div className="text-right">
-                <div className="text-xs font-medium">
-                  {profile?.name || "Admin User"}
-                </div>
-                <div className="text-[11px] uppercase tracking-wide text-slate-400">
-                  {profile?.role || "admin"}
-                </div>
-              </div>
-              <div className="h-9 w-9 rounded-full bg-gradient-to-br from-sky-500 to-indigo-600 flex items-center justify-center text-xs font-semibold text-white">
-                {profile?.name?.[0]?.toUpperCase() || "A"}
-              </div>
-            </div>
+            <WebProfileMenu
+              user={user}
+              profile={displayProfile}
+              onProfileUpdated={(nextProfile) => setProfilePhotoOverride(nextProfile.photoURL)}
+              onLogout={() => handleLogout(auth, router)}
+            />
           </div>
         </header>
 

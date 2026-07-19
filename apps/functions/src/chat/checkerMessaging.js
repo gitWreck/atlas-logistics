@@ -9,7 +9,8 @@ if (!admin.apps.length) admin.initializeApp();
 
 const db = admin.firestore();
 const FieldValue = admin.firestore.FieldValue;
-const CONTACT_ROLES = ["driver", "checker", "manager", "admin", "employee"];
+// Include all variations of staff roles to ensure no one is filtered out
+const CONTACT_ROLES = ["driver", "checker", "manager", "admin", "employee", "administrator", "staff", "support"];
 const INACTIVE_TRIP_STATUSES = new Set([
   "completed",
   "cancelled",
@@ -58,7 +59,12 @@ function overlaps(left = [], right = []) {
 function sharesWarehouse(checker = {}, contact = {}) {
   const checkerKeys = warehouseKeys(checker);
   const contactKeys = new Set(warehouseKeys(contact));
-  return checkerKeys.length > 0 && checkerKeys.some((key) => contactKeys.has(key));
+  // If either user has no warehouse info, allow the contact (no warehouse restriction)
+  if (checkerKeys.length === 0 || contactKeys.size === 0) {
+    return true;
+  }
+  // Both have warehouse info, so they must match
+  return checkerKeys.some((key) => contactKeys.has(key));
 }
 
 function displayName(user = {}, fallback = "Atlas staff") {
@@ -122,6 +128,32 @@ async function ensureCheckerAccessKey(uid, checker, ref = db.collection("users")
   return accessKey;
 }
 
+function driverAccessKey(driver = {}) {
+  const payload = JSON.stringify({
+    warehouse: warehouseKeys(driver).sort(),
+    municipalities: municipalityLabels(driver).map(normalized).sort(),
+  });
+  return crypto.createHash("sha256").update(payload).digest("hex").slice(0, 32);
+}
+
+function driverAccessToken(uid, accessKey) {
+  return `${uid}:${accessKey}`;
+}
+
+async function ensureDriverAccessKey(uid, driver, ref = db.collection("users").doc(uid)) {
+  const accessKey = driverAccessKey(driver);
+  if (driver.driverChatAccessKey !== accessKey) {
+    await ref.set(
+      {
+        driverChatAccessKey: accessKey,
+        driverChatAccessUpdatedAt: FieldValue.serverTimestamp(),
+      },
+      { merge: true },
+    );
+  }
+  return accessKey;
+}
+
 async function routeCoverageById() {
   const snap = await db.collection("routes").where("active", "==", true).get();
   const result = new Map();
@@ -173,12 +205,13 @@ function contactIsAuthorized(checker, contact, contactMunicipalities = municipal
 
   const checkerMunicipalities = municipalityLabels(checker);
   if (role === "driver" || role === "checker") {
-    return checkerMunicipalities.length > 0 && overlaps(checkerMunicipalities, contactMunicipalities);
+    // Allow if either has no municipality restriction, or if they overlap
+    return checkerMunicipalities.length === 0 || contactMunicipalities.length === 0 || overlaps(checkerMunicipalities, contactMunicipalities);
   }
 
   // Area-scoped support employees must overlap. Warehouse-wide management and
   // operations contacts remain available when they do not declare an area.
-  return !contactMunicipalities.length || overlaps(checkerMunicipalities, contactMunicipalities);
+  return !contactMunicipalities.length || checkerMunicipalities.length === 0 || overlaps(checkerMunicipalities, contactMunicipalities);
 }
 
 function serializeContact(id, user, municipalities = municipalityLabels(user)) {
@@ -227,6 +260,57 @@ async function getCheckerAndContacts(req) {
   const accessKey = await ensureCheckerAccessKey(uid, user, checkerRef);
   const contacts = await authorizedContactsForChecker(uid, user);
   return { uid, checker: user, accessKey, contacts };
+}
+
+async function authorizedContactsForDriver(uid, driver) {
+  const usersSnap = await db.collection("users").where("role", "in", CONTACT_ROLES).get();
+  const users = usersSnap.docs
+    .filter((docSnap) => docSnap.id !== uid)
+    .map((docSnap) => ({ id: docSnap.id, ...docSnap.data() }));
+  const driverCoverage = await deriveDriverCoverage([{ id: uid, ...driver }]);
+  const municipalities = driverCoverage.get(uid) || municipalityLabels(driver);
+
+  return users
+    .filter((contact) => {
+      if (
+        !contact ||
+        contact.active === false ||
+        String(contact.status || "").toLowerCase() === "inactive"
+      ) {
+        return false;
+      }
+
+      const role = String(contact.role || "").toLowerCase();
+      if (!CONTACT_ROLES.includes(role) || role === "driver") return false;
+      
+      // Allow warehouse check to be lenient (done in sharesWarehouse now)
+      if (!sharesWarehouse(driver, contact)) {
+        return false;
+      }
+
+      // Allow municipality/coverage matching to be optional for staff
+      const contactMunicipalities = municipalityLabels(contact);
+      if (role === "checker") {
+        // For checkers, allow if either has no municipality restriction, or if they overlap
+        return municipalities.length === 0 || contactMunicipalities.length === 0 || overlaps(municipalities, contactMunicipalities);
+      }
+      // For other staff, always allow (they can contact anyone in their warehouse)
+      return true;
+    })
+    .map((contact) => serializeContact(contact.id, contact))
+    .sort((a, b) => a.name.localeCompare(b.name));
+}
+
+async function getDriverAndContacts(req) {
+  const { uid, user } = await requireRole(db, req, ["driver"]);
+  const contacts = await authorizedContactsForDriver(uid, user);
+  const coverage = await deriveDriverCoverage([{ id: uid, ...user }]);
+  return {
+    uid,
+    driver: user,
+    contacts,
+    municipalities: coverage.get(uid) || municipalityLabels(user),
+  };
 }
 
 async function assertDirectConversationAccess(conversation, uid, user) {
@@ -330,6 +414,115 @@ exports.createCheckerConversation = onCall(
         checkerAccessTokens: uniqueStrings([
           ...(existing.checkerAccessTokens || []).filter(
             (token) => !token.startsWith(`${uid}:`) && !token.startsWith(`${contactId}:`),
+          ),
+          ...accessTokens,
+        ]),
+        updatedAt: now,
+      });
+    });
+
+    return { success: true, conversationId };
+  },
+);
+
+exports.listDriverChatContacts = onCall(
+  { region: "asia-southeast1", maxInstances: 20, invoker: "public" },
+  async (req) => {
+    const { driver, contacts, municipalities } = await getDriverAndContacts(req);
+    return {
+      contacts,
+      warehouseName: driver.warehouseName || driver.warehouseCode || null,
+      municipalities,
+    };
+  },
+);
+
+exports.createDriverConversation = onCall(
+  { region: "asia-southeast1", maxInstances: 20, invoker: "public" },
+  async (req) => {
+    const contactId = String(req.data?.contactId || "").trim();
+    if (!contactId) throw new HttpsError("invalid-argument", "contactId is required.");
+
+    const { uid, driver, contacts } = await getDriverAndContacts(req);
+    const authorizedContact = contacts.find((contact) => contact.id === contactId);
+    if (!authorizedContact) {
+      throw new HttpsError(
+        "permission-denied",
+        "This contact is outside your assigned warehouse or delivery area.",
+      );
+    }
+
+    const contactRef = db.collection("users").doc(contactId);
+    const contactSnap = await contactRef.get();
+    if (!contactSnap.exists) throw new HttpsError("not-found", "Contact not found.");
+    const contact = contactSnap.data() || {};
+    const ids = [uid, contactId].sort();
+    const conversationId = `staff_${crypto.createHash("sha256").update(ids.join(":"))
+      .digest("hex").slice(0, 32)}`;
+    const ref = db.collection("conversations").doc(conversationId);
+    const now = FieldValue.serverTimestamp();
+    const accessTokens = [];
+    const driverAccessTokens = [];
+
+    // Generate driver access token
+    const driverAccessKey = await ensureDriverAccessKey(uid, driver);
+    driverAccessTokens.push(driverAccessToken(uid, driverAccessKey));
+
+    if (String(contact.role || "").toLowerCase() === "checker") {
+      const contactAccessKey = await ensureCheckerAccessKey(contactId, contact, contactRef);
+      accessTokens.push(checkerAccessToken(contactId, contactAccessKey));
+    }
+
+    const participantProfiles = {
+      [uid]: serializeContact(uid, driver),
+      [contactId]: serializeContact(contactId, contact, authorizedContact.municipalities),
+    };
+
+    await db.runTransaction(async (tx) => {
+      const snap = await tx.get(ref);
+      if (!snap.exists) {
+        tx.set(ref, {
+          conversationId,
+          type: "direct_staff",
+          participantIds: ids,
+          participantRoles: {
+            [uid]: "driver",
+            [contactId]: String(contact.role || "staff").toLowerCase(),
+          },
+          participantProfiles,
+          driverAccessTokens,
+          checkerAccessTokens: accessTokens,
+          status: "active",
+          lastMessage: "",
+          lastMessageText: "",
+          lastMessageAt: now,
+          lastActivityAt: now,
+          lastMessageBy: null,
+          unreadCounts: { [uid]: 0, [contactId]: 0 },
+          createdAt: now,
+          updatedAt: now,
+        });
+        return;
+      }
+
+      const existing = snap.data() || {};
+      if (
+        existing.type !== "direct_staff" ||
+        !ids.every((id) => Array.isArray(existing.participantIds) && existing.participantIds.includes(id))
+      ) {
+        throw new HttpsError("already-exists", "Conversation identifier conflict.");
+      }
+      tx.update(ref, {
+        participantProfiles,
+        driverAccessTokens: uniqueStrings([
+          ...(existing.driverAccessTokens || []).filter(
+            (token) => !token.startsWith(`${uid}:`),
+          ),
+          ...driverAccessTokens,
+        ]),
+        checkerAccessTokens: uniqueStrings([
+          ...(existing.checkerAccessTokens || []).filter(
+            (token) => !token.startsWith(`${contactId}:`),
           ),
           ...accessTokens,
         ]),

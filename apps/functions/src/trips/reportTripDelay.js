@@ -2,7 +2,7 @@
 
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const admin = require("firebase-admin");
-const { requireAuth } = require("../utilities/helpers");
+const { requireRole } = require("../utilities/helpers");
 
 if (!admin.apps.length) admin.initializeApp();
 const db = admin.firestore();
@@ -11,7 +11,8 @@ exports.reportTripDelay = onCall(
   { region: "asia-southeast1", maxInstances: 10 },
   async (req) => {
     // 1. AUTHENTICATION
-    const uid = await requireAuth(req);
+    const actor = await requireRole(db, req, ["driver"]);
+    const uid = actor.uid;
     const { tripId, type, notes, updatedBy } = req.data;
 
     // 2. VALIDATION
@@ -32,7 +33,9 @@ exports.reportTripDelay = onCall(
 
     // Optional: Ensure the caller is actually the assigned driver
     const tripData = tripSnap.data();
-    // if (tripData.driverUid !== uid) throw new HttpsError("permission-denied", "Not your trip.");
+    if (String(tripData.driverId || tripData.driverUid || "") !== String(uid)) {
+      throw new HttpsError("permission-denied", "This trip is not assigned to your Driver account.");
+    }
 
     const userData = userSnap.data() || {};
     const driverName = userData.name || userData.fullName || "Driver";
