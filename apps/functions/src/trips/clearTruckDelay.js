@@ -29,7 +29,7 @@ exports.clearTruckDelay = onCall(
     secrets: [SEMAPHORE_API_KEY, SEMAPHORE_SENDER_NAME],
   },
   async (req) => {
-    await requireRole(db, req, ["admin", "manager", "driver"]);
+    const actor = await requireRole(db, req, ["admin", "manager", "driver"]);
 
     const {
       tripId,
@@ -44,7 +44,10 @@ exports.clearTruckDelay = onCall(
       throw new HttpsError("invalid-argument", "tripId required");
     }
 
-    const { uid, role, name } = updatedBy(req);
+    const actorMeta = updatedBy(req);
+    const uid = actor.uid;
+    const role = actor.role;
+    const name = actor.user?.name || actor.user?.fullName || actorMeta.name || uid;
     const channels = normalizeNotificationChannels({
       notificationChannels,
       notify,
@@ -67,6 +70,13 @@ exports.clearTruckDelay = onCall(
       }
 
       const trip = snap.data();
+
+      if (
+        actor.role === "driver" &&
+        String(trip.driverId || trip.driverUid || "") !== String(actor.uid)
+      ) {
+        throw new HttpsError("permission-denied", "This trip is not assigned to your Driver account.");
+      }
 
       // 🔒 Hard stop: completed trip
       if (trip.active === false || trip.status === "COMPLETED") {

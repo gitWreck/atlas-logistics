@@ -43,6 +43,8 @@ export const getShipmentCustodyTimeline = httpsCallable(
 
 export const startTrip = httpsCallable(functions, "startTrip");
 export const reportTripDelay = httpsCallable(functions, "reportTripDelay");
+export const confirmDriverArrival = httpsCallable(functions, "confirmDriverArrival");
+export const reportDriverTripIssue = httpsCallable(functions, "reportDriverTripIssue");
 export const reportCheckerTrip = httpsCallable(functions, "reportCheckerTrip");
 export const clearTruckDelay = httpsCallable(functions, "clearTruckDelay");
 
@@ -75,6 +77,14 @@ export const listCheckerChatContacts = httpsCallable(
 export const createCheckerConversation = httpsCallable(
   functions,
   "createCheckerConversation",
+);
+export const listDriverChatContacts = httpsCallable(
+  functions,
+  "listDriverChatContacts",
+);
+export const createDriverConversation = httpsCallable(
+  functions,
+  "createDriverConversation",
 );
 export const createCallHistoryMessage = httpsCallable(
   functions,

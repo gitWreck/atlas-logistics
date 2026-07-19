@@ -73,6 +73,7 @@ function SectionTitle({ icon, title, onViewAll }) {
 
 export function CheckerHomeHero({
   userName,
+  photoURL,
   onProfilePress,
   currentDate = new Date(),
   onDatePress,
@@ -109,11 +110,15 @@ export function CheckerHomeHero({
               },
             ]}
           >
-            <FontAwesome5
-              name="user-check"
-              size={clamp(avatarSize * 0.38, 20, 28)}
-              color="#0b63ef"
-            />
+            {photoURL ? (
+              <Image source={{ uri: photoURL }} style={styles.heroAvatarImage} />
+            ) : (
+              <FontAwesome5
+                name="user-check"
+                size={clamp(avatarSize * 0.38, 20, 28)}
+                color="#0b63ef"
+              />
+            )}
           </View>
           <View style={styles.heroGreeting}>
             <Text style={styles.heroHello}>Hello,</Text>
@@ -770,7 +775,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: "#ffffff",
+    overflow: "hidden",
   },
+  heroAvatarImage: { width: "100%", height: "100%" },
   heroGreeting: {
     flex: 1,
   },

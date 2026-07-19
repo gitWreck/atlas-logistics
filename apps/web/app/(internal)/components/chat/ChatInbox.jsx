@@ -379,6 +379,7 @@ export default function ChatInbox({ user, profile, isDark = false, onViewCustome
   const [lightboxUrl, setLightboxUrl] = useState(null);
   const [emojiOpen, setEmojiOpen] = useState(false);
   const [customerProfile, setCustomerProfile] = useState(null);
+  const [profilePhotos, setProfilePhotos] = useState({});
   const [activeShipment, setActiveShipment] = useState(null);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [historyLoading, setHistoryLoading] = useState(false);
@@ -393,6 +394,51 @@ export default function ChatInbox({ user, profile, isDark = false, onViewCustome
   const emojiRef = useRef(null);
   const statusMenuRef = useRef(null);
   const assignMenuRef = useRef(null);
+
+  const profilePhotoUserIds = useMemo(() => {
+    const ids = new Set();
+    conversations.forEach((conversation) => {
+      if (conversation.customerId) ids.add(String(conversation.customerId));
+      (conversation.participantIds || []).forEach((id) => {
+        if (id) ids.add(String(id));
+      });
+    });
+    messages.forEach((message) => {
+      if (message.senderId) ids.add(String(message.senderId));
+    });
+    return [...ids].sort();
+  }, [conversations, messages]);
+  const profilePhotoUserIdsKey = profilePhotoUserIds.join(",");
+
+  useEffect(() => {
+    let active = true;
+    if (!profilePhotoUserIds.length) {
+      setProfilePhotos({});
+      return undefined;
+    }
+
+    Promise.all(
+      profilePhotoUserIds.map(async (uid) => {
+        const snapshot = await getDoc(doc(db, "users", uid));
+        return [uid, snapshot.exists() ? String(snapshot.data()?.photoURL || "").trim() : ""];
+      }),
+    )
+      .then((entries) => {
+        if (active) setProfilePhotos(Object.fromEntries(entries));
+      })
+      .catch((error) => console.warn("Profile photo lookup skipped:", error));
+
+    return () => {
+      active = false;
+    };
+  }, [profilePhotoUserIdsKey]);
+
+  const profilePhotoFor = (uid, fallback = null) => {
+    const key = String(uid || "").trim();
+    return key && Object.prototype.hasOwnProperty.call(profilePhotos, key)
+      ? profilePhotos[key] || null
+      : fallback;
+  };
 
   useEffect(() => {
     if (!user?.uid || !profile?.role) return undefined;
@@ -569,6 +615,7 @@ export default function ChatInbox({ user, profile, isDark = false, onViewCustome
   );
   const currentAssigneeName = assignedStaffName || staffDisplayName(assignedMember || {});
   const currentAssigneeRole = assignedStaffRole || assignedMember?.role || "";
+  const currentAssigneePhotoURL = assignedMember?.photoURL || null;
   const hasCurrentAssignee = Boolean(assignedStaffId || assignedStaffName);
 
   const filteredConversations = useMemo(() => {
@@ -1047,6 +1094,11 @@ export default function ChatInbox({ user, profile, isDark = false, onViewCustome
                 const unread = conversationUnreadCount(item, user?.uid);
                 const peer = getDirectPeer(item, user?.uid);
                 const displayName = conversationDisplayName(item, user?.uid);
+                const avatarUserId = peer?.id || item.customerId;
+                const avatarPhotoURL = profilePhotoFor(
+                  avatarUserId,
+                  peer?.photoURL || null,
+                );
                 const isOnline = isDirectStaffConversation(item)
                   ? !!peer?.online
                   : String(item.status || "").toLowerCase() === "open";
@@ -1076,7 +1128,7 @@ export default function ChatInbox({ user, profile, isDark = false, onViewCustome
                           : "hover:bg-slate-100"
                     }`}
                   >
-                    <Avatar name={displayName} photoURL={peer?.photoURL} size={52} online={isOnline} />
+                    <Avatar name={displayName} photoURL={avatarPhotoURL} size={52} online={isOnline} />
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center justify-between gap-2">
                         <p className="truncate text-sm font-semibold">
@@ -1160,7 +1212,10 @@ export default function ChatInbox({ user, profile, isDark = false, onViewCustome
                   </button>
                   <Avatar
                     name={selectedName}
-                    photoURL={selectedDirectPeer?.photoURL}
+                    photoURL={profilePhotoFor(
+                      selectedDirectPeer?.id || selected?.customerId,
+                      selectedDirectPeer?.photoURL || customerProfile?.photoURL,
+                    )}
                     size={40}
                     online={selectedIsDirect ? !!selectedDirectPeer?.online : selected.status === "open"}
                   />
@@ -1243,7 +1298,11 @@ export default function ChatInbox({ user, profile, isDark = false, onViewCustome
                       >
                         {!mine &&
                           (showAvatar ? (
-                            <Avatar name={message.senderName} size={28} />
+                            <Avatar
+                              name={message.senderName}
+                              photoURL={profilePhotoFor(ownerId)}
+                              size={28}
+                            />
                           ) : (
                             <div className="w-7 shrink-0" />
                           ))}
@@ -1457,6 +1516,10 @@ export default function ChatInbox({ user, profile, isDark = false, onViewCustome
             <div className="flex flex-col items-center px-5 py-6">
               <Avatar
                 name={selectedName}
+                photoURL={profilePhotoFor(
+                  selectedDirectPeer?.id || selected?.customerId,
+                  selectedDirectPeer?.photoURL || customerProfile?.photoURL,
+                )}
                 size={80}
                 online={selectedIsDirect ? !!selectedDirectPeer?.online : selected.status === "open"}
               />
@@ -1665,6 +1728,7 @@ export default function ChatInbox({ user, profile, isDark = false, onViewCustome
                     <div className="flex items-center gap-3">
                       <Avatar
                         name={currentAssigneeName}
+                        photoURL={profilePhotoFor(assignedStaffId, currentAssigneePhotoURL)}
                         size={40}
                       />
                       <div className="min-w-0 flex-1">
@@ -1846,7 +1910,7 @@ export default function ChatInbox({ user, profile, isDark = false, onViewCustome
                                     isDark ? "hover:bg-slate-700" : "hover:bg-slate-100"
                                   } ${active ? (isDark ? "bg-slate-700" : "bg-slate-100") : ""}`}
                                 >
-                                  <Avatar name={staffDisplayName(member)} size={28} />
+                                  <Avatar name={staffDisplayName(member)} photoURL={profilePhotoFor(member.id, member.photoURL)} size={28} />
                                   <span className="min-w-0 flex-1 text-left">
                                     <span className="block truncate font-medium">
                                       {staffDisplayName(member)}

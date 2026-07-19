@@ -9,12 +9,17 @@ import {
   ActivityIndicator,
   SafeAreaView,
   Platform,
+  Image,
+  Modal,
+  Pressable,
   StatusBar as RNStatusBar,
   Linking,
   TextInput,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { FontAwesome5 } from "@expo/vector-icons";
+import * as ImagePicker from "expo-image-picker";
+import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
 import { normalizePhoneNumber } from "../utilities/helpers";
 import { useAuth } from "../../contexts/AuthContext";
 import {
@@ -24,6 +29,7 @@ import {
 } from "../utilities/FirebaseFunctions";
 import { useTheme } from "../../contexts/ThemeContext";
 import { useOfflineSyncOptional } from "../../contexts/OfflineSyncContext";
+import { storage } from "../../firebase";
 import ShipmentDetailHeader from "../shipments/ShipmentDetailHeader";
 import DropdownModal from "../customer/RequestPickup/DropdownModal";
 import OfflineSyncQueueModal from "../checker/OfflineSyncQueueModal";
@@ -76,6 +82,8 @@ const roleConfig = {
 export default function ProfileViewer({
   showBackButton = false,
   compactTop = false,
+  minimalStaff = false,
+  driverAssignment = {},
 }) {
   const router = useRouter();
   const { user, refreshUser, signOut } = useAuth();
@@ -90,11 +98,16 @@ export default function ProfileViewer({
   const [showProvinceModal, setShowProvinceModal] = useState(false);
   const [showCityModal, setShowCityModal] = useState(false);
   const [queueModalVisible, setQueueModalVisible] = useState(false);
+  const [photoActionVisible, setPhotoActionVisible] = useState(false);
+  const [selectedPhoto, setSelectedPhoto] = useState(null);
+  const [photoUploading, setPhotoUploading] = useState(false);
 
   const offlineSync = useOfflineSyncOptional();
   const isCustomer = user?.role === "customer";
   const isChecker = user?.role === "checker";
-  const isStaff = isChecker || user?.role === "driver";
+  const isDriver = user?.role === "driver";
+  const isStaff = isChecker || isDriver;
+  const profilePhotoURL = String(user?.photoURL || "").trim();
   const config = roleConfig[user?.role] || {
     icon: "user-circle",
     label: user?.role || "User",
@@ -124,6 +137,77 @@ export default function ProfileViewer({
   };
   const isDark = resolvedScheme === "dark";
 
+  const selectProfilePhoto = async (source) => {
+    try {
+      const permission = source === "camera"
+        ? await ImagePicker.requestCameraPermissionsAsync()
+        : await ImagePicker.requestMediaLibraryPermissionsAsync();
+
+      if (!permission.granted) {
+        Alert.alert(
+          "Permission needed",
+          source === "camera"
+            ? "Allow camera access to take a profile photo."
+            : "Allow photo library access to choose a profile photo.",
+        );
+        return;
+      }
+
+      const options = {
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+      };
+      const result = source === "camera"
+        ? await ImagePicker.launchCameraAsync(options)
+        : await ImagePicker.launchImageLibraryAsync(options);
+
+      if (!result.canceled && result.assets?.[0]?.uri) {
+        setPhotoActionVisible(false);
+        setSelectedPhoto(result.assets[0]);
+      }
+    } catch (error) {
+      console.error("Profile photo selection failed:", error);
+      Alert.alert("Unable to select photo", "Please try again.");
+    }
+  };
+
+  const uploadProfilePhoto = async () => {
+    if (!selectedPhoto?.uri || !user?.uid || photoUploading) return;
+
+    setPhotoUploading(true);
+    try {
+      const response = await fetch(selectedPhoto.uri);
+      const blob = await response.blob();
+      const avatarRef = ref(storage, `users/${user.uid}/profile/avatar.jpg`);
+
+      await uploadBytes(avatarRef, blob, {
+        contentType: selectedPhoto.mimeType || "image/jpeg",
+      });
+      const photoURL = await getDownloadURL(avatarRef);
+
+      await updateUserProfileMobile({ targetUid: user.uid, photoURL });
+      await refreshUser();
+
+      setSelectedPhoto(null);
+      Alert.alert("Profile photo updated", "Your new profile photo is saved.");
+    } catch (error) {
+      console.error("Profile photo upload failed:", error);
+      const message = /network|internet|offline|failed to fetch/i.test(
+        String(error?.message || ""),
+      )
+        ? "No internet connection. Check your connection and try again."
+        : "We could not upload your profile photo. Please try again.";
+      Alert.alert("Upload failed", message, [
+        { text: "Cancel", style: "cancel" },
+        { text: "Retry", onPress: uploadProfilePhoto },
+      ]);
+    } finally {
+      setPhotoUploading(false);
+    }
+  };
+
   const addressSummary = [user?.address?.city, user?.address?.province]
     .filter(Boolean)
     .join(", ");
@@ -131,6 +215,12 @@ export default function ProfileViewer({
   const warehouseSummary = [user?.warehouseName, user?.warehouseCode]
     .filter(Boolean)
     .join(" - ");
+  const driverMunicipality = driverAssignment.municipality || user?.assignedMunicipality || user?.municipality || (Array.isArray(user?.assignedMunicipalities) ? user.assignedMunicipalities.join(", ") : null);
+  const driverVehicle = driverAssignment.vehicle || [user?.vehiclePlate, user?.vehicleType].filter(Boolean).join(" · ");
+  const driverPlate = driverAssignment.plateNumber || user?.vehiclePlate || user?.plateNumber;
+  const driverRoute = driverAssignment.route || user?.assignedRoute || user?.routeName || user?.route;
+  const driverLicense = user?.licenseNumber || user?.licenseNo || user?.driverLicenseNumber;
+  const employmentStatus = user?.employmentStatus || user?.status || (user?.active === false ? "Inactive" : "Active");
 
   const profileSubtitle = isCustomer
     ? displayValue(addressSummary, "Customer Account")
@@ -459,14 +549,23 @@ export default function ProfileViewer({
             { backgroundColor: colors.surface, borderColor: colors.border },
           ]}
         >
-          <View
+          <TouchableOpacity
             style={[
               styles.avatar,
+              profilePhotoURL && styles.photoAvatar,
               { backgroundColor: avatarBg, borderColor: avatarBorder },
             ]}
+            onPress={() => setPhotoActionVisible(true)}
+            activeOpacity={0.8}
+            accessibilityRole="button"
+            accessibilityLabel="Change profile photo"
           >
-            <FontAwesome5 name={config.icon} size={24} color={config.color} />
-          </View>
+            {profilePhotoURL ? (
+              <Image source={{ uri: profilePhotoURL }} style={styles.avatarImage} />
+            ) : (
+              <FontAwesome5 name={config.icon} size={24} color={config.color} />
+            )}
+          </TouchableOpacity>
 
           <View style={styles.heroTextBlock}>
             <View
@@ -661,6 +760,48 @@ export default function ProfileViewer({
               icon: "id-badge",
               editable: false,
             })}
+            {isDriver && renderField({
+              label: "Assigned Municipality",
+              value: driverMunicipality,
+              stateKey: "driverMunicipality",
+              icon: "map-marker-alt",
+              editable: false,
+            })}
+            {isDriver && renderField({
+              label: "Assigned Vehicle",
+              value: driverVehicle,
+              stateKey: "driverVehicle",
+              icon: "truck",
+              editable: false,
+            })}
+            {isDriver && renderField({
+              label: "Plate Number",
+              value: driverPlate,
+              stateKey: "driverPlate",
+              icon: "credit-card",
+              editable: false,
+            })}
+            {isDriver && renderField({
+              label: "Assigned Route",
+              value: driverRoute,
+              stateKey: "driverRoute",
+              icon: "route",
+              editable: false,
+            })}
+            {isDriver && renderField({
+              label: "License Number",
+              value: driverLicense,
+              stateKey: "driverLicense",
+              icon: "id-card",
+              editable: false,
+            })}
+            {isDriver && renderField({
+              label: "Employment Status",
+              value: employmentStatus,
+              stateKey: "employmentStatus",
+              icon: "user-check",
+              editable: false,
+            })}
           </View>
         )}
 
@@ -787,7 +928,7 @@ export default function ProfileViewer({
           </View>
         )}
 
-        {!isEditing && (
+        {!isEditing && !minimalStaff && (
           <View
             style={[
               styles.card,
@@ -870,7 +1011,21 @@ export default function ProfileViewer({
           </View>
         )}
 
-        {!isEditing && (
+        {!isEditing && minimalStaff && (
+          <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <SectionHeader icon="shield-alt" eyebrow="Account" title="Security" colors={colors} isDark={isDark} />
+            <TouchableOpacity style={[styles.signOutBtn, { backgroundColor: colors.cardMuted, borderColor: colors.border, marginBottom: 10 }]} onPress={() => setIsEditing(true)} activeOpacity={0.85}>
+              <FontAwesome5 name="lock" size={14} color={PRIMARY} />
+              <Text style={[styles.signOutBtnText, { color: PRIMARY }]}>Change Password</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.signOutBtn, { backgroundColor: colors.cardMuted, borderColor: colors.border }]} onPress={handleSignOut} activeOpacity={0.85}>
+              <FontAwesome5 name="sign-out-alt" size={14} color={DANGER} />
+              <Text style={styles.signOutBtnText}>Logout</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {!isEditing && !minimalStaff && (
           <View
             style={[
               styles.card,
@@ -1011,6 +1166,66 @@ export default function ProfileViewer({
           syncNow={offlineSync.syncNow}
         />
       ) : null}
+
+      <Modal
+        visible={photoActionVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setPhotoActionVisible(false)}
+      >
+        <Pressable
+          style={styles.photoSheetBackdrop}
+          onPress={() => setPhotoActionVisible(false)}
+        >
+          <Pressable
+            style={[styles.photoSheet, { backgroundColor: colors.surface }]}
+            onPress={(event) => event.stopPropagation()}
+          >
+            <Text style={[styles.photoSheetTitle, { color: colors.text }]}>Profile photo</Text>
+            <TouchableOpacity style={styles.photoSheetAction} onPress={() => selectProfilePhoto("camera")}>
+              <FontAwesome5 name="camera" size={18} color={PRIMARY} />
+              <Text style={[styles.photoSheetActionText, { color: colors.text }]}>Take Photo</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.photoSheetAction} onPress={() => selectProfilePhoto("library")}>
+              <FontAwesome5 name="images" size={18} color={PRIMARY} />
+              <Text style={[styles.photoSheetActionText, { color: colors.text }]}>Choose from Gallery</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.photoSheetCancel} onPress={() => setPhotoActionVisible(false)}>
+              <Text style={[styles.photoSheetCancelText, { color: colors.textMuted }]}>Cancel</Text>
+            </TouchableOpacity>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      <Modal
+        visible={Boolean(selectedPhoto)}
+        transparent
+        animationType="fade"
+        onRequestClose={() => !photoUploading && setSelectedPhoto(null)}
+      >
+        <View style={styles.photoPreviewBackdrop}>
+          <View style={[styles.photoPreviewCard, { backgroundColor: colors.surface }]}>
+            <Text style={[styles.photoSheetTitle, { color: colors.text }]}>Preview profile photo</Text>
+            {selectedPhoto?.uri ? <Image source={{ uri: selectedPhoto.uri }} style={styles.photoPreviewImage} /> : null}
+            <View style={styles.photoPreviewActions}>
+              <TouchableOpacity
+                disabled={photoUploading}
+                style={[styles.photoPreviewButton, { borderColor: colors.border }]}
+                onPress={() => setSelectedPhoto(null)}
+              >
+                <Text style={[styles.photoPreviewCancelText, { color: colors.textMuted }]}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                disabled={photoUploading}
+                style={[styles.photoPreviewButton, styles.photoUploadButton]}
+                onPress={uploadProfilePhoto}
+              >
+                {photoUploading ? <ActivityIndicator color="#fff" /> : <Text style={styles.photoUploadText}>Upload</Text>}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </Container>
   );
 }
@@ -1070,7 +1285,51 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     alignItems: "center",
     justifyContent: "center",
+    overflow: "hidden",
   },
+  avatarImage: {
+    width: "100%",
+    height: "100%",
+  },
+  photoAvatar: {
+    borderRadius: 32,
+  },
+  photoSheetBackdrop: {
+    flex: 1,
+    justifyContent: "flex-end",
+    backgroundColor: "rgba(15, 23, 42, 0.45)",
+  },
+  photoSheet: {
+    padding: 20,
+    paddingBottom: 32,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    gap: 4,
+  },
+  photoSheetTitle: { fontSize: 17, fontWeight: "700", marginBottom: 8 },
+  photoSheetAction: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 14,
+    paddingVertical: 15,
+  },
+  photoSheetActionText: { fontSize: 16, fontWeight: "600" },
+  photoSheetCancel: { alignItems: "center", paddingTop: 16, paddingBottom: 4 },
+  photoSheetCancelText: { fontSize: 16, fontWeight: "600" },
+  photoPreviewBackdrop: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 24,
+    backgroundColor: "rgba(15, 23, 42, 0.55)",
+  },
+  photoPreviewCard: { width: "100%", maxWidth: 360, borderRadius: 20, padding: 20 },
+  photoPreviewImage: { width: "100%", aspectRatio: 1, borderRadius: 14, backgroundColor: "#e2e8f0" },
+  photoPreviewActions: { flexDirection: "row", gap: 12, marginTop: 18 },
+  photoPreviewButton: { flex: 1, minHeight: 46, borderWidth: 1, borderRadius: 10, alignItems: "center", justifyContent: "center" },
+  photoPreviewCancelText: { fontWeight: "700" },
+  photoUploadButton: { backgroundColor: PRIMARY, borderColor: PRIMARY },
+  photoUploadText: { color: "#fff", fontWeight: "700" },
   heroTextBlock: {
     flex: 1,
     marginLeft: 14,

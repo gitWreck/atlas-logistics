@@ -145,7 +145,11 @@ exports.updateShipmentStatus = onCall(
       "driver",
     ]);
 
-    const { uid, role, name, usercode } = updatedBy(req);
+    const actorMeta = updatedBy(req);
+    const uid = actor.uid;
+    const role = actor.role;
+    const name = actor.user?.name || actor.user?.fullName || actorMeta.name || uid;
+    const usercode = actorMeta.usercode;
     const checkerAuthUid = req.auth?.uid || uid;
 
     const {
@@ -164,6 +168,11 @@ exports.updateShipmentStatus = onCall(
       notificationChannels = null,
       sourceUI = "SYSTEM",
       packageIds = null,
+      receiverName = null,
+      receiverSignature = null,
+      gpsCoordinates = null,
+      failureReasonCode = null,
+      returnDisposition = null,
     } = req.data || {};
 
     if (!shipmentId || !newStatus) {
@@ -177,18 +186,96 @@ exports.updateShipmentStatus = onCall(
     const isFinalDeliveryStatus =
       newStatus === "DELIVERED" || newStatus === "COMPLETED";
 
-    if (actor.role === "driver" && (isFinalDeliveryStatus || proofOfDelivery)) {
-      throw new HttpsError(
-        "permission-denied",
-        "Drivers cannot complete delivery or upload proof of delivery.",
-      );
-    }
-
     const shipmentRef = db.collection("shipments").doc(shipmentId);
     const tripRef = tripId ? db.collection("truck_trips").doc(tripId) : null;
     const tripShipmentRef = tripRef
       ? tripRef.collection("trip_shipments").doc(shipmentId)
       : null;
+
+    if (actor.role === "driver") {
+      const driverStatuses = new Set([
+        "DELIVERED",
+        "COMPLETED",
+        "FAILED_DELIVERY",
+        "CANCELLED",
+        "DAMAGED",
+      ]);
+      if (!driverStatuses.has(newStatus)) {
+        throw new HttpsError(
+          "permission-denied",
+          "Drivers can only complete an assigned delivery or record a delivery exception.",
+        );
+      }
+
+      const [driverShipmentSnap, driverTripSnap, driverTripShipmentSnap] = await Promise.all([
+        shipmentRef.get(),
+        tripRef ? tripRef.get() : Promise.resolve(null),
+        tripShipmentRef ? tripShipmentRef.get() : Promise.resolve(null),
+      ]);
+      if (!driverShipmentSnap.exists) {
+        throw new HttpsError("not-found", "Shipment not found.");
+      }
+      const driverShipment = driverShipmentSnap.data() || {};
+      const driverShipmentStatus = String(driverShipment.status || "").toUpperCase();
+      const directlyAssigned =
+        String(driverShipment.driverId || driverShipment.assignedDriverId || "") === String(actor.uid);
+      const assignedThroughTrip = Boolean(
+        driverTripSnap?.exists &&
+        driverTripShipmentSnap?.exists &&
+        String(driverTripSnap.data()?.driverId || "") === String(actor.uid),
+      );
+      if (!directlyAssigned && !assignedThroughTrip) {
+        throw new HttpsError(
+          "permission-denied",
+          "This shipment is not assigned to your Driver account.",
+        );
+      }
+
+      const activeDeliveryStatuses = new Set([
+        "OUT_FOR_DELIVERY",
+        "PARTIALLY_OUT_FOR_DELIVERY",
+        "FAILED_DELIVERY",
+      ]);
+      if (!activeDeliveryStatuses.has(driverShipmentStatus)) {
+        throw new HttpsError(
+          "failed-precondition",
+          "The Checker must load and release this shipment for delivery before the Driver can update it.",
+        );
+      }
+      if (isFinalDeliveryStatus && driverShipmentStatus === "FAILED_DELIVERY") {
+        throw new HttpsError(
+          "failed-precondition",
+          "A failed delivery must be rescheduled and released again before it can be completed.",
+        );
+      }
+
+      if (isFinalDeliveryStatus) {
+        const photos = Array.isArray(proofOfDelivery)
+          ? proofOfDelivery.filter((value) => typeof value === "string" && value.trim())
+          : typeof proofOfDelivery === "string" && proofOfDelivery.trim()
+            ? [proofOfDelivery]
+            : [];
+        const signaturePoints = Array.isArray(receiverSignature?.points)
+          ? receiverSignature.points
+          : [];
+        const lat = Number(gpsCoordinates?.lat ?? gpsCoordinates?.latitude);
+        const lng = Number(gpsCoordinates?.lng ?? gpsCoordinates?.longitude);
+        if (!String(receiverName || "").trim()) {
+          throw new HttpsError("failed-precondition", "Receiver name is required before delivery completion.");
+        }
+        if (photos.length === 0) {
+          throw new HttpsError("failed-precondition", "A delivery photo is required before delivery completion.");
+        }
+        if (signaturePoints.length < 2) {
+          throw new HttpsError("failed-precondition", "Receiver signature is required before delivery completion.");
+        }
+        if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+          throw new HttpsError("failed-precondition", "GPS coordinates are required before delivery completion.");
+        }
+      } else if (!String(failureReasonCode || returnDisposition || remarks || "").trim()) {
+        throw new HttpsError("failed-precondition", "A delivery exception reason is required.");
+      }
+    }
 
     let checkerPromotedOutForDelivery = false;
     let checkerDeliveredPieceIds = [];
@@ -513,6 +600,7 @@ exports.updateShipmentStatus = onCall(
 
       if (
         !isCheckerPieceDelivery &&
+        actor.role !== "driver" &&
         packagesUnchanged &&
         derivedShipmentStatus === oldStatus
       ) {
@@ -530,6 +618,11 @@ exports.updateShipmentStatus = onCall(
 
         ...(location && { lastLocation: location }),
         ...(proofOfDelivery && { proofOfDelivery }),
+        ...(receiverName && { receiverName: String(receiverName).trim() }),
+        ...(receiverSignature && { receiverSignature }),
+        ...(gpsCoordinates && { deliveryGpsCoordinates: gpsCoordinates }),
+        ...(failureReasonCode && { failureReasonCode }),
+        ...(returnDisposition && { returnDisposition }),
         ...(proofOfReceipt && { proofOfReceipt }),
         ...(paymentStatus && { paymentStatus }),
 
@@ -737,6 +830,25 @@ exports.updateShipmentStatus = onCall(
           }),
         ),
       );
+    }
+
+    if (actor.role === "driver" && isFinalDeliveryStatus) {
+      await writeShipmentEvent({
+        db,
+        event: {
+          shipmentId,
+          eventType: EVENT_TYPES.DELIVERED,
+          driverId: uid,
+          driverName: name,
+          location: location || null,
+          gpsCoordinates: gpsCoordinates || null,
+          proofPhotoUrl: Array.isArray(proofOfDelivery) ? proofOfDelivery[0] || null : proofOfDelivery || null,
+          remarks: remarks || `Delivered to ${String(receiverName || "receiver").trim()}.`,
+          createdBy: uid,
+          createdByRole: role,
+          source: sourceUI || "DRIVER_MOBILE",
+        },
+      });
     }
 
     let notificationDelivered = false;

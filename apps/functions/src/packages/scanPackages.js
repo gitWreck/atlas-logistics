@@ -63,7 +63,7 @@ exports.scanPackages = onCall(
           "Only Checkers can Load items onto the truck.",
         );
       }
-    } else if (!["checker", "driver", "admin"].includes(userRole)) {
+    } else if (!["checker", "admin"].includes(userRole)) {
       throw new HttpsError("permission-denied", "Unauthorized role.");
     }
 

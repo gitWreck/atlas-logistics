@@ -16,7 +16,7 @@ exports.updateUserProfileMobile = onCall(
 
     const uid = req.auth.uid;
     // ✅ Added phoneNumber to destructured data
-    const { targetUid, name, password, address, phoneNumber } = req.data;
+    const { targetUid, name, password, address, phoneNumber, photoURL } = req.data;
 
     if (!targetUid)
       throw new HttpsError("invalid-argument", "Target UID required.");
@@ -41,6 +41,15 @@ exports.updateUserProfileMobile = onCall(
 
     const authUpdates = {};
     const firestoreUpdates = { updatedAt: FieldValue.serverTimestamp() };
+
+    if (photoURL !== undefined) {
+      const normalizedPhotoURL = String(photoURL || "").trim();
+      if (normalizedPhotoURL && !/^https:\/\//i.test(normalizedPhotoURL)) {
+        throw new HttpsError("invalid-argument", "Profile photo URL must use HTTPS.");
+      }
+      authUpdates.photoURL = normalizedPhotoURL || null;
+      firestoreUpdates.photoURL = normalizedPhotoURL || null;
+    }
 
     // 1. HANDLE NAME UPDATE (Staff names are locked for self-update, usually)
     if (name && name.trim().length > 0) {
