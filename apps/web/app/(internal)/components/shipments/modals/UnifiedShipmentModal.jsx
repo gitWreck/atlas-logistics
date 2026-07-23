@@ -93,6 +93,10 @@ export default function UnifiedShipmentModal({
         recipient: {
           name: editData.recipient?.name || "",
           phone: editData.recipient?.phone || "",
+          secondaryPhone:
+            editData.recipient?.secondaryPhone ||
+            editData.recipient?.altPhone ||
+            "",
           ...(editData.recipient?.address || editData.recipient?.details || {}),
         },
         items: editData.packages || editData.items || [],
@@ -198,6 +202,7 @@ export default function UnifiedShipmentModal({
           uid: shipmentDraft.recipient.uid || null,
           name: shipmentDraft.recipient.name,
           phone: shipmentDraft.recipient.phone,
+          secondaryPhone: shipmentDraft.recipient.secondaryPhone || null,
           email: shipmentDraft.recipient.email || null,
           address: {
             unit: shipmentDraft.recipient.unit,

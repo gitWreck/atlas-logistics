@@ -14,7 +14,12 @@ import StatusBadge from "../ui/figma/StatusBadge"; // Reuse your badge
 import * as Clipboard from "expo-clipboard"; // ✅ Add this
 import { useTheme } from "../../contexts/ThemeContext";
 
-const ShipmentHeaderCard = ({ shipment, showActions = true }) => {
+const ShipmentHeaderCard = ({
+  shipment,
+  showActions = true,
+  showCustomerCall = true,
+  hidePhone = false,
+}) => {
   const { colors, resolvedScheme } = useTheme();
   const isDark = resolvedScheme === "dark";
 
@@ -170,23 +175,25 @@ const ShipmentHeaderCard = ({ shipment, showActions = true }) => {
               >
                 {receiverName}
               </Text>
-              <Text
-                style={[
-                  styles.phoneText,
-                  {
-                    color: colors.textMuted,
-                    marginRight: 12,
-                    marginTop: 2,
-                  },
-                ]}
-              >
-                {receiverPhone}
-              </Text>
+              {!hidePhone && (
+                <Text
+                  style={[
+                    styles.phoneText,
+                    {
+                      color: colors.textMuted,
+                      marginRight: 12,
+                      marginTop: 2,
+                    },
+                  ]}
+                >
+                  {receiverPhone}
+                </Text>
+              )}
             </View>
           </View>
 
           {/* --- RIGHT SIDE: Phone & Quick Actions --- */}
-          {showActions && (
+          {showActions && showCustomerCall && !hidePhone && (
             <View style={{ flexDirection: "row", alignItems: "center" }}>
             {receiverPhone !== "No Phone" && (
               <View style={{ flexDirection: "row", gap: 8 }}>

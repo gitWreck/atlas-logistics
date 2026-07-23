@@ -104,6 +104,10 @@ exports.createShipment = onCall(
       requireNormalizedPhone(recipient?.phone) ||
       normalizePhone(recipient?.phone) ||
       null;
+    const recipientSecondaryPhone =
+      requireNormalizedPhone(recipient?.secondaryPhone || recipient?.altPhone) ||
+      normalizePhone(recipient?.secondaryPhone || recipient?.altPhone) ||
+      null;
     const [senderCustomer, recipientCustomer] = await Promise.all([
       findCustomerByPhone(db, senderPhone),
       findCustomerByPhone(db, recipientPhone),
@@ -223,6 +227,7 @@ exports.createShipment = onCall(
         userId: getPublicUserId(recipient, getPublicUserId(recipientCustomer)),
         name: recipient?.name || "",
         phone: recipientPhone,
+        secondaryPhone: recipientSecondaryPhone,
         email: recipient?.email || recipientCustomer?.email || null,
         address: recipientAddress,
         formattedAddress: formatAddress(recipientAddress),

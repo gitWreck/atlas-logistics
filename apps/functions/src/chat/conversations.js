@@ -14,6 +14,15 @@ const {
   getRtcSecretConfig,
 } = require("./trtcConfig");
 const { assertDirectConversationAccess } = require("./checkerMessaging");
+const {
+  assertCustomerCommsAllowed,
+  resolveShipmentCommsOwner,
+  getCheckerActivePieceIds,
+  evaluateCheckerCustomerComms,
+} = require("./customerCommsAuth");
+const {
+  resolveShipmentReference,
+} = require("../shipments/resolveShipmentReference");
 
 if (!admin.apps.length) admin.initializeApp();
 
@@ -42,9 +51,12 @@ const CALL_STATUSES = [
   "busy",
   "cancelled",
   "timeout",
+  "failed",
   "ended",
 ];
-const TERMINAL_CALL_STATUSES = ["ended", "declined", "missed", "busy", "cancelled", "timeout"];
+const TERMINAL_CALL_STATUSES = ["ended", "declined", "missed", "busy", "cancelled", "timeout", "failed"];
+// Non-answer terminal statuses that should trigger Atlas Support fallback ringing.
+const SUPPORT_FALLBACK_STATUSES = ["declined", "missed", "busy", "timeout", "failed"];
 const CALL_LOCK_COLLECTION = "callAccountLocks";
 const CALL_HEARTBEAT_STALE_MS = 90 * 1000;
 const BACKGROUND_CALL_HEARTBEAT_STALE_MS = 10 * 60 * 1000;
@@ -260,6 +272,10 @@ async function createRingingConversationCall({
       participantIds: [...new Set(participantIds || [callerId, receiverId])],
       type: callType,
       status: "ringing",
+      // Communication log context (spec section 18); overridable via extraFields.
+      shipmentId: null,
+      pieceIds: [],
+      checkerId: null,
       rtcRoomId,
       roomId: rtcRoomId,
       rtcProvider: "tencent",
@@ -336,6 +352,52 @@ async function createRingingConversationCall({
   };
 }
 
+/**
+ * Atlas Customer Support fallback: when the primary support agent (Rose /
+ * admin) does not answer, automatically ring the secondary agent (Lean /
+ * manager) for the same customer (spec section 2). Employee identities are
+ * never exposed — the customer only ever sees "Atlas Support".
+ */
+async function startSupportFallbackCall(call = {}, routing = {}) {
+  const secondaryId = String(routing.secondaryId || "").trim();
+  if (!secondaryId) return;
+
+  const callerId = String(call.callerId || "").trim();
+  const conversationId = String(call.conversationId || "").trim();
+  if (!callerId || !conversationId) return;
+
+  const secondarySnap = await db.collection("users").doc(secondaryId).get();
+  if (!secondarySnap.exists || secondarySnap.data()?.active === false) return null;
+  const secondary = secondarySnap.data() || {};
+
+  return createRingingConversationCall({
+    conversationId,
+    callType: call.type === "video" ? "video" : "voice",
+    callerId,
+    callerRole: String(call.callerRole || "customer").toLowerCase(),
+    callerName: call.callerName || "Customer",
+    callerSessionId: null,
+    callerDeviceId: null,
+    receiverId: secondaryId,
+    receiverRole: String(secondary.role || "manager").toLowerCase(),
+    // Privacy: never surface the real agent name to the customer.
+    receiverName: "Atlas Support",
+    participantIds: [callerId, secondaryId],
+    extraFields: {
+      conversationType: call.conversationType || null,
+      customerId: call.customerId || null,
+      shipmentId: call.shipmentId || null,
+      isSupportFallback: true,
+      routedFromCallId: String(call.callId || "").trim() || null,
+      supportRouting: {
+        primaryId: routing.primaryId || null,
+        secondaryId,
+        stage: "secondary",
+      },
+    },
+  });
+}
+
 function cleanText(value, fieldName = "text", maxLength = 2000) {
   const text = String(value || "").trim();
   if (!text) {
@@ -375,6 +437,130 @@ function displayName(user = {}, fallback = "User") {
 
 function assignedStaffId(conversation = {}) {
   return conversation.assignedStaffId || conversation.assignedTo || null;
+}
+
+/**
+ * Resolve the shipment document tied to a conversation (if any). Returns null
+ * rather than throwing so callers can decide how to gate missing shipments.
+ */
+async function loadShipmentForConversation(conversation = {}) {
+  const ref = String(
+    conversation.shipmentId || conversation.trackingNumber || "",
+  ).trim();
+  if (!ref) return null;
+  try {
+    const { shipment } = await resolveShipmentReference(db, ref);
+    return shipment || null;
+  } catch (error) {
+    return null;
+  }
+}
+
+/**
+ * Keep shipment-thread ownership aligned with custody (spec §14):
+ *   - Checker owns while they hold OFD / Failed Delivery pieces.
+ *   - Warehouse (Rose → Lean) owns otherwise.
+ * Returns the conversation fields after any ownership write.
+ */
+async function syncShipmentConversationOwnership(conversationRef, conversation = {}) {
+  if (String(conversation.type || "") !== "shipment") {
+    return conversation;
+  }
+
+  const shipment = await loadShipmentForConversation(conversation);
+  if (!shipment) return conversation;
+
+  const owner = resolveShipmentCommsOwner(shipment);
+  const currentAssignee = String(assignedStaffId(conversation) || "").trim();
+  const currentRole = String(
+    assignedStaffRole(conversation) || "",
+  ).trim().toLowerCase();
+  const now = FieldValue.serverTimestamp();
+
+  if (owner.ownerType === "checker" && owner.checkerId) {
+    if (currentAssignee === owner.checkerId && currentRole === "checker") {
+      return conversation;
+    }
+
+    const checkerSnap = await db.collection("users").doc(owner.checkerId).get();
+    const checker = checkerSnap.data() || {};
+    const checkerName = displayName(checker, "Checker");
+    const assignment = {
+      ...staffAssignmentFields({
+        assigneeId: owner.checkerId,
+        assigneeRole: "checker",
+        assigneeName: checkerName,
+      }),
+      participantIds: FieldValue.arrayUnion(owner.checkerId),
+      [`participantRoles.${owner.checkerId}`]: "checker",
+      [`participantProfiles.${owner.checkerId}`]: {
+        name: checkerName,
+        role: "checker",
+      },
+      assignmentSource: "shipment_custody",
+      status: "active",
+      updatedAt: now,
+    };
+    await conversationRef.update(assignment);
+    return {
+      ...conversation,
+      ...staffAssignmentFields({
+        assigneeId: owner.checkerId,
+        assigneeRole: "checker",
+        assigneeName: checkerName,
+      }),
+      assignmentSource: "shipment_custody",
+    };
+  }
+
+  // Warehouse owns again — if a checker still holds the assignment, hand back
+  // to Rose (admin) then Lean (manager).
+  if (currentRole === "checker") {
+    const roseId = String(process.env.AUTO_SUPPORT_ROSE_UID || "").trim();
+    const leanId = String(process.env.AUTO_SUPPORT_LEAN_UID || "").trim();
+    const warehouseIds = [roseId, leanId].filter(Boolean);
+
+    let warehouseId = null;
+    let warehouseUser = null;
+    for (const candidateId of warehouseIds) {
+      const snap = await db.collection("users").doc(candidateId).get();
+      if (snap.exists && snap.data()?.active !== false) {
+        warehouseId = candidateId;
+        warehouseUser = snap.data() || {};
+        break;
+      }
+    }
+
+    if (warehouseId) {
+      const warehouseName = displayName(warehouseUser, "Atlas Support");
+      const warehouseRole = String(warehouseUser.role || "manager")
+        .trim()
+        .toLowerCase();
+      const assignment = {
+        ...staffAssignmentFields({
+          assigneeId: warehouseId,
+          assigneeRole: warehouseRole,
+          assigneeName: warehouseName,
+        }),
+        participantIds: FieldValue.arrayUnion(warehouseId),
+        [`participantRoles.${warehouseId}`]: warehouseRole,
+        assignmentSource: "custody_ended_warehouse",
+        updatedAt: now,
+      };
+      await conversationRef.update(assignment);
+      return {
+        ...conversation,
+        ...staffAssignmentFields({
+          assigneeId: warehouseId,
+          assigneeRole: warehouseRole,
+          assigneeName: warehouseName,
+        }),
+        assignmentSource: "custody_ended_warehouse",
+      };
+    }
+  }
+
+  return conversation;
 }
 
 function assignedStaffName(conversation = {}) {
@@ -499,13 +685,20 @@ async function getConversationForUser(conversationId, uid, role) {
       "This staff conversation is outside your current assignment.",
     );
   }
-  const isAdmin = normalizedRole === "admin";
+  const isAdmin = normalizedRole === "admin" || normalizedRole === "administrator";
   const isManager = normalizedRole === "manager";
-  const isEmployee = normalizedRole === "employee";
   const isCustomer = conversation.customerId === uid;
   const isAssigned = assignedStaffId(conversation) === uid;
+  const isParticipant =
+    Array.isArray(conversation.participantIds) &&
+    conversation.participantIds.includes(uid);
+  // Field staff (employee / checker / driver) may access a shipment thread when
+  // they are the assigned owner or an explicit participant.
+  const isFieldStaff =
+    ["employee", "checker", "driver"].includes(normalizedRole) &&
+    (isAssigned || isParticipant);
 
-  if (!(isAdmin || isManager || isCustomer || (isEmployee && isAssigned))) {
+  if (!(isAdmin || isManager || isCustomer || isFieldStaff)) {
     throw new HttpsError("permission-denied", "Conversation access denied.");
   }
 
@@ -594,23 +787,37 @@ async function sendExpoPush({ userIds, title, body, data }) {
 }
 
 async function notifyStaff({ conversationId, conversation, message, sender }) {
+  const assignedStaffIdValue = String(assignedStaffId(conversation) || "").trim();
+  const assignedRole = String(
+    assignedStaffRole(conversation) || "",
+  ).trim().toLowerCase();
+  const isShipmentThread = String(conversation.type || "") === "shipment";
+  // Spec §14: one responsible owner. While a checker owns a shipment thread,
+  // customer replies notify that checker only — not the whole admin roster.
+  const checkerOwnsThread = isShipmentThread && assignedRole === "checker";
+
   const targetUserIds = [];
-  const assignedStaffIdValue = assignedStaffId(conversation);
   if (assignedStaffIdValue) targetUserIds.push(assignedStaffIdValue);
 
-  const staffIds = (await getStaffUserIds()).filter((uid) => uid !== assignedStaffIdValue);
-  targetUserIds.push(...staffIds);
+  if (!checkerOwnsThread) {
+    const staffIds = (await getStaffUserIds()).filter(
+      (staffId) => staffId !== assignedStaffIdValue,
+    );
+    targetUserIds.push(...staffIds);
+  }
 
   if (!targetUserIds.length) return;
 
   const batch = db.batch();
   const now = FieldValue.serverTimestamp();
-  const title = `New chat from ${conversation.customerName || "Customer"}`;
+  const title = checkerOwnsThread
+    ? `Customer reply · ${conversation.trackingNumber || "shipment"}`
+    : `New chat from ${conversation.customerName || "Customer"}`;
 
-  targetUserIds.forEach((uid) => {
+  targetUserIds.forEach((targetUid) => {
     const notificationRef = db
       .collection("users")
-      .doc(uid)
+      .doc(targetUid)
       .collection("notifications")
       .doc();
 
@@ -625,30 +832,45 @@ async function notifyStaff({ conversationId, conversation, message, sender }) {
       },
       entityType: "conversation",
       entityId: conversationId,
-      ownerId: uid,
+      ownerId: targetUid,
       read: false,
       createdAt: now,
     });
   });
 
-  const alertRef = db.collection("admin_alerts").doc();
-  batch.set(alertRef, {
-    type: "CHAT_MESSAGE",
-    status: "UNREAD",
-    conversationId,
-    customerId: conversation.customerId,
-    trackingNumber: conversation.trackingNumber || null,
-    message,
-    details: {
-      customerName: conversation.customerName || sender.name || "Customer",
-      senderName: sender.name || "Customer",
+  // Keep a warehouse audit trail, but do not treat it as the primary inbox
+  // owner while a checker holds custody.
+  if (!checkerOwnsThread) {
+    const alertRef = db.collection("admin_alerts").doc();
+    batch.set(alertRef, {
+      type: "CHAT_MESSAGE",
+      status: "UNREAD",
+      conversationId,
+      customerId: conversation.customerId,
       trackingNumber: conversation.trackingNumber || null,
-    },
-    createdAt: now,
-    updatedAt: now,
-  });
+      message,
+      details: {
+        customerName: conversation.customerName || sender.name || "Customer",
+        senderName: sender.name || "Customer",
+        trackingNumber: conversation.trackingNumber || null,
+      },
+      createdAt: now,
+      updatedAt: now,
+    });
+  }
 
   await batch.commit();
+
+  await sendExpoPush({
+    userIds: targetUserIds,
+    title,
+    body: message,
+    data: {
+      screen: "chat",
+      conversationId,
+      trackingNumber: conversation.trackingNumber || null,
+    },
+  });
 }
 
 async function notifyCustomer({ conversationId, customerId, message, sender }) {
@@ -750,6 +972,75 @@ async function findOpenWebSupportConversation(uid) {
   });
 }
 
+/** Open general (non-shipment) customer support thread for a signed-in customer. */
+function customerSupportConversationId(uid) {
+  return `customer_support_${String(uid || "").trim()}`;
+}
+
+async function findOpenCustomerSupportConversation(uid) {
+  const canonicalId = customerSupportConversationId(uid);
+  const canonicalSnap = await db.collection("conversations").doc(canonicalId).get();
+  if (canonicalSnap.exists) {
+    const data = canonicalSnap.data() || {};
+    const status = String(data.status || "open").toLowerCase();
+    if (!["closed", "archived"].includes(status) && data.type === "customer_support") {
+      return canonicalSnap;
+    }
+  }
+
+  const existingSnap = await db
+    .collection("conversations")
+    .where("customerId", "==", uid)
+    .orderBy("lastMessageAt", "desc")
+    .limit(40)
+    .get();
+
+  return existingSnap.docs.find((doc) => {
+    const data = doc.data() || {};
+    const status = String(data.status || "open").toLowerCase();
+    if (["closed", "archived"].includes(status)) return false;
+    if (data.type !== "customer_support") return false;
+    return !data.trackingNumber && !data.shipmentId;
+  });
+}
+
+/** Collapse accidental duplicate general-support threads to a single inbox entry. */
+async function archiveDuplicateCustomerSupportThreads(uid, keepId) {
+  const keep = String(keepId || "").trim();
+  if (!keep) return;
+
+  const existingSnap = await db
+    .collection("conversations")
+    .where("customerId", "==", uid)
+    .orderBy("lastMessageAt", "desc")
+    .limit(40)
+    .get();
+
+  const duplicates = existingSnap.docs.filter((doc) => {
+    if (doc.id === keep) return false;
+    const data = doc.data() || {};
+    if (String(data.type || "") !== "customer_support") return false;
+    if (data.trackingNumber || data.shipmentId) return false;
+    const status = String(data.status || "open").toLowerCase();
+    return !["closed", "archived"].includes(status);
+  });
+
+  if (!duplicates.length) return;
+
+  const now = FieldValue.serverTimestamp();
+  for (let i = 0; i < duplicates.length; i += 400) {
+    const batch = db.batch();
+    duplicates.slice(i, i + 400).forEach((doc) => {
+      batch.update(doc.ref, {
+        status: "archived",
+        archivedReason: "duplicate_default_support",
+        updatedAt: now,
+      });
+    });
+    await batch.commit();
+  }
+}
+
 async function notifyDirectParticipants({ conversationId, conversation, message, sender }) {
   const recipients = (conversation.participantIds || []).filter(
     (participantId) => participantId && participantId !== sender.uid,
@@ -832,6 +1123,7 @@ exports.createConversation = onCall(
     const trackingNumber =
       guest || isWebSupport ? null : normalizeTracking(req.data?.trackingNumber);
     const initialMessage = String(req.data?.message || "").trim();
+    const ensureDefault = req.data?.ensureDefault === true;
 
     let shipmentData = null;
     if (trackingNumber) {
@@ -870,9 +1162,19 @@ exports.createConversation = onCall(
       if (existing) {
         return { success: true, conversationId: existing.id, reused: true };
       }
+    } else {
+      // Always reuse the customer's open general Atlas Support thread.
+      const existing = await findOpenCustomerSupportConversation(uid);
+      if (existing) {
+        if (ensureDefault) {
+          await archiveDuplicateCustomerSupportThreads(uid, existing.id);
+        }
+        return { success: true, conversationId: existing.id, reused: true };
+      }
     }
 
-    if (!initialMessage) {
+    // Default Atlas Support inbox entry can be created without a first message.
+    if (!initialMessage && !ensureDefault && !(guest || isWebSupport)) {
       return {
         success: false,
         requiresMessage: true,
@@ -880,12 +1182,33 @@ exports.createConversation = onCall(
       };
     }
 
-    const conversationRef = db.collection("conversations").doc();
     const treatAsGuest = guest || profileMissing;
+    const isGeneralCustomerSupport = !treatAsGuest && !trackingNumber;
+    // One canonical doc per customer so concurrent ensureDefault calls cannot
+    // create duplicate Atlas Customer Support inbox rows.
+    const conversationRef = isGeneralCustomerSupport
+      ? db.collection("conversations").doc(customerSupportConversationId(uid))
+      : db.collection("conversations").doc();
     const customerName = treatAsGuest
       ? displayName(user, authTokenName(req, "Guest"))
       : displayName(user, "Customer");
     const now = FieldValue.serverTimestamp();
+    const seedText =
+      initialMessage ||
+      (ensureDefault || isGeneralCustomerSupport
+        ? "How can we help you today?"
+        : "Conversation started");
+
+    // Race-safe reuse if another request created the canonical doc first.
+    if (isGeneralCustomerSupport) {
+      const existingCanonical = await conversationRef.get();
+      if (existingCanonical.exists) {
+        if (ensureDefault) {
+          await archiveDuplicateCustomerSupportThreads(uid, conversationRef.id);
+        }
+        return { success: true, conversationId: conversationRef.id, reused: true };
+      }
+    }
 
     let conversation = {
       conversationId: conversationRef.id,
@@ -921,12 +1244,12 @@ exports.createConversation = onCall(
       participantRoles: {
         [uid]: role,
       },
-      lastMessage: initialMessage || "Conversation started",
+      lastMessage: seedText,
       lastMessageType: "text",
-      lastMessageSender: uid,
-      lastMessageText: initialMessage || "Conversation started",
+      lastMessageSender: initialMessage ? uid : null,
+      lastMessageText: seedText,
       lastMessageAt: now,
-      lastMessageBy: uid,
+      lastMessageBy: initialMessage ? uid : null,
       lastActivityAt: now,
       status: "unassigned",
       priority: "normal",
@@ -965,6 +1288,14 @@ exports.createConversation = onCall(
       const presenceCutoffMillis = Date.now() - (2 * 60 * 1000);
 
       conversation = await db.runTransaction(async (tx) => {
+        const existingConversationSnap = await tx.get(conversationRef);
+        if (existingConversationSnap.exists) {
+          return {
+            ...(existingConversationSnap.data() || {}),
+            __reusedCanonical: true,
+          };
+        }
+
         const assignmentStateSnap = await tx.get(assignmentStateRef);
         const staffSnaps = [];
         for (const staffId of supportStaffIds) {
@@ -1036,6 +1367,13 @@ exports.createConversation = onCall(
 
         return assignedConversation;
       });
+
+      if (conversation.__reusedCanonical) {
+        if (ensureDefault || isGeneralCustomerSupport) {
+          await archiveDuplicateCustomerSupportThreads(uid, conversationRef.id);
+        }
+        return { success: true, conversationId: conversationRef.id, reused: true };
+      }
     } else {
       await conversationRef.set(conversation);
     }
@@ -1060,6 +1398,10 @@ exports.createConversation = onCall(
         message: initialMessage,
         sender: { uid, role, name: customerName },
       });
+    }
+
+    if (ensureDefault || isGeneralCustomerSupport) {
+      await archiveDuplicateCustomerSupportThreads(uid, conversationRef.id);
     }
 
     return { success: true, conversationId: conversationRef.id, reused: false };
@@ -1153,13 +1495,50 @@ exports.sendChatMessage = onCall(
     const isDirectStaff = conversation.type === "direct_staff";
     const isRequester = conversation.customerId === uid;
     const isStaff = STAFF_ROLES.includes(role) && !isRequester;
+    const isShipmentThread = String(conversation.type || "") === "shipment";
+
+    // Keep shipment ownership aligned with custody before any send/notify.
+    let liveConversation = conversation;
+    if (isShipmentThread) {
+      liveConversation = await syncShipmentConversationOwnership(
+        ref,
+        conversation,
+      );
+    }
+
+    // Customer-facing messages from a driver are always blocked, and from a
+    // checker are allowed only while the shipment is in their custody and out
+    // for delivery (spec sections 7, 8, 13, 17). Admin/manager are unrestricted.
+    let shipmentForComms = null;
+    if (!isDirectStaff && isStaff && (role === "driver" || role === "checker")) {
+      shipmentForComms = await loadShipmentForConversation(liveConversation);
+      assertCustomerCommsAllowed({
+        uid,
+        role,
+        shipment: shipmentForComms,
+      });
+    }
+
+    // Customers must never see employee names (Rose, Lean, etc.) — only
+    // "Atlas Support" (spec sections 1, 16). Staff still see real names in
+    // direct_staff threads.
+    const publicSenderName =
+      !isDirectStaff && isStaff ? "Atlas Support" : null;
+
     const senderName =
-      guest || profileMissing
+      publicSenderName ||
+      (guest || profileMissing
         ? displayName(user, authTokenName(req, "Guest"))
         : displayName(
             user,
             isRequester ? "Customer" : isStaff ? "Staff" : "Customer",
-          );
+          ));
+    // Internal assignment should keep the real staff name; customers only see
+    // the masked senderName on the message bubble.
+    const assignmentDisplayName = displayName(
+      user,
+      isStaff ? "Atlas staff" : "Customer",
+    );
     const senderRole =
       guest || profileMissing || isRequester
         ? guest || profileMissing
@@ -1181,29 +1560,37 @@ exports.sendChatMessage = onCall(
       lastMessageAt: now,
       lastMessageBy: uid,
       updatedAt: now,
-      status: normalizeConversationStatus(conversation.status) === "closed" ? "closed" : normalizeConversationStatus(conversation.status) === "unassigned" ? "active" : normalizeConversationStatus(conversation.status),
+      status: normalizeConversationStatus(liveConversation.status) === "closed" ? "closed" : normalizeConversationStatus(liveConversation.status) === "unassigned" ? "active" : normalizeConversationStatus(liveConversation.status),
     };
 
     if (isDirectStaff) {
-      (conversation.participantIds || []).forEach((participantId) => {
+      (liveConversation.participantIds || []).forEach((participantId) => {
         updates[`unreadCounts.${participantId}`] =
           participantId === uid ? 0 : FieldValue.increment(1);
       });
       updates[`participantRoles.${uid}`] = role;
     } else if (isStaff) {
-      updates[`unreadCounts.${conversation.customerId}`] = FieldValue.increment(1);
+      updates[`unreadCounts.${liveConversation.customerId}`] = FieldValue.increment(1);
       updates.unreadCustomer = FieldValue.increment(1);
       updates.unreadStaff = 0;
       updates["unreadCounts.staff"] = 0;
-      if (!assignedStaffId(conversation)) {
+      // Checker with custody always takes ownership of the shipment thread
+      // (even if Admin was previously assigned). Other staff claim only when
+      // unassigned.
+      const shouldTakeOwnership =
+        role === "checker" || !assignedStaffId(liveConversation);
+      if (shouldTakeOwnership) {
         Object.assign(
           updates,
           staffAssignmentFields({
             assigneeId: uid,
             assigneeRole: role,
-            assigneeName: senderName,
+            assigneeName: assignmentDisplayName,
           }),
         );
+        if (role === "checker") {
+          updates.assignmentSource = "checker_message";
+        }
       }
       updates[`participantRoles.${uid}`] = role;
       updates.participantIds = FieldValue.arrayUnion(uid);
@@ -1211,6 +1598,10 @@ exports.sendChatMessage = onCall(
       updates.unreadStaff = FieldValue.increment(1);
       updates.unreadCustomer = 0;
       updates["unreadCounts.staff"] = FieldValue.increment(1);
+      const assigneeId = String(assignedStaffId(liveConversation) || "").trim();
+      if (assigneeId) {
+        updates[`unreadCounts.${assigneeId}`] = FieldValue.increment(1);
+      }
     }
 
     await db.runTransaction(async (tx) => {
@@ -1257,18 +1648,29 @@ exports.sendChatMessage = onCall(
       tx.update(ref, updates);
     });
 
+    const conversationForNotify = {
+      ...liveConversation,
+      ...(isStaff && (role === "checker" || !assignedStaffId(liveConversation))
+        ? staffAssignmentFields({
+            assigneeId: uid,
+            assigneeRole: role,
+            assigneeName: assignmentDisplayName,
+          })
+        : {}),
+    };
+
     if (isDirectStaff) {
       await notifyDirectParticipants({
         conversationId,
-        conversation,
+        conversation: conversationForNotify,
         message: messageText,
         sender: { uid, role, name: senderName },
       });
     } else if (isStaff) {
-      if (!conversation.isGuest) {
+      if (!liveConversation.isGuest) {
         await notifyCustomer({
           conversationId,
-          customerId: conversation.customerId,
+          customerId: liveConversation.customerId,
           message: messageText,
           sender: { uid, role, name: senderName },
         });
@@ -1276,7 +1678,7 @@ exports.sendChatMessage = onCall(
     } else {
       await notifyStaff({
         conversationId,
-        conversation,
+        conversation: conversationForNotify,
         message: messageText,
         sender: { uid, role, name: senderName },
       });
@@ -1305,9 +1707,11 @@ exports.markConversationRead = onCall(
     }
 
     const directStaff = conversation.type === "direct_staff";
+    const isStaffReader =
+      STAFF_ROLES.includes(role) && conversation.customerId !== uid;
     const key = directStaff
       ? uid
-      : STAFF_ROLES.includes(role) && conversation.customerId !== uid
+      : isStaffReader
         ? "staff"
         : uid;
 
@@ -1315,9 +1719,17 @@ exports.markConversationRead = onCall(
       [`unreadCounts.${key}`]: 0,
       updatedAt: FieldValue.serverTimestamp(),
     };
+    // Checkers (and any assigned staff) also clear their personal unread bucket
+    // used when customers reply on shipment threads.
+    if (isStaffReader) {
+      updates[`unreadCounts.${uid}`] = 0;
+      updates.unreadStaff = 0;
+    }
     if (!directStaff) {
       updates.unreadCustomer = role === "customer" ? 0 : FieldValue.increment(0);
-      updates.unreadStaff = role === "customer" ? FieldValue.increment(0) : 0;
+      if (role === "customer") {
+        updates.unreadStaff = FieldValue.increment(0);
+      }
     }
 
     await ref.update(updates);
@@ -1521,6 +1933,9 @@ exports.startConversationCall = onCall(
           receiverName: displayName(receiver, "This contact"),
           participantIds,
           extraFields: {
+            conversationType: conversation.type || null,
+            shipmentId:
+              conversation.shipmentId || conversation.trackingNumber || null,
             driverId,
             driverAccessTokens: conversation.driverAccessTokens || [],
             checkerAccessTokens: conversation.checkerAccessTokens || [],
@@ -1537,15 +1952,30 @@ exports.startConversationCall = onCall(
       }
 
       const isCustomerCaller = role === "customer" && uid === customerId;
+      const isAdminCaller = ["admin", "administrator"].includes(role);
       const isManagerCaller = role === "manager";
-      if (!isCustomerCaller && !isManagerCaller) {
-        throw new HttpsError(
-          "permission-denied",
-          "Only the customer or a manager can start this call.",
-        );
+      const isCheckerCaller = role === "checker";
+      if (
+        !isCustomerCaller &&
+        !isAdminCaller &&
+        !isManagerCaller &&
+        !isCheckerCaller
+      ) {
+        // Drivers and any other role may never reach a customer (spec 13, 17).
+        throw new HttpsError("permission-denied", "403 Permission Denied");
       }
 
       await getConversationForUser(conversationId, uid, role);
+
+      // Load the shipment so custody rules can be enforced (checker) and so a
+      // customer-initiated call routes to the current responsible owner.
+      const shipment = await loadShipmentForConversation(conversation);
+
+      // A checker may only reach a customer while the shipment is out for
+      // delivery in their custody with an undelivered piece (spec 7, 8, 17).
+      if (isCheckerCaller) {
+        assertCustomerCommsAllowed({ uid, role, shipment });
+      }
 
       // Customer accounts are stored in users/{uid}; the account creation
       // flow does not create a parallel customers/{uid} document.
@@ -1558,51 +1988,137 @@ exports.startConversationCall = onCall(
         throw new HttpsError("not-found", "Customer account not found.");
       }
 
-      const assignedManagerId = String(
-        assignedStaffId(conversation) ||
-          customerData.primaryAssignedStaffId ||
-          (isManagerCaller ? uid : ""),
-      ).trim();
+      let receiverId;
+      let expectedReceiverRole; // null => accept any active staff (support)
+      let assignedStaffRoleForCall;
+      let supportRouting = null;
+      let overrideReceiverName = null;
 
-      if (!assignedManagerId) {
-        throw new HttpsError(
-          "failed-precondition",
-          "This conversation has no assigned manager.",
-        );
+      // Customer-facing threads (support + shipment) are branded "Atlas Support".
+      // Voice/Video always use Rose → Lean (spec §2), even when a checker owns
+      // the shipment chat during OFD. Messaging ownership stays separate (§14).
+      const isCustomerFacingSupportThread = [
+        "customer_support",
+        "guest_support",
+        "shipment",
+      ].includes(String(conversation.type || ""));
+
+      if (isCustomerCaller) {
+        if (isCustomerFacingSupportThread) {
+          // Atlas Customer Support: ring Rose (admin) first, then fall back to
+          // Lean (manager) on no-answer (spec section 2).
+          const roseId = String(process.env.AUTO_SUPPORT_ROSE_UID || "").trim();
+          const leanId = String(process.env.AUTO_SUPPORT_LEAN_UID || "").trim();
+
+          let primaryId = roseId || leanId;
+          let ringingRose = !!roseId && primaryId === roseId;
+
+          // Skip straight to Lean when Rose is missing or deactivated.
+          if (roseId) {
+            const roseSnap = await db.collection("users").doc(roseId).get();
+            if (!roseSnap.exists || roseSnap.data()?.active === false) {
+              primaryId = leanId || null;
+              ringingRose = false;
+            }
+          }
+
+          if (!primaryId) {
+            throw new HttpsError(
+              "failed-precondition",
+              "Atlas Customer Support is not available right now.",
+            );
+          }
+
+          receiverId = primaryId;
+          expectedReceiverRole = null;
+          assignedStaffRoleForCall = "support";
+          overrideReceiverName = "Atlas Support";
+          supportRouting = {
+            primaryId: roseId || null,
+            secondaryId: leanId || null,
+            // Only leave room for a fallback when we are actually ringing Rose
+            // first and a distinct Lean exists.
+            stage:
+              ringingRose && leanId && leanId !== roseId ? "primary" : "secondary",
+          };
+        } else {
+          // Non-support customer threads: route to assigned staff if any.
+          const assignedManagerId = String(
+            assignedStaffId(conversation) ||
+              customerData.primaryAssignedStaffId ||
+              "",
+          ).trim();
+          if (!assignedManagerId) {
+            throw new HttpsError(
+              "failed-precondition",
+              "This conversation has no assigned manager.",
+            );
+          }
+          receiverId = assignedManagerId;
+          expectedReceiverRole = null;
+          assignedStaffRoleForCall = "support";
+          overrideReceiverName = "Atlas Support";
+        }
+      } else {
+        // Staff (admin / manager / authorized checker) calling the customer.
+        receiverId = customerId;
+        expectedReceiverRole = "customer";
+        assignedStaffRoleForCall = role;
       }
 
-      const receiverId = isCustomerCaller ? assignedManagerId : customerId;
       const receiverSnap = await db.collection("users").doc(receiverId).get();
       if (!receiverSnap.exists || receiverSnap.data()?.active === false) {
         throw new HttpsError("failed-precondition", "The other participant is not available for calls.");
       }
 
       const receiverRole = String(receiverSnap.data()?.role || "").trim().toLowerCase();
-      const expectedReceiverRole = isCustomerCaller ? "manager" : "customer";
-      if (receiverRole !== expectedReceiverRole) {
+      if (expectedReceiverRole && receiverRole !== expectedReceiverRole) {
         throw new HttpsError(
           "failed-precondition",
           `The call recipient must be a ${expectedReceiverRole}.`,
         );
       }
 
+      // Communication log context (spec section 18).
+      const commsCheckerId = isCheckerCaller
+        ? uid
+        : receiverRole === "checker"
+          ? receiverId
+          : null;
+      const commsPieceIds =
+        commsCheckerId && shipment
+          ? getCheckerActivePieceIds(shipment, commsCheckerId)
+          : [];
+
       return createRingingConversationCall({
         conversationId,
         callType,
         callerId: uid,
         callerRole: role,
-        callerName: displayName(user, isCustomerCaller ? "Customer" : "Manager"),
+        // Staff calling a customer always appear as "Atlas Support" so the
+        // customer never sees employee names (spec sections 1, 16).
+        callerName: isCustomerCaller
+          ? displayName(user, "Customer")
+          : "Atlas Support",
         callerSessionId,
         callerDeviceId,
         receiverId,
         receiverRole,
-        receiverName: displayName(receiverSnap.data() || {}, "This contact"),
+        receiverName:
+          overrideReceiverName ||
+          (expectedReceiverRole === "customer"
+            ? displayName(receiverSnap.data() || {}, "Customer")
+            : displayName(receiverSnap.data() || {}, "This contact")),
         participantIds: [uid, receiverId],
         extraFields: {
+          conversationType: conversation.type || null,
           shipmentId: conversation.shipmentId || conversation.trackingNumber || null,
+          pieceIds: commsPieceIds,
+          checkerId: commsCheckerId,
           customerId,
-          assignedStaffId: assignedManagerId,
-          assignedStaffRole: "manager",
+          assignedStaffId: expectedReceiverRole === "customer" ? uid : receiverId,
+          assignedStaffRole: assignedStaffRoleForCall,
+          ...(supportRouting ? { supportRouting } : {}),
         },
       });
     } catch (error) {
@@ -1612,6 +2128,261 @@ exports.startConversationCall = onCall(
 
       console.error("Conversation call start failed:", error);
       throw new HttpsError("internal", "Failed to start the conversation call.");
+    }
+  },
+);
+
+/**
+ * Return a customer's phone number(s) for the cell-phone dialer, but only after
+ * the backend re-validates the caller's authority (spec section 17). Customers
+ * never use this — they only ever see "Atlas Customer Support".
+ */
+exports.getCustomerContactForShipment = onCall(
+  { region: "asia-southeast1", maxInstances: 20 },
+  async (req) => {
+    try {
+      const uid = requireAuth(req);
+      const shipmentRef = cleanText(
+        req.data?.shipmentId || req.data?.trackingNumber,
+        "shipmentId",
+        160,
+      );
+
+      const userSnap = await db.collection("users").doc(uid).get();
+      if (!userSnap.exists || userSnap.data()?.active === false) {
+        throw new HttpsError("permission-denied", "Inactive or missing user.");
+      }
+      const role = String(userSnap.data()?.role || "").trim().toLowerCase();
+
+      let shipment = null;
+      try {
+        ({ shipment } = await resolveShipmentReference(db, shipmentRef));
+      } catch (error) {
+        throw new HttpsError("not-found", "Shipment not found.");
+      }
+
+      // Enforces: admin/manager unrestricted, driver denied, checker only while
+      // in custody and out for delivery. Throws 403 otherwise.
+      assertCustomerCommsAllowed({ uid, role, shipment });
+
+      const recipient = shipment.recipient || {};
+      const primaryPhone =
+        String(
+          recipient.phone ||
+            shipment.consigneePhone ||
+            shipment.customerPhone ||
+            "",
+        ).trim() || null;
+      const secondaryPhone =
+        String(recipient.secondaryPhone || recipient.altPhone || "").trim() ||
+        null;
+
+      if (!primaryPhone && !secondaryPhone) {
+        throw new HttpsError(
+          "failed-precondition",
+          "No phone number is on file for this customer.",
+        );
+      }
+
+      return {
+        success: true,
+        customerName: recipient.name || shipment.consigneeName || "Customer",
+        primaryPhone,
+        secondaryPhone,
+      };
+    } catch (error) {
+      if (error instanceof HttpsError) throw error;
+      console.error("getCustomerContactForShipment failed:", error);
+      throw new HttpsError("internal", "Failed to retrieve customer contact.");
+    }
+  },
+);
+
+/**
+ * Get (or create) the shipment conversation used for in-app Atlas RTC calls and
+ * messaging between an authorized staff member and the shipment's customer.
+ * Enforces the same custody rules as calls (spec sections 7, 8, 11, 17), and
+ * requires the customer to have an Atlas account (otherwise only the cell-phone
+ * dialer path via getCustomerContactForShipment is available).
+ */
+exports.getOrCreateShipmentConversation = onCall(
+  { region: "asia-southeast1", maxInstances: 10 },
+  async (req) => {
+    try {
+      const uid = requireAuth(req);
+      const shipmentRefCode = cleanText(
+        req.data?.shipmentId || req.data?.trackingNumber,
+        "shipmentId",
+        160,
+      );
+
+      const userSnap = await db.collection("users").doc(uid).get();
+      if (!userSnap.exists || userSnap.data()?.active === false) {
+        throw new HttpsError("permission-denied", "Inactive or missing user.");
+      }
+      const actor = userSnap.data() || {};
+      const role = String(actor.role || "").trim().toLowerCase();
+
+      let shipment = null;
+      let shipmentDocId = shipmentRefCode;
+      try {
+        const resolved = await resolveShipmentReference(db, shipmentRefCode);
+        shipment = resolved.shipment;
+        shipmentDocId = resolved.shipmentDocId;
+      } catch (error) {
+        throw new HttpsError("not-found", "Shipment not found.");
+      }
+
+      assertCustomerCommsAllowed({ uid, role, shipment });
+
+      // The in-app RTC/chat path needs the customer's Atlas account.
+      const candidateIds = [
+        shipment.recipient?.uid,
+        shipment.customerId,
+        shipment.sender?.uid,
+        shipment.createdBy,
+      ]
+        .map((value) => String(value || "").trim())
+        .filter(Boolean);
+
+      let customerId = null;
+      let customerUser = null;
+      for (const candidate of candidateIds) {
+        const snap = await db.collection("users").doc(candidate).get();
+        if (
+          snap.exists &&
+          String(snap.data()?.role || "").toLowerCase() === "customer"
+        ) {
+          customerId = candidate;
+          customerUser = snap.data() || {};
+          break;
+        }
+      }
+
+      if (!customerId) {
+        throw new HttpsError(
+          "failed-precondition",
+          "This customer has no Atlas account. Use the cell phone option instead.",
+        );
+      }
+
+      const now = FieldValue.serverTimestamp();
+      const callerName = displayName(actor, "Atlas staff");
+      const isCheckerActor = role === "checker";
+
+      const existingSnap = await db
+        .collection("conversations")
+        .where("customerId", "==", customerId)
+        .where("trackingNumber", "==", shipmentDocId)
+        .limit(10)
+        .get();
+
+      const existing = existingSnap.docs.find(
+        (docSnap) =>
+          String(docSnap.data()?.status || "open").toLowerCase() !== "closed",
+      );
+
+      if (existing) {
+        const existingData = existing.data() || {};
+        const updates = {
+          participantIds: FieldValue.arrayUnion(uid),
+          [`participantRoles.${uid}`]: role,
+          [`participantProfiles.${uid}`]: { name: callerName, role },
+          updatedAt: now,
+        };
+        // Checker opening/messaging from My Deliveries takes ownership while
+        // they hold custody (spec §14) — even if Admin was previously assigned.
+        if (isCheckerActor) {
+          Object.assign(
+            updates,
+            staffAssignmentFields({
+              assigneeId: uid,
+              assigneeRole: "checker",
+              assigneeName: callerName,
+            }),
+          );
+          updates.assignmentSource = "checker_open_shipment";
+          updates.status = "active";
+        }
+        await existing.ref.update(updates);
+        // Re-sync in case custody already ended (hand back to warehouse).
+        await syncShipmentConversationOwnership(existing.ref, {
+          ...existingData,
+          ...updates,
+          type: existingData.type || "shipment",
+          shipmentId: existingData.shipmentId || shipmentDocId,
+          trackingNumber: existingData.trackingNumber || shipmentDocId,
+          assignedStaffId: isCheckerActor ? uid : assignedStaffId(existingData),
+          assignedStaffRole: isCheckerActor
+            ? "checker"
+            : assignedStaffRole(existingData),
+        });
+        return {
+          success: true,
+          conversationId: existing.id,
+          customerId,
+          reused: true,
+        };
+      }
+
+      const conversationRef = db.collection("conversations").doc();
+      await conversationRef.set({
+        conversationId: conversationRef.id,
+        type: "shipment",
+        isGuest: false,
+        source: null,
+        shipmentId: shipmentDocId,
+        trackingNumber: shipmentDocId,
+        shipmentSummary: {
+          status: shipment.status || null,
+          origin: shipment.origin || shipment.sender?.address?.city || null,
+          destination:
+            shipment.destination ||
+            shipment.recipient?.address?.city ||
+            null,
+        },
+        customerId,
+        customerName: displayName(customerUser, "Customer"),
+        customerPhone:
+          customerUser.phoneNumber ||
+          customerUser.phone ||
+          shipment.recipient?.phone ||
+          null,
+        ...staffAssignmentFields({
+          assigneeId: isCheckerActor ? uid : null,
+          assigneeRole: isCheckerActor ? "checker" : null,
+          assigneeName: isCheckerActor ? callerName : null,
+        }),
+        participantIds: [uid, customerId],
+        participantRoles: { [uid]: role, [customerId]: "customer" },
+        participantProfiles: { [uid]: { name: callerName, role } },
+        lastMessage: "Conversation started",
+        lastMessageText: "Conversation started",
+        lastMessageAt: now,
+        lastMessageBy: uid,
+        lastActivityAt: now,
+        status: "active",
+        priority: "normal",
+        unreadCustomer: 0,
+        unreadStaff: 0,
+        unreadCounts: { [uid]: 0, [customerId]: 0, staff: 0 },
+        createdAt: now,
+        updatedAt: now,
+      });
+
+      return {
+        success: true,
+        conversationId: conversationRef.id,
+        customerId,
+        reused: false,
+      };
+    } catch (error) {
+      if (error instanceof HttpsError) throw error;
+      console.error("getOrCreateShipmentConversation failed:", error);
+      throw new HttpsError(
+        "internal",
+        "Failed to open the shipment conversation.",
+      );
     }
   },
 );
@@ -1872,12 +2643,39 @@ exports.updateConversationCallStatus = onCall(
       });
     }
 
+    // Atlas Support sequential fallback: if the primary agent (Rose) did not
+    // answer, automatically ring the secondary agent (Lean) (spec section 2).
+    let fallbackCallId = null;
+    if (
+      transition.changed &&
+      SUPPORT_FALLBACK_STATUSES.includes(status) &&
+      // The caller hanging up (reason "cancelled") must not trigger a fallback.
+      endReason !== "cancelled"
+    ) {
+      const call = transition.call || {};
+      const routing = call.supportRouting;
+      if (
+        routing &&
+        routing.stage === "primary" &&
+        routing.secondaryId &&
+        routing.secondaryId !== routing.primaryId
+      ) {
+        try {
+          const fallback = await startSupportFallbackCall(call, routing);
+          fallbackCallId = fallback?.callId || null;
+        } catch (error) {
+          console.error("Atlas Support fallback ring failed:", error);
+        }
+      }
+    }
+
     return {
       success: true,
       changed: transition.changed,
       callId,
       status: transition.status,
       event: TERMINAL_CALL_STATUSES.includes(transition.status) ? "call_ended" : null,
+      fallbackCallId,
     };
   },
 );
@@ -1900,7 +2698,67 @@ exports.heartbeatConversationCall = onCall(
     if (!userSnap.exists || userSnap.data()?.active === false) {
       throw new HttpsError("permission-denied", "Inactive or missing user.");
     }
+    const role = String(userSnap.data()?.role || "").trim().toLowerCase();
     await getAuthorizedCallForUser(callRef, uid, userSnap.data() || {});
+
+    // Spec section 12: end customer communication immediately when custody ends.
+    // Re-check on each heartbeat so an active checker↔customer call cannot continue
+    // after delivery / return / reassignment.
+    const preSnap = await callRef.get();
+    if (preSnap.exists) {
+      const preCall = preSnap.data() || {};
+      const preStatus = String(preCall.status || "").trim().toLowerCase();
+      const involvesCustomer =
+        String(preCall.callerRole || "").toLowerCase() === "customer" ||
+        String(preCall.receiverRole || "").toLowerCase() === "customer";
+      const shipmentRef = String(preCall.shipmentId || "").trim();
+      if (
+        ACTIVE_CALL_STATUSES.includes(preStatus) &&
+        involvesCustomer &&
+        role === "checker" &&
+        shipmentRef
+      ) {
+        let shipment = null;
+        try {
+          ({ shipment } = await resolveShipmentReference(db, shipmentRef));
+        } catch (_) {
+          shipment = null;
+        }
+        const { allowed } = evaluateCheckerCustomerComms(shipment || {}, uid);
+        if (!allowed) {
+          const now = FieldValue.serverTimestamp();
+          await db.runTransaction(async (tx) => {
+            const snap = await tx.get(callRef);
+            if (!snap.exists) return;
+            const call = snap.data() || {};
+            if (TERMINAL_CALL_STATUSES.includes(String(call.status || "").toLowerCase())) {
+              return;
+            }
+            const callerLockRef = db.collection(CALL_LOCK_COLLECTION).doc(call.callerId);
+            const receiverLockRef = db.collection(CALL_LOCK_COLLECTION).doc(call.receiverId);
+            tx.update(callRef, {
+              status: "ended",
+              endedAt: now,
+              endedBy: "system",
+              endedReason: "custody_ended",
+              updatedAt: now,
+              signalingEvent: "call_ended",
+              termination: {
+                event: "call_ended",
+                callId,
+                endedBy: "system",
+                reason: "custody_ended",
+                participantIds: [call.callerId, call.receiverId].filter(Boolean),
+                timestamp: now,
+              },
+            });
+            tx.delete(callerLockRef);
+            tx.delete(receiverLockRef);
+          });
+          return { success: true, active: false, status: "ended", reason: "custody_ended" };
+        }
+      }
+    }
 
     return db.runTransaction(async (tx) => {
       const callSnap = await tx.get(callRef);

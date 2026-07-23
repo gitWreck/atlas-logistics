@@ -12,6 +12,7 @@ import {
 import { auth } from "@/lib/firebase";
 import StatusBadge from "../ui/StatusBadge";
 import CustomerMessageWidget from "../messaging/CustomerMessageWidget";
+import CustomerCommsPanel from "./CustomerCommsPanel";
 import PackagesTable from "./Packages/PackagesTable";
 import ShipmentOperations from "./ShipmentOperations";
 import ShipmentProofs from "./ShipmentProofs";
@@ -43,6 +44,10 @@ export default function ShipmentDrawer({
   const [shipmentData, setShipmentData] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
   const theme = getDrawerThemeClasses(isDark);
+  const role = String(profile?.role || "").trim().toLowerCase();
+  const canContactCustomer = ["admin", "manager", "administrator"].includes(
+    role,
+  );
 
   const fetchShipmentDetails = useCallback(async (shipmentId) => {
     if (!shipmentId) return;
@@ -270,6 +275,13 @@ export default function ShipmentDrawer({
                 onStatusUpdated={handleShipmentUpdated}
                 profile={profile}
               />
+
+              {canContactCustomer && (
+                <CustomerCommsPanel
+                  shipment={displayData}
+                  isDark={isDark}
+                />
+              )}
 
               <CustomerMessageWidget shipment={displayData} isDark={isDark} />
 

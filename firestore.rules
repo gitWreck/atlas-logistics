@@ -39,7 +39,7 @@ service cloud.firestore {
     }
 
     function isAdminOrManager() {
-      return hasAnyRole(['admin', 'manager']);
+      return hasAnyRole(['admin', 'manager', 'administrator']);
     }
 
     function isAnonymousUser() {
@@ -208,7 +208,14 @@ service cloud.firestore {
         || canReadDirectStaffConversation(resource.data)
         || canReadOwnedConversation(resource.data)
         || (hasRole('employee') && (resource.data.assignedTo == request.auth.uid || resource.data.assignedStaffId == request.auth.uid))
-        || (isActiveUser() && resource.data.customerId == request.auth.uid);
+        || (isActiveUser() && resource.data.customerId == request.auth.uid)
+        // Assigned/participant field staff (e.g. a checker holding custody) may
+        // read the shipment conversation they belong to.
+        || (
+          isActiveUser()
+          && resource.data.get('type', '') != 'direct_staff'
+          && request.auth.uid in resource.data.get('participantIds', [])
+        );
 
       allow list: if isAdminOrManager()
         || canListParticipantConversation(resource.data)

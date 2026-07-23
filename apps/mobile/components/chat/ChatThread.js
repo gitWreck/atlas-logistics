@@ -64,6 +64,8 @@ import {
   startConversationCall,
 } from "../utilities/FirebaseFunctions";
 import { useTheme } from "../../contexts/ThemeContext";
+import { useAuth } from "../../contexts/AuthContext";
+import { canCheckerContactCustomer } from "../utilities/checkerDelivery";
 import {
   buildMessageItems,
   encodeTextAttachment,
@@ -176,7 +178,7 @@ function CallHistoryCard({ message, mine, colors, onCall }) {
   );
 }
 
-function MessageBubble({ item, colors, onOpenImage, onCall, isCustomerSupport, senderPhotoURL, showSenderProfilePhotos }) {
+function MessageBubble({ item, colors, onOpenImage, onCall, maskStaffIdentity, senderPhotoURL, showSenderProfilePhotos }) {
   const { message, mine, isFirstInGroup, isLastInGroup } = item;
   const attachment = getMessageAttachment(message);
   const text = getMessageText(message);
@@ -204,8 +206,12 @@ function MessageBubble({ item, colors, onOpenImage, onCall, isCustomerSupport, s
   const isAudio = attachment?.type === "audio";
   const isCall = String(message.type || "").trim().toLowerCase() === "call";
   const isSupportSender = String(message.senderRole || "").trim().toLowerCase() !== "customer";
-  const isCustomerSupportMessageFromSupport =
-    isCustomerSupport && !showSenderProfilePhotos && !mine && isSupportSender;
+  // Customers never see employee names / personal avatars — only Atlas Support.
+  const showAsAtlasSupport =
+    !!maskStaffIdentity && !mine && isSupportSender;
+  const displaySenderName = showAsAtlasSupport
+    ? "Atlas Support"
+    : message.senderName || "Atlas Support";
 
   return (
     <Animated.View
@@ -229,12 +235,12 @@ function MessageBubble({ item, colors, onOpenImage, onCall, isCustomerSupport, s
       {!mine && (
         <View style={styles.avatarSlot}>
           {isLastInGroup ? (
-            isCustomerSupportMessageFromSupport ? (
+            showAsAtlasSupport ? (
               <SupportAvatar size={28} online={false} ringColor={colors.chatBg} />
             ) : (
               <PersonAvatar
-                name={message.senderName || "Atlas Support"}
-                avatarSeed={message.senderId || message.senderName}
+                name={displaySenderName}
+                avatarSeed={message.senderId || displaySenderName}
                 photoURL={senderPhotoURL}
                 size={28}
               />
@@ -248,7 +254,7 @@ function MessageBubble({ item, colors, onOpenImage, onCall, isCustomerSupport, s
       <View style={styles.bubbleColumn}>
         {!mine && isFirstInGroup && (
           <Text style={[styles.senderName, { color: colors.textMuted }]}>
-            {message.senderName || "Atlas Support"}
+            {displaySenderName}
           </Text>
         )}
 
@@ -1014,7 +1020,9 @@ export default function ChatThread({
 }) {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const { isChecker, profile } = useAuth();
   const { colors: themeColors, resolvedScheme } = useTheme();
+  const custodyEndedRef = useRef(false);
   const colors = useMemo(
     () => getChatColors(themeColors, resolvedScheme),
     [themeColors, resolvedScheme],
@@ -1082,6 +1090,46 @@ export default function ChatThread({
     ),
     [conversation?.participantProfiles],
   );
+
+  // Spec section 12: if a checker loses custody while chatting with the
+  // customer, leave the thread immediately after the shipment syncs.
+  useEffect(() => {
+    if (!isChecker || !conversation || conversation.type === "direct_staff") {
+      return undefined;
+    }
+    const shipmentRef = String(
+      conversation.shipmentId || conversation.trackingNumber || "",
+    ).trim();
+    if (!shipmentRef || !profile?.uid) return undefined;
+
+    custodyEndedRef.current = false;
+    return onSnapshot(
+      doc(db, "shipments", shipmentRef),
+      (snap) => {
+        if (!snap.exists() || custodyEndedRef.current) return;
+        const shipment = { id: snap.id, ...snap.data() };
+        if (canCheckerContactCustomer(shipment, profile.uid)) return;
+        custodyEndedRef.current = true;
+        Alert.alert(
+          "Customer contact ended",
+          "This shipment is no longer in your custody, so customer messaging is unavailable.",
+          [{ text: "OK", onPress: () => (onBack ? onBack() : router.back()) }],
+        );
+      },
+      (error) => {
+        console.warn("Shipment custody watch failed:", error);
+      },
+    );
+  }, [
+    conversation?.id,
+    conversation?.shipmentId,
+    conversation?.trackingNumber,
+    conversation?.type,
+    isChecker,
+    onBack,
+    profile?.uid,
+    router,
+  ]);
 
   // Conversation metadata subscription.
   useEffect(() => {
@@ -1183,14 +1231,28 @@ export default function ChatThread({
 
   const isClosed = conversation?.status === "closed";
   const isDirectStaff = conversation?.type === "direct_staff";
-  const isCustomerSupport = conversation?.type === "customer_support";
   const directContact = useMemo(() => {
     if (!isDirectStaff) return null;
     const contactId = (conversation?.participantIds || []).find((id) => id !== myUid);
     return contactId ? conversation?.participantProfiles?.[contactId] || null : null;
   }, [conversation, isDirectStaff, myUid]);
   const isDriver = String(conversation?.participantRoles?.[myUid] || "").toLowerCase() === "driver";
-  const headerTitle = isDirectStaff ? directContact?.name || "Atlas staff" : "Atlas Support";
+  // Staff (checker/admin/manager) viewing a customer or shipment thread must see
+  // the customer — not the customer-facing "Atlas Support" mask, which is only
+  // for the customer's own app (spec sections 1, 16).
+  const isStaffViewer =
+    !isDirectStaff &&
+    !!conversation?.customerId &&
+    !!myUid &&
+    myUid !== conversation.customerId;
+  const customerDisplayName = conversation?.customerName || "Customer";
+  const headerTitle = isDirectStaff
+    ? directContact?.name || "Atlas staff"
+    : isStaffViewer
+      ? customerDisplayName
+      : "Atlas Support";
+  // Customers never see Rose/Lean/employee names — only Atlas Support branding.
+  const maskStaffIdentity = !isDirectStaff && !isStaffViewer;
   const hasShipment = !!(conversation?.trackingNumber || conversation?.shipmentId);
   const canSend = !!draft.trim() || !!pendingAttachment;
   const showSendButton = canSend || sending || uploading;
@@ -1219,7 +1281,7 @@ export default function ChatThread({
         });
       } catch (error) {
         console.error("Start call failed:", error);
-        const fallbackMessage = isDirectStaff
+        const fallbackMessage = isDirectStaff || isStaffViewer
           ? `Unable to call ${headerTitle} right now.`
           : "Unable to call Atlas Support right now.";
         const busyReason = error?.details?.reason || error?.customData?.details?.reason;
@@ -1240,7 +1302,7 @@ export default function ChatThread({
         setStartingCall(null);
       }
     },
-    [conversationId, headerTitle, isClosed, isDirectStaff, startingCall],
+    [conversationId, headerTitle, isClosed, isDirectStaff, isStaffViewer, startingCall],
   );
 
   const handleVoiceCall = useCallback(async () => {
@@ -1439,7 +1501,11 @@ export default function ChatThread({
       ]
         .filter(Boolean)
         .join(" · ")
-    : "Online";
+    : isStaffViewer
+      ? conversation?.trackingNumber
+        ? `Customer · ${conversation.trackingNumber}`
+        : "Customer"
+      : "Online";
 
   const handleViewDetails = useCallback(() => {
     if (hasShipment) setDetailsOpen(true);
@@ -1464,7 +1530,7 @@ export default function ChatThread({
         colors={colors}
         onOpenImage={setLightbox}
         onCall={startCall}
-        isCustomerSupport={isCustomerSupport}
+        maskStaffIdentity={maskStaffIdentity}
         senderPhotoURL={showSenderProfilePhotos
           ? senderPhotoURLs[String(item.message?.senderId || "").trim()] || null
           : null}
@@ -1490,12 +1556,12 @@ export default function ChatThread({
             <FontAwesome5 name="chevron-left" size={22} color={colors.text} />
           </TouchableOpacity>
         )}
-        {isDirectStaff ? (
+        {isDirectStaff || isStaffViewer ? (
           <PersonAvatar
             name={headerTitle}
-            avatarSeed={directContact?.id || headerTitle}
+            avatarSeed={directContact?.id || conversation?.customerId || headerTitle}
             photoURL={directContact?.photoURL}
-            online={!!directContact?.online}
+            online={isDirectStaff ? !!directContact?.online : true}
             ringColor={colors.chatBg}
             size={48}
           />
@@ -1600,7 +1666,7 @@ export default function ChatThread({
                 listRef.current?.scrollToEnd({ animated: false });
               }
             }}
-            ListHeaderComponent={!isDirectStaff ? (
+            ListHeaderComponent={!isDirectStaff && !isStaffViewer ? (
               <View style={styles.welcomeBubbleRow}>
                 <SupportAvatar size={36} online={false} ringColor={colors.chatBg} />
                 <View style={[styles.welcomeBubble, { backgroundColor: colors.receivedBg }]}>
@@ -1618,7 +1684,7 @@ export default function ChatThread({
                   color={colors.textMuted}
                 />
                 <Text style={[styles.emptyText, { color: colors.textMuted }]}>
-                  {isDirectStaff
+                  {isDirectStaff || isStaffViewer
                     ? `Send a message to ${headerTitle}.`
                     : "Send a message and the Atlas team will reply here."}
                 </Text>

@@ -77,6 +77,27 @@ const roleConfig = {
     bg: "#eff6ff",
     border: "#bfdbfe",
   },
+  admin: {
+    icon: "user-shield",
+    label: "Admin",
+    color: "#0f766e",
+    bg: "#f0fdfa",
+    border: "#99f6e4",
+  },
+  manager: {
+    icon: "user-tie",
+    label: "Manager",
+    color: "#b45309",
+    bg: "#fffbeb",
+    border: "#fde68a",
+  },
+  administrator: {
+    icon: "user-shield",
+    label: "Administrator",
+    color: "#0f766e",
+    bg: "#f0fdfa",
+    border: "#99f6e4",
+  },
 };
 
 export default function ProfileViewer({

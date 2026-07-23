@@ -61,6 +61,15 @@ export default function ShipmentTimelineTab({ data, isDark = false }) {
           value={data.recipient?.phone}
           isDark={isDark}
         />
+        {!!(data.recipient?.secondaryPhone || data.recipient?.altPhone) && (
+          <InfoCard
+            label="Secondary Phone"
+            value={
+              data.recipient?.secondaryPhone || data.recipient?.altPhone
+            }
+            isDark={isDark}
+          />
+        )}
         <InfoCard label="Origin" value={data.origin} isDark={isDark} />
         <InfoCard
           label="Destination"

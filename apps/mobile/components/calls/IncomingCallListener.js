@@ -124,7 +124,7 @@ function WebMediaElement({ stream, muted = false, hidden = false, style }) {
 }
 
 export default function IncomingCallListener() {
-  const { user, loading, isReady } = useAuth();
+  const { user, loading, isReady, isCustomer } = useAuth();
   const { resolvedScheme } = useTheme();
   const isDarkCallTheme = resolvedScheme === "dark";
   const callPalette = isDarkCallTheme
@@ -1006,9 +1006,22 @@ export default function IncomingCallListener() {
   const isCallerRinging = Boolean(activeCall && String(activeCall?.callerId || "").trim() === user?.uid && status === "ringing");
   const isActiveCall = Boolean(activeCall && ["accepted", "connecting", "connected", "ongoing"].includes(status));
   const showIncomingControls = isIncoming && status === "ringing";
-  const peerName = String(activeCall?.callerId || "") === String(user?.uid || "")
-    ? activeCall?.receiverName || activeCall?.receiverDisplayName || "Atlas staff"
-    : activeCall?.callerName || "Atlas support";
+  const peerName = (() => {
+    const isCaller =
+      String(activeCall?.callerId || "") === String(user?.uid || "");
+    // Customers only ever see "Atlas Support" — never Rose/Lean/employee names.
+    if (isCustomer && activeCall?.conversationType !== "direct_staff") {
+      return "Atlas Support";
+    }
+    if (isCaller) {
+      return (
+        activeCall?.receiverName ||
+        activeCall?.receiverDisplayName ||
+        "Atlas staff"
+      );
+    }
+    return activeCall?.callerName || "Atlas Support";
+  })();
   const callTypeLabel = activeCall?.type === "video" ? "Video Call" : "Voice Call";
   const mediaFailed = Boolean(mediaNotice && /failed|unable|could not|permission/i.test(mediaNotice));
   const statusLabel = isIncoming

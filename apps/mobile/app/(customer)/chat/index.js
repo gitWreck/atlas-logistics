@@ -3,9 +3,9 @@ import {
   ActivityIndicator,
   Alert,
   FlatList,
-  Image,
   KeyboardAvoidingView,
   Modal,
+  PixelRatio,
   Platform,
   Pressable,
   SafeAreaView,
@@ -19,6 +19,7 @@ import {
   StatusBar as RNStatusBar,
 } from "react-native";
 import { StatusBar } from "expo-status-bar";
+import { Image } from "expo-image";
 import Feather from "@expo/vector-icons/Feather";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
@@ -40,6 +41,10 @@ import ChatThread from "../../../components/chat/ChatThread";
 import CustomerBottomNav from "../../../components/customer/CustomerBottomNav";
 import { displayMessagePreview, formatListTime } from "../../../components/chat/chatUtils";
 
+const atlasSupportBanner = require("../../../assets/atlas-banner-2.jpeg");
+const BANNER_ASPECT_RATIO = 1774 / 887;
+const BANNER_HEIGHT_SCALE = 0.84;
+
 const TWO_PANEL_WIDTH = 900;
 const BG = "#020b18";
 const PANEL = "#071d34";
@@ -48,6 +53,21 @@ const MUTED = "#aab8cf";
 const BLUE = "#0b7dff";
 const GREEN = "#2bd66f";
 const BORDER = "#143353";
+
+function hexToRgba(hex, alpha = 1) {
+  if (!hex || typeof hex !== "string") return `rgba(255,255,255,${alpha})`;
+  const normalized = hex.replace("#", "").trim();
+  const full =
+    normalized.length === 3
+      ? normalized.split("").map((char) => char + char).join("")
+      : normalized;
+  const value = parseInt(full, 16);
+  if (Number.isNaN(value)) return `rgba(255,255,255,${alpha})`;
+  const r = (value >> 16) & 255;
+  const g = (value >> 8) & 255;
+  const b = value & 255;
+  return `rgba(${r},${g},${b},${alpha})`;
+}
 
 function supportPalette(theme, scheme) {
   const dark = scheme === "dark";
@@ -71,37 +91,6 @@ function supportPalette(theme, scheme) {
     overlay: dark ? "rgba(0,0,0,0.42)" : "rgba(15,23,42,0.18)",
   };
 }
-
-const CONCERN_CATEGORIES = [
-  {
-    key: "delivery_status",
-    title: "Delivery Status",
-    description: "Check the current shipment status.",
-    icon: "map-pin",
-    starter: "I need help checking my delivery status.",
-  },
-  {
-    key: "delivery_concern",
-    title: "Delivery Concern",
-    description: "Report delivery issues such as delays or missing parcels.",
-    icon: "alert-triangle",
-    starter: "I need help with a delivery concern.",
-  },
-  {
-    key: "change_delivery",
-    title: "Change Delivery",
-    description: "Request a delivery schedule or address change.",
-    icon: "calendar",
-    starter: "I would like to request a delivery change.",
-  },
-  {
-    key: "other",
-    title: "Other Concerns",
-    description: "General inquiries or service concerns.",
-    icon: "message-circle",
-    starter: "I need help with another concern.",
-  },
-];
 
 function SupportAvatar({ ui, size = 52, packageIcon = false, showPresence = false }) {
   return (
@@ -132,27 +121,28 @@ function SupportAvatar({ ui, size = 52, packageIcon = false, showPresence = fals
   );
 }
 
-function TruckIllustration({ ui }) {
-  return (
-    <Image
-      source={require("../../../assets/customer/support-truck-3d.png")}
-      style={styles.truckImage}
-      resizeMode="contain"
-      accessibilityLabel="Atlas delivery truck"
-    />
-  );
-}
-
 function ConversationRow({ ui, item, unread, active, onPress }) {
-  const isShipment = !!item.trackingNumber;
+  const isShipment =
+    !!item.trackingNumber ||
+    !!item.shipmentId ||
+    String(item.type || "") === "shipment";
+  const isDefaultSupport =
+    !isShipment &&
+    (String(item.type || "") === "customer_support" || item.__defaultSupport);
   const status = String(item.status || "open").toLowerCase();
   const isResolved = ["resolved", "closed", "archived"].includes(status);
-  const title = isShipment ? `Shipment #${item.trackingNumber}` : isResolved ? "Support Ticket #0021" : "Atlas Support";
+  const title = isShipment
+    ? `Shipment #${item.trackingNumber || item.shipmentId}`
+    : isDefaultSupport
+      ? "Atlas Customer Support"
+      : isResolved
+        ? "Support Ticket"
+        : "Atlas Support";
   const statusLabel = isShipment
     ? item.shipmentSummary?.status || (status === "pending" ? "In Transit" : "Out for Delivery")
     : isResolved
       ? "Resolved"
-      : "";
+      : "Always available";
   const normalizedStatus = String(statusLabel || item.shipmentSummary?.status || item.status || "").toLowerCase();
   const statusColor = isResolved
     ? ui.success
@@ -170,7 +160,7 @@ function ConversationRow({ ui, item, unread, active, onPress }) {
       ? "Your issue has been resolved."
       : "How can we help you today?";
 
-  const showPresence = active || (!isResolved && status === "open");
+  const showPresence = active || (!isResolved && (isDefaultSupport || status === "open" || status === "active" || status === "unassigned"));
 
   return (
     <Pressable
@@ -187,13 +177,10 @@ function ConversationRow({ ui, item, unread, active, onPress }) {
         <View style={styles.rowTop}>
           <View style={styles.titleLine}>
             <Text style={[styles.rowTitle, { color: ui.text }]} numberOfLines={1}>{title}</Text>
-            {!isShipment && !isResolved && (
-              <View style={[styles.newPill, { backgroundColor: ui.primary }]}>
-                <Text style={[styles.newPillText, { color: ui.onPrimary }]}>New</Text>
-              </View>
-            )}
           </View>
-          <Text style={[styles.rowTime, { color: ui.muted }]}>{formatListTime(item.lastMessageAt) || "9:41 AM"}</Text>
+          <Text style={[styles.rowTime, { color: ui.muted }]}>
+            {formatListTime(item.lastMessageAt) || (isDefaultSupport ? "" : "9:41 AM")}
+          </Text>
         </View>
         {!!statusLabel && (
           <Text style={[styles.statusText, { color: statusColor }]} numberOfLines={1}>
@@ -232,10 +219,31 @@ export default function CustomerChatListScreen() {
   const [composeVisible, setComposeVisible] = useState(false);
   const composeScrollRef = useRef(null);
   const [initialMessage, setInitialMessage] = useState("");
-  const [selectedCategory, setSelectedCategory] = useState(CONCERN_CATEGORIES[0]);
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState("all");
   const [selectedId, setSelectedId] = useState(null);
+  const ensuringDefaultRef = useRef(false);
+
+  const isDefaultSupportConversation = (item) => {
+    if (!item) return false;
+    if (item.__defaultSupport) return true;
+    const type = String(item.type || "");
+    if (type === "shipment") return false;
+    if (item.trackingNumber || item.shipmentId) return false;
+    return type === "customer_support" || type === "guest_support";
+  };
+
+  const pickPrimarySupportConversation = (items = []) => {
+    if (!items.length) return null;
+    const uidKey = auth.currentUser?.uid ? `customer_support_${auth.currentUser.uid}` : null;
+    const canonical = uidKey ? items.find((item) => item.id === uidKey) : null;
+    if (canonical) return canonical;
+    return [...items].sort((a, b) => {
+      const left = a.lastMessageAt?.toMillis?.() || 0;
+      const right = b.lastMessageAt?.toMillis?.() || 0;
+      return right - left;
+    })[0];
+  };
 
   useEffect(() => {
     const user = auth.currentUser;
@@ -262,56 +270,149 @@ export default function CustomerChatListScreen() {
     return unsubscribe;
   }, []);
 
+  // Always keep a single default Atlas Customer Support thread in the inbox.
+  useEffect(() => {
+    const user = auth.currentUser;
+    if (!user || ensuringDefaultRef.current) return undefined;
+
+    let cancelled = false;
+    ensuringDefaultRef.current = true;
+
+    (async () => {
+      try {
+        await createConversation({ ensureDefault: true });
+      } catch (error) {
+        if (!cancelled) {
+          console.warn("Failed to ensure default Atlas Support conversation:", error);
+        }
+      } finally {
+        ensuringDefaultRef.current = false;
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const uid = auth.currentUser?.uid;
+
+  const inboxConversations = useMemo(() => {
+    const support = [];
+    const rest = [];
+    conversations.forEach((item) => {
+      const status = String(item.status || "open").toLowerCase();
+      if (["closed", "archived"].includes(status) && isDefaultSupportConversation(item)) {
+        return;
+      }
+      if (isDefaultSupportConversation(item)) support.push(item);
+      else rest.push(item);
+    });
+    const primary = pickPrimarySupportConversation(support);
+    return primary ? [primary, ...rest] : rest;
+  }, [conversations]);
+
   const unreadTotal = useMemo(
-    () => conversations.reduce((sum, item) => sum + Number(item.unreadCounts?.[uid] || 0), 0),
-    [conversations, uid],
+    () => inboxConversations.reduce((sum, item) => sum + Number(item.unreadCounts?.[uid] || 0), 0),
+    [inboxConversations, uid],
   );
 
   const filterCounts = useMemo(() => {
-    const counts = { all: conversations.length, open: 0, resolved: 0 };
-    conversations.forEach((item) => {
+    const counts = { all: inboxConversations.length, open: 0, resolved: 0 };
+    inboxConversations.forEach((item) => {
       const status = String(item.status || "open").toLowerCase();
       if (["resolved", "closed", "archived"].includes(status)) counts.resolved += 1;
       else counts.open += 1;
     });
+    if (!inboxConversations.some(isDefaultSupportConversation)) {
+      counts.all += 1;
+      counts.open += 1;
+    }
     return counts;
-  }, [conversations]);
+  }, [inboxConversations]);
 
   const filtered = useMemo(() => {
     const term = search.trim().toLowerCase();
-    return conversations.filter((item) => {
+    const list = inboxConversations.filter((item) => {
       const status = String(item.status || "open").toLowerCase();
       const resolved = ["resolved", "closed", "archived"].includes(status);
       if (filter === "open" && resolved) return false;
       if (filter === "resolved" && !resolved) return false;
       if (!term) return true;
-      return [item.trackingNumber, item.customerName, item.status, item.lastMessageText]
+      return [
+        item.trackingNumber,
+        item.shipmentId,
+        item.customerName,
+        item.status,
+        item.lastMessageText,
+        isDefaultSupportConversation(item) ? "atlas customer support" : "",
+      ]
         .filter(Boolean)
         .join(" ")
         .toLowerCase()
         .includes(term);
     });
-  }, [conversations, filter, search]);
+
+    const support = list.filter(isDefaultSupportConversation);
+    const rest = list.filter((item) => !isDefaultSupportConversation(item));
+    const primary = pickPrimarySupportConversation(support);
+
+    if (
+      !primary &&
+      filter !== "resolved" &&
+      (!term || "atlas customer support".includes(term))
+    ) {
+      return [
+        {
+          id: "__atlas_customer_support__",
+          __defaultSupport: true,
+          type: "customer_support",
+          status: "open",
+          lastMessageText: "How can we help you today?",
+        },
+        ...rest,
+      ];
+    }
+
+    return primary ? [primary, ...rest] : rest;
+  }, [inboxConversations, filter, search]);
 
   useEffect(() => {
     if (twoPanel && !selectedId && filtered.length) setSelectedId(filtered[0].id);
   }, [twoPanel, selectedId, filtered]);
 
-  const openConversation = (id) => {
-    if (twoPanel) setSelectedId(id);
+  const openConversation = async (id) => {
+    let conversationId = id;
+    if (id === "__atlas_customer_support__") {
+      try {
+        setStarting(true);
+        const result = await createConversation({ ensureDefault: true });
+        conversationId = result?.data?.conversationId;
+        if (!conversationId) {
+          Alert.alert("Unable to open support", "Please try again in a moment.");
+          return;
+        }
+      } catch (error) {
+        console.error("Failed to open default support:", error);
+        Alert.alert("Unable to open support", "Please try again in a moment.");
+        return;
+      } finally {
+        setStarting(false);
+      }
+    }
+
+    if (twoPanel) setSelectedId(conversationId);
     else {
       router.push({
         pathname: "/(customer)/chat/[conversationId]",
-        params: { conversationId: id },
+        params: { conversationId },
       });
     }
   };
 
   const handleStartGeneral = async () => {
     const detail = initialMessage.trim();
-    const category = selectedCategory || CONCERN_CATEGORIES[0];
-    const message = detail ? `${category.title}: ${detail}` : `${category.title}: ${category.starter}`;
+    const message = detail || "Hello, I need help with a concern.";
 
     try {
       setStarting(true);
@@ -319,7 +420,6 @@ export default function CustomerChatListScreen() {
       const conversationId = result?.data?.conversationId;
       if (conversationId) {
         setInitialMessage("");
-        setSelectedCategory(CONCERN_CATEGORIES[0]);
         setComposeVisible(false);
         openConversation(conversationId);
       }
@@ -345,28 +445,77 @@ export default function CustomerChatListScreen() {
     }
   };
 
-  const renderList = () => (
-    <LinearGradient colors={[ui.bg2, ui.bg, ui.bg2]} style={styles.phone}>
-      <View style={styles.hero}>
-        <View style={styles.heroText}>
-          <Text style={[styles.brand, { color: ui.text }]}>ATLAS</Text>
-          <Text style={[styles.brandSub, { color: ui.text }]}>Customer Support</Text>
-        </View>
-        <TruckIllustration />
-      </View>
+  const isDark = resolvedScheme === "dark";
+  const fadeBase = isDark ? ui.bg : "#ffffff";
+  const bannerWidth = PixelRatio.roundToNearestPixel(width);
+  const bannerNaturalHeight = bannerWidth / BANNER_ASPECT_RATIO;
+  const bannerHeight = PixelRatio.roundToNearestPixel(
+    bannerNaturalHeight * BANNER_HEIGHT_SCALE,
+  );
 
-      <View style={styles.searchRow}>
-        <View style={[styles.searchBar, { backgroundColor: ui.surface2 }]}>
-          <Feather name="search" size={17} color={ui.muted} />
-          <TextInput
-            style={[styles.searchInput, { color: ui.text }]}
-            value={search}
-            onChangeText={setSearch}
-            placeholder="Search conversations"
-            placeholderTextColor={ui.muted}
+  const renderList = () => (
+    <View style={[styles.phone, { backgroundColor: fadeBase }]}>
+      <View style={[styles.heroSection, { backgroundColor: fadeBase }]}>
+        <View
+          style={[
+            styles.heroBannerWrap,
+            { height: bannerHeight, backgroundColor: fadeBase },
+          ]}
+        >
+          <Image
+            source={atlasSupportBanner}
+            style={{ width: bannerWidth, height: bannerNaturalHeight }}
+            contentFit="fill"
+            transition={0}
+            priority="high"
+            allowDownscaling={false}
           />
+          {isDark ? (
+            <LinearGradient
+              pointerEvents="none"
+              colors={[hexToRgba(fadeBase, 0.55), hexToRgba(fadeBase, 0.18), "transparent"]}
+              locations={[0, 0.28, 0.58]}
+              start={{ x: 0, y: 0.5 }}
+              end={{ x: 1, y: 0.5 }}
+              style={StyleSheet.absoluteFill}
+            />
+          ) : null}
+          <LinearGradient
+            pointerEvents="none"
+            colors={["transparent", hexToRgba(fadeBase, 0.45), fadeBase]}
+            locations={[0, 0.72, 1]}
+            style={styles.heroBottomFade}
+          />
+          <View style={styles.heroContent}>
+            <Text style={[styles.brand, { color: isDark ? ui.text : "#031A2D" }]}>
+              ATLAS
+            </Text>
+            <Text style={[styles.brandSub, { color: isDark ? ui.text : "#64748b" }]}>
+              Customer Support
+            </Text>
+          </View>
         </View>
-       
+
+        <View style={styles.searchRow}>
+          <View
+            style={[
+              styles.searchBar,
+              {
+                backgroundColor: isDark ? ui.surface2 : "#ffffff",
+                borderColor: isDark ? ui.border : "#e2e8f0",
+              },
+            ]}
+          >
+            <Feather name="search" size={17} color={ui.muted} />
+            <TextInput
+              style={[styles.searchInput, { color: ui.text }]}
+              value={search}
+              onChangeText={setSearch}
+              placeholder="Search conversations"
+              placeholderTextColor={ui.muted}
+            />
+          </View>
+        </View>
       </View>
 
       <View style={styles.tabs}>
@@ -424,7 +573,7 @@ export default function CustomerChatListScreen() {
       )}
 
       <CustomerBottomNav active="messages" unreadMessages={unreadTotal} />
-    </LinearGradient>
+    </View>
   );
 
   return (
@@ -449,15 +598,6 @@ export default function CustomerChatListScreen() {
         renderList()
       )}
 
-      <TouchableOpacity
-        style={[styles.floatingCompose, { backgroundColor: ui.primary }]}
-        onPress={() => setComposeVisible(true)}
-        disabled={starting}
-        activeOpacity={0.88}
-      >
-        {starting ? <ActivityIndicator size="small" color={ui.onPrimary} /> : <Feather name="edit-3" size={23} color={ui.onPrimary} />}
-      </TouchableOpacity>
-
       <Modal transparent animationType="slide" visible={composeVisible} onRequestClose={() => setComposeVisible(false)}>
         <KeyboardAvoidingView
           style={styles.keyboardAvoider}
@@ -474,28 +614,7 @@ export default function CustomerChatListScreen() {
                 showsVerticalScrollIndicator={false}
               >
                 <View style={[styles.sheetHandle, { backgroundColor: ui.border }]} />
-                <Text style={[styles.modalTitle, { color: ui.text }]}>Quick Actions</Text>
-                <View style={styles.categoryList}>
-                  {CONCERN_CATEGORIES.map((category) => {
-                    const active = selectedCategory?.key === category.key;
-                    return (
-                      <TouchableOpacity
-                        key={category.key}
-                        style={[styles.categoryOption, { borderBottomColor: ui.border }]}
-                        onPress={() => setSelectedCategory(category)}
-                        activeOpacity={0.84}
-                      >
-                        <View style={[styles.categoryIcon, { backgroundColor: active ? ui.primary : ui.primarySoft }]}>
-                          <Feather name={category.icon} size={18} color={active ? ui.onPrimary : ui.primary} />
-                        </View>
-                        <View style={styles.categoryText}>
-                          <Text style={[styles.categoryTitle, { color: ui.text }]}>{category.title}</Text>
-                          <Text style={[styles.categoryDescription, { color: ui.muted }]}>{category.description}</Text>
-                        </View>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
+                <Text style={[styles.modalTitle, { color: ui.text }]}>Start a Conversation</Text>
                 <TextInput
                   style={[styles.modalInput, { backgroundColor: ui.surface2, color: ui.text }]}
                   value={initialMessage}
@@ -515,7 +634,6 @@ export default function CustomerChatListScreen() {
                     onPress={() => {
                       setComposeVisible(false);
                       setInitialMessage("");
-                      setSelectedCategory(CONCERN_CATEGORIES[0]);
                     }}
                     disabled={starting}
                   >
@@ -545,37 +663,66 @@ const styles = StyleSheet.create({
   splitList: { width: 396, borderRightWidth: 1, borderRightColor: BORDER },
   splitThread: { flex: 1, backgroundColor: BG },
   splitPlaceholder: { flex: 1, alignItems: "center", justifyContent: "center", padding: 28 },
-  hero: {
-    height: 96,
-    paddingHorizontal: 18,
-    paddingTop: 20,
-    paddingBottom: 10,
-    flexDirection: "row",
-    alignItems: "flex-start",
-    justifyContent: "space-between",
+  heroSection: {
+    position: "relative",
+    overflow: "hidden",
+    paddingBottom: 12,
   },
-  heroText: {
-    paddingTop: 2,
+  heroBannerWrap: {
+    position: "relative",
+    width: "100%",
+    overflow: "hidden",
   },
-  brand: { fontSize: 24, fontWeight: "700", letterSpacing: 0 },
+  heroBottomFade: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 0,
+    height: "48%",
+  },
+  heroContent: {
+    position: "absolute",
+    top: 0,
+    bottom: 0,
+    left: 18,
+    right: 18,
+    justifyContent: "center",
+    zIndex: 2,
+  },
+  brand: {
+    fontSize: 26,
+    lineHeight: 32,
+    fontWeight: "700",
+    letterSpacing: 0.1,
+  },
   brandSub: {
-    fontSize: 14,
+    fontSize: 16,
+    lineHeight: 21,
     fontWeight: "400",
-    marginTop: 2,
+    marginTop: 3,
   },
-  truckImage: { width: 88, height: 54 },
-  searchRow: { flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 18 },
+  searchRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    paddingHorizontal: 18,
+    zIndex: 2,
+    marginTop: -10,
+  },
   searchBar: {
     flex: 1,
-    height: 35,
-    borderRadius: 10,
-    backgroundColor: "rgba(28, 39, 58, 0.92)",
+    height: 38,
+    borderRadius: 12,
     flexDirection: "row",
     alignItems: "center",
     gap: 10,
-    paddingHorizontal: 11,
+    paddingHorizontal: 12,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.04)",
+    shadowColor: "#0f172a",
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 1,
   },
   searchInput: { flex: 1, fontSize: 13, fontWeight: "400", paddingVertical: 0 },
   filterButton: { width: 26, height: 35, alignItems: "center", justifyContent: "center" },

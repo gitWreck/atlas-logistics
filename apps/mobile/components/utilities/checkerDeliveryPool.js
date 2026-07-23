@@ -210,6 +210,33 @@ export function shipmentHasAvailablePieces(shipment = {}) {
   return countDeliveryPoolPieces(shipment).available > 0;
 }
 
+/**
+ * Piece statuses where the assigned checker still owns customer communication
+ * (spec §14: Out for Delivery and Failed Delivery).
+ */
+const CHECKER_COMMS_PIECE_STATUSES = new Set([
+  "OUT_FOR_DELIVERY",
+  "FAILED_DELIVERY",
+]);
+
+/**
+ * Count this checker's pieces that authorize customer contact: OUT_FOR_DELIVERY
+ * or FAILED_DELIVERY in their custody. A value > 0 satisfies the customer
+ * communication gate in spec sections 8, 11, and 14.
+ */
+export function countCheckerOutForDeliveryPieces(shipment = {}, checkerUid = null) {
+  if (!checkerUid) return 0;
+  const packages = Array.isArray(shipment.packages) ? shipment.packages : [];
+  let count = 0;
+  packages.forEach((pkg) => {
+    if (!isCheckerCustodyPiece(pkg, checkerUid)) return;
+    if (CHECKER_COMMS_PIECE_STATUSES.has(normalizeStatus(pkg.status))) {
+      count += pieceQuantity(pkg);
+    }
+  });
+  return count;
+}
+
 /** Shipments Rose released to the checker pool (Firestore + piece rules). */
 export function isAvailableToLoadShipment(shipment = {}) {
   if (!isShipmentInDeliveryPool(shipment)) {

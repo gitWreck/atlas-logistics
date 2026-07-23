@@ -129,6 +129,7 @@ export default function CheckerChatScreen({ accountType = "checker" }) {
 
   const [contacts, setContacts] = useState([]);
   const [conversations, setConversations] = useState([]);
+  const [customerConversations, setCustomerConversations] = useState([]);
   const [accessToken, setAccessToken] = useState(null);
   const [scope, setScope] = useState({ warehouseName: null, municipalities: [] });
   const [search, setSearch] = useState("");
@@ -233,6 +234,48 @@ export default function CheckerChatScreen({ accountType = "checker" }) {
     );
   }, [accessToken, contacts, isDriver, uid]);
 
+  // Shipment customer threads the checker owns / participates in (My Deliveries).
+  useEffect(() => {
+    if (!uid || isDriver) {
+      setCustomerConversations([]);
+      return undefined;
+    }
+    const shipmentQuery = query(
+      collection(db, "conversations"),
+      where("type", "==", "shipment"),
+      where("participantIds", "array-contains", uid),
+    );
+    return onSnapshot(
+      shipmentQuery,
+      (snapshot) => {
+        const next = snapshot.docs
+          .map((conversation) => ({ id: conversation.id, ...conversation.data() }))
+          .sort((a, b) => {
+            const left = a.lastMessageAt?.toMillis?.() || 0;
+            const right = b.lastMessageAt?.toMillis?.() || 0;
+            return right - left;
+          });
+        setCustomerConversations(next);
+      },
+      (error) =>
+        console.error("Checker customer conversations subscription failed:", error),
+    );
+  }, [isDriver, uid]);
+
+  const openCustomerConversation = useCallback(
+    (conversationId) => {
+      if (!conversationId) return;
+      if (twoPanel) {
+        setSelectedId(String(conversationId));
+        return;
+      }
+      router.push({
+        pathname: "/(checker)/chat/[conversationId]",
+        params: { conversationId: String(conversationId) },
+      });
+    },
+    [router, twoPanel],
+  );
   const conversationByContact = useMemo(() => {
     const result = new Map();
     conversations.forEach((conversation) => {
@@ -501,6 +544,104 @@ export default function CheckerChatScreen({ accountType = "checker" }) {
         </View>
       ) : null}
 
+      {!loading && !isDriver && customerConversations.length > 0 ? (
+        <View style={styles.customerSection}>
+          <View style={styles.sectionHeader}>
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>
+              Customer deliveries
+            </Text>
+            <Text style={[styles.sectionMeta, { color: colors.textMuted }]}>
+              Replies go to you while you hold custody
+            </Text>
+          </View>
+          {customerConversations
+            .filter((conversation) => {
+              const term = search.trim().toLowerCase();
+              if (!term) return true;
+              return [
+                conversation.customerName,
+                conversation.trackingNumber,
+                conversation.shipmentId,
+              ]
+                .filter(Boolean)
+                .join(" ")
+                .toLowerCase()
+                .includes(term);
+            })
+            .map((conversation) => {
+              const unread = Number(conversation?.unreadCounts?.[uid] || 0);
+              const preview = conversation.lastMessageText
+                ? displayMessagePreview({ text: conversation.lastMessageText })
+                : "Shipment conversation";
+              return (
+                <Pressable
+                  key={conversation.id}
+                  onPress={() => openCustomerConversation(conversation.id)}
+                  style={({ pressed }) => [
+                    styles.row,
+                    { borderBottomColor: colors.border },
+                    selectedId === conversation.id && {
+                      backgroundColor: colors.accentSoft,
+                    },
+                    pressed && styles.rowPressed,
+                  ]}
+                >
+                  <View
+                    style={[
+                      styles.customerAvatar,
+                      { backgroundColor: colors.accentSoft },
+                    ]}
+                  >
+                    <Feather name="package" size={22} color={colors.accent} />
+                  </View>
+                  <View style={styles.rowBody}>
+                    <View style={styles.rowTop}>
+                      <Text
+                        style={[styles.rowTitle, { color: colors.text }]}
+                        numberOfLines={1}
+                      >
+                        {conversation.customerName || "Customer"}
+                      </Text>
+                      <Text style={[styles.rowTime, { color: colors.textMuted }]}>
+                        {formatListTime(conversation.lastMessageAt)}
+                      </Text>
+                    </View>
+                    <Text
+                      style={[styles.role, { color: colors.accent }]}
+                      numberOfLines={1}
+                    >
+                      {conversation.trackingNumber ||
+                        conversation.shipmentId ||
+                        "Shipment"}
+                    </Text>
+                    <View style={styles.previewLine}>
+                      <Text
+                        style={[
+                          styles.preview,
+                          { color: unread ? colors.text : colors.textMuted },
+                          unread > 0 && styles.previewUnread,
+                        ]}
+                        numberOfLines={1}
+                      >
+                        {preview}
+                      </Text>
+                      {unread > 0 ? (
+                        <View
+                          style={[styles.unread, { backgroundColor: colors.unread }]}
+                        >
+                          <Text style={styles.unreadText}>
+                            {unread > 99 ? "99+" : unread}
+                          </Text>
+                        </View>
+                      ) : null}
+                    </View>
+                  </View>
+                </Pressable>
+              );
+            })}
+        </View>
+      ) : null}
+
       {loading ? (
         <View style={styles.center}>
           <ActivityIndicator color={colors.accent} />
@@ -674,6 +815,14 @@ const styles = StyleSheet.create({
   sectionHeader: { paddingHorizontal: 18, paddingTop: 8, paddingBottom: 6, flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   sectionTitle: { fontSize: 15, fontWeight: "900" },
   sectionMeta: { fontSize: 11, fontWeight: "600" },
+  customerSection: { marginBottom: 4 },
+  customerAvatar: {
+    width: 54,
+    height: 54,
+    borderRadius: 27,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   unread: {
     minWidth: 20,
     height: 20,
