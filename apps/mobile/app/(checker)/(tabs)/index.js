@@ -1,12 +1,7 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { View, StyleSheet, RefreshControl, ScrollView } from "react-native";
 import { useRouter } from "expo-router";
-import {
-  collection,
-  query,
-  where,
-  onSnapshot,
-} from "firebase/firestore";
+import { collection, query, where, onSnapshot } from "firebase/firestore";
 import { db } from "../../../firebase";
 import { useAuth } from "../../../contexts/AuthContext";
 import { useTheme } from "../../../contexts/ThemeContext";
@@ -272,7 +267,8 @@ export default function CheckerIndex() {
       icon: "check-circle",
       color: SECTION.delivered.accent,
       softColor: "#e7f8ed",
-      trend: glance.delivered > 0 ? { positive: true, label: "Live today" } : null,
+      trend:
+        glance.delivered > 0 ? { positive: true, label: "Live today" } : null,
       onPress: goHistory,
     },
     {
@@ -283,7 +279,8 @@ export default function CheckerIndex() {
       icon: "exclamation-circle",
       color: SECTION.failed.accent,
       softColor: "#fee8e8",
-      trend: glance.failed > 0 ? { positive: false, label: "Needs action" } : null,
+      trend:
+        glance.failed > 0 ? { positive: false, label: "Needs action" } : null,
       onPress: goRoute,
     },
     {

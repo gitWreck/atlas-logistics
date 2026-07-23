@@ -7,8 +7,36 @@ import {
 import { getCurrentLocationSafe, updatedBy } from "./helpers";
 import {
   countDeliveryPoolPieces,
+  countCheckerOutForDeliveryPieces,
   getCheckerPieceActionPhase,
 } from "./checkerDeliveryPool";
+
+/** Shipment statuses that permanently end customer communication (spec 12). */
+const COMMS_TERMINAL_STATUSES = new Set([
+  "DELIVERED",
+  "COMPLETED",
+  "CANCELLED",
+  "RETURNED_TO_WAREHOUSE",
+  "RETURNED_RECEIVED_AT_HUB",
+  "RETURNED_RECEIVED_AT_ODIONGAN",
+]);
+
+/**
+ * Whether the logged-in checker may communicate with the customer for this
+ * shipment. Mirrors the backend rule in
+ * apps/functions/src/chat/customerCommsAuth.js: the shipment must be active
+ * (not delivered/returned/cancelled), assigned to the checker, and have at
+ * least one of the checker's pieces still OUT_FOR_DELIVERY or FAILED_DELIVERY
+ * (spec 7, 8, 11, 12, 14).
+ */
+export function canCheckerContactCustomer(shipment, checkerUid) {
+  if (!shipment || !checkerUid) return false;
+  if (COMMS_TERMINAL_STATUSES.has(String(shipment.status || "").trim().toUpperCase())) {
+    return false;
+  }
+  if (!canCheckerAccessShipment(shipment, checkerUid)) return false;
+  return countCheckerOutForDeliveryPieces(shipment, checkerUid) > 0;
+}
 
 export function canCheckerAccessShipment(shipment, checkerUid) {
   if (!shipment || !checkerUid) return false;

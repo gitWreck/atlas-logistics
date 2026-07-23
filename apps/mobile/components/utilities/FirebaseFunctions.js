@@ -86,11 +86,27 @@ export const createDriverConversation = httpsCallable(
   functions,
   "createDriverConversation",
 );
+export const listStaffChatContacts = httpsCallable(
+  functions,
+  "listStaffChatContacts",
+);
+export const createStaffConversation = httpsCallable(
+  functions,
+  "createStaffConversation",
+);
 export const createCallHistoryMessage = httpsCallable(
   functions,
   "createCallHistoryMessage",
 );
 export const sendChatMessage = httpsCallable(functions, "sendChatMessage");
+export const getCustomerContactForShipment = httpsCallable(
+  functions,
+  "getCustomerContactForShipment",
+);
+export const getOrCreateShipmentConversation = httpsCallable(
+  functions,
+  "getOrCreateShipmentConversation",
+);
 export const markConversationRead = httpsCallable(
   functions,
   "markConversationRead",

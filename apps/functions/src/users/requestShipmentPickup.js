@@ -75,6 +75,8 @@ exports.requestShipmentPickup = onCall(
     const recipientAddress = normalizeAddress(recipient);
     const senderPhone = normalizePhone(sender.phone || userData.phoneNumber);
     const recipientPhone = normalizePhone(recipient.phone);
+    const recipientSecondaryPhone =
+      normalizePhone(recipient.secondaryPhone || recipient.altPhone) || null;
     const recipientCustomer = await findCustomerByPhone(db, recipientPhone);
     const recipientUid = recipient.uid || recipientCustomer?.uid || null;
     const shipmentVisibilityUserIds = [
@@ -132,6 +134,7 @@ exports.requestShipmentPickup = onCall(
         userId: getPublicUserId(recipient, getPublicUserId(recipientCustomer)),
         name: recipient.name || "",
         phone: recipientPhone,
+        secondaryPhone: recipientSecondaryPhone,
         address: recipientAddress,
         formattedAddress: formatAddress(recipientAddress),
       },

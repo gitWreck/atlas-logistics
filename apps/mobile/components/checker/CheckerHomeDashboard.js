@@ -1,6 +1,5 @@
 import React from "react";
 import {
-  Image,
   View,
   Text,
   StyleSheet,
@@ -9,7 +8,9 @@ import {
   ScrollView,
   Modal,
   ActivityIndicator,
+  Image as RNImage,
 } from "react-native";
+import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { FontAwesome5 } from "@expo/vector-icons";
 import { format } from "date-fns";
@@ -21,7 +22,7 @@ import {
   getShipmentNumber,
 } from "./dashboardData";
 
-const customerTruckImage = require("../../assets/customer/active-shipment-truck.png");
+const atlasBannerImage = require("../../assets/atlas-banner-2.jpeg");
 
 const COLORS = {
   blue: "#075de8",
@@ -81,97 +82,106 @@ export function CheckerHomeHero({
   assignedAreas = [],
 }) {
   const { width } = useWindowDimensions();
-  const heroHeight = clamp(width * 0.44, 186, 218);
-  const hasAssignedAreas = Array.isArray(assignedAreas) && assignedAreas.length > 0;
+  const heroHeight = clamp(width * 0.52, 220, 268);
+  const hasAssignedAreas =
+    Array.isArray(assignedAreas) && assignedAreas.length > 0;
   const avatarSize = clamp(width * 0.12, 44, 56);
   const dateWidth = clamp(width * 0.46, 176, 214);
-  const artScale = clamp(width / 430, 0.68, 0.86);
 
   return (
-    <LinearGradient
-      colors={["#086cff", "#0757e1", "#043eb7"]}
-      start={{ x: 0, y: 0 }}
-      end={{ x: 1, y: 1 }}
-      style={[styles.hero, { minHeight: heroHeight }]}
-    >
-      <View style={styles.heroTop}>
-        <TouchableOpacity
-          style={styles.profileCluster}
-          onPress={onProfilePress}
-          activeOpacity={0.8}
-        >
-          <View
-            style={[
-              styles.heroAvatar,
-              {
-                width: avatarSize,
-                height: avatarSize,
-                borderRadius: avatarSize / 2,
-              },
-            ]}
+    <View style={[styles.hero, { width, height: heroHeight }]}>
+      <Image
+        source={atlasBannerImage}
+        style={{ width, height: heroHeight }}
+        contentFit="cover"
+        contentPosition="center"
+        transition={0}
+        priority="high"
+        allowDownscaling={false}
+      />
+      <LinearGradient
+        colors={[
+          "rgba(3, 26, 45, 0.72)",
+          "rgba(3, 26, 45, 0.38)",
+          "rgba(3, 26, 45, 0.22)",
+        ]}
+        start={{ x: 0, y: 0.5 }}
+        end={{ x: 1, y: 0.5 }}
+        style={StyleSheet.absoluteFill}
+        pointerEvents="none"
+      />
+      <View style={styles.heroContent}>
+        <View style={styles.heroTop}>
+          <TouchableOpacity
+            style={styles.profileCluster}
+            onPress={onProfilePress}
+            activeOpacity={0.8}
           >
-            {photoURL ? (
-              <Image source={{ uri: photoURL }} style={styles.heroAvatarImage} />
+            <View
+              style={[
+                styles.heroAvatar,
+                {
+                  width: avatarSize,
+                  height: avatarSize,
+                  borderRadius: avatarSize / 2,
+                },
+              ]}
+            >
+              {photoURL ? (
+                <RNImage
+                  source={{ uri: photoURL }}
+                  style={styles.heroAvatarImage}
+                />
+              ) : (
+                <FontAwesome5
+                  name="user-check"
+                  size={clamp(avatarSize * 0.38, 20, 28)}
+                  color="#0b63ef"
+                />
+              )}
+            </View>
+            <View style={styles.heroGreeting}>
+              <Text style={styles.heroHello}>Hello,</Text>
+              <Text style={styles.heroName} numberOfLines={1}>
+                {userName}
+              </Text>
+              <Text style={styles.heroMessage} numberOfLines={2}>
+                Ready to deliver. Let's make it a great day!
+              </Text>
+            </View>
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.heroBottom}>
+          <TouchableOpacity
+            style={[styles.dateCard, { width: dateWidth }]}
+            onPress={onDatePress}
+            activeOpacity={0.82}
+          >
+            <FontAwesome5 name="calendar-alt" size={16} color="#ffffff" />
+            <View style={styles.dateTextBlock}>
+              <Text style={styles.dateMain}>
+                {format(currentDate, "MMM d, yyyy")}
+              </Text>
+              <Text style={styles.dateSub}>{format(currentDate, "EEEE")}</Text>
+            </View>
+            {dateLoading ? (
+              <ActivityIndicator size="small" color="#ffffff" />
             ) : (
-              <FontAwesome5
-                name="user-check"
-                size={clamp(avatarSize * 0.38, 20, 28)}
-                color="#0b63ef"
-              />
+              <FontAwesome5 name="chevron-down" size={13} color="#ffffff" />
             )}
-          </View>
-          <View style={styles.heroGreeting}>
-            <Text style={styles.heroHello}>Hello,</Text>
-            <Text style={styles.heroName} numberOfLines={1}>
-              {userName}
-            </Text>
-            <Text style={styles.heroMessage} numberOfLines={2}>
-              Ready to deliver. Let's make it a great day!
-            </Text>
-          </View>
-        </TouchableOpacity>
-
-      </View>
-
-      <View style={styles.heroBottom}>
-        <TouchableOpacity
-          style={[styles.dateCard, { width: dateWidth }]}
-          onPress={onDatePress}
-          activeOpacity={0.82}
-        >
-          <FontAwesome5 name="calendar-alt" size={16} color="#ffffff" />
-          <View style={styles.dateTextBlock}>
-            <Text style={styles.dateMain}>
-              {format(currentDate, "MMM d, yyyy")}
-            </Text>
-            <Text style={styles.dateSub}>{format(currentDate, "EEEE")}</Text>
-          </View>
-          {dateLoading ? (
-            <ActivityIndicator size="small" color="#ffffff" />
-          ) : (
-            <FontAwesome5 name="chevron-down" size={13} color="#ffffff" />
-          )}
-        </TouchableOpacity>
-
-        <View style={[styles.heroArt, { transform: [{ scale: artScale }] }]}>
-          <View style={styles.cityBarTall} />
-          <View style={styles.cityBar} />
-          <Image
-            source={customerTruckImage}
-            style={styles.heroTruckImage}
-            resizeMode="contain"
-          />
+          </TouchableOpacity>
+        </View>
+        <View style={styles.assignedAreaRow}>
+          <FontAwesome5 name="map-marker-alt" size={13} color="#ffffff" />
+          <Text style={styles.assignedAreaText} numberOfLines={2}>
+            {hasAssignedAreas
+              ? `Area assigned: ${assignedAreas.join(", ")}`
+              : "Area assigned: No assigned areas"}
+          </Text>
         </View>
       </View>
-      <View style={styles.assignedAreaRow}>
-        <FontAwesome5 name="map-marker-alt" size={13} color="#ffffff" />
-        <Text style={styles.assignedAreaText} numberOfLines={2}>
-          {hasAssignedAreas
-            ? `Area assigned: ${assignedAreas.join(", ")}`
-            : "Area assigned: No assigned areas"}
-        </Text>
-      </View>
-    </LinearGradient>
+    </View>
   );
 }
 
@@ -294,7 +304,10 @@ export function DashboardStatCard({
           <FontAwesome5 name={icon} size={21} color={color} />
         </View>
         <View style={styles.statCopy}>
-          <Text style={[styles.statTitle, { color: colors.text }]} numberOfLines={1}>
+          <Text
+            style={[styles.statTitle, { color: colors.text }]}
+            numberOfLines={1}
+          >
             {title}
           </Text>
           <Text
@@ -354,13 +367,12 @@ export function DeliveryProgressCard({ delivered, total, goal, style }) {
   const { colors } = useTheme();
   const { width } = useWindowDimensions();
   const cardWidth = Math.floor((width - SCREEN_PADDING * 2 - GRID_GAP) / 2);
-  const ringSize = clamp(cardWidth * 0.30, 48, 56);
+  const ringSize = clamp(cardWidth * 0.3, 48, 56);
   const ringStroke = clamp(ringSize * 0.1, 5, 7);
   const percentage =
     total > 0 ? clamp(Math.round((delivered / total) * 100), 0, 100) : 0;
   const rightRotation = -180 + Math.min(percentage, 50) * 3.6;
-  const leftRotation =
-    percentage > 50 ? -180 + (percentage - 50) * 3.6 : -180;
+  const leftRotation = percentage > 50 ? -180 + (percentage - 50) * 3.6 : -180;
   const completedText = `${formatCount(delivered)} of ${formatCount(
     goal || total,
   )}\ncompleted`;
@@ -502,14 +514,21 @@ export function DeliveryProgressCard({ delivered, total, goal, style }) {
         </View>
       ) : (
         <View style={styles.progressEmpty}>
-          <View style={[styles.emptyProgressIcon, { backgroundColor: colors.cardMuted }]}>
+          <View
+            style={[
+              styles.emptyProgressIcon,
+              { backgroundColor: colors.cardMuted },
+            ]}
+          >
             <FontAwesome5 name="route" size={22} color={COLORS.blue} />
           </View>
           <View style={styles.progressEmptyCopy}>
             <Text style={[styles.emptyProgressTitle, { color: colors.text }]}>
               No deliveries yet
             </Text>
-            <Text style={[styles.emptyProgressText, { color: colors.textMuted }]}>
+            <Text
+              style={[styles.emptyProgressText, { color: colors.textMuted }]}
+            >
               Load shipments to your deliveries to start today's progress.
             </Text>
           </View>
@@ -536,10 +555,7 @@ export function TodayAtGlance({ cards, progress, onViewAll }) {
         {cards.map((card) => {
           const { key, ...cardProps } = card;
           return (
-            <View
-              key={key}
-              style={[styles.statGridItem, { width: cardWidth }]}
-            >
+            <View key={key} style={[styles.statGridItem, { width: cardWidth }]}>
               <DashboardStatCard
                 {...cardProps}
                 style={{ height: cardHeight }}
@@ -547,9 +563,7 @@ export function TodayAtGlance({ cards, progress, onViewAll }) {
             </View>
           );
         })}
-        <View
-          style={[styles.statGridItem, { width: cardWidth }]}
-        >
+        <View style={[styles.statGridItem, { width: cardWidth }]}>
           <DeliveryProgressCard {...progress} style={{ height: cardHeight }} />
         </View>
       </View>
@@ -557,19 +571,10 @@ export function TodayAtGlance({ cards, progress, onViewAll }) {
   );
 }
 
-export function QuickActionCard({
-  title,
-  subtitle,
-  icon,
-  color,
-  onPress,
-}) {
+export function QuickActionCard({ title, subtitle, icon, color, onPress }) {
   return (
     <TouchableOpacity
-      style={[
-        styles.quickCard,
-        { borderColor: color, backgroundColor: color },
-      ]}
+      style={[styles.quickCard, { borderColor: color, backgroundColor: color }]}
       onPress={onPress}
       activeOpacity={0.84}
     >
@@ -580,9 +585,7 @@ export function QuickActionCard({
       </View>
       <View style={styles.quickCopy}>
         <Text style={styles.quickTitle}>{title}</Text>
-        <Text style={styles.quickSubtitle}>
-          {subtitle}
-        </Text>
+        <Text style={styles.quickSubtitle}>{subtitle}</Text>
       </View>
       <View style={styles.quickArrow}>
         <FontAwesome5 name="chevron-right" size={16} color="#ffffff" />
@@ -693,8 +696,17 @@ export function DeliveredHistoryList({
             onPress={() => onPressShipment?.(shipment)}
             activeOpacity={0.78}
           >
-            <View style={[styles.historyIcon, { backgroundColor: colors.successSoft }]}>
-              <FontAwesome5 name="check-circle" size={20} color={COLORS.green} />
+            <View
+              style={[
+                styles.historyIcon,
+                { backgroundColor: colors.successSoft },
+              ]}
+            >
+              <FontAwesome5
+                name="check-circle"
+                size={20}
+                color={COLORS.green}
+              />
             </View>
             <View style={styles.historyIdentity}>
               <Text
@@ -736,7 +748,12 @@ export function DeliveredHistoryList({
                 </Text>
               ) : null}
             </View>
-            <View style={[styles.deliveredBadge, { backgroundColor: colors.successSoft }]}>
+            <View
+              style={[
+                styles.deliveredBadge,
+                { backgroundColor: colors.successSoft },
+              ]}
+            >
               <Text style={styles.deliveredBadgeText}>Delivered</Text>
             </View>
             <FontAwesome5 name="chevron-right" size={16} color={colors.text} />
@@ -749,12 +766,18 @@ export function DeliveredHistoryList({
 
 const styles = StyleSheet.create({
   hero: {
-    paddingHorizontal: SCREEN_PADDING,
-    paddingTop: 14,
-    paddingBottom: 14,
+    position: "relative",
+    overflow: "hidden",
     borderBottomLeftRadius: 34,
     borderBottomRightRadius: 34,
-    overflow: "hidden",
+    backgroundColor: "#dbe7f5",
+  },
+  heroContent: {
+    ...StyleSheet.absoluteFillObject,
+    paddingHorizontal: SCREEN_PADDING,
+    paddingTop: 14,
+    paddingBottom: 22,
+    justifyContent: "space-between",
   },
   heroTop: {
     flexDirection: "row",
@@ -835,38 +858,6 @@ const styles = StyleSheet.create({
     fontWeight: "400",
     marginTop: 2,
   },
-  heroArt: {
-    flex: 1,
-    minHeight: 70,
-    alignItems: "center",
-    justifyContent: "flex-end",
-    position: "relative",
-    zIndex: 0,
-  },
-  cityBarTall: {
-    position: "absolute",
-    right: 55,
-    bottom: 22,
-    width: 18,
-    height: 68,
-    borderRadius: 3,
-    backgroundColor: "rgba(255,255,255,0.12)",
-  },
-  cityBar: {
-    position: "absolute",
-    right: 28,
-    bottom: 22,
-    width: 15,
-    height: 48,
-    borderRadius: 3,
-    backgroundColor: "rgba(255,255,255,0.1)",
-  },
-  heroTruckImage: {
-    width: 230,
-    height: 90,
-    marginBottom: -10,
-    transform: [{ scaleX: -1 }],
-  },
   modalBackdrop: {
     flex: 1,
     backgroundColor: "rgba(15, 23, 42, 0.35)",
@@ -942,10 +933,11 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   assignedAreaRow: {
-    marginTop: 12,
+    marginTop: 4,
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "flex-start",
     gap: 8,
+    paddingRight: 8,
   },
   assignedAreaEmpty: {
     color: "rgba(255, 255, 255, 0.78)",

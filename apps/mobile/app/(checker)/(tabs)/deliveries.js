@@ -14,11 +14,13 @@ import { useAuth } from "../../../contexts/AuthContext";
 import { useTheme } from "../../../contexts/ThemeContext";
 import StatusBadge from "../../../components/ui/StatusBadge";
 import {
+  canCheckerContactCustomer,
   getCallableErrorMessage,
   getCheckerDeliveryNextAction,
   reportCheckerFailedDelivery,
   returnCheckerShipmentsToWarehouse,
 } from "../../../components/utilities/checkerDelivery";
+import CustomerCommsBar from "../../../components/shipments/CustomerCommsBar";
 import { useCheckerLastMile } from "../../../contexts/CheckerLastMileContext";
 import {
   SectionHeader,
@@ -43,7 +45,8 @@ function getTimeLabel(value) {
 export default function CheckerDeliveriesTab() {
   const router = useRouter();
   const { profile } = useAuth();
-  const { colors } = useTheme();
+  const { colors, resolvedScheme } = useTheme();
+  const isDark = resolvedScheme === "dark";
   const [refreshing, setRefreshing] = useState(false);
   const [actionShipmentId, setActionShipmentId] = useState(null);
 
@@ -268,6 +271,15 @@ export default function CheckerDeliveriesTab() {
                       goToDeliveryScan(shipment.id, "RETURNED_TO_WAREHOUSE")
                     }
                     style={{ marginTop: 14 }}
+                  />
+                )}
+
+                {canCheckerContactCustomer(shipment, checkerId) && (
+                  <CustomerCommsBar
+                    shipment={shipment}
+                    colors={colors}
+                    isDark={isDark}
+                    variant="compact"
                   />
                 )}
               </Card>

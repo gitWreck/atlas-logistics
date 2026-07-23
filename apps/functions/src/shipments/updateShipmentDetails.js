@@ -71,6 +71,8 @@ exports.updateShipmentDetails = onCall(
       "sender.address": sender.address,
       "recipient.name": recipient.name,
       "recipient.phone": recipient.phone,
+      "recipient.secondaryPhone":
+        recipient.secondaryPhone || recipient.altPhone || null,
       "recipient.address": recipient.address,
       origin: origin,
       originCode: originCode,

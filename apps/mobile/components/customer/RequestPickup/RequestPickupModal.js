@@ -28,6 +28,7 @@ const createEmptyParty = () => ({
   userId: null,
   name: "",
   phone: "",
+  secondaryPhone: "",
   unit: "",
   street: "",
   barangay: "",

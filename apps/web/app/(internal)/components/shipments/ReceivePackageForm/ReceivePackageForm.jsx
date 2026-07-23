@@ -284,6 +284,7 @@ export default function ReceivePackageForm({
       userId: contact.userId || contact.publicId || null,
       name: contact.name || "",
       phone: contact.phone || "",
+      secondaryPhone: contact.secondaryPhone || "",
       email: contact.email || "",
       unit: contact.unit || "",
       street: contact.street || "",

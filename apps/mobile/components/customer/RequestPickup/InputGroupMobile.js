@@ -110,6 +110,29 @@ export default function InputGroupMobile({
         />
       </View>
 
+      <TextInput
+        style={[
+          styles.input,
+          {
+            backgroundColor: colors.inputBg,
+            borderColor: colors.border,
+            color: colors.text,
+            marginBottom: 10,
+          },
+        ]}
+        placeholder="Secondary Phone (optional)"
+        placeholderTextColor={colors.textMuted}
+        keyboardType="phone-pad"
+        value={values.secondaryPhone || ""}
+        onBlur={() =>
+          onChange({
+            ...values,
+            secondaryPhone: normalizePhoneNumber(values.secondaryPhone || ""),
+          })
+        }
+        onChangeText={(val) => onChange({ ...values, secondaryPhone: val })}
+      />
+
       {/* Address Rows */}
       <View style={styles.row}>
         <TextInput

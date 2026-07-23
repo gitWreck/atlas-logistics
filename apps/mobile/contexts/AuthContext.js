@@ -8,7 +8,15 @@ import {
   ensureUserPublicId,
 } from "../components/utilities/FirebaseFunctions";
 
-const ALLOWED_ROLES = ["checker", "driver", "customer"];
+const ALLOWED_ROLES = [
+  "checker",
+  "driver",
+  "customer",
+  "admin",
+  "manager",
+  "administrator",
+];
+const STAFF_ROLES = ["admin", "manager", "administrator"];
 const profileCacheKey = (uid) => `atlas_profile_${String(uid || "").trim()}`;
 
 const AuthContext = createContext(null);
@@ -131,6 +139,7 @@ export function AuthProvider({ children }) {
   const isChecker = role === "checker";
   const isDriver = role === "driver";
   const isCustomer = role === "customer";
+  const isStaff = STAFF_ROLES.includes(role);
 
   const value = {
     user,
@@ -142,6 +151,7 @@ export function AuthProvider({ children }) {
     isChecker,
     isDriver,
     isCustomer,
+    isStaff,
     signOut,
     refreshUser,
   };

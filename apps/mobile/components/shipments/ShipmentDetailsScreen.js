@@ -33,12 +33,14 @@ import {
   getCallableErrorMessage,
   getCheckerDeliveryNextAction,
   canCheckerAccessShipment,
+  canCheckerContactCustomer,
   reportCheckerFailedDelivery,
   returnCheckerShipmentsToWarehouse,
 } from "../utilities/checkerDelivery";
 
 import ShipmentDetailHeader from "./ShipmentDetailHeader";
 import ShipmentHeaderCard from "./ShipmentHeaderCard";
+import CustomerCommsBar from "./CustomerCommsBar";
 import ShipmentActionFooter from "./ShipmentActionFooter";
 
 import ReportIssueModal from "./modals/ReportIssueModal";
@@ -67,7 +69,7 @@ const FINAL_SHIPMENT_STATUSES = new Set(["COMPLETED", "DELIVERED"]);
 export default function ShipmentDetailsScreen() {
   const { shipmentId, tripId, tripType, parentTripId } = useLocalSearchParams();
   const router = useRouter();
-  const { isChecker, isDriver, profile } = useAuth();
+  const { isChecker, isDriver, isStaff, profile } = useAuth();
   const { colors, resolvedScheme } = useTheme();
   const isDark = resolvedScheme === "dark";
 
@@ -532,6 +534,14 @@ export default function ShipmentDetailsScreen() {
     !isShipmentFinal &&
     ["OUT_FOR_DELIVERY", "READY_FOR_DELIVERY"].includes(shipment?.status);
 
+  // Customer communication: staff (admin/manager) can always contact;
+  // checkers only when they hold OFD/failed custody. Drivers never see this.
+  const canContactCustomer =
+    isStaff ||
+    (isChecker &&
+      tripType !== "HUB_TRANSFER" &&
+      canCheckerContactCustomer(shipment, profile?.uid));
+
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.bg }]}>
       <StatusBar style={isDark ? "light" : "dark"} />
@@ -539,7 +549,24 @@ export default function ShipmentDetailsScreen() {
       <ShipmentDetailHeader onBack={() => router.back()} />
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
-        <ShipmentHeaderCard shipment={shipment} />
+        <ShipmentHeaderCard
+          shipment={shipment}
+          showCustomerCall={false}
+          hidePhone={isDriver}
+        />
+
+        {canContactCustomer && (
+          <CustomerCommsBar
+            shipment={shipment}
+            colors={colors}
+            isDark={isDark}
+            chatPathname={
+              isStaff
+                ? "/(staff)/chat/[conversationId]"
+                : "/(checker)/chat/[conversationId]"
+            }
+          />
+        )}
 
         <View
           style={[

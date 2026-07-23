@@ -216,6 +216,10 @@ exports.listDriverChatContacts =
   require("./src/chat/checkerMessaging").listDriverChatContacts;
 exports.createDriverConversation =
   require("./src/chat/checkerMessaging").createDriverConversation;
+exports.listStaffChatContacts =
+  require("./src/chat/checkerMessaging").listStaffChatContacts;
+exports.createStaffConversation =
+  require("./src/chat/checkerMessaging").createStaffConversation;
 exports.createCallHistoryMessage =
   require("./src/chat/conversations").createCallHistoryMessage;
 exports.sendChatMessage = require("./src/chat/conversations").sendChatMessage;
@@ -227,6 +231,10 @@ exports.assignConversation =
   require("./src/chat/conversations").assignConversation;
 exports.startConversationCall =
   require("./src/chat/conversations").startConversationCall;
+exports.getCustomerContactForShipment =
+  require("./src/chat/conversations").getCustomerContactForShipment;
+exports.getOrCreateShipmentConversation =
+  require("./src/chat/conversations").getOrCreateShipmentConversation;
 exports.acceptConversationCall =
   require("./src/chat/conversations").acceptConversationCall;
 exports.updateConversationCallStatus =

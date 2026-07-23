@@ -153,19 +153,28 @@ export default function InputGroup({
           placeholder="Phone Number"
           className={inputClass}
           value={values.phone}
-          // onChange={(e) => handleChange("phone", e.target.value)}
-          // 1. ALLOW TYPING: Let them type dashes/spaces if they want
           onChange={(e) => handleChange("phone", e.target.value)}
-          // 2. FORMAT ON LEAVE: When they click away, auto-fix the format
           onBlur={(e) => {
             const formatted = normalizePhoneNumber(e.target.value);
-            // Only update if it changed
             if (formatted !== values.phone) {
               handleChange("phone", formatted);
             }
           }}
         />
       </div>
+
+      <input
+        placeholder="Secondary Phone (optional)"
+        className={inputClass}
+        value={values.secondaryPhone || ""}
+        onChange={(e) => handleChange("secondaryPhone", e.target.value)}
+        onBlur={(e) => {
+          const formatted = normalizePhoneNumber(e.target.value);
+          if (formatted !== (values.secondaryPhone || "")) {
+            handleChange("secondaryPhone", formatted);
+          }
+        }}
+      />
 
       <input
         placeholder="Email (optional)"

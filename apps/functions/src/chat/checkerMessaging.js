@@ -534,5 +534,136 @@ exports.createDriverConversation = onCall(
   },
 );
 
+const STAFF_MESSAGING_ROLES = ["admin", "manager", "administrator"];
+
+async function authorizedContactsForStaff(uid) {
+  const usersSnap = await db.collection("users").where("role", "in", CONTACT_ROLES).get();
+  return usersSnap.docs
+    .filter((docSnap) => docSnap.id !== uid)
+    .map((docSnap) => ({ id: docSnap.id, ...docSnap.data() }))
+    .filter((contact) => {
+      if (
+        !contact ||
+        contact.active === false ||
+        String(contact.status || "").toLowerCase() === "inactive"
+      ) {
+        return false;
+      }
+      return CONTACT_ROLES.includes(String(contact.role || "").toLowerCase());
+    })
+    .map((contact) => serializeContact(contact.id, contact))
+    .sort((a, b) => a.name.localeCompare(b.name));
+}
+
+exports.listStaffChatContacts = onCall(
+  { region: "asia-southeast1", maxInstances: 20, invoker: "public" },
+  async (req) => {
+    const { uid } = await requireRole(db, req, STAFF_MESSAGING_ROLES);
+    const contacts = await authorizedContactsForStaff(uid);
+    return { contacts };
+  },
+);
+
+exports.createStaffConversation = onCall(
+  { region: "asia-southeast1", maxInstances: 20, invoker: "public" },
+  async (req) => {
+    const contactId = String(req.data?.contactId || "").trim();
+    if (!contactId) throw new HttpsError("invalid-argument", "contactId is required.");
+
+    const { uid, user } = await requireRole(db, req, STAFF_MESSAGING_ROLES);
+    const contacts = await authorizedContactsForStaff(uid);
+    const authorizedContact = contacts.find((contact) => contact.id === contactId);
+    if (!authorizedContact) {
+      throw new HttpsError("permission-denied", "This contact is not available.");
+    }
+
+    const contactRef = db.collection("users").doc(contactId);
+    const contactSnap = await contactRef.get();
+    if (!contactSnap.exists) throw new HttpsError("not-found", "Contact not found.");
+    const contact = contactSnap.data() || {};
+    const contactRole = String(contact.role || "").toLowerCase();
+
+    const ids = [uid, contactId].sort();
+    const conversationId = `staff_${crypto.createHash("sha256").update(ids.join(":"))
+      .digest("hex").slice(0, 32)}`;
+    const ref = db.collection("conversations").doc(conversationId);
+    const now = FieldValue.serverTimestamp();
+    const accessTokens = [];
+
+    if (contactRole === "checker") {
+      const contactAccessKey = await ensureCheckerAccessKey(contactId, contact, contactRef);
+      accessTokens.push(checkerAccessToken(contactId, contactAccessKey));
+    }
+    if (contactRole === "driver") {
+      // Drivers read via driverAccessTokens; set below.
+    }
+
+    let driverAccessTokens = [];
+    if (contactRole === "driver") {
+      const contactAccessKey = await ensureDriverAccessKey(contactId, contact, contactRef);
+      driverAccessTokens = [driverAccessToken(contactId, contactAccessKey)];
+    }
+
+    const participantProfiles = {
+      [uid]: serializeContact(uid, user),
+      [contactId]: serializeContact(contactId, contact, authorizedContact.municipalities),
+    };
+
+    await db.runTransaction(async (tx) => {
+      const snap = await tx.get(ref);
+      if (!snap.exists) {
+        tx.set(ref, {
+          conversationId,
+          type: "direct_staff",
+          participantIds: ids,
+          participantRoles: {
+            [uid]: String(user.role || "admin").toLowerCase(),
+            [contactId]: contactRole || "staff",
+          },
+          participantProfiles,
+          checkerAccessTokens: accessTokens,
+          driverAccessTokens,
+          status: "active",
+          lastMessage: "",
+          lastMessageText: "",
+          lastMessageAt: now,
+          lastActivityAt: now,
+          lastMessageBy: null,
+          unreadCounts: { [uid]: 0, [contactId]: 0 },
+          createdAt: now,
+          updatedAt: now,
+        });
+        return;
+      }
+
+      const existing = snap.data() || {};
+      if (
+        existing.type !== "direct_staff" ||
+        !ids.every((id) => Array.isArray(existing.participantIds) && existing.participantIds.includes(id))
+      ) {
+        throw new HttpsError("already-exists", "Conversation identifier conflict.");
+      }
+      tx.update(ref, {
+        participantProfiles,
+        checkerAccessTokens: uniqueStrings([
+          ...(existing.checkerAccessTokens || []).filter(
+            (token) => !token.startsWith(`${contactId}:`),
+          ),
+          ...accessTokens,
+        ]),
+        driverAccessTokens: uniqueStrings([
+          ...(existing.driverAccessTokens || []).filter(
+            (token) => !token.startsWith(`${contactId}:`),
+          ),
+          ...driverAccessTokens,
+        ]),
+        updatedAt: now,
+      });
+    });
+
+    return { success: true, conversationId };
+  },
+);
+
 module.exports.assertDirectConversationAccess = assertDirectConversationAccess;
 module.exports.checkerAccessKey = checkerAccessKey;
