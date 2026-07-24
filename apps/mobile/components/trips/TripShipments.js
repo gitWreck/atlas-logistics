@@ -59,7 +59,7 @@ export default function ShipmentListScreen({
     UIManager.setLayoutAnimationEnabledExperimental(true);
   }
 
-  const { isChecker, profile } = useAuth();
+  const { isCheckerOps, profile } = useAuth();
   const router = useRouter();
 
   const { tripId, tripType, plate } = useLocalSearchParams();
@@ -190,7 +190,7 @@ export default function ShipmentListScreen({
     return filtered;
   }, [shipments, searchText, activeFilter]);
 
-  const routeBase = isChecker ? "/(checker)" : "/(driver)";
+  const routeBase = isCheckerOps ? "/(checker)" : "/(driver)";
 
   const handlePressShipment = (shipment) => {
     router.push({

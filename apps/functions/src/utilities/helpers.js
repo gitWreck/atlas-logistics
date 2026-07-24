@@ -280,6 +280,13 @@ function isAnonymousAuth(context) {
   return String(provider).toLowerCase() === "anonymous";
 }
 
+/** Roles that may run checker last-mile ops (load / OFD / deliver / fail). */
+const CHECKER_OPS_ROLES = ["checker", "admin", "manager", "administrator"];
+
+function isCheckerOpsRole(role) {
+  return CHECKER_OPS_ROLES.includes(String(role || "").toLowerCase());
+}
+
 async function requireRole(db, context, allowedRoles = []) {
   const uid = requireAuth(context);
 
@@ -518,6 +525,8 @@ module.exports = {
   requireAuth,
   isAnonymousAuth,
   requireRole,
+  CHECKER_OPS_ROLES,
+  isCheckerOpsRole,
   requireShipmentTripDeleteAccess,
   requireDeliveryRouteAssignmentAccess,
   canDeleteShipmentsAndTrips,

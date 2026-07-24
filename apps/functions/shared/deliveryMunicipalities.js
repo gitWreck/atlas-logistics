@@ -109,6 +109,30 @@ function checkerCoversMunicipality(assignedMunicipalities = [], municipality = "
 
 function validateCheckerMunicipalityAccess(shipment = {}, checkerUser = {}) {
   const municipality = resolveShipmentMunicipality(shipment);
+  const role = String(checkerUser.role || "").toLowerCase();
+  const isStaffOps = ["admin", "manager", "administrator"].includes(role);
+
+  // Admin/manager act as checkers across all municipalities.
+  if (isStaffOps) {
+    if (!municipality) {
+      return {
+        ok: false,
+        code: "MUNICIPALITY_MISSING",
+        message:
+          "This shipment has no destination municipality on file. Ask staff to set the municipality before loading.",
+        municipality: null,
+        assignedMunicipalities: [...DELIVERY_MUNICIPALITIES],
+      };
+    }
+    return {
+      ok: true,
+      code: "PASS",
+      message: null,
+      municipality,
+      assignedMunicipalities: [...DELIVERY_MUNICIPALITIES],
+    };
+  }
+
   const assigned = normalizeMunicipalityList(checkerUser.assignedMunicipalities);
 
   if (!municipality) {

@@ -6,6 +6,7 @@ const { FieldValue } = require("firebase-admin/firestore");
 const {
   requireRole,
   updatedBy,
+  isCheckerOpsRole,
 } = require("../utilities/helpers");
 const { ALLOWED_SHIPMENT_STATUSES } = require("../utilities/dataDetails");
 const { writeShipmentActionLog } = require("../utilities/shipmentLogger");
@@ -141,6 +142,7 @@ exports.updateShipmentStatus = onCall(
     const actor = await requireRole(db, req, [
       "admin",
       "manager",
+      "administrator",
       "checker",
       "driver",
     ]);
@@ -174,6 +176,14 @@ exports.updateShipmentStatus = onCall(
       failureReasonCode = null,
       returnDisposition = null,
     } = req.data || {};
+
+    // Field checkers always use piece custody paths. Admin/manager only do when
+    // acting from the checker mobile app (same dashboard as checkers).
+    const fromCheckerMobile = String(sourceUI || "")
+      .toUpperCase()
+      .includes("CHECKER");
+    const isCheckerOps =
+      role === "checker" || (isCheckerOpsRole(role) && fromCheckerMobile);
 
     if (!shipmentId || !newStatus) {
       throw new HttpsError("invalid-argument", "Missing shipmentId or status.");
@@ -288,7 +298,7 @@ exports.updateShipmentStatus = onCall(
 
     const packageIdSet = normalizePackageIdSet(packageIds);
     const isCheckerPieceDelivery =
-      isFinalDeliveryStatus && actor.role === "checker";
+      isFinalDeliveryStatus && isCheckerOps;
 
     if (isCheckerPieceDelivery) {
       const shipmentSnap = await shipmentRef.get();
@@ -419,7 +429,7 @@ exports.updateShipmentStatus = onCall(
       const rowCount = oldPackages.length;
 
       const isCheckerOwnedPiece = (pkg = {}) => {
-        if (actor.role !== "checker") return true;
+        if (!isCheckerOps) return true;
         const checkerUid = String(checkerAuthUid || "");
         const legacyUserCode = String(usercode || "").trim();
         const loadedBy = String(pkg.loadedByCheckerId || "").trim();
@@ -448,7 +458,7 @@ exports.updateShipmentStatus = onCall(
         ].includes(status);
       };
 
-      if (newStatus === "OUT_FOR_DELIVERY" && actor.role === "checker") {
+      if (newStatus === "OUT_FOR_DELIVERY" && isCheckerOps) {
         const promotableCount = oldPackages.filter(
           (pkg) =>
             isCheckerOwnedPiece(pkg) && canPromotePieceToOutForDelivery(pkg),
@@ -502,7 +512,7 @@ exports.updateShipmentStatus = onCall(
           });
         }
 
-        if (newStatus === "OUT_FOR_DELIVERY" && actor.role === "checker") {
+        if (newStatus === "OUT_FOR_DELIVERY" && isCheckerOps) {
           if (!isCheckerOwnedPiece(pkg)) return pkg;
           if (String(pkg.status || "").toUpperCase() === "OUT_FOR_DELIVERY") {
             return pkg;
@@ -540,7 +550,7 @@ exports.updateShipmentStatus = onCall(
 
       checkerPromotedOutForDelivery =
         newStatus === "OUT_FOR_DELIVERY" &&
-        actor.role === "checker" &&
+        isCheckerOps &&
         updatedPackages.some(
           (pkg, index) =>
             String(pkg.status || "").toUpperCase() === "OUT_FOR_DELIVERY" &&
@@ -582,7 +592,7 @@ exports.updateShipmentStatus = onCall(
         },
         shouldPromoteOutForDelivery:
           newStatus === "OUT_FOR_DELIVERY" &&
-          (actor.role === "checker" || checkerPromotedOutForDelivery),
+          (isCheckerOps || checkerPromotedOutForDelivery),
       });
 
       const derivedShipmentStatus = derivedSnapshot.status;

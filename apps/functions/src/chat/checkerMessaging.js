@@ -255,7 +255,12 @@ async function authorizedContactsForChecker(uid, checker) {
 }
 
 async function getCheckerAndContacts(req) {
-  const { uid, user } = await requireRole(db, req, ["checker"]);
+  const { uid, user } = await requireRole(db, req, [
+    "checker",
+    "admin",
+    "manager",
+    "administrator",
+  ]);
   const checkerRef = db.collection("users").doc(uid);
   const accessKey = await ensureCheckerAccessKey(uid, user, checkerRef);
   const contacts = await authorizedContactsForChecker(uid, user);

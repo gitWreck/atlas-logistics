@@ -14,7 +14,7 @@ import {
   Animated,
   Dimensions,
   FlatList,
-  KeyboardAvoidingView,
+  Keyboard,
   LayoutAnimation,
   Linking,
   Platform,
@@ -1020,7 +1020,7 @@ export default function ChatThread({
 }) {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { isChecker, profile } = useAuth();
+  const { isCheckerOps, isStaff, profile } = useAuth();
   const { colors: themeColors, resolvedScheme } = useTheme();
   const custodyEndedRef = useRef(false);
   const colors = useMemo(
@@ -1071,6 +1071,7 @@ export default function ChatThread({
   const [startingCall, setStartingCall] = useState(null);
   const [pendingAttachment, setPendingAttachment] = useState(null);
   const [emojiOpen, setEmojiOpen] = useState(false);
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
   const [lightbox, setLightbox] = useState(null);
   const [infoOpen, setInfoOpen] = useState(false);
   const [quickOpen, setQuickOpen] = useState(false);
@@ -1094,7 +1095,13 @@ export default function ChatThread({
   // Spec section 12: if a checker loses custody while chatting with the
   // customer, leave the thread immediately after the shipment syncs.
   useEffect(() => {
-    if (!isChecker || !conversation || conversation.type === "direct_staff") {
+    // Admin/manager keep customer threads; only field checkers lose access with custody.
+    if (
+      !isCheckerOps ||
+      isStaff ||
+      !conversation ||
+      conversation.type === "direct_staff"
+    ) {
       return undefined;
     }
     const shipmentRef = String(
@@ -1125,7 +1132,8 @@ export default function ChatThread({
     conversation?.shipmentId,
     conversation?.trackingNumber,
     conversation?.type,
-    isChecker,
+    isCheckerOps,
+    isStaff,
     onBack,
     profile?.uid,
     router,
@@ -1205,6 +1213,31 @@ export default function ChatThread({
       () => {},
     );
   }, [conversationId]);
+
+  // iOS: pad by keyboard height instead of KeyboardAvoidingView (negative
+  // safe-area offsets were leaving a blank white gap above the keyboard).
+  // Android already resizes via softwareKeyboardLayoutMode: "resize".
+  useEffect(() => {
+    if (Platform.OS !== "ios") return undefined;
+    const onShow = (event) => {
+      const height = Math.max(0, event?.endCoordinates?.height || 0);
+      setKeyboardHeight(height);
+    };
+    const onHide = () => setKeyboardHeight(0);
+    const showSub = Keyboard.addListener("keyboardWillShow", onShow);
+    const hideSub = Keyboard.addListener("keyboardWillHide", onHide);
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (keyboardHeight <= 0) return;
+    requestAnimationFrame(() => {
+      listRef.current?.scrollToEnd({ animated: true });
+    });
+  }, [keyboardHeight]);
 
   const { items } = useMemo(
     () => buildMessageItems(messages, myUid),
@@ -1646,12 +1679,13 @@ export default function ChatThread({
       {loading ? (
         <ThreadSkeleton colors={colors} />
       ) : (
-        <KeyboardAvoidingView
-          style={styles.flex}
-          behavior={Platform.OS === "ios" ? "padding" : undefined}
-          keyboardVerticalOffset={
-            Platform.OS === "ios" && !embedded ? -insets.bottom : 0
-          }
+        <View
+          style={[
+            styles.flex,
+            Platform.OS === "ios" && keyboardHeight > 0
+              ? { paddingBottom: keyboardHeight }
+              : null,
+          ]}
         >
           <FlatList
             ref={listRef}
@@ -1801,7 +1835,17 @@ export default function ChatThread({
           <View
             style={[
               styles.composer,
-              { backgroundColor: colors.chatBg, borderTopColor: colors.border },
+              {
+                backgroundColor: colors.chatBg,
+                borderTopColor: colors.border,
+                paddingBottom:
+                  keyboardHeight > 0
+                    ? 8
+                    : Math.max(
+                        insets.bottom,
+                        Platform.OS === "ios" ? 14 : 9,
+                      ),
+              },
             ]}
           >
             <TouchableOpacity
@@ -1902,7 +1946,7 @@ export default function ChatThread({
               </TouchableOpacity>
             )}
           </View>
-        </KeyboardAvoidingView>
+        </View>
       )}
 
       {/* Image lightbox */}
@@ -2345,7 +2389,6 @@ const styles = StyleSheet.create({
     gap: 2,
     paddingHorizontal: 8,
     paddingTop: 8,
-    paddingBottom: Platform.OS === "ios" ? 14 : 9,
     borderTopWidth: 1,
   },
   composerIcon: {

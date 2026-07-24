@@ -126,8 +126,11 @@ export default function ProfileViewer({
   const offlineSync = useOfflineSyncOptional();
   const isCustomer = user?.role === "customer";
   const isChecker = user?.role === "checker";
+  const isAdminOps = ["admin", "manager", "administrator"].includes(
+    String(user?.role || "").toLowerCase(),
+  );
   const isDriver = user?.role === "driver";
-  const isStaff = isChecker || isDriver;
+  const isStaff = isChecker || isDriver || isAdminOps;
   const profilePhotoURL = String(user?.photoURL || "").trim();
   const config = roleConfig[user?.role] || {
     icon: "user-circle",
@@ -826,7 +829,7 @@ export default function ProfileViewer({
           </View>
         )}
 
-        {isChecker && offlineSync && !isEditing && (
+        {(isChecker || isAdminOps) && offlineSync && !isEditing && (
           <View
             style={[
               styles.card,
@@ -1178,7 +1181,7 @@ export default function ProfileViewer({
         onClose={() => setShowCityModal(false)}
       />
 
-      {isChecker && offlineSync ? (
+      {(isChecker || isAdminOps) && offlineSync ? (
         <OfflineSyncQueueModal
           visible={queueModalVisible}
           onClose={() => setQueueModalVisible(false)}

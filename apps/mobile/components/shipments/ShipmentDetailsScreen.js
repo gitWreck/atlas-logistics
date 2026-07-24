@@ -69,7 +69,7 @@ const FINAL_SHIPMENT_STATUSES = new Set(["COMPLETED", "DELIVERED"]);
 export default function ShipmentDetailsScreen() {
   const { shipmentId, tripId, tripType, parentTripId } = useLocalSearchParams();
   const router = useRouter();
-  const { isChecker, isDriver, isStaff, profile } = useAuth();
+  const { isDriver, isStaff, isCheckerOps, profile } = useAuth();
   const { colors, resolvedScheme } = useTheme();
   const isDark = resolvedScheme === "dark";
 
@@ -203,7 +203,7 @@ export default function ShipmentDetailsScreen() {
     try {
       const location = await getCurrentLocationSafe();
       const isCheckerLastMile =
-        isChecker &&
+        isCheckerOps &&
         tripType !== "HUB_TRANSFER" &&
         canCheckerAccessShipment(shipment, profile?.uid);
 
@@ -244,7 +244,7 @@ export default function ShipmentDetailsScreen() {
           location,
           remarks: `Proof of Receipt: ${photoUrls.length} images uploaded.`,
           proofOfReceipt: photoUrls,
-          sourceUI: isChecker ? "CHECKER_MOBILE" : "DRIVER_MOBILE",
+          sourceUI: isCheckerOps ? "CHECKER_MOBILE" : "DRIVER_MOBILE",
           updatedBy: updatedBy(profile),
         });
 
@@ -291,7 +291,7 @@ export default function ShipmentDetailsScreen() {
               Boolean,
             );
 
-            if (isChecker && tripType !== "HUB_TRANSFER") {
+            if (isCheckerOps && tripType !== "HUB_TRANSFER") {
               await completeCheckerDelivery({
                 shipmentId: String(shipmentId),
                 profile,
@@ -310,7 +310,7 @@ export default function ShipmentDetailsScreen() {
                 remarks: `Proof of Delivery: ${photoUrls.length} images uploaded.`,
                 proofOfDelivery: photoUrls,
                 paymentStatus: shipment.isCOD ? "COLLECTED_BY_CHECKER" : "PAID",
-                sourceUI: isChecker ? "CHECKER_MOBILE" : "DRIVER_MOBILE",
+                sourceUI: isCheckerOps ? "CHECKER_MOBILE" : "DRIVER_MOBILE",
                 notify,
                 notificationChannels: deliveryNotificationChannels,
                 notifySms: deliveryNotificationChannels.sms,
@@ -368,7 +368,7 @@ export default function ShipmentDetailsScreen() {
 
     try {
       if (
-        isChecker &&
+        isCheckerOps &&
         tripType !== "HUB_TRANSFER" &&
         !["PENDING_PICKUP"].includes(shipment?.status)
       ) {
@@ -382,7 +382,7 @@ export default function ShipmentDetailsScreen() {
           : "FAILED_DELIVERY";
 
       if (
-        isChecker &&
+        isCheckerOps &&
         tripType !== "HUB_TRANSFER" &&
         newStatus === "FAILED_DELIVERY"
       ) {
@@ -403,7 +403,7 @@ export default function ShipmentDetailsScreen() {
           newStatus,
           location,
           remarks: `Exception: ${reasonText} (${reasonId})`,
-          sourceUI: isChecker ? "CHECKER_MOBILE" : "DRIVER_MOBILE",
+          sourceUI: isCheckerOps ? "CHECKER_MOBILE" : "DRIVER_MOBILE",
           updatedBy: updatedBy(profile),
         });
         Alert.alert(
@@ -433,7 +433,7 @@ export default function ShipmentDetailsScreen() {
         message: actionMessage,
         shipmentId,
         tripId: resolvedTripId,
-        reason: isChecker ? "checker_update" : "driver_update",
+        reason: isCheckerOps ? "checker_update" : "driver_update",
       });
 
       Alert.alert("Success", "SMS sent to customer.");
@@ -513,7 +513,7 @@ export default function ShipmentDetailsScreen() {
     tripType !== "HUB_TRANSFER" &&
     shipment?.status === "PENDING_PICKUP";
   const isCheckerLastMile =
-    isChecker &&
+    isCheckerOps &&
     tripType !== "HUB_TRANSFER" &&
     canCheckerAccessShipment(shipment, profile?.uid);
   const checkerNextAction = isCheckerLastMile
@@ -538,7 +538,7 @@ export default function ShipmentDetailsScreen() {
   // checkers only when they hold OFD/failed custody. Drivers never see this.
   const canContactCustomer =
     isStaff ||
-    (isChecker &&
+    (isCheckerOps &&
       tripType !== "HUB_TRANSFER" &&
       canCheckerContactCustomer(shipment, profile?.uid));
 
@@ -560,11 +560,7 @@ export default function ShipmentDetailsScreen() {
             shipment={shipment}
             colors={colors}
             isDark={isDark}
-            chatPathname={
-              isStaff
-                ? "/(staff)/chat/[conversationId]"
-                : "/(checker)/chat/[conversationId]"
-            }
+            chatPathname="/(checker)/chat/[conversationId]"
           />
         )}
 

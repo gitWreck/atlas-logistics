@@ -15,10 +15,8 @@ import {
 } from "../../../components/checker/CheckerHomeDashboard";
 import { SECTION } from "../../../components/checker/design/checkerTheme";
 import {
-  countAvailablePiecesForDate,
   countDeliveredPiecesForDate,
   countFailedPiecesForDate,
-  countOutForDeliveryTotalPiecesForDate,
   countReturnedPiecesForDate,
   getDeliveredShipmentsForDate,
   getLocalDateKey,
@@ -177,16 +175,18 @@ export default function CheckerIndex() {
   );
 
   const glance = useMemo(() => {
-    const routeTotal = allKnownShipments.reduce(
-      (sum, shipment) =>
-        sum +
-        countOutForDeliveryTotalPiecesForDate(
-          shipment,
-          checkerId,
-          selectedDate,
-        ),
+    // Live warehouse pool (not date-scoped) — matches Available tab.
+    const available = (availableShipments || []).reduce(
+      (sum, shipment) => sum + (shipment?.poolStats?.available || 0),
       0,
     );
+
+    // Live on-van / OFD work for this user — matches My Deliveries tab.
+    const onVan = (myRouteShipments || []).reduce(
+      (sum, shipment) => sum + (shipment?.poolStats?.mine || 0),
+      0,
+    );
+
     const delivered = allKnownShipments.reduce(
       (sum, shipment) =>
         sum + countDeliveredPiecesForDate(shipment, checkerId, selectedDate),
@@ -204,18 +204,20 @@ export default function CheckerIndex() {
     );
 
     return {
-      available: allKnownShipments.reduce(
-        (sum, shipment) =>
-          sum + countAvailablePiecesForDate(shipment, checkerId, selectedDate),
-        0,
-      ),
-      routeTotal,
-      onVan: Math.max(routeTotal - delivered - failed - returned, 0),
+      available,
+      routeTotal: onVan + delivered + failed + returned,
+      onVan,
       delivered,
       failed,
       returned,
     };
-  }, [allKnownShipments, checkerId, selectedDate]);
+  }, [
+    allKnownShipments,
+    availableShipments,
+    myRouteShipments,
+    checkerId,
+    selectedDate,
+  ]);
 
   const recentDelivered = useMemo(
     () =>

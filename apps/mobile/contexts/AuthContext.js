@@ -140,6 +140,8 @@ export function AuthProvider({ children }) {
   const isDriver = role === "driver";
   const isCustomer = role === "customer";
   const isStaff = STAFF_ROLES.includes(role);
+  /** Checker app access: field checkers plus admin/manager (all routes). */
+  const isCheckerOps = isChecker || isStaff;
 
   const value = {
     user,
@@ -152,6 +154,7 @@ export function AuthProvider({ children }) {
     isDriver,
     isCustomer,
     isStaff,
+    isCheckerOps,
     signOut,
     refreshUser,
   };

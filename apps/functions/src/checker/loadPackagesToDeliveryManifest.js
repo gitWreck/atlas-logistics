@@ -249,7 +249,12 @@ exports.loadPackagesToDeliveryManifest = onCall(
       uid: actorUid,
       role: actorRole,
       user: actorUser,
-    } = await requireRole(db, req, ["checker"]);
+    } = await requireRole(db, req, [
+      "checker",
+      "admin",
+      "manager",
+      "administrator",
+    ]);
     const actorName =
       actorUser?.fullName ||
       actorUser?.name ||

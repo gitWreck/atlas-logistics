@@ -96,7 +96,7 @@ exports.returnPackagesToWarehouse = onCall(
       uid: actorUid,
       role: actorRole,
       user: actorUser,
-    } = await requireRole(db, req, ["checker", "manager", "admin"]);
+    } = await requireRole(db, req, ["checker", "manager", "admin", "administrator"]);
     const actorName =
       actorUser?.fullName ||
       actorUser?.name ||

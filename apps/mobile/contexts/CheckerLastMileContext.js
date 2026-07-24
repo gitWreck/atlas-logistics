@@ -5,8 +5,10 @@ import { useCheckerLastMileSync } from "../hooks/useCheckerLastMileSync";
 const CheckerLastMileContext = createContext(null);
 
 export function CheckerLastMileProvider({ children }) {
-  const { profile } = useAuth();
-  const value = useCheckerLastMileSync(profile?.uid);
+  const { profile, isStaff } = useAuth();
+  const value = useCheckerLastMileSync(profile?.uid, {
+    allMunicipalities: isStaff,
+  });
 
   return (
     <CheckerLastMileContext.Provider value={value}>
