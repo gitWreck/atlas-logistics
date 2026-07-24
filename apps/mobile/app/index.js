@@ -12,6 +12,7 @@ export default function Index() {
     isChecker,
     isDriver,
     isCustomer,
+    isManager,
     isStaff,
     signOut,
   } = useAuth();
@@ -26,6 +27,10 @@ export default function Index() {
 
   if (!user) {
     return <Redirect href="/(auth)/login" />;
+  }
+
+  if (isManager) {
+    return <Redirect href="/(manager)/" />;
   }
 
   if (isStaff) {

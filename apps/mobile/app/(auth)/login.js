@@ -73,7 +73,19 @@ export default function LoginScreen() {
         console.log("User Role:", role);
 
         // 4. Route based on Role
-        if (role === "admin" || role === "manager" || role === "administrator") {
+        const isActive =
+          userData.active !== false &&
+          String(userData.status || "").toLowerCase() !== "inactive" &&
+          String(userData.employmentStatus || "").toLowerCase() !== "inactive";
+        if (!isActive) {
+          Alert.alert(
+            "Account Inactive",
+            "Your account is inactive. Contact an administrator for access.",
+          );
+          await signOut(auth);
+        } else if (role === "manager") {
+          router.replace("/(manager)/");
+        } else if (role === "admin" || role === "administrator") {
           router.replace("/(staff)/");
         } else if (role === "driver") {
           router.replace("/(driver)/");

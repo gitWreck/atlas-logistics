@@ -56,3 +56,11 @@ Thumbs.db
 
 docs
 apps/web/.env.local
+expo-8081-error.log
+expo-8081.log
+package-lock.json
+package-lock.json
+.local-mobile.err.log
+.local-mobile.out.log
+.local-web.err.log
+.local-web.out.log

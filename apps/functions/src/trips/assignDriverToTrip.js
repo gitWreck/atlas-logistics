@@ -6,6 +6,10 @@ const {
   requireRole,
 } = require("../utilities/helpers");
 const { writeTripActionLog } = require("../utilities/tripLogger");
+const {
+  canAccessRecord,
+  canAccessStaff,
+} = require("../manager/managerAccess");
 
 if (!admin.apps.length) admin.initializeApp();
 const db = admin.firestore();
@@ -16,10 +20,10 @@ const db = admin.firestore();
 exports.assignDriverToTrip = onCall(
   { region: "asia-southeast1", maxInstances: 10 },
   async (req) => {
-    await requireRole(db, req, ["admin", "manager"]);
+    const actor = await requireRole(db, req, ["admin", "manager"]);
 
     const { tripId, driverId, truckPlateNumber, truckId } = req.data || {};
-    if (!tripId || typeoftripId !== "string") {
+    if (!tripId || typeof tripId !== "string") {
       throw new HttpsError("invalid-argument", "tripId required");
     }
     // if (!driverId || typeof driverId !== "string") {
@@ -27,7 +31,7 @@ exports.assignDriverToTrip = onCall(
     // }
 
     const uid = req.auth.uid;
-    const role = req.auth.token?.role || "unknown";
+    const role = actor.role;
 
     const tripRef = db.collection("truck_trips").doc(tripId);
     const driverRef = db.collection("users").doc(driverId);
@@ -47,6 +51,16 @@ exports.assignDriverToTrip = onCall(
 
       const trip = tripSnap.data();
       const driver = driverSnap.data();
+      if (
+        actor.role === "manager" &&
+        (!canAccessRecord(actor.user, trip) ||
+          !canAccessStaff(actor.user, driver))
+      ) {
+        throw new HttpsError(
+          "permission-denied",
+          "The trip or Driver is outside your assigned operational scope.",
+        );
+      }
 
       if (driver.role !== "driver") {
         throw new HttpsError("failed-precondition", "User is not a driver");

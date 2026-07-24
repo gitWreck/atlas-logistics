@@ -1,8 +1,35 @@
-import { getFunctions, httpsCallable } from "firebase/functions";
+import {
+  connectFunctionsEmulator,
+  getFunctions,
+  httpsCallable,
+} from "firebase/functions";
+import { Platform } from "react-native";
 import { app } from "../../firebase";
 import { getCallIdentity } from "../calls/callSession";
 
 const functions = getFunctions(app, "asia-southeast1");
+const useFunctionsEmulator =
+  __DEV__ &&
+  process.env.EXPO_PUBLIC_USE_FUNCTIONS_EMULATOR === "true";
+
+if (useFunctionsEmulator) {
+  const emulatorHost =
+    process.env.EXPO_PUBLIC_FUNCTIONS_EMULATOR_HOST ||
+    (Platform.OS === "android" ? "10.0.2.2" : "127.0.0.1");
+  const emulatorPort = Number(
+    process.env.EXPO_PUBLIC_FUNCTIONS_EMULATOR_PORT || 5001,
+  );
+
+  try {
+    connectFunctionsEmulator(functions, emulatorHost, emulatorPort);
+  } catch (error) {
+    // Expo Fast Refresh can evaluate this module again after the emulator has
+    // already been connected. Only rethrow unexpected configuration errors.
+    if (!String(error?.message || "").includes("already")) {
+      throw error;
+    }
+  }
+}
 
 export const scanPackages = httpsCallable(functions, "scanPackages");
 export const finalizeHubProcessing = httpsCallable(
@@ -18,11 +45,20 @@ export const updateShipmentStatus = httpsCallable(
   functions,
   "updateShipmentStatus",
 );
+export const reconcileShipmentAtHub = httpsCallable(
+  functions,
+  "reconcileShipmentAtHub",
+);
 export const updateShipmentImages = httpsCallable(
   functions,
   "updateShipmentImages",
 );
 export const updateTripStatus = httpsCallable(functions, "updateTripStatus");
+export const assignDriverToTrip = httpsCallable(functions, "assignDriverToTrip");
+export const assignCheckerMunicipalities = httpsCallable(
+  functions,
+  "assignCheckerMunicipalities",
+);
 
 export const loadPackagesToDeliveryManifest = httpsCallable(
   functions,
@@ -63,6 +99,19 @@ export const bulkShipmentAction = httpsCallable(
   functions,
   "bulkShipmentAction",
 );
+export const createShipment = httpsCallable(functions, "createShipment");
+export const createTruckTrip = httpsCallable(functions, "createTruckTrip");
+export const cancelTruckTrip = httpsCallable(functions, "cancelTruckTrip");
+export const archiveTruckTrip = httpsCallable(functions, "archiveTruckTrip");
+export const getTripAuditLog = httpsCallable(functions, "getTripAuditLog");
+export const generateTripManifest = httpsCallable(
+  functions,
+  "generateTripManifest",
+);
+export const unlockTripManifest = httpsCallable(
+  functions,
+  "unlockTripManifest",
+);
 
 // Messaging
 export const sendManualSMS = httpsCallable(functions, "sendManualSMS");
@@ -93,6 +142,47 @@ export const listStaffChatContacts = httpsCallable(
 export const createStaffConversation = httpsCallable(
   functions,
   "createStaffConversation",
+);
+export const getManagerMobileDashboard = httpsCallable(
+  functions,
+  "getManagerMobileDashboard",
+);
+export const listManagerMobileShipments = httpsCallable(
+  functions,
+  "listManagerMobileShipments",
+);
+export const getManagerMobileShipment = httpsCallable(
+  functions,
+  "getManagerMobileShipment",
+);
+export const listManagerMobileOperations = httpsCallable(
+  functions,
+  "listManagerMobileOperations",
+);
+export const getManagerMobileTrip = httpsCallable(
+  functions,
+  "getManagerMobileTrip",
+);
+export const getManagerMobileModules = httpsCallable(
+  functions,
+  "getManagerMobileModules",
+);
+export const upsertTruck = httpsCallable(functions, "upsertTruck");
+export const updateTruckStatus = httpsCallable(functions, "updateTruckStatus");
+export const createInvoice = httpsCallable(functions, "createInvoice");
+export const editInvoice = httpsCallable(functions, "editInvoice");
+export const createUserProfile = httpsCallable(functions, "createUserProfile");
+export const updateInvoiceStatus = httpsCallable(
+  functions,
+  "updateInvoiceStatus",
+);
+export const listManagerMobileNotifications = httpsCallable(
+  functions,
+  "listManagerMobileNotifications",
+);
+export const listManagerMobileConversations = httpsCallable(
+  functions,
+  "listManagerMobileConversations",
 );
 export const createCallHistoryMessage = httpsCallable(
   functions,

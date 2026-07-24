@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
-import { adminDb } from "@/lib/firebase-admin";
-import { getAuth } from "firebase-admin/auth";
+import { adminAuth, adminDb } from "@/lib/firebase-admin";
 import { headers } from "next/headers";
+import { managerCanAccessRecord } from "@/lib/managerAccess";
 
 export const dynamic = "force-dynamic";
 
@@ -14,11 +14,12 @@ export async function GET(request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const decodedToken = await getAuth().verifyIdToken(token);
+    const decodedToken = await adminAuth.verifyIdToken(token);
     const uid = decodedToken.uid;
 
     const userDoc = await adminDb.collection("users").doc(uid).get();
-    if (!["admin", "manager"].includes(userDoc.data()?.role)) {
+    const requesterData = userDoc.data() || {};
+    if (!["admin", "manager"].includes(requesterData.role)) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
@@ -30,12 +31,18 @@ export async function GET(request) {
       .get();
 
     // 3. Transform Data
-    const drivers = snapshot.docs.map((doc) => ({
-      id: doc.id,
-      name: doc.data().name || "Unknown Driver",
-      email: doc.data().email || "",
-      // Add license number or other fields if you have them
-    }));
+    const drivers = snapshot.docs
+      .filter((doc) => managerCanAccessRecord(requesterData, doc.data()))
+      .map((doc) => ({
+        id: doc.id,
+        name: doc.data().name || "Unknown Driver",
+        email: doc.data().email || "",
+        warehouseName: doc.data().warehouseName || "",
+        warehouseCode: doc.data().warehouseCode || "",
+        assignedMunicipalities: Array.isArray(doc.data().assignedMunicipalities)
+          ? doc.data().assignedMunicipalities
+          : [],
+      }));
 
     return NextResponse.json({ drivers });
   } catch (error) {

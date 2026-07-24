@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
-import { getAuth } from "firebase-admin/auth";
 import { headers } from "next/headers";
-import { adminDb } from "@/lib/firebase-admin";
+import { adminAuth, adminDb } from "@/lib/firebase-admin";
 import {
   DEFAULT_OPERATIONAL_SETTINGS,
   normalizeOperationalSettings,
@@ -20,7 +19,7 @@ async function assertAdmin() {
     return { error: "Unauthorized", status: 401 };
   }
 
-  const decodedToken = await getAuth().verifyIdToken(token);
+  const decodedToken = await adminAuth.verifyIdToken(token);
   const userDoc = await adminDb.collection("users").doc(decodedToken.uid).get();
   const role = userDoc.data()?.role?.toLowerCase();
 

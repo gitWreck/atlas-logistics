@@ -613,7 +613,11 @@ async function writeCallHistoryMessage({ conversationRef, conversationId, call, 
       duration: Math.max(0, Number(duration || 0)),
       attachments: [],
       status: "sent",
+      messageStatus: "sent",
       createdAt: now,
+      sentAt: now,
+      deliveredAt: now,
+      seenAt: null,
       readBy: {},
       seenBy: {},
     });
@@ -1379,6 +1383,7 @@ exports.createConversation = onCall(
     }
 
     if (initialMessage) {
+      const initialSentAt = FieldValue.serverTimestamp();
       await conversationRef.collection("messages").add({
         senderId: uid,
         senderRole: role,
@@ -1386,9 +1391,17 @@ exports.createConversation = onCall(
         type: "text",
         text: initialMessage,
         attachments: [],
-        createdAt: FieldValue.serverTimestamp(),
+        status: "sent",
+        messageStatus: "sent",
+        createdAt: initialSentAt,
+        sentAt: initialSentAt,
+        deliveredAt: initialSentAt,
+        seenAt: null,
         readBy: {
-          [uid]: FieldValue.serverTimestamp(),
+          [uid]: initialSentAt,
+        },
+        seenBy: {
+          [uid]: initialSentAt,
         },
       });
 
@@ -1637,7 +1650,11 @@ exports.sendChatMessage = onCall(
         attachmentType: attachmentType || null,
         attachmentName: attachmentName || null,
         status: "sent",
+        messageStatus: "sent",
         createdAt: now,
+        sentAt: now,
+        deliveredAt: now,
+        seenAt: null,
         readBy: {
           [uid]: now,
         },
@@ -1717,7 +1734,7 @@ exports.markConversationRead = onCall(
 
     const updates = {
       [`unreadCounts.${key}`]: 0,
-      updatedAt: FieldValue.serverTimestamp(),
+      [`lastReadAt.${uid}`]: FieldValue.serverTimestamp(),
     };
     // Checkers (and any assigned staff) also clear their personal unread bucket
     // used when customers reply on shipment threads.
@@ -1732,9 +1749,54 @@ exports.markConversationRead = onCall(
       }
     }
 
-    await ref.update(updates);
+    const requestedIds = Array.isArray(req.data?.messageIds)
+      ? [...new Set(
+          req.data.messageIds
+            .map((value) => String(value || "").trim())
+            .filter(Boolean),
+        )].slice(0, 200)
+      : [];
+    let messageDocs = [];
 
-    return { success: true };
+    if (requestedIds.length) {
+      const refs = requestedIds.map((messageId) =>
+        ref.collection("messages").doc(messageId),
+      );
+      messageDocs = await db.getAll(...refs);
+    } else {
+      // Backward compatibility for older clients. New clients always provide
+      // visible message IDs so online presence alone never marks a message seen.
+      const latest = await ref
+        .collection("messages")
+        .orderBy("createdAt", "desc")
+        .limit(200)
+        .get();
+      messageDocs = latest.docs;
+    }
+
+    const batch = db.batch();
+    batch.update(ref, updates);
+    let seenCount = 0;
+    messageDocs.forEach((messageDoc) => {
+      if (!messageDoc.exists) return;
+      const message = messageDoc.data() || {};
+      if (String(message.senderId || "") === uid) return;
+      const alreadySeenByUser = Boolean(message.seenBy?.[uid] || message.readBy?.[uid]);
+      if (alreadySeenByUser && message.messageStatus === "seen") return;
+      const seenUpdate = {
+        [`seenBy.${uid}`]: FieldValue.serverTimestamp(),
+        [`readBy.${uid}`]: FieldValue.serverTimestamp(),
+        messageStatus: "seen",
+      };
+      if (!message.seenAt) {
+        seenUpdate.seenAt = FieldValue.serverTimestamp();
+      }
+      batch.update(messageDoc.ref, seenUpdate);
+      seenCount += 1;
+    });
+    await batch.commit();
+
+    return { success: true, seenCount };
   },
 );
 

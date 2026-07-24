@@ -14,6 +14,7 @@ const {
   resolveManifestStatus,
 } = require("./manifestStatus");
 const { resetPendingAmendmentSession } = require("./manifestAmendment");
+const { canAccessRecord } = require("../manager/managerAccess");
 
 if (!admin.apps.length) admin.initializeApp();
 const db = admin.firestore();
@@ -33,7 +34,7 @@ function resolveNextManifestStatusAfterUnlock() {
 exports.unlockTripManifest = onCall(
   { region: "asia-southeast1", maxInstances: 10 },
   async (req) => {
-    await requireRole(db, req, ["admin", "manager"]);
+    const actor = await requireRole(db, req, ["admin", "manager"]);
 
     const { uid, role, name } = updatedBy(req);
     const isAdmin = String(role || "").toLowerCase() === "admin";
@@ -51,6 +52,12 @@ exports.unlockTripManifest = onCall(
       if (!tripSnap.exists) throw new HttpsError("not-found", "Trip not found");
 
       const trip = tripSnap.data();
+      if (actor.role === "manager" && !canAccessRecord(actor.user, trip)) {
+        throw new HttpsError(
+          "permission-denied",
+          "This trip is outside your assigned warehouse or municipality.",
+        );
+      }
       const manifestStatus = resolveManifestStatus(trip);
       const wasReconciled = manifestStatus === MANIFEST_STATUS.RECONCILED;
       const wasLocked = trip.manifestLocked === true;

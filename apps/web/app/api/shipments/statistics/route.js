@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { headers } from "next/headers";
 import { Timestamp } from "firebase-admin/firestore";
 import { adminAuth, adminDb } from "@/lib/firebase-admin";
+import { managerCanAccessRecord } from "@/lib/managerAccess";
 
 export async function GET(request) {
   try {
@@ -54,6 +55,39 @@ export async function GET(request) {
 
     const startTimestamp = Timestamp.fromDate(startDate);
     const shipmentsRef = adminDb.collection("shipments");
+    const role = String(userData.role || "").toLowerCase();
+
+    if (role === "manager") {
+      const scopedSnapshot = await shipmentsRef
+        .where("updatedAt", ">=", startTimestamp)
+        .get();
+      const scoped = scopedSnapshot.docs
+        .filter((doc) => managerCanAccessRecord(userData, doc.data()))
+        .sort(
+          (left, right) =>
+            (right.data().updatedAt?.toMillis?.() || 0) -
+            (left.data().updatedAt?.toMillis?.() || 0),
+        );
+      const recentShipments = scoped.slice(0, limitParam).map((doc) => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          ...data,
+          updatedAt: data.updatedAt?.toDate().toISOString() || null,
+          createdAt: data.createdAt?.toDate().toISOString() || null,
+        };
+      });
+      return NextResponse.json({
+        stats: {
+          total: scoped.length,
+          delayed: scoped.filter((doc) => doc.data().delayCleared === false).length,
+          inTransit: scoped.filter(
+            (doc) => String(doc.data().status || "").toUpperCase() === "IN_TRANSIT",
+          ).length,
+        },
+        recentShipments,
+      });
+    }
 
     const qTotal = shipmentsRef
       .where("updatedAt", ">=", startTimestamp)

@@ -79,6 +79,15 @@ export default function CheckerTabsLayout() {
               ),
             }}
           />
+          <Tabs.Screen
+            name="profile"
+            options={{
+              title: "Profile",
+              tabBarIcon: ({ color }) => (
+                <FontAwesome5 name="user-circle" size={20} color={color} />
+              ),
+            }}
+          />
         </Tabs>
       </View>
     </View>

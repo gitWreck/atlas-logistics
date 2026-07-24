@@ -102,9 +102,12 @@ const TripBoard = forwardRef(function TripBoard(
         cache: "no-store",
       });
 
-      if (!res.ok) throw new Error("Failed to fetch trips");
-
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(
+          data.details || data.error || `Failed to fetch trips (${res.status})`,
+        );
+      }
 
       const formatted = (data.trips || []).map((trip) => ({
         ...trip,

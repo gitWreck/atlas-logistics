@@ -6,6 +6,7 @@ const {
 } = require("../utilities/invoiceLogger");
 
 const { updatedBy } = require("../utilities/helpers");
+const { canAccessRecord } = require("../manager/managerAccess");
 let sendInvoicesStatusSmsLogic = null;
 try {
   ({
@@ -102,6 +103,15 @@ exports.updateInvoiceStatus = onCall(
       if (shipmentDoc.exists) {
         shipmentData = shipmentDoc.data() || {};
       }
+    }
+    if (
+      String(userData.role || "").toLowerCase() === "manager" &&
+      (!shipmentData || !canAccessRecord(userData, shipmentData))
+    ) {
+      throw new HttpsError(
+        "permission-denied",
+        "This invoice is outside your assigned scope.",
+      );
     }
 
     const now = admin.firestore.Timestamp.now();

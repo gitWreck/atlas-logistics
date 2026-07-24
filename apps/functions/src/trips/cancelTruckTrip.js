@@ -17,6 +17,7 @@ const {
   assertTripNotArchived,
   updatedBy,
 } = require("./tripLifecycleAdmin");
+const { canAccessRecord } = require("../manager/managerAccess");
 
 if (!admin.apps.length) admin.initializeApp();
 const db = admin.firestore();
@@ -190,7 +191,7 @@ async function detachShipmentsFromTrip(tripDocId, actorName) {
 exports.cancelTruckTrip = onCall(
   { region: "asia-southeast1", maxInstances: 10 },
   async (req) => {
-    await requireTripLifecycleAdmin(db, req);
+    const actor = await requireTripLifecycleAdmin(db, req);
 
     const { uid, role, name } = updatedBy(req);
     const tripDocId = requireString(
@@ -208,6 +209,12 @@ exports.cancelTruckTrip = onCall(
       }
 
       const trip = tripSnap.data() || {};
+      if (actor.role === "manager" && !canAccessRecord(actor.user, trip)) {
+        throw new HttpsError(
+          "permission-denied",
+          "This trip is outside your assigned warehouse or municipality.",
+        );
+      }
       assertTripNotArchived(trip);
 
       const status = String(trip.status || "").toUpperCase();

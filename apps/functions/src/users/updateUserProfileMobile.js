@@ -24,7 +24,8 @@ exports.updateUserProfileMobile = onCall(
     const isSelf = uid === targetUid;
     const callerSnap = await db.collection("users").doc(uid).get();
     const callerData = callerSnap.data();
-    const isAdmin = ["admin", "manager"].includes(callerData?.role);
+    const callerRole = String(callerData?.role || "").toLowerCase();
+    const isAdmin = ["admin", "administrator"].includes(callerRole);
 
     if (!isSelf && !isAdmin) {
       throw new HttpsError(

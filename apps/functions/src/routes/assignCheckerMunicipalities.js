@@ -9,6 +9,11 @@ const {
   DELIVERY_MUNICIPALITIES,
   normalizeMunicipalityList,
 } = require("../../shared/deliveryMunicipalities");
+const {
+  canAccessStaff,
+  municipalityLabels,
+  overlaps,
+} = require("../manager/managerAccess");
 
 if (!admin.apps.length) admin.initializeApp();
 const db = admin.firestore();
@@ -43,6 +48,19 @@ exports.assignCheckerMunicipalities = onCall(
       throw new HttpsError(
         "failed-precondition",
         "Municipality assignment is only supported for checker accounts.",
+      );
+    }
+    if (
+      actor.role === "manager" &&
+      (!canAccessStaff(actor.user, checkerData) ||
+        (municipalityLabels(actor.user).length > 0 &&
+          !normalizedMunicipalities.every((municipality) =>
+            overlaps(municipalityLabels(actor.user), [municipality]),
+          )))
+    ) {
+      throw new HttpsError(
+        "permission-denied",
+        "This Checker or municipality is outside your assigned scope.",
       );
     }
 

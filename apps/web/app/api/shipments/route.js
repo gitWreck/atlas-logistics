@@ -7,6 +7,7 @@ import {
   calculateShipmentProgress,
 } from "@/app/utility/shipmentProgress";
 import { resolveShipmentPackageBreakdown } from "@/app/utility/packageStatus";
+import { managerCanAccessRecord } from "@/lib/managerAccess";
 
 export const dynamic = "force-dynamic";
 
@@ -71,9 +72,13 @@ export async function GET(request) {
 
     // THE 1-LINE FIX: Drop any document where it explicitly equals true.
     // This perfectly allows false, null, and missing fields to pass through.
-    const standardDocs = snapshot.docs.filter(
-      (doc) => doc.data().isPickupRequested !== true,
-    );
+    const standardDocs = snapshot.docs.filter((doc) => {
+      const data = doc.data();
+      return (
+        data.isPickupRequested !== true &&
+        managerCanAccessRecord(userData, data)
+      );
+    });
 
     // ---------------------------------------------------------
     // 4. PRE-FETCH TRUCK DATA

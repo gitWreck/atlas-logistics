@@ -16,7 +16,7 @@ const ALLOWED_ROLES = [
   "manager",
   "administrator",
 ];
-const STAFF_ROLES = ["admin", "manager", "administrator"];
+const STAFF_ROLES = ["admin", "administrator"];
 const profileCacheKey = (uid) => `atlas_profile_${String(uid || "").trim()}`;
 
 const AuthContext = createContext(null);
@@ -135,11 +135,16 @@ export function AuthProvider({ children }) {
     }
   };
 
-  const isAllowedRole = ALLOWED_ROLES.includes(role);
-  const isChecker = role === "checker";
-  const isDriver = role === "driver";
-  const isCustomer = role === "customer";
-  const isStaff = STAFF_ROLES.includes(role);
+  const isActive =
+    profile?.active !== false &&
+    String(profile?.status || "").toLowerCase() !== "inactive" &&
+    String(profile?.employmentStatus || "").toLowerCase() !== "inactive";
+  const isAllowedRole = isActive && ALLOWED_ROLES.includes(role);
+  const isChecker = isActive && role === "checker";
+  const isDriver = isActive && role === "driver";
+  const isCustomer = isActive && role === "customer";
+  const isManager = isActive && role === "manager";
+  const isStaff = isActive && STAFF_ROLES.includes(role);
 
   const value = {
     user,
@@ -148,9 +153,11 @@ export function AuthProvider({ children }) {
     loading,
     isReady,
     isAllowedRole,
+    isActive,
     isChecker,
     isDriver,
     isCustomer,
+    isManager,
     isStaff,
     signOut,
     refreshUser,

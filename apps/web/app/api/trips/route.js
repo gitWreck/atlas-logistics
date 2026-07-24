@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
-import { adminDb } from "@/lib/firebase-admin";
-import { getAuth } from "firebase-admin/auth";
+import { adminAuth, adminDb } from "@/lib/firebase-admin";
 import { headers } from "next/headers";
 import {
   MANIFEST_STATUS,
@@ -8,6 +7,7 @@ import {
   resolveManifestStatus,
 } from "@/app/utility/manifestStatus";
 import { getTripScopedPackages } from "@/app/utility/tripScopedPackages";
+import { managerCanAccessRecord } from "@/lib/managerAccess";
 
 export const dynamic = "force-dynamic"; // Prevent caching
 
@@ -292,7 +292,7 @@ export async function GET(request) {
     if (!token) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
-    const decodedToken = await getAuth().verifyIdToken(token);
+    const decodedToken = await adminAuth.verifyIdToken(token);
     const uid = decodedToken.uid;
 
     const { searchParams } = new URL(request.url);
@@ -320,8 +320,11 @@ export async function GET(request) {
       );
     }
 
+    const authorizedDocs = allDocs.filter((doc) =>
+      managerCanAccessRecord(userData, doc.data()),
+    );
     const limitedDocs = selectLimitedTripDocs(
-      allDocs,
+      authorizedDocs,
       activeLimit,
       completedLimit,
     );

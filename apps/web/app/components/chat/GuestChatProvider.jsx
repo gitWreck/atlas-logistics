@@ -154,9 +154,6 @@ export function GuestChatProvider({ children }) {
       setConversationId(existingId);
       initRef.current = true;
 
-      if (existingId) {
-        markConversationRead({ conversationId: existingId }).catch(() => {});
-      }
     } catch (error) {
       console.error("Failed to start live chat:", error);
       initRef.current = false;
@@ -194,7 +191,6 @@ export function GuestChatProvider({ children }) {
             ...doc.data(),
           })),
         );
-        markConversationRead({ conversationId }).catch(() => {});
       },
       (error) => {
         if (error?.code === "permission-denied") {
@@ -209,6 +205,14 @@ export function GuestChatProvider({ children }) {
       },
     );
   }, [chatUid, conversationId, isOpen]);
+
+  const markVisibleMessages = useCallback(
+    (messageIds) => {
+      if (!conversationId || !isOpen || !messageIds?.length) return;
+      markConversationRead({ conversationId, messageIds }).catch(() => {});
+    },
+    [conversationId, isOpen],
+  );
 
   const handleSend = useCallback(async () => {
     const text = draft.trim();
@@ -282,6 +286,7 @@ export function GuestChatProvider({ children }) {
         loading={loading}
         chatUid={chatUid}
         errorMessage={errorMessage}
+        onVisibleMessageIds={markVisibleMessages}
       />
     </GuestChatContext.Provider>
   );

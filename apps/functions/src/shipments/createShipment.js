@@ -26,6 +26,7 @@ const {
   canonicalMunicipalityLabel,
 } = require("../../shared/deliveryMunicipalities");
 const { defineSecret } = require("firebase-functions/params");
+const { canAccessRecord } = require("../manager/managerAccess");
 
 const SMTP_EMAIL = defineSecret("SMTP_EMAIL");
 const SMTP_PASSWORD = defineSecret("SMTP_PASSWORD");
@@ -70,7 +71,36 @@ exports.createShipment = onCall(
       municipality = null,
     } = request.data || {};
 
-    const { uid, role, name } = updatedBy(request);
+    const auditActor = updatedBy(request);
+    const actorSnap = await db.collection("users").doc(request.auth.uid).get();
+    const actorProfile = actorSnap.exists
+      ? { id: actorSnap.id, ...actorSnap.data() }
+      : {};
+    const profileRole = String(actorProfile.role || "").toLowerCase();
+    const uid = auditActor.uid;
+    const role = profileRole || auditActor.role;
+    const name =
+      actorProfile.fullName ||
+      actorProfile.name ||
+      actorProfile.displayName ||
+      auditActor.name;
+
+    if (
+      profileRole === "manager" &&
+      !canAccessRecord(actorProfile, {
+        origin,
+        originCode,
+        destination,
+        destinationCode,
+        municipality,
+        recipient,
+      })
+    ) {
+      throw new HttpsError(
+        "permission-denied",
+        "The shipment is outside your assigned warehouse or municipality.",
+      );
+    }
 
     if (!origin || !destination) {
       throw new HttpsError(

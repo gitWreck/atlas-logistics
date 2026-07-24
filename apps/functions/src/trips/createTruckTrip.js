@@ -11,6 +11,10 @@ const {
 } = require("../utilities/helpers");
 const { writeTripActionLog } = require("../utilities/tripLogger");
 const { MANIFEST_STATUS } = require("./manifestStatus");
+const {
+  canAccessRecord,
+  canAccessStaff,
+} = require("../manager/managerAccess");
 
 if (!admin.apps.length) admin.initializeApp();
 const db = admin.firestore();
@@ -51,6 +55,27 @@ exports.createTruckTrip = onCall(
 
     const plannedDeparture = req.data?.plannedDeparture;
     const estimatedArrival = req.data?.estimatedArrival;
+    const actorSnap = await db.collection("users").doc(req.auth.uid).get();
+    const actorProfile = actorSnap.exists
+      ? { id: actorSnap.id, ...actorSnap.data() }
+      : {};
+    const actorRole = String(actorProfile.role || "").toLowerCase();
+
+    if (
+      actorRole === "manager" &&
+      !canAccessRecord(actorProfile, {
+        origin: req.data?.origin,
+        originCode,
+        destination: req.data?.destination,
+        destinationCode,
+        municipality: req.data?.municipality,
+      })
+    ) {
+      throw new HttpsError(
+        "permission-denied",
+        "The trip is outside your assigned warehouse or municipality.",
+      );
+    }
 
     if (!plannedDeparture) {
       throw new HttpsError(
@@ -120,6 +145,15 @@ exports.createTruckTrip = onCall(
         throw new HttpsError("not-found", "Selected driver was not found.");
       }
       driver = snap.data() || null;
+      if (
+        actorRole === "manager" &&
+        !canAccessStaff(actorProfile, { id: snap.id, ...driver })
+      ) {
+        throw new HttpsError(
+          "permission-denied",
+          "The selected driver is outside your assigned scope.",
+        );
+      }
     }
 
     const today = yyyymmddFromDate(new Date());

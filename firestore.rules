@@ -42,6 +42,88 @@ service cloud.firestore {
       return hasAnyRole(['admin', 'manager', 'administrator']);
     }
 
+    function isAdmin() {
+      return hasAnyRole(['admin', 'administrator']);
+    }
+
+    function managerWarehouseCode() {
+      return userDoc().data.get('warehouseCode',
+        userDoc().data.get('assignedWarehouseCode', ''));
+    }
+
+    function managerWarehouseId() {
+      return userDoc().data.get('warehouseId',
+        userDoc().data.get('assignedWarehouseId', ''));
+    }
+
+    function managerWarehouseName() {
+      return userDoc().data.get('warehouseName',
+        userDoc().data.get('assignedWarehouseName', ''));
+    }
+
+    function managerHasWarehouseAssignment() {
+      return managerWarehouseCode() != ''
+        || managerWarehouseId() != ''
+        || managerWarehouseName() != '';
+    }
+
+    function managerMunicipalities() {
+      return userDoc().data.get('assignedMunicipalities',
+        userDoc().data.get('municipalityCoverage', []));
+    }
+
+    // Manager client reads require a matching warehouse assignment. Server
+    // callables repeat and broaden this normalization for legacy field names.
+    function managerCanAccessOperation(data) {
+      return hasRole('manager')
+        && managerHasWarehouseAssignment()
+        && (
+          managerWarehouseCode() in [
+            data.get('warehouseCode', ''),
+            data.get('assignedWarehouseCode', ''),
+            data.get('currentWarehouseCode', ''),
+            data.get('originCode', ''),
+            data.get('destinationCode', '')
+          ]
+          || managerWarehouseId() in [
+            data.get('warehouseId', ''),
+            data.get('assignedWarehouseId', ''),
+            data.get('currentWarehouseId', ''),
+            data.get('originWarehouseId', ''),
+            data.get('destinationWarehouseId', '')
+          ]
+          || managerWarehouseName() in [
+            data.get('warehouseName', ''),
+            data.get('assignedWarehouseName', ''),
+            data.get('currentWarehouseName', ''),
+            data.get('origin', ''),
+            data.get('destination', '')
+          ]
+        )
+        && (
+          managerMunicipalities().size() == 0
+          || data.get('municipality', '') == ''
+          || data.get('municipality', '') in managerMunicipalities()
+        );
+    }
+
+    function managerCanAccessConversation(conversation) {
+      let shipmentId = conversation.get('shipmentId',
+        conversation.get('trackingNumber', ''));
+      return hasRole('manager') && (
+        request.auth.uid in conversation.get('participantIds', [])
+        || conversation.get('assignedTo', '') == request.auth.uid
+        || conversation.get('assignedStaffId', '') == request.auth.uid
+        || (
+          shipmentId != ''
+          && exists(/databases/$(database)/documents/shipments/$(shipmentId))
+          && managerCanAccessOperation(
+            get(/databases/$(database)/documents/shipments/$(shipmentId)).data
+          )
+        )
+      );
+    }
+
     function isAnonymousUser() {
       return isSignedIn()
         && request.auth.token.firebase.sign_in_provider == 'anonymous';
@@ -83,7 +165,7 @@ service cloud.firestore {
     }
 
     function canReadDeliveryManifest() {
-      return isAdminOrManager() ||
+      return isAdmin() || managerCanAccessOperation(resource.data) ||
         (hasRole('checker') && resource.data.checkerId == request.auth.uid);
     }
 
@@ -93,7 +175,8 @@ service cloud.firestore {
           request.auth.uid == userId
           && (!exists(userDocPath()) || userDoc().data.get('active', true) != false)
         ) ||
-        isActiveUser() && hasAnyRole(['admin', 'manager'])
+        isAdmin()
+        || managerCanAccessOperation(resource.data)
       );
     }
 
@@ -167,7 +250,7 @@ service cloud.firestore {
       allow create: if isSignedIn() && request.auth.uid == userId;
       allow update: if isActiveUser() && (
         request.auth.uid == userId ||
-        isAdminOrManager()
+        isAdmin()
       );
       allow delete: if hasRole('admin');
 
@@ -204,7 +287,8 @@ service cloud.firestore {
       // Admins/managers can see the full support inbox (including unassigned
       // website guest chats). Guests/customers can read conversations they own.
       // Direct staff threads stay scoped to participants.
-      allow get: if isAdminOrManager()
+      allow get: if isAdmin()
+        || managerCanAccessConversation(resource.data)
         || canReadDirectStaffConversation(resource.data)
         || canReadOwnedConversation(resource.data)
         || (hasRole('employee') && (resource.data.assignedTo == request.auth.uid || resource.data.assignedStaffId == request.auth.uid))
@@ -217,7 +301,8 @@ service cloud.firestore {
           && request.auth.uid in resource.data.get('participantIds', [])
         );
 
-      allow list: if isAdminOrManager()
+      allow list: if isAdmin()
+        || managerCanAccessConversation(resource.data)
         || canListParticipantConversation(resource.data)
         || canReadOwnedConversation(resource.data)
         || (hasRole('employee') && (resource.data.assignedTo == request.auth.uid || resource.data.assignedStaffId == request.auth.uid))
@@ -226,7 +311,10 @@ service cloud.firestore {
       allow create, update, delete: if false;
 
       match /messages/{messageId} {
-        allow read: if isAdminOrManager()
+        allow read: if isAdmin()
+          || managerCanAccessConversation(
+            get(/databases/$(database)/documents/conversations/$(conversationId)).data
+          )
           || canReadDirectStaffConversation(
             get(/databases/$(database)/documents/conversations/$(conversationId)).data
           )
@@ -257,12 +345,12 @@ service cloud.firestore {
       allow get: if isSignedIn() && callDriverAssignmentIsCurrent(resource.data) && (
         resource.data.receiverId == request.auth.uid ||
         resource.data.callerId == request.auth.uid ||
-        isAdminOrManager()
+        isAdmin()
       );
       allow list: if isSignedIn() && callDriverAssignmentIsCurrent(resource.data) && (
         resource.data.receiverId == request.auth.uid ||
         resource.data.callerId == request.auth.uid ||
-        isAdminOrManager()
+        isAdmin()
       );
       allow create: if false;
       allow update: if isSignedIn() && callDriverAssignmentIsCurrent(resource.data) && (
@@ -275,8 +363,8 @@ service cloud.firestore {
     // --- OPERATIONS ---
 
     match /shipments/{shipmentId} {
-      allow get: if isAdminOrManager() || hasRole('checker') || driverCanReadShipmentData(resource.data) || customerOwnsShipment();
-      allow list: if isAdminOrManager() || hasRole('checker') || driverCanReadShipmentData(resource.data)
+      allow get: if isAdmin() || managerCanAccessOperation(resource.data) || hasRole('checker') || driverCanReadShipmentData(resource.data) || customerOwnsShipment();
+      allow list: if isAdmin() || managerCanAccessOperation(resource.data) || hasRole('checker') || driverCanReadShipmentData(resource.data)
         || customerOwnsShipment()
         || (
           hasRole('customer')
@@ -285,17 +373,23 @@ service cloud.firestore {
       allow create, update, delete: if false;
 
       match /status_events/{statusId} {
-        allow read: if isAdminOrManager() || hasRole('checker') || driverCanReadShipmentData(
+        allow read: if isAdmin() || managerCanAccessOperation(
+          get(/databases/$(database)/documents/shipments/$(shipmentId)).data
+        ) || hasRole('checker') || driverCanReadShipmentData(
           get(/databases/$(database)/documents/shipments/$(shipmentId)).data
         );
         allow create, update, delete: if false;
       }
 
       match /packages/{packageId} {
-        allow get: if isAdminOrManager() || hasRole('checker') || driverCanReadShipmentData(
+        allow get: if isAdmin() || managerCanAccessOperation(
+          get(/databases/$(database)/documents/shipments/$(shipmentId)).data
+        ) || hasRole('checker') || driverCanReadShipmentData(
           get(/databases/$(database)/documents/shipments/$(shipmentId)).data
         ) || customerOwnsShipment();
-        allow list: if isAdminOrManager() || hasRole('checker') || driverCanReadShipmentData(
+        allow list: if isAdmin() || managerCanAccessOperation(
+          get(/databases/$(database)/documents/shipments/$(shipmentId)).data
+        ) || hasRole('checker') || driverCanReadShipmentData(
           get(/databases/$(database)/documents/shipments/$(shipmentId)).data
         )
           || customerOwnsShipment()
@@ -307,10 +401,14 @@ service cloud.firestore {
       }
 
       match /invoices/{invoiceId} {
-        allow get: if isAdminOrManager() || hasRole('checker') || driverCanReadShipmentData(
+        allow get: if isAdmin() || managerCanAccessOperation(
+          get(/databases/$(database)/documents/shipments/$(shipmentId)).data
+        ) || hasRole('checker') || driverCanReadShipmentData(
           get(/databases/$(database)/documents/shipments/$(shipmentId)).data
         ) || customerOwnsShipment();
-        allow list: if isAdminOrManager() || hasRole('checker') || driverCanReadShipmentData(
+        allow list: if isAdmin() || managerCanAccessOperation(
+          get(/databases/$(database)/documents/shipments/$(shipmentId)).data
+        ) || hasRole('checker') || driverCanReadShipmentData(
           get(/databases/$(database)/documents/shipments/$(shipmentId)).data
         ) || customerOwnsShipment();
         allow create, update, delete: if false;
@@ -318,23 +416,27 @@ service cloud.firestore {
     }
 
     match /tracking_records/{trackingNumber} {
-      allow read: if isAdminOrManager() || hasRole('checker');
+      allow read: if isAdmin() || managerCanAccessOperation(resource.data) || hasRole('checker');
       allow write: if false;
 
       match /status_events/{statusId} {
-        allow read: if isAdminOrManager() || hasRole('checker');
+        allow read: if isAdmin() || managerCanAccessOperation(
+          get(/databases/$(database)/documents/tracking_records/$(trackingNumber)).data
+        ) || hasRole('checker');
         allow write: if false;
       }
     }
 
     match /truck_trips/{tripId} {
-      allow read: if isAdminOrManager() ||
+      allow read: if isAdmin() || managerCanAccessOperation(resource.data) ||
         hasRole('checker') ||
         (hasRole('driver') && isAssignedDriver());
       allow create, update, delete: if false;
 
       match /trip_shipments/{shipmentId} {
-        allow read: if isAdminOrManager() || hasRole('checker') || (
+        allow read: if isAdmin() || managerCanAccessOperation(
+          get(/databases/$(database)/documents/truck_trips/$(tripId)).data
+        ) || hasRole('checker') || (
           hasRole('driver') &&
           get(/databases/$(database)/documents/truck_trips/$(tripId)).data.get('driverId', null) == request.auth.uid
         );
@@ -342,7 +444,9 @@ service cloud.firestore {
       }
 
       match /trip_packages/{packageId} {
-        allow read: if isAdminOrManager() || hasRole('checker') || (
+        allow read: if isAdmin() || managerCanAccessOperation(
+          get(/databases/$(database)/documents/truck_trips/$(tripId)).data
+        ) || hasRole('checker') || (
           hasRole('driver') &&
           get(/databases/$(database)/documents/truck_trips/$(tripId)).data.get('driverId', null) == request.auth.uid
         );
@@ -350,19 +454,28 @@ service cloud.firestore {
       }
 
       match /manifest_amendments/{amendmentId} {
-        allow read: if isAdminOrManager();
+        allow read: if isAdmin() || managerCanAccessOperation(
+          get(/databases/$(database)/documents/truck_trips/$(tripId)).data
+        );
         allow create, update, delete: if false;
       }
 
       match /manifest_events/{eventId} {
-        allow read: if isAdminOrManager();
+        allow read: if isAdmin() || managerCanAccessOperation(
+          get(/databases/$(database)/documents/truck_trips/$(tripId)).data
+        );
         allow create, update, delete: if false;
       }
     }
 
     // Custody event ledger (append-only via Cloud Functions)
     match /shipment_events/{eventId} {
-      allow read: if isAdminOrManager() || hasRole('checker') || (
+      allow read: if isAdmin() || (
+        resource.data.get('shipmentId', '') != ''
+        && managerCanAccessOperation(
+          get(/databases/$(database)/documents/shipments/$(resource.data.shipmentId)).data
+        )
+      ) || hasRole('checker') || (
         hasRole('driver')
         && resource.data.get('shipmentId', '') != ''
         && driverCanReadShipmentData(
@@ -379,24 +492,24 @@ service cloud.firestore {
 
     // Sealed linehaul manifests and amendments (server-written; staff read)
     match /manifests/{manifestId} {
-      allow read: if isAdminOrManager();
+      allow read: if isAdmin() || managerCanAccessOperation(resource.data);
       allow create, update, delete: if false;
     }
 
     match /manifest_amendments/{amendmentId} {
-      allow read: if isAdminOrManager();
+      allow read: if isAdmin() || managerCanAccessOperation(resource.data);
       allow create, update, delete: if false;
     }
 
     // --- BILLING ---
 
     match /invoices/{invoiceId} {
-      allow read: if isAdminOrManager() || hasRole('checker');
+      allow read: if isAdmin() || managerCanAccessOperation(resource.data) || hasRole('checker');
       allow create, update, delete: if false;
     }
 
     match /invoice_events/{eventId} {
-      allow read: if isAdminOrManager();
+      allow read: if isAdmin() || managerCanAccessOperation(resource.data);
       allow create, update, delete: if false;
     }
 
@@ -416,20 +529,20 @@ service cloud.firestore {
     // --- ALERTS AND LOGS ---
 
     match /admin_alerts/{alertId} {
-      allow read: if isAdminOrManager();
-      allow update: if isAdminOrManager()
+      allow read: if isAdmin() || managerCanAccessOperation(resource.data);
+      allow update: if (isAdmin() || managerCanAccessOperation(resource.data))
         && request.resource.data.diff(resource.data).changedKeys().hasOnly(['status', 'readAt'])
         && request.resource.data.status in ['UNREAD', 'READ'];
       allow create, delete: if false;
     }
 
     match /sms_logs/{smsId} {
-      allow read: if isAdminOrManager();
+      allow read: if isAdmin() || managerCanAccessOperation(resource.data);
       allow write: if false;
     }
 
     match /notificationLogs/{logId} {
-      allow read: if isAdminOrManager();
+      allow read: if isAdmin() || managerCanAccessOperation(resource.data);
       allow write: if false;
     }
 
@@ -444,22 +557,27 @@ service cloud.firestore {
     }
 
     match /admin_logs/{logId} {
-      allow read: if isAdminOrManager();
+      allow read: if isAdmin() || managerCanAccessOperation(resource.data);
       allow write: if false;
     }
 
     match /routes/{routeId} {
-      allow read: if isAdminOrManager() || hasRole('checker');
+      allow read: if isAdmin() || managerCanAccessOperation(resource.data) || hasRole('checker');
       allow write: if false;
     }
 
     match /daily_route_assignments/{assignmentId} {
-      allow read: if isAdminOrManager() || hasRole('checker');
+      allow read: if isAdmin() || managerCanAccessOperation(resource.data) || hasRole('checker');
       allow write: if false;
     }
 
     match /scan_audit_logs/{logId} {
-      allow read: if isAdminOrManager();
+      allow read: if isAdmin() || (
+        resource.data.get('shipmentId', '') != ''
+        && managerCanAccessOperation(
+          get(/databases/$(database)/documents/shipments/$(resource.data.shipmentId)).data
+        )
+      );
       allow write: if false;
     }
   }
