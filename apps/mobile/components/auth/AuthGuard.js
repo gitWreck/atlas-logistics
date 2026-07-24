@@ -16,7 +16,8 @@ export default function AuthGuard({ role, children, loaderColor = COLORS.primary
 
   let allowed = false;
   if (role === "checker") {
-    allowed = isChecker;
+    // Admin/manager share the checker last-mile experience.
+    allowed = isChecker || isStaff;
   } else if (role === "driver") {
     allowed = isDriver;
   } else if (role === "customer") {

@@ -28,11 +28,8 @@ export default function Index() {
     return <Redirect href="/(auth)/login" />;
   }
 
-  if (isStaff) {
-    return <Redirect href="/(staff)/" />;
-  }
-
-  if (isChecker) {
+  // Admin/manager use the same last-mile app as checkers (all municipalities).
+  if (isStaff || isChecker) {
     return <Redirect href="/(checker)" />;
   }
 

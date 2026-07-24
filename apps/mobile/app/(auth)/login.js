@@ -73,12 +73,15 @@ export default function LoginScreen() {
         console.log("User Role:", role);
 
         // 4. Route based on Role
-        if (role === "admin" || role === "manager" || role === "administrator") {
-          router.replace("/(staff)/");
+        if (
+          role === "admin" ||
+          role === "manager" ||
+          role === "administrator" ||
+          role === "checker"
+        ) {
+          router.replace("/(checker)");
         } else if (role === "driver") {
           router.replace("/(driver)/");
-        } else if (role === "checker") {
-          router.replace("/(checker)");
         } else if (role === "customer") {
           router.replace("/(customer)/");
         } else {

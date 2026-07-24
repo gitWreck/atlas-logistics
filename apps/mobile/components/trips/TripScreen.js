@@ -36,11 +36,11 @@ import {
 
 export default function TripScreen() {
   const { colors, resolvedScheme } = useTheme();
-  const { role, isChecker, isDriver } = useAuth();
+  const { role, isCheckerOps, isDriver } = useAuth();
   const router = useRouter();
   const uid = auth.currentUser?.uid;
 
-  //   const [userName, setUserName] = useState(isChecker ? "Checker" : "Driver");
+  //   const [userName, setUserName] = useState(isCheckerOps ? "Checker" : "Driver");
   const [trips, setTrips] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -66,20 +66,20 @@ export default function TripScreen() {
         //       userData?.name ||
         //         userData?.fullName ||
         //         auth.currentUser?.displayName ||
-        //         (isChecker ? "Checker" : "Driver"),
+        //         (isCheckerOps ? "Checker" : "Driver"),
         //     );
         //   } else if (auth.currentUser?.displayName) {
         //     setUserName(auth.currentUser.displayName);
         //   }
         // }
 
-        const statuses = isChecker
+        const statuses = isCheckerOps
           ? CHECKER_VISIBLE_STATUSES
           : DRIVER_VISIBLE_STATUSES;
 
         // const tripsQuery = query(
         //   collection(db, "truck_trips"),
-        //   isChecker ? where("tripType" === "DEL") : "",
+        //   isCheckerOps ? where("tripType" === "DEL") : "",
         //   where("status", "in", statuses),
         //   orderBy("updatedAt", "desc"),
         // );
@@ -89,7 +89,7 @@ export default function TripScreen() {
           orderBy("updatedAt", "desc"),
         ];
 
-        if (isChecker) {
+        if (isCheckerOps) {
           constraints.unshift(where("tripType", "==", "DELIVERY"));
         }
 
@@ -135,7 +135,7 @@ export default function TripScreen() {
     return () => {
       if (unsubscribe) unsubscribe();
     };
-  }, [uid, isChecker, isDriver]);
+  }, [uid, isCheckerOps, isDriver]);
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -172,7 +172,7 @@ export default function TripScreen() {
       }
     }
 
-    if (isChecker) {
+    if (isCheckerOps) {
       if (activeTab !== "ALL") {
         filtered = filtered.filter((trip) => trip.status === activeTab);
       }
@@ -200,7 +200,7 @@ export default function TripScreen() {
   }, [
     trips,
     uid,
-    isChecker,
+    isCheckerOps,
     isDriver,
     activeTab,
     activeStatusFilter,
@@ -208,7 +208,7 @@ export default function TripScreen() {
   ]);
 
   const handleTripPress = (trip) => {
-    if (isChecker) {
+    if (isCheckerOps) {
       router.push({
         pathname: "/(checker)/trip-details",
         params: {
@@ -228,7 +228,7 @@ export default function TripScreen() {
   };
 
   const renderTabs = () => {
-    const tabs = isChecker ? CHECKER_TAB_OPTIONS : DRIVER_TAB_OPTIONS;
+    const tabs = isCheckerOps ? CHECKER_TAB_OPTIONS : DRIVER_TAB_OPTIONS;
     const activeChipColors =
       resolvedScheme === "dark"
         ? { bg: "#0284c7", border: "#0284c7", text: "#ffffff" }
@@ -287,7 +287,7 @@ export default function TripScreen() {
 
   const emptyText = searchText
     ? "No trips match your search."
-    : isChecker
+    : isCheckerOps
       ? "No active loads found."
       : activeTab === "COMPLETED"
         ? "No completed trips."
@@ -326,7 +326,7 @@ export default function TripScreen() {
           <TextInput
             style={[styles.searchInput, { color: colors.text }]}
             placeholder={
-              isChecker
+              isCheckerOps
                 ? "Search plate, route, driver..."
                 : "Search trips, route..."
             }
@@ -380,7 +380,7 @@ export default function TripScreen() {
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
             <FontAwesome5
-              name={isChecker ? "truck-loading" : "clipboard-list"}
+              name={isCheckerOps ? "truck-loading" : "clipboard-list"}
               size={40}
               color={colors.textMuted}
               style={{ marginBottom: 12 }}

@@ -56,11 +56,10 @@ export default function TripDetailsScreen() {
     UIManager.setLayoutAnimationEnabledExperimental(true);
   }
 
-  const { profile } = useAuth();
+  const { role, isCheckerOps, isDriver, profile } = useAuth();
 
   const { tripId } = useLocalSearchParams();
   const router = useRouter();
-  const { role, isChecker, isDriver } = useAuth();
 
   const [trip, setTrip] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -108,10 +107,10 @@ export default function TripDetailsScreen() {
   const isDelayed = trip?.delayCleared === false && !!trip?.delayReason;
 
   const roleLabel = useMemo(() => {
-    if (isChecker) return "Checker";
+    if (isCheckerOps) return "Checker";
     if (isDriver) return "Driver";
     return role || "User";
-  }, [isChecker, isDriver, role]);
+  }, [isCheckerOps, isDriver, role]);
 
   const canViewShipments = !!trip && !isCompleted;
   const isHubTransfer = String(trip?.tripType || "HUB_TRANSFER").toUpperCase() === "HUB_TRANSFER";
@@ -124,7 +123,7 @@ export default function TripDetailsScreen() {
   const canDriverMarkArrived = isDriver && isDriving && !isHubTransfer;
   const canDriverCompleteTrip = isDriver && isArrived;
 
-  const canCheckerOpenShipments = isChecker && !!trip;
+  const canCheckerOpenShipments = isCheckerOps && !!trip;
   const hasAnyBottomAction =
     canDriverStartTrip ||
     canDriverReportDelay ||
@@ -134,7 +133,7 @@ export default function TripDetailsScreen() {
     canCheckerOpenShipments;
 
   const handleViewShipments = () => {
-    const basePath = isChecker
+    const basePath = isCheckerOps
       ? "/(checker)/trip-shipments"
       : "/(driver)/trip-shipments";
 
@@ -536,7 +535,7 @@ export default function TripDetailsScreen() {
           delivered={trip.totalDelivered ?? 0}
         />
 
-        {isChecker && (
+        {isCheckerOps && (
           <View
             style={[
               styles.checkerInfoCard,
@@ -636,7 +635,7 @@ export default function TripDetailsScreen() {
               disabled={actionLoading}
             >
               <Text style={styles.secondaryLinkText}>
-                {isChecker ? "View Trip Shipments" : "View Shipments"}
+                {isCheckerOps ? "View Trip Shipments" : "View Shipments"}
               </Text>
             </TouchableOpacity>
           )}
