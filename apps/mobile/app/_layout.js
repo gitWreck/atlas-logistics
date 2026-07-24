@@ -5,6 +5,7 @@ import { AuthProvider } from "../contexts/AuthContext";
 import { ThemeProvider } from "../contexts/ThemeContext";
 import CustomerNotificationProvider from "../components/notifications/CustomerNotificationProvider";
 import IncomingCallListener from "../components/calls/IncomingCallListener";
+import { ErrorBoundary } from "../components/ErrorBoundary";
 
 // `Alert.alert` is a no-op on react-native-web, which makes confirmation
 // buttons (logout, delete, etc.) appear broken in the browser. Map it to the
@@ -37,15 +38,17 @@ if (Platform.OS === "web" && typeof window !== "undefined") {
 
 export default function RootLayout() {
   return (
-    <SafeAreaProvider>
-      <ThemeProvider>
-        <AuthProvider>
-          <CustomerNotificationProvider>
-            <IncomingCallListener />
-            <Stack screenOptions={{ headerShown: false }} />
-          </CustomerNotificationProvider>
-        </AuthProvider>
-      </ThemeProvider>
-    </SafeAreaProvider>
+    <ErrorBoundary>
+      <SafeAreaProvider>
+        <ThemeProvider>
+          <AuthProvider>
+            <CustomerNotificationProvider>
+              <IncomingCallListener />
+              <Stack screenOptions={{ headerShown: false }} />
+            </CustomerNotificationProvider>
+          </AuthProvider>
+        </ThemeProvider>
+      </SafeAreaProvider>
+    </ErrorBoundary>
   );
 }
