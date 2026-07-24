@@ -11,6 +11,7 @@ import React, {
 import {
   ActivityIndicator,
   Alert,
+  AppState,
   Animated,
   Dimensions,
   FlatList,
@@ -79,7 +80,6 @@ import {
   PersonAvatar,
   SupportAvatar,
   ThreadSkeleton,
-  TypingDots,
 } from "./ChatComponents";
 
 if (
@@ -183,7 +183,6 @@ function MessageBubble({ item, colors, onOpenImage, onCall, maskStaffIdentity, s
   const attachment = getMessageAttachment(message);
   const text = getMessageText(message);
   const appear = useRef(new Animated.Value(0)).current;
-  const sentStatusColor = item.seenByOther ? colors.accent : colors.textMuted;
 
   useEffect(() => {
     Animated.spring(appear, {
@@ -323,7 +322,16 @@ function MessageBubble({ item, colors, onOpenImage, onCall, maskStaffIdentity, s
             <Text style={[styles.metaTime, { color: colors.textMuted }]}>
               {formatClockTime(message.createdAt)}
             </Text>
-            <FontAwesome5 name="check-double" size={11} color={sentStatusColor} />
+            {item.showStatus ? (
+              <Text
+                style={[
+                  styles.messageStatusText,
+                  { color: item.seenByOther ? colors.accent : colors.textMuted },
+                ]}
+              >
+                {item.seenByOther ? "Seen" : "Sent"}
+              </Text>
+            ) : null}
           </View>
         ) : null}
       </View>
@@ -1057,7 +1065,13 @@ export default function ChatThread({
 
   const listRef = useRef(null);
   const shouldAutoScroll = useRef(true);
-  const lastReadRef = useRef(null);
+  const receiptContextRef = useRef({ conversationId: null, myUid: null });
+  const visibleMessageIdsRef = useRef([]);
+  const lastSeenSignatureRef = useRef("");
+  const viewabilityConfig = useRef({
+    itemVisiblePercentThreshold: 60,
+    minimumViewTime: 250,
+  }).current;
   const audioRecorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
   const recorderState = useAudioRecorderState(audioRecorder, 250);
 
@@ -1070,6 +1084,7 @@ export default function ChatThread({
   const [recordingStarting, setRecordingStarting] = useState(false);
   const [startingCall, setStartingCall] = useState(null);
   const [pendingAttachment, setPendingAttachment] = useState(null);
+  const [pendingSend, setPendingSend] = useState(null);
   const [emojiOpen, setEmojiOpen] = useState(false);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
   const [lightbox, setLightbox] = useState(null);
@@ -1082,6 +1097,7 @@ export default function ChatThread({
   const [newCount, setNewCount] = useState(0);
 
   const myUid = auth.currentUser?.uid;
+  receiptContextRef.current = { conversationId, myUid };
   const senderPhotoURLs = useMemo(
     () => Object.fromEntries(
       Object.entries(conversation?.participantProfiles || {}).map(([uid, profile]) => [
@@ -1186,7 +1202,7 @@ export default function ChatThread({
         });
         if (shouldAutoScroll.current) {
           setTimeout(
-            () => listRef.current?.scrollToEnd({ animated: true }),
+            () => listRef.current?.scrollToOffset({ offset: 0, animated: false }),
             60,
           );
         }
@@ -1195,24 +1211,53 @@ export default function ChatThread({
     );
   }, [conversationId, myUid]);
 
-  // Mark read on open and whenever a new inbound message arrives.
-  useEffect(() => {
-    if (!conversationId || !messages.length) return;
-    const last = messages[messages.length - 1];
-    if (last?.senderId && last.senderId !== myUid && lastReadRef.current !== last.id) {
-      lastReadRef.current = last.id;
-      markConversationRead({ conversationId: String(conversationId) }).catch(
-        () => {},
-      );
+  const markVisibleMessages = useCallback(() => {
+    const context = receiptContextRef.current;
+    const ids = visibleMessageIdsRef.current;
+    if (
+      AppState.currentState !== "active" ||
+      !context.conversationId ||
+      !ids.length
+    ) {
+      return;
     }
-  }, [messages, conversationId, myUid]);
+    const signature = `${context.conversationId}:${ids.join(",")}`;
+    if (lastSeenSignatureRef.current === signature) return;
+    lastSeenSignatureRef.current = signature;
+    markConversationRead({
+      conversationId: String(context.conversationId),
+      messageIds: ids,
+    }).catch(() => {
+      lastSeenSignatureRef.current = "";
+    });
+  }, []);
+
+  const onViewableItemsChanged = useRef(({ viewableItems }) => {
+    const { myUid: viewerUid } = receiptContextRef.current;
+    visibleMessageIdsRef.current = viewableItems
+      .map((entry) => entry.item)
+      .filter(
+        (item) =>
+          item?.type === "message" &&
+          item.message?.senderId &&
+          item.message.senderId !== viewerUid,
+      )
+      .map((item) => item.id)
+      .slice(0, 200);
+    markVisibleMessages();
+  }).current;
 
   useEffect(() => {
-    if (!conversationId) return;
-    markConversationRead({ conversationId: String(conversationId) }).catch(
-      () => {},
-    );
+    lastSeenSignatureRef.current = "";
+    visibleMessageIdsRef.current = [];
   }, [conversationId]);
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener("change", (state) => {
+      if (state === "active") markVisibleMessages();
+    });
+    return () => subscription.remove();
+  }, [markVisibleMessages]);
 
   // iOS: pad by keyboard height instead of KeyboardAvoidingView (negative
   // safe-area offsets were leaving a blank white gap above the keyboard).
@@ -1235,7 +1280,8 @@ export default function ChatThread({
   useEffect(() => {
     if (keyboardHeight <= 0) return;
     requestAnimationFrame(() => {
-      listRef.current?.scrollToEnd({ animated: true });
+      // Inverted list: offset 0 is the latest messages.
+      listRef.current?.scrollToOffset({ offset: 0, animated: true });
     });
   }, [keyboardHeight]);
 
@@ -1244,11 +1290,26 @@ export default function ChatThread({
     [messages, myUid],
   );
 
+  useEffect(() => {
+    shouldAutoScroll.current = true;
+    setNewCount(0);
+    setShowScrollDown(false);
+  }, [conversationId]);
+
+  useEffect(() => {
+    if (loading || !messages.length) return undefined;
+    const frame = requestAnimationFrame(() => {
+      listRef.current?.scrollToOffset({ offset: 0, animated: false });
+      setTimeout(() => listRef.current?.scrollToOffset({ offset: 0, animated: false }), 80);
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [conversationId, loading, messages.length]);
+
   const scrollToBottom = useCallback((animated = true) => {
     shouldAutoScroll.current = true;
     setNewCount(0);
     setShowScrollDown(false);
-    listRef.current?.scrollToEnd({ animated });
+    listRef.current?.scrollToOffset({ offset: 0, animated });
   }, []);
 
   const handleScroll = useCallback((event) => {
@@ -1348,17 +1409,29 @@ export default function ChatThread({
 
   const doSend = useCallback(
     async (payload) => {
-      if (!conversationId) return;
+      if (!conversationId) return false;
+      const preview = payload.attachmentType === "image"
+        ? "Photo"
+        : payload.attachmentType === "audio"
+          ? "Voice message"
+          : payload.attachmentType
+            ? payload.attachmentName || "Attachment"
+            : String(payload.text || "");
       try {
         setSending(true);
+        setPendingSend({ payload, preview, status: "sending" });
         await sendChatMessage({
           conversationId: String(conversationId),
           ...payload,
         });
+        setPendingSend(null);
         shouldAutoScroll.current = true;
-        setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 60);
+        setTimeout(() => listRef.current?.scrollToOffset({ offset: 0, animated: false }), 60);
+        return true;
       } catch (error) {
         console.error("Failed to send message:", error);
+        setPendingSend({ payload, preview, status: "failed" });
+        return false;
       } finally {
         setSending(false);
       }
@@ -1382,6 +1455,7 @@ export default function ChatThread({
     // Upload staged images/documents first, matching the attachment scheme
     // shared by the customer mobile chat and the web messaging console.
     if (pendingAttachment) {
+      let uploaded = false;
       try {
         setUploading(true);
         const attachmentType = pendingAttachment.type === "image" ? "image" : pendingAttachment.type === "audio" ? "audio" : "file";
@@ -1396,18 +1470,23 @@ export default function ChatThread({
         );
         await uploadBytes(storageRef, blob);
         const url = await getDownloadURL(storageRef);
-        await doSend({
+        const sent = await doSend({
           text: encodeTextAttachment({ url, type: attachmentType, name }),
           attachmentUrl: url,
           attachmentType,
           attachmentName: name,
         });
+        uploaded = sent;
       } catch (error) {
         console.error("Attachment upload failed:", error);
-        Alert.alert("Upload failed", "The attachment could not be sent. Please try again.");
+        setPendingSend({
+          preview: pendingAttachment.name || "Attachment",
+          status: "failed",
+          retryAttachment: true,
+        });
       } finally {
         setUploading(false);
-        setPendingAttachment(null);
+        if (uploaded) setPendingAttachment(null);
       }
     }
 
@@ -1416,6 +1495,18 @@ export default function ChatThread({
       await doSend({ text });
     }
   }, [draft, pendingAttachment, isClosed, sending, uploading, conversationId, doSend]);
+
+  const retryPendingSend = useCallback(() => {
+    if (!pendingSend || sending || uploading) return;
+    if (pendingSend.retryAttachment) {
+      setPendingSend(null);
+      void handleSend();
+      return;
+    }
+    if (pendingSend.payload) {
+      void doSend(pendingSend.payload);
+    }
+  }, [doSend, handleSend, pendingSend, sending, uploading]);
 
   const handlePickImage = useCallback(async () => {
     if (isClosed) return;
@@ -1589,18 +1680,6 @@ export default function ChatThread({
             <FontAwesome5 name="chevron-left" size={22} color={colors.text} />
           </TouchableOpacity>
         )}
-        {isDirectStaff || isStaffViewer ? (
-          <PersonAvatar
-            name={headerTitle}
-            avatarSeed={directContact?.id || conversation?.customerId || headerTitle}
-            photoURL={directContact?.photoURL}
-            online={isDirectStaff ? !!directContact?.online : true}
-            ringColor={colors.chatBg}
-            size={48}
-          />
-        ) : (
-          <SupportAvatar size={48} online ringColor={colors.chatBg} />
-        )}
         <View style={styles.headerText}>
           <Text
             style={[styles.headerTitle, { color: colors.text }]}
@@ -1690,14 +1769,18 @@ export default function ChatThread({
           <FlatList
             ref={listRef}
             data={items}
+            inverted={true}
             keyExtractor={(item) => item.id}
             renderItem={renderItem}
             contentContainerStyle={styles.messages}
             onScroll={handleScroll}
             scrollEventThrottle={32}
+            onViewableItemsChanged={onViewableItemsChanged}
+            viewabilityConfig={viewabilityConfig}
             onContentSizeChange={() => {
               if (shouldAutoScroll.current) {
-                listRef.current?.scrollToEnd({ animated: false });
+                listRef.current?.scrollToOffset({ offset: 0, animated: false });
+                setTimeout(() => listRef.current?.scrollToOffset({ offset: 0, animated: false }), 50);
               }
             }}
             ListHeaderComponent={!isDirectStaff && !isStaffViewer ? (
@@ -1726,16 +1809,60 @@ export default function ChatThread({
             }
           />
 
-          {/* Optimistic "sending" bubble */}
-          {sending || uploading ? (
+          {/* Optimistic outgoing bubble with retryable delivery state. */}
+          {pendingSend || uploading ? (
             <View style={styles.sendingRow}>
               <View
                 style={[
                   styles.sendingBubble,
-                  { backgroundColor: colors.receivedBg },
+                  {
+                    backgroundColor:
+                      pendingSend?.status === "failed"
+                        ? colors.dangerSoft
+                        : colors.sentBg,
+                  },
                 ]}
               >
-                <TypingDots color={colors.textMuted} />
+                <Text
+                  style={[
+                    styles.pendingMessageText,
+                    {
+                      color:
+                        pendingSend?.status === "failed"
+                          ? colors.danger
+                          : colors.sentText,
+                    },
+                  ]}
+                  numberOfLines={4}
+                >
+                  {pendingSend?.preview ||
+                    pendingAttachment?.name ||
+                    "Uploading attachment"}
+                </Text>
+              </View>
+              <View style={styles.pendingStatusRow}>
+                <Text
+                  style={[
+                    styles.messageStatusText,
+                    {
+                      color:
+                        pendingSend?.status === "failed"
+                          ? colors.danger
+                          : colors.textMuted,
+                    },
+                  ]}
+                >
+                  {pendingSend?.status === "failed"
+                    ? "Failed to send"
+                    : "Sending..."}
+                </Text>
+                {pendingSend?.status === "failed" ? (
+                  <TouchableOpacity onPress={retryPendingSend} activeOpacity={0.75}>
+                    <Text style={[styles.retryText, { color: colors.accent }]}>
+                      Retry
+                    </Text>
+                  </TouchableOpacity>
+                ) : null}
               </View>
             </View>
           ) : null}
@@ -2324,10 +2451,23 @@ const styles = StyleSheet.create({
   emptyText: { textAlign: "center", fontSize: 13, lineHeight: 19 },
   sendingRow: { paddingHorizontal: 20, paddingBottom: 4, alignItems: "flex-end" },
   sendingBubble: {
+    maxWidth: "76%",
     paddingHorizontal: 14,
     paddingVertical: 11,
     borderRadius: 18,
   },
+  pendingMessageText: { fontSize: 14, lineHeight: 19, fontWeight: "500" },
+  pendingStatusRow: {
+    minHeight: 22,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "flex-end",
+    gap: 10,
+    paddingHorizontal: 4,
+    paddingTop: 3,
+  },
+  messageStatusText: { fontSize: 11, lineHeight: 15, fontWeight: "600" },
+  retryText: { fontSize: 11, lineHeight: 15, fontWeight: "800" },
   scrollFab: {
     position: "absolute",
     right: 16,

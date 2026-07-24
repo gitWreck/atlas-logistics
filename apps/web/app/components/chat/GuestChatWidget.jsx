@@ -10,6 +10,12 @@ import {
 } from "@fortawesome/free-solid-svg-icons";
 import { formatFirestoreDate } from "@/app/utility/utilities";
 
+function isSeen(message = {}, senderId) {
+  if (message.messageStatus === "seen" || message.seenAt) return true;
+  const seen = message.seenBy || message.readBy || {};
+  return Object.keys(seen).some((uid) => uid && uid !== senderId);
+}
+
 export default function GuestChatWidget({
   isOpen,
   onClose,
@@ -22,8 +28,10 @@ export default function GuestChatWidget({
   loading,
   chatUid,
   errorMessage,
+  onVisibleMessageIds,
 }) {
   const listEndRef = useRef(null);
+  const messageListRef = useRef(null);
   const inputRef = useRef(null);
 
   useEffect(() => {
@@ -38,10 +46,54 @@ export default function GuestChatWidget({
     }
   }, [isOpen, loading]);
 
+  useEffect(() => {
+    if (!isOpen || !chatUid || !messageListRef.current) return undefined;
+    const root = messageListRef.current;
+    const reportVisibleMessages = () => {
+      if (document.visibilityState !== "visible" || !document.hasFocus()) return;
+      const rootRect = root.getBoundingClientRect();
+      const visibleIds = [...root.querySelectorAll("[data-message-id]")]
+        .filter((node) => node.dataset.senderId !== chatUid)
+        .filter((node) => {
+          const rect = node.getBoundingClientRect();
+          const visibleHeight = Math.max(
+            0,
+            Math.min(rect.bottom, rootRect.bottom) -
+              Math.max(rect.top, rootRect.top),
+          );
+          return rect.height > 0 && visibleHeight / rect.height >= 0.6;
+        })
+        .map((node) => node.dataset.messageId)
+        .filter(Boolean);
+      if (visibleIds.length) onVisibleMessageIds?.(visibleIds);
+    };
+
+    const observer = new IntersectionObserver(reportVisibleMessages, {
+      root,
+      threshold: 0.6,
+    });
+    root
+      .querySelectorAll("[data-message-id]")
+      .forEach((node) => observer.observe(node));
+    const frame = requestAnimationFrame(reportVisibleMessages);
+    window.addEventListener("focus", reportVisibleMessages);
+    document.addEventListener("visibilitychange", reportVisibleMessages);
+    return () => {
+      cancelAnimationFrame(frame);
+      observer.disconnect();
+      window.removeEventListener("focus", reportVisibleMessages);
+      document.removeEventListener("visibilitychange", reportVisibleMessages);
+    };
+  }, [chatUid, isOpen, messages, onVisibleMessageIds]);
+
   const handleSubmit = (event) => {
     event.preventDefault();
     onSend();
   };
+  const latestOutgoingId = [...messages]
+    .reverse()
+    .find((message) => message.senderId === chatUid)?.id;
+  const failed = String(errorMessage || "").toLowerCase().includes("failed to send");
 
   return (
     <>
@@ -83,7 +135,10 @@ export default function GuestChatWidget({
             </button>
           </div>
 
-          <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto px-5 py-3 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+          <div
+            ref={messageListRef}
+            className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto px-5 py-3 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
+          >
             {loading ? (
               <div className="flex h-full items-center justify-center text-[13px] font-medium text-slate-500">
                 Connecting to support...
@@ -114,6 +169,8 @@ export default function GuestChatWidget({
                   return (
                     <div
                       key={message.id}
+                      data-message-id={message.id}
+                      data-sender-id={message.senderId}
                       className={`flex min-w-0 w-full ${mine ? "justify-end" : "justify-start"}`}
                     >
                       <div
@@ -143,10 +200,34 @@ export default function GuestChatWidget({
                         <p className="whitespace-pre-wrap break-words text-[15px] leading-6 tracking-[-0.01em] [overflow-wrap:anywhere]">
                           {message.text}
                         </p>
+                        {mine && message.id === latestOutgoingId && (
+                          <p className={`mt-1 text-right text-[10px] font-medium ${isSeen(message, chatUid) ? "text-blue-100" : "text-white/60"}`}>
+                            {isSeen(message, chatUid) ? "Seen" : "Sent"}
+                          </p>
+                        )}
                       </div>
                     </div>
                   );
                 })}
+                {(sending || failed) && draft.trim() && (
+                  <div className="flex w-full justify-end">
+                    <div className="max-w-[82%]">
+                      <div className={`rounded-xl rounded-br-sm px-3.5 py-2 text-[15px] leading-6 ${failed ? "bg-red-500/15 text-red-100" : "bg-blue-600 text-white"}`}>
+                        {draft.trim()}
+                      </div>
+                      <div className="mt-1 flex items-center justify-end gap-2 text-[10px]">
+                        <span className={failed ? "font-semibold text-red-300" : "text-slate-400"}>
+                          {failed ? "Failed to send" : "Sending..."}
+                        </span>
+                        {failed && (
+                          <button type="button" onClick={onSend} className="font-bold text-blue-300 hover:underline">
+                            Retry
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
                 <div ref={listEndRef} />
               </div>
             )}

@@ -34,7 +34,6 @@ import {
 import { auth, db } from "../../../firebase";
 import {
   createConversation,
-  markConversationRead,
 } from "../../../components/utilities/FirebaseFunctions";
 import { useTheme } from "../../../contexts/ThemeContext";
 import ChatThread from "../../../components/chat/ChatThread";
@@ -215,7 +214,6 @@ export default function CustomerChatListScreen() {
   const [conversations, setConversations] = useState([]);
   const [loading, setLoading] = useState(true);
   const [starting, setStarting] = useState(false);
-  const [markingRead, setMarkingRead] = useState(false);
   const [composeVisible, setComposeVisible] = useState(false);
   const composeScrollRef = useRef(null);
   const [initialMessage, setInitialMessage] = useState("");
@@ -428,20 +426,6 @@ export default function CustomerChatListScreen() {
       Alert.alert("Unable to start conversation", "Please try again in a moment.");
     } finally {
       setStarting(false);
-    }
-  };
-
-  const handleMarkAllRead = async () => {
-    const unreadConversations = conversations.filter((item) => Number(item.unreadCounts?.[uid] || 0) > 0);
-    if (!unreadConversations.length || markingRead) return;
-
-    try {
-      setMarkingRead(true);
-      await Promise.all(unreadConversations.map((item) => markConversationRead({ conversationId: item.id })));
-    } catch (error) {
-      console.error("Failed to mark chats read:", error);
-    } finally {
-      setMarkingRead(false);
     }
   };
 

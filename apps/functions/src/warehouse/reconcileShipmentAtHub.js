@@ -10,6 +10,7 @@ const {
   assertEligibleForHubReconcile,
   getExpectedPieceCount,
 } = require("./hubReconcileEligibility");
+const { canAccessRecord } = require("../manager/managerAccess");
 
 if (!admin.apps.length) admin.initializeApp();
 const db = admin.firestore();
@@ -33,7 +34,7 @@ function parseNonNegativeInt(value, fieldName) {
 exports.reconcileShipmentAtHub = onCall(
   { region: "asia-southeast1", maxInstances: 10 },
   async (req) => {
-    await requireRole(db, req, ["admin", "manager"]);
+    const actor = await requireRole(db, req, ["admin", "manager"]);
 
     const { uid: actorUid, name: actorName, role: actorRole } = updatedBy(req);
     const {
@@ -62,6 +63,15 @@ exports.reconcileShipmentAtHub = onCall(
     }
 
     const shipmentData = shipmentSnap.data() || {};
+    if (
+      actor.role === "manager" &&
+      !canAccessRecord(actor.user, shipmentData)
+    ) {
+      throw new HttpsError(
+        "permission-denied",
+        "This shipment is outside your assigned warehouse or municipality.",
+      );
+    }
     assertEligibleForHubReconcile(shipmentRef.id, shipmentData.status);
 
     const defaultExpected = getExpectedPieceCount(shipmentData);

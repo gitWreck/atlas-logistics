@@ -6,12 +6,12 @@ import { COLORS, GLOBAL_STYLES } from "../constants/theme";
 /**
  * Protects role-based routes. Shows loading, redirects to login if unauthorized,
  * or renders children when user has the allowed role.
- * @param {"checker" | "driver" | "customer" | "staff"} role - Allowed role (lowercase).
+ * @param {"checker" | "driver" | "customer" | "manager" | "staff"} role - Allowed role (lowercase).
  * @param {React.ReactNode} children - Layout content to render when allowed.
  * @param {string} [loaderColor] - ActivityIndicator color (default: theme primary).
  */
 export default function AuthGuard({ role, children, loaderColor = COLORS.primary }) {
-  const { user, isChecker, isDriver, isCustomer, isStaff, loading, isReady } =
+  const { user, isChecker, isDriver, isCustomer, isManager, isStaff, loading, isReady } =
     useAuth();
 
   let allowed = false;
@@ -22,6 +22,8 @@ export default function AuthGuard({ role, children, loaderColor = COLORS.primary
     allowed = isDriver;
   } else if (role === "customer") {
     allowed = isCustomer;
+  } else if (role === "manager") {
+    allowed = isManager;
   } else if (role === "staff") {
     allowed = isStaff;
   }

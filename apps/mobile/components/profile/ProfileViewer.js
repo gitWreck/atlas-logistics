@@ -43,7 +43,7 @@ const DANGER = "#dc2626";
 
 const getInitialFormData = (user = {}) => ({
   name: user?.name || "",
-  phoneNumber: user?.phoneNumber || "",
+  phoneNumber: user?.phoneNumber || user?.phone || "",
   password: "",
   confirmPassword: "",
   address: {
@@ -130,6 +130,7 @@ export default function ProfileViewer({
     String(user?.role || "").toLowerCase(),
   );
   const isDriver = user?.role === "driver";
+  const isManager = user?.role === "manager";
   const isStaff = isChecker || isDriver || isAdminOps;
   const profilePhotoURL = String(user?.photoURL || "").trim();
   const config = roleConfig[user?.role] || {
@@ -139,7 +140,12 @@ export default function ProfileViewer({
     bg: "#f8fafc",
     border: "#e2e8f0",
   };
-  const publicId = user?.publicId || user?.userCode || user?.driverCode;
+  const publicId =
+    user?.employeeId ||
+    user?.employeeID ||
+    user?.publicId ||
+    user?.userCode ||
+    user?.driverCode;
 
   useEffect(() => {
     if (!isEditing) {
@@ -826,6 +832,20 @@ export default function ProfileViewer({
               icon: "user-check",
               editable: false,
             })}
+            {isManager && renderField({
+              label: "Assigned Municipalities",
+              value: driverMunicipality,
+              stateKey: "managerMunicipalities",
+              icon: "map-marker-alt",
+              editable: false,
+            })}
+            {isManager && renderField({
+              label: "Employment Status",
+              value: employmentStatus,
+              stateKey: "managerEmploymentStatus",
+              icon: "user-check",
+              editable: false,
+            })}
           </View>
         )}
 
@@ -952,7 +972,7 @@ export default function ProfileViewer({
           </View>
         )}
 
-        {!isEditing && !minimalStaff && (
+        {!isEditing && (!minimalStaff || isManager || isDriver) && (
           <View
             style={[
               styles.card,

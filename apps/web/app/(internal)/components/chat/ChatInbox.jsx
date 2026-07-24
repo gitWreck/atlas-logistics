@@ -40,7 +40,6 @@ import {
   faEnvelope,
   faCalendarDays,
   faLocationDot,
-  faCheckDouble,
   faXmark,
   faSpinner,
   faPaperclip,
@@ -52,6 +51,7 @@ import {
   sendChatMessage,
   startConversationCall,
   updateConversationStatus,
+  listManagerMobileConversations,
 } from "@/app/utility/FirebaseFunctions";
 import { formatFirestoreDate } from "@/app/utility/utilities";
 import TrackingResult from "@/app/(public)/components/tracking/TrackingResult";
@@ -73,6 +73,12 @@ function avatarColor(name = "") {
   let hash = 0;
   for (const ch of String(name)) hash = (hash * 31 + ch.charCodeAt(0)) & 0xffffffff;
   return palette[Math.abs(hash) % palette.length];
+}
+
+function messageSeenByRecipient(message = {}, senderId) {
+  if (message.messageStatus === "seen" || message.seenAt) return true;
+  const seen = message.seenBy || message.readBy || {};
+  return Object.keys(seen).some((uid) => uid && uid !== senderId);
 }
 
 const EMOJIS = [
@@ -360,6 +366,7 @@ export default function ChatInbox({ user, profile, isDark = false, onViewCustome
   const [statusFilter, setStatusFilter] = useState("open");
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
+  const [pendingOutgoing, setPendingOutgoing] = useState(null);
   const [uploading, setUploading] = useState(false);
   const [pendingFile, setPendingFile] = useState(null);
   const [pendingPreview, setPendingPreview] = useState("");
@@ -390,6 +397,7 @@ export default function ChatInbox({ user, profile, isDark = false, onViewCustome
   const [trackError, setTrackError] = useState("");
   const [trackData, setTrackData] = useState(null);
   const listEndRef = useRef(null);
+  const messageScrollRef = useRef(null);
   const fileInputRef = useRef(null);
   const emojiRef = useRef(null);
   const statusMenuRef = useRef(null);
@@ -507,18 +515,16 @@ export default function ChatInbox({ user, profile, isDark = false, onViewCustome
       );
 
       if (role === "manager") {
-        // Managers can read the full support inbox; surface unassigned website
-        // guest chats even before auto-assignment lands.
-        unsubscribers.push(
-          subscribe(
-            "unassignedSupport",
-            query(
-              collection(db, "conversations"),
-              where("status", "==", "unassigned"),
-              limit(100),
-            ),
-          ),
-        );
+        // Include scoped, unassigned shipment conversations without issuing a
+        // warehouse-wide client query.
+        listManagerMobileConversations()
+          .then((result) => {
+            sources.set("scopedSupport", result?.data?.conversations || []);
+            publish();
+          })
+          .catch((error) =>
+            console.error("Scoped Manager inbox failed:", error),
+          );
       }
     } else if (role === "customer") {
       unsubscribers.push(
@@ -553,8 +559,6 @@ export default function ChatInbox({ user, profile, isDark = false, onViewCustome
       return undefined;
     }
 
-    markConversationRead({ conversationId: selectedId }).catch(() => {});
-
     const q = query(
       collection(db, "conversations", selectedId, "messages"),
       orderBy("createdAt", "desc"),
@@ -572,6 +576,67 @@ export default function ChatInbox({ user, profile, isDark = false, onViewCustome
       );
     });
   }, [selectedId]);
+
+  useEffect(() => {
+    const root = messageScrollRef.current;
+    if (!selectedId || !root || typeof IntersectionObserver === "undefined") {
+      return undefined;
+    }
+
+    const visibleIncoming = new Set();
+    let flushTimer = null;
+    let lastSignature = "";
+    const flushSeen = () => {
+      if (
+        document.visibilityState !== "visible" ||
+        !document.hasFocus() ||
+        visibleIncoming.size === 0
+      ) {
+        return;
+      }
+      const messageIds = [...visibleIncoming].sort();
+      const signature = `${selectedId}:${messageIds.join(",")}`;
+      if (signature === lastSignature) return;
+      lastSignature = signature;
+      markConversationRead({ conversationId: selectedId, messageIds }).catch(
+        () => {
+          lastSignature = "";
+        },
+      );
+    };
+    const scheduleFlush = () => {
+      clearTimeout(flushTimer);
+      flushTimer = setTimeout(flushSeen, 250);
+    };
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          const messageId = entry.target.dataset.messageId;
+          const senderId = entry.target.dataset.senderId;
+          if (!messageId || senderId === user?.uid) return;
+          if (entry.isIntersecting && entry.intersectionRatio >= 0.6) {
+            visibleIncoming.add(messageId);
+          } else {
+            visibleIncoming.delete(messageId);
+          }
+        });
+        scheduleFlush();
+      },
+      { root, threshold: [0.6] },
+    );
+
+    root.querySelectorAll("[data-message-id]").forEach((node) => observer.observe(node));
+    const handleFocus = () => scheduleFlush();
+    window.addEventListener("focus", handleFocus);
+    document.addEventListener("visibilitychange", handleFocus);
+
+    return () => {
+      clearTimeout(flushTimer);
+      observer.disconnect();
+      window.removeEventListener("focus", handleFocus);
+      document.removeEventListener("visibilitychange", handleFocus);
+    };
+  }, [messages, selectedId, user?.uid]);
 
   // Drop any staged attachment when switching conversations.
   useEffect(() => {
@@ -595,6 +660,19 @@ export default function ChatInbox({ user, profile, isDark = false, onViewCustome
   const selected = useMemo(
     () => conversations.find((item) => item.id === selectedId) || null,
     [conversations, selectedId],
+  );
+  const latestOutgoingId = useMemo(
+    () =>
+      [...messages]
+        .reverse()
+        .find((message) => {
+          const ownerId =
+            String(message.type || "").toLowerCase() === "call"
+              ? message.callerId || message.senderId
+              : message.senderId;
+          return ownerId === user?.uid;
+        })?.id || null,
+    [messages, user?.uid],
   );
   const selectedDirectPeer = useMemo(
     () => getDirectPeer(selected || {}, user?.uid),
@@ -788,6 +866,19 @@ export default function ChatInbox({ user, profile, isDark = false, onViewCustome
     };
   }, [selectedId, conversations]);
 
+  const sendPayload = async (payload, preview) => {
+    setPendingOutgoing({ payload, preview, status: "sending" });
+    try {
+      await sendChatMessage(payload);
+      setPendingOutgoing(null);
+      return true;
+    } catch (error) {
+      console.error("Send failed:", error);
+      setPendingOutgoing({ payload, preview, status: "failed" });
+      return false;
+    }
+  };
+
   const handleSend = async (event) => {
     event?.preventDefault();
     const text = draft.trim();
@@ -802,6 +893,11 @@ export default function ChatInbox({ user, profile, isDark = false, onViewCustome
         const file = pendingFile;
         const isImage = file.type.startsWith("image/");
         setUploading(true);
+        setPendingOutgoing({
+          preview: isImage ? "Photo" : file.name,
+          status: "sending",
+          retryFile: true,
+        });
         try {
           const storageRef = ref(
             storage,
@@ -809,7 +905,7 @@ export default function ChatInbox({ user, profile, isDark = false, onViewCustome
           );
           await uploadBytes(storageRef, file);
           const url = await getDownloadURL(storageRef);
-          await sendChatMessage({
+          const sent = await sendPayload({
             conversationId: selectedId,
             text: isImage
               ? encodeTextAttachment({ url, type: "image", name: file.name })
@@ -817,20 +913,32 @@ export default function ChatInbox({ user, profile, isDark = false, onViewCustome
             attachmentUrl: url,
             attachmentType: isImage ? "image" : "file",
             attachmentName: file.name,
+          }, isImage ? "Photo" : file.name);
+          if (sent) clearPendingFile();
+        } catch (error) {
+          console.error("Upload failed:", error);
+          setPendingOutgoing({
+            preview: isImage ? "Photo" : file.name,
+            status: "failed",
+            retryFile: true,
           });
         } finally {
           setUploading(false);
         }
-        clearPendingFile();
       }
 
       if (text) {
-        await sendChatMessage({ conversationId: selectedId, text });
-        setDraft("");
+        const sent = await sendPayload(
+          { conversationId: selectedId, text },
+          text,
+        );
+        if (sent) setDraft("");
       }
     } catch (err) {
       console.error("Send failed:", err);
-      alert("Failed to send. Please try again.");
+      setPendingOutgoing((current) =>
+        current || { preview: text || pendingFile?.name || "Message", status: "failed" },
+      );
     } finally {
       setSending(false);
     }
@@ -840,9 +948,28 @@ export default function ChatInbox({ user, profile, isDark = false, onViewCustome
     if (!selectedId || sending || uploading || selected?.status === "closed") return;
     try {
       setSending(true);
-      await sendChatMessage({ conversationId: selectedId, text: "👍" });
+      await sendPayload(
+        { conversationId: selectedId, text: "👍" },
+        "👍",
+      );
     } catch (err) {
       console.error("Send failed:", err);
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const retryPendingOutgoing = async () => {
+    if (!pendingOutgoing || sending || uploading) return;
+    if (pendingOutgoing.retryFile && pendingFile) {
+      setPendingOutgoing(null);
+      await handleSend();
+      return;
+    }
+    if (!pendingOutgoing.payload) return;
+    try {
+      setSending(true);
+      await sendPayload(pendingOutgoing.payload, pendingOutgoing.preview);
     } finally {
       setSending(false);
     }
@@ -1277,7 +1404,10 @@ export default function ChatInbox({ user, profile, isDark = false, onViewCustome
               </div>
 
               {/* Messages */}
-              <div className={`min-h-0 flex-1 overflow-y-auto px-3 py-5 sm:px-4 ${isDark ? "bg-slate-950" : "bg-white"}`}>
+              <div
+                ref={messageScrollRef}
+                className={`min-h-0 flex-1 overflow-y-auto px-3 py-5 sm:px-4 ${isDark ? "bg-slate-950" : "bg-white"}`}
+              >
                 <div className="flex w-full flex-col gap-1">
                   {messages.map((message, idx) => {
                     const isCallMessage = String(message.type || "").trim().toLowerCase() === "call";
@@ -1294,6 +1424,8 @@ export default function ChatInbox({ user, profile, isDark = false, onViewCustome
                     return (
                       <div
                         key={message.id}
+                        data-message-id={message.id}
+                        data-sender-id={ownerId || ""}
                         className={`flex items-end gap-2 ${mine ? "justify-end" : "justify-start"}`}
                       >
                         {!mine &&
@@ -1338,12 +1470,47 @@ export default function ChatInbox({ user, profile, isDark = false, onViewCustome
                           )}
                           <div className={`mt-0.5 flex items-center gap-1 px-1 text-[10px] ${muted}`}>
                             <span>{formatFirestoreDate(message.createdAt) || ""}</span>
-                            {mine && <FontAwesomeIcon icon={faCheckDouble} className="text-blue-500" />}
+                            {mine && message.id === latestOutgoingId && (
+                              <span className={messageSeenByRecipient(message, ownerId) ? "font-semibold text-blue-500" : muted}>
+                                {messageSeenByRecipient(message, ownerId) ? "Seen" : "Sent"}
+                              </span>
+                            )}
                           </div>
                         </div>
                       </div>
                     );
                   })}
+                  {pendingOutgoing && (
+                    <div className="flex justify-end">
+                      <div className="flex min-w-0 max-w-[80%] flex-col items-end sm:max-w-[70%]">
+                        <div
+                          className={`max-w-full rounded-2xl rounded-br-md px-3.5 py-2.5 text-sm leading-relaxed shadow-sm ${
+                            pendingOutgoing.status === "failed"
+                              ? "bg-red-50 text-red-700"
+                              : "bg-blue-600 text-white"
+                          }`}
+                        >
+                          <p className="whitespace-pre-wrap break-words [overflow-wrap:anywhere]">
+                            {pendingOutgoing.preview || "Message"}
+                          </p>
+                        </div>
+                        <div className="mt-1 flex items-center gap-2 px-1 text-[10px]">
+                          <span className={pendingOutgoing.status === "failed" ? "font-semibold text-red-600" : muted}>
+                            {pendingOutgoing.status === "failed" ? "Failed to send" : "Sending..."}
+                          </span>
+                          {pendingOutgoing.status === "failed" && (
+                            <button
+                              type="button"
+                              onClick={retryPendingOutgoing}
+                              className="font-bold text-blue-600 hover:underline"
+                            >
+                              Retry
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )}
                   <div ref={listEndRef} />
                 </div>
               </div>

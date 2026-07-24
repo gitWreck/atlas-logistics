@@ -363,6 +363,7 @@ exports.createCheckerConversation = onCall(
     const contactSnap = await contactRef.get();
     if (!contactSnap.exists) throw new HttpsError("not-found", "Contact not found.");
     const contact = contactSnap.data() || {};
+    const contactRole = String(contact.role || "").toLowerCase();
 
     const ids = [uid, contactId].sort();
     const conversationId = `staff_${crypto.createHash("sha256").update(ids.join(":"))
@@ -370,10 +371,15 @@ exports.createCheckerConversation = onCall(
     const ref = db.collection("conversations").doc(conversationId);
     const now = FieldValue.serverTimestamp();
     const accessTokens = [checkerAccessToken(uid, accessKey)];
+    let driverAccessTokens = [];
 
-    if (String(contact.role || "").toLowerCase() === "checker") {
+    if (contactRole === "checker") {
       const contactAccessKey = await ensureCheckerAccessKey(contactId, contact, contactRef);
       accessTokens.push(checkerAccessToken(contactId, contactAccessKey));
+    }
+    if (contactRole === "driver") {
+      const contactAccessKey = await ensureDriverAccessKey(contactId, contact, contactRef);
+      driverAccessTokens = [driverAccessToken(contactId, contactAccessKey)];
     }
 
     const participantProfiles = {
@@ -394,6 +400,7 @@ exports.createCheckerConversation = onCall(
           },
           participantProfiles,
           checkerAccessTokens: accessTokens,
+          driverAccessTokens,
           status: "active",
           lastMessage: "",
           lastMessageText: "",
@@ -422,6 +429,12 @@ exports.createCheckerConversation = onCall(
           ),
           ...accessTokens,
         ]),
+        driverAccessTokens: uniqueStrings([
+          ...(existing.driverAccessTokens || []).filter(
+            (token) => !token.startsWith(`${contactId}:`),
+          ),
+          ...driverAccessTokens,
+        ]),
         updatedAt: now,
       });
     });
@@ -433,9 +446,44 @@ exports.createCheckerConversation = onCall(
 exports.listDriverChatContacts = onCall(
   { region: "asia-southeast1", maxInstances: 20, invoker: "public" },
   async (req) => {
-    const { driver, contacts, municipalities } = await getDriverAndContacts(req);
+    const { uid, driver, contacts, municipalities } = await getDriverAndContacts(req);
+    const accessKey = await ensureDriverAccessKey(uid, driver);
+    const accessToken = driverAccessToken(uid, accessKey);
+
+    // Repair older direct threads created before Driver access tokens were
+    // consistently attached. This keeps the security-rule-backed real-time
+    // query working without changing message timestamps or conversation order.
+    const conversationSnap = await db
+      .collection("conversations")
+      .where("participantIds", "array-contains", uid)
+      .get();
+    const batch = db.batch();
+    let repairCount = 0;
+    conversationSnap.docs.forEach((conversationDoc) => {
+      const conversation = conversationDoc.data() || {};
+      if (conversation.type !== "direct_staff") return;
+      const currentTokens = Array.isArray(conversation.driverAccessTokens)
+        ? conversation.driverAccessTokens
+        : [];
+      const nextTokens = uniqueStrings([
+        ...currentTokens.filter((token) => !token.startsWith(`${uid}:`)),
+        accessToken,
+      ]);
+      if (
+        currentTokens.length === nextTokens.length &&
+        currentTokens.every((token, index) => token === nextTokens[index])
+      ) {
+        return;
+      }
+      batch.update(conversationDoc.ref, { driverAccessTokens: nextTokens });
+      repairCount += 1;
+    });
+    if (repairCount) await batch.commit();
+
     return {
       contacts,
+      accessKey,
+      accessToken,
       warehouseName: driver.warehouseName || driver.warehouseCode || null,
       municipalities,
     };
@@ -541,7 +589,8 @@ exports.createDriverConversation = onCall(
 
 const STAFF_MESSAGING_ROLES = ["admin", "manager", "administrator"];
 
-async function authorizedContactsForStaff(uid) {
+async function authorizedContactsForStaff(uid, staffUser = {}) {
+  const staffRole = String(staffUser.role || "").toLowerCase();
   const usersSnap = await db.collection("users").where("role", "in", CONTACT_ROLES).get();
   return usersSnap.docs
     .filter((docSnap) => docSnap.id !== uid)
@@ -554,7 +603,12 @@ async function authorizedContactsForStaff(uid) {
       ) {
         return false;
       }
-      return CONTACT_ROLES.includes(String(contact.role || "").toLowerCase());
+      if (!CONTACT_ROLES.includes(String(contact.role || "").toLowerCase())) {
+        return false;
+      }
+      // Admin retains the global directory. Managers only see contacts in
+      // their assigned warehouse and, when configured, municipality scope.
+      return staffRole !== "manager" || contactIsAuthorized(staffUser, contact);
     })
     .map((contact) => serializeContact(contact.id, contact))
     .sort((a, b) => a.name.localeCompare(b.name));
@@ -563,8 +617,8 @@ async function authorizedContactsForStaff(uid) {
 exports.listStaffChatContacts = onCall(
   { region: "asia-southeast1", maxInstances: 20, invoker: "public" },
   async (req) => {
-    const { uid } = await requireRole(db, req, STAFF_MESSAGING_ROLES);
-    const contacts = await authorizedContactsForStaff(uid);
+    const { uid, user } = await requireRole(db, req, STAFF_MESSAGING_ROLES);
+    const contacts = await authorizedContactsForStaff(uid, user);
     return { contacts };
   },
 );
@@ -576,7 +630,7 @@ exports.createStaffConversation = onCall(
     if (!contactId) throw new HttpsError("invalid-argument", "contactId is required.");
 
     const { uid, user } = await requireRole(db, req, STAFF_MESSAGING_ROLES);
-    const contacts = await authorizedContactsForStaff(uid);
+    const contacts = await authorizedContactsForStaff(uid, user);
     const authorizedContact = contacts.find((contact) => contact.id === contactId);
     if (!authorizedContact) {
       throw new HttpsError("permission-denied", "This contact is not available.");

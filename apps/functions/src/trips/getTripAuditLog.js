@@ -3,6 +3,7 @@
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const admin = require("firebase-admin");
 const { requireTripLifecycleAdmin } = require("./tripLifecycleAdmin");
+const { canAccessRecord } = require("../manager/managerAccess");
 
 if (!admin.apps.length) admin.initializeApp();
 const db = admin.firestore();
@@ -29,7 +30,7 @@ function normalizeLogEntry(doc) {
 exports.getTripAuditLog = onCall(
   { region: "asia-southeast1", maxInstances: 10 },
   async (req) => {
-    await requireTripLifecycleAdmin(db, req);
+    const actor = await requireTripLifecycleAdmin(db, req);
 
     const tripDocId = String(req.data?.tripDocId || req.data?.tripId || "").trim();
     if (!tripDocId) {
@@ -43,6 +44,12 @@ exports.getTripAuditLog = onCall(
     }
 
     const trip = tripSnap.data() || {};
+    if (actor.role === "manager" && !canAccessRecord(actor.user, trip)) {
+      throw new HttpsError(
+        "permission-denied",
+        "This trip is outside your assigned warehouse or municipality.",
+      );
+    }
     const publicTripId = trip.tripId || tripDocId;
 
     const [byDocIdSnap, byTripIdSnap, manifestEventsSnap] = await Promise.all([

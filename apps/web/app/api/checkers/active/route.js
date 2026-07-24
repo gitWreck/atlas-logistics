@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 import { canAssignDeliveryRoutes } from "@/app/utility/deliveryRoutePermissions";
-import { adminDb } from "@/lib/firebase-admin";
-import { getAuth } from "firebase-admin/auth";
+import { adminAuth, adminDb } from "@/lib/firebase-admin";
 import { headers } from "next/headers";
+import { managerCanAccessRecord } from "@/lib/managerAccess";
 
 export const dynamic = "force-dynamic";
 
@@ -14,7 +14,7 @@ export async function GET() {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const decodedToken = await getAuth().verifyIdToken(token);
+    const decodedToken = await adminAuth.verifyIdToken(token);
     const uid = decodedToken.uid;
 
     const requesterSnap = await adminDb.collection("users").doc(uid).get();
@@ -35,16 +35,18 @@ export async function GET() {
       .where("active", "==", true)
       .get();
 
-    const checkers = snapshot.docs.map((doc) => ({
-      id: doc.id,
-      name: doc.data().fullName || doc.data().name || "Unknown Checker",
-      email: doc.data().email || "",
-      warehouseName: doc.data().warehouseName || "",
-      warehouseCode: doc.data().warehouseCode || "",
-      assignedMunicipalities: Array.isArray(doc.data().assignedMunicipalities)
-        ? doc.data().assignedMunicipalities
-        : [],
-    }));
+    const checkers = snapshot.docs
+      .filter((doc) => managerCanAccessRecord(requesterData, doc.data()))
+      .map((doc) => ({
+        id: doc.id,
+        name: doc.data().fullName || doc.data().name || "Unknown Checker",
+        email: doc.data().email || "",
+        warehouseName: doc.data().warehouseName || "",
+        warehouseCode: doc.data().warehouseCode || "",
+        assignedMunicipalities: Array.isArray(doc.data().assignedMunicipalities)
+          ? doc.data().assignedMunicipalities
+          : [],
+      }));
 
     return NextResponse.json({ checkers });
   } catch (error) {

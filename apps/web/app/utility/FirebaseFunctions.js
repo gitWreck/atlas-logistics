@@ -278,6 +278,10 @@ export const createConversation = httpsCallable(
   functions,
   "createConversation",
 );
+export const listManagerMobileConversations = httpsCallable(
+  functions,
+  "listManagerMobileConversations",
+);
 export const createCallHistoryMessage = httpsCallable(
   functions,
   "createCallHistoryMessage",

@@ -2,6 +2,10 @@ const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const admin = require("firebase-admin");
 const { FieldValue } = require("firebase-admin/firestore");
 const { normalizePhone } = require("../utilities/phoneHelpers");
+const {
+  getManagerScope,
+  key,
+} = require("../manager/managerAccess");
 
 // Ensure app is initialized
 if (admin.apps.length === 0) {
@@ -165,6 +169,22 @@ exports.createUserProfile = onCall(
         "Only admins can create staff; managers can create customers.",
       );
     }
+    const managerScope = canManagerCreateCustomer
+      ? getManagerScope(requester)
+      : null;
+    if (
+      canManagerCreateCustomer &&
+      managerScope.municipalities.length &&
+      city &&
+      !managerScope.municipalities.some(
+        (municipality) => key(municipality) === key(city),
+      )
+    ) {
+      throw new HttpsError(
+        "permission-denied",
+        "The customer municipality is outside your assigned scope.",
+      );
+    }
 
     try {
       // 3. Create Auth User
@@ -193,8 +213,16 @@ exports.createUserProfile = onCall(
         name: displayName,
         role: normalizedRole,
         phoneNumber: phoneNumber ? normalizePhone(phoneNumber) || null : null,
-        warehouseName: warehouseName || null,
-        warehouseCode: warehouseCode || null,
+        warehouseName: canManagerCreateCustomer
+          ? requester.warehouseName ||
+            requester.warehouseCode ||
+            managerScope.warehouses[0]
+          : warehouseName || null,
+        warehouseCode: canManagerCreateCustomer
+          ? requester.warehouseCode ||
+            requester.warehouseName ||
+            managerScope.warehouses[0]
+          : warehouseCode || null,
         active: true,
         status: "active",
         provider: "password",

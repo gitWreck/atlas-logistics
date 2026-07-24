@@ -246,6 +246,27 @@ exports.endCurrentCallSession =
 exports.generateTencentUserSig =
   require("./src/chat/generateTencentUserSig").generateTencentUserSig;
 
+// Manager mobile (all reads are warehouse/municipality scoped server-side)
+const managerMobile = require("./src/manager/managerMobile");
+exports.getManagerMobileDashboard = managerMobile.getManagerMobileDashboard;
+exports.listManagerMobileShipments = managerMobile.listManagerMobileShipments;
+exports.getManagerMobileShipment = managerMobile.getManagerMobileShipment;
+exports.listManagerMobileOperations = managerMobile.listManagerMobileOperations;
+exports.getManagerMobileTrip = managerMobile.getManagerMobileTrip;
+exports.getManagerMobileModules = managerMobile.getManagerMobileModules;
+exports.listManagerMobileNotifications =
+  managerMobile.listManagerMobileNotifications;
+exports.listManagerMobileConversations =
+  managerMobile.listManagerMobileConversations;
+exports.notifyManagersOnShipmentCreated =
+  managerMobile.notifyManagersOnShipmentCreated;
+exports.notifyManagersOnShipmentUpdated =
+  managerMobile.notifyManagersOnShipmentUpdated;
+exports.notifyManagersOnTripUpdated =
+  managerMobile.notifyManagersOnTripUpdated;
+exports.notifyManagersOnStaffAssignmentUpdated =
+  managerMobile.notifyManagersOnStaffAssignmentUpdated;
+
 // Firestore Triggers
 const {
   mirrorShipmentToPublic,

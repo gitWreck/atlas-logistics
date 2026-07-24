@@ -25,6 +25,7 @@ const {
 const { writeCustodyAuditLog } = require("../utilities/custodyAuditLog");
 const { MANIFEST_STATUS } = require("./manifestStatus");
 const { ORIGINAL_MANIFEST_VERSION } = require("./manifestAmendment");
+const { canAccessRecord } = require("../manager/managerAccess");
 
 if (!admin.apps.length) admin.initializeApp();
 const db = admin.firestore();
@@ -33,7 +34,7 @@ exports.generateTripManifest = onCall(
   { region: "asia-southeast1", maxInstances: 10 },
   async (req) => {
     // 1. Role Guard
-    await requireRole(db, req, ["admin", "manager"]);
+    const actor = await requireRole(db, req, ["admin", "manager"]);
 
     const tripId = requireString(req.data?.tripId, "tripId");
     const uid = req.auth.uid;
@@ -56,6 +57,12 @@ exports.generateTripManifest = onCall(
       if (!tripSnap.exists) throw new HttpsError("not-found", "Trip not found");
 
       const trip = tripSnap.data() || {};
+      if (actor.role === "manager" && !canAccessRecord(actor.user, trip)) {
+        throw new HttpsError(
+          "permission-denied",
+          "This trip is outside your assigned warehouse or municipality.",
+        );
+      }
 
       // Guard: Trip Status
       const tripClosed =

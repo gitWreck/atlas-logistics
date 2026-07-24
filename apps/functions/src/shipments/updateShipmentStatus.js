@@ -48,6 +48,7 @@ const {
   SEMAPHORE_SENDER_NAME,
 } = require("../../shared/sms-service");
 const { defineSecret } = require("firebase-functions/params");
+const { canAccessRecord } = require("../manager/managerAccess");
 
 const SMTP_EMAIL = defineSecret("SMTP_EMAIL");
 const SMTP_PASSWORD = defineSecret("SMTP_PASSWORD");
@@ -357,6 +358,15 @@ exports.updateShipmentStatus = onCall(
       }
 
       const currentData = shipmentSnap.data() || {};
+      if (
+        actor.role === "manager" &&
+        !canAccessRecord(actor.user, currentData)
+      ) {
+        throw new HttpsError(
+          "permission-denied",
+          "This shipment is outside your assigned warehouse or municipality.",
+        );
+      }
       updatedShipmentData = currentData;
       const oldStatus = currentData.status || null;
       shipmentWasOutForDelivery = wasShipmentOutForDelivery(oldStatus);

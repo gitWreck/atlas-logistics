@@ -73,12 +73,23 @@ export default function LoginScreen() {
         console.log("User Role:", role);
 
         // 4. Route based on Role
-        if (
+        const isActive =
+          userData.active !== false &&
+          String(userData.status || "").toLowerCase() !== "inactive" &&
+          String(userData.employmentStatus || "").toLowerCase() !== "inactive";
+        if (!isActive) {
+          Alert.alert(
+            "Account Inactive",
+            "Your account is inactive. Contact an administrator for access.",
+          );
+          await signOut(auth);
+        } else if (
           role === "admin" ||
           role === "manager" ||
           role === "administrator" ||
           role === "checker"
         ) {
+          // Admin/manager use the same last-mile app as checkers.
           router.replace("/(checker)");
         } else if (role === "driver") {
           router.replace("/(driver)/");

@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
-import { adminDb } from "@/lib/firebase-admin";
-import { getAuth } from "firebase-admin/auth";
+import { adminAuth, adminDb } from "@/lib/firebase-admin";
 import { headers } from "next/headers";
 
 export async function getManifestTripShipments(tripId) {
@@ -16,7 +15,7 @@ export async function getManifestTripShipments(tripId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const decodedToken = await getAuth().verifyIdToken(token);
+  const decodedToken = await adminAuth.verifyIdToken(token);
   const uid = decodedToken.uid;
 
   const userDoc = await adminDb.collection("users").doc(uid).get();

@@ -2,6 +2,7 @@ const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const admin = require("firebase-admin");
 const { writeInvoiceActionLog } = require("../utilities/invoiceLogger");
 const { updatedBy } = require("../utilities/helpers");
+const { canAccessRecord } = require("../manager/managerAccess");
 const { Timestamp } = admin.firestore;
 
 if (!admin.apps.length) admin.initializeApp();
@@ -52,6 +53,21 @@ exports.createInvoice = onCall(
     }
 
     const shipmentData = shipmentDoc.data();
+    const actorDoc = await db.collection("users").doc(request.auth.uid).get();
+    const actorProfile = actorDoc.exists ? actorDoc.data() : null;
+    const actorRole = String(actorProfile?.role || "").toLowerCase();
+    if (!["admin", "manager"].includes(actorRole)) {
+      throw new HttpsError(
+        "permission-denied",
+        "Only an Admin or Manager can create invoices.",
+      );
+    }
+    if (actorRole === "manager" && !canAccessRecord(actorProfile, shipmentData)) {
+      throw new HttpsError(
+        "permission-denied",
+        "This shipment is outside your assigned scope.",
+      );
+    }
 
     const existingInvoices = await db
       .collection("invoices")

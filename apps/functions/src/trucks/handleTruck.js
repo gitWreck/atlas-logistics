@@ -8,6 +8,10 @@ const {
   parseOptionalNumber,
   parseOptionalDateString,
 } = require("../utilities/helpers");
+const {
+  canAccessRecord,
+  getManagerScope,
+} = require("../manager/managerAccess");
 
 const REGION = "asia-southeast1";
 const ALLOWED_ROLES = new Set(["admin", "manager"]);
@@ -31,11 +35,22 @@ function requireAuth(request) {
   };
 }
 
+async function loadAuthorizedActor(db, request) {
+  const actor = requireAuth(request);
+  const snap = await db.collection("users").doc(actor.uid).get();
+  const profile = snap.exists ? { id: snap.id, ...snap.data() } : {};
+  const role = String(profile.role || actor.role || "").toLowerCase();
+  if (!ALLOWED_ROLES.has(role)) {
+    throw new HttpsError("permission-denied", "Admin or Manager access required.");
+  }
+  return { ...actor, role, profile };
+}
+
 exports.upsertTruck = onCall(
   { region: REGION, maxInstances: 10 },
   async (request) => {
-    const { uid, role } = requireAuth(request);
     const db = admin.firestore();
+    const { uid, role, profile } = await loadAuthorizedActor(db, request);
 
     const { id, ...data } = request.data || {};
 
@@ -116,6 +131,9 @@ exports.upsertTruck = onCall(
           if (!existingTruckSnap.exists) {
             throw new Error("NOT_FOUND");
           }
+          if (role === "manager" && !canAccessRecord(profile, existingTruckSnap.data())) {
+            throw new Error("OUTSIDE_SCOPE");
+          }
         }
 
         const duplicateQuery = db
@@ -148,6 +166,21 @@ exports.upsertTruck = onCall(
           updatedAt: timestamp,
           updatedBy: uid,
         };
+        if (role === "manager") {
+          const managerScope = getManagerScope(profile);
+          basePayload.warehouseCode =
+            data.warehouseCode ||
+            data.warehouseName ||
+            managerScope.warehouses[0];
+          basePayload.warehouseName =
+            data.warehouseName ||
+            profile.warehouseName ||
+            profile.warehouseCode ||
+            managerScope.warehouses[0];
+        } else {
+          basePayload.warehouseCode = data.warehouseCode || null;
+          basePayload.warehouseName = data.warehouseName || null;
+        }
 
         if (!id) {
           const createPayload = {
@@ -205,6 +238,12 @@ exports.upsertTruck = onCall(
       if (error.message === "NOT_FOUND") {
         throw new HttpsError("not-found", "Truck not found.");
       }
+      if (error.message === "OUTSIDE_SCOPE") {
+        throw new HttpsError(
+          "permission-denied",
+          "This truck is outside your assigned warehouse or municipality.",
+        );
+      }
 
       if (error instanceof HttpsError) {
         throw error;
@@ -218,8 +257,8 @@ exports.upsertTruck = onCall(
 exports.updateTruckStatus = onCall(
   { region: REGION, maxInstances: 10 },
   async (request) => {
-    const { uid, role } = requireAuth(request);
     const db = admin.firestore();
+    const { uid, role, profile } = await loadAuthorizedActor(db, request);
 
     const { truckId, status, plateNumber } = request.data || {};
 
@@ -247,6 +286,9 @@ exports.updateTruckStatus = onCall(
         }
 
         const truckData = truckSnap.data() || {};
+        if (role === "manager" && !canAccessRecord(profile, truckData)) {
+          throw new Error("OUTSIDE_SCOPE");
+        }
         const oldStatus = String(truckData.status || "").toUpperCase();
 
         if (oldStatus === normalizedStatus) {
@@ -290,6 +332,12 @@ exports.updateTruckStatus = onCall(
         throw new HttpsError(
           "failed-precondition",
           "Truck already has that status.",
+        );
+      }
+      if (error.message === "OUTSIDE_SCOPE") {
+        throw new HttpsError(
+          "permission-denied",
+          "This truck is outside your assigned warehouse or municipality.",
         );
       }
 

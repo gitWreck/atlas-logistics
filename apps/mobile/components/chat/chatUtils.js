@@ -279,9 +279,11 @@ export function buildMessageItems(messages = [], myUid) {
       timeValue(next.createdAt) - timeValue(msg.createdAt) < GROUP_WINDOW_MS &&
       isSameDay(next.createdAt, msg.createdAt);
 
+    const seenMap = msg.seenBy || msg.readBy || {};
     const seenByOther =
-      msg.readBy &&
-      Object.keys(msg.readBy).some((uid) => uid && uid !== myUid);
+      msg.messageStatus === "seen" ||
+      Boolean(msg.seenAt) ||
+      Object.keys(seenMap).some((uid) => uid && uid !== myUid);
 
     if (mine) {
       lastMineId = msg.id;
@@ -299,5 +301,14 @@ export function buildMessageItems(messages = [], myUid) {
     });
   }
 
-  return { items, lastSeenMineId, lastMineId };
+  // ChatThread uses an inverted FlatList, whose first data item is rendered at
+  // the visual bottom beside the composer. Build groups chronologically above,
+  // then reverse the completed rows so the newest message is data index zero.
+  // Without this, successful sends appear above the visible viewport while
+  // scrollToOffset(0) remains parked on the oldest message.
+  const statusItems = items.map((item) => ({
+    ...item,
+    showStatus: item.type === "message" && item.id === lastMineId,
+  }));
+  return { items: statusItems.reverse(), lastSeenMineId, lastMineId };
 }

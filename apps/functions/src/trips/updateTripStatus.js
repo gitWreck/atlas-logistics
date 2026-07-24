@@ -21,6 +21,7 @@ const { sealTripDeliveryManifest } = require("./tripDeliveryManifest");
 const {
   sendTripStatusCustomerNotifications,
 } = require("../notifications/customerNotificationService");
+const { canAccessRecord } = require("../manager/managerAccess");
 
 if (!admin.apps.length) admin.initializeApp();
 const db = admin.firestore();
@@ -86,6 +87,15 @@ exports.updateTripStatus = onCall(
     await db.runTransaction(async (tx) => {
       const tripSnap = await tx.get(tripRef);
       if (!tripSnap.exists) throw new HttpsError("not-found", "Trip not found");
+      if (
+        role === "manager" &&
+        !canAccessRecord(actor.user, tripSnap.data())
+      ) {
+        throw new HttpsError(
+          "permission-denied",
+          "This trip is outside your assigned warehouse or municipality.",
+        );
+      }
 
       if (
         role === "driver" &&

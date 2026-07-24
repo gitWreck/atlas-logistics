@@ -23,8 +23,10 @@ import { auth, db } from "../../firebase";
 import {
   createCheckerConversation,
   createDriverConversation,
+  createStaffConversation,
   listCheckerChatContacts,
   listDriverChatContacts,
+  listStaffChatContacts,
 } from "../utilities/FirebaseFunctions";
 import { useTheme } from "../../contexts/ThemeContext";
 import { useAuth } from "../../contexts/AuthContext";
@@ -37,6 +39,27 @@ import {
 } from "../chat/chatUtils";
 
 const TWO_PANEL_WIDTH = 900;
+
+function timestampMillis(value) {
+  if (!value) return 0;
+  if (typeof value?.toMillis === "function") return value.toMillis();
+  if (typeof value?.toDate === "function") return value.toDate().getTime();
+  if (value instanceof Date) return value.getTime();
+  if (Number.isFinite(value?.seconds)) {
+    return value.seconds * 1000 + Math.floor(Number(value.nanoseconds || 0) / 1e6);
+  }
+  const parsed = new Date(value).getTime();
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function conversationActivityMillis(conversation = {}) {
+  return Math.max(
+    timestampMillis(conversation.lastMessageAt),
+    timestampMillis(conversation.lastActivityAt),
+    timestampMillis(conversation.updatedAt),
+    timestampMillis(conversation.createdAt),
+  );
+}
 
 function ContactAvatar({ contact, colors, size = 54 }) {
   return (
@@ -64,7 +87,21 @@ function ContactRow({ contact, conversation, unread, active, colors, onPress, me
     ? displayMessagePreview({ text: conversation.lastMessageText })
     : messenger
       ? "Start a conversation"
-      : `${contact.roleLabel} · ${contact.municipality}`;
+      : "";
+
+  const normalizedRole = String(contact.roleLabel || contact.role || "")
+    .trim()
+    .toLowerCase();
+  const roleText = (() => {
+    if (normalizedRole.includes("admin")) return "(Admin)";
+    if (normalizedRole.includes("checker")) return "(Checker)";
+    if (normalizedRole.includes("manager")) return "(Manager)";
+    if (normalizedRole.includes("driver")) return "(Driver)";
+    if (normalizedRole.includes("customer")) return "(Customer)";
+    if (normalizedRole.includes("staff")) return "(Admin)";
+    return "(Admin)";
+  })();
+  const lastMessageStamp = conversation?.lastMessageAt ? formatListTime(conversation.lastMessageAt) : "";
 
   return (
     <Pressable
@@ -80,16 +117,17 @@ function ContactRow({ contact, conversation, unread, active, colors, onPress, me
       <ContactAvatar contact={contact} colors={colors} />
       <View style={styles.rowBody}>
         <View style={styles.rowTop}>
-          <Text style={[styles.rowTitle, { color: colors.text }]} numberOfLines={2}>
-            {contact.name}
-          </Text>
-          <Text style={[styles.rowTime, { color: colors.textMuted }]}>
-            {formatListTime(conversation?.lastMessageAt)}
-          </Text>
+          <View style={styles.nameRow}>
+            <Text style={[styles.rowTitle, { color: colors.text }]} numberOfLines={1}>
+              {contact.name}
+            </Text>
+            {roleText ? (
+              <Text style={[styles.role, messenger && styles.messengerRole, { color: colors.textMuted }]} numberOfLines={1}>
+                {roleText}
+              </Text>
+            ) : null}
+          </View>
         </View>
-        <Text style={[styles.role, messenger && styles.messengerRole, { color: messenger ? colors.textMuted : colors.accent }]} numberOfLines={1}>
-          {[contact.roleLabel, contact.municipality || contact.warehouseName].filter(Boolean).join(" · ")}
-        </Text>
         <View style={styles.previewLine}>
           <Text
             style={[
@@ -101,6 +139,11 @@ function ContactRow({ contact, conversation, unread, active, colors, onPress, me
           >
             {preview}
           </Text>
+          {lastMessageStamp ? (
+            <Text style={[styles.messageStamp, { color: colors.textMuted }]} numberOfLines={1}>
+              {lastMessageStamp}
+            </Text>
+          ) : null}
           {unread > 0 ? (
             messenger ? (
               <View style={[styles.messengerUnreadDot, { backgroundColor: colors.unread }]} />
@@ -144,11 +187,19 @@ export default function CheckerChatScreen({ accountType = "checker" }) {
   const roleFilterButtonRef = useRef(null);
   const uid = auth.currentUser?.uid;
   const isDriver = accountType === "driver";
+  const isManager = accountType === "manager";
+  const showMessengerLayout = true;
 
   const loadContacts = useCallback(async ({ refresh = false } = {}) => {
     try {
       if (refresh) setRefreshing(true);
-      const result = await (isDriver ? listDriverChatContacts() : listCheckerChatContacts());
+      const result = await (
+        isManager
+          ? listStaffChatContacts()
+          : isDriver
+            ? listDriverChatContacts()
+            : listCheckerChatContacts()
+      );
       const data = result?.data || {};
       setContacts(Array.isArray(data.contacts) ? data.contacts : []);
       setAccessToken(data.accessToken || null);
@@ -157,13 +208,13 @@ export default function CheckerChatScreen({ accountType = "checker" }) {
         municipalities: Array.isArray(data.municipalities) ? data.municipalities : [],
       });
     } catch (error) {
-      console.error(`${isDriver ? "Driver" : "Checker"} contacts load failed:`, error);
+      console.error(`${isManager ? "Manager" : isDriver ? "Driver" : "Checker"} contacts load failed:`, error);
       Alert.alert("Messages unavailable", "Authorized contacts could not be loaded. Please try again.");
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [isDriver]);
+  }, [isDriver, isManager]);
 
   useEffect(() => {
     const uid = auth.currentUser?.uid;
@@ -199,16 +250,21 @@ export default function CheckerChatScreen({ accountType = "checker" }) {
   }, [loadContacts]);
 
   useEffect(() => {
-    if (!accessToken || !uid) return undefined;
-    const conversationsQuery = query(
-      collection(db, "conversations"),
-      where(
-        isDriver ? "driverAccessTokens" : "checkerAccessTokens",
-        "array-contains",
-        accessToken,
-      ),
-      where("type", "==", "direct_staff"),
-    );
+    if ((!accessToken && !isManager) || !uid) return undefined;
+    const conversationsQuery = isManager
+      ? query(
+          collection(db, "conversations"),
+          where("participantIds", "array-contains", uid),
+        )
+      : query(
+          collection(db, "conversations"),
+          where(
+            isDriver ? "driverAccessTokens" : "checkerAccessTokens",
+            "array-contains",
+            accessToken,
+          ),
+          where("type", "==", "direct_staff"),
+        );
     return onSnapshot(
       conversationsQuery,
       (snapshot) => {
@@ -217,22 +273,20 @@ export default function CheckerChatScreen({ accountType = "checker" }) {
           .map((conversation) => ({ id: conversation.id, ...conversation.data() }))
           .filter((conversation) => {
             if (conversation.type !== "direct_staff") return false;
-            if (!isDriver) return true;
+            if (!isDriver && !isManager) return true;
             const contactId = (conversation.participantIds || []).find(
               (participantId) => participantId !== uid,
             );
             return Boolean(contactId && authorizedContactIds.has(contactId));
           })
           .sort((a, b) => {
-            const left = a.lastMessageAt?.toMillis?.() || 0;
-            const right = b.lastMessageAt?.toMillis?.() || 0;
-            return right - left;
+            return conversationActivityMillis(b) - conversationActivityMillis(a);
           });
         setConversations(next);
       },
-      (error) => console.error("Checker conversations subscription failed:", error),
+      (error) => console.error(`${isManager ? "Manager" : isDriver ? "Driver" : "Checker"} conversations subscription failed:`, error),
     );
-  }, [accessToken, contacts, isDriver, uid]);
+  }, [accessToken, contacts, isDriver, isManager, uid]);
 
   // Shipment customer threads the checker owns / participates in (My Deliveries).
   useEffect(() => {
@@ -250,11 +304,7 @@ export default function CheckerChatScreen({ accountType = "checker" }) {
       (snapshot) => {
         const next = snapshot.docs
           .map((conversation) => ({ id: conversation.id, ...conversation.data() }))
-          .sort((a, b) => {
-            const left = a.lastMessageAt?.toMillis?.() || 0;
-            const right = b.lastMessageAt?.toMillis?.() || 0;
-            return right - left;
-          });
+          .sort((a, b) => conversationActivityMillis(b) - conversationActivityMillis(a));
         setCustomerConversations(next);
       },
       (error) =>
@@ -270,11 +320,13 @@ export default function CheckerChatScreen({ accountType = "checker" }) {
         return;
       }
       router.push({
-        pathname: "/(checker)/chat/[conversationId]",
+        pathname: isManager
+          ? "/(manager)/chat/[conversationId]"
+          : "/(checker)/chat/[conversationId]",
         params: { conversationId: String(conversationId) },
       });
     },
-    [router, twoPanel],
+    [isManager, router, twoPanel],
   );
   const conversationByContact = useMemo(() => {
     const result = new Map();
@@ -295,9 +347,10 @@ export default function CheckerChatScreen({ accountType = "checker" }) {
         .toLowerCase()
         .includes(term);
     }).filter((contact) => {
-      if (!isDriver || messageFilter === "all") return true;
-      const conversation = conversationByContact.get(contact.id);
+      if (messageFilter === "customers") return false;
+      if (messageFilter === "all") return true;
       if (messageFilter === "unread") {
+        const conversation = conversationByContact.get(contact.id);
         return Number(conversation?.unreadCounts?.[uid] || 0) > 0;
       }
       const role = String(contact.role || "").toLowerCase();
@@ -313,24 +366,57 @@ export default function CheckerChatScreen({ accountType = "checker" }) {
       return true;
     });
     return visible.sort((a, b) => {
-      const left = conversationByContact.get(a.id)?.lastMessageAt?.toMillis?.() || 0;
-      const right = conversationByContact.get(b.id)?.lastMessageAt?.toMillis?.() || 0;
+      const left = conversationActivityMillis(conversationByContact.get(a.id));
+      const right = conversationActivityMillis(conversationByContact.get(b.id));
       return right - left || a.name.localeCompare(b.name);
     });
-  }, [contacts, conversationByContact, isDriver, messageFilter, search, uid]);
+  }, [contacts, conversationByContact, messageFilter, search, uid]);
+
+  const filteredCustomerConversations = useMemo(() => {
+    const term = search.trim().toLowerCase();
+    return customerConversations
+      .filter((conversation) => {
+        if (!term) return true;
+        return [
+          conversation.customerName,
+          conversation.trackingNumber,
+          conversation.shipmentId,
+          conversation.lastMessageText,
+        ]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase()
+          .includes(term);
+      })
+      .sort((a, b) => conversationActivityMillis(b) - conversationActivityMillis(a));
+  }, [customerConversations, search]);
+
+  const visibleListData = messageFilter === "customers" && !isDriver
+    ? filteredCustomerConversations
+    : filteredContacts;
 
   const openContact = useCallback(
     async (contact) => {
       if (openingId) return;
       try {
         setOpeningId(contact.id);
-        const result = await (isDriver ? createDriverConversation({ contactId: contact.id }) : createCheckerConversation({ contactId: contact.id }));
+        const result = await (
+          isManager
+            ? createStaffConversation({ contactId: contact.id })
+            : isDriver
+              ? createDriverConversation({ contactId: contact.id })
+              : createCheckerConversation({ contactId: contact.id })
+        );
         const conversationId = result?.data?.conversationId;
         if (!conversationId) throw new Error("Conversation was not created.");
         if (twoPanel) setSelectedId(conversationId);
         else {
           router.push({
-            pathname: isDriver ? "/(driver)/chat/[conversationId]" : "/(checker)/chat/[conversationId]",
+            pathname: isManager
+              ? "/(manager)/chat/[conversationId]"
+              : isDriver
+                ? "/(driver)/chat/[conversationId]"
+                : "/(checker)/chat/[conversationId]",
             params: { conversationId },
           });
         }
@@ -345,7 +431,7 @@ export default function CheckerChatScreen({ accountType = "checker" }) {
         setOpeningId(null);
       }
     },
-    [isDriver, loadContacts, openingId, router, twoPanel],
+    [isDriver, isManager, loadContacts, openingId, router, twoPanel],
   );
 
   const scopeLabel = [scope.warehouseName, scope.municipalities.join(", ")]
@@ -355,8 +441,8 @@ export default function CheckerChatScreen({ accountType = "checker" }) {
   const activeContacts = useMemo(
     () => [...contacts]
       .sort((a, b) => {
-        const left = conversationByContact.get(a.id)?.lastMessageAt?.toMillis?.() || 0;
-        const right = conversationByContact.get(b.id)?.lastMessageAt?.toMillis?.() || 0;
+        const left = conversationActivityMillis(conversationByContact.get(a.id));
+        const right = conversationActivityMillis(conversationByContact.get(b.id));
         return right - left || a.name.localeCompare(b.name);
       })
       .slice(0, 8),
@@ -387,13 +473,20 @@ export default function CheckerChatScreen({ accountType = "checker" }) {
       <View style={styles.messengerHeader}>
         <TouchableOpacity
           style={styles.messengerProfileButton}
-          onPress={() => router.navigate("/(driver)/(tabs)/profile")}
-          accessibilityLabel="Open Driver profile"
+          onPress={() => {
+            if (isDriver) {
+              router.navigate("/(driver)/(tabs)/profile");
+            } else if (isManager) {
+              router.navigate("/(manager)/(tabs)/profile");
+            }
+          }}
+          accessibilityLabel={isManager ? "Open Manager profile" : isDriver ? "Open Driver profile" : "Open profile"}
+          disabled={!isDriver && !isManager}
         >
           <ContactAvatar
             contact={{
               id: user?.uid || auth.currentUser?.uid,
-              name: user?.name || user?.fullName || user?.displayName || auth.currentUser?.displayName || "Driver",
+              name: user?.name || user?.fullName || user?.displayName || auth.currentUser?.displayName || (isManager ? "Manager" : isDriver ? "Driver" : "Checker"),
               photoURL: user?.photoURL || user?.profilePhotoURL || user?.profilePicture || user?.avatarUrl || auth.currentUser?.photoURL || null,
               online: false,
             }}
@@ -459,6 +552,7 @@ export default function CheckerChatScreen({ accountType = "checker" }) {
               ["manager", "Manager"],
               ["checker", "Checker"],
               ["driver", "Driver"],
+              ["customers", "Customers"],
             ].map(([value, label]) => (
               <TouchableOpacity
                 key={value}
@@ -475,34 +569,15 @@ export default function CheckerChatScreen({ accountType = "checker" }) {
     </View>
   ) : null;
 
-  const renderList = () => (
-    <LinearGradient
-      colors={
-        isDriver
-          ? [colors.chatBg, colors.chatBg]
-          : resolvedScheme === "dark"
-          ? ["#07111F", "#020916", "#07111F"]
-          : [themeColors.dashboardBg, colors.chatBg, themeColors.dashboardBg]
-      }
-      style={styles.listPanel}
-    >
-      {isDriver ? messengerHeader : <View style={styles.header}>
-        <View>
-          <Text style={[styles.eyebrow, { color: colors.accent }]}>{isDriver ? "DRIVER" : "CHECKER"}</Text>
-          <Text style={[styles.title, { color: colors.text }]}>Messages</Text>
-          <Text style={[styles.scope, { color: colors.textMuted }]} numberOfLines={1}>
-            {scopeLabel || "No warehouse or municipality assigned"}
-          </Text>
-        </View>
-      </View>}
-
+  const listHeader = (
+    <View style={styles.listHeaderContent}>
       <View style={[styles.search, { backgroundColor: colors.inputBar }]}>
         <Feather name="search" size={18} color={colors.textMuted} />
         <TextInput
           ref={searchInputRef}
           value={search}
           onChangeText={setSearch}
-          placeholder={isDriver ? "Search" : "Search people"}
+          placeholder="Search people"
           placeholderTextColor={colors.textMuted}
           style={[styles.searchInput, { color: colors.text }]}
           returnKeyType="search"
@@ -514,7 +589,7 @@ export default function CheckerChatScreen({ accountType = "checker" }) {
         ) : null}
       </View>
 
-      {isDriver && !loading && !search && activeContacts.length > 0 ? (
+      {showMessengerLayout && !loading && !search && activeContacts.length > 0 ? (
         <ScrollView
           horizontal
           style={styles.activeContactsScroller}
@@ -537,82 +612,112 @@ export default function CheckerChatScreen({ accountType = "checker" }) {
         </ScrollView>
       ) : null}
 
-      {!loading && !search && !isDriver && conversations.length > 0 ? (
-        <View style={styles.sectionHeader}>
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>Recent conversations</Text>
-          <Text style={[styles.sectionMeta, { color: colors.textMuted }]}>Calling is available inside chat</Text>
-        </View>
-      ) : null}
 
-      {!loading && !isDriver && customerConversations.length > 0 ? (
-        <View style={styles.customerSection}>
-          <View style={styles.sectionHeader}>
-            <Text style={[styles.sectionTitle, { color: colors.text }]}>
-              Customer deliveries
-            </Text>
-            <Text style={[styles.sectionMeta, { color: colors.textMuted }]}>
-              Replies go to you while you hold custody
-            </Text>
-          </View>
-          {customerConversations
-            .filter((conversation) => {
-              const term = search.trim().toLowerCase();
-              if (!term) return true;
-              return [
-                conversation.customerName,
-                conversation.trackingNumber,
-                conversation.shipmentId,
-              ]
-                .filter(Boolean)
-                .join(" ")
-                .toLowerCase()
-                .includes(term);
-            })
-            .map((conversation) => {
+      {driverFilterHeader}
+    </View>
+  );
+
+  const renderList = () => (
+    <LinearGradient
+      colors={
+        resolvedScheme === "dark"
+          ? ["#07111F", "#020916", "#07111F"]
+          : [themeColors.dashboardBg, colors.chatBg, themeColors.dashboardBg]
+      }
+      style={styles.listPanel}
+    >
+      {showMessengerLayout ? messengerHeader : <View style={styles.header}>
+        <View>
+          <Text style={[styles.eyebrow, { color: colors.accent }]}>{isDriver ? "DRIVER" : "CHECKER"}</Text>
+          <Text style={[styles.title, { color: colors.text }]}>Messages</Text>
+          <Text style={[styles.scope, { color: colors.textMuted }]} numberOfLines={1}>
+            {scopeLabel || "No warehouse or municipality assigned"}
+          </Text>
+        </View>
+      </View>}
+
+      <FlatList
+        data={visibleListData}
+        keyExtractor={(item) => item.id}
+        keyboardShouldPersistTaps="handled"
+        removeClippedSubviews={false}
+        style={styles.chatList}
+        contentContainerStyle={styles.listContent}
+        ListHeaderComponent={listHeader}
+        ListEmptyComponent={
+          loading ? (
+            <View style={styles.center}>
+              <ActivityIndicator color={colors.accent} />
+              <Text style={[styles.loadingText, { color: colors.textMuted }]}>Loading authorized contacts…</Text>
+            </View>
+          ) : (
+            <View style={styles.empty}>
+              <View style={[styles.emptyIcon, { backgroundColor: colors.accentSoft }]}>
+                <Feather name={search ? "search" : "users"} size={30} color={colors.accent} />
+              </View>
+              <Text style={[styles.emptyTitle, { color: colors.text }]}> 
+                {search
+                  ? "No matches"
+                  : messageFilter === "unread"
+                    ? "No unread messages"
+                    : messageFilter === "customers"
+                      ? "No customer messages"
+                      : messageFilter !== "all"
+                        ? `No ${messageFilter} contacts`
+                        : "No contacts"}
+              </Text>
+              <Text style={[styles.emptyText, { color: colors.textMuted }]}> 
+                {search
+                  ? "Try searching by name, role, or municipality."
+                  : messageFilter === "unread"
+                    ? "New unread conversations will appear here."
+                    : messageFilter === "customers"
+                      ? "Customer shipment conversations will appear here."
+                      : messageFilter !== "all"
+                        ? "Choose another role or select All to view everyone."
+                        : "Active personnel will appear here automatically."}
+              </Text>
+            </View>
+          )
+        }
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={() => loadContacts({ refresh: true })}
+            tintColor={colors.accent}
+          />
+        }
+        renderItem={({ item }) => {
+            if (messageFilter === "customers" && !isDriver) {
+              const conversation = item;
               const unread = Number(conversation?.unreadCounts?.[uid] || 0);
               const preview = conversation.lastMessageText
                 ? displayMessagePreview({ text: conversation.lastMessageText })
                 : "Shipment conversation";
               return (
                 <Pressable
-                  key={conversation.id}
                   onPress={() => openCustomerConversation(conversation.id)}
                   style={({ pressed }) => [
                     styles.row,
                     { borderBottomColor: colors.border },
-                    selectedId === conversation.id && {
-                      backgroundColor: colors.accentSoft,
-                    },
+                    selectedId === conversation.id && { backgroundColor: colors.accentSoft },
                     pressed && styles.rowPressed,
                   ]}
                 >
-                  <View
-                    style={[
-                      styles.customerAvatar,
-                      { backgroundColor: colors.accentSoft },
-                    ]}
-                  >
+                  <View style={[styles.customerAvatar, { backgroundColor: colors.accentSoft }]}>
                     <Feather name="package" size={22} color={colors.accent} />
                   </View>
                   <View style={styles.rowBody}>
                     <View style={styles.rowTop}>
-                      <Text
-                        style={[styles.rowTitle, { color: colors.text }]}
-                        numberOfLines={1}
-                      >
+                      <Text style={[styles.rowTitle, { color: colors.text }]} numberOfLines={1}>
                         {conversation.customerName || "Customer"}
                       </Text>
                       <Text style={[styles.rowTime, { color: colors.textMuted }]}>
                         {formatListTime(conversation.lastMessageAt)}
                       </Text>
                     </View>
-                    <Text
-                      style={[styles.role, { color: colors.accent }]}
-                      numberOfLines={1}
-                    >
-                      {conversation.trackingNumber ||
-                        conversation.shipmentId ||
-                        "Shipment"}
+                    <Text style={[styles.role, { color: colors.accent }]} numberOfLines={1}>
+                      {conversation.trackingNumber || conversation.shipmentId || "Shipment"}
                     </Text>
                     <View style={styles.previewLine}>
                       <Text
@@ -626,42 +731,15 @@ export default function CheckerChatScreen({ accountType = "checker" }) {
                         {preview}
                       </Text>
                       {unread > 0 ? (
-                        <View
-                          style={[styles.unread, { backgroundColor: colors.unread }]}
-                        >
-                          <Text style={styles.unreadText}>
-                            {unread > 99 ? "99+" : unread}
-                          </Text>
+                        <View style={[styles.unread, { backgroundColor: colors.unread }]}> 
+                          <Text style={styles.unreadText}>{unread > 99 ? "99+" : unread}</Text>
                         </View>
                       ) : null}
                     </View>
                   </View>
                 </Pressable>
               );
-            })}
-        </View>
-      ) : null}
-
-      {loading ? (
-        <View style={styles.center}>
-          <ActivityIndicator color={colors.accent} />
-          <Text style={[styles.loadingText, { color: colors.textMuted }]}>Loading authorized contacts…</Text>
-        </View>
-      ) : (
-        <FlatList
-          data={filteredContacts}
-          keyExtractor={(item) => item.id}
-          keyboardShouldPersistTaps="handled"
-          removeClippedSubviews={false}
-          ListHeaderComponent={isDriver ? driverFilterHeader : null}
-          refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={() => loadContacts({ refresh: true })}
-              tintColor={colors.accent}
-            />
-          }
-          renderItem={({ item }) => {
+            }
             const conversation = conversationByContact.get(item.id);
             return (
               <ContactRow
@@ -670,39 +748,12 @@ export default function CheckerChatScreen({ accountType = "checker" }) {
                 unread={Number(conversation?.unreadCounts?.[uid] || 0)}
                 active={twoPanel && conversation?.id === selectedId}
                 colors={colors}
-                messenger={isDriver}
+                messenger={false}
                 onPress={() => openContact(item)}
               />
             );
           }}
-          contentContainerStyle={filteredContacts.length ? styles.rows : styles.emptyList}
-          ListEmptyComponent={
-            <View style={styles.empty}>
-              <View style={[styles.emptyIcon, { backgroundColor: colors.accentSoft }]}>
-                <Feather name={search ? "search" : "users"} size={30} color={colors.accent} />
-              </View>
-              <Text style={[styles.emptyTitle, { color: colors.text }]}> 
-                {search
-                  ? "No matches"
-                  : messageFilter === "unread"
-                    ? "No unread messages"
-                    : messageFilter !== "all"
-                      ? `No ${messageFilter} contacts`
-                      : "No contacts"}
-              </Text>
-              <Text style={[styles.emptyText, { color: colors.textMuted }]}> 
-                {search
-                  ? "Try searching by name, role, or municipality."
-                  : messageFilter === "unread"
-                    ? "New unread conversations will appear here."
-                    : messageFilter !== "all"
-                      ? "Choose another role or select All to view everyone."
-                      : "Active personnel will appear here automatically."}
-              </Text>
-            </View>
-          }
         />
-      )}
     </LinearGradient>
   );
 
@@ -771,7 +822,8 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   searchInput: { flex: 1, minWidth: 0, fontSize: 15, paddingVertical: 10 },
-  rows: { paddingBottom: 90, zIndex: 0 },
+  chatList: { flex: 1 },
+  rows: { flexGrow: 1, paddingBottom: 90, zIndex: 0 },
   row: {
     minHeight: 86,
     paddingHorizontal: 16,
@@ -784,13 +836,15 @@ const styles = StyleSheet.create({
   rowPressed: { opacity: 0.72 },
   messengerRow: { minHeight: 82, paddingVertical: 10, borderBottomWidth: 0 },
   rowBody: { flex: 1, minWidth: 0 },
-  rowTop: { flexDirection: "row", alignItems: "center", gap: 8 },
-  rowTitle: { flex: 1, minWidth: 0, fontSize: 16, fontWeight: "800" },
-  rowTime: { fontSize: 11, fontWeight: "700" },
-  role: { marginTop: 3, fontSize: 12, fontWeight: "700" },
+  rowTop: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8 },
+  nameRow: { flex: 1, flexDirection: "row", alignItems: "center", gap: 6, flexWrap: "wrap" },
+  rowTitle: { flexShrink: 1, fontSize: 15, fontWeight: "700" },
+  rowTime: { fontSize: 11, fontWeight: "600", marginTop: 2 },
+  role: { fontSize: 12, fontWeight: "500", color: "#8A8F98" },
   messengerRole: { fontWeight: "500" },
   previewLine: { marginTop: 4, flexDirection: "row", alignItems: "center", gap: 8 },
   preview: { flex: 1, minWidth: 0, fontSize: 13 },
+  messageStamp: { fontSize: 11, fontWeight: "600", marginLeft: 6 },
   previewUnread: { fontWeight: "800" },
   filterArea: { position: "relative", paddingHorizontal: 16, paddingTop: 4, paddingBottom: 6 },
   messageFilters: { minHeight: 38, flexDirection: "row", alignItems: "center", gap: 8 },

@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
-import { adminDb } from "@/lib/firebase-admin";
-import { getAuth } from "firebase-admin/auth";
+import { adminAuth, adminDb } from "@/lib/firebase-admin";
 import { headers } from "next/headers";
 import { formatShipmentForBoard } from "@/app/utility/shipmentBoardFormatter";
 
@@ -18,7 +17,7 @@ export async function GET(request, { params }) {
     const token = headersList.get("authorization")?.split("Bearer ")[1];
     if (!token)
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    await getAuth().verifyIdToken(token);
+    await adminAuth.verifyIdToken(token);
 
     // 2. Fetch from the ROOT "shipments" collection
     const docRef = adminDb.collection("shipments").doc(id);
