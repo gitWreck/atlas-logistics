@@ -78,10 +78,12 @@ function threadSubtitle(conversation) {
   return "Team chat";
 }
 
-export default function StaffChatScreen() {
+export default function StaffChatScreen({
+  chatPathname = "/(staff)/chat/[conversationId]",
+}) {
   const router = useRouter();
   const { colors: themeColors, resolvedScheme } = useTheme();
-  const { user } = useAuth();
+  const { user, role } = useAuth();
   const colors = useMemo(
     () => getChatColors(themeColors, resolvedScheme),
     [themeColors, resolvedScheme],
@@ -96,6 +98,7 @@ export default function StaffChatScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [openingId, setOpeningId] = useState(null);
   const uid = auth.currentUser?.uid || user?.uid;
+  const roleLabel = String(role || user?.role || "staff").toUpperCase();
 
   const loadContacts = useCallback(async ({ refresh = false } = {}) => {
     try {
@@ -209,11 +212,11 @@ export default function StaffChatScreen() {
     (conversationId) => {
       if (!conversationId) return;
       router.push({
-        pathname: "/(staff)/chat/[conversationId]",
+        pathname: chatPathname,
         params: { conversationId: String(conversationId) },
       });
     },
-    [router],
+    [chatPathname, router],
   );
 
   const openContact = useCallback(
@@ -355,7 +358,7 @@ export default function StaffChatScreen() {
   return (
     <View style={[styles.container, { backgroundColor: colors.chatBg }]}>
       <View style={styles.header}>
-        <Text style={[styles.eyebrow, { color: colors.accent }]}>STAFF</Text>
+        <Text style={[styles.eyebrow, { color: colors.accent }]}>{roleLabel}</Text>
         <Text style={[styles.title, { color: colors.text }]}>Messages</Text>
         <Text style={[styles.scope, { color: colors.textMuted }]}>
           Customers, support, and team
