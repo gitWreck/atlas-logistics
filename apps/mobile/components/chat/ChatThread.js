@@ -14,6 +14,7 @@ import {
   AppState,
   Animated,
   Dimensions,
+  Easing,
   FlatList,
   Keyboard,
   LayoutAnimation,
@@ -88,6 +89,9 @@ if (
 ) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
 }
+
+const COMPOSER_ACTION_SLOT = 36;
+const COMPOSER_ACTIONS_WIDTH = COMPOSER_ACTION_SLOT * 4;
 
 const EMOJIS = [
   "😀", "😁", "😂", "🤣", "😊", "😍", "😘", "😎",
@@ -1078,6 +1082,8 @@ export default function ChatThread({
   const [conversation, setConversation] = useState(null);
   const [messages, setMessages] = useState([]);
   const [draft, setDraft] = useState("");
+  const [composerActionsOpen, setComposerActionsOpen] = useState(true);
+  const composerActionsAnim = useRef(new Animated.Value(1)).current;
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -1349,6 +1355,54 @@ export default function ChatThread({
   const maskStaffIdentity = !isDirectStaff && !isStaffViewer;
   const hasShipment = !!(conversation?.trackingNumber || conversation?.shipmentId);
   const canSend = !!draft.trim() || !!pendingAttachment;
+  // Messenger-style: collapse plus/camera/gallery/mic while typing so the
+  // input can use the full width. Keep actions visible while recording.
+  const forceComposerActionsOpen =
+    recorderState.isRecording || recordingStarting;
+
+  const setComposerActionsVisible = useCallback(
+    (open, { animated = true } = {}) => {
+      setComposerActionsOpen(open);
+      if (!animated) {
+        composerActionsAnim.setValue(open ? 1 : 0);
+        return;
+      }
+      Animated.timing(composerActionsAnim, {
+        toValue: open ? 1 : 0,
+        duration: 125,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: false,
+      }).start();
+    },
+    [composerActionsAnim],
+  );
+
+  useEffect(() => {
+    if (forceComposerActionsOpen && !composerActionsOpen) {
+      setComposerActionsVisible(true);
+    }
+  }, [
+    composerActionsOpen,
+    forceComposerActionsOpen,
+    setComposerActionsVisible,
+  ]);
+
+  const handleDraftChange = useCallback(
+    (value) => {
+      const next = String(value ?? "");
+      const hadText = !!draft.trim();
+      const hasText = !!next.trim();
+      if (hadText !== hasText && !forceComposerActionsOpen) {
+        setComposerActionsVisible(!hasText);
+      }
+      setDraft(next);
+    },
+    [draft, forceComposerActionsOpen, setComposerActionsVisible],
+  );
+
+  const expandComposerActions = useCallback(() => {
+    setComposerActionsVisible(true);
+  }, [setComposerActionsVisible]);
   const showSendButton = canSend || sending || uploading;
 
   const openTracking = useCallback(() => {
@@ -1443,9 +1497,10 @@ export default function ChatThread({
     (text) => {
       if (isClosed || sending || uploading) return;
       setDraft("");
+      setComposerActionsVisible(true);
       doSend({ text });
     },
-    [doSend, isClosed, sending, uploading],
+    [doSend, isClosed, sending, setComposerActionsVisible, uploading],
   );
 
   const handleSend = useCallback(async () => {
@@ -1492,9 +1547,19 @@ export default function ChatThread({
 
     if (text) {
       setDraft("");
+      setComposerActionsVisible(true);
       await doSend({ text });
     }
-  }, [draft, pendingAttachment, isClosed, sending, uploading, conversationId, doSend]);
+  }, [
+    draft,
+    pendingAttachment,
+    isClosed,
+    sending,
+    uploading,
+    conversationId,
+    doSend,
+    setComposerActionsVisible,
+  ]);
 
   const retryPendingSend = useCallback(() => {
     if (!pendingSend || sending || uploading) return;
@@ -1680,7 +1745,13 @@ export default function ChatThread({
             <FontAwesome5 name="chevron-left" size={22} color={colors.text} />
           </TouchableOpacity>
         )}
-        <View style={styles.headerText}>
+        <TouchableOpacity
+          style={styles.headerText}
+          onPress={() => setInfoOpen((open) => !open)}
+          activeOpacity={0.7}
+          accessibilityRole="button"
+          accessibilityLabel="Chat information"
+        >
           <Text
             style={[styles.headerTitle, { color: colors.text }]}
             numberOfLines={1}
@@ -1693,7 +1764,7 @@ export default function ChatThread({
           >
             {headerSubtitle}
           </Text>
-        </View>
+        </TouchableOpacity>
         <View style={styles.headerActions}>
           <TouchableOpacity
             style={styles.headerActionBtn}
@@ -1724,15 +1795,6 @@ export default function ChatThread({
             )}
           </TouchableOpacity>
         </View>
-        <TouchableOpacity
-          style={[styles.headerBtn, styles.headerInfoBtn, { backgroundColor: colors.accentSoft }]}
-          onPress={() => setInfoOpen(true)}
-          hitSlop={8}
-          accessibilityRole="button"
-          accessibilityLabel="Chat information"
-        >
-          <FontAwesome5 name="info-circle" size={17} color={colors.accent} />
-        </TouchableOpacity>
       </View>
 
       {hasShipment && (
@@ -1900,7 +1962,7 @@ export default function ChatThread({
                 <TouchableOpacity
                   key={emoji}
                   style={styles.emojiBtn}
-                  onPress={() => setDraft((prev) => prev + emoji)}
+                  onPress={() => handleDraftChange(draft + emoji)}
                 >
                   <Text style={styles.emojiText}>{emoji}</Text>
                 </TouchableOpacity>
@@ -1958,7 +2020,7 @@ export default function ChatThread({
 
 
 
-          {/* Sticky composer — styled to match the manager messaging console */}
+          {/* Sticky composer — Messenger-style: actions collapse while typing */}
           <View
             style={[
               styles.composer,
@@ -1975,52 +2037,150 @@ export default function ChatThread({
               },
             ]}
           >
-            <TouchableOpacity
-              style={styles.composerIcon}
-              onPress={handlePickFile}
-              disabled={isClosed || uploading}
-              hitSlop={6}
-              accessibilityLabel="Add a file"
+            <Animated.View
+              style={[
+                styles.composerActionsShell,
+                {
+                  width: composerActionsAnim.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [COMPOSER_ACTION_SLOT, COMPOSER_ACTIONS_WIDTH],
+                  }),
+                },
+              ]}
             >
-              <FontAwesome5
-                name="plus-circle"
-                size={25}
-                color={isClosed ? colors.textMuted : colors.accent}
-              />
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.composerIcon}
-              onPress={handleTakePhoto}
-              disabled={isClosed || uploading}
-              hitSlop={6}
-              accessibilityLabel="Open camera"
-            >
-              <FontAwesome5
-                name="camera"
-                size={22}
-                color={isClosed ? colors.textMuted : colors.accent}
-              />
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.composerIcon} onPress={handlePickImage} disabled={isClosed || uploading} hitSlop={6} accessibilityLabel="Choose a picture">
-              <FontAwesome5 name="image" size={22} color={isClosed ? colors.textMuted : colors.accent} />
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.composerIcon, recorderState.isRecording && { backgroundColor: colors.dangerSoft || "rgba(255,59,48,0.12)" }]}
-              onPress={toggleVoiceRecording}
-              disabled={isClosed || uploading || sending || recordingStarting}
-              hitSlop={6}
-              accessibilityLabel={recorderState.isRecording ? "Stop voice recording" : "Record a voice message"}
-            >
-              {recordingStarting ? <ActivityIndicator size="small" color={colors.accent} /> : (
-                <FontAwesome5 name={recorderState.isRecording ? "stop-circle" : "microphone"} size={22} color={isClosed ? colors.textMuted : recorderState.isRecording ? colors.danger : colors.accent} />
-              )}
-            </TouchableOpacity>
+              <Animated.View
+                pointerEvents={composerActionsOpen || forceComposerActionsOpen ? "auto" : "none"}
+                style={[
+                  styles.composerActionsRow,
+                  {
+                    opacity: composerActionsAnim,
+                    transform: [
+                      {
+                        translateX: composerActionsAnim.interpolate({
+                          inputRange: [0, 1],
+                          outputRange: [-10, 0],
+                        }),
+                      },
+                    ],
+                  },
+                ]}
+              >
+                <TouchableOpacity
+                  style={styles.composerIcon}
+                  onPress={handlePickFile}
+                  disabled={isClosed || uploading}
+                  hitSlop={6}
+                  accessibilityLabel="Add a file"
+                >
+                  <FontAwesome5
+                    name="plus-circle"
+                    size={25}
+                    color={isClosed ? colors.textMuted : colors.accent}
+                  />
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.composerIcon}
+                  onPress={handleTakePhoto}
+                  disabled={isClosed || uploading}
+                  hitSlop={6}
+                  accessibilityLabel="Open camera"
+                >
+                  <FontAwesome5
+                    name="camera"
+                    size={22}
+                    color={isClosed ? colors.textMuted : colors.accent}
+                  />
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.composerIcon}
+                  onPress={handlePickImage}
+                  disabled={isClosed || uploading}
+                  hitSlop={6}
+                  accessibilityLabel="Choose a picture"
+                >
+                  <FontAwesome5
+                    name="image"
+                    size={22}
+                    color={isClosed ? colors.textMuted : colors.accent}
+                  />
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[
+                    styles.composerIcon,
+                    recorderState.isRecording && {
+                      backgroundColor:
+                        colors.dangerSoft || "rgba(255,59,48,0.12)",
+                    },
+                  ]}
+                  onPress={toggleVoiceRecording}
+                  disabled={isClosed || uploading || sending || recordingStarting}
+                  hitSlop={6}
+                  accessibilityLabel={
+                    recorderState.isRecording
+                      ? "Stop voice recording"
+                      : "Record a voice message"
+                  }
+                >
+                  {recordingStarting ? (
+                    <ActivityIndicator size="small" color={colors.accent} />
+                  ) : (
+                    <FontAwesome5
+                      name={
+                        recorderState.isRecording ? "stop-circle" : "microphone"
+                      }
+                      size={22}
+                      color={
+                        isClosed
+                          ? colors.textMuted
+                          : recorderState.isRecording
+                            ? colors.danger
+                            : colors.accent
+                      }
+                    />
+                  )}
+                </TouchableOpacity>
+              </Animated.View>
+
+              <Animated.View
+                pointerEvents={composerActionsOpen || forceComposerActionsOpen ? "none" : "auto"}
+                style={[
+                  styles.composerChevronWrap,
+                  {
+                    opacity: composerActionsAnim.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [1, 0],
+                    }),
+                    transform: [
+                      {
+                        scale: composerActionsAnim.interpolate({
+                          inputRange: [0, 1],
+                          outputRange: [1, 0.85],
+                        }),
+                      },
+                    ],
+                  },
+                ]}
+              >
+                <TouchableOpacity
+                  style={styles.composerIcon}
+                  onPress={expandComposerActions}
+                  hitSlop={8}
+                  accessibilityLabel="Show attachment actions"
+                >
+                  <FontAwesome5
+                    name="chevron-right"
+                    size={18}
+                    color={colors.accent}
+                  />
+                </TouchableOpacity>
+              </Animated.View>
+            </Animated.View>
 
             <View style={[styles.inputWrap, { backgroundColor: colors.inputBar }]}>
               <TextInput
                 style={[styles.input, { color: colors.text }]}
                 value={draft}
-                onChangeText={setDraft}
+                onChangeText={handleDraftChange}
                 placeholder={isClosed ? "Conversation is closed" : recorderState.isRecording ? `Recording ${Math.floor((recorderState.durationMillis || 0) / 60000)}:${String(Math.floor(((recorderState.durationMillis || 0) % 60000) / 1000)).padStart(2, "0")}` : "Message"}
                 placeholderTextColor={recorderState.isRecording ? colors.danger : colors.textMuted}
                 editable={!isClosed && !recorderState.isRecording}
@@ -2530,6 +2690,29 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingTop: 8,
     borderTopWidth: 1,
+  },
+  composerActionsShell: {
+    height: 40,
+    overflow: "hidden",
+    justifyContent: "center",
+  },
+  composerActionsRow: {
+    position: "absolute",
+    left: 0,
+    top: 0,
+    bottom: 0,
+    width: COMPOSER_ACTIONS_WIDTH,
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  composerChevronWrap: {
+    position: "absolute",
+    left: 0,
+    top: 0,
+    bottom: 0,
+    width: COMPOSER_ACTION_SLOT,
+    alignItems: "center",
+    justifyContent: "center",
   },
   composerIcon: {
     width: 36,

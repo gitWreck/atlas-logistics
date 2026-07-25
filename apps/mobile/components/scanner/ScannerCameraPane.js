@@ -10,9 +10,10 @@ import {
 } from "react-native";
 import { CameraView } from "expo-camera";
 import { FontAwesome5 } from "@expo/vector-icons";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 const FRAME_SIZE = 250;
-const SAFE_AREA_CONTROL_TOP = 8;
+const SAFE_AREA_CONTROL_GAP = 8;
 
 export default function ScannerCameraPane({
   scanned,
@@ -25,6 +26,11 @@ export default function ScannerCameraPane({
   onBarcodeScanned,
   accentColor = "#2563eb",
 }) {
+  const insets = useSafeAreaInsets();
+  // Full-screen camera draws under the status bar on iOS; Android often
+  // already windows below it. Always offset by the live top inset.
+  const topControlsOffset = insets.top + SAFE_AREA_CONTROL_GAP;
+
   // Animated glowing scan line that sweeps within the frame.
   const sweep = useRef(new Animated.Value(0)).current;
   useEffect(() => {
@@ -106,7 +112,7 @@ export default function ScannerCameraPane({
         <Animated.View
           style={[styles.cameraOverlay, { paddingBottom: detailsSheetHeight }]}
         >
-          <View style={[styles.topControls, { top: SAFE_AREA_CONTROL_TOP }]}>
+          <View style={[styles.topControls, { top: topControlsOffset }]}>
             <TouchableOpacity
               style={[styles.button, styles.backButton]}
               onPress={onBack}
