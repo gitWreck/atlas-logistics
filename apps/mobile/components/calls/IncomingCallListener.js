@@ -87,6 +87,31 @@ function belongsToCallSession(call, userId, sessionId) {
   return !boundSessionId || String(boundSessionId) === String(sessionId || "");
 }
 
+function callRingingReceiverIds(call) {
+  const fromField = Array.isArray(call?.ringingReceiverIds)
+    ? call.ringingReceiverIds.map((id) => String(id || "").trim()).filter(Boolean)
+    : [];
+  if (fromField.length) return fromField;
+  const receiverId = String(call?.receiverId || "").trim();
+  return receiverId ? [receiverId] : [];
+}
+
+function isCallForUser(call, uid) {
+  const normalizedUid = String(uid || "").trim();
+  if (!normalizedUid) return false;
+  if (String(call?.callerId || "").trim() === normalizedUid) return true;
+  if (String(call?.receiverId || "").trim() === normalizedUid) return true;
+  return callRingingReceiverIds(call).includes(normalizedUid);
+}
+
+function isIncomingRingForUser(call, uid) {
+  const normalizedUid = String(uid || "").trim();
+  if (!normalizedUid) return false;
+  if (String(call?.status || "").trim().toLowerCase() !== "ringing") return false;
+  if (String(call?.receiverId || "").trim() === normalizedUid) return true;
+  return callRingingReceiverIds(call).includes(normalizedUid);
+}
+
 function WebMediaElement({ stream, muted = false, hidden = false, style }) {
   const elementRef = useRef(null);
 
@@ -473,11 +498,12 @@ export default function IncomingCallListener() {
 
     const uid = user.uid;
     const receiverQuery = query(collection(db, "calls"), where("receiverId", "==", uid));
+    const ringingQuery = query(collection(db, "calls"), where("ringingReceiverIds", "array-contains", uid));
     const callerQuery = query(collection(db, "calls"), where("callerId", "==", uid));
 
     const syncActiveCall = () => {
       const entries = [...callMapRef.current.values()]
-        .filter((call) => String(call?.receiverId || "").trim() === uid || String(call?.callerId || "").trim() === uid)
+        .filter((call) => isCallForUser(call, uid))
         .filter((call) => belongsToCallSession(call, uid, callSessionId))
         .filter((call) => {
           const status = String(call?.status || "").trim().toLowerCase();
@@ -486,7 +512,7 @@ export default function IncomingCallListener() {
         .sort((left, right) => callActivityMillis(right) - callActivityMillis(left));
 
       const preferred = entries.find((call) => ["connected", "ongoing", "accepted", "connecting"].includes(String(call?.status || "").trim().toLowerCase()));
-      const ringingCall = entries.find((call) => String(call?.callerId || "").trim() === uid && String(call?.status || "").trim().toLowerCase() === "ringing") || entries.find((call) => String(call?.receiverId || "").trim() === uid && String(call?.status || "").trim().toLowerCase() === "ringing");
+      const ringingCall = entries.find((call) => String(call?.callerId || "").trim() === uid && String(call?.status || "").trim().toLowerCase() === "ringing") || entries.find((call) => isIncomingRingForUser(call, uid));
       const nextCall = preferred || ringingCall || null;
       // update both state and ref synchronously so snapshot handlers can respond immediately
       if (!nextCall) {
@@ -542,12 +568,16 @@ export default function IncomingCallListener() {
     const unsubscribeReceiver = onSnapshot(receiverQuery, applySnapshot, (error) => {
       console.error("Incoming call receiver listener error:", error);
     });
+    const unsubscribeRinging = onSnapshot(ringingQuery, applySnapshot, (error) => {
+      console.error("Incoming call ringing listener error:", error);
+    });
     const unsubscribeCaller = onSnapshot(callerQuery, applySnapshot, (error) => {
       console.error("Incoming call caller listener error:", error);
     });
 
     return () => {
       unsubscribeReceiver?.();
+      unsubscribeRinging?.();
       unsubscribeCaller?.();
       callMapRef.current.clear();
       if (timeoutRef.current) {
@@ -761,7 +791,7 @@ export default function IncomingCallListener() {
       return undefined;
     }
 
-    if (String(activeCall?.receiverId || "").trim() !== user?.uid) {
+    if (!isIncomingRingForUser(activeCall, user?.uid)) {
       return undefined;
     }
 
@@ -775,7 +805,7 @@ export default function IncomingCallListener() {
         timeoutRef.current = null;
       }
     };
-  }, [activeCall?.id, activeCall?.status, activeCall?.receiverId, user?.uid]);
+  }, [activeCall?.id, activeCall?.status, activeCall?.receiverId, activeCall?.ringingReceiverIds, user?.uid]);
 
   const closeDialog = () => {
     // ensure any active WebRTC peer and media tracks are cleaned up
@@ -955,12 +985,21 @@ export default function IncomingCallListener() {
 
     setIsProcessing(true);
     try {
-      await updateConversationCallStatus({
+      const result = await updateConversationCallStatus({
         callId: activeCall.id,
         status: "declined",
         endReason: reason,
       });
-      await logCallEvent({ conversationId: activeCall.conversationId, callId: activeCall.id, text: `📞 ${activeCall?.type === "video" ? "Video" : "Voice"} Call\nMissed Call` });
+      const finalStatus = String(
+        result?.data?.status || result?.status || "declined",
+      )
+        .trim()
+        .toLowerCase();
+      // Only log a missed call when the whole ring ended (not when another
+      // support agent is still being rung).
+      if (["declined", "missed", "busy", "timeout", "cancelled", "ended"].includes(finalStatus)) {
+        await logCallEvent({ conversationId: activeCall.conversationId, callId: activeCall.id, text: `📞 ${activeCall?.type === "video" ? "Video" : "Voice"} Call\nMissed Call` });
+      }
       closeDialog();
     } catch (error) {
       console.error("Incoming call decline failed:", error);
@@ -1002,7 +1041,7 @@ export default function IncomingCallListener() {
   };
 
   const status = String(activeCall?.status || "").trim().toLowerCase();
-  const isIncoming = Boolean(activeCall && String(activeCall?.receiverId || "").trim() === user?.uid && status === "ringing");
+  const isIncoming = Boolean(activeCall && isIncomingRingForUser(activeCall, user?.uid));
   const isCallerRinging = Boolean(activeCall && String(activeCall?.callerId || "").trim() === user?.uid && status === "ringing");
   const isActiveCall = Boolean(activeCall && ["accepted", "connecting", "connected", "ongoing"].includes(status));
   const showIncomingControls = isIncoming && status === "ringing";

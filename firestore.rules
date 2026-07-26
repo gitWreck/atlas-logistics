@@ -345,17 +345,20 @@ service cloud.firestore {
       allow get: if isSignedIn() && callDriverAssignmentIsCurrent(resource.data) && (
         resource.data.receiverId == request.auth.uid ||
         resource.data.callerId == request.auth.uid ||
+        (resource.data.ringingReceiverIds is list && request.auth.uid in resource.data.ringingReceiverIds) ||
         isAdmin()
       );
       allow list: if isSignedIn() && callDriverAssignmentIsCurrent(resource.data) && (
         resource.data.receiverId == request.auth.uid ||
         resource.data.callerId == request.auth.uid ||
+        (resource.data.ringingReceiverIds is list && request.auth.uid in resource.data.ringingReceiverIds) ||
         isAdmin()
       );
       allow create: if false;
       allow update: if isSignedIn() && callDriverAssignmentIsCurrent(resource.data) && (
         resource.data.receiverId == request.auth.uid ||
-        resource.data.callerId == request.auth.uid
+        resource.data.callerId == request.auth.uid ||
+        (resource.data.ringingReceiverIds is list && request.auth.uid in resource.data.ringingReceiverIds)
       );
       allow delete: if false;
     }

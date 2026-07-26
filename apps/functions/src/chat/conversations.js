@@ -55,12 +55,77 @@ const CALL_STATUSES = [
   "ended",
 ];
 const TERMINAL_CALL_STATUSES = ["ended", "declined", "missed", "busy", "cancelled", "timeout", "failed"];
-// Non-answer terminal statuses that should trigger Atlas Support fallback ringing.
+// Legacy sequential fallback statuses (kept for older in-flight Rose→Lean calls).
 const SUPPORT_FALLBACK_STATUSES = ["declined", "missed", "busy", "timeout", "failed"];
 const CALL_LOCK_COLLECTION = "callAccountLocks";
 const CALL_HEARTBEAT_STALE_MS = 90 * 1000;
 const BACKGROUND_CALL_HEARTBEAT_STALE_MS = 10 * 60 * 1000;
 const RINGING_CALL_STALE_MS = 45 * 1000;
+
+function normalizeIdList(values = []) {
+  return [
+    ...new Set(
+      (Array.isArray(values) ? values : [values])
+        .map((value) => String(value || "").trim())
+        .filter(Boolean),
+    ),
+  ];
+}
+
+/**
+ * Atlas Support simultaneous ring roster.
+ * Prefer AUTO_SUPPORT_RING_UIDS (comma-separated). Otherwise Rose + Lean + Jay
+ * plus any AUTO_SUPPORT_EXTRA_UIDS.
+ */
+function getConfiguredSupportAgentIds() {
+  const fromList = normalizeIdList(
+    String(process.env.AUTO_SUPPORT_RING_UIDS || "").split(","),
+  );
+  if (fromList.length) return fromList;
+  return normalizeIdList([
+    process.env.AUTO_SUPPORT_ROSE_UID,
+    process.env.AUTO_SUPPORT_LEAN_UID,
+    process.env.AUTO_SUPPORT_JAY_UID,
+    ...String(process.env.AUTO_SUPPORT_EXTRA_UIDS || "").split(","),
+  ]);
+}
+
+function callRingingReceiverIds(call = {}) {
+  const fromField = normalizeIdList(call.ringingReceiverIds);
+  if (fromField.length) return fromField;
+  const receiverId = String(call.receiverId || "").trim();
+  return receiverId ? [receiverId] : [];
+}
+
+function isCallParticipantUid(call = {}, uid) {
+  const normalizedUid = String(uid || "").trim();
+  if (!normalizedUid) return false;
+  if (String(call.callerId || "").trim() === normalizedUid) return true;
+  if (String(call.receiverId || "").trim() === normalizedUid) return true;
+  if (String(call.acceptedBy || "").trim() === normalizedUid) return true;
+  return callRingingReceiverIds(call).includes(normalizedUid);
+}
+
+async function resolveActiveSupportRingAgents() {
+  const ids = getConfiguredSupportAgentIds();
+  const agents = [];
+  for (const id of ids) {
+    const snap = await db.collection("users").doc(id).get();
+    if (!snap.exists) continue;
+    const data = snap.data() || {};
+    if (data.active === false) continue;
+    const role = String(data.role || "").trim().toLowerCase();
+    if (!STAFF_ROLES.includes(role)) continue;
+    agents.push({ id, role, data });
+  }
+  return agents;
+}
+
+function deleteCallLockIfMatches(tx, lockSnap, lockRef, callId) {
+  if (String(lockSnap.data()?.activeCallId || "").trim() === callId) {
+    tx.delete(lockRef);
+  }
+}
 
 function cleanCallIdentity(value, fallback = null) {
   const normalized = String(value || "")
@@ -141,7 +206,7 @@ function callBusyError({ callerBusy, receiverBusy, receiverName }) {
 
 async function findActiveCallCandidates(participantIds) {
   const lookups = [];
-  for (const participantId of participantIds) {
+  for (const participantId of normalizeIdList(participantIds)) {
     lookups.push(
       db
         .collection("calls")
@@ -153,6 +218,12 @@ async function findActiveCallCandidates(participantIds) {
         .collection("calls")
         .where("status", "in", ACTIVE_CALL_STATUSES)
         .where("receiverId", "==", participantId)
+        .limit(20)
+        .get(),
+      db
+        .collection("calls")
+        .where("status", "in", ACTIVE_CALL_STATUSES)
+        .where("ringingReceiverIds", "array-contains", participantId)
         .limit(20)
         .get(),
     );
@@ -175,34 +246,54 @@ async function createRingingConversationCall({
   callerSessionId,
   callerDeviceId,
   receiverId,
+  receiverIds,
   receiverRole,
   receiverName,
   participantIds,
   extraFields = {},
 }) {
+  const ringingReceiverIds = normalizeIdList(
+    receiverIds?.length ? receiverIds : [receiverId],
+  );
+  if (!ringingReceiverIds.length) {
+    throw new HttpsError(
+      "failed-precondition",
+      "No call recipient is available.",
+    );
+  }
+
+  const primaryReceiverId = ringingReceiverIds[0];
   const callRef = db.collection("calls").doc();
   const callerLockRef = db.collection(CALL_LOCK_COLLECTION).doc(callerId);
-  const receiverLockRef = db.collection(CALL_LOCK_COLLECTION).doc(receiverId);
-  const candidateIds = await findActiveCallCandidates([callerId, receiverId]);
+  const receiverLockRefs = ringingReceiverIds.map((id) =>
+    db.collection(CALL_LOCK_COLLECTION).doc(id),
+  );
+  const candidateIds = await findActiveCallCandidates([
+    callerId,
+    ...ringingReceiverIds,
+  ]);
   const now = FieldValue.serverTimestamp();
   const rtcRoomId = `atlas_${callRef.id}`;
   const rtcConfig = getRtcSecretConfig();
 
   const staleEndedCalls = await db.runTransaction(async (tx) => {
     const callerLockSnap = await tx.get(callerLockRef);
-    const receiverLockSnap = await tx.get(receiverLockRef);
-    const lockedCallIds = [callerLockSnap, receiverLockSnap]
+    const receiverLockSnaps = [];
+    for (const lockRef of receiverLockRefs) {
+      receiverLockSnaps.push(await tx.get(lockRef));
+    }
+    const lockedCallIds = [callerLockSnap, ...receiverLockSnaps]
       .map((snap) => String(snap.data()?.activeCallId || "").trim())
       .filter(Boolean);
-    lockedCallIds.forEach((callId) => candidateIds.add(callId));
+    lockedCallIds.forEach((id) => candidateIds.add(id));
 
     const candidateSnaps = [];
-    for (const callId of candidateIds) {
-      candidateSnaps.push(await tx.get(db.collection("calls").doc(callId)));
+    for (const id of candidateIds) {
+      candidateSnaps.push(await tx.get(db.collection("calls").doc(id)));
     }
 
     let callerBusy = false;
-    let receiverBusy = false;
+    const busyReceiverIds = new Set();
     const staleCalls = new Map();
     const liveCallIds = new Set();
     const nowMillis = Date.now();
@@ -217,25 +308,42 @@ async function createRingingConversationCall({
         return;
       }
       liveCallIds.add(snap.id);
-      if (call.callerId === callerId || call.receiverId === callerId) callerBusy = true;
-      if (call.callerId === receiverId || call.receiverId === receiverId) receiverBusy = true;
+      if (isCallParticipantUid(call, callerId)) callerBusy = true;
+      ringingReceiverIds.forEach((id) => {
+        if (isCallParticipantUid(call, id)) busyReceiverIds.add(id);
+      });
     });
 
     const callerLockCallId = String(callerLockSnap.data()?.activeCallId || "").trim();
-    const receiverLockCallId = String(receiverLockSnap.data()?.activeCallId || "").trim();
     if (callerLockCallId && liveCallIds.has(callerLockCallId)) callerBusy = true;
-    if (receiverLockCallId && liveCallIds.has(receiverLockCallId)) receiverBusy = true;
+    receiverLockSnaps.forEach((snap, index) => {
+      const lockCallId = String(snap.data()?.activeCallId || "").trim();
+      if (lockCallId && liveCallIds.has(lockCallId)) {
+        busyReceiverIds.add(ringingReceiverIds[index]);
+      }
+    });
 
-    if (callerBusy || receiverBusy) {
-      throw callBusyError({ callerBusy, receiverBusy, receiverName });
+    const availableReceiverIds = ringingReceiverIds.filter(
+      (id) => !busyReceiverIds.has(id),
+    );
+
+    if (callerBusy) {
+      throw callBusyError({ callerBusy: true, receiverBusy: false, receiverName });
+    }
+    if (!availableReceiverIds.length) {
+      throw callBusyError({
+        callerBusy: false,
+        receiverBusy: true,
+        receiverName: receiverName || "Atlas Support",
+      });
     }
 
-    staleCalls.forEach((call, callId) => {
+    staleCalls.forEach((call, staleCallId) => {
       const connectedAtMillis = timestampMillis(call.connectedAt || call.answeredAt || call.startedAt);
       const staleDuration = connectedAtMillis
         ? Math.max(0, Math.floor((Date.now() - connectedAtMillis) / 1000))
         : 0;
-      tx.update(db.collection("calls").doc(callId), {
+      tx.update(db.collection("calls").doc(staleCallId), {
         status: "ended",
         endedAt: now,
         endedBy: "system",
@@ -245,15 +353,20 @@ async function createRingingConversationCall({
         signalingEvent: "call_ended",
         termination: {
           event: "call_ended",
-          callId,
+          callId: staleCallId,
           endedBy: "system",
           reason: "stale_heartbeat",
-          participantIds: [call.callerId, call.receiverId].filter(Boolean),
+          participantIds: normalizeIdList([
+            call.callerId,
+            call.receiverId,
+            ...callRingingReceiverIds(call),
+          ]),
           timestamp: now,
         },
       });
     });
 
+    const selectedReceiverId = availableReceiverIds[0];
     const callData = {
       callId: callRef.id,
       conversationId,
@@ -263,13 +376,24 @@ async function createRingingConversationCall({
       callerSessionId,
       callerDeviceId,
       callerLastHeartbeatAt: now,
-      receiverId,
+      // Provisional receiver for backward-compatible listeners; first answer
+      // claims the call and replaces this with the accepting agent.
+      receiverId: selectedReceiverId,
       receiverRole,
       receiverName: receiverName || null,
       receiverSessionId: null,
       receiverDeviceId: null,
       receiverLastHeartbeatAt: now,
-      participantIds: [...new Set(participantIds || [callerId, receiverId])],
+      ringingReceiverIds: availableReceiverIds,
+      participantIds: [
+        ...new Set(
+          normalizeIdList([
+            ...(participantIds || []),
+            callerId,
+            ...availableReceiverIds,
+          ]),
+        ),
+      ],
       type: callType,
       status: "ringing",
       // Communication log context (spec section 18); overridable via extraFields.
@@ -285,6 +409,9 @@ async function createRingingConversationCall({
       lastHeartbeat: now,
       updatedAt: now,
       ...extraFields,
+      // Ensure multi-ring fields win over accidental extraFields overrides.
+      ringingReceiverIds: availableReceiverIds,
+      receiverId: selectedReceiverId,
     };
     tx.set(callRef, callData);
     tx.set(callerLockRef, {
@@ -297,20 +424,22 @@ async function createRingingConversationCall({
       lastHeartbeatAt: now,
       updatedAt: now,
     });
-    tx.set(receiverLockRef, {
-      userId: receiverId,
-      activeCallId: callRef.id,
-      participantRole: "receiver",
-      sessionId: null,
-      deviceId: null,
-      status: "ringing",
-      lastHeartbeatAt: now,
-      updatedAt: now,
+    availableReceiverIds.forEach((id) => {
+      tx.set(db.collection(CALL_LOCK_COLLECTION).doc(id), {
+        userId: id,
+        activeCallId: callRef.id,
+        participantRole: "receiver",
+        sessionId: null,
+        deviceId: null,
+        status: "ringing",
+        lastHeartbeatAt: now,
+        updatedAt: now,
+      });
     });
-    return [...staleCalls.entries()].map(([callId, call]) => ({
+    return [...staleCalls.entries()].map(([staleCallId, call]) => ({
       ...call,
-      id: callId,
-      callId,
+      id: staleCallId,
+      callId: staleCallId,
       duration: Math.max(
         0,
         Math.floor((Date.now() - (timestampMillis(call.connectedAt || call.answeredAt || call.startedAt) || Date.now())) / 1000),
@@ -333,19 +462,27 @@ async function createRingingConversationCall({
     }
   }
 
-  await notifyIncomingCall({
-    callId: callRef.id,
-    conversationId,
-    receiverId,
-    callerName,
-    callType,
-  });
+  const createdSnap = await callRef.get();
+  const created = createdSnap.data() || {};
+  const notifyIds = callRingingReceiverIds(created);
+  await Promise.all(
+    notifyIds.map((id) =>
+      notifyIncomingCall({
+        callId: callRef.id,
+        conversationId,
+        receiverId: id,
+        callerName,
+        callType,
+      }),
+    ),
+  );
 
   return {
     success: true,
     callId: callRef.id,
     conversationId,
-    receiverId,
+    receiverId: created.receiverId || primaryReceiverId,
+    ringingReceiverIds: notifyIds,
     rtcRoomId,
     roomId: rtcRoomId,
     status: "ringing",
@@ -701,8 +838,13 @@ async function getConversationForUser(conversationId, uid, role) {
   const isFieldStaff =
     ["employee", "checker", "driver"].includes(normalizedRole) &&
     (isAssigned || isParticipant);
+  const isSupportRingAgent =
+    getConfiguredSupportAgentIds().includes(uid) &&
+    ["customer_support", "guest_support", "shipment"].includes(
+      String(conversation.type || ""),
+    );
 
-  if (!(isAdmin || isManager || isCustomer || isFieldStaff)) {
+  if (!(isAdmin || isManager || isCustomer || isFieldStaff || isSupportRingAgent)) {
     throw new HttpsError("permission-denied", "Conversation access denied.");
   }
 
@@ -713,7 +855,7 @@ async function getAuthorizedCallForUser(callRef, uid, user) {
   const callSnap = await callRef.get();
   if (!callSnap.exists) throw new HttpsError("not-found", "Call not found.");
   const call = callSnap.data() || {};
-  if (call.callerId !== uid && call.receiverId !== uid) {
+  if (!isCallParticipantUid(call, uid)) {
     throw new HttpsError("permission-denied", "Call access denied.");
   }
   const conversationId = String(call.conversationId || "").trim();
@@ -1271,15 +1413,9 @@ exports.createConversation = onCall(
       conversation.type === "customer_support" ||
       conversation.type === "guest_support"
     ) {
-      const supportStaffIds = [
-        String(process.env.AUTO_SUPPORT_ROSE_UID || "").trim(),
-        String(process.env.AUTO_SUPPORT_LEAN_UID || "").trim(),
-      ];
+      const supportStaffIds = getConfiguredSupportAgentIds();
 
-      if (
-        supportStaffIds.some((staffId) => !staffId) ||
-        new Set(supportStaffIds).size !== supportStaffIds.length
-      ) {
+      if (supportStaffIds.length < 1) {
         throw new HttpsError(
           "failed-precondition",
           "Automatic support assignment is not configured.",
@@ -2051,14 +2187,16 @@ exports.startConversationCall = onCall(
       }
 
       let receiverId;
+      let receiverIds = null;
       let expectedReceiverRole; // null => accept any active staff (support)
       let assignedStaffRoleForCall;
       let supportRouting = null;
       let overrideReceiverName = null;
+      let receiverRoleOverride = null;
 
       // Customer-facing threads (support + shipment) are branded "Atlas Support".
-      // Voice/Video always use Rose → Lean (spec §2), even when a checker owns
-      // the shipment chat during OFD. Messaging ownership stays separate (§14).
+      // Voice/Video simultaneously ring configured support agents (Rose/Lean/Jay);
+      // first agent to answer wins. Messaging ownership stays separate (§14).
       const isCustomerFacingSupportThread = [
         "customer_support",
         "guest_support",
@@ -2067,41 +2205,27 @@ exports.startConversationCall = onCall(
 
       if (isCustomerCaller) {
         if (isCustomerFacingSupportThread) {
-          // Atlas Customer Support: ring Rose (admin) first, then fall back to
-          // Lean (manager) on no-answer (spec section 2).
-          const roseId = String(process.env.AUTO_SUPPORT_ROSE_UID || "").trim();
-          const leanId = String(process.env.AUTO_SUPPORT_LEAN_UID || "").trim();
-
-          let primaryId = roseId || leanId;
-          let ringingRose = !!roseId && primaryId === roseId;
-
-          // Skip straight to Lean when Rose is missing or deactivated.
-          if (roseId) {
-            const roseSnap = await db.collection("users").doc(roseId).get();
-            if (!roseSnap.exists || roseSnap.data()?.active === false) {
-              primaryId = leanId || null;
-              ringingRose = false;
-            }
-          }
-
-          if (!primaryId) {
+          const supportAgents = await resolveActiveSupportRingAgents();
+          if (!supportAgents.length) {
             throw new HttpsError(
               "failed-precondition",
               "Atlas Customer Support is not available right now.",
             );
           }
 
-          receiverId = primaryId;
+          receiverIds = supportAgents.map((agent) => agent.id);
+          receiverId = receiverIds[0];
           expectedReceiverRole = null;
           assignedStaffRoleForCall = "support";
           overrideReceiverName = "Atlas Support";
+          receiverRoleOverride = "support";
           supportRouting = {
-            primaryId: roseId || null,
-            secondaryId: leanId || null,
-            // Only leave room for a fallback when we are actually ringing Rose
-            // first and a distinct Lean exists.
-            stage:
-              ringingRose && leanId && leanId !== roseId ? "primary" : "secondary",
+            mode: "simultaneous",
+            agentIds: receiverIds,
+            // Keep legacy fields empty so old sequential fallback does not fire.
+            primaryId: null,
+            secondaryId: null,
+            stage: "simultaneous",
           };
         } else {
           // Non-support customer threads: route to assigned staff if any.
@@ -2133,7 +2257,9 @@ exports.startConversationCall = onCall(
         throw new HttpsError("failed-precondition", "The other participant is not available for calls.");
       }
 
-      const receiverRole = String(receiverSnap.data()?.role || "").trim().toLowerCase();
+      const receiverRole =
+        receiverRoleOverride ||
+        String(receiverSnap.data()?.role || "").trim().toLowerCase();
       if (expectedReceiverRole && receiverRole !== expectedReceiverRole) {
         throw new HttpsError(
           "failed-precondition",
@@ -2165,13 +2291,18 @@ exports.startConversationCall = onCall(
         callerSessionId,
         callerDeviceId,
         receiverId,
+        receiverIds,
         receiverRole,
         receiverName:
           overrideReceiverName ||
           (expectedReceiverRole === "customer"
             ? displayName(receiverSnap.data() || {}, "Customer")
             : displayName(receiverSnap.data() || {}, "This contact")),
-        participantIds: [uid, receiverId],
+        participantIds: normalizeIdList([
+          uid,
+          receiverId,
+          ...(receiverIds || []),
+        ]),
         extraFields: {
           conversationType: conversation.type || null,
           shipmentId: conversation.shipmentId || conversation.trackingNumber || null,
@@ -2474,12 +2605,32 @@ exports.acceptConversationCall = onCall(
         }
 
         const call = callSnap.data() || {};
-        if (call.receiverId !== uid) {
-          throw new HttpsError("permission-denied", "Only the receiver can accept this call.");
+        const ringingIds = callRingingReceiverIds(call);
+        const isRingTarget =
+          String(call.receiverId || "").trim() === uid ||
+          ringingIds.includes(uid);
+        if (!isRingTarget) {
+          throw new HttpsError("permission-denied", "Only a ringing agent can accept this call.");
+        }
+
+        if (
+          call.status === "accepted" &&
+          String(call.acceptedBy || call.receiverId || "").trim() &&
+          String(call.acceptedBy || call.receiverId || "").trim() !== uid
+        ) {
+          throw new HttpsError(
+            "already-exists",
+            "This call was answered by another agent.",
+            { reason: "answered-elsewhere" },
+          );
         }
 
         const boundSessionId = cleanCallIdentity(call.receiverSessionId);
-        if (boundSessionId && boundSessionId !== sessionId) {
+        if (
+          boundSessionId &&
+          boundSessionId !== sessionId &&
+          String(call.acceptedBy || call.receiverId || "").trim() === uid
+        ) {
           throw new HttpsError(
             "already-exists",
             "This call was answered on another device.",
@@ -2487,7 +2638,7 @@ exports.acceptConversationCall = onCall(
           );
         }
 
-        if (call.status === "accepted" && boundSessionId === sessionId) {
+        if (call.status === "accepted" && String(call.acceptedBy || call.receiverId || "").trim() === uid) {
           return {
             accepted: true,
             callId,
@@ -2514,13 +2665,32 @@ exports.acceptConversationCall = onCall(
           );
         }
 
+        const otherRingIds = ringingIds.filter((id) => id !== uid);
+        const otherLockSnaps = [];
+        for (const otherId of otherRingIds) {
+          otherLockSnaps.push({
+            id: otherId,
+            snap: await tx.get(db.collection(CALL_LOCK_COLLECTION).doc(otherId)),
+          });
+        }
+
+        const accepterRole = String(userSnap.data()?.role || call.receiverRole || "support")
+          .trim()
+          .toLowerCase();
+
         tx.update(callRef, {
           status: "accepted",
           answeredAt: now,
           acceptedBy: uid,
+          receiverId: uid,
+          receiverRole: accepterRole,
+          // Keep Atlas Support branding for the customer.
+          receiverName: call.receiverName || "Atlas Support",
           receiverSessionId: sessionId,
           receiverDeviceId: deviceId,
           receiverLastHeartbeatAt: now,
+          ringingReceiverIds: [],
+          answeredElsewhereIds: otherRingIds,
           lastHeartbeat: now,
           updatedAt: now,
         });
@@ -2534,6 +2704,14 @@ exports.acceptConversationCall = onCall(
           lastHeartbeatAt: now,
           updatedAt: now,
         });
+        otherLockSnaps.forEach(({ id, snap }) => {
+          deleteCallLockIfMatches(
+            tx,
+            snap,
+            db.collection(CALL_LOCK_COLLECTION).doc(id),
+            callId,
+          );
+        });
 
         return {
           accepted: true,
@@ -2541,7 +2719,7 @@ exports.acceptConversationCall = onCall(
           rtcRoomId: call.rtcRoomId || call.roomId || null,
           conversationId: call.conversationId || null,
           callerId: call.callerId || null,
-          receiverId: call.receiverId || null,
+          receiverId: uid,
           type: call.type || null,
         };
       });
@@ -2589,7 +2767,7 @@ exports.updateConversationCallStatus = onCall(
     const initialCall = initialSnap.data() || {};
     await getConversationForUser(initialCall.conversationId, uid, role);
 
-    const isParticipant = initialCall.callerId === uid || initialCall.receiverId === uid;
+    const isParticipant = isCallParticipantUid(initialCall, uid);
     if (!isParticipant && !STAFF_MONITOR_ROLES.includes(role)) {
       throw new HttpsError("permission-denied", "Call access denied.");
     }
@@ -2599,13 +2777,24 @@ exports.updateConversationCallStatus = onCall(
       if (!snap.exists) throw new HttpsError("not-found", "Call not found.");
       const call = snap.data() || {};
       const currentStatus = String(call.status || "").trim().toLowerCase();
-      const callerLockRef = db.collection(CALL_LOCK_COLLECTION).doc(call.callerId);
-      const receiverLockRef = db.collection(CALL_LOCK_COLLECTION).doc(call.receiverId);
-      const callerLockSnap = await tx.get(callerLockRef);
-      const receiverLockSnap = await tx.get(receiverLockRef);
+      const ringingIds = callRingingReceiverIds(call);
+      const lockUserIds = normalizeIdList([
+        call.callerId,
+        call.receiverId,
+        ...ringingIds,
+      ]);
+      const lockEntries = [];
+      for (const lockUserId of lockUserIds) {
+        const lockRef = db.collection(CALL_LOCK_COLLECTION).doc(lockUserId);
+        lockEntries.push({
+          userId: lockUserId,
+          ref: lockRef,
+          snap: await tx.get(lockRef),
+        });
+      }
       const participantRole = call.callerId === uid
         ? "caller"
-        : call.receiverId === uid
+        : call.receiverId === uid || ringingIds.includes(uid)
           ? "receiver"
           : null;
       const boundSessionId = participantRole
@@ -2625,12 +2814,9 @@ exports.updateConversationCallStatus = onCall(
       }
       // A terminal call is immutable. Repeated hangups are successful no-ops.
       if (TERMINAL_CALL_STATUSES.includes(currentStatus)) {
-        if (String(callerLockSnap.data()?.activeCallId || "") === callId) {
-          tx.delete(callerLockRef);
-        }
-        if (String(receiverLockSnap.data()?.activeCallId || "") === callId) {
-          tx.delete(receiverLockRef);
-        }
+        lockEntries.forEach(({ snap: lockSnap, ref }) => {
+          deleteCallLockIfMatches(tx, lockSnap, ref, callId);
+        });
         return { changed: false, call, status: currentStatus };
       }
       if (["declined", "missed", "busy", "cancelled", "timeout"].includes(status) && currentStatus !== "ringing") {
@@ -2638,6 +2824,40 @@ exports.updateConversationCallStatus = onCall(
       }
 
       const now = FieldValue.serverTimestamp();
+
+      // Simultaneous ring: one agent declining/timing out should leave the
+      // call ringing for the remaining agents (first answer still wins).
+      const isRingAgentDecline =
+        ["declined", "missed", "timeout", "busy"].includes(status) &&
+        ringingIds.includes(uid) &&
+        String(call.callerId || "").trim() !== uid &&
+        endReason !== "cancelled";
+      if (isRingAgentDecline && ringingIds.length > 1) {
+        const remaining = ringingIds.filter((id) => id !== uid);
+        const agentLock = lockEntries.find((entry) => entry.userId === uid);
+        if (agentLock) {
+          deleteCallLockIfMatches(tx, agentLock.snap, agentLock.ref, callId);
+        }
+        tx.update(callRef, {
+          ringingReceiverIds: remaining,
+          receiverId: remaining[0],
+          updatedAt: now,
+          statusUpdatedBy: uid,
+          lastHeartbeat: now,
+          lastRingLeaveBy: uid,
+          lastRingLeaveReason: endReason || status,
+        });
+        return {
+          changed: true,
+          call: {
+            ...call,
+            ringingReceiverIds: remaining,
+            receiverId: remaining[0],
+          },
+          status: "ringing",
+        };
+      }
+
       const update = {
         status,
         updatedAt: now,
@@ -2656,22 +2876,24 @@ exports.updateConversationCallStatus = onCall(
         update.endedReason = endReason || status;
         update.duration = duration;
         update.signalingEvent = "call_ended";
+        update.ringingReceiverIds = [];
         update.termination = {
           event: "call_ended",
           callId,
           endedBy: uid,
           reason: endReason || status,
-          participantIds: [call.callerId, call.receiverId].filter(Boolean),
+          participantIds: normalizeIdList([
+            call.callerId,
+            call.receiverId,
+            ...ringingIds,
+          ]),
           timestamp: now,
         };
-        if (String(callerLockSnap.data()?.activeCallId || "") === callId) {
-          tx.delete(callerLockRef);
-        }
-        if (String(receiverLockSnap.data()?.activeCallId || "") === callId) {
-          tx.delete(receiverLockRef);
-        }
+        lockEntries.forEach(({ snap: lockSnap, ref }) => {
+          deleteCallLockIfMatches(tx, lockSnap, ref, callId);
+        });
       } else if (participantRole) {
-        const participantLockRef = participantRole === "caller" ? callerLockRef : receiverLockRef;
+        const participantLockRef = db.collection(CALL_LOCK_COLLECTION).doc(uid);
         tx.set(participantLockRef, {
           userId: uid,
           activeCallId: callId,
@@ -2705,19 +2927,18 @@ exports.updateConversationCallStatus = onCall(
       });
     }
 
-    // Atlas Support sequential fallback: if the primary agent (Rose) did not
-    // answer, automatically ring the secondary agent (Lean) (spec section 2).
+    // Legacy Rose→Lean sequential fallback only (older in-flight calls).
+    // Simultaneous ring-all does not use this path.
     let fallbackCallId = null;
     if (
       transition.changed &&
       SUPPORT_FALLBACK_STATUSES.includes(status) &&
-      // The caller hanging up (reason "cancelled") must not trigger a fallback.
       endReason !== "cancelled"
     ) {
       const call = transition.call || {};
-      const routing = call.supportRouting;
+      const routing = call.supportRouting || {};
       if (
-        routing &&
+        routing.mode !== "simultaneous" &&
         routing.stage === "primary" &&
         routing.secondaryId &&
         routing.secondaryId !== routing.primaryId
