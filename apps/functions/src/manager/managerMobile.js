@@ -54,6 +54,73 @@ function serialize(value) {
   return value;
 }
 
+function cleanSetting(value, maxLength = 120) {
+  return String(value || "").trim().slice(0, maxLength);
+}
+
+function sanitizeOperationalSettings(input = {}, current = {}) {
+  const next = { ...current };
+  if (Array.isArray(input.truckTypes)) {
+    const truckTypes = [...new Set(
+      input.truckTypes.map((value) => cleanSetting(value)).filter(Boolean),
+    )].slice(0, 100);
+    if (!truckTypes.length) {
+      throw new HttpsError(
+        "invalid-argument",
+        "At least one truck type is required.",
+      );
+    }
+    next.truckTypes = truckTypes;
+  }
+  if (Array.isArray(input.warehouses)) {
+    const warehouses = input.warehouses
+      .map((warehouse = {}) => ({
+        name: cleanSetting(warehouse.name),
+        code: cleanSetting(warehouse.code, 30).toUpperCase(),
+        city: cleanSetting(warehouse.city),
+        province: cleanSetting(warehouse.province),
+      }))
+      .filter((warehouse) => warehouse.name && warehouse.code)
+      .slice(0, 100);
+    if (!warehouses.length) {
+      throw new HttpsError(
+        "invalid-argument",
+        "At least one warehouse with a name and code is required.",
+      );
+    }
+    next.warehouses = warehouses;
+  }
+  if (
+    input.phLocations &&
+    typeof input.phLocations === "object" &&
+    !Array.isArray(input.phLocations)
+  ) {
+    const phLocations = Object.fromEntries(
+      Object.entries(input.phLocations)
+        .map(([province, cities]) => [
+          cleanSetting(province),
+          (Array.isArray(cities) ? cities : [])
+            .map((city = {}) => ({
+              name: cleanSetting(city.name),
+              code: cleanSetting(city.code, 30).toUpperCase(),
+            }))
+            .filter((city) => city.name && city.code)
+            .slice(0, 250),
+        ])
+        .filter(([province, cities]) => province && cities.length)
+        .slice(0, 100),
+    );
+    if (!Object.keys(phLocations).length) {
+      throw new HttpsError(
+        "invalid-argument",
+        "At least one province and city are required.",
+      );
+    }
+    next.phLocations = phLocations;
+  }
+  return next;
+}
+
 function row(doc) {
   return serialize({ id: doc.id, ...doc.data() });
 }
@@ -319,13 +386,127 @@ exports.getManagerMobileModules = onCall(REGION_OPTIONS, async (request) => {
     shipments: shipments.slice(0, 500),
     reports: reportSummary(shipments, trips, staff),
     settings: settingsSnap.exists ? settingsSnap.data() : {},
+    preferences: {
+      pushNotifications:
+        profile.notificationPreferences?.managerPushEnabled !== false,
+    },
   });
 });
 
+exports.updateManagerMobileSettings = onCall(
+  REGION_OPTIONS,
+  async (request) => {
+    const { uid, profile } = await requireManagerScope(db, request);
+    const payload = request.data || {};
+    const updates = {};
+
+    if (typeof payload.pushNotifications === "boolean") {
+      updates["notificationPreferences.managerPushEnabled"] =
+        payload.pushNotifications;
+      updates.updatedAt = admin.firestore.FieldValue.serverTimestamp();
+      await db.collection("users").doc(uid).set(updates, { merge: true });
+    }
+
+    let settings = null;
+    if (payload.operationalSettings != null) {
+      const role = String(profile.role || "").trim().toLowerCase();
+      if (role !== "admin" && role !== "administrator") {
+        throw new HttpsError(
+          "permission-denied",
+          "Only Admin accounts can update operational settings.",
+        );
+      }
+      const settingsRef = db.collection("app_settings").doc("operational");
+      const currentSnap = await settingsRef.get();
+      settings = sanitizeOperationalSettings(
+        payload.operationalSettings,
+        currentSnap.exists ? currentSnap.data() : {},
+      );
+      await settingsRef.set(
+        {
+          ...settings,
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          updatedBy: uid,
+        },
+        { merge: true },
+      );
+    }
+
+    return serialize({
+      pushNotifications:
+        typeof payload.pushNotifications === "boolean"
+          ? payload.pushNotifications
+          : profile.notificationPreferences?.managerPushEnabled !== false,
+      settings,
+    });
+  },
+);
+
 exports.listManagerMobileShipments = onCall(REGION_OPTIONS, async (request) => {
   const { profile, scope } = await requireManagerScope(db, request);
-  const snap = await db.collection("shipments").get();
   const limit = Math.min(Math.max(Number(request.data?.limit) || 250, 1), 500);
+  const role = String(profile.role || "").trim().toLowerCase();
+  const isAdmin = role === "admin" || role === "administrator";
+  const summaryFields = [
+    "shipmentId",
+    "trackingNumber",
+    "status",
+    "createdAt",
+    "updatedAt",
+    "sender",
+    "recipient",
+    "customerName",
+    "municipality",
+    "destinationMunicipality",
+    "origin",
+    "originCode",
+    "destination",
+    "destinationCode",
+    "currentLocation",
+    "currentLocationState",
+    "warehouse",
+    "warehouseId",
+    "warehouseCode",
+    "warehouseName",
+    "assignedWarehouseId",
+    "assignedWarehouseCode",
+    "assignedWarehouseName",
+    "currentWarehouseId",
+    "currentWarehouseCode",
+    "currentWarehouseName",
+    "originWarehouseId",
+    "originWarehouseCode",
+    "originWarehouseName",
+    "destinationWarehouseId",
+    "destinationWarehouseCode",
+    "destinationWarehouseName",
+    "assignedMunicipalities",
+    "municipalityCoverage",
+    "serviceMunicipalities",
+    "handledMunicipalities",
+    "municipalities",
+    "assignedMunicipality",
+    "recipientMunicipality",
+    "checkerName",
+    "assignedCheckerName",
+    "assignedCheckerId",
+    "driverName",
+    "assignedDriverName",
+    "assignedDriverId",
+    "truckPlateNumber",
+    "vehiclePlate",
+    "truckDetails",
+    "currentTripId",
+    "currentTruckTripId",
+    "tripId",
+    "availableForDelivery",
+    "isPickupRequested",
+  ];
+  let query = db.collection("shipments").select(...summaryFields);
+  if (isAdmin) {
+    query = query.orderBy("updatedAt", "desc").limit(limit);
+  }
+  const snap = await query.get();
   return {
     scope: serialize(scope),
     shipments: serialize(

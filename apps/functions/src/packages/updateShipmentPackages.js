@@ -40,6 +40,7 @@ const {
   SEMAPHORE_SENDER_NAME,
 } = require("../../shared/sms-service");
 const { defineSecret } = require("firebase-functions/params");
+const { canAccessRecord } = require("../manager/managerAccess");
 
 const SMTP_EMAIL = defineSecret("SMTP_EMAIL");
 const SMTP_PASSWORD = defineSecret("SMTP_PASSWORD");
@@ -77,7 +78,7 @@ exports.updateShipmentPackages = onCall(
     secrets: [SEMAPHORE_API_KEY, SEMAPHORE_SENDER_NAME, SMTP_EMAIL, SMTP_PASSWORD],
   },
   async (req) => {
-    await requireRole(db, req, ["admin", "manager", "checker"]);
+    const actor = await requireRole(db, req, ["admin", "manager", "checker"]);
 
     const authUid = req.auth?.uid;
     if (!authUid) {
@@ -171,6 +172,15 @@ exports.updateShipmentPackages = onCall(
       }
 
       const oldData = shipmentSnap.data() || {};
+      if (
+        actor.role === "manager" &&
+        !canAccessRecord(actor.user, oldData)
+      ) {
+        throw new HttpsError(
+          "permission-denied",
+          "This shipment is outside your assigned warehouse or municipality.",
+        );
+      }
       const oldPackages = Array.isArray(oldData.packages)
         ? oldData.packages
         : [];

@@ -1,6 +1,8 @@
 import React, { useMemo, useState } from "react";
 import {
+  Alert,
   FlatList,
+  Modal,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -12,8 +14,12 @@ import {
 import Feather from "@expo/vector-icons/Feather";
 import { useRouter } from "expo-router";
 import { useTheme } from "../../contexts/ThemeContext";
+import { useAuth } from "../../contexts/AuthContext";
 import StatusBadge from "../ui/StatusBadge";
-import { listManagerMobileShipments } from "../utilities/FirebaseFunctions";
+import {
+  deleteShipment,
+  listManagerMobileShipments,
+} from "../utilities/FirebaseFunctions";
 import useManagerRequest from "./useManagerRequest";
 import ManagerCreateShipmentModal from "./ManagerCreateShipmentModal";
 import {
@@ -27,14 +33,71 @@ import {
 
 const STATUS_FILTERS = [
   "ALL",
+  "CREATED",
+  "PENDING_PICKUP",
+  "PICKED_UP",
+  "RECEIVED",
   "AVAILABLE",
+  "ASSIGNED",
   "LOADED",
   "IN_TRANSIT",
+  "ARRIVED_AT_ODIONGAN",
+  "READY_FOR_DELIVERY",
   "OUT_FOR_DELIVERY",
   "DELIVERED",
+  "DELAYED",
   "FAILED_DELIVERY",
   "RETURNED",
+  "CANCELLED",
 ];
+
+const BOARD_TABS = [
+  ["ALL", "All Shipments", "list"],
+  ["DIVISORIA", "Divisoria", "home"],
+  ["ODIONGAN", "Odiongan", "home"],
+  ["DELIVERY", "Delivery Operations", "truck"],
+];
+
+const DELIVERY_STATUSES = new Set([
+  "ARRIVED",
+  "ARRIVED_AT_ODIONGAN",
+  "READY_FOR_DELIVERY",
+  "AVAILABLE_FOR_DELIVERY",
+  "ASSIGNED",
+  "OUT_FOR_DELIVERY",
+  "PARTIALLY_OUT_FOR_DELIVERY",
+  "FAILED_DELIVERY",
+  "RETURNED_TO_WAREHOUSE",
+]);
+
+function shipmentLocationText(shipment = {}) {
+  return [
+    shipment.origin,
+    shipment.originCode,
+    shipment.destination,
+    shipment.destinationCode,
+    shipment.currentLocation,
+    shipment.currentLocationState,
+    shipment.warehouse,
+    shipment.warehouseCode,
+    shipment.custodyOwnerId,
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toUpperCase();
+}
+
+function matchesBoardTab(shipment, tab) {
+  if (tab === "ALL") return true;
+  if (tab === "DELIVERY") {
+    return (
+      DELIVERY_STATUSES.has(String(shipment.status || "").toUpperCase()) ||
+      shipment.availableForDelivery === true ||
+      Boolean(shipment.assignedCheckerId)
+    );
+  }
+  return shipmentLocationText(shipment).includes(tab);
+}
 
 function searchText(shipment = {}) {
   return [
@@ -69,14 +132,18 @@ function dateValue(shipment = {}) {
 export default function ManagerShipmentsScreen() {
   const router = useRouter();
   const { colors } = useTheme();
+  const { role } = useAuth();
+  const canDelete = role === "admin";
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("ALL");
+  const [boardTab, setBoardTab] = useState("ALL");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [municipality, setMunicipality] = useState("");
   const [checker, setChecker] = useState("");
   const [driver, setDriver] = useState("");
   const [createVisible, setCreateVisible] = useState(false);
+  const [selectedShipment, setSelectedShipment] = useState(null);
   const { data, loading, refreshing, error, reload } = useManagerRequest(
     listManagerMobileShipments,
     { limit: 500 },
@@ -87,6 +154,7 @@ export default function ManagerShipmentsScreen() {
     const start = startDate ? new Date(`${startDate}T00:00:00`) : null;
     const end = endDate ? new Date(`${endDate}T23:59:59`) : null;
     return (data?.shipments || []).filter((shipment) => {
+      if (!matchesBoardTab(shipment, boardTab)) return false;
       if (term && !searchText(shipment).includes(term)) return false;
       const municipalityText = [
         shipment.municipality,
@@ -111,7 +179,59 @@ export default function ManagerShipmentsScreen() {
       if (end && date && date > end) return false;
       return true;
     });
-  }, [data, search, status, startDate, endDate, municipality, checker, driver]);
+  }, [data, boardTab, search, status, startDate, endDate, municipality, checker, driver]);
+
+  const boardCounts = useMemo(
+    () =>
+      Object.fromEntries(
+        BOARD_TABS.map(([value]) => [
+          value,
+          (data?.shipments || []).filter((shipment) =>
+            matchesBoardTab(shipment, value),
+          ).length,
+        ]),
+      ),
+    [data],
+  );
+
+  const openDetails = (shipment, activeTab = "status") => {
+    setSelectedShipment(null);
+    router.push({
+      pathname: "/(manager)/shipment-details",
+      params: { shipmentId: shipment.id, tab: activeTab },
+    });
+  };
+
+  const confirmDelete = (shipment) => {
+    const label = shipment.trackingNumber || shipment.shipmentId || shipment.id;
+    Alert.alert(
+      "Delete Shipment",
+      `Permanently delete ${label}? This also removes its trip manifest entry and cannot be undone.`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              await deleteShipment({
+                shipmentId: shipment.id,
+                reason: "Deleted from Admin mobile shipment board",
+              });
+              setSelectedShipment(null);
+              await reload({ refresh: true });
+              Alert.alert("Shipment deleted", `${label} was removed.`);
+            } catch (nextError) {
+              Alert.alert(
+                "Shipment not deleted",
+                nextError.message || "Please try again.",
+              );
+            }
+          },
+        },
+      ],
+    );
+  };
 
   if (loading) return <LoadingState label="Loading authorized shipments…" />;
   if (error) return <ErrorState message={error.message} onRetry={() => reload()} />;
@@ -124,6 +244,52 @@ export default function ManagerShipmentsScreen() {
         actionIcon="plus"
         onAction={() => setCreateVisible(true)}
       />
+      <FlatList
+        style={styles.boardScroll}
+        data={shipments}
+        keyExtractor={(item) => item.id}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={() => reload({ refresh: true })}
+            tintColor="#4f46e5"
+          />
+        }
+        contentContainerStyle={shipments.length ? styles.list : styles.emptyList}
+        ListHeaderComponent={
+          <>
+      <View style={[styles.boardTabsWrap, { backgroundColor: colors.surface }]}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+          <View style={styles.boardTabs}>
+            {BOARD_TABS.map(([value, label, icon]) => {
+              const active = boardTab === value;
+              return (
+                <Pressable
+                  key={value}
+                  onPress={() => setBoardTab(value)}
+                  style={[
+                    styles.boardTab,
+                    {
+                      backgroundColor: active ? "#2563eb" : colors.cardMuted,
+                      borderColor: active ? "#2563eb" : colors.border,
+                    },
+                  ]}
+                >
+                  <Feather name={icon} size={15} color={active ? "#fff" : colors.textMuted} />
+                  <Text style={[styles.boardTabText, { color: active ? "#fff" : colors.text }]}>
+                    {label}
+                  </Text>
+                  <View style={[styles.boardCount, { backgroundColor: active ? "rgba(255,255,255,0.2)" : colors.surface }]}>
+                    <Text style={[styles.boardCountText, { color: active ? "#fff" : colors.textMuted }]}>
+                      {boardCounts[value] || 0}
+                    </Text>
+                  </View>
+                </Pressable>
+              );
+            })}
+          </View>
+        </ScrollView>
+      </View>
       <View style={[styles.filters, { backgroundColor: colors.surface }]}>
         <View style={[styles.search, { backgroundColor: colors.cardMuted }]}>
           <Feather name="search" size={18} color={colors.textMuted} />
@@ -201,25 +367,12 @@ export default function ManagerShipmentsScreen() {
           </View>
         </ScrollView>
       </View>
-
-      <FlatList
-        data={shipments}
-        keyExtractor={(item) => item.id}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={() => reload({ refresh: true })}
-            tintColor="#4f46e5"
-          />
+          </>
         }
-        contentContainerStyle={shipments.length ? styles.list : styles.emptyList}
         renderItem={({ item }) => (
           <Pressable
             onPress={() =>
-              router.push({
-                pathname: "/(manager)/shipment-details",
-                params: { shipmentId: item.id },
-              })
+              openDetails(item)
             }
           >
             <ManagerCard>
@@ -238,10 +391,7 @@ export default function ManagerShipmentsScreen() {
                   hitSlop={8}
                   onPress={(event) => {
                     event.stopPropagation?.();
-                    router.push({
-                      pathname: "/(manager)/shipment-details",
-                      params: { shipmentId: item.id },
-                    });
+                    setSelectedShipment(item);
                   }}
                   style={[styles.moreButton, { backgroundColor: colors.cardMuted }]}
                 >
@@ -308,7 +458,70 @@ export default function ManagerShipmentsScreen() {
         onClose={() => setCreateVisible(false)}
         onCreated={() => reload({ refresh: true })}
       />
+      <ShipmentActionSheet
+        shipment={selectedShipment}
+        colors={colors}
+        onClose={() => setSelectedShipment(null)}
+        onOpen={(tabName) => selectedShipment && openDetails(selectedShipment, tabName)}
+        canDelete={canDelete}
+        onDelete={() => selectedShipment && confirmDelete(selectedShipment)}
+      />
     </View>
+  );
+}
+
+function ShipmentActionSheet({ shipment, colors, onClose, onOpen, canDelete, onDelete }) {
+  const actions = [
+    ["status", "View shipment details", "file-text", "Status, customer, route, custody, and timeline"],
+    ["items", "View items and pieces", "package", "Package breakdown and piece statuses"],
+    ["actions", "Shipment actions", "tool", "Status override, returns, release, reconcile, print, and edit"],
+  ];
+  return (
+    <Modal visible={Boolean(shipment)} transparent animationType="fade" onRequestClose={onClose}>
+      <Pressable style={styles.sheetBackdrop} onPress={onClose}>
+        <Pressable style={[styles.sheet, { backgroundColor: colors.surface }]} onPress={() => {}}>
+          <View style={styles.sheetHandle} />
+          <Text style={[styles.sheetTitle, { color: colors.text }]} numberOfLines={1}>
+            {shipment?.trackingNumber || shipment?.shipmentId || shipment?.id}
+          </Text>
+          <Text style={[styles.sheetSubtitle, { color: colors.textMuted }]}>
+            Select the same shipment workspace used by the web board.
+          </Text>
+          {actions.map(([tabName, label, icon, description]) => (
+            <Pressable
+              key={tabName}
+              onPress={() => onOpen(tabName)}
+              style={[styles.sheetAction, { borderTopColor: colors.border }]}
+            >
+              <View style={[styles.sheetIcon, { backgroundColor: colors.primarySoft }]}>
+                <Feather name={icon} size={19} color="#2563eb" />
+              </View>
+              <View style={styles.cardCopy}>
+                <Text style={[styles.sheetActionTitle, { color: colors.text }]}>{label}</Text>
+                <Text style={[styles.sheetActionCopy, { color: colors.textMuted }]}>{description}</Text>
+              </View>
+              <Feather name="chevron-right" size={20} color={colors.textMuted} />
+            </Pressable>
+          ))}
+          {canDelete ? (
+            <Pressable
+              onPress={onDelete}
+              style={[styles.deleteAction, { borderTopColor: colors.border }]}
+            >
+              <View style={styles.deleteIcon}>
+                <Feather name="trash-2" size={19} color="#dc2626" />
+              </View>
+              <View style={styles.cardCopy}>
+                <Text style={styles.deleteTitle}>Delete Shipment</Text>
+                <Text style={[styles.sheetActionCopy, { color: colors.textMuted }]}>
+                  Permanently remove this shipment and its manifest reference.
+                </Text>
+              </View>
+            </Pressable>
+          ) : null}
+        </Pressable>
+      </Pressable>
+    </Modal>
   );
 }
 
@@ -343,12 +556,19 @@ function Meta({ icon, label, value, colors }) {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
+  boardScroll: { flex: 1, minHeight: 0 },
   filters: {
-    paddingHorizontal: 14,
+    paddingHorizontal: 0,
     paddingTop: 10,
     paddingBottom: 12,
     gap: 10,
   },
+  boardTabsWrap: { paddingHorizontal: 0, paddingTop: 10 },
+  boardTabs: { flexDirection: "row", gap: 8, paddingBottom: 2 },
+  boardTab: { minHeight: 42, borderRadius: 13, borderWidth: 1, paddingHorizontal: 12, flexDirection: "row", alignItems: "center", gap: 7 },
+  boardTabText: { fontSize: 11, fontWeight: "900" },
+  boardCount: { minWidth: 24, height: 22, borderRadius: 11, paddingHorizontal: 6, alignItems: "center", justifyContent: "center" },
+  boardCountText: { fontSize: 10, fontWeight: "900" },
   search: {
     minHeight: 46,
     borderRadius: 14,
@@ -380,7 +600,7 @@ const styles = StyleSheet.create({
   advancedFilters: { flexDirection: "row", gap: 8 },
   advancedInput: { width: 145, minHeight: 51, borderWidth: 1, borderRadius: 13, paddingHorizontal: 11, paddingVertical: 6 },
   list: { padding: 14, paddingBottom: 28, gap: 11 },
-  emptyList: { flexGrow: 1 },
+  emptyList: { flexGrow: 1, padding: 14, gap: 11 },
   cardTop: { flexDirection: "row", alignItems: "flex-start", gap: 10 },
   cardCopy: { flex: 1, minWidth: 0 },
   moreButton: { width: 38, height: 38, borderRadius: 12, alignItems: "center", justifyContent: "center" },
@@ -392,4 +612,16 @@ const styles = StyleSheet.create({
   metaCopy: { flex: 1, minWidth: 0 },
   metaLabel: { fontSize: 9, fontWeight: "800", textTransform: "uppercase" },
   metaValue: { fontSize: 11, lineHeight: 16, fontWeight: "600", marginTop: 2 },
+  sheetBackdrop: { flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(15,23,42,0.55)" },
+  sheet: { borderTopLeftRadius: 26, borderTopRightRadius: 26, paddingHorizontal: 18, paddingTop: 10, paddingBottom: 28 },
+  sheetHandle: { alignSelf: "center", width: 42, height: 5, borderRadius: 3, backgroundColor: "#94a3b8", marginBottom: 14 },
+  sheetTitle: { fontSize: 17, fontWeight: "900" },
+  sheetSubtitle: { fontSize: 11, lineHeight: 16, marginTop: 3, marginBottom: 10 },
+  sheetAction: { minHeight: 76, borderTopWidth: StyleSheet.hairlineWidth, flexDirection: "row", alignItems: "center", gap: 11 },
+  sheetIcon: { width: 42, height: 42, borderRadius: 13, alignItems: "center", justifyContent: "center" },
+  sheetActionTitle: { fontSize: 13, fontWeight: "900" },
+  sheetActionCopy: { fontSize: 10, lineHeight: 15, marginTop: 3 },
+  deleteAction: { minHeight: 72, borderTopWidth: StyleSheet.hairlineWidth, flexDirection: "row", alignItems: "center", gap: 11 },
+  deleteIcon: { width: 42, height: 42, borderRadius: 13, backgroundColor: "#fef2f2", alignItems: "center", justifyContent: "center" },
+  deleteTitle: { color: "#dc2626", fontSize: 13, fontWeight: "900" },
 });

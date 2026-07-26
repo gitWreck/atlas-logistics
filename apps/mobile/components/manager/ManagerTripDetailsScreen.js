@@ -8,9 +8,13 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from "react-native";
 import Feather from "@expo/vector-icons/Feather";
+import * as FileSystem from "expo-file-system";
+import * as Print from "expo-print";
+import * as Sharing from "expo-sharing";
 import { useLocalSearchParams } from "expo-router";
 import { useTheme } from "../../contexts/ThemeContext";
 import { useAuth } from "../../contexts/AuthContext";
@@ -19,12 +23,16 @@ import {
   archiveTruckTrip,
   assignDriverToTrip,
   cancelTruckTrip,
+  dispatchTrip,
   generateTripManifest,
   getManagerMobileTrip,
+  recoverFoundPackage,
+  startReceiving,
   unlockTripManifest,
   updateTripStatus,
 } from "../utilities/FirebaseFunctions";
 import useManagerRequest from "./useManagerRequest";
+import ManagerTripScheduleModal from "./ManagerTripScheduleModal";
 import {
   EmptyState,
   ErrorState,
@@ -50,12 +58,34 @@ function manifestStatus(trip) {
   return trip.manifestLocked ? "LOCKED" : "OPEN";
 }
 
+function htmlEscape(value) {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+function csvValue(value) {
+  return `"${String(value ?? "").replace(/"/g, '""')}"`;
+}
+
 export default function ManagerTripDetailsScreen() {
-  const { tripId } = useLocalSearchParams();
+  const { tripId, tab: initialTab } = useLocalSearchParams();
   const { colors } = useTheme();
   const { profile } = useAuth();
-  const [tab, setTab] = React.useState("status");
+  const [tab, setTab] = React.useState(
+    ["status", "manifest", "actions"].includes(String(initialTab))
+      ? String(initialTab)
+      : "status",
+  );
   const [driverModal, setDriverModal] = React.useState(false);
+  const [scheduleVisible, setScheduleVisible] = React.useState(false);
+  const [unlockMode, setUnlockMode] = React.useState(false);
+  const [unlockReason, setUnlockReason] = React.useState("");
+  const [foundModal, setFoundModal] = React.useState(false);
+  const [foundLabel, setFoundLabel] = React.useState("");
+  const [foundRemarks, setFoundRemarks] = React.useState("");
   const [saving, setSaving] = React.useState(false);
   const id = tripId ? String(tripId) : "";
   const { data, loading, refreshing, error, reload } = useManagerRequest(
@@ -80,8 +110,32 @@ export default function ManagerTripDetailsScreen() {
     ARRIVED: "COMPLETED",
   }[status];
   const resolvedManifestStatus = manifestStatus(trip);
+  const isHubTransfer =
+    String(trip.tripType || "").toUpperCase() === "HUB_TRANSFER" ||
+    Boolean(trip.originCode && trip.destinationCode);
+  const canDispatch =
+    isHubTransfer &&
+    resolvedManifestStatus === "LOCKED" &&
+    ((!trip.manifestReopenedAt &&
+      (status === "LOADED" ||
+        (status === "IN_TRANSIT" && !trip.dispatchedAt))) ||
+      (trip.manifestReopenedAt &&
+        ["ARRIVED", "LOADED", "LOADING"].includes(status) &&
+        !trip.correctionDispatchedAt));
+  const canReceive =
+    isHubTransfer &&
+    resolvedManifestStatus === "LOCKED" &&
+    ((!trip.receivingStartedAt && status === "IN_TRANSIT") ||
+      (trip.manifestReopenedAt &&
+        ((status === "ARRIVED" && trip.correctionDispatchedAt) ||
+          (status === "IN_TRANSIT" &&
+            trip.dispatchedAt &&
+            trip.receivingStartedAt))));
+  const profileRole = String(profile?.role || "").toLowerCase();
   const privilegedLifecycle =
-    String(profile?.email || "").toLowerCase() === "roselyn@gmail.com";
+    profileRole === "admin" ||
+    (profileRole === "manager" &&
+      String(profile?.email || "").toLowerCase() === "roselyn@gmail.com");
   const canCancel = privilegedLifecycle && !CLOSED.has(status);
   const canArchive =
     privilegedLifecycle &&
@@ -103,8 +157,10 @@ export default function ManagerTripDetailsScreen() {
       setSaving(true);
       await callable(payload);
       await reload({ refresh: true });
+      return true;
     } catch (nextError) {
       Alert.alert(failureTitle, nextError.message || "Please try again.");
+      return false;
     } finally {
       setSaving(false);
     }
@@ -135,22 +191,126 @@ export default function ManagerTripDetailsScreen() {
     );
     setDriverModal(false);
   };
+  const printManifest = async () => {
+    try {
+      setSaving(true);
+      const rows = shipments
+        .map(
+          (shipment) => `
+            <tr>
+              <td>${htmlEscape(
+                shipment.trackingNumber ||
+                  shipment.trackingShipmentId ||
+                  shipment.id,
+              )}</td>
+              <td>${htmlEscape(
+                shipment.customerName || shipment.recipientName || "",
+              )}</td>
+              <td>${htmlEscape(
+                shipment.municipality ||
+                  shipment.recipientMunicipality ||
+                  "",
+              )}</td>
+              <td>${htmlEscape(
+                shipment.status || shipment.masterStatus || "",
+              )}</td>
+            </tr>`,
+        )
+        .join("");
+      await Print.printAsync({
+        html: `<!doctype html><html><head><meta charset="utf-8"><style>
+          body{font-family:Arial,sans-serif;color:#0f172a;padding:24px}
+          h1{font-size:22px;margin:0 0 6px}p{font-size:12px;color:#475569}
+          table{width:100%;border-collapse:collapse;margin-top:22px}
+          th,td{border:1px solid #cbd5e1;padding:8px;text-align:left;font-size:10px}
+          th{background:#f1f5f9;text-transform:uppercase}
+        </style></head><body>
+          <h1>Trip Manifest — ${htmlEscape(trip.tripId || trip.id)}</h1>
+          <p>${htmlEscape(
+            `${trip.origin || trip.originCode || "Divisoria"} → ${
+              trip.destination || trip.destinationCode || "Odiongan"
+            }`,
+          )}</p>
+          <p>Driver: ${htmlEscape(
+            trip.driverName || "Unassigned",
+          )} &nbsp; Truck: ${htmlEscape(
+            trip.truckPlateNumber || trip.vehiclePlate || "Unassigned",
+          )}</p>
+          <table><thead><tr><th>Shipment</th><th>Customer</th><th>Municipality</th><th>Status</th></tr></thead>
+          <tbody>${rows}</tbody></table>
+        </body></html>`,
+      });
+    } catch (error) {
+      Alert.alert("Unable to print manifest", error.message || "Please try again.");
+    } finally {
+      setSaving(false);
+    }
+  };
+  const exportManifest = async () => {
+    try {
+      setSaving(true);
+      const header = ["Shipment", "Customer", "Municipality", "Status"];
+      const rows = shipments.map((shipment) => [
+        shipment.trackingNumber ||
+          shipment.trackingShipmentId ||
+          shipment.id,
+        shipment.customerName || shipment.recipientName || "",
+        shipment.municipality || shipment.recipientMunicipality || "",
+        shipment.status || shipment.masterStatus || "",
+      ]);
+      const csv = [header, ...rows]
+        .map((row) => row.map(csvValue).join(","))
+        .join("\r\n");
+      const safeId = String(trip.tripId || trip.id || "trip")
+        .replace(/[^a-z0-9_-]/gi, "-");
+      const uri = `${FileSystem.cacheDirectory}${safeId}-manifest.csv`;
+      await FileSystem.writeAsStringAsync(uri, csv, {
+        encoding: FileSystem.EncodingType.UTF8,
+      });
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(uri, {
+          mimeType: "text/csv",
+          dialogTitle: `Export ${trip.tripId || trip.id} manifest`,
+          UTI: "public.comma-separated-values-text",
+        });
+      } else {
+        Alert.alert("Manifest exported", uri);
+      }
+    } catch (error) {
+      Alert.alert("Unable to export manifest", error.message || "Please try again.");
+    } finally {
+      setSaving(false);
+    }
+  };
 
   return (
     <View style={[styles.container, { backgroundColor: colors.bg }]}>
       <ManagerHeader
         back
         title={trip.tripId || trip.id}
+        titleNumberOfLines={1}
+        titleStyle={styles.tripTitle}
         subtitle="Active Trip Details"
         actionIcon="refresh-cw"
         onAction={() => reload({ refresh: true })}
       />
 
+      <ScrollView
+        style={styles.detailScroll}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={() => reload({ refresh: true })}
+            tintColor="#0f766e"
+          />
+        }
+        contentContainerStyle={styles.scrollContent}
+      >
       <View style={[styles.summary, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
         <View style={styles.summaryLine}>
           <StatusBadge status={trip.status} />
           <StatusBadge status={resolvedManifestStatus} />
-          <Text style={[styles.summaryRoute, { color: colors.textMuted }]}>
+          <Text style={[styles.summaryRoute, { color: colors.textMuted }]} numberOfLines={1}>
             {trip.origin || trip.originCode || "Divisoria"} → {trip.destination || trip.destinationCode || "Odiongan"}
           </Text>
         </View>
@@ -175,16 +335,7 @@ export default function ManagerTripDetailsScreen() {
         })}
       </View>
 
-      <ScrollView
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={() => reload({ refresh: true })}
-            tintColor="#0f766e"
-          />
-        }
-        contentContainerStyle={styles.content}
-      >
+      <View style={styles.content}>
         {tab === "status" ? (
           <>
             <ManagerCard>
@@ -280,6 +431,15 @@ export default function ManagerTripDetailsScreen() {
           <>
             <ManagerCard>
               <SectionTitle title="Assignments" subtitle="Uses authorized staff from your Manager scope" />
+              {["CREATED", "LOADED"].includes(status) ? (
+                <ActionButton
+                  icon="calendar"
+                  label="Edit Trip Schedule"
+                  description="Update loading, departure, arrival, and customer notifications"
+                  onPress={() => setScheduleVisible(true)}
+                  colors={colors}
+                />
+              ) : null}
               <ActionButton
                 icon="user-check"
                 label="Assign or change Driver"
@@ -291,6 +451,57 @@ export default function ManagerTripDetailsScreen() {
 
             <ManagerCard>
               <SectionTitle title="Manifest Actions" />
+              <ActionButton
+                icon="search"
+                label="Found Package"
+                description="Recover a missing or on-trip package using its package label"
+                onPress={() => setFoundModal(true)}
+                colors={colors}
+              />
+              <ActionButton
+                icon="printer"
+                label="Print Manifest"
+                description="Open the native print dialog with this trip's authorized manifest"
+                onPress={printManifest}
+                colors={colors}
+              />
+              <ActionButton
+                icon="download"
+                label="Export Manifest"
+                description="Create and share a CSV manifest from the current live trip data"
+                onPress={exportManifest}
+                colors={colors}
+              />
+              {canDispatch ? (
+                <ActionButton
+                  icon="truck"
+                  label={trip.manifestReopenedAt ? "Dispatch Correction" : "Dispatch Trip"}
+                  description="Apply the web dispatch workflow, shipment custody updates, and notifications"
+                  onPress={() => confirmAction({
+                    title: trip.manifestReopenedAt ? "Dispatch correction" : "Dispatch trip",
+                    message: "Dispatch this trip and update all trip-scoped shipments?",
+                    confirm: "Dispatch",
+                    callable: dispatchTrip,
+                    payload: { tripId: trip.id },
+                  })}
+                  colors={colors}
+                />
+              ) : null}
+              {canReceive ? (
+                <ActionButton
+                  icon="download"
+                  label={trip.receivingStartedAt ? "Resume Receiving" : "Start Receiving"}
+                  description="Mark arrival and begin the destination receiving workflow"
+                  onPress={() => confirmAction({
+                    title: trip.receivingStartedAt ? "Resume receiving" : "Start receiving",
+                    message: "Begin receiving this trip at its destination warehouse?",
+                    confirm: "Continue",
+                    callable: startReceiving,
+                    payload: { tripId: trip.id },
+                  })}
+                  colors={colors}
+                />
+              ) : null}
               {resolvedManifestStatus === "OPEN" ? (
                 <ActionButton
                   icon="lock"
@@ -307,19 +518,78 @@ export default function ManagerTripDetailsScreen() {
                 />
               ) : null}
               {resolvedManifestStatus === "LOCKED" ? (
-                <ActionButton
-                  icon="unlock"
-                  label="Unlock Manifest"
-                  description="Reopen the manifest for an authorized correction"
-                  onPress={() => confirmAction({
-                    title: "Unlock manifest",
-                    message: "Reopen this manifest for correction?",
-                    confirm: "Unlock",
-                    callable: unlockTripManifest,
-                    payload: { tripId: trip.id, reason: "Manager mobile manifest correction" },
-                  })}
-                  colors={colors}
-                />
+                !unlockMode ? (
+                  <ActionButton
+                    icon="unlock"
+                    label="Unlock Manifest"
+                    description="Reopen the manifest for an authorized correction"
+                    onPress={() => setUnlockMode(true)}
+                    colors={colors}
+                  />
+                ) : (
+                  <View
+                    style={[
+                      styles.unlockBox,
+                      {
+                        borderColor: colors.border,
+                        backgroundColor: colors.cardMuted,
+                      },
+                    ]}
+                  >
+                    <Text style={[styles.unlockLabel, { color: colors.text }]}>
+                      Reason for unlocking
+                    </Text>
+                    <TextInput
+                      value={unlockReason}
+                      onChangeText={setUnlockReason}
+                      multiline
+                      placeholder="Explain why the manifest must be reopened"
+                      placeholderTextColor={colors.textMuted}
+                      style={[
+                        styles.unlockInput,
+                        {
+                          color: colors.text,
+                          borderColor: colors.border,
+                          backgroundColor: colors.surface,
+                        },
+                      ]}
+                    />
+                    <View style={styles.unlockActions}>
+                      <Pressable
+                        onPress={() => {
+                          setUnlockMode(false);
+                          setUnlockReason("");
+                        }}
+                        style={[styles.unlockButton, { borderColor: colors.border }]}
+                      >
+                        <Text style={[styles.cancelText, { color: colors.textMuted }]}>
+                          Cancel
+                        </Text>
+                      </Pressable>
+                      <Pressable
+                        disabled={!unlockReason.trim() || saving}
+                        onPress={async () => {
+                          const unlocked = await runAction(
+                            unlockTripManifest,
+                            { tripId: trip.id, reason: unlockReason.trim() },
+                            "Unlock manifest failed",
+                          );
+                          if (unlocked) {
+                            setUnlockMode(false);
+                            setUnlockReason("");
+                          }
+                        }}
+                        style={[
+                          styles.unlockButton,
+                          styles.unlockConfirm,
+                          (!unlockReason.trim() || saving) && styles.disabled,
+                        ]}
+                      >
+                        <Text style={styles.saveText}>Confirm Unlock</Text>
+                      </Pressable>
+                    </View>
+                  </View>
+                )
               ) : null}
               {!["OPEN", "LOCKED"].includes(resolvedManifestStatus) ? (
                 <Text style={[styles.actionNotice, { color: colors.textMuted }]}>
@@ -416,6 +686,7 @@ export default function ManagerTripDetailsScreen() {
             </ManagerCard>
           </>
         ) : null}
+      </View>
       </ScrollView>
 
       {saving ? (
@@ -476,6 +747,99 @@ export default function ManagerTripDetailsScreen() {
           </View>
         </View>
       </Modal>
+      <ManagerTripScheduleModal
+        visible={scheduleVisible}
+        trip={trip}
+        trips={[trip]}
+        onClose={() => setScheduleVisible(false)}
+        onSaved={() => reload({ refresh: true })}
+      />
+      <Modal
+        visible={foundModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => !saving && setFoundModal(false)}
+      >
+        <View style={styles.modalBackdrop}>
+          <View style={[styles.modalSheet, { backgroundColor: colors.surface }]}>
+            <Text style={[styles.modalTitle, { color: colors.text }]}>
+              Recover Found Package
+            </Text>
+            <Text style={[styles.modalSubtitle, { color: colors.textMuted }]}>
+              Enter the scanned package label. Existing custody and manifest rules are applied.
+            </Text>
+            <TextInput
+              value={foundLabel}
+              onChangeText={setFoundLabel}
+              autoCapitalize="characters"
+              placeholder="Package label"
+              placeholderTextColor={colors.textMuted}
+              style={[
+                styles.foundInput,
+                {
+                  color: colors.text,
+                  borderColor: colors.border,
+                  backgroundColor: colors.cardMuted,
+                },
+              ]}
+            />
+            <TextInput
+              value={foundRemarks}
+              onChangeText={setFoundRemarks}
+              multiline
+              placeholder="Remarks (optional)"
+              placeholderTextColor={colors.textMuted}
+              style={[
+                styles.foundInput,
+                styles.foundRemarks,
+                {
+                  color: colors.text,
+                  borderColor: colors.border,
+                  backgroundColor: colors.cardMuted,
+                },
+              ]}
+            />
+            <View style={styles.unlockActions}>
+              <Pressable
+                disabled={saving}
+                onPress={() => setFoundModal(false)}
+                style={[styles.unlockButton, { borderColor: colors.border }]}
+              >
+                <Text style={[styles.cancelText, { color: colors.textMuted }]}>
+                  Cancel
+                </Text>
+              </Pressable>
+              <Pressable
+                disabled={saving || !foundLabel.trim()}
+                onPress={async () => {
+                  const recovered = await runAction(
+                    recoverFoundPackage,
+                    {
+                      tripId: trip.id,
+                      packageLabel: foundLabel.trim(),
+                      remarks: foundRemarks.trim() || null,
+                      sourceUI: "MANAGER_MOBILE_TRIP",
+                    },
+                    "Package not recovered",
+                  );
+                  if (recovered) {
+                    setFoundModal(false);
+                    setFoundLabel("");
+                    setFoundRemarks("");
+                  }
+                }}
+                style={[
+                  styles.unlockButton,
+                  styles.foundConfirm,
+                  (saving || !foundLabel.trim()) && styles.disabled,
+                ]}
+              >
+                <Text style={styles.saveText}>Recover Package</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -533,9 +897,12 @@ function ActionButton({ icon, label, description, onPress, colors, danger = fals
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  summary: { paddingHorizontal: 15, paddingBottom: 12, borderBottomWidth: 1 },
-  summaryLine: { flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: 8 },
-  summaryRoute: { fontSize: 12, fontWeight: "700" },
+  detailScroll: { flex: 1 },
+  scrollContent: { paddingBottom: 1 },
+  tripTitle: { fontSize: 17, letterSpacing: -0.45 },
+  summary: { minHeight: 44, paddingHorizontal: 15, paddingVertical: 7, borderBottomWidth: 1 },
+  summaryLine: { flexDirection: "row", alignItems: "center", gap: 8 },
+  summaryRoute: { flex: 1, minWidth: 0, fontSize: 11, fontWeight: "700" },
   tabs: { flexDirection: "row", borderBottomWidth: 1 },
   tab: { flex: 1, minHeight: 52, flexDirection: "row", gap: 6, alignItems: "center", justifyContent: "center", borderBottomWidth: 3, borderBottomColor: "transparent" },
   tabActive: { borderBottomColor: "#10b981", backgroundColor: "rgba(16,185,129,0.08)" },
@@ -569,6 +936,14 @@ const styles = StyleSheet.create({
   actionLabel: { fontSize: 13, fontWeight: "900" },
   actionDescription: { fontSize: 10, lineHeight: 15, marginTop: 3 },
   actionNotice: { fontSize: 12, lineHeight: 18, marginTop: 12 },
+  unlockBox: { borderWidth: 1, borderRadius: 13, padding: 12, marginTop: 10 },
+  unlockLabel: { fontSize: 12, fontWeight: "900" },
+  unlockInput: { minHeight: 82, borderWidth: 1, borderRadius: 11, paddingHorizontal: 10, paddingVertical: 9, marginTop: 8, fontSize: 12, textAlignVertical: "top" },
+  unlockActions: { flexDirection: "row", gap: 8, marginTop: 9 },
+  unlockButton: { flex: 1, minHeight: 42, borderWidth: 1, borderRadius: 11, alignItems: "center", justifyContent: "center" },
+  unlockConfirm: { backgroundColor: "#d97706", borderColor: "#d97706" },
+  saveText: { color: "#fff", fontSize: 11, fontWeight: "900" },
+  disabled: { opacity: 0.5 },
   auditRow: { flexDirection: "row", gap: 10, minHeight: 62, paddingTop: 12 },
   auditRail: { width: 14, alignItems: "center" },
   auditDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: "#4f46e5", marginTop: 3 },
@@ -584,6 +959,9 @@ const styles = StyleSheet.create({
   modalSheet: { maxHeight: "78%", borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 20, paddingBottom: 28 },
   modalTitle: { fontSize: 20, fontWeight: "900" },
   modalSubtitle: { fontSize: 12, lineHeight: 17, marginTop: 5 },
+  foundInput: { minHeight: 47, borderWidth: 1, borderRadius: 12, paddingHorizontal: 11, marginTop: 12, fontSize: 13 },
+  foundRemarks: { minHeight: 82, paddingVertical: 10, textAlignVertical: "top" },
+  foundConfirm: { backgroundColor: "#059669", borderColor: "#059669" },
   driverList: { maxHeight: 420, marginTop: 12 },
   driverRow: { minHeight: 62, borderBottomWidth: StyleSheet.hairlineWidth, flexDirection: "row", alignItems: "center", gap: 10 },
   driverCopy: { flex: 1 },

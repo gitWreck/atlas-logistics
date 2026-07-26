@@ -49,6 +49,18 @@ export const reconcileShipmentAtHub = httpsCallable(
   functions,
   "reconcileShipmentAtHub",
 );
+export const receiveReturnedShipmentAtHub = httpsCallable(
+  functions,
+  "receiveReturnedShipmentAtHub",
+);
+export const releaseForDeliveryOperations = httpsCallable(
+  functions,
+  "releaseForDeliveryOperations",
+);
+export const updateShipmentDetails = httpsCallable(
+  functions,
+  "updateShipmentDetails",
+);
 export const updateShipmentImages = httpsCallable(
   functions,
   "updateShipmentImages",
@@ -78,6 +90,9 @@ export const getShipmentCustodyTimeline = httpsCallable(
 );
 
 export const startTrip = httpsCallable(functions, "startTrip");
+export const dispatchTrip = httpsCallable(functions, "dispatchTrip");
+export const startReceiving = httpsCallable(functions, "startReceiving");
+export const recoverFoundPackage = httpsCallable(functions, "recoverFoundPackage");
 export const reportTripDelay = httpsCallable(functions, "reportTripDelay");
 export const confirmDriverArrival = httpsCallable(functions, "confirmDriverArrival");
 export const reportDriverTripIssue = httpsCallable(functions, "reportDriverTripIssue");
@@ -100,7 +115,9 @@ export const bulkShipmentAction = httpsCallable(
   "bulkShipmentAction",
 );
 export const createShipment = httpsCallable(functions, "createShipment");
+export const deleteShipment = httpsCallable(functions, "deleteShipment");
 export const createTruckTrip = httpsCallable(functions, "createTruckTrip");
+export const updateTripSchedule = httpsCallable(functions, "updateTripSchedule");
 export const cancelTruckTrip = httpsCallable(functions, "cancelTruckTrip");
 export const archiveTruckTrip = httpsCallable(functions, "archiveTruckTrip");
 export const getTripAuditLog = httpsCallable(functions, "getTripAuditLog");
@@ -166,6 +183,10 @@ export const getManagerMobileTrip = httpsCallable(
 export const getManagerMobileModules = httpsCallable(
   functions,
   "getManagerMobileModules",
+);
+export const updateManagerMobileSettings = httpsCallable(
+  functions,
+  "updateManagerMobileSettings",
 );
 export const upsertTruck = httpsCallable(functions, "upsertTruck");
 export const updateTruckStatus = httpsCallable(functions, "updateTruckStatus");

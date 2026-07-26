@@ -13,9 +13,24 @@ const {
   broadcastTripLogic,
 } = require("../messaging/broadcastTripMessage");
 const { writeTripActionLog } = require("../utilities/tripLogger");
+const { canAccessRecord } = require("../manager/managerAccess");
 
 if (!admin.apps.length) admin.initializeApp();
 const db = admin.firestore();
+
+function formatSmsDate(value) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toLocaleString("en-PH", {
+    timeZone: "Asia/Manila",
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
 
 /* =========================
    FUNCTION
@@ -53,7 +68,26 @@ exports.updateTripSchedule = onCall(
     const plannedDeparture = req.data?.plannedDeparture || null;
     const estimatedArrival = req.data?.estimatedArrival || null;
     const plannedLoadingStart = req.data?.plannedLoadingStart || null;
-    const notify = !!req.data?.notify;
+    const requestedChannels =
+      req.data?.notificationChannels &&
+      typeof req.data.notificationChannels === "object"
+        ? req.data.notificationChannels
+        : {};
+    const channels = {
+      sms:
+        req.data?.notifySms !== undefined
+          ? req.data.notifySms === true
+          : requestedChannels.sms === true,
+      email:
+        req.data?.notifyEmail !== undefined
+          ? req.data.notifyEmail === true
+          : requestedChannels.email === true,
+      push:
+        req.data?.notifyPush !== undefined
+          ? req.data.notifyPush === true
+          : requestedChannels.push === true,
+    };
+    const notify = !!req.data?.notify && Object.values(channels).some(Boolean);
 
     const parseOptionalDate = (value, label) => {
       if (!value) return null;
@@ -146,7 +180,7 @@ exports.updateTripSchedule = onCall(
     const tripRef = db.collection("truck_trips").doc(tripId);
 
     const result = await db.runTransaction(async (tx) => {
-      const { role } = await assertAdminOrManager(db, tx, req.auth.uid);
+      const { role, user } = await assertAdminOrManager(db, tx, req.auth.uid);
 
       const tripSnap = await tx.get(tripRef);
       if (!tripSnap.exists) {
@@ -154,6 +188,12 @@ exports.updateTripSchedule = onCall(
       }
 
       const trip = tripSnap.data();
+      if (role === "manager" && !canAccessRecord(user, { id: tripId, ...trip })) {
+        throw new HttpsError(
+          "permission-denied",
+          "This trip is outside your assigned warehouse or municipality.",
+        );
+      }
 
       if (trip.active === false || trip.status === "COMPLETED") {
         throw new HttpsError(
@@ -190,6 +230,7 @@ exports.updateTripSchedule = onCall(
           plannedDeparture: parsedPlannedDeparture,
           estimatedArrival: parsedEstimatedArrival,
           plannedLoadingStart: parsedPlannedLoadingStart,
+          notificationChannels: channels,
           // plannedLoadingEnd: parsedPlannedLoadingEnd,
           // actualLoadingStart: parsedActualLoadingStart,
           // actualLoadingEnd: parsedActualLoadingEnd,
@@ -246,7 +287,10 @@ exports.updateTripSchedule = onCall(
           tripId,
           message: messageText,
           actorUid: req.auth.uid || "SYSTEM",
+          actorName: req.auth.token?.name || null,
+          actorRole: req.auth.token?.role || null,
           type: "SCHEDULE_UPDATE",
+          channels,
         });
       } catch (err) {
         console.error("[Notify] Failed to send schedule SMS:", err);

@@ -64,3 +64,16 @@ package-lock.json
 .local-mobile.out.log
 .local-web.err.log
 .local-web.out.log
+apps/mobile/components/ErrorBoundary.js
+apps/mobile/components/ErrorBoundary.js
+apps/mobile/components/ErrorBoundary.js
+apps/mobile/firebase.js
+package-lock.json
+package.json
+response2.txt
+*.js
+/apps/mobile/components
+apps/mobile/components/ErrorBoundary.js
+apps/mobile/firebase.js
+package-lock.json
+package.json

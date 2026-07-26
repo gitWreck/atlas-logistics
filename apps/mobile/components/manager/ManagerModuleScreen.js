@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -16,15 +16,18 @@ import {
 import Feather from "@expo/vector-icons/Feather";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useTheme } from "../../contexts/ThemeContext";
+import { useAuth } from "../../contexts/AuthContext";
 import StatusBadge from "../ui/StatusBadge";
 import {
   assignCheckerMunicipalities,
   getManagerMobileModules,
   updateInvoiceStatus,
+  updateManagerMobileSettings,
   updateTruckStatus,
 } from "../utilities/FirebaseFunctions";
 import useManagerRequest from "./useManagerRequest";
 import ManagerQuickCreateModal from "./ManagerQuickCreateModal";
+import AdminMobileSettingsEditor from "./AdminMobileSettingsEditor";
 import {
   EmptyState,
   ErrorState,
@@ -43,11 +46,34 @@ const MODULES = {
     icon: "truck",
     source: "trucks",
   },
+  drivers: {
+    title: "Drivers",
+    subtitle: "Authorized drivers and their current assignments",
+    icon: "users",
+    source: "staff",
+    resourceType: "staff",
+    roleFilter: "driver",
+  },
+  checkers: {
+    title: "Checkers",
+    subtitle: "Authorized Checkers and municipality coverage",
+    icon: "user-check",
+    source: "staff",
+    resourceType: "staff",
+    roleFilter: "checker",
+  },
   customers: {
     title: "Customers",
     subtitle: "Accounts, contacts, shipments, and pickup history",
     icon: "users",
     source: "customers",
+  },
+  warehouses: {
+    title: "Warehouses",
+    subtitle: "Warehouse locations available to your account",
+    icon: "home",
+    source: "warehouses",
+    resourceType: "warehouses",
   },
   invoices: {
     title: "Invoices",
@@ -127,9 +153,38 @@ export default function ManagerModuleScreen() {
   const { data, loading, refreshing, error, reload } = useManagerRequest(
     getManagerMobileModules,
   );
+  useEffect(() => {
+    if (data?.preferences) {
+      setPushAlerts(data.preferences.pushNotifications !== false);
+    }
+  }, [data?.preferences]);
 
   const sourceRows = useMemo(() => {
     if (!data) return [];
+    if (config.source === "settings" || config.source === "reports") {
+      return [];
+    }
+    if (config.source === "warehouses") {
+      const assigned = (data.scope?.warehouses || [])
+        .map((value) => String(value || "").trim().toLowerCase())
+        .filter(Boolean);
+      return (data.settings?.warehouses || [])
+        .map((warehouse, index) =>
+          typeof warehouse === "string"
+            ? { id: warehouse, name: warehouse, active: true }
+            : {
+                id: warehouse.id || warehouse.code || `warehouse-${index}`,
+                active: warehouse.active !== false,
+                ...warehouse,
+              },
+        )
+        .filter((warehouse) => {
+          if (!assigned.length) return true;
+          return [warehouse.id, warehouse.code, warehouse.name]
+            .map((value) => String(value || "").trim().toLowerCase())
+            .some((value) => value && assigned.includes(value));
+        });
+    }
     if (config.source === "delivery") {
       return (data.shipments || []).filter((row) =>
         ["OUT_FOR_DELIVERY", "FAILED", "FAILED_DELIVERY", "DELIVERED", "RETURNED"]
@@ -141,8 +196,15 @@ export default function ManagerModuleScreen() {
         (row) => String(row.role || "").toLowerCase() === "checker",
       );
     }
-    return data[config.source] || [];
-  }, [config.source, data]);
+    const values = data[config.source] || [];
+    if (config.roleFilter) {
+      return values.filter(
+        (row) =>
+          String(row.role || "").toLowerCase() === config.roleFilter,
+      );
+    }
+    return values;
+  }, [config.roleFilter, config.source, data]);
 
   const statuses = useMemo(
     () => [
@@ -165,6 +227,7 @@ export default function ManagerModuleScreen() {
       );
     });
   }, [search, sourceRows, status]);
+  const resourceType = config.resourceType || config.source;
 
   if (loading) return <LoadingState label={`Loading ${config.title.toLowerCase()}…`} />;
   if (error) return <ErrorState message={error.message} onRetry={() => reload()} />;
@@ -201,6 +264,7 @@ export default function ManagerModuleScreen() {
         colors={colors}
         pushAlerts={pushAlerts}
         setPushAlerts={setPushAlerts}
+        reload={reload}
       />
     );
   }
@@ -214,40 +278,8 @@ export default function ManagerModuleScreen() {
         actionIcon={["trucks", "customers", "invoices"].includes(config.source) ? "plus" : undefined}
         onAction={() => setCreateVisible(true)}
       />
-      <View style={[styles.toolbar, { backgroundColor: colors.surface }]}>
-        <View style={[styles.search, { backgroundColor: colors.cardMuted }]}>
-          <Feather name="search" size={17} color={colors.textMuted} />
-          <TextInput
-            value={search}
-            onChangeText={setSearch}
-            placeholder={`Search ${config.title.toLowerCase()}`}
-            placeholderTextColor={colors.textMuted}
-            style={[styles.searchInput, { color: colors.text }]}
-          />
-        </View>
-        {statuses.length > 1 ? (
-          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-            <View style={styles.chips}>
-              {statuses.map((value) => (
-                <Pressable
-                  key={value}
-                  onPress={() => setStatus(value)}
-                  style={[
-                    styles.chip,
-                    { borderColor: colors.border, backgroundColor: colors.surface },
-                    status === value && styles.chipActive,
-                  ]}
-                >
-                  <Text style={[styles.chipText, { color: status === value ? "#fff" : colors.textMuted }]}>
-                    {value.replace(/_/g, " ")}
-                  </Text>
-                </Pressable>
-              ))}
-            </View>
-          </ScrollView>
-        ) : null}
-      </View>
       <FlatList
+        style={styles.moduleList}
         data={rows}
         keyExtractor={(item, index) => item.id || `${key}-${index}`}
         refreshControl={
@@ -258,6 +290,42 @@ export default function ManagerModuleScreen() {
           />
         }
         contentContainerStyle={rows.length ? styles.list : styles.emptyList}
+        ListHeaderComponentStyle={rows.length ? styles.scrollingToolbarHeader : undefined}
+        ListHeaderComponent={
+          <View style={[styles.toolbar, { backgroundColor: colors.surface }]}>
+            <View style={[styles.search, { backgroundColor: colors.cardMuted }]}>
+              <Feather name="search" size={17} color={colors.textMuted} />
+              <TextInput
+                value={search}
+                onChangeText={setSearch}
+                placeholder={`Search ${config.title.toLowerCase()}`}
+                placeholderTextColor={colors.textMuted}
+                style={[styles.searchInput, { color: colors.text }]}
+              />
+            </View>
+            {statuses.length > 1 ? (
+              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                <View style={styles.chips}>
+                  {statuses.map((value) => (
+                    <Pressable
+                      key={value}
+                      onPress={() => setStatus(value)}
+                      style={[
+                        styles.chip,
+                        { borderColor: colors.border, backgroundColor: colors.surface },
+                        status === value && styles.chipActive,
+                      ]}
+                    >
+                      <Text style={[styles.chipText, { color: status === value ? "#fff" : colors.textMuted }]}>
+                        {value.replace(/_/g, " ")}
+                      </Text>
+                    </Pressable>
+                  ))}
+                </View>
+              </ScrollView>
+            ) : null}
+          </View>
+        }
         renderItem={({ item }) => (
           <Pressable
             onPress={() => {
@@ -271,7 +339,7 @@ export default function ManagerModuleScreen() {
               }
             }}
           >
-            <ResourceCard type={config.source} item={item} colors={colors} />
+            <ResourceCard type={resourceType} item={item} colors={colors} />
           </Pressable>
         )}
         ListEmptyComponent={
@@ -283,7 +351,7 @@ export default function ManagerModuleScreen() {
         }
       />
       <DetailSheet
-        type={config.source}
+        type={resourceType}
         item={selected}
         data={data}
         colors={colors}
@@ -331,6 +399,8 @@ function ResourceCard({ type, item, colors }) {
   const title =
     type === "trucks"
       ? item.plateNumber
+      : type === "warehouses"
+        ? item.name || item.code || item.id
       : type === "invoices"
         ? item.invoiceNumber || item.id
         : type === "staff" || type === "municipalities"
@@ -341,6 +411,8 @@ function ResourceCard({ type, item, colors }) {
   const subtitle =
     type === "trucks"
       ? [item.model, item.type, item.payloadCapacity ? `${item.payloadCapacity} kg` : null]
+      : type === "warehouses"
+        ? [item.code, item.address, item.municipality || item.city]
       : type === "invoices"
         ? [item.billingName, item.shipmentTrackingNumber, `₱${Number(item.amount || 0).toLocaleString()}`]
         : type === "staff" || type === "municipalities"
@@ -430,7 +502,12 @@ function DetailSheet({
           <View style={styles.sheetTop}>
             <View style={styles.cardCopy}>
               <Text style={[styles.sheetTitle, { color: colors.text }]}>
-                {item.plateNumber || item.invoiceNumber || displayName(item) || item.id}
+                {item.plateNumber ||
+                  item.invoiceNumber ||
+                  item.name ||
+                  item.code ||
+                  displayName(item) ||
+                  item.id}
               </Text>
               <Text style={[styles.sheetSubtitle, { color: colors.textMuted }]}>
                 Authorized Manager record
@@ -580,8 +657,91 @@ function ReportView({ config, data, colors, refreshing, reload }) {
   );
 }
 
-function SettingsView({ config, data, colors, pushAlerts, setPushAlerts }) {
+function SettingsView({
+  config,
+  data,
+  colors,
+  pushAlerts,
+  setPushAlerts,
+  reload,
+}) {
+  const { role } = useAuth();
+  const isAdmin = role === "admin" || role === "administrator";
   const settings = data?.settings || {};
+  const [truckTypesText, setTruckTypesText] = useState("");
+  const [warehousesText, setWarehousesText] = useState("");
+  const [savingSettings, setSavingSettings] = useState(false);
+  const [saveMessage, setSaveMessage] = useState("");
+
+  useEffect(() => {
+    setTruckTypesText((settings.truckTypes || []).join("\n"));
+    setWarehousesText(
+      (settings.warehouses || [])
+        .map((warehouse) =>
+          typeof warehouse === "string"
+            ? warehouse
+            : [
+                warehouse.code,
+                warehouse.name,
+                warehouse.city,
+                warehouse.province,
+              ]
+                .filter(Boolean)
+                .join(" | "),
+        )
+        .join("\n"),
+    );
+  }, [settings.truckTypes, settings.warehouses]);
+
+  if (isAdmin) {
+    return (
+      <AdminMobileSettingsEditor
+        settings={settings}
+        reload={reload}
+      />
+    );
+  }
+
+  const saveSettings = async () => {
+    if (savingSettings) return;
+    try {
+      setSavingSettings(true);
+      setSaveMessage("");
+      const payload = { pushNotifications: pushAlerts };
+      if (isAdmin) {
+        const truckTypes = truckTypesText
+          .split(/\r?\n|,/)
+          .map((value) => value.trim())
+          .filter(Boolean);
+        const warehouses = warehousesText
+          .split(/\r?\n/)
+          .map((line) => {
+            const [code, name, city, province] = line
+              .split("|")
+              .map((value) => value.trim());
+            return { code, name, city, province };
+          })
+          .filter((warehouse) => warehouse.code && warehouse.name);
+        if (!truckTypes.length || !warehouses.length) {
+          throw new Error(
+            "Add at least one truck type and one warehouse using CODE | Name.",
+          );
+        }
+        payload.operationalSettings = { truckTypes, warehouses };
+      }
+      await updateManagerMobileSettings(payload);
+      setSaveMessage("Settings saved successfully.");
+      await reload({ refresh: true });
+    } catch (nextError) {
+      Alert.alert(
+        "Settings not saved",
+        nextError.message || "Please try again.",
+      );
+    } finally {
+      setSavingSettings(false);
+    }
+  };
+
   return (
     <View style={[styles.container, { backgroundColor: colors.bg }]}>
       <ManagerHeader back title={config.title} subtitle={config.subtitle} />
@@ -598,14 +758,85 @@ function SettingsView({ config, data, colors, pushAlerts, setPushAlerts }) {
             <Switch value={pushAlerts} onValueChange={setPushAlerts} trackColor={{ true: "#818cf8" }} />
           </View>
         </ManagerCard>
+        {isAdmin ? (
+          <ManagerCard>
+            <SectionTitle
+              title="Operational settings"
+              subtitle="These values are shared with the web application"
+            />
+            <Text style={[styles.settingsFieldLabel, { color: colors.text }]}>
+              Truck types
+            </Text>
+            <TextInput
+              multiline
+              value={truckTypesText}
+              onChangeText={setTruckTypesText}
+              placeholder="One truck type per line"
+              placeholderTextColor={colors.textMuted}
+              style={[
+                styles.settingsInput,
+                {
+                  color: colors.text,
+                  borderColor: colors.border,
+                  backgroundColor: colors.cardMuted,
+                },
+              ]}
+            />
+            <Text style={[styles.settingsFieldLabel, { color: colors.text }]}>
+              Warehouses
+            </Text>
+            <Text style={[styles.settingsHint, { color: colors.textMuted }]}>
+              Enter one per line: CODE | Name | City | Province
+            </Text>
+            <TextInput
+              multiline
+              value={warehousesText}
+              onChangeText={setWarehousesText}
+              placeholder="DIV | Divisoria | Manila | Metro Manila"
+              placeholderTextColor={colors.textMuted}
+              style={[
+                styles.settingsInput,
+                styles.warehouseInput,
+                {
+                  color: colors.text,
+                  borderColor: colors.border,
+                  backgroundColor: colors.cardMuted,
+                },
+              ]}
+            />
+          </ManagerCard>
+        ) : (
+          <ManagerCard>
+            <SectionTitle
+              title="Operational reference"
+              subtitle="Global settings can only be changed by an Admin"
+            />
+            <InfoLine label="Truck types" value={(settings.truckTypes || []).join(", ") || "Default types"} colors={colors} />
+            <InfoLine label="Warehouses" value={(settings.warehouses || []).map((value) => value.name || value.code || value).join(", ") || (data?.scope?.warehouses || []).join(", ")} colors={colors} />
+          </ManagerCard>
+        )}
+        <Pressable
+          disabled={savingSettings}
+          onPress={saveSettings}
+          style={[styles.primary, savingSettings && styles.disabled]}
+        >
+          {savingSettings ? (
+            <ActivityIndicator color="#fff" />
+          ) : (
+            <Text style={styles.primaryText}>Save Settings</Text>
+          )}
+        </Pressable>
+        {saveMessage ? (
+          <Text style={[styles.settingsSuccess, { color: colors.success }]}>
+            {saveMessage}
+          </Text>
+        ) : null}
         <ManagerCard>
-          <SectionTitle title="Operational reference" subtitle="Managed centrally on the web platform" />
-          <InfoLine label="Truck types" value={(settings.truckTypes || []).join(", ") || "Default types"} colors={colors} />
-          <InfoLine label="Warehouses" value={(settings.warehouses || []).map((value) => value.name || value.code || value).join(", ") || (data?.scope?.warehouses || []).join(", ")} colors={colors} />
+          <SectionTitle title="Assignment scope" subtitle="Access applied to this account" />
           <InfoLine label="Your municipalities" value={(data?.scope?.municipalities || []).join(", ") || "Warehouse-wide"} colors={colors} />
         </ManagerCard>
         <Text style={[styles.settingsNote, { color: colors.textMuted }]}>
-          Admin-only global configuration remains unavailable. Your theme, password, and account controls are in Profile.
+          Theme, password, and account controls remain available in Profile.
         </Text>
       </ScrollView>
     </View>
@@ -623,7 +854,9 @@ function InfoLine({ label, value, colors }) {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
+  moduleList: { flex: 1 },
   toolbar: { padding: 14, gap: 10 },
+  scrollingToolbarHeader: { marginHorizontal: -14, marginTop: -14 },
   search: { minHeight: 46, borderRadius: 13, paddingHorizontal: 13, flexDirection: "row", alignItems: "center", gap: 9 },
   searchInput: { flex: 1, fontSize: 14, paddingVertical: 8 },
   chips: { flexDirection: "row", gap: 7 },
@@ -667,4 +900,19 @@ const styles = StyleSheet.create({
   reportCount: { marginLeft: "auto", color: "#4f46e5", fontWeight: "900" },
   settingRow: { flexDirection: "row", alignItems: "center", gap: 12, marginTop: 14 },
   settingsNote: { fontSize: 12, lineHeight: 18, paddingHorizontal: 4 },
+  settingsFieldLabel: { fontSize: 12, fontWeight: "800", marginTop: 16 },
+  settingsHint: { fontSize: 10, lineHeight: 15, marginTop: 3 },
+  settingsInput: {
+    minHeight: 92,
+    marginTop: 7,
+    borderWidth: 1,
+    borderRadius: 13,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 12,
+    lineHeight: 18,
+    textAlignVertical: "top",
+  },
+  warehouseInput: { minHeight: 120 },
+  settingsSuccess: { fontSize: 12, fontWeight: "800", textAlign: "center" },
 });

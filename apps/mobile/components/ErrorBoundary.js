@@ -1,5 +1,5 @@
-import React from 'react';
-import { View, Text, ScrollView } from 'react-native';
+import React from "react";
+import { View, Text, Button, StyleSheet } from "react-native";
 
 export class ErrorBoundary extends React.Component {
   constructor(props) {
@@ -11,29 +11,41 @@ export class ErrorBoundary extends React.Component {
     return { hasError: true, error };
   }
 
-  componentDidCatch(error, errorInfo) {
-    console.error('Error Boundary caught:', error, errorInfo);
+  componentDidCatch(error, info) {
+    // You can log the error to an error reporting service here
+    // console.error(error, info);
   }
+
+  reset = () => this.setState({ hasError: false, error: null });
 
   render() {
-    if (this.state.hasError) {
-      return (
-        <View style={{ flex: 1, backgroundColor: '#fff', padding: 20, justifyContent: 'center' }}>
-          <ScrollView>
-            <Text style={{ fontSize: 18, fontWeight: 'bold', color: 'red', marginBottom: 10 }}>
-              ⚠️ App Error
-            </Text>
-            <Text style={{ fontSize: 14, color: '#666', marginBottom: 10, fontFamily: 'monospace' }}>
-              {this.state.error?.toString()}
-            </Text>
-            <Text style={{ fontSize: 12, color: '#999', fontFamily: 'monospace' }}>
-              {this.state.error?.stack}
-            </Text>
-          </ScrollView>
-        </View>
-      );
+    if (!this.state.hasError) {
+      return this.props.children || null;
     }
 
-    return this.props.children;
+    return (
+      <View style={styles.container}>
+        <Text style={styles.title}>Something went wrong.</Text>
+        <Text style={styles.message}>{String(this.state.error)}</Text>
+        <Button title="Retry" onPress={this.reset} />
+      </View>
+    );
   }
 }
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 16,
+  },
+  title: {
+    fontSize: 18,
+    fontWeight: "bold",
+    marginBottom: 8,
+  },
+  message: {
+    marginBottom: 12,
+  },
+});

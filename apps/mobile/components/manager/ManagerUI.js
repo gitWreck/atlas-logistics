@@ -7,8 +7,9 @@ import {
   View,
 } from "react-native";
 import Feather from "@expo/vector-icons/Feather";
-import { useRouter } from "expo-router";
+import { usePathname, useRouter } from "expo-router";
 import { useTheme } from "../../contexts/ThemeContext";
+import { useAuth } from "../../contexts/AuthContext";
 
 export const MANAGER_ACCENT = "#4f46e5";
 
@@ -18,9 +19,29 @@ export function ManagerHeader({
   back = false,
   actionIcon,
   onAction,
+  titleNumberOfLines = 1,
+  titleStyle,
 }) {
   const router = useRouter();
+  const pathname = usePathname();
   const { colors } = useTheme();
+  const { role } = useAuth();
+  const isQuickAccess = String(pathname || "").includes("/quick/");
+  const isManagerShortcut =
+    String(pathname || "").includes("/management/") ||
+    String(pathname || "").endsWith("/notifications");
+  const showBack = back || isQuickAccess;
+  const roleLabel =
+    role === "admin" || role === "administrator" ? "ADMIN" : "MANAGER";
+  const handleBack = () => {
+    if (isQuickAccess || isManagerShortcut) {
+      router.replace(
+        isQuickAccess ? "/(checker)/(tabs)" : "/(manager)/(tabs)",
+      );
+      return;
+    }
+    router.back();
+  };
   return (
     <View
       style={[
@@ -28,9 +49,9 @@ export function ManagerHeader({
         { backgroundColor: colors.surface, borderBottomColor: colors.border },
       ]}
     >
-      {back ? (
+      {showBack ? (
         <Pressable
-          onPress={() => router.back()}
+          onPress={handleBack}
           style={[styles.iconButton, { backgroundColor: colors.cardMuted }]}
           accessibilityLabel="Go back"
         >
@@ -38,8 +59,15 @@ export function ManagerHeader({
         </Pressable>
       ) : null}
       <View style={styles.headerCopy}>
-        <Text style={[styles.eyebrow, { color: MANAGER_ACCENT }]}>MANAGER</Text>
-        <Text style={[styles.headerTitle, { color: colors.text }]} numberOfLines={1}>
+        {!showBack ? (
+          <Text style={[styles.eyebrow, { color: MANAGER_ACCENT }]}>
+            {roleLabel}
+          </Text>
+        ) : null}
+        <Text
+          style={[styles.headerTitle, { color: colors.text }, titleStyle]}
+          numberOfLines={titleNumberOfLines}
+        >
           {title}
         </Text>
         {subtitle ? (
@@ -122,8 +150,8 @@ export function MetricCard({ label, value, icon, tone = "blue" }) {
 export function LoadingState({ label = "Loading live operations…" }) {
   const { colors } = useTheme();
   return (
-    <View style={styles.state}>
-      <ActivityIndicator size="large" color={MANAGER_ACCENT} />
+    <View style={[styles.state, { backgroundColor: colors.bg }]}>
+      <ActivityIndicator size="large" color={colors.primary} />
       <Text style={[styles.stateText, { color: colors.textMuted }]}>{label}</Text>
     </View>
   );
@@ -147,7 +175,7 @@ export function EmptyState({ icon = "inbox", title, message }) {
 export function ErrorState({ message, onRetry }) {
   const { colors } = useTheme();
   return (
-    <View style={styles.state}>
+    <View style={[styles.state, { backgroundColor: colors.bg }]}>
       <Feather name="alert-circle" size={28} color={colors.danger} />
       <Text style={[styles.emptyTitle, { color: colors.text }]}>Unable to load</Text>
       <Text style={[styles.stateText, { color: colors.textMuted }]}>{message}</Text>
