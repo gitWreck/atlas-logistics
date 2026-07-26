@@ -193,6 +193,84 @@ export default function PrintLabelsClient() {
           margin: 0;
         }
 
+        .shipping-label {
+          box-sizing: border-box;
+          position: relative;
+          display: grid;
+          grid-template-rows: 22mm 30mm 73mm 15mm;
+          width: 100mm;
+          height: 150mm;
+          padding: 5mm;
+          overflow: hidden;
+          background: white;
+          border: 2px solid black;
+          margin: 0;
+        }
+
+        .label-header,
+        .label-details,
+        .label-qr,
+        .label-footer {
+          min-height: 0;
+          overflow: hidden;
+        }
+
+        .label-header {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          text-align: center;
+          border-bottom: 3px solid black;
+        }
+
+        .label-details {
+          display: grid;
+          grid-template-columns: 1fr 32mm;
+          gap: 2mm;
+          padding-top: 1mm;
+        }
+
+        .label-qr {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          border: 3px solid black;
+          border-radius: 8px;
+          padding: 1.5mm;
+        }
+
+        .label-footer {
+          display: flex;
+          justify-content: space-between;
+          align-items: flex-end;
+          border-top: 3px solid black;
+          padding-top: 1mm;
+        }
+
+        .package-description {
+          display: -webkit-box;
+          overflow: hidden;
+          overflow-wrap: anywhere;
+          line-height: 1.2;
+          -webkit-box-orient: vertical;
+          -webkit-line-clamp: 3;
+        }
+
+        .package-description.long-text {
+          font-size: 9px;
+        }
+
+        .package-address {
+          display: -webkit-box;
+          overflow: hidden;
+          overflow-wrap: anywhere;
+          line-height: 1.15;
+          -webkit-box-orient: vertical;
+          -webkit-line-clamp: 2;
+        }
+
         @media print {
           html,
           body {
@@ -235,13 +313,9 @@ export default function PrintLabelsClient() {
             overflow: hidden;
           }
 
-          .label-sheet {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100mm !important;
-            height: 150mm !important;
-            margin: 0 !important;
+          .shipping-label {
+            border: 0 !important;
+            page-break-after: always;
           }
         }
       `}</style>
@@ -249,87 +323,66 @@ export default function PrintLabelsClient() {
   );
 }
 
-// --- REUSABLE LABEL COMPONENT (4x6) ---
+// --- REUSABLE LABEL COMPONENT (100mm x 150mm fixed grid) ---
 function StandardLabel({ shipment, pkg, index, total }) {
   const recipient = shipment.recipient || {};
   const address = recipient.address || {};
   const addressText = formatAddress(address);
   const qrValue = pkg.packageId || "NO_ID";
-  const QR_SIZE_MM = 56;
+  const description = pkg.description || "No Description";
+  const isLongDescription = description.length > 48;
+  const QR_SIZE_MM = 52;
   const QR_SIZE = Math.round((QR_SIZE_MM * 96) / 25.4);
   const LOGO_SIZE = Math.round(QR_SIZE * 0.26);
   const LOGO_PAD = Math.round(QR_SIZE * 0.018);
 
   return (
-    <div
-      className="label-sheet w-[100mm] h-[150mm] bg-white border-2 border-black p-[3mm]
-  print:border-0
-  flex flex-col justify-between relative overflow-hidden box-border
-  m-0 print:m-0 print:shadow-none"
-    >
-      {/* 1. TOP HEADER */}
-      <div className="border-b-4 border-black pb-2 mb-2">
-        <div className="flex flex-col items-center text-center">
-          <div className="text-[35px] font-bold text-dark uppercase leading-none">
-            ATLAS
-          </div>
-          <div className="text-[17px] font-medium text-gray-700 leading-tight">
-            Fast & Easy Shipping
-          </div>
+    <div className="shipping-label label-sheet print:shadow-none">
+      {/* Header — 22mm */}
+      <div className="label-header">
+        <div className="text-[28px] font-bold uppercase leading-none">ATLAS</div>
+        <div className="text-[13px] font-medium text-gray-700 leading-tight">
+          Fast & Easy Shipping
         </div>
       </div>
-      <div className="my-1 flex-1 flex justify-between gap-3">
-        {/* LEFT: RECIPIENT + PACKAGE INFO */}
-        <div className="flex-1 flex flex-col justify-start">
-          <div className="text-[10px] font-bold text-gray-500 uppercase mb-0.5">
+
+      {/* Recipient & package details — 30mm */}
+      <div className="label-details">
+        <div className="min-h-0 overflow-hidden">
+          <div className="text-[9px] font-bold text-gray-500 uppercase leading-none">
             Ship To:
           </div>
-
-          <div className="text-xl font-bold uppercase leading-tight line-clamp-2">
+          <div className="text-[15px] font-bold uppercase leading-tight line-clamp-1">
             {recipient.name || "Unknown"}
           </div>
-          <div className="text-sm font-mono mt-0.5">{recipient.phone}</div>
-
-          <div className="text-[10px] leading-tight mt-2 font-bold uppercase text-gray-800">
-            {addressText || "No address provided"}
+          <div className="text-[11px] font-mono leading-tight">
+            {recipient.phone}
           </div>
-
-          {/* PACKAGE INFO */}
-          <div className="mt-3 border-t pt-2 text-[10px]">
-            {/* <div className="font-bold uppercase text-gray-500">
-              Package Details
-            </div>
-            <div className="font-semibold uppercase">
-              Description: {pkg.description || "No Description"}
-            </div>
-            <div className="text-gray-600 uppercase">
-              Package Type: {pkg.packagingType || "Standard Packaging"}
-            </div>
-            <div className="text-gray-600 uppercase">
-              Quantity: {pkg.quantity || 1}
-            </div> */}
+          <div className="package-address text-[9px] font-bold uppercase text-gray-800">
+            {addressText || "No address provided"}
           </div>
         </div>
 
-        {/* RIGHT: DELIVERY / RETURN ATTEMPTS */}
-        <div className="w-[32mm] shrink-0 flex flex-col justify-start text-[10px]">
-          <div className="font-bold uppercase text-gray-500">
-            Package Details
+        <div className="min-h-0 overflow-hidden text-[9px] leading-tight">
+          <div className="font-bold uppercase text-gray-500">Package Details</div>
+          <div
+            className={`package-description font-semibold uppercase ${
+              isLongDescription ? "long-text" : ""
+            }`}
+          >
+            Description: {description}
           </div>
-          <div className="font-semibold uppercase">
-            Description: {pkg.description || "No Description"}
+          <div className="text-gray-600 uppercase line-clamp-1">
+            Type: {pkg.packagingType || "Standard Packaging"}
           </div>
           <div className="text-gray-600 uppercase">
-            Package Type: {pkg.packagingType || "Standard Packaging"}
-          </div>
-          <div className="text-gray-600 uppercase">
-            Quantity: {pkg.quantity || 1}
+            Qty: {pkg.quantity || 1}
           </div>
         </div>
       </div>
 
-      {/* QR CODE */}
-      <div className="flex w-full min-h-[80mm] flex-col items-center justify-center border-4 border-black rounded-xl px-[2mm] py-[2mm] my-1">
+      {/* QR code — 73mm */}
+      <div className="label-qr">
         <div
           className="relative shrink-0"
           style={{ width: `${QR_SIZE_MM}mm`, height: `${QR_SIZE_MM}mm` }}
@@ -356,46 +409,45 @@ function StandardLabel({ shipment, pkg, index, total }) {
             </div>
           </div>
         </div>
-        <div className="mt-2 w-full text-[13px] font-mono font-bold tracking-tight text-center uppercase">
+        <div className="w-full text-[12px] font-mono font-bold tracking-tight text-center uppercase leading-tight">
           {pkg.packageId || "NO ID"}
         </div>
-        <div className="mt-1 text-[12px] font-mono tracking-widest text-center">
+        <div className="text-[10px] font-mono tracking-widest text-center leading-tight">
           ATLAS PACKAGE ID
         </div>
       </div>
 
-      {/* 4. FOOTER (Origin & Count) */}
-      <div className="border-t-4 border-black pt-2 flex justify-between items-end mt-2">
+      {/* Footer — 15mm */}
+      <div className="label-footer">
         <div>
-          <div className="text-[10px] font-bold text-gray-500 uppercase">
+          <div className="text-[8px] font-bold text-gray-500 uppercase leading-none">
             Origin
           </div>
-          <div className="text-2xl font-bold uppercase text-gray-800">
+          <div className="text-xl font-bold uppercase text-gray-800 leading-none">
             {shipment.originCode || "ORG"}
           </div>
         </div>
 
-        {/* Package Handling Icons/Tags */}
         <div className="flex gap-1">
           {pkg.isFragile && (
-            <span className="text-2xl" title="Fragile">
+            <span className="text-xl" title="Fragile">
               <FontAwesomeIcon icon={faWineGlass} />
             </span>
           )}
           {pkg.isPerishable && (
-            <span className="text-2xl" title="Perishable">
+            <span className="text-xl" title="Perishable">
               <FontAwesomeIcon icon={faSnowflake} />
             </span>
           )}
         </div>
 
         <div className="text-center">
-          <div className="text-[10px] font-bold text-gray-500 uppercase">
+          <div className="text-[8px] font-bold text-gray-500 uppercase leading-none line-clamp-1 max-w-[36mm]">
             {pkg.packagingType || "Standard Packaging"}
           </div>
-          <div className="text-3xl font-bold leading-none">
+          <div className="text-2xl font-bold leading-none">
             {index + 1}
-            <span className="text-lg text-gray-400 font-normal">/</span>
+            <span className="text-base text-gray-400 font-normal">/</span>
             {total}
           </div>
         </div>

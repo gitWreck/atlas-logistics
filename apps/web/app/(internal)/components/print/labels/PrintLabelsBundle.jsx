@@ -234,7 +234,64 @@ export default function PrintLabelsBundle() {
           size: 100mm 150mm;
           margin: 0;
         }
- 
+
+        .shipping-label-bundle {
+          box-sizing: border-box;
+          position: relative;
+          display: grid;
+          grid-template-rows: 22mm 103mm 15mm;
+          width: 100mm;
+          height: 150mm;
+          padding: 5mm;
+          overflow: hidden;
+          background: white;
+          border: 2px solid black;
+          margin: 0;
+        }
+
+        .label-header,
+        .label-body,
+        .label-footer {
+          min-height: 0;
+          overflow: hidden;
+        }
+
+        .label-header {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          border-bottom: 3px solid black;
+        }
+
+        .label-body {
+          display: grid;
+          grid-template-columns: 42mm 1fr;
+          gap: 2mm;
+          padding-top: 1mm;
+        }
+
+        .label-footer {
+          display: flex;
+          justify-content: space-between;
+          align-items: flex-end;
+          border-top: 3px solid black;
+          padding-top: 1mm;
+        }
+
+        .package-items {
+          max-height: 78mm;
+          overflow: hidden;
+        }
+
+        .package-address {
+          display: -webkit-box;
+          overflow: hidden;
+          overflow-wrap: anywhere;
+          line-height: 1.15;
+          -webkit-box-orient: vertical;
+          -webkit-line-clamp: 3;
+        }
+
         @media print {
           html,
           body {
@@ -277,13 +334,9 @@ export default function PrintLabelsBundle() {
             overflow: hidden;
           }
 
-          .label-sheet {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100mm !important;
-            height: 150mm !important;
-            margin: 0 !important;
+          .shipping-label-bundle {
+            border: 0 !important;
+            page-break-after: always;
           }
         }
       `}</style>
@@ -303,155 +356,116 @@ function StandardLabel({
   const address = recipient.address || {};
   const addressText = formatAddress(address);
   const qrValue = shipment.shipmentId || "NO_ID";
+  const QR_SIZE_MM = 34;
+  const QR_SIZE = Math.round((QR_SIZE_MM * 96) / 25.4);
 
   return (
-    <div className="label-sheet w-[100mm] h-[150mm] bg-white border-2 border-black p-[3mm] print:border-0 flex flex-col justify-between relative overflow-hidden box-border m-0 print:m-0 print:shadow-none">
-      {/* 1. HEADER (Original) */}
-      <div className="border-b-4 border-black pb-2 mb-2">
-        <div className="flex justify-between items-center">
-          <div className="flex items-center gap-2">
-            <img
-              src="/atlas-logo.png"
-              alt="Atlas"
-              className="h-16 w-auto object-contain"
-            />
-          </div>
-          <div className="text-right">
-            <span className="text-xl font-bold uppercase">ATLAS: </span>
-            <span className="text-xl font-medium text-gray-600">
-              Fast & Easy Shipping
-            </span>
-          </div>
+    <div className="shipping-label-bundle label-sheet print:shadow-none">
+      {/* Header — 22mm */}
+      <div className="label-header">
+        <img
+          src="/atlas-logo.png"
+          alt="Atlas"
+          className="h-[14mm] w-auto object-contain"
+        />
+        <div className="text-right leading-tight">
+          <span className="text-base font-bold uppercase">ATLAS: </span>
+          <span className="text-base font-medium text-gray-600">
+            Fast & Easy Shipping
+          </span>
         </div>
       </div>
 
-      <div className="my-1 flex-1 flex justify-between gap-2">
-        {/* LEFT: RECIPIENT & DETAILED PACKAGE LIST (Moved here) */}
-        <div className="w-[1.75in] shrink-0 flex flex-col justify-start">
-          <div className="text-[10px] font-bold text-gray-500 uppercase mb-0.5">
+      {/* Body — 103mm fixed */}
+      <div className="label-body">
+        <div className="min-h-0 overflow-hidden flex flex-col">
+          <div className="text-[9px] font-bold text-gray-500 uppercase leading-none">
             Ship To:
           </div>
-          <div className="text-lg font-bold uppercase leading-tight">
+          <div className="text-[13px] font-bold uppercase leading-tight line-clamp-2">
             {recipient.name}
           </div>
-          <div className="text-sm font-mono mt-0.5">{recipient.phone}</div>
-          <div className="text-[10px] leading-tight mt-1 font-medium uppercase text-gray-800">
+          <div className="text-[11px] font-mono leading-tight">
+            {recipient.phone}
+          </div>
+          <div className="package-address text-[9px] font-medium uppercase text-gray-800">
             {addressText || "No address provided"}
           </div>
 
-          <div className="self-center w-[1.7in] flex flex-col items-center justify-center border-2 rounded-lg border-black mt-3 px-2 py-2 mb-2">
+          <div className="mt-auto flex w-full flex-col items-center justify-center border-2 border-black rounded-lg px-1 py-1">
             <QRCode
               value={qrValue}
-              size={150}
+              size={QR_SIZE}
               level="M"
               bgColor="#ffffff"
               fgColor="#000000"
-              className="bg-white p-1"
+              className="bg-white"
+              style={{ width: `${QR_SIZE_MM}mm`, height: `${QR_SIZE_MM}mm` }}
             />
-            <div className="w-full text-[11px] font-mono font-bold mt-2 tracking-tighter text-center uppercase break-all">
+            <div className="w-full text-[9px] font-mono font-bold tracking-tighter text-center uppercase break-all leading-tight">
               {shipment.shipmentId}
             </div>
-            <div className="text-[10px] font-mono mt-1 tracking-widest text-center">
+            <div className="text-[8px] font-mono tracking-widest text-center leading-tight">
               ATLAS TRACKING NUMBER
             </div>
           </div>
         </div>
 
-        {/* RIGHT: QR CODE & ATTEMPTS (Moved here) */}
-        <div className="flex-1 min-w-0 flex flex-col items-stretch justify-start border-l pl-2">
-          {/* QR CODE */}
-          {/* <div className="flex flex-col items-center justify-center border-2 border-black p-1 mb-3">
-            <QRCode value={qrValue} size={100} level="M" />
-            <div className="text-[9px] font-mono font-bold mt-1 tracking-tighter text-center uppercase">
-              {shipment.trackingNumber}
-            </div>
-          </div> */}
-
-          {/* DELIVERY ATTEMPTS */}
-          <div className="w-full">
-            {/* <div className="text-[9px] font-bold uppercase text-gray-400 mb-1">
-              Delivery
-            </div>
-            <div className="flex gap-1 mb-2">
-              {[1, 2, 3].map((n) => (
-                <span
-                  key={n}
-                  className="w-4 h-4 border border-black text-[10px] flex items-center justify-center font-bold"
-                >
-                  {n}
-                </span>
-              ))}
-            </div>
-            <div className="text-[9px] font-bold uppercase text-gray-400 mb-1">
-              Return
-            </div>
-            <div className="flex gap-1">
-              {[1, 2, 3].map((n) => (
-                <span
-                  key={n}
-                  className="w-4 h-4 border border-black text-[10px] flex items-center justify-center font-bold"
-                >
-                  {n}
-                </span>
-              ))}
-            </div> */}
+        <div className="min-h-0 overflow-hidden border-l border-gray-300 pl-2">
+          <div className="flex items-center justify-between gap-2 font-bold uppercase text-gray-500 text-[9px]">
+            <span>Package Breakdown</span>
+            {packagePageCount > 1 && (
+              <span className="shrink-0 text-[8px] text-gray-400">
+                {packagePageIndex + 1}/{packagePageCount}
+              </span>
+            )}
           </div>
-          {/* ✅ DETAILED PACKAGE BREAKDOWN */}
-          <div className="mt-3 border-t pt-2 w-full">
-            <div className="flex items-center justify-between gap-2 font-bold uppercase text-gray-500 text-[10px] mb-1">
-              <span>Package Breakdown</span>
-              {packagePageCount > 1 && (
-                <span className="shrink-0 text-[9px] text-gray-400">
-                  {packagePageIndex + 1}/{packagePageCount}
+          <div className="package-items space-y-0.5">
+            {packagePage.map((p, i) => (
+              <div
+                key={i}
+                className="grid grid-cols-[minmax(0,1fr)_0.4in] gap-1 text-[9px] leading-tight border-b border-gray-100 pb-0.5"
+              >
+                <span className="min-w-0 uppercase whitespace-normal break-words line-clamp-2">
+                  {p.packagingType || "Package"}:{" "}
+                  {p.description || "No Description"}
                 </span>
-              )}
-            </div>
-            <div className="space-y-1">
-              {packagePage.map((p, i) => (
-                <div
-                  key={i}
-                  className="grid grid-cols-[minmax(0,1fr)_0.45in] gap-1 text-[10px] leading-tight border-b border-gray-100 pb-0.5"
-                >
-                  <span className="min-w-0 uppercase whitespace-normal break-words line-clamp-2">
-                    {p.packagingType || "Package"}:{" "}
-                    {p.description || "No Description"}
-                  </span>
-                  <span className="font-bold text-right whitespace-nowrap">
-                    {p.quantity || 1} PCS
-                  </span>
-                </div>
-              ))}
-            </div>
+                <span className="font-bold text-right whitespace-nowrap">
+                  {p.quantity || 1} PCS
+                </span>
+              </div>
+            ))}
           </div>
         </div>
       </div>
 
-      {/* 4. FOOTER (Original) */}
-      <div className="border-t-4 border-black pt-2 flex justify-between items-end mt-2">
+      {/* Footer — 15mm */}
+      <div className="label-footer">
         <div>
-          <div className="text-[10px] font-bold text-gray-500 uppercase">
+          <div className="text-[8px] font-bold text-gray-500 uppercase leading-none">
             Origin
           </div>
-          <div className="text-2xl font-bold uppercase">
+          <div className="text-xl font-bold uppercase leading-none">
             {shipment.originCode || "ORG"}
           </div>
         </div>
 
-        <div className="flex gap-2 mb-1">
+        <div className="flex gap-2">
           {pkg.isFragile && (
-            <FontAwesomeIcon icon={faWineGlass} className="text-2xl" />
+            <FontAwesomeIcon icon={faWineGlass} className="text-xl" />
           )}
           {pkg.isPerishable && (
-            <FontAwesomeIcon icon={faSnowflake} className="text-2xl" />
+            <FontAwesomeIcon icon={faSnowflake} className="text-xl" />
           )}
         </div>
 
         <div className="text-center">
-          <div className="text-[10px] font-bold text-gray-500 uppercase">
+          <div className="text-[8px] font-bold text-gray-500 uppercase leading-none">
             Total Items
           </div>
-          <div className="text-3xl font-bold leading-none">
-            {totalQuantity} <span className="text-sm text-gray-400">PCS</span>
+          <div className="text-2xl font-bold leading-none">
+            {totalQuantity}{" "}
+            <span className="text-xs text-gray-400">PCS</span>
           </div>
         </div>
       </div>
