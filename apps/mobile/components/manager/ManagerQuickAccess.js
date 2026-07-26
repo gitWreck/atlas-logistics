@@ -9,7 +9,6 @@ import { FontAwesome5 } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useTheme } from "../../contexts/ThemeContext";
 import { useAuth } from "../../contexts/AuthContext";
-import { cardShadow } from "../checker/design/checkerTheme";
 
 const ACCESS_ITEMS = [
   {
@@ -114,11 +113,6 @@ export default function ManagerQuickAccess({
       style={[
         styles.section,
         !inset && styles.sectionEmbedded,
-        {
-          backgroundColor: colors.surface,
-          borderColor: colors.border,
-          shadowColor: colors.shadow || "#0f172a",
-        },
       ]}
     >
       <View style={styles.heading}>
@@ -179,12 +173,7 @@ const styles = StyleSheet.create({
   section: {
     marginHorizontal: 14,
     marginTop: 13,
-    borderWidth: 1,
-    borderRadius: 18,
-    paddingHorizontal: 12,
-    paddingTop: 13,
-    paddingBottom: 14,
-    ...cardShadow,
+    paddingBottom: 4,
   },
   sectionEmbedded: { marginHorizontal: 0, marginTop: 0 },
   heading: {
