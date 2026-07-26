@@ -70,6 +70,7 @@ apps/mobile/components/ErrorBoundary.js
 apps/mobile/firebase.js
 package-lock.json
 package.json
+
 response2.txt
 *.js
 /apps/mobile/components
@@ -77,3 +78,20 @@ apps/mobile/components/ErrorBoundary.js
 apps/mobile/firebase.js
 package-lock.json
 package.json
+
+# New Manager mobile components required by Expo production builds.
+# Keep the broader generated/source ignore rules above, but allow these
+# imported modules to be committed so EAS receives them.
+!/apps/mobile/components/
+/apps/mobile/components/*
+!/apps/mobile/components/manager/
+/apps/mobile/components/manager/*
+!/apps/mobile/components/manager/AdminMobileSettingsEditor.js
+!/apps/mobile/components/manager/ManagerQuickAccess.js
+!/apps/mobile/components/manager/ManagerTripScheduleModal.js
+
+# Quick Access Expo Router screens must also be present in the EAS checkout.
+!/apps/mobile/app/(checker)/(tabs)/quick/
+!/apps/mobile/app/(checker)/(tabs)/quick/*.js
+!/apps/mobile/app/(checker)/(tabs)/quick/management/
+!/apps/mobile/app/(checker)/(tabs)/quick/management/*.js
