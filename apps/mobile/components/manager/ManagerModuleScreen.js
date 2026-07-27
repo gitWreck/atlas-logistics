@@ -158,6 +158,7 @@ export default function ManagerModuleScreen() {
   const [status, setStatus] = useState("ALL");
   const [selected, setSelected] = useState(null);
   const [actionUser, setActionUser] = useState(null);
+  const [invoiceMenu, setInvoiceMenu] = useState(null);
   const [editingUser, setEditingUser] = useState(null);
   const [createVisible, setCreateVisible] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -504,6 +505,8 @@ export default function ManagerModuleScreen() {
                 event?.stopPropagation?.();
                 if (key === "staff" && isAdmin) {
                   setActionUser(item);
+                } else if (config.source === "invoices") {
+                  setInvoiceMenu(item);
                 } else {
                   setSelected(item);
                 }
@@ -602,6 +605,36 @@ export default function ManagerModuleScreen() {
               }),
           );
           if (updated) setActionUser(null);
+        }}
+      />
+      <InvoiceActionMenu
+        invoice={invoiceMenu}
+        colors={colors}
+        saving={saving}
+        onClose={() => setInvoiceMenu(null)}
+        onViewInvoice={(invoice) => {
+          setSelected(invoice);
+          setInvoiceMenu(null);
+        }}
+        onEditInvoice={(invoice) => {
+          setSelected(invoice);
+          setInvoiceMenu(null);
+        }}
+        onIssueInvoice={(invoice) => {
+          perform("Issue invoice", () => updateInvoiceStatus({
+            invoiceId: invoice.id,
+            status: "ISSUED",
+            sendNotification: true,
+          }));
+          setInvoiceMenu(null);
+        }}
+        onCancelInvoice={(invoice) => {
+          perform("Cancel invoice", () => updateInvoiceStatus({
+            invoiceId: invoice.id,
+            status: "CANCELLED",
+            sendNotification: true,
+          }));
+          setInvoiceMenu(null);
         }}
       />
       {editingUser ? (
@@ -877,6 +910,159 @@ function AdminUserActionMenu({
               <Feather name="chevron-right" size={18} color={colors.textMuted} />
             )}
           </Pressable>
+        </Pressable>
+      </Pressable>
+    </Modal>
+  );
+}
+
+function InvoiceActionMenu({
+  invoice,
+  colors,
+  saving,
+  onClose,
+  onViewInvoice,
+  onEditInvoice,
+  onIssueInvoice,
+  onCancelInvoice,
+}) {
+  if (!invoice) return null;
+  const nextStatuses = INVOICE_TRANSITIONS[String(invoice.status || "DRAFT").toUpperCase()] || [];
+
+  return (
+    <Modal visible transparent animationType="fade" onRequestClose={onClose}>
+      <Pressable style={styles.userMenuBackdrop} onPress={onClose}>
+        <Pressable
+          onPress={(event) => event.stopPropagation()}
+          style={[styles.userMenuSheet, { backgroundColor: colors.surface }]}
+        >
+          <View style={styles.userMenuHeader}>
+            <View style={styles.cardCopy}>
+              <Text style={[styles.userMenuTitle, { color: colors.text }]}>
+                {invoice.invoiceNumber || "Invoice"}
+              </Text>
+              <Text style={[styles.userMenuMeta, { color: colors.textMuted }]}>
+                {invoice.billingName || "N/A"} · ₱{Number(invoice.amount || 0).toLocaleString()}
+              </Text>
+            </View>
+            <Pressable
+              disabled={saving}
+              onPress={onClose}
+              style={[styles.close, { backgroundColor: colors.cardMuted }]}
+            >
+              <Feather name="x" size={20} color={colors.text} />
+            </Pressable>
+          </View>
+
+          <Pressable
+            disabled={saving}
+            onPress={() => onViewInvoice?.(invoice)}
+            style={[
+              styles.userMenuAction,
+              {
+                backgroundColor: colors.cardMuted,
+                borderColor: colors.border,
+              },
+            ]}
+          >
+            <View style={[styles.userMenuIcon, { backgroundColor: "#dbeafe" }]}>
+              <Feather name="eye" size={18} color="#2563eb" />
+            </View>
+            <View style={styles.cardCopy}>
+              <Text style={[styles.userMenuActionTitle, { color: colors.text }]}>
+                View Invoice
+              </Text>
+              <Text style={[styles.userMenuActionMeta, { color: colors.textMuted }]}>
+                View invoice details and shipments
+              </Text>
+            </View>
+            <Feather name="chevron-right" size={18} color={colors.textMuted} />
+          </Pressable>
+
+          {invoice.status === "DRAFT" && (
+            <>
+              <Pressable
+                disabled={saving}
+                onPress={() => onEditInvoice?.(invoice)}
+                style={[
+                  styles.userMenuAction,
+                  {
+                    backgroundColor: colors.cardMuted,
+                    borderColor: colors.border,
+                  },
+                ]}
+              >
+                <View style={[styles.userMenuIcon, { backgroundColor: "#fed7aa" }]}>
+                  <Feather name="edit-2" size={18} color="#f59e0b" />
+                </View>
+                <View style={styles.cardCopy}>
+                  <Text style={[styles.userMenuActionTitle, { color: colors.text }]}>
+                    Edit Invoice
+                  </Text>
+                  <Text style={[styles.userMenuActionMeta, { color: colors.textMuted }]}>
+                    Update invoice details
+                  </Text>
+                </View>
+                <Feather name="chevron-right" size={18} color={colors.textMuted} />
+              </Pressable>
+
+              <Pressable
+                disabled={saving}
+                onPress={() => onIssueInvoice?.(invoice)}
+                style={[
+                  styles.userMenuAction,
+                  {
+                    backgroundColor: colors.cardMuted,
+                    borderColor: "#e9d5ff",
+                  },
+                ]}
+              >
+                <View style={[styles.userMenuIcon, { backgroundColor: "#f3e8ff" }]}>
+                  <Feather name="send" size={18} color="#a855f7" />
+                </View>
+                <View style={styles.cardCopy}>
+                  <Text style={[styles.userMenuActionTitle, { color: colors.text }]}>
+                    Issue Invoice
+                  </Text>
+                  <Text style={[styles.userMenuActionMeta, { color: colors.textMuted }]}>
+                    Issue and send to customer
+                  </Text>
+                </View>
+                <Feather name="chevron-right" size={18} color={colors.textMuted} />
+              </Pressable>
+            </>
+          )}
+
+          {invoice.status !== "PAID" && invoice.status !== "CANCELLED" && (
+            <Pressable
+              disabled={saving}
+              onPress={() => onCancelInvoice?.(invoice)}
+              style={[
+                styles.userMenuAction,
+                {
+                  backgroundColor: colors.cardMuted,
+                  borderColor: "#fecaca",
+                },
+              ]}
+            >
+              <View style={[styles.userMenuIcon, { backgroundColor: "#fee2e2" }]}>
+                <Feather name="x-circle" size={18} color="#ef4444" />
+              </View>
+              <View style={styles.cardCopy}>
+                <Text style={[styles.userMenuActionTitle, { color: colors.text }]}>
+                  Cancel Invoice
+                </Text>
+                <Text style={[styles.userMenuActionMeta, { color: colors.textMuted }]}>
+                  Cancel and archive this invoice
+                </Text>
+              </View>
+              {saving ? (
+                <ActivityIndicator color="#ef4444" size="small" />
+              ) : (
+                <Feather name="chevron-right" size={18} color={colors.textMuted} />
+              )}
+            </Pressable>
+          )}
         </Pressable>
       </Pressable>
     </Modal>
