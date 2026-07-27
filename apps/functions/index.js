@@ -255,6 +255,8 @@ exports.listManagerMobileShipments = managerMobile.listManagerMobileShipments;
 exports.getManagerMobileShipment = managerMobile.getManagerMobileShipment;
 exports.listManagerMobileOperations = managerMobile.listManagerMobileOperations;
 exports.getManagerMobileTrip = managerMobile.getManagerMobileTrip;
+exports.resolveManagerMobileTripScan =
+  managerMobile.resolveManagerMobileTripScan;
 exports.getManagerMobileModules = managerMobile.getManagerMobileModules;
 exports.updateManagerMobileSettings =
   managerMobile.updateManagerMobileSettings;

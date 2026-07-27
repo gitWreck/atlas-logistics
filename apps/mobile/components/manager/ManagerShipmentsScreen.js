@@ -56,18 +56,14 @@ const BOARD_TABS = [
   ["DIVISORIA", "Divisoria", "home"],
   ["ODIONGAN", "Odiongan", "home"],
   ["DELIVERY", "Delivery Operations", "truck"],
+  ["PICKUPS", "Pickups", "map-pin"],
 ];
 
-const DELIVERY_STATUSES = new Set([
-  "ARRIVED",
-  "ARRIVED_AT_ODIONGAN",
-  "READY_FOR_DELIVERY",
-  "AVAILABLE_FOR_DELIVERY",
-  "ASSIGNED",
-  "OUT_FOR_DELIVERY",
-  "PARTIALLY_OUT_FOR_DELIVERY",
-  "FAILED_DELIVERY",
-  "RETURNED_TO_WAREHOUSE",
+const PICKUP_STATUSES = new Set([
+  "PENDING_PICKUP",
+  "PICKUP_APPROVED",
+  "PICKUP_ASSIGNED",
+  "PICKED_UP",
 ]);
 
 function shipmentLocationText(shipment = {}) {
@@ -89,11 +85,31 @@ function shipmentLocationText(shipment = {}) {
 
 function matchesBoardTab(shipment, tab) {
   if (tab === "ALL") return true;
+  if (tab === "PICKUPS") {
+    const status = String(shipment.status || "").toUpperCase();
+    const shipmentType = String(
+      shipment.shipmentType ||
+        shipment.serviceType ||
+        shipment.requestType ||
+        shipment.fulfillmentType ||
+        "",
+    ).toUpperCase();
+    return (
+      PICKUP_STATUSES.has(status) ||
+      shipmentType.includes("PICKUP") ||
+      shipment.pickupRequested === true ||
+      Boolean(
+        shipment.pickupRequestId ||
+          shipment.pickupRequestedAt ||
+          shipment.pickupAddress ||
+          shipment.pickupSchedule,
+      )
+    );
+  }
   if (tab === "DELIVERY") {
     return (
-      DELIVERY_STATUSES.has(String(shipment.status || "").toUpperCase()) ||
-      shipment.availableForDelivery === true ||
-      Boolean(shipment.assignedCheckerId)
+      Array.isArray(shipment.deliveryOperationPieces) &&
+      shipment.deliveryOperationPieces.length > 0
     );
   }
   return shipmentLocationText(shipment).includes(tab);
@@ -129,6 +145,28 @@ function dateValue(shipment = {}) {
   return Number.isFinite(date.getTime()) ? date : null;
 }
 
+function deliveryCheckerKey(piece = {}) {
+  return String(piece.checkerId || piece.checkerName || "checker")
+    .trim()
+    .toLowerCase();
+}
+
+function deliveryPieceBucket(piece = {}) {
+  const status = String(piece.status || "").trim().toUpperCase();
+  if (["DELIVERED", "COMPLETED"].includes(status)) return "delivered";
+  if (
+    [
+      "FAILED_DELIVERY",
+      "RETURNED_TO_WAREHOUSE",
+      "RETURNED_RECEIVED_AT_HUB",
+      "RETURNED_RECEIVED_AT_ODIONGAN",
+    ].includes(status)
+  ) {
+    return "returnedFailed";
+  }
+  return "outForDelivery";
+}
+
 export default function ManagerShipmentsScreen() {
   const router = useRouter();
   const { colors } = useTheme();
@@ -142,6 +180,8 @@ export default function ManagerShipmentsScreen() {
   const [municipality, setMunicipality] = useState("");
   const [checker, setChecker] = useState("");
   const [driver, setDriver] = useState("");
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [deliveryChecker, setDeliveryChecker] = useState("all");
   const [createVisible, setCreateVisible] = useState(false);
   const [selectedShipment, setSelectedShipment] = useState(null);
   const { data, loading, refreshing, error, reload } = useManagerRequest(
@@ -155,6 +195,15 @@ export default function ManagerShipmentsScreen() {
     const end = endDate ? new Date(`${endDate}T23:59:59`) : null;
     return (data?.shipments || []).filter((shipment) => {
       if (!matchesBoardTab(shipment, boardTab)) return false;
+      if (
+        boardTab === "DELIVERY" &&
+        deliveryChecker !== "all" &&
+        !(shipment.deliveryOperationPieces || []).some(
+          (piece) => deliveryCheckerKey(piece) === deliveryChecker,
+        )
+      ) {
+        return false;
+      }
       if (term && !searchText(shipment).includes(term)) return false;
       const municipalityText = [
         shipment.municipality,
@@ -179,7 +228,7 @@ export default function ManagerShipmentsScreen() {
       if (end && date && date > end) return false;
       return true;
     });
-  }, [data, boardTab, search, status, startDate, endDate, municipality, checker, driver]);
+  }, [data, boardTab, deliveryChecker, search, status, startDate, endDate, municipality, checker, driver]);
 
   const boardCounts = useMemo(
     () =>
@@ -193,6 +242,97 @@ export default function ManagerShipmentsScreen() {
       ),
     [data],
   );
+  const deliveryCheckerTabs = useMemo(() => {
+    const checkerMap = new Map();
+    let total = 0;
+    (data?.shipments || []).forEach((shipment) => {
+      (shipment.deliveryOperationPieces || []).forEach((piece) => {
+        const quantity = Math.max(Number(piece.quantity) || 1, 1);
+        const key = deliveryCheckerKey(piece);
+        const label = piece.checkerName || piece.checkerId || "Checker";
+        total += quantity;
+        const current = checkerMap.get(key) || { key, label, count: 0 };
+        current.count += quantity;
+        checkerMap.set(key, current);
+      });
+    });
+    return [
+      { key: "all", label: "All Checkers", count: total },
+      ...Array.from(checkerMap.values()).sort(
+        (left, right) => right.count - left.count,
+      ),
+    ];
+  }, [data?.shipments]);
+  const deliveryStats = useMemo(() => {
+    const stats = { total: 0, delivered: 0, outForDelivery: 0, returnedFailed: 0 };
+    (data?.shipments || []).forEach((shipment) => {
+      (shipment.deliveryOperationPieces || []).forEach((piece) => {
+        if (
+          deliveryChecker !== "all" &&
+          deliveryCheckerKey(piece) !== deliveryChecker
+        ) {
+          return;
+        }
+        const quantity = Math.max(Number(piece.quantity) || 1, 1);
+        const bucket = deliveryPieceBucket(piece);
+        stats.total += quantity;
+        stats[bucket] += quantity;
+      });
+    });
+    return stats;
+  }, [data?.shipments, deliveryChecker]);
+  const selectedDeliveryChecker = deliveryCheckerTabs.find(
+    (entry) => entry.key === deliveryChecker,
+  );
+  const selectedDeliveryAreas = useMemo(() => {
+    if (deliveryChecker === "all") return [];
+    return Array.from(
+      new Set(
+        (data?.shipments || [])
+          .filter((shipment) =>
+            (shipment.deliveryOperationPieces || []).some(
+              (piece) => deliveryCheckerKey(piece) === deliveryChecker,
+            ),
+          )
+          .map(
+            (shipment) =>
+              shipment.municipality ||
+              shipment.destinationMunicipality ||
+              shipment.recipient?.address?.city ||
+              shipment.recipient?.city,
+          )
+          .filter(Boolean),
+      ),
+    );
+  }, [data?.shipments, deliveryChecker]);
+  const boardContext = {
+    ALL: {
+      icon: "package",
+      title: "All Shipments",
+      subtitle: "Authorized shipment orders across your operational scope",
+    },
+    DIVISORIA: {
+      icon: "home",
+      title: "Divisoria Shipments",
+      subtitle: "Orders currently assigned to Divisoria operations",
+    },
+    ODIONGAN: {
+      icon: "home",
+      title: "Odiongan Shipments",
+      subtitle: "Orders currently assigned to Odiongan operations",
+    },
+    DELIVERY: {
+      icon: "truck",
+      title: "Delivery Operations",
+      subtitle:
+        "Show only items scanned and loaded into delivery trucks by checkers.",
+    },
+    PICKUPS: {
+      icon: "map-pin",
+      title: "Pickup Shipments",
+      subtitle: "Pending, assigned, and completed pickup requests",
+    },
+  }[boardTab];
 
   const openDetails = (shipment, activeTab = "status") => {
     setSelectedShipment(null);
@@ -258,10 +398,23 @@ export default function ManagerShipmentsScreen() {
         contentContainerStyle={shipments.length ? styles.list : styles.emptyList}
         ListHeaderComponent={
           <>
-      <View style={[styles.boardTabsWrap, { backgroundColor: colors.surface }]}>
+      <View
+        style={[
+          styles.toolbar,
+          {
+            backgroundColor: colors.surface,
+          },
+        ]}
+      >
+        <View
+          style={[
+            styles.boardTabsWrap,
+            { backgroundColor: colors.cardMuted },
+          ]}
+        >
         <ScrollView horizontal showsHorizontalScrollIndicator={false}>
           <View style={styles.boardTabs}>
-            {BOARD_TABS.map(([value, label, icon]) => {
+            {BOARD_TABS.map(([value, label]) => {
               const active = boardTab === value;
               return (
                 <Pressable
@@ -269,28 +422,128 @@ export default function ManagerShipmentsScreen() {
                   onPress={() => setBoardTab(value)}
                   style={[
                     styles.boardTab,
-                    {
-                      backgroundColor: active ? "#2563eb" : colors.cardMuted,
-                      borderColor: active ? "#2563eb" : colors.border,
-                    },
+                    active && styles.boardTabActive,
                   ]}
                 >
-                  <Feather name={icon} size={15} color={active ? "#fff" : colors.textMuted} />
-                  <Text style={[styles.boardTabText, { color: active ? "#fff" : colors.text }]}>
-                    {label}
+                  <Text style={[styles.boardTabText, { color: active ? "#fff" : colors.textMuted }]}>
+                    {label} {boardCounts[value] || 0}
                   </Text>
-                  <View style={[styles.boardCount, { backgroundColor: active ? "rgba(255,255,255,0.2)" : colors.surface }]}>
-                    <Text style={[styles.boardCountText, { color: active ? "#fff" : colors.textMuted }]}>
-                      {boardCounts[value] || 0}
-                    </Text>
-                  </View>
                 </Pressable>
               );
             })}
           </View>
         </ScrollView>
       </View>
-      <View style={[styles.filters, { backgroundColor: colors.surface }]}>
+        <View style={styles.boardSectionTitle}>
+          <View style={[styles.boardSectionIcon, { backgroundColor: colors.cardMuted }]}>
+            <Feather name={boardContext.icon} size={18} color="#0f766e" />
+          </View>
+          <View style={styles.cardCopy}>
+            <Text style={[styles.boardSectionHeading, { color: colors.text }]}>
+              {boardContext.title}
+            </Text>
+            <Text style={[styles.boardSectionSubtitle, { color: colors.textMuted }]}>
+              {boardContext.subtitle}
+            </Text>
+          </View>
+        </View>
+        {boardTab === "DELIVERY" ? (
+          <View style={[styles.deliveryDashboard, { borderColor: colors.border }]}>
+            <View style={styles.deliveryActions}>
+              <Pressable
+                onPress={() => reload({ refresh: true })}
+                style={[styles.deliveryActionButton, { borderColor: colors.border }]}
+              >
+                <Feather name="refresh-cw" size={14} color="#2563eb" />
+                <Text style={[styles.deliveryActionText, { color: colors.text }]}>
+                  Refresh
+                </Text>
+              </Pressable>
+              <Pressable
+                onPress={() =>
+                  router.push(
+                    role === "manager"
+                      ? "/(manager)/management/municipalities"
+                      : "/(checker)/(tabs)/quick/management/municipalities",
+                  )
+                }
+                style={[styles.deliveryActionButton, styles.assignAreasButton, { borderColor: colors.border }]}
+              >
+                <Feather name="map" size={14} color="#2563eb" />
+                <Text style={[styles.deliveryActionText, { color: colors.text }]}>
+                  Assign checker municipalities
+                </Text>
+              </Pressable>
+            </View>
+            <View style={styles.checkerFilterHeading}>
+              <Feather name="user-check" size={14} color={colors.textMuted} />
+              <Text style={[styles.checkerFilterLabel, { color: colors.textMuted }]}>
+                FILTER BY CHECKER
+              </Text>
+            </View>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+              <View style={[styles.checkerTabs, { backgroundColor: colors.cardMuted }]}>
+                {deliveryCheckerTabs.map((entry) => {
+                  const active = deliveryChecker === entry.key;
+                  return (
+                    <Pressable
+                      key={entry.key}
+                      onPress={() => setDeliveryChecker(entry.key)}
+                      style={[
+                        styles.checkerTab,
+                        {
+                          backgroundColor: active ? colors.surface : "transparent",
+                          borderColor: active ? "#93c5fd" : "transparent",
+                        },
+                      ]}
+                    >
+                      <Text style={[styles.checkerTabText, { color: active ? colors.text : colors.textMuted }]}>
+                        {entry.label}
+                      </Text>
+                      <View style={styles.checkerCount}>
+                        <Text style={styles.checkerCountText}>{entry.count}</Text>
+                      </View>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            </ScrollView>
+            <Text style={[styles.deliveryAreaCopy, { color: colors.textMuted }]}>
+              {deliveryChecker === "all"
+                ? "Select a checker above to view their assigned delivery areas."
+                : `${selectedDeliveryChecker?.label || "Checker"} delivery areas: ${
+                    selectedDeliveryAreas.join(", ") || "No assigned areas found"
+                  }`}
+            </Text>
+            <View style={styles.deliveryStatsGrid}>
+              {[
+                ["TOTAL PACKAGES", deliveryStats.total, "#2563eb", "package"],
+                ["DELIVERED", deliveryStats.delivered, "#059669", "check"],
+                ["OUT FOR DELIVERY", deliveryStats.outForDelivery, "#d97706", "truck"],
+                ["RETURNED / FAILED", deliveryStats.returnedFailed, "#7c3aed", "rotate-ccw"],
+              ].map(([label, value, color, icon]) => (
+                <View
+                  key={label}
+                  style={[
+                    styles.deliveryStat,
+                    { backgroundColor: `${color}12`, borderColor: `${color}35` },
+                  ]}
+                >
+                  <View style={styles.deliveryStatTop}>
+                    <Text style={[styles.deliveryStatLabel, { color }]}>{label}</Text>
+                    <Feather name={icon} size={17} color={color} />
+                  </View>
+                  <Text style={[styles.deliveryStatValue, { color }]}>{value}</Text>
+                  <Text style={[styles.deliveryStatPercent, { color }]}>
+                    {label === "TOTAL PACKAGES"
+                      ? "Packages"
+                      : `${deliveryStats.total ? ((Number(value) / deliveryStats.total) * 100).toFixed(1) : "0.0"}% of total`}
+                  </Text>
+                </View>
+              ))}
+            </View>
+          </View>
+        ) : null}
         <View style={[styles.search, { backgroundColor: colors.cardMuted }]}>
           <Feather name="search" size={18} color={colors.textMuted} />
           <TextInput
@@ -305,7 +558,28 @@ export default function ManagerShipmentsScreen() {
               <Feather name="x-circle" size={18} color={colors.textMuted} />
             </Pressable>
           ) : null}
+          <Pressable
+            accessibilityLabel="Shipment filters"
+            onPress={() => setFiltersOpen((current) => !current)}
+            style={[
+              styles.filterButton,
+              filtersOpen && styles.filterButtonActive,
+            ]}
+          >
+            <Feather
+              name="sliders"
+              size={17}
+              color={filtersOpen ? "#fff" : colors.textMuted}
+            />
+          </Pressable>
         </View>
+        {filtersOpen ? (
+          <View
+            style={[
+              styles.filterPanel,
+              { borderColor: colors.border, backgroundColor: colors.cardMuted },
+            ]}
+          >
         <ScrollView horizontal showsHorizontalScrollIndicator={false}>
           <View style={styles.chips}>
             {STATUS_FILTERS.map((value) => {
@@ -366,6 +640,21 @@ export default function ManagerShipmentsScreen() {
             <FilterInput label="DRIVER" value={driver} onChangeText={setDriver} colors={colors} />
           </View>
         </ScrollView>
+            <Pressable
+              onPress={() => {
+                setStatus("ALL");
+                setStartDate("");
+                setEndDate("");
+                setMunicipality("");
+                setChecker("");
+                setDriver("");
+              }}
+              style={styles.clearFilters}
+            >
+              <Text style={styles.clearFiltersText}>Clear filters</Text>
+            </Pressable>
+          </View>
+        ) : null}
       </View>
           </>
         }
@@ -557,27 +846,55 @@ function Meta({ icon, label, value, colors }) {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   boardScroll: { flex: 1, minHeight: 0 },
+  toolbar: { padding: 13, gap: 10 },
   filters: {
     paddingHorizontal: 0,
     paddingTop: 10,
     paddingBottom: 12,
     gap: 10,
   },
-  boardTabsWrap: { paddingHorizontal: 0, paddingTop: 10 },
-  boardTabs: { flexDirection: "row", gap: 8, paddingBottom: 2 },
-  boardTab: { minHeight: 42, borderRadius: 13, borderWidth: 1, paddingHorizontal: 12, flexDirection: "row", alignItems: "center", gap: 7 },
+  boardTabsWrap: { borderRadius: 13, padding: 4, overflow: "hidden" },
+  boardTabs: { flexDirection: "row", gap: 3 },
+  boardTab: { minWidth: 110, minHeight: 38, borderRadius: 10, paddingHorizontal: 10, alignItems: "center", justifyContent: "center" },
+  boardTabActive: { backgroundColor: "#0f766e" },
   boardTabText: { fontSize: 11, fontWeight: "900" },
-  boardCount: { minWidth: 24, height: 22, borderRadius: 11, paddingHorizontal: 6, alignItems: "center", justifyContent: "center" },
-  boardCountText: { fontSize: 10, fontWeight: "900" },
+  boardSectionTitle: { minHeight: 52, flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 2, paddingVertical: 4 },
+  boardSectionIcon: { width: 40, height: 40, borderRadius: 12, alignItems: "center", justifyContent: "center" },
+  boardSectionHeading: { fontSize: 14, fontWeight: "900" },
+  boardSectionSubtitle: { fontSize: 9, lineHeight: 14, marginTop: 2 },
+  deliveryDashboard: { borderTopWidth: StyleSheet.hairlineWidth, borderBottomWidth: StyleSheet.hairlineWidth, paddingVertical: 11, gap: 11 },
+  deliveryActions: { flexDirection: "row", gap: 7 },
+  deliveryActionButton: { minHeight: 38, borderWidth: 1, borderRadius: 10, paddingHorizontal: 10, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6 },
+  assignAreasButton: { flex: 1 },
+  deliveryActionText: { fontSize: 9, fontWeight: "900" },
+  checkerFilterHeading: { flexDirection: "row", alignItems: "center", gap: 7 },
+  checkerFilterLabel: { fontSize: 9, fontWeight: "900", letterSpacing: 0.5 },
+  checkerTabs: { flexDirection: "row", borderRadius: 12, padding: 4, gap: 4 },
+  checkerTab: { minWidth: 128, minHeight: 42, borderWidth: 1, borderRadius: 10, paddingHorizontal: 10, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 7 },
+  checkerTabText: { maxWidth: 92, fontSize: 10, fontWeight: "900" },
+  checkerCount: { minWidth: 25, height: 20, borderRadius: 10, paddingHorizontal: 6, backgroundColor: "#dbeafe", alignItems: "center", justifyContent: "center" },
+  checkerCountText: { color: "#1d4ed8", fontSize: 9, fontWeight: "900" },
+  deliveryAreaCopy: { fontSize: 9, lineHeight: 14 },
+  deliveryStatsGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  deliveryStat: { width: "48.7%", minHeight: 112, borderWidth: 1, borderRadius: 14, padding: 12 },
+  deliveryStatTop: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 7 },
+  deliveryStatLabel: { flex: 1, fontSize: 8, fontWeight: "900" },
+  deliveryStatValue: { fontSize: 25, lineHeight: 30, fontWeight: "900", marginTop: 10 },
+  deliveryStatPercent: { fontSize: 9, marginTop: 4 },
   search: {
-    minHeight: 46,
-    borderRadius: 14,
-    paddingHorizontal: 13,
+    minHeight: 45,
+    borderRadius: 13,
+    paddingHorizontal: 12,
     flexDirection: "row",
     alignItems: "center",
     gap: 9,
   },
-  searchInput: { flex: 1, padding: 0, fontSize: 14 },
+  searchInput: { flex: 1, padding: 0, fontSize: 13 },
+  filterButton: { width: 34, height: 34, borderRadius: 10, alignItems: "center", justifyContent: "center" },
+  filterButtonActive: { backgroundColor: "#0f766e" },
+  filterPanel: { borderWidth: 1, borderRadius: 14, padding: 11, gap: 10 },
+  clearFilters: { alignSelf: "flex-end", paddingVertical: 5 },
+  clearFiltersText: { color: "#0f766e", fontSize: 10, fontWeight: "900" },
   chips: { flexDirection: "row", gap: 8 },
   chip: {
     borderWidth: 1,

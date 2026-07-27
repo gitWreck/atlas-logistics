@@ -19,8 +19,12 @@ export function ManagerHeader({
   back = false,
   actionIcon,
   onAction,
+  actions = [],
   titleNumberOfLines = 1,
   titleStyle,
+  subtitleStyle,
+  titleAdjustsFontSizeToFit = false,
+  titleMinimumFontScale = 0.75,
 }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -67,15 +71,50 @@ export function ManagerHeader({
         <Text
           style={[styles.headerTitle, { color: colors.text }, titleStyle]}
           numberOfLines={titleNumberOfLines}
+          adjustsFontSizeToFit={titleAdjustsFontSizeToFit}
+          minimumFontScale={titleMinimumFontScale}
         >
           {title}
         </Text>
         {subtitle ? (
-          <Text style={[styles.headerSubtitle, { color: colors.textMuted }]} numberOfLines={2}>
+          <Text
+            style={[
+              styles.headerSubtitle,
+              { color: colors.textMuted },
+              subtitleStyle,
+            ]}
+            numberOfLines={2}
+          >
             {subtitle}
           </Text>
         ) : null}
       </View>
+      {actions.length ? (
+        <View style={styles.headerActions}>
+          {actions.map((action) => {
+            const accent =
+              action.tone === "green" ? "#059669" : action.color || "#2563eb";
+            const background =
+              action.tone === "green" ? "#ecfdf5" : "#eff6ff";
+            return (
+              <Pressable
+                key={action.key || action.label}
+                onPress={action.onPress}
+                style={[
+                  styles.headerActionButton,
+                  { borderColor: accent, backgroundColor: background },
+                ]}
+                accessibilityLabel={action.label}
+              >
+                <Feather name={action.icon} size={13} color={accent} />
+                <Text style={[styles.headerActionText, { color: accent }]}>
+                  {action.label}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+      ) : null}
       {actionIcon ? (
         <Pressable
           onPress={onAction}
@@ -213,6 +252,19 @@ const styles = StyleSheet.create({
   eyebrow: { fontSize: 10, fontWeight: "900", letterSpacing: 1.2 },
   headerTitle: { fontSize: 23, fontWeight: "900", marginTop: 1 },
   headerSubtitle: { fontSize: 12, lineHeight: 17, marginTop: 2 },
+  headerActions: { flexDirection: "row", alignItems: "center", gap: 5 },
+  headerActionButton: {
+    minWidth: 54,
+    height: 36,
+    borderWidth: 1,
+    borderRadius: 11,
+    paddingHorizontal: 7,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 4,
+  },
+  headerActionText: { fontSize: 9, fontWeight: "900" },
   iconButton: {
     width: 42,
     height: 42,

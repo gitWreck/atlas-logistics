@@ -5,16 +5,17 @@ import {
   Image,
   Linking,
   Modal,
+  Platform,
   Pressable,
   RefreshControl,
   ScrollView,
   StyleSheet,
-  Switch,
   Text,
   TextInput,
   View,
 } from "react-native";
 import Feather from "@expo/vector-icons/Feather";
+import qrcode from "qrcode-generator";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useTheme } from "../../contexts/ThemeContext";
 import { useAuth } from "../../contexts/AuthContext";
@@ -25,6 +26,7 @@ import {
   reconcileShipmentAtHub,
   receiveReturnedShipmentAtHub,
   releaseForDeliveryOperations,
+  sendManualSMS,
   updateShipmentDetails,
   updateShipmentPackages,
   updateShipmentStatus,
@@ -69,6 +71,17 @@ const SHIPMENT_STATUSES = [
   "RETURNED_TO_WAREHOUSE",
   "CANCELLED",
 ];
+const STATUS_FLOW = [
+  "CREATED",
+  "PENDING_PICKUP",
+  "PICKED_UP",
+  "RECEIVED_AT_DIVISORIA",
+  "LOADED",
+  "IN_TRANSIT",
+  "ARRIVED_AT_ODIONGAN",
+  "OUT_FOR_DELIVERY",
+  "DELIVERED",
+];
 
 function escapeHtml(value) {
   return String(value ?? "")
@@ -76,6 +89,105 @@ function escapeHtml(value) {
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;");
+}
+
+function createQr(value) {
+  const code = qrcode(0, "M");
+  code.addData(String(value || ""));
+  code.make();
+  return code;
+}
+
+async function printHtmlDocument(html) {
+  if (
+    Platform.OS === "web" &&
+    typeof window !== "undefined" &&
+    typeof document !== "undefined"
+  ) {
+    await new Promise((resolve, reject) => {
+      const frame = document.createElement("iframe");
+      frame.setAttribute("title", "Atlas Label Print Document");
+      frame.style.position = "fixed";
+      frame.style.left = "-10000px";
+      frame.style.top = "0";
+      frame.style.width = "816px";
+      frame.style.height = "1056px";
+      frame.style.border = "0";
+      frame.onload = () => {
+        window.setTimeout(() => {
+          try {
+            frame.contentWindow?.focus();
+            frame.contentWindow?.print();
+            window.setTimeout(() => frame.remove(), 500);
+            resolve();
+          } catch (error) {
+            frame.remove();
+            reject(error);
+          }
+        }, 250);
+      };
+      frame.onerror = () => {
+        frame.remove();
+        reject(new Error("The label print document could not be created."));
+      };
+      document.body.appendChild(frame);
+      frame.srcdoc = html;
+    });
+    return;
+  }
+  await Print.printAsync({ html });
+}
+
+function labelHtml({ title, code, subtitle, details = [] }) {
+  const qrSvg = createQr(code).createSvgTag({
+    cellSize: 3,
+    margin: 0,
+    scalable: true,
+  });
+  return `<!doctype html><html><head><meta charset="utf-8"><style>
+    @page{size:4in 3in;margin:.18in}*{box-sizing:border-box}
+    body{font-family:Arial,sans-serif;color:#0f172a;margin:0}
+    .label{height:2.64in;border:2px solid #0f172a;border-radius:12px;padding:14px;display:grid;grid-template-columns:1fr 112px;gap:14px}
+    .brand{font-size:11px;font-weight:900;letter-spacing:1.5px;color:#2563eb}.title{font-size:17px;font-weight:900;margin:10px 0 4px}
+    .code{font-family:monospace;font-size:13px;font-weight:800;word-break:break-all}.subtitle{font-size:11px;color:#475569;margin:7px 0 12px}
+    .detail{font-size:9px;color:#475569;margin-top:4px}.detail b{color:#0f172a}.qr{width:112px;height:112px;align-self:center}.qr svg{width:100%;height:100%}
+  </style></head><body><section class="label"><div><div class="brand">ATLAS TRANSPORT</div>
+    <div class="title">${escapeHtml(title)}</div><div class="code">${escapeHtml(code)}</div>
+    <div class="subtitle">${escapeHtml(subtitle)}</div>
+    ${details
+      .map(
+        ([label, value]) =>
+          `<div class="detail"><b>${escapeHtml(label)}:</b> ${escapeHtml(value || "—")}</div>`,
+      )
+      .join("")}</div><div class="qr">${qrSvg}</div></section></body></html>`;
+}
+
+function packageLabelsHtml(shipmentCode, destination, packages) {
+  const labels = packages
+    .map((item, index) => {
+      const packageCode =
+        item.packageId || item.trackingNumber || item.id || `${shipmentCode}-${index + 1}`;
+      const qrSvg = createQr(packageCode).createSvgTag({
+        cellSize: 3,
+        margin: 0,
+        scalable: true,
+      });
+      return `<section class="label"><div><div class="brand">ATLAS TRANSPORT</div>
+        <div class="title">Package Label</div><div class="code">${escapeHtml(packageCode)}</div>
+        <div class="subtitle">${escapeHtml(item.description || "Package")}</div>
+        <div class="detail"><b>Shipment:</b> ${escapeHtml(shipmentCode)}</div>
+        <div class="detail"><b>Type:</b> ${escapeHtml(item.type || item.packageType || "Standard")}</div>
+        <div class="detail"><b>Quantity:</b> ${escapeHtml(item.quantity || 1)}</div>
+        <div class="detail"><b>Destination:</b> ${escapeHtml(destination || "—")}</div>
+        </div><div class="qr">${qrSvg}</div></section>`;
+    })
+    .join("");
+  return `<!doctype html><html><head><meta charset="utf-8"><style>
+    @page{size:4in 3in;margin:.18in}*{box-sizing:border-box}
+    body{font-family:Arial,sans-serif;color:#0f172a;margin:0}.label{height:2.64in;border:2px solid #0f172a;border-radius:12px;padding:14px;display:grid;grid-template-columns:1fr 112px;gap:14px;break-after:page;page-break-after:always}
+    .label:last-child{break-after:auto;page-break-after:auto}.brand{font-size:11px;font-weight:900;letter-spacing:1.5px;color:#2563eb}.title{font-size:17px;font-weight:900;margin:10px 0 4px}
+    .code{font-family:monospace;font-size:13px;font-weight:800;word-break:break-all}.subtitle{font-size:11px;color:#475569;margin:7px 0 12px}.detail{font-size:9px;color:#475569;margin-top:4px}.detail b{color:#0f172a}.qr{width:112px;height:112px;align-self:center}.qr svg{width:100%;height:100%}
+  </style></head><body>${labels}</body></html>`;
 }
 
 export default function ManagerShipmentDetailsScreen() {
@@ -95,7 +207,6 @@ export default function ManagerShipmentDetailsScreen() {
   const [operationRemarks, setOperationRemarks] = React.useState("");
   const [workflow, setWorkflow] = React.useState(null);
   const [selectedStatus, setSelectedStatus] = React.useState("");
-  const [statusRemarks, setStatusRemarks] = React.useState("");
   const [notifyCustomers, setNotifyCustomers] = React.useState(false);
   const [editOpen, setEditOpen] = React.useState(false);
   const id = shipmentId ? String(shipmentId) : "";
@@ -154,7 +265,7 @@ export default function ManagerShipmentDetailsScreen() {
     }
   };
 
-  const changeStatus = (nextStatus, notify = notifyCustomers, remarks = statusRemarks) => {
+  const changeStatus = (nextStatus, notify = notifyCustomers) => {
     Alert.alert(
       "Update shipment status",
       `Move this shipment to ${nextStatus.replace(/_/g, " ")}? Existing custody and notification rules will apply.`,
@@ -173,11 +284,9 @@ export default function ManagerShipmentDetailsScreen() {
                 notifySms: notify,
                 notifyEmail: notify,
                 notifyPush: notify,
-                remarks: remarks.trim() || null,
                 sourceUI: "MANAGER_MOBILE",
               });
               setSelectedStatus("");
-              setStatusRemarks("");
               setNotifyCustomers(false);
               await reload({ refresh: true });
             } catch (nextError) {
@@ -359,18 +468,10 @@ export default function ManagerShipmentDetailsScreen() {
             saving={saving}
             colors={colors}
             onStatus={changeStatus}
-            onReconcile={openReconcile}
             selectedStatus={selectedStatus}
             onSelectStatus={setSelectedStatus}
-            statusRemarks={statusRemarks}
-            onStatusRemarks={setStatusRemarks}
             notifyCustomers={notifyCustomers}
             onNotifyCustomers={setNotifyCustomers}
-            onWorkflow={setWorkflow}
-            onEdit={() => setEditOpen(true)}
-            onPrint={printShipment}
-            canDelete={canDelete}
-            onDelete={confirmDelete}
           />
         ) : null}
       </View>
@@ -443,16 +544,32 @@ function StatusTab({ shipment, timeline, municipality, colors, onReconcile, onWo
     shipment.availableForDelivery !== true &&
     !["DELIVERED", "COMPLETED", "CANCELLED"].includes(status);
   const reconciled = Boolean(shipment.reconciledAt || shipment.reconcileResult);
-  const receiptImages = [
-    ...(Array.isArray(shipment.proofOfReceipt) ? shipment.proofOfReceipt : []),
-    ...(Array.isArray(shipment.receiptImages) ? shipment.receiptImages : []),
-    ...(Array.isArray(shipment.receiptPhotos) ? shipment.receiptPhotos : []),
-  ].filter(Boolean);
-  const deliveryImages = [
-    ...(Array.isArray(shipment.proofOfDelivery) ? shipment.proofOfDelivery : []),
-    ...(Array.isArray(shipment.deliveryImages) ? shipment.deliveryImages : []),
-    ...(Array.isArray(shipment.deliveryPhotos) ? shipment.deliveryPhotos : []),
-  ].filter(Boolean);
+  const inferredFlowIndex =
+    status === "DELIVERED" || status === "COMPLETED"
+      ? 8
+      : status.includes("OUT_FOR_DELIVERY") ||
+          status.includes("FAILED_DELIVERY") ||
+          status.startsWith("RETURN")
+        ? 7
+        : status.includes("ARRIVED_AT_ODIONGAN") ||
+            status === "READY_FOR_DELIVERY" ||
+            status === "AVAILABLE_FOR_DELIVERY"
+          ? 6
+          : status === "IN_TRANSIT" || status === "DELAYED"
+            ? 5
+            : status === "LOADED" || status === "PARTIALLY_LOADED"
+              ? 4
+              : ["RECEIVED", "AVAILABLE", "ASSIGNED", "READY_FOR_LOADING"].includes(status)
+                ? 3
+                : status === "PICKED_UP"
+                  ? 2
+                  : status === "PENDING_PICKUP"
+                    ? 1
+                    : 0;
+  const currentFlowIndex = Math.max(
+    STATUS_FLOW.findIndex((value) => value === status),
+    inferredFlowIndex,
+  );
   return (
     <>
       <ManagerCard>
@@ -516,7 +633,62 @@ function StatusTab({ shipment, timeline, municipality, colors, onReconcile, onWo
       </View>
 
       <ManagerCard>
-        <SectionTitle title="Timeline and scan history" subtitle={`${timeline.length} events`} />
+        <SectionTitle
+          title="Status Flow"
+          subtitle={String(shipment.status || "Created").replace(/_/g, " ")}
+        />
+        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+          <View style={styles.statusFlow}>
+            {STATUS_FLOW.map((flowStatus, index) => {
+              const complete = index <= currentFlowIndex;
+              return (
+                <View key={flowStatus} style={styles.statusFlowStep}>
+                  <View
+                    style={[
+                      styles.statusFlowDot,
+                      {
+                        backgroundColor: complete ? "#059669" : colors.cardMuted,
+                        borderColor: complete ? "#059669" : colors.border,
+                      },
+                    ]}
+                  >
+                    <Feather
+                      name={complete ? "check" : "circle"}
+                      size={12}
+                      color={complete ? "#fff" : colors.textMuted}
+                    />
+                  </View>
+                  <Text
+                    style={[
+                      styles.statusFlowLabel,
+                      { color: complete ? colors.text : colors.textMuted },
+                    ]}
+                  >
+                    {flowStatus.replace(/_/g, " ")}
+                  </Text>
+                  {index < STATUS_FLOW.length - 1 ? (
+                    <View
+                      style={[
+                        styles.statusFlowConnector,
+                        {
+                          backgroundColor:
+                            index < currentFlowIndex ? "#10b981" : colors.border,
+                        },
+                      ]}
+                    />
+                  ) : null}
+                </View>
+              );
+            })}
+          </View>
+        </ScrollView>
+      </ManagerCard>
+
+      <ManagerCard>
+        <SectionTitle
+          title="Scanned Info / Custody Timeline"
+          subtitle={`${timeline.length} custody event${timeline.length === 1 ? "" : "s"}`}
+        />
         {timeline.length ? timeline.map((event, index) => (
           <View key={event.id || index} style={styles.timelineRow}>
             <View style={styles.timelineRail}>
@@ -525,7 +697,13 @@ function StatusTab({ shipment, timeline, municipality, colors, onReconcile, onWo
             </View>
             <View style={styles.timelineCopy}>
               <Text style={[styles.timelineTitle, { color: colors.text }]}>
-                {String(event.status || event.action || event.eventType || "Operational update").replace(/_/g, " ")}
+                {String(
+                  event.scanAction ||
+                    event.action ||
+                    event.status ||
+                    event.eventType ||
+                    "Custody update",
+                ).replace(/_/g, " ")}
               </Text>
               <Text style={[styles.timelineMeta, { color: colors.textMuted }]}>
                 {[event.actorName || event.scannedByName || event.createdByName, event.location, formatDate(event.timestamp || event.createdAt || event.updatedAt)]
@@ -535,42 +713,32 @@ function StatusTab({ shipment, timeline, municipality, colors, onReconcile, onWo
               {event.note || event.reason ? <Text style={[styles.timelineNote, { color: colors.textMuted }]}>{event.note || event.reason}</Text> : null}
             </View>
           </View>
-        )) : <EmptyState icon="clock" title="No audit events yet" />}
+        )) : <EmptyState icon="clock" title="No custody scans yet" />}
       </ManagerCard>
-      {(receiptImages.length || deliveryImages.length || shipment.remarks || shipment.deliveryRemarks || shipment.failureReason) ? (
-        <ManagerCard>
-          <SectionTitle
-            title="Proofs and remarks"
-            subtitle={`${receiptImages.length + deliveryImages.length} captured image${receiptImages.length + deliveryImages.length === 1 ? "" : "s"}`}
-          />
-          {receiptImages.length ? <ProofStrip label="Receipt" images={receiptImages} colors={colors} /> : null}
-          {deliveryImages.length ? <ProofStrip label="Delivery" images={deliveryImages} colors={colors} /> : null}
-          {[shipment.remarks, shipment.deliveryRemarks, shipment.failureReason, shipment.returnReason]
-            .filter(Boolean)
-            .map((remark, index) => (
-              <View key={`${remark}-${index}`} style={[styles.remarkBox, { backgroundColor: colors.cardMuted, borderColor: colors.border }]}>
-                <Text style={[styles.remarkText, { color: colors.text }]}>{String(remark)}</Text>
-              </View>
-            ))}
-        </ManagerCard>
-      ) : null}
     </>
   );
 }
 
-function ProofStrip({ label, images, colors }) {
+function PackageQr({ value, size = 128 }) {
+  const code = React.useMemo(() => createQr(value), [value]);
+  const count = code.getModuleCount();
+  const cell = size / count;
   return (
-    <View style={styles.proofGroup}>
-      <Text style={[styles.fieldLabel, { color: colors.textMuted }]}>{label.toUpperCase()}</Text>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-        <View style={styles.proofRow}>
-          {images.map((url, index) => (
-            <Pressable key={`${url}-${index}`} onPress={() => Linking.openURL(url)}>
-              <Image source={{ uri: url }} style={styles.proofImage} />
-            </Pressable>
+    <View style={[styles.qrCanvas, { width: size, height: size }]}>
+      {Array.from({ length: count }, (_, row) => (
+        <View key={row} style={styles.qrRow}>
+          {Array.from({ length: count }, (__, column) => (
+            <View
+              key={column}
+              style={{
+                width: cell,
+                height: cell,
+                backgroundColor: code.isDark(row, column) ? "#000" : "#fff",
+              }}
+            />
           ))}
         </View>
-      </ScrollView>
+      ))}
     </View>
   );
 }
@@ -579,6 +747,9 @@ function ItemsTab({ shipment, packages, colors, onRefresh }) {
   const [savingPackage, setSavingPackage] = React.useState(false);
   const [selectedPackage, setSelectedPackage] = React.useState(null);
   const [manualQty, setManualQty] = React.useState("1");
+  const [visibleQr, setVisibleQr] = React.useState(null);
+  const shipmentCode =
+    shipment.trackingNumber || shipment.shipmentId || shipment.id || "SHIPMENT";
   const updatePackage = async (item, newStatus, quantity = null) => {
     const packageId = item.packageId || item.trackingNumber || item.id;
     if (newStatus === "LOADED" && !(shipment.currentTripId || shipment.tripId)) {
@@ -610,11 +781,80 @@ function ItemsTab({ shipment, packages, colors, onRefresh }) {
     setSelectedPackage(item);
     setManualQty(String(item.quantity || 1));
   };
+  const printShipmentLabel = () =>
+    printHtmlDocument(
+      labelHtml({
+        title: "Shipment Label",
+        code: shipmentCode,
+        subtitle: `${shipment.originCode || shipment.origin || "Origin"} → ${
+          shipment.destinationCode || shipment.destination || "Destination"
+        }`,
+        details: [
+          ["Recipient", displayName(shipment.recipient)],
+          [
+            "Municipality",
+            shipment.municipality ||
+              shipment.recipient?.address?.city ||
+              shipment.recipient?.city,
+          ],
+          ["Pieces", shipment.totals?.totalItems || packages.length],
+        ],
+      }),
+    ).catch((error) =>
+      Alert.alert("Shipment label unavailable", error.message || "Please try again."),
+    );
+  const printPackageLabel = (item) => {
+    const packageCode =
+      item?.packageId || item?.trackingNumber || item?.id || shipmentCode;
+    return printHtmlDocument(
+      labelHtml({
+        title: "Package Label",
+        code: packageCode,
+        subtitle: item?.description || "Package",
+        details: [
+          ["Shipment", shipmentCode],
+          ["Type", item?.type || item?.packageType || "Standard"],
+          ["Quantity", item?.quantity || 1],
+          ["Destination", shipment.destination || shipment.destinationCode],
+        ],
+      }),
+    ).catch((error) =>
+      Alert.alert("Package label unavailable", error.message || "Please try again."),
+    );
+  };
+  const printAllPackageLabels = () =>
+    printHtmlDocument(
+      packageLabelsHtml(
+        shipmentCode,
+        shipment.destination || shipment.destinationCode,
+        packages,
+      ),
+    ).catch((error) =>
+      Alert.alert("Package labels unavailable", error.message || "Please try again."),
+    );
   return (
     <ManagerCard>
       <SectionTitle title="Shipment items" subtitle={`${packages.length || shipment.totals?.totalItems || 0} recorded`} />
+      <View style={styles.labelActions}>
+        <Pressable
+          onPress={printShipmentLabel}
+          style={[styles.labelButton, { backgroundColor: colors.cardMuted, borderColor: colors.border }]}
+        >
+          <Feather name="tag" size={16} color="#2563eb" />
+          <Text style={[styles.labelButtonText, { color: colors.text }]}>Shipment Label</Text>
+        </Pressable>
+        <Pressable
+          disabled={!packages.length}
+          onPress={printAllPackageLabels}
+          style={[styles.labelButton, { backgroundColor: colors.cardMuted, borderColor: colors.border }, !packages.length && styles.disabled]}
+        >
+          <Feather name="printer" size={16} color="#2563eb" />
+          <Text style={[styles.labelButtonText, { color: colors.text }]}>Package Labels</Text>
+        </Pressable>
+      </View>
       {packages.length ? packages.map((item, index) => (
-        <View key={item.id || item.packageId || index} style={[styles.packageRow, index > 0 && { borderTopColor: colors.border, borderTopWidth: 1 }]}>
+        <React.Fragment key={item.id || item.packageId || index}>
+        <View style={[styles.packageRow, index > 0 && { borderTopColor: colors.border, borderTopWidth: 1 }]}>
           <View style={styles.packageIcon}><Feather name="box" size={18} color="#4f46e5" /></View>
           <View style={styles.flex}>
             <Text style={[styles.packageTitle, { color: colors.text }]}>{item.packageId || item.id || `Item ${index + 1}`}</Text>
@@ -624,42 +864,155 @@ function ItemsTab({ shipment, packages, colors, onRefresh }) {
           </View>
           <View style={styles.packageControls}>
             <StatusBadge status={item.status || shipment.status} />
-            <Pressable
-              disabled={savingPackage}
-              onPress={() => openPackageActions(item)}
-              style={[styles.packageMore, { backgroundColor: colors.cardMuted }]}
-            >
-              {savingPackage ? <ActivityIndicator size="small" color="#4f46e5" /> : <Feather name="more-vertical" size={18} color={colors.text} />}
-            </Pressable>
+            <View style={styles.packageButtons}>
+              <Pressable
+                accessibilityLabel="Toggle package QR code"
+                onPress={() => {
+                  const packageCode = item.packageId || item.trackingNumber || item.id;
+                  setVisibleQr(visibleQr === packageCode ? null : packageCode);
+                }}
+                style={[
+                  styles.packageMore,
+                  {
+                    backgroundColor:
+                      visibleQr === (item.packageId || item.trackingNumber || item.id)
+                        ? "#dbeafe"
+                        : colors.cardMuted,
+                  },
+                ]}
+              >
+                <Feather name="grid" size={17} color="#2563eb" />
+              </Pressable>
+              <Pressable
+                disabled={savingPackage}
+                onPress={() => openPackageActions(item)}
+                style={[styles.packageMore, { backgroundColor: colors.cardMuted }]}
+              >
+                {savingPackage ? <ActivityIndicator size="small" color="#4f46e5" /> : <Feather name="more-vertical" size={18} color={colors.text} />}
+              </Pressable>
+            </View>
           </View>
         </View>
+        {visibleQr === (item.packageId || item.trackingNumber || item.id) ? (
+          <View style={[styles.qrPanel, { backgroundColor: colors.cardMuted, borderColor: colors.border }]}>
+            <PackageQr value={item.packageId || item.trackingNumber || item.id} size={128} />
+            <View style={styles.flex}>
+              <Text style={[styles.qrTitle, { color: colors.text }]}>Package QR Code</Text>
+              <Text style={[styles.qrCodeText, { color: colors.textMuted }]}>
+                {item.packageId || item.trackingNumber || item.id}
+              </Text>
+              <Pressable onPress={() => printPackageLabel(item)} style={styles.qrPrintButton}>
+                <Feather name="printer" size={14} color="#fff" />
+                <Text style={styles.qrPrintText}>Package Label</Text>
+              </Pressable>
+            </View>
+          </View>
+        ) : null}
+        </React.Fragment>
       )) : (
         <EmptyState icon="package" title="No item rows recorded" message="Shipment totals are still available on the order." />
       )}
       <Modal visible={Boolean(selectedPackage)} transparent animationType="slide" onRequestClose={() => !savingPackage && setSelectedPackage(null)}>
         <View style={styles.modalBackdrop}>
-          <View style={[styles.modalSheet, { backgroundColor: colors.surface }]}>
-            <Text style={[styles.modalTitle, { color: colors.text }]}>Manage Package</Text>
-            <Text style={[styles.modalSubtitle, { color: colors.textMuted }]}>
-              {selectedPackage?.packageId || selectedPackage?.trackingNumber || selectedPackage?.id}
-            </Text>
-            <Text style={[styles.fieldLabel, { color: colors.textMuted }]}>
-              PARTIAL LOAD QUANTITY · MAX {Number(selectedPackage?.quantity || 1)}
-            </Text>
-            <TextInput
-              value={manualQty}
-              onChangeText={setManualQty}
-              keyboardType="number-pad"
-              style={[styles.actionInput, { color: colors.text, borderColor: colors.border, backgroundColor: colors.cardMuted }]}
-            />
-            <ActionButton icon="layers" label="Load All" onPress={() => updatePackage(selectedPackage, "LOADED")} colors={colors} disabled={savingPackage} />
-            <ActionButton icon="box" label={`Partial Load (${Math.max(1, Number(manualQty) || 1)})`} onPress={() => updatePackage(selectedPackage, "LOADED", manualQty)} colors={colors} disabled={savingPackage || Number(selectedPackage?.quantity || 1) <= 1} />
-            <ActionButton icon="rotate-ccw" label="Unload Package" onPress={() => updatePackage(selectedPackage, "RECEIVED")} colors={colors} disabled={savingPackage} />
-            <ActionButton icon="help-circle" label="Mark Missing" onPress={() => updatePackage(selectedPackage, "MISSING")} colors={colors} disabled={savingPackage} />
-            <ActionButton icon="alert-triangle" label="Mark Damaged" onPress={() => updatePackage(selectedPackage, "DAMAGED")} colors={colors} disabled={savingPackage} />
-            <Pressable disabled={savingPackage} onPress={() => setSelectedPackage(null)} style={[styles.modalButton, styles.packageClose, { borderColor: colors.border }]}>
-              {savingPackage ? <ActivityIndicator color="#4f46e5" /> : <Text style={[styles.cancelText, { color: colors.text }]}>Close</Text>}
-            </Pressable>
+          <View style={[styles.managePackageSheet, { backgroundColor: colors.surface }]}>
+            <View style={[styles.manageHeader, { borderBottomColor: colors.border }]}>
+              <View style={styles.flex}>
+                <Text style={[styles.modalTitle, { color: colors.text }]}>Manage Package</Text>
+                <Text style={[styles.modalSubtitle, styles.manageSubtitle, { color: colors.textMuted }]}>
+                  Update loading or unload this package item.
+                </Text>
+              </View>
+              <Pressable
+                disabled={savingPackage}
+                onPress={() => setSelectedPackage(null)}
+                style={[styles.closeButton, { backgroundColor: colors.cardMuted }]}
+              >
+                <Feather name="x" size={23} color={colors.textMuted} />
+              </Pressable>
+            </View>
+            <ScrollView
+              contentContainerStyle={styles.manageBody}
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+            >
+              <View style={[styles.manageCard, { backgroundColor: colors.cardMuted, borderColor: colors.border }]}>
+                <View style={styles.manageCardTop}>
+                  <View style={styles.manageLabelRow}>
+                    <Feather name="box" size={19} color="#2563eb" />
+                    <Text style={[styles.manageLabel, { color: colors.textMuted }]}>PACKAGE DETAILS</Text>
+                  </View>
+                  <View style={styles.manageType}>
+                    <Text style={[styles.manageLabel, { color: colors.textMuted }]}>TYPE</Text>
+                    <Text style={[styles.manageTypeValue, { color: colors.textMuted }]}>
+                      {selectedPackage?.type || selectedPackage?.packageType || "Bundle"}
+                    </Text>
+                  </View>
+                </View>
+                <Text style={styles.managePackageCode}>
+                  {selectedPackage?.packageId || selectedPackage?.trackingNumber || selectedPackage?.id}
+                </Text>
+                <Text style={[styles.manageDescription, { color: colors.text }]}>
+                  {selectedPackage?.description || "Package"}
+                </Text>
+              </View>
+              <View style={[styles.manageCard, { backgroundColor: colors.cardMuted, borderColor: colors.border }]}>
+                <View style={styles.manageLabelRow}>
+                  <Feather name="hexagon" size={19} color="#2563eb" />
+                  <Text style={[styles.manageLabel, { color: colors.textMuted }]}>MANUAL QUANTITY</Text>
+                </View>
+                <Text style={[styles.manageHelp, { color: colors.textMuted }]}>
+                  Set how many pieces to process for partial load. Max: {Number(selectedPackage?.quantity || 1)}
+                </Text>
+                <View style={styles.manualQuantityRow}>
+                  <TextInput
+                    value={manualQty}
+                    onChangeText={setManualQty}
+                    keyboardType="number-pad"
+                    style={[styles.manualQuantityInput, { color: colors.text, borderColor: colors.border, backgroundColor: colors.surface }]}
+                  />
+                  <Pressable
+                    onPress={() => setManualQty(String(selectedPackage?.quantity || 1))}
+                    style={[styles.maxButton, { borderColor: colors.border, backgroundColor: colors.surface }]}
+                  >
+                    <Text style={[styles.maxButtonText, { color: colors.textMuted }]}>MAX</Text>
+                  </Pressable>
+                </View>
+              </View>
+              <View style={styles.manageActionGrid}>
+                <Pressable
+                  disabled={savingPackage}
+                  onPress={() => updatePackage(selectedPackage, "LOADED")}
+                  style={[styles.manageAction, styles.loadAllAction, savingPackage && styles.disabled]}
+                >
+                  <Feather name="layers" size={18} color="#059669" />
+                  <Text style={styles.loadAllText}>Load All</Text>
+                </Pressable>
+                <Pressable
+                  disabled={savingPackage || Number(selectedPackage?.quantity || 1) <= 1}
+                  onPress={() => updatePackage(selectedPackage, "LOADED", manualQty)}
+                  style={[styles.manageAction, styles.partialAction, (savingPackage || Number(selectedPackage?.quantity || 1) <= 1) && styles.disabled]}
+                >
+                  <Feather name="box" size={18} color="#3b82f6" />
+                  <Text style={styles.partialText}>Partial Load ({Math.max(1, Number(manualQty) || 1)})</Text>
+                </Pressable>
+              </View>
+              <Pressable
+                disabled={savingPackage}
+                onPress={() => updatePackage(selectedPackage, "RECEIVED")}
+                style={[styles.unloadAction, savingPackage && styles.disabled]}
+              >
+                <Feather name="rotate-ccw" size={19} color="#ef4444" />
+                <Text style={styles.unloadText}>Unload Package</Text>
+              </Pressable>
+              <Pressable
+                disabled={savingPackage}
+                onPress={() => printPackageLabel(selectedPackage)}
+                style={[styles.packageLabelAction, { borderColor: colors.border }]}
+              >
+                <Feather name="printer" size={18} color="#2563eb" />
+                <Text style={[styles.packageLabelText, { color: colors.text }]}>Print Package Label</Text>
+              </Pressable>
+            </ScrollView>
           </View>
         </View>
       </Modal>
@@ -672,72 +1025,125 @@ function ActionsTab({
   saving,
   colors,
   onStatus,
-  onReconcile,
   selectedStatus,
   onSelectStatus,
-  statusRemarks,
-  onStatusRemarks,
   notifyCustomers,
   onNotifyCustomers,
-  onWorkflow,
-  onEdit,
-  onPrint,
-  canDelete,
-  onDelete,
 }) {
+  const [statusPickerOpen, setStatusPickerOpen] = React.useState(false);
+  const [recipientMessage, setRecipientMessage] = React.useState("");
+  const [smsSending, setSmsSending] = React.useState(false);
+  const [smsSent, setSmsSent] = React.useState(false);
   const currentStatus = String(shipment.status || "").toUpperCase();
-  const canReceiveReturn = ["FAILED_DELIVERY", "RETURNING_TO_WAREHOUSE", "RETURNED_TO_WAREHOUSE"].includes(currentStatus);
-  const canRelease =
-    Boolean(shipment.returnReceivedAt || shipment.reconciledAt) &&
-    shipment.availableForDelivery !== true &&
-    !["DELIVERED", "COMPLETED", "CANCELLED"].includes(currentStatus);
+  const recipientName = displayName(shipment.recipient) || "Customer";
+  const recipientPhone =
+    shipment.recipient?.phone ||
+    shipment.recipientPhone ||
+    shipment.recipient?.secondaryPhone ||
+    shipment.recipient?.altPhone ||
+    "";
+  const receiptImages = [
+    ...(Array.isArray(shipment.proofOfReceipt) ? shipment.proofOfReceipt : []),
+    ...(Array.isArray(shipment.receiptImages) ? shipment.receiptImages : []),
+    ...(Array.isArray(shipment.receiptPhotos) ? shipment.receiptPhotos : []),
+  ].filter(Boolean);
+  const deliveryImages = [
+    ...(Array.isArray(shipment.proofOfDelivery) ? shipment.proofOfDelivery : []),
+    ...(Array.isArray(shipment.deliveryImages) ? shipment.deliveryImages : []),
+    ...(Array.isArray(shipment.deliveryPhotos) ? shipment.deliveryPhotos : []),
+  ].filter(Boolean);
+  const shipmentRemarks = [
+    shipment.remarks,
+    shipment.deliveryRemarks,
+    shipment.failureReason,
+    shipment.returnReason,
+  ].filter(Boolean);
+  const sendRecipientMessage = async () => {
+    const message = recipientMessage.trim();
+    if (!recipientPhone || !message || smsSending) return;
+    try {
+      setSmsSending(true);
+      setSmsSent(false);
+      const result = await sendManualSMS({
+        phoneNumber: recipientPhone,
+        message,
+        shipmentId: shipment.id,
+        relatedTo: "SHIPMENT",
+      });
+      setRecipientMessage("");
+      setSmsSent(true);
+      Alert.alert(
+        result?.data?.suppressed ? "Message already sent" : "Message sent",
+        result?.data?.suppressed
+          ? "An identical recent SMS was suppressed to prevent duplicates."
+          : `The SMS was sent to ${recipientName}.`,
+      );
+    } catch (error) {
+      Alert.alert("Message not sent", error.message || "Please try again.");
+    } finally {
+      setSmsSending(false);
+    }
+  };
   return (
     <>
       <ManagerCard>
-        <SectionTitle title="Shipment Status Override" subtitle="The full Manager status workflow from the web console" />
-        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-          <View style={styles.statusOptions}>
-            {SHIPMENT_STATUSES.map((value) => {
-              const selected = selectedStatus === value;
-              const current = currentStatus === value;
-              return (
-                <Pressable
-                  key={value}
-                  disabled={current || saving}
-                  onPress={() => onSelectStatus(value)}
-                  style={[
-                    styles.statusOption,
-                    {
-                      backgroundColor: selected ? "#2563eb" : colors.cardMuted,
-                      borderColor: selected ? "#2563eb" : colors.border,
-                      opacity: current ? 0.45 : 1,
-                    },
-                  ]}
-                >
-                  <Text style={[styles.statusOptionText, { color: selected ? "#fff" : colors.text }]}>
-                    {value.replace(/_/g, " ")}{current ? " (CURRENT)" : ""}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </View>
-        </ScrollView>
-        <TextInput
-          value={statusRemarks}
-          onChangeText={onStatusRemarks}
-          placeholder="Remarks (optional)"
-          placeholderTextColor={colors.textMuted}
-          style={[styles.actionInput, { color: colors.text, borderColor: colors.border, backgroundColor: colors.cardMuted }]}
+        <SectionTitle
+          title="Shipment Status Override"
+          subtitle="Manually update the shipment status. Customer notifications are off unless you enable them below."
         />
-        <View style={styles.notifyRow}>
+        <Text style={[styles.fieldLabel, { color: colors.textMuted }]}>
+          NEW SHIPMENT STATUS
+        </Text>
+        <Pressable
+          disabled={saving}
+          onPress={() => setStatusPickerOpen(true)}
+          style={[
+            styles.statusDropdown,
+            { backgroundColor: colors.cardMuted, borderColor: colors.border },
+            saving && styles.disabled,
+          ]}
+        >
           <View style={styles.flex}>
-            <Text style={[styles.actionTitle, { color: colors.text }]}>Notify customer</Text>
-            <Text style={[styles.actionDescription, { color: colors.textMuted }]}>
-              Send the same SMS, email, and push lifecycle notifications as web.
+            <Text
+              style={[
+                styles.statusDropdownValue,
+                { color: selectedStatus ? colors.text : colors.textMuted },
+              ]}
+            >
+              {selectedStatus
+                ? selectedStatus.replace(/_/g, " ")
+                : "Select shipment status"}
+            </Text>
+            <Text style={[styles.statusDropdownCurrent, { color: colors.textMuted }]}>
+              Current: {currentStatus.replace(/_/g, " ")}
             </Text>
           </View>
-          <Switch value={notifyCustomers} onValueChange={onNotifyCustomers} trackColor={{ false: "#94a3b8", true: "#60a5fa" }} thumbColor={notifyCustomers ? "#2563eb" : "#f8fafc"} />
-        </View>
+          <Feather name="chevron-down" size={20} color={colors.textMuted} />
+        </Pressable>
+        <Pressable
+          onPress={() => onNotifyCustomers(!notifyCustomers)}
+          style={styles.silentUpdateRow}
+        >
+          <View
+            style={[
+              styles.silentCheckbox,
+              {
+                borderColor: notifyCustomers ? "#d97706" : colors.textMuted,
+                backgroundColor: notifyCustomers ? "#d97706" : "transparent",
+              },
+            ]}
+          >
+            {notifyCustomers ? <Feather name="check" size={12} color="#fff" /> : null}
+          </View>
+          <Text
+            style={[
+              styles.silentUpdateText,
+              { color: notifyCustomers ? "#d97706" : colors.textMuted },
+            ]}
+          >
+            {notifyCustomers ? "NOTIFY CUSTOMERS" : "SILENT UPDATE"}
+          </Text>
+        </Pressable>
         {selectedStatus === "CANCELLED" ? (
           <View style={styles.warningBox}>
             <Feather name="alert-triangle" size={16} color="#dc2626" />
@@ -752,46 +1158,244 @@ function ActionsTab({
           {saving ? <ActivityIndicator color="#fff" /> : <Feather name="refresh-cw" size={18} color="#fff" />}
           <Text style={styles.fullActionText}>Update Shipment Status</Text>
         </Pressable>
-      </ManagerCard>
-      <ManagerCard>
-        <SectionTitle title="Warehouse operations" subtitle="Return loop, hub reconcile, and checker-pool release" />
-        <ActionButton icon="check-square" label={shipment.reconciledAt ? "Update Odiongan reconcile" : "Reconcile at Odiongan"} onPress={onReconcile} colors={colors} disabled={saving || ["DELIVERED", "COMPLETED", "CANCELLED"].includes(currentStatus)} />
-        <ActionButton icon="corner-down-left" label="Receive returned shipment" onPress={() => onWorkflow("receive-return")} colors={colors} disabled={saving || !canReceiveReturn} />
-        <ActionButton icon="send" label="Release to delivery operations" onPress={() => onWorkflow("release")} colors={colors} disabled={saving || !canRelease} />
-      </ManagerCard>
-      <ManagerCard>
-        <SectionTitle title="Order tools" subtitle="Authorized shipment document and structural actions" />
-        <ActionButton icon="edit-3" label="Edit shipment details" onPress={onEdit} colors={colors} disabled={saving} />
-        <ActionButton icon="printer" label="Print or share shipment order" onPress={onPrint} colors={colors} disabled={saving} />
-        {canDelete ? (
-          <Pressable disabled={saving} onPress={onDelete} style={[styles.actionRow, { borderTopColor: colors.border }, saving && styles.disabled]}>
-            <View style={styles.deleteIcon}>
-              <Feather name="trash-2" size={20} color="#dc2626" />
-            </View>
-            <View style={styles.flex}>
-              <Text style={styles.deleteTitle}>Delete Shipment</Text>
-              <Text style={[styles.actionDescription, { color: colors.textMuted }]}>Admin-only permanent deletion with audit logging.</Text>
-            </View>
-            <Feather name="chevron-right" size={19} color="#dc2626" />
+        <Modal
+          visible={statusPickerOpen}
+          transparent
+          animationType="slide"
+          onRequestClose={() => setStatusPickerOpen(false)}
+        >
+          <Pressable
+            style={styles.modalBackdrop}
+            onPress={() => setStatusPickerOpen(false)}
+          >
+            <Pressable
+              style={[styles.statusPickerSheet, { backgroundColor: colors.surface }]}
+              onPress={() => {}}
+            >
+              <View style={styles.statusPickerHeader}>
+                <View style={styles.flex}>
+                  <Text style={[styles.modalTitle, { color: colors.text }]}>
+                    Select Shipment Status
+                  </Text>
+                  <Text style={[styles.modalSubtitle, { color: colors.textMuted }]}>
+                    Current status: {currentStatus.replace(/_/g, " ")}
+                  </Text>
+                </View>
+                <Pressable
+                  onPress={() => setStatusPickerOpen(false)}
+                  style={[styles.closeButton, { backgroundColor: colors.cardMuted }]}
+                >
+                  <Feather name="x" size={21} color={colors.text} />
+                </Pressable>
+              </View>
+              <ScrollView
+                style={styles.statusPickerScroll}
+                contentContainerStyle={styles.statusPickerList}
+              >
+                {SHIPMENT_STATUSES.map((value) => {
+                  const selected = selectedStatus === value;
+                  const current = currentStatus === value;
+                  return (
+                    <Pressable
+                      key={value}
+                      disabled={current}
+                      onPress={() => {
+                        onSelectStatus(value);
+                        setStatusPickerOpen(false);
+                      }}
+                      style={[
+                        styles.statusPickerOption,
+                        {
+                          backgroundColor: selected
+                            ? colors.primarySoft
+                            : colors.cardMuted,
+                          borderColor: selected ? "#2563eb" : colors.border,
+                          opacity: current ? 0.55 : 1,
+                        },
+                      ]}
+                    >
+                      <View
+                        style={[
+                          styles.statusPickerRadio,
+                          {
+                            borderColor: selected ? "#2563eb" : colors.textMuted,
+                            backgroundColor: selected ? "#2563eb" : "transparent",
+                          },
+                        ]}
+                      >
+                        {selected ? <View style={styles.statusPickerRadioDot} /> : null}
+                      </View>
+                      <Text style={[styles.statusPickerOptionText, { color: colors.text }]}>
+                        {value.replace(/_/g, " ")}
+                      </Text>
+                      {current ? (
+                        <Text style={[styles.statusPickerCurrent, { color: colors.textMuted }]}>
+                          CURRENT
+                        </Text>
+                      ) : null}
+                    </Pressable>
+                  );
+                })}
+              </ScrollView>
+            </Pressable>
           </Pressable>
-        ) : null}
+        </Modal>
       </ManagerCard>
       <ManagerCard>
-        <SectionTitle title="Customer communications" subtitle="Contact the sender or recipient from the shipment workspace" />
-        {shipment.sender?.phone || shipment.senderPhone ? (
-          <>
-            <ActionButton icon="message-circle" label="Message sender" onPress={() => Linking.openURL(`sms:${shipment.sender?.phone || shipment.senderPhone}`)} colors={colors} disabled={saving} />
-            <ActionButton icon="phone" label="Call sender" onPress={() => Linking.openURL(`tel:${shipment.sender?.phone || shipment.senderPhone}`)} colors={colors} disabled={saving} />
-          </>
+        <SectionTitle
+          title="Message Recipient"
+          subtitle={`Send a direct SMS update to the recipient for ${
+            shipment.trackingNumber || shipment.shipmentId || shipment.id
+          }.`}
+        />
+        <View
+          style={[
+            styles.recipientAddress,
+            { backgroundColor: colors.cardMuted, borderColor: colors.border },
+          ]}
+        >
+          <Text style={[styles.recipientAddressText, { color: colors.text }]}>
+            To: <Text style={styles.recipientName}>{recipientName}</Text>
+          </Text>
+          <Text style={[styles.recipientPhone, { color: colors.textMuted }]}>
+            {recipientPhone || "No Phone Number"}
+          </Text>
+        </View>
+        <TextInput
+          value={recipientMessage}
+          onChangeText={(value) => {
+            setRecipientMessage(value);
+            setSmsSent(false);
+          }}
+          editable={!smsSending && Boolean(recipientPhone)}
+          multiline
+          textAlignVertical="top"
+          placeholder={`Hi ${recipientName}, regarding your package...`}
+          placeholderTextColor={colors.textMuted}
+          style={[
+            styles.recipientMessageInput,
+            {
+              color: colors.text,
+              backgroundColor: colors.surface,
+              borderColor: colors.border,
+            },
+            !recipientPhone && styles.disabled,
+          ]}
+        />
+        {smsSent ? (
+          <View style={styles.smsSuccess}>
+            <Feather name="check-circle" size={15} color="#059669" />
+            <Text style={styles.smsSuccessText}>Message sent successfully.</Text>
+          </View>
         ) : null}
-        {shipment.recipient?.phone || shipment.recipientPhone ? (
-          <>
-            <ActionButton icon="message-circle" label="Message recipient" onPress={() => Linking.openURL(`sms:${shipment.recipient?.phone || shipment.recipientPhone}`)} colors={colors} disabled={saving} />
-            <ActionButton icon="phone" label="Call recipient" onPress={() => Linking.openURL(`tel:${shipment.recipient?.phone || shipment.recipientPhone}`)} colors={colors} disabled={saving} />
-          </>
+        <Pressable
+          disabled={
+            saving ||
+            smsSending ||
+            !recipientPhone ||
+            !recipientMessage.trim()
+          }
+          onPress={sendRecipientMessage}
+          style={[
+            styles.messageRecipientButton,
+            (saving ||
+              smsSending ||
+              !recipientPhone ||
+              !recipientMessage.trim()) &&
+              styles.disabled,
+          ]}
+        >
+          {smsSending ? (
+            <ActivityIndicator color="#fff" />
+          ) : (
+            <Feather name="send" size={18} color="#fff" />
+          )}
+          <Text style={styles.messageRecipientText}>
+            {smsSending ? "Sending..." : "Send SMS"}
+          </Text>
+        </Pressable>
+        <View style={[styles.smsNotice, { backgroundColor: colors.cardMuted }]}>
+          <Feather name="alert-triangle" size={14} color={colors.textMuted} />
+          <Text style={[styles.smsNoticeText, { color: colors.textMuted }]}>
+            This sends a real SMS to the recipient linked to this shipment.
+            Standard messaging rates may apply.
+          </Text>
+        </View>
+      </ManagerCard>
+      <ManagerCard>
+        <SectionTitle
+          title="Captured Proofs and Shipment Remarks"
+          subtitle={`${receiptImages.length + deliveryImages.length} captured proof${
+            receiptImages.length + deliveryImages.length === 1 ? "" : "s"
+          }`}
+        />
+        {receiptImages.length ? (
+          <CapturedProofStrip
+            label="Receipt Proofs"
+            images={receiptImages}
+            colors={colors}
+          />
         ) : null}
+        {deliveryImages.length ? (
+          <CapturedProofStrip
+            label="Delivery Proofs"
+            images={deliveryImages}
+            colors={colors}
+          />
+        ) : null}
+        {shipmentRemarks.length ? (
+          shipmentRemarks.map((remark, index) => (
+            <View
+              key={`${remark}-${index}`}
+              style={[
+                styles.shipmentRemark,
+                { backgroundColor: colors.cardMuted, borderColor: colors.border },
+              ]}
+            >
+              <Feather name="message-square" size={15} color={colors.textMuted} />
+              <Text style={[styles.shipmentRemarkText, { color: colors.text }]}>
+                {String(remark)}
+              </Text>
+            </View>
+          ))
+        ) : (
+          <EmptyState
+            icon="image"
+            title="No proofs or remarks"
+            message="Captured delivery evidence and shipment remarks will appear here."
+          />
+        )}
       </ManagerCard>
     </>
+  );
+}
+
+function CapturedProofStrip({ label, images, colors }) {
+  return (
+    <View style={styles.capturedProofGroup}>
+      <Text style={[styles.fieldLabel, { color: colors.textMuted }]}>
+        {label.toUpperCase()}
+      </Text>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+        <View style={styles.capturedProofRow}>
+          {images.map((image, index) => {
+            const url =
+              typeof image === "string"
+                ? image
+                : image?.url || image?.uri || image?.downloadURL || "";
+            if (!url) return null;
+            return (
+              <Pressable
+                key={`${url}-${index}`}
+                onPress={() => Linking.openURL(url)}
+              >
+                <Image source={{ uri: url }} style={styles.capturedProofImage} />
+              </Pressable>
+            );
+          })}
+        </View>
+      </ScrollView>
+    </View>
   );
 }
 
@@ -1030,8 +1634,19 @@ const styles = StyleSheet.create({
   packageTitle: { fontSize: 13, fontWeight: "900" },
   packageMeta: { fontSize: 11, lineHeight: 16, marginTop: 3 },
   packageControls: { alignItems: "flex-end", gap: 7 },
+  packageButtons: { flexDirection: "row", gap: 6 },
   packageMore: { width: 34, height: 34, borderRadius: 11, alignItems: "center", justifyContent: "center" },
   packageClose: { marginTop: 12, flex: 0 },
+  labelActions: { flexDirection: "row", gap: 8, marginTop: 12, marginBottom: 4 },
+  labelButton: { flex: 1, minHeight: 42, borderWidth: 1, borderRadius: 11, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 7 },
+  labelButtonText: { fontSize: 10, fontWeight: "900" },
+  qrPanel: { borderWidth: 1, borderRadius: 14, padding: 12, marginBottom: 10, flexDirection: "row", alignItems: "center", gap: 14 },
+  qrCanvas: { backgroundColor: "#fff", padding: 0, overflow: "hidden" },
+  qrRow: { flexDirection: "row" },
+  qrTitle: { fontSize: 14, fontWeight: "900" },
+  qrCodeText: { fontSize: 9, lineHeight: 14, marginTop: 4 },
+  qrPrintButton: { alignSelf: "flex-start", minHeight: 34, borderRadius: 9, backgroundColor: "#2563eb", paddingHorizontal: 10, marginTop: 10, flexDirection: "row", alignItems: "center", gap: 6 },
+  qrPrintText: { color: "#fff", fontSize: 9, fontWeight: "900" },
   actionRow: { minHeight: 76, borderTopWidth: StyleSheet.hairlineWidth, flexDirection: "row", alignItems: "center", gap: 11 },
   actionIcon: { width: 42, height: 42, borderRadius: 13, alignItems: "center", justifyContent: "center" },
   deleteIcon: { width: 42, height: 42, borderRadius: 13, backgroundColor: "#fef2f2", alignItems: "center", justifyContent: "center" },
@@ -1041,13 +1656,44 @@ const styles = StyleSheet.create({
   statusOptions: { flexDirection: "row", gap: 8, paddingVertical: 12 },
   statusOption: { minHeight: 38, borderWidth: 1, borderRadius: 999, paddingHorizontal: 12, alignItems: "center", justifyContent: "center" },
   statusOptionText: { fontSize: 9, fontWeight: "900" },
+  statusDropdown: { minHeight: 58, borderWidth: 1, borderRadius: 12, paddingHorizontal: 13, marginTop: 7, marginBottom: 5, flexDirection: "row", alignItems: "center", gap: 10 },
+  statusDropdownValue: { fontSize: 13, fontWeight: "900" },
+  statusDropdownCurrent: { fontSize: 9, marginTop: 4 },
+  statusPickerSheet: { maxHeight: "82%", borderTopLeftRadius: 26, borderTopRightRadius: 26, overflow: "hidden" },
+  statusPickerHeader: { padding: 18, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: "#cbd5e1", flexDirection: "row", alignItems: "flex-start", gap: 12 },
+  statusPickerScroll: { minHeight: 0 },
+  statusPickerList: { padding: 14, gap: 8, paddingBottom: 28 },
+  statusPickerOption: { minHeight: 50, borderWidth: 1, borderRadius: 12, paddingHorizontal: 13, flexDirection: "row", alignItems: "center", gap: 10 },
+  statusPickerRadio: { width: 20, height: 20, borderRadius: 10, borderWidth: 2, alignItems: "center", justifyContent: "center" },
+  statusPickerRadioDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: "#fff" },
+  statusPickerOptionText: { flex: 1, fontSize: 11, fontWeight: "900" },
+  statusPickerCurrent: { fontSize: 8, fontWeight: "900" },
   actionInput: { minHeight: 48, borderWidth: 1, borderRadius: 12, paddingHorizontal: 13, fontSize: 13, marginTop: 7, marginBottom: 12 },
   multilineInput: { minHeight: 82, paddingTop: 12, textAlignVertical: "top" },
   notifyRow: { minHeight: 68, flexDirection: "row", alignItems: "center", gap: 12, marginBottom: 10 },
+  silentUpdateRow: { alignSelf: "flex-start", minHeight: 40, flexDirection: "row", alignItems: "center", gap: 9, marginBottom: 12 },
+  silentCheckbox: { width: 18, height: 18, borderRadius: 4, borderWidth: 1.5, alignItems: "center", justifyContent: "center" },
+  silentUpdateText: { fontSize: 10, fontWeight: "900" },
   warningBox: { borderRadius: 11, backgroundColor: "#fef2f2", flexDirection: "row", alignItems: "flex-start", gap: 8, padding: 11, marginBottom: 12 },
   warningText: { flex: 1, color: "#b91c1c", fontSize: 10, lineHeight: 15, fontWeight: "700" },
   fullAction: { minHeight: 50, borderRadius: 14, backgroundColor: "#059669", flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 9 },
   fullActionText: { color: "#fff", fontWeight: "900" },
+  messageRecipientButton: { minHeight: 50, borderRadius: 14, backgroundColor: "#2563eb", flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 9, marginTop: 12 },
+  messageRecipientText: { color: "#fff", fontSize: 12, fontWeight: "900" },
+  recipientAddress: { minHeight: 50, borderWidth: 1, borderRadius: 11, paddingHorizontal: 12, marginTop: 12, flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 10 },
+  recipientAddressText: { flex: 1, fontSize: 11 },
+  recipientName: { fontWeight: "900" },
+  recipientPhone: { fontFamily: "monospace", fontSize: 10 },
+  recipientMessageInput: { minHeight: 112, borderWidth: 1, borderRadius: 11, padding: 12, fontSize: 13, lineHeight: 19, marginTop: 12 },
+  smsSuccess: { minHeight: 38, borderRadius: 10, backgroundColor: "#d1fae5", paddingHorizontal: 11, marginTop: 10, flexDirection: "row", alignItems: "center", gap: 7 },
+  smsSuccessText: { color: "#047857", fontSize: 10, fontWeight: "800" },
+  smsNotice: { borderRadius: 10, padding: 10, marginTop: 10, flexDirection: "row", alignItems: "flex-start", gap: 8 },
+  smsNoticeText: { flex: 1, fontSize: 9, lineHeight: 14 },
+  capturedProofGroup: { marginTop: 14 },
+  capturedProofRow: { flexDirection: "row", gap: 10, paddingTop: 8 },
+  capturedProofImage: { width: 92, height: 92, borderRadius: 13, backgroundColor: "#e2e8f0" },
+  shipmentRemark: { borderWidth: 1, borderRadius: 11, padding: 11, marginTop: 10, flexDirection: "row", alignItems: "flex-start", gap: 9 },
+  shipmentRemarkText: { flex: 1, fontSize: 11, lineHeight: 17 },
   timelineRow: { flexDirection: "row", gap: 11, minHeight: 68, paddingTop: 12 },
   timelineRail: { width: 14, alignItems: "center" },
   timelineDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: "#059669", marginTop: 3 },
@@ -1056,6 +1702,11 @@ const styles = StyleSheet.create({
   timelineTitle: { fontSize: 13, fontWeight: "800", textTransform: "capitalize" },
   timelineMeta: { fontSize: 10, lineHeight: 15, marginTop: 3 },
   timelineNote: { fontSize: 12, lineHeight: 17, marginTop: 5 },
+  statusFlow: { flexDirection: "row", alignItems: "flex-start", paddingVertical: 14, paddingHorizontal: 2 },
+  statusFlowStep: { width: 92, alignItems: "center", position: "relative" },
+  statusFlowDot: { width: 28, height: 28, borderRadius: 14, borderWidth: 1, alignItems: "center", justifyContent: "center", zIndex: 2 },
+  statusFlowLabel: { fontSize: 8, lineHeight: 11, textAlign: "center", fontWeight: "800", marginTop: 6, paddingHorizontal: 2 },
+  statusFlowConnector: { position: "absolute", height: 2, width: 66, left: 59, top: 13 },
   proofGroup: { marginTop: 14 },
   proofRow: { flexDirection: "row", gap: 10, paddingTop: 8 },
   proofImage: { width: 86, height: 86, borderRadius: 13, backgroundColor: "#e2e8f0" },
@@ -1063,6 +1714,33 @@ const styles = StyleSheet.create({
   remarkText: { fontSize: 11, lineHeight: 17 },
   modalBackdrop: { flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(15,23,42,0.55)" },
   modalSheet: { borderTopLeftRadius: 26, borderTopRightRadius: 26, padding: 20, paddingBottom: 28 },
+  managePackageSheet: { borderTopLeftRadius: 26, borderTopRightRadius: 26, overflow: "hidden", maxHeight: "92%" },
+  manageHeader: { minHeight: 94, paddingHorizontal: 20, paddingTop: 20, paddingBottom: 16, borderBottomWidth: 1, flexDirection: "row", alignItems: "flex-start", gap: 12 },
+  manageSubtitle: { marginBottom: 0 },
+  manageBody: { padding: 20, gap: 14 },
+  manageCard: { borderWidth: 1, borderRadius: 15, padding: 16 },
+  manageCardTop: { flexDirection: "row", justifyContent: "space-between", gap: 12 },
+  manageLabelRow: { flexDirection: "row", alignItems: "center", gap: 8 },
+  manageLabel: { fontSize: 11, fontWeight: "900" },
+  manageType: { alignItems: "flex-end" },
+  manageTypeValue: { fontSize: 12, marginTop: 6 },
+  managePackageCode: { color: "#f59e0b", fontFamily: "monospace", fontSize: 13, marginTop: 13 },
+  manageDescription: { fontSize: 16, marginTop: 12 },
+  manageHelp: { fontSize: 11, lineHeight: 17, marginTop: 20, marginBottom: 12 },
+  manualQuantityRow: { flexDirection: "row", gap: 9 },
+  manualQuantityInput: { flex: 1, minHeight: 50, borderWidth: 1, borderRadius: 11, paddingHorizontal: 13, fontSize: 16 },
+  maxButton: { flex: 1.1, minHeight: 50, borderWidth: 1, borderRadius: 11, alignItems: "center", justifyContent: "center" },
+  maxButtonText: { fontSize: 14, fontWeight: "800" },
+  manageActionGrid: { flexDirection: "row", gap: 10 },
+  manageAction: { flex: 1, minHeight: 58, borderRadius: 4, borderWidth: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8 },
+  loadAllAction: { backgroundColor: "#d1fae5", borderColor: "#6ee7b7" },
+  loadAllText: { color: "#059669", fontSize: 12, fontWeight: "900" },
+  partialAction: { backgroundColor: "#dbeafe", borderColor: "#93c5fd" },
+  partialText: { color: "#3b82f6", fontSize: 11, fontWeight: "900" },
+  unloadAction: { minHeight: 58, borderRadius: 4, borderWidth: 1, borderColor: "#fca5a5", backgroundColor: "#fee2e2", flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 9 },
+  unloadText: { color: "#ef4444", fontSize: 12, fontWeight: "900" },
+  packageLabelAction: { minHeight: 48, borderRadius: 11, borderWidth: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8 },
+  packageLabelText: { fontSize: 11, fontWeight: "900" },
   modalTitle: { fontSize: 20, fontWeight: "900" },
   modalSubtitle: { fontSize: 12, lineHeight: 17, marginTop: 4, marginBottom: 14 },
   quantityField: { marginBottom: 12 },

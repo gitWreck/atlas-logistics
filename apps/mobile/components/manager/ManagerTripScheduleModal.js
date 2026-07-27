@@ -168,7 +168,7 @@ export default function ManagerTripScheduleModal({
           <View style={styles.header}>
             <View style={styles.headerCopy}>
               <Text style={[styles.title, { color: colors.text }]}>
-                {trip ? "Edit Trip Schedule" : "Trip Schedule"}
+                {trip ? "Edit Trip Schedule" : "Add Trip Schedule"}
               </Text>
               <Text style={[styles.subtitle, { color: colors.textMuted }]}>
                 Planned loading, departure, arrival, and notifications

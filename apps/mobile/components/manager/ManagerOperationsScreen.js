@@ -21,7 +21,7 @@ import {
   archiveTruckTrip,
   assignCheckerMunicipalities,
   cancelTruckTrip,
-  listManagerMobileOperations,
+  getManagerMobileModules,
 } from "../utilities/FirebaseFunctions";
 import { DELIVERY_MUNICIPALITIES } from "../utilities/deliveryMunicipalities";
 import useManagerRequest from "./useManagerRequest";
@@ -39,6 +39,7 @@ import {
 
 const DONE = new Set(["COMPLETED", "DELIVERED", "CANCELLED", "CANCELED", "ARCHIVED", "CLOSED"]);
 const SCHEDULED = new Set(["CREATED", "LOADED"]);
+const ACTIVE_MANIFESTS = new Set(["IN_TRANSIT", "DELAYED"]);
 
 function staffAssignment(member = {}) {
   return (
@@ -71,7 +72,7 @@ export default function ManagerOperationsScreen() {
   const [saving, setSaving] = useState(false);
   const [createTripVisible, setCreateTripVisible] = useState(false);
   const { data, loading, refreshing, error, reload } = useManagerRequest(
-    listManagerMobileOperations,
+    getManagerMobileModules,
   );
 
   const rows = useMemo(() => {
@@ -99,7 +100,7 @@ export default function ManagerOperationsScreen() {
       const tripStatus = String(trip.status || "").toUpperCase();
       const tripType = String(trip.tripType || trip.routeType || "").toUpperCase();
       const complete = trip.archived === true || DONE.has(tripStatus);
-      if (tab === "active" && complete) return false;
+      if (tab === "active" && !ACTIVE_MANIFESTS.has(tripStatus)) return false;
       if (tab === "scheduled" && (complete || !SCHEDULED.has(tripStatus))) {
         return false;
       }
@@ -146,7 +147,7 @@ export default function ManagerOperationsScreen() {
     return {
       active: trips.filter((trip) => {
         const status = String(trip.status || "").toUpperCase();
-        return trip.archived !== true && !DONE.has(status);
+        return trip.archived !== true && ACTIVE_MANIFESTS.has(status);
       }).length,
       scheduled: trips.filter((trip) =>
         SCHEDULED.has(String(trip.status || "").toUpperCase()),
@@ -251,6 +252,119 @@ export default function ManagerOperationsScreen() {
       setSaving(false);
     }
   };
+  const searchAndFilters = (
+    <>
+      <View style={[styles.search, { backgroundColor: colors.cardMuted }]}>
+        <Feather name="search" size={17} color={colors.textMuted} />
+        <TextInput
+          value={search}
+          onChangeText={setSearch}
+          placeholder="Search trip, route, Driver, Checker, or truck"
+          placeholderTextColor={colors.textMuted}
+          style={[styles.searchInput, { color: colors.text }]}
+        />
+        <Pressable
+          accessibilityLabel="Trip filters"
+          onPress={() => setFiltersOpen((current) => !current)}
+          style={[
+            styles.filterButton,
+            filtersOpen && styles.filterButtonActive,
+          ]}
+        >
+          <Feather
+            name="sliders"
+            size={17}
+            color={filtersOpen ? "#fff" : colors.textMuted}
+          />
+        </Pressable>
+      </View>
+      {filtersOpen ? (
+        <View
+          style={[
+            styles.filters,
+            { borderColor: colors.border, backgroundColor: colors.cardMuted },
+          ]}
+        >
+          <Text style={[styles.filterLabel, { color: colors.textMuted }]}>
+            STATUS
+          </Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+            <View style={styles.filterChips}>
+              {(tab === "active"
+                ? ["ALL", "IN_TRANSIT", "DELAYED"]
+                : ["ALL", "CREATED", "LOADING", "LOADED", "ARRIVED"]
+              ).map((value) => (
+                <FilterChip
+                  key={value}
+                  label={value.replace(/_/g, " ")}
+                  active={statusFilter === value}
+                  colors={colors}
+                  onPress={() => setStatusFilter(value)}
+                />
+              ))}
+            </View>
+          </ScrollView>
+          <Text style={[styles.filterLabel, { color: colors.textMuted }]}>
+            TRIP TYPE
+          </Text>
+          <View style={styles.filterChips}>
+            {["ALL", "HUB_TRANSFER", "LOCAL_PICKUP", "DELIVERY"].map(
+              (value) => (
+                <FilterChip
+                  key={value}
+                  label={value.replace(/_/g, " ")}
+                  active={typeFilter === value}
+                  colors={colors}
+                  onPress={() => setTypeFilter(value)}
+                />
+              ),
+            )}
+          </View>
+          <View style={styles.dateRow}>
+            <TextInput
+              value={startDate}
+              onChangeText={setStartDate}
+              placeholder="From YYYY-MM-DD"
+              placeholderTextColor={colors.textMuted}
+              style={[
+                styles.dateInput,
+                {
+                  color: colors.text,
+                  borderColor: colors.border,
+                  backgroundColor: colors.surface,
+                },
+              ]}
+            />
+            <TextInput
+              value={endDate}
+              onChangeText={setEndDate}
+              placeholder="To YYYY-MM-DD"
+              placeholderTextColor={colors.textMuted}
+              style={[
+                styles.dateInput,
+                {
+                  color: colors.text,
+                  borderColor: colors.border,
+                  backgroundColor: colors.surface,
+                },
+              ]}
+            />
+          </View>
+          <Pressable
+            onPress={() => {
+              setStatusFilter("ALL");
+              setTypeFilter("ALL");
+              setStartDate("");
+              setEndDate("");
+            }}
+            style={styles.clearFilters}
+          >
+            <Text style={styles.clearFiltersText}>Clear filters</Text>
+          </Pressable>
+        </View>
+      ) : null}
+    </>
+  );
 
   return (
     <View style={[styles.container, { backgroundColor: colors.bg }]}>
@@ -271,155 +385,87 @@ export default function ManagerOperationsScreen() {
             tintColor="#0f766e"
           />
         }
-        contentContainerStyle={rows.length ? styles.list : styles.emptyList}
+        contentContainerStyle={[
+          styles.list,
+          !rows.length && styles.emptyList,
+        ]}
         ListHeaderComponent={
           <>
-      <View style={[styles.toolbar, { backgroundColor: colors.surface }]}>
-        <View style={[styles.tabs, { backgroundColor: colors.cardMuted }]}>
-          {[
-            ["active", "Active", tripCounts.active],
-            ["scheduled", "Scheduled", tripCounts.scheduled],
-            ["completed", "Completed", tripCounts.completed],
-          ].map(([value, label, count]) => {
-            const active = value === tab;
-            return (
-              <Pressable
-                key={value}
-                onPress={() => setTab(value)}
-                style={[styles.tab, active && styles.tabActive]}
-              >
-                <Text style={[styles.tabText, { color: active ? "#fff" : colors.textMuted }]}>
-                  {label} {count}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </View>
-        <View style={[styles.search, { backgroundColor: colors.cardMuted }]}>
-          <Feather name="search" size={17} color={colors.textMuted} />
-          <TextInput
-            value={search}
-            onChangeText={setSearch}
-            placeholder="Search trip, route, Driver, Checker, or truck"
-            placeholderTextColor={colors.textMuted}
-            style={[styles.searchInput, { color: colors.text }]}
-          />
-          <Pressable
-            accessibilityLabel="Trip filters"
-            onPress={() => setFiltersOpen((current) => !current)}
-            style={[
-              styles.filterButton,
-              filtersOpen && styles.filterButtonActive,
-            ]}
-          >
-            <Feather
-              name="sliders"
-              size={17}
-              color={filtersOpen ? "#fff" : colors.textMuted}
-            />
-          </Pressable>
-        </View>
-        {tab === "scheduled" ? (
-          <Pressable
-            onPress={() => openSchedule(null)}
-            style={styles.scheduleButton}
-          >
-            <Feather name="calendar" size={16} color="#fff" />
-            <Text style={styles.scheduleButtonText}>Create Trip Schedule</Text>
-          </Pressable>
-        ) : null}
-        {filtersOpen ? (
-          <View
-            style={[
-              styles.filters,
-              { borderColor: colors.border, backgroundColor: colors.cardMuted },
-            ]}
-          >
-            <Text style={[styles.filterLabel, { color: colors.textMuted }]}>
-              STATUS
-            </Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-              <View style={styles.filterChips}>
-                {["ALL", "CREATED", "LOADING", "LOADED", "IN_TRANSIT", "ARRIVED"].map(
-                  (value) => (
-                    <FilterChip
+            <View style={[styles.toolbar, { backgroundColor: colors.surface }]}>
+              <View style={[styles.tabs, { backgroundColor: colors.cardMuted }]}>
+                {[
+                  ["active", "Active", tripCounts.active],
+                  ["scheduled", "Scheduled", tripCounts.scheduled],
+                  ["completed", "Completed", tripCounts.completed],
+                ].map(([value, label, count]) => {
+                  const active = value === tab;
+                  return (
+                    <Pressable
                       key={value}
-                      label={value.replace(/_/g, " ")}
-                      active={statusFilter === value}
-                      colors={colors}
-                      onPress={() => setStatusFilter(value)}
-                    />
-                  ),
-                )}
+                      onPress={() => {
+                        setTab(value);
+                        setStatusFilter("ALL");
+                      }}
+                      style={[styles.tab, active && styles.tabActive]}
+                    >
+                      <Text
+                        style={[
+                          styles.tabText,
+                          { color: active ? "#fff" : colors.textMuted },
+                        ]}
+                      >
+                        {label} {count}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
               </View>
-            </ScrollView>
-            <Text style={[styles.filterLabel, { color: colors.textMuted }]}>
-              TRIP TYPE
-            </Text>
-            <View style={styles.filterChips}>
-              {["ALL", "HUB_TRANSFER", "LOCAL_PICKUP", "DELIVERY"].map(
-                (value) => (
-                  <FilterChip
-                    key={value}
-                    label={value.replace(/_/g, " ")}
-                    active={typeFilter === value}
-                    colors={colors}
-                    onPress={() => setTypeFilter(value)}
-                  />
-                ),
-              )}
+              {tab === "active" ? (
+                <BoardSectionTitle
+                  icon="truck"
+                  title="Active Manifests"
+                  subtitle="In-transit and delayed trips currently in operation"
+                  colors={colors}
+                />
+              ) : null}
+              {tab !== "scheduled" ? searchAndFilters : null}
+              {tab === "scheduled" ? (
+                <Pressable
+                  onPress={() => openSchedule(null)}
+                  style={styles.scheduleButton}
+                >
+                  <Feather name="calendar" size={16} color="#fff" />
+                  <Text style={styles.scheduleButtonText}>
+                    Create Trip Schedule
+                  </Text>
+                </Pressable>
+              ) : null}
             </View>
-            <View style={styles.dateRow}>
-              <TextInput
-                value={startDate}
-                onChangeText={setStartDate}
-                placeholder="From YYYY-MM-DD"
-                placeholderTextColor={colors.textMuted}
-                style={[
-                  styles.dateInput,
-                  {
-                    color: colors.text,
-                    borderColor: colors.border,
-                    backgroundColor: colors.surface,
-                  },
-                ]}
-              />
-              <TextInput
-                value={endDate}
-                onChangeText={setEndDate}
-                placeholder="To YYYY-MM-DD"
-                placeholderTextColor={colors.textMuted}
-                style={[
-                  styles.dateInput,
-                  {
-                    color: colors.text,
-                    borderColor: colors.border,
-                    backgroundColor: colors.surface,
-                  },
-                ]}
-              />
-            </View>
-            <Pressable
-              onPress={() => {
-                setStatusFilter("ALL");
-                setTypeFilter("ALL");
-                setStartDate("");
-                setEndDate("");
-              }}
-              style={styles.clearFilters}
-            >
-              <Text style={styles.clearFiltersText}>Clear filters</Text>
-            </Pressable>
-          </View>
-        ) : null}
-      </View>
             {tab === "scheduled" ? (
-            <UpcomingDepartures
-              trips={upcomingTrips}
-              colors={colors}
-              onOpen={openTrip}
-              onEdit={openSchedule}
-            />
+              <>
+                <UpcomingDepartures
+                  trips={upcomingTrips}
+                  colors={colors}
+                  onOpen={openTrip}
+                  onEdit={openSchedule}
+                />
+                <View style={styles.scheduleListSection}>
+                  <BoardSectionTitle
+                    icon="calendar"
+                    title="Schedule List"
+                    subtitle="Search and manage all scheduled trips"
+                    colors={colors}
+                  />
+                  <View
+                    style={[
+                      styles.scheduledSearchArea,
+                      { backgroundColor: colors.surface },
+                    ]}
+                  >
+                    {searchAndFilters}
+                  </View>
+                </View>
+              </>
             ) : null}
           </>
         }
@@ -561,9 +607,34 @@ export default function ManagerOperationsScreen() {
         visible={createTripVisible}
         scope={data?.scope}
         staff={data?.staff}
+        trucks={data?.trucks}
+        settings={data?.settings}
         onClose={() => setCreateTripVisible(false)}
         onCreated={() => reload({ refresh: true })}
       />
+    </View>
+  );
+}
+
+function BoardSectionTitle({ icon, title, subtitle, colors }) {
+  return (
+    <View style={styles.boardSectionTitle}>
+      <View
+        style={[
+          styles.boardSectionIcon,
+          { backgroundColor: colors.cardMuted },
+        ]}
+      >
+        <Feather name={icon} size={17} color="#0f766e" />
+      </View>
+      <View style={styles.boardSectionCopy}>
+        <Text style={[styles.boardSectionHeading, { color: colors.text }]}>
+          {title}
+        </Text>
+        <Text style={[styles.boardSectionSubtitle, { color: colors.textMuted }]}>
+          {subtitle}
+        </Text>
+      </View>
     </View>
   );
 }
@@ -1060,6 +1131,26 @@ const styles = StyleSheet.create({
   clearFiltersText: { color: "#0f766e", fontSize: 10, fontWeight: "900" },
   list: { padding: 14, paddingBottom: 28, gap: 11 },
   emptyList: { flexGrow: 1 },
+  boardSectionTitle: {
+    minHeight: 52,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingHorizontal: 2,
+    paddingVertical: 4,
+  },
+  boardSectionIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  boardSectionCopy: { flex: 1, minWidth: 0 },
+  boardSectionHeading: { fontSize: 16, fontWeight: "900" },
+  boardSectionSubtitle: { fontSize: 10, lineHeight: 14, marginTop: 2 },
+  scheduleListSection: { gap: 8 },
+  scheduledSearchArea: { borderRadius: 15, padding: 10, gap: 9 },
   upcomingCard: { marginBottom: 2 },
   upcomingHeading: { flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 8 },
   upcomingIcon: { width: 38, height: 38, borderRadius: 12, alignItems: "center", justifyContent: "center" },
