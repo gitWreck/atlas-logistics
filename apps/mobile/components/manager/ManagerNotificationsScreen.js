@@ -1,6 +1,7 @@
-import React from "react";
+import React, { useMemo } from "react";
 import { FlatList, RefreshControl, StyleSheet, Text, View } from "react-native";
 import Feather from "@expo/vector-icons/Feather";
+import { useLocalSearchParams } from "expo-router";
 import { useTheme } from "../../contexts/ThemeContext";
 import { listManagerMobileNotifications } from "../utilities/FirebaseFunctions";
 import useManagerRequest from "./useManagerRequest";
@@ -23,16 +24,58 @@ function iconFor(type = "") {
 
 export default function ManagerNotificationsScreen() {
   const { colors } = useTheme();
+  const { view } = useLocalSearchParams();
   const { data, loading, refreshing, error, reload } = useManagerRequest(
     listManagerMobileNotifications,
   );
+  const mode = String(view || "history").toLowerCase();
+  const notifications = useMemo(() => {
+    const rows = data?.notifications || [];
+    if (mode === "history") return rows;
+    return rows.filter((item) => {
+      const searchable = [
+        item.type,
+        item.category,
+        item.title,
+        item.message,
+        item.body,
+        item.description,
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+      const terms =
+        mode === "customer"
+          ? ["customer", "shipment", "pickup", "request"]
+          : ["delay", "failed", "failure", "issue", "alert", "returned"];
+      return terms.some((term) => searchable.includes(term));
+    });
+  }, [data?.notifications, mode]);
+  const pageCopy =
+    mode === "customer"
+      ? {
+          title: "Customer Notification History",
+          subtitle: "Customer, shipment, and pickup updates",
+        }
+      : mode === "alerts"
+        ? {
+            title: "Recent Delays & Alerts",
+            subtitle: "Operational delays, failures, returns, and issues",
+          }
+        : {
+            title: "Customer Notification History",
+            subtitle: "Operational alerts and assignment updates",
+          };
   if (loading) return <LoadingState label="Loading Manager notifications…" />;
   if (error) return <ErrorState message={error.message} onRetry={() => reload()} />;
-  const notifications = data?.notifications || [];
 
   return (
     <View style={[styles.container, { backgroundColor: colors.bg }]}>
-      <ManagerHeader back title="Notifications" subtitle="Operational alerts and assignment updates" />
+      <ManagerHeader
+        back
+        title={pageCopy.title}
+        subtitle={pageCopy.subtitle}
+      />
       <FlatList
         data={notifications}
         keyExtractor={(item) => item.id}

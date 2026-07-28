@@ -13,6 +13,7 @@ const {
   CUSTOMER_NOTIFICATION_TYPES,
   sendTripCustomerNotifications,
 } = require("../notifications/customerNotificationService");
+const { canAccessRecord } = require("../manager/managerAccess");
 
 if (!admin.apps.length) admin.initializeApp();
 const db = admin.firestore();
@@ -114,6 +115,19 @@ exports.broadcastTripMessage = onCall(
     const { tripId, message } = request.data;
 
     try {
+      const tripSnap = await db.collection("truck_trips").doc(String(tripId || "")).get();
+      if (!tripSnap.exists) {
+        throw new HttpsError("not-found", "Trip not found.");
+      }
+      if (
+        actor.role === "manager" &&
+        !canAccessRecord(actor.user, tripSnap.data() || {})
+      ) {
+        throw new HttpsError(
+          "permission-denied",
+          "This trip is outside your assigned warehouse or municipality.",
+        );
+      }
       return await broadcastTripLogic({
         tripId,
         message,
@@ -124,6 +138,7 @@ exports.broadcastTripMessage = onCall(
       });
     } catch (error) {
       console.error("Broadcast Logic Failed:", error);
+      if (error instanceof HttpsError) throw error;
       throw new HttpsError("internal", error.message);
     }
   },

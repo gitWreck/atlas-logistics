@@ -31,6 +31,7 @@ const {
   resolveRemarkForMissingPackage,
 } = require("../trips/reconciliationPieces");
 const { sealManifestAmendment } = require("../trips/manifestAmendment");
+const { canAccessRecord } = require("../manager/managerAccess");
 
 if (!admin.apps.length) admin.initializeApp();
 const db = admin.firestore();
@@ -337,6 +338,17 @@ exports.releaseForDeliveryOperations = onCall(
       resolvedShipmentIds,
       packageIdSet,
     );
+    if (
+      actorRole === "manager" &&
+      releaseCandidates.some(
+        (candidate) => !canAccessRecord(actor.user, candidate.data),
+      )
+    ) {
+      throw new HttpsError(
+        "permission-denied",
+        "One or more shipments are outside your assigned warehouse or municipality.",
+      );
+    }
 
     const txResult = await db.runTransaction(async (tx) => {
       const releasedIds = [];

@@ -7,6 +7,7 @@ const { requireRole, updatedBy } = require("../utilities/helpers");
 const { broadcastTripLogic } = require("../messaging/broadcastTripMessage"); // Import if you want to call it directly
 const { STATUS_MESSAGES } = require("../utilities/dataDetails");
 const { writeTripActionLog } = require("../utilities/tripLogger");
+const { canAccessRecord } = require("../manager/managerAccess");
 
 const SEMAPHORE_API_KEY = defineSecret("SEMAPHORE_API_KEY");
 const SEMAPHORE_SENDER_NAME = defineSecret("SEMAPHORE_SENDER_NAME");
@@ -24,7 +25,7 @@ exports.setTruckDelay = onCall(
     secrets: [SEMAPHORE_API_KEY, SEMAPHORE_SENDER_NAME],
   },
   async (req) => {
-    await requireRole(db, req, ["admin", "manager"]);
+    const actor = await requireRole(db, req, ["admin", "manager"]);
 
     const {
       tripId,
@@ -55,6 +56,15 @@ exports.setTruckDelay = onCall(
       }
 
       const trip = snap.data();
+      if (
+        actor.role === "manager" &&
+        !canAccessRecord(actor.user, trip)
+      ) {
+        throw new HttpsError(
+          "permission-denied",
+          "This trip is outside your assigned warehouse or municipality.",
+        );
+      }
 
       // 🔒 Hard stop: completed trip
       if (trip.active === false || trip.status === "COMPLETED") {

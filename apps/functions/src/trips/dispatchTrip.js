@@ -31,6 +31,7 @@ const {
   SEMAPHORE_SENDER_NAME,
 } = require("../../shared/sms-service");
 const { defineSecret } = require("firebase-functions/params");
+const { canAccessRecord } = require("../manager/managerAccess");
 
 const SMTP_EMAIL = defineSecret("SMTP_EMAIL");
 const SMTP_PASSWORD = defineSecret("SMTP_PASSWORD");
@@ -45,7 +46,7 @@ exports.dispatchTrip = onCall(
     secrets: [SEMAPHORE_API_KEY, SEMAPHORE_SENDER_NAME, SMTP_EMAIL, SMTP_PASSWORD],
   },
   async (req) => {
-    await requireRole(db, req, ["admin", "manager"]);
+    const actor = await requireRole(db, req, ["admin", "manager"]);
 
     const tripId = requireString(req.data?.tripId, "tripId");
     const location = req.data?.location || null;
@@ -63,6 +64,15 @@ exports.dispatchTrip = onCall(
     }
 
     const trip = tripSnap.data() || {};
+    if (
+      actor.role === "manager" &&
+      !canAccessRecord(actor.user, { id: tripId, ...trip })
+    ) {
+      throw new HttpsError(
+        "permission-denied",
+        "This trip is outside your assigned warehouse or municipality.",
+      );
+    }
     const isCorrectionDispatch = canDispatchCorrectionTrip(trip);
 
     if (!isHubTransferTrip(trip)) {

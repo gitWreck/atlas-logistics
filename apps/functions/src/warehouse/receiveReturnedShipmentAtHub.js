@@ -23,6 +23,7 @@ const {
   pieceReceivedReturnedIntake,
   shipmentHasWarehouseCustodyPieces,
 } = require("./packageDeliveryOperations");
+const { canAccessRecord } = require("../manager/managerAccess");
 
 if (!admin.apps.length) admin.initializeApp();
 const db = admin.firestore();
@@ -53,7 +54,7 @@ function collectReceivedPieceIdentities(beforePackages = [], afterPackages = [])
 exports.receiveReturnedShipmentAtHub = onCall(
   { region: "asia-southeast1", maxInstances: 10 },
   async (req) => {
-    await requireRole(db, req, ["admin", "manager"]);
+    const actor = await requireRole(db, req, ["admin", "manager"]);
 
     const { uid: actorUid, name: actorName, role: actorRole } = updatedBy(req);
     const {
@@ -91,6 +92,15 @@ exports.receiveReturnedShipmentAtHub = onCall(
         }
 
         const data = snap.data() || {};
+        if (
+          actor.role === "manager" &&
+          !canAccessRecord(actor.user, data)
+        ) {
+          throw new HttpsError(
+            "permission-denied",
+            `Shipment ${shipmentId} is outside your assigned warehouse or municipality.`,
+          );
+        }
         assertEligibleForReturnReceive(shipmentId, data);
 
         const beforePackages = Array.isArray(data.packages) ? data.packages : [];

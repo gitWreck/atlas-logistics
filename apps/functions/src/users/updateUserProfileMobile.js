@@ -16,7 +16,16 @@ exports.updateUserProfileMobile = onCall(
 
     const uid = req.auth.uid;
     // ✅ Added phoneNumber to destructured data
-    const { targetUid, name, password, address, phoneNumber, photoURL } = req.data;
+    const {
+      targetUid,
+      name,
+      email,
+      password,
+      address,
+      phoneNumber,
+      photoURL,
+      status,
+    } = req.data;
 
     if (!targetUid)
       throw new HttpsError("invalid-argument", "Target UID required.");
@@ -27,18 +36,20 @@ exports.updateUserProfileMobile = onCall(
     const callerRole = String(callerData?.role || "").toLowerCase();
     const isAdmin = ["admin", "administrator"].includes(callerRole);
 
+    // Get Target User Data to check role
+    const targetSnap = await db.collection("users").doc(targetUid).get();
+    if (!targetSnap.exists)
+      throw new HttpsError("not-found", "User not found.");
+    const targetData = targetSnap.data();
+    const targetRole = String(targetData.role || "").toLowerCase();
+
+    // Manager role cannot edit customer profiles. Only the user themselves or admins may update.
     if (!isSelf && !isAdmin) {
       throw new HttpsError(
         "permission-denied",
         "You cannot update this profile.",
       );
     }
-
-    // Get Target User Data to check role
-    const targetSnap = await db.collection("users").doc(targetUid).get();
-    if (!targetSnap.exists)
-      throw new HttpsError("not-found", "User not found.");
-    const targetData = targetSnap.data();
 
     const authUpdates = {};
     const firestoreUpdates = { updatedAt: FieldValue.serverTimestamp() };
@@ -52,21 +63,30 @@ exports.updateUserProfileMobile = onCall(
       firestoreUpdates.photoURL = normalizedPhotoURL || null;
     }
 
+    if (email !== undefined) {
+      const normalizedEmail = String(email || "").trim().toLowerCase();
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
+        throw new HttpsError("invalid-argument", "A valid email is required.");
+      }
+      authUpdates.email = normalizedEmail;
+      firestoreUpdates.email = normalizedEmail;
+    }
+
     // 1. HANDLE NAME UPDATE (Staff names are locked for self-update, usually)
     if (name && name.trim().length > 0) {
       // Logic: Admins can change any name. Customers can change their own.
       // Staff (Checkers/Drivers) can usually only change password.
-      if (isAdmin || targetData.role === "customer") {
+      if (isAdmin || targetRole === "customer") {
         authUpdates.displayName = name;
         firestoreUpdates.name = name;
       }
     }
 
     // 2. HANDLE PHONE & ADDRESS (Only for Customers or by Admins)
-    if (isAdmin || targetData.role === "customer") {
-      if (phoneNumber) {
+    if (isAdmin || targetRole === "customer") {
+      if (phoneNumber !== undefined) {
         const normalizedPhone = normalizePhone(phoneNumber);
-        if (!/^63[89]\d{9}$/.test(normalizedPhone)) {
+        if (normalizedPhone && !/^63[89]\d{9}$/.test(normalizedPhone)) {
           throw new HttpsError(
             "invalid-argument",
             "Invalid Philippine mobile number.",
@@ -84,6 +104,19 @@ exports.updateUserProfileMobile = onCall(
           province: address.province || "",
         };
       }
+    }
+
+    if (status !== undefined && isAdmin) {
+      const normalizedStatus = String(status || "").trim().toLowerCase();
+      if (!["active", "inactive"].includes(normalizedStatus)) {
+        throw new HttpsError(
+          "invalid-argument",
+          "Status must be active or inactive.",
+        );
+      }
+      authUpdates.disabled = normalizedStatus === "inactive";
+      firestoreUpdates.status = normalizedStatus;
+      firestoreUpdates.active = normalizedStatus === "active";
     }
 
     try {
@@ -116,6 +149,13 @@ exports.updateUserProfileMobile = onCall(
       return { success: true, message: "Profile updated successfully." };
     } catch (error) {
       console.error("Update Error:", error);
+      if (error instanceof HttpsError) throw error;
+      if (error?.code === "auth/email-already-exists") {
+        throw new HttpsError(
+          "already-exists",
+          "That email address is already in use.",
+        );
+      }
       throw new HttpsError("internal", error.message);
     }
   },

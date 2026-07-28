@@ -131,12 +131,17 @@ async function requireManagerScope(db, request) {
   }
 
   const profile = { id: snap.id, ...snap.data() };
-  if (clean(profile.role).toLowerCase() !== "manager" || !isActiveProfile(profile)) {
-    throw new HttpsError("permission-denied", "An active Manager account is required.");
+  const role = clean(profile.role).toLowerCase();
+  const isAdmin = role === "admin" || role === "administrator";
+  if ((!isAdmin && role !== "manager") || !isActiveProfile(profile)) {
+    throw new HttpsError(
+      "permission-denied",
+      "An active Manager or Admin account is required.",
+    );
   }
 
   const scope = getManagerScope(profile);
-  if (!scope.warehouses.length) {
+  if (!isAdmin && !scope.warehouses.length) {
     throw new HttpsError(
       "failed-precondition",
       "This Manager account has no assigned warehouse.",

@@ -130,6 +130,8 @@ exports.updateTripStatus =
   require("./src/trips/updateTripStatus").updateTripStatus;
 exports.updateTripDetails =
   require("./src/trips/updateTripDetails").updateTripDetails;
+exports.updateTripSchedule =
+  require("./src/trips/updateTripSchedule").updateTripSchedule;
 exports.finalizeTripUnloadHandoff =
   require("./src/trips/finalizeTripUnloadHandoff").finalizeTripUnloadHandoff;
 exports.finalizeTripUnloadReadyForDelivery =
@@ -253,7 +255,11 @@ exports.listManagerMobileShipments = managerMobile.listManagerMobileShipments;
 exports.getManagerMobileShipment = managerMobile.getManagerMobileShipment;
 exports.listManagerMobileOperations = managerMobile.listManagerMobileOperations;
 exports.getManagerMobileTrip = managerMobile.getManagerMobileTrip;
+exports.resolveManagerMobileTripScan =
+  managerMobile.resolveManagerMobileTripScan;
 exports.getManagerMobileModules = managerMobile.getManagerMobileModules;
+exports.updateManagerMobileSettings =
+  managerMobile.updateManagerMobileSettings;
 exports.listManagerMobileNotifications =
   managerMobile.listManagerMobileNotifications;
 exports.listManagerMobileConversations =
