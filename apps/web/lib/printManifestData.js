@@ -188,6 +188,7 @@ export async function buildPrintManifestPayload(tripIdOrPublicId) {
     driverName: tripData.driverName || "Unassigned",
     truckPlate: tripData.truckPlateNumber || tripData.plateNumber || "—",
     origin: tripData.origin || "Warehouse",
+    destination: tripData.destination || "—",
     route: tripData.route || "Direct",
     sealedAt,
     version:
