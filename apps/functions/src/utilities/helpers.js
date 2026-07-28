@@ -446,6 +446,7 @@ async function assertAdminOrManager(db, tx, uid) {
   return {
     role,
     name: userData.name || null,
+    user: { id: uid, ...userData },
   };
 }
 

@@ -10,6 +10,8 @@ const {
   assertCustodyStructuralEditAllowed,
   loadTripForShipment,
 } = require("../trips/manifestLockGuard");
+const { requireRole } = require("../utilities/helpers");
+const { canAccessRecord } = require("../manager/managerAccess");
 
 if (!admin.apps.length) admin.initializeApp();
 const db = admin.firestore();
@@ -17,10 +19,11 @@ const db = admin.firestore();
 exports.updateShipmentDetails = onCall(
   { region: "asia-southeast1", maxInstances: 10 },
   async (request) => {
-    // 1. Auth Check
-    if (!request.auth) {
-      throw new HttpsError("unauthenticated", "Login required.");
-    }
+    const actor = await requireRole(db, request, [
+      "admin",
+      "administrator",
+      "manager",
+    ]);
 
     const {
       shipmentId,
@@ -49,6 +52,15 @@ exports.updateShipmentDetails = onCall(
     }
 
     const shipmentData = shipmentSnap.data() || {};
+    if (
+      actor.role === "manager" &&
+      !canAccessRecord(actor.user, shipmentData)
+    ) {
+      throw new HttpsError(
+        "permission-denied",
+        "This shipment is outside your assigned warehouse or municipality.",
+      );
+    }
     const { trip } = await loadTripForShipment(null, db, { shipment: shipmentData });
     assertCustodyStructuralEditAllowed(shipmentData, trip);
 

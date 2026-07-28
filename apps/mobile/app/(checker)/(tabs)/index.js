@@ -13,6 +13,7 @@ import {
   QuickActions,
   TodayAtGlance,
 } from "../../../components/checker/CheckerHomeDashboard";
+import ManagerQuickAccess from "../../../components/manager/ManagerQuickAccess";
 import { SECTION } from "../../../components/checker/design/checkerTheme";
 import {
   countDeliveredPiecesForDate,
@@ -55,7 +56,7 @@ function getRecentDateOptions(referenceDate = new Date()) {
 export default function CheckerIndex() {
   const router = useRouter();
   const { colors } = useTheme();
-  const { user, profile } = useAuth();
+  const { user, profile, isStaff } = useAuth();
   const {
     availableShipments = [],
     myRouteShipments = [],
@@ -337,6 +338,8 @@ export default function CheckerIndex() {
           onOffload={goOffload}
           onInfo={goInfo}
         />
+
+        {isStaff ? <ManagerQuickAccess preserveStaffTabs /> : null}
 
         <DeliveredHistoryList
           shipments={recentDelivered}

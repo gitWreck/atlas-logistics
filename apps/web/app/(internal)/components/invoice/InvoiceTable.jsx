@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faSearch,
@@ -11,6 +11,7 @@ import {
   faPaperPlane,
   faCircleCheck,
   faBan,
+  faEllipsisV,
 } from "@fortawesome/free-solid-svg-icons";
 import {
   getRowThemeClasses,
@@ -36,6 +37,22 @@ export default function InvoiceTable({
   const [statusFilter, setStatusFilter] = useState("ALL");
   const [page, setPage] = useState(1);
   const [invoiceLimit, setInvoiceLimit] = useState("50");
+  const [openMenuId, setOpenMenuId] = useState(null);
+  const menuRef = useRef(null);
+
+  // Close menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (menuRef.current && !menuRef.current.contains(event.target)) {
+        setOpenMenuId(null);
+      }
+    };
+
+    if (openMenuId) {
+      document.addEventListener("mousedown", handleClickOutside);
+      return () => document.removeEventListener("mousedown", handleClickOutside);
+    }
+  }, [openMenuId]);
 
   const itemsPerPage = 10;
   const theme = getTableTheme(isDark);
@@ -370,60 +387,90 @@ export default function InvoiceTable({
                     </td>
 
                     <td className="px-6 py-4 text-right">
-                      <div className="flex justify-end gap-1">
+                      <div
+                        className="relative inline-block"
+                        ref={(el) => {
+                          if (invoice.id === openMenuId) {
+                            menuRef.current = el;
+                          }
+                        }}
+                      >
                         <button
                           type="button"
-                          onClick={() => onViewInvoice?.(invoice)}
+                          onClick={() => setOpenMenuId(openMenuId === invoice.id ? null : invoice.id)}
                           className={`w-8 h-8 rounded inline-flex items-center justify-center transition-all ${themeRow.iconActionButton}`}
-                          title="View Invoice"
+                          title="More Actions"
                         >
-                          <FontAwesomeIcon icon={faEye} />
+                          <FontAwesomeIcon icon={faEllipsisV} />
                         </button>
 
-                        {invoice.status === "DRAFT" && (
-                          <button
-                            type="button"
-                            onClick={() => onEditInvoice?.(invoice)}
-                            className={`w-8 h-8 rounded inline-flex items-center justify-center transition-all ${themeRow.iconActionButton}`}
-                            title="Edit Invoice"
-                          >
-                            <FontAwesomeIcon icon={faEdit} />
-                          </button>
-                        )}
-
-                        {invoice.status === "DRAFT" && (
-                          <button
-                            type="button"
-                            onClick={() => onIssueInvoice?.(invoice)}
-                            className="w-8 h-8 rounded inline-flex items-center justify-center transition-all bg-violet-600 hover:bg-violet-500 text-white"
-                            title="Issue Invoice"
-                          >
-                            <FontAwesomeIcon icon={faPaperPlane} />
-                          </button>
-                        )}
-
-                        {invoice.status === "ISSUED" && (
-                          <button
-                            type="button"
-                            onClick={() => onMarkPaid?.(invoice)}
-                            className="w-8 h-8 rounded inline-flex items-center justify-center transition-all bg-emerald-600 hover:bg-emerald-500 text-white"
-                            title="Mark Paid"
-                          >
-                            <FontAwesomeIcon icon={faCircleCheck} />
-                          </button>
-                        )}
-
-                        {invoice.status !== "PAID" &&
-                          invoice.status !== "CANCELLED" && (
+                        {openMenuId === invoice.id && (
+                          <div className={`absolute right-0 mt-2 w-48 rounded-lg shadow-lg z-50 border ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
                             <button
                               type="button"
-                              onClick={() => onCancelInvoice?.(invoice)}
-                              className="w-8 h-8 rounded inline-flex items-center justify-center transition-all bg-rose-600 hover:bg-rose-500 text-white"
-                              title="Cancel Invoice"
+                              onClick={() => {
+                                onViewInvoice?.(invoice);
+                                setOpenMenuId(null);
+                              }}
+                              className={`w-full text-left px-4 py-2 text-sm transition-colors first:rounded-t-md ${isDark ? 'hover:bg-slate-700 text-slate-100' : 'hover:bg-slate-100 text-slate-900'}`}
                             >
-                              <FontAwesomeIcon icon={faBan} />
+                              View Invoice
                             </button>
-                          )}
+
+                            {invoice.status === "DRAFT" && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  onEditInvoice?.(invoice);
+                                  setOpenMenuId(null);
+                                }}
+                                className={`w-full text-left px-4 py-2 text-sm transition-colors ${isDark ? 'hover:bg-slate-700 text-slate-100' : 'hover:bg-slate-100 text-slate-900'}`}
+                              >
+                                Edit Invoice
+                              </button>
+                            )}
+
+                            {invoice.status === "DRAFT" && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  onIssueInvoice?.(invoice);
+                                  setOpenMenuId(null);
+                                }}
+                                className={`w-full text-left px-4 py-2 text-sm transition-colors ${isDark ? 'hover:bg-slate-700 text-violet-400' : 'hover:bg-slate-100 text-violet-600'}`}
+                              >
+                                Issue Invoice
+                              </button>
+                            )}
+
+                            {invoice.status === "ISSUED" && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  onMarkPaid?.(invoice);
+                                  setOpenMenuId(null);
+                                }}
+                                className={`w-full text-left px-4 py-2 text-sm transition-colors ${isDark ? 'hover:bg-slate-700 text-emerald-400' : 'hover:bg-slate-100 text-emerald-600'}`}
+                              >
+                                Mark Paid
+                              </button>
+                            )}
+
+                            {invoice.status !== "PAID" &&
+                              invoice.status !== "CANCELLED" && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    onCancelInvoice?.(invoice);
+                                    setOpenMenuId(null);
+                                  }}
+                                  className={`w-full text-left px-4 py-2 text-sm transition-colors last:rounded-b-md ${isDark ? 'hover:bg-slate-700 text-rose-400' : 'hover:bg-slate-100 text-rose-600'}`}
+                                >
+                                  Cancel Invoice
+                                </button>
+                              )}
+                          </div>
+                        )}
                       </div>
                     </td>
                   </tr>

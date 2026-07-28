@@ -23,7 +23,7 @@ export default function AuthGuard({ role, children, loaderColor = COLORS.primary
   } else if (role === "customer") {
     allowed = isCustomer;
   } else if (role === "manager") {
-    allowed = isManager;
+    allowed = isManager || isStaff;
   } else if (role === "staff") {
     allowed = isStaff;
   }

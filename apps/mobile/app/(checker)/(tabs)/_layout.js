@@ -88,6 +88,7 @@ export default function CheckerTabsLayout() {
               ),
             }}
           />
+          <Tabs.Screen name="quick" options={{ href: null }} />
         </Tabs>
       </View>
     </View>

@@ -22,6 +22,7 @@ const {
   assertCanUnloadAtHub,
   isHubTransferTrip,
 } = require("../trips/manifestStatus");
+const { canAccessRecord } = require("../manager/managerAccess");
 
 if (!admin.apps.length) admin.initializeApp();
 const db = admin.firestore();
@@ -43,6 +44,7 @@ exports.scanPackages = onCall(
     const rawBarcode = req.data.barcode;
     const barcode = (rawBarcode || "").trim();
     const mode = req.data.mode;
+    const requestedTripId = String(req.data.tripId || "").trim();
     const location = req.data.location || null;
 
     logger.info("SCAN START", { barcode, mode, user: uid, role: userRole });
@@ -57,13 +59,13 @@ exports.scanPackages = onCall(
     }
 
     if (mode === "loading") {
-      if (userRole !== "checker" && userRole !== "admin") {
+      if (!["checker", "admin", "manager"].includes(userRole)) {
         throw new HttpsError(
           "permission-denied",
-          "Only Checkers can Load items onto the truck.",
+          "Only authorized Checkers, Managers, or Admins can load items onto the truck.",
         );
       }
-    } else if (!["checker", "admin"].includes(userRole)) {
+    } else if (!["checker", "admin", "manager"].includes(userRole)) {
       throw new HttpsError("permission-denied", "Unauthorized role.");
     }
 
@@ -98,6 +100,21 @@ exports.scanPackages = onCall(
     if (!tripSnap.exists) throw new HttpsError("not-found", "Trip not found.");
 
     const tripData = tripSnap.data() || {};
+    if (
+      userRole === "manager" &&
+      !canAccessRecord(userSnap.data() || {}, tripData)
+    ) {
+      throw new HttpsError(
+        "permission-denied",
+        "This trip is outside your assigned warehouse or municipality.",
+      );
+    }
+    if (requestedTripId && requestedTripId !== String(tripId)) {
+      throw new HttpsError(
+        "failed-precondition",
+        "This package is assigned to a different trip.",
+      );
+    }
     if (tripData.status === "COMPLETED") {
       throw new HttpsError("failed-precondition", "Trip is already COMPLETED.");
     }

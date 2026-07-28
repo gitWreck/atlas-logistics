@@ -27,10 +27,36 @@ function dateInput(hoursFromNow) {
     .slice(0, 16);
 }
 
+function optionKey(value) {
+  return String(value || "").trim().toLowerCase();
+}
+
+function warehouseOption(value, index) {
+  if (typeof value === "string") {
+    return { id: value, name: value, code: value };
+  }
+  const name =
+    value?.name || value?.warehouseName || value?.label || value?.code || "";
+  const code = value?.code || value?.warehouseCode || name;
+  return { ...value, id: value?.id || code || `warehouse-${index}`, name, code };
+}
+
+function truckPlate(truck = {}) {
+  return (
+    truck.plateNumber ||
+    truck.truckPlateNumber ||
+    truck.vehiclePlate ||
+    truck.registrationNumber ||
+    ""
+  );
+}
+
 export default function ManagerCreateTripModal({
   visible,
   scope,
   staff,
+  trucks,
+  settings,
   onClose,
   onCreated,
 }) {
@@ -39,26 +65,72 @@ export default function ManagerCreateTripModal({
     () => (staff || []).filter((member) => String(member.role).toLowerCase() === "driver"),
     [staff],
   );
+  const warehouses = useMemo(() => {
+    const configured = (settings?.warehouses || [])
+      .map(warehouseOption)
+      .filter((warehouse) => warehouse.name);
+    const assigned = (scope?.warehouses || [])
+      .map(warehouseOption)
+      .filter((warehouse) => warehouse.name);
+    if (!assigned.length) return configured;
+    const allowed = new Set(
+      assigned.flatMap((warehouse) => [
+        optionKey(warehouse.name),
+        optionKey(warehouse.code),
+      ]),
+    );
+    const matched = configured.filter(
+      (warehouse) =>
+        allowed.has(optionKey(warehouse.name)) ||
+        allowed.has(optionKey(warehouse.code)),
+    );
+    return matched.length ? matched : assigned;
+  }, [scope?.warehouses, settings?.warehouses]);
+  const truckOptions = useMemo(
+    () => (trucks || []).filter((truck) => truckPlate(truck)),
+    [trucks],
+  );
   const [form, setForm] = useState({});
+  const [openDropdown, setOpenDropdown] = useState(null);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (!visible) return;
+    const initialWarehouse = warehouses[0] || null;
     setForm({
       tripType: "HUB_TRANSFER",
-      origin: scope?.warehouses?.[0] || "",
+      origin: initialWarehouse?.name || "",
+      originCode: initialWarehouse?.code || "",
       destination: "",
+      destinationCode: "",
       plannedDeparture: dateInput(1),
       estimatedArrival: dateInput(9),
       driverId: "",
       driverName: "",
+      truckId: "",
       truckPlateNumber: "",
       helperName: "",
     });
-  }, [visible, scope]);
+    setOpenDropdown(null);
+  }, [visible, warehouses]);
 
   const setField = (field, value) =>
     setForm((current) => ({ ...current, [field]: value }));
+
+  const selectTripType = (tripType) => {
+    const initialWarehouse = warehouses[0] || null;
+    setForm((current) => ({
+      ...current,
+      tripType,
+      origin:
+        tripType === "HUB_TRANSFER" ? initialWarehouse?.name || "" : "",
+      originCode:
+        tripType === "HUB_TRANSFER" ? initialWarehouse?.code || "" : "",
+      destination: "",
+      destinationCode: "",
+    }));
+    setOpenDropdown(null);
+  };
 
   const selectDriver = (driver) =>
     setForm((current) => ({
@@ -66,6 +138,29 @@ export default function ManagerCreateTripModal({
       driverId: driver.id,
       driverName: displayName(driver),
     }));
+
+  const selectWarehouse = (field, warehouse) => {
+    setForm((current) => ({
+      ...current,
+      [field]: warehouse.name,
+      [`${field}Code`]: warehouse.code,
+      ...(field === "origin" &&
+      optionKey(current.destinationCode || current.destination) ===
+        optionKey(warehouse.code || warehouse.name)
+        ? { destination: "", destinationCode: "" }
+        : {}),
+    }));
+    setOpenDropdown(null);
+  };
+
+  const selectTruck = (truck) => {
+    setForm((current) => ({
+      ...current,
+      truckId: truck.id || null,
+      truckPlateNumber: truckPlate(truck),
+    }));
+    setOpenDropdown(null);
+  };
 
   const save = async () => {
     if (
@@ -83,14 +178,15 @@ export default function ManagerCreateTripModal({
       const response = await createTruckTrip({
         tripType: form.tripType,
         origin: form.origin?.trim() || null,
-        originCode: form.origin?.trim() || null,
-        destination: form.destination?.trim() || form.origin?.trim() || null,
+        originCode: form.originCode?.trim() || form.origin?.trim() || null,
+        destination: form.destination?.trim() || null,
         destinationCode:
-          form.destination?.trim() || form.origin?.trim() || null,
+          form.destinationCode?.trim() || form.destination?.trim() || null,
         plannedDeparture: new Date(form.plannedDeparture).toISOString(),
         estimatedArrival: new Date(form.estimatedArrival).toISOString(),
         driverId: form.driverId || null,
         driverName: form.driverName || null,
+        truckId: form.truckId || null,
         truckPlateNumber: form.truckPlateNumber.trim().toUpperCase(),
         helperName: form.helperName?.trim() || null,
       });
@@ -130,7 +226,7 @@ export default function ManagerCreateTripModal({
                 return (
                   <Pressable
                     key={value}
-                    onPress={() => setField("tripType", value)}
+                    onPress={() => selectTripType(value)}
                     style={[
                       styles.type,
                       {
@@ -144,38 +240,107 @@ export default function ManagerCreateTripModal({
                 );
               })}
             </View>
-            <Field label="Origin warehouse *" value={form.origin || ""} onChangeText={(value) => setField("origin", value)} colors={colors} />
-            <Field label={form.tripType === "HUB_TRANSFER" ? "Destination warehouse *" : "Destination"} value={form.destination || ""} onChangeText={(value) => setField("destination", value)} colors={colors} />
-            <Field label="Departure (YYYY-MM-DDTHH:mm) *" value={form.plannedDeparture || ""} onChangeText={(value) => setField("plannedDeparture", value)} colors={colors} />
-            <Field label="Estimated arrival (YYYY-MM-DDTHH:mm) *" value={form.estimatedArrival || ""} onChangeText={(value) => setField("estimatedArrival", value)} colors={colors} />
-            <Field label="Truck plate *" value={form.truckPlateNumber || ""} onChangeText={(value) => setField("truckPlateNumber", value)} autoCapitalize="characters" colors={colors} />
-            <Field label="Helper" value={form.helperName || ""} onChangeText={(value) => setField("helperName", value)} colors={colors} />
-            {drivers.length ? (
+            {form.tripType === "HUB_TRANSFER" ? (
               <>
-                <Text style={[styles.label, { color: colors.textMuted }]}>AUTHORIZED DRIVER</Text>
-                <View style={styles.driverList}>
-                  {drivers.map((driver) => {
-                    const selected = form.driverId === driver.id;
-                    return (
-                      <Pressable
-                        key={driver.id}
-                        onPress={() => selectDriver(driver)}
-                        style={[
-                          styles.driver,
-                          {
-                            borderColor: selected ? "#0f766e" : colors.border,
-                            backgroundColor: selected ? colors.cardMuted : colors.surface,
-                          },
-                        ]}
-                      >
-                        <Feather name={selected ? "check-circle" : "user"} size={16} color={selected ? "#0f766e" : colors.textMuted} />
-                        <Text style={[styles.driverText, { color: colors.text }]}>{displayName(driver)}</Text>
-                      </Pressable>
-                    );
-                  })}
-                </View>
+                <DropdownField
+                  label="Origin warehouse *"
+                  value={form.origin}
+                  placeholder="Select origin warehouse"
+                  options={warehouses}
+                  open={openDropdown === "origin"}
+                  onToggle={() =>
+                    setOpenDropdown((current) =>
+                      current === "origin" ? null : "origin",
+                    )
+                  }
+                  onSelect={(warehouse) =>
+                    selectWarehouse("origin", warehouse)
+                  }
+                  getKey={(warehouse) => warehouse.id || warehouse.code}
+                  getLabel={(warehouse) => warehouse.name}
+                  getMeta={(warehouse) => warehouse.code}
+                  colors={colors}
+                />
+                <DropdownField
+                  label="Destination *"
+                  value={form.destination}
+                  placeholder="Select destination"
+                  options={warehouses.filter(
+                    (warehouse) =>
+                      optionKey(warehouse.code || warehouse.name) !==
+                      optionKey(form.originCode || form.origin),
+                  )}
+                  open={openDropdown === "destination"}
+                  onToggle={() =>
+                    setOpenDropdown((current) =>
+                      current === "destination" ? null : "destination",
+                    )
+                  }
+                  onSelect={(warehouse) =>
+                    selectWarehouse("destination", warehouse)
+                  }
+                  getKey={(warehouse) => warehouse.id || warehouse.code}
+                  getLabel={(warehouse) => warehouse.name}
+                  getMeta={(warehouse) => warehouse.code}
+                  colors={colors}
+                />
               </>
             ) : null}
+            <Field label="Departure (YYYY-MM-DDTHH:mm) *" value={form.plannedDeparture || ""} onChangeText={(value) => setField("plannedDeparture", value)} colors={colors} />
+            <Field label="Estimated arrival (YYYY-MM-DDTHH:mm) *" value={form.estimatedArrival || ""} onChangeText={(value) => setField("estimatedArrival", value)} colors={colors} />
+            <DropdownField
+              label="Driver name"
+              value={form.driverName}
+              placeholder="Select authorized driver (optional)"
+              options={drivers}
+              open={openDropdown === "driver"}
+              onToggle={() =>
+                setOpenDropdown((current) =>
+                  current === "driver" ? null : "driver",
+                )
+              }
+              onSelect={(driver) => {
+                selectDriver(driver);
+                setOpenDropdown(null);
+              }}
+              getKey={(driver) => driver.id}
+              getLabel={displayName}
+              getMeta={(driver) =>
+                driver.assignedMunicipality ||
+                driver.warehouseName ||
+                driver.status
+              }
+              colors={colors}
+            />
+            <DropdownField
+              label="Truck plate # *"
+              value={form.truckPlateNumber}
+              placeholder="Select authorized truck"
+              options={truckOptions}
+              open={openDropdown === "truck"}
+              onToggle={() =>
+                setOpenDropdown((current) =>
+                  current === "truck" ? null : "truck",
+                )
+              }
+              onSelect={selectTruck}
+              getKey={(truck) => truck.id || truckPlate(truck)}
+              getLabel={truckPlate}
+              getMeta={(truck) =>
+                truck.truckType ||
+                truck.vehicleType ||
+                truck.model ||
+                truck.status
+              }
+              colors={colors}
+            />
+            <Field
+              label="Truck helper (optional)"
+              value={form.helperName || ""}
+              onChangeText={(value) => setField("helperName", value)}
+              placeholder="Optional name"
+              colors={colors}
+            />
           </ScrollView>
           <View style={[styles.actions, { borderTopColor: colors.border }]}>
             <Pressable disabled={saving} onPress={onClose} style={[styles.button, { borderColor: colors.border }]}>
@@ -188,6 +353,115 @@ export default function ManagerCreateTripModal({
         </View>
       </View>
     </Modal>
+  );
+}
+
+function DropdownField({
+  label,
+  value,
+  placeholder,
+  options,
+  open,
+  onToggle,
+  onSelect,
+  getKey,
+  getLabel,
+  getMeta,
+  colors,
+}) {
+  return (
+    <View style={styles.field}>
+      <Text style={[styles.label, { color: colors.textMuted }]}>
+        {label.toUpperCase()}
+      </Text>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityState={{ expanded: open }}
+        onPress={onToggle}
+        style={[
+          styles.dropdownControl,
+          {
+            borderColor: open ? "#0f766e" : colors.border,
+            backgroundColor: colors.cardMuted,
+          },
+        ]}
+      >
+        <Text
+          style={[
+            styles.dropdownValue,
+            { color: value ? colors.text : colors.textMuted },
+          ]}
+          numberOfLines={1}
+        >
+          {value || placeholder}
+        </Text>
+        <Feather
+          name={open ? "chevron-up" : "chevron-down"}
+          size={18}
+          color={colors.textMuted}
+        />
+      </Pressable>
+      {open ? (
+        <View
+          style={[
+            styles.dropdownMenu,
+            { borderColor: colors.border, backgroundColor: colors.surface },
+          ]}
+        >
+          {options.length ? (
+            <ScrollView
+              nestedScrollEnabled
+              keyboardShouldPersistTaps="handled"
+              style={styles.dropdownScroll}
+            >
+              {options.map((option, index) => {
+                const optionLabel = getLabel(option);
+                const meta = getMeta?.(option);
+                const selected = optionKey(optionLabel) === optionKey(value);
+                return (
+                  <Pressable
+                    key={String(getKey(option) || index)}
+                    onPress={() => onSelect(option)}
+                    style={[
+                      styles.dropdownOption,
+                      index > 0 && { borderTopColor: colors.border },
+                    ]}
+                  >
+                    <View style={styles.dropdownOptionCopy}>
+                      <Text
+                        style={[
+                          styles.dropdownOptionLabel,
+                          { color: colors.text },
+                        ]}
+                      >
+                        {optionLabel}
+                      </Text>
+                      {meta ? (
+                        <Text
+                          style={[
+                            styles.dropdownOptionMeta,
+                            { color: colors.textMuted },
+                          ]}
+                        >
+                          {meta}
+                        </Text>
+                      ) : null}
+                    </View>
+                    {selected ? (
+                      <Feather name="check" size={17} color="#0f766e" />
+                    ) : null}
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
+          ) : (
+            <Text style={[styles.dropdownEmpty, { color: colors.textMuted }]}>
+              No authorized options available.
+            </Text>
+          )}
+        </View>
+      ) : null}
+    </View>
   );
 }
 
@@ -218,9 +492,15 @@ const styles = StyleSheet.create({
   type: { flex: 1, minHeight: 42, borderWidth: 1, borderRadius: 12, alignItems: "center", justifyContent: "center" },
   field: { gap: 5 },
   input: { minHeight: 47, borderWidth: 1, borderRadius: 13, paddingHorizontal: 12, fontSize: 14 },
-  driverList: { gap: 8 },
-  driver: { minHeight: 45, borderWidth: 1, borderRadius: 12, paddingHorizontal: 12, flexDirection: "row", alignItems: "center", gap: 9 },
-  driverText: { flex: 1, fontWeight: "700" },
+  dropdownControl: { minHeight: 47, borderWidth: 1, borderRadius: 13, paddingHorizontal: 12, flexDirection: "row", alignItems: "center", gap: 8 },
+  dropdownValue: { flex: 1, minWidth: 0, fontSize: 13, fontWeight: "700" },
+  dropdownMenu: { maxHeight: 190, borderWidth: 1, borderRadius: 13, overflow: "hidden" },
+  dropdownScroll: { maxHeight: 188 },
+  dropdownOption: { minHeight: 50, paddingHorizontal: 12, paddingVertical: 8, flexDirection: "row", alignItems: "center", gap: 9, borderTopWidth: StyleSheet.hairlineWidth },
+  dropdownOptionCopy: { flex: 1, minWidth: 0 },
+  dropdownOptionLabel: { fontSize: 12, fontWeight: "800" },
+  dropdownOptionMeta: { marginTop: 2, fontSize: 9, textTransform: "uppercase" },
+  dropdownEmpty: { padding: 14, fontSize: 11, textAlign: "center" },
   actions: { borderTopWidth: StyleSheet.hairlineWidth, flexDirection: "row", gap: 10, padding: 16 },
   button: { flex: 1, minHeight: 49, borderWidth: 1, borderRadius: 14, alignItems: "center", justifyContent: "center" },
   primary: { backgroundColor: "#0f766e", borderColor: "#0f766e" },

@@ -7,6 +7,7 @@ const {
   RecoverFoundPackageError,
   runRecoverFoundPackage,
 } = require("./recoverFoundPackageCore");
+const { canAccessRecord } = require("../manager/managerAccess");
 
 if (!admin.apps.length) admin.initializeApp();
 
@@ -35,6 +36,24 @@ exports.recoverFoundPackage = onCall(
         remarks = null,
         sourceUI = "TRIP_SCANNER",
       } = req.data || {};
+      if (actor.role === "manager") {
+        const tripSnap = await db
+          .collection("truck_trips")
+          .doc(String(tripId || "").trim())
+          .get();
+        if (
+          !tripSnap.exists ||
+          !canAccessRecord(actor.user, {
+            id: tripSnap.id,
+            ...tripSnap.data(),
+          })
+        ) {
+          throw new HttpsError(
+            "permission-denied",
+            "This trip is outside your assigned warehouse or municipality.",
+          );
+        }
+      }
 
       return await runRecoverFoundPackage(db, {
         tripId,

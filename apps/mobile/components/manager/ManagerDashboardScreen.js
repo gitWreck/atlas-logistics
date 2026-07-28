@@ -14,6 +14,7 @@ import { useAuth } from "../../contexts/AuthContext";
 import StatusBadge from "../ui/StatusBadge";
 import { getManagerMobileDashboard } from "../utilities/FirebaseFunctions";
 import useManagerRequest from "./useManagerRequest";
+import ManagerQuickAccess from "./ManagerQuickAccess";
 import {
   ErrorState,
   LoadingState,
@@ -36,18 +37,6 @@ const STAT_CARDS = [
   ["activeTrips", "Active Trips", "map", "teal"],
   ["activeDrivers", "Active Drivers", "users", "green"],
   ["activeCheckers", "Active Checkers", "user-check", "blue"],
-];
-
-const SHORTCUTS = [
-  ["Trucks", "truck", "trucks", "Fleet and maintenance"],
-  ["Customers", "users", "customers", "Accounts and history"],
-  ["Invoices", "file-text", "invoices", "Billing and payments"],
-  ["Delivery Operations", "navigation", "delivery-operations", "Current delivery work"],
-  ["Pickup Requests", "inbox", "pickup-requests", "Pickup workflow"],
-  ["Staff Management", "user-check", "staff", "Drivers and Checkers"],
-  ["Municipality Assignments", "map-pin", "municipalities", "Checker coverage"],
-  ["Reports", "bar-chart-2", "reports", "Live performance"],
-  ["Settings", "settings", "settings", "Manager preferences"],
 ];
 
 function greeting() {
@@ -138,24 +127,7 @@ export default function ManagerDashboardScreen() {
           <Text style={[styles.progressValue, { color: colors.text }]}>{stats.deliveryProgress || 0}%</Text>
         </ManagerCard>
 
-        <SectionTitle title="Management Shortcuts" subtitle="Manager web modules adapted for mobile" />
-        <View style={styles.shortcutGrid}>
-          {SHORTCUTS.map(([label, icon, module, description]) => (
-            <Pressable
-              key={label}
-              style={[styles.shortcut, { backgroundColor: colors.surface, borderColor: colors.border }]}
-              onPress={() => router.push(`/(manager)/management/${module}`)}
-            >
-              <View style={[styles.shortcutIcon, { backgroundColor: colors.primarySoft }]}>
-                <Feather name={icon} size={21} color="#4f46e5" />
-              </View>
-              <Text style={[styles.shortcutTitle, { color: colors.text }]}>{label}</Text>
-              <Text style={[styles.shortcutDescription, { color: colors.textMuted }]} numberOfLines={2}>
-                {description}
-              </Text>
-            </Pressable>
-          ))}
-        </View>
+        <ManagerQuickAccess inset={false} />
 
         <ManagerCard>
           <SectionTitle
@@ -208,11 +180,6 @@ const styles = StyleSheet.create({
   progressTrack: { height: 10, borderRadius: 999, overflow: "hidden", marginTop: 15 },
   progressFill: { height: "100%", borderRadius: 999, backgroundColor: "#4f46e5" },
   progressValue: { fontSize: 21, fontWeight: "900", marginTop: 8 },
-  shortcutGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
-  shortcut: { width: "48.5%", minHeight: 142, borderWidth: 1, borderRadius: 18, padding: 14 },
-  shortcutIcon: { width: 42, height: 42, borderRadius: 13, alignItems: "center", justifyContent: "center" },
-  shortcutTitle: { fontSize: 13, fontWeight: "900", marginTop: 12 },
-  shortcutDescription: { fontSize: 10, lineHeight: 14, marginTop: 4 },
   activityRow: { minHeight: 70, paddingVertical: 13, flexDirection: "row", alignItems: "center", gap: 10 },
   activityTitle: { fontSize: 14, fontWeight: "800" },
   activityMeta: { fontSize: 11, marginTop: 4 },

@@ -12,6 +12,9 @@ const {
   getManagerScope,
   requireManagerScope,
 } = require("./managerAccess");
+const {
+  resolveShipmentReference,
+} = require("../shipments/resolveShipmentReference");
 
 if (!admin.apps.length) admin.initializeApp();
 
@@ -52,6 +55,73 @@ function serialize(value) {
     );
   }
   return value;
+}
+
+function cleanSetting(value, maxLength = 120) {
+  return String(value || "").trim().slice(0, maxLength);
+}
+
+function sanitizeOperationalSettings(input = {}, current = {}) {
+  const next = { ...current };
+  if (Array.isArray(input.truckTypes)) {
+    const truckTypes = [...new Set(
+      input.truckTypes.map((value) => cleanSetting(value)).filter(Boolean),
+    )].slice(0, 100);
+    if (!truckTypes.length) {
+      throw new HttpsError(
+        "invalid-argument",
+        "At least one truck type is required.",
+      );
+    }
+    next.truckTypes = truckTypes;
+  }
+  if (Array.isArray(input.warehouses)) {
+    const warehouses = input.warehouses
+      .map((warehouse = {}) => ({
+        name: cleanSetting(warehouse.name),
+        code: cleanSetting(warehouse.code, 30).toUpperCase(),
+        city: cleanSetting(warehouse.city),
+        province: cleanSetting(warehouse.province),
+      }))
+      .filter((warehouse) => warehouse.name && warehouse.code)
+      .slice(0, 100);
+    if (!warehouses.length) {
+      throw new HttpsError(
+        "invalid-argument",
+        "At least one warehouse with a name and code is required.",
+      );
+    }
+    next.warehouses = warehouses;
+  }
+  if (
+    input.phLocations &&
+    typeof input.phLocations === "object" &&
+    !Array.isArray(input.phLocations)
+  ) {
+    const phLocations = Object.fromEntries(
+      Object.entries(input.phLocations)
+        .map(([province, cities]) => [
+          cleanSetting(province),
+          (Array.isArray(cities) ? cities : [])
+            .map((city = {}) => ({
+              name: cleanSetting(city.name),
+              code: cleanSetting(city.code, 30).toUpperCase(),
+            }))
+            .filter((city) => city.name && city.code)
+            .slice(0, 250),
+        ])
+        .filter(([province, cities]) => province && cities.length)
+        .slice(0, 100),
+    );
+    if (!Object.keys(phLocations).length) {
+      throw new HttpsError(
+        "invalid-argument",
+        "At least one province and city are required.",
+      );
+    }
+    next.phLocations = phLocations;
+  }
+  return next;
 }
 
 function row(doc) {
@@ -319,22 +389,221 @@ exports.getManagerMobileModules = onCall(REGION_OPTIONS, async (request) => {
     shipments: shipments.slice(0, 500),
     reports: reportSummary(shipments, trips, staff),
     settings: settingsSnap.exists ? settingsSnap.data() : {},
+    preferences: {
+      pushNotifications:
+        profile.notificationPreferences?.managerPushEnabled !== false,
+    },
   });
 });
 
+exports.updateManagerMobileSettings = onCall(
+  REGION_OPTIONS,
+  async (request) => {
+    const { uid, profile } = await requireManagerScope(db, request);
+    const payload = request.data || {};
+    const updates = {};
+
+    if (typeof payload.pushNotifications === "boolean") {
+      updates["notificationPreferences.managerPushEnabled"] =
+        payload.pushNotifications;
+      updates.updatedAt = admin.firestore.FieldValue.serverTimestamp();
+      await db.collection("users").doc(uid).set(updates, { merge: true });
+    }
+
+    let settings = null;
+    if (payload.operationalSettings != null) {
+      const role = String(profile.role || "").trim().toLowerCase();
+      if (role !== "admin" && role !== "administrator") {
+        throw new HttpsError(
+          "permission-denied",
+          "Only Admin accounts can update operational settings.",
+        );
+      }
+      const settingsRef = db.collection("app_settings").doc("operational");
+      const currentSnap = await settingsRef.get();
+      settings = sanitizeOperationalSettings(
+        payload.operationalSettings,
+        currentSnap.exists ? currentSnap.data() : {},
+      );
+      await settingsRef.set(
+        {
+          ...settings,
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          updatedBy: uid,
+        },
+        { merge: true },
+      );
+    }
+
+    return serialize({
+      pushNotifications:
+        typeof payload.pushNotifications === "boolean"
+          ? payload.pushNotifications
+          : profile.notificationPreferences?.managerPushEnabled !== false,
+      settings,
+    });
+  },
+);
+
 exports.listManagerMobileShipments = onCall(REGION_OPTIONS, async (request) => {
   const { profile, scope } = await requireManagerScope(db, request);
-  const snap = await db.collection("shipments").get();
   const limit = Math.min(Math.max(Number(request.data?.limit) || 250, 1), 500);
+  const role = String(profile.role || "").trim().toLowerCase();
+  const isAdmin = role === "admin" || role === "administrator";
+  const summaryFields = [
+    "shipmentId",
+    "trackingNumber",
+    "status",
+    "createdAt",
+    "updatedAt",
+    "sender",
+    "recipient",
+    "customerName",
+    "municipality",
+    "destinationMunicipality",
+    "origin",
+    "originCode",
+    "destination",
+    "destinationCode",
+    "currentLocation",
+    "currentLocationState",
+    "warehouse",
+    "warehouseId",
+    "warehouseCode",
+    "warehouseName",
+    "assignedWarehouseId",
+    "assignedWarehouseCode",
+    "assignedWarehouseName",
+    "currentWarehouseId",
+    "currentWarehouseCode",
+    "currentWarehouseName",
+    "originWarehouseId",
+    "originWarehouseCode",
+    "originWarehouseName",
+    "destinationWarehouseId",
+    "destinationWarehouseCode",
+    "destinationWarehouseName",
+    "assignedMunicipalities",
+    "municipalityCoverage",
+    "serviceMunicipalities",
+    "handledMunicipalities",
+    "municipalities",
+    "assignedMunicipality",
+    "recipientMunicipality",
+    "checkerName",
+    "assignedCheckerName",
+    "assignedCheckerId",
+    "driverName",
+    "assignedDriverName",
+    "assignedDriverId",
+    "truckPlateNumber",
+    "vehiclePlate",
+    "truckDetails",
+    "currentTripId",
+    "currentTruckTripId",
+    "tripId",
+    "availableForDelivery",
+    "isPickupRequested",
+    "pickupRequestId",
+    "pickupRequestedAt",
+    "pickupAddress",
+    "pickupSchedule",
+    "shipmentType",
+    "serviceType",
+    "requestType",
+    "fulfillmentType",
+    "activeCheckerIds",
+    "packageBreakdown",
+    "packages",
+  ];
+  let query = db.collection("shipments").select(...summaryFields);
+  if (isAdmin) {
+    query = query.orderBy("updatedAt", "desc").limit(limit);
+  }
+  const snap = await query.get();
+  const shipments = scopedDocs(snap, profile)
+    .slice(0, limit)
+    .map((shipment) => {
+      const deliveryOperationPieces = (Array.isArray(shipment.packages)
+        ? shipment.packages
+        : []
+      )
+        .filter((pkg = {}) => {
+          const packageStatus = String(pkg.status || "").trim().toUpperCase();
+          if (["MISSING", "DAMAGED", "CANCELLED"].includes(packageStatus)) {
+            return false;
+          }
+          const custodyType = String(pkg.custodyOwnerType || "")
+            .trim()
+            .toUpperCase();
+          return Boolean(
+            String(pkg.loadedByCheckerId || "").trim() ||
+              String(pkg.deliveredByCheckerId || "").trim() ||
+              (custodyType === "CHECKER" &&
+                String(pkg.custodyOwnerId || "").trim()),
+          );
+        })
+        .map((pkg = {}) => ({
+          packageId: pkg.packageId || pkg.trackingNumber || pkg.id || null,
+          description: pkg.description || null,
+          quantity: Math.max(Number(pkg.quantity) || 1, 1),
+          status: pkg.status || shipment.status || null,
+          checkerId:
+            pkg.loadedByCheckerId ||
+            pkg.deliveredByCheckerId ||
+            pkg.custodyOwnerId ||
+            shipment.assignedCheckerId ||
+            null,
+          checkerName:
+            pkg.loadedByCheckerName ||
+            pkg.deliveredByCheckerName ||
+            shipment.assignedCheckerName ||
+            shipment.checkerName ||
+            null,
+        }));
+      const checkerPieceCount = deliveryOperationPieces.reduce(
+        (total, pkg) => total + Number(pkg.quantity || 1),
+        0,
+      );
+      const checkerPoolCount =
+        Number(shipment.packageBreakdown?.outForDelivery || 0) +
+        Number(shipment.packageBreakdown?.onCheckerVan || 0);
+      const activeCheckerIds = (Array.isArray(shipment.activeCheckerIds)
+        ? shipment.activeCheckerIds
+        : []
+      )
+        .map((value) => String(value || "").trim())
+        .filter(Boolean);
+      const fallbackPieceCount = Math.max(
+        checkerPoolCount - checkerPieceCount,
+        0,
+      );
+      if (fallbackPieceCount > 0 && activeCheckerIds.length === 1) {
+        deliveryOperationPieces.push({
+          packageId: null,
+          description: "Checker-loaded packages",
+          quantity: fallbackPieceCount,
+          status: "OUT_FOR_DELIVERY",
+          checkerId: activeCheckerIds[0],
+          checkerName:
+            shipment.assignedCheckerName ||
+            shipment.checkerName ||
+            activeCheckerIds[0],
+        });
+      }
+      const { packages: _packages, ...summary } = shipment;
+      return {
+        ...summary,
+        deliveryOperationPieces,
+        deliveryOperationPieceCount: deliveryOperationPieces.reduce(
+          (total, pkg) => total + Number(pkg.quantity || 1),
+          0,
+        ),
+      };
+    });
   return {
     scope: serialize(scope),
-    shipments: serialize(
-      scopedDocs(
-        snap,
-        profile,
-        (shipment) => shipment.isPickupRequested !== true,
-      ).slice(0, limit),
-    ),
+    shipments: serialize(shipments),
   };
 });
 
@@ -436,6 +705,88 @@ exports.getManagerMobileTrip = onCall(REGION_OPTIONS, async (request) => {
     ),
   };
 });
+
+exports.resolveManagerMobileTripScan = onCall(
+  REGION_OPTIONS,
+  async (request) => {
+    const { profile } = await requireManagerScope(db, request);
+    const trip = await getScopedTrip(profile, request.data?.tripId);
+    const scanCode = String(request.data?.scanCode || "").trim();
+    if (!scanCode) {
+      throw new HttpsError("invalid-argument", "Package label is required.");
+    }
+
+    const resolved = await resolveShipmentReference(db, scanCode);
+    const shipment = resolved.shipment || {};
+    if (!canAccessRecord(profile, shipment)) {
+      throw new HttpsError(
+        "permission-denied",
+        "This shipment is outside your assigned warehouse or municipality.",
+      );
+    }
+
+    const manifestSnap = await db
+      .collection("truck_trips")
+      .doc(trip.id)
+      .collection("trip_shipments")
+      .doc(resolved.shipmentDocId)
+      .get();
+    const shipmentTripId = String(
+      shipment.currentTripId ||
+        shipment.currentTruckTripId ||
+        shipment.assignedTripId ||
+        "",
+    ).trim();
+    if (!manifestSnap.exists && shipmentTripId !== String(trip.id)) {
+      throw new HttpsError(
+        "failed-precondition",
+        "This shipment is not on the selected trip manifest.",
+      );
+    }
+
+    const packages = Array.isArray(shipment.packages) ? shipment.packages : [];
+    const normalizedCode = scanCode.toUpperCase();
+    const matchingPackages =
+      resolved.packageLabel
+        ? packages.filter((pkg = {}) =>
+            [pkg.packageId, pkg.trackingNumber]
+              .filter(Boolean)
+              .some(
+                (value) =>
+                  String(value).trim().toUpperCase() === normalizedCode,
+              ),
+          )
+        : packages;
+    const packageRows = matchingPackages
+      .map((pkg = {}) => {
+        const packageId = String(
+          pkg.packageId || pkg.trackingNumber || "",
+        ).trim();
+        if (!packageId) return null;
+        return {
+          packageId,
+          quantity: Math.max(Number(pkg.quantity) || 1, 1),
+          status: String(pkg.status || "").toUpperCase(),
+        };
+      })
+      .filter(Boolean);
+    if (!packageRows.length) {
+      throw new HttpsError(
+        "not-found",
+        "No package rows were found for this label.",
+      );
+    }
+
+    return serialize({
+      found: true,
+      tripId: trip.id,
+      shipmentId: resolved.shipmentDocId,
+      trackingNumber: shipment.shipmentId || resolved.shipmentDocId,
+      packageRows,
+      matchedBy: resolved.matchedBy,
+    });
+  },
+);
 
 exports.listManagerMobileNotifications = onCall(
   REGION_OPTIONS,

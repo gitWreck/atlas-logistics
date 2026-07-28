@@ -12,6 +12,7 @@ const {
   getTripNotificationTargets,
   normalizeNotificationChannels,
 } = require("../utilities/notificationHelpers");
+const { canAccessRecord } = require("../manager/managerAccess");
 
 const SEMAPHORE_API_KEY = defineSecret("SEMAPHORE_API_KEY");
 const SEMAPHORE_SENDER_NAME = defineSecret("SEMAPHORE_SENDER_NAME");
@@ -70,6 +71,15 @@ exports.clearTruckDelay = onCall(
       }
 
       const trip = snap.data();
+      if (
+        actor.role === "manager" &&
+        !canAccessRecord(actor.user, trip)
+      ) {
+        throw new HttpsError(
+          "permission-denied",
+          "This trip is outside your assigned warehouse or municipality.",
+        );
+      }
 
       if (
         actor.role === "driver" &&

@@ -49,12 +49,32 @@ export const reconcileShipmentAtHub = httpsCallable(
   functions,
   "reconcileShipmentAtHub",
 );
+export const receiveReturnedShipmentAtHub = httpsCallable(
+  functions,
+  "receiveReturnedShipmentAtHub",
+);
+export const releaseForDeliveryOperations = httpsCallable(
+  functions,
+  "releaseForDeliveryOperations",
+);
+export const updateShipmentDetails = httpsCallable(
+  functions,
+  "updateShipmentDetails",
+);
 export const updateShipmentImages = httpsCallable(
   functions,
   "updateShipmentImages",
 );
 export const updateTripStatus = httpsCallable(functions, "updateTripStatus");
 export const assignDriverToTrip = httpsCallable(functions, "assignDriverToTrip");
+export const assignShipmentToTrip = httpsCallable(
+  functions,
+  "assignShipmentToTrip",
+);
+export const unassignShipmentFromTrip = httpsCallable(
+  functions,
+  "unassignShipmentFromTrip",
+);
 export const assignCheckerMunicipalities = httpsCallable(
   functions,
   "assignCheckerMunicipalities",
@@ -78,11 +98,23 @@ export const getShipmentCustodyTimeline = httpsCallable(
 );
 
 export const startTrip = httpsCallable(functions, "startTrip");
+export const dispatchTrip = httpsCallable(functions, "dispatchTrip");
+export const startReceiving = httpsCallable(functions, "startReceiving");
+export const recoverFoundPackage = httpsCallable(functions, "recoverFoundPackage");
 export const reportTripDelay = httpsCallable(functions, "reportTripDelay");
 export const confirmDriverArrival = httpsCallable(functions, "confirmDriverArrival");
 export const reportDriverTripIssue = httpsCallable(functions, "reportDriverTripIssue");
 export const reportCheckerTrip = httpsCallable(functions, "reportCheckerTrip");
 export const clearTruckDelay = httpsCallable(functions, "clearTruckDelay");
+export const setTruckDelay = httpsCallable(functions, "setTruckDelay");
+export const manualAssignShipmentToTrip = httpsCallable(
+  functions,
+  "manualAssignShipmentToTrip",
+);
+export const broadcastTripMessage = httpsCallable(
+  functions,
+  "broadcastTripMessage",
+);
 
 // Customer helpers
 export const addTrackedShipment = httpsCallable(
@@ -100,7 +132,9 @@ export const bulkShipmentAction = httpsCallable(
   "bulkShipmentAction",
 );
 export const createShipment = httpsCallable(functions, "createShipment");
+export const deleteShipment = httpsCallable(functions, "deleteShipment");
 export const createTruckTrip = httpsCallable(functions, "createTruckTrip");
+export const updateTripSchedule = httpsCallable(functions, "updateTripSchedule");
 export const cancelTruckTrip = httpsCallable(functions, "cancelTruckTrip");
 export const archiveTruckTrip = httpsCallable(functions, "archiveTruckTrip");
 export const getTripAuditLog = httpsCallable(functions, "getTripAuditLog");
@@ -163,9 +197,17 @@ export const getManagerMobileTrip = httpsCallable(
   functions,
   "getManagerMobileTrip",
 );
+export const resolveManagerMobileTripScan = httpsCallable(
+  functions,
+  "resolveManagerMobileTripScan",
+);
 export const getManagerMobileModules = httpsCallable(
   functions,
   "getManagerMobileModules",
+);
+export const updateManagerMobileSettings = httpsCallable(
+  functions,
+  "updateManagerMobileSettings",
 );
 export const upsertTruck = httpsCallable(functions, "upsertTruck");
 export const updateTruckStatus = httpsCallable(functions, "updateTruckStatus");
@@ -231,6 +273,8 @@ export const updateUserProfileMobile = httpsCallable(
   functions,
   "updateUserProfileMobile",
 );
+export const updateUserProfile = httpsCallable(functions, "updateUserProfile");
+export const toggleUserStatus = httpsCallable(functions, "toggleUserStatus");
 export const updateUserThemePreference = httpsCallable(
   functions,
   "updateUserThemePreference",
