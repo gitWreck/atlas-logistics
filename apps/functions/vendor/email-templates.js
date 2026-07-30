@@ -24319,7 +24319,11 @@ var require_icons = __commonJS({
 // src/index.js
 var import_react3 = __toESM(require_react());
 
+<<<<<<<<< Temporary merge branch 1
+// ../../node_modules/@react-email/render/dist/node/index.mjs
+=========
 // node_modules/@react-email/render/dist/node/index.mjs
+>>>>>>>>> Temporary merge branch 2
 var import_react = __toESM(require_react(), 1);
 
 // ../../node_modules/prettier/plugins/html.mjs
