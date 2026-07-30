@@ -16,14 +16,26 @@ import {
 import { resolveShipmentIdByPackageBarcode } from "./offlineShipmentResolve";
 
 async function resolveShipmentIdForOperation(operation) {
-  if (operation.shipmentId) return operation.shipmentId;
   const packageIds = Array.isArray(operation.packageIds)
     ? operation.packageIds
     : [];
-  const barcode = operation.barcode;
-  const lookupCode = packageIds[0] || barcode;
-  if (!lookupCode) return null;
-  return resolveShipmentIdByPackageBarcode(lookupCode);
+  const candidates = [
+    operation.shipmentId,
+    packageIds[0],
+    operation.barcode,
+  ]
+    .map((value) => String(value || "").trim())
+    .filter(Boolean);
+
+  const tried = new Set();
+  for (const code of candidates) {
+    const key = code.toUpperCase();
+    if (tried.has(key)) continue;
+    tried.add(key);
+    const resolved = await resolveShipmentIdByPackageBarcode(code);
+    if (resolved) return resolved;
+  }
+  return null;
 }
 
 async function uploadLocalPhotos(shipmentId, localPaths = []) {

@@ -67,6 +67,8 @@ exports.verifyRecoveryOTP = require("./src/users/recovery").verifyRecoveryOTP;
 // packages
 exports.createShipment =
   require("./src/shipments/createShipment").createShipment;
+exports.resolveShipmentByLabel =
+  require("./src/shipments/resolveShipmentReference").resolveShipmentByLabel;
 exports.updateShipmentStatus =
   require("./src/shipments/updateShipmentStatus").updateShipmentStatus;
 exports.overrideShipmentPieceStatus =

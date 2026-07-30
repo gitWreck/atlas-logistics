@@ -24319,8 +24319,8 @@ var require_icons = __commonJS({
 // src/index.js
 var import_react3 = __toESM(require_react());
 
-// ../../node_modules/@react-email/render/dist/node/index.mjs
-var import_react = __toESM(require_react2(), 1);
+// node_modules/@react-email/render/dist/node/index.mjs
+var import_react = __toESM(require_react(), 1);
 
 // ../../node_modules/prettier/plugins/html.mjs
 var html_exports = {};

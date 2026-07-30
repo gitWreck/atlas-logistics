@@ -1715,9 +1715,7 @@ export default function ScannerScreen() {
     } catch (error) {
       console.error(
         "Delivery proof completion failed:",
-        error?.code,
-        error?.message,
-        error,
+        error?.message || error,
       );
       Alert.alert(
         "Action Failed",

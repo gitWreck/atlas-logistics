@@ -45,6 +45,10 @@ export const updateShipmentStatus = httpsCallable(
   functions,
   "updateShipmentStatus",
 );
+export const resolveShipmentByLabel = httpsCallable(
+  functions,
+  "resolveShipmentByLabel",
+);
 export const reconcileShipmentAtHub = httpsCallable(
   functions,
   "reconcileShipmentAtHub",
