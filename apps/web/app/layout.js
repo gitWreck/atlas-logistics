@@ -6,7 +6,7 @@ config.autoAddCss = false; // <--- THIS LINE IS CRITICAL
 
 import "./globals.css";
 import { AlertProvider } from "./context/AlertContext";
-import IncomingCallListener from "./components/calls/IncomingCallListener";
+import IncomingCallListener from "./_components/calls/IncomingCallListener";
 
 export default function RootLayout({ children }) {
   return (

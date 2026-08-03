@@ -1,11 +1,11 @@
-import HeroSection from "./components/home/HeroSection";
-import HomeNav from "./components/home/HomeNav";
-import PickupSection from "./components/home/PickupSection";
-import ScheduleSection from "./components/home/ScheduleSection";
-import SupportSection from "./components/home/SupportSection";
-import TrackingSection from "./components/home/TrackingSection";
-import WarehousesSection from "./components/home/WarehousesSection";
-import { GuestChatProvider } from "./components/chat/GuestChatProvider";
+import HeroSection from "./_components/home/HeroSection";
+import HomeNav from "./_components/home/HomeNav";
+import PickupSection from "./_components/home/PickupSection";
+import ScheduleSection from "./_components/home/ScheduleSection";
+import SupportSection from "./_components/home/SupportSection";
+import TrackingSection from "./_components/home/TrackingSection";
+import WarehousesSection from "./_components/home/WarehousesSection";
+import { GuestChatProvider } from "./_components/chat/GuestChatProvider";
 
 export default function Home() {
   return (
