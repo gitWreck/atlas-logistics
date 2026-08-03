@@ -156,6 +156,14 @@ export default function PrintLabelsBundle() {
       </div>
     );
 
+  const labelPages = printItems.flatMap((item) =>
+    item.packagePages.map((packagePage, pageIndex) => ({
+      item,
+      packagePage,
+      pageIndex,
+    })),
+  );
+
   return (
     <div className="label-print-root bg-gray-100 min-h-screen p-8 print:m-0 print:min-h-0 print:p-0 print:bg-white text-black font-sans">
       {/* INSTRUCTIONS (Hidden when printing) */}
@@ -210,23 +218,22 @@ export default function PrintLabelsBundle() {
 
       {/* LABEL LIST */}
       <div className="flex flex-col items-center print:m-0 print:block print:p-0">
-        {printItems.map((item) =>
-          item.packagePages.map((packagePage, pageIndex) => (
-            <React.Fragment key={`${item.uniqueKey}-page-${pageIndex}`}>
-              <div className="label-container mb-8 print:mb-0">
-                <StandardLabel
-                  shipment={item.shipment}
-                  pkg={item.pkg}
-                  packagePage={packagePage}
-                  packagePageIndex={pageIndex}
-                  packagePageCount={item.packagePages.length}
-                  totalQuantity={item.totalQuantity}
-                />
-              </div>
-              <div className="page-break" />
-            </React.Fragment>
-          )),
-        )}
+        {labelPages.map(({ item, packagePage, pageIndex }, i) => (
+          <React.Fragment key={`${item.uniqueKey}-page-${pageIndex}`}>
+            <div className="label-container mb-8 print:mb-0">
+              <StandardLabel
+                shipment={item.shipment}
+                pkg={item.pkg}
+                packagePage={packagePage}
+                packagePageIndex={pageIndex}
+                packagePageCount={item.packagePages.length}
+                totalQuantity={item.totalQuantity}
+              />
+            </div>
+            {/* Only between labels — a break after the last one creates a blank page */}
+            {i < labelPages.length - 1 && <div className="page-break" />}
+          </React.Fragment>
+        ))}
       </div>
 
       <style jsx global>{`
@@ -336,7 +343,6 @@ export default function PrintLabelsBundle() {
 
           .shipping-label-bundle {
             border: 0 !important;
-            page-break-after: always;
           }
         }
       `}</style>

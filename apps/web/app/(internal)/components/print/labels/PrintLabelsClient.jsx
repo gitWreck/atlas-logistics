@@ -172,7 +172,7 @@ export default function PrintLabelsClient() {
 
       {/* LABEL LIST */}
       <div className="flex flex-col items-center print:m-0 print:block print:p-0">
-        {printItems.map((item) => (
+        {printItems.map((item, i) => (
           <React.Fragment key={item.uniqueKey}>
             <div className="label-container mb-8 print:mb-0">
               <StandardLabel
@@ -182,7 +182,8 @@ export default function PrintLabelsClient() {
                 total={item.totalInShipment}
               />
             </div>
-            <div className="page-break" />
+            {/* Only between labels — a break after the last one creates a blank page */}
+            {i < printItems.length - 1 && <div className="page-break" />}
           </React.Fragment>
         ))}
       </div>
@@ -315,7 +316,6 @@ export default function PrintLabelsClient() {
 
           .shipping-label {
             border: 0 !important;
-            page-break-after: always;
           }
         }
       `}</style>

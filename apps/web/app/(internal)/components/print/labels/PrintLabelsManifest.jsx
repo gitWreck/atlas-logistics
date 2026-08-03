@@ -334,7 +334,9 @@ export default function PrintManifest() {
                 </div>
               </div>
             </div>
-            <div className="page-break" />
+            {pageIndex < shipmentPages.length - 1 && (
+              <div className="page-break" />
+            )}
           </div>
         ))}
       </div>
