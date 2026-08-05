@@ -27,11 +27,64 @@ import TripDeliveryPoolSummary from "./TripDeliveryPoolSummary";
 import TripLoadSummary from "./TripLoadSummary";
 import TripShipmentProgressCell from "./TripShipmentProgressCell";
 import { aggregateTripLoadSummary } from "@/app/utility/tripStats";
+import { formatFirestoreDate } from "@/app/utility/utilities";
 import { isCompletedTrip } from "./tripHelpers";
 import TripCompletedManifestsView from "./TripCompletedManifestsView";
 
+function ActorMetaBlock({ byName, at, isDark = false, className = "" }) {
+  const when = formatFirestoreDate(at);
+  if (!byName && !when) return null;
+  return (
+    <div
+      className={`mt-1 space-y-0.5 text-[10px] leading-snug ${
+        isDark ? "text-slate-500" : "text-slate-500"
+      } ${className}`}
+    >
+      {byName ? <div>by {byName}</div> : null}
+      {when ? <div>{when}</div> : null}
+    </div>
+  );
+}
+
+function getCustomAddActor(shipment = {}) {
+  const entry = Array.isArray(shipment.customAddedPackageEntries)
+    ? shipment.customAddedPackageEntries.find(
+        (item) => item?.addedByName || item?.addedAt,
+      ) || shipment.customAddedPackageEntries[0]
+    : null;
+  return {
+    byName: shipment.customAddedByName || entry?.addedByName || null,
+    at: shipment.customAddedAt || entry?.addedAt || shipment.createdAt || null,
+  };
+}
+
+function CompactManualAddLabel({ shipment, isDark = false }) {
+  const { byName, at } = getCustomAddActor(shipment);
+  const when = formatFirestoreDate(at);
+  const details = [byName, when].filter(Boolean).join(" · ");
+  const full = details ? `Manual add · ${details}` : "Manual add";
+
+  return (
+    <div
+      className={`mt-0.5 text-[10px] truncate max-w-[220px] ${
+        isDark ? "text-amber-500/80" : "text-amber-700"
+      }`}
+      title={full}
+    >
+      Manual add
+      {details ? (
+        <span className={isDark ? "text-slate-500" : "text-slate-500"}>
+          {" "}
+          · {details}
+        </span>
+      ) : null}
+    </div>
+  );
+}
+
 export default function TripManifestTab({
   shipments = [],
+  removedManifestEntries = [],
   loading,
   isLocked,
   manifestEditable: manifestEditableProp,
@@ -174,6 +227,188 @@ export default function TripManifestTab({
       );
     });
   }, [shipments, search]);
+
+  const removedShipments = useMemo(() => {
+    const activeIds = new Set(
+      shipments.map((s) => String(s.id || s.trackingShipmentId || "")),
+    );
+    const byShipment = new Map();
+
+    const upsertRemoved = (docId, entry = {}) => {
+      if (!docId) return;
+      const packageId = entry?.packageId ? String(entry.packageId) : null;
+      const packageIds = [
+        ...new Set(
+          [
+            ...(Array.isArray(entry.packageIds) ? entry.packageIds : []),
+            ...(packageId ? [packageId] : []),
+          ]
+            .map((id) => String(id || "").trim())
+            .filter(Boolean),
+        ),
+      ];
+
+      const existing = byShipment.get(docId);
+      if (!existing) {
+        byShipment.set(docId, {
+          id: docId,
+          shipmentId: entry.shipmentId || docId,
+          trackingShipmentId: docId,
+          recipient: { name: entry.recipientName || "—" },
+          destinationCity: entry.destinationCity || "—",
+          removedPackageIds: packageIds,
+          removedPackages: packageIds.map((id) => ({
+            packageId: id,
+            removedByName: entry.removedByName || null,
+            removedAt: entry.removedAt || null,
+          })),
+          removedAt: entry.removedAt || null,
+          removedByName: entry.removedByName || null,
+          reason: entry.reason || null,
+          isRemoved: true,
+          stillOnManifest: activeIds.has(docId),
+        });
+        return;
+      }
+
+      const known = new Set(existing.removedPackageIds);
+      for (const id of packageIds) {
+        if (known.has(id)) continue;
+        known.add(id);
+        existing.removedPackageIds.push(id);
+        existing.removedPackages.push({
+          packageId: id,
+          removedByName: entry.removedByName || null,
+          removedAt: entry.removedAt || null,
+        });
+      }
+      if (
+        entry.removedAt &&
+        (!existing.removedAt || entry.removedAt > existing.removedAt)
+      ) {
+        existing.removedAt = entry.removedAt;
+        existing.removedByName = entry.removedByName || existing.removedByName;
+        existing.reason = entry.reason || existing.reason;
+      }
+    };
+
+    for (const entry of removedManifestEntries || []) {
+      const docId = String(entry?.shipmentDocId || "").trim();
+      upsertRemoved(docId, entry);
+    }
+
+    // Piece removals stored on remaining trip_shipments rows.
+    for (const shipment of shipments) {
+      const docId = String(shipment.id || shipment.trackingShipmentId || "").trim();
+      const entries = Array.isArray(shipment.removedPackageEntries)
+        ? shipment.removedPackageEntries
+        : [];
+      const ids = Array.isArray(shipment.removedPackageIds)
+        ? shipment.removedPackageIds
+        : [];
+      if (!docId || (entries.length === 0 && ids.length === 0)) continue;
+
+      if (entries.length > 0) {
+        for (const entry of entries) {
+          upsertRemoved(docId, {
+            shipmentId: shipment.shipmentId || docId,
+            recipientName: shipment.recipient?.name || "—",
+            destinationCity: shipment.recipient?.address?.city || "—",
+            packageId: entry.packageId,
+            packageIds: entry.packageId ? [entry.packageId] : [],
+            removedByName: entry.removedByName || null,
+            removedAt: entry.removedAt || null,
+          });
+        }
+      } else {
+        upsertRemoved(docId, {
+          shipmentId: shipment.shipmentId || docId,
+          recipientName: shipment.recipient?.name || "—",
+          destinationCity: shipment.recipient?.address?.city || "—",
+          packageIds: ids,
+        });
+      }
+    }
+
+    const keyword = search.toLowerCase().trim();
+    return [...byShipment.values()]
+      .filter((shipment) => shipment.removedPackageIds.length > 0 || !shipment.stillOnManifest)
+      .filter((shipment) => {
+        if (!keyword) return true;
+        const haystack = [
+          shipment.shipmentId,
+          shipment.recipient?.name,
+          ...(shipment.removedPackageIds || []),
+        ]
+          .join(" ")
+          .toLowerCase();
+        return haystack.includes(keyword);
+      });
+  }, [removedManifestEntries, shipments, search]);
+
+  const renderRemovedPieceList = (
+    pieces = [],
+    { sharedByName = null, sharedAt = null } = {},
+  ) => {
+    const seen = new Set();
+    const list = Array.isArray(pieces)
+      ? pieces
+          .map((item) =>
+            typeof item === "string"
+              ? { packageId: item, removedByName: null, removedAt: null }
+              : {
+                  packageId: item?.packageId || null,
+                  removedByName: item?.removedByName || null,
+                  removedAt: item?.removedAt || null,
+                },
+          )
+          .filter((item) => {
+            const packageId = String(item.packageId || "").trim();
+            if (!packageId || seen.has(packageId)) return false;
+            seen.add(packageId);
+            item.packageId = packageId;
+            return true;
+          })
+      : [];
+    if (!list.length) return null;
+
+    const sharedWhen = formatFirestoreDate(sharedAt);
+
+    return (
+      <div className="mt-1.5 flex flex-col gap-2">
+        {list.map((item) => {
+          const pieceWhen = formatFirestoreDate(item.removedAt);
+          const sameAsShared =
+            (item.removedByName || null) === (sharedByName || null) &&
+            pieceWhen === sharedWhen;
+          const showPieceMeta =
+            !sameAsShared && (item.removedByName || pieceWhen);
+
+          return (
+            <div key={item.packageId} className="min-w-0">
+              <span
+                className={`font-mono text-[10px] px-1.5 py-0.5 rounded border inline-block max-w-full break-all line-through ${
+                  isDark
+                    ? "text-red-400/90 border-red-500/20 bg-red-500/10"
+                    : "text-red-700 border-red-200 bg-red-50"
+                }`}
+                title={`Removed piece ${item.packageId}`}
+              >
+                {item.packageId}
+              </span>
+              {showPieceMeta ? (
+                <ActorMetaBlock
+                  byName={item.removedByName}
+                  at={item.removedAt}
+                  isDark={isDark}
+                />
+              ) : null}
+            </div>
+          );
+        })}
+      </div>
+    );
+  };
 
   useEffect(() => {
     setCurrentPage(1);
@@ -360,11 +595,16 @@ export default function TripManifestTab({
                 0;
               const isFullyLoaded = loadedCount >= (shipmentPieceTotal || 1);
               const shipmentStatus = shipment.status || "UNKNOWN";
+              const isCustomAdded = shipment.customAdded === true;
 
               return (
                 <div
                   key={shipment.id || idx}
-                  className={`rounded-2xl border p-4 transition-colors ${theme.container}`}
+                  className={`rounded-2xl border p-4 transition-colors border-l-2 ${theme.container} ${
+                    isCustomAdded
+                      ? "border-l-amber-500"
+                      : "border-l-transparent"
+                  }`}
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0 flex-1">
@@ -379,6 +619,12 @@ export default function TripManifestTab({
                       >
                         {shipment.recipient?.name || "Unknown"}
                       </div>
+                      {isCustomAdded ? (
+                        <CompactManualAddLabel
+                          shipment={shipment}
+                          isDark={isDark}
+                        />
+                      ) : null}
 
                       <div className="hidden">
                         {shipment.recipient?.address?.city || "—"}
@@ -556,6 +802,7 @@ export default function TripManifestTab({
                     const isFullyLoaded =
                       loadedCount >= (shipmentPieceTotal || 1);
                     const shipmentStatus = shipment.status || "UNKNOWN";
+                    const isCustomAdded = shipment.customAdded === true;
 
                     return (
                       <tr
@@ -563,7 +810,11 @@ export default function TripManifestTab({
                         className={`transition-colors ${theme.rowHover}`}
                       >
                         <td
-                          className={`px-4 py-3 text-center font-mono text-xs ${theme.cellSecondary}`}
+                          className={`px-4 py-3 text-center font-mono text-xs ${theme.cellSecondary} ${
+                            isCustomAdded
+                              ? "shadow-[inset_2px_0_0_0_rgb(245,158,11)]"
+                              : ""
+                          }`}
                         >
                           {pageStartIndex + idx + 1}
                         </td>
@@ -579,6 +830,12 @@ export default function TripManifestTab({
                           >
                             {shipment.recipient?.name || "Unknown"}
                           </div>
+                          {isCustomAdded ? (
+                            <CompactManualAddLabel
+                              shipment={shipment}
+                              isDark={isDark}
+                            />
+                          ) : null}
                         </td>
 
                         <td
@@ -701,6 +958,159 @@ export default function TripManifestTab({
             />
           )}
         </div>
+
+        {!loading && removedShipments.length > 0 && (
+          <div
+            className={`border rounded-2xl overflow-hidden ${theme.container}`}
+          >
+            <div
+              className={`px-4 py-3 border-b text-xs font-bold uppercase tracking-wider ${theme.header} ${theme.cellSecondary}`}
+            >
+              Removed from trip ({removedShipments.length})
+            </div>
+
+            <div className="block lg:hidden divide-y divide-slate-800/50">
+              {removedShipments.map((shipment) => (
+                <div
+                  key={`removed-mobile-${shipment.id}`}
+                  className={`p-4 border-l-2 border-l-red-500/70 opacity-80 ${theme.container}`}
+                >
+                  <div
+                    className={`font-bold text-sm font-mono ${
+                      shipment.stillOnManifest ? "" : "line-through"
+                    } ${theme.cellPrimary}`}
+                  >
+                    {shipment.shipmentId}
+                  </div>
+                  <div className={`text-sm mt-1 ${theme.cellSecondary}`}>
+                    {shipment.recipient?.name || "—"}
+                  </div>
+                  <div
+                    className={`text-[10px] mt-1 ${
+                      isDark ? "text-red-400/90" : "text-red-700"
+                    }`}
+                  >
+                    {shipment.stillOnManifest
+                      ? "Removed pieces from trip"
+                      : "Removed from trip"}
+                    {shipment.removedPackageIds?.length
+                      ? ` · ${shipment.removedPackageIds.length} piece(s)`
+                      : ""}
+                  </div>
+                  <ActorMetaBlock
+                    byName={shipment.removedByName}
+                    at={shipment.removedAt}
+                    isDark={isDark}
+                  />
+                  {renderRemovedPieceList(
+                    shipment.removedPackages?.length
+                      ? shipment.removedPackages
+                      : shipment.removedPackageIds,
+                    {
+                      sharedByName: shipment.removedByName,
+                      sharedAt: shipment.removedAt,
+                    },
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => onViewPackages?.(shipment)}
+                    className={`mt-3 text-xs border px-3 py-2 rounded-xl ${rowAction.view}`}
+                  >
+                    <FontAwesomeIcon icon={faBoxOpen} className="mr-2" />
+                    View pieces
+                  </button>
+                </div>
+              ))}
+            </div>
+
+            <div className="hidden lg:block overflow-x-auto">
+              <table className={`w-full text-left text-sm ${theme.tableText}`}>
+                <thead
+                  className={`uppercase font-bold text-[10px] tracking-wider ${theme.thead}`}
+                >
+                  <tr>
+                    <th className="px-4 py-3">Tracking / Customer</th>
+                    <th className="px-4 py-3">Removed pieces</th>
+                    <th className="px-4 py-3">Destination</th>
+                    <th className="px-4 py-3">Status</th>
+                    <th className="px-4 py-3 text-right">Action</th>
+                  </tr>
+                </thead>
+                <tbody className={`divide-y ${theme.tbodyDivide}`}>
+                  {removedShipments.map((shipment) => (
+                    <tr
+                      key={`removed-${shipment.id}`}
+                      className="opacity-80"
+                    >
+                      <td
+                        className={`px-4 py-3 shadow-[inset_2px_0_0_0_rgb(239,68,68)]`}
+                      >
+                        <div
+                          className={`font-bold text-xs font-mono ${
+                            shipment.stillOnManifest ? "" : "line-through"
+                          } ${theme.cellPrimary}`}
+                        >
+                          {shipment.shipmentId}
+                        </div>
+                        <div
+                          className={`text-[11px] truncate max-w-[180px] ${theme.cellSecondary}`}
+                        >
+                          {shipment.recipient?.name || "—"}
+                        </div>
+                        <ActorMetaBlock
+                          byName={shipment.removedByName}
+                          at={shipment.removedAt}
+                          isDark={isDark}
+                        />
+                      </td>
+                      <td className="px-4 py-3">
+                        {shipment.removedPackageIds?.length ? (
+                          renderRemovedPieceList(
+                            shipment.removedPackages?.length
+                              ? shipment.removedPackages
+                              : shipment.removedPackageIds,
+                            {
+                              sharedByName: shipment.removedByName,
+                              sharedAt: shipment.removedAt,
+                            },
+                          )
+                        ) : (
+                          <span className={`text-[10px] ${theme.cellSecondary}`}>
+                            Entire shipment
+                          </span>
+                        )}
+                      </td>
+                      <td className={`px-4 py-3 text-xs ${theme.cellSecondary}`}>
+                        {shipment.destinationCity || "—"}
+                      </td>
+                      <td className="px-4 py-3">
+                        <span
+                          className={`inline-flex items-center text-[9px] tracking-wider font-bold px-1.5 py-0.5 rounded border leading-none ${
+                            isDark
+                              ? "bg-red-500/10 text-red-400 border-red-500/20"
+                              : "bg-red-50 text-red-700 border-red-200"
+                          }`}
+                        >
+                          REMOVED
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        <button
+                          type="button"
+                          onClick={() => onViewPackages?.(shipment)}
+                          className={`text-xs border px-3 py-1.5 rounded transition-all ${rowAction.view}`}
+                          title="View pieces"
+                        >
+                          <FontAwesomeIcon icon={faBoxOpen} />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
       </div>
     </>
   );

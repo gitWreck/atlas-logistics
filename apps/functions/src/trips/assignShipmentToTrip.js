@@ -109,6 +109,12 @@ exports.assignShipmentToTrip = onCall(
 
       // 📦 Ensure trip_shipments exists (NO loading yet)
       if (!shipSnap.exists) {
+        const packageIdsAtAssign = packages
+          .map((pkg) => String(pkg.packageId || pkg.trackingNumber || "").trim())
+          .filter(Boolean);
+        const addedAt = admin.firestore.Timestamp.now();
+        const addedByName = actor.actorName || null;
+
         tx.set(shipRef, {
           trackingShipmentId,
           shipmentId: tracking.shipmentId || null,
@@ -133,6 +139,20 @@ exports.assignShipmentToTrip = onCall(
           updatedAt: now,
           updatedBy: uid,
           updatedRole: role,
+
+          customAdded: true,
+          addedVia: "DIRECT",
+          customAddedBy: uid,
+          customAddedByName: addedByName,
+          customAddedAt: addedAt,
+          customAddedPackageIds: packageIdsAtAssign,
+          customAddedPackageEntries: packageIdsAtAssign.map((packageId) => ({
+            packageId,
+            addedBy: uid,
+            addedByName,
+            addedAt,
+            addedVia: "DIRECT",
+          })),
 
           status: "ASSIGNED",
         });

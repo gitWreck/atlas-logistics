@@ -259,10 +259,37 @@ exports.unassignShipmentFromTrip = onCall(
       const nowTs = admin.firestore.Timestamp.now();
       const nowIso = new Date().toISOString();
 
+      const packagesBeingRemoved = (tracking.packages || []).filter((pkg) => {
+        const packageId = getPackageIdentity(pkg);
+        return requestedPackageId
+          ? packageId === requestedPackageId
+          : packageLinkedToTrip(pkg, tripId, packageBarcodes, {
+              scannedPackageIds,
+            });
+      });
+      const removedPackageIdList = packagesBeingRemoved
+        .map(getPackageIdentity)
+        .filter(Boolean);
+
       // ======================================================
       // 2. UPDATE TRUCK TRIP (Subtract Everything)
       // ======================================================
       // We subtract ALL counters that this shipment contributed to the trip
+      const removedEntry = {
+        shipmentDocId: trackingShipmentId,
+        shipmentId: tracking.shipmentId || trackingShipmentId,
+        packageId: requestedPackageId || null,
+        packageIds: removedPackageIdList,
+        recipientName: tracking.recipient?.name || null,
+        destinationCity: tracking.recipient?.address?.city || null,
+        reason: requestedPackageId
+          ? `Package ${requestedPackageId} removed from trip and reset to Received at Divisoria.`
+          : "Shipment removed from trip and reset to Received at Divisoria.",
+        removedAt: nowTs,
+        removedBy: uid,
+        removedByName: name || null,
+      };
+
       tx.update(tripRef, {
         totalItems: subtractCounter(trip, "totalItems", removeTotal),
         itemPending: subtractCounter(trip, "itemPending", removePending),
@@ -271,6 +298,7 @@ exports.unassignShipmentFromTrip = onCall(
         totalArrived: subtractCounter(trip, "totalArrived", removeDelivered),
         totalMissing: subtractCounter(trip, "totalMissing", removeMissing),
         totalDamaged: subtractCounter(trip, "totalDamaged", removeDamaged),
+        removedManifestEntries: FieldValue.arrayUnion(removedEntry),
         updatedAt: now,
         updatedBy: name,
       });
@@ -481,6 +509,14 @@ exports.unassignShipmentFromTrip = onCall(
           ),
           packageBarcodes: FieldValue.arrayRemove(requestedPackageId),
           scannedPackageIds: FieldValue.arrayRemove(requestedPackageId),
+          removedPackageIds: FieldValue.arrayUnion(requestedPackageId),
+          customAddedPackageIds: FieldValue.arrayRemove(requestedPackageId),
+          removedPackageEntries: FieldValue.arrayUnion({
+            packageId: requestedPackageId,
+            removedBy: uid,
+            removedByName: name || null,
+            removedAt: nowTs,
+          }),
           updatedAt: now,
           updatedBy: name,
         });

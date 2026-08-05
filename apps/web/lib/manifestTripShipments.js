@@ -27,12 +27,11 @@ export async function getManifestTripShipments(tripId) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  const snapshot = await adminDb
-    .collection("truck_trips")
-    .doc(normalizedTripId)
-    .collection("trip_shipments")
-    .orderBy("createdAt", "desc")
-    .get();
+  const tripRef = adminDb.collection("truck_trips").doc(normalizedTripId);
+  const [snapshot, tripSnap] = await Promise.all([
+    tripRef.collection("trip_shipments").orderBy("createdAt", "desc").get(),
+    tripRef.get(),
+  ]);
 
   const shipmentIds = snapshot.docs.map((doc) => doc.id);
   const rootRefs = shipmentIds.map((id) =>
@@ -46,6 +45,14 @@ export async function getManifestTripShipments(tripId) {
       rootMap[snap.id] = snap.data();
     }
   });
+
+  const actorUidSet = new Set();
+  snapshot.docs.forEach((doc) => {
+    const data = doc.data() || {};
+    collectActorUids(data, actorUidSet);
+  });
+
+  const actorNameByUid = await resolveUserDisplayNames([...actorUidSet]);
 
   const shipments = snapshot.docs.map((doc) => {
     const data = doc.data();
@@ -129,6 +136,28 @@ export async function getManifestTripShipments(tripId) {
       root.invoiceStatus !== "CANCELLED" &&
       (root.hasInvoice || Boolean(root.invoiceId));
 
+    const customAddedBy =
+      data.customAddedBy ||
+      (data.customAdded === true ? data.createdBy || null : null);
+    const customAddedByName = resolveActorName(
+      data.customAddedByName,
+      customAddedBy,
+      actorNameByUid,
+    );
+    const customAddedPackageEntries = enrichActorPackageEntries(
+      serializeActorPackageEntries(data.customAddedPackageEntries, "addedAt"),
+      {
+        fallbackName: customAddedByName,
+        fallbackAt: serializeTimestamp(data.customAddedAt) ||
+          (data.createdAt?.toDate
+            ? data.createdAt.toDate().toISOString()
+            : null),
+        fallbackBy: customAddedBy,
+        nameByUid: actorNameByUid,
+        packageIds: data.customAddedPackageIds,
+      },
+    );
+
     return {
       id: doc.id,
       ...data,
@@ -190,8 +219,164 @@ export async function getManifestTripShipments(tripId) {
       updatedAt: data.updatedAt?.toDate
         ? data.updatedAt.toDate().toISOString()
         : null,
+      customAddedAt:
+        serializeTimestamp(data.customAddedAt) ||
+        (data.customAdded === true && data.createdAt?.toDate
+          ? data.createdAt.toDate().toISOString()
+          : null),
+      customAddedBy,
+      customAddedByName,
+      customAddedPackageEntries,
+      removedPackageEntries: serializeActorPackageEntries(
+        data.removedPackageEntries,
+        "removedAt",
+      ),
     };
   });
 
-  return NextResponse.json({ shipments });
+  return NextResponse.json({
+    shipments,
+    removedManifestEntries: serializeRemovedManifestEntries(
+      tripSnap.exists ? tripSnap.data()?.removedManifestEntries : [],
+    ),
+  });
+}
+
+function looksLikeUserId(value) {
+  const text = String(value || "").trim();
+  if (!text || /\s/.test(text)) return false;
+  return /^[A-Za-z0-9_-]{20,}$/.test(text);
+}
+
+function collectActorUids(data = {}, uidSet) {
+  const maybeAdd = (uid, hasName) => {
+    if (!hasName && looksLikeUserId(uid)) uidSet.add(String(uid));
+  };
+
+  maybeAdd(
+    data.customAdded === true ? data.customAddedBy || data.createdBy : data.customAddedBy,
+    Boolean(data.customAddedByName),
+  );
+
+  for (const entry of data.customAddedPackageEntries || []) {
+    maybeAdd(entry?.addedBy, Boolean(entry?.addedByName));
+  }
+  for (const entry of data.removedPackageEntries || []) {
+    maybeAdd(entry?.removedBy, Boolean(entry?.removedByName));
+  }
+}
+
+async function resolveUserDisplayNames(uids = []) {
+  const unique = [...new Set(uids.map(String).filter(Boolean))];
+  const nameByUid = new Map();
+  if (!unique.length) return nameByUid;
+
+  const refs = unique.map((uid) => adminDb.collection("users").doc(uid));
+  const snaps = await adminDb.getAll(...refs);
+  snaps.forEach((snap, index) => {
+    if (!snap.exists) return;
+    const user = snap.data() || {};
+    const name =
+      user.name ||
+      user.displayName ||
+      user.fullName ||
+      user.email ||
+      unique[index];
+    nameByUid.set(unique[index], name);
+  });
+  return nameByUid;
+}
+
+function resolveActorName(existingName, uid, nameByUid) {
+  if (existingName) return existingName;
+  if (!uid) return null;
+  if (!looksLikeUserId(uid)) return String(uid);
+  return nameByUid.get(String(uid)) || null;
+}
+
+function enrichActorPackageEntries(
+  entries = [],
+  {
+    fallbackName = null,
+    fallbackAt = null,
+    fallbackBy = null,
+    nameByUid = new Map(),
+    packageIds = [],
+  } = {},
+) {
+  const byPackageId = new Map();
+
+  for (const entry of entries) {
+    const packageId = String(entry?.packageId || "").trim();
+    if (!packageId) continue;
+    byPackageId.set(packageId, {
+      ...entry,
+      addedBy: entry.addedBy || fallbackBy || null,
+      addedByName: resolveActorName(
+        entry.addedByName,
+        entry.addedBy || fallbackBy,
+        nameByUid,
+      ) || fallbackName,
+      addedAt: entry.addedAt || fallbackAt,
+    });
+  }
+
+  for (const rawId of packageIds || []) {
+    const packageId = String(rawId || "").trim();
+    if (!packageId || byPackageId.has(packageId)) continue;
+    byPackageId.set(packageId, {
+      packageId,
+      addedBy: fallbackBy || null,
+      addedByName: fallbackName || null,
+      addedAt: fallbackAt || null,
+      addedVia: null,
+    });
+  }
+
+  return [...byPackageId.values()];
+}
+
+function serializeTimestamp(value) {
+  if (!value) return null;
+  if (value?.toDate) return value.toDate().toISOString();
+  return value;
+}
+
+function serializeActorPackageEntries(entries, atField) {
+  if (!Array.isArray(entries)) return [];
+  return entries.map((entry) => ({
+    packageId: entry?.packageId || null,
+    addedBy: entry?.addedBy || null,
+    addedByName: entry?.addedByName || null,
+    addedVia: entry?.addedVia || null,
+    removedBy: entry?.removedBy || null,
+    removedByName: entry?.removedByName || null,
+    [atField]: serializeTimestamp(entry?.[atField]),
+  }));
+}
+
+function serializeRemovedManifestEntries(entries) {
+  if (!Array.isArray(entries)) return [];
+  return entries.map((entry) => {
+    const removedAt = entry?.removedAt;
+    return {
+      shipmentDocId: entry?.shipmentDocId || null,
+      shipmentId: entry?.shipmentId || entry?.shipmentDocId || null,
+      packageId: entry?.packageId || null,
+      packageIds: Array.isArray(entry?.packageIds)
+        ? entry.packageIds.map(String).filter(Boolean)
+        : entry?.packageId
+          ? [String(entry.packageId)]
+          : [],
+      recipientName: entry?.recipientName || null,
+      destinationCity: entry?.destinationCity || null,
+      reason: entry?.reason || null,
+      removedBy: entry?.removedBy || null,
+      removedByName: entry?.removedByName || null,
+      removedAt:
+        removedAt?.toDate
+          ? removedAt.toDate().toISOString()
+          : removedAt || null,
+    };
+  });
 }

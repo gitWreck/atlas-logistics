@@ -437,6 +437,23 @@ exports.manualAssignShipmentToTrip = onCall(
                 createdBy: uid,
               }
             : {}),
+          customAdded: true,
+          addedVia: "MANUAL",
+          customAddedBy: uid,
+          customAddedByName: name || null,
+          customAddedAt: admin.firestore.Timestamp.now(),
+          customAddedPackageIds: admin.firestore.FieldValue.arrayUnion(
+            ...addedPackageIds,
+          ),
+          customAddedPackageEntries: admin.firestore.FieldValue.arrayUnion(
+            ...addedPackageIds.map((packageId) => ({
+              packageId,
+              addedBy: uid,
+              addedByName: name || null,
+              addedAt: admin.firestore.Timestamp.now(),
+              addedVia: "MANUAL",
+            })),
+          ),
           updatedAt: now,
           updatedBy: name,
           updatedRole: role,

@@ -44,6 +44,7 @@ export default function TripDrawer({
 }) {
   const [activeTab, setActiveTab] = useState("TIMELINE");
   const [shipments, setShipments] = useState([]);
+  const [removedManifestEntries, setRemovedManifestEntries] = useState([]);
   const [loadingShips, setLoadingShips] = useState(false);
   const [manifestTripId, setManifestTripId] = useState(null);
   const fetchInFlightRef = useRef(null);
@@ -96,6 +97,11 @@ export default function TripDrawer({
           const json = await res.json();
           const list = json.shipments || [];
           setShipments(list);
+          setRemovedManifestEntries(
+            Array.isArray(json.removedManifestEntries)
+              ? json.removedManifestEntries
+              : [],
+          );
           setManifestTripId(data.tripId);
           return list;
         } catch (error) {
@@ -144,6 +150,7 @@ export default function TripDrawer({
     if (isOpen && data?.tripId) {
       setActiveTab("TIMELINE");
       setShipments([]);
+      setRemovedManifestEntries([]);
       setManifestTripId(null);
       fetchInFlightRef.current = null;
     }
@@ -364,6 +371,7 @@ export default function TripDrawer({
           {activeTab === "MANIFEST" && (
             <TripManifestTab
               shipments={shipments}
+              removedManifestEntries={removedManifestEntries}
               loading={loadingShips}
               isLocked={data.manifestLocked}
               manifestEditable={isManifestEditable(data)}
@@ -424,6 +432,7 @@ export default function TripDrawer({
         isOpen={!!selectedShipmentForModal}
         shipment={selectedShipmentForModal}
         tripId={data?.id || data?.tripId || null}
+        removedManifestEntries={removedManifestEntries}
         onClose={() => setSelectedShipmentForModal(null)}
         isLocked={data.manifestLocked}
         onRefresh={() => {

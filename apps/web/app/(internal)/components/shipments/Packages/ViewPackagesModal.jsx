@@ -69,6 +69,7 @@ export default function ViewPackagesModal({
   onClose,
   shipment,
   tripId = null,
+  removedManifestEntries = [],
   isLocked,
   onRefresh,
   isDark = false,
@@ -102,6 +103,153 @@ export default function ViewPackagesModal({
   const modalTheme = getModalThemeClasses(isDark);
   const modalAction = getModalActionClasses();
   const tableTheme = getTableTheme(isDark);
+
+  const customAddedPackageIdSet = useMemo(() => {
+    const ids = Array.isArray(shipment?.customAddedPackageIds)
+      ? shipment.customAddedPackageIds
+      : [];
+    return new Set(ids.map((id) => String(id || "").trim()).filter(Boolean));
+  }, [shipment?.customAddedPackageIds]);
+
+  const customAddedByNameByPackageId = useMemo(() => {
+    const map = new Map();
+    const fallbackName = shipment?.customAddedByName || null;
+    const fallbackAt = shipment?.customAddedAt || null;
+    for (const entry of shipment?.customAddedPackageEntries || []) {
+      const packageId = String(entry?.packageId || "").trim();
+      if (!packageId) continue;
+      map.set(packageId, {
+        name: entry.addedByName || fallbackName,
+        at: entry.addedAt || fallbackAt,
+      });
+    }
+    for (const id of customAddedPackageIdSet) {
+      if (!map.has(id)) {
+        map.set(id, { name: fallbackName, at: fallbackAt });
+      }
+    }
+    return map;
+  }, [
+    shipment?.customAddedByName,
+    shipment?.customAddedAt,
+    shipment?.customAddedPackageEntries,
+    customAddedPackageIdSet,
+  ]);
+
+  const removedPackageIdSet = useMemo(() => {
+    const fromShipment = Array.isArray(shipment?.removedPackageIds)
+      ? shipment.removedPackageIds
+      : [];
+    const shipmentKey = String(
+      shipment?.id || shipment?.trackingShipmentId || "",
+    ).trim();
+    const fromTripEntries = (removedManifestEntries || [])
+      .filter(
+        (entry) => String(entry?.shipmentDocId || "").trim() === shipmentKey,
+      )
+      .flatMap((entry) => {
+        if (Array.isArray(entry?.packageIds) && entry.packageIds.length) {
+          return entry.packageIds;
+        }
+        return entry?.packageId ? [entry.packageId] : [];
+      });
+    return new Set(
+      [...fromShipment, ...fromTripEntries]
+        .map((id) => String(id || "").trim())
+        .filter(Boolean),
+    );
+  }, [
+    shipment?.id,
+    shipment?.trackingShipmentId,
+    shipment?.removedPackageIds,
+    removedManifestEntries,
+  ]);
+
+  const removedByNameByPackageId = useMemo(() => {
+    const map = new Map();
+    const shipmentKey = String(
+      shipment?.id || shipment?.trackingShipmentId || "",
+    ).trim();
+
+    for (const entry of shipment?.removedPackageEntries || []) {
+      const packageId = String(entry?.packageId || "").trim();
+      if (!packageId) continue;
+      map.set(packageId, {
+        name: entry.removedByName || null,
+        at: entry.removedAt || null,
+      });
+    }
+
+    for (const entry of removedManifestEntries || []) {
+      if (String(entry?.shipmentDocId || "").trim() !== shipmentKey) continue;
+      const ids =
+        Array.isArray(entry?.packageIds) && entry.packageIds.length
+          ? entry.packageIds
+          : entry?.packageId
+            ? [entry.packageId]
+            : [];
+      for (const id of ids) {
+        const packageId = String(id || "").trim();
+        if (!packageId) continue;
+        const prev = map.get(packageId) || {};
+        map.set(packageId, {
+          name: entry.removedByName || prev.name || null,
+          at: entry.removedAt || prev.at || null,
+        });
+      }
+    }
+
+    return map;
+  }, [
+    shipment?.id,
+    shipment?.trackingShipmentId,
+    shipment?.removedPackageEntries,
+    removedManifestEntries,
+  ]);
+
+  const isCustomAddedPackage = (pkg) => {
+    const packageId = String(pkg?.packageId || pkg?.trackingNumber || "").trim();
+    return packageId ? customAddedPackageIdSet.has(packageId) : false;
+  };
+
+  const isRemovedPackage = (pkg) => {
+    const packageId = String(pkg?.packageId || pkg?.trackingNumber || "").trim();
+    return packageId ? removedPackageIdSet.has(packageId) : false;
+  };
+
+  const formatPackageActorMeta = (name, at) => {
+    const when = formatFirestoreDate(at);
+    return { byName: name || "", when };
+  };
+
+  const renderPackageActorMeta = (name, at) => {
+    const { byName, when } = formatPackageActorMeta(name, at);
+    if (!byName && !when) return null;
+    return (
+      <div
+        className={`mt-1 space-y-0.5 text-[10px] leading-snug ${
+          isDark ? "text-slate-500" : "text-slate-500"
+        }`}
+      >
+        {byName ? <div>by {byName}</div> : null}
+        {when ? <div>{when}</div> : null}
+      </div>
+    );
+  };
+
+  const getAddedActorMetaNode = (pkg) => {
+    const packageId = String(pkg?.packageId || pkg?.trackingNumber || "").trim();
+    if (!packageId || !customAddedPackageIdSet.has(packageId)) return null;
+    const meta = customAddedByNameByPackageId.get(packageId) || {};
+    return renderPackageActorMeta(meta.name, meta.at);
+  };
+
+  const getRemovedActorMetaNode = (pkg) => {
+    const packageId = String(pkg?.packageId || pkg?.trackingNumber || "").trim();
+    if (!packageId || !removedPackageIdSet.has(packageId)) return null;
+    const meta = removedByNameByPackageId.get(packageId) || {};
+    return renderPackageActorMeta(meta.name, meta.at);
+  };
 
   useEffect(() => {
     if (isOpen && shipment?.id) {
@@ -168,11 +316,13 @@ export default function ViewPackagesModal({
 
   const tripScopedPackages = useMemo(() => {
     if (!tripId || !scopeToTrip) return packages;
-    const scoped = packages.filter(packageBelongsToTrip);
+    const scoped = packages.filter(
+      (pkg) => packageBelongsToTrip(pkg) || isRemovedPackage(pkg),
+    );
     // Fall back to all pieces if none are trip-linked yet (e.g. just assigned,
     // not yet scanned) so the list is never confusingly empty.
     return scoped.length > 0 ? scoped : packages;
-  }, [packages, tripId, scopeToTrip]);
+  }, [packages, tripId, scopeToTrip, removedPackageIdSet]);
 
   const tripScopeActive =
     Boolean(tripId) &&
@@ -695,10 +845,44 @@ export default function ViewPackagesModal({
                                       </span>
                                     )}
 
+                                    {isCustomAddedPackage(pkg) &&
+                                      !isRemovedPackage(pkg) && (
+                                      <span
+                                        className={`font-bold px-1.5 py-0.5 rounded border ${
+                                          isDark
+                                            ? "text-amber-500/90 border-amber-500/20 bg-amber-500/10"
+                                            : "text-amber-700 border-amber-300 bg-amber-50"
+                                        }`}
+                                      >
+                                        Manual add
+                                      </span>
+                                    )}
+
+                                    {isRemovedPackage(pkg) && (
+                                      <span
+                                        className={`font-bold px-1.5 py-0.5 rounded border ${
+                                          isDark
+                                            ? "text-red-400 border-red-500/20 bg-red-500/10"
+                                            : "text-red-700 border-red-200 bg-red-50"
+                                        }`}
+                                      >
+                                        Removed
+                                      </span>
+                                    )}
+
                                     <span className="text-blue-500 font-bold">
                                       {pkg.quantity || 1} pcs
                                     </span>
                                   </div>
+                                  {(() => {
+                                    if (isRemovedPackage(pkg)) {
+                                      return getRemovedActorMetaNode(pkg);
+                                    }
+                                    if (isCustomAddedPackage(pkg)) {
+                                      return getAddedActorMetaNode(pkg);
+                                    }
+                                    return null;
+                                  })()}
 
                                   <div className="mt-3 flex items-center gap-2">
                                     <StatusBadge
@@ -995,10 +1179,44 @@ export default function ViewPackagesModal({
                                             </span>
                                           )}
 
+                                          {isCustomAddedPackage(pkg) &&
+                                            !isRemovedPackage(pkg) && (
+                                            <span
+                                              className={`font-bold px-1.5 py-0.5 rounded border ${
+                                                isDark
+                                                  ? "text-amber-500/90 border-amber-500/20 bg-amber-500/10"
+                                                  : "text-amber-700 border-amber-300 bg-amber-50"
+                                              }`}
+                                            >
+                                              Manual add
+                                            </span>
+                                          )}
+
+                                          {isRemovedPackage(pkg) && (
+                                            <span
+                                              className={`font-bold px-1.5 py-0.5 rounded border ${
+                                                isDark
+                                                  ? "text-red-400 border-red-500/20 bg-red-500/10"
+                                                  : "text-red-700 border-red-200 bg-red-50"
+                                              }`}
+                                            >
+                                              Removed
+                                            </span>
+                                          )}
+
                                           <span className="text-blue-500 font-bold">
                                             {pkg.quantity || 1} pcs
                                           </span>
                                         </div>
+                                        {(() => {
+                                          if (isRemovedPackage(pkg)) {
+                                            return getRemovedActorMetaNode(pkg);
+                                          }
+                                          if (isCustomAddedPackage(pkg)) {
+                                            return getAddedActorMetaNode(pkg);
+                                          }
+                                          return null;
+                                        })()}
                                       </div>
                                     )}
                                   </td>
