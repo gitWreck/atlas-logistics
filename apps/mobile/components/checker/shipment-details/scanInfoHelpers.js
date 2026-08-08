@@ -223,6 +223,127 @@ function buildReconcileResult(shipmentData = {}) {
   return `${received ?? "—"} of ${expected ?? "—"} pieces matched`;
 }
 
+function resolveShipmentDeliverySection({
+  shipmentData = {},
+  releaseEvent = null,
+  loadVanEvent = null,
+  ofdEvent = null,
+}) {
+  return {
+    releasedTo:
+      releaseEvent?.checkerName ||
+      (releaseEvent?.eventType === "RELEASED_FOR_DELIVERY_OPERATIONS"
+        ? "Delivery operations pool (warehouse custody until load)"
+        : null) ||
+      shipmentData.assignedCheckerName ||
+      shipmentData.checkerName ||
+      null,
+    deliveryVehicle:
+      releaseEvent?.deliveryVehicleName ||
+      shipmentData.deliveryVehicleName ||
+      shipmentData.deliveryVehicleId ||
+      null,
+    plate: shipmentData.deliveryVehiclePlate || null,
+    driver:
+      loadVanEvent?.driverName ||
+      ofdEvent?.driverName ||
+      shipmentData.deliveryDriverName ||
+      null,
+    loadedForDelivery: formatTimestamp(loadVanEvent?.timestamp),
+    outForDelivery: formatTimestamp(ofdEvent?.timestamp),
+  };
+}
+
+/**
+ * Piece view must use piece custody/vehicle fields. Shipment-level
+ * deliveryVehicleName is often the last loader and misleads on split vans.
+ */
+function resolvePieceDeliverySection({
+  pkg = null,
+  shipmentData = {},
+  releaseEvent = null,
+  loadVanEvent = null,
+  ofdEvent = null,
+}) {
+  if (!pkg) {
+    return resolveShipmentDeliverySection({
+      shipmentData,
+      releaseEvent,
+      loadVanEvent,
+      ofdEvent,
+    });
+  }
+
+  const custodyType = String(pkg.custodyOwnerType || "").toUpperCase();
+  const hasPieceChecker = !!(
+    pkg.loadedByCheckerId ||
+    (custodyType === "CHECKER" && pkg.custodyOwnerId)
+  );
+  // Prefer piece loader name only — timeline events can still carry the
+  // shipment's last-loader checker on split vans.
+  const checkerName = hasPieceChecker
+    ? pkg.loadedByCheckerName || null
+    : pkg.loadedByCheckerName ||
+      loadVanEvent?.checkerName ||
+      ofdEvent?.checkerName ||
+      null;
+
+  let releasedTo = null;
+  if (custodyType === "CUSTOMER") {
+    releasedTo = "Delivered to customer";
+  } else if (hasPieceChecker) {
+    releasedTo = checkerName
+      ? `Loaded by ${checkerName}`
+      : "Loaded to checker van";
+  } else if (
+    custodyType === "WAREHOUSE" ||
+    pkg.availableForDelivery === true ||
+    releaseEvent?.eventType === "RELEASED_FOR_DELIVERY_OPERATIONS"
+  ) {
+    releasedTo = "Delivery operations pool (warehouse custody until load)";
+  } else {
+    releasedTo =
+      releaseEvent?.checkerName ||
+      shipmentData.assignedCheckerName ||
+      shipmentData.checkerName ||
+      null;
+  }
+
+  // Never fall back to shipment/event vehicle once the piece has a checker.
+  // Split loads leave shipment.deliveryVehicleName as the last loader.
+  const pieceVehicle = hasPieceChecker
+    ? pkg.deliveryVehicleName ||
+      (checkerName ? `${checkerName}'s van` : null)
+    : pkg.deliveryVehicleName ||
+      loadVanEvent?.deliveryVehicleName ||
+      ofdEvent?.deliveryVehicleName ||
+      releaseEvent?.deliveryVehicleName ||
+      shipmentData.deliveryVehicleName ||
+      shipmentData.deliveryVehicleId ||
+      null;
+
+  return {
+    releasedTo,
+    deliveryVehicle: pieceVehicle,
+    plate: hasPieceChecker
+      ? pkg.deliveryVehiclePlate || null
+      : pkg.deliveryVehiclePlate || shipmentData.deliveryVehiclePlate || null,
+    driver: hasPieceChecker
+      ? checkerName || null
+      : checkerName ||
+        loadVanEvent?.driverName ||
+        ofdEvent?.driverName ||
+        shipmentData.deliveryDriverName ||
+        null,
+    loadedForDelivery: formatTimestamp(
+      pkg.loadedAt || loadVanEvent?.timestamp,
+    ),
+    outForDelivery: formatTimestamp(
+      pkg.outForDeliveryAt || ofdEvent?.timestamp,
+    ),
+  };
+}
+
 export function buildScanInfoSections({
   shipmentData = {},
   events = [],
@@ -270,6 +391,21 @@ export function buildScanInfoSections({
     acc[key] = (acc[key] || 0) + 1;
     return acc;
   }, {});
+
+  const delivery = isPieceView
+    ? resolvePieceDeliverySection({
+        pkg: matchedPkg,
+        shipmentData,
+        releaseEvent,
+        loadVanEvent,
+        ofdEvent,
+      })
+    : resolveShipmentDeliverySection({
+        shipmentData,
+        releaseEvent,
+        loadVanEvent,
+        ofdEvent,
+      });
 
   return {
     summary: {
@@ -333,29 +469,7 @@ export function buildScanInfoSections({
       returnedAt: formatTimestamp(shipmentData.returnedAt),
       failureReason: shipmentData.failureReasonCode || null,
     },
-    delivery: {
-      releasedTo:
-        releaseEvent?.checkerName ||
-        (releaseEvent?.eventType === "RELEASED_FOR_DELIVERY_OPERATIONS"
-          ? "Delivery operations pool (warehouse custody until load)"
-          : null) ||
-        shipmentData.assignedCheckerName ||
-        shipmentData.checkerName ||
-        null,
-      deliveryVehicle:
-        releaseEvent?.deliveryVehicleName ||
-        shipmentData.deliveryVehicleName ||
-        shipmentData.deliveryVehicleId ||
-        null,
-      plate: shipmentData.deliveryVehiclePlate || null,
-      driver:
-        loadVanEvent?.driverName ||
-        ofdEvent?.driverName ||
-        shipmentData.deliveryDriverName ||
-        null,
-      loadedForDelivery: formatTimestamp(loadVanEvent?.timestamp),
-      outForDelivery: formatTimestamp(ofdEvent?.timestamp),
-    },
+    delivery,
     deliveryStatus: {
       currentStatus,
       attempts: countDeliveryAttempts(events),
@@ -375,8 +489,17 @@ export function buildScanInfoSections({
         shipmentData.currentTruckTripId ||
         loadedTripEvent?.tripId ||
         null,
-      checkerId: shipmentData.assignedCheckerId || null,
-      checkerName: shipmentData.assignedCheckerName || null,
+      checkerId: isPieceView
+        ? matchedPkg?.loadedByCheckerId ||
+          (String(matchedPkg?.custodyOwnerType || "").toUpperCase() ===
+          "CHECKER"
+            ? matchedPkg?.custodyOwnerId
+            : null) ||
+          null
+        : shipmentData.assignedCheckerId || null,
+      checkerName: isPieceView
+        ? matchedPkg?.loadedByCheckerName || null
+        : shipmentData.assignedCheckerName || null,
       eventCount: events.length,
       hashChainStatus: "Not enabled",
     },

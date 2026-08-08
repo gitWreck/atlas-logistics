@@ -10,9 +10,11 @@ import {
   Dimensions,
   ActivityIndicator,
 } from "react-native";
+import { doc, getDoc } from "firebase/firestore";
 import { FontAwesome5 } from "@expo/vector-icons";
 import { useTheme } from "../../../contexts/ThemeContext";
 import { useShipmentCustodyTimeline } from "../../../hooks/useShipmentCustodyTimeline";
+import { db } from "../../../firebase";
 import StatusBadge from "../../ui/StatusBadge";
 import {
   buildMilestoneChecklist,
@@ -204,10 +206,43 @@ export default function ScanInfoAuditScreen({
   const isDark = resolvedScheme === "dark";
   const shipmentId = data?.id || data?.shipmentId || null;
   const scannedCode = data?.scannedPackageId || data?.scannedCode || "";
+  const [liveShipment, setLiveShipment] = useState(null);
+
+  useEffect(() => {
+    if (!visible || !shipmentId) {
+      setLiveShipment(null);
+      return undefined;
+    }
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const snap = await getDoc(doc(db, "shipments", String(shipmentId)));
+        if (cancelled || !snap.exists()) return;
+        setLiveShipment({ id: snap.id, ...snap.data() });
+      } catch (error) {
+        console.warn("Scan Info shipment refresh failed:", error);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [visible, shipmentId]);
+
+  const shipmentData = useMemo(() => {
+    const base = liveShipment || data || {};
+    return {
+      ...base,
+      id: shipmentId || base.id,
+      scannedPackageId: scannedCode || base.scannedPackageId,
+      scannedCode: scannedCode || base.scannedCode,
+    };
+  }, [liveShipment, data, shipmentId, scannedCode]);
 
   const pieceContext = useMemo(
-    () => resolveScannedPieceContext(data || {}, scannedCode),
-    [data, scannedCode],
+    () => resolveScannedPieceContext(shipmentData, scannedCode),
+    [shipmentData, scannedCode],
   );
 
   const [viewScope, setViewScope] = useState(pieceContext.defaultViewScope);
@@ -231,12 +266,12 @@ export default function ScanInfoAuditScreen({
   const sections = useMemo(
     () =>
       buildScanInfoSections({
-        shipmentData: { ...data, id: shipmentId },
+        shipmentData,
         events,
         pieceId: activePieceId,
         viewScope,
       }),
-    [data, shipmentId, events, activePieceId, viewScope],
+    [shipmentData, events, activePieceId, viewScope],
   );
 
   const milestones = useMemo(() => buildMilestoneChecklist(events), [events]);
