@@ -15,6 +15,23 @@ function buildInvoiceRouteLabel(source = {}, fallback = EMPTY_INVOICE_VALUE) {
   return `${origin} -> ${destination}`;
 }
 
+function formatInvoiceContactAddress(contact = {}) {
+  if (contact.formattedAddress) return contact.formattedAddress;
+
+  const address = contact.address || {};
+
+  return [
+    address.unit,
+    address.street,
+    address.barangay,
+    address.city,
+    address.province,
+  ]
+    .map((part) => String(part || "").trim())
+    .filter(Boolean)
+    .join(", ");
+}
+
 function buildInitialForm(shipment, invoice, mode) {
   if (mode === "edit" && invoice) {
     return {
@@ -30,7 +47,7 @@ function buildInitialForm(shipment, invoice, mode) {
       dueDate: invoice.dueDate || "",
       billingName: invoice.billingName || shipment?.sender?.name || "",
       billingAddress:
-        invoice.billingAddress || shipment?.sender?.formattedAddress || "",
+        invoice.billingAddress || formatInvoiceContactAddress(shipment?.sender),
       senderName: invoice.senderName || shipment?.sender?.name || "",
       senderPhone: invoice.senderPhone || shipment?.sender?.phone || "",
       recipientName: invoice.recipientName || shipment?.recipient?.name || "",
@@ -63,7 +80,7 @@ function buildInitialForm(shipment, invoice, mode) {
     invoiceDate: "",
     dueDate: "",
     billingName: shipment?.sender?.name || "",
-    billingAddress: shipment?.sender?.formattedAddress || "",
+    billingAddress: formatInvoiceContactAddress(shipment?.sender),
     senderName: shipment?.sender?.name || "",
     senderPhone: shipment?.sender?.phone || "",
     recipientName: shipment?.recipient?.name || "",
@@ -183,6 +200,7 @@ export {
   INVOICE_STATUSES,
   buildInitialForm,
   buildInvoiceRouteLabel,
+  formatInvoiceContactAddress,
   formatAmount,
   parseInvoiceDate,
   formatInvoiceDate,

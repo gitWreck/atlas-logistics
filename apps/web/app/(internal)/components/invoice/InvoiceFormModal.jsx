@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faTimes,
@@ -10,11 +10,60 @@ import {
 } from "@fortawesome/free-solid-svg-icons";
 import { getModalThemeClasses } from "@/app/utility/constant/theme";
 import { getModalActionClasses } from "@/app/utility/constant/action";
-import { buildInitialForm, getInvoiceTripId } from "./invoiceHelpers";
 import {
-  getShipmentTripId,
+  buildInitialForm,
+  buildInvoiceRouteLabel,
+  formatInvoiceContactAddress,
+} from "./invoiceHelpers";
+import {
+  getShipmentTripIds,
   getShipmentTripIdsLabel,
+  shipmentIsOnTrip,
 } from "../shipments/shipmentHelpers";
+
+function clearSelectedShipment(form, truckTripId = "") {
+  return {
+    ...form,
+    shipmentId: "",
+    shipmentTrackingNumber: "",
+    shipmentStatus: "",
+    truckTripId,
+    senderName: "",
+    senderPhone: "",
+    recipientName: "",
+    recipientPhone: "",
+    origin: "",
+    destination: "",
+    routeLabel: "",
+    billingName: "",
+    billingAddress: "",
+    totalPackages: 0,
+    totalItems: 0,
+    shipmentSnapshot: null,
+  };
+}
+
+function getShipmentPackageTotals(shipment = {}) {
+  const totalPackages = Array.isArray(shipment.packages)
+    ? shipment.packages.length
+    : Number(
+        shipment.totals?.totalPackages ??
+          shipment.metrics?.totalPackages ??
+          0,
+      );
+
+  const totalItems = Number(
+    shipment.totals?.totalContentQty ??
+      shipment.totals?.totalItems ??
+      shipment.items?.reduce?.(
+        (total, item) => total + Number(item.quantity || 1),
+        0,
+      ) ??
+      0,
+  );
+
+  return { totalPackages, totalItems };
+}
 
 export default function InvoiceFormModal({
   isOpen = false,
@@ -28,26 +77,70 @@ export default function InvoiceFormModal({
   isDark = false,
 }) {
   const [form, setForm] = useState(buildInitialForm(shipment, invoice, mode));
+  const [tripQuery, setTripQuery] = useState("");
   const [shipmentQuery, setShipmentQuery] = useState("");
+  const [showTripDropdown, setShowTripDropdown] = useState(false);
   const [showShipmentDropdown, setShowShipmentDropdown] = useState(false);
+  const [formError, setFormError] = useState("");
 
   const modalTheme = getModalThemeClasses(isDark);
   const actionTheme = getModalActionClasses();
 
   useEffect(() => {
     if (isOpen) {
-      setForm(buildInitialForm(shipment, invoice, mode));
+      const initialForm = buildInitialForm(shipment, invoice, mode);
+      setForm(initialForm);
+      setTripQuery(initialForm.truckTripId || "");
+      setShipmentQuery(initialForm.shipmentId || "");
+      setShowTripDropdown(false);
+      setShowShipmentDropdown(false);
+      setFormError("");
     }
   }, [isOpen, shipment, invoice, mode]);
-
-  if (!isOpen) return null;
 
   const updateField = (key, value) => {
     setForm((prev) => ({ ...prev, [key]: value }));
   };
 
-  const filteredShipments = eligibleShipments.filter((item) => {
-    const keyword = shipmentQuery.toLowerCase();
+  const tripOptions = useMemo(() => {
+    const tripsById = new Map();
+
+    eligibleShipments.forEach((item) => {
+      getShipmentTripIds(item).forEach((tripId) => {
+        if (tripsById.has(tripId)) return;
+
+        tripsById.set(tripId, {
+          id: tripId,
+          routeLabel: buildInvoiceRouteLabel(item, "Unknown"),
+          status: item.truckDetails?.status || "",
+        });
+      });
+    });
+
+    return Array.from(tripsById.values());
+  }, [eligibleShipments]);
+
+  const filteredTrips = useMemo(() => {
+    const keyword = tripQuery.trim().toLowerCase();
+    if (!keyword || form.truckTripId) return tripOptions;
+
+    return tripOptions.filter((trip) =>
+      `${trip.id} ${trip.routeLabel} ${trip.status}`
+        .toLowerCase()
+        .includes(keyword),
+    );
+  }, [form.truckTripId, tripOptions, tripQuery]);
+
+  const shipmentsForSelectedTrip = useMemo(() => {
+    if (!form.truckTripId) return [];
+
+    return eligibleShipments.filter((item) =>
+      shipmentIsOnTrip(item, form.truckTripId),
+    );
+  }, [eligibleShipments, form.truckTripId]);
+
+  const filteredShipments = shipmentsForSelectedTrip.filter((item) => {
+    const keyword = shipmentQuery.trim().toLowerCase();
 
     return `
     ${item.id || ""}
@@ -62,8 +155,55 @@ export default function InvoiceFormModal({
       .includes(keyword);
   });
 
+  const handleSelectTrip = (trip) => {
+    setTripQuery(trip.id);
+    setShipmentQuery("");
+    setForm((prev) => clearSelectedShipment(prev, trip.id));
+    setShowTripDropdown(false);
+    setShowShipmentDropdown(false);
+    setFormError("");
+  };
+
+  const handleSelectShipment = (item) => {
+    const { totalPackages, totalItems } = getShipmentPackageTotals(item);
+
+    setShipmentQuery(item.id || item.trackingNumber || "");
+    setForm((prev) => ({
+      ...prev,
+      shipmentId: item.id || "",
+      shipmentTrackingNumber: item.trackingNumber || item.id || "",
+      shipmentStatus: item.status || "",
+      senderName: item.sender?.name || "",
+      senderPhone: item.sender?.phone || "",
+      recipientName: item.recipient?.name || "",
+      recipientPhone: item.recipient?.phone || "",
+      origin: item.origin || "",
+      destination: item.destination || "",
+      routeLabel: buildInvoiceRouteLabel(item, "Unknown"),
+      billingName: item.sender?.name || "",
+      billingAddress: formatInvoiceContactAddress(item.sender),
+      totalPackages,
+      totalItems,
+      shipmentSnapshot: item,
+    }));
+    setShowShipmentDropdown(false);
+    setFormError("");
+  };
+
   const handleSubmit = (e) => {
     e.preventDefault();
+
+    if (mode !== "edit" && !form.truckTripId) {
+      setFormError("Please select a trip from the dropdown first.");
+      return;
+    }
+
+    if (mode !== "edit" && !form.shipmentId) {
+      setFormError("Please select a shipment from the selected trip.");
+      return;
+    }
+
+    setFormError("");
     onSubmit?.({
       ...form,
       amount: Number(form.amount || 0),
@@ -71,6 +211,8 @@ export default function InvoiceFormModal({
       totalItems: Number(form.totalItems || 0),
     });
   };
+
+  if (!isOpen) return null;
 
   return (
     <div className={`fixed inset-0 z-[100] ${modalTheme.overlay}`}>
@@ -118,8 +260,13 @@ export default function InvoiceFormModal({
                       Shipment Reference
                     </h3>
                     <p className={`text-xs mt-1 ${modalTheme.helperText}`}>
-                      Auto-filled from the connected shipment
+                      Select a trip first, then choose one of its shipments.
                     </p>
+                    {formError && (
+                      <p className="text-xs mt-2 font-semibold text-red-500">
+                        {formError}
+                      </p>
+                    )}
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
@@ -127,31 +274,29 @@ export default function InvoiceFormModal({
                       <label
                         className={`text-xs font-semibold ${modalTheme.label}`}
                       >
-                        Shipment
+                        Trip
                       </label>
-                      {/* {JSON.stringify(form, null, 2)} */}
                       <input
                         type="text"
-                        value={
-                          mode === "edit" || form.shipmentId !== ""
-                            ? form.shipmentId || ""
-                            : shipmentQuery
-                        }
-                        placeholder="Search shipment ID, sender, recipient..."
+                        value={tripQuery}
+                        placeholder="Search trip ID, route, status..."
                         disabled={mode === "edit"}
                         onChange={(e) => {
-                          setShipmentQuery(e.target.value);
-                          setShowShipmentDropdown(true);
+                          setTripQuery(e.target.value);
+                          setShipmentQuery("");
+                          setForm((prev) => clearSelectedShipment(prev));
+                          setShowTripDropdown(true);
+                          setShowShipmentDropdown(false);
+                          setFormError("");
                         }}
                         onFocus={() => {
-                          if (mode !== "edit") setShowShipmentDropdown(true);
+                          if (mode !== "edit") setShowTripDropdown(true);
                         }}
                         className={`w-full rounded-lg border px-3 py-2 text-sm mt-1 ${modalTheme.input}`}
                       />
 
                       {mode !== "edit" &&
-                        showShipmentDropdown &&
-                        filteredShipments.length > 0 && (
+                        showTripDropdown && (
                           <div
                             className={`absolute z-50 w-full mt-1 rounded-lg border shadow-xl overflow-hidden max-h-64 overflow-y-auto ${
                               isDark
@@ -159,62 +304,111 @@ export default function InvoiceFormModal({
                                 : "bg-white border-slate-200"
                             }`}
                           >
-                            {filteredShipments.slice(0, 10).map((item) => (
-                              <button
-                                key={item.id}
-                                type="button"
-                                onClick={() => {
-                                  setShipmentQuery(
-                                    `${item.id} — ${item.sender?.name || "Unknown Sender"} → ${item.recipient?.name || "Unknown Recipient"}`,
-                                  );
-
-                                  setForm((prev) => ({
-                                    ...prev,
-                                    shipmentId: item.id || "",
-                                    shipmentTrackingNumber:
-                                      item.trackingNumber || item.id || "",
-                                    shipmentStatus: item.status || "",
-                                    truckTripId:
-                                      getShipmentTripIdsLabel(item) ||
-                                      getShipmentTripId(item) ||
-                                      "",
-                                    senderName: item.sender?.name || "",
-                                    senderPhone: item.sender?.phone || "",
-                                    recipientName: item.recipient?.name || "",
-                                    recipientPhone: item.recipient?.phone || "",
-                                    origin: item.origin || "",
-                                    destination: item.destination || "",
-                                    routeLabel: `${item.origin || "Unknown"} → ${item.destination || "Unknown"}`,
-                                    billingName: item.sender?.name || "",
-                                    billingAddress:
-                                      item.sender?.formattedAddress || "",
-                                    totalPackages: item.packages?.length || 0,
-                                    totalItems: item.totals?.totalItems || 0,
-                                    shipmentSnapshot: item,
-                                  }));
-
-                                  setShowShipmentDropdown(false);
-                                }}
-                                className={`w-full text-left px-3 py-2 text-xs transition-colors ${
-                                  isDark
-                                    ? "hover:bg-slate-800 text-slate-300"
-                                    : "hover:bg-slate-100 text-slate-700"
-                                }`}
+                            {filteredTrips.length === 0 ? (
+                              <div
+                                className={`px-3 py-3 text-xs ${modalTheme.helperText}`}
                               >
-                                <div className="font-bold">{item.id}</div>
-                                <div className="opacity-70">
-                                  {item.sender?.name || "Unknown Sender"} →{" "}
-                                  {item.recipient?.name || "Unknown Recipient"}
-                                </div>
-                                <div className="opacity-50 text-[10px]">
-                                  {item.origin || "Unknown"} →{" "}
-                                  {item.destination || "Unknown"}
-                                  {getShipmentTripIdsLabel(item)
-                                    ? ` • ${getShipmentTripIdsLabel(item)}`
-                                    : ""}
-                                </div>
-                              </button>
-                            ))}
+                                No trips with eligible shipments found.
+                              </div>
+                            ) : (
+                              filteredTrips.slice(0, 20).map((trip) => (
+                                <button
+                                  key={trip.id}
+                                  type="button"
+                                  onClick={() => handleSelectTrip(trip)}
+                                  className={`w-full text-left px-3 py-2 text-xs transition-colors ${
+                                    isDark
+                                      ? "hover:bg-slate-800 text-slate-300"
+                                      : "hover:bg-slate-100 text-slate-700"
+                                  }`}
+                                >
+                                  <div className="font-bold">{trip.id}</div>
+                                  <div className="opacity-70">
+                                    {trip.routeLabel}
+                                  </div>
+                                  {trip.status && (
+                                    <div className="opacity-50 text-[10px]">
+                                      {trip.status.replaceAll("_", " ")}
+                                    </div>
+                                  )}
+                                </button>
+                              ))
+                            )}
+                          </div>
+                        )}
+                    </div>
+
+                    <div className="relative">
+                      <label
+                        className={`text-xs font-semibold ${modalTheme.label}`}
+                      >
+                        Shipment
+                      </label>
+                      <input
+                        type="text"
+                        value={shipmentQuery}
+                        placeholder={
+                          form.truckTripId
+                            ? "Search shipment ID, sender, recipient..."
+                            : "Select a trip first"
+                        }
+                        disabled={mode === "edit" || !form.truckTripId}
+                        onChange={(e) => {
+                          setShipmentQuery(e.target.value);
+                          setForm((prev) =>
+                            clearSelectedShipment(prev, prev.truckTripId),
+                          );
+                          setShowShipmentDropdown(true);
+                          setFormError("");
+                        }}
+                        onFocus={() => {
+                          if (mode !== "edit" && form.truckTripId) {
+                            setShowShipmentDropdown(true);
+                          }
+                        }}
+                        className={`w-full rounded-lg border px-3 py-2 text-sm mt-1 ${modalTheme.input}`}
+                      />
+
+                      {mode !== "edit" &&
+                        form.truckTripId &&
+                        showShipmentDropdown && (
+                          <div
+                            className={`absolute z-50 w-full mt-1 rounded-lg border shadow-xl overflow-hidden max-h-64 overflow-y-auto ${
+                              isDark
+                                ? "bg-slate-900 border-slate-700"
+                                : "bg-white border-slate-200"
+                            }`}
+                          >
+                            {filteredShipments.length === 0 ? (
+                              <div
+                                className={`px-3 py-3 text-xs ${modalTheme.helperText}`}
+                              >
+                                No eligible shipments found in this trip.
+                              </div>
+                            ) : (
+                              filteredShipments.slice(0, 20).map((item) => (
+                                <button
+                                  key={item.id}
+                                  type="button"
+                                  onClick={() => handleSelectShipment(item)}
+                                  className={`w-full text-left px-3 py-2 text-xs transition-colors ${
+                                    isDark
+                                      ? "hover:bg-slate-800 text-slate-300"
+                                      : "hover:bg-slate-100 text-slate-700"
+                                  }`}
+                                >
+                                  <div className="font-bold">{item.id}</div>
+                                  <div className="opacity-70">
+                                    {item.sender?.name || "Unknown Sender"} -{" "}
+                                    {item.recipient?.name ||
+                                      "Unknown Recipient"}
+                                  </div>
+                                  <div className="opacity-50 text-[10px]">
+                                    {buildInvoiceRouteLabel(item, "Unknown")}
+                                  </div>
+                                </button>
+                              ))
+                            )}
                           </div>
                         )}
                     </div>
@@ -228,20 +422,6 @@ export default function InvoiceFormModal({
                       <input
                         type="text"
                         value={form.shipmentStatus}
-                        readOnly
-                        className={`w-full rounded-lg border px-3 py-2 text-sm mt-1 ${modalTheme.input}`}
-                      />
-                    </div>
-
-                    <div>
-                      <label
-                        className={`text-xs font-semibold ${modalTheme.label}`}
-                      >
-                        Trip ID
-                      </label>
-                      <input
-                        type="text"
-                        value={form.truckTripId}
                         readOnly
                         className={`w-full rounded-lg border px-3 py-2 text-sm mt-1 ${modalTheme.input}`}
                       />
