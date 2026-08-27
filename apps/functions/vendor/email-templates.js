@@ -24319,7 +24319,7 @@ var require_icons = __commonJS({
 // src/index.js
 var import_react3 = __toESM(require_react());
 
-// node_modules/@react-email/render/dist/node/index.mjs
+// ../../node_modules/@react-email/render/dist/node/index.mjs
 var import_react = __toESM(require_react(), 1);
 
 // ../../node_modules/prettier/plugins/html.mjs
@@ -24329,7 +24329,7 @@ __export(html_exports, {
   languages: () => Ui,
   options: () => zi,
   parsers: () => Pr,
-  printers: () => zo
+  printers: () => $o
 });
 var Nr = Object.defineProperty;
 var Dr = (e2) => {
@@ -24344,7 +24344,7 @@ var ts = (e2, t2, r2) => t2.has(e2) || Dr("Cannot " + r2);
 var qe = (e2, t2, r2) => (ts(e2, t2, "read from private field"), r2 ? r2.call(e2) : t2.get(e2));
 var Rr = (e2, t2, r2) => t2.has(e2) ? Dr("Cannot add the same private member more than once") : t2 instanceof WeakSet ? t2.add(e2) : t2.set(e2, r2);
 var Zi = {};
-Ir(Zi, { languages: () => Ui, options: () => zi, parsers: () => Pr, printers: () => zo });
+Ir(Zi, { languages: () => Ui, options: () => zi, parsers: () => Pr, printers: () => $o });
 var ke = (e2, t2) => (r2, n2, ...i) => r2 | 1 && n2 == null ? void 0 : (t2.call(n2) ?? n2[e2]).apply(n2, i);
 var rs = String.prototype.replaceAll ?? function(e2, t2) {
   return e2.global ? this.replace(e2, t2) : this.split(e2).join(t2);
@@ -24716,7 +24716,7 @@ function Ds(e2) {
 }
 var Qt = Ds;
 var Zr = "inline";
-var Xt = { area: "none", base: "none", basefont: "none", datalist: "none", head: "none", link: "none", meta: "none", noembed: "none", noframes: "none", param: "block", rp: "none", script: "block", style: "none", template: "inline", title: "none", html: "block", body: "block", address: "block", blockquote: "block", center: "block", dialog: "block", div: "block", figure: "block", figcaption: "block", footer: "block", form: "block", header: "block", hr: "block", legend: "block", listing: "block", main: "block", p: "block", plaintext: "block", pre: "block", search: "block", xmp: "block", slot: "contents", ruby: "ruby", rt: "ruby-text", article: "block", aside: "block", h1: "block", h2: "block", h3: "block", h4: "block", h5: "block", h6: "block", hgroup: "block", nav: "block", section: "block", dir: "block", dd: "block", dl: "block", dt: "block", menu: "block", ol: "block", ul: "block", li: "list-item", table: "table", caption: "table-caption", colgroup: "table-column-group", col: "table-column", thead: "table-header-group", tbody: "table-row-group", tfoot: "table-footer-group", tr: "table-row", td: "table-cell", th: "table-cell", input: "inline-block", button: "inline-block", fieldset: "block", details: "block", summary: "block", marquee: "inline-block", select: "inline-block", source: "block", track: "block", meter: "inline-block", progress: "inline-block", object: "inline-block", video: "inline-block", audio: "inline-block", option: "block", optgroup: "block" };
+var Xt = { area: "none", base: "none", basefont: "none", datalist: "none", head: "none", link: "none", meta: "none", noembed: "none", noframes: "none", param: "block", rp: "none", script: "block", style: "none", template: "inline", title: "none", html: "block", body: "block", address: "block", blockquote: "block", center: "block", dialog: "block", div: "block", figure: "block", figcaption: "block", footer: "block", form: "block", header: "block", hr: "block", legend: "block", listing: "block", main: "block", p: "block", plaintext: "block", pre: "block", search: "block", xmp: "block", slot: "contents", ruby: "ruby", rt: "ruby-text", article: "block", aside: "block", h1: "block", h2: "block", h3: "block", h4: "block", h5: "block", h6: "block", hgroup: "block", nav: "block", section: "block", dir: "block", dd: "block", dl: "block", dt: "block", menu: "block", ol: "block", ul: "block", li: "list-item", table: "table", caption: "table-caption", colgroup: "table-column-group", col: "table-column", thead: "table-header-group", tbody: "table-row-group", tfoot: "table-footer-group", tr: "table-row", td: "table-cell", th: "table-cell", input: "inline-block", button: "inline-block", fieldset: "block", details: "block", summary: "block", marquee: "inline-block", option: "block", optgroup: "block", select: "inline-block", source: "block", track: "block", meter: "inline-block", progress: "inline-block", object: "inline-block", video: "inline-block", audio: "inline-block" };
 var en = "normal";
 var Jt = { listing: "pre", plaintext: "pre", pre: "pre", xmp: "pre", nobr: "nowrap", table: "initial", textarea: "pre-wrap" };
 function Is(e2) {
@@ -25387,11 +25387,13 @@ function Ae(e2, t2, r2) {
 }
 function ni(e2, t2, r2) {
   let { node: n2 } = e2, i = [];
-  if (Da(e2) && i.push("} "), i.push("@", n2.name), Pa(n2)) return i.push(";"), i;
-  if (n2.parameters && i.push(" ", "(", C(r2("parameters")), ")"), !Na(n2)) {
+  Da(e2) && i.push("} "), i.push("@", n2.name);
+  let s2 = Pa(n2);
+  if (n2.parameters && (s2 || i.push(" "), i.push("(", C(r2("parameters")), ")")), s2) return i.push(";"), i;
+  if (!Na(n2)) {
     i.push(" {");
-    let s2 = ii(n2);
-    n2.children.length > 0 ? (n2.firstChild.hasLeadingSpaces = true, n2.lastChild.hasTrailingSpaces = true, i.push(A([k, Ae(e2, t2, r2)])), s2 && i.push(k, "}")) : s2 && i.push("}");
+    let a = ii(n2);
+    n2.children.length > 0 ? (n2.firstChild.hasLeadingSpaces = true, n2.lastChild.hasTrailingSpaces = true, i.push(A([k, Ae(e2, t2, r2)])), a && i.push(k, "}")) : a && i.push("}");
   }
   return C(i, { shouldBreak: true });
 }
@@ -25817,7 +25819,7 @@ var bi = class {
     this.value = e2, this.type = t2, this.sourceSpan = r2;
   }
   visit(e2, t2) {
-    return e2.visitAttributeComment ? e2.visitAttributeComment(this, t2) : void 0;
+    return e2.visitStartTagComment ? e2.visitStartTagComment(this, t2) : void 0;
   }
   kind = "startTagComment";
 };
@@ -25956,7 +25958,7 @@ var gr = class {
   }
   visitAttribute(e2, t2) {
   }
-  visitAttributeComment(e2, t2) {
+  visitStartTagComment(e2, t2) {
   }
   visitText(e2, t2) {
   }
@@ -26033,8 +26035,8 @@ var za = class {
   }
 };
 function Di(e2, t2, r2, n2 = {}) {
-  let i = new Ya(new rt(e2, t2), r2, n2);
-  return i.tokenize(), new za(to(i.tokens), i.errors, i.nonNormalizedIcuExpressions);
+  let i = new Qa(new rt(e2, t2), r2, n2);
+  return i.tokenize(), new za(no(i.tokens), i.errors, i.nonNormalizedIcuExpressions);
 }
 var Ga = /\r\n?/g;
 function Se(e2) {
@@ -26048,7 +26050,9 @@ function $a(e2, t2) {
 }
 var ja = ["@if", "@else", "@for", "@switch", "@case", "@default", "@empty", "@defer", "@placeholder", "@loading", "@error", "@content"];
 var it = { start: "{{", end: "}}" };
-var Ya = class {
+var Ya = /^default[^\S\r\n]+never/;
+var Ka = /^else[^\S\r\n]+if/;
+var Qa = class {
   _getTagContentType;
   _cursor;
   _tokenizeIcu;
@@ -26073,7 +26077,7 @@ var Ya = class {
   constructor(e2, t2, r2) {
     this._getTagContentType = t2, this._tokenizeIcu = r2.tokenizeExpansionForms || false, this._leadingTriviaCodePoints = r2.leadingTriviaChars && r2.leadingTriviaChars.map((i) => i.codePointAt(0) || 0), this._canSelfClose = r2.canSelfClose || false, this._allowHtmComponentClosingTags = r2.allowHtmComponentClosingTags || false, this._allowStartTagComments = r2.allowStartTagComments ?? true;
     let n2 = r2.range || { endPos: e2.content.length, startPos: 0, startLine: 0, startCol: 0 };
-    this._cursor = r2.escapedString ? new ro(e2, n2) : new Ii(e2, n2), this._preserveLineEndings = r2.preserveLineEndings || false, this._i18nNormalizeLineEndingsInICUs = r2.i18nNormalizeLineEndingsInICUs || false, this._tokenizeBlocks = r2.tokenizeBlocks ?? true, this._tokenizeLet = r2.tokenizeLet ?? true, this._selectorlessEnabled = r2.selectorlessEnabled ?? false;
+    this._cursor = r2.escapedString ? new io(e2, n2) : new Ii(e2, n2), this._preserveLineEndings = r2.preserveLineEndings || false, this._i18nNormalizeLineEndingsInICUs = r2.i18nNormalizeLineEndingsInICUs || false, this._tokenizeBlocks = r2.tokenizeBlocks ?? true, this._tokenizeLet = r2.tokenizeLet ?? true, this._selectorlessEnabled = r2.selectorlessEnabled ?? false;
     try {
       this._cursor.init();
     } catch (i) {
@@ -26103,7 +26107,9 @@ var Ya = class {
   }
   _getBlockName() {
     let e2 = false, t2 = this._cursor.clone();
-    return this._attemptCharCodeUntilFn((r2) => nt(r2) ? !e2 : eo(r2) ? (e2 = true, false) : true), this._cursor.getChars(t2).trim();
+    this._attemptCharCodeUntilFn((n2) => nt(n2) ? !e2 : ro(n2) ? (e2 = true, false) : true);
+    let r2 = this._cursor.getChars(t2).trim();
+    return Ka.test(r2) ? r2 = "else if" : Ya.test(r2) && (r2 = "default never"), r2;
   }
   _consumeBlockStart(e2) {
     this._requireCharCode(64), this._beginToken(26, e2);
@@ -26170,7 +26176,7 @@ var Ya = class {
   }
   _tokenizeExpansionForm() {
     if (this.isExpansionFormStart()) return this._consumeExpansionFormStart(), true;
-    if (Ja(this._cursor.peek()) && this._isInExpansionForm()) return this._consumeExpansionCaseStart(), true;
+    if (eo(this._cursor.peek()) && this._isInExpansionForm()) return this._consumeExpansionCaseStart(), true;
     if (this._cursor.peek() === 125) {
       if (this._isInExpansionCase()) return this._consumeExpansionCaseEnd(), true;
       if (this._isInExpansionForm()) return this._consumeExpansionFormEnd(), true;
@@ -26199,7 +26205,7 @@ var Ya = class {
     return this._cursor.peek() === e2 ? (this._cursor.advance(), true) : false;
   }
   _attemptCharCodeCaseInsensitive(e2) {
-    return Za(this._cursor.peek(), e2) ? (this._cursor.advance(), true) : false;
+    return to(this._cursor.peek(), e2) ? (this._cursor.advance(), true) : false;
   }
   _requireCharCode(e2) {
     let t2 = this._cursor.clone();
@@ -26259,7 +26265,7 @@ var Ya = class {
     let t2 = this._cursor.clone();
     if (this._cursor.advance(), this._attemptCharCode(35)) {
       let r2 = this._attemptCharCode(120) || this._attemptCharCode(88), n2 = this._cursor.clone();
-      if (this._attemptCharCodeUntilFn(Qa), this._cursor.peek() != 59) {
+      if (this._attemptCharCodeUntilFn(Ja), this._cursor.peek() != 59) {
         this._cursor.advance();
         let s2 = r2 ? "hexadecimal" : "decimal";
         throw this._createError($a(s2, this._cursor.getChars(t2)), this._cursor.getSpan());
@@ -26274,7 +26280,7 @@ var Ya = class {
       }
     } else {
       let r2 = this._cursor.clone();
-      if (this._attemptCharCodeUntilFn(Xa), this._cursor.peek() != 59) this._beginToken(e2, t2), this._cursor = r2, this._endToken(["&"]);
+      if (this._attemptCharCodeUntilFn(Za), this._cursor.peek() != 59) this._beginToken(e2, t2), this._cursor = r2, this._endToken(["&"]);
       else {
         let n2 = this._cursor.getChars(r2);
         this._cursor.advance();
@@ -26308,7 +26314,7 @@ var Ya = class {
   }
   _consumePrefixAndName(e2) {
     let t2 = this._cursor.clone(), r2 = "";
-    for (; this._cursor.peek() !== 58 && !Ka(this._cursor.peek()); ) this._cursor.advance();
+    for (; this._cursor.peek() !== 58 && !Xa(this._cursor.peek()); ) this._cursor.advance();
     let n2;
     this._cursor.peek() === 58 ? (r2 = this._cursor.getChars(t2), this._cursor.advance(), n2 = this._cursor.clone()) : n2 = t2, this._requireCharCodeUntilFn(e2, r2 === "" ? 0 : 1);
     let i = this._cursor.getChars(n2);
@@ -26576,25 +26582,25 @@ function b(e2) {
 function ve(e2) {
   return nt(e2) || e2 === 62 || e2 === 60 || e2 === 47 || e2 === 39 || e2 === 34 || e2 === 61 || e2 === 0;
 }
-function Ka(e2) {
+function Xa(e2) {
   return (e2 < 97 || 122 < e2) && (e2 < 65 || 90 < e2) && (e2 < 48 || e2 > 57);
 }
-function Qa(e2) {
+function Ja(e2) {
   return e2 === 59 || e2 === 0 || !Ei(e2);
 }
-function Xa(e2) {
+function Za(e2) {
   return e2 === 59 || e2 === 0 || !(Re(e2) || Ie(e2));
 }
-function Ja(e2) {
+function eo(e2) {
   return e2 !== 125;
 }
-function Za(e2, t2) {
+function to(e2, t2) {
   return Li(e2) === Li(t2);
 }
 function Li(e2) {
   return e2 >= 97 && e2 <= 122 ? e2 - 97 + 65 : e2;
 }
-function eo(e2) {
+function ro(e2) {
   return Re(e2) || Ie(e2) || e2 === 95;
 }
 function Ai(e2) {
@@ -26609,7 +26615,7 @@ function Pi(e2) {
 function Ni(e2) {
   return e2 === 47 || e2 === 62 || e2 === 60 || e2 === 0;
 }
-function to(e2) {
+function no(e2) {
   let t2 = [], r2;
   for (let n2 = 0; n2 < e2.length; n2++) {
     let i = e2[n2];
@@ -26675,7 +26681,7 @@ var Ii = class Sr {
     return new De(t2.file, t2.state.offset, t2.state.line, t2.state.column);
   }
 };
-var ro = class vr extends Ii {
+var io = class vr extends Ii {
   internalState;
   constructor(t2, r2) {
     t2 instanceof vr ? (super(t2), this.internalState = { ...t2.internalState }) : (super(t2, r2), this.internalState = this.state);
@@ -26743,7 +26749,7 @@ var x = class Mi extends te {
     super(r2, n2), this.elementName = t2;
   }
 };
-var no = class {
+var so = class {
   rootNodes;
   errors;
   constructor(e2, t2) {
@@ -26759,11 +26765,11 @@ var Bi = class {
     let s2 = (h) => (f, ...g2) => h(f.toLowerCase(), ...g2), a = n2 ? this.getTagDefinition : s2(this.getTagDefinition), o2 = (h) => a(h).getContentType(), l2 = n2 ? i : s2(i), c2 = Di(e2, t2, i ? (h, f, g2, v2) => {
       let W2 = l2(h, f, g2, v2);
       return W2 !== void 0 ? W2 : o2(h);
-    } : o2, r2), u = r2 && r2.canSelfClose || false, d = r2 && r2.allowHtmComponentClosingTags || false, _ = new io(c2.tokens, a, u, d, n2);
-    return _.build(), new no(_.rootNodes, [...c2.errors, ..._.errors]);
+    } : o2, r2), u = r2 && r2.canSelfClose || false, d = r2 && r2.allowHtmComponentClosingTags || false, _ = new ao(c2.tokens, a, u, d, n2);
+    return _.build(), new so(_.rootNodes, [...c2.errors, ..._.errors]);
   }
 };
-var io = class qi {
+var ao = class qi {
   tokens;
   tagDefinitionResolver;
   canSelfClose;
@@ -27060,12 +27066,12 @@ function Mt(e2, t2 = {}) {
   let { canSelfClose: r2 = false, allowHtmComponentClosingTags: n2 = false, allowStartTagComments: i = false, isTagNameCaseSensitive: s2 = false, getTagContentType: a, tokenizeAngularBlocks: o2 = false, tokenizeAngularLetDeclaration: l2 = false, enableAngularSelectorlessSyntax: c2 = false } = t2;
   return kr ?? (kr = new Hi()), kr.parse(e2, "angular-html-parser", { tokenizeExpansionForms: o2, canSelfClose: r2, allowHtmComponentClosingTags: n2, allowStartTagComments: i, tokenizeBlocks: o2, tokenizeLet: l2, selectorlessEnabled: c2 }, s2, a);
 }
-var so = [oo, lo, uo, ho, mo, _o, fo, go, So, po];
-function ao(e2, t2) {
-  for (let r2 of so) r2(e2, t2);
+var oo = [co, uo, ho, fo, go, vo, _o, So, Co, mo];
+function lo(e2, t2) {
+  for (let r2 of oo) r2(e2, t2);
   return e2;
 }
-function oo(e2) {
+function co(e2) {
   e2.walk((t2) => {
     if (t2.kind === "element" && t2.tagDefinition.ignoreFirstLf && t2.children.length > 0 && t2.children[0].kind === "text" && t2.children[0].value[0] === `
 `) {
@@ -27074,7 +27080,7 @@ function oo(e2) {
     }
   });
 }
-function lo(e2) {
+function uo(e2) {
   let t2 = (r2) => r2.kind === "element" && r2.prev?.kind === "ieConditionalStartComment" && r2.prev.sourceSpan.end.offset === r2.startSourceSpan.start.offset && r2.firstChild?.kind === "ieConditionalEndComment" && r2.firstChild.sourceSpan.start.offset === r2.startSourceSpan.end.offset;
   e2.walk((r2) => {
     if (r2.children) for (let n2 = 0; n2 < r2.children.length; n2++) {
@@ -27087,7 +27093,7 @@ function lo(e2) {
     }
   });
 }
-function co(e2, t2, r2) {
+function po(e2, t2, r2) {
   e2.walk((n2) => {
     if (n2.children) for (let i = 0; i < n2.children.length; i++) {
       let s2 = n2.children[i];
@@ -27098,10 +27104,10 @@ function co(e2, t2, r2) {
     }
   });
 }
-function uo(e2) {
-  return co(e2, (t2) => t2.kind === "cdata", (t2) => `<![CDATA[${t2.value}]]>`);
+function ho(e2) {
+  return po(e2, (t2) => t2.kind === "cdata", (t2) => `<![CDATA[${t2.value}]]>`);
 }
-function po(e2) {
+function mo(e2) {
   let t2 = (r2) => r2.kind === "element" && r2.attrs.length === 0 && !X(r2.startTagComments) && r2.children.length === 1 && r2.firstChild.kind === "text" && !P.hasWhitespaceCharacter(r2.children[0].value) && !r2.firstChild.hasLeadingSpaces && !r2.firstChild.hasTrailingSpaces && r2.isLeadingSpaceSensitive && !r2.hasLeadingSpaces && r2.isTrailingSpaceSensitive && !r2.hasTrailingSpaces && r2.prev?.kind === "text" && r2.next?.kind === "text";
   e2.walk((r2) => {
     if (r2.children) for (let n2 = 0; n2 < r2.children.length; n2++) {
@@ -27112,7 +27118,7 @@ function po(e2) {
     }
   });
 }
-function ho(e2, t2) {
+function fo(e2, t2) {
   if (t2.parser === "html") return;
   let r2 = /\{\{(.+?)\}\}/s;
   e2.walk((n2) => {
@@ -27131,7 +27137,7 @@ function ho(e2, t2) {
     }
   });
 }
-function mo(e2, t2) {
+function go(e2, t2) {
   e2.walk((r2) => {
     let n2 = r2.$children;
     if (!n2) return;
@@ -27149,22 +27155,22 @@ function mo(e2, t2) {
     r2.isWhitespaceSensitive = i, r2.isIndentationSensitive = s2;
   });
 }
-function fo(e2) {
+function _o(e2) {
   e2.walk((t2) => {
     t2.isSelfClosing = !t2.children || t2.kind === "element" && (t2.tagDefinition.isVoid || t2.endSourceSpan && t2.startSourceSpan.start === t2.endSourceSpan.start && t2.startSourceSpan.end === t2.endSourceSpan.end);
   });
 }
-function go(e2, t2) {
+function So(e2, t2) {
   e2.walk((r2) => {
     r2.kind === "element" && (r2.hasHtmComponentClosingTag = r2.endSourceSpan && /^<\s*\/\s*\/\s*>$/.test(t2.originalText.slice(r2.endSourceSpan.start.offset, r2.endSourceSpan.end.offset)));
   });
 }
-function _o(e2, t2) {
+function vo(e2, t2) {
   e2.walk((r2) => {
     r2.cssDisplay = fn(r2, t2);
   });
 }
-function So(e2, t2) {
+function Co(e2, t2) {
   e2.walk((r2) => {
     let { children: n2 } = r2;
     if (n2) {
@@ -27180,8 +27186,8 @@ function So(e2, t2) {
     }
   });
 }
-var Fi = ao;
-function vo(e2, t2, r2) {
+var Fi = lo;
+function ko(e2, t2, r2) {
   let { node: n2 } = e2;
   switch (n2.kind) {
     case "root":
@@ -27231,23 +27237,23 @@ function vo(e2, t2, r2) {
       throw new Gr(n2, "HTML");
   }
 }
-var Co = { features: { experimental_frontMatterSupport: { massageAstNode: true, embed: true, print: true } }, preprocess: Fi, print: vo, insertPragma: ei, massageAstNode: or, embed: Gn, getVisitorKeys: Yn };
-var Vi = Co;
+var bo = { features: { experimental_frontMatterSupport: { massageAstNode: true, embed: true, print: true } }, preprocess: Fi, print: ko, insertPragma: ei, massageAstNode: or, embed: Gn, getVisitorKeys: Yn };
+var Vi = bo;
 var Ui = [{ name: "Angular", type: "markup", aceMode: "html", extensions: [".component.html"], tmScope: "text.html.basic", aliases: ["xhtml"], codemirrorMode: "htmlmixed", codemirrorMimeType: "text/html", parsers: ["angular"], vscodeLanguageIds: ["html"], filenames: [], linguistLanguageId: 146 }, { name: "HTML", type: "markup", aceMode: "html", extensions: [".html", ".hta", ".htm", ".html.hl", ".inc", ".xht", ".xhtml"], tmScope: "text.html.basic", aliases: ["xhtml"], codemirrorMode: "htmlmixed", codemirrorMimeType: "text/html", parsers: ["html"], vscodeLanguageIds: ["html"], linguistLanguageId: 146 }, { name: "Lightning Web Components", type: "markup", aceMode: "html", extensions: [], tmScope: "text.html.basic", aliases: ["LWC", "lwc"], codemirrorMode: "htmlmixed", codemirrorMimeType: "text/html", parsers: ["lwc"], vscodeLanguageIds: ["html"], filenames: [], linguistLanguageId: 146 }, { name: "MJML", type: "markup", aceMode: "html", extensions: [".mjml"], tmScope: "text.mjml.basic", aliases: ["MJML", "mjml"], codemirrorMode: "htmlmixed", codemirrorMimeType: "text/html", parsers: ["mjml"], filenames: [], vscodeLanguageIds: ["mjml"], linguistLanguageId: 146 }, { name: "Vue", type: "markup", aceMode: "vue", extensions: [".vue"], tmScope: "text.html.vue", codemirrorMode: "vue", codemirrorMimeType: "text/x-vue", parsers: ["vue"], vscodeLanguageIds: ["vue"], linguistLanguageId: 391 }];
 var br = { bracketSpacing: { category: "Common", type: "boolean", default: true, description: "Print spaces between brackets.", oppositeDescription: "Do not print spaces between brackets." }, objectWrap: { category: "Common", type: "choice", default: "preserve", description: "How to wrap object literals.", choices: [{ value: "preserve", description: "Keep as multi-line, if there is a newline between the opening brace and first property." }, { value: "collapse", description: "Fit to a single line when possible." }] }, singleQuote: { category: "Common", type: "boolean", default: false, description: "Use single quotes instead of double quotes." }, proseWrap: { category: "Common", type: "choice", default: "preserve", description: "How to wrap prose.", choices: [{ value: "always", description: "Wrap prose if it exceeds the print width." }, { value: "never", description: "Do not wrap prose." }, { value: "preserve", description: "Wrap prose as-is." }] }, bracketSameLine: { category: "Common", type: "boolean", default: false, description: "Put > of opening tags on the last line instead of on a new line." }, singleAttributePerLine: { category: "Common", type: "boolean", default: false, description: "Enforce single attribute per line in HTML, Vue and JSX." } };
 var Wi = "HTML";
-var ko = { bracketSameLine: br.bracketSameLine, htmlWhitespaceSensitivity: { category: Wi, type: "choice", default: "css", description: "How to handle whitespaces in HTML.", choices: [{ value: "css", description: "Respect the default value of CSS display property." }, { value: "strict", description: "Whitespaces are considered sensitive." }, { value: "ignore", description: "Whitespaces are considered insensitive." }] }, singleAttributePerLine: br.singleAttributePerLine, vueIndentScriptAndStyle: { category: Wi, type: "boolean", default: false, description: "Indent script and style tags in Vue files." } };
-var zi = ko;
+var wo = { bracketSameLine: br.bracketSameLine, htmlWhitespaceSensitivity: { category: Wi, type: "choice", default: "css", description: "How to handle whitespaces in HTML.", choices: [{ value: "css", description: "Respect the default value of CSS display property." }, { value: "strict", description: "Whitespaces are considered sensitive." }, { value: "ignore", description: "Whitespaces are considered insensitive." }] }, singleAttributePerLine: br.singleAttributePerLine, vueIndentScriptAndStyle: { category: Wi, type: "boolean", default: false, description: "Indent script and style tags in Vue files." } };
+var zi = wo;
 var Pr = {};
-Ir(Pr, { angular: () => Vo, html: () => qo, lwc: () => Wo, mjml: () => Fo, vue: () => Uo });
-function bo(e2, t2) {
+Ir(Pr, { angular: () => Wo, html: () => Fo, lwc: () => Go, mjml: () => Uo, vue: () => zo });
+function To(e2, t2) {
   let r2 = new SyntaxError(e2 + " (" + t2.loc.start.line + ":" + t2.loc.start.column + ")");
   return Object.assign(r2, t2);
 }
-var Gi = bo;
-var wo = { canSelfClose: true, normalizeTagName: false, normalizeAttributeName: false, allowHtmComponentClosingTags: false, allowStartTagComments: false, isTagNameCaseSensitive: false, shouldParseFrontMatter: true };
+var Gi = To;
+var yo = { canSelfClose: true, normalizeTagName: false, normalizeAttributeName: false, allowHtmComponentClosingTags: false, allowStartTagComments: false, isTagNameCaseSensitive: false, shouldParseFrontMatter: true };
 function Bt(e2) {
-  return { ...wo, ...e2 };
+  return { ...yo, ...e2 };
 }
 function wr(e2) {
   let { canSelfClose: t2, allowHtmComponentClosingTags: r2, allowStartTagComments: n2, isTagNameCaseSensitive: i, shouldParseAsRawText: s2, tokenizeAngularBlocks: a, tokenizeAngularLetDeclaration: o2 } = e2;
@@ -27282,7 +27288,7 @@ var Me = class Me2 {
     for (let n2 in Ht) {
       let i = this[n2];
       if (i) {
-        let s2 = To(i, (a) => a.map(t2));
+        let s2 = Eo(i, (a) => a.map(t2));
         r2 !== i && (r2 ?? (r2 = new Me2({ parent: this.parent })), r2.setProperty(n2, s2));
       }
     }
@@ -27351,19 +27357,19 @@ ne = /* @__PURE__ */ new WeakSet(), Tr = function() {
   return this.parent?.$children ?? [];
 };
 var Ft = Me;
-function To(e2, t2) {
+function Eo(e2, t2) {
   let r2 = e2.map(t2);
   return r2.some((n2, i) => n2 !== e2[i]) ? r2 : e2;
 }
-var yo = [{ regex: /^(?<openingTagSuffix>\[if(?<condition>[^\]]*)\]>)(?<data>.*?)<!\s*\[endif\]$/s, parse: Eo }, { regex: /^\[if(?<condition>[^\]]*)\]><!$/, parse: xo }, { regex: /^<!\s*\[endif\]$/, parse: Lo }];
+var xo = [{ regex: /^(?<openingTagSuffix>\[if(?<condition>[^\]]*)\]>)(?<data>.*?)<!\s*\[endif\]$/s, parse: Lo }, { regex: /^\[if(?<condition>[^\]]*)\]><!$/, parse: Ao }, { regex: /^<!\s*\[endif\]$/, parse: Po }];
 function Yi(e2, t2) {
-  if (e2.value) for (let { regex: r2, parse: n2 } of yo) {
+  if (e2.value) for (let { regex: r2, parse: n2 } of xo) {
     let i = e2.value.match(r2);
     if (i) return n2(e2, i, t2);
   }
   return null;
 }
-function Eo(e2, t2, r2) {
+function Lo(e2, t2, r2) {
   let { openingTagSuffix: n2, condition: i, data: s2 } = t2.groups, a = 4 + n2.length, o2 = e2.sourceSpan.start.moveBy(a), l2 = o2.moveBy(s2.length), [c2, u] = (() => {
     try {
       return [true, r2(s2, o2).children];
@@ -27373,11 +27379,11 @@ function Eo(e2, t2, r2) {
   })();
   return { kind: "ieConditionalComment", complete: c2, children: u, condition: T(0, i.trim(), /\s+/g, " "), sourceSpan: e2.sourceSpan, startSourceSpan: new p(e2.sourceSpan.start, o2), endSourceSpan: new p(l2, e2.sourceSpan.end) };
 }
-function xo(e2, t2) {
+function Ao(e2, t2) {
   let { condition: r2 } = t2.groups;
   return { kind: "ieConditionalStartComment", condition: T(0, r2.trim(), /\s+/g, " "), sourceSpan: e2.sourceSpan };
 }
-function Lo(e2) {
+function Po(e2) {
   return { kind: "ieConditionalEndComment", sourceSpan: e2.sourceSpan };
 }
 var Er = class extends gr {
@@ -27387,7 +27393,7 @@ var Er = class extends gr {
     });
   }
   visit(t2, { parseOptions: r2 }) {
-    Do(t2), Io(t2, r2), Oo(t2, r2), Ro(t2);
+    Ro(t2), Oo(t2, r2), Bo(t2, r2), Mo(t2);
   }
 };
 function Xi(e2, t2, r2, n2) {
@@ -27399,10 +27405,10 @@ function Xi(e2, t2, r2, n2) {
       let o2 = Yi(a, n2);
       o2 && a.parent.replaceChild(a, o2);
     } else i && a.kind === "element" && a.comments && (a.startTagComments = a.comments, delete a.comments);
-    i && (Ao(a), Po(a), No(a));
+    i && (No(a), Do(a), Io(a));
   }), s2;
 }
-function Ao(e2) {
+function No(e2) {
   if (e2.kind === "block") {
     if (e2.name = T(0, e2.name.toLowerCase(), /\s+/g, " ").trim(), e2.kind = "angularControlFlowBlock", !X(e2.parameters)) {
       delete e2.parameters;
@@ -27412,10 +27418,10 @@ function Ao(e2) {
     e2.parameters = { kind: "angularControlFlowBlockParameters", children: e2.parameters, sourceSpan: new p(e2.parameters[0].sourceSpan.start, I(0, e2.parameters, -1).sourceSpan.end) };
   }
 }
-function Po(e2) {
+function Do(e2) {
   e2.kind === "letDeclaration" && (e2.kind = "angularLetDeclaration", e2.id = e2.name, e2.init = { kind: "angularLetDeclarationInitializer", sourceSpan: new p(e2.valueSpan.start, e2.valueSpan.end), value: e2.value }, delete e2.name, delete e2.value);
 }
-function No(e2) {
+function Io(e2) {
   e2.kind === "expansion" && (e2.kind = "angularIcuExpression"), e2.kind === "expansionCase" && (e2.kind = "angularIcuCase");
 }
 function Ki(e2, t2) {
@@ -27426,7 +27432,7 @@ function Qi(e2) {
   let t2 = e2.name.startsWith(":") ? e2.name.slice(1).split(":", 1)[0] : null, r2 = e2.nameSpan.toString(), n2 = t2 !== null && r2.startsWith(`${t2}:`), i = n2 ? r2.slice(t2.length + 1) : r2;
   e2.name = i, e2.namespace = t2, e2.hasExplicitNamespace = n2;
 }
-function Do(e2) {
+function Ro(e2) {
   switch (e2.kind) {
     case "element":
       Qi(e2);
@@ -27440,16 +27446,16 @@ function Do(e2) {
       break;
   }
 }
-function Io(e2, t2) {
+function Oo(e2, t2) {
   if (e2.kind === "element") {
     let r2 = Ne(t2.isTagNameCaseSensitive ? e2.name : e2.name.toLowerCase());
     !e2.namespace || e2.namespace === r2.implicitNamespacePrefix || oe(e2) ? e2.tagDefinition = r2 : e2.tagDefinition = Ne("");
   }
 }
-function Ro(e2) {
+function Mo(e2) {
   e2.sourceSpan && e2.endSourceSpan && (e2.sourceSpan = new p(e2.sourceSpan.start, e2.endSourceSpan.end));
 }
-function Oo(e2, t2) {
+function Bo(e2, t2) {
   if (e2.kind === "element" && (t2.normalizeTagName && (!e2.namespace || e2.namespace === e2.tagDefinition.implicitNamespacePrefix || oe(e2)) && (e2.name = Ki(e2.name, (r2) => $i.has(r2))), t2.normalizeAttributeName)) for (let r2 of e2.attrs) r2.namespace || (r2.name = Ki(r2.name, (n2) => qt.has(e2.name) && (qt.get("*").has(n2) || qt.get(e2.name).has(n2))));
 }
 function Lr(e2, t2) {
@@ -27465,14 +27471,14 @@ function Ji(e2, t2) {
   };
   for (let [c2, u] of n2.entries()) if (u.kind === "element") {
     if (u.isVoid) i = o2().errors, n2[c2] = l2(u);
-    else if (Mo(u)) {
+    else if (qo(u)) {
       let { endSourceSpan: d, startSourceSpan: _ } = u, h = o2().errors.find((f) => f.span.start.offset > _.start.offset && f.span.start.offset < d.end.offset);
       h && xr(h), n2[c2] = l2(u);
     }
   }
   return i.length > 0 && xr(i[0]), { parseOptions: t2, rootNodes: n2 };
 }
-function Mo(e2) {
+function qo(e2) {
   if (e2.kind !== "element" || e2.name !== "template") return false;
   let t2 = e2.attrs.find((r2) => r2.name === "lang")?.value;
   return !t2 || t2 === "html";
@@ -27481,7 +27487,7 @@ function xr(e2) {
   let { msg: t2, span: { start: r2, end: n2 } } = e2;
   throw Gi(t2, { loc: { start: { line: r2.line + 1, column: r2.col + 1 }, end: { line: n2.line + 1, column: n2.col + 1 } }, cause: e2 });
 }
-function Bo(e2, t2, r2, n2, i, s2) {
+function Ho(e2, t2, r2, n2, i, s2) {
   let { offset: a } = n2, o2 = vt(t2.slice(0, a)) + r2, l2 = Ar(o2, e2, { ...i, shouldParseFrontMatter: false }, s2);
   l2.sourceSpan = new p(n2, I(0, l2.children, -1).sourceSpan.end);
   let c2 = l2.children[0];
@@ -27493,22 +27499,22 @@ function Ar(e2, t2, r2, n2 = {}) {
     let [f, g2] = [i.start, i.end].map((v2) => new De(a, v2.index, v2.line - 1, v2.column));
     _ = { ...i, kind: "frontMatter", sourceSpan: new p(f, g2) };
   }
-  return Xi(d, _, c2, (f, g2) => Bo(t2, e2, f, g2, c2, n2));
+  return Xi(d, _, c2, (f, g2) => Ho(t2, e2, f, g2, c2, n2));
 }
 var Vt = Bt({ name: "html", normalizeTagName: true, normalizeAttributeName: true, allowHtmComponentClosingTags: true });
 function st(e2) {
   let t2 = Bt(e2), r2 = t2.name === "vue" ? Ji : Lr;
   return { parse: (n2, i) => Ar(n2, r2, t2, i), hasPragma: Jn, hasIgnorePragma: Zn, astFormat: "html", locStart: F, locEnd: J };
 }
-var qo = st(Vt);
-var Ho = /* @__PURE__ */ new Set(["mj-style", "mj-raw"]);
-var Fo = st({ ...Vt, name: "mjml", shouldParseAsRawText: (e2) => Ho.has(e2) });
-var Vo = st({ name: "angular", tokenizeAngularBlocks: true, tokenizeAngularLetDeclaration: true, allowStartTagComments: true });
-var Uo = st({ name: "vue", isTagNameCaseSensitive: true, shouldParseAsRawText(e2, t2, r2, n2) {
+var Fo = st(Vt);
+var Vo = /* @__PURE__ */ new Set(["mj-style", "mj-raw"]);
+var Uo = st({ ...Vt, name: "mjml", shouldParseAsRawText: (e2) => Vo.has(e2) });
+var Wo = st({ name: "angular", tokenizeAngularBlocks: true, tokenizeAngularLetDeclaration: true, allowStartTagComments: true });
+var zo = st({ name: "vue", isTagNameCaseSensitive: true, shouldParseAsRawText(e2, t2, r2, n2) {
   return e2.toLowerCase() !== "html" && !r2 && (e2 !== "template" || n2.some(({ name: i, value: s2 }) => i === "lang" && s2 !== "html" && s2 !== "" && s2 !== void 0));
 } });
-var Wo = st({ name: "lwc", canSelfClose: false });
-var zo = { html: Vi };
+var Go = st({ name: "lwc", canSelfClose: false });
+var $o = { html: Vi };
 
 // ../../node_modules/prettier/standalone.mjs
 var Ru = Object.defineProperty;
@@ -28651,14 +28657,14 @@ function an2(t2, e2) {
   let n2 = [], { printer: { features: { experimental_avoidAstMutation: u }, handleComments: o2 = {} }, originalText: i } = e2, { ownLine: D2 = Yt2, endOfLine: s2 = Yt2, remaining: a = Yt2 } = o2, c2 = r2.map((l2, m2) => ({ ...Dn2(t2, l2, e2), comment: l2, text: i, options: e2, ast: t2, isLastComment: r2.length - 1 === m2, placement: void 0 })), p2 = !u;
   for (let [l2, m2] of c2.entries()) {
     let { comment: f, precedingNode: F2, enclosingNode: d, followingNode: E2, text: C2, options: h, ast: _, isLastComment: P2 } = m2, A2 = Co2(C2, h, c2, l2) ? "ownLine" : ho2(C2, h, c2, l2) ? "endOfLine" : "remaining", B2;
-    if (u ? (m2.placement = A2, B2 = [m2]) : B2 = [f, C2, h, _, P2], p2 && (f.placement = A2, f.enclosingNode = d, f.precedingNode = F2, f.followingNode = E2), A2 === "ownLine") D2(...B2) || (E2 ? ce2(E2, f) : F2 ? fe2(F2, f) : d ? re2(d, f) : re2(_, f));
+    if (u ? (m2.placement = A2, B2 = [m2]) : B2 = [f, C2, h, _, P2], p2 && (f.enclosingNode = d, f.precedingNode = F2, f.followingNode = E2), f.placement = A2, A2 === "ownLine") D2(...B2) || (E2 ? ce2(E2, f) : F2 ? fe2(F2, f) : d ? re2(d, f) : re2(_, f));
     else if (A2 === "endOfLine") s2(...B2) || (F2 ? fe2(F2, f) : E2 ? ce2(E2, f) : d ? re2(d, f) : re2(_, f));
     else if (!a(...B2)) if (F2 && E2) {
       let J2 = n2.length;
       J2 > 0 && n2[J2 - 1].followingNode !== E2 && sn2(n2, h), n2.push(m2);
     } else F2 ? fe2(F2, f) : E2 ? ce2(E2, f) : d ? re2(d, f) : re2(_, f);
   }
-  if (sn2(n2, e2), p2) for (let l2 of r2) delete l2.precedingNode, delete l2.enclosingNode, delete l2.followingNode, delete l2.placement;
+  if (sn2(n2, e2), p2) for (let l2 of r2) delete l2.precedingNode, delete l2.enclosingNode, delete l2.followingNode;
 }
 var cn2 = (t2) => !/[\S\n\u2028\u2029]/.test(t2);
 function Co2(t2, e2, r2, n2) {
@@ -29321,22 +29327,22 @@ function Wo2(t2, { isCLI: e2, optionInfos: r2, FlagSchema: n2 }) {
   return t2.array ? pt2.create({ ...e2 ? { preprocess: (s2) => Array.isArray(s2) ? s2 : [s2] } : {}, ...D2, valueSchema: i.create(o2) }) : i.create({ ...o2, ...D2 });
 }
 var $n2 = Uo2;
-var $o = Array.prototype.findLast ?? function(t2) {
+var $o2 = Array.prototype.findLast ?? function(t2) {
   for (let e2 = this.length - 1; e2 >= 0; e2--) {
     let r2 = this[e2];
     if (t2(r2, e2, this)) return r2;
   }
 };
 var zo2 = X2("findLast", function() {
-  if (Array.isArray(this)) return $o;
+  if (Array.isArray(this)) return $o2;
 });
 var qt2 = zo2;
 var zn2 = Symbol.for("PRETTIER_IS_FRONT_MATTER");
 var Xt2 = [];
-function Go(t2) {
+function Go2(t2) {
   return !!t2?.[zn2];
 }
-var pe2 = Go;
+var pe2 = Go2;
 var Gn2 = /* @__PURE__ */ new Set(["yaml", "toml"]);
 var je2 = ({ node: t2 }) => pe2(t2) && Gn2.has(t2.language);
 async function Qt2(t2, e2, r2, n2) {
@@ -29694,6 +29700,8 @@ function iu(t2, e2, r2) {
     case "meriyah":
     case "oxc":
     case "oxc-ts":
+    case "yuku":
+    case "yuku-ts":
     case "__babel_estree":
       return Fi2(e2.type, r2?.type);
     case "json":
@@ -29830,7 +29838,7 @@ yt2(ar2, { builders: () => _i2, printer: () => yi2, utils: () => Ai2 });
 var _i2 = { join: be2, line: Ze2, softline: Mr2, hardline: W, literalline: Je2, group: wt2, conditionalGroup: Ir2, fill: kr2, lineSuffix: Ie2, lineSuffixBoundary: Yr2, cursor: ee2, breakParent: ae2, ifBreak: Rr2, trim: jr2, indent: oe2, indentIfBreak: vr2, align: De2, addAlignmentToDoc: Qe2, markAsRoot: Xe2, dedentToRoot: Sr2, dedent: br2, hardlineWithoutBreakParent: ke2, literallineWithoutBreakParent: Ot2, label: Lr2, concat: (t2) => t2 };
 var yi2 = { printDocToString: Ce };
 var Ai2 = { willBreak: xr2, traverseDoc: Oe2, findInDoc: Ke2, mapDoc: Se2, removeLines: Tr2, stripTrailingHardline: He2, replaceEndOfLine: Nr2, canBreak: wr2 };
-var gu = "3.9.4";
+var gu = "3.9.6";
 var fr2 = {};
 yt2(fr2, { addDanglingComment: () => re2, addLeadingComment: () => ce2, addTrailingComment: () => fe2, getAlignmentSize: () => he2, getIndentSize: () => _u, getMaxContinuousCount: () => yu, getNextNonSpaceNonCommentCharacter: () => Au, getNextNonSpaceNonCommentCharacterIndex: () => vi2, getPreferredQuote: () => Tu, getStringWidth: () => Re2, hasNewline: () => H2, hasNewlineInRange: () => Nu, hasSpaces: () => wu, isNextLineEmpty: () => Ui2, isNextLineEmptyAfterIndex: () => gt2, isPreviousLineEmpty: () => Mi2, makeString: () => ji2, skip: () => _e2, skipEverythingButNewLine: () => ut2, skipInlineComment: () => Be, skipNewline: () => $2, skipSpaces: () => j2, skipToLineEnd: () => nt2, skipTrailingComment: () => Te2, skipWhitespace: () => tn2 });
 function xi2(t2, e2) {
@@ -34874,7 +34882,7 @@ function handleDeprecatedOptions(options) {
   }
 }
 
-// node_modules/@react-email/render/dist/node/index.mjs
+// ../../node_modules/@react-email/render/dist/node/index.mjs
 var import_node_stream = require("node:stream");
 var import_jsx_runtime = __toESM(require_jsx_runtime(), 1);
 function recursivelyMapDoc(doc, callback) {

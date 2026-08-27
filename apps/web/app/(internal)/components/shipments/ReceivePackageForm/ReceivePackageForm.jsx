@@ -270,6 +270,14 @@ export default function ReceivePackageForm({
       );
     }
 
+    if (!String(sender.name || "").trim()) {
+      return showAlert(
+        "error",
+        "Sender Required",
+        "Enter the sender name before creating the shipment.",
+      );
+    }
+
     // 4. Validate Items
     if (items.some((it) => !it.description || !it.quantity)) {
       return showAlert(

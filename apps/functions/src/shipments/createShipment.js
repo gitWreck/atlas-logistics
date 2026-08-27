@@ -109,6 +109,10 @@ exports.createShipment = onCall(
       );
     }
 
+    if (!String(sender?.name || "").trim()) {
+      throw new HttpsError("invalid-argument", "Sender name is required.");
+    }
+
     if (!Array.isArray(items) || items.length === 0) {
       throw new HttpsError("invalid-argument", "Items array is invalid.");
     }

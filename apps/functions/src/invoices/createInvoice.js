@@ -3,6 +3,7 @@ const admin = require("firebase-admin");
 const { writeInvoiceActionLog } = require("../utilities/invoiceLogger");
 const { updatedBy } = require("../utilities/helpers");
 const { canAccessRecord } = require("../manager/managerAccess");
+const { formatAddress } = require("../utilities/addressHelpers");
 const { Timestamp } = admin.firestore;
 
 if (!admin.apps.length) admin.initializeApp();
@@ -39,10 +40,6 @@ exports.createInvoice = onCall(
       throw new HttpsError("invalid-argument", "Missing shipmentId.");
     }
 
-    if (!billingName) {
-      throw new HttpsError("invalid-argument", "Missing billingName.");
-    }
-
     if (amount === undefined || isNaN(Number(amount))) {
       throw new HttpsError("invalid-argument", "Invalid amount.");
     }
@@ -55,6 +52,13 @@ exports.createInvoice = onCall(
     }
 
     const shipmentData = shipmentDoc.data();
+    const requestedBillingName = String(billingName || "").trim();
+    const shipmentSenderName = String(
+      shipmentData?.sender?.name || shipmentData?.senderName || "",
+    ).trim();
+    const resolvedBillingName =
+      requestedBillingName || shipmentSenderName || "Unknown Sender";
+
     const requestedTripId = String(truckTripId || tripId || "").trim();
 
     if (requestedTripId) {
@@ -134,18 +138,28 @@ exports.createInvoice = onCall(
       throw new HttpsError("already-exists", "Invoice ID collision.");
     }
 
-    const finalSenderName = shipmentData?.sender?.name || "";
-    const finalSenderPhone = shipmentData?.sender?.phone || "";
-    const finalRecipientName = shipmentData?.recipient?.name || "";
-    const finalRecipientPhone = shipmentData?.recipient?.phone || "";
+    const finalSenderName =
+      shipmentData?.sender?.name ||
+      shipmentData?.senderName ||
+      "Unknown Sender";
+    const finalSenderPhone =
+      shipmentData?.sender?.phone || shipmentData?.senderPhone || "";
+    const finalRecipientName =
+      shipmentData?.recipient?.name || shipmentData?.recipientName || "";
+    const finalRecipientPhone =
+      shipmentData?.recipient?.phone || shipmentData?.recipientPhone || "";
 
     const finalOrigin = shipmentData?.origin || "";
     const finalDestination = shipmentData?.destination || "";
     const finalRouteLabel = `${finalOrigin || "Unknown"} → ${finalDestination || "Unknown"}`;
 
-    const finalBillingName = billingName || shipmentData?.sender?.name || "";
+    const finalBillingName = resolvedBillingName;
     const finalBillingAddress =
-      billingAddress || shipmentData?.sender?.formattedAddress || "";
+      String(billingAddress || "").trim() ||
+      shipmentData?.sender?.formattedAddress ||
+      formatAddress(
+        shipmentData?.sender?.address || shipmentData?.sender?.details || {},
+      );
 
     const finalTrackingNumber =
       shipmentData?.trackingNumber || shipmentData?.shipmentId || shipmentId;

@@ -8,6 +8,29 @@ import {
 } from "@/app/utility/FirebaseFunctions";
 import { updatedBy } from "@/app/utility/utilities";
 
+function getInvoiceSubmitError(error) {
+  const rawMessage = String(error?.message || "").trim();
+
+  if (/missing billingname|billing name.*required/i.test(rawMessage)) {
+    return "Billing Name is required. This shipment has no sender information, so enter the billing name manually or update the shipment.";
+  }
+
+  if (/already exists/i.test(rawMessage)) {
+    return "An active invoice already exists for this shipment.";
+  }
+
+  if (/does not belong to the selected trip/i.test(rawMessage)) {
+    return "The selected shipment does not belong to the selected trip. Select the trip and shipment again.";
+  }
+
+  const cleanedMessage = rawMessage
+    .replace(/^Firebase:\s*/i, "")
+    .replace(/\s*\(functions\/[a-z-]+\)\.?$/i, "")
+    .trim();
+
+  return cleanedMessage || "The invoice could not be saved. Please try again.";
+}
+
 export default function useInvoiceWorkflow({
   user,
   onRefresh,
@@ -20,6 +43,7 @@ export default function useInvoiceWorkflow({
   const [formMode, setFormMode] = useState("create");
   const [selectedShipment, setSelectedShipment] = useState(null);
   const [selectedInvoice, setSelectedInvoice] = useState(null);
+  const [submitError, setSubmitError] = useState("");
 
   const handleError = useCallback(
     (message, error) => {
@@ -63,6 +87,7 @@ export default function useInvoiceWorkflow({
   }, []);
 
   const openCreateInvoice = useCallback((shipment = null) => {
+    setSubmitError("");
     setFormMode("create");
     setSelectedShipment(shipment);
     setSelectedInvoice(null);
@@ -73,6 +98,7 @@ export default function useInvoiceWorkflow({
     (invoice, shipment = null) => {
       if (!invoice) return;
 
+      setSubmitError("");
       setFormMode("edit");
       setSelectedInvoice(invoice);
       setSelectedShipment(resolveShipment(invoice, shipment));
@@ -130,6 +156,7 @@ export default function useInvoiceWorkflow({
   );
 
   const closeForm = useCallback(() => {
+    setSubmitError("");
     setIsFormOpen(false);
     setSelectedShipment(null);
     setSelectedInvoice(null);
@@ -144,6 +171,7 @@ export default function useInvoiceWorkflow({
 
   const submitInvoice = useCallback(
     async (payload) => {
+      setSubmitError("");
       setIsSaving(true);
 
       try {
@@ -161,13 +189,14 @@ export default function useInvoiceWorkflow({
         closeForm();
         return true;
       } catch (error) {
-        handleError("Error saving invoice", error);
+        console.error("Error saving invoice", error);
+        setSubmitError(getInvoiceSubmitError(error));
         return false;
       } finally {
         setIsSaving(false);
       }
     },
-    [closeForm, formMode, handleError, refresh, selectedInvoice],
+    [closeForm, formMode, profile, refresh, selectedInvoice],
   );
 
   const changeInvoiceStatus = useCallback(
@@ -200,6 +229,7 @@ export default function useInvoiceWorkflow({
     isFormOpen,
     isDetailsOpen,
     isSaving,
+    submitError,
     formMode,
     selectedShipment,
     selectedInvoice,

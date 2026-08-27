@@ -134,6 +134,7 @@ export default function TripDrawer({
     isFormOpen: isInvoiceFormOpen,
     isDetailsOpen: isInvoiceDetailsOpen,
     isSaving: isInvoiceSaving,
+    submitError: invoiceSubmitError,
     formMode: invoiceMode,
     selectedShipment: selectedInvoiceShipment,
     selectedInvoice,
@@ -506,6 +507,7 @@ export default function TripDrawer({
         trips={data ? [data] : []}
         eligibleShipments={shipments}
         user={user}
+        submissionError={invoiceSubmitError}
         onClose={closeInvoiceForm}
         onSubmit={submitInvoice}
         isDark={isDark}

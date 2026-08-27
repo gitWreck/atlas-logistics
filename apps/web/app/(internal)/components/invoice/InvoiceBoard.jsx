@@ -98,6 +98,7 @@ const InvoiceBoard = forwardRef(function InvoiceBoard(
     isFormOpen,
     isDetailsOpen,
     isSaving: isInvoiceSaving,
+    submitError: invoiceSubmitError,
     formMode,
     selectedShipment,
     selectedInvoice,
@@ -243,6 +244,7 @@ const InvoiceBoard = forwardRef(function InvoiceBoard(
         eligibleShipments={eligibleShipments}
         invoicedShipmentIds={Object.keys(invoiceByShipmentId)}
         user={user}
+        submissionError={invoiceSubmitError}
         onClose={closeForm}
         onSubmit={submitInvoice}
         isDark={isDark}

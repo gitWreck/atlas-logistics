@@ -14,6 +14,7 @@ import {
   buildInitialForm,
   buildInvoiceRouteLabel,
   formatInvoiceContactAddress,
+  resolveInvoiceContact,
 } from "./invoiceHelpers";
 import {
   getShipmentTripIds,
@@ -90,6 +91,7 @@ export default function InvoiceFormModal({
   eligibleShipments = [],
   invoicedShipmentIds = [],
   user = null,
+  submissionError = "",
   onClose,
   onSubmit,
   isDark = false,
@@ -126,8 +128,13 @@ export default function InvoiceFormModal({
     }
   }, [isOpen, shipment, invoice, mode]);
 
+  useEffect(() => {
+    if (submissionError) setFormError(submissionError);
+  }, [submissionError]);
+
   const updateField = (key, value) => {
     setForm((prev) => ({ ...prev, [key]: value }));
+    setFormError("");
   };
 
   const tripOptions = useMemo(() => {
@@ -190,11 +197,13 @@ export default function InvoiceFormModal({
 
   const filteredShipments = tripShipments.filter((item) => {
     const keyword = shipmentQuery.trim().toLowerCase();
+    const sender = resolveInvoiceContact(item, "sender");
+    const recipient = resolveInvoiceContact(item, "recipient");
 
     return `
     ${item.id || ""}
-    ${item.sender?.name || ""}
-    ${item.recipient?.name || ""}
+    ${sender.name || ""}
+    ${recipient.name || ""}
     ${item.origin || ""}
     ${item.destination || ""}
     ${getShipmentTripIdsLabel(item) || item.currentTripId || ""}
@@ -210,7 +219,7 @@ export default function InvoiceFormModal({
 
     setTripQuery(trip.id);
     setShipmentQuery("");
-    setForm((prev) => clearSelectedShipment(prev, trip.id));
+    setForm((prev) => clearSelectedShipment(prev, trip.docId));
     setTripShipments([]);
     setShowTripDropdown(false);
     setShowShipmentDropdown(true);
@@ -259,6 +268,9 @@ export default function InvoiceFormModal({
 
   const handleSelectShipment = (item) => {
     const { totalPackages, totalItems } = getShipmentPackageTotals(item);
+    const sender = resolveInvoiceContact(item, "sender");
+    const recipient = resolveInvoiceContact(item, "recipient");
+    const senderName = sender.name || "Unknown Sender";
 
     setShipmentQuery(item.id || item.trackingNumber || "");
     setForm((prev) => ({
@@ -266,15 +278,15 @@ export default function InvoiceFormModal({
       shipmentId: item.id || "",
       shipmentTrackingNumber: item.trackingNumber || item.id || "",
       shipmentStatus: item.status || "",
-      senderName: item.sender?.name || "",
-      senderPhone: item.sender?.phone || "",
-      recipientName: item.recipient?.name || "",
-      recipientPhone: item.recipient?.phone || "",
+      senderName,
+      senderPhone: sender.phone || "",
+      recipientName: recipient.name || "",
+      recipientPhone: recipient.phone || "",
       origin: item.origin || "",
       destination: item.destination || "",
       routeLabel: buildInvoiceRouteLabel(item, "Unknown"),
-      billingName: item.sender?.name || "",
-      billingAddress: formatInvoiceContactAddress(item.sender),
+      billingName: senderName,
+      billingAddress: formatInvoiceContactAddress(sender),
       totalPackages,
       totalItems,
       shipmentSnapshot: item,
@@ -297,8 +309,13 @@ export default function InvoiceFormModal({
     }
 
     setFormError("");
+    const senderName = form.senderName.trim() || "Unknown Sender";
+    const billingName = form.billingName.trim() || senderName;
+
     onSubmit?.({
       ...form,
+      senderName,
+      billingName,
       amount: Number(form.amount || 0),
       totalPackages: Number(form.totalPackages || 0),
       totalItems: Number(form.totalItems || 0),
@@ -355,11 +372,6 @@ export default function InvoiceFormModal({
                     <p className={`text-xs mt-1 ${modalTheme.helperText}`}>
                       Select a trip first, then choose one of its shipments.
                     </p>
-                    {formError && (
-                      <p className="text-xs mt-2 font-semibold text-red-500">
-                        {formError}
-                      </p>
-                    )}
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
@@ -512,8 +524,10 @@ export default function InvoiceFormModal({
                                 >
                                   <div className="font-bold">{item.id}</div>
                                   <div className="opacity-70">
-                                    {item.sender?.name || "Unknown Sender"} -{" "}
-                                    {item.recipient?.name ||
+                                    {resolveInvoiceContact(item, "sender")
+                                      .name || "Unknown Sender"} -{" "}
+                                    {resolveInvoiceContact(item, "recipient")
+                                      .name ||
                                       "Unknown Recipient"}
                                   </div>
                                   <div className="opacity-50 text-[10px]">
@@ -754,30 +768,40 @@ export default function InvoiceFormModal({
                 </section>
               </div>
 
-              <div
-                className={`px-5 sm:px-6 py-4 border-t flex justify-end gap-2 ${modalTheme.divider}`}
-              >
-                <button
-                  type="button"
-                  onClick={onClose}
-                  className={actionTheme.secondary}
-                >
-                  Cancel
-                </button>
+              <div className={`px-5 sm:px-6 py-4 border-t ${modalTheme.divider}`}>
+                {formError && (
+                  <p
+                    role="alert"
+                    className="mb-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-semibold text-red-700"
+                  >
+                    {formError}
+                  </p>
+                )}
 
-                <button
-                  type="submit"
-                  className={`${actionTheme.primaryInlineCompact} px-4`}
-                >
-                  {loading ? (
-                    <FontAwesomeIcon icon={faCircleNotch} spin />
-                  ) : (
-                    <span className="inline-flex items-center gap-2">
-                      <FontAwesomeIcon icon={faFloppyDisk} />
-                      {mode === "edit" ? "Save Changes" : "Save Invoice"}
-                    </span>
-                  )}
-                </button>
+                <div className="flex justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={onClose}
+                    className={actionTheme.secondary}
+                  >
+                    Cancel
+                  </button>
+
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className={`${actionTheme.primaryInlineCompact} px-4 disabled:cursor-not-allowed disabled:opacity-60`}
+                  >
+                    {loading ? (
+                      <FontAwesomeIcon icon={faCircleNotch} spin />
+                    ) : (
+                      <span className="inline-flex items-center gap-2">
+                        <FontAwesomeIcon icon={faFloppyDisk} />
+                        {mode === "edit" ? "Save Changes" : "Save Invoice"}
+                      </span>
+                    )}
+                  </button>
+                </div>
               </div>
             </form>
           </div>

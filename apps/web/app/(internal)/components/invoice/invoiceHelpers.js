@@ -16,9 +16,11 @@ function buildInvoiceRouteLabel(source = {}, fallback = EMPTY_INVOICE_VALUE) {
 }
 
 function formatInvoiceContactAddress(contact = {}) {
+  if (typeof contact === "string") return contact.trim();
   if (contact.formattedAddress) return contact.formattedAddress;
 
-  const address = contact.address || {};
+  const address = contact.address || contact.details || contact;
+  if (typeof address === "string") return address.trim();
 
   return [
     address.unit,
@@ -32,7 +34,43 @@ function formatInvoiceContactAddress(contact = {}) {
     .join(", ");
 }
 
+function resolveInvoiceContact(source = {}, type = "sender") {
+  const nestedContact =
+    source?.[type] && typeof source[type] === "object" ? source[type] : {};
+  const legacyAddress =
+    nestedContact.address ||
+    nestedContact.details ||
+    source?.[`${type}Address`] ||
+    {};
+
+  return {
+    ...nestedContact,
+    name:
+      nestedContact.name ||
+      source?.[`${type}Name`] ||
+      (type === "sender" ? source?.customerName : "") ||
+      "",
+    phone:
+      nestedContact.phone ||
+      source?.[`${type}Phone`] ||
+      (type === "sender" ? source?.customerPhoneNumber : "") ||
+      "",
+    address: legacyAddress,
+    formattedAddress:
+      nestedContact.formattedAddress ||
+      (typeof source?.[`${type}Address`] === "string"
+        ? source[`${type}Address`]
+        : ""),
+  };
+}
+
 function buildInitialForm(shipment, invoice, mode) {
+  const sender = resolveInvoiceContact(shipment, "sender");
+  const recipient = resolveInvoiceContact(shipment, "recipient");
+  const senderName =
+    sender.name ||
+    (shipment?.id || shipment?.shipmentId ? "Unknown Sender" : "");
+
   if (mode === "edit" && invoice) {
     return {
       shipmentId:
@@ -45,14 +83,14 @@ function buildInitialForm(shipment, invoice, mode) {
       invoiceNumber: invoice.invoiceNumber || "",
       invoiceDate: invoice.invoiceDate || "",
       dueDate: invoice.dueDate || "",
-      billingName: invoice.billingName || shipment?.sender?.name || "",
+      billingName: invoice.billingName || senderName,
       billingAddress:
-        invoice.billingAddress || formatInvoiceContactAddress(shipment?.sender),
-      senderName: invoice.senderName || shipment?.sender?.name || "",
-      senderPhone: invoice.senderPhone || shipment?.sender?.phone || "",
-      recipientName: invoice.recipientName || shipment?.recipient?.name || "",
+        invoice.billingAddress || formatInvoiceContactAddress(sender),
+      senderName: invoice.senderName || senderName,
+      senderPhone: invoice.senderPhone || sender.phone || "",
+      recipientName: invoice.recipientName || recipient.name || "",
       recipientPhone:
-        invoice.recipientPhone || shipment?.recipient?.phone || "",
+        invoice.recipientPhone || recipient.phone || "",
       origin: invoice.origin || shipment?.origin || "",
       destination: invoice.destination || shipment?.destination || "",
       routeLabel:
@@ -79,12 +117,12 @@ function buildInitialForm(shipment, invoice, mode) {
     invoiceNumber: "",
     invoiceDate: "",
     dueDate: "",
-    billingName: shipment?.sender?.name || "",
-    billingAddress: formatInvoiceContactAddress(shipment?.sender),
-    senderName: shipment?.sender?.name || "",
-    senderPhone: shipment?.sender?.phone || "",
-    recipientName: shipment?.recipient?.name || "",
-    recipientPhone: shipment?.recipient?.phone || "",
+    billingName: senderName,
+    billingAddress: formatInvoiceContactAddress(sender),
+    senderName,
+    senderPhone: sender.phone || "",
+    recipientName: recipient.name || "",
+    recipientPhone: recipient.phone || "",
     origin: shipment?.origin || "",
     destination: shipment?.destination || "",
     routeLabel: buildInvoiceRouteLabel({
@@ -201,6 +239,7 @@ export {
   buildInitialForm,
   buildInvoiceRouteLabel,
   formatInvoiceContactAddress,
+  resolveInvoiceContact,
   formatAmount,
   parseInvoiceDate,
   formatInvoiceDate,
