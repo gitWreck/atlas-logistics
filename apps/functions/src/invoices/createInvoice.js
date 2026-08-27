@@ -29,6 +29,8 @@ exports.createInvoice = onCall(
       amount,
       notes,
       status,
+      truckTripId,
+      tripId,
     } = request.data || {};
 
     const { uid, role, name } = updatedBy(request);
@@ -53,6 +55,39 @@ exports.createInvoice = onCall(
     }
 
     const shipmentData = shipmentDoc.data();
+    const requestedTripId = String(truckTripId || tripId || "").trim();
+
+    if (requestedTripId) {
+      const activeTripIds = new Set(
+        [
+          shipmentData.currentTripId,
+          shipmentData.currentTruckTripId,
+          shipmentData.truckTripId,
+          ...(Array.isArray(shipmentData.currentTripIds)
+            ? shipmentData.currentTripIds
+            : []),
+        ]
+          .filter(Boolean)
+          .map(String),
+      );
+
+      if (!activeTripIds.has(requestedTripId)) {
+        const manifestShipmentDoc = await db
+          .collection("truck_trips")
+          .doc(requestedTripId)
+          .collection("trip_shipments")
+          .doc(shipmentId)
+          .get();
+
+        if (!manifestShipmentDoc.exists) {
+          throw new HttpsError(
+            "failed-precondition",
+            "The selected shipment does not belong to the selected trip.",
+          );
+        }
+      }
+    }
+
     const actorDoc = await db.collection("users").doc(request.auth.uid).get();
     const actorProfile = actorDoc.exists ? actorDoc.data() : null;
     const actorRole = String(actorProfile?.role || "").toLowerCase();
@@ -116,7 +151,7 @@ exports.createInvoice = onCall(
       shipmentData?.trackingNumber || shipmentData?.shipmentId || shipmentId;
 
     const finalShipmentStatus = shipmentData?.status || "";
-    const finalTripId = shipmentData?.currentTripId || null;
+    const finalTripId = requestedTripId || shipmentData?.currentTripId || null;
 
     const finalTotalPackages = shipmentData?.packages?.length || 0;
     const finalTotalItems = shipmentData?.totals?.totalItems || 0;

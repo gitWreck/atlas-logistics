@@ -503,6 +503,7 @@ export default function TripDrawer({
         mode={invoiceMode}
         shipment={selectedInvoiceShipment}
         invoice={selectedInvoice}
+        trips={data ? [data] : []}
         eligibleShipments={shipments}
         user={user}
         onClose={closeInvoiceForm}

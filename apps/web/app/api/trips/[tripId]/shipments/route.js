@@ -26,6 +26,30 @@ function serializeFirestoreValue(value) {
   return value;
 }
 
+async function fetchRootShipmentsById(shipmentIds = []) {
+  const uniqueIds = [...new Set(shipmentIds.filter(Boolean))];
+  const rootShipments = new Map();
+  const batchSize = 100;
+
+  for (let index = 0; index < uniqueIds.length; index += batchSize) {
+    const chunk = uniqueIds.slice(index, index + batchSize);
+    const snapshots = await adminDb.getAll(
+      ...chunk.map((id) => adminDb.collection("shipments").doc(id)),
+    );
+
+    snapshots.forEach((snapshot) => {
+      if (snapshot.exists) {
+        rootShipments.set(snapshot.id, {
+          id: snapshot.id,
+          ...serializeFirestoreValue(snapshot.data()),
+        });
+      }
+    });
+  }
+
+  return rootShipments;
+}
+
 export async function GET(_req, context) {
   try {
     const { tripId } = await context.params;
@@ -69,7 +93,7 @@ export async function GET(_req, context) {
     // Multi-trip shipments have currentTripId=null (pointer only set when on a
     // single trip), so also match on the currentTripIds array to avoid dropping
     // shipments split across trips.
-    const [byTripIdSnap, byTripIdsArraySnap] = await Promise.all([
+    const [byTripIdSnap, byTripIdsArraySnap, manifestSnap] = await Promise.all([
       adminDb
         .collection("shipments")
         .where("currentTripId", "==", tripId)
@@ -79,6 +103,7 @@ export async function GET(_req, context) {
         .where("currentTripIds", "array-contains", tripId)
         .get()
         .catch(() => ({ docs: [] })),
+      tripRef.collection("trip_shipments").get(),
     ]);
 
     const trip = {
@@ -91,6 +116,32 @@ export async function GET(_req, context) {
       shipmentMap.set(doc.id, {
         id: doc.id,
         ...serializeFirestoreValue(doc.data()),
+      });
+    });
+
+    // Completed hub handoffs clear currentTripId from the master shipment.
+    // The trip manifest remains the historical source of membership, so merge
+    // those rows with the current master documents for complete invoice data.
+    const manifestRows = new Map();
+    manifestSnap.docs.forEach((doc) => {
+      const data = serializeFirestoreValue(doc.data());
+      const rootShipmentId = data.trackingShipmentId || doc.id;
+      manifestRows.set(rootShipmentId, {
+        id: rootShipmentId,
+        ...data,
+      });
+    });
+
+    const rootShipments = await fetchRootShipmentsById([
+      ...manifestRows.keys(),
+    ]);
+
+    manifestRows.forEach((manifestRow, shipmentId) => {
+      const rootShipment = rootShipments.get(shipmentId);
+      shipmentMap.set(shipmentId, {
+        ...manifestRow,
+        ...(rootShipment || {}),
+        id: shipmentId,
       });
     });
 

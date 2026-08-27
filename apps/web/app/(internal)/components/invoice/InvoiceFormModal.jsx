@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faTimes,
@@ -18,7 +18,6 @@ import {
 import {
   getShipmentTripIds,
   getShipmentTripIdsLabel,
-  shipmentIsOnTrip,
 } from "../shipments/shipmentHelpers";
 
 function clearSelectedShipment(form, truckTripId = "") {
@@ -65,13 +64,32 @@ function getShipmentPackageTotals(shipment = {}) {
   return { totalPackages, totalItems };
 }
 
+function shipmentCanBeInvoiced(shipment = {}, invoicedShipmentIds = new Set()) {
+  if (shipment.archived) return false;
+  if (String(shipment.status || "").toUpperCase() === "CANCELLED") {
+    return false;
+  }
+  if (invoicedShipmentIds.has(shipment.id)) return false;
+
+  const invoiceStatus = String(shipment.invoiceStatus || "").toUpperCase();
+  if (shipment.hasInvoice === true && invoiceStatus !== "CANCELLED") {
+    return false;
+  }
+  if (shipment.invoiceId && invoiceStatus !== "CANCELLED") return false;
+
+  return true;
+}
+
 export default function InvoiceFormModal({
   isOpen = false,
   loading = false,
   mode = "create",
   shipment = null,
   invoice = null,
+  trips = [],
   eligibleShipments = [],
+  invoicedShipmentIds = [],
+  user = null,
   onClose,
   onSubmit,
   isDark = false,
@@ -82,6 +100,12 @@ export default function InvoiceFormModal({
   const [showTripDropdown, setShowTripDropdown] = useState(false);
   const [showShipmentDropdown, setShowShipmentDropdown] = useState(false);
   const [formError, setFormError] = useState("");
+  const [tripShipments, setTripShipments] = useState(
+    shipment ? [shipment] : [],
+  );
+  const [loadingTripShipments, setLoadingTripShipments] = useState(false);
+  const [tripShipmentsError, setTripShipmentsError] = useState("");
+  const tripRequestId = useRef(0);
 
   const modalTheme = getModalThemeClasses(isDark);
   const actionTheme = getModalActionClasses();
@@ -95,6 +119,10 @@ export default function InvoiceFormModal({
       setShowTripDropdown(false);
       setShowShipmentDropdown(false);
       setFormError("");
+      setTripShipments(shipment ? [shipment] : []);
+      setLoadingTripShipments(false);
+      setTripShipmentsError("");
+      tripRequestId.current += 1;
     }
   }, [isOpen, shipment, invoice, mode]);
 
@@ -105,41 +133,62 @@ export default function InvoiceFormModal({
   const tripOptions = useMemo(() => {
     const tripsById = new Map();
 
-    eligibleShipments.forEach((item) => {
-      getShipmentTripIds(item).forEach((tripId) => {
-        if (tripsById.has(tripId)) return;
+    if (trips.length > 0) {
+      trips.forEach((trip) => {
+        const displayId = trip.tripId || trip.id;
+        const docId = trip.id || trip.tripId;
+        const status = String(trip.status || "").toUpperCase();
+        if (!displayId || !docId || trip.archived || status === "CANCELLED") {
+          return;
+        }
 
-        tripsById.set(tripId, {
-          id: tripId,
-          routeLabel: buildInvoiceRouteLabel(item, "Unknown"),
-          status: item.truckDetails?.status || "",
+        tripsById.set(docId, {
+          id: displayId,
+          docId,
+          routeLabel:
+            trip.route || buildInvoiceRouteLabel(trip, "Unknown"),
+          status,
+          driverName: trip.driverName || "",
+          truckPlateNumber: trip.truckPlateNumber || "",
         });
       });
-    });
+    } else {
+      eligibleShipments.forEach((item) => {
+        getShipmentTripIds(item).forEach((tripId) => {
+          if (tripsById.has(tripId)) return;
+
+          tripsById.set(tripId, {
+            id: tripId,
+            docId: tripId,
+            routeLabel: buildInvoiceRouteLabel(item, "Unknown"),
+            status: item.truckDetails?.status || "",
+            driverName: item.truckDetails?.driverName || "",
+            truckPlateNumber: item.truckDetails?.truckPlate || "",
+          });
+        });
+      });
+    }
 
     return Array.from(tripsById.values());
-  }, [eligibleShipments]);
+  }, [eligibleShipments, trips]);
 
   const filteredTrips = useMemo(() => {
     const keyword = tripQuery.trim().toLowerCase();
     if (!keyword || form.truckTripId) return tripOptions;
 
     return tripOptions.filter((trip) =>
-      `${trip.id} ${trip.routeLabel} ${trip.status}`
+      `${trip.id} ${trip.routeLabel} ${trip.status} ${trip.driverName} ${trip.truckPlateNumber}`
         .toLowerCase()
         .includes(keyword),
     );
   }, [form.truckTripId, tripOptions, tripQuery]);
 
-  const shipmentsForSelectedTrip = useMemo(() => {
-    if (!form.truckTripId) return [];
+  const invoicedShipmentIdSet = useMemo(
+    () => new Set(invoicedShipmentIds.filter(Boolean)),
+    [invoicedShipmentIds],
+  );
 
-    return eligibleShipments.filter((item) =>
-      shipmentIsOnTrip(item, form.truckTripId),
-    );
-  }, [eligibleShipments, form.truckTripId]);
-
-  const filteredShipments = shipmentsForSelectedTrip.filter((item) => {
+  const filteredShipments = tripShipments.filter((item) => {
     const keyword = shipmentQuery.trim().toLowerCase();
 
     return `
@@ -155,13 +204,57 @@ export default function InvoiceFormModal({
       .includes(keyword);
   });
 
-  const handleSelectTrip = (trip) => {
+  const handleSelectTrip = async (trip) => {
+    const requestId = tripRequestId.current + 1;
+    tripRequestId.current = requestId;
+
     setTripQuery(trip.id);
     setShipmentQuery("");
     setForm((prev) => clearSelectedShipment(prev, trip.id));
+    setTripShipments([]);
     setShowTripDropdown(false);
-    setShowShipmentDropdown(false);
+    setShowShipmentDropdown(true);
     setFormError("");
+    setTripShipmentsError("");
+    setLoadingTripShipments(true);
+
+    try {
+      const token = await user?.getIdToken();
+      if (!token) throw new Error("You must be signed in to load shipments.");
+
+      const response = await fetch(
+        `/api/trips/${encodeURIComponent(trip.docId)}/shipments`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+          cache: "no-store",
+        },
+      );
+      const payload = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        throw new Error(
+          payload.details || payload.error || "Failed to load trip shipments.",
+        );
+      }
+
+      if (tripRequestId.current !== requestId) return;
+
+      setTripShipments(
+        (payload.shipments || []).filter((item) =>
+          shipmentCanBeInvoiced(item, invoicedShipmentIdSet),
+        ),
+      );
+    } catch (error) {
+      if (tripRequestId.current !== requestId) return;
+      setTripShipments([]);
+      setTripShipmentsError(error.message || "Failed to load trip shipments.");
+    } finally {
+      if (tripRequestId.current === requestId) {
+        setLoadingTripShipments(false);
+      }
+    }
   };
 
   const handleSelectShipment = (item) => {
@@ -282,9 +375,13 @@ export default function InvoiceFormModal({
                         placeholder="Search trip ID, route, status..."
                         disabled={mode === "edit"}
                         onChange={(e) => {
+                          tripRequestId.current += 1;
                           setTripQuery(e.target.value);
                           setShipmentQuery("");
                           setForm((prev) => clearSelectedShipment(prev));
+                          setTripShipments([]);
+                          setLoadingTripShipments(false);
+                          setTripShipmentsError("");
                           setShowTripDropdown(true);
                           setShowShipmentDropdown(false);
                           setFormError("");
@@ -308,12 +405,12 @@ export default function InvoiceFormModal({
                               <div
                                 className={`px-3 py-3 text-xs ${modalTheme.helperText}`}
                               >
-                                No trips with eligible shipments found.
+                                No matching trips found.
                               </div>
                             ) : (
                               filteredTrips.slice(0, 20).map((trip) => (
                                 <button
-                                  key={trip.id}
+                                  key={trip.docId}
                                   type="button"
                                   onClick={() => handleSelectTrip(trip)}
                                   className={`w-full text-left px-3 py-2 text-xs transition-colors ${
@@ -348,11 +445,17 @@ export default function InvoiceFormModal({
                         type="text"
                         value={shipmentQuery}
                         placeholder={
-                          form.truckTripId
+                          loadingTripShipments
+                            ? "Loading shipments..."
+                            : form.truckTripId
                             ? "Search shipment ID, sender, recipient..."
                             : "Select a trip first"
                         }
-                        disabled={mode === "edit" || !form.truckTripId}
+                        disabled={
+                          mode === "edit" ||
+                          !form.truckTripId ||
+                          loadingTripShipments
+                        }
                         onChange={(e) => {
                           setShipmentQuery(e.target.value);
                           setForm((prev) =>
@@ -379,7 +482,17 @@ export default function InvoiceFormModal({
                                 : "bg-white border-slate-200"
                             }`}
                           >
-                            {filteredShipments.length === 0 ? (
+                            {loadingTripShipments ? (
+                              <div
+                                className={`px-3 py-3 text-xs ${modalTheme.helperText}`}
+                              >
+                                Loading shipments from this trip...
+                              </div>
+                            ) : tripShipmentsError ? (
+                              <div className="px-3 py-3 text-xs text-red-500">
+                                {tripShipmentsError}
+                              </div>
+                            ) : filteredShipments.length === 0 ? (
                               <div
                                 className={`px-3 py-3 text-xs ${modalTheme.helperText}`}
                               >

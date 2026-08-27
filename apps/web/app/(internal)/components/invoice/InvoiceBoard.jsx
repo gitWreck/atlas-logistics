@@ -22,6 +22,7 @@ const InvoiceBoard = forwardRef(function InvoiceBoard(
   ref,
 ) {
   const [shipments, setShipments] = useState([]);
+  const [trips, setTrips] = useState([]);
   const [invoices, setInvoices] = useState([]);
   const [loading, setLoading] = useState(false);
 
@@ -39,7 +40,7 @@ const InvoiceBoard = forwardRef(function InvoiceBoard(
 
       const token = await user.getIdToken();
 
-      const [shipmentsRes, invoicesRes] = await Promise.all([
+      const [shipmentsRes, tripsRes, invoicesRes] = await Promise.all([
         fetch("/api/shipments", {
           method: "GET",
           headers: {
@@ -48,6 +49,17 @@ const InvoiceBoard = forwardRef(function InvoiceBoard(
           },
           cache: "no-store",
         }),
+        fetch(
+          "/api/trips?view=board&activeLimit=all&completedLimit=all",
+          {
+            method: "GET",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`,
+            },
+            cache: "no-store",
+          },
+        ),
         fetch("/api/invoices", {
           method: "GET",
           headers: {
@@ -59,12 +71,15 @@ const InvoiceBoard = forwardRef(function InvoiceBoard(
       ]);
 
       if (!shipmentsRes.ok) throw new Error("Failed to fetch shipments");
+      if (!tripsRes.ok) throw new Error("Failed to fetch trips");
       if (!invoicesRes.ok) throw new Error("Failed to fetch invoices");
 
       const shipmentsData = await shipmentsRes.json();
+      const tripsData = await tripsRes.json();
       const invoicesData = await invoicesRes.json();
 
       setShipments(shipmentsData.shipments || []);
+      setTrips(tripsData.trips || []);
       setInvoices(invoicesData.invoices || []);
     } catch (err) {
       console.error("Error fetching invoices/shipments:", err);
@@ -224,7 +239,9 @@ const InvoiceBoard = forwardRef(function InvoiceBoard(
         mode={formMode}
         shipment={selectedShipment}
         invoice={selectedInvoice}
+        trips={trips}
         eligibleShipments={eligibleShipments}
+        invoicedShipmentIds={Object.keys(invoiceByShipmentId)}
         user={user}
         onClose={closeForm}
         onSubmit={submitInvoice}
