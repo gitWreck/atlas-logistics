@@ -50,6 +50,16 @@ exports.editInvoice = onCall(
 
     const invoiceData = invoiceDoc.data();
 
+    if (
+      invoiceData.sourceReadOnly === true ||
+      String(invoiceData.sourceSystem || "").toLowerCase() === "atlas-finance"
+    ) {
+      throw new HttpsError(
+        "failed-precondition",
+        "Atlas Finance invoices are read-only in Atlas Transport.",
+      );
+    }
+
     // Optional: prevent editing if already paid/cancelled
     if (["PAID", "CANCELLED"].includes(invoiceData.status)) {
       throw new HttpsError(

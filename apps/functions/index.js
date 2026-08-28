@@ -196,6 +196,8 @@ exports.unlockTripManifest =
 
 // Invoices
 exports.createInvoice = require("./src/invoices/createInvoice").createInvoice;
+exports.upsertFinanceInvoice =
+  require("./src/invoices/upsertFinanceInvoice").upsertFinanceInvoice;
 exports.editInvoice = require("./src/invoices/editInvoice").editInvoice;
 exports.updateInvoiceStatus =
   require("./src/invoices/updateInvoiceStatus").updateInvoiceStatus;

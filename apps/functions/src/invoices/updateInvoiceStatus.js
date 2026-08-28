@@ -83,6 +83,15 @@ exports.updateInvoiceStatus = onCall(
     }
 
     const invoiceData = invoiceDoc.data() || {};
+    if (
+      invoiceData.sourceReadOnly === true ||
+      String(invoiceData.sourceSystem || "").toLowerCase() === "atlas-finance"
+    ) {
+      throw new HttpsError(
+        "failed-precondition",
+        "Atlas Finance invoice statuses must be changed in Atlas Finance.",
+      );
+    }
     const currentStatus = invoiceData.status || "DRAFT";
 
     const allowedNextStatuses = INVOICES_VALID_TRANSITIONS[currentStatus] || [];

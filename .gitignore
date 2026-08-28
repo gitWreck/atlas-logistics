@@ -88,6 +88,9 @@ package.json
 /apps/mobile/components/manager/*
 !/apps/mobile/components/manager/AdminMobileSettingsEditor.js
 !/apps/mobile/components/manager/ManagerQuickAccess.js
+!apps/functions/src/invoices/financeInvoiceProjection.js
+!apps/functions/src/invoices/upsertFinanceInvoice.js
+!apps/functions/test/financeInvoiceProjection.test.js
 !/apps/mobile/components/manager/ManagerTripScheduleModal.js
 
 # Quick Access Expo Router screens must also be present in the EAS checkout.
