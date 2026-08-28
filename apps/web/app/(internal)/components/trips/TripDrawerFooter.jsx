@@ -46,6 +46,8 @@ import {
 import { runAction, updatedBy } from "@/app/utility/utilities";
 import { getDrawerThemeClasses } from "@/app/utility/constant/theme";
 import ExportTripButton from "../exports/ExportTripManifest";
+import { formatAmount } from "../invoice/invoiceHelpers";
+import { summarizeTripInvoices } from "./tripInvoiceSummary.mjs";
 
 export default function TripDrawerFooter({
   data,
@@ -103,6 +105,7 @@ export default function TripDrawerFooter({
   const showLifecycleSection = showCancelTrip || showArchiveTrip || canAudit;
   const completedTrip = String(data.status || "").toUpperCase() === "COMPLETED" ||
     String(data.status || "").toUpperCase() === "DELIVERED";
+  const invoiceSummary = summarizeTripInvoices(shipments);
 
   const handleUnlockSuccess = () => {
     setTimeout(() => {
@@ -116,9 +119,30 @@ export default function TripDrawerFooter({
   return (
     <div className={`p-4 border-t flex flex-col gap-3 ${theme.footerPanel}`}>
       <div className={`rounded-lg border px-3 py-2 text-xs ${theme.footerPanel}`}>
-        <span className="font-bold uppercase opacity-60">Manifest</span>
-        <span className="ml-2 font-semibold">{manifestStatusLabel}</span>
-        <span className="ml-2 opacity-50">({manifestStatus})</span>
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <span className="font-bold uppercase opacity-60">Manifest</span>
+            <span className="ml-2 font-semibold">{manifestStatusLabel}</span>
+            <span className="ml-2 opacity-50">({manifestStatus})</span>
+          </div>
+          <div
+            className={`flex items-center gap-3 rounded-md border px-3 py-1.5 ${
+              isDark
+                ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-300"
+                : "border-emerald-200 bg-emerald-50 text-emerald-700"
+            }`}
+          >
+            <span>
+              <span className="font-bold">Invoices:</span>{" "}
+              {invoiceSummary.count}
+            </span>
+            <span className="h-4 w-px bg-current opacity-20" />
+            <span>
+              <span className="font-bold">Total:</span>{" "}
+              {formatAmount(invoiceSummary.totalAmount)}
+            </span>
+          </div>
+        </div>
         {manifestStatus === MANIFEST_STATUS.RECONCILED && !isAdmin && (
           <p className="mt-2 text-[11px] opacity-70">
             Reconciled manifests can only be unlocked by an Admin.
