@@ -201,6 +201,8 @@ exports.upsertFinanceInvoice =
 exports.editInvoice = require("./src/invoices/editInvoice").editInvoice;
 exports.updateInvoiceStatus =
   require("./src/invoices/updateInvoiceStatus").updateInvoiceStatus;
+exports.cleanupDeletedInvoice =
+  require("./src/invoices/cleanupDeletedInvoice.cjs").cleanupDeletedInvoice;
 
 // Messaging
 exports.sendManualSms = require("./src/messaging/sendManualSms").sendManualSms;

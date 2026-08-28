@@ -113,6 +113,25 @@ async function fetchRootShipmentsById(shipmentIds = []) {
   return rootShipments;
 }
 
+async function fetchExistingInvoiceIds(invoiceIds = []) {
+  const uniqueIds = [...new Set(invoiceIds.filter(Boolean).map(String))];
+  const existingIds = new Set();
+  const batchSize = 100;
+
+  for (let index = 0; index < uniqueIds.length; index += batchSize) {
+    const chunk = uniqueIds.slice(index, index + batchSize);
+    const snapshots = await adminDb.getAll(
+      ...chunk.map((id) => adminDb.collection("invoices").doc(id)),
+    );
+
+    snapshots.forEach((snapshot) => {
+      if (snapshot.exists) existingIds.add(snapshot.id);
+    });
+  }
+
+  return existingIds;
+}
+
 export async function GET(_req, context) {
   try {
     const { tripId } = await context.params;
@@ -218,7 +237,34 @@ export async function GET(_req, context) {
       });
     });
 
-    const shipments = [...shipmentMap.values()].sort((a, b) => {
+    const linkedInvoiceIds = [...shipmentMap.values()]
+      .filter(
+        (shipment) =>
+          String(shipment.invoiceStatus || "").toUpperCase() !== "CANCELLED",
+      )
+      .map((shipment) => shipment.invoiceId || shipment.invoiceNumber)
+      .filter(Boolean);
+    const existingInvoiceIds = await fetchExistingInvoiceIds(linkedInvoiceIds);
+
+    const shipments = [...shipmentMap.values()].map((shipment) => {
+      const linkedInvoiceId = String(
+        shipment.invoiceId || shipment.invoiceNumber || "",
+      );
+      const hasMissingInvoice =
+        linkedInvoiceId &&
+        String(shipment.invoiceStatus || "").toUpperCase() !== "CANCELLED" &&
+        !existingInvoiceIds.has(linkedInvoiceId);
+
+      return hasMissingInvoice
+        ? {
+            ...shipment,
+            hasInvoice: false,
+            invoiceId: null,
+            invoiceNumber: null,
+            invoiceStatus: null,
+          }
+        : shipment;
+    }).sort((a, b) => {
       const aTime = Date.parse(a.updatedAt || "") || 0;
       const bTime = Date.parse(b.updatedAt || "") || 0;
       return bTime - aTime;

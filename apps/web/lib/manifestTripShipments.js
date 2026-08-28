@@ -161,6 +161,7 @@ export async function getManifestTripShipments(tripId) {
     const parsedInvoiceAmount = Number(rawInvoiceAmount);
     const hasActiveInvoice =
       String(invoiceStatus || "").toUpperCase() !== "CANCELLED" &&
+      Boolean(linkedInvoice) &&
       (root.hasInvoice || Boolean(root.invoiceId));
 
     const customAddedBy =
