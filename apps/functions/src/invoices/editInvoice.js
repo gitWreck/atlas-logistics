@@ -29,6 +29,7 @@ exports.editInvoice = onCall(
       dueDate,
       billingName,
       billingAddress,
+      senderName,
       amount,
       notes,
       status,
@@ -79,6 +80,10 @@ exports.editInvoice = onCall(
     if (billingName !== undefined) updateData.billingName = billingName;
     if (billingAddress !== undefined)
       updateData.billingAddress = billingAddress;
+    if (senderName !== undefined) {
+      updateData.senderName =
+        String(senderName || "").trim().slice(0, 500) || "Unknown Sender";
+    }
     if (amount !== undefined && !isNaN(Number(amount)))
       updateData.amount = Number(amount);
     if (notes !== undefined) updateData.notes = notes;

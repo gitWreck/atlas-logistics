@@ -702,7 +702,10 @@ export default function InvoiceFormModal({
                       <input
                         type="text"
                         value={form.senderName}
-                        readOnly
+                        onChange={(e) =>
+                          updateField("senderName", e.target.value)
+                        }
+                        maxLength={500}
                         className={`w-full rounded-lg border px-3 py-2 text-sm mt-1 ${modalTheme.input}`}
                       />
                     </div>

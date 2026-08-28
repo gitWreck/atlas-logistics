@@ -27,6 +27,7 @@ exports.createInvoice = onCall(
       dueDate,
       billingName,
       billingAddress,
+      senderName,
       amount,
       notes,
       status,
@@ -139,6 +140,7 @@ exports.createInvoice = onCall(
     }
 
     const finalSenderName =
+      String(senderName || "").trim().slice(0, 500) ||
       shipmentData?.sender?.name ||
       shipmentData?.senderName ||
       "Unknown Sender";
