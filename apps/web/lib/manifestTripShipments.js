@@ -52,7 +52,28 @@ export async function getManifestTripShipments(tripId) {
     collectActorUids(data, actorUidSet);
   });
 
-  const actorNameByUid = await resolveUserDisplayNames([...actorUidSet]);
+  const activeInvoiceIds = [
+    ...new Set(
+      Object.values(rootMap)
+        .filter(
+          (shipment) =>
+            shipment?.invoiceId &&
+            String(shipment.invoiceStatus || "").toUpperCase() !== "CANCELLED",
+        )
+        .map((shipment) => String(shipment.invoiceId)),
+    ),
+  ];
+  const invoiceRefs = activeInvoiceIds.map((id) =>
+    adminDb.collection("invoices").doc(id),
+  );
+  const [actorNameByUid, invoiceSnaps] = await Promise.all([
+    resolveUserDisplayNames([...actorUidSet]),
+    invoiceRefs.length ? adminDb.getAll(...invoiceRefs) : [],
+  ]);
+  const invoiceMap = {};
+  invoiceSnaps.forEach((snap) => {
+    if (snap.exists) invoiceMap[snap.id] = snap.data() || {};
+  });
 
   const shipments = snapshot.docs.map((doc) => {
     const data = doc.data();
@@ -132,8 +153,14 @@ export async function getManifestTripShipments(tripId) {
           visibleDamagedQty,
         0,
       );
+    const linkedInvoice = root.invoiceId
+      ? invoiceMap[String(root.invoiceId)] || null
+      : null;
+    const invoiceStatus = linkedInvoice?.status || root.invoiceStatus || null;
+    const rawInvoiceAmount = linkedInvoice?.amount ?? root.invoiceAmount ?? 0;
+    const parsedInvoiceAmount = Number(rawInvoiceAmount);
     const hasActiveInvoice =
-      root.invoiceStatus !== "CANCELLED" &&
+      String(invoiceStatus || "").toUpperCase() !== "CANCELLED" &&
       (root.hasInvoice || Boolean(root.invoiceId));
 
     const customAddedBy =
@@ -212,7 +239,11 @@ export async function getManifestTripShipments(tripId) {
       hasInvoice: hasActiveInvoice,
       invoiceId: hasActiveInvoice ? root.invoiceId || null : null,
       invoiceNumber: hasActiveInvoice ? root.invoiceNumber || null : null,
-      invoiceStatus: root.invoiceStatus || null,
+      invoiceStatus,
+      invoiceAmount:
+        hasActiveInvoice && Number.isFinite(parsedInvoiceAmount)
+          ? parsedInvoiceAmount
+          : 0,
       createdAt: data.createdAt?.toDate
         ? data.createdAt.toDate().toISOString()
         : null,

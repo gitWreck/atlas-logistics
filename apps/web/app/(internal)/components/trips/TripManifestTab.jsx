@@ -30,6 +30,8 @@ import { aggregateTripLoadSummary } from "@/app/utility/tripStats";
 import { formatFirestoreDate } from "@/app/utility/utilities";
 import { isCompletedTrip } from "./tripHelpers";
 import TripCompletedManifestsView from "./TripCompletedManifestsView";
+import { formatAmount } from "../invoice/invoiceHelpers";
+import { summarizeTripInvoices } from "./tripInvoiceSummary.mjs";
 
 function ActorMetaBlock({ byName, at, isDark = false, className = "" }) {
   const when = formatFirestoreDate(at);
@@ -142,6 +144,10 @@ export default function TripManifestTab({
     (actorRole === "manager" && manifestLocked === false);
 
   const isManifestReconciled = manifestStatus === MANIFEST_STATUS.RECONCILED;
+  const invoiceSummary = useMemo(
+    () => summarizeTripInvoices(shipments),
+    [shipments],
+  );
 
   const loadSummary = useMemo(
     () =>
@@ -505,7 +511,7 @@ export default function TripManifestTab({
         {/* Header */}
         <div className={`p-4 rounded-2xl border ${theme.statCard}`}>
           <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-            <div className="flex items-center justify-between gap-3">
+            <div className="grid grid-cols-2 items-center gap-5">
               <div>
                 <div
                   className={`text-xs font-bold uppercase ${theme.cellSecondary}`}
@@ -518,6 +524,29 @@ export default function TripManifestTab({
                   {/* <span className={`text-sm font-normal ${theme.cellSecondary}`}>
                   shipment{shipments.length > 1 ? "s" : ""}
                 </span> */}
+                </div>
+              </div>
+
+              <div
+                className={`border-l pl-5 ${isDark ? "border-slate-700" : "border-slate-200"}`}
+              >
+                <div
+                  className={`text-xs font-bold uppercase ${theme.cellSecondary}`}
+                >
+                  Total Invoice Amount
+                </div>
+                <div className="mt-0.5 text-xl font-bold text-emerald-600">
+                  {loading ? "..." : formatAmount(invoiceSummary.totalAmount)}
+                </div>
+                <div className={`mt-0.5 text-[10px] ${theme.cellSecondary}`}>
+                  {loading ? (
+                    "Loading invoice totals..."
+                  ) : (
+                    <>
+                      {invoiceSummary.count} active invoice
+                      {invoiceSummary.count === 1 ? "" : "s"}
+                    </>
+                  )}
                 </div>
               </div>
             </div>
