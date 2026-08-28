@@ -340,6 +340,7 @@ export default function ReceivePackageForm({
                 color="blue"
                 isDark={isDark}
                 phLocations={phLocations}
+                optional
               />
               <InputGroup
                 label="Recipient Contact"

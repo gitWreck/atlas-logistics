@@ -171,19 +171,8 @@ export default function UnifiedShipmentModal({
       }
 
       // --- Construct Base Payload ---
-      if (
-        notificationChannels.email &&
-        !shipmentDraft.sender.email &&
-        !shipmentDraft.recipient.email &&
-        !shipmentDraft.sender.uid &&
-        !shipmentDraft.recipient.uid
-      ) {
-        setLoading(false);
-        return alert(
-          "Email is enabled, but neither sender nor recipient has an email address. Add an email or pick a registered customer.",
-        );
-      }
-
+      // Missing optional contact channels never block shipment creation. The
+      // notification service skips unavailable recipients after the save.
       const payload = {
         sender: {
           uid: shipmentDraft.sender.uid || null,

@@ -14,6 +14,7 @@ export default function InputGroup({
   isDark = false,
   user,
   phLocations = PH_LOCATIONS,
+  optional = false,
 }) {
   const [cities, setCities] = useState([]);
   const provinces = Object.keys(phLocations || {}).sort();
@@ -103,11 +104,20 @@ export default function InputGroup({
       className={`space-y-4 p-4 rounded-xl border ${isDark ? "bg-slate-950/50 border-slate-800/50" : "bg-slate-50 border-slate-200"}`}
     >
       <div className="flex justify-between items-center mb-2">
-        <h3
-          className={`text-xs font-bold uppercase tracking-wider ${titleColor}`}
-        >
-          {label} Details
-        </h3>
+        <div className="flex items-center gap-2">
+          <h3
+            className={`text-xs font-bold uppercase tracking-wider ${titleColor}`}
+          >
+            {label} Details
+          </h3>
+          {optional && (
+            <span
+              className={`rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide ${isDark ? "bg-slate-800 text-slate-400" : "bg-slate-200 text-slate-600"}`}
+            >
+              Optional
+            </span>
+          )}
+        </div>
         {values.code && (
           <span
             className={`text-[10px] font-mono px-2 py-1 rounded border ${isDark ? "bg-slate-800 text-white border-slate-700" : "bg-slate-200 text-slate-800 border-slate-300"}`}
@@ -120,7 +130,7 @@ export default function InputGroup({
       <div className="grid grid-cols-2 gap-3">
         <div className="relative">
           <input
-            placeholder="Contact Name"
+            placeholder={optional ? "Contact Name (optional)" : "Contact Name"}
             className={inputClass}
             value={values.name}
             onChange={(e) => handleChange("name", e.target.value)}
@@ -150,7 +160,7 @@ export default function InputGroup({
         </div>
 
         <input
-          placeholder="Phone Number"
+          placeholder={optional ? "Phone Number (optional)" : "Phone Number"}
           className={inputClass}
           value={values.phone}
           onChange={(e) => handleChange("phone", e.target.value)}

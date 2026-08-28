@@ -109,10 +109,6 @@ exports.createShipment = onCall(
       );
     }
 
-    if (!String(sender?.name || "").trim()) {
-      throw new HttpsError("invalid-argument", "Sender name is required.");
-    }
-
     if (!Array.isArray(items) || items.length === 0) {
       throw new HttpsError("invalid-argument", "Items array is invalid.");
     }
@@ -166,7 +162,10 @@ exports.createShipment = onCall(
       ),
     ];
 
-    const originSummary = `${senderAddress.city}, ${senderAddress.province}`;
+    const originSummary = [senderAddress.city, senderAddress.province]
+      .map((value) => String(value || "").trim())
+      .filter(Boolean)
+      .join(", ") || origin;
     const finalOriginCode = originCode || "GEN";
     const finalDestCode = destinationCode || "GEN";
 
