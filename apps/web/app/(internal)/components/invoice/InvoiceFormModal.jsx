@@ -108,6 +108,9 @@ export default function InvoiceFormModal({
   const [loadingTripShipments, setLoadingTripShipments] = useState(false);
   const [tripShipmentsError, setTripShipmentsError] = useState("");
   const tripRequestId = useRef(0);
+  const isPaidCorrection =
+    mode === "edit" &&
+    String(invoice?.status || form.status || "").toUpperCase() === "PAID";
 
   const modalTheme = getModalThemeClasses(isDark);
   const actionTheme = getModalActionClasses();
@@ -305,6 +308,14 @@ export default function InvoiceFormModal({
 
     if (mode !== "edit" && !form.shipmentId) {
       setFormError("Please select a shipment from the selected trip.");
+      return;
+    }
+
+    if (
+      isPaidCorrection &&
+      String(form.correctionReason || "").trim().length < 5
+    ) {
+      setFormError("Enter a correction reason with at least 5 characters.");
       return;
     }
 
@@ -769,6 +780,53 @@ export default function InvoiceFormModal({
                     className={`w-full rounded-lg border px-3 py-2 text-sm resize-none ${modalTheme.input}`}
                   />
                 </section>
+
+                {isPaidCorrection && (
+                  <section
+                    className={`space-y-3 rounded-xl border p-4 ${
+                      isDark
+                        ? "border-amber-500/30 bg-amber-500/10"
+                        : "border-amber-200 bg-amber-50"
+                    }`}
+                  >
+                    <div>
+                      <h3
+                        className={`text-sm font-bold uppercase tracking-widest ${
+                          isDark ? "text-amber-200" : "text-amber-900"
+                        }`}
+                      >
+                        Paid Invoice Correction
+                      </h3>
+                      <p
+                        className={`mt-1 text-xs ${
+                          isDark ? "text-amber-200/80" : "text-amber-800"
+                        }`}
+                      >
+                        The invoice remains paid. Your reason and the original
+                        values will be retained in the audit history.
+                      </p>
+                    </div>
+                    <div>
+                      <label
+                        className={`text-xs font-semibold ${modalTheme.label}`}
+                      >
+                        Correction Reason
+                      </label>
+                      <textarea
+                        rows={3}
+                        required
+                        minLength={5}
+                        maxLength={500}
+                        value={form.correctionReason || ""}
+                        onChange={(e) =>
+                          updateField("correctionReason", e.target.value)
+                        }
+                        placeholder="Explain why this paid invoice is being corrected..."
+                        className={`mt-1 w-full resize-none rounded-lg border px-3 py-2 text-sm ${modalTheme.input}`}
+                      />
+                    </div>
+                  </section>
+                )}
               </div>
 
               <div className={`px-5 sm:px-6 py-4 border-t ${modalTheme.divider}`}>
@@ -800,7 +858,11 @@ export default function InvoiceFormModal({
                     ) : (
                       <span className="inline-flex items-center gap-2">
                         <FontAwesomeIcon icon={faFloppyDisk} />
-                        {mode === "edit" ? "Save Changes" : "Save Invoice"}
+                        {isPaidCorrection
+                          ? "Save Correction"
+                          : mode === "edit"
+                            ? "Save Changes"
+                            : "Save Invoice"}
                       </span>
                     )}
                   </button>

@@ -107,6 +107,7 @@ function buildInitialForm(shipment, invoice, mode) {
       amount: invoice.amount ?? 0,
       notes: invoice.notes || "",
       status: invoice.status || "DRAFT",
+      correctionReason: "",
       shipmentSnapshot: invoice.shipmentSnapshot || shipment || null,
     };
   }
@@ -136,6 +137,7 @@ function buildInitialForm(shipment, invoice, mode) {
     amount: 0,
     notes: "",
     status: "DRAFT",
+    correctionReason: "",
     shipmentSnapshot: shipment || null,
   };
 }

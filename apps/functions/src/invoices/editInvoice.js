@@ -5,6 +5,7 @@ const {
   writeInvoiceActionLog,
 } = require("../utilities/invoiceLogger");
 const { updatedBy } = require("../utilities/helpers");
+const { evaluateInvoiceEdit } = require("./invoiceEditPolicy.cjs");
 
 if (!admin.apps.length) admin.initializeApp();
 const db = admin.firestore();
@@ -33,9 +34,11 @@ exports.editInvoice = onCall(
       amount,
       notes,
       status,
+      correctionReason,
     } = request.data || {};
 
-    const { uid, role, name } = updatedBy(request);
+    const requestActor = updatedBy(request);
+    const { uid } = requestActor;
 
     // 2. VALIDATION
     if (!invoiceId) {
@@ -61,18 +64,32 @@ exports.editInvoice = onCall(
       );
     }
 
-    // Optional: prevent editing if already paid/cancelled
-    if (["PAID", "CANCELLED"].includes(invoiceData.status)) {
-      throw new HttpsError(
-        "failed-precondition",
-        "Cannot edit finalized invoice.",
-      );
+    const currentStatus = String(invoiceData.status || "DRAFT").toUpperCase();
+    let trustedUserData = {};
+    if (currentStatus === "PAID") {
+      const userDoc = await db.collection("users").doc(uid).get();
+      trustedUserData = userDoc.exists ? userDoc.data() || {} : {};
     }
+
+    const actor = getActorFromRequest(request, trustedUserData);
+    const editPolicy = evaluateInvoiceEdit({
+      currentStatus,
+      actorRole:
+        trustedUserData.role || request.auth?.token?.role,
+      correctionReason,
+      requestedStatus: status,
+    });
+    if (!editPolicy.allowed) {
+      throw new HttpsError(editPolicy.code, editPolicy.message);
+    }
+
+    const actorName = actor.actorName || requestActor.name || "Unknown user";
+    const actorRole = actor.actorRole || requestActor.role || "unknown";
 
     // 3. BUILD UPDATE OBJECT
     const updateData = {
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-      updatedBy: name,
+      updatedBy: actorName,
     };
 
     if (invoiceDate !== undefined) updateData.invoiceDate = invoiceDate;
@@ -84,8 +101,16 @@ exports.editInvoice = onCall(
       updateData.senderName =
         String(senderName || "").trim().slice(0, 500) || "Unknown Sender";
     }
-    if (amount !== undefined && !isNaN(Number(amount)))
-      updateData.amount = Number(amount);
+    if (amount !== undefined) {
+      const nextAmount = Number(amount);
+      if (!Number.isFinite(nextAmount) || nextAmount < 0) {
+        throw new HttpsError(
+          "invalid-argument",
+          "Invoice amount must be a valid non-negative number.",
+        );
+      }
+      updateData.amount = nextAmount;
+    }
     if (notes !== undefined) updateData.notes = notes;
     if (status !== undefined) updateData.status = status;
 
@@ -98,28 +123,58 @@ exports.editInvoice = onCall(
 
     batch.update(invoiceRef, updateData);
 
+    const eventType = editPolicy.isPaidCorrection
+      ? "PAID_INVOICE_CORRECTED"
+      : "INVOICE_UPDATED";
     batch.set(db.collection("invoice_events").doc(), {
       invoiceId,
-      type: "INVOICE_UPDATED",
+      invoiceNumber: invoiceData.invoiceNumber || invoiceId,
+      shipmentId: invoiceData.shipmentId || null,
+      tripId: invoiceData.tripId || invoiceData.truckTripId || null,
+      type: eventType,
       actorId: uid,
       at: admin.firestore.Timestamp.now(),
-      note: "Invoice updated",
+      note: editPolicy.isPaidCorrection
+        ? `Paid invoice corrected: ${editPolicy.reason}`
+        : "Invoice updated",
+      ...(editPolicy.isPaidCorrection
+        ? {
+            correctionReason: editPolicy.reason,
+            previousAmount: Number(invoiceData.amount || 0),
+            amount: Number(updateData.amount ?? invoiceData.amount ?? 0),
+            previousStatus: currentStatus,
+            status: "PAID",
+          }
+        : {}),
     });
 
     writeInvoiceActionLog({
       db,
       batch,
-      action: "UPDATE_INVOICE",
+      action: editPolicy.isPaidCorrection
+        ? "CORRECT_PAID_INVOICE"
+        : "UPDATE_INVOICE",
       invoiceId,
       invoiceDocId: invoiceRef.id,
       invoiceNumber: invoiceData.invoiceNumber || invoiceId,
       shipmentId: invoiceData.shipmentId || null,
       actorId: uid,
-      actorName: name,
-      actorRole: role,
+      actorName,
+      actorRole,
       details: {
         changedFields,
         status: updateData.status,
+        ...(editPolicy.isPaidCorrection
+          ? {
+              correctionReason: editPolicy.reason,
+              previousAmount: Number(invoiceData.amount || 0),
+              amount: Number(updateData.amount ?? invoiceData.amount ?? 0),
+              previousBillingName: invoiceData.billingName || null,
+              billingName: updateData.billingName ?? invoiceData.billingName ?? null,
+              previousSenderName: invoiceData.senderName || null,
+              senderName: updateData.senderName ?? invoiceData.senderName ?? null,
+            }
+          : {}),
       },
       createdAt: nowAt,
     });
