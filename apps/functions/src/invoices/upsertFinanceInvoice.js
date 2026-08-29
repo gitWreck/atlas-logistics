@@ -151,7 +151,8 @@ exports.upsertFinanceInvoice = onCall(
         shipmentTrackingNumber:
           clean(shipment.trackingNumber || shipment.shipmentId || shipmentId, 250),
         billingName:
-          clean(data.billingName || sender?.name, 500) || "Atlas Finance customer",
+          clean(data.billingName || recipient?.name, 500) ||
+          "Atlas Finance customer",
         billingAddress: clean(data.billingAddress, 1000) || null,
         senderName: clean(sender?.name, 500) || null,
         senderPhone: clean(sender?.phone, 100) || null,

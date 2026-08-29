@@ -274,6 +274,7 @@ export default function InvoiceFormModal({
     const sender = resolveInvoiceContact(item, "sender");
     const recipient = resolveInvoiceContact(item, "recipient");
     const senderName = sender.name || "Unknown Sender";
+    const recipientName = recipient.name || "Unknown Recipient";
 
     setShipmentQuery(item.id || item.trackingNumber || "");
     setForm((prev) => ({
@@ -283,12 +284,12 @@ export default function InvoiceFormModal({
       shipmentStatus: item.status || "",
       senderName,
       senderPhone: sender.phone || "",
-      recipientName: recipient.name || "",
+      recipientName,
       recipientPhone: recipient.phone || "",
       origin: item.origin || "",
       destination: item.destination || "",
       routeLabel: buildInvoiceRouteLabel(item, "Unknown"),
-      billingName: senderName,
+      billingName: recipientName,
       billingAddress: formatInvoiceContactAddress(sender),
       totalPackages,
       totalItems,
@@ -321,11 +322,13 @@ export default function InvoiceFormModal({
 
     setFormError("");
     const senderName = form.senderName.trim() || "Unknown Sender";
-    const billingName = form.billingName.trim() || senderName;
+    const recipientName = form.recipientName.trim() || "Unknown Recipient";
+    const billingName = form.billingName.trim() || recipientName;
 
     onSubmit?.({
       ...form,
       senderName,
+      recipientName,
       billingName,
       amount: Number(form.amount || 0),
       totalPackages: Number(form.totalPackages || 0),

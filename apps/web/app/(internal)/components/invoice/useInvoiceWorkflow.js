@@ -12,7 +12,7 @@ function getInvoiceSubmitError(error) {
   const rawMessage = String(error?.message || "").trim();
 
   if (/missing billingname|billing name.*required/i.test(rawMessage)) {
-    return "Billing Name is required. This shipment has no sender information, so enter the billing name manually or update the shipment.";
+    return "Billing Name is required. This shipment has no receiver information, so enter the billing name manually or update the shipment.";
   }
 
   if (/already exists/i.test(rawMessage)) {

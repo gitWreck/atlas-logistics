@@ -54,11 +54,11 @@ exports.createInvoice = onCall(
 
     const shipmentData = shipmentDoc.data();
     const requestedBillingName = String(billingName || "").trim();
-    const shipmentSenderName = String(
-      shipmentData?.sender?.name || shipmentData?.senderName || "",
+    const shipmentRecipientName = String(
+      shipmentData?.recipient?.name || shipmentData?.recipientName || "",
     ).trim();
     const resolvedBillingName =
-      requestedBillingName || shipmentSenderName || "Unknown Sender";
+      requestedBillingName || shipmentRecipientName || "Unknown Recipient";
 
     const requestedTripId = String(truckTripId || tripId || "").trim();
 

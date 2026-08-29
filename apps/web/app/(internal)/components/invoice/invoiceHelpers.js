@@ -70,6 +70,9 @@ function buildInitialForm(shipment, invoice, mode) {
   const senderName =
     sender.name ||
     (shipment?.id || shipment?.shipmentId ? "Unknown Sender" : "");
+  const recipientName =
+    recipient.name ||
+    (shipment?.id || shipment?.shipmentId ? "Unknown Recipient" : "");
 
   if (mode === "edit" && invoice) {
     return {
@@ -83,12 +86,12 @@ function buildInitialForm(shipment, invoice, mode) {
       invoiceNumber: invoice.invoiceNumber || "",
       invoiceDate: invoice.invoiceDate || "",
       dueDate: invoice.dueDate || "",
-      billingName: invoice.billingName || senderName,
+      billingName: invoice.billingName || recipientName,
       billingAddress:
         invoice.billingAddress || formatInvoiceContactAddress(sender),
       senderName: invoice.senderName || senderName,
       senderPhone: invoice.senderPhone || sender.phone || "",
-      recipientName: invoice.recipientName || recipient.name || "",
+      recipientName: invoice.recipientName || recipientName,
       recipientPhone:
         invoice.recipientPhone || recipient.phone || "",
       origin: invoice.origin || shipment?.origin || "",
@@ -118,11 +121,11 @@ function buildInitialForm(shipment, invoice, mode) {
     invoiceNumber: "",
     invoiceDate: "",
     dueDate: "",
-    billingName: senderName,
+    billingName: recipientName,
     billingAddress: formatInvoiceContactAddress(sender),
     senderName,
     senderPhone: sender.phone || "",
-    recipientName: recipient.name || "",
+    recipientName,
     recipientPhone: recipient.phone || "",
     origin: shipment?.origin || "",
     destination: shipment?.destination || "",
