@@ -516,6 +516,27 @@ service cloud.firestore {
       allow create, update, delete: if false;
     }
 
+    match /shipmentPayments/{paymentId} {
+      allow read: if isAdmin() || managerCanAccessOperation(resource.data);
+      allow create, update, delete: if false;
+    }
+
+    match /financeEventOutbox/{eventId} {
+      allow read, write: if false;
+    }
+
+    match /paymentRequestReservations/{reservationId} {
+      allow read, write: if false;
+    }
+
+    match /paymentReferenceReservations/{reservationId} {
+      allow read, write: if false;
+    }
+
+    match /shipmentInvoiceReservations/{reservationId} {
+      allow read, write: if false;
+    }
+
     // --- PUBLIC TRACKING ---
 
     match /tracking_public/{trackingNumber} {

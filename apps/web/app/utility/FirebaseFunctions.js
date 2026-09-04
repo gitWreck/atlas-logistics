@@ -339,6 +339,14 @@ export const updateInvoiceStatus = httpsCallable(
   functions,
   "updateInvoiceStatus",
 );
+export const recordShipmentPayment = httpsCallable(
+  functions,
+  "recordShipmentPayment",
+);
+export const reverseShipmentPayment = httpsCallable(
+  functions,
+  "reverseShipmentPayment",
+);
 
 // ADMIN
 export const createUserProfile = httpsCallable(functions, "createUserProfile");

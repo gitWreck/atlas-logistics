@@ -145,6 +145,7 @@ export default function TripDrawer({
     closeDetails: closeInvoiceDetails,
     submitInvoice,
     changeInvoiceStatus,
+    reversePayment,
   } = invoiceWorkflow;
 
   useEffect(() => {
@@ -522,6 +523,10 @@ export default function TripDrawer({
         onIssue={() => changeInvoiceStatus(selectedInvoice, "ISSUED")}
         onMarkPaid={() => changeInvoiceStatus(selectedInvoice, "PAID")}
         onCancel={() => changeInvoiceStatus(selectedInvoice, "CANCELLED")}
+        onReversePayment={async () => {
+          const reason = window.prompt("Enter the reason for reversing this payment:");
+          if (reason) await reversePayment(selectedInvoice, reason);
+        }}
         isDark={isDark}
       />
     </>

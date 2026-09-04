@@ -5,6 +5,7 @@ const { updatedBy } = require("../utilities/helpers");
 const { canAccessRecord } = require("../manager/managerAccess");
 const { formatAddress } = require("../utilities/addressHelpers");
 const { Timestamp } = admin.firestore;
+const crypto = require("node:crypto");
 
 if (!admin.apps.length) admin.initializeApp();
 const db = admin.firestore();
@@ -188,9 +189,12 @@ exports.createInvoice = onCall(
       currentTripId: finalTripId,
     };
 
-    const batch = db.batch();
+    const reservationRef = db.collection("shipmentInvoiceReservations").doc(
+      crypto.createHash("sha256").update(String(shipmentId)).digest("hex"),
+    );
 
-    batch.set(invoiceRef, {
+    const writeInvoice = (transaction) => {
+      transaction.set(invoiceRef, {
       invoiceNumber,
       shipmentId,
       shipmentTrackingNumber: finalTrackingNumber,
@@ -215,6 +219,7 @@ exports.createInvoice = onCall(
       amount: finalAmount,
       notes: notes || "",
       status: finalStatus,
+      financeSourceVersion: 1,
 
       invoiceDate: invoiceDate || null,
       dueDate: dueDate || null,
@@ -225,51 +230,68 @@ exports.createInvoice = onCall(
       updatedAt: nowAt,
       createdBy: name,
       updatedBy: name,
-    });
+      });
 
-    batch.set(
-      shipmentRef,
-      {
+      transaction.set(
+        shipmentRef,
+        {
+          invoiceId: invoiceRef.id,
+          invoiceNumber,
+          invoiceStatus: finalStatus,
+          hasInvoice: true,
+          updatedAt: nowAt,
+          updatedBy: name,
+        },
+        { merge: true },
+      );
+
+      writeInvoiceActionLog({
+        db,
+        batch: transaction,
+        action: "CREATE_INVOICE",
+        invoiceId: invoiceRef.id,
+        invoiceDocId: invoiceRef.id,
+        invoiceNumber,
+        shipmentId,
+        actorId: uid,
+        actorName: name,
+        actorRole: role,
+        details: {
+          amount: finalAmount,
+          status: finalStatus,
+        },
+        createdAt: nowAt,
+      });
+
+      transaction.set(db.collection("invoice_events").doc(), {
         invoiceId: invoiceRef.id,
         invoiceNumber,
-        invoiceStatus: finalStatus,
-        hasInvoice: true,
-        updatedAt: nowAt,
-        updatedBy: name,
-      },
-      { merge: true },
-    );
-
-    writeInvoiceActionLog({
-      db,
-      batch,
-      action: "CREATE_INVOICE",
-      invoiceId: invoiceRef.id,
-      invoiceDocId: invoiceRef.id,
-      invoiceNumber,
-      shipmentId,
-      actorId: uid,
-      actorName: name,
-      actorRole: role,
-      details: {
-        amount: finalAmount,
+        type: "INVOICE_CREATED",
         status: finalStatus,
-      },
-      createdAt: nowAt,
-    });
+        actorId: uid,
+        at: now,
+        note: `Invoice ${invoiceNumber} created`,
+      });
 
-    batch.set(db.collection("invoice_events").doc(), {
-      invoiceId: invoiceRef.id,
-      invoiceNumber,
-      type: "INVOICE_CREATED",
-      status: finalStatus,
-      actorId: uid,
-      at: now,
-      note: `Invoice ${invoiceNumber} created`,
-    });
+    };
 
     try {
-      await batch.commit();
+      await db.runTransaction(async (transaction) => {
+        const reservation = await transaction.get(reservationRef);
+        if (reservation.exists) {
+          throw new HttpsError(
+            "already-exists",
+            "An active invoice already exists for this shipment.",
+          );
+        }
+        writeInvoice(transaction);
+        transaction.create(reservationRef, {
+          shipmentId,
+          invoiceId: invoiceRef.id,
+          invoiceNumber,
+          createdAt: now,
+        });
+      });
 
       return {
         success: true,

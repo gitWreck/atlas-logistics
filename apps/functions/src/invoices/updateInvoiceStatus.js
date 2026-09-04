@@ -1,5 +1,6 @@
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const admin = require("firebase-admin");
+const crypto = require("node:crypto");
 const {
   getActorFromRequest,
   writeInvoiceActionLog,
@@ -58,6 +59,12 @@ exports.updateInvoiceStatus = onCall(
     if (!INVOICES_ALLOWED_STATUSES.includes(status)) {
       throw new HttpsError("invalid-argument", "Invalid invoice status.");
     }
+    if (status === "PAID") {
+      throw new HttpsError(
+        "failed-precondition",
+        "Record a customer payment to mark an invoice as paid. A paid status cannot be entered without payment evidence.",
+      );
+    }
 
     const userDoc = await db.collection("users").doc(request.auth.uid).get();
     const userData = userDoc.data();
@@ -94,6 +101,13 @@ exports.updateInvoiceStatus = onCall(
     }
     const currentStatus = invoiceData.status || "DRAFT";
 
+    if (status === "CANCELLED" && Number(invoiceData.amountPaidCentavos || 0) > 0) {
+      throw new HttpsError(
+        "failed-precondition",
+        "Reverse every customer payment before cancelling this invoice.",
+      );
+    }
+
     const allowedNextStatuses = INVOICES_VALID_TRANSITIONS[currentStatus] || [];
     if (!allowedNextStatuses.includes(status)) {
       throw new HttpsError(
@@ -129,6 +143,7 @@ exports.updateInvoiceStatus = onCall(
 
     batch.update(invoiceRef, {
       status,
+      financeSourceVersion: admin.firestore.FieldValue.increment(1),
       updatedAt: nowAt,
       updatedBy: name,
     });
@@ -150,6 +165,11 @@ exports.updateInvoiceStatus = onCall(
             },
             { merge: true },
           );
+        }
+        if (shipmentId) {
+          batch.delete(db.collection("shipmentInvoiceReservations").doc(
+            crypto.createHash("sha256").update(String(shipmentId)).digest("hex"),
+          ));
         }
       } else {
         batch.set(

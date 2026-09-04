@@ -15,6 +15,7 @@ import {
   faPhone,
   faTruckFast,
   faPrint,
+  faRotateLeft,
 } from "@fortawesome/free-solid-svg-icons";
 import { getModalThemeClasses } from "@/app/utility/constant/theme";
 import { getModalActionClasses } from "@/app/utility/constant/action";
@@ -33,6 +34,7 @@ export default function InvoiceDetailsModal({
   onIssue,
   onMarkPaid,
   onCancel,
+  onReversePayment,
   isDark = false,
 }) {
   const modalTheme = getModalThemeClasses(isDark);
@@ -142,6 +144,20 @@ export default function InvoiceDetailsModal({
                     successLabel="Saved"
                     errorLabel="Error"
                     label="Cancel Invoice"
+                    variant="red"
+                    isDark={isDark}
+                    className="w-full lg:w-auto px-3 sm:px-4 py-2 text-sm"
+                  />
+                )}
+
+                {invoice.lastPaymentId && (
+                  <StatusButton
+                    onClick={onReversePayment}
+                    icon={faRotateLeft}
+                    loadingLabel="Reversing..."
+                    successLabel="Reversed"
+                    errorLabel="Error"
+                    label="Reverse Payment"
                     variant="red"
                     isDark={isDark}
                     className="w-full lg:w-auto px-3 sm:px-4 py-2 text-sm"

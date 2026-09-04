@@ -90,6 +90,7 @@ exports.editInvoice = onCall(
     const updateData = {
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       updatedBy: actorName,
+      financeSourceVersion: admin.firestore.FieldValue.increment(1),
     };
 
     if (invoiceDate !== undefined) updateData.invoiceDate = invoiceDate;
@@ -118,7 +119,7 @@ exports.editInvoice = onCall(
     const nowAt = admin.firestore.FieldValue.serverTimestamp();
     const batch = db.batch();
     const changedFields = Object.keys(updateData).filter(
-      (field) => field !== "updatedAt" && field !== "updatedBy",
+      (field) => !["updatedAt", "updatedBy", "financeSourceVersion"].includes(field),
     );
 
     batch.update(invoiceRef, updateData);

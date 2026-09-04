@@ -32,6 +32,9 @@ const InvoiceBoard = forwardRef(function InvoiceBoard(
   const [confirmAction, setConfirmAction] = useState(null);
   const [confirmInvoice, setConfirmInvoice] = useState(null);
   const [sendNotification, setSendNotification] = useState(true);
+  const [paymentMethod, setPaymentMethod] = useState("CASH");
+  const [paymentReference, setPaymentReference] = useState("");
+  const [paymentDestination, setPaymentDestination] = useState("");
 
   const fetchInvoicesAndShipments = async () => {
     try {
@@ -109,6 +112,7 @@ const InvoiceBoard = forwardRef(function InvoiceBoard(
     closeDetails,
     submitInvoice,
     changeInvoiceStatus,
+    reversePayment,
   } = invoiceWorkflow;
 
   useEffect(() => {
@@ -177,6 +181,9 @@ const InvoiceBoard = forwardRef(function InvoiceBoard(
     setConfirmInvoice(invoice);
     setConfirmAction(action);
     setSendNotification(true);
+    setPaymentMethod("CASH");
+    setPaymentReference("");
+    setPaymentDestination("");
     setIsConfirmOpen(true);
   };
 
@@ -192,6 +199,11 @@ const InvoiceBoard = forwardRef(function InvoiceBoard(
 
     await changeInvoiceStatus(confirmInvoice, confirmAction, {
       sendNotification,
+      payment: confirmAction === "PAID" ? {
+        method: paymentMethod,
+        referenceNumber: paymentReference,
+        destinationCode: paymentDestination,
+      } : undefined,
     });
 
     handleCloseConfirm();
@@ -262,6 +274,10 @@ const InvoiceBoard = forwardRef(function InvoiceBoard(
         onIssue={() => handleOpenConfirm(selectedInvoice, "ISSUED")}
         onMarkPaid={() => handleOpenConfirm(selectedInvoice, "PAID")}
         onCancel={() => handleOpenConfirm(selectedInvoice, "CANCELLED")}
+        onReversePayment={async () => {
+          const reason = window.prompt("Enter the reason for reversing this payment:");
+          if (reason) await reversePayment(selectedInvoice, reason);
+        }}
         isDark={isDark}
       />
 
@@ -307,6 +323,28 @@ const InvoiceBoard = forwardRef(function InvoiceBoard(
               </p>
 
               <section className="space-y-3">
+                {confirmAction === "PAID" && (
+                  <div className="grid grid-cols-1 gap-3">
+                    <label className="text-sm font-semibold">
+                      Payment method
+                      <select value={paymentMethod} onChange={(event) => setPaymentMethod(event.target.value)} className={`mt-1 w-full rounded-lg border px-3 py-2 ${isDark ? "bg-slate-950 border-slate-700" : "bg-white border-slate-300"}`}>
+                        <option value="CASH">Cash</option>
+                        <option value="BANK_TRANSFER">Bank transfer</option>
+                        <option value="GCASH">GCash</option>
+                        <option value="CHECK">Check</option>
+                      </select>
+                    </label>
+                    <label className="text-sm font-semibold">
+                      Reference number <span className="font-normal opacity-70">(recommended)</span>
+                      <input value={paymentReference} onChange={(event) => setPaymentReference(event.target.value)} maxLength={180} className={`mt-1 w-full rounded-lg border px-3 py-2 ${isDark ? "bg-slate-950 border-slate-700" : "bg-white border-slate-300"}`} placeholder="Receipt, transfer, or check number" />
+                    </label>
+                    <label className="text-sm font-semibold">
+                      Finance destination code <span className="font-normal opacity-70">(optional if clearing is configured)</span>
+                      <input value={paymentDestination} onChange={(event) => setPaymentDestination(event.target.value)} maxLength={100} className={`mt-1 w-full rounded-lg border px-3 py-2 ${isDark ? "bg-slate-950 border-slate-700" : "bg-white border-slate-300"}`} placeholder="Bank code or clearing account" />
+                    </label>
+                    <p className={`text-xs ${isDark ? "text-slate-400" : "text-slate-600"}`}>This creates a Transport payment record and sends its accounting event to Atlas Finance. It does not directly edit the Finance ledger.</p>
+                  </div>
+                )}
                 <div>
                   {/* <h3
                     className={`text-xs sm:text-sm font-bold uppercase tracking-widest ${isDark ? "text-white" : "text-slate-900"}`}

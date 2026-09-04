@@ -4,6 +4,8 @@ import { useCallback, useState } from "react";
 import {
   createInvoice,
   editInvoice,
+  recordShipmentPayment,
+  reverseShipmentPayment,
   updateInvoiceStatus,
 } from "@/app/utility/FirebaseFunctions";
 import { updatedBy } from "@/app/utility/utilities";
@@ -200,16 +202,30 @@ export default function useInvoiceWorkflow({
   );
 
   const changeInvoiceStatus = useCallback(
-    async (invoice, status, { sendNotification = false } = {}) => {
+    async (invoice, status, { sendNotification = false, payment = {} } = {}) => {
       if (!invoice?.id || !status) return false;
 
       try {
-        await updateInvoiceStatus({
-          invoiceId: invoice.id,
-          status,
-          sendNotification,
-          updatedBy: updatedBy(profile),
-        });
+        if (status === "PAID") {
+          const totalCentavos = Math.round(Number(invoice.amount || 0) * 100);
+          const amountCentavos = Number(payment.amountCentavos) || Math.max(0, totalCentavos - Number(invoice.amountPaidCentavos || 0));
+          await recordShipmentPayment({
+            invoiceId: invoice.id,
+            requestId: payment.requestId || crypto.randomUUID(),
+            amountCentavos,
+            receivedAtMs: payment.receivedAtMs || Date.now(),
+            method: payment.method || "CASH",
+            referenceNumber: payment.referenceNumber || null,
+            destinationCode: payment.destinationCode || null,
+          });
+        } else {
+          await updateInvoiceStatus({
+            invoiceId: invoice.id,
+            status,
+            sendNotification,
+            updatedBy: updatedBy(profile),
+          });
+        }
 
         setSelectedInvoice((prev) =>
           prev?.id === invoice.id ? { ...prev, status } : prev,
@@ -224,6 +240,23 @@ export default function useInvoiceWorkflow({
     },
     [handleError, refresh],
   );
+
+  const reversePayment = useCallback(async (invoice, reason) => {
+    if (!invoice?.lastPaymentId || !String(reason || "").trim()) return false;
+    try {
+      await reverseShipmentPayment({
+        paymentId: invoice.lastPaymentId,
+        requestId: crypto.randomUUID(),
+        reason: String(reason).trim(),
+      });
+      setSelectedInvoice((previous) => previous?.id === invoice.id ? { ...previous, status: "ISSUED", lastPaymentId: null } : previous);
+      await refresh();
+      return true;
+    } catch (error) {
+      handleError("Error reversing payment", error);
+      return false;
+    }
+  }, [handleError, refresh]);
 
   return {
     isFormOpen,
@@ -241,5 +274,6 @@ export default function useInvoiceWorkflow({
     closeDetails,
     submitInvoice,
     changeInvoiceStatus,
+    reversePayment,
   };
 }
