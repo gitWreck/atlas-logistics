@@ -200,6 +200,8 @@ exports.editInvoice = require("./src/invoices/editInvoice").editInvoice;
 exports.updateInvoiceStatus =
   require("./src/invoices/updateInvoiceStatus").updateInvoiceStatus;
 const shipmentPayments = require("./src/invoices/shipmentPayments");
+exports.uploadPaymentProof = shipmentPayments.uploadPaymentProof;
+exports.downloadPaymentProof = shipmentPayments.downloadPaymentProof;
 exports.recordShipmentPayment = shipmentPayments.recordShipmentPayment;
 exports.reverseShipmentPayment = shipmentPayments.reverseShipmentPayment;
 exports.retryFinanceEventOutbox = shipmentPayments.retryFinanceEventOutbox;

@@ -20,9 +20,17 @@ test("Transport payment events use stable IDs, versions and complete allocations
     customerId: "customer-1", receivedAtMs: 1_788_408_000_000,
     amountCentavos: 12_345, method: "BANK_TRANSFER", referenceNumber: "REF-1",
     destinationCode: "BDO-001", status: "APPROVED", sourceVersion: 1,
+    proofDocuments: [{
+      proofId: "proof-1", fileName: "receipt.pdf", contentType: "application/pdf",
+      sizeBytes: 1234, sha256: "a".repeat(64),
+      storagePath: "payment-proofs/invoice-1/proof-1/receipt.pdf",
+      uploadedAtMs: 1_788_407_000_000, uploadedBy: "user-1",
+    }],
   };
   const payload = _test.paymentPayload(payment);
   assert.deepEqual(payload.allocations, [{ invoiceId: "invoice-1", amountCentavos: 12_345 }]);
+  assert.equal(payload.proofDocuments[0].proofId, "proof-1");
+  assert.equal(payload.proofDocuments[0].sha256, "a".repeat(64));
   const envelope = makeEnvelope({ eventType: "SHIPMENT_PAYMENT_CREATED", entityId: payment.id, sourceVersion: 1, occurredAtMs: payment.receivedAtMs, correlationId: payment.invoiceId, payload });
   assert.equal(envelope.contractVersion, 1);
   assert.equal(envelope.eventId, eventId("SHIPMENT_PAYMENT_CREATED", "payment-1", 1, "SHIPMENT_PAYMENT_CREATED"));
@@ -40,7 +48,7 @@ test("retry delivery is bounded and payment collections are server controlled", 
   assert.equal(retryDelayMs(1), 30_000);
   assert.equal(retryDelayMs(20), 3_600_000);
   const rules = fs.readFileSync(path.resolve(__dirname, "../../../firestore.rules"), "utf8");
-  for (const collection of ["shipmentPayments", "financeEventOutbox", "paymentRequestReservations", "paymentReferenceReservations", "shipmentInvoiceReservations"]) {
+  for (const collection of ["shipmentPayments", "paymentProofs", "financeEventOutbox", "paymentRequestReservations", "paymentReferenceReservations", "shipmentInvoiceReservations"]) {
     assert.match(rules, new RegExp(`match \\/${collection}\\/\\{[^}]+\\}[\\s\\S]*?allow (?:read, )?write: if false`));
   }
   const statusSource = fs.readFileSync(path.resolve(__dirname, "../src/invoices/updateInvoiceStatus.js"), "utf8");

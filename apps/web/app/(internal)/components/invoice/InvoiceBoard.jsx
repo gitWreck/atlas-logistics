@@ -15,7 +15,11 @@ import InvoiceStatistics from "./InvoiceStatistics";
 import useInvoiceWorkflow from "./useInvoiceWorkflow";
 import { getBoardThemeClasses } from "@/app/utility/constant/theme";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faBell } from "@fortawesome/free-solid-svg-icons";
+import { faBell, faPaperclip, faTrash } from "@fortawesome/free-solid-svg-icons";
+
+const PAYMENT_PROOF_TYPES = new Set(["application/pdf", "image/jpeg", "image/jpg", "image/png"]);
+const MAX_PAYMENT_PROOF_BYTES = 15 * 1024 * 1024;
+const MAX_PAYMENT_PROOFS = 5;
 
 const InvoiceBoard = forwardRef(function InvoiceBoard(
   { user, isDark = false, profile },
@@ -35,6 +39,8 @@ const InvoiceBoard = forwardRef(function InvoiceBoard(
   const [paymentMethod, setPaymentMethod] = useState("CASH");
   const [paymentReference, setPaymentReference] = useState("");
   const [paymentDestination, setPaymentDestination] = useState("");
+  const [paymentProofFiles, setPaymentProofFiles] = useState([]);
+  const [paymentValidationError, setPaymentValidationError] = useState("");
 
   const fetchInvoicesAndShipments = async () => {
     try {
@@ -101,7 +107,9 @@ const InvoiceBoard = forwardRef(function InvoiceBoard(
     isFormOpen,
     isDetailsOpen,
     isSaving: isInvoiceSaving,
+    isStatusSaving,
     submitError: invoiceSubmitError,
+    statusError,
     formMode,
     selectedShipment,
     selectedInvoice,
@@ -110,6 +118,7 @@ const InvoiceBoard = forwardRef(function InvoiceBoard(
     openInvoiceDetails,
     closeForm,
     closeDetails,
+    clearStatusError,
     submitInvoice,
     changeInvoiceStatus,
     reversePayment,
@@ -178,35 +187,70 @@ const InvoiceBoard = forwardRef(function InvoiceBoard(
   }, [mappedInvoices]);
 
   const handleOpenConfirm = (invoice, action) => {
+    clearStatusError();
     setConfirmInvoice(invoice);
     setConfirmAction(action);
     setSendNotification(true);
     setPaymentMethod("CASH");
     setPaymentReference("");
     setPaymentDestination("");
+    setPaymentProofFiles([]);
+    setPaymentValidationError("");
     setIsConfirmOpen(true);
   };
 
   const handleCloseConfirm = () => {
+    clearStatusError();
     setIsConfirmOpen(false);
     setConfirmInvoice(null);
     setConfirmAction(null);
     setSendNotification(true);
+    setPaymentProofFiles([]);
+    setPaymentValidationError("");
+  };
+
+  const handlePaymentProofSelection = (event) => {
+    const selected = Array.from(event.target.files || []);
+    event.target.value = "";
+    const combined = [...paymentProofFiles, ...selected];
+    if (combined.length > MAX_PAYMENT_PROOFS) {
+      setPaymentValidationError(`Attach no more than ${MAX_PAYMENT_PROOFS} payment proofs.`);
+      return;
+    }
+    const invalidType = selected.find((file) => !PAYMENT_PROOF_TYPES.has(String(file.type || "").toLowerCase()));
+    if (invalidType) {
+      setPaymentValidationError(`${invalidType.name} is not a PDF, JPG, or PNG file.`);
+      return;
+    }
+    const oversized = selected.find((file) => file.size > MAX_PAYMENT_PROOF_BYTES);
+    if (oversized) {
+      setPaymentValidationError(`${oversized.name} is larger than 15 MB.`);
+      return;
+    }
+    setPaymentValidationError("");
+    setPaymentProofFiles(combined);
   };
 
   const handleConfirmStatusUpdate = async () => {
     if (!confirmInvoice || !confirmAction) return;
 
-    await changeInvoiceStatus(confirmInvoice, confirmAction, {
+    if (["BANK_TRANSFER", "GCASH", "CHECK"].includes(paymentMethod) && paymentProofFiles.length === 0) {
+      setPaymentValidationError("Upload at least one payment proof for this payment method.");
+      return;
+    }
+
+    setPaymentValidationError("");
+    const succeeded = await changeInvoiceStatus(confirmInvoice, confirmAction, {
       sendNotification,
       payment: confirmAction === "PAID" ? {
         method: paymentMethod,
         referenceNumber: paymentReference,
         destinationCode: paymentDestination,
+        proofFiles: paymentProofFiles,
       } : undefined,
     });
 
-    handleCloseConfirm();
+    if (succeeded) handleCloseConfirm();
   };
 
   useImperativeHandle(
@@ -342,6 +386,52 @@ const InvoiceBoard = forwardRef(function InvoiceBoard(
                       Finance destination code <span className="font-normal opacity-70">(optional if clearing is configured)</span>
                       <input value={paymentDestination} onChange={(event) => setPaymentDestination(event.target.value)} maxLength={100} className={`mt-1 w-full rounded-lg border px-3 py-2 ${isDark ? "bg-slate-950 border-slate-700" : "bg-white border-slate-300"}`} placeholder="Bank code or clearing account" />
                     </label>
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="text-sm font-semibold">
+                          Proof of payment{" "}
+                          <span className="font-normal opacity-70">
+                            {paymentMethod === "CASH" ? "(optional)" : "(required)"}
+                          </span>
+                        </span>
+                        <span className="text-xs opacity-70">PDF, JPG, PNG · 15 MB each</span>
+                      </div>
+                      <label className={`flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed px-3 py-3 text-sm font-semibold ${isDark ? "border-slate-600 bg-slate-950 hover:bg-slate-800" : "border-slate-300 bg-slate-50 hover:bg-slate-100"}`}>
+                        <FontAwesomeIcon icon={faPaperclip} />
+                        Select payment proof
+                        <input
+                          type="file"
+                          accept="application/pdf,image/jpeg,image/png"
+                          multiple
+                          className="sr-only"
+                          disabled={isStatusSaving || paymentProofFiles.length >= MAX_PAYMENT_PROOFS}
+                          onChange={handlePaymentProofSelection}
+                        />
+                      </label>
+                      {paymentProofFiles.length > 0 && (
+                        <ul className="space-y-1">
+                          {paymentProofFiles.map((file, index) => (
+                            <li key={`${file.name}-${file.size}-${file.lastModified}-${index}`} className={`flex items-center justify-between gap-3 rounded-lg px-3 py-2 text-xs ${isDark ? "bg-slate-800" : "bg-slate-100"}`}>
+                              <span className="min-w-0 truncate">{file.name} · {(file.size / (1024 * 1024)).toFixed(2)} MB</span>
+                              <button
+                                type="button"
+                                disabled={isStatusSaving}
+                                onClick={() => setPaymentProofFiles((files) => files.filter((_, fileIndex) => fileIndex !== index))}
+                                className="shrink-0 text-red-600 hover:text-red-500 disabled:opacity-50"
+                                aria-label={`Remove ${file.name}`}
+                              >
+                                <FontAwesomeIcon icon={faTrash} />
+                              </button>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                      {(paymentValidationError || statusError) && (
+                        <p role="alert" className="text-sm font-medium text-red-600">
+                          {paymentValidationError || statusError}
+                        </p>
+                      )}
+                    </div>
                     <p className={`text-xs ${isDark ? "text-slate-400" : "text-slate-600"}`}>This creates a Transport payment record and sends its accounting event to Atlas Finance. It does not directly edit the Finance ledger.</p>
                   </div>
                 )}
@@ -387,6 +477,7 @@ const InvoiceBoard = forwardRef(function InvoiceBoard(
               <button
                 type="button"
                 onClick={handleCloseConfirm}
+                disabled={isStatusSaving}
                 className={
                   isDark
                     ? "px-4 py-2 rounded-lg border border-slate-700 text-slate-300 hover:bg-slate-800"
@@ -399,6 +490,7 @@ const InvoiceBoard = forwardRef(function InvoiceBoard(
               <button
                 type="button"
                 onClick={handleConfirmStatusUpdate}
+                disabled={isStatusSaving}
                 className={
                   confirmAction === "PAID"
                     ? "px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-semibold"
@@ -407,7 +499,7 @@ const InvoiceBoard = forwardRef(function InvoiceBoard(
                       : "px-4 py-2 rounded-lg bg-amber-600 hover:bg-amber-500 text-white font-semibold"
                 }
               >
-                Confirm
+                {isStatusSaving ? "Saving payment..." : "Confirm"}
               </button>
             </div>
           </div>

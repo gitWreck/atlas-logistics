@@ -339,6 +339,14 @@ export const updateInvoiceStatus = httpsCallable(
   functions,
   "updateInvoiceStatus",
 );
+export const uploadPaymentProof = httpsCallable(
+  functions,
+  "uploadPaymentProof",
+);
+export const downloadPaymentProof = httpsCallable(
+  functions,
+  "downloadPaymentProof",
+);
 export const recordShipmentPayment = httpsCallable(
   functions,
   "recordShipmentPayment",

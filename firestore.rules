@@ -521,6 +521,11 @@ service cloud.firestore {
       allow create, update, delete: if false;
     }
 
+    match /paymentProofs/{proofId} {
+      allow read: if isAdmin() || managerCanAccessOperation(resource.data);
+      allow create, update, delete: if false;
+    }
+
     match /financeEventOutbox/{eventId} {
       allow read, write: if false;
     }

@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faTimes,
@@ -16,6 +16,8 @@ import {
   faTruckFast,
   faPrint,
   faRotateLeft,
+  faDownload,
+  faPaperclip,
 } from "@fortawesome/free-solid-svg-icons";
 import { getModalThemeClasses } from "@/app/utility/constant/theme";
 import { getModalActionClasses } from "@/app/utility/constant/action";
@@ -24,6 +26,7 @@ import InvoiceStatusBadge from "../ui/InvoiceStatusBadge";
 import InfoBlock from "../ui/InfoBlock";
 import StatusButton from "../ui/StatusButton";
 import { invoiceUrl } from "@/app/utility/constant/templates";
+import { downloadPaymentProof } from "@/app/utility/FirebaseFunctions";
 
 export default function InvoiceDetailsModal({
   isOpen = false,
@@ -39,6 +42,8 @@ export default function InvoiceDetailsModal({
 }) {
   const modalTheme = getModalThemeClasses(isDark);
   const actionTheme = getModalActionClasses();
+  const [downloadingProofId, setDownloadingProofId] = useState(null);
+  const [proofDownloadError, setProofDownloadError] = useState("");
 
   if (!isOpen || !invoice) return null;
 
@@ -46,6 +51,31 @@ export default function InvoiceDetailsModal({
     shipment || invoice.shipment || invoice.shipmentSnapshot;
   const packages = connectedShipment?.packages || [];
   const status = invoice.status || "DRAFT";
+  const paymentProofs = Array.isArray(invoice.lastPaymentProofs) ? invoice.lastPaymentProofs : [];
+
+  const handleProofDownload = async (proof) => {
+    setProofDownloadError("");
+    setDownloadingProofId(proof.proofId);
+    try {
+      const response = await downloadPaymentProof({ proofId: proof.proofId });
+      const payload = response.data || {};
+      const binary = window.atob(payload.base64Data || "");
+      const bytes = new Uint8Array(binary.length);
+      for (let index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index);
+      const url = URL.createObjectURL(new Blob([bytes], { type: payload.contentType || "application/octet-stream" }));
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = payload.fileName || proof.fileName || "payment-proof";
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      setProofDownloadError(String(error?.message || "Payment proof could not be downloaded.").replace(/^Firebase:\s*/i, "").replace(/\s*\(functions\/[a-z-]+\)\.?$/i, ""));
+    } finally {
+      setDownloadingProofId(null);
+    }
+  };
 
   return (
     <div className={`fixed inset-0 z-[110] ${modalTheme.overlay}`}>
@@ -299,6 +329,37 @@ export default function InvoiceDetailsModal({
                   </div>
                 </div>
               </section>
+
+              {paymentProofs.length > 0 && (
+                <section className={`rounded-xl border p-4 ${modalTheme.panelSurface}`}>
+                  <div className="mb-3 flex items-center gap-2">
+                    <FontAwesomeIcon icon={faPaperclip} className={modalTheme.accentText} />
+                    <h3 className={`font-bold ${modalTheme.title}`}>Proof of Payment</h3>
+                  </div>
+                  <div className="space-y-2">
+                    {paymentProofs.map((proof) => (
+                      <div key={proof.proofId} className={`flex items-center justify-between gap-3 rounded-lg border px-3 py-2 ${isDark ? "border-slate-700" : "border-slate-200"}`}>
+                        <div className="min-w-0">
+                          <p className={`truncate text-sm font-semibold ${modalTheme.title}`}>{proof.fileName}</p>
+                          <p className={`text-xs ${modalTheme.bodyText}`}>
+                            {(Number(proof.sizeBytes || 0) / (1024 * 1024)).toFixed(2)} MB · SHA-256 {String(proof.sha256 || "").slice(0, 12)}…
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => handleProofDownload(proof)}
+                          disabled={downloadingProofId === proof.proofId}
+                          className="shrink-0 rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white hover:bg-blue-500 disabled:opacity-60"
+                        >
+                          <FontAwesomeIcon icon={faDownload} className="mr-2" />
+                          {downloadingProofId === proof.proofId ? "Downloading..." : "Download"}
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                  {proofDownloadError && <p role="alert" className="mt-3 text-sm font-medium text-red-600">{proofDownloadError}</p>}
+                </section>
+              )}
 
               <section
                 className={`rounded-xl border p-4 ${modalTheme.panelSurface}`}

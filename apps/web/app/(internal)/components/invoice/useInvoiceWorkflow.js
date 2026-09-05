@@ -6,6 +6,7 @@ import {
   editInvoice,
   recordShipmentPayment,
   reverseShipmentPayment,
+  uploadPaymentProof,
   updateInvoiceStatus,
 } from "@/app/utility/FirebaseFunctions";
 import { updatedBy } from "@/app/utility/utilities";
@@ -33,6 +34,15 @@ function getInvoiceSubmitError(error) {
   return cleanedMessage || "The invoice could not be saved. Please try again.";
 }
 
+function fileToBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || "").split(",")[1] || "");
+    reader.onerror = () => reject(reader.error || new Error("The payment proof could not be read."));
+    reader.readAsDataURL(file);
+  });
+}
+
 export default function useInvoiceWorkflow({
   user,
   onRefresh,
@@ -42,10 +52,12 @@ export default function useInvoiceWorkflow({
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isStatusSaving, setIsStatusSaving] = useState(false);
   const [formMode, setFormMode] = useState("create");
   const [selectedShipment, setSelectedShipment] = useState(null);
   const [selectedInvoice, setSelectedInvoice] = useState(null);
   const [submitError, setSubmitError] = useState("");
+  const [statusError, setStatusError] = useState("");
 
   const handleError = useCallback(
     (message, error) => {
@@ -171,6 +183,8 @@ export default function useInvoiceWorkflow({
     setSelectedInvoice(null);
   }, []);
 
+  const clearStatusError = useCallback(() => setStatusError(""), []);
+
   const submitInvoice = useCallback(
     async (payload) => {
       setSubmitError("");
@@ -205,11 +219,25 @@ export default function useInvoiceWorkflow({
     async (invoice, status, { sendNotification = false, payment = {} } = {}) => {
       if (!invoice?.id || !status) return false;
 
+      setStatusError("");
+      setIsStatusSaving(true);
       try {
+        let paymentResult = null;
         if (status === "PAID") {
           const totalCentavos = Math.round(Number(invoice.amount || 0) * 100);
           const amountCentavos = Number(payment.amountCentavos) || Math.max(0, totalCentavos - Number(invoice.amountPaidCentavos || 0));
-          await recordShipmentPayment({
+          const proofFiles = Array.isArray(payment.proofFiles) ? payment.proofFiles : [];
+          const proofUploads = await Promise.all(proofFiles.map(async (file) => {
+            const response = await uploadPaymentProof({
+              invoiceId: invoice.id,
+              requestId: crypto.randomUUID(),
+              fileName: file.name,
+              contentType: file.type,
+              base64Data: await fileToBase64(file),
+            });
+            return response.data;
+          }));
+          const paymentResponse = await recordShipmentPayment({
             invoiceId: invoice.id,
             requestId: payment.requestId || crypto.randomUUID(),
             amountCentavos,
@@ -217,7 +245,9 @@ export default function useInvoiceWorkflow({
             method: payment.method || "CASH",
             referenceNumber: payment.referenceNumber || null,
             destinationCode: payment.destinationCode || null,
+            proofDocumentIds: proofUploads.map((proof) => proof.proofId),
           });
+          paymentResult = paymentResponse.data || null;
         } else {
           await updateInvoiceStatus({
             invoiceId: invoice.id,
@@ -228,14 +258,24 @@ export default function useInvoiceWorkflow({
         }
 
         setSelectedInvoice((prev) =>
-          prev?.id === invoice.id ? { ...prev, status } : prev,
+          prev?.id === invoice.id ? {
+            ...prev,
+            status,
+            ...(status === "PAID" ? {
+              lastPaymentId: paymentResult?.paymentId || prev.lastPaymentId,
+              lastPaymentProofs: paymentResult?.proofDocuments || prev.lastPaymentProofs || [],
+            } : {}),
+          } : prev,
         );
 
         await refresh();
         return true;
       } catch (error) {
         handleError("Error updating invoice status", error);
+        setStatusError(getInvoiceSubmitError(error));
         return false;
+      } finally {
+        setIsStatusSaving(false);
       }
     },
     [handleError, refresh],
@@ -262,7 +302,9 @@ export default function useInvoiceWorkflow({
     isFormOpen,
     isDetailsOpen,
     isSaving,
+    isStatusSaving,
     submitError,
+    statusError,
     formMode,
     selectedShipment,
     selectedInvoice,
@@ -272,6 +314,7 @@ export default function useInvoiceWorkflow({
     openInvoiceDetailsById,
     closeForm,
     closeDetails,
+    clearStatusError,
     submitInvoice,
     changeInvoiceStatus,
     reversePayment,
