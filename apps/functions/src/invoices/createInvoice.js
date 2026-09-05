@@ -279,13 +279,30 @@ exports.createInvoice = onCall(
       await db.runTransaction(async (transaction) => {
         const reservation = await transaction.get(reservationRef);
         if (reservation.exists) {
-          throw new HttpsError(
-            "already-exists",
-            "An active invoice already exists for this shipment.",
-          );
+          const reservedInvoiceId = String(
+            reservation.data()?.invoiceId || "",
+          ).trim();
+          const reservedInvoice = reservedInvoiceId
+            ? await transaction.get(
+                db.collection("invoices").doc(reservedInvoiceId),
+              )
+            : null;
+          const reservedInvoiceStatus = String(
+            reservedInvoice?.data()?.status || "DRAFT",
+          ).toUpperCase();
+
+          // A reservation can outlive an invoice after an administrative data
+          // repair. Only a reservation backed by an active invoice may block a
+          // new invoice; transaction.set below safely replaces stale records.
+          if (reservedInvoice?.exists && reservedInvoiceStatus !== "CANCELLED") {
+            throw new HttpsError(
+              "already-exists",
+              "An active invoice already exists for this shipment.",
+            );
+          }
         }
         writeInvoice(transaction);
-        transaction.create(reservationRef, {
+        transaction.set(reservationRef, {
           shipmentId,
           invoiceId: invoiceRef.id,
           invoiceNumber,
@@ -300,6 +317,7 @@ exports.createInvoice = onCall(
       };
     } catch (error) {
       console.error("Invoice creation failed:", error);
+      if (error instanceof HttpsError) throw error;
       throw new HttpsError("internal", "Failed to create invoice.");
     }
   },
