@@ -330,22 +330,20 @@ const InvoiceBoard = forwardRef(function InvoiceBoard(
           className={`fixed inset-0 z-[120] flex items-center justify-center p-4 ${isDark ? "bg-slate-950/70 backdrop-blur-sm" : "bg-black/40 backdrop-blur-sm"}`}
         >
           <div
-            className={`w-full max-w-md  border shadow-2xl ${isDark ? "bg-slate-900 border-slate-700 text-white" : "bg-white border-slate-200 text-slate-900"}`}
+            className={`w-full max-w-md overflow-hidden rounded-2xl border shadow-2xl ${isDark ? "bg-slate-900 border-slate-700 text-white" : "bg-white border-slate-200 text-slate-900"}`}
           >
             <div
-              className={`px-5 py-4 border-b ${isDark ? "border-slate-800 bg-slate-950/50" : "border-slate-200 bg-slate-50"}`}
+              className={`border-b px-6 py-5 ${isDark ? "border-slate-800 bg-slate-950/50" : "border-slate-200 bg-slate-50/80"}`}
             >
-              <h3 className="text-base font-bold">
-                Confirm{" "}
+              <h3 className="text-lg font-bold">
                 {confirmAction === "ISSUED"
-                  ? "Issue"
+                  ? "Issue invoice"
                   : confirmAction === "PAID"
-                    ? "Mark as Paid"
-                    : "Cancel"}{" "}
-                Invoice
+                    ? "Mark invoice as paid"
+                    : "Cancel invoice"}
               </h3>
               <p
-                className={`text-sm mt-1 ${isDark ? "text-slate-400" : "text-slate-600"}`}
+                className={`mt-1 text-sm ${isDark ? "text-slate-400" : "text-slate-500"}`}
               >
                 {confirmInvoice?.invoiceNumber ||
                   confirmInvoice?.id ||
@@ -353,25 +351,21 @@ const InvoiceBoard = forwardRef(function InvoiceBoard(
               </p>
             </div>
 
-            <div className="p-5 space-y-4">
-              <p className={` ${isDark ? "text-slate-300" : "text-slate-700"}`}>
-                Are you sure you want to{" "}
-                <span className="font-semibold">
-                  {confirmAction === "ISSUED"
-                    ? "issue"
-                    : confirmAction === "PAID"
-                      ? "mark this invoice as paid"
-                      : "cancel"}
-                </span>
-                ?
+            <div className="space-y-5 p-6">
+              <p className={`text-sm ${isDark ? "text-slate-300" : "text-slate-600"}`}>
+                {confirmAction === "PAID"
+                  ? "Enter the payment details below."
+                  : confirmAction === "ISSUED"
+                    ? "Confirm that this invoice is ready to issue."
+                    : "Confirm that you want to cancel this invoice."}
               </p>
 
-              <section className="space-y-3">
+              <section className="space-y-4">
                 {confirmAction === "PAID" && (
-                  <div className="grid grid-cols-1 gap-3">
+                  <div className="grid grid-cols-1 gap-4">
                     <label className="text-sm font-semibold">
-                      Payment method
-                      <select value={paymentMethod} onChange={(event) => setPaymentMethod(event.target.value)} className={`mt-1 w-full rounded-lg border px-3 py-2 ${isDark ? "bg-slate-950 border-slate-700" : "bg-white border-slate-300"}`}>
+                      <span>Payment method</span>
+                      <select value={paymentMethod} onChange={(event) => setPaymentMethod(event.target.value)} className={`mt-1.5 w-full rounded-lg border px-3 py-2.5 text-sm ${isDark ? "bg-slate-950 border-slate-700" : "bg-white border-slate-300"}`}>
                         <option value="CASH">Cash</option>
                         <option value="BANK_TRANSFER">Bank transfer</option>
                         <option value="GCASH">GCash</option>
@@ -379,26 +373,29 @@ const InvoiceBoard = forwardRef(function InvoiceBoard(
                       </select>
                     </label>
                     <label className="text-sm font-semibold">
-                      Reference number <span className="font-normal opacity-70">(recommended)</span>
-                      <input value={paymentReference} onChange={(event) => setPaymentReference(event.target.value)} maxLength={180} className={`mt-1 w-full rounded-lg border px-3 py-2 ${isDark ? "bg-slate-950 border-slate-700" : "bg-white border-slate-300"}`} placeholder="Receipt, transfer, or check number" />
+                      <span className="flex items-center justify-between gap-3">
+                        <span>Reference number</span>
+                        <span className={`text-xs font-normal ${isDark ? "text-slate-400" : "text-slate-500"}`}>Optional</span>
+                      </span>
+                      <input value={paymentReference} onChange={(event) => setPaymentReference(event.target.value)} maxLength={180} className={`mt-1.5 w-full rounded-lg border px-3 py-2.5 text-sm ${isDark ? "bg-slate-950 border-slate-700" : "bg-white border-slate-300"}`} placeholder="Receipt, transfer, or check number" />
                     </label>
                     <label className="text-sm font-semibold">
-                      Finance destination code <span className="font-normal opacity-70">(optional if clearing is configured)</span>
-                      <input value={paymentDestination} onChange={(event) => setPaymentDestination(event.target.value)} maxLength={100} className={`mt-1 w-full rounded-lg border px-3 py-2 ${isDark ? "bg-slate-950 border-slate-700" : "bg-white border-slate-300"}`} placeholder="Bank code or clearing account" />
+                      <span className="flex items-center justify-between gap-3">
+                        <span>Destination account</span>
+                        <span className={`text-xs font-normal ${isDark ? "text-slate-400" : "text-slate-500"}`}>Optional</span>
+                      </span>
+                      <input value={paymentDestination} onChange={(event) => setPaymentDestination(event.target.value)} maxLength={100} className={`mt-1.5 w-full rounded-lg border px-3 py-2.5 text-sm ${isDark ? "bg-slate-950 border-slate-700" : "bg-white border-slate-300"}`} placeholder="Bank or clearing account code" />
                     </label>
-                    <div className="space-y-2">
+                    <div className="space-y-2.5">
                       <div className="flex items-center justify-between gap-3">
-                        <span className="text-sm font-semibold">
-                          Proof of payment{" "}
-                          <span className="font-normal opacity-70">
-                            {paymentMethod === "CASH" ? "(optional)" : "(required)"}
-                          </span>
+                        <span className="text-sm font-semibold">Proof of payment</span>
+                        <span className={`text-xs ${isDark ? "text-slate-400" : "text-slate-500"}`}>
+                          {paymentMethod === "CASH" ? "Optional" : "Required"}
                         </span>
-                        <span className="text-xs opacity-70">PDF, JPG, PNG · 15 MB each</span>
                       </div>
-                      <label className={`flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed px-3 py-3 text-sm font-semibold ${isDark ? "border-slate-600 bg-slate-950 hover:bg-slate-800" : "border-slate-300 bg-slate-50 hover:bg-slate-100"}`}>
+                      <label className={`flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed px-3 py-3 text-sm font-semibold transition-colors ${isDark ? "border-slate-600 bg-slate-950 hover:bg-slate-800" : "border-slate-300 bg-slate-50 hover:bg-slate-100"}`}>
                         <FontAwesomeIcon icon={faPaperclip} />
-                        Select payment proof
+                        Add proof of payment
                         <input
                           type="file"
                           accept="application/pdf,image/jpeg,image/png"
@@ -408,6 +405,9 @@ const InvoiceBoard = forwardRef(function InvoiceBoard(
                           onChange={handlePaymentProofSelection}
                         />
                       </label>
+                      <p className={`text-xs ${isDark ? "text-slate-400" : "text-slate-500"}`}>
+                        PDF, JPG or PNG, up to 15 MB each
+                      </p>
                       {paymentProofFiles.length > 0 && (
                         <ul className="space-y-1">
                           {paymentProofFiles.map((file, index) => (
@@ -432,47 +432,34 @@ const InvoiceBoard = forwardRef(function InvoiceBoard(
                         </p>
                       )}
                     </div>
-                    <p className={`text-xs ${isDark ? "text-slate-400" : "text-slate-600"}`}>This creates a Transport payment record and sends its accounting event to Atlas Finance. It does not directly edit the Finance ledger.</p>
+                    <p className={`rounded-lg px-3 py-2.5 text-xs ${isDark ? "bg-slate-800/70 text-slate-300" : "bg-blue-50 text-slate-600"}`}>
+                      The payment is recorded in Atlas Transport and sent to Atlas Finance automatically.
+                    </p>
                   </div>
                 )}
-                <div>
-                  {/* <h3
-                    className={`text-xs sm:text-sm font-bold uppercase tracking-widest ${isDark ? "text-white" : "text-slate-900"}`}
-                  >
-                    Customer Notification
-                  </h3> */}
-                  {/* <p
-                    className={`text-xs mt-1 ${isDark ? "text-slate-500" : "text-slate-600"}`}
-                  >
-                    Choose whether the Firebase Function should send schedule
-                    updates to customers.
-                  </p> */}
-                </div>
-
                 <label
-                  className={`flex items-start gap-3 rounded-xl border p-4 cursor-pointer ${isDark ? "bg-slate-950 border-slate-800" : "bg-slate-50 border-slate-200"}`}
+                  className={`flex cursor-pointer items-center justify-between gap-3 rounded-xl border px-4 py-3 ${isDark ? "bg-slate-950 border-slate-800" : "bg-slate-50 border-slate-200"}`}
                 >
-                  <input
-                    type="checkbox"
-                    checked={sendNotification}
-                    onChange={(e) => setSendNotification(e.target.checked)}
-                    className="mt-1 h-4 w-4"
-                  />
-
                   <div className="min-w-0">
                     <div
                       className={`text-sm font-semibold flex items-center gap-2 ${isDark ? "text-white" : "text-slate-900"}`}
                     >
                       <FontAwesomeIcon icon={faBell} />
-                      Notify customers
+                      Notify customer
                     </div>
                   </div>
+                  <input
+                    type="checkbox"
+                    checked={sendNotification}
+                    onChange={(e) => setSendNotification(e.target.checked)}
+                    className="h-4 w-4"
+                  />
                 </label>
               </section>
             </div>
 
             <div
-              className={`px-5 py-4 border-t flex justify-end gap-2 ${isDark ? "border-slate-800" : "border-slate-200"}`}
+              className={`flex justify-end gap-2 border-t px-6 py-4 ${isDark ? "border-slate-800 bg-slate-950/30" : "border-slate-200 bg-slate-50/60"}`}
             >
               <button
                 type="button"
@@ -484,7 +471,7 @@ const InvoiceBoard = forwardRef(function InvoiceBoard(
                     : "px-4 py-2 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50"
                 }
               >
-                Back
+                Cancel
               </button>
 
               <button
@@ -499,7 +486,13 @@ const InvoiceBoard = forwardRef(function InvoiceBoard(
                       : "px-4 py-2 rounded-lg bg-amber-600 hover:bg-amber-500 text-white font-semibold"
                 }
               >
-                {isStatusSaving ? "Saving payment..." : "Confirm"}
+                {isStatusSaving
+                  ? "Saving..."
+                  : confirmAction === "PAID"
+                    ? "Mark as paid"
+                    : confirmAction === "ISSUED"
+                      ? "Issue invoice"
+                      : "Cancel invoice"}
               </button>
             </div>
           </div>
