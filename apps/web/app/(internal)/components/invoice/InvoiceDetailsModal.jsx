@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faTimes,
@@ -16,7 +16,6 @@ import {
   faTruckFast,
   faPrint,
   faRotateLeft,
-  faDownload,
   faPaperclip,
 } from "@fortawesome/free-solid-svg-icons";
 import { getModalThemeClasses } from "@/app/utility/constant/theme";
@@ -42,8 +41,65 @@ export default function InvoiceDetailsModal({
 }) {
   const modalTheme = getModalThemeClasses(isDark);
   const actionTheme = getModalActionClasses();
-  const [downloadingProofId, setDownloadingProofId] = useState(null);
-  const [proofDownloadError, setProofDownloadError] = useState("");
+  const [proofPreviews, setProofPreviews] = useState({});
+  const paymentProofs = Array.isArray(invoice?.lastPaymentProofs)
+    ? invoice.lastPaymentProofs
+    : [];
+  const paymentProofKey = paymentProofs
+    .map((proof) => `${proof.proofId}:${proof.sha256 || ""}`)
+    .join("|");
+
+  useEffect(() => {
+    let active = true;
+    const objectUrls = [];
+    setProofPreviews({});
+
+    if (isOpen && paymentProofs.length > 0) {
+      paymentProofs.forEach(async (proof) => {
+        try {
+          const response = await downloadPaymentProof({ proofId: proof.proofId });
+          const payload = response.data || {};
+          const binary = window.atob(payload.base64Data || "");
+          const bytes = new Uint8Array(binary.length);
+          for (let index = 0; index < binary.length; index += 1) {
+            bytes[index] = binary.charCodeAt(index);
+          }
+          const contentType = payload.contentType || proof.contentType || "application/octet-stream";
+          const url = URL.createObjectURL(new Blob([bytes], { type: contentType }));
+          objectUrls.push(url);
+          if (!active) {
+            URL.revokeObjectURL(url);
+            return;
+          }
+          setProofPreviews((current) => ({
+            ...current,
+            [proof.proofId]: {
+              url,
+              contentType,
+              fileName: payload.fileName || proof.fileName || "Payment proof",
+            },
+          }));
+        } catch (error) {
+          if (!active) return;
+          setProofPreviews((current) => ({
+            ...current,
+            [proof.proofId]: {
+              error: String(error?.message || "Payment proof could not be displayed.")
+                .replace(/^Firebase:\s*/i, "")
+                .replace(/\s*\(functions\/[a-z-]+\)\.?$/i, ""),
+            },
+          }));
+        }
+      });
+    }
+
+    return () => {
+      active = false;
+      objectUrls.forEach((url) => URL.revokeObjectURL(url));
+    };
+  // The stable proof key prevents repeated authorized downloads on ordinary renders.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, paymentProofKey]);
 
   if (!isOpen || !invoice) return null;
 
@@ -51,31 +107,6 @@ export default function InvoiceDetailsModal({
     shipment || invoice.shipment || invoice.shipmentSnapshot;
   const packages = connectedShipment?.packages || [];
   const status = invoice.status || "DRAFT";
-  const paymentProofs = Array.isArray(invoice.lastPaymentProofs) ? invoice.lastPaymentProofs : [];
-
-  const handleProofDownload = async (proof) => {
-    setProofDownloadError("");
-    setDownloadingProofId(proof.proofId);
-    try {
-      const response = await downloadPaymentProof({ proofId: proof.proofId });
-      const payload = response.data || {};
-      const binary = window.atob(payload.base64Data || "");
-      const bytes = new Uint8Array(binary.length);
-      for (let index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index);
-      const url = URL.createObjectURL(new Blob([bytes], { type: payload.contentType || "application/octet-stream" }));
-      const anchor = document.createElement("a");
-      anchor.href = url;
-      anchor.download = payload.fileName || proof.fileName || "payment-proof";
-      document.body.appendChild(anchor);
-      anchor.click();
-      anchor.remove();
-      URL.revokeObjectURL(url);
-    } catch (error) {
-      setProofDownloadError(String(error?.message || "Payment proof could not be downloaded.").replace(/^Firebase:\s*/i, "").replace(/\s*\(functions\/[a-z-]+\)\.?$/i, ""));
-    } finally {
-      setDownloadingProofId(null);
-    }
-  };
 
   return (
     <div className={`fixed inset-0 z-[110] ${modalTheme.overlay}`}>
@@ -337,27 +368,51 @@ export default function InvoiceDetailsModal({
                     <h3 className={`font-bold ${modalTheme.title}`}>Proof of Payment</h3>
                   </div>
                   <div className="space-y-2">
-                    {paymentProofs.map((proof) => (
-                      <div key={proof.proofId} className={`flex items-center justify-between gap-3 rounded-lg border px-3 py-2 ${isDark ? "border-slate-700" : "border-slate-200"}`}>
-                        <div className="min-w-0">
+                    {paymentProofs.map((proof) => {
+                      const preview = proofPreviews[proof.proofId];
+                      const fileName = preview?.fileName || proof.fileName || "Payment proof";
+                      const contentType = String(preview?.contentType || proof.contentType || "").toLowerCase();
+                      const isPdf = contentType.includes("pdf") || fileName.toLowerCase().endsWith(".pdf");
+                      const isImage = contentType.startsWith("image/") || /\.(png|jpe?g|webp|gif)$/i.test(fileName);
+                      return (
+                      <div key={proof.proofId} className={`overflow-hidden rounded-lg border ${isDark ? "border-slate-700 bg-slate-950/30" : "border-slate-200 bg-white"}`}>
+                        <div className={`border-b px-3 py-2 ${isDark ? "border-slate-700" : "border-slate-200"}`}>
                           <p className={`truncate text-sm font-semibold ${modalTheme.title}`}>{proof.fileName}</p>
                           <p className={`text-xs ${modalTheme.bodyText}`}>
                             {(Number(proof.sizeBytes || 0) / (1024 * 1024)).toFixed(2)} MB · SHA-256 {String(proof.sha256 || "").slice(0, 12)}…
                           </p>
                         </div>
-                        <button
-                          type="button"
-                          onClick={() => handleProofDownload(proof)}
-                          disabled={downloadingProofId === proof.proofId}
-                          className="shrink-0 rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white hover:bg-blue-500 disabled:opacity-60"
-                        >
-                          <FontAwesomeIcon icon={faDownload} className="mr-2" />
-                          {downloadingProofId === proof.proofId ? "Downloading..." : "Download"}
-                        </button>
+                        {!preview ? (
+                          <div className={`flex min-h-40 items-center justify-center px-4 py-8 text-sm ${modalTheme.bodyText}`}>
+                            Loading payment proofâ€¦
+                          </div>
+                        ) : preview.error ? (
+                          <p role="alert" className="px-4 py-6 text-center text-sm font-medium text-red-600">
+                            {preview.error}
+                          </p>
+                        ) : isImage ? (
+                          <div className={`flex justify-center p-3 ${isDark ? "bg-slate-900" : "bg-slate-50"}`}>
+                            <img
+                              src={preview.url}
+                              alt={`Proof of payment: ${fileName}`}
+                              className="max-h-[520px] max-w-full rounded object-contain"
+                            />
+                          </div>
+                        ) : isPdf ? (
+                          <iframe
+                            src={preview.url}
+                            title={`Proof of payment: ${fileName}`}
+                            className="h-[520px] w-full bg-white"
+                          />
+                        ) : (
+                          <p className={`px-4 py-6 text-center text-sm ${modalTheme.bodyText}`}>
+                            This payment-proof file type cannot be displayed in the browser.
+                          </p>
+                        )}
                       </div>
-                    ))}
+                      );
+                    })}
                   </div>
-                  {proofDownloadError && <p role="alert" className="mt-3 text-sm font-medium text-red-600">{proofDownloadError}</p>}
                 </section>
               )}
 
