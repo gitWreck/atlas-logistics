@@ -6,6 +6,7 @@ const {
 } = require("../utilities/invoiceLogger");
 const { updatedBy } = require("../utilities/helpers");
 const { evaluateInvoiceEdit } = require("./invoiceEditPolicy.cjs");
+const { financeSourceVersionIncrement } = require("./financeSourceVersion.cjs");
 
 if (!admin.apps.length) admin.initializeApp();
 const db = admin.firestore();
@@ -90,7 +91,12 @@ exports.editInvoice = onCall(
     const updateData = {
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       updatedBy: actorName,
-      financeSourceVersion: admin.firestore.FieldValue.increment(1),
+      // Legacy invoices were mirrored into Finance at source version 1 before
+      // Transport-side versioning existed. Their first event must therefore be
+      // version 2; versioned invoices continue incrementing by one.
+      financeSourceVersion: admin.firestore.FieldValue.increment(
+        financeSourceVersionIncrement(invoiceData.financeSourceVersion),
+      ),
     };
 
     if (invoiceDate !== undefined) updateData.invoiceDate = invoiceDate;

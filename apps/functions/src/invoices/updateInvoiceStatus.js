@@ -1,5 +1,6 @@
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const admin = require("firebase-admin");
+const { financeSourceVersionIncrement } = require("./financeSourceVersion.cjs");
 const crypto = require("node:crypto");
 const {
   getActorFromRequest,
@@ -143,7 +144,9 @@ exports.updateInvoiceStatus = onCall(
 
     batch.update(invoiceRef, {
       status,
-      financeSourceVersion: admin.firestore.FieldValue.increment(1),
+      financeSourceVersion: admin.firestore.FieldValue.increment(
+        financeSourceVersionIncrement(invoiceData.financeSourceVersion),
+      ),
       updatedAt: nowAt,
       updatedBy: name,
     });
