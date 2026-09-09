@@ -19,6 +19,7 @@ const {
   outboxRecord,
   deliverOutboxDocument,
 } = require("./financeEventOutbox");
+const { paymentPayload } = require("./paymentFinancePayload.cjs");
 
 if (!admin.apps.length) admin.initializeApp();
 const db = admin.firestore();
@@ -32,35 +33,6 @@ function stableId(prefix, ...values) { return `${prefix}_${crypto.createHash("sh
 function pesosToCentavos(value) {
   const number = Number(value);
   return Number.isFinite(number) && number > 0 ? Math.round(number * 100) : null;
-}
-function paymentPayload(payment) {
-  return {
-    paymentId: payment.id,
-    paymentNumber: payment.paymentNumber,
-    invoiceId: payment.invoiceId,
-    customerId: payment.customerId,
-    customerName: payment.customerName,
-    receivedAt: payment.receivedAtMs,
-    amountCentavos: payment.amountCentavos,
-    method: payment.method,
-    referenceNumber: payment.referenceNumber,
-    destinationCode: payment.destinationCode,
-    status: payment.status,
-    sourceVersion: payment.sourceVersion,
-    reversed: payment.status === "REVERSED",
-    reversalReason: payment.reversalReason || null,
-    proofDocuments: Array.isArray(payment.proofDocuments) ? payment.proofDocuments.map((proof) => ({
-      proofId: proof.proofId,
-      fileName: proof.fileName,
-      contentType: proof.contentType,
-      sizeBytes: proof.sizeBytes,
-      sha256: proof.sha256,
-      storagePath: proof.storagePath,
-      uploadedAtMs: proof.uploadedAtMs,
-      uploadedBy: proof.uploadedBy,
-    })) : [],
-    allocations: [{ invoiceId: payment.invoiceId, amountCentavos: payment.amountCentavos }],
-  };
 }
 async function actorFor(request) {
   if (!request.auth?.uid) throw new HttpsError("unauthenticated", "Login required.");
