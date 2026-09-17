@@ -92,12 +92,28 @@ async function enrichHubTripsWithMasterPackages(trips = []) {
   return trips.map((trip) => {
     if (!tripNeedsDeliveryEnrichment(trip)) return trip;
 
-    const shipments = (trip.shipments || []).map((row) => {
+    const shipments = (trip.shipments || []).flatMap((row) => {
       const masterId = row.trackingShipmentId || row.id;
       const master = masterById.get(masterId);
-      if (!master) return row;
+      if (!master) return [row];
 
-      return {
+      // `trip_shipments` is an operational manifest ledger. A shipment can be
+      // moved to a later trip after the ledger row was written. When its live
+      // master record has a definite assignment elsewhere, do not expose that
+      // stale row as part of this trip's active shipment or invoice total.
+      // A record with no current assignment is retained for historical views;
+      // an explicit multi-trip assignment is retained for each listed trip.
+      const assignedTripIds = [
+        master.currentTripId,
+        ...(Array.isArray(master.currentTripIds) ? master.currentTripIds : []),
+      ]
+        .map((value) => String(value || "").trim())
+        .filter(Boolean);
+      if (assignedTripIds.length > 0 && !assignedTripIds.includes(String(trip.id))) {
+        return [];
+      }
+
+      return [{
         ...row,
         packages: getTripScopedPackages(
           row,
@@ -108,7 +124,7 @@ async function enrichHubTripsWithMasterPackages(trips = []) {
         masterStatus: master.status || null,
         releasedForDeliveryAt: master.releasedForDeliveryAt || null,
         availableForDelivery: master.availableForDelivery === true,
-      };
+      }];
     });
 
     return { ...trip, shipments };
