@@ -38,7 +38,6 @@ export async function GET() {
     const snapshot = await adminDb
       .collection("invoices")
       .orderBy("updatedAt", "desc")
-      .limit(100)
       .get();
 
     // 4. PRE-FETCH RELATED SHIPMENTS
