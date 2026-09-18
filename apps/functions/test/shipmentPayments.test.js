@@ -59,4 +59,9 @@ test("retry delivery is bounded and payment collections are server controlled", 
   assert.match(createInvoiceSource, /transaction\.set\(reservationRef/);
   assert.match(createInvoiceSource, /if \(error instanceof HttpsError\) throw error/);
   assert.doesNotMatch(fs.readFileSync(path.resolve(__dirname, "../index.js"), "utf8"), /exports\.upsertFinanceInvoice/);
+  assert.match(fs.readFileSync(path.resolve(__dirname, "../index.js"), "utf8"), /exports\.replayShipmentPayment/);
+  const paymentSource = fs.readFileSync(path.resolve(__dirname, "../src/invoices/shipmentPayments.js"), "utf8");
+  assert.match(paymentSource, /replayShipmentPayment/);
+  assert.match(paymentSource, /payment_replay/);
+  assert.match(paymentSource, /sourceVersion = Number\(payment\.sourceVersion \|\| 0\) \+ 1/);
 });

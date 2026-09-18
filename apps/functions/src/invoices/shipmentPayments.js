@@ -42,6 +42,13 @@ async function actorFor(request) {
   if (!ROLES.has(role) || !isActiveProfile(profile)) throw new HttpsError("permission-denied", "An active Transport Admin or Manager account is required.");
   return { uid: request.auth.uid, role, profile, name: clean(profile.name || profile.displayName || request.auth.token?.name || request.auth.uid, 250) };
 }
+async function adminActorFor(request) {
+  const actor = await actorFor(request);
+  if (!["admin", "administrator"].includes(actor.role)) {
+    throw new HttpsError("permission-denied", "An active Transport Admin account is required.");
+  }
+  return actor;
+}
 
 const uploadPaymentProof = onCall({ region: "asia-southeast1", maxInstances: 10, memory: "512MiB" }, async (request) => {
   const actor = await actorFor(request);
@@ -272,6 +279,49 @@ const reverseShipmentPayment = onCall({ region: "asia-southeast1", maxInstances:
   return { success: true, ...result, financeDeliveryStatus: delivery.status };
 });
 
+const replayShipmentPayment = onCall({ region: "asia-southeast1", maxInstances: 2, memory: "512MiB", secrets: [FINANCE_WEBHOOK_SECRET] }, async (request) => {
+  const actor = await adminActorFor(request);
+  const paymentId = clean(request.data?.paymentId, 250);
+  const requestId = clean(request.data?.requestId, 250);
+  if (!paymentId || !requestId) throw new HttpsError("invalid-argument", "Payment ID and replay request ID are required.");
+  const paymentRef = db.collection("shipmentPayments").doc(paymentId);
+  const requestRef = db.collection("paymentRequestReservations").doc(stableId("payment_replay", actor.uid, requestId));
+  const result = await db.runTransaction(async (tx) => {
+    const [paymentSnapshot, requestSnapshot] = await Promise.all([tx.get(paymentRef), tx.get(requestRef)]);
+    if (requestSnapshot.exists) return { duplicate: true, paymentId, outboxId: requestSnapshot.data().outboxId };
+    if (!paymentSnapshot.exists) throw new HttpsError("not-found", "Payment not found.");
+    const payment = paymentSnapshot.data() || {};
+    if (payment.status === "REVERSED") throw new HttpsError("failed-precondition", "Reversed payments cannot be replayed as created events.");
+    const sourceVersion = Number(payment.sourceVersion || 0) + 1;
+    if (!Number.isSafeInteger(sourceVersion) || sourceVersion <= 0) {
+      throw new HttpsError("failed-precondition", "Payment source version is invalid.");
+    }
+    const replayedPayment = { ...payment, id: paymentId, sourceVersion, status: "APPROVED" };
+    const envelope = makeEnvelope({
+      eventType: "SHIPMENT_PAYMENT_CREATED",
+      entityId: paymentId,
+      sourceVersion,
+      occurredAtMs: Number(payment.receivedAtMs || payment.receivedAt?.toMillis?.() || Date.now()),
+      correlationId: payment.invoiceId || paymentId,
+      causationId: payment.financeEventId || null,
+      payload: paymentPayload(replayedPayment),
+    });
+    const outboxId = outboxDocumentId(envelope);
+    const now = Timestamp.now();
+    tx.update(paymentRef, {
+      sourceVersion,
+      updatedAt: now,
+      lastReplayAt: now,
+      lastReplayBy: actor.uid,
+    });
+    tx.create(db.collection("financeEventOutbox").doc(outboxId), outboxRecord(envelope, now));
+    tx.create(requestRef, { paymentId, outboxId, actorId: actor.uid, requestId, sourceVersion, createdAt: now });
+    return { duplicate: false, paymentId, outboxId, sourceVersion };
+  });
+  const delivery = await deliverOutboxDocument(db.collection("financeEventOutbox").doc(result.outboxId), FINANCE_WEBHOOK_SECRET.value());
+  return { success: true, ...result, financeDeliveryStatus: delivery.status };
+});
+
 const retryFinanceEventOutbox = onSchedule({ region: "asia-southeast1", schedule: "every 1 minutes", timeZone: "Asia/Manila", secrets: [FINANCE_WEBHOOK_SECRET], maxInstances: 1 }, async () => {
   const nowTimestamp = Timestamp.now();
   const due = await db.collection("financeEventOutbox")
@@ -285,4 +335,4 @@ const retryFinanceEventOutbox = onSchedule({ region: "asia-southeast1", schedule
   }
 });
 
-module.exports = { uploadPaymentProof, downloadPaymentProof, recordShipmentPayment, reverseShipmentPayment, retryFinanceEventOutbox, _test: { pesosToCentavos, paymentPayload, stableId } };
+module.exports = { uploadPaymentProof, downloadPaymentProof, recordShipmentPayment, reverseShipmentPayment, replayShipmentPayment, retryFinanceEventOutbox, _test: { pesosToCentavos, paymentPayload, stableId } };

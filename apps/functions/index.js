@@ -204,6 +204,7 @@ exports.uploadPaymentProof = shipmentPayments.uploadPaymentProof;
 exports.downloadPaymentProof = shipmentPayments.downloadPaymentProof;
 exports.recordShipmentPayment = shipmentPayments.recordShipmentPayment;
 exports.reverseShipmentPayment = shipmentPayments.reverseShipmentPayment;
+exports.replayShipmentPayment = shipmentPayments.replayShipmentPayment;
 exports.retryFinanceEventOutbox = shipmentPayments.retryFinanceEventOutbox;
 exports.queueInvoiceFinanceEvent =
   require("./src/invoices/invoiceFinanceEvents").queueInvoiceFinanceEvent;
