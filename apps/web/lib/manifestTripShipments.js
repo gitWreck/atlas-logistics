@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { adminAuth, adminDb } from "@/lib/firebase-admin";
 import { headers } from "next/headers";
+import { invoiceBelongsToTrip } from "@/lib/invoiceTripMembership.mjs";
 
 export async function getManifestTripShipments(tripId) {
   const normalizedTripId = String(tripId || "").trim();
@@ -161,7 +162,7 @@ export async function getManifestTripShipments(tripId) {
     const parsedInvoiceAmount = Number(rawInvoiceAmount);
     const hasActiveInvoice =
       String(invoiceStatus || "").toUpperCase() !== "CANCELLED" &&
-      Boolean(linkedInvoice) &&
+      invoiceBelongsToTrip(linkedInvoice, normalizedTripId) &&
       (root.hasInvoice || Boolean(root.invoiceId));
 
     const customAddedBy =

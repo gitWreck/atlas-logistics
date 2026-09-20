@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { invoiceBelongsToTrip } from "@/lib/invoiceTripMembership.mjs";
 import { adminAuth, adminDb } from "@/lib/firebase-admin";
 import { headers } from "next/headers";
 
@@ -113,9 +114,9 @@ async function fetchRootShipmentsById(shipmentIds = []) {
   return rootShipments;
 }
 
-async function fetchExistingInvoiceIds(invoiceIds = []) {
+async function fetchExistingInvoices(invoiceIds = []) {
   const uniqueIds = [...new Set(invoiceIds.filter(Boolean).map(String))];
-  const existingIds = new Set();
+  const invoices = new Map();
   const batchSize = 100;
 
   for (let index = 0; index < uniqueIds.length; index += batchSize) {
@@ -125,11 +126,11 @@ async function fetchExistingInvoiceIds(invoiceIds = []) {
     );
 
     snapshots.forEach((snapshot) => {
-      if (snapshot.exists) existingIds.add(snapshot.id);
+      if (snapshot.exists) invoices.set(snapshot.id, snapshot.data() || {});
     });
   }
 
-  return existingIds;
+  return invoices;
 }
 
 export async function GET(_req, context) {
@@ -244,7 +245,7 @@ export async function GET(_req, context) {
       )
       .map((shipment) => shipment.invoiceId || shipment.invoiceNumber)
       .filter(Boolean);
-    const existingInvoiceIds = await fetchExistingInvoiceIds(linkedInvoiceIds);
+    const existingInvoices = await fetchExistingInvoices(linkedInvoiceIds);
 
     const shipments = [...shipmentMap.values()].map((shipment) => {
       const linkedInvoiceId = String(
@@ -253,7 +254,7 @@ export async function GET(_req, context) {
       const hasMissingInvoice =
         linkedInvoiceId &&
         String(shipment.invoiceStatus || "").toUpperCase() !== "CANCELLED" &&
-        !existingInvoiceIds.has(linkedInvoiceId);
+        !invoiceBelongsToTrip(existingInvoices.get(linkedInvoiceId), tripId);
 
       return hasMissingInvoice
         ? {
