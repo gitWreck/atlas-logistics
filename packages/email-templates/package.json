@@ -11,12 +11,12 @@
   "dependencies": {
     "@react-email/components": "0.0.36",
     "@react-email/render": "^1.0.4",
+    "esbuild": "0.23.0",
     "react": "19.0.0",
     "react-dom": "19.0.0"
   },
   "devDependencies": {
     "@react-email/preview-server": "^4.3.2",
-    "esbuild": "0.23.0",
     "react-email": "4.3.2"
   }
 }
