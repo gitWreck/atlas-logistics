@@ -20,7 +20,8 @@
     "ios": "expo run:ios",
     "functions:check": "npm run lint --workspace=apps/functions",
     "deploy:functions": "firebase deploy --only functions",
-    "deploy:functions:manifest": "firebase deploy --only functions:unlockTripManifest,functions:manualAssignShipmentToTrip,functions:bulkAssignShipments,functions:assignShipmentToTrip,functions:generateTripManifest"
+    "deploy:functions:manifest": "firebase deploy --only functions:unlockTripManifest,functions:manualAssignShipmentToTrip,functions:bulkAssignShipments,functions:assignShipmentToTrip,functions:generateTripManifest",
+    "deploy:web": "firebase apphosting:rollouts:create atlastransport --git-branch atlas-final-build-v10 --project atlas-tracking"
   },
   "devDependencies": {
     "turbo": "latest"

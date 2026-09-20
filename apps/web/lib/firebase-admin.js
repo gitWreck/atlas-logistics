@@ -1,6 +1,11 @@
 import "server-only";
 import fs from "fs";
-import { initializeApp, getApps, cert } from "firebase-admin/app";
+import {
+  applicationDefault,
+  cert,
+  getApps,
+  initializeApp,
+} from "firebase-admin/app";
 import { getFirestore } from "firebase-admin/firestore";
 import { getAuth } from "firebase-admin/auth";
 import { admin } from "firebase-admin";
@@ -36,14 +41,22 @@ function ensureAdminApp() {
   if (getApps().length > 0) return;
 
   const serviceAccount = resolveServiceAccount();
-  if (!serviceAccount?.project_id) {
+  if (serviceAccount && !serviceAccount.project_id) {
     throw new Error(
-      "Firebase Admin credentials are missing or invalid. Set FIREBASE_SERVICE_ACCOUNT_KEY (single-line JSON) or GOOGLE_APPLICATION_CREDENTIALS (path to service account JSON) in your environment.",
+      "Firebase Admin credentials are invalid: the configured service account is missing project_id.",
     );
   }
 
+  const projectId =
+    serviceAccount?.project_id ||
+    process.env.FIREBASE_PROJECT_ID ||
+    process.env.GCLOUD_PROJECT ||
+    process.env.GOOGLE_CLOUD_PROJECT ||
+    process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
+
   initializeApp({
-    credential: cert(serviceAccount),
+    credential: serviceAccount ? cert(serviceAccount) : applicationDefault(),
+    ...(projectId ? { projectId } : {}),
   });
 }
 
