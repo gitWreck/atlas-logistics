@@ -23,5 +23,9 @@ test("manifest footer details can be collapsed without hiding the summary", () =
 
   const detailsStart = source.indexOf("{showDetails && (");
   const summaryStart = source.indexOf("Manifest</span>");
+  const toggleStart = source.indexOf('aria-controls="trip-manifest-details"');
+  const invoicesStart = source.indexOf('className="font-bold">Invoices:');
   assert.ok(summaryStart >= 0 && summaryStart < detailsStart);
+  assert.ok(summaryStart < toggleStart && toggleStart < invoicesStart);
+  assert.match(source, /sm:grid-cols-\[1fr_auto_1fr\]/);
 });

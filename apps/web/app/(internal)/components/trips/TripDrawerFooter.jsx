@@ -125,46 +125,44 @@ export default function TripDrawerFooter({
       <div
         className={`rounded-lg border px-3 py-2 text-xs ${theme.footerPanel}`}
       >
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <div className="grid gap-2 sm:grid-cols-[1fr_auto_1fr] sm:items-center">
           <div>
             <span className="font-bold uppercase opacity-60">Manifest</span>
             <span className="ml-2 font-semibold">{manifestStatusLabel}</span>
             <span className="ml-2 opacity-50">({manifestStatus})</span>
           </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <div
-              className={`flex items-center gap-3 rounded-md border px-3 py-1.5 ${
-                isDark
-                  ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-300"
-                  : "border-emerald-200 bg-emerald-50 text-emerald-700"
-              }`}
-            >
-              <span>
-                <span className="font-bold">Invoices:</span>{" "}
-                {invoiceSummary.count}
-              </span>
-              <span className="h-4 w-px bg-current opacity-20" />
-              <span>
-                <span className="font-bold">Total:</span>{" "}
-                {formatAmount(invoiceSummary.totalAmount)}
-              </span>
-            </div>
-            <button
-              type="button"
-              onClick={() => setShowDetails((visible) => !visible)}
-              aria-expanded={showDetails}
-              aria-controls="trip-manifest-details"
-              className={`inline-flex items-center justify-center gap-2 rounded-md border px-3 py-1.5 font-semibold transition-colors ${
-                isDark
-                  ? "border-slate-600 text-slate-200 hover:bg-slate-700"
-                  : "border-slate-300 text-slate-700 hover:bg-slate-100"
-              }`}
-            >
-              <FontAwesomeIcon
-                icon={showDetails ? faChevronUp : faChevronDown}
-              />
-              {showDetails ? "Hide details" : "Show details"}
-            </button>
+          <button
+            type="button"
+            onClick={() => setShowDetails((visible) => !visible)}
+            aria-expanded={showDetails}
+            aria-controls="trip-manifest-details"
+            className={`inline-flex items-center justify-center gap-2 justify-self-center rounded-md border px-3 py-1.5 font-semibold transition-colors ${
+              isDark
+                ? "border-slate-600 text-slate-200 hover:bg-slate-700"
+                : "border-slate-300 text-slate-700 hover:bg-slate-100"
+            }`}
+          >
+            <FontAwesomeIcon
+              icon={showDetails ? faChevronUp : faChevronDown}
+            />
+            {showDetails ? "Hide details" : "Show details"}
+          </button>
+          <div
+            className={`flex items-center gap-3 justify-self-end rounded-md border px-3 py-1.5 ${
+              isDark
+                ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-300"
+                : "border-emerald-200 bg-emerald-50 text-emerald-700"
+            }`}
+          >
+            <span>
+              <span className="font-bold">Invoices:</span>{" "}
+              {invoiceSummary.count}
+            </span>
+            <span className="h-4 w-px bg-current opacity-20" />
+            <span>
+              <span className="font-bold">Total:</span>{" "}
+              {formatAmount(invoiceSummary.totalAmount)}
+            </span>
           </div>
         </div>
       </div>
