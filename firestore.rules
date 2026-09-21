@@ -542,6 +542,10 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    match /packageInvoiceReservations/{reservationId} {
+      allow read, write: if false;
+    }
+
     // --- PUBLIC TRACKING ---
 
     match /tracking_public/{trackingNumber} {

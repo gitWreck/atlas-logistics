@@ -889,6 +889,18 @@ export default function ViewPackagesModal({
                                       status={pkg.status}
                                       isDark={isDark}
                                     />
+                                    <StatusBadge
+                                      status={
+                                        pkg.billingStatus || "NOT_INVOICED"
+                                      }
+                                      label={
+                                        pkg.billingStatus === "INVOICED"
+                                          ? "Invoiced"
+                                          : "Not Invoiced"
+                                      }
+                                      isDark={isDark}
+                                      compact
+                                    />
                                     {showPieceStatusOverride && (
                                       <button
                                         type="button"
@@ -1228,10 +1240,22 @@ export default function ViewPackagesModal({
                                   </td>
 
                                   <td className="px-4 py-3">
-                                    <div className="flex items-center gap-2">
+                                    <div className="flex flex-wrap items-center gap-2">
                                       <StatusBadge
                                         status={pkg.status}
                                         isDark={isDark}
+                                      />
+                                      <StatusBadge
+                                        status={
+                                          pkg.billingStatus || "NOT_INVOICED"
+                                        }
+                                        label={
+                                          pkg.billingStatus === "INVOICED"
+                                            ? "Invoiced"
+                                            : "Not Invoiced"
+                                        }
+                                        isDark={isDark}
+                                        compact
                                       />
                                       {showPieceStatusOverride && (
                                         <button

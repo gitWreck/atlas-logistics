@@ -3,6 +3,13 @@ const admin = require("firebase-admin");
 const { financeSourceVersionIncrement } = require("./financeSourceVersion.cjs");
 const crypto = require("node:crypto");
 const {
+  invoicePackageIds,
+  packageReservationId,
+  releaseInvoiceFromPackages,
+  shipmentInvoicingSummary,
+  updatePackageInvoiceStatus,
+} = require("./packageInvoiceScope.cjs");
+const {
   getActorFromRequest,
   writeInvoiceActionLog,
 } = require("../utilities/invoiceLogger");
@@ -118,14 +125,30 @@ exports.updateInvoiceStatus = onCall(
     }
 
     const shipmentId = invoiceData.shipmentId || null;
+    const packageIds = invoicePackageIds(invoiceData);
     let shipmentRef = null;
     let shipmentData = null;
+    let replacementInvoice = null;
 
     if (shipmentId) {
       shipmentRef = db.collection("shipments").doc(shipmentId);
       const shipmentDoc = await shipmentRef.get();
       if (shipmentDoc.exists) {
         shipmentData = shipmentDoc.data() || {};
+      }
+
+      if (status === "CANCELLED") {
+        const shipmentInvoices = await db
+          .collection("invoices")
+          .where("shipmentId", "==", shipmentId)
+          .get();
+        replacementInvoice = shipmentInvoices.docs
+          .filter((document) => document.id !== invoiceId)
+          .map((document) => ({ id: document.id, ...(document.data() || {}) }))
+          .find(
+            (invoice) =>
+              String(invoice.status || "DRAFT").toUpperCase() !== "CANCELLED",
+          );
       }
     }
     if (
@@ -152,32 +175,70 @@ exports.updateInvoiceStatus = onCall(
     });
 
     if (shipmentRef) {
+      const shipmentPackages = Array.isArray(shipmentData?.packages)
+        ? shipmentData.packages
+        : [];
+
       if (status === "CANCELLED") {
         const linkedInvoiceId = shipmentData?.invoiceId || null;
+        const updatedPackages = releaseInvoiceFromPackages(
+          shipmentPackages,
+          invoiceId,
+        );
+        const invoicingSummary = shipmentInvoicingSummary(updatedPackages);
 
         if (!linkedInvoiceId || linkedInvoiceId === invoiceId) {
           batch.set(
             shipmentRef,
             {
-              invoiceId: null,
-              invoiceNumber: null,
-              invoiceStatus: "CANCELLED",
-              hasInvoice: false,
+              packages: updatedPackages,
+              ...invoicingSummary,
+              invoiceId: replacementInvoice?.id || null,
+              invoiceNumber:
+                replacementInvoice?.invoiceNumber || replacementInvoice?.id || null,
+              invoiceStatus: replacementInvoice?.status || "CANCELLED",
+              hasInvoice: Boolean(replacementInvoice),
+              updatedAt: nowAt,
+              updatedBy: name,
+            },
+            { merge: true },
+          );
+        } else {
+          batch.set(
+            shipmentRef,
+            {
+              packages: updatedPackages,
+              ...invoicingSummary,
               updatedAt: nowAt,
               updatedBy: name,
             },
             { merge: true },
           );
         }
-        if (shipmentId) {
+        if (packageIds.length > 0) {
+          packageIds.forEach((packageId) => {
+            batch.delete(
+              db
+                .collection("packageInvoiceReservations")
+                .doc(packageReservationId(shipmentId, packageId)),
+            );
+          });
+        } else if (shipmentId) {
           batch.delete(db.collection("shipmentInvoiceReservations").doc(
             crypto.createHash("sha256").update(String(shipmentId)).digest("hex"),
           ));
         }
       } else {
+        const updatedPackages = updatePackageInvoiceStatus(
+          shipmentPackages,
+          packageIds,
+          status,
+        );
         batch.set(
           shipmentRef,
           {
+            packages: updatedPackages,
+            ...shipmentInvoicingSummary(updatedPackages),
             invoiceId,
             invoiceNumber: invoiceData.invoiceNumber || invoiceId,
             invoiceStatus: status,

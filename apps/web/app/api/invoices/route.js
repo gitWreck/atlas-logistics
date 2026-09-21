@@ -2,8 +2,76 @@ import { NextResponse } from "next/server";
 import { adminDb, adminAuth } from "@/lib/firebase-admin";
 import { headers } from "next/headers";
 import { formatFirestoreDate } from "@/app/utility/utilities";
+import {
+  inferredInvoicePackageIds,
+  packageIdFor,
+} from "@/lib/packageInvoiceScope.mjs";
 
 export const dynamic = "force-dynamic";
+
+function buildInvoiceShipmentSnapshot(data, linkedShipment, shipmentId) {
+  const storedSnapshot =
+    data.shipmentSnapshot && typeof data.shipmentSnapshot === "object"
+      ? data.shipmentSnapshot
+      : null;
+
+  if (!linkedShipment) return storedSnapshot;
+
+  const livePackages = Array.isArray(linkedShipment.packages)
+    ? linkedShipment.packages
+    : [];
+  const effectivePackageIds = inferredInvoicePackageIds(data, livePackages);
+  const effectivePackageIdSet = new Set(effectivePackageIds);
+  const packageSource = Array.isArray(storedSnapshot?.packages)
+    ? storedSnapshot.packages
+    : Array.isArray(data.packageLineItems)
+      ? data.packageLineItems
+      : livePackages;
+  const filteredPackages = packageSource.filter((pkg) =>
+    effectivePackageIdSet.has(packageIdFor(pkg)),
+  );
+  const hasInvoicePackageScope = effectivePackageIds.length > 0;
+  const scopedPackages = hasInvoicePackageScope
+    ? filteredPackages.length > 0
+      ? filteredPackages
+      : data.packageLineItems || []
+    : packageSource;
+  const scopedTotalItems = scopedPackages.reduce(
+    (total, pkg) => total + Math.max(Number(pkg.quantity) || 1, 1),
+    0,
+  );
+  const scopedTotals = hasInvoicePackageScope
+    ? {
+        ...(storedSnapshot?.totals || {}),
+        totalPackages: scopedPackages.length,
+        totalItems: scopedTotalItems,
+        totalContentQty: scopedTotalItems,
+      }
+    : linkedShipment.totals || storedSnapshot?.totals || null;
+
+  return {
+    ...(storedSnapshot || {}),
+    id: shipmentId,
+    shipmentId:
+      linkedShipment.shipmentId || linkedShipment.trackingNumber || shipmentId,
+    origin: linkedShipment.origin || storedSnapshot?.origin || null,
+    destination:
+      linkedShipment.destination || storedSnapshot?.destination || null,
+    status: linkedShipment.status || storedSnapshot?.status || null,
+    sender: linkedShipment.sender || storedSnapshot?.sender || null,
+    recipient: linkedShipment.recipient || storedSnapshot?.recipient || null,
+    totals: scopedTotals,
+    packages: scopedPackages,
+    currentTripId:
+      data.tripId || storedSnapshot?.currentTripId || linkedShipment.currentTripId || null,
+    createdAt: linkedShipment.createdAt
+      ? formatFirestoreDate(linkedShipment.createdAt)
+      : storedSnapshot?.createdAt || null,
+    updatedAt: linkedShipment.updatedAt
+      ? formatFirestoreDate(linkedShipment.updatedAt)
+      : storedSnapshot?.updatedAt || null,
+  };
+}
 
 export async function GET() {
   try {
@@ -84,6 +152,11 @@ export async function GET() {
         : null;
 
       const dueDate = data.dueDate ? formatFirestoreDate(data.dueDate) : null;
+      const shipmentSnapshot = buildInvoiceShipmentSnapshot(
+        data,
+        linkedShipment,
+        data.shipmentId,
+      );
 
       return {
         id: doc.id,
@@ -95,28 +168,13 @@ export async function GET() {
 
         amount: Number(data.amount || 0),
         status: data.status || "DRAFT",
-
-        shipmentSnapshot: linkedShipment
-          ? {
-              id: data.shipmentId,
-              shipmentId:
-                linkedShipment.shipmentId || linkedShipment.id || doc.id,
-              origin: linkedShipment.origin || null,
-              destination: linkedShipment.destination || null,
-              status: linkedShipment.status || null,
-              sender: linkedShipment.sender || null,
-              recipient: linkedShipment.recipient || null,
-              totals: linkedShipment.totals || null,
-              packages: linkedShipment.packages || [],
-              currentTripId: linkedShipment.currentTripId || null,
-              createdAt: linkedShipment.createdAt
-                ? formatFirestoreDate(linkedShipment.createdAt)
-                : null,
-              updatedAt: linkedShipment.updatedAt
-                ? formatFirestoreDate(linkedShipment.updatedAt)
-                : null,
-            }
-          : null,
+        totalPackages: Number(
+          shipmentSnapshot?.totals?.totalPackages ?? data.totalPackages ?? 0,
+        ),
+        totalItems: Number(
+          shipmentSnapshot?.totals?.totalItems ?? data.totalItems ?? 0,
+        ),
+        shipmentSnapshot,
       };
     });
 

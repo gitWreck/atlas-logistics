@@ -48,15 +48,17 @@ test("retry delivery is bounded and payment collections are server controlled", 
   assert.equal(retryDelayMs(1), 30_000);
   assert.equal(retryDelayMs(20), 3_600_000);
   const rules = fs.readFileSync(path.resolve(__dirname, "../../../firestore.rules"), "utf8");
-  for (const collection of ["shipmentPayments", "paymentProofs", "financeEventOutbox", "paymentRequestReservations", "paymentReferenceReservations", "shipmentInvoiceReservations"]) {
+  for (const collection of ["shipmentPayments", "paymentProofs", "financeEventOutbox", "paymentRequestReservations", "paymentReferenceReservations", "shipmentInvoiceReservations", "packageInvoiceReservations"]) {
     assert.match(rules, new RegExp(`match \\/${collection}\\/\\{[^}]+\\}[\\s\\S]*?allow (?:read, )?write: if false`));
   }
   const statusSource = fs.readFileSync(path.resolve(__dirname, "../src/invoices/updateInvoiceStatus.js"), "utf8");
   assert.match(statusSource, /Record a customer payment to mark an invoice as paid/);
   const createInvoiceSource = fs.readFileSync(path.resolve(__dirname, "../src/invoices/createInvoice.js"), "utf8");
-  assert.match(createInvoiceSource, /shipmentInvoiceReservations[\s\S]*runTransaction/);
-  assert.match(createInvoiceSource, /reservedInvoice\?\.exists && reservedInvoiceStatus !== "CANCELLED"/);
-  assert.match(createInvoiceSource, /transaction\.set\(reservationRef/);
+  assert.match(createInvoiceSource, /runTransaction[\s\S]*packageInvoiceReservations/);
+  assert.match(createInvoiceSource, /reservationSnapshots\.some\(\(snapshot\) => snapshot\.exists\)/);
+  assert.match(createInvoiceSource, /transaction\.create\(reference/);
+  assert.match(createInvoiceSource, /activeInvoices\.filter\(isLegacyWholeShipmentInvoice\)/);
+  assert.match(createInvoiceSource, /packageScopeMigrationVersion: 1/);
   assert.match(createInvoiceSource, /if \(error instanceof HttpsError\) throw error/);
   assert.doesNotMatch(fs.readFileSync(path.resolve(__dirname, "../index.js"), "utf8"), /exports\.upsertFinanceInvoice/);
   assert.match(fs.readFileSync(path.resolve(__dirname, "../index.js"), "utf8"), /exports\.replayShipmentPayment/);

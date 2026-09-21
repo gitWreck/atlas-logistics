@@ -1,5 +1,12 @@
 import { NextResponse } from "next/server";
 import { invoiceBelongsToTrip } from "@/lib/invoiceTripMembership.mjs";
+import {
+  inferredInvoicePackageIds,
+  invoicePackageIds,
+  invoiceTripId,
+  isActiveInvoice,
+  packageBelongsToTrip,
+} from "@/lib/packageInvoiceScope.mjs";
 import { adminAuth, adminDb } from "@/lib/firebase-admin";
 import { headers } from "next/headers";
 
@@ -114,19 +121,26 @@ async function fetchRootShipmentsById(shipmentIds = []) {
   return rootShipments;
 }
 
-async function fetchExistingInvoices(invoiceIds = []) {
-  const uniqueIds = [...new Set(invoiceIds.filter(Boolean).map(String))];
+async function fetchInvoicesForShipments(shipmentIds = []) {
+  const uniqueIds = [...new Set(shipmentIds.filter(Boolean).map(String))];
   const invoices = new Map();
-  const batchSize = 100;
+  const batchSize = 30;
 
   for (let index = 0; index < uniqueIds.length; index += batchSize) {
     const chunk = uniqueIds.slice(index, index + batchSize);
-    const snapshots = await adminDb.getAll(
-      ...chunk.map((id) => adminDb.collection("invoices").doc(id)),
-    );
+    const snapshot = await adminDb
+      .collection("invoices")
+      .where("shipmentId", "in", chunk)
+      .get();
 
-    snapshots.forEach((snapshot) => {
-      if (snapshot.exists) invoices.set(snapshot.id, snapshot.data() || {});
+    snapshot.docs.forEach((document) => {
+      const data = {
+        id: document.id,
+        ...serializeFirestoreValue(document.data() || {}),
+      };
+      const rows = invoices.get(data.shipmentId) || [];
+      rows.push(data);
+      invoices.set(data.shipmentId, rows);
     });
   }
 
@@ -238,33 +252,72 @@ export async function GET(_req, context) {
       });
     });
 
-    const linkedInvoiceIds = [...shipmentMap.values()]
-      .filter(
-        (shipment) =>
-          String(shipment.invoiceStatus || "").toUpperCase() !== "CANCELLED",
-      )
-      .map((shipment) => shipment.invoiceId || shipment.invoiceNumber)
-      .filter(Boolean);
-    const existingInvoices = await fetchExistingInvoices(linkedInvoiceIds);
+    const invoicesByShipment = await fetchInvoicesForShipments([
+      ...shipmentMap.keys(),
+    ]);
 
     const shipments = [...shipmentMap.values()].map((shipment) => {
-      const linkedInvoiceId = String(
-        shipment.invoiceId || shipment.invoiceNumber || "",
+      const activeInvoices = (invoicesByShipment.get(shipment.id) || []).filter(
+        isActiveInvoice,
       );
-      const hasMissingInvoice =
-        linkedInvoiceId &&
-        String(shipment.invoiceStatus || "").toUpperCase() !== "CANCELLED" &&
-        !invoiceBelongsToTrip(existingInvoices.get(linkedInvoiceId), tripId);
+      const tripInvoices = activeInvoices.filter((invoice) =>
+        invoiceBelongsToTrip(invoice, tripId),
+      );
+      const selectedInvoice = tripInvoices[0] || null;
+      const manifestRow = manifestRows.get(shipment.id) || {};
+      const manifestPackageIds = [
+        ...(Array.isArray(manifestRow.packageBarcodes)
+          ? manifestRow.packageBarcodes
+          : []),
+        ...(Array.isArray(manifestRow.loadedPackageIds)
+          ? manifestRow.loadedPackageIds
+          : []),
+      ];
+      const loadedPackages = (Array.isArray(shipment.packages)
+        ? shipment.packages
+        : []
+      ).filter((pkg) =>
+        packageBelongsToTrip(pkg, tripId, manifestPackageIds),
+      );
+      const allShipmentPackages = Array.isArray(shipment.packages)
+        ? shipment.packages
+        : [];
+      const effectivePackageIds = (invoice) =>
+        inferredInvoicePackageIds(
+          invoice,
+          allShipmentPackages,
+          invoiceTripId(invoice) === tripId ? manifestPackageIds : [],
+        );
+      const invoicedPackageIds = new Set(
+        activeInvoices.flatMap(effectivePackageIds),
+      );
+      const hasLegacyWholeShipmentInvoice = activeInvoices.some(
+        (invoice) =>
+          invoicePackageIds(invoice).length === 0 &&
+          effectivePackageIds(invoice).length === 0,
+      );
+      const invoiceEligiblePackages = hasLegacyWholeShipmentInvoice
+        ? []
+        : loadedPackages.filter(
+            (pkg) =>
+              !invoicedPackageIds.has(
+                String(pkg.packageId || pkg.trackingNumber || "").trim(),
+              ),
+          );
 
-      return hasMissingInvoice
-        ? {
-            ...shipment,
-            hasInvoice: false,
-            invoiceId: null,
-            invoiceNumber: null,
-            invoiceStatus: null,
-          }
-        : shipment;
+      return {
+        ...shipment,
+        hasInvoice: Boolean(selectedInvoice),
+        invoiceId: selectedInvoice?.id || null,
+        invoiceNumber: selectedInvoice?.invoiceNumber || null,
+        invoiceStatus: selectedInvoice?.status || null,
+        invoiceAmount: Number(selectedInvoice?.amount || 0),
+        selectedTripId: tripId,
+        tripInvoices,
+        loadedPackages,
+        invoiceEligiblePackages,
+        hasUninvoicedPackages: invoiceEligiblePackages.length > 0,
+      };
     }).sort((a, b) => {
       const aTime = Date.parse(a.updatedAt || "") || 0;
       const bTime = Date.parse(b.updatedAt || "") || 0;

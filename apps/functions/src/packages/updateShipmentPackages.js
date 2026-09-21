@@ -41,6 +41,9 @@ const {
 } = require("../../shared/sms-service");
 const { defineSecret } = require("firebase-functions/params");
 const { canAccessRecord } = require("../manager/managerAccess");
+const {
+  shipmentInvoicingSummary,
+} = require("../invoices/packageInvoiceScope.cjs");
 
 const SMTP_EMAIL = defineSecret("SMTP_EMAIL");
 const SMTP_PASSWORD = defineSecret("SMTP_PASSWORD");
@@ -867,6 +870,11 @@ exports.updateShipmentPackages = onCall(
         });
       }
 
+      finalPackages = finalPackages.map((pkg) => ({
+        ...pkg,
+        billingStatus: pkg.billingStatus || "NOT_INVOICED",
+      }));
+
       // -----------------------------
       // 4. RECALCULATE TOTALS
       // -----------------------------
@@ -929,6 +937,21 @@ exports.updateShipmentPackages = onCall(
       const packageBarcodes = finalPackages
         .map((pkg) => getPackageIdentity(pkg))
         .filter(Boolean);
+      const hasLegacyWholeShipmentInvoice =
+        oldData.hasInvoice === true &&
+        Boolean(oldData.invoiceId || oldData.invoiceNumber) &&
+        String(oldData.invoiceStatus || "DRAFT").toUpperCase() !==
+          "CANCELLED" &&
+        oldPackages.every(
+          (pkg) => !pkg.invoiceId && !pkg.invoiceNumber && !pkg.billingStatus,
+        );
+      const invoicingSummary = hasLegacyWholeShipmentInvoice
+        ? {
+            invoicingStatus: "FULLY_INVOICED",
+            invoicedPackageCount: finalPackages.length,
+            uninvoicedPackageCount: 0,
+          }
+        : shipmentInvoicingSummary(finalPackages);
       const activeTripIds = [
         ...new Set(
           finalPackages
@@ -995,6 +1018,7 @@ exports.updateShipmentPackages = onCall(
       // -----------------------------
       tx.update(shipmentRef, {
         packages: finalPackages,
+        ...invoicingSummary,
         packageBarcodes,
         currentTripIds: activeTripIds,
         currentTripId: singleCurrentTripId,

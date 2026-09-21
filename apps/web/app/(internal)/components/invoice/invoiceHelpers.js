@@ -73,6 +73,27 @@ function buildInitialForm(shipment, invoice, mode) {
   const recipientName =
     recipient.name ||
     (shipment?.id || shipment?.shipmentId ? "Unknown Recipient" : "");
+  const scopedPackages = Array.isArray(shipment?.invoiceEligiblePackages)
+    ? shipment.invoiceEligiblePackages
+    : Array.isArray(shipment?.packages)
+      ? shipment.packages
+      : [];
+  const scopedTotalItems = scopedPackages.reduce(
+    (sum, pkg) => sum + Math.max(Number(pkg.quantity) || 1, 1),
+    0,
+  );
+  const scopedShipment = shipment
+    ? {
+        ...shipment,
+        packages: scopedPackages,
+        totals: {
+          ...(shipment.totals || {}),
+          totalPackages: scopedPackages.length,
+          totalItems: scopedTotalItems,
+          totalContentQty: scopedTotalItems,
+        },
+      }
+    : null;
 
   if (mode === "edit" && invoice) {
     return {
@@ -104,14 +125,18 @@ function buildInitialForm(shipment, invoice, mode) {
         }),
       shipmentStatus: invoice.shipmentStatus || shipment?.status || "",
       truckTripId:
-        invoice.truckTripId || getShipmentTripId(shipment) || "",
+        invoice.tripId ||
+        invoice.truckTripId ||
+        shipment?.selectedTripId ||
+        getShipmentTripId(shipment) ||
+        "",
       totalPackages: invoice.totalPackages || shipment?.packages?.length || 0,
       totalItems: invoice.totalItems || shipment?.totals?.totalItems || 0,
       amount: invoice.amount ?? 0,
       notes: invoice.notes || "",
       status: invoice.status || "DRAFT",
       correctionReason: "",
-      shipmentSnapshot: invoice.shipmentSnapshot || shipment || null,
+      shipmentSnapshot: invoice.shipmentSnapshot || scopedShipment,
     };
   }
 
@@ -134,14 +159,14 @@ function buildInitialForm(shipment, invoice, mode) {
       destination: shipment?.destination || "Unknown",
     }),
     shipmentStatus: shipment?.status || "",
-    truckTripId: getShipmentTripId(shipment) || "",
-    totalPackages: shipment?.packages?.length || 0,
-    totalItems: shipment?.totals?.totalItems || 0,
+    truckTripId: shipment?.selectedTripId || getShipmentTripId(shipment) || "",
+    totalPackages: scopedPackages.length,
+    totalItems: scopedTotalItems,
     amount: 0,
     notes: "",
     status: "DRAFT",
     correctionReason: "",
-    shipmentSnapshot: shipment || null,
+    shipmentSnapshot: scopedShipment,
   };
 }
 

@@ -85,6 +85,10 @@ export default function StatusBadge({
     OPEN: "bg-slate-500/10 text-slate-300 border-slate-500/20",
     LOCKED: "bg-amber-500/10 text-amber-400 border-amber-500/20",
     UNLOADING: "bg-teal-500/10 text-teal-400 border-teal-500/20",
+    NOT_INVOICED: "bg-slate-500/10 text-slate-300 border-slate-500/20",
+    INVOICED: "bg-blue-500/10 text-blue-300 border-blue-500/20",
+    PARTIALLY_INVOICED: "bg-amber-500/10 text-amber-400 border-amber-500/20",
+    FULLY_INVOICED: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
 
     // --- NEW TRUCK ASSET STATUSES ---
     ACTIVE: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
@@ -141,6 +145,10 @@ export default function StatusBadge({
     OPEN: "bg-slate-500/15 text-slate-600 border-slate-300",
     LOCKED: "bg-amber-500/15 text-amber-700 border-amber-400/40",
     UNLOADING: "bg-teal-500/15 text-teal-600 border-teal-400/40",
+    NOT_INVOICED: "bg-slate-500/15 text-slate-600 border-slate-300",
+    INVOICED: "bg-blue-500/15 text-blue-600 border-blue-400/40",
+    PARTIALLY_INVOICED: "bg-amber-500/15 text-amber-700 border-amber-400/40",
+    FULLY_INVOICED: "bg-emerald-500/15 text-emerald-600 border-emerald-400/40",
 
     ACTIVE: "bg-emerald-500/15 text-emerald-600 border-emerald-400/40",
     IDLE: "bg-slate-500/15 text-slate-600 border-slate-400/40",

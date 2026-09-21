@@ -17,6 +17,7 @@ import { doc, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { formatAmount } from "../../invoice/invoiceHelpers";
 import InfoRow from "../../ui/InfoRow";
+import { invoicePackagesForDisplay } from "@/lib/packageInvoiceScope.mjs";
 
 function InvoicePrintView() {
   const searchParams = useSearchParams();
@@ -91,7 +92,7 @@ function InvoicePrintView() {
   const connectedShipment =
     shipment || invoice.shipment || invoice.shipmentSnapshot || null;
 
-  const packages = connectedShipment?.packages || [];
+  const packages = invoicePackagesForDisplay(invoice, connectedShipment);
   const senderName = invoice.senderName || connectedShipment?.sender?.name;
   const recipientName =
     invoice.recipientName || connectedShipment?.recipient?.name;

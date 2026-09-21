@@ -44,33 +44,46 @@ function clearSelectedShipment(form, truckTripId = "") {
 }
 
 function getShipmentPackageTotals(shipment = {}) {
-  const totalPackages = Array.isArray(shipment.packages)
-    ? shipment.packages.length
+  const hasInvoiceScope = Array.isArray(shipment.invoiceEligiblePackages);
+  const packages = hasInvoiceScope
+    ? shipment.invoiceEligiblePackages
+    : Array.isArray(shipment.packages)
+      ? shipment.packages
+      : [];
+  const totalPackages = packages.length
+    ? packages.length
     : Number(
         shipment.totals?.totalPackages ??
           shipment.metrics?.totalPackages ??
           0,
       );
 
-  const totalItems = Number(
-    shipment.totals?.totalContentQty ??
-      shipment.totals?.totalItems ??
-      shipment.items?.reduce?.(
+  const totalItems = hasInvoiceScope
+    ? packages.reduce(
         (total, item) => total + Number(item.quantity || 1),
         0,
-      ) ??
-      0,
-  );
+      )
+    : Number(
+        shipment.totals?.totalContentQty ??
+          shipment.totals?.totalItems ??
+          packages.reduce(
+            (total, item) => total + Number(item.quantity || 1),
+            0,
+          ),
+      );
 
   return { totalPackages, totalItems };
 }
 
-function shipmentCanBeInvoiced(shipment = {}, invoicedShipmentIds = new Set()) {
+function shipmentCanBeInvoiced(shipment = {}) {
   if (shipment.archived) return false;
   if (String(shipment.status || "").toUpperCase() === "CANCELLED") {
     return false;
   }
-  if (invoicedShipmentIds.has(shipment.id)) return false;
+
+  if (Array.isArray(shipment.invoiceEligiblePackages)) {
+    return shipment.invoiceEligiblePackages.length > 0;
+  }
 
   const invoiceStatus = String(shipment.invoiceStatus || "").toUpperCase();
   if (shipment.hasInvoice === true && invoiceStatus !== "CANCELLED") {
@@ -89,7 +102,6 @@ export default function InvoiceFormModal({
   invoice = null,
   trips = [],
   eligibleShipments = [],
-  invoicedShipmentIds = [],
   user = null,
   submissionError = "",
   onClose,
@@ -193,11 +205,6 @@ export default function InvoiceFormModal({
     );
   }, [form.truckTripId, tripOptions, tripQuery]);
 
-  const invoicedShipmentIdSet = useMemo(
-    () => new Set(invoicedShipmentIds.filter(Boolean)),
-    [invoicedShipmentIds],
-  );
-
   const filteredShipments = tripShipments.filter((item) => {
     const keyword = shipmentQuery.trim().toLowerCase();
     const sender = resolveInvoiceContact(item, "sender");
@@ -254,9 +261,7 @@ export default function InvoiceFormModal({
       if (tripRequestId.current !== requestId) return;
 
       setTripShipments(
-        (payload.shipments || []).filter((item) =>
-          shipmentCanBeInvoiced(item, invoicedShipmentIdSet),
-        ),
+        (payload.shipments || []).filter(shipmentCanBeInvoiced),
       );
     } catch (error) {
       if (tripRequestId.current !== requestId) return;
@@ -271,6 +276,9 @@ export default function InvoiceFormModal({
 
   const handleSelectShipment = (item) => {
     const { totalPackages, totalItems } = getShipmentPackageTotals(item);
+    const invoicePackages = Array.isArray(item.invoiceEligiblePackages)
+      ? item.invoiceEligiblePackages
+      : item.packages || [];
     const sender = resolveInvoiceContact(item, "sender");
     const recipient = resolveInvoiceContact(item, "recipient");
     const senderName = sender.name || "Unknown Sender";
@@ -293,7 +301,16 @@ export default function InvoiceFormModal({
       billingAddress: formatInvoiceContactAddress(sender),
       totalPackages,
       totalItems,
-      shipmentSnapshot: item,
+      shipmentSnapshot: {
+        ...item,
+        packages: invoicePackages,
+        totals: {
+          ...(item.totals || {}),
+          totalPackages,
+          totalItems,
+          totalContentQty: totalItems,
+        },
+      },
     }));
     setShowShipmentDropdown(false);
     setFormError("");
@@ -766,6 +783,35 @@ export default function InvoiceFormModal({
                       />
                     </div>
                   </div>
+
+                  {Array.isArray(form.shipmentSnapshot?.packages) &&
+                    form.shipmentSnapshot.packages.length > 0 && (
+                      <div className={`rounded-xl border ${modalTheme.panelSurface}`}>
+                        <div className="border-b px-4 py-3 text-xs font-bold uppercase tracking-widest">
+                          Packages included in this trip invoice
+                        </div>
+                        <div className="max-h-52 divide-y overflow-y-auto">
+                          {form.shipmentSnapshot.packages.map((pkg, index) => (
+                            <div
+                              key={pkg.packageId || pkg.trackingNumber || index}
+                              className="grid grid-cols-[1fr_auto] gap-3 px-4 py-3 text-sm"
+                            >
+                              <div>
+                                <div className="font-semibold">
+                                  {pkg.packageId || pkg.trackingNumber || "Package"}
+                                </div>
+                                <div className={modalTheme.bodyText}>
+                                  {pkg.description || "No description"}
+                                </div>
+                              </div>
+                              <div className="text-right">
+                                Qty {Number(pkg.quantity || 1)}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                 </section>
 
                 <section className="space-y-3">

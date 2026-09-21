@@ -26,6 +26,7 @@ import InfoBlock from "../ui/InfoBlock";
 import StatusButton from "../ui/StatusButton";
 import { invoiceUrl } from "@/app/utility/constant/templates";
 import { downloadPaymentProof } from "@/app/utility/FirebaseFunctions";
+import { invoicePackagesForDisplay } from "@/lib/packageInvoiceScope.mjs";
 
 export default function InvoiceDetailsModal({
   isOpen = false,
@@ -105,7 +106,7 @@ export default function InvoiceDetailsModal({
 
   const connectedShipment =
     shipment || invoice.shipment || invoice.shipmentSnapshot;
-  const packages = connectedShipment?.packages || [];
+  const packages = invoicePackagesForDisplay(invoice, connectedShipment);
   const status = invoice.status || "DRAFT";
 
   return (

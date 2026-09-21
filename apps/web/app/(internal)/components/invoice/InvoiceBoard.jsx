@@ -128,15 +128,6 @@ const InvoiceBoard = forwardRef(function InvoiceBoard(
     fetchInvoicesAndShipments();
   }, []);
 
-  const invoiceByShipmentId = useMemo(() => {
-    return invoices.reduce((acc, invoice) => {
-      if (invoice?.shipmentId && invoice.status !== "CANCELLED") {
-        acc[invoice.shipmentId] = invoice;
-      }
-      return acc;
-    }, {});
-  }, [invoices]);
-
   const mappedInvoices = useMemo(() => {
     return invoices.map((invoice) => {
       const shipment =
@@ -167,13 +158,11 @@ const InvoiceBoard = forwardRef(function InvoiceBoard(
 
   const eligibleShipments = useMemo(() => {
     return shipments.filter((shipment) => {
-      const hasInvoice = !!invoiceByShipmentId[shipment.id];
-      if (hasInvoice) return false;
       if (shipment.archived) return false;
       if (shipment.status === "CANCELLED") return false;
       return true;
     });
-  }, [shipments, invoiceByShipmentId]);
+  }, [shipments]);
 
   const counts = useMemo(() => {
     return {
@@ -298,7 +287,6 @@ const InvoiceBoard = forwardRef(function InvoiceBoard(
         invoice={selectedInvoice}
         trips={trips}
         eligibleShipments={eligibleShipments}
-        invoicedShipmentIds={Object.keys(invoiceByShipmentId)}
         user={user}
         submissionError={invoiceSubmitError}
         onClose={closeForm}

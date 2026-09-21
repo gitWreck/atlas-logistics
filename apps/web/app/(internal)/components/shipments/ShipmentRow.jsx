@@ -190,6 +190,15 @@ export default function ShipmentRow({
               isDark={isDark}
             />
 
+            {s.invoicingStatus && (
+              <StatusBadge
+                status={s.invoicingStatus}
+                label={formatStatusLabel(s.invoicingStatus)}
+                compact
+                isDark={isDark}
+              />
+            )}
+
             <span
               className={`text-xs md:text-xs font-mono border-l pl-2 shrink-0 ${theme.statsDivider}`}
             >

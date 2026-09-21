@@ -20,6 +20,11 @@ const {
   deliverOutboxDocument,
 } = require("./financeEventOutbox");
 const { paymentPayload } = require("./paymentFinancePayload.cjs");
+const {
+  invoicePackageIds,
+  shipmentInvoicingSummary,
+  updatePackageInvoiceStatus,
+} = require("./packageInvoiceScope.cjs");
 
 if (!admin.apps.length) admin.initializeApp();
 const db = admin.firestore();
@@ -192,6 +197,10 @@ const recordShipmentPayment = onCall({ region: "asia-southeast1", maxInstances: 
     if (referenceSnapshot?.exists) throw new HttpsError("already-exists", "This payment reference was already recorded for the invoice.");
     if (!invoiceSnapshot.exists) throw new HttpsError("not-found", "Invoice not found.");
     const invoice = invoiceSnapshot.data() || {};
+    const shipmentRef = invoice.shipmentId
+      ? db.collection("shipments").doc(invoice.shipmentId)
+      : null;
+    const shipmentSnapshot = shipmentRef ? await tx.get(shipmentRef) : null;
     if (actor.role === "manager" && !canAccessRecord(actor.profile, invoice)) throw new HttpsError("permission-denied", "This invoice is outside your assigned scope.");
     if (invoice.sourceReadOnly === true) throw new HttpsError("failed-precondition", "This invoice is not owned by Atlas Transport.");
     if (!["ISSUED", "PAID"].includes(clean(invoice.status, 40).toUpperCase())) throw new HttpsError("failed-precondition", "Only an issued invoice can receive a payment.");
@@ -223,12 +232,30 @@ const recordShipmentPayment = onCall({ region: "asia-southeast1", maxInstances: 
     const outboxId = outboxDocumentId(envelope);
     const now = Timestamp.now();
     const nextPaid = previouslyPaid + amountCentavos;
+    const nextInvoiceStatus = nextPaid === invoiceCentavos ? "PAID" : "ISSUED";
     tx.create(db.collection("shipmentPayments").doc(paymentId), { ...payment, amount: amountCentavos / 100, receivedAt: Timestamp.fromMillis(receivedAtMs), paymentDate: Timestamp.fromMillis(receivedAtMs), sourceSystem: "atlas-tracking", immutable: true, warehouseId: invoice.warehouseId || invoice.shipmentSnapshot?.warehouseId || null, warehouseCode: invoice.warehouseCode || invoice.shipmentSnapshot?.warehouseCode || null, origin: invoice.origin || invoice.shipmentSnapshot?.origin || null, destination: invoice.destination || invoice.shipmentSnapshot?.destination || null, createdBy: actor.uid, createdByName: actor.name, createdAt: now, updatedAt: now });
     tx.create(db.collection("financeEventOutbox").doc(outboxId), outboxRecord(envelope, now));
     tx.create(requestRef, { paymentId, outboxId, actorId: actor.uid, requestId, createdAt: now });
     if (referenceRef) tx.create(referenceRef, { paymentId, invoiceId, referenceNumber, createdAt: now });
     proofRefs.forEach((proofRef) => tx.update(proofRef, { status: "BOUND", paymentId, paymentNumber, boundAt: now, updatedAt: now }));
-    tx.update(invoiceRef, { amountPaidCentavos: nextPaid, balanceCentavos: invoiceCentavos - nextPaid, status: nextPaid === invoiceCentavos ? "PAID" : "ISSUED", lastPaymentId: paymentId, lastPaymentProofs: proofDocuments, updatedBy: actor.name, updatedAt: now });
+    tx.update(invoiceRef, { amountPaidCentavos: nextPaid, balanceCentavos: invoiceCentavos - nextPaid, status: nextInvoiceStatus, lastPaymentId: paymentId, lastPaymentProofs: proofDocuments, updatedBy: actor.name, updatedAt: now });
+    if (shipmentRef && shipmentSnapshot?.exists) {
+      const shipment = shipmentSnapshot.data() || {};
+      const updatedPackages = updatePackageInvoiceStatus(
+        Array.isArray(shipment.packages) ? shipment.packages : [],
+        invoicePackageIds(invoice),
+        nextInvoiceStatus,
+      );
+      tx.set(shipmentRef, {
+        packages: updatedPackages,
+        ...shipmentInvoicingSummary(updatedPackages),
+        ...(shipment.invoiceId === invoiceId
+          ? { invoiceStatus: nextInvoiceStatus }
+          : {}),
+        updatedAt: now,
+        updatedBy: actor.name,
+      }, { merge: true });
+    }
     tx.create(db.collection("invoice_events").doc(), { invoiceId, invoiceNumber: invoice.invoiceNumber || invoiceId, shipmentId: invoice.shipmentId || null, type: "PAYMENT_RECORDED", paymentId, paymentNumber, amountCentavos, proofDocumentIds, actorId: actor.uid, at: now, note: `Payment ${paymentNumber} recorded` });
     return { duplicate: false, paymentId, paymentNumber, outboxId, proofDocuments };
   });
@@ -257,6 +284,10 @@ const reverseShipmentPayment = onCall({ region: "asia-southeast1", maxInstances:
     ]);
     if (!invoiceSnapshot.exists) throw new HttpsError("failed-precondition", "The payment invoice no longer exists.");
     const invoice = invoiceSnapshot.data() || {};
+    const shipmentRef = invoice.shipmentId
+      ? db.collection("shipments").doc(invoice.shipmentId)
+      : null;
+    const shipmentSnapshot = shipmentRef ? await tx.get(shipmentRef) : null;
     if (actor.role === "manager" && !canAccessRecord(actor.profile, invoice)) throw new HttpsError("permission-denied", "This payment is outside your assigned scope.");
     const sourceVersion = Number(payment.sourceVersion || 1) + 1;
     const next = { ...payment, id: paymentId, sourceVersion, status: "REVERSED", reversalReason: reason };
@@ -271,7 +302,25 @@ const reverseShipmentPayment = onCall({ region: "asia-southeast1", maxInstances:
     tx.update(paymentRef, { status: "REVERSED", sourceVersion, reversalReason: reason, reversedBy: actor.uid, reversedByName: actor.name, reversedAt: now, updatedAt: now });
     tx.create(db.collection("financeEventOutbox").doc(outboxId), outboxRecord(envelope, now));
     tx.create(requestRef, { paymentId, outboxId, actorId: actor.uid, requestId, createdAt: now });
-    tx.update(invoiceRef, { amountPaidCentavos: paid, balanceCentavos: Math.max(0, total - paid), status: paid === total && total > 0 ? "PAID" : "ISSUED", lastPaymentId: priorActive?.id || null, lastPaymentProofs: priorActive?.data()?.proofDocuments || [], updatedBy: actor.name, updatedAt: now });
+    const nextInvoiceStatus = paid === total && total > 0 ? "PAID" : "ISSUED";
+    tx.update(invoiceRef, { amountPaidCentavos: paid, balanceCentavos: Math.max(0, total - paid), status: nextInvoiceStatus, lastPaymentId: priorActive?.id || null, lastPaymentProofs: priorActive?.data()?.proofDocuments || [], updatedBy: actor.name, updatedAt: now });
+    if (shipmentRef && shipmentSnapshot?.exists) {
+      const shipment = shipmentSnapshot.data() || {};
+      const updatedPackages = updatePackageInvoiceStatus(
+        Array.isArray(shipment.packages) ? shipment.packages : [],
+        invoicePackageIds(invoice),
+        nextInvoiceStatus,
+      );
+      tx.set(shipmentRef, {
+        packages: updatedPackages,
+        ...shipmentInvoicingSummary(updatedPackages),
+        ...(shipment.invoiceId === payment.invoiceId
+          ? { invoiceStatus: nextInvoiceStatus }
+          : {}),
+        updatedAt: now,
+        updatedBy: actor.name,
+      }, { merge: true });
+    }
     tx.create(db.collection("invoice_events").doc(), { invoiceId: payment.invoiceId, invoiceNumber: invoice.invoiceNumber || payment.invoiceId, shipmentId: invoice.shipmentId || null, type: "PAYMENT_REVERSED", paymentId, amountCentavos: payment.amountCentavos, reason, actorId: actor.uid, at: now, note: `Payment ${payment.paymentNumber || paymentId} reversed` });
     return { duplicate: false, paymentId, outboxId };
   });

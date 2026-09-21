@@ -14,6 +14,12 @@ const {
   deliverOutboxDocument,
 } = require("./financeEventOutbox");
 const { paymentPayload } = require("./paymentFinancePayload.cjs");
+const {
+  invoicePackageIds,
+  packageReservationId,
+  releaseInvoiceFromPackages,
+  shipmentInvoicingSummary,
+} = require("./packageInvoiceScope.cjs");
 
 if (!admin.apps.length) admin.initializeApp();
 const db = admin.firestore();
@@ -119,18 +125,57 @@ exports.cleanupDeletedInvoice = onDocumentDeleted(
     if (!shipmentId) return;
 
     const shipmentRef = db.collection("shipments").doc(shipmentId);
+    const packageIds = invoicePackageIds(deletedInvoice);
 
     await db.runTransaction(async (transaction) => {
-      const shipmentSnap = await transaction.get(shipmentRef);
+      const [shipmentSnap, remainingInvoices] = await Promise.all([
+        transaction.get(shipmentRef),
+        transaction.get(
+          db.collection("invoices").where("shipmentId", "==", shipmentId),
+        ),
+      ]);
       if (!shipmentSnap.exists) return;
 
       const shipment = shipmentSnap.data() || {};
-      if (!shouldClearDeletedInvoiceLink(shipment, invoiceId)) return;
+      const updatedPackages = releaseInvoiceFromPackages(
+        Array.isArray(shipment.packages) ? shipment.packages : [],
+        invoiceId,
+      );
+      const replacementInvoice = remainingInvoices.docs
+        .map((document) => ({ id: document.id, ...(document.data() || {}) }))
+        .find(
+          (invoice) =>
+            String(invoice.status || "DRAFT").toUpperCase() !== "CANCELLED",
+        );
+      const clearsCurrentLink = shouldClearDeletedInvoiceLink(
+        shipment,
+        invoiceId,
+      );
 
       transaction.update(shipmentRef, {
-        ...clearedInvoiceLinkFields(),
+        packages: updatedPackages,
+        ...shipmentInvoicingSummary(updatedPackages),
+        ...(clearsCurrentLink
+          ? replacementInvoice
+            ? {
+                invoiceId: replacementInvoice.id,
+                invoiceNumber:
+                  replacementInvoice.invoiceNumber || replacementInvoice.id,
+                invoiceStatus: replacementInvoice.status || "DRAFT",
+                hasInvoice: true,
+              }
+            : clearedInvoiceLinkFields()
+          : {}),
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
         updatedBy: "system:invoice-delete-cleanup",
+      });
+
+      packageIds.forEach((packageId) => {
+        transaction.delete(
+          db
+            .collection("packageInvoiceReservations")
+            .doc(packageReservationId(shipmentId, packageId)),
+        );
       });
     });
   },

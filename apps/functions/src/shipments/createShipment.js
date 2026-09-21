@@ -308,6 +308,9 @@ exports.createShipment = onCall(
       proofOfReceipt,
       packages: packagesArray,
       packageBarcodes,
+      invoicingStatus: "NOT_INVOICED",
+      invoicedPackageCount: 0,
+      uninvoicedPackageCount: packagesArray.length,
     });
 
     writeShipmentActionLog({

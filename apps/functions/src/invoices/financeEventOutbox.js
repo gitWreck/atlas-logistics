@@ -81,6 +81,13 @@ function invoicePayload(invoice, invoiceId) {
     invoiceNumber: invoice.invoiceNumber || invoiceId,
     shipmentId: invoice.shipmentId || null,
     tripId: invoice.tripId || invoice.truckTripId || null,
+    packageIds: Array.isArray(invoice.packageIds) ? invoice.packageIds : [],
+    packageAssignmentIds: Array.isArray(invoice.packageAssignmentIds)
+      ? invoice.packageAssignmentIds
+      : [],
+    packageLineItems: Array.isArray(invoice.packageLineItems)
+      ? invoice.packageLineItems
+      : [],
     customerId: invoice.customerId || invoice.shipmentSnapshot?.sender?.uid || null,
     customerName: invoice.billingName || invoice.senderName || null,
     billingName: invoice.billingName || null,

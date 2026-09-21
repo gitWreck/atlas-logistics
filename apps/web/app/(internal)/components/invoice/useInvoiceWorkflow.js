@@ -18,8 +18,20 @@ function getInvoiceSubmitError(error) {
     return "Billing Name is required. This shipment has no receiver information, so enter the billing name manually or update the shipment.";
   }
 
+  if (/legacy whole-shipment invoice/i.test(rawMessage)) {
+    return "An older whole-shipment invoice already covers every package in this shipment.";
+  }
+
+  if (/every package loaded on this trip already has an active invoice/i.test(rawMessage)) {
+    return "Every package loaded on this trip is already invoiced.";
+  }
+
+  if (/one or more packages were already invoiced/i.test(rawMessage)) {
+    return "One or more selected packages were just invoiced. Refresh and try again.";
+  }
+
   if (/already exists/i.test(rawMessage)) {
-    return "An active invoice already exists for this shipment.";
+    return "An active invoice already covers the selected package(s).";
   }
 
   if (/does not belong to the selected trip/i.test(rawMessage)) {
