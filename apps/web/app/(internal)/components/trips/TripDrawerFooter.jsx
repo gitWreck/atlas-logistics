@@ -5,6 +5,8 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faArchive,
   faBan,
+  faChevronDown,
+  faChevronUp,
   faClipboardList,
   faLock,
   faUnlock,
@@ -68,6 +70,7 @@ export default function TripDrawerFooter({
   const [cancelOpen, setCancelOpen] = useState(false);
   const [archiveOpen, setArchiveOpen] = useState(false);
   const [auditOpen, setAuditOpen] = useState(false);
+  const [showDetails, setShowDetails] = useState(true);
 
   const theme = getDrawerThemeClasses(isDark);
 
@@ -103,7 +106,8 @@ export default function TripDrawerFooter({
   const showCancelTrip = canManageLifecycle && canCancelTrip(data);
   const showArchiveTrip = canManageLifecycle && canArchiveTrip(data);
   const showLifecycleSection = showCancelTrip || showArchiveTrip || canAudit;
-  const completedTrip = String(data.status || "").toUpperCase() === "COMPLETED" ||
+  const completedTrip =
+    String(data.status || "").toUpperCase() === "COMPLETED" ||
     String(data.status || "").toUpperCase() === "DELIVERED";
   const invoiceSummary = summarizeTripInvoices(shipments);
 
@@ -118,238 +122,263 @@ export default function TripDrawerFooter({
 
   return (
     <div className={`p-4 border-t flex flex-col gap-3 ${theme.footerPanel}`}>
-      <div className={`rounded-lg border px-3 py-2 text-xs ${theme.footerPanel}`}>
+      <div
+        className={`rounded-lg border px-3 py-2 text-xs ${theme.footerPanel}`}
+      >
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <span className="font-bold uppercase opacity-60">Manifest</span>
             <span className="ml-2 font-semibold">{manifestStatusLabel}</span>
             <span className="ml-2 opacity-50">({manifestStatus})</span>
           </div>
-          <div
-            className={`flex items-center gap-3 rounded-md border px-3 py-1.5 ${
-              isDark
-                ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-300"
-                : "border-emerald-200 bg-emerald-50 text-emerald-700"
-            }`}
-          >
-            <span>
-              <span className="font-bold">Invoices:</span>{" "}
-              {invoiceSummary.count}
-            </span>
-            <span className="h-4 w-px bg-current opacity-20" />
-            <span>
-              <span className="font-bold">Total:</span>{" "}
-              {formatAmount(invoiceSummary.totalAmount)}
-            </span>
+          <div className="flex flex-wrap items-center gap-2">
+            <div
+              className={`flex items-center gap-3 rounded-md border px-3 py-1.5 ${
+                isDark
+                  ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-300"
+                  : "border-emerald-200 bg-emerald-50 text-emerald-700"
+              }`}
+            >
+              <span>
+                <span className="font-bold">Invoices:</span>{" "}
+                {invoiceSummary.count}
+              </span>
+              <span className="h-4 w-px bg-current opacity-20" />
+              <span>
+                <span className="font-bold">Total:</span>{" "}
+                {formatAmount(invoiceSummary.totalAmount)}
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowDetails((visible) => !visible)}
+              aria-expanded={showDetails}
+              aria-controls="trip-manifest-details"
+              className={`inline-flex items-center justify-center gap-2 rounded-md border px-3 py-1.5 font-semibold transition-colors ${
+                isDark
+                  ? "border-slate-600 text-slate-200 hover:bg-slate-700"
+                  : "border-slate-300 text-slate-700 hover:bg-slate-100"
+              }`}
+            >
+              <FontAwesomeIcon
+                icon={showDetails ? faChevronUp : faChevronDown}
+              />
+              {showDetails ? "Hide details" : "Show details"}
+            </button>
           </div>
         </div>
-        {manifestStatus === MANIFEST_STATUS.RECONCILED && !isAdmin && (
-          <p className="mt-2 text-[11px] opacity-70">
-            Reconciled manifests can only be unlocked by an Admin.
-          </p>
-        )}
-        {manifestEditable && manifestStatus !== MANIFEST_STATUS.OPEN && (
-          <p className="mt-2 text-[11px] text-amber-500">
-            Manifest is open for edits. Add shipments, scan loads/unloads, then
-            lock again when done.
-          </p>
-        )}
       </div>
 
-      {canEditManifestControls && isHubTrip && (
-        <div className="flex flex-col gap-2">
-          {showDispatchCorrection ? (
-            <StatusButton
-              status={dispatchStatus}
-              label="Dispatch Correction"
-              loadingLabel="Dispatching..."
-              successLabel="Dispatched!"
-              icon={faTruck}
-              variant="blue"
-              onClick={() =>
-                runAction(
-                  setDispatchStatus,
-                  () =>
-                    dispatchTrip({
-                      tripId: tripDocId,
-                      updatedBy: updatedBy(profile),
-                    }),
-                  () => onSuccess?.(),
-                )
-              }
-            />
-          ) : showDispatchTrip ? (
-            <StatusButton
-              status={dispatchStatus}
-              label="Dispatch Trip"
-              loadingLabel="Dispatching..."
-              successLabel="Dispatched!"
-              icon={faTruck}
-              variant="blue"
-              onClick={() =>
-                runAction(
-                  setDispatchStatus,
-                  () =>
-                    dispatchTrip({
-                      tripId: tripDocId,
-                      updatedBy: updatedBy(profile),
-                    }),
-                  () => onSuccess?.(),
-                )
-              }
-            />
-          ) : (
-            manifestStatus === MANIFEST_STATUS.LOCKED &&
-            dispatchBlockReason && (
-              <p className={`text-xs px-1 ${theme.mutedText}`}>
-                {dispatchBlockReason}
-              </p>
-            )
+      {showDetails && (
+        <div id="trip-manifest-details" className="flex flex-col gap-3">
+          {manifestStatus === MANIFEST_STATUS.RECONCILED && !isAdmin && (
+            <p className="px-1 text-[11px] opacity-70">
+              Reconciled manifests can only be unlocked by an Admin.
+            </p>
+          )}
+          {manifestEditable && manifestStatus !== MANIFEST_STATUS.OPEN && (
+            <p className="px-1 text-[11px] text-amber-500">
+              Manifest is open for edits. Add shipments, scan loads/unloads,
+              then lock again when done.
+            </p>
           )}
 
-          {showResumeReceiving ? (
-            <StatusButton
-              status={receivingStatus}
-              label="Resume Receiving"
-              loadingLabel="Resuming..."
-              successLabel="Receiving resumed!"
-              icon={faTruckRampBox}
-              variant="emerald"
-              onClick={() =>
-                runAction(
-                  setReceivingStatus,
-                  () =>
-                    startReceiving({
-                      tripId: tripDocId,
-                      updatedBy: updatedBy(profile),
-                    }),
-                  () => onSuccess?.(),
+          {canEditManifestControls && isHubTrip && (
+            <div className="flex flex-col gap-2">
+              {showDispatchCorrection ? (
+                <StatusButton
+                  status={dispatchStatus}
+                  label="Dispatch Correction"
+                  loadingLabel="Dispatching..."
+                  successLabel="Dispatched!"
+                  icon={faTruck}
+                  variant="blue"
+                  onClick={() =>
+                    runAction(
+                      setDispatchStatus,
+                      () =>
+                        dispatchTrip({
+                          tripId: tripDocId,
+                          updatedBy: updatedBy(profile),
+                        }),
+                      () => onSuccess?.(),
+                    )
+                  }
+                />
+              ) : showDispatchTrip ? (
+                <StatusButton
+                  status={dispatchStatus}
+                  label="Dispatch Trip"
+                  loadingLabel="Dispatching..."
+                  successLabel="Dispatched!"
+                  icon={faTruck}
+                  variant="blue"
+                  onClick={() =>
+                    runAction(
+                      setDispatchStatus,
+                      () =>
+                        dispatchTrip({
+                          tripId: tripDocId,
+                          updatedBy: updatedBy(profile),
+                        }),
+                      () => onSuccess?.(),
+                    )
+                  }
+                />
+              ) : (
+                manifestStatus === MANIFEST_STATUS.LOCKED &&
+                dispatchBlockReason && (
+                  <p className={`text-xs px-1 ${theme.mutedText}`}>
+                    {dispatchBlockReason}
+                  </p>
                 )
-              }
-            />
-          ) : showStartReceiving ? (
-            <StatusButton
-              status={receivingStatus}
-              label="Start Receiving"
-              loadingLabel="Starting..."
-              successLabel="Receiving started!"
-              icon={faTruckRampBox}
-              variant="emerald"
-              onClick={() =>
-                runAction(
-                  setReceivingStatus,
-                  () =>
-                    startReceiving({
-                      tripId: tripDocId,
-                      updatedBy: updatedBy(profile),
-                    }),
-                  () => onSuccess?.(),
-                )
-              }
-            />
-          ) : null}
-        </div>
-      )}
+              )}
 
-      {canEditManifestControls && showUnlockReason && (
-        <div
-          className={`p-3 rounded-xl border animate-in slide-in-from-bottom-2 duration-200 ${theme.reasonBox}`}
-        >
-          <div className="flex justify-between items-center mb-2">
-            <label className={theme.reasonLabel}>
-              Reason for Unlocking Manifest
-            </label>
-
-            <button
-              type="button"
-              onClick={() => {
-                setShowUnlockReason(false);
-                setUnlockReason("");
-              }}
-              className={theme.closeButton}
-            >
-              <FontAwesomeIcon icon={faTimes} />
-            </button>
-          </div>
-
-          <textarea
-            autoFocus
-            value={unlockReason}
-            onChange={(e) => setUnlockReason(e.target.value)}
-            placeholder="Please explain why the manifest is being unlocked..."
-            className={`w-full p-3 rounded-lg text-xs min-h-[80px] outline-none focus:ring-1 focus:ring-amber-500 transition-all border ${theme.textarea}`}
-          />
-        </div>
-      )}
-
-      {canViewManifestControls && (
-        <div className="flex gap-3">
-          <StatusButton
-            status={lockStatus}
-            label="Lock Manifest"
-            loadingLabel="Locking..."
-            successLabel="Locked!"
-            icon={faLock}
-            // idleColor="bg-emerald-600/20 hover:bg-emerald-600/40 text-emerald-400 border border-emerald-500/30"
-            variant="emerald"
-            disabled={!canEditManifestControls || isLocked || showUnlockReason}
-            onClick={() =>
-              runAction(
-                setLockStatus,
-                () =>
-                  generateTripManifest({
-                    tripId: tripDocId,
-                    updatedBy: updatedBy(profile),
-                  }),
-                () => onSuccess?.(),
-              )
-            }
-          />
-
-          {!showUnlockReason ? (
-            <button
-              type="button"
-              disabled={!canEditManifestControls || !canUnlock}
-              onClick={() => setShowUnlockReason(true)}
-              className={theme.warningOutlineButton}
-              title={
-                manifestStatus === MANIFEST_STATUS.RECONCILED && !isAdmin
-                  ? "Only Admin can unlock a reconciled manifest"
-                  : undefined
-              }
-            >
-              <FontAwesomeIcon icon={faUnlock} />
-              Unlock Manifest
-            </button>
-          ) : (
-            <StatusButton
-              status={unlockStatus}
-              label="Confirm Unlock"
-              loadingLabel="Unlocking..."
-              successLabel="Unlocked!"
-              icon={faUnlock}
-              // idleColor="bg-amber-600 text-white shadow-lg shadow-amber-600/20"
-              variant="amber"
-              disabled={!unlockReason.trim()}
-              onClick={() =>
-                runAction(
-                  setUnlockStatus,
-                  () =>
-                    unlockTripManifest({
-                      tripId: tripDocId,
-                      reason: unlockReason,
-                      updatedBy: updatedBy(profile),
-                    }),
-                  () => {
-                    onSuccess?.();
-                    handleUnlockSuccess();
-                  },
-                )
-              }
-            />
+              {showResumeReceiving ? (
+                <StatusButton
+                  status={receivingStatus}
+                  label="Resume Receiving"
+                  loadingLabel="Resuming..."
+                  successLabel="Receiving resumed!"
+                  icon={faTruckRampBox}
+                  variant="emerald"
+                  onClick={() =>
+                    runAction(
+                      setReceivingStatus,
+                      () =>
+                        startReceiving({
+                          tripId: tripDocId,
+                          updatedBy: updatedBy(profile),
+                        }),
+                      () => onSuccess?.(),
+                    )
+                  }
+                />
+              ) : showStartReceiving ? (
+                <StatusButton
+                  status={receivingStatus}
+                  label="Start Receiving"
+                  loadingLabel="Starting..."
+                  successLabel="Receiving started!"
+                  icon={faTruckRampBox}
+                  variant="emerald"
+                  onClick={() =>
+                    runAction(
+                      setReceivingStatus,
+                      () =>
+                        startReceiving({
+                          tripId: tripDocId,
+                          updatedBy: updatedBy(profile),
+                        }),
+                      () => onSuccess?.(),
+                    )
+                  }
+                />
+              ) : null}
+            </div>
           )}
 
-          {/* <StatusButton
+          {canEditManifestControls && showUnlockReason && (
+            <div
+              className={`p-3 rounded-xl border animate-in slide-in-from-bottom-2 duration-200 ${theme.reasonBox}`}
+            >
+              <div className="flex justify-between items-center mb-2">
+                <label className={theme.reasonLabel}>
+                  Reason for Unlocking Manifest
+                </label>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowUnlockReason(false);
+                    setUnlockReason("");
+                  }}
+                  className={theme.closeButton}
+                >
+                  <FontAwesomeIcon icon={faTimes} />
+                </button>
+              </div>
+
+              <textarea
+                autoFocus
+                value={unlockReason}
+                onChange={(e) => setUnlockReason(e.target.value)}
+                placeholder="Please explain why the manifest is being unlocked..."
+                className={`w-full p-3 rounded-lg text-xs min-h-[80px] outline-none focus:ring-1 focus:ring-amber-500 transition-all border ${theme.textarea}`}
+              />
+            </div>
+          )}
+
+          {canViewManifestControls && (
+            <div className="flex gap-3">
+              <StatusButton
+                status={lockStatus}
+                label="Lock Manifest"
+                loadingLabel="Locking..."
+                successLabel="Locked!"
+                icon={faLock}
+                // idleColor="bg-emerald-600/20 hover:bg-emerald-600/40 text-emerald-400 border border-emerald-500/30"
+                variant="emerald"
+                disabled={
+                  !canEditManifestControls || isLocked || showUnlockReason
+                }
+                onClick={() =>
+                  runAction(
+                    setLockStatus,
+                    () =>
+                      generateTripManifest({
+                        tripId: tripDocId,
+                        updatedBy: updatedBy(profile),
+                      }),
+                    () => onSuccess?.(),
+                  )
+                }
+              />
+
+              {!showUnlockReason ? (
+                <button
+                  type="button"
+                  disabled={!canEditManifestControls || !canUnlock}
+                  onClick={() => setShowUnlockReason(true)}
+                  className={theme.warningOutlineButton}
+                  title={
+                    manifestStatus === MANIFEST_STATUS.RECONCILED && !isAdmin
+                      ? "Only Admin can unlock a reconciled manifest"
+                      : undefined
+                  }
+                >
+                  <FontAwesomeIcon icon={faUnlock} />
+                  Unlock Manifest
+                </button>
+              ) : (
+                <StatusButton
+                  status={unlockStatus}
+                  label="Confirm Unlock"
+                  loadingLabel="Unlocking..."
+                  successLabel="Unlocked!"
+                  icon={faUnlock}
+                  // idleColor="bg-amber-600 text-white shadow-lg shadow-amber-600/20"
+                  variant="amber"
+                  disabled={!unlockReason.trim()}
+                  onClick={() =>
+                    runAction(
+                      setUnlockStatus,
+                      () =>
+                        unlockTripManifest({
+                          tripId: tripDocId,
+                          reason: unlockReason,
+                          updatedBy: updatedBy(profile),
+                        }),
+                      () => {
+                        onSuccess?.();
+                        handleUnlockSuccess();
+                      },
+                    )
+                  }
+                />
+              )}
+
+              {/* <StatusButton
           status={reopenStatus}
           label="Reopen"
           loadingLabel="..."
@@ -372,94 +401,96 @@ export default function TripDrawerFooter({
             }
           }}
         /> */}
-        </div>
-      )}
+            </div>
+          )}
 
-      <div className="flex flex-wrap gap-3 pt-1">
-        <button
-          type="button"
-          disabled={showUnlockReason}
-          onClick={() =>
-            window.open(
-              `/components/print/manifest?tripId=${tripDocId}`,
-              "_blank",
-            )
-          }
-          className={`${theme.secondaryActionButton} ${
-            showUnlockReason ? "opacity-30 pointer-events-none" : ""
-          }`}
-        >
-          <FontAwesomeIcon icon={faPrint} />
-          Print Manifest
-        </button>
+          <div className="flex flex-wrap gap-3 pt-1">
+            <button
+              type="button"
+              disabled={showUnlockReason}
+              onClick={() =>
+                window.open(
+                  `/components/print/manifest?tripId=${tripDocId}`,
+                  "_blank",
+                )
+              }
+              className={`${theme.secondaryActionButton} ${
+                showUnlockReason ? "opacity-30 pointer-events-none" : ""
+              }`}
+            >
+              <FontAwesomeIcon icon={faPrint} />
+              Print Manifest
+            </button>
 
-        {data.latestAmendmentId ? (
-          <button
-            type="button"
-            disabled={showUnlockReason}
-            onClick={() =>
-              window.open(
-                `/components/print/manifest-amendment?amendmentId=${data.latestAmendmentId}`,
-                "_blank",
-              )
-            }
-            className={`${theme.secondaryActionButton} ${
-              showUnlockReason ? "opacity-30 pointer-events-none" : ""
-            }`}
-          >
-            <FontAwesomeIcon icon={faPrint} />
-            Print Addendum
-            {data.latestAmendmentVersion
-              ? ` (${data.latestAmendmentVersion})`
-              : ""}
-          </button>
-        ) : null}
-
-        <ExportTripButton trip={data} user={user} />
-      </div>
-
-      {showLifecycleSection && (
-        <div
-          className={`rounded-lg border px-3 py-3 flex flex-col gap-2 ${theme.footerPanel}`}
-        >
-          <span className="text-[10px] font-bold uppercase opacity-60">
-            Trip Lifecycle
-          </span>
-          <div className="flex flex-wrap gap-2">
-            {showCancelTrip && (
+            {data.latestAmendmentId ? (
               <button
                 type="button"
                 disabled={showUnlockReason}
-                onClick={() => setCancelOpen(true)}
-                className={theme.warningOutlineButton}
+                onClick={() =>
+                  window.open(
+                    `/components/print/manifest-amendment?amendmentId=${data.latestAmendmentId}`,
+                    "_blank",
+                  )
+                }
+                className={`${theme.secondaryActionButton} ${
+                  showUnlockReason ? "opacity-30 pointer-events-none" : ""
+                }`}
               >
-                <FontAwesomeIcon icon={faBan} />
-                Cancel Trip
+                <FontAwesomeIcon icon={faPrint} />
+                Print Addendum
+                {data.latestAmendmentVersion
+                  ? ` (${data.latestAmendmentVersion})`
+                  : ""}
               </button>
-            )}
-            {showArchiveTrip && (
-              <button
-                type="button"
-                disabled={showUnlockReason}
-                onClick={() => setArchiveOpen(true)}
-                className={theme.secondaryActionButton}
-              >
-                <FontAwesomeIcon icon={faArchive} />
-                Archive Trip
-              </button>
-            )}
-            {canAudit && (
-              <button
-                type="button"
-                disabled={showUnlockReason}
-                onClick={() => setAuditOpen(true)}
-                className={theme.secondaryActionButton}
-              >
-                <FontAwesomeIcon icon={faClipboardList} />
-                View Audit Log
-              </button>
-            )}
+            ) : null}
+
+            <ExportTripButton trip={data} user={user} />
           </div>
+
+          {showLifecycleSection && (
+            <div
+              className={`rounded-lg border px-3 py-3 flex flex-col gap-2 ${theme.footerPanel}`}
+            >
+              <span className="text-[10px] font-bold uppercase opacity-60">
+                Trip Lifecycle
+              </span>
+              <div className="flex flex-wrap gap-2">
+                {showCancelTrip && (
+                  <button
+                    type="button"
+                    disabled={showUnlockReason}
+                    onClick={() => setCancelOpen(true)}
+                    className={theme.warningOutlineButton}
+                  >
+                    <FontAwesomeIcon icon={faBan} />
+                    Cancel Trip
+                  </button>
+                )}
+                {showArchiveTrip && (
+                  <button
+                    type="button"
+                    disabled={showUnlockReason}
+                    onClick={() => setArchiveOpen(true)}
+                    className={theme.secondaryActionButton}
+                  >
+                    <FontAwesomeIcon icon={faArchive} />
+                    Archive Trip
+                  </button>
+                )}
+                {canAudit && (
+                  <button
+                    type="button"
+                    disabled={showUnlockReason}
+                    onClick={() => setAuditOpen(true)}
+                    className={theme.secondaryActionButton}
+                  >
+                    <FontAwesomeIcon icon={faClipboardList} />
+                    View Audit Log
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
         </div>
       )}
 
