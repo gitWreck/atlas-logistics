@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { adminAuth, adminDb } from "@/lib/firebase-admin";
 import { headers } from "next/headers";
-import { invoiceBelongsToTrip } from "@/lib/invoiceTripMembership.mjs";
+import { withTripInvoiceContext } from "@/lib/tripInvoiceContext.mjs";
 
 export async function getManifestTripShipments(tripId) {
   const normalizedTripId = String(tripId || "").trim();
@@ -53,28 +53,10 @@ export async function getManifestTripShipments(tripId) {
     collectActorUids(data, actorUidSet);
   });
 
-  const activeInvoiceIds = [
-    ...new Set(
-      Object.values(rootMap)
-        .filter(
-          (shipment) =>
-            shipment?.invoiceId &&
-            String(shipment.invoiceStatus || "").toUpperCase() !== "CANCELLED",
-        )
-        .map((shipment) => String(shipment.invoiceId)),
-    ),
-  ];
-  const invoiceRefs = activeInvoiceIds.map((id) =>
-    adminDb.collection("invoices").doc(id),
-  );
-  const [actorNameByUid, invoiceSnaps] = await Promise.all([
+  const [actorNameByUid, invoicesByShipment] = await Promise.all([
     resolveUserDisplayNames([...actorUidSet]),
-    invoiceRefs.length ? adminDb.getAll(...invoiceRefs) : [],
+    fetchInvoicesByShipment(shipmentIds, rootMap),
   ]);
-  const invoiceMap = {};
-  invoiceSnaps.forEach((snap) => {
-    if (snap.exists) invoiceMap[snap.id] = snap.data() || {};
-  });
 
   const shipments = snapshot.docs.map((doc) => {
     const data = doc.data();
@@ -154,17 +136,6 @@ export async function getManifestTripShipments(tripId) {
           visibleDamagedQty,
         0,
       );
-    const linkedInvoice = root.invoiceId
-      ? invoiceMap[String(root.invoiceId)] || null
-      : null;
-    const invoiceStatus = linkedInvoice?.status || root.invoiceStatus || null;
-    const rawInvoiceAmount = linkedInvoice?.amount ?? root.invoiceAmount ?? 0;
-    const parsedInvoiceAmount = Number(rawInvoiceAmount);
-    const hasActiveInvoice =
-      String(invoiceStatus || "").toUpperCase() !== "CANCELLED" &&
-      invoiceBelongsToTrip(linkedInvoice, normalizedTripId) &&
-      (root.hasInvoice || Boolean(root.invoiceId));
-
     const customAddedBy =
       data.customAddedBy ||
       (data.customAdded === true ? data.createdBy || null : null);
@@ -187,7 +158,7 @@ export async function getManifestTripShipments(tripId) {
       },
     );
 
-    return {
+    return withTripInvoiceContext({
       id: doc.id,
       ...data,
       shipmentId: data.shipmentId || root.id || doc.id,
@@ -238,14 +209,6 @@ export async function getManifestTripShipments(tripId) {
       receivedCount: visibleReceivedQty,
       deliveredCount: visibleReceivedQty,
       pendingCount: visiblePendingQty,
-      hasInvoice: hasActiveInvoice,
-      invoiceId: hasActiveInvoice ? root.invoiceId || null : null,
-      invoiceNumber: hasActiveInvoice ? root.invoiceNumber || null : null,
-      invoiceStatus,
-      invoiceAmount:
-        hasActiveInvoice && Number.isFinite(parsedInvoiceAmount)
-          ? parsedInvoiceAmount
-          : 0,
       createdAt: data.createdAt?.toDate
         ? data.createdAt.toDate().toISOString()
         : null,
@@ -264,7 +227,12 @@ export async function getManifestTripShipments(tripId) {
         data.removedPackageEntries,
         "removedAt",
       ),
-    };
+    }, normalizedTripId, {
+      invoices: invoicesByShipment.get(doc.id) || [],
+      allPackages: rootPackages,
+      tripPackages: visiblePackages,
+      manifestPackageIds: [...tripBarcodeSet],
+    });
   });
 
   return NextResponse.json({
@@ -273,6 +241,61 @@ export async function getManifestTripShipments(tripId) {
       tripSnap.exists ? tripSnap.data()?.removedManifestEntries : [],
     ),
   });
+}
+
+async function fetchInvoicesByShipment(shipmentIds = [], rootMap = {}) {
+  const uniqueIds = [...new Set(shipmentIds.map(String).filter(Boolean))];
+  const invoicesByShipment = new Map();
+  const invoiceIds = new Set();
+  const batchSize = 30;
+
+  const addInvoice = (invoice, fallbackShipmentId = "") => {
+    const invoiceId = String(invoice?.id || "").trim();
+    const shipmentId = String(invoice?.shipmentId || fallbackShipmentId).trim();
+    if (!invoiceId || !shipmentId || invoiceIds.has(invoiceId)) return;
+
+    invoiceIds.add(invoiceId);
+    const rows = invoicesByShipment.get(shipmentId) || [];
+    rows.push({ ...invoice, shipmentId });
+    invoicesByShipment.set(shipmentId, rows);
+  };
+
+  for (let index = 0; index < uniqueIds.length; index += batchSize) {
+    const chunk = uniqueIds.slice(index, index + batchSize);
+    const snapshot = await adminDb
+      .collection("invoices")
+      .where("shipmentId", "in", chunk)
+      .get();
+
+    snapshot.docs.forEach((document) => {
+      const invoice = { id: document.id, ...(document.data() || {}) };
+      addInvoice(invoice);
+    });
+  }
+
+  const linkedInvoiceShipments = new Map();
+  uniqueIds.forEach((shipmentId) => {
+    const invoiceId = String(rootMap[shipmentId]?.invoiceId || "").trim();
+    if (invoiceId && !invoiceIds.has(invoiceId)) {
+      linkedInvoiceShipments.set(invoiceId, shipmentId);
+    }
+  });
+  if (linkedInvoiceShipments.size > 0) {
+    const linkedSnapshots = await adminDb.getAll(
+      ...[...linkedInvoiceShipments.keys()].map((invoiceId) =>
+        adminDb.collection("invoices").doc(invoiceId),
+      ),
+    );
+    linkedSnapshots.forEach((snapshot) => {
+      if (!snapshot.exists) return;
+      addInvoice(
+        { id: snapshot.id, ...(snapshot.data() || {}) },
+        linkedInvoiceShipments.get(snapshot.id),
+      );
+    });
+  }
+
+  return invoicesByShipment;
 }
 
 function looksLikeUserId(value) {
