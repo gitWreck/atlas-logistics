@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { InteractionManager } from "react-native";
 import {
   collection,
   doc,
@@ -159,6 +160,7 @@ export function useCheckerLastMileSync(checkerId, options = {}) {
 
   const docUnsubsRef = useRef({});
   const cacheWarmTimerRef = useRef(null);
+  const cacheWarmTaskRef = useRef(null);
 
   useEffect(() => {
     if (!checkerId) {
@@ -499,18 +501,25 @@ export function useCheckerLastMileSync(checkerId, options = {}) {
     if (cacheWarmTimerRef.current) {
       clearTimeout(cacheWarmTimerRef.current);
     }
+    cacheWarmTaskRef.current?.cancel?.();
     cacheWarmTimerRef.current = setTimeout(() => {
       cacheWarmTimerRef.current = null;
-      void warmShipmentCache(shipmentsById, {
-        manifests,
-        assignedMunicipalities,
+      cacheWarmTaskRef.current = InteractionManager.runAfterInteractions(() => {
+        cacheWarmTaskRef.current = null;
+        void warmShipmentCache(
+          shipmentsById,
+          { manifests, assignedMunicipalities },
+          { publish: false },
+        );
       });
-    }, 500);
+    }, 1500);
     return () => {
       if (cacheWarmTimerRef.current) {
         clearTimeout(cacheWarmTimerRef.current);
         cacheWarmTimerRef.current = null;
       }
+      cacheWarmTaskRef.current?.cancel?.();
+      cacheWarmTaskRef.current = null;
     };
   }, [
     checkerId,

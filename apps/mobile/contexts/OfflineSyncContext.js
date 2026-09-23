@@ -77,6 +77,15 @@ export function OfflineSyncProvider({ children }) {
     void refreshQueueState();
   }, [refreshCacheState, refreshQueueState]);
 
+  useEffect(() => {
+    if (!isOnline) {
+      // Background cache persistence intentionally avoids publishing large
+      // maps while online. Reload the latest durable snapshot only when it is
+      // needed for offline operation.
+      void refreshCacheState();
+    }
+  }, [isOnline, refreshCacheState]);
+
   const syncNow = useCallback(async () => {
     if (!checkerId || !profile || syncInFlightRef.current) {
       return lastSyncResult;
@@ -217,11 +226,13 @@ export function OfflineSyncProvider({ children }) {
   );
 
   const warmShipmentCache = useCallback(
-    async (shipmentsById = {}, extras = {}) => {
+    async (shipmentsById = {}, extras = {}, options = {}) => {
       if (!checkerId) return {};
       const merged = await upsertShipmentsInCache(checkerId, shipmentsById, extras);
-      setCachedShipmentsById(merged);
-      setCacheSavedAt(Date.now());
+      if (options.publish !== false) {
+        setCachedShipmentsById(merged);
+        setCacheSavedAt(Date.now());
+      }
       return merged;
     },
     [checkerId],

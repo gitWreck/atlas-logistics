@@ -100,6 +100,7 @@ package.json
 /apps/mobile/components/utilities/*
 !/apps/mobile/components/utilities/scanPerformance.js
 !/apps/mobile/components/utilities/scanPerformance.test.cjs
+!/apps/mobile/components/utilities/authPerformance.js
 
 # Quick Access Expo Router screens must also be present in the EAS checkout.
 !/apps/mobile/app/(checker)/(tabs)/quick/

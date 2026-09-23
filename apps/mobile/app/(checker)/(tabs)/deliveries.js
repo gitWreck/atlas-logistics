@@ -1,12 +1,12 @@
-import React, { useState, useMemo } from "react";
+import React, { memo, useCallback, useMemo, useState } from "react";
 import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
+  FlatList,
+  Platform,
   RefreshControl,
+  StyleSheet,
+  Text,
   TouchableOpacity,
-  Alert,
+  View,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { FontAwesome5 } from "@expo/vector-icons";
@@ -15,10 +15,7 @@ import { useTheme } from "../../../contexts/ThemeContext";
 import StatusBadge from "../../../components/ui/StatusBadge";
 import {
   canCheckerContactCustomer,
-  getCallableErrorMessage,
   getCheckerDeliveryNextAction,
-  reportCheckerFailedDelivery,
-  returnCheckerShipmentsToWarehouse,
 } from "../../../components/utilities/checkerDelivery";
 import CustomerCommsBar from "../../../components/shipments/CustomerCommsBar";
 import { useCheckerLastMile } from "../../../contexts/CheckerLastMileContext";
@@ -42,23 +39,110 @@ function getTimeLabel(value) {
   return date.toLocaleString();
 }
 
+const DeliveryShipmentCard = memo(function DeliveryShipmentCard({
+  shipment,
+  checkerId,
+  colors,
+  isDark,
+  accent,
+  onOpen,
+  onScan,
+}) {
+  const nextAction = getCheckerDeliveryNextAction(shipment, checkerId);
+  const mine = shipment.poolStats?.mine || 0;
+  const delivered = shipment.poolStats?.delivered || 0;
+
+  return (
+    <Card style={styles.card}>
+      <TouchableOpacity
+        activeOpacity={0.8}
+        onPress={() => onOpen(shipment.id)}
+      >
+        <View style={styles.cardHeader}>
+          <Text
+            style={[styles.shipmentId, { color: colors.text }]}
+            numberOfLines={1}
+          >
+            {shipment.shipmentId || shipment.id}
+          </Text>
+          <FontAwesome5
+            name="chevron-right"
+            size={13}
+            color={colors.textMuted}
+          />
+        </View>
+
+        <View style={styles.badgeRow}>
+          <StatusBadge status={shipment.displayStatus || shipment.status} />
+        </View>
+
+        <Text style={[styles.customer, { color: colors.text }]}>
+          {shipment.recipient?.name ||
+            shipment.customerName ||
+            "Unknown recipient"}
+        </Text>
+
+        <View style={styles.pieceRow}>
+          <FontAwesome5 name="users" size={11} color={colors.textMuted} />
+          <Text style={[styles.pieceText, { color: colors.textMuted }]}>
+            {mine} on van · {delivered} delivered
+          </Text>
+        </View>
+
+        <Text style={[styles.metaText, { color: colors.textMuted }]}>
+          Vehicle: {shipment.deliveryVehicleName || "—"} · Updated{" "}
+          {getTimeLabel(shipment.updatedAt)}
+        </Text>
+      </TouchableOpacity>
+
+      {nextAction === "deliver" ? (
+        <PrimaryButton
+          label="SCAN DELIVERY"
+          icon="qrcode"
+          color={accent}
+          onPress={() => onScan(shipment.id, "DELIVERED")}
+          style={styles.actionButton}
+        />
+      ) : null}
+
+      {nextAction === "return" ? (
+        <PrimaryButton
+          label="SCAN RETURN TO WAREHOUSE"
+          icon="undo"
+          color={SECTION.return.accent}
+          onPress={() => onScan(shipment.id, "RETURNED_TO_WAREHOUSE")}
+          style={styles.actionButton}
+        />
+      ) : null}
+
+      {canCheckerContactCustomer(shipment, checkerId) ? (
+        <CustomerCommsBar
+          shipment={shipment}
+          colors={colors}
+          isDark={isDark}
+          variant="compact"
+        />
+      ) : null}
+    </Card>
+  );
+});
+
 export default function CheckerDeliveriesTab() {
   const router = useRouter();
   const { profile } = useAuth();
   const { colors, resolvedScheme } = useTheme();
-  const isDark = resolvedScheme === "dark";
   const [refreshing, setRefreshing] = useState(false);
-  const [actionShipmentId, setActionShipmentId] = useState(null);
-
   const checkerId = profile?.uid;
+  const isDark = resolvedScheme === "dark";
+  const accent = SECTION.route.accent;
   const { myRouteShipments, summary, loading } = useCheckerLastMile();
 
   const routeStats = useMemo(() => {
     let onVan = 0;
     let delivered = 0;
-    myRouteShipments.forEach((s) => {
-      onVan += s.poolStats?.mine || 0;
-      delivered += s.poolStats?.delivered || 0;
+    myRouteShipments.forEach((shipment) => {
+      onVan += shipment.poolStats?.mine || 0;
+      delivered += shipment.poolStats?.delivered || 0;
     });
     const failed = summary?.failed || 0;
     return {
@@ -69,68 +153,101 @@ export default function CheckerDeliveriesTab() {
     };
   }, [myRouteShipments, summary]);
 
-  const runShipmentAction = async (shipmentId, action) => {
-    if (actionShipmentId) return;
+  const openShipment = useCallback(
+    (shipmentId) =>
+      router.push({
+        pathname: "/(checker)/shipment-details",
+        params: { shipmentId },
+      }),
+    [router],
+  );
 
-    setActionShipmentId(shipmentId);
+  const goToDeliveryScan = useCallback(
+    (shipmentId = null, presetScanStatus = null) => {
+      const isOffloadAction =
+        presetScanStatus === "DELIVERED" ||
+        presetScanStatus === "FAILED_DELIVERY" ||
+        presetScanStatus === "RETURNED_TO_WAREHOUSE";
+      const title =
+        presetScanStatus === "FAILED_DELIVERY"
+          ? "Failed Delivery"
+          : presetScanStatus === "RETURNED_TO_WAREHOUSE"
+            ? "Return to Warehouse"
+            : "Deliver Piece";
 
-    try {
-      if (action === "failed") {
-        await reportCheckerFailedDelivery({
-          shipmentIds: [shipmentId],
-          profile,
-          reasonCode: "DELIVERY_FAILED",
-          remarks: "Failed delivery reported from My Deliveries.",
-        });
-        Alert.alert(
-          "Failed Delivery",
-          "Your loaded pieces were marked failed. Return them to Odiongan warehouse.",
-        );
-      } else if (action === "return") {
-        await returnCheckerShipmentsToWarehouse({
-          shipmentIds: [shipmentId],
-          profile,
-        });
-        Alert.alert(
-          "Returned",
-          "Shipment returned to warehouse and removed from your deliveries.",
-        );
-      }
-    } catch (error) {
-      console.error("My Deliveries action failed:", error);
-      Alert.alert(
-        "Action Failed",
-        getCallableErrorMessage(error, "Could not update shipment."),
-      );
-    } finally {
-      setActionShipmentId(null);
-    }
-  };
+      router.push({
+        pathname: "/(checker)/scan",
+        params: {
+          mode: isOffloadAction ? "offloading" : "delivery",
+          title,
+          ...(shipmentId ? { focusShipmentId: shipmentId } : {}),
+          ...(presetScanStatus ? { presetScanStatus } : {}),
+        },
+      });
+    },
+    [router],
+  );
 
-  const goToDeliveryScan = (shipmentId = null, presetScanStatus = null) => {
-    const isOffloadAction =
-      presetScanStatus === "DELIVERED" ||
-      presetScanStatus === "FAILED_DELIVERY" ||
-      presetScanStatus === "RETURNED_TO_WAREHOUSE";
-    const title =
-      presetScanStatus === "FAILED_DELIVERY"
-        ? "Failed Delivery"
-        : presetScanStatus === "RETURNED_TO_WAREHOUSE"
-          ? "Return to Warehouse"
-          : "Deliver Piece";
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
+    setTimeout(() => setRefreshing(false), 400);
+  }, []);
 
-    router.push({
-      pathname: "/(checker)/scan",
-      params: {
-        mode: isOffloadAction ? "offloading" : "delivery",
-        title,
-        ...(shipmentId ? { focusShipmentId: shipmentId } : {}),
-        ...(presetScanStatus ? { presetScanStatus } : {}),
-      },
-    });
-  };
+  const statsHeader = useMemo(
+    () => (
+      <View style={styles.statsHeader}>
+        <StatPillRow
+          items={[
+            { label: "On Van", value: routeStats.onVan, color: colors.text },
+            { label: "Delivered", value: routeStats.delivered, color: "#16a34a" },
+            { label: "Failed", value: routeStats.failed, color: "#dc2626" },
+            { label: "Remaining", value: routeStats.remaining, color: "#2563eb" },
+          ]}
+        />
+      </View>
+    ),
+    [colors.text, routeStats],
+  );
 
-  const accent = SECTION.route.accent;
+  const emptyState = useMemo(
+    () =>
+      loading ? (
+        <View style={styles.emptyState}>
+          <Text style={[styles.emptyTitle, { color: colors.text }]}>
+            Loading your deliveries...
+          </Text>
+        </View>
+      ) : (
+        <View style={styles.emptyStateCentered}>
+          <View style={[styles.emptyIcon, { backgroundColor: `${accent}18` }]}>
+            <FontAwesome5 name="route" size={22} color={accent} />
+          </View>
+          <Text style={[styles.emptyTitle, { color: colors.text }]}>
+            No active deliveries yet
+          </Text>
+          <Text style={[styles.emptySub, { color: colors.textMuted }]}>
+            Load pieces from the Available tab first. Each scan marks them out
+            for delivery and they will appear here for last-mile delivery.
+          </Text>
+        </View>
+      ),
+    [accent, colors, loading],
+  );
+
+  const renderShipment = useCallback(
+    ({ item }) => (
+      <DeliveryShipmentCard
+        shipment={item}
+        checkerId={checkerId}
+        colors={colors}
+        isDark={isDark}
+        accent={accent}
+        onOpen={openShipment}
+        onScan={goToDeliveryScan}
+      />
+    ),
+    [accent, checkerId, colors, goToDeliveryScan, isDark, openShipment],
+  );
 
   return (
     <View style={[styles.container, { backgroundColor: colors.bg }]}>
@@ -144,212 +261,62 @@ export default function CheckerDeliveriesTab() {
         }
       />
 
-      <ScrollView
-        contentContainerStyle={styles.content}
+      <FlatList
+        data={loading ? [] : myRouteShipments}
+        keyExtractor={(shipment) => String(shipment.id)}
+        renderItem={renderShipment}
+        ListHeaderComponent={statsHeader}
+        ListEmptyComponent={emptyState}
+        ItemSeparatorComponent={() => <View style={styles.listGap} />}
+        contentContainerStyle={[
+          styles.content,
+          myRouteShipments.length === 0 && styles.contentGrow,
+        ]}
         showsVerticalScrollIndicator={false}
+        initialNumToRender={5}
+        maxToRenderPerBatch={5}
+        windowSize={7}
+        updateCellsBatchingPeriod={50}
+        removeClippedSubviews={Platform.OS !== "web"}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
-            onRefresh={() => {
-              setRefreshing(true);
-              setTimeout(() => setRefreshing(false), 400);
-            }}
+            onRefresh={onRefresh}
             tintColor={colors.text}
             colors={[colors.text]}
           />
         }
-      >
-        <StatPillRow
-          items={[
-            { label: "On Van", value: routeStats.onVan, color: colors.text },
-            { label: "Delivered", value: routeStats.delivered, color: "#16a34a" },
-            { label: "Failed", value: routeStats.failed, color: "#dc2626" },
-            { label: "Remaining", value: routeStats.remaining, color: "#2563eb" },
-          ]}
-        />
-
-        {loading ? (
-          <View style={styles.emptyState}>
-            <Text style={[styles.emptyTitle, { color: colors.text }]}>
-              Loading your deliveries...
-            </Text>
-          </View>
-        ) : myRouteShipments.length === 0 ? (
-          <View style={styles.emptyStateCentered}>
-            <View style={[styles.emptyIcon, { backgroundColor: `${accent}18` }]}>
-              <FontAwesome5 name="route" size={22} color={accent} />
-            </View>
-            <Text style={[styles.emptyTitle, { color: colors.text }]}>
-              No active deliveries yet
-            </Text>
-            <Text style={[styles.emptySub, { color: colors.textMuted }]}>
-              Load pieces from the Available tab first. Each scan marks them out
-              for delivery and they will appear here for last-mile delivery.
-            </Text>
-          </View>
-        ) : (
-          myRouteShipments.map((shipment) => {
-            const nextAction = getCheckerDeliveryNextAction(
-              shipment,
-              checkerId,
-            );
-            const mine = shipment.poolStats?.mine || 0;
-            const delivered = shipment.poolStats?.delivered || 0;
-
-            return (
-              <Card key={shipment.id} style={styles.card}>
-                <TouchableOpacity
-                  activeOpacity={0.8}
-                  onPress={() =>
-                    router.push({
-                      pathname: "/(checker)/shipment-details",
-                      params: { shipmentId: shipment.id },
-                    })
-                  }
-                >
-                  <View style={styles.cardHeader}>
-                    <Text
-                      style={[styles.shipmentId, { color: colors.text }]}
-                      numberOfLines={1}
-                    >
-                      {shipment.shipmentId || shipment.id}
-                    </Text>
-                    <FontAwesome5
-                      name="chevron-right"
-                      size={13}
-                      color={colors.textMuted}
-                    />
-                  </View>
-
-                  <View style={styles.badgeRow}>
-                    <StatusBadge
-                      status={shipment.displayStatus || shipment.status}
-                    />
-                  </View>
-
-                  <Text style={[styles.customer, { color: colors.text }]}>
-                    {shipment.recipient?.name ||
-                      shipment.customerName ||
-                      "Unknown recipient"}
-                  </Text>
-
-                  <View style={styles.pieceRow}>
-                    <FontAwesome5
-                      name="users"
-                      size={11}
-                      color={colors.textMuted}
-                    />
-                    <Text
-                      style={[styles.pieceText, { color: colors.textMuted }]}
-                    >
-                      {mine} on van · {delivered} delivered
-                    </Text>
-                  </View>
-
-                  <Text style={[styles.metaText, { color: colors.textMuted }]}>
-                    Vehicle: {shipment.deliveryVehicleName || "—"} · Updated{" "}
-                    {getTimeLabel(shipment.updatedAt)}
-                  </Text>
-                </TouchableOpacity>
-
-                {nextAction === "deliver" && (
-                  <PrimaryButton
-                    label="SCAN DELIVERY"
-                    icon="qrcode"
-                    color={accent}
-                    onPress={() => goToDeliveryScan(shipment.id, "DELIVERED")}
-                    style={{ marginTop: 14 }}
-                  />
-                )}
-
-                {nextAction === "return" && (
-                  <PrimaryButton
-                    label="SCAN RETURN TO WAREHOUSE"
-                    icon="undo"
-                    color={SECTION.return.accent}
-                    onPress={() =>
-                      goToDeliveryScan(shipment.id, "RETURNED_TO_WAREHOUSE")
-                    }
-                    style={{ marginTop: 14 }}
-                  />
-                )}
-
-                {canCheckerContactCustomer(shipment, checkerId) && (
-                  <CustomerCommsBar
-                    shipment={shipment}
-                    colors={colors}
-                    isDark={isDark}
-                    variant="compact"
-                  />
-                )}
-              </Card>
-            );
-          })
-        )}
-      </ScrollView>
+      />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  content: {
-    paddingHorizontal: 20,
-    paddingBottom: 24,
-    gap: 12,
-  },
-  shortcutRow: {
-    flexDirection: "row",
-    gap: 12,
-  },
-  shortcutBtn: {
-    flex: 1,
-    paddingVertical: 10,
-  },
-  card: {
-    padding: 16,
-  },
+  container: { flex: 1 },
+  content: { paddingHorizontal: 20, paddingBottom: 24 },
+  contentGrow: { flexGrow: 1 },
+  statsHeader: { marginBottom: 12 },
+  listGap: { height: 12 },
+  card: { padding: 16 },
   cardHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
     gap: 12,
   },
-  shipmentId: {
-    fontSize: 15,
-    fontWeight: "800",
-    flex: 1,
-  },
-  badgeRow: {
-    flexDirection: "row",
-    marginTop: 10,
-  },
-  customer: {
-    fontSize: 16,
-    fontWeight: "800",
-    marginTop: 10,
-  },
+  shipmentId: { fontSize: 15, fontWeight: "800", flex: 1 },
+  badgeRow: { flexDirection: "row", marginTop: 10 },
+  customer: { fontSize: 16, fontWeight: "800", marginTop: 10 },
   pieceRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: 7,
     marginTop: 6,
   },
-  pieceText: {
-    fontSize: 13,
-    fontWeight: "600",
-  },
-  metaText: {
-    fontSize: 11,
-    marginTop: 8,
-  },
-  emptyState: {
-    marginTop: 18,
-    borderRadius: 14,
-    padding: 16,
-  },
+  pieceText: { fontSize: 13, fontWeight: "600" },
+  metaText: { fontSize: 11, marginTop: 8 },
+  actionButton: { marginTop: 14 },
+  emptyState: { marginTop: 18, borderRadius: 14, padding: 16 },
   emptyStateCentered: {
     marginTop: 40,
     alignItems: "center",
@@ -369,9 +336,5 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     textAlign: "center",
   },
-  emptySub: {
-    fontSize: 13,
-    lineHeight: 18,
-    textAlign: "center",
-  },
+  emptySub: { fontSize: 13, lineHeight: 18, textAlign: "center" },
 });

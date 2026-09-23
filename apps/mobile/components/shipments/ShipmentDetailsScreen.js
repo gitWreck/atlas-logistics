@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   View,
   StyleSheet,
@@ -12,7 +12,7 @@ import {
   StatusBar as RNStatusBar,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { doc, getDoc } from "firebase/firestore";
+import { doc, getDoc, getDocFromCache } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import * as ImagePicker from "expo-image-picker";
 import { StatusBar } from "expo-status-bar";
@@ -66,7 +66,7 @@ const NOTIFICATION_CHANNEL_OPTIONS = [
 
 const FINAL_SHIPMENT_STATUSES = new Set(["COMPLETED", "DELIVERED"]);
 
-export default function ShipmentDetailsScreen() {
+export default function ShipmentDetailsScreen({ initialShipment = null }) {
   const { shipmentId, tripId, tripType, parentTripId } = useLocalSearchParams();
   const router = useRouter();
   const { isDriver, isStaff, isCheckerOps, profile } = useAuth();
@@ -75,8 +75,14 @@ export default function ShipmentDetailsScreen() {
 
   const resolvedTripId = parentTripId || tripId;
 
-  const [shipment, setShipment] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const initialShipmentMatches = Boolean(
+    initialShipment?.id && String(initialShipment.id) === String(shipmentId),
+  );
+  const [shipment, setShipment] = useState(() =>
+    initialShipmentMatches ? initialShipment : null,
+  );
+  const [loading, setLoading] = useState(() => !initialShipmentMatches);
+  const hasVisibleShipmentRef = useRef(initialShipmentMatches);
   const [actionLoading, setActionLoading] = useState(false);
 
   const [photos, setPhotos] = useState([]);
@@ -91,12 +97,59 @@ export default function ShipmentDetailsScreen() {
   } = useShipmentCustodyTimeline(shipmentId, !!shipmentId);
 
   useEffect(() => {
+    if (
+      initialShipment?.id &&
+      String(initialShipment.id) === String(shipmentId)
+    ) {
+      hasVisibleShipmentRef.current = true;
+      setShipment(initialShipment);
+      setLoading(false);
+    }
+  }, [initialShipment, shipmentId]);
+
+  useEffect(() => {
     if (!shipmentId) return;
+
+    let cancelled = false;
+    const shipmentRef = doc(db, "shipments", String(shipmentId));
+    let hasLocalShipment = Boolean(
+      initialShipment?.id &&
+        String(initialShipment.id) === String(shipmentId),
+    );
+
+    if (!hasLocalShipment) {
+      hasVisibleShipmentRef.current = false;
+      setShipment((current) => {
+        if (current?.id && String(current.id) === String(shipmentId)) {
+          hasLocalShipment = true;
+          hasVisibleShipmentRef.current = true;
+          return current;
+        }
+        return null;
+      });
+      setLoading(true);
+    }
 
     const fetchDetails = async () => {
       try {
-        const snap = await getDoc(doc(db, "shipments", String(shipmentId)));
+        if (!hasLocalShipment) {
+          try {
+            const cachedSnap = await getDocFromCache(shipmentRef);
+            if (!cancelled && cachedSnap.exists()) {
+              hasLocalShipment = true;
+              hasVisibleShipmentRef.current = true;
+              setShipment({ id: cachedSnap.id, ...cachedSnap.data() });
+              setLoading(false);
+            }
+          } catch {
+            // A cache miss is expected on the first visit. Continue refreshing.
+          }
+        }
+
+        const snap = await getDoc(shipmentRef);
+        if (cancelled) return;
         if (snap.exists()) {
+          hasVisibleShipmentRef.current = true;
           setShipment({ id: snap.id, ...snap.data() });
         } else {
           Alert.alert("Error", "Shipment data not found");
@@ -104,13 +157,19 @@ export default function ShipmentDetailsScreen() {
         }
       } catch (error) {
         console.error("Shipment details fetch error:", error);
-        Alert.alert("Error", "Failed to load shipment details.");
+        if (!cancelled && !hasVisibleShipmentRef.current) {
+          Alert.alert("Error", "Failed to load shipment details.");
+        }
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     };
 
-    fetchDetails();
+    void fetchDetails();
+
+    return () => {
+      cancelled = true;
+    };
   }, [shipmentId, router]);
 
   const pickImage = async (useCamera) => {

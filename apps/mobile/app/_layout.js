@@ -2,7 +2,7 @@ import React, { lazy, Suspense } from "react";
 import { Stack } from "expo-router";
 import { Alert, Platform } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
-import { AuthProvider } from "../contexts/AuthContext";
+import { AuthProvider, useAuth } from "../contexts/AuthContext";
 import { ThemeProvider } from "../contexts/ThemeContext";
 import { ErrorBoundary } from "../components/ErrorBoundary";
 
@@ -12,6 +12,24 @@ const IncomingCallListener = lazy(
 const CustomerNotificationBootstrap = lazy(
   () => import("../components/notifications/CustomerNotificationProvider"),
 );
+
+function AuthenticatedServices() {
+  const { isReady, user, isCustomer } = useAuth();
+  if (!isReady || !user) return null;
+
+  return (
+    <>
+      {isCustomer ? (
+        <Suspense fallback={null}>
+          <CustomerNotificationBootstrap />
+        </Suspense>
+      ) : null}
+      <Suspense fallback={null}>
+        <IncomingCallListener />
+      </Suspense>
+    </>
+  );
+}
 
 // `Alert.alert` is a no-op on react-native-web, which makes confirmation
 // buttons (logout, delete, etc.) appear broken in the browser. Map it to the
@@ -48,12 +66,7 @@ export default function RootLayout() {
       <SafeAreaProvider>
         <ThemeProvider>
           <AuthProvider>
-            <Suspense fallback={null}>
-              <CustomerNotificationBootstrap />
-            </Suspense>
-            <Suspense fallback={null}>
-              <IncomingCallListener />
-            </Suspense>
+            <AuthenticatedServices />
             <Stack screenOptions={{ headerShown: false }} />
           </AuthProvider>
         </ThemeProvider>

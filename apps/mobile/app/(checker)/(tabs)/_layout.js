@@ -14,6 +14,9 @@ export default function CheckerTabsLayout() {
         <Tabs
           screenOptions={{
             headerShown: false,
+            lazy: true,
+            freezeOnBlur: true,
+            tabBarHideOnKeyboard: true,
             tabBarStyle: {
               backgroundColor: colors.surface,
               borderTopColor: colors.border,

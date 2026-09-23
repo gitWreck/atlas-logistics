@@ -1,9 +1,10 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
   FlatList,
   Modal,
+  Platform,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -16,7 +17,7 @@ import {
 } from "react-native";
 import Feather from "@expo/vector-icons/Feather";
 import { LinearGradient } from "expo-linear-gradient";
-import { useRouter } from "expo-router";
+import { useFocusEffect, useRouter } from "expo-router";
 import { collection, doc, onSnapshot, query, where } from "firebase/firestore";
 
 import { auth, db } from "../../firebase";
@@ -216,7 +217,7 @@ export default function CheckerChatScreen({ accountType = "checker" }) {
     }
   }, [isDriver, isManager]);
 
-  useEffect(() => {
+  useFocusEffect(useCallback(() => {
     const uid = auth.currentUser?.uid;
     if (!uid) {
       setLoading(false);
@@ -247,9 +248,9 @@ export default function CheckerChatScreen({ accountType = "checker" }) {
         setLoading(false);
       },
     );
-  }, [loadContacts]);
+  }, [loadContacts]));
 
-  useEffect(() => {
+  useFocusEffect(useCallback(() => {
     if ((!accessToken && !isManager) || !uid) return undefined;
     const conversationsQuery = isManager
       ? query(
@@ -286,10 +287,10 @@ export default function CheckerChatScreen({ accountType = "checker" }) {
       },
       (error) => console.error(`${isManager ? "Manager" : isDriver ? "Driver" : "Checker"} conversations subscription failed:`, error),
     );
-  }, [accessToken, contacts, isDriver, isManager, uid]);
+  }, [accessToken, contacts, isDriver, isManager, uid]));
 
   // Shipment customer threads the checker owns / participates in (My Deliveries).
-  useEffect(() => {
+  useFocusEffect(useCallback(() => {
     if (!uid || isDriver) {
       setCustomerConversations([]);
       return undefined;
@@ -310,7 +311,7 @@ export default function CheckerChatScreen({ accountType = "checker" }) {
       (error) =>
         console.error("Checker customer conversations subscription failed:", error),
     );
-  }, [isDriver, uid]);
+  }, [isDriver, uid]));
 
   const openCustomerConversation = useCallback(
     (conversationId) => {
@@ -640,7 +641,11 @@ export default function CheckerChatScreen({ accountType = "checker" }) {
         data={visibleListData}
         keyExtractor={(item) => item.id}
         keyboardShouldPersistTaps="handled"
-        removeClippedSubviews={false}
+        initialNumToRender={10}
+        maxToRenderPerBatch={8}
+        windowSize={7}
+        updateCellsBatchingPeriod={50}
+        removeClippedSubviews={Platform.OS !== "web"}
         style={styles.chatList}
         contentContainerStyle={styles.listContent}
         ListHeaderComponent={listHeader}

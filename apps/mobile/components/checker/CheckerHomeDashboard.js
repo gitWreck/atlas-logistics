@@ -97,7 +97,8 @@ export function CheckerHomeHero({
         contentPosition="center"
         transition={0}
         priority="high"
-        allowDownscaling={false}
+        allowDownscaling
+        cachePolicy="memory-disk"
       />
       <LinearGradient
         colors={[

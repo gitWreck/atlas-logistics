@@ -438,6 +438,119 @@ export function getDeliveredShipmentsForDate(
     );
 }
 
+/**
+ * Builds the date-scoped dashboard counts and recent-delivery rows in one
+ * package pass per shipment. The home screen used to rescan every package up
+ * to five times for the same date whenever a live shipment snapshot arrived.
+ */
+export function getDashboardSummaryForDate(
+  shipments = [],
+  checkerUid = null,
+  date = new Date(),
+  recentLimit = 3,
+) {
+  const summary = {
+    delivered: 0,
+    failed: 0,
+    returned: 0,
+    recentDelivered: [],
+  };
+
+  shipments.forEach((shipment = {}) => {
+    const packages = Array.isArray(shipment.packages) ? shipment.packages : [];
+    let delivered = 0;
+    let failed = 0;
+    let returned = 0;
+    let deliveredAtMs = 0;
+
+    if (packages.length === 0) {
+      const shipmentDelivered =
+        statusMatches(shipment.status, DELIVERED_STATUSES) &&
+        (isSameLocalDay(
+          shipment.deliveredAt || shipment.completedAt || shipment.updatedAt,
+          date,
+        ) || statusEventOnDate(shipment, DELIVERED_STATUSES, date));
+      const shipmentFailed =
+        statusMatches(shipment.status, FAILED_STATUSES) &&
+        (isSameLocalDay(shipment.failedAt || shipment.updatedAt, date) ||
+          statusEventOnDate(shipment, FAILED_STATUSES, date));
+      const shipmentReturned =
+        statusMatches(shipment.status, RETURNED_STATUSES) &&
+        (isSameLocalDay(shipment.returnedAt || shipment.updatedAt, date) ||
+          statusEventOnDate(shipment, RETURNED_STATUSES, date));
+
+      delivered = shipmentDelivered ? 1 : 0;
+      failed = shipmentFailed ? 1 : 0;
+      returned = shipmentReturned ? 1 : 0;
+
+      const deliveredAt =
+        shipment.deliveredAt || shipment.completedAt || shipment.updatedAt;
+      if (
+        statusMatches(shipment.status, DELIVERED_STATUSES) &&
+        isSameLocalDay(deliveredAt, date)
+      ) {
+        deliveredAtMs = timestampMs(deliveredAt);
+      }
+    } else {
+      packages.forEach((pkg = {}) => {
+        if (checkerUid && !isCheckerPiece(pkg, checkerUid, shipment)) return;
+
+        const status = normalizeStatus(pkg.status);
+        const qty = pieceQty(pkg);
+        if (
+          DELIVERED_STATUSES.includes(status) &&
+          pieceEventOnDate(pkg, ["deliveredAt", "updatedAt"], date)
+        ) {
+          delivered += qty;
+        }
+        if (
+          FAILED_STATUSES.includes(status) &&
+          pieceEventOnDate(pkg, ["failedAt", "updatedAt"], date)
+        ) {
+          failed += qty;
+        }
+        if (
+          RETURNED_STATUSES.includes(status) &&
+          pieceEventOnDate(pkg, ["returnedAt", "updatedAt"], date)
+        ) {
+          returned += qty;
+        }
+
+        if (
+          status === "DELIVERED" &&
+          pieceEventOnDate(pkg, ["deliveredAt", "updatedAt"], date)
+        ) {
+          deliveredAtMs = Math.max(
+            deliveredAtMs,
+            timestampMs(pkg.deliveredAt || pkg.updatedAt),
+          );
+        }
+      });
+    }
+
+    summary.delivered += delivered;
+    summary.failed += failed;
+    summary.returned += returned;
+    if (delivered > 0) {
+      summary.recentDelivered.push({
+        ...shipment,
+        deliveredAtDate: deliveredAtMs ? new Date(deliveredAtMs) : null,
+      });
+    }
+  });
+
+  summary.recentDelivered.sort(
+    (a, b) =>
+      (b.deliveredAtDate?.getTime?.() || 0) -
+      (a.deliveredAtDate?.getTime?.() || 0),
+  );
+  summary.recentDelivered = summary.recentDelivered.slice(
+    0,
+    Math.max(0, recentLimit),
+  );
+  return summary;
+}
+
 export function getShipmentActivityDates(shipments = []) {
   const dates = new Map();
   const add = (value) => {

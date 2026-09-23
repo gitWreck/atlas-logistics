@@ -1,8 +1,12 @@
-import React, { useState, useEffect, useMemo } from "react";
-import { View, StyleSheet, RefreshControl, ScrollView } from "react-native";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  View,
+  StyleSheet,
+  RefreshControl,
+  ScrollView,
+  InteractionManager,
+} from "react-native";
 import { useRouter } from "expo-router";
-import { collection, query, where, onSnapshot } from "firebase/firestore";
-import { db } from "../../../firebase";
 import { useAuth } from "../../../contexts/AuthContext";
 import { useTheme } from "../../../contexts/ThemeContext";
 import { useCheckerLastMile } from "../../../contexts/CheckerLastMileContext";
@@ -16,10 +20,7 @@ import {
 import ManagerQuickAccess from "../../../components/manager/ManagerQuickAccess";
 import { SECTION } from "../../../components/checker/design/checkerTheme";
 import {
-  countDeliveredPiecesForDate,
-  countFailedPiecesForDate,
-  countReturnedPiecesForDate,
-  getDeliveredShipmentsForDate,
+  getDashboardSummaryForDate,
   getLocalDateKey,
   getShipmentActivityDates,
   startOfLocalDay,
@@ -62,107 +63,56 @@ export default function CheckerIndex() {
     myRouteShipments = [],
     shipmentsById = {},
     assignedMunicipalities = [],
+    loading: statsLoading = false,
   } = useCheckerLastMile();
 
   const [refreshing, setRefreshing] = useState(false);
   const [selectedDate, setSelectedDate] = useState(() => new Date());
   const [datePickerVisible, setDatePickerVisible] = useState(false);
-  const [queriedShipments, setQueriedShipments] = useState([]);
-  const [statsLoading, setStatsLoading] = useState(true);
+  const [activityDates, setActivityDates] = useState([]);
   const checkerId = profile?.uid || user?.uid;
 
-  const goToScan = (mode, title, extra = {}) => {
+  const goToScan = useCallback((mode, title, extra = {}) => {
     router.push({
       pathname: "/(checker)/scan",
       params: { mode, title, ...extra },
     });
-  };
+  }, [router]);
 
-  const goLoad = () =>
-    goToScan("delivery", "Load", { presetScanStatus: "LOAD_TO_VEHICLE" });
-  const goRoute = () => router.push("/(checker)/(tabs)/deliveries");
-  const goOffload = () => goToScan("offloading", "Offload Items");
-  const goInfo = () => goToScan("info", "Information");
-  const goAvailable = () => router.push("/(checker)/(tabs)/available-to-load");
-  const goHistory = () => router.push("/(checker)/delivered-history");
-  const openShipment = (shipment) =>
+  const goLoad = useCallback(
+    () => goToScan("delivery", "Load", { presetScanStatus: "LOAD_TO_VEHICLE" }),
+    [goToScan],
+  );
+  const goRoute = useCallback(
+    () => router.push("/(checker)/(tabs)/deliveries"),
+    [router],
+  );
+  const goOffload = useCallback(
+    () => goToScan("offloading", "Offload Items"),
+    [goToScan],
+  );
+  const goInfo = useCallback(
+    () => goToScan("info", "Information"),
+    [goToScan],
+  );
+  const goAvailable = useCallback(
+    () => router.push("/(checker)/(tabs)/available-to-load"),
+    [router],
+  );
+  const goHistory = useCallback(
+    () => router.push("/(checker)/delivered-history"),
+    [router],
+  );
+  const openShipment = useCallback((shipment) =>
     router.push({
       pathname: "/(checker)/shipment-details",
       params: { shipmentId: shipment.id },
-    });
+    }), [router]);
 
-  useEffect(() => {
-    if (!checkerId) {
-      setQueriedShipments([]);
-      setStatsLoading(false);
-      return undefined;
-    }
-
-    setStatsLoading(true);
-    let assigned = [];
-    let active = [];
-    let assignedReady = false;
-    let activeReady = false;
-
-    const publish = () => {
-      setQueriedShipments(mergeShipmentLists(assigned, active));
-      if (assignedReady && activeReady) setStatsLoading(false);
-    };
-
-    const shipmentsRef = collection(db, "shipments");
-    const assignedQuery = query(
-      shipmentsRef,
-      where("assignedCheckerId", "==", String(checkerId)),
-    );
-    const activeQuery = query(
-      shipmentsRef,
-      where("activeCheckerIds", "array-contains", String(checkerId)),
-    );
-
-    const unsubAssigned = onSnapshot(
-      assignedQuery,
-      (snap) => {
-        assigned = snap.docs.map((docSnap) => ({
-          id: docSnap.id,
-          ...docSnap.data(),
-        }));
-        assignedReady = true;
-        publish();
-      },
-      (err) => {
-        console.warn("Checker home assigned shipment query failed:", err);
-        assignedReady = true;
-        publish();
-      },
-    );
-
-    const unsubActive = onSnapshot(
-      activeQuery,
-      (snap) => {
-        active = snap.docs.map((docSnap) => ({
-          id: docSnap.id,
-          ...docSnap.data(),
-        }));
-        activeReady = true;
-        publish();
-      },
-      (err) => {
-        console.warn("Checker home active shipment query failed:", err);
-        activeReady = true;
-        publish();
-      },
-    );
-
-    return () => {
-      unsubAssigned();
-      unsubActive();
-    };
-  }, [checkerId]);
-
-  const onRefresh = async () => {
+  const onRefresh = useCallback(() => {
     setRefreshing(true);
     setTimeout(() => setRefreshing(false), 350);
-  };
+  }, []);
 
   const allKnownShipments = useMemo(
     () =>
@@ -170,9 +120,19 @@ export default function CheckerIndex() {
         Object.values(shipmentsById || {}),
         availableShipments,
         myRouteShipments,
-        queriedShipments,
       ),
-    [shipmentsById, availableShipments, myRouteShipments, queriedShipments],
+    [shipmentsById, availableShipments, myRouteShipments],
+  );
+
+  const dateSummary = useMemo(
+    () =>
+      getDashboardSummaryForDate(
+        allKnownShipments,
+        checkerId,
+        selectedDate,
+        3,
+      ),
+    [allKnownShipments, checkerId, selectedDate],
   );
 
   const glance = useMemo(() => {
@@ -188,21 +148,7 @@ export default function CheckerIndex() {
       0,
     );
 
-    const delivered = allKnownShipments.reduce(
-      (sum, shipment) =>
-        sum + countDeliveredPiecesForDate(shipment, checkerId, selectedDate),
-      0,
-    );
-    const failed = allKnownShipments.reduce(
-      (sum, shipment) =>
-        sum + countFailedPiecesForDate(shipment, checkerId, selectedDate),
-      0,
-    );
-    const returned = allKnownShipments.reduce(
-      (sum, shipment) =>
-        sum + countReturnedPiecesForDate(shipment, checkerId, selectedDate),
-      0,
-    );
+    const { delivered, failed, returned } = dateSummary;
 
     return {
       available,
@@ -213,35 +159,39 @@ export default function CheckerIndex() {
       returned,
     };
   }, [
-    allKnownShipments,
     availableShipments,
     myRouteShipments,
-    checkerId,
-    selectedDate,
+    dateSummary,
   ]);
 
-  const recentDelivered = useMemo(
-    () =>
-      getDeliveredShipmentsForDate(
-        allKnownShipments,
-        checkerId,
-        selectedDate,
-      ).slice(0, 3),
-    [allKnownShipments, checkerId, selectedDate],
-  );
+  const recentDelivered = dateSummary.recentDelivered;
+
+  useEffect(() => {
+    if (!datePickerVisible) return undefined;
+    let cancelled = false;
+    const task = InteractionManager.runAfterInteractions(() => {
+      if (!cancelled) {
+        setActivityDates(getShipmentActivityDates(allKnownShipments));
+      }
+    });
+    return () => {
+      cancelled = true;
+      task?.cancel?.();
+    };
+  }, [datePickerVisible, allKnownShipments]);
 
   const availableDates = useMemo(
     () =>
       mergeDates(
         getRecentDateOptions(new Date()),
         [selectedDate],
-        getShipmentActivityDates(allKnownShipments),
+        activityDates,
       ),
-    [allKnownShipments, selectedDate],
+    [activityDates, selectedDate],
   );
 
   const goal = glance.routeTotal;
-  const cards = [
+  const cards = useMemo(() => [
     {
       key: "available",
       title: "Available",
@@ -296,7 +246,7 @@ export default function CheckerIndex() {
       softColor: "#fff1df",
       onPress: goRoute,
     },
-  ];
+  ], [glance, goAvailable, goRoute, goHistory]);
 
   return (
     <View style={[styles.container, { backgroundColor: colors.bg }]}>

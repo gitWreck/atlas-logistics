@@ -6,6 +6,28 @@ function normalizeQueuedScanCode(value) {
   return String(value || "").trim().toUpperCase();
 }
 
+function createLayeredBarcodeIndex(...indexes) {
+  const availableIndexes = indexes.filter(
+    (index) => index && typeof index.get === "function",
+  );
+
+  return {
+    get(code) {
+      for (const index of availableIndexes) {
+        const match = index.get(code);
+        if (match) return match;
+      }
+      return undefined;
+    },
+  };
+}
+
+function selectCachedShipment(shipmentsById = {}, shipmentId = null) {
+  const resolvedId = Array.isArray(shipmentId) ? shipmentId[0] : shipmentId;
+  if (!resolvedId) return null;
+  return shipmentsById[String(resolvedId)] || null;
+}
+
 function createScanGate({
   cooldownMs = DEFAULT_SCAN_COOLDOWN_MS,
   duplicateBlockMs = DEFAULT_DUPLICATE_BLOCK_MS,
@@ -80,7 +102,9 @@ function createSerialTaskQueue({ onDepthChange = () => {} } = {}) {
 module.exports = {
   DEFAULT_DUPLICATE_BLOCK_MS,
   DEFAULT_SCAN_COOLDOWN_MS,
+  createLayeredBarcodeIndex,
   createScanGate,
   createSerialTaskQueue,
   normalizeQueuedScanCode,
+  selectCachedShipment,
 };

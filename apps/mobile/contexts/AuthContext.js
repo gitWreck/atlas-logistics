@@ -1,4 +1,10 @@
-import React, { createContext, useContext, useEffect, useState } from "react";
+import React, {
+  createContext,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import { onAuthStateChanged, signOut as firebaseSignOut } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -7,6 +13,7 @@ import {
   endCurrentCallSession,
   ensureUserPublicId,
 } from "../components/utilities/FirebaseFunctions";
+import { getUsableCachedAuthProfile } from "../components/utilities/authPerformance";
 
 const ALLOWED_ROLES = [
   "checker",
@@ -27,9 +34,15 @@ export function AuthProvider({ children }) {
   const [role, setRole] = useState(null);
   const [loading, setLoading] = useState(true);
   const [isReady, setIsReady] = useState(false);
+  const authGenerationRef = useRef(0);
 
   useEffect(() => {
+    let disposed = false;
     const unsub = onAuthStateChanged(auth, async (firebaseUser) => {
+      const generation = ++authGenerationRef.current;
+      const isCurrent = () =>
+        !disposed && generation === authGenerationRef.current;
+
       setLoading(true);
       setUser(firebaseUser ?? null);
       setProfile(null);
@@ -41,9 +54,35 @@ export function AuthProvider({ children }) {
         return;
       }
 
+      // Restore the last server-validated profile immediately so startup and
+      // navigation are not blocked by a slow Firestore round trip. The cache
+      // is UID-bound and still applies the same active-role checks; the server
+      // request below always runs and reconciles or revokes the cached state.
+      let cachedProfile = null;
+      try {
+        const cached = await AsyncStorage.getItem(
+          profileCacheKey(firebaseUser.uid),
+        );
+        cachedProfile = getUsableCachedAuthProfile(cached, {
+          uid: firebaseUser.uid,
+          allowedRoles: ALLOWED_ROLES,
+        });
+        if (cachedProfile && isCurrent()) {
+          setRole(String(cachedProfile.role).toLowerCase());
+          setProfile(cachedProfile);
+          setUser(cachedProfile);
+          setLoading(false);
+          setIsReady(true);
+        }
+      } catch (cacheErr) {
+        console.warn("AuthContext: profile cache read failed", cacheErr);
+      }
+
       try {
         const userDocRef = doc(db, "users", firebaseUser.uid);
         const userDoc = await getDoc(userDocRef);
+
+        if (!isCurrent()) return;
 
         if (userDoc.exists()) {
           const userData = userDoc.data();
@@ -77,33 +116,25 @@ export function AuthProvider({ children }) {
           setRole(null);
         }
       } catch (err) {
+        if (!isCurrent()) return;
         console.error("AuthContext: fetch role error", err);
-        try {
-          const cached = await AsyncStorage.getItem(
-            profileCacheKey(firebaseUser.uid),
-          );
-          if (cached) {
-            const userData = JSON.parse(cached);
-            const r = (userData.role ?? "").toString().toLowerCase();
-            setRole(r);
-            setProfile(userData);
-            setUser(userData);
-          } else {
-            setProfile(null);
-            setRole(null);
-          }
-        } catch (cacheErr) {
-          console.warn("AuthContext: profile cache read failed", cacheErr);
+        if (!cachedProfile) {
           setProfile(null);
           setRole(null);
         }
       } finally {
-        setLoading(false);
-        setIsReady(true);
+        if (isCurrent()) {
+          setLoading(false);
+          setIsReady(true);
+        }
       }
     });
 
-    return () => unsub();
+    return () => {
+      disposed = true;
+      authGenerationRef.current += 1;
+      unsub();
+    };
   }, []);
 
   const refreshUser = async () => {

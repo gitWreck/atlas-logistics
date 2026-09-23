@@ -66,6 +66,7 @@ import {
   lookupScannedShipmentOffline,
 } from "../../components/utilities/offlineScanLookup";
 import {
+  createLayeredBarcodeIndex,
   createScanGate,
   createSerialTaskQueue,
 } from "../../components/utilities/scanPerformance";
@@ -145,7 +146,6 @@ export default function ScannerScreen() {
 
   const [scanned, setScanned] = useState(false);
   const [processing, setProcessing] = useState(false);
-  const [scanQueueDepth, setScanQueueDepth] = useState(0);
   const [flashEnabled, setFlashEnabled] = useState(false);
   const [showManual, setShowManual] = useState(false);
 
@@ -191,14 +191,13 @@ export default function ScannerScreen() {
   const countdownTimerRef = useRef(null);
   const scanLookupCacheRef = useRef(createScanLookupCache());
   const tripBarcodeIndexRef = useRef(new Map());
+  const checkerBarcodeIndexRef = useRef(new Map());
   const cachedLocationRef = useRef(null);
   const summaryRefreshTimerRef = useRef(null);
   const scanGateRef = useRef(createScanGate());
   const scanQueueRef = useRef(null);
   if (!scanQueueRef.current) {
-    scanQueueRef.current = createSerialTaskQueue({
-      onDepthChange: setScanQueueDepth,
-    });
+    scanQueueRef.current = createSerialTaskQueue();
   }
   const detailsSheetHeight = useRef(
     new Animated.Value(DEFAULT_DETAILS_SHEET_HEIGHT),
@@ -537,9 +536,13 @@ export default function ScannerScreen() {
   }, []);
 
   useEffect(() => {
-    if (!isOnline || Object.keys(routeShipments).length === 0) return;
-    void warmShipmentCache(routeShipments);
-  }, [isOnline, routeShipments, warmShipmentCache]);
+    const knownShipments = {
+      ...effectiveShipmentsById,
+      ...routeShipments,
+    };
+    checkerBarcodeIndexRef.current =
+      buildShipmentMapBarcodeIndex(knownShipments);
+  }, [routeShipments, effectiveShipmentsById]);
 
   useEffect(() => {
     fetchTripScanSummary(resolvedTripId);
@@ -2069,8 +2072,12 @@ export default function ScannerScreen() {
           );
         }
       } else {
+        const localBarcodeIndex = createLayeredBarcodeIndex(
+          tripBarcodeIndexRef.current,
+          checkerBarcodeIndexRef.current,
+        );
         lookupResult = await lookupScannedShipment(db, barcode, {
-          tripIndex: tripBarcodeIndexRef.current,
+          tripIndex: localBarcodeIndex,
           cache: scanLookupCacheRef.current,
         });
         if (checkerLastMile && lookupResult?.shipmentDoc?.id) {
@@ -2395,7 +2402,9 @@ export default function ScannerScreen() {
     <View style={[styles.container, { backgroundColor: colors.bg }]}>
       <ScannerCameraPane
         scanEnabled={!scanInputPaused}
-        processing={processing || scanQueueDepth > 0}
+        // Network synchronization runs behind the scanner. Keep the active
+        // scan line visible so a queued update never looks like a camera lock.
+        processing={false}
         flashEnabled={flashEnabled}
         modeLabel={modeLabel}
         detailsSheetHeight={detailsSheetHeight}
