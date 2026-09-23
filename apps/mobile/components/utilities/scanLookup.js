@@ -224,50 +224,17 @@ export async function lookupScannedShipment(
     }
   }
 
-  const lookupTasks = [];
-
+  // Piece labels encode their parent shipment. Resolve that parent first;
+  // this turns the normal scanner path into one direct shipment read instead
+  // of waiting for every fallback query to finish.
   if (parentCode) {
-    lookupTasks.push(
-      getShipmentDocByCode(db, parentCode).then((shipmentDoc) => ({
-        kind: "parent",
-        shipmentDoc,
-      })),
-    );
-  }
-
-  barcodeVariants.forEach((codeVariant) => {
-    lookupTasks.push(
-      queryByPackageBarcode(db, codeVariant).then((shipmentDoc) => ({
-        kind: "barcode",
-        shipmentDoc,
-      })),
-    );
-    lookupTasks.push(
-      getDoc(doc(db, "shipments", codeVariant)).then((shipmentDoc) => ({
-        kind: "direct",
-        shipmentDoc: shipmentDoc.exists() ? shipmentDoc : null,
-      })),
-    );
-  });
-
-  lookupTasks.push(
-    getShipmentDocByCode(db, normalizedBarcode).then((shipmentDoc) => ({
-      kind: "fallback",
-      shipmentDoc,
-    })),
-  );
-
-  const results = await Promise.all(lookupTasks);
-
-  const parentResult = results.find((entry) => entry.kind === "parent");
-  if (parentResult?.shipmentDoc) {
-    const pkg = findPackageInShipment(
-      parentResult.shipmentDoc.data(),
-      normalizedBarcode,
-    );
+    const parentShipmentDoc = await getShipmentDocByCode(db, parentCode);
+    const pkg = parentShipmentDoc
+      ? findPackageInShipment(parentShipmentDoc.data(), normalizedBarcode)
+      : null;
     if (pkg) {
       const resolved = buildLookupResult(
-        parentResult.shipmentDoc,
+        parentShipmentDoc,
         normalizedBarcode,
         "package",
       );
@@ -275,6 +242,19 @@ export async function lookupScannedShipment(
       return resolved;
     }
   }
+
+  const results = await Promise.all([
+    ...barcodeVariants.map((codeVariant) =>
+      queryByPackageBarcode(db, codeVariant).then((shipmentDoc) => ({
+        kind: "barcode",
+        shipmentDoc,
+      })),
+    ),
+    getShipmentDocByCode(db, normalizedBarcode).then((shipmentDoc) => ({
+      kind: "shipment",
+      shipmentDoc,
+    })),
+  ]);
 
   const barcodeResult = results.find(
     (entry) => entry.kind === "barcode" && entry.shipmentDoc,
@@ -297,8 +277,7 @@ export async function lookupScannedShipment(
   }
 
   const directResult = results.find(
-    (entry) =>
-      (entry.kind === "direct" || entry.kind === "fallback") && entry.shipmentDoc,
+    (entry) => entry.kind === "shipment" && entry.shipmentDoc,
   );
   if (directResult?.shipmentDoc) {
     const resolved = buildLookupResult(

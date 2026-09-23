@@ -20,20 +20,8 @@ const {
   shipmentHasWarehouseCustodyPieces,
 } = require("../warehouse/packageDeliveryOperations");
 const {
-  sendAutomaticShipmentLifecycleNotification,
-  CUSTOMER_NOTIFICATION_TYPES,
-} = require("../notifications/customerNotificationService");
-const {
-  SEMAPHORE_API_KEY,
-  SEMAPHORE_SENDER_NAME,
-} = require("../../shared/sms-service");
-const {
   enforceMunicipalityDeliveryAccess,
 } = require("../routes/municipalityDeliveryAccess");
-const { defineSecret } = require("firebase-functions/params");
-
-const SMTP_EMAIL = defineSecret("SMTP_EMAIL");
-const SMTP_PASSWORD = defineSecret("SMTP_PASSWORD");
 
 function wasShipmentOutForDelivery(status = "") {
   const normalized = String(status || "").toUpperCase();
@@ -242,7 +230,6 @@ exports.loadPackagesToDeliveryManifest = onCall(
   {
     region: "asia-southeast1",
     maxInstances: 10,
-    secrets: [SEMAPHORE_API_KEY, SEMAPHORE_SENDER_NAME, SMTP_EMAIL, SMTP_PASSWORD],
   },
   async (req) => {
     const {
@@ -270,7 +257,17 @@ exports.loadPackagesToDeliveryManifest = onCall(
       location = null,
       gpsCoordinates = null,
       remarks = null,
+      notificationChannels = null,
     } = req.data || {};
+
+    const lifecycleChannels = {
+      sms: notificationChannels?.sms === true,
+      email: notificationChannels?.email === true,
+      push: notificationChannels?.push === true,
+    };
+    const shouldSendLifecycleNotification = Object.values(
+      lifecycleChannels,
+    ).some(Boolean);
 
     const normalizedPackageIds = new Set(normalizeStringList(packageIds));
     const hasPieceScope = normalizedPackageIds.size > 0;
@@ -293,7 +290,6 @@ exports.loadPackagesToDeliveryManifest = onCall(
     let resolvedVehicleId = null;
     let resolvedVehicleName = null;
     let checkerName = actorName || null;
-    let outForDeliveryNotifications = [];
 
     const shipmentRefs = resolvedShipmentIds.map((id) =>
       db.collection("shipments").doc(id),
@@ -553,22 +549,31 @@ exports.loadPackagesToDeliveryManifest = onCall(
           },
         });
 
-        if (!wasShipmentOutForDelivery(status)) {
-          outForDeliveryNotifications.push({
+        if (
+          !wasShipmentOutForDelivery(status) &&
+          shouldSendLifecycleNotification
+        ) {
+          const notificationJobRef = db
+            .collection("customer_notification_jobs")
+            .doc();
+          tx.set(notificationJobRef, {
+            status: "PENDING",
             shipmentId,
-            shipment: {
-              ...shipmentData,
-              packages: updatedPackages,
-              packageBreakdown,
-              status: shipmentStatus,
-              deliveryManifestId: manifestRefId,
-              deliveryVehicleId: resolvedVehicleId,
-              deliveryVehicleName: resolvedVehicleName,
-            },
+            notificationType: "OUT_FOR_DELIVERY",
             tripId:
               shipmentData.currentTripId ||
               shipmentData.currentTruckTripId ||
               null,
+            source: "CHECKER_LOAD_MANIFEST",
+            channels: lifecycleChannels,
+            actor: {
+              uid: actorUid,
+              name: checkerName,
+              role: actorRole || "checker",
+            },
+            attempts: 0,
+            createdAt: now,
+            updatedAt: now,
           });
         }
 
@@ -653,29 +658,6 @@ exports.loadPackagesToDeliveryManifest = onCall(
         }),
       ),
     );
-
-    for (const entry of outForDeliveryNotifications) {
-      try {
-        await sendAutomaticShipmentLifecycleNotification({
-          db,
-          shipment: entry.shipment,
-          shipmentId: entry.shipmentId,
-          tripId: entry.tripId,
-          notificationType: CUSTOMER_NOTIFICATION_TYPES.OUT_FOR_DELIVERY,
-          source: "CHECKER_LOAD_MANIFEST",
-          actor: {
-            uid: actorUid,
-            name: checkerName,
-            role: actorRole || "checker",
-          },
-        });
-      } catch (notificationError) {
-        console.error(
-          `[loadPackagesToDeliveryManifest] Notification failed for ${entry.shipmentId}:`,
-          notificationError,
-        );
-      }
-    }
 
     return {
       success: true,

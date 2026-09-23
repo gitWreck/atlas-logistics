@@ -125,15 +125,20 @@ export async function loadAssignedShipmentsToVehicle({
   packageIds = null,
   profile,
   remarks = "",
+  location = null,
+  notificationChannels = null,
 }) {
-  const location = await getCurrentLocationSafe();
+  const resolvedLocation = location || (await getCurrentLocationSafe());
   const response = await loadPackagesToDeliveryManifest({
     shipmentIds,
     ...(Array.isArray(packageIds) && packageIds.length > 0
       ? { packageIds }
       : {}),
-    location: location ? `${location.lat},${location.lng}` : null,
-    gpsCoordinates: location,
+    location: resolvedLocation
+      ? `${resolvedLocation.lat},${resolvedLocation.lng}`
+      : null,
+    gpsCoordinates: resolvedLocation,
+    notificationChannels,
     remarks: remarks || "Loaded out for delivery from checker app.",
   });
 
@@ -145,16 +150,26 @@ export async function markShipmentOutForDelivery({
   profile,
   tripId = null,
   remarks = "",
+  location = null,
+  notificationChannels = null,
 }) {
-  const location = await getCurrentLocationSafe();
+  const resolvedLocation = location || (await getCurrentLocationSafe());
+  const notify = notificationChannels
+    ? Object.values(notificationChannels).some(Boolean)
+    : false;
 
   await updateShipmentStatus({
     shipmentId,
     tripId,
     newStatus: "OUT_FOR_DELIVERY",
-    location,
+    location: resolvedLocation,
     remarks: remarks || "Checker marked shipment out for delivery.",
     sourceUI: "CHECKER_MOBILE",
+    notify,
+    notificationChannels,
+    notifySms: notificationChannels?.sms,
+    notifyEmail: notificationChannels?.email,
+    notifyPush: notificationChannels?.push,
     updatedBy: updatedBy(profile),
   });
 }
@@ -166,8 +181,10 @@ export async function reportCheckerFailedDelivery({
   reasonCode = null,
   remarks = "",
   failurePhotoUrls = null,
+  location = null,
+  notificationChannels = null,
 }) {
-  const location = await getCurrentLocationSafe();
+  const resolvedLocation = location || (await getCurrentLocationSafe());
   const response = await reportFailedDelivery({
     shipmentIds,
     ...(Array.isArray(packageIds) && packageIds.length > 0
@@ -175,8 +192,11 @@ export async function reportCheckerFailedDelivery({
       : {}),
     reasonCode,
     remarks: remarks || "Failed delivery reported from checker app.",
-    location: location ? `${location.lat},${location.lng}` : null,
-    gpsCoordinates: location,
+    location: resolvedLocation
+      ? `${resolvedLocation.lat},${resolvedLocation.lng}`
+      : null,
+    gpsCoordinates: resolvedLocation,
+    notificationChannels,
     ...(Array.isArray(failurePhotoUrls) && failurePhotoUrls.length > 0
       ? { failurePhotoUrls }
       : {}),
@@ -190,8 +210,10 @@ export async function returnCheckerShipmentsToWarehouse({
   profile,
   remarks = "",
   warehouseCode = "ODIONGAN_WAREHOUSE",
+  location = null,
+  notificationChannels = null,
 }) {
-  const location = await getCurrentLocationSafe();
+  const resolvedLocation = location || (await getCurrentLocationSafe());
   const response = await returnPackagesToWarehouse({
     shipmentIds,
     ...(Array.isArray(packageIds) && packageIds.length > 0
@@ -199,8 +221,11 @@ export async function returnCheckerShipmentsToWarehouse({
       : {}),
     warehouseCode,
     remarks: remarks || "Returned to Odiongan warehouse.",
-    location: location ? `${location.lat},${location.lng}` : null,
-    gpsCoordinates: location,
+    location: resolvedLocation
+      ? `${resolvedLocation.lat},${resolvedLocation.lng}`
+      : null,
+    gpsCoordinates: resolvedLocation,
+    notificationChannels,
   });
   return response?.data || {};
 }

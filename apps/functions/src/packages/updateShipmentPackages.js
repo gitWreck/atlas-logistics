@@ -1163,8 +1163,6 @@ exports.updateShipmentPackages = onCall(
         }
 
         completedTripId = tripId;
-        shouldTryAutoCompleteTrip = true;
-        if (tripId) autoCompleteTripIds.add(String(tripId));
         tx.update(tripRef, tripUpdate);
       }
 

@@ -42,12 +42,6 @@ export function AuthProvider({ children }) {
       }
 
       try {
-        try {
-          await ensureUserPublicId();
-        } catch (idError) {
-          console.warn("AuthContext: public ID sync skipped", idError);
-        }
-
         const userDocRef = doc(db, "users", firebaseUser.uid);
         const userDoc = await getDoc(userDocRef);
 
@@ -64,10 +58,18 @@ export function AuthProvider({ children }) {
           setRole(r);
           setProfile(fullProfile);
           setUser(fullProfile);
-          await AsyncStorage.setItem(
+          void AsyncStorage.setItem(
             profileCacheKey(firebaseUser.uid),
             JSON.stringify(fullProfile),
-          );
+          ).catch((cacheError) => {
+            console.warn("AuthContext: profile cache write skipped", cacheError);
+          });
+
+          // Public-ID repair is not required to route an authenticated user.
+          // Keep it out of the startup critical path.
+          void ensureUserPublicId().catch((idError) => {
+            console.warn("AuthContext: public ID sync skipped", idError);
+          });
         } else {
           // Fallback if Auth exists but Firestore doc doesn't
           setUser({ uid: firebaseUser.uid, email: firebaseUser.email });

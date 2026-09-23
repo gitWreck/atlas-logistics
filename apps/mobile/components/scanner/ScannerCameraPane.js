@@ -16,7 +16,7 @@ const FRAME_SIZE = 250;
 const SAFE_AREA_CONTROL_GAP = 8;
 
 export default function ScannerCameraPane({
-  scanned,
+  scanEnabled = true,
   processing,
   flashEnabled,
   modeLabel,
@@ -104,7 +104,7 @@ export default function ScannerCameraPane({
         style={styles.camera}
         facing="back"
         enableTorch={flashEnabled}
-        onBarcodeScanned={scanned ? undefined : onBarcodeScanned}
+        onBarcodeScanned={scanEnabled ? onBarcodeScanned : undefined}
         barcodeScannerSettings={{
           barcodeTypes: ["qr", "code128", "code39", "pdf417"],
         }}

@@ -158,6 +158,7 @@ export function useCheckerLastMileSync(checkerId, options = {}) {
   const [error, setError] = useState(null);
 
   const docUnsubsRef = useRef({});
+  const cacheWarmTimerRef = useRef(null);
 
   useEffect(() => {
     if (!checkerId) {
@@ -208,6 +209,7 @@ export function useCheckerLastMileSync(checkerId, options = {}) {
 
     const publishQueries = () => {
       setQueryShipments(mergeShipmentMaps(assignedMap, availableMap, activeMap));
+      setLoading(false);
     };
 
     // Helper to batch an array into chunks of size n
@@ -374,6 +376,7 @@ export function useCheckerLastMileSync(checkerId, options = {}) {
     } else {
       // no assigned municipalities: clear query shipments so UI shows empty
       setQueryShipments({});
+      setLoading(false);
     }
 
     // Manifests (unchanged, still scoped to checkerId)
@@ -418,9 +421,10 @@ export function useCheckerLastMileSync(checkerId, options = {}) {
   );
 
   const watchedDocIds = useMemo(() => {
-    const ids = new Set(manifestShipmentIds);
-    Object.keys(queryShipments).forEach((id) => ids.add(id));
-    return [...ids];
+    // Query listeners already stream changes for their result documents.
+    // Only add per-document listeners for manifest shipments not covered by
+    // one of those queries, avoiding one duplicate listener per shipment.
+    return manifestShipmentIds.filter((id) => !queryShipments[String(id)]);
   }, [manifestShipmentIds, queryShipments]);
 
   useEffect(() => {
@@ -492,10 +496,22 @@ export function useCheckerLastMileSync(checkerId, options = {}) {
   useEffect(() => {
     if (!checkerId || !isOnline) return;
     if (Object.keys(shipmentsById).length === 0) return;
-    void warmShipmentCache(shipmentsById, {
-      manifests,
-      assignedMunicipalities,
-    });
+    if (cacheWarmTimerRef.current) {
+      clearTimeout(cacheWarmTimerRef.current);
+    }
+    cacheWarmTimerRef.current = setTimeout(() => {
+      cacheWarmTimerRef.current = null;
+      void warmShipmentCache(shipmentsById, {
+        manifests,
+        assignedMunicipalities,
+      });
+    }, 500);
+    return () => {
+      if (cacheWarmTimerRef.current) {
+        clearTimeout(cacheWarmTimerRef.current);
+        cacheWarmTimerRef.current = null;
+      }
+    };
   }, [
     checkerId,
     isOnline,
@@ -506,10 +522,10 @@ export function useCheckerLastMileSync(checkerId, options = {}) {
   ]);
 
   useEffect(() => {
-    if (!isOnline && Object.keys(cachedShipmentsById).length > 0) {
+    if (Object.keys(cachedShipmentsById).length > 0) {
       setLoading(false);
     }
-  }, [isOnline, cachedShipmentsById]);
+  }, [cachedShipmentsById]);
 
   const municipalityLabels = useMemo(
     () =>

@@ -9,6 +9,7 @@ import {
   Animated,
 } from "react-native";
 import { useCameraPermissions } from "expo-camera";
+import { useAudioPlayer } from "expo-audio";
 import * as ImagePicker from "expo-image-picker";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import {
@@ -64,6 +65,10 @@ import {
   buildShipmentMapBarcodeIndex,
   lookupScannedShipmentOffline,
 } from "../../components/utilities/offlineScanLookup";
+import {
+  createScanGate,
+  createSerialTaskQueue,
+} from "../../components/utilities/scanPerformance";
 import {
   appendBatchDeliveryPiece,
   assertPieceEligibleForBatchScan,
@@ -134,9 +139,13 @@ export default function ScannerScreen() {
     useOfflineSync();
   const { shipmentsById: routeShipments } = useCheckerLastMile();
   const [permission, requestPermission] = useCameraPermissions();
+  const scanFeedbackPlayer = useAudioPlayer(
+    require("../../../web/public/sounds/alert1.mp3"),
+  );
 
   const [scanned, setScanned] = useState(false);
   const [processing, setProcessing] = useState(false);
+  const [scanQueueDepth, setScanQueueDepth] = useState(0);
   const [flashEnabled, setFlashEnabled] = useState(false);
   const [showManual, setShowManual] = useState(false);
 
@@ -184,7 +193,13 @@ export default function ScannerScreen() {
   const tripBarcodeIndexRef = useRef(new Map());
   const cachedLocationRef = useRef(null);
   const summaryRefreshTimerRef = useRef(null);
-  const lastScanRef = useRef({ code: "", at: 0 });
+  const scanGateRef = useRef(createScanGate());
+  const scanQueueRef = useRef(null);
+  if (!scanQueueRef.current) {
+    scanQueueRef.current = createSerialTaskQueue({
+      onDepthChange: setScanQueueDepth,
+    });
+  }
   const detailsSheetHeight = useRef(
     new Animated.Value(DEFAULT_DETAILS_SHEET_HEIGHT),
   ).current;
@@ -233,7 +248,7 @@ export default function ScannerScreen() {
     summaryRefreshTimerRef.current = setTimeout(() => {
       summaryRefreshTimerRef.current = null;
       void fetchTripScanSummary(targetTripId, { showLoading: false });
-    }, 800);
+    }, 3000);
   };
 
   const fetchTripScanSummary = async (
@@ -259,11 +274,23 @@ export default function ScannerScreen() {
       ]);
 
       const shipmentIds = shipmentSnap.docs.map((shipmentDoc) => shipmentDoc.id);
+      const cachedShipments = {
+        ...routeShipments,
+        ...effectiveShipmentsById,
+      };
       const shipmentDocs = shipmentIds.length
         ? await Promise.all(
-            shipmentIds.map((shipmentId) =>
-              getDoc(doc(db, "shipments", String(shipmentId))),
-            ),
+            shipmentIds.map((shipmentId) => {
+              const cached = cachedShipments[String(shipmentId)];
+              if (cached) {
+                return {
+                  id: String(shipmentId),
+                  exists: () => true,
+                  data: () => cached,
+                };
+              }
+              return getDoc(doc(db, "shipments", String(shipmentId)));
+            }),
           )
         : [];
       tripBarcodeIndexRef.current = buildTripBarcodeIndex(
@@ -647,6 +674,25 @@ export default function ScannerScreen() {
   }) => {
     clearSuccessTimers();
 
+    // Camera scans use the inline details panel so the modal never blocks the
+    // next label. Manual actions keep the richer confirmation dialog.
+    if (source === "scan") {
+      setSuccessModalVisible(false);
+      setSuccessPayload(null);
+      setLatestScan((current) => ({
+        ...current,
+        type: current.type === "checking" ? "package" : current.type,
+        code: barcode || current.code,
+        shipmentId: shipmentId || current.shipmentId,
+        packageStatus: packageStatus || current.packageStatus,
+        shipmentStatus: shipmentStatus || current.shipmentStatus,
+        title: pendingSync ? "Saved locally — pending sync" : "Scan synced",
+        source,
+      }));
+      setScanned(false);
+      return;
+    }
+
     setSuccessPayload({
       barcode,
       shipmentId,
@@ -780,6 +826,8 @@ export default function ScannerScreen() {
             remarks:
               remarks ||
               "Marked out for delivery via scan (legacy loaded piece).",
+            location,
+            notificationChannels,
           });
 
           showSuccessModal({
@@ -835,6 +883,8 @@ export default function ScannerScreen() {
           profile,
           remarks:
             remarks || "Loaded and marked out for delivery via checker scan.",
+          location,
+          notificationChannels,
         });
 
         showSuccessModal({
@@ -890,6 +940,8 @@ export default function ScannerScreen() {
           profile,
           reasonCode: "DELIVERY_FAILED",
           remarks: remarks || "Failed delivery reported via scan.",
+          location,
+          notificationChannels,
         });
         showSuccessModal({
           barcode,
@@ -936,6 +988,8 @@ export default function ScannerScreen() {
           packageIds: deliveryPieceIds,
           profile,
           remarks: remarks || "Returned to Odiongan warehouse via scan.",
+          location,
+          notificationChannels,
         });
         showSuccessModal({
           barcode,
@@ -1310,6 +1364,8 @@ export default function ScannerScreen() {
         reasonCode,
         remarks: note,
         failurePhotoUrls: photoUrls,
+        location: cachedLocationRef.current,
+        notificationChannels,
       });
 
       setFailedReasonVisible(false);
@@ -1353,6 +1409,8 @@ export default function ScannerScreen() {
         remarks: `Returned ${packageIds.length} piece${
           packageIds.length === 1 ? "" : "s"
         } to Odiongan warehouse.`,
+        location: cachedLocationRef.current,
+        notificationChannels,
       });
 
       clearBatchDeliverySession();
@@ -1864,11 +1922,6 @@ export default function ScannerScreen() {
     manualQtyOverride = null,
     source = "scan",
   ) => {
-    if (processing) return;
-
-    setProcessing(true);
-    Vibration.vibrate();
-
     const locationPromise = cachedLocationRef.current
       ? Promise.resolve(cachedLocationRef.current)
       : getCurrentLocationSafe().then((location) => {
@@ -2152,6 +2205,15 @@ export default function ScannerScreen() {
       });
     } catch (error) {
       console.error("Process package error:", error);
+      setLatestScan((current) => ({
+        ...current,
+        type: "checking",
+        code: barcode || current.code,
+        title: "Scan failed",
+        packageStatus: "ERROR",
+        shipmentStatus: "NOT SYNCED",
+        source,
+      }));
       Alert.alert(
         "Error",
         getActionErrorMessage(error, "Failed to process package."),
@@ -2162,26 +2224,38 @@ export default function ScannerScreen() {
   };
 
   const onCameraScan = ({ data }) => {
-    if (scanned || processing) return;
+    const decision = scanGateRef.current.accept(data);
+    if (!decision.accepted) return;
 
-    const code = String(data || "").trim();
-    if (!code) return;
-
-    const now = Date.now();
-    const lastScan = lastScanRef.current;
-    if (lastScan.code === code && now - lastScan.at < 1200) {
-      return;
+    // Local confirmation is deliberately synchronous. Firestore lookup and
+    // mutation continue on the serial queue without disabling CameraView.
+    Vibration.vibrate(35);
+    try {
+      void scanFeedbackPlayer.seekTo(0).catch(() => undefined);
+      scanFeedbackPlayer.play();
+    } catch {
+      // Sound is supplemental; visual and haptic feedback still complete.
     }
-    lastScanRef.current = { code, at: now };
-
-    setScanned(true);
-    handleProcessPackage(code, null, "scan");
+    setLatestScan({
+      ...EMPTY_SCAN_DETAILS,
+      type: "checking",
+      code: decision.code,
+      title: "Queued for validation",
+      packageStatus: "SYNCING",
+      shipmentStatus: "CHECKING",
+      source: "scan",
+    });
+    void scanQueueRef.current
+      .enqueue(() => handleProcessPackage(decision.code, null, "scan"))
+      .catch(() => undefined);
   };
 
   const onManualSubmit = async (code) => {
     setShowManual(false);
     setScanned(true);
-    await handleProcessPackage(code, null, "manual");
+    await scanQueueRef.current.enqueue(() =>
+      handleProcessPackage(code, null, "manual"),
+    );
   };
 
   const handleMarkOutForDelivery = () => {
@@ -2308,12 +2382,20 @@ export default function ScannerScreen() {
     !!pendingDelivery &&
     deliveryProofTotalCount >= DELIVERY_PROOF_MIN_IMAGES &&
     !deliveryProofUploading;
+  const scanInputPaused =
+    showManual ||
+    actionModalVisible ||
+    infoModalVisible ||
+    deliveryProofVisible ||
+    batchSummaryVisible ||
+    failedReasonVisible ||
+    successModalVisible;
 
   return (
     <View style={[styles.container, { backgroundColor: colors.bg }]}>
       <ScannerCameraPane
-        scanned={scanned}
-        processing={processing}
+        scanEnabled={!scanInputPaused}
+        processing={processing || scanQueueDepth > 0}
         flashEnabled={flashEnabled}
         modeLabel={modeLabel}
         detailsSheetHeight={detailsSheetHeight}

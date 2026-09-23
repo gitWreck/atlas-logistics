@@ -92,7 +92,14 @@ package.json
 !apps/functions/src/invoices/upsertFinanceInvoice.js
 !apps/functions/test/financeInvoiceProjection.test.js
 !apps/functions/test/shipmentSenderOptional.test.js
+!apps/functions/src/notifications/processCustomerNotificationJob.js
 !/apps/mobile/components/manager/ManagerTripScheduleModal.js
+
+# Scanner timing/queue logic and its focused regression test are source files.
+!/apps/mobile/components/utilities/
+/apps/mobile/components/utilities/*
+!/apps/mobile/components/utilities/scanPerformance.js
+!/apps/mobile/components/utilities/scanPerformance.test.cjs
 
 # Quick Access Expo Router screens must also be present in the EAS checkout.
 !/apps/mobile/app/(checker)/(tabs)/quick/

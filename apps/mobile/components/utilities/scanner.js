@@ -231,7 +231,13 @@ export const getModeLabel = (mode) => {
 };
 
 export const getLatestTypeLabel = (type) =>
-  type === "package" ? "Package" : type === "shipment" ? "Shipment" : "Waiting";
+  type === "package"
+    ? "Package"
+    : type === "shipment"
+      ? "Shipment"
+      : type === "checking"
+        ? "Checking"
+        : "Waiting";
 
 export const getProgressLabel = (mode) =>
   mode === "offloading" ? "Offloaded" : mode === "info" ? "Scanned" : "Loaded";

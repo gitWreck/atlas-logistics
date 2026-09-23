@@ -793,7 +793,7 @@ exports.updateShipmentStatus = onCall(
       });
     });
 
-    if (completedTripId) {
+    if (completedTripId && wasShipmentDelivered(derivedShipmentStatus)) {
       try {
         await tryAutoCompleteTrip(completedTripId, {
           actorId: uid,

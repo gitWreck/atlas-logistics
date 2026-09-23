@@ -164,6 +164,8 @@ exports.releaseForDeliveryOperations =
   require("./src/warehouse/releaseForDeliveryOperations").releaseForDeliveryOperations;
 exports.loadPackagesToDeliveryManifest =
   require("./src/checker/loadPackagesToDeliveryManifest").loadPackagesToDeliveryManifest;
+exports.processCustomerNotificationJob =
+  require("./src/notifications/processCustomerNotificationJob").processCustomerNotificationJob;
 exports.reportFailedDelivery =
   require("./src/checker/reportFailedDelivery").reportFailedDelivery;
 exports.returnPackagesToWarehouse =

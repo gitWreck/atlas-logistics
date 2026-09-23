@@ -1,11 +1,17 @@
+import React, { lazy, Suspense } from "react";
 import { Stack } from "expo-router";
 import { Alert, Platform } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { AuthProvider } from "../contexts/AuthContext";
 import { ThemeProvider } from "../contexts/ThemeContext";
-import CustomerNotificationProvider from "../components/notifications/CustomerNotificationProvider";
-import IncomingCallListener from "../components/calls/IncomingCallListener";
 import { ErrorBoundary } from "../components/ErrorBoundary";
+
+const IncomingCallListener = lazy(
+  () => import("../components/calls/IncomingCallListener"),
+);
+const CustomerNotificationBootstrap = lazy(
+  () => import("../components/notifications/CustomerNotificationProvider"),
+);
 
 // `Alert.alert` is a no-op on react-native-web, which makes confirmation
 // buttons (logout, delete, etc.) appear broken in the browser. Map it to the
@@ -42,10 +48,13 @@ export default function RootLayout() {
       <SafeAreaProvider>
         <ThemeProvider>
           <AuthProvider>
-            <CustomerNotificationProvider>
+            <Suspense fallback={null}>
+              <CustomerNotificationBootstrap />
+            </Suspense>
+            <Suspense fallback={null}>
               <IncomingCallListener />
-              <Stack screenOptions={{ headerShown: false }} />
-            </CustomerNotificationProvider>
+            </Suspense>
+            <Stack screenOptions={{ headerShown: false }} />
           </AuthProvider>
         </ThemeProvider>
       </SafeAreaProvider>
