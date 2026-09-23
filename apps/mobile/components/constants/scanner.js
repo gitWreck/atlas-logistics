@@ -1,6 +1,5 @@
 import { Dimensions } from "react-native";
 
-export const SUCCESS_MODAL_SECONDS = 2;
 export const DELIVERY_PROOF_MIN_IMAGES = 1;
 export const DELIVERY_PROOF_MAX_IMAGES = 5;
 

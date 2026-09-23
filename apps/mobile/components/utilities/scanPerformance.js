@@ -1,6 +1,15 @@
 const DEFAULT_SCAN_COOLDOWN_MS = 400;
 const DEFAULT_DUPLICATE_BLOCK_MS = 2500;
 const MAX_RECENT_SCAN_CODES = 200;
+const CHECKER_LOADED_STATUSES = new Set([
+  "LOADED_TO_DELIVERY_VEHICLE",
+  "LOADED",
+  "READY_FOR_DELIVERY",
+  "PARTIALLY_LOADED",
+  "OUT_FOR_DELIVERY",
+  "FAILED_DELIVERY",
+  "DELIVERED",
+]);
 
 function normalizeQueuedScanCode(value) {
   return String(value || "").trim().toUpperCase();
@@ -26,6 +35,35 @@ function selectCachedShipment(shipmentsById = {}, shipmentId = null) {
   const resolvedId = Array.isArray(shipmentId) ? shipmentId[0] : shipmentId;
   if (!resolvedId) return null;
   return shipmentsById[String(resolvedId)] || null;
+}
+
+/**
+ * Last-mile loading progress must come from piece custody, not the shipment's
+ * line-haul `loadedCount`, which can already equal the full shipment total.
+ */
+function countCheckerLoadedPieces(shipment = {}, checkerUid = null) {
+  const uid = String(checkerUid || "").trim();
+  if (!uid) return 0;
+
+  const packages = Array.isArray(shipment?.packages) ? shipment.packages : [];
+  return packages.reduce((sum, pkg = {}) => {
+    const loadedByChecker =
+      String(pkg.loadedByCheckerId || "").trim() === uid;
+    const checkerCustody =
+      String(pkg.custodyOwnerType || "").trim().toUpperCase() === "CHECKER" &&
+      String(pkg.custodyOwnerId || "").trim() === uid;
+    const status = String(pkg.status || "").trim().toUpperCase();
+
+    if (
+      (!loadedByChecker && !checkerCustody) ||
+      !CHECKER_LOADED_STATUSES.has(status)
+    ) {
+      return sum;
+    }
+
+    const quantity = Number(pkg.quantity);
+    return sum + (Number.isFinite(quantity) && quantity > 0 ? quantity : 1);
+  }, 0);
 }
 
 function createScanGate({
@@ -105,6 +143,7 @@ module.exports = {
   createLayeredBarcodeIndex,
   createScanGate,
   createSerialTaskQueue,
+  countCheckerLoadedPieces,
   normalizeQueuedScanCode,
   selectCachedShipment,
 };

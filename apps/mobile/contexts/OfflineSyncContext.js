@@ -73,9 +73,12 @@ export function OfflineSyncProvider({ children }) {
   }, [checkerId]);
 
   useEffect(() => {
-    void refreshCacheState();
+    // Keep online startup responsive: the durable shipment cache can be very
+    // large and is only needed when the device is actually offline.
+    setCachedShipmentsById({});
+    setCacheSavedAt(null);
     void refreshQueueState();
-  }, [refreshCacheState, refreshQueueState]);
+  }, [checkerId, refreshQueueState]);
 
   useEffect(() => {
     if (!isOnline) {
@@ -228,7 +231,10 @@ export function OfflineSyncProvider({ children }) {
   const warmShipmentCache = useCallback(
     async (shipmentsById = {}, extras = {}, options = {}) => {
       if (!checkerId) return {};
-      const merged = await upsertShipmentsInCache(checkerId, shipmentsById, extras);
+      const merged = await upsertShipmentsInCache(checkerId, shipmentsById, {
+        ...extras,
+        replace: options.replace === true,
+      });
       if (options.publish !== false) {
         setCachedShipmentsById(merged);
         setCacheSavedAt(Date.now());

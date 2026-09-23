@@ -4,6 +4,7 @@ const path = require("node:path");
 const test = require("node:test");
 
 const {
+  countCheckerLoadedPieces,
   createLayeredBarcodeIndex,
   createScanGate,
   createSerialTaskQueue,
@@ -90,6 +91,34 @@ test("blocks the same normalized QR for 2.5 seconds", () => {
   assert.equal(gate.accept(" PACKAGE-A ", 2499).reason, "duplicate");
   assert.equal(gate.accept("PACKAGE-A", 3499).reason, "duplicate");
   assert.equal(gate.accept("PACKAGE-A", 3500).accepted, true);
+});
+
+test("last-mile progress counts only pieces loaded by the active checker", () => {
+  const shipment = {
+    loadedCount: 3,
+    totals: { loaded: 3 },
+    packages: [
+      {
+        packageId: "PKG-01",
+        status: "OUT_FOR_DELIVERY",
+        loadedByCheckerId: "checker-1",
+      },
+      {
+        packageId: "PKG-02",
+        status: "RELEASED_FOR_DELIVERY",
+        custodyOwnerType: "WAREHOUSE",
+      },
+      {
+        packageId: "PKG-03",
+        status: "OUT_FOR_DELIVERY",
+        loadedByCheckerId: "checker-2",
+      },
+    ],
+  };
+
+  assert.equal(countCheckerLoadedPieces(shipment, "checker-1"), 1);
+  assert.equal(countCheckerLoadedPieces(shipment, "checker-2"), 1);
+  assert.equal(countCheckerLoadedPieces(shipment, null), 0);
 });
 
 test("serial task queue preserves order and continues after a failure", async () => {
@@ -215,6 +244,46 @@ test("scanner does not persist the entire shared route cache a second time", () 
   const source = readFileSync(scannerPath, "utf8");
 
   assert.doesNotMatch(source, /warmShipmentCache\(routeShipments\)/);
+});
+
+test("scanner success confirmations are persistent for camera and manual input", () => {
+  const sourceRoot = path.join(__dirname, "..", "..");
+  const scanner = readFileSync(
+    path.join(sourceRoot, "app", "(checker)", "scan.js"),
+    "utf8",
+  );
+  const modal = readFileSync(
+    path.join(sourceRoot, "components", "scanner", "ScanSuccessModal.js"),
+    "utf8",
+  );
+
+  assert.doesNotMatch(scanner, /if \(source === "scan"\)/);
+  assert.doesNotMatch(scanner, /SUCCESS_MODAL_SECONDS/);
+  assert.doesNotMatch(modal, /Auto-closing/);
+  assert.match(modal, /onScanAnother/);
+  assert.match(modal, /onDone/);
+});
+
+test("online startup does not hydrate or merge the full offline shipment cache", () => {
+  const sourceRoot = path.join(__dirname, "..", "..");
+  const offlineContext = readFileSync(
+    path.join(sourceRoot, "contexts", "OfflineSyncContext.js"),
+    "utf8",
+  );
+  const lastMile = readFileSync(
+    path.join(sourceRoot, "hooks", "useCheckerLastMileSync.js"),
+    "utf8",
+  );
+
+  assert.match(
+    offlineContext,
+    /if \(!isOnline\)[\s\S]{0,300}void refreshCacheState\(\)/,
+  );
+  assert.doesNotMatch(
+    offlineContext,
+    /useEffect\(\(\) => \{\s*void refreshCacheState\(\);\s*void refreshQueueState\(\)/,
+  );
+  assert.match(lastMile, /replace:\s*true/);
 });
 
 test("high-volume checker tabs use virtualized lists and freeze when inactive", () => {

@@ -509,7 +509,7 @@ export function useCheckerLastMileSync(checkerId, options = {}) {
         void warmShipmentCache(
           shipmentsById,
           { manifests, assignedMunicipalities },
-          { publish: false },
+          { publish: false, replace: true },
         );
       });
     }, 1500);

@@ -66,6 +66,7 @@ import {
   lookupScannedShipmentOffline,
 } from "../../components/utilities/offlineScanLookup";
 import {
+  countCheckerLoadedPieces,
   createLayeredBarcodeIndex,
   createScanGate,
   createSerialTaskQueue,
@@ -112,7 +113,6 @@ import {
   getPrimaryScanActions,
   isCheckerLastMileScanMode,
   ISSUE_SCAN_ACTIONS,
-  SUCCESS_MODAL_SECONDS,
 } from "../../components/constants/scanner";
 import { useAuth } from "../../contexts/AuthContext";
 import { useCheckerLastMile } from "../../contexts/CheckerLastMileContext";
@@ -136,7 +136,7 @@ export default function ScannerScreen() {
   const router = useRouter();
   const { colors } = useTheme();
   const { profile } = useAuth();
-  const { isOnline, enqueueOfflineOperation, effectiveShipmentsById, warmShipmentCache } =
+  const { isOnline, enqueueOfflineOperation, effectiveShipmentsById } =
     useOfflineSync();
   const { shipmentsById: routeShipments } = useCheckerLastMile();
   const [permission, requestPermission] = useCameraPermissions();
@@ -163,7 +163,6 @@ export default function ScannerScreen() {
 
   const [successModalVisible, setSuccessModalVisible] = useState(false);
   const [successPayload, setSuccessPayload] = useState(null);
-  const [countdown, setCountdown] = useState(SUCCESS_MODAL_SECONDS);
   const [deliveryProofVisible, setDeliveryProofVisible] = useState(false);
   const [deliveryProofPhotos, setDeliveryProofPhotos] = useState([]);
   const [deliveryProofRemarks, setDeliveryProofRemarks] = useState("");
@@ -187,8 +186,6 @@ export default function ScannerScreen() {
   const [notificationChannels, setNotificationChannels] = useState(
     DEFAULT_NOTIFICATION_CHANNELS,
   );
-  const successTimerRef = useRef(null);
-  const countdownTimerRef = useRef(null);
   const scanLookupCacheRef = useRef(createScanLookupCache());
   const tripBarcodeIndexRef = useRef(new Map());
   const checkerBarcodeIndexRef = useRef(new Map());
@@ -310,8 +307,15 @@ export default function ScannerScreen() {
           sum + getShipmentScannedCount(shipment, resolvedMode),
         0,
       );
+      const checkerLastMile = isCheckerLastMileScanMode(resolvedMode, {
+        tripId: resolvedTripId,
+      });
       const loadedPackages = shipments.reduce(
-        (sum, shipment) => sum + getShipmentLoadedCount(shipment),
+        (sum, shipment) =>
+          sum +
+          (checkerLastMile
+            ? countCheckerLoadedPieces(shipment, profile?.uid)
+            : getShipmentLoadedCount(shipment)),
         0,
       );
       const deliveredPackages = shipments.reduce(
@@ -346,12 +350,17 @@ export default function ScannerScreen() {
 
   const buildShipmentScanSummary = (shipmentDoc, shipmentData, modeValue) => {
     const totalPackages = getShipmentTotal(shipmentData);
-    const loadedPackages = getShipmentLoadedCount(shipmentData);
+    const checkerLastMile = isCheckerLastMileScanMode(modeValue, {
+      tripId: resolvedTripId,
+    });
+    const loadedPackages = checkerLastMile
+      ? countCheckerLoadedPieces(shipmentData, profile?.uid)
+      : getShipmentLoadedCount(shipmentData);
     const deliveredPackages = getShipmentDeliveredCount(shipmentData);
-    const baseScannedPackages = getShipmentScannedCount(
-      shipmentData,
-      modeValue,
-    );
+    const baseScannedPackages =
+      checkerLastMile && modeValue === "delivery"
+        ? loadedPackages
+        : getShipmentScannedCount(shipmentData, modeValue);
     const scannedPackages =
       modeValue === "offloading"
         ? Math.max(baseScannedPackages, loadedPackages)
@@ -375,6 +384,46 @@ export default function ScannerScreen() {
       deliveredPackages,
       progress,
     };
+  };
+
+  const showLoadedPiecesInShipmentSummary = (
+    shipmentId,
+    shipmentData,
+    packageIds,
+  ) => {
+    const loadedIds = new Set(
+      (Array.isArray(packageIds) ? packageIds : [])
+        .map(normalizeScanCode)
+        .filter(Boolean),
+    );
+    if (loadedIds.size === 0) return;
+
+    const optimisticShipment = {
+      ...shipmentData,
+      packages: (Array.isArray(shipmentData?.packages)
+        ? shipmentData.packages
+        : []
+      ).map((pkg) =>
+        loadedIds.has(normalizeScanCode(getPackageIdentity(pkg)))
+          ? {
+              ...pkg,
+              status: "OUT_FOR_DELIVERY",
+              loadedByCheckerId: profile?.uid || pkg.loadedByCheckerId,
+              custodyOwnerType: "CHECKER",
+              custodyOwnerId: profile?.uid || pkg.custodyOwnerId,
+              availableForDelivery: false,
+            }
+          : pkg,
+      ),
+    };
+
+    setShipmentSummary(
+      buildShipmentScanSummary(
+        { id: shipmentId },
+        optimisticShipment,
+        resolvedMode,
+      ),
+    );
   };
 
   const refreshShipmentScanSummary = async (shipmentId) => {
@@ -520,7 +569,6 @@ export default function ScannerScreen() {
 
   useEffect(() => {
     return () => {
-      clearSuccessTimers();
       if (summaryRefreshTimerRef.current) {
         clearTimeout(summaryRefreshTimerRef.current);
       }
@@ -557,13 +605,6 @@ export default function ScannerScreen() {
       getDefaultScanStatus(resolvedMode, { tripId: resolvedTripId }),
     );
   }, [resolvedMode, presetScanStatus, resolvedTripId]);
-
-  const clearSuccessTimers = () => {
-    if (successTimerRef.current) clearTimeout(successTimerRef.current);
-    if (countdownTimerRef.current) clearInterval(countdownTimerRef.current);
-    successTimerRef.current = null;
-    countdownTimerRef.current = null;
-  };
 
   const clearBatchDeliverySession = () => {
     setBatchDeliverySession(null);
@@ -658,11 +699,15 @@ export default function ScannerScreen() {
   };
 
   const closeSuccessModal = () => {
-    clearSuccessTimers();
     setSuccessModalVisible(false);
     setSuccessPayload(null);
     resetDeliveryProof();
     resetScanner();
+  };
+
+  const finishSuccessFlow = () => {
+    closeSuccessModal();
+    router.back();
   };
 
   const showSuccessModal = ({
@@ -675,27 +720,6 @@ export default function ScannerScreen() {
     source = "scan",
     pendingSync = false,
   }) => {
-    clearSuccessTimers();
-
-    // Camera scans use the inline details panel so the modal never blocks the
-    // next label. Manual actions keep the richer confirmation dialog.
-    if (source === "scan") {
-      setSuccessModalVisible(false);
-      setSuccessPayload(null);
-      setLatestScan((current) => ({
-        ...current,
-        type: current.type === "checking" ? "package" : current.type,
-        code: barcode || current.code,
-        shipmentId: shipmentId || current.shipmentId,
-        packageStatus: packageStatus || current.packageStatus,
-        shipmentStatus: shipmentStatus || current.shipmentStatus,
-        title: pendingSync ? "Saved locally — pending sync" : "Scan synced",
-        source,
-      }));
-      setScanned(false);
-      return;
-    }
-
     setSuccessPayload({
       barcode,
       shipmentId,
@@ -707,25 +731,9 @@ export default function ScannerScreen() {
       pendingSync,
     });
 
-    setCountdown(SUCCESS_MODAL_SECONDS);
     setSuccessModalVisible(true);
     setProcessing(false);
     setScanned(false);
-
-    countdownTimerRef.current = setInterval(() => {
-      setCountdown((prev) => {
-        if (prev <= 1) {
-          clearInterval(countdownTimerRef.current);
-          countdownTimerRef.current = null;
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-
-    successTimerRef.current = setTimeout(() => {
-      closeSuccessModal();
-    }, SUCCESS_MODAL_SECONDS * 1000);
   };
 
   if (!permission) return <View />;
@@ -866,6 +874,11 @@ export default function ScannerScreen() {
             shipmentSnapshot: shipmentDocData,
             notificationChannels,
           });
+          showLoadedPiecesInShipmentSummary(
+            shipmentId,
+            shipmentDocData,
+            loadPackageIds,
+          );
           showSuccessModal({
             barcode,
             shipmentId,
@@ -889,6 +902,13 @@ export default function ScannerScreen() {
           location,
           notificationChannels,
         });
+
+        showLoadedPiecesInShipmentSummary(
+          shipmentId,
+          shipmentDocData,
+          loadPackageIds,
+        );
+        void refreshShipmentScanSummary(shipmentId);
 
         showSuccessModal({
           barcode,
@@ -1132,7 +1152,6 @@ export default function ScannerScreen() {
   };
 
   const openDeliveryProofModal = (delivery) => {
-    clearSuccessTimers();
     setSuccessModalVisible(false);
     setSuccessPayload(null);
     setPendingDelivery({
@@ -2080,13 +2099,6 @@ export default function ScannerScreen() {
           tripIndex: localBarcodeIndex,
           cache: scanLookupCacheRef.current,
         });
-        if (checkerLastMile && lookupResult?.shipmentDoc?.id) {
-          const shipmentId = lookupResult.shipmentDoc.id;
-          const shipmentData = lookupResult.shipmentData;
-          void warmShipmentCache({
-            [shipmentId]: { id: shipmentId, ...shipmentData },
-          });
-        }
       }
 
       const [{ shipmentDoc, shipmentData, pkg, scanType }, resolvedLocation] =
@@ -2627,8 +2639,9 @@ export default function ScannerScreen() {
       <ScanSuccessModal
         visible={successModalVisible}
         payload={successPayload}
-        countdown={countdown}
-        onClose={closeSuccessModal}
+        onScanAnother={closeSuccessModal}
+        onDone={finishSuccessFlow}
+        onRequestClose={closeSuccessModal}
         accentColor={scanAccentColor}
       />
     </View>

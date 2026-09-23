@@ -12,8 +12,9 @@ import { useTheme } from "../../contexts/ThemeContext";
 export default function ScanSuccessModal({
   visible,
   payload,
-  countdown,
-  onClose,
+  onScanAnother,
+  onDone,
+  onRequestClose,
   accentColor = "#2563eb",
 }) {
   const { colors } = useTheme();
@@ -33,7 +34,7 @@ export default function ScanSuccessModal({
       visible={visible}
       transparent
       animationType="fade"
-      onRequestClose={onClose}
+      onRequestClose={onRequestClose}
     >
       <View style={styles.overlay}>
         <View style={[styles.card, { backgroundColor: colors.surface }]}>
@@ -109,7 +110,7 @@ export default function ScanSuccessModal({
 
           <TouchableOpacity
             style={[styles.primaryButton, { backgroundColor: accentColor }]}
-            onPress={onClose}
+            onPress={onScanAnother}
             activeOpacity={0.85}
           >
             <FontAwesome5 name="qrcode" size={14} color="#fff" />
@@ -118,7 +119,7 @@ export default function ScanSuccessModal({
 
           <TouchableOpacity
             style={[styles.doneButton, { borderColor: accentColor }]}
-            onPress={onClose}
+            onPress={onDone}
             activeOpacity={0.85}
           >
             <Text style={[styles.doneButtonText, { color: accentColor }]}>
@@ -126,9 +127,6 @@ export default function ScanSuccessModal({
             </Text>
           </TouchableOpacity>
 
-          <Text style={[styles.countdown, { color: colors.textMuted }]}>
-            Auto-closing in {countdown}s
-          </Text>
         </View>
       </View>
     </Modal>
@@ -231,12 +229,6 @@ const styles = StyleSheet.create({
     textAlign: "right",
     fontSize: 12,
     color: "#0f172a",
-    fontWeight: "700",
-  },
-  countdown: {
-    marginTop: 14,
-    fontSize: 12,
-    color: "#94a3b8",
     fontWeight: "700",
   },
   primaryButton: {

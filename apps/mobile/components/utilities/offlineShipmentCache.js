@@ -198,11 +198,15 @@ export async function applyOptimisticUpdateToCache(
 export async function upsertShipmentsInCache(
   checkerId,
   shipmentsById = {},
-  { manifests, assignedMunicipalities } = {},
+  { manifests, assignedMunicipalities, replace = false } = {},
 ) {
   if (!checkerId) return {};
-  const cached = await loadShipmentCache(checkerId);
-  const merged = mergeShipmentMaps(cached.shipmentsById, shipmentsById);
+  const cached = replace
+    ? { shipmentsById: {}, manifests: [], assignedMunicipalities: [] }
+    : await loadShipmentCache(checkerId);
+  const merged = replace
+    ? mergeShipmentMaps(shipmentsById)
+    : mergeShipmentMaps(cached.shipmentsById, shipmentsById);
   await saveShipmentCache(checkerId, {
     shipmentsById: merged,
     manifests: manifests ?? cached.manifests,
