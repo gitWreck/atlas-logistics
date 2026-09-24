@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   Animated,
   Easing,
@@ -50,10 +50,50 @@ function formatCount(value) {
   return Number.isFinite(num) ? num.toLocaleString() : "0";
 }
 
+function LoadingProgressIndicator() {
+  const [progressPercent, setProgressPercent] = useState(1);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setProgressPercent((current) => {
+        if (current >= 100) {
+          clearInterval(timer);
+          return 100;
+        }
+        return current + 1;
+      });
+    }, 90);
+
+    return () => clearInterval(timer);
+  }, []);
+
+  return (
+    <View
+      style={styles.loadingProgress}
+      accessible
+      accessibilityRole="progressbar"
+      accessibilityLabel="Dashboard loading progress"
+      accessibilityValue={{ min: 1, max: 100, now: progressPercent }}
+    >
+      <View style={styles.loadingProgressHeader}>
+        <Text style={styles.loadingProgressLabel}>Loading dashboard</Text>
+        <Text style={styles.loadingProgressPercent}>{progressPercent}%</Text>
+      </View>
+      <View style={styles.loadingProgressTrack}>
+        <View
+          style={[
+            styles.loadingProgressFill,
+            { width: `${progressPercent}%` },
+          ]}
+        />
+      </View>
+    </View>
+  );
+}
+
 export function CheckerHomeSkeleton() {
   const { colors } = useTheme();
   const pulse = useRef(new Animated.Value(0)).current;
-  const progress = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     const pulseAnimation = Animated.loop(
@@ -72,41 +112,17 @@ export function CheckerHomeSkeleton() {
         }),
       ]),
     );
-    const progressAnimation = Animated.loop(
-      Animated.timing(progress, {
-        toValue: 1,
-        duration: 1400,
-        easing: Easing.inOut(Easing.cubic),
-        useNativeDriver: true,
-      }),
-    );
     pulseAnimation.start();
-    progressAnimation.start();
     return () => {
       pulseAnimation.stop();
-      progressAnimation.stop();
     };
-  }, [progress, pulse]);
+  }, [pulse]);
 
   const pulseStyle = {
     opacity: pulse.interpolate({
       inputRange: [0, 1],
       outputRange: [0.42, 0.82],
     }),
-  };
-  const progressStyle = {
-    opacity: progress.interpolate({
-      inputRange: [0, 0.5, 1],
-      outputRange: [0.5, 1, 0.5],
-    }),
-    transform: [
-      {
-        scaleX: progress.interpolate({
-          inputRange: [0, 0.5, 1],
-          outputRange: [0.18, 0.72, 0.18],
-        }),
-      },
-    ],
   };
   const placeholder = { backgroundColor: colors.cardMuted };
   const statIcons = [
@@ -144,9 +160,7 @@ export function CheckerHomeSkeleton() {
         <Text style={styles.loadingSubtitle}>
           Syncing assignments and the latest delivery updates
         </Text>
-        <View style={styles.loadingProgressTrack}>
-          <Animated.View style={[styles.loadingProgressFill, progressStyle]} />
-        </View>
+        <LoadingProgressIndicator />
       </LinearGradient>
 
       <View style={styles.loadingBody}>
@@ -1046,13 +1060,34 @@ const styles = StyleSheet.create({
     textAlign: "center",
     marginTop: 5,
   },
-  loadingProgressTrack: {
+  loadingProgress: {
     width: "72%",
+    marginTop: 18,
+  },
+  loadingProgressHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 7,
+  },
+  loadingProgressLabel: {
+    color: "rgba(255,255,255,0.78)",
+    fontSize: 10,
+    fontWeight: "700",
+    letterSpacing: 0.2,
+  },
+  loadingProgressPercent: {
+    color: "#ffffff",
+    fontSize: 11,
+    fontWeight: "900",
+    fontVariant: ["tabular-nums"],
+  },
+  loadingProgressTrack: {
+    width: "100%",
     height: 5,
     borderRadius: 3,
     overflow: "hidden",
     backgroundColor: "rgba(255,255,255,0.18)",
-    marginTop: 20,
   },
   loadingProgressFill: {
     width: "100%",

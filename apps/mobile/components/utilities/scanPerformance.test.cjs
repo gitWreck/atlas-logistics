@@ -390,7 +390,12 @@ test("checker home loading state uses a compact branded animated layout", () => 
 
   assert.match(dashboard, /Preparing your dashboard/);
   assert.match(dashboard, /styles\.loadingProgressTrack/);
-  assert.match(dashboard, /Animated\.loop/);
+  assert.match(dashboard, /function LoadingProgressIndicator/);
+  assert.match(dashboard, /useState\(1\)/);
+  assert.match(dashboard, /current >= 100/);
+  assert.match(dashboard, /\{progressPercent\}%/);
+  assert.match(dashboard, /accessibilityRole="progressbar"/);
+  assert.match(dashboard, /width: `\$\{progressPercent\}%`/);
   assert.match(dashboard, /accessibilityLabel="Loading checker home data"/);
   assert.doesNotMatch(dashboard, /Array\.from\(\{ length: 6 \}/);
   assert.doesNotMatch(dashboard, /Loading your latest deliveries/);
