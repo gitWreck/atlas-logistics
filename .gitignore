@@ -110,6 +110,8 @@ package.json
 !/apps/mobile/components/utilities/navigationPersistence.test.cjs
 !/apps/mobile/components/utilities/offlineQueuePerformance.js
 !/apps/mobile/components/utilities/offlineQueuePerformance.test.cjs
+!/apps/mobile/components/utilities/checkerRealtime.js
+!/apps/mobile/components/utilities/checkerRealtime.test.cjs
 
 # Quick Access Expo Router screens must also be present in the EAS checkout.
 !/apps/mobile/app/(checker)/(tabs)/quick/

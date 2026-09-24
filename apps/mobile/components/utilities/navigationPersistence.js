@@ -53,6 +53,19 @@ function getAllowedGroups(scope) {
   return ALLOWED_GROUPS_BY_SCOPE[scope] || null;
 }
 
+function navigateBackOrFallback(router, fallbackHref) {
+  if (!router) return false;
+  if (typeof router.canGoBack === "function" && router.canGoBack()) {
+    router.back();
+    return true;
+  }
+  if (fallbackHref && typeof router.replace === "function") {
+    router.replace(fallbackHref);
+    return true;
+  }
+  return false;
+}
+
 function createPersistedRoute({
   scope,
   segments = [],
@@ -115,6 +128,7 @@ module.exports = {
   createPersistedRoute,
   getNavigationScope,
   getNavigationStorageKey,
+  navigateBackOrFallback,
   parsePersistedRoute,
   sanitizeParams,
 };

@@ -105,7 +105,11 @@ test("checker startup defers queue hydration and observes only current manifests
   assert.match(offlineContext, /InteractionManager\.runAfterInteractions/);
   assert.match(offlineContext, /syncNow\(\{ retryFailed: false \}\)/);
   assert.doesNotMatch(offlineContext, /getPendingCount/);
-  assert.match(lastMile, /collectCurrentManifestIds\(queryShipments\)/);
+  assert.match(lastMile, /collectCurrentManifestIds\(/);
+  assert.match(
+    lastMile,
+    /mergeShipmentMaps\(cachedShipmentsById, queryShipments\)/,
+  );
   assert.match(
     lastMile,
     /doc\(db, "delivery_manifests", manifestId\)/,

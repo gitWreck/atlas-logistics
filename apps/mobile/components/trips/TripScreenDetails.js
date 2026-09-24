@@ -27,6 +27,7 @@ import TripSummaryCard from "./TripSummaryCard";
 import TripProgressStepper from "./TripProgressStepper";
 import TripStatusRow from "./TripStatusRow";
 import GradientButton from "../ui/figma/GradientButton";
+import { navigateBackOrFallback } from "../utilities/navigationPersistence";
 
 import {
   clearTruckDelay,
@@ -60,6 +61,11 @@ export default function TripDetailsScreen() {
 
   const { tripId } = useLocalSearchParams();
   const router = useRouter();
+  const goBack = () =>
+    navigateBackOrFallback(
+      router,
+      isDriver ? "/(driver)/(tabs)" : "/(checker)/(tabs)",
+    );
 
   const [trip, setTrip] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -84,7 +90,7 @@ export default function TripDetailsScreen() {
           });
         } else {
           Alert.alert("Error", "Trip not found");
-          router.back();
+          goBack();
         }
         setLoading(false);
       },
@@ -331,7 +337,7 @@ export default function TripDetailsScreen() {
               styles.backGhostBtn,
               { backgroundColor: colors.surface, borderColor: colors.border },
             ]}
-            onPress={() => router.back()}
+            onPress={goBack}
           >
             <Text style={[styles.backGhostBtnText, { color: colors.text }]}>
               Go Back
@@ -356,7 +362,7 @@ export default function TripDetailsScreen() {
         ]}
       >
         <TouchableOpacity
-          onPress={() => router.back()}
+          onPress={goBack}
           style={[
             styles.backBtn,
             { backgroundColor: colors.cardMuted, borderColor: colors.border },

@@ -48,6 +48,63 @@ function formatCount(value) {
   return Number.isFinite(num) ? num.toLocaleString() : "0";
 }
 
+export function CheckerHomeSkeleton() {
+  const { colors } = useTheme();
+  const { width } = useWindowDimensions();
+  const heroHeight = clamp(width * 0.52, 220, 268);
+  const placeholder = { backgroundColor: colors.cardMuted };
+
+  return (
+    <ScrollView
+      style={{ flex: 1, backgroundColor: colors.bg }}
+      contentContainerStyle={styles.skeletonContent}
+      showsVerticalScrollIndicator={false}
+      accessibilityLabel="Loading checker home data"
+    >
+      <View
+        style={[
+          styles.skeletonHero,
+          { width, height: heroHeight, backgroundColor: colors.surface },
+        ]}
+      >
+        <View style={[styles.skeletonAvatar, placeholder]} />
+        <View style={styles.skeletonGreeting}>
+          <View style={[styles.skeletonLineWide, placeholder]} />
+          <View style={[styles.skeletonLineMedium, placeholder]} />
+        </View>
+        <View style={[styles.skeletonDate, placeholder]} />
+        <View style={[styles.skeletonArea, placeholder]} />
+      </View>
+
+      <View style={styles.skeletonStatusRow}>
+        <ActivityIndicator size="small" color={COLORS.blue} />
+        <Text style={[styles.skeletonStatusText, { color: colors.textMuted }]}>
+          Loading your latest deliveries…
+        </Text>
+      </View>
+
+      <View style={styles.skeletonGrid}>
+        {Array.from({ length: 6 }, (_, index) => (
+          <View
+            key={`home-skeleton-${index}`}
+            style={[
+              styles.skeletonCard,
+              {
+                backgroundColor: colors.surface,
+                borderColor: colors.border,
+              },
+            ]}
+          >
+            <View style={[styles.skeletonIcon, placeholder]} />
+            <View style={[styles.skeletonLineMedium, placeholder]} />
+            <View style={[styles.skeletonValue, placeholder]} />
+          </View>
+        ))}
+      </View>
+    </ScrollView>
+  );
+}
+
 function SectionTitle({ icon, title, onViewAll }) {
   const { colors } = useTheme();
   return (
@@ -766,6 +823,87 @@ export function DeliveredHistoryList({
 }
 
 const styles = StyleSheet.create({
+  skeletonContent: {
+    paddingBottom: 28,
+  },
+  skeletonHero: {
+    paddingHorizontal: SCREEN_PADDING,
+    paddingTop: 24,
+    position: "relative",
+  },
+  skeletonAvatar: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+  },
+  skeletonGreeting: {
+    position: "absolute",
+    left: SCREEN_PADDING + 66,
+    right: SCREEN_PADDING,
+    top: 28,
+    gap: 10,
+  },
+  skeletonLineWide: {
+    width: "72%",
+    height: 18,
+    borderRadius: 9,
+  },
+  skeletonLineMedium: {
+    width: "58%",
+    height: 12,
+    borderRadius: 6,
+  },
+  skeletonDate: {
+    position: "absolute",
+    left: SCREEN_PADDING,
+    bottom: 52,
+    width: "46%",
+    height: 54,
+    borderRadius: 18,
+  },
+  skeletonArea: {
+    position: "absolute",
+    left: SCREEN_PADDING,
+    right: SCREEN_PADDING,
+    bottom: 22,
+    height: 12,
+    borderRadius: 6,
+  },
+  skeletonStatusRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 10,
+    paddingVertical: 18,
+  },
+  skeletonStatusText: {
+    fontSize: 13,
+    fontWeight: "700",
+  },
+  skeletonGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    paddingHorizontal: SCREEN_PADDING,
+    gap: GRID_GAP,
+  },
+  skeletonCard: {
+    width: "48%",
+    minHeight: 126,
+    borderWidth: 1,
+    borderRadius: 18,
+    padding: 16,
+    gap: 13,
+  },
+  skeletonIcon: {
+    width: 34,
+    height: 34,
+    borderRadius: 12,
+  },
+  skeletonValue: {
+    width: "30%",
+    height: 22,
+    borderRadius: 11,
+  },
   hero: {
     position: "relative",
     overflow: "hidden",

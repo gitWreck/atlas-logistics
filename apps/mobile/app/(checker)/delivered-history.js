@@ -15,6 +15,7 @@ import { format, startOfDay, subDays } from "date-fns";
 import { db } from "../../firebase";
 import { useAuth } from "../../contexts/AuthContext";
 import { useTheme } from "../../contexts/ThemeContext";
+import { navigateBackOrFallback } from "../../components/utilities/navigationPersistence";
 import { useCheckerLastMile } from "../../contexts/CheckerLastMileContext";
 import {
   DeliveredHistoryList,
@@ -217,7 +218,7 @@ export default function DeliveredHistoryPage() {
       >
         <TouchableOpacity
           style={[styles.backButton, { backgroundColor: colors.cardMuted }]}
-          onPress={() => router.back()}
+          onPress={() => navigateBackOrFallback(router, "/(checker)/(tabs)")}
           activeOpacity={0.75}
         >
           <FontAwesome5 name="chevron-left" size={16} color={colors.text} />

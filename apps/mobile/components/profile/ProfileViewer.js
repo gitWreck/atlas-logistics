@@ -34,6 +34,7 @@ import ShipmentDetailHeader from "../shipments/ShipmentDetailHeader";
 import DropdownModal from "../customer/RequestPickup/DropdownModal";
 import OfflineSyncQueueModal from "../checker/OfflineSyncQueueModal";
 import { PROVINCES, getCities } from "../utilities/PhilippinesData";
+import { navigateBackOrFallback } from "../utilities/navigationPersistence";
 
 const EMPTY_VALUE = "Not provided";
 const ACCOUNT_DELETION_POLICY_URL =
@@ -132,6 +133,11 @@ export default function ProfileViewer({
   const isDriver = user?.role === "driver";
   const isManager = user?.role === "manager";
   const isStaff = isChecker || isDriver || isAdminOps;
+  const profileFallbackHref = isDriver
+    ? "/(driver)/(tabs)"
+    : isCustomer
+      ? "/(customer)"
+      : "/(checker)/(tabs)";
   const profilePhotoURL = String(user?.photoURL || "").trim();
   const config = roleConfig[user?.role] || {
     icon: "user-circle",
@@ -562,7 +568,7 @@ export default function ProfileViewer({
         <ShipmentDetailHeader
           title="Profile"
           subtitle="Account and address details"
-          onBack={() => router.back()}
+          onBack={() => navigateBackOrFallback(router, profileFallbackHref)}
         />
       )}
 

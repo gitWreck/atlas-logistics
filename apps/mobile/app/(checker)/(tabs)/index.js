@@ -12,6 +12,7 @@ import { useTheme } from "../../../contexts/ThemeContext";
 import { useCheckerLastMile } from "../../../contexts/CheckerLastMileContext";
 import {
   CheckerHomeHero,
+  CheckerHomeSkeleton,
   DateFilterModal,
   DeliveredHistoryList,
   QuickActions,
@@ -64,6 +65,7 @@ export default function CheckerIndex() {
     shipmentsById = {},
     assignedMunicipalities = [],
     loading: statsLoading = false,
+    hasCachedSnapshot = false,
   } = useCheckerLastMile();
 
   const [refreshing, setRefreshing] = useState(false);
@@ -71,6 +73,10 @@ export default function CheckerIndex() {
   const [datePickerVisible, setDatePickerVisible] = useState(false);
   const [activityDates, setActivityDates] = useState([]);
   const checkerId = profile?.uid || user?.uid;
+  const showInitialSkeleton =
+    statsLoading &&
+    !hasCachedSnapshot &&
+    Object.keys(shipmentsById || {}).length === 0;
 
   const goToScan = useCallback((mode, title, extra = {}) => {
     router.push({
@@ -248,6 +254,10 @@ export default function CheckerIndex() {
     },
   ], [glance, goAvailable, goRoute, goHistory]);
 
+  if (showInitialSkeleton) {
+    return <CheckerHomeSkeleton />;
+  }
+
   return (
     <View style={[styles.container, { backgroundColor: colors.bg }]}>
       <ScrollView
@@ -268,7 +278,7 @@ export default function CheckerIndex() {
           onProfilePress={() => router.push("/(checker)/profile")}
           currentDate={selectedDate}
           onDatePress={() => setDatePickerVisible(true)}
-          dateLoading={statsLoading}
+          dateLoading={statsLoading && !hasCachedSnapshot}
           assignedAreas={assignedMunicipalities}
         />
 

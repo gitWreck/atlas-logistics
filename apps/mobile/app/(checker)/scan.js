@@ -117,6 +117,7 @@ import {
 } from "../../components/constants/scanner";
 import { useAuth } from "../../contexts/AuthContext";
 import { useCheckerLastMile } from "../../contexts/CheckerLastMileContext";
+import { navigateBackOrFallback } from "../../components/utilities/navigationPersistence";
 import { useOfflineSync } from "../../contexts/OfflineSyncContext";
 import { useTheme } from "../../contexts/ThemeContext";
 
@@ -2464,7 +2465,7 @@ export default function ScannerScreen() {
         flashEnabled={flashEnabled}
         modeLabel={modeLabel}
         detailsSheetHeight={detailsSheetHeight}
-        onBack={() => router.back()}
+        onBack={() => navigateBackOrFallback(router, "/(checker)/(tabs)")}
         onToggleFlash={() => setFlashEnabled((current) => !current)}
         onBarcodeScanned={onCameraScan}
         accentColor={scanAccentColor}

@@ -34,13 +34,18 @@ export function OfflineSyncProvider({ children }) {
   const { isOnline } = useNetworkStatus();
 
   const [cachedShipmentsById, setCachedShipmentsById] = useState({});
+  const [cachedManifests, setCachedManifests] = useState([]);
+  const [cachedAssignedMunicipalities, setCachedAssignedMunicipalities] =
+    useState([]);
   const [cacheSavedAt, setCacheSavedAt] = useState(null);
+  const [cacheHydrated, setCacheHydrated] = useState(false);
   const [pendingOperations, setPendingOperations] = useState([]);
   const [pendingCount, setPendingCount] = useState(0);
   const [syncing, setSyncing] = useState(false);
   const [lastSyncResult, setLastSyncResult] = useState(null);
   const [queueHydrated, setQueueHydrated] = useState(false);
   const syncInFlightRef = useRef(false);
+  const cacheLoadGenerationRef = useRef(0);
   const prevOnlineRef = useRef(true);
   const initialSyncDoneRef = useRef(false);
 
@@ -58,25 +63,45 @@ export function OfflineSyncProvider({ children }) {
   }, [checkerId]);
 
   const refreshCacheState = useCallback(async () => {
+    const generation = ++cacheLoadGenerationRef.current;
     if (!checkerId) {
       setCachedShipmentsById({});
+      setCachedManifests([]);
+      setCachedAssignedMunicipalities([]);
       setCacheSavedAt(null);
+      setCacheHydrated(true);
       return;
     }
-    const cached = await loadShipmentCache(checkerId);
-    setCachedShipmentsById(cached.shipmentsById || {});
-    setCacheSavedAt(cached.savedAt || null);
+    try {
+      const cached = await loadShipmentCache(checkerId);
+      if (generation !== cacheLoadGenerationRef.current) return;
+      setCachedShipmentsById(cached.shipmentsById || {});
+      setCachedManifests(cached.manifests || []);
+      setCachedAssignedMunicipalities(
+        cached.assignedMunicipalities || [],
+      );
+      setCacheSavedAt(cached.savedAt || null);
+    } finally {
+      if (generation === cacheLoadGenerationRef.current) {
+        setCacheHydrated(true);
+      }
+    }
   }, [checkerId]);
 
   useEffect(() => {
-    // Keep online startup responsive: the durable shipment cache can be very
-    // large and is only needed when the device is actually offline.
+    // The cache contains only the current checker work set. Hydrate it on
+    // every launch so useful UI can render while Firestore listeners reconcile
+    // newer documents in the background.
     setCachedShipmentsById({});
+    setCachedManifests([]);
+    setCachedAssignedMunicipalities([]);
     setCacheSavedAt(null);
+    setCacheHydrated(false);
     setPendingOperations([]);
     setPendingCount(0);
     setQueueHydrated(false);
     initialSyncDoneRef.current = false;
+    void refreshCacheState();
 
     let timer = null;
     const task = InteractionManager.runAfterInteractions(() => {
@@ -89,16 +114,7 @@ export function OfflineSyncProvider({ children }) {
       task?.cancel?.();
       if (timer) clearTimeout(timer);
     };
-  }, [checkerId, refreshQueueState]);
-
-  useEffect(() => {
-    if (!isOnline) {
-      // Background cache persistence intentionally avoids publishing large
-      // maps while online. Reload the latest durable snapshot only when it is
-      // needed for offline operation.
-      void refreshCacheState();
-    }
-  }, [isOnline, refreshCacheState]);
+  }, [checkerId, refreshCacheState, refreshQueueState]);
 
   const syncNow = useCallback(async ({ retryFailed = true } = {}) => {
     if (!checkerId || !profile || syncInFlightRef.current) {
@@ -289,8 +305,11 @@ export function OfflineSyncProvider({ children }) {
       pendingSummaries,
       lastSyncResult,
       cachedShipmentsById,
+      cachedManifests,
+      cachedAssignedMunicipalities,
       effectiveShipmentsById,
       cacheSavedAt,
+      cacheHydrated,
       syncNow,
       enqueueOfflineOperation,
       warmShipmentCache,
@@ -306,8 +325,11 @@ export function OfflineSyncProvider({ children }) {
       pendingSummaries,
       lastSyncResult,
       cachedShipmentsById,
+      cachedManifests,
+      cachedAssignedMunicipalities,
       effectiveShipmentsById,
       cacheSavedAt,
+      cacheHydrated,
       syncNow,
       enqueueOfflineOperation,
       warmShipmentCache,

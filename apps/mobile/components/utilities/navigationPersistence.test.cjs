@@ -7,6 +7,7 @@ const {
   createPersistedRoute,
   getNavigationScope,
   getNavigationStorageKey,
+  navigateBackOrFallback,
   parsePersistedRoute,
 } = require("./navigationPersistence");
 
@@ -84,6 +85,25 @@ test("maps roles to allowed navigation scopes and binds storage to the user", ()
   assert.equal(getNavigationStorageKey(" user-1 "), "atlas_last_route_user-1");
 });
 
+test("cold-restored screens fall back safely when no back stack exists", () => {
+  const calls = [];
+  const withHistory = {
+    canGoBack: () => true,
+    back: () => calls.push("back"),
+    replace: (href) => calls.push(`replace:${href}`),
+  };
+  const withoutHistory = {
+    canGoBack: () => false,
+    back: () => calls.push("unexpected-back"),
+    replace: (href) => calls.push(`replace:${href}`),
+  };
+
+  navigateBackOrFallback(withHistory, "/(checker)/(tabs)");
+  navigateBackOrFallback(withoutHistory, "/(checker)/(tabs)");
+
+  assert.deepEqual(calls, ["back", "replace:/(checker)/(tabs)"]);
+});
+
 test("root layout tracks routes and logout clears the saved route", () => {
   const sourceRoot = path.join(__dirname, "..", "..");
   const rootLayout = readFileSync(
@@ -108,4 +128,34 @@ test("root layout tracks routes and logout clears the saved route", () => {
     authContext,
     /AsyncStorage\.removeItem\(navigationStorageKey\)/,
   );
+});
+
+test("checker screens use a fallback instead of assuming back history", () => {
+  const sourceRoot = path.join(__dirname, "..", "..");
+  const files = [
+    path.join(sourceRoot, "app", "(checker)", "scan.js"),
+    path.join(sourceRoot, "app", "(checker)", "delivered-history.js"),
+    path.join(
+      sourceRoot,
+      "app",
+      "(checker)",
+      "chat",
+      "[conversationId].js",
+    ),
+    path.join(sourceRoot, "components", "checker", "DeliveryLoadScreen.js"),
+    path.join(sourceRoot, "components", "profile", "ProfileViewer.js"),
+    path.join(
+      sourceRoot,
+      "components",
+      "shipments",
+      "ShipmentDetailsScreen.js",
+    ),
+    path.join(sourceRoot, "components", "trips", "TripScreenDetails.js"),
+  ];
+
+  files.forEach((file) => {
+    const source = readFileSync(file, "utf8");
+    assert.match(source, /navigateBackOrFallback/);
+    assert.doesNotMatch(source, /router\.back\(\)/);
+  });
 });

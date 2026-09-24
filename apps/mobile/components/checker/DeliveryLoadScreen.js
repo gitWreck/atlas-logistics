@@ -15,6 +15,7 @@ import { useAuth } from "../../contexts/AuthContext";
 import { useTheme } from "../../contexts/ThemeContext";
 import { useDeliveryManifests } from "../../hooks/useDeliveryManifests";
 import DeliveryManifestCard from "../../components/checker/DeliveryManifestCard";
+import { navigateBackOrFallback } from "../utilities/navigationPersistence";
 
 const FILTER_TABS = [
   { value: "all", label: "All" },
@@ -157,7 +158,7 @@ export default function DeliveryLoadScreen({ showBackButton = false }) {
         <View style={styles.backRow}>
           <TouchableOpacity
             style={styles.backBtn}
-            onPress={() => router.back()}
+            onPress={() => navigateBackOrFallback(router, "/(checker)/(tabs)")}
             activeOpacity={0.8}
           >
             <FontAwesome5 name="arrow-left" size={14} color={colors.text} />

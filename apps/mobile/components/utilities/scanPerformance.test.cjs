@@ -348,7 +348,7 @@ test("checker startup feed avoids the unbounded historical assignment listener",
   assert.match(lastMile, /offlineCacheShipments/);
 });
 
-test("online startup does not hydrate or merge the full offline shipment cache", () => {
+test("online startup hydrates the bounded current-work cache before live refresh", () => {
   const sourceRoot = path.join(__dirname, "..", "..");
   const offlineContext = readFileSync(
     path.join(sourceRoot, "contexts", "OfflineSyncContext.js"),
@@ -358,16 +358,23 @@ test("online startup does not hydrate or merge the full offline shipment cache",
     path.join(sourceRoot, "hooks", "useCheckerLastMileSync.js"),
     "utf8",
   );
+  const checkerHome = readFileSync(
+    path.join(sourceRoot, "app", "(checker)", "(tabs)", "index.js"),
+    "utf8",
+  );
 
   assert.match(
     offlineContext,
-    /if \(!isOnline\)[\s\S]{0,300}void refreshCacheState\(\)/,
+    /void refreshCacheState\(\)/,
   );
-  assert.doesNotMatch(
-    offlineContext,
-    /useEffect\(\(\) => \{\s*void refreshCacheState\(\);\s*void refreshQueueState\(\)/,
-  );
+  assert.match(offlineContext, /cacheHydrated/);
+  assert.match(lastMile, /liveQueryReady/);
+  assert.match(lastMile, /cachedAssignedMunicipalities/);
+  assert.match(lastMile, /snap\.docChanges\(\)/);
+  assert.doesNotMatch(lastMile, /snap\.docs\.forEach/);
   assert.match(lastMile, /replace:\s*true/);
+  assert.match(checkerHome, /<CheckerHomeSkeleton/);
+  assert.match(checkerHome, /hasCachedSnapshot/);
 });
 
 test("high-volume checker tabs use virtualized lists and freeze when inactive", () => {

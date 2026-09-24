@@ -51,6 +51,7 @@ import ExistingProofsViewer from "../tracking/ExistingProofsViewer";
 import ShipmentPackagesPanel from "./details/ShipmentPackagesPanel";
 import CustodyTimeline from "../custody/CustodyTimeline";
 import { useShipmentCustodyTimeline } from "../../hooks/useShipmentCustodyTimeline";
+import { navigateBackOrFallback } from "../utilities/navigationPersistence";
 
 const DEFAULT_NOTIFICATION_CHANNELS = {
   sms: true,
@@ -72,6 +73,15 @@ export default function ShipmentDetailsScreen({ initialShipment = null }) {
   const { isDriver, isStaff, isCheckerOps, profile } = useAuth();
   const { colors, resolvedScheme } = useTheme();
   const isDark = resolvedScheme === "dark";
+  const goBack = () =>
+    navigateBackOrFallback(
+      router,
+      isDriver
+        ? "/(driver)/(tabs)"
+        : isStaff || isCheckerOps
+          ? "/(checker)/(tabs)"
+          : "/(customer)",
+    );
 
   const resolvedTripId = parentTripId || tripId;
 
@@ -153,7 +163,7 @@ export default function ShipmentDetailsScreen({ initialShipment = null }) {
           setShipment({ id: snap.id, ...snap.data() });
         } else {
           Alert.alert("Error", "Shipment data not found");
-          router.back();
+          goBack();
         }
       } catch (error) {
         console.error("Shipment details fetch error:", error);
@@ -279,7 +289,7 @@ export default function ShipmentDetailsScreen({ initialShipment = null }) {
           "Returned",
           "Shipment returned to Odiongan warehouse. It is no longer on your deliveries.",
         );
-        router.back();
+        goBack();
         setActionLoading(false);
         return;
       }
@@ -308,7 +318,7 @@ export default function ShipmentDetailsScreen({ initialShipment = null }) {
         });
 
         Alert.alert("Success", "Package collected successfully.");
-        router.back();
+        goBack();
         return;
       }
 
@@ -380,7 +390,7 @@ export default function ShipmentDetailsScreen({ initialShipment = null }) {
             }
 
             Alert.alert("Success", "Delivery completed.");
-            router.back();
+            goBack();
           } catch (error) {
             console.error("Complete delivery error:", error);
             Alert.alert(
@@ -471,7 +481,7 @@ export default function ShipmentDetailsScreen({ initialShipment = null }) {
         );
       }
 
-      router.back();
+      goBack();
     } catch (error) {
       console.error("Report issue error:", error);
       Alert.alert("Error", error.message || "Failed to report issue.");
@@ -558,7 +568,7 @@ export default function ShipmentDetailsScreen({ initialShipment = null }) {
     return (
       <SafeAreaView style={[styles.container, { backgroundColor: colors.bg }]}>
         <StatusBar style={isDark ? "light" : "dark"} />
-        <ShipmentDetailHeader onBack={() => router.back()} />
+        <ShipmentDetailHeader onBack={goBack} />
       </SafeAreaView>
     );
   }
@@ -605,7 +615,7 @@ export default function ShipmentDetailsScreen({ initialShipment = null }) {
     <SafeAreaView style={[styles.container, { backgroundColor: colors.bg }]}>
       <StatusBar style={isDark ? "light" : "dark"} />
 
-      <ShipmentDetailHeader onBack={() => router.back()} />
+      <ShipmentDetailHeader onBack={goBack} />
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
         <ShipmentHeaderCard

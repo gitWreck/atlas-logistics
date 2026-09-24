@@ -24,6 +24,7 @@ import {
   resolveShipmentMunicipality,
 } from "../components/utilities/deliveryMunicipalities";
 import { useOfflineSync } from "../contexts/OfflineSyncContext";
+import { applyFirestoreDocumentChanges } from "../components/utilities/checkerRealtime";
 
 const CLOSED_MANIFEST_STATUSES = new Set(["CLOSED", "COMPLETED", "CANCELLED"]);
 
@@ -156,7 +157,10 @@ export function useCheckerLastMileSync(checkerId, options = {}) {
   const {
     isOnline,
     cachedShipmentsById,
-    setCachedShipmentsById,
+    cachedManifests,
+    cachedAssignedMunicipalities,
+    cacheHydrated,
+    cacheSavedAt,
     pendingOperations,
     effectiveShipmentsById,
     warmShipmentCache,
@@ -166,11 +170,33 @@ export function useCheckerLastMileSync(checkerId, options = {}) {
   const [manifests, setManifests] = useState([]);
   const [assignedMunicipalities, setAssignedMunicipalities] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [assignmentResolved, setAssignmentResolved] = useState(false);
+  const [liveQueryReady, setLiveQueryReady] = useState(false);
   const [error, setError] = useState(null);
 
   const docUnsubsRef = useRef({});
   const cacheWarmTimerRef = useRef(null);
   const cacheWarmTaskRef = useRef(null);
+  const assignmentReady =
+    allMunicipalities ||
+    assignmentResolved ||
+    assignedMunicipalities.length > 0;
+
+  useEffect(() => {
+    if (
+      !checkerId ||
+      allMunicipalities ||
+      !Array.isArray(cachedAssignedMunicipalities) ||
+      cachedAssignedMunicipalities.length === 0
+    ) return;
+    setAssignedMunicipalities((current) =>
+      current.length > 0 ? current : cachedAssignedMunicipalities,
+    );
+  }, [
+    checkerId,
+    allMunicipalities,
+    cachedAssignedMunicipalities,
+  ]);
 
   useEffect(() => {
     if (!checkerId) {
@@ -179,14 +205,19 @@ export function useCheckerLastMileSync(checkerId, options = {}) {
       setManifests([]);
       setAssignedMunicipalities([]);
       setLoading(false);
+      setAssignmentResolved(false);
+      setLiveQueryReady(false);
       return undefined;
     }
 
     setLoading(true);
+    setAssignmentResolved(false);
+    setLiveQueryReady(false);
     setError(null);
 
     if (allMunicipalities) {
       setAssignedMunicipalities([...DELIVERY_MUNICIPALITIES]);
+      setAssignmentResolved(true);
       return undefined;
     }
 
@@ -202,8 +233,12 @@ export function useCheckerLastMileSync(checkerId, options = {}) {
             ? data.assignedMunicipalities
             : [],
         );
+        setAssignmentResolved(true);
       },
-      (err) => console.warn("Checker profile listener failed:", err),
+      (err) => {
+        console.warn("Checker profile listener failed:", err);
+        setAssignmentResolved(true);
+      },
     );
 
     return () => {
@@ -214,9 +249,17 @@ export function useCheckerLastMileSync(checkerId, options = {}) {
   // Subscribe to current shipments using municipality-scoped queries.
   useEffect(() => {
     if (!checkerId) return undefined;
+    if (!assignmentReady) {
+      return undefined;
+    }
+
+    setLiveQueryReady(false);
 
     const availableBuckets = new Map();
     const activeBuckets = new Map();
+    const expectedBuckets = new Set();
+    const readyBuckets = new Set();
+    const failedBuckets = new Set();
     let publishTimer = null;
 
     const publishQueries = () => {
@@ -227,7 +270,11 @@ export function useCheckerLastMileSync(checkerId, options = {}) {
           ...activeBuckets.values(),
         ),
       );
-      setLoading(false);
+      const allBucketsSettled =
+        expectedBuckets.size === 0 ||
+        [...expectedBuckets].every((key) => readyBuckets.has(key));
+      setLiveQueryReady(allBucketsSettled && failedBuckets.size === 0);
+      if (allBucketsSettled) setLoading(false);
     };
 
     const schedulePublishQueries = () => {
@@ -245,23 +292,36 @@ export function useCheckerLastMileSync(checkerId, options = {}) {
     const unsubs = [];
 
     const subscribeAvailable = (muniFilter = null, bucketKey = "all") => {
+      const readinessKey = `available:${bucketKey}`;
+      expectedBuckets.add(readinessKey);
       const constraints = [where("availableForDelivery", "==", true)];
       if (muniFilter) constraints.push(where("municipality", "in", muniFilter));
       return onSnapshot(
         query(collection(db, "shipments"), ...constraints),
         (snap) => {
-          const nextBucket = {};
-          snap.docs.forEach((docSnap) => {
-            nextBucket[docSnap.id] = { id: docSnap.id, ...docSnap.data() };
-          });
-          availableBuckets.set(bucketKey, nextBucket);
+          availableBuckets.set(
+            bucketKey,
+            applyFirestoreDocumentChanges(
+              availableBuckets.get(bucketKey),
+              snap.docChanges(),
+            ),
+          );
+          readyBuckets.add(readinessKey);
           schedulePublishQueries();
         },
-        (err) => console.warn("Checker available pool failed:", err),
+        (err) => {
+          console.warn("Checker available pool failed:", err);
+          readyBuckets.add(readinessKey);
+          failedBuckets.add(readinessKey);
+          setError(err);
+          schedulePublishQueries();
+        },
       );
     };
 
     const subscribeActive = (muniFilter = null, bucketKey = "all") => {
+      const readinessKey = `active:${bucketKey}`;
+      expectedBuckets.add(readinessKey);
       const constraints = [
         where("activeCheckerIds", "array-contains", String(checkerId)),
       ];
@@ -269,14 +329,23 @@ export function useCheckerLastMileSync(checkerId, options = {}) {
       return onSnapshot(
         query(collection(db, "shipments"), ...constraints),
         (snap) => {
-          const nextBucket = {};
-          snap.docs.forEach((docSnap) => {
-            nextBucket[docSnap.id] = { id: docSnap.id, ...docSnap.data() };
-          });
-          activeBuckets.set(bucketKey, nextBucket);
+          activeBuckets.set(
+            bucketKey,
+            applyFirestoreDocumentChanges(
+              activeBuckets.get(bucketKey),
+              snap.docChanges(),
+            ),
+          );
+          readyBuckets.add(readinessKey);
           schedulePublishQueries();
         },
-        (err) => console.warn("Checker activeCheckerIds failed:", err),
+        (err) => {
+          console.warn("Checker activeCheckerIds failed:", err);
+          readyBuckets.add(readinessKey);
+          failedBuckets.add(readinessKey);
+          setError(err);
+          schedulePublishQueries();
+        },
       );
     };
 
@@ -308,6 +377,7 @@ export function useCheckerLastMileSync(checkerId, options = {}) {
     } else {
       // no assigned municipalities: clear query shipments so UI shows empty
       setQueryShipments({});
+      setLiveQueryReady(true);
       setLoading(false);
     }
 
@@ -317,11 +387,21 @@ export function useCheckerLastMileSync(checkerId, options = {}) {
         try { u(); } catch (e) { /* ignore */ }
       });
     };
-  }, [checkerId, allMunicipalities, assignedMunicipalities.join("|")]);
+  }, [
+    checkerId,
+    allMunicipalities,
+    assignmentReady,
+    assignedMunicipalities.join("|"),
+  ]);
 
   const currentManifestIds = useMemo(
-    () => collectCurrentManifestIds(queryShipments),
-    [queryShipments],
+    () =>
+      collectCurrentManifestIds(
+        liveQueryReady
+          ? queryShipments
+          : mergeShipmentMaps(cachedShipmentsById, queryShipments),
+      ),
+    [cachedShipmentsById, queryShipments, liveQueryReady],
   );
 
   // A checker may have years of closed manifests. Querying all of them at
@@ -330,11 +410,20 @@ export function useCheckerLastMileSync(checkerId, options = {}) {
   // carry their manifest ID, so observe only those referenced by live work.
   useEffect(() => {
     if (!checkerId || currentManifestIds.length === 0) {
-      setManifests([]);
+      setManifests(
+        !liveQueryReady && Array.isArray(cachedManifests)
+          ? cachedManifests
+          : [],
+      );
       return undefined;
     }
 
-    const manifestMap = new Map();
+    const currentIdSet = new Set(currentManifestIds);
+    const manifestMap = new Map(
+      (Array.isArray(cachedManifests) ? cachedManifests : [])
+        .filter((manifest) => currentIdSet.has(String(manifest?.id || "")))
+        .map((manifest) => [String(manifest.id), manifest]),
+    );
     const publishManifests = () => {
       const next = [...manifestMap.values()]
         .filter(
@@ -348,6 +437,7 @@ export function useCheckerLastMileSync(checkerId, options = {}) {
         );
       setManifests(next);
     };
+    publishManifests();
 
     const unsubs = currentManifestIds.map((manifestId) =>
       onSnapshot(
@@ -370,7 +460,11 @@ export function useCheckerLastMileSync(checkerId, options = {}) {
     return () => {
       unsubs.forEach((unsub) => unsub());
     };
-  }, [checkerId, currentManifestIds.join("|")]);
+  }, [
+    checkerId,
+    currentManifestIds.join("|"),
+    cachedManifests,
+  ]);
 
   const manifestShipmentIds = useMemo(
     () => collectShipmentIdsFromManifests(manifests),
@@ -447,6 +541,9 @@ export function useCheckerLastMileSync(checkerId, options = {}) {
     if (!isOnline) {
       return effectiveShipmentsById;
     }
+    if (!liveQueryReady) {
+      return mergeShipmentMaps(effectiveShipmentsById, shipmentsById);
+    }
     if (pendingOperations.length > 0) {
       return mergeShipmentMaps(shipmentsById, effectiveShipmentsById);
     }
@@ -459,6 +556,7 @@ export function useCheckerLastMileSync(checkerId, options = {}) {
     shipmentsById,
     effectiveShipmentsById,
     pendingOperations.length,
+    liveQueryReady,
   ]);
 
   useEffect(() => {
@@ -497,10 +595,13 @@ export function useCheckerLastMileSync(checkerId, options = {}) {
   ]);
 
   useEffect(() => {
-    if (Object.keys(cachedShipmentsById).length > 0) {
+    if (
+      cacheHydrated &&
+      (cacheSavedAt || Object.keys(cachedShipmentsById).length > 0)
+    ) {
       setLoading(false);
     }
-  }, [cachedShipmentsById]);
+  }, [cacheHydrated, cacheSavedAt, cachedShipmentsById]);
 
   const municipalityLabels = useMemo(
     () =>
@@ -656,5 +757,7 @@ export function useCheckerLastMileSync(checkerId, options = {}) {
     assignedMunicipalities: municipalityLabels,
     municipalityLabel,
     hasMunicipalityAssignment,
+    hasCachedSnapshot: Boolean(cacheHydrated && cacheSavedAt),
+    liveQueryReady,
   };
 }

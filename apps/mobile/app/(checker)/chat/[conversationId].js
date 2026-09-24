@@ -4,6 +4,7 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 
 import ChatThread from "../../../components/chat/ChatThread";
 import { useTheme } from "../../../contexts/ThemeContext";
+import { navigateBackOrFallback } from "../../../components/utilities/navigationPersistence";
 
 export default function CheckerChatThreadScreen() {
   const { conversationId } = useLocalSearchParams();
@@ -14,7 +15,9 @@ export default function CheckerChatThreadScreen() {
     <View style={[styles.container, { backgroundColor: colors.surface }]}>
       <ChatThread
         conversationId={conversationId ? String(conversationId) : null}
-        onBack={() => router.back()}
+        onBack={() =>
+          navigateBackOrFallback(router, "/(checker)/(tabs)/messages")
+        }
         showSenderProfilePhotos
       />
     </View>
