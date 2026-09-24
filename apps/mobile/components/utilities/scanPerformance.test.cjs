@@ -377,6 +377,47 @@ test("online startup hydrates the bounded current-work cache before live refresh
   assert.match(checkerHome, /hasCachedSnapshot/);
 });
 
+test("checker home loading state uses a compact branded animated layout", () => {
+  const dashboard = readFileSync(
+    path.join(
+      __dirname,
+      "..",
+      "checker",
+      "CheckerHomeDashboard.js",
+    ),
+    "utf8",
+  );
+
+  assert.match(dashboard, /Preparing your dashboard/);
+  assert.match(dashboard, /styles\.loadingProgressTrack/);
+  assert.match(dashboard, /Animated\.loop/);
+  assert.match(dashboard, /accessibilityLabel="Loading checker home data"/);
+  assert.doesNotMatch(dashboard, /Array\.from\(\{ length: 6 \}/);
+  assert.doesNotMatch(dashboard, /Loading your latest deliveries/);
+});
+
+test("checker home quick actions omit the duplicate My Deliveries shortcut", () => {
+  const dashboard = readFileSync(
+    path.join(
+      __dirname,
+      "..",
+      "checker",
+      "CheckerHomeDashboard.js",
+    ),
+    "utf8",
+  );
+  const quickActions = dashboard.slice(
+    dashboard.indexOf("export function QuickActions"),
+    dashboard.indexOf("export function DeliveredHistoryList"),
+  );
+
+  assert.doesNotMatch(quickActions, /title="My Deliveries"/);
+  assert.doesNotMatch(quickActions, /onRoute/);
+  assert.match(quickActions, /title="Load to Van"/);
+  assert.match(quickActions, /title="Offload"/);
+  assert.match(quickActions, /title="Scan Info"/);
+});
+
 test("high-volume checker tabs use virtualized lists and freeze when inactive", () => {
   const sourceRoot = path.join(__dirname, "..", "..");
   const available = readFileSync(

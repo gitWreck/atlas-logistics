@@ -1,5 +1,7 @@
-import React from "react";
+import React, { useEffect, useRef } from "react";
 import {
+  Animated,
+  Easing,
   View,
   Text,
   StyleSheet,
@@ -50,9 +52,69 @@ function formatCount(value) {
 
 export function CheckerHomeSkeleton() {
   const { colors } = useTheme();
-  const { width } = useWindowDimensions();
-  const heroHeight = clamp(width * 0.52, 220, 268);
+  const pulse = useRef(new Animated.Value(0)).current;
+  const progress = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const pulseAnimation = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulse, {
+          toValue: 1,
+          duration: 850,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulse, {
+          toValue: 0,
+          duration: 850,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+      ]),
+    );
+    const progressAnimation = Animated.loop(
+      Animated.timing(progress, {
+        toValue: 1,
+        duration: 1400,
+        easing: Easing.inOut(Easing.cubic),
+        useNativeDriver: true,
+      }),
+    );
+    pulseAnimation.start();
+    progressAnimation.start();
+    return () => {
+      pulseAnimation.stop();
+      progressAnimation.stop();
+    };
+  }, [progress, pulse]);
+
+  const pulseStyle = {
+    opacity: pulse.interpolate({
+      inputRange: [0, 1],
+      outputRange: [0.42, 0.82],
+    }),
+  };
+  const progressStyle = {
+    opacity: progress.interpolate({
+      inputRange: [0, 0.5, 1],
+      outputRange: [0.5, 1, 0.5],
+    }),
+    transform: [
+      {
+        scaleX: progress.interpolate({
+          inputRange: [0, 0.5, 1],
+          outputRange: [0.18, 0.72, 0.18],
+        }),
+      },
+    ],
+  };
   const placeholder = { backgroundColor: colors.cardMuted };
+  const statIcons = [
+    { icon: "box", color: "#2563eb", soft: "#dbeafe" },
+    { icon: "truck", color: "#16a34a", soft: "#dcfce7" },
+    { icon: "check", color: "#0891b2", soft: "#cffafe" },
+    { icon: "undo", color: "#f97316", soft: "#ffedd5" },
+  ];
 
   return (
     <ScrollView
@@ -61,45 +123,138 @@ export function CheckerHomeSkeleton() {
       showsVerticalScrollIndicator={false}
       accessibilityLabel="Loading checker home data"
     >
-      <View
-        style={[
-          styles.skeletonHero,
-          { width, height: heroHeight, backgroundColor: colors.surface },
-        ]}
+      <LinearGradient
+        colors={["#075de8", "#043fbe", "#032b78"]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.loadingHero}
       >
-        <View style={[styles.skeletonAvatar, placeholder]} />
-        <View style={styles.skeletonGreeting}>
-          <View style={[styles.skeletonLineWide, placeholder]} />
-          <View style={[styles.skeletonLineMedium, placeholder]} />
+        <View style={styles.loadingOrbLarge} />
+        <View style={styles.loadingOrbSmall} />
+        <View style={styles.loadingBrandRow}>
+          <View style={styles.loadingBrandIcon}>
+            <FontAwesome5 name="truck" size={16} color="#075de8" />
+          </View>
+          <Text style={styles.loadingBrandText}>ATLAS TRANSPORT</Text>
         </View>
-        <View style={[styles.skeletonDate, placeholder]} />
-        <View style={[styles.skeletonArea, placeholder]} />
-      </View>
-
-      <View style={styles.skeletonStatusRow}>
-        <ActivityIndicator size="small" color={COLORS.blue} />
-        <Text style={[styles.skeletonStatusText, { color: colors.textMuted }]}>
-          Loading your latest deliveries…
+        <View style={styles.loadingRouteIcon}>
+          <FontAwesome5 name="route" size={25} color="#ffffff" />
+        </View>
+        <Text style={styles.loadingTitle}>Preparing your dashboard</Text>
+        <Text style={styles.loadingSubtitle}>
+          Syncing assignments and the latest delivery updates
         </Text>
-      </View>
+        <View style={styles.loadingProgressTrack}>
+          <Animated.View style={[styles.loadingProgressFill, progressStyle]} />
+        </View>
+      </LinearGradient>
 
-      <View style={styles.skeletonGrid}>
-        {Array.from({ length: 6 }, (_, index) => (
+      <View style={styles.loadingBody}>
+        <View style={styles.loadingSectionHeader}>
+          <Text style={[styles.loadingSectionTitle, { color: colors.text }]}>
+            Today at a Glance
+          </Text>
           <View
-            key={`home-skeleton-${index}`}
             style={[
-              styles.skeletonCard,
-              {
-                backgroundColor: colors.surface,
-                borderColor: colors.border,
-              },
+              styles.loadingSyncPill,
+              { backgroundColor: colors.cardMuted },
             ]}
           >
-            <View style={[styles.skeletonIcon, placeholder]} />
-            <View style={[styles.skeletonLineMedium, placeholder]} />
-            <View style={[styles.skeletonValue, placeholder]} />
+            <View style={styles.loadingSyncDot} />
+            <Text style={[styles.loadingSyncText, { color: colors.textMuted }]}>
+              Updating
+            </Text>
           </View>
-        ))}
+        </View>
+
+        <View style={styles.loadingStatsGrid}>
+          {statIcons.map((item) => (
+            <View
+              key={item.icon}
+              style={[
+                styles.loadingStatCard,
+                {
+                  backgroundColor: colors.surface,
+                  borderColor: colors.border,
+                },
+              ]}
+            >
+              <View
+                style={[
+                  styles.loadingStatIcon,
+                  { backgroundColor: item.soft },
+                ]}
+              >
+                <FontAwesome5 name={item.icon} size={15} color={item.color} />
+              </View>
+              <View style={styles.loadingStatCopy}>
+                <Animated.View
+                  style={[
+                    styles.loadingLinePrimary,
+                    placeholder,
+                    pulseStyle,
+                  ]}
+                />
+                <Animated.View
+                  style={[
+                    styles.loadingLineSecondary,
+                    placeholder,
+                    pulseStyle,
+                  ]}
+                />
+              </View>
+              <Animated.View
+                style={[styles.loadingCount, placeholder, pulseStyle]}
+              />
+            </View>
+          ))}
+        </View>
+
+        <Text style={[styles.loadingSectionTitle, { color: colors.text }]}>
+          Quick Actions
+        </Text>
+        <View style={styles.loadingActionsRow}>
+          {["truck-loading", "map-marker-alt"].map((icon, index) => (
+            <View
+              key={icon}
+              style={[
+                styles.loadingActionCard,
+                {
+                  backgroundColor: colors.surface,
+                  borderColor: colors.border,
+                },
+              ]}
+            >
+              <View
+                style={[
+                  styles.loadingActionIcon,
+                  { backgroundColor: index === 0 ? "#dbeafe" : "#dcfce7" },
+                ]}
+              >
+                <FontAwesome5
+                  name={icon}
+                  size={17}
+                  color={index === 0 ? "#2563eb" : "#16a34a"}
+                />
+              </View>
+              <Animated.View
+                style={[styles.loadingActionLine, placeholder, pulseStyle]}
+              />
+            </View>
+          ))}
+        </View>
+
+        <View
+          style={[
+            styles.loadingNotice,
+            { backgroundColor: colors.surface, borderColor: colors.border },
+          ]}
+        >
+          <FontAwesome5 name="shield-alt" size={14} color="#2563eb" />
+          <Text style={[styles.loadingNoticeText, { color: colors.textMuted }]}>
+            Securely refreshing only the newest route changes
+          </Text>
+        </View>
       </View>
     </ScrollView>
   );
@@ -652,7 +807,7 @@ export function QuickActionCard({ title, subtitle, icon, color, onPress }) {
   );
 }
 
-export function QuickActions({ onLoad, onRoute, onOffload, onInfo }) {
+export function QuickActions({ onLoad, onOffload, onInfo }) {
   const { width } = useWindowDimensions();
   const actionWidth = clamp(width * 0.52, 178, 222);
 
@@ -674,16 +829,6 @@ export function QuickActions({ onLoad, onRoute, onOffload, onInfo }) {
             color={SECTION.load.accent}
             softColor="#f4f8ff"
             onPress={onLoad}
-          />
-        </View>
-        <View style={[styles.quickRailItem, { width: actionWidth }]}>
-          <QuickActionCard
-            title="My Deliveries"
-            subtitle="View your deliveries"
-            icon="map-marker-alt"
-            color={SECTION.route.accent}
-            softColor="#f3fff7"
-            onPress={onRoute}
           />
         </View>
         <View style={[styles.quickRailItem, { width: actionWidth }]}>
@@ -824,85 +969,218 @@ export function DeliveredHistoryList({
 
 const styles = StyleSheet.create({
   skeletonContent: {
-    paddingBottom: 28,
+    paddingBottom: 24,
   },
-  skeletonHero: {
-    paddingHorizontal: SCREEN_PADDING,
-    paddingTop: 24,
+  loadingHero: {
+    minHeight: 250,
+    paddingHorizontal: 26,
+    paddingTop: 22,
+    paddingBottom: 28,
+    alignItems: "center",
+    overflow: "hidden",
+    borderBottomLeftRadius: 32,
+    borderBottomRightRadius: 32,
     position: "relative",
   },
-  skeletonAvatar: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-  },
-  skeletonGreeting: {
+  loadingOrbLarge: {
     position: "absolute",
-    left: SCREEN_PADDING + 66,
-    right: SCREEN_PADDING,
-    top: 28,
-    gap: 10,
+    width: 180,
+    height: 180,
+    borderRadius: 90,
+    backgroundColor: "rgba(255,255,255,0.07)",
+    right: -65,
+    top: -54,
   },
-  skeletonLineWide: {
-    width: "72%",
-    height: 18,
-    borderRadius: 9,
-  },
-  skeletonLineMedium: {
-    width: "58%",
-    height: 12,
-    borderRadius: 6,
-  },
-  skeletonDate: {
+  loadingOrbSmall: {
     position: "absolute",
-    left: SCREEN_PADDING,
-    bottom: 52,
-    width: "46%",
+    width: 92,
+    height: 92,
+    borderRadius: 46,
+    backgroundColor: "rgba(255,255,255,0.06)",
+    left: -34,
+    bottom: 12,
+  },
+  loadingBrandRow: {
+    alignSelf: "stretch",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 9,
+  },
+  loadingBrandIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 11,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#ffffff",
+  },
+  loadingBrandText: {
+    color: "rgba(255,255,255,0.9)",
+    fontSize: 12,
+    fontWeight: "900",
+    letterSpacing: 1.2,
+  },
+  loadingRouteIcon: {
+    width: 54,
     height: 54,
     borderRadius: 18,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.16)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.24)",
+    marginTop: 22,
   },
-  skeletonArea: {
+  loadingTitle: {
+    color: "#ffffff",
+    fontSize: 21,
+    lineHeight: 27,
+    fontWeight: "900",
+    marginTop: 14,
+  },
+  loadingSubtitle: {
+    color: "rgba(255,255,255,0.74)",
+    fontSize: 13,
+    lineHeight: 19,
+    fontWeight: "600",
+    textAlign: "center",
+    marginTop: 5,
+  },
+  loadingProgressTrack: {
+    width: "72%",
+    height: 5,
+    borderRadius: 3,
+    overflow: "hidden",
+    backgroundColor: "rgba(255,255,255,0.18)",
+    marginTop: 20,
+  },
+  loadingProgressFill: {
+    width: "100%",
+    height: 5,
+    borderRadius: 3,
+    backgroundColor: "#ffffff",
+  },
+  loadingBody: {
+    paddingHorizontal: SCREEN_PADDING,
+    paddingTop: 22,
+  },
+  loadingSectionHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 13,
+  },
+  loadingSectionTitle: {
+    fontSize: 16,
+    lineHeight: 21,
+    fontWeight: "900",
+  },
+  loadingSyncPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
+  },
+  loadingSyncDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 4,
+    backgroundColor: "#2563eb",
+  },
+  loadingSyncText: {
+    fontSize: 10,
+    fontWeight: "800",
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+  },
+  loadingStatsGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "space-between",
+    rowGap: 12,
+    marginBottom: 22,
+  },
+  loadingStatCard: {
+    width: "48%",
+    minHeight: 112,
+    borderWidth: 1,
+    borderRadius: 18,
+    padding: 14,
+  },
+  loadingStatIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 11,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  loadingStatCopy: {
+    gap: 7,
+    marginTop: 12,
+  },
+  loadingLinePrimary: {
+    width: "78%",
+    height: 9,
+    borderRadius: 5,
+  },
+  loadingLineSecondary: {
+    width: "52%",
+    height: 7,
+    borderRadius: 4,
+  },
+  loadingCount: {
     position: "absolute",
-    left: SCREEN_PADDING,
-    right: SCREEN_PADDING,
-    bottom: 22,
-    height: 12,
-    borderRadius: 6,
+    width: 24,
+    height: 18,
+    borderRadius: 7,
+    right: 14,
+    bottom: 15,
   },
-  skeletonStatusRow: {
+  loadingActionsRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginTop: 13,
+  },
+  loadingActionCard: {
+    width: "48%",
+    height: 68,
+    borderWidth: 1,
+    borderRadius: 18,
+    paddingHorizontal: 13,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 11,
+  },
+  loadingActionIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  loadingActionLine: {
+    flex: 1,
+    height: 10,
+    borderRadius: 5,
+  },
+  loadingNotice: {
+    minHeight: 44,
+    borderWidth: 1,
+    borderRadius: 14,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: 10,
-    paddingVertical: 18,
+    gap: 9,
+    paddingHorizontal: 14,
+    marginTop: 16,
   },
-  skeletonStatusText: {
-    fontSize: 13,
+  loadingNoticeText: {
+    flexShrink: 1,
+    fontSize: 11,
+    lineHeight: 16,
     fontWeight: "700",
-  },
-  skeletonGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    paddingHorizontal: SCREEN_PADDING,
-    gap: GRID_GAP,
-  },
-  skeletonCard: {
-    width: "48%",
-    minHeight: 126,
-    borderWidth: 1,
-    borderRadius: 18,
-    padding: 16,
-    gap: 13,
-  },
-  skeletonIcon: {
-    width: 34,
-    height: 34,
-    borderRadius: 12,
-  },
-  skeletonValue: {
-    width: "30%",
-    height: 22,
-    borderRadius: 11,
   },
   hero: {
     position: "relative",

@@ -294,7 +294,6 @@ export default function CheckerIndex() {
 
         <QuickActions
           onLoad={goLoad}
-          onRoute={goRoute}
           onOffload={goOffload}
           onInfo={goInfo}
         />
