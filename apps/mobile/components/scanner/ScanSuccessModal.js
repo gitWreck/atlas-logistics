@@ -19,6 +19,12 @@ export default function ScanSuccessModal({
 }) {
   const { colors } = useTheme();
   const pending = !!payload?.pendingSync;
+  const alreadyScanned = payload?.resultType === "already_scanned";
+  const resultColor = alreadyScanned
+    ? "#d97706"
+    : pending
+      ? "#f59e0b"
+      : "#16a34a";
   const confetti = [
     { top: 2, left: 30, color: "#f59e0b", size: 8 },
     { top: 10, left: 96, color: "#ec4899", size: 6 },
@@ -39,7 +45,7 @@ export default function ScanSuccessModal({
       <View style={styles.overlay}>
         <View style={[styles.card, { backgroundColor: colors.surface }]}>
           <View style={styles.iconArea}>
-            {!pending
+            {!pending && !alreadyScanned
               ? confetti.map((c, i) => (
                   <View
                     key={i}
@@ -59,11 +65,17 @@ export default function ScanSuccessModal({
             <View
               style={[
                 styles.iconWrap,
-                { backgroundColor: pending ? "#f59e0b" : "#16a34a" },
+                { backgroundColor: resultColor },
               ]}
             >
               <FontAwesome5
-                name={pending ? "cloud-upload-alt" : "check"}
+                name={
+                  alreadyScanned
+                    ? "exclamation"
+                    : pending
+                      ? "cloud-upload-alt"
+                      : "check"
+                }
                 size={26}
                 color="#fff"
               />
@@ -73,12 +85,14 @@ export default function ScanSuccessModal({
           <Text
             style={[
               styles.title,
-              { color: pending ? "#b45309" : "#16a34a" },
+              { color: alreadyScanned || pending ? "#b45309" : "#16a34a" },
             ]}
           >
-            {pending
-              ? "Saved — Pending Sync"
-              : payload?.successTitle || "Success!"}
+            {alreadyScanned
+              ? "Already scanned"
+              : pending
+                ? "Saved — Pending Sync"
+                : payload?.successTitle || "Success!"}
           </Text>
           <Text style={[styles.message, { color: colors.textMuted }]}>
             {payload?.message || "Package processed successfully."}

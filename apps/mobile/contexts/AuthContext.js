@@ -14,6 +14,7 @@ import {
   ensureUserPublicId,
 } from "../components/utilities/FirebaseFunctions";
 import { getUsableCachedAuthProfile } from "../components/utilities/authPerformance";
+import { getNavigationStorageKey } from "../components/utilities/navigationPersistence";
 
 const ALLOWED_ROLES = [
   "checker",
@@ -158,6 +159,12 @@ export function AuthProvider({ children }) {
   const signOut = async () => {
     try {
       if (auth.currentUser) {
+        const navigationStorageKey = getNavigationStorageKey(
+          auth.currentUser.uid,
+        );
+        if (navigationStorageKey) {
+          await AsyncStorage.removeItem(navigationStorageKey);
+        }
         await endCurrentCallSession({ reason: "logout" }).catch((error) => {
           console.warn("AuthContext: active call cleanup skipped", error);
         });

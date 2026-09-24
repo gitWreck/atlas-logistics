@@ -4,6 +4,11 @@ import {
   readJson,
   writeJson,
 } from "./offlineStorage";
+import {
+  compactOfflineOperation,
+  getPendingQueueOperations,
+  prepareQueueSnapshot,
+} from "./offlineQueuePerformance";
 
 const QUEUE_STATUS = {
   PENDING: "pending",
@@ -55,7 +60,7 @@ export async function enqueueOperation(checkerId, payload) {
     throw new Error("This scan is already queued and waiting to sync.");
   }
 
-  const operation = {
+  const operation = compactOfflineOperation({
     id: generateOperationId(),
     checkerId: String(checkerId),
     createdAt: Date.now(),
@@ -64,15 +69,22 @@ export async function enqueueOperation(checkerId, payload) {
     lastError: null,
     ...payload,
     type: String(payload.type || "").trim().toUpperCase(),
-  };
+  });
 
   queue.push(operation);
   await saveQueue(checkerId, queue);
   return operation;
 }
 
-export async function updateOperation(checkerId, operationId, patch) {
-  const queue = await loadQueue(checkerId);
+export async function updateOperation(
+  checkerId,
+  operationId,
+  patch,
+  queueSnapshot = null,
+) {
+  const queue = Array.isArray(queueSnapshot)
+    ? queueSnapshot
+    : await loadQueue(checkerId);
   const next = queue.map((op) =>
     op.id === operationId ? { ...op, ...patch } : op,
   );
@@ -82,10 +94,7 @@ export async function updateOperation(checkerId, operationId, patch) {
 
 export async function getPendingOperations(checkerId) {
   const queue = await loadQueue(checkerId);
-  return queue.filter(
-    (op) =>
-      op.status === QUEUE_STATUS.PENDING || op.status === QUEUE_STATUS.FAILED,
-  );
+  return getPendingQueueOperations(queue);
 }
 
 export async function getPendingCount(checkerId) {
@@ -95,11 +104,11 @@ export async function getPendingCount(checkerId) {
 
 export async function pruneSyncedOperations(checkerId) {
   const queue = await loadQueue(checkerId);
-  const next = queue.filter((op) => op.status !== QUEUE_STATUS.SYNCED);
-  if (next.length !== queue.length) {
-    await saveQueue(checkerId, next);
+  const prepared = prepareQueueSnapshot(queue, { pruneSynced: true });
+  if (prepared.changed) {
+    await saveQueue(checkerId, prepared.queue);
   }
-  return next;
+  return prepared.queue;
 }
 
 export { QUEUE_STATUS };
@@ -139,23 +148,26 @@ export async function recoverStuckSyncingOperations(
   maxAgeMs = 90_000,
 ) {
   const queue = await loadQueue(checkerId);
-  const now = Date.now();
-  let changed = false;
-
-  const next = queue.map((operation) => {
-    if (operation.status !== QUEUE_STATUS.SYNCING) return operation;
-    const startedAt = operation.syncingStartedAt || operation.createdAt || 0;
-    if (now - startedAt <= maxAgeMs) return operation;
-    changed = true;
-    return {
-      ...operation,
-      status: QUEUE_STATUS.FAILED,
-      lastError: "Sync interrupted. Tap Sync now to retry.",
-    };
+  const prepared = prepareQueueSnapshot(queue, {
+    maxSyncingAgeMs: maxAgeMs,
   });
-
-  if (changed) {
-    await saveQueue(checkerId, next);
+  if (prepared.changed) {
+    await saveQueue(checkerId, prepared.queue);
   }
-  return next;
+  return prepared.queue;
+}
+
+export async function preparePendingQueue(
+  checkerId,
+  { includeFailed = true, pruneSynced = false } = {},
+) {
+  const queue = await loadQueue(checkerId);
+  const prepared = prepareQueueSnapshot(queue, { pruneSynced });
+  if (prepared.changed) {
+    await saveQueue(checkerId, prepared.queue);
+  }
+  return {
+    queue: prepared.queue,
+    pending: getPendingQueueOperations(prepared.queue, { includeFailed }),
+  };
 }

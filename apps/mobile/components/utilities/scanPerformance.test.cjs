@@ -6,6 +6,7 @@ const test = require("node:test");
 const {
   countCheckerLoadedPieces,
   createLayeredBarcodeIndex,
+  createProcessedActionRegistry,
   createScanGate,
   createSerialTaskQueue,
   selectCachedShipment,
@@ -155,6 +156,32 @@ test("serial task queue preserves order and continues after a failure", async ()
   assert.deepEqual(depthChanges, [1, 2, 3, 2, 1, 0]);
 });
 
+test("resolved package identity blocks a second success from an alternate QR", () => {
+  const registry = createProcessedActionRegistry();
+  const first = {
+    action: "LOAD_TO_VEHICLE",
+    shipmentId: "shipment-1",
+    packageIds: ["piece-2", "piece-1"],
+  };
+  const sameResolvedPieces = {
+    action: "load_to_vehicle",
+    shipmentId: " SHIPMENT-1 ",
+    packageIds: ["PIECE-1", "PIECE-2"],
+  };
+
+  assert.equal(registry.has(first), false);
+  registry.mark(first);
+  assert.equal(registry.has(sameResolvedPieces), true);
+  assert.equal(
+    registry.has({
+      action: "LOAD_TO_VEHICLE",
+      shipmentId: "shipment-1",
+      packageIds: ["piece-3"],
+    }),
+    false,
+  );
+});
+
 async function loadDashboardData() {
   const dashboardPath = path.join(
     __dirname,
@@ -262,6 +289,63 @@ test("scanner success confirmations are persistent for camera and manual input",
   assert.doesNotMatch(modal, /Auto-closing/);
   assert.match(modal, /onScanAnother/);
   assert.match(modal, /onDone/);
+});
+
+test("already processed load scans render a warning instead of success", () => {
+  const sourceRoot = path.join(__dirname, "..", "..");
+  const scanner = readFileSync(
+    path.join(sourceRoot, "app", "(checker)", "scan.js"),
+    "utf8",
+  );
+  const modal = readFileSync(
+    path.join(sourceRoot, "components", "scanner", "ScanSuccessModal.js"),
+    "utf8",
+  );
+
+  assert.match(scanner, /resultType:\s*"already_scanned"/);
+  assert.match(scanner, /processedActionRegistryRef\.current\.has\(loadAction\)/);
+  assert.match(modal, /alreadyScanned\s*=\s*payload\?\.resultType/);
+  assert.match(modal, /"Already scanned"/);
+  assert.doesNotMatch(
+    scanner,
+    /message:\s*"Piece is already out for delivery on your van\."/,
+  );
+});
+
+test("scanner Done dismisses only the success popup", () => {
+  const scanner = readFileSync(
+    path.join(__dirname, "..", "..", "app", "(checker)", "scan.js"),
+    "utf8",
+  );
+
+  assert.match(scanner, /onDone=\{closeSuccessModal\}/);
+  assert.doesNotMatch(scanner, /finishSuccessFlow/);
+});
+
+test("scanner controls use equal side slots and stay separate from the scan frame", () => {
+  const cameraPane = readFileSync(
+    path.join(__dirname, "..", "scanner", "ScannerCameraPane.js"),
+    "utf8",
+  );
+
+  assert.match(cameraPane, /styles\.controlSlot/);
+  assert.match(cameraPane, /styles\.rightControlSlot/);
+  assert.match(cameraPane, /styles\.scanContent/);
+  assert.doesNotMatch(cameraPane, /paddingBottom:\s*detailsSheetHeight/);
+});
+
+test("checker startup feed avoids the unbounded historical assignment listener", () => {
+  const lastMile = readFileSync(
+    path.join(__dirname, "..", "..", "hooks", "useCheckerLastMileSync.js"),
+    "utf8",
+  );
+
+  assert.doesNotMatch(lastMile, /subscribeAssigned/);
+  assert.doesNotMatch(
+    lastMile,
+    /where\("assignedCheckerId",\s*"==",\s*String\(checkerId\)\)/,
+  );
+  assert.match(lastMile, /offlineCacheShipments/);
 });
 
 test("online startup does not hydrate or merge the full offline shipment cache", () => {

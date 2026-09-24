@@ -58,6 +58,16 @@ function sortShipmentsNewest(shipments = []) {
   });
 }
 
+function collectCurrentManifestIds(shipmentsById = {}) {
+  return [
+    ...new Set(
+      Object.values(shipmentsById)
+        .map((shipment) => String(shipment?.deliveryManifestId || "").trim())
+        .filter(Boolean),
+    ),
+  ].sort();
+}
+
 /** Badge status for checker UI — prefers this checker's piece state over master. */
 export function getCheckerShipmentDisplayStatus(shipment, checkerUid) {
   const phase = getCheckerPieceActionPhase(shipment, checkerUid);
@@ -201,17 +211,28 @@ export function useCheckerLastMileSync(checkerId, options = {}) {
     };
   }, [checkerId, allMunicipalities]);
 
-  // Subscribe to shipments and manifests using municipality-scoped queries.
+  // Subscribe to current shipments using municipality-scoped queries.
   useEffect(() => {
     if (!checkerId) return undefined;
 
-    let assignedMap = {};
-    let availableMap = {};
-    let activeMap = {};
+    const availableBuckets = new Map();
+    const activeBuckets = new Map();
+    let publishTimer = null;
 
     const publishQueries = () => {
-      setQueryShipments(mergeShipmentMaps(assignedMap, availableMap, activeMap));
+      publishTimer = null;
+      setQueryShipments(
+        mergeShipmentMaps(
+          ...availableBuckets.values(),
+          ...activeBuckets.values(),
+        ),
+      );
       setLoading(false);
+    };
+
+    const schedulePublishQueries = () => {
+      if (publishTimer) return;
+      publishTimer = setTimeout(publishQueries, 0);
     };
 
     // Helper to batch an array into chunks of size n
@@ -223,44 +244,24 @@ export function useCheckerLastMileSync(checkerId, options = {}) {
 
     const unsubs = [];
 
-    const subscribeAssigned = (muniFilter = null) => {
-      const constraints = [
-        where("assignedCheckerId", "==", String(checkerId)),
-      ];
-      if (muniFilter) constraints.push(where("municipality", "in", muniFilter));
-      return onSnapshot(
-        query(collection(db, "shipments"), ...constraints),
-        (snap) => {
-          if (!muniFilter) assignedMap = {};
-          snap.docs.forEach((docSnap) => {
-            assignedMap[docSnap.id] = { id: docSnap.id, ...docSnap.data() };
-          });
-          publishQueries();
-        },
-        (err) => {
-          console.error("Checker assigned shipments failed:", err);
-          setError(err);
-        },
-      );
-    };
-
-    const subscribeAvailable = (muniFilter = null) => {
+    const subscribeAvailable = (muniFilter = null, bucketKey = "all") => {
       const constraints = [where("availableForDelivery", "==", true)];
       if (muniFilter) constraints.push(where("municipality", "in", muniFilter));
       return onSnapshot(
         query(collection(db, "shipments"), ...constraints),
         (snap) => {
-          if (!muniFilter) availableMap = {};
+          const nextBucket = {};
           snap.docs.forEach((docSnap) => {
-            availableMap[docSnap.id] = { id: docSnap.id, ...docSnap.data() };
+            nextBucket[docSnap.id] = { id: docSnap.id, ...docSnap.data() };
           });
-          publishQueries();
+          availableBuckets.set(bucketKey, nextBucket);
+          schedulePublishQueries();
         },
         (err) => console.warn("Checker available pool failed:", err),
       );
     };
 
-    const subscribeActive = (muniFilter = null) => {
+    const subscribeActive = (muniFilter = null, bucketKey = "all") => {
       const constraints = [
         where("activeCheckerIds", "array-contains", String(checkerId)),
       ];
@@ -268,11 +269,12 @@ export function useCheckerLastMileSync(checkerId, options = {}) {
       return onSnapshot(
         query(collection(db, "shipments"), ...constraints),
         (snap) => {
-          if (!muniFilter) activeMap = {};
+          const nextBucket = {};
           snap.docs.forEach((docSnap) => {
-            activeMap[docSnap.id] = { id: docSnap.id, ...docSnap.data() };
+            nextBucket[docSnap.id] = { id: docSnap.id, ...docSnap.data() };
           });
-          publishQueries();
+          activeBuckets.set(bucketKey, nextBucket);
+          schedulePublishQueries();
         },
         (err) => console.warn("Checker activeCheckerIds failed:", err),
       );
@@ -280,71 +282,18 @@ export function useCheckerLastMileSync(checkerId, options = {}) {
 
     // Admin/manager: all municipalities (no municipality filter on queries).
     if (allMunicipalities) {
-      unsubs.push(subscribeAssigned());
       unsubs.push(subscribeAvailable());
       unsubs.push(subscribeActive());
     } else if (
       Array.isArray(assignedMunicipalities) &&
       assignedMunicipalities.length > 0
     ) {
-      // assigned shipments (explicitly assigned to this checker)
-      if (assignedMunicipalities.length <= 10) {
-        unsubs.push(subscribeAssigned(assignedMunicipalities));
-      } else {
-        batchesOf(assignedMunicipalities, 10).forEach((batch) => {
-          unsubs.push(
-            onSnapshot(
-              query(
-                collection(db, "shipments"),
-                where("assignedCheckerId", "==", String(checkerId)),
-                where("municipality", "in", batch),
-              ),
-              (snap) => {
-                snap.docs.forEach((docSnap) => {
-                  assignedMap[docSnap.id] = {
-                    id: docSnap.id,
-                    ...docSnap.data(),
-                  };
-                });
-                publishQueries();
-              },
-              (err) => {
-                console.error(
-                  "Checker assigned shipments failed (batch):",
-                  err,
-                );
-                setError(err);
-              },
-            ),
-          );
-        });
-      }
-
       // available shipments filter (only for assigned municipalities)
       if (assignedMunicipalities.length <= 10) {
         unsubs.push(subscribeAvailable(assignedMunicipalities));
       } else {
-        batchesOf(assignedMunicipalities, 10).forEach((batch) => {
-          unsubs.push(
-            onSnapshot(
-              query(
-                collection(db, "shipments"),
-                where("availableForDelivery", "==", true),
-                where("municipality", "in", batch),
-              ),
-              (snap) => {
-                snap.docs.forEach((docSnap) => {
-                  availableMap[docSnap.id] = {
-                    id: docSnap.id,
-                    ...docSnap.data(),
-                  };
-                });
-                publishQueries();
-              },
-              (err) =>
-                console.warn("Checker available pool failed (batch):", err),
-            ),
-          );
+        batchesOf(assignedMunicipalities, 10).forEach((batch, index) => {
+          unsubs.push(subscribeAvailable(batch, `available-${index}`));
         });
       }
 
@@ -352,27 +301,8 @@ export function useCheckerLastMileSync(checkerId, options = {}) {
       if (assignedMunicipalities.length <= 10) {
         unsubs.push(subscribeActive(assignedMunicipalities));
       } else {
-        batchesOf(assignedMunicipalities, 10).forEach((batch) => {
-          unsubs.push(
-            onSnapshot(
-              query(
-                collection(db, "shipments"),
-                where("activeCheckerIds", "array-contains", String(checkerId)),
-                where("municipality", "in", batch),
-              ),
-              (snap) => {
-                snap.docs.forEach((docSnap) => {
-                  activeMap[docSnap.id] = {
-                    id: docSnap.id,
-                    ...docSnap.data(),
-                  };
-                });
-                publishQueries();
-              },
-              (err) =>
-                console.warn("Checker activeCheckerIds failed (batch):", err),
-            ),
-          );
+        batchesOf(assignedMunicipalities, 10).forEach((batch, index) => {
+          unsubs.push(subscribeActive(batch, `active-${index}`));
         });
       }
     } else {
@@ -381,41 +311,66 @@ export function useCheckerLastMileSync(checkerId, options = {}) {
       setLoading(false);
     }
 
-    // Manifests (unchanged, still scoped to checkerId)
-    const manifestQuery = query(
-      collection(db, "delivery_manifests"),
-      where("checkerId", "==", String(checkerId)),
-    );
-    const unsubManifests = onSnapshot(
-      manifestQuery,
-      (snap) => {
-        const next = snap.docs
-          .map((docSnap) => ({ id: docSnap.id, ...docSnap.data() }))
-          .filter((m) => !CLOSED_MANIFEST_STATUSES.has(normalizeStatus(m.status)))
-          .sort(
-            (a, b) =>
-              getTimestampMs(b.updatedAt || b.releasedAt) -
-              getTimestampMs(a.updatedAt || a.releasedAt),
-          );
-        setManifests(next);
-        setLoading(false);
-      },
-      (err) => {
-        console.error("Checker manifests failed:", err);
-        setError(err);
-        setLoading(false);
-      },
-    );
-
-    // Track manifest unsub as well
-    unsubs.push(unsubManifests);
-
     return () => {
+      if (publishTimer) clearTimeout(publishTimer);
       unsubs.forEach((u) => {
         try { u(); } catch (e) { /* ignore */ }
       });
     };
   }, [checkerId, allMunicipalities, assignedMunicipalities.join("|")]);
+
+  const currentManifestIds = useMemo(
+    () => collectCurrentManifestIds(queryShipments),
+    [queryShipments],
+  );
+
+  // A checker may have years of closed manifests. Querying all of them at
+  // layout startup made high-history accounts download and parse the full
+  // history before taps could be handled. Current shipment documents already
+  // carry their manifest ID, so observe only those referenced by live work.
+  useEffect(() => {
+    if (!checkerId || currentManifestIds.length === 0) {
+      setManifests([]);
+      return undefined;
+    }
+
+    const manifestMap = new Map();
+    const publishManifests = () => {
+      const next = [...manifestMap.values()]
+        .filter(
+          (manifest) =>
+            !CLOSED_MANIFEST_STATUSES.has(normalizeStatus(manifest.status)),
+        )
+        .sort(
+          (a, b) =>
+            getTimestampMs(b.updatedAt || b.releasedAt) -
+            getTimestampMs(a.updatedAt || a.releasedAt),
+        );
+      setManifests(next);
+    };
+
+    const unsubs = currentManifestIds.map((manifestId) =>
+      onSnapshot(
+        doc(db, "delivery_manifests", manifestId),
+        (snap) => {
+          if (snap.exists()) {
+            manifestMap.set(snap.id, { id: snap.id, ...snap.data() });
+          } else {
+            manifestMap.delete(manifestId);
+          }
+          publishManifests();
+        },
+        (err) => {
+          console.warn("Checker active manifest failed:", manifestId, err);
+          setError(err);
+        },
+      ),
+    );
+
+    return () => {
+      unsubs.forEach((unsub) => unsub());
+    };
+  }, [checkerId, currentManifestIds.join("|")]);
 
   const manifestShipmentIds = useMemo(
     () => collectShipmentIdsFromManifests(manifests),
@@ -477,6 +432,17 @@ export function useCheckerLastMileSync(checkerId, options = {}) {
     [queryShipments, docShipments],
   );
 
+  const offlineCacheShipments = useMemo(() => {
+    const manifestIds = new Set(manifestShipmentIds.map(String));
+    return Object.fromEntries(
+      Object.entries(shipmentsById).filter(([shipmentId, shipment]) =>
+        manifestIds.has(String(shipmentId)) ||
+        isAvailableToLoadShipment(shipment) ||
+        isMyActiveDeliveryShipment(shipment, checkerId),
+      ),
+    );
+  }, [shipmentsById, manifestShipmentIds, checkerId]);
+
   const activeShipmentsById = useMemo(() => {
     if (!isOnline) {
       return effectiveShipmentsById;
@@ -497,7 +463,7 @@ export function useCheckerLastMileSync(checkerId, options = {}) {
 
   useEffect(() => {
     if (!checkerId || !isOnline) return;
-    if (Object.keys(shipmentsById).length === 0) return;
+    if (Object.keys(offlineCacheShipments).length === 0) return;
     if (cacheWarmTimerRef.current) {
       clearTimeout(cacheWarmTimerRef.current);
     }
@@ -507,12 +473,12 @@ export function useCheckerLastMileSync(checkerId, options = {}) {
       cacheWarmTaskRef.current = InteractionManager.runAfterInteractions(() => {
         cacheWarmTaskRef.current = null;
         void warmShipmentCache(
-          shipmentsById,
+          offlineCacheShipments,
           { manifests, assignedMunicipalities },
           { publish: false, replace: true },
         );
       });
-    }, 1500);
+    }, 3000);
     return () => {
       if (cacheWarmTimerRef.current) {
         clearTimeout(cacheWarmTimerRef.current);
@@ -524,7 +490,7 @@ export function useCheckerLastMileSync(checkerId, options = {}) {
   }, [
     checkerId,
     isOnline,
-    shipmentsById,
+    offlineCacheShipments,
     manifests,
     assignedMunicipalities,
     warmShipmentCache,

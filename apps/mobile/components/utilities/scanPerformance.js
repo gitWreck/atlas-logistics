@@ -137,10 +137,48 @@ function createSerialTaskQueue({ onDepthChange = () => {} } = {}) {
   };
 }
 
+function createProcessedActionRegistry() {
+  const processed = new Set();
+
+  const createKey = ({ action, shipmentId, packageIds = [] } = {}) => {
+    const normalizedAction = normalizeQueuedScanCode(action);
+    const normalizedShipmentId = normalizeQueuedScanCode(shipmentId);
+    const normalizedPackageIds = [
+      ...new Set(
+        (Array.isArray(packageIds) ? packageIds : [packageIds])
+          .map(normalizeQueuedScanCode)
+          .filter(Boolean),
+      ),
+    ].sort();
+
+    if (!normalizedAction || !normalizedShipmentId || !normalizedPackageIds.length) {
+      return null;
+    }
+
+    return `${normalizedAction}:${normalizedShipmentId}:${normalizedPackageIds.join(",")}`;
+  };
+
+  return {
+    has(action) {
+      const key = createKey(action);
+      return key ? processed.has(key) : false;
+    },
+    mark(action) {
+      const key = createKey(action);
+      if (key) processed.add(key);
+      return key;
+    },
+    reset() {
+      processed.clear();
+    },
+  };
+}
+
 module.exports = {
   DEFAULT_DUPLICATE_BLOCK_MS,
   DEFAULT_SCAN_COOLDOWN_MS,
   createLayeredBarcodeIndex,
+  createProcessedActionRegistry,
   createScanGate,
   createSerialTaskQueue,
   countCheckerLoadedPieces,

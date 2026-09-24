@@ -95,12 +95,21 @@ package.json
 !apps/functions/src/notifications/processCustomerNotificationJob.js
 !/apps/mobile/components/manager/ManagerTripScheduleModal.js
 
+# Authenticated route restoration must ship with the mobile bundle.
+!/apps/mobile/components/navigation/
+/apps/mobile/components/navigation/*
+!/apps/mobile/components/navigation/NavigationPersistence.js
+
 # Scanner timing/queue logic and its focused regression test are source files.
 !/apps/mobile/components/utilities/
 /apps/mobile/components/utilities/*
 !/apps/mobile/components/utilities/scanPerformance.js
 !/apps/mobile/components/utilities/scanPerformance.test.cjs
 !/apps/mobile/components/utilities/authPerformance.js
+!/apps/mobile/components/utilities/navigationPersistence.js
+!/apps/mobile/components/utilities/navigationPersistence.test.cjs
+!/apps/mobile/components/utilities/offlineQueuePerformance.js
+!/apps/mobile/components/utilities/offlineQueuePerformance.test.cjs
 
 # Quick Access Expo Router screens must also be present in the EAS checkout.
 !/apps/mobile/app/(checker)/(tabs)/quick/

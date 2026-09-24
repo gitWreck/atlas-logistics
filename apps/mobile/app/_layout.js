@@ -5,6 +5,7 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 import { AuthProvider, useAuth } from "../contexts/AuthContext";
 import { ThemeProvider } from "../contexts/ThemeContext";
 import { ErrorBoundary } from "../components/ErrorBoundary";
+import NavigationPersistence from "../components/navigation/NavigationPersistence";
 
 const IncomingCallListener = lazy(
   () => import("../components/calls/IncomingCallListener"),
@@ -67,6 +68,7 @@ export default function RootLayout() {
         <ThemeProvider>
           <AuthProvider>
             <AuthenticatedServices />
+            <NavigationPersistence />
             <Stack screenOptions={{ headerShown: false }} />
           </AuthProvider>
         </ThemeProvider>

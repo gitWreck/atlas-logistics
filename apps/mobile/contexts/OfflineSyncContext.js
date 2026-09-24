@@ -7,7 +7,7 @@ import React, {
   useRef,
   useState,
 } from "react";
-import { Alert } from "react-native";
+import { Alert, InteractionManager } from "react-native";
 import NetInfo from "@react-native-community/netinfo";
 import { useAuth } from "./AuthContext";
 import { useNetworkStatus } from "../hooks/useNetworkStatus";
@@ -20,10 +20,7 @@ import {
 } from "../components/utilities/offlineShipmentCache";
 import {
   enqueueOperation,
-  getPendingCount,
-  getPendingOperations,
-  pruneSyncedOperations,
-  recoverStuckSyncingOperations,
+  preparePendingQueue,
   summarizeQueueOperations,
 } from "../components/utilities/offlineQueue";
 import { persistOfflinePhotos } from "../components/utilities/offlinePhotoStore";
@@ -42,23 +39,22 @@ export function OfflineSyncProvider({ children }) {
   const [pendingCount, setPendingCount] = useState(0);
   const [syncing, setSyncing] = useState(false);
   const [lastSyncResult, setLastSyncResult] = useState(null);
+  const [queueHydrated, setQueueHydrated] = useState(false);
   const syncInFlightRef = useRef(false);
   const prevOnlineRef = useRef(true);
   const initialSyncDoneRef = useRef(false);
 
-  const refreshQueueState = useCallback(async () => {
+  const refreshQueueState = useCallback(async ({ pruneSynced = false } = {}) => {
     if (!checkerId) {
       setPendingOperations([]);
       setPendingCount(0);
+      setQueueHydrated(true);
       return;
     }
-    await recoverStuckSyncingOperations(checkerId);
-    const [pending, count] = await Promise.all([
-      getPendingOperations(checkerId),
-      getPendingCount(checkerId),
-    ]);
+    const { pending } = await preparePendingQueue(checkerId, { pruneSynced });
     setPendingOperations(pending);
-    setPendingCount(count);
+    setPendingCount(pending.length);
+    setQueueHydrated(true);
   }, [checkerId]);
 
   const refreshCacheState = useCallback(async () => {
@@ -77,7 +73,22 @@ export function OfflineSyncProvider({ children }) {
     // large and is only needed when the device is actually offline.
     setCachedShipmentsById({});
     setCacheSavedAt(null);
-    void refreshQueueState();
+    setPendingOperations([]);
+    setPendingCount(0);
+    setQueueHydrated(false);
+    initialSyncDoneRef.current = false;
+
+    let timer = null;
+    const task = InteractionManager.runAfterInteractions(() => {
+      timer = setTimeout(() => {
+        void refreshQueueState();
+      }, 750);
+    });
+
+    return () => {
+      task?.cancel?.();
+      if (timer) clearTimeout(timer);
+    };
   }, [checkerId, refreshQueueState]);
 
   useEffect(() => {
@@ -89,7 +100,7 @@ export function OfflineSyncProvider({ children }) {
     }
   }, [isOnline, refreshCacheState]);
 
-  const syncNow = useCallback(async () => {
+  const syncNow = useCallback(async ({ retryFailed = true } = {}) => {
     if (!checkerId || !profile || syncInFlightRef.current) {
       return lastSyncResult;
     }
@@ -107,9 +118,10 @@ export function OfflineSyncProvider({ children }) {
     setSyncing(true);
 
     try {
-      await recoverStuckSyncingOperations(checkerId);
-      await pruneSyncedOperations(checkerId);
-      const pending = await getPendingOperations(checkerId);
+      const { pending } = await preparePendingQueue(checkerId, {
+        includeFailed: retryFailed,
+        pruneSynced: true,
+      });
       if (!pending.length) {
         const empty = { synced: 0, failed: 0, errors: [] };
         setLastSyncResult(empty);
@@ -125,13 +137,9 @@ export function OfflineSyncProvider({ children }) {
         checkerId,
         profile,
         operations: sortedPending,
-        onProgress: () => {
-          void refreshQueueState();
-        },
       });
 
-      await pruneSyncedOperations(checkerId);
-      await refreshQueueState();
+      await refreshQueueState({ pruneSynced: true });
       setLastSyncResult(result);
 
       if (result.failed > 0) {
@@ -160,24 +168,37 @@ export function OfflineSyncProvider({ children }) {
     const wasOffline = !prevOnlineRef.current;
     prevOnlineRef.current = isOnline;
     if (isOnline && wasOffline && checkerId && pendingCount > 0 && !syncing) {
-      void syncNow();
+      // Freshly queued work can resume automatically. Previously failed work
+      // stays visible for an explicit retry instead of storming every launch
+      // or brief network reconnect.
+      void syncNow({ retryFailed: false });
     }
   }, [isOnline, checkerId, pendingCount, syncing, syncNow]);
 
   useEffect(() => {
-    if (!checkerId || !isOnline || initialSyncDoneRef.current) return undefined;
+    if (
+      !checkerId ||
+      !isOnline ||
+      !queueHydrated ||
+      initialSyncDoneRef.current
+    ) return undefined;
     initialSyncDoneRef.current = true;
-    let cancelled = false;
-    (async () => {
-      const count = await getPendingCount(checkerId);
-      if (!cancelled && count > 0) {
-        void syncNow();
-      }
-    })();
+    const hasNewPendingWork = pendingOperations.some(
+      (operation) => operation.status === "pending",
+    );
+    if (hasNewPendingWork) {
+      void syncNow({ retryFailed: false });
+    }
     return () => {
-      cancelled = true;
+      // The worker is durable and owns its own in-flight guard.
     };
-  }, [checkerId, isOnline, syncNow]);
+  }, [
+    checkerId,
+    isOnline,
+    queueHydrated,
+    pendingOperations,
+    syncNow,
+  ]);
 
   const enqueueOfflineOperation = useCallback(
     async (payload) => {

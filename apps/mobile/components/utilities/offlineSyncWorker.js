@@ -10,6 +10,7 @@ import {
 import { deleteOfflinePhotos } from "./offlinePhotoStore";
 import {
   QUEUE_STATUS,
+  loadQueue,
   updateOperation,
   formatOfflineOperationLabel,
 } from "./offlineQueue";
@@ -168,6 +169,7 @@ export async function syncPendingOperations({
   onProgress,
 }) {
   const results = { synced: 0, failed: 0, errors: [] };
+  let queueSnapshot = await loadQueue(checkerId);
 
   for (const operation of operations) {
     if (
@@ -177,29 +179,44 @@ export async function syncPendingOperations({
       continue;
     }
 
-    await updateOperation(checkerId, operation.id, {
-      status: QUEUE_STATUS.SYNCING,
-      syncingStartedAt: Date.now(),
-      lastError: null,
-    });
+    queueSnapshot = await updateOperation(
+      checkerId,
+      operation.id,
+      {
+        status: QUEUE_STATUS.SYNCING,
+        syncingStartedAt: Date.now(),
+        lastError: null,
+      },
+      queueSnapshot,
+    );
     onProgress?.({ operation, phase: "syncing" });
 
     try {
       await replayOfflineOperation(operation, profile);
-      await updateOperation(checkerId, operation.id, {
-        status: QUEUE_STATUS.SYNCED,
-        syncedAt: Date.now(),
-        lastError: null,
-      });
+      queueSnapshot = await updateOperation(
+        checkerId,
+        operation.id,
+        {
+          status: QUEUE_STATUS.SYNCED,
+          syncedAt: Date.now(),
+          lastError: null,
+        },
+        queueSnapshot,
+      );
       results.synced += 1;
       onProgress?.({ operation, phase: "synced" });
     } catch (error) {
       const message = getCallableErrorMessage(error, "Sync failed.");
-      await updateOperation(checkerId, operation.id, {
-        status: QUEUE_STATUS.FAILED,
-        retryCount: (operation.retryCount || 0) + 1,
-        lastError: message,
-      });
+      queueSnapshot = await updateOperation(
+        checkerId,
+        operation.id,
+        {
+          status: QUEUE_STATUS.FAILED,
+          retryCount: (operation.retryCount || 0) + 1,
+          lastError: message,
+        },
+        queueSnapshot,
+      );
       results.failed += 1;
       results.errors.push({
         operationId: operation.id,

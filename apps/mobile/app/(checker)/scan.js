@@ -68,6 +68,7 @@ import {
 import {
   countCheckerLoadedPieces,
   createLayeredBarcodeIndex,
+  createProcessedActionRegistry,
   createScanGate,
   createSerialTaskQueue,
 } from "../../components/utilities/scanPerformance";
@@ -192,6 +193,7 @@ export default function ScannerScreen() {
   const cachedLocationRef = useRef(null);
   const summaryRefreshTimerRef = useRef(null);
   const scanGateRef = useRef(createScanGate());
+  const processedActionRegistryRef = useRef(createProcessedActionRegistry());
   const scanQueueRef = useRef(null);
   if (!scanQueueRef.current) {
     scanQueueRef.current = createSerialTaskQueue();
@@ -705,11 +707,6 @@ export default function ScannerScreen() {
     resetScanner();
   };
 
-  const finishSuccessFlow = () => {
-    closeSuccessModal();
-    router.back();
-  };
-
   const showSuccessModal = ({
     barcode,
     shipmentId,
@@ -719,6 +716,7 @@ export default function ScannerScreen() {
     message,
     source = "scan",
     pendingSync = false,
+    resultType = "success",
   }) => {
     setSuccessPayload({
       barcode,
@@ -729,11 +727,30 @@ export default function ScannerScreen() {
       message,
       source,
       pendingSync,
+      resultType,
     });
 
     setSuccessModalVisible(true);
     setProcessing(false);
     setScanned(false);
+  };
+
+  const showAlreadyScannedModal = ({
+    barcode,
+    shipmentId,
+    packageStatus,
+    source = "scan",
+  }) => {
+    showSuccessModal({
+      barcode,
+      shipmentId,
+      shipmentStatus: packageStatus || "OUT_FOR_DELIVERY",
+      packageStatus: packageStatus || "OUT_FOR_DELIVERY",
+      message:
+        "This package was already scanned and processed. No duplicate update was created.",
+      source,
+      resultType: "already_scanned",
+    });
   };
 
   if (!permission) return <View />;
@@ -808,19 +825,32 @@ export default function ScannerScreen() {
 
         const matchedPkg = findPackageInShipment(shipmentDocData, barcode);
         const pieceStatus = String(matchedPkg?.status || "").toUpperCase();
+        const loadAction = {
+          action: "LOAD_TO_VEHICLE",
+          shipmentId,
+          packageIds: loadPackageIds,
+        };
+
+        if (processedActionRegistryRef.current.has(loadAction)) {
+          showAlreadyScannedModal({
+            barcode,
+            shipmentId,
+            packageStatus: "OUT_FOR_DELIVERY",
+            source,
+          });
+          return;
+        }
 
         if (
           matchedPkg &&
           pieceStatus === "OUT_FOR_DELIVERY" &&
           isCheckerCustodyPiece(matchedPkg, profile?.uid)
         ) {
-          showSuccessModal({
+          processedActionRegistryRef.current.mark(loadAction);
+          showAlreadyScannedModal({
             barcode,
             shipmentId,
-            shipmentStatus: "OUT_FOR_DELIVERY",
             packageStatus: "OUT_FOR_DELIVERY",
-            quantity: qty,
-            message: "Piece is already out for delivery on your van.",
             source,
           });
           return;
@@ -841,6 +871,7 @@ export default function ScannerScreen() {
             notificationChannels,
           });
 
+          processedActionRegistryRef.current.mark(loadAction);
           showSuccessModal({
             barcode,
             shipmentId,
@@ -874,6 +905,7 @@ export default function ScannerScreen() {
             shipmentSnapshot: shipmentDocData,
             notificationChannels,
           });
+          processedActionRegistryRef.current.mark(loadAction);
           showLoadedPiecesInShipmentSummary(
             shipmentId,
             shipmentDocData,
@@ -893,7 +925,7 @@ export default function ScannerScreen() {
           return;
         }
 
-        await loadAssignedShipmentsToVehicle({
+        const loadResult = await loadAssignedShipmentsToVehicle({
           shipmentIds: [shipmentId],
           packageIds: loadPackageIds,
           profile,
@@ -902,6 +934,18 @@ export default function ScannerScreen() {
           location,
           notificationChannels,
         });
+
+        if (Number(loadResult?.packageCount || 0) < 1) {
+          showAlreadyScannedModal({
+            barcode,
+            shipmentId,
+            packageStatus: "OUT_FOR_DELIVERY",
+            source,
+          });
+          return;
+        }
+
+        processedActionRegistryRef.current.mark(loadAction);
 
         showLoadedPiecesInShipmentSummary(
           shipmentId,
@@ -2640,7 +2684,7 @@ export default function ScannerScreen() {
         visible={successModalVisible}
         payload={successPayload}
         onScanAnother={closeSuccessModal}
-        onDone={finishSuccessFlow}
+        onDone={closeSuccessModal}
         onRequestClose={closeSuccessModal}
         accentColor={scanAccentColor}
       />

@@ -10,10 +10,8 @@ import {
 } from "react-native";
 import { CameraView } from "expo-camera";
 import { FontAwesome5 } from "@expo/vector-icons";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 const FRAME_SIZE = 250;
-const SAFE_AREA_CONTROL_GAP = 8;
 
 export default function ScannerCameraPane({
   scanEnabled = true,
@@ -26,11 +24,6 @@ export default function ScannerCameraPane({
   onBarcodeScanned,
   accentColor = "#2563eb",
 }) {
-  const insets = useSafeAreaInsets();
-  // Full-screen camera draws under the status bar on iOS; Android often
-  // already windows below it. Always offset by the live top inset.
-  const topControlsOffset = insets.top + SAFE_AREA_CONTROL_GAP;
-
   // Animated glowing scan line that sweeps within the frame.
   const sweep = useRef(new Animated.Value(0)).current;
   useEffect(() => {
@@ -109,18 +102,18 @@ export default function ScannerCameraPane({
           barcodeTypes: ["qr", "code128", "code39", "pdf417"],
         }}
       >
-        <Animated.View
-          style={[styles.cameraOverlay, { paddingBottom: detailsSheetHeight }]}
-        >
-          <View style={[styles.topControls, { top: topControlsOffset }]}>
-            <TouchableOpacity
-              style={[styles.button, styles.backButton]}
-              onPress={onBack}
-              activeOpacity={0.82}
-            >
-              <FontAwesome5 name="arrow-left" size={14} color="#ffffff" />
-              <Text style={styles.backButtonText}>Back</Text>
-            </TouchableOpacity>
+        <Animated.View style={styles.cameraOverlay}>
+          <View style={styles.topControls}>
+            <View style={styles.controlSlot}>
+              <TouchableOpacity
+                style={[styles.button, styles.backButton]}
+                onPress={onBack}
+                activeOpacity={0.82}
+              >
+                <FontAwesome5 name="arrow-left" size={14} color="#ffffff" />
+                <Text style={styles.backButtonText}>Back</Text>
+              </TouchableOpacity>
+            </View>
 
             <View style={styles.modeWrapper} pointerEvents="none">
               <View
@@ -133,58 +126,65 @@ export default function ScannerCameraPane({
               </View>
             </View>
 
-            <TouchableOpacity
-              style={[
-                styles.button,
-                styles.flashButton,
-                flashEnabled && styles.flashButtonActive,
-              ]}
-              onPress={onToggleFlash}
-              activeOpacity={0.82}
-            >
-              <FontAwesome5
-                name={flashEnabled ? "bolt" : "lightbulb"}
-                size={16}
-                color={flashEnabled ? "#0f172a" : "#ffffff"}
-              />
-              <Text
+            <View style={[styles.controlSlot, styles.rightControlSlot]}>
+              <TouchableOpacity
                 style={[
-                  styles.flashButtonText,
-                  flashEnabled && styles.flashButtonTextActive,
+                  styles.button,
+                  styles.flashButton,
+                  flashEnabled && styles.flashButtonActive,
                 ]}
+                onPress={onToggleFlash}
+                activeOpacity={0.82}
               >
-                {flashEnabled ? "Flash On" : "Flash"}
+                <FontAwesome5
+                  name={flashEnabled ? "bolt" : "lightbulb"}
+                  size={16}
+                  color={flashEnabled ? "#0f172a" : "#ffffff"}
+                />
+                <Text
+                  style={[
+                    styles.flashButtonText,
+                    flashEnabled && styles.flashButtonTextActive,
+                  ]}
+                >
+                  {flashEnabled ? "Flash On" : "Flash"}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          <Animated.View
+            pointerEvents="none"
+            style={[styles.scanContent, { bottom: detailsSheetHeight }]}
+          >
+            <View style={styles.scanFrame}>
+              <Corner pos="tl" />
+              <Corner pos="tr" />
+              <Corner pos="bl" />
+              <Corner pos="br" />
+              {processing ? (
+                <ActivityIndicator size="large" color="#fbbf24" />
+              ) : (
+                <Animated.View
+                  style={[
+                    styles.scanLine,
+                    {
+                      backgroundColor: lineColor,
+                      shadowColor: lineColor,
+                      transform: [{ translateY }],
+                    },
+                  ]}
+                />
+              )}
+            </View>
+
+            <View style={styles.instructionRow}>
+              <FontAwesome5 name="qrcode" size={13} color="#e2e8f0" />
+              <Text style={styles.scanInstruction}>
+                Align code within the frame
               </Text>
-            </TouchableOpacity>
-          </View>
-
-          <View style={styles.scanFrame}>
-            <Corner pos="tl" />
-            <Corner pos="tr" />
-            <Corner pos="bl" />
-            <Corner pos="br" />
-            {processing ? (
-              <ActivityIndicator size="large" color="#fbbf24" />
-            ) : (
-              <Animated.View
-                style={[
-                  styles.scanLine,
-                  {
-                    backgroundColor: lineColor,
-                    shadowColor: lineColor,
-                    transform: [{ translateY }],
-                  },
-                ]}
-              />
-            )}
-          </View>
-
-          <View style={styles.instructionRow}>
-            <FontAwesome5 name="qrcode" size={13} color="#e2e8f0" />
-            <Text style={styles.scanInstruction}>
-              Align code within the frame
-            </Text>
-          </View>
+            </View>
+          </Animated.View>
         </Animated.View>
       </CameraView>
     </View>
@@ -200,12 +200,10 @@ const styles = StyleSheet.create({
   cameraOverlay: {
     flex: 1,
     backgroundColor: "rgba(0, 0, 0, 0.45)",
-    justifyContent: "center",
-    alignItems: "center",
-    padding: 18,
   },
   topControls: {
     position: "absolute",
+    top: 12,
     left: 0,
     right: 0,
     flexDirection: "row",
@@ -213,6 +211,14 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     paddingHorizontal: 18,
     zIndex: 20,
+  },
+  controlSlot: {
+    width: 104,
+    alignItems: "flex-start",
+    justifyContent: "center",
+  },
+  rightControlSlot: {
+    alignItems: "flex-end",
   },
   button: {
     minHeight: 36,
@@ -273,7 +279,15 @@ const styles = StyleSheet.create({
   flashButtonTextActive: {
     color: "#0f172a",
   },
-  
+  scanContent: {
+    position: "absolute",
+    top: 76,
+    left: 18,
+    right: 18,
+    alignItems: "center",
+    justifyContent: "center",
+    overflow: "hidden",
+  },
   scanFrame: {
     width: FRAME_SIZE,
     height: FRAME_SIZE,
