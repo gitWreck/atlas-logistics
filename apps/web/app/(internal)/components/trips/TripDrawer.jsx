@@ -25,6 +25,7 @@ import ViewPackagesModal from "../shipments/Packages/ViewPackagesModal";
 import ScanFoundPackageModal from "./modals/ScanFoundPackageModal";
 import ShipmentScanActionModal from "../shipments/ShipmentScanner/ShipmentScanActionModal";
 import InvoiceDetailsModal from "../invoice/InvoiceDetailsModal";
+import InvoicePaymentDialog from "../invoice/InvoicePaymentDialog";
 import InvoiceFormModal from "../invoice/InvoiceFormModal";
 import useInvoiceWorkflow from "../invoice/useInvoiceWorkflow";
 import { updateShipmentPackages } from "@/app/utility/FirebaseFunctions";
@@ -55,6 +56,7 @@ export default function TripDrawer({
   const [isScanModalOpen, setScanModalOpen] = useState(false);
   const [isFoundScanOpen, setFoundScanOpen] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [isPaymentDialogOpen, setPaymentDialogOpen] = useState(false);
 
   const theme = getDrawerThemeClasses(isDark);
 
@@ -134,6 +136,8 @@ export default function TripDrawer({
     isFormOpen: isInvoiceFormOpen,
     isDetailsOpen: isInvoiceDetailsOpen,
     isSaving: isInvoiceSaving,
+    isStatusSaving: isInvoiceStatusSaving,
+    statusError: invoiceStatusError,
     submitError: invoiceSubmitError,
     formMode: invoiceMode,
     selectedShipment: selectedInvoiceShipment,
@@ -145,12 +149,14 @@ export default function TripDrawer({
     closeDetails: closeInvoiceDetails,
     submitInvoice,
     changeInvoiceStatus,
+    clearStatusError,
     reversePayment,
   } = invoiceWorkflow;
 
   useEffect(() => {
     if (isOpen && data?.tripId) {
       setActiveTab("TIMELINE");
+      setPaymentDialogOpen(false);
       setShipments([]);
       setRemovedManifestEntries([]);
       setManifestTripId(null);
@@ -222,6 +228,11 @@ export default function TripDrawer({
 
   const handleViewInvoice = async (shipment) => {
     await openInvoiceDetailsById(shipment?.invoiceId, shipment);
+  };
+
+  const handleMarkInvoicePaid = async (options) => {
+    const succeeded = await changeInvoiceStatus(selectedInvoice, "PAID", options);
+    if (succeeded) setPaymentDialogOpen(false);
   };
 
   const handleRefresh = async () => {
@@ -521,7 +532,10 @@ export default function TripDrawer({
         onClose={closeInvoiceDetails}
         onEdit={() => openEditInvoice(selectedInvoice, selectedInvoiceShipment)}
         onIssue={() => changeInvoiceStatus(selectedInvoice, "ISSUED")}
-        onMarkPaid={() => changeInvoiceStatus(selectedInvoice, "PAID")}
+        onMarkPaid={() => {
+          clearStatusError();
+          setPaymentDialogOpen(true);
+        }}
         onCancel={() => changeInvoiceStatus(selectedInvoice, "CANCELLED")}
         onReversePayment={async () => {
           const reason = window.prompt("Enter the reason for reversing this payment:");
@@ -529,6 +543,20 @@ export default function TripDrawer({
         }}
         isDark={isDark}
       />
+      {isPaymentDialogOpen && selectedInvoice && (
+        <InvoicePaymentDialog
+          key={selectedInvoice.id}
+          invoice={selectedInvoice}
+          isDark={isDark}
+          isSaving={isInvoiceStatusSaving}
+          statusError={invoiceStatusError}
+          onCancel={() => {
+            clearStatusError();
+            setPaymentDialogOpen(false);
+          }}
+          onConfirm={handleMarkInvoicePaid}
+        />
+      )}
     </>
   );
 }
