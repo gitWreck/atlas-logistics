@@ -1747,7 +1747,7 @@ export default function ScannerScreen() {
             : null;
 
         if (pieceIds) {
-          await completeCheckerDelivery({
+          const deliveryResult = await completeCheckerDelivery({
             shipmentId: canonicalShipmentId,
             packageIds: pieceIds,
             profile,
@@ -1757,6 +1757,25 @@ export default function ScannerScreen() {
             shipment: shipmentDocData,
             notificationChannels,
           });
+
+          if (deliveryResult?.alreadyCompleted) {
+            const shipmentAlreadyCompleted =
+              String(deliveryResult.status || "").toUpperCase() ===
+              "COMPLETED";
+            showSuccessModal({
+              barcode: pendingDelivery.barcode,
+              shipmentId: canonicalShipmentId,
+              shipmentStatus: deliveryResult.status,
+              packageStatus: "DELIVERED",
+              quantity: pendingDelivery.qty,
+              message: shipmentAlreadyCompleted
+                ? "This shipment was already completed. No duplicate delivery was created."
+                : "This piece was already delivered. No duplicate update was created.",
+              source: pendingDelivery.source,
+              resultType: "already_scanned",
+            });
+            return;
+          }
 
           const pieceCount = pieceIds.length;
           showSuccessModal({

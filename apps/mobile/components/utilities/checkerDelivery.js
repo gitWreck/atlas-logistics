@@ -244,7 +244,7 @@ export async function completeCheckerDelivery({
     ? Object.values(notificationChannels).some(Boolean)
     : false;
 
-  await updateShipmentStatus({
+  const response = await updateShipmentStatus({
     shipmentId,
     tripId,
     newStatus: "DELIVERED",
@@ -263,4 +263,6 @@ export async function completeCheckerDelivery({
     notifyPush: notificationChannels?.push,
     updatedBy: updatedBy(profile),
   });
+
+  return response?.data || {};
 }

@@ -16,6 +16,7 @@ const { EVENT_TYPES } = require("../tracking/eventTypes");
 const {
   normalizePackageIdSet,
   collectTargetPieceIdentities,
+  collectAlreadyDeliveredPieceIdentities,
   assertHasTargetPieces,
   assertRequestedPiecesOwned,
   shouldTargetCheckerPiece,
@@ -341,7 +342,7 @@ exports.updateShipmentStatus = onCall(
 
     let updatedShipmentData = null;
 
-    const notificationPlan = await db.runTransaction(async (tx) => {
+    const transactionResult = await db.runTransaction(async (tx) => {
       const shipmentSnap = await tx.get(shipmentRef);
 
       if (!shipmentSnap.exists) {
@@ -495,6 +496,22 @@ exports.updateShipmentStatus = onCall(
           packageIdSet,
           mode: "deliver",
         });
+        if (targetIdentities.length === 0) {
+          const alreadyDeliveredPieceIds =
+            collectAlreadyDeliveredPieceIdentities(oldPackages, {
+              checkerUid: checkerAuthUid,
+              legacyUserCode: usercode,
+              packageIdSet,
+            });
+
+          if (alreadyDeliveredPieceIds.length > 0) {
+            return {
+              alreadyCompleted: true,
+              status: currentData.status || "DELIVERED",
+              deliveredPieceIds: alreadyDeliveredPieceIds,
+            };
+          }
+        }
         assertHasTargetPieces(
           targetIdentities,
           "deliver. Mark out for delivery or scan the piece label first.",
@@ -793,6 +810,17 @@ exports.updateShipmentStatus = onCall(
       });
     });
 
+    if (transactionResult?.alreadyCompleted) {
+      return {
+        success: true,
+        status: transactionResult.status,
+        deliveredPieceIds: transactionResult.deliveredPieceIds,
+        alreadyCompleted: true,
+      };
+    }
+
+    const notificationPlan = transactionResult;
+
     if (completedTripId && wasShipmentDelivered(derivedShipmentStatus)) {
       try {
         await tryAutoCompleteTrip(completedTripId, {
@@ -824,32 +852,39 @@ exports.updateShipmentStatus = onCall(
     }
 
     if (isCheckerPieceDelivery && checkerDeliveredPieceIds.length > 0) {
-      await Promise.all(
-        checkerDeliveredPieceIds.map((pieceId) =>
-          writeShipmentEvent({
-            db,
-            event: {
-              shipmentId,
-              pieceId,
-              eventType: EVENT_TYPES.DELIVERED,
-              checkerId: uid,
-              checkerName: name,
-              location: location || null,
-              proofPhotoUrl: Array.isArray(proofOfDelivery)
-                ? proofOfDelivery[0] || null
-                : proofOfDelivery || null,
-              remarks:
-                remarks ||
-                `Delivered by checker (${checkerDeliveredPieceIds.length} piece${
-                  checkerDeliveredPieceIds.length === 1 ? "" : "s"
-                }).`,
-              createdBy: uid,
-              createdByRole: role,
-              source: sourceUI || "CHECKER_MOBILE",
-            },
-          }),
-        ),
-      );
+      try {
+        await Promise.all(
+          checkerDeliveredPieceIds.map((pieceId) =>
+            writeShipmentEvent({
+              db,
+              event: {
+                shipmentId,
+                pieceId,
+                eventType: EVENT_TYPES.DELIVERED,
+                checkerId: uid,
+                checkerName: name,
+                location: location || null,
+                proofPhotoUrl: Array.isArray(proofOfDelivery)
+                  ? proofOfDelivery[0] || null
+                  : proofOfDelivery || null,
+                remarks:
+                  remarks ||
+                  `Delivered by checker (${checkerDeliveredPieceIds.length} piece${
+                    checkerDeliveredPieceIds.length === 1 ? "" : "s"
+                  }).`,
+                createdBy: uid,
+                createdByRole: role,
+                source: sourceUI || "CHECKER_MOBILE",
+              },
+            }),
+          ),
+        );
+      } catch (eventError) {
+        console.error(
+          "[updateShipmentStatus] Delivery committed but piece history event write failed:",
+          eventError,
+        );
+      }
     }
 
     if (actor.role === "driver" && isFinalDeliveryStatus) {

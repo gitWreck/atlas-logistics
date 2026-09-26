@@ -126,6 +126,33 @@ function collectTargetPieceIdentities(
   return identities;
 }
 
+function collectAlreadyDeliveredPieceIdentities(
+  packages = [],
+  { checkerUid, legacyUserCode = null, packageIdSet = null } = {},
+) {
+  if (!checkerUid || !packageIdSet || packageIdSet.size === 0) return [];
+
+  const identities = [];
+  for (const packageId of packageIdSet) {
+    const pkg = packages.find((row) => packageMatchesId(row, packageId));
+    if (String(pkg?.status || "").trim().toUpperCase() !== "DELIVERED") {
+      return [];
+    }
+
+    const deliveredBy = String(pkg.deliveredByCheckerId || "").trim();
+    if (
+      deliveredBy !== String(checkerUid) &&
+      (!legacyUserCode || deliveredBy !== String(legacyUserCode).trim())
+    ) {
+      return [];
+    }
+
+    identities.push(getPackageIdentity(pkg));
+  }
+
+  return identities;
+}
+
 function explainCheckerReturnFailure(
   packages = [],
   { checkerUid, shipmentData = {}, packageIdSet = null } = {},
@@ -310,6 +337,7 @@ module.exports = {
   isPieceReturnable,
   shouldTargetCheckerPiece,
   collectTargetPieceIdentities,
+  collectAlreadyDeliveredPieceIdentities,
   assertHasTargetPieces,
   explainCheckerReturnFailure,
   assertRequestedPiecesOwned,
