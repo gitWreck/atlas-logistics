@@ -67,6 +67,7 @@ function formatShipmentDoc(doc, tripMap = {}) {
     createdAt: data.createdAt ? formatFirestoreDate(data.createdAt) : null,
     createdAtIso: toShipmentIsoDate(data.createdAt),
     updatedAt: data.updatedAt ? formatFirestoreDate(data.updatedAt) : null,
+    updatedAtIso: toShipmentIsoDate(data.updatedAt),
     metrics: {
       totalContent: effectiveTotal,
       totalPackages: data.totals?.totalItems || 0,

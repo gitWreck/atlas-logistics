@@ -22,6 +22,7 @@ import ReturnLoopCard from "./ReturnLoopCard";
 import { resolveShipmentMunicipality } from "@/app/utility/deliveryMunicipalities";
 import DrawerTabButton from "../ui/DrawerTabButton";
 import { getDrawerThemeClasses } from "@/app/utility/constant/theme";
+import { formatShipmentBoardTimestamp } from "@/app/utility/shipmentBoardFormatter";
 import {
   getCustodyLockMessage,
   isShipmentCustodyLocked,
@@ -146,6 +147,14 @@ export default function ShipmentDrawer({
               >
                 {displayData.route ||
                   displayData.originCode + " → " + displayData.destinationCode}
+              </span>
+            </div>
+            <div className={`mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs ${theme.mutedText}`}>
+              <span>
+                <strong>Created (PH):</strong> {formatShipmentBoardTimestamp(displayData.createdAtIso || displayData.createdAt)}
+              </span>
+              <span>
+                <strong>Updated (PH):</strong> {formatShipmentBoardTimestamp(displayData.updatedAtIso || displayData.updatedAt)}
               </span>
             </div>
           </div>

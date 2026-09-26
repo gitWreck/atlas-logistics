@@ -18,6 +18,21 @@ export function toShipmentIsoDate(value) {
   return Number.isNaN(date.getTime()) ? null : date.toISOString();
 }
 
+export function formatShipmentBoardTimestamp(value) {
+  const iso = toShipmentIsoDate(value);
+  if (!iso) return "—";
+
+  return new Intl.DateTimeFormat("en-US", {
+    timeZone: "Asia/Manila",
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  }).format(new Date(iso));
+}
+
 export function formatShipmentForBoard(shipment = {}, { id = shipment.id } = {}) {
   const breakdown = resolveShipmentPackageBreakdown(shipment);
   const totalUnits =
@@ -45,6 +60,7 @@ export function formatShipmentForBoard(shipment = {}, { id = shipment.id } = {})
     updatedAt: shipment.updatedAt
       ? formatFirestoreDate(shipment.updatedAt)
       : shipment.updatedAt,
+    updatedAtIso: shipment.updatedAtIso || toShipmentIsoDate(shipment.updatedAt),
     progress: progressPercent,
     metrics: {
       ...(shipment.metrics || {}),

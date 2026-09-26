@@ -104,6 +104,14 @@ export async function GET(request) {
 
     const pickups = limitedPickupDocs.map((doc) => {
       const data = doc.data();
+      const boardData = { ...data };
+      if (limitParam === "all") {
+        delete boardData.packages;
+        delete boardData.packageBarcodes;
+        delete boardData.statusHistory;
+        delete boardData.proofOfDelivery;
+        delete boardData.proofOfReceipt;
+      }
       const assignedTrip = data.currentTripId
         ? tripMap[data.currentTripId]
         : null;
@@ -135,10 +143,11 @@ export async function GET(request) {
 
       return {
         id: doc.id,
-        ...data,
+        ...boardData,
         createdAt,
         createdAtIso: toShipmentIsoDate(data.createdAt),
         updatedAt,
+        updatedAtIso: toShipmentIsoDate(data.updatedAt),
 
         // Calculated Metrics for Dashboard
         metrics: {

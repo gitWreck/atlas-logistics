@@ -128,12 +128,8 @@ function mergeShipmentsById(primary = [], supplemental = []) {
   });
 
   return [...merged.values()].sort((a, b) => {
-    const aMs = a.updatedAt?._seconds
-      ? a.updatedAt._seconds * 1000
-      : new Date(a.updatedAt || 0).getTime();
-    const bMs = b.updatedAt?._seconds
-      ? b.updatedAt._seconds * 1000
-      : new Date(b.updatedAt || 0).getTime();
+    const aMs = Date.parse(a.createdAtIso || a.updatedAtIso || "") || 0;
+    const bMs = Date.parse(b.createdAtIso || b.updatedAtIso || "") || 0;
     return bMs - aMs;
   });
 }
@@ -502,6 +498,12 @@ const ShipmentBoard = forwardRef(function ShipmentBoard(
   }, [lookupShipment, searchQuery, shipments, user]);
 
   useEffect(() => {
+    if (SHIPMENT_TRACKING_PATTERN.test(searchQuery.trim())) {
+      setActiveBoardTab(SHIPMENT_BOARD_TABS.ALL);
+    }
+  }, [searchQuery]);
+
+  useEffect(() => {
     if (activeBoardTab !== SHIPMENT_BOARD_TABS.DELIVERY || !user) return;
     fetchCheckerDirectory();
   }, [activeBoardTab, fetchCheckerDirectory, user]);
@@ -509,6 +511,7 @@ const ShipmentBoard = forwardRef(function ShipmentBoard(
   const filteredShipments = useMemo(() => {
     return shipmentsWithPickups.filter((shipment) => {
       const searchContent = [
+        shipment.id,
         shipment.shipmentId,
         shipment.sender?.name,
         shipment.recipient?.name,
@@ -518,6 +521,16 @@ const ShipmentBoard = forwardRef(function ShipmentBoard(
         .toLowerCase();
 
       if (!searchContent.includes(searchQuery.toLowerCase())) return false;
+
+      if (
+        SHIPMENT_TRACKING_PATTERN.test(searchQuery.trim()) &&
+        [shipment.id, shipment.shipmentId].some(
+          (id) =>
+            String(id || "").toLowerCase() === searchQuery.trim().toLowerCase(),
+        )
+      ) {
+        return true;
+      }
 
       if (startDate || endDate) {
         const shipmentDate = new Date(shipment.createdAtIso || shipment.createdAt);
@@ -962,21 +975,42 @@ const ShipmentBoard = forwardRef(function ShipmentBoard(
                 <div className="flex gap-2 w-full sm:w-auto">
                   {/* Date filters */}
                   <div
-                    className={`flex items-center gap-2 border rounded-lg px-2 py-1 flex-1 sm:flex-none justify-center ${theme.filterWrap}`}
+                    className={`flex flex-col gap-1 border rounded-lg px-2 py-1 flex-1 sm:flex-none ${theme.filterWrap}`}
                   >
-                    <input
-                      type="date"
-                      className={`bg-transparent text-xs outline-none w-24 ${theme.dateInput}`}
-                      value={startDate}
-                      onChange={(e) => setStartDate(e.target.value)}
-                    />
-                    <span className={theme.iconMuted}>-</span>
-                    <input
-                      type="date"
-                      className={`bg-transparent text-xs outline-none w-24 ${theme.dateInput}`}
-                      value={endDate}
-                      onChange={(e) => setEndDate(e.target.value)}
-                    />
+                    <span className={`text-[10px] font-semibold ${theme.iconMuted}`}>
+                      Date created (PH)
+                    </span>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="date"
+                        aria-label="Date created from"
+                        title="Date created from (Philippine time)"
+                        className={`bg-transparent text-xs outline-none w-24 ${theme.dateInput}`}
+                        value={startDate}
+                        onChange={(e) => {
+                          setStartDate(e.target.value);
+                          if (e.target.value) {
+                            setShipmentLimit("all");
+                            setPickupLimit("all");
+                          }
+                        }}
+                      />
+                      <span className={theme.iconMuted}>-</span>
+                      <input
+                        type="date"
+                        aria-label="Date created to"
+                        title="Date created to (Philippine time)"
+                        className={`bg-transparent text-xs outline-none w-24 ${theme.dateInput}`}
+                        value={endDate}
+                        onChange={(e) => {
+                          setEndDate(e.target.value);
+                          if (e.target.value) {
+                            setShipmentLimit("all");
+                            setPickupLimit("all");
+                          }
+                        }}
+                      />
+                    </div>
                   </div>
 
                   {/* Main filter */}
@@ -1036,15 +1070,15 @@ const ShipmentBoard = forwardRef(function ShipmentBoard(
 
             {/* Table */}
             <div className="md:overflow-x-auto">
-              <div className="md:min-w-[900px]">
+              <div className="md:min-w-[1050px]">
                 <div
-                  className={`hidden md:grid grid-cols-13 gap-4 px-6 py-3 border-b text-xs font-semibold uppercase tracking-wider ${theme.tableHead}`}
+                  className={`hidden md:grid grid-cols-14 gap-4 px-6 py-3 border-b text-xs font-semibold uppercase tracking-wider ${theme.tableHead}`}
                 >
                   <div className="col-span-4">Tracking / Customer</div>
                   <div className="col-span-2">Route</div>
                   <div className="col-span-2">Details</div>
                   <div className="col-span-3">Progress</div>
-                  <div className="col-span-1">Update</div>
+                  <div className="col-span-2">Dates (PH)</div>
                   <div className="col-span-1 text-right">Action</div>
                 </div>
 

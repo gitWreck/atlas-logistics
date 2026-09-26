@@ -11,6 +11,7 @@ import StatusBadge from "../ui/StatusBadge";
 import StatusDot from "../ui/StatusDot";
 import { getRowThemeClasses } from "@/app/utility/constant/theme";
 import { getShipmentRouteLabel } from "./shipmentHelpers";
+import { formatShipmentBoardTimestamp } from "@/app/utility/shipmentBoardFormatter";
 import AdminRowDeleteButton from "../admin/AdminRowDeleteButton";
 import { deleteShipment } from "@/app/utility/FirebaseFunctions";
 import { isShipmentCustodyLocked } from "@/app/utility/custodyLock";
@@ -18,28 +19,6 @@ import {
   getOdionganHubBoardStatusKey,
   getOdionganHubBoardStatusLabel,
 } from "@/app/utility/packageStatus";
-
-function formatTimestampLabel(value) {
-  if (!value) return "Just now";
-  if (typeof value === "string") return value;
-  if (typeof value === "number") {
-    const date = new Date(value);
-    return Number.isNaN(date.getTime()) ? "Just now" : date.toLocaleString();
-  }
-
-  const date =
-    typeof value.toDate === "function"
-      ? value.toDate()
-      : value._seconds
-        ? new Date(value._seconds * 1000)
-        : null;
-
-  if (date && !Number.isNaN(date.getTime())) {
-    return date.toLocaleString();
-  }
-
-  return "Just now";
-}
 
 function formatStatusLabel(status) {
   if (!status) return "UNKNOWN";
@@ -77,7 +56,8 @@ export default function ShipmentRow({
   const trackingNumber = s.shipmentId || s.trackingNumber || "—";
   const routeCode = `${s.originCode || "N/A"} -> ${s.destinationCode || "N/A"}`;
   const routeLabel = getShipmentRouteLabel(s);
-  const updatedLabel = formatTimestampLabel(s.updatedAt);
+  const createdLabel = formatShipmentBoardTimestamp(s.createdAtIso || s.createdAt);
+  const updatedLabel = formatShipmentBoardTimestamp(s.updatedAtIso || s.updatedAt);
   const boardStatusKey = isOdionganTab
     ? getOdionganHubBoardStatusKey(s)
     : s.status;
@@ -105,7 +85,7 @@ export default function ShipmentRow({
 
   return (
     <div
-      className={`relative flex flex-col gap-3 p-4 cursor-pointer transition-colors group md:grid md:grid-cols-13 md:gap-4 md:px-6 md:items-center ${mobileDividerClass} ${rowStateClass}`}
+      className={`relative flex flex-col gap-3 p-4 cursor-pointer transition-colors group md:grid ${shipmentBoard ? "md:grid-cols-14" : "md:grid-cols-13"} md:gap-4 md:px-6 md:items-center ${mobileDividerClass} ${rowStateClass}`}
     >
       {/* Mobile Header */}
       <div className="flex md:hidden justify-between items-start mb-1">
@@ -118,8 +98,11 @@ export default function ShipmentRow({
             >
               {trackingNumber}
             </div>
-            <div className={`text-xs md:text-[10px] ${theme.mutedText}`}>
-              {updatedLabel}
+            <div className={`text-xs ${theme.mutedText}`}>
+              Created: {createdLabel}
+            </div>
+            <div className={`text-xs ${theme.mutedText}`}>
+              Updated: {updatedLabel}
             </div>
           </div>
         </div>
@@ -285,9 +268,16 @@ export default function ShipmentRow({
         </div>
       </div>
 
-      {/* Col 5: Time / Delay */}
-      <div className="hidden md:flex col-span-1 flex-col gap-2">
-        <div className={`text-xs ${theme.mutedText}`}>{updatedLabel}</div>
+      {/* Col 5: Creation and update dates */}
+      <div className={`hidden md:flex flex-col gap-1 ${shipmentBoard ? "col-span-2" : "col-span-1"}`}>
+        {shipmentBoard && (
+          <div className={`text-[11px] ${theme.mutedText}`}>
+            <span className="font-semibold">Created:</span> {createdLabel}
+          </div>
+        )}
+        <div className={`text-[11px] ${theme.mutedText}`}>
+          {shipmentBoard && <span className="font-semibold">Updated:</span>} {updatedLabel}
+        </div>
 
         {isDelayed && (
           <div className="w-fit">

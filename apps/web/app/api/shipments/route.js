@@ -90,7 +90,7 @@ export async function GET(request) {
       );
     }
     shipmentsQuery = shipmentsQuery.orderBy(
-      startMs !== null || endMs !== null ? "createdAt" : "updatedAt",
+      "createdAt",
       "desc",
     );
 
@@ -203,6 +203,7 @@ export async function GET(request) {
         createdAt,
         createdAtIso: toShipmentIsoDate(data.createdAt),
         updatedAt,
+        updatedAtIso: toShipmentIsoDate(data.updatedAt),
         packageBreakdown: breakdown,
 
         // Calculated Metrics for Dashboard
