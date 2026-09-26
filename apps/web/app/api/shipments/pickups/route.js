@@ -3,6 +3,7 @@ import { adminDb, adminAuth } from "@/lib/firebase-admin";
 import { headers } from "next/headers";
 import { formatFirestoreDate } from "@/app/utility/utilities";
 import { resolveShipmentDeliveryMetrics } from "@/app/utility/shipmentProgress";
+import { toShipmentIsoDate } from "@/app/utility/shipmentBoardFormatter";
 
 export const dynamic = "force-dynamic";
 
@@ -136,6 +137,7 @@ export async function GET(request) {
         id: doc.id,
         ...data,
         createdAt,
+        createdAtIso: toShipmentIsoDate(data.createdAt),
         updatedAt,
 
         // Calculated Metrics for Dashboard

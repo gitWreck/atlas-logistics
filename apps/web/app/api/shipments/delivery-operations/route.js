@@ -8,6 +8,7 @@ import {
 } from "@/app/utility/shipmentProgress";
 import { resolveShipmentPackageBreakdown } from "@/app/utility/packageStatus";
 import { shipmentMatchesDeliveryCheckerPool } from "@/app/utility/deliveryOperationsCheckers";
+import { toShipmentIsoDate } from "@/app/utility/shipmentBoardFormatter";
 
 export const dynamic = "force-dynamic";
 
@@ -64,6 +65,7 @@ function formatShipmentDoc(doc, tripMap = {}) {
     id: doc.id,
     ...data,
     createdAt: data.createdAt ? formatFirestoreDate(data.createdAt) : null,
+    createdAtIso: toShipmentIsoDate(data.createdAt),
     updatedAt: data.updatedAt ? formatFirestoreDate(data.updatedAt) : null,
     metrics: {
       totalContent: effectiveTotal,

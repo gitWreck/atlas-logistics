@@ -183,6 +183,8 @@ const ShipmentBoard = forwardRef(function ShipmentBoard(
   const [coreShipments, setCoreShipments] = useState([]);
   const [deliveryShipments, setDeliveryShipments] = useState([]);
   const [pickups, setPickups] = useState([]);
+  const [lookupShipment, setLookupShipment] = useState(null);
+  const coreFetchSequenceRef = useRef(0);
   const [loading, setLoading] = useState(true);
   const [loadingDelivery, setLoadingDelivery] = useState(false);
   const [deliveryOpsLoaded, setDeliveryOpsLoaded] = useState(false);
@@ -193,8 +195,12 @@ const ShipmentBoard = forwardRef(function ShipmentBoard(
   );
 
   const shipmentsWithPickups = useMemo(
-    () => mergeShipmentsById(shipments, pickups),
-    [pickups, shipments],
+    () =>
+      mergeShipmentsById(
+        mergeShipmentsById(shipments, pickups),
+        lookupShipment ? [lookupShipment] : [],
+      ),
+    [lookupShipment, pickups, shipments],
   );
 
   const [isNewOrderModalOpen, setIsNewOrderModalOpen] = useState(false);
@@ -276,6 +282,7 @@ const ShipmentBoard = forwardRef(function ShipmentBoard(
       return;
     }
 
+    const requestSequence = ++coreFetchSequenceRef.current;
     const token = await user.getIdToken();
 
     const requestOptions = {
@@ -287,10 +294,13 @@ const ShipmentBoard = forwardRef(function ShipmentBoard(
       cache: "no-store",
     };
 
-    const shipmentsUrl =
-      shipmentLimit === "50"
-        ? "/api/shipments"
-        : `/api/shipments?limit=${shipmentLimit}`;
+    const shipmentParams = new URLSearchParams();
+    if (shipmentLimit !== "50") shipmentParams.set("limit", shipmentLimit);
+    if (startDate) shipmentParams.set("startDate", startDate);
+    if (endDate) shipmentParams.set("endDate", endDate);
+    const shipmentsUrl = shipmentParams.size
+      ? `/api/shipments?${shipmentParams}`
+      : "/api/shipments";
     const pickupsUrl =
       pickupLimit === "50"
         ? "/api/shipments/pickups"
@@ -327,9 +337,10 @@ const ShipmentBoard = forwardRef(function ShipmentBoard(
       hydrateBoardShipment,
     );
 
+    if (requestSequence !== coreFetchSequenceRef.current) return;
     setCoreShipments(formattedCoreShipments);
     setPickups(formattedPickups);
-  }, [pickupLimit, shipmentLimit, user]);
+  }, [endDate, pickupLimit, shipmentLimit, startDate, user]);
 
   const fetchDeliveryOperationsData = useCallback(async () => {
     if (!user) return;
@@ -446,13 +457,22 @@ const ShipmentBoard = forwardRef(function ShipmentBoard(
 
   useEffect(() => {
     const trackingRef = searchQuery.trim();
-    if (!user || !SHIPMENT_TRACKING_PATTERN.test(trackingRef)) return;
+    if (!user || !SHIPMENT_TRACKING_PATTERN.test(trackingRef)) {
+      setLookupShipment(null);
+      return;
+    }
 
     const alreadyLoaded = shipments.some(
       (shipment) =>
         shipment.id === trackingRef || shipment.shipmentId === trackingRef,
     );
-    if (alreadyLoaded) return;
+    if (alreadyLoaded) {
+      setLookupShipment(null);
+      return;
+    }
+    if (lookupShipment?.id === trackingRef) return;
+
+    setLookupShipment(null);
 
     let cancelled = false;
 
@@ -460,7 +480,7 @@ const ShipmentBoard = forwardRef(function ShipmentBoard(
       try {
         const token = await user.getIdToken();
         const res = await fetch(
-          `/api/shipments/delivery-operations?shipmentRef=${encodeURIComponent(trackingRef)}`,
+          `/api/shipments/${encodeURIComponent(trackingRef)}`,
           {
             headers: { Authorization: `Bearer ${token}` },
             cache: "no-store",
@@ -469,26 +489,17 @@ const ShipmentBoard = forwardRef(function ShipmentBoard(
         if (!res.ok || cancelled) return;
 
         const data = await res.json();
-        const extraShipments = (data.shipments || []).map((shipment) => ({
-          ...shipment,
-          progress: calculateShipmentProgress(shipment),
-        }));
-
-        if (!extraShipments.length || cancelled) return;
-
-        setDeliveryShipments((current) =>
-          mergeShipmentsById(current, extraShipments),
-        );
-        setDeliveryOpsLoaded(true);
+        if (!data.shipment || cancelled) return;
+        setLookupShipment(data.shipment);
       } catch (err) {
-        console.warn("Delivery operations lookup unavailable:", err);
+        console.warn("Shipment lookup unavailable:", err);
       }
     })();
 
     return () => {
       cancelled = true;
     };
-  }, [searchQuery, shipments, user]);
+  }, [lookupShipment, searchQuery, shipments, user]);
 
   useEffect(() => {
     if (activeBoardTab !== SHIPMENT_BOARD_TABS.DELIVERY || !user) return;
@@ -509,20 +520,20 @@ const ShipmentBoard = forwardRef(function ShipmentBoard(
       if (!searchContent.includes(searchQuery.toLowerCase())) return false;
 
       if (startDate || endDate) {
-        const shipmentDate = shipment.createdAt?._seconds
-          ? new Date(shipment.createdAt._seconds * 1000)
-          : new Date(shipment.createdAt);
+        const shipmentDate = new Date(shipment.createdAtIso || shipment.createdAt);
+
+        if (Number.isNaN(shipmentDate.getTime())) return false;
 
         if (startDate) {
-          const start = new Date(startDate);
-          start.setHours(0, 0, 0, 0);
+          const start = new Date(`${startDate}T00:00:00+08:00`);
           if (shipmentDate < start) return false;
         }
 
         if (endDate) {
-          const end = new Date(endDate);
-          end.setHours(23, 59, 59, 999);
-          if (shipmentDate > end) return false;
+          const end = new Date(
+            Date.parse(`${endDate}T00:00:00+08:00`) + 24 * 60 * 60 * 1000,
+          );
+          if (shipmentDate >= end) return false;
         }
       }
 

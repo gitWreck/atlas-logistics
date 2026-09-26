@@ -5,6 +5,19 @@ import {
 } from "./shipmentProgress";
 import { resolveShipmentPackageBreakdown } from "./packageStatus";
 
+export function toShipmentIsoDate(value) {
+  if (!value) return null;
+  let date;
+  if (typeof value.toDate === "function") date = value.toDate();
+  else if (typeof value.seconds === "number") date = new Date(value.seconds * 1000);
+  else if (typeof value._seconds === "number") date = new Date(value._seconds * 1000);
+  else if (value instanceof Date) date = value;
+  else if (typeof value === "string" && /^\d{4}-\d{2}-\d{2}/.test(value))
+    date = new Date(value);
+  else return null;
+  return Number.isNaN(date.getTime()) ? null : date.toISOString();
+}
+
 export function formatShipmentForBoard(shipment = {}, { id = shipment.id } = {}) {
   const breakdown = resolveShipmentPackageBreakdown(shipment);
   const totalUnits =
@@ -28,6 +41,7 @@ export function formatShipmentForBoard(shipment = {}, { id = shipment.id } = {})
     createdAt: shipment.createdAt
       ? formatFirestoreDate(shipment.createdAt)
       : shipment.createdAt,
+    createdAtIso: shipment.createdAtIso || toShipmentIsoDate(shipment.createdAt),
     updatedAt: shipment.updatedAt
       ? formatFirestoreDate(shipment.updatedAt)
       : shipment.updatedAt,

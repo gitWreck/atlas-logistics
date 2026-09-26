@@ -8,6 +8,7 @@ import {
 } from "@/app/utility/shipmentProgress";
 import { resolveShipmentPackageBreakdown } from "@/app/utility/packageStatus";
 import { managerCanAccessRecord } from "@/lib/managerAccess";
+import { toShipmentIsoDate } from "@/app/utility/shipmentBoardFormatter";
 
 export const dynamic = "force-dynamic";
 
@@ -42,6 +43,8 @@ export async function GET(request) {
 
     const { searchParams } = new URL(request.url);
     const limitParam = searchParams.get("limit") || "50";
+    const startDate = searchParams.get("startDate") || "";
+    const endDate = searchParams.get("endDate") || "";
     const allowedLimits = ["all", "50", "100", "200"];
 
     if (!allowedLimits.includes(limitParam)) {
@@ -49,6 +52,21 @@ export async function GET(request) {
         { error: "Invalid limit. Use all, 50, 100, or 200." },
         { status: 400 },
       );
+    }
+
+    const parseManilaDate = (value) => {
+      if (!value) return null;
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return NaN;
+      return Date.parse(`${value}T00:00:00+08:00`);
+    };
+    const startMs = parseManilaDate(startDate);
+    const endMs = parseManilaDate(endDate);
+    if (
+      Number.isNaN(startMs) ||
+      Number.isNaN(endMs) ||
+      (startMs !== null && endMs !== null && startMs > endMs)
+    ) {
+      return NextResponse.json({ error: "Invalid shipment date range." }, { status: 400 });
     }
 
     // 3. FETCH SHIPMENTS (The Base Data)
@@ -60,9 +78,21 @@ export async function GET(request) {
     //   .limit(50)
     //   .get();
 
-    let shipmentsQuery = adminDb
-      .collection("shipments")
-      .orderBy("updatedAt", "desc");
+    let shipmentsQuery = adminDb.collection("shipments");
+    if (startMs !== null) {
+      shipmentsQuery = shipmentsQuery.where("createdAt", ">=", new Date(startMs));
+    }
+    if (endMs !== null) {
+      shipmentsQuery = shipmentsQuery.where(
+        "createdAt",
+        "<",
+        new Date(endMs + 24 * 60 * 60 * 1000),
+      );
+    }
+    shipmentsQuery = shipmentsQuery.orderBy(
+      startMs !== null || endMs !== null ? "createdAt" : "updatedAt",
+      "desc",
+    );
 
     if (limitParam !== "all") {
       shipmentsQuery = shipmentsQuery.limit(Number(limitParam));
@@ -160,6 +190,7 @@ export async function GET(request) {
         id: doc.id,
         ...data,
         createdAt,
+        createdAtIso: toShipmentIsoDate(data.createdAt),
         updatedAt,
 
         // Calculated Metrics for Dashboard
