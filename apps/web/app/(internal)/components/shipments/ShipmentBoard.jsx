@@ -978,7 +978,7 @@ const ShipmentBoard = forwardRef(function ShipmentBoard(
                     className={`flex flex-col gap-1 border rounded-lg px-2 py-1 flex-1 sm:flex-none ${theme.filterWrap}`}
                   >
                     <span className={`text-[10px] font-semibold ${theme.iconMuted}`}>
-                      Date created (PH)
+                      Date created
                     </span>
                     <div className="flex items-center gap-2">
                       <input
@@ -1086,7 +1086,7 @@ const ShipmentBoard = forwardRef(function ShipmentBoard(
                   <div className="col-span-2">Route</div>
                   <div className="col-span-2">Details</div>
                   <div className="col-span-3">Progress</div>
-                  <div className="col-span-2">Dates (PH)</div>
+                  <div className="col-span-2">Dates</div>
                   <div className="col-span-1 text-right">Action</div>
                 </div>
 

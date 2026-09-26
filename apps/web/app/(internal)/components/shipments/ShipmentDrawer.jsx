@@ -151,10 +151,10 @@ export default function ShipmentDrawer({
             </div>
             <div className={`mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs ${theme.mutedText}`}>
               <span>
-                <strong>Created (PH):</strong> {formatShipmentBoardTimestamp(displayData.createdAtIso || displayData.createdAt)}
+                <strong>Created:</strong> {formatShipmentBoardTimestamp(displayData.createdAtIso || displayData.createdAt)}
               </span>
               <span>
-                <strong>Updated (PH):</strong> {formatShipmentBoardTimestamp(displayData.updatedAtIso || displayData.updatedAt)}
+                <strong>Updated:</strong> {formatShipmentBoardTimestamp(displayData.updatedAtIso || displayData.updatedAt)}
               </span>
             </div>
           </div>
