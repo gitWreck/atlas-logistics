@@ -821,7 +821,7 @@ exports.updateShipmentStatus = onCall(
 
     const notificationPlan = transactionResult;
 
-    if (completedTripId && wasShipmentDelivered(derivedShipmentStatus)) {
+    if (completedTripId && wasShipmentDelivered(resultStatus)) {
       try {
         await tryAutoCompleteTrip(completedTripId, {
           actorId: uid,

@@ -1759,6 +1759,7 @@ export default function ScannerScreen() {
           });
 
           if (deliveryResult?.alreadyCompleted) {
+            resetDeliveryProof();
             const shipmentAlreadyCompleted =
               String(deliveryResult.status || "").toUpperCase() ===
               "COMPLETED";
@@ -1777,6 +1778,7 @@ export default function ScannerScreen() {
             return;
           }
 
+          resetDeliveryProof();
           const pieceCount = pieceIds.length;
           showSuccessModal({
             barcode: pendingDelivery.barcode,
@@ -1814,6 +1816,7 @@ export default function ScannerScreen() {
           throwOnError: true,
         });
 
+        resetDeliveryProof();
         const pieceCount = batchPackageIds.length;
         showSuccessModal({
           barcode: pendingDelivery.barcode,
@@ -1910,6 +1913,25 @@ export default function ScannerScreen() {
 
     if (!statusToApply) {
       throw new Error("Unsupported scan mode.");
+    }
+
+    if (
+      statusToApply === "DELIVERED" &&
+      ["DELIVERED", "COMPLETED"].includes(
+        String(pkg?.status || "").toUpperCase(),
+      )
+    ) {
+      showSuccessModal({
+        barcode,
+        shipmentId: shipmentDoc.id,
+        shipmentStatus: shipmentData?.status || pkg.status,
+        packageStatus: pkg.status,
+        source,
+        message:
+          "This piece was already delivered. No duplicate update was created.",
+        resultType: "already_scanned",
+      });
+      return;
     }
 
     if (

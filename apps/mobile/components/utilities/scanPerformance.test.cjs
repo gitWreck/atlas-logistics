@@ -312,6 +312,24 @@ test("already processed load scans render a warning instead of success", () => {
   );
 });
 
+test("already delivered pieces are acknowledged before opening proof upload", () => {
+  const scanner = readFileSync(
+    path.join(__dirname, "..", "..", "app", "(checker)", "scan.js"),
+    "utf8",
+  );
+  const resolvedPackage = scanner.slice(
+    scanner.indexOf("const handleResolvedPackage"),
+    scanner.indexOf("const handleProcessPackage"),
+  );
+  const duplicateMessage = resolvedPackage.indexOf(
+    'resultType: "already_scanned"',
+  );
+  const proofDialog = resolvedPackage.indexOf("openDeliveryProofModal({");
+
+  assert.ok(duplicateMessage >= 0);
+  assert.ok(proofDialog > duplicateMessage);
+});
+
 test("scanner Done dismisses only the success popup", () => {
   const scanner = readFileSync(
     path.join(__dirname, "..", "..", "app", "(checker)", "scan.js"),
