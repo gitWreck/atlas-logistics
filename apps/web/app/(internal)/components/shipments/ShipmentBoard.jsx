@@ -452,7 +452,7 @@ const ShipmentBoard = forwardRef(function ShipmentBoard(
   }, [activeBoardTab, deliveryOpsLoaded, fetchDeliveryOperationsData, user]);
 
   useEffect(() => {
-    const trackingRef = searchQuery.trim();
+    const trackingRef = searchQuery.trim().toUpperCase();
     if (!user || !SHIPMENT_TRACKING_PATTERN.test(trackingRef)) {
       setLookupShipment(null);
       return;
@@ -520,7 +520,7 @@ const ShipmentBoard = forwardRef(function ShipmentBoard(
         .join(" ")
         .toLowerCase();
 
-      if (!searchContent.includes(searchQuery.toLowerCase())) return false;
+      if (!searchContent.includes(searchQuery.trim().toLowerCase())) return false;
 
       if (
         SHIPMENT_TRACKING_PATTERN.test(searchQuery.trim()) &&
@@ -1066,6 +1066,14 @@ const ShipmentBoard = forwardRef(function ShipmentBoard(
                   </div>
                 )}
               </div>
+            </div>
+
+            <div className={`px-4 sm:px-6 py-2 text-xs ${theme.emptyText}`}>
+              {tableLoading ? "Loading shipments…" : `${visibleShipments.length} matching shipments`}
+              {" · Newest created first · Philippine time"}
+              {SHIPMENT_TRACKING_PATTERN.test(searchQuery.trim()) && (
+                <span> · Exact ID search across all dates and statuses</span>
+              )}
             </div>
 
             {/* Table */}
