@@ -155,6 +155,17 @@ export async function GET(request) {
     // ---------------------------------------------------------
     const shipments = standardDocs.map((doc) => {
       const data = doc.data();
+      const boardData = { ...data };
+      if (limitParam === "all") {
+        // The board loads full shipment details from /api/shipments/[id] on open.
+        // Keeping these large fields in an all-items response exceeds the
+        // App Hosting response size limit for the current shipment collection.
+        delete boardData.packages;
+        delete boardData.packageBarcodes;
+        delete boardData.statusHistory;
+        delete boardData.proofOfDelivery;
+        delete boardData.proofOfReceipt;
+      }
       const assignedTrip = data.currentTripId
         ? tripMap[data.currentTripId]
         : null;
@@ -188,10 +199,11 @@ export async function GET(request) {
 
       return {
         id: doc.id,
-        ...data,
+        ...boardData,
         createdAt,
         createdAtIso: toShipmentIsoDate(data.createdAt),
         updatedAt,
+        packageBreakdown: breakdown,
 
         // Calculated Metrics for Dashboard
         metrics: {
