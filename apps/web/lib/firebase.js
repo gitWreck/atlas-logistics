@@ -1,7 +1,7 @@
 import { initializeApp, getApps } from "firebase/app";
-import { getFirestore, initializeFirestore } from "firebase/firestore";
-import { getAuth } from "firebase/auth";
-import { getFunctions } from "firebase/functions";
+import { getFirestore, initializeFirestore, connectFirestoreEmulator } from "firebase/firestore";
+import { getAuth, connectAuthEmulator } from "firebase/auth";
+import { getFunctions, connectFunctionsEmulator } from "firebase/functions";
 import { getStorage } from "firebase/storage";
 
 const firebaseConfig = {
@@ -34,6 +34,15 @@ export const db = createFirestore();
 export const auth = getAuth(app);
 export const functions = getFunctions(app, "asia-southeast1");
 export const storage = getStorage(app); // <--- 2. Export this
+
+if (process.env.NEXT_PUBLIC_USE_FIREBASE_EMULATOR === "true") {
+  if (!globalThis.__firebase_emulator_connected) {
+    globalThis.__firebase_emulator_connected = true;
+    connectAuthEmulator(auth, "http://localhost:9099", { disableWarnings: true });
+    connectFirestoreEmulator(db, "localhost", 8080);
+    connectFunctionsEmulator(functions, "localhost", 5001);
+  }
+}
 
 if (typeof window !== "undefined") {
   window.__atlasFirebaseFunctionsRegion = "asia-southeast1";

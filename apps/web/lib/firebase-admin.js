@@ -52,11 +52,22 @@ function ensureAdminApp() {
     process.env.FIREBASE_PROJECT_ID ||
     process.env.GCLOUD_PROJECT ||
     process.env.GOOGLE_CLOUD_PROJECT ||
-    process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
+    process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID ||
+    "atlas-tracking";
+
+  const isEmulator = Boolean(
+    process.env.FIRESTORE_EMULATOR_HOST ||
+    process.env.FIREBASE_AUTH_EMULATOR_HOST ||
+    process.env.NEXT_PUBLIC_USE_FIREBASE_EMULATOR === "true"
+  );
 
   initializeApp({
-    credential: serviceAccount ? cert(serviceAccount) : applicationDefault(),
-    ...(projectId ? { projectId } : {}),
+    ...(serviceAccount
+      ? { credential: cert(serviceAccount) }
+      : isEmulator
+      ? {}
+      : { credential: applicationDefault() }),
+    projectId,
   });
 }
 

@@ -176,24 +176,32 @@ export default function NotificationBell({ isDark = false }) {
                         isDark ? "text-slate-200" : "text-slate-900"
                       }`}
                     >
-                      {/* Construct message since 'message' field is missing in data */}
-                      {alert.details?.driverName
-                        ? `${alert.details.driverName}: `
-                        : alert.type === "CHAT_MESSAGE"
-                          ? `${alert.details?.customerName || "Customer"}: `
-                        : `${alert.tripId || "Unknown Trip"} `}
+                      {/* Construct message with title/driver/trip/customer support */}
+                      {alert.title ? (
+                        <span>{alert.title}</span>
+                      ) : alert.details?.driverName ? (
+                        `${alert.details.driverName}: `
+                      ) : alert.type === "CHAT_MESSAGE" ? (
+                        `${alert.details?.customerName || "Customer"}: `
+                      ) : alert.tripId ? (
+                        `${alert.tripId}: `
+                      ) : null}
 
-                      {/* Badge aligns nicely beside text */}
+                      {/* Badge or message text */}
                       {alert.details?.reason ? (
                         <StatusBadge
                           status="delayed"
                           reason={alert.details.reason}
                         />
+                      ) : alert.message ? (
+                        <span className="font-normal text-xs text-slate-500 dark:text-slate-400 block mt-0.5">
+                          {alert.message}
+                        </span>
                       ) : alert.type === "CHAT_MESSAGE" ? (
-                        alert.message || "New chat message"
-                      ) : (
+                        "New chat message"
+                      ) : !alert.title ? (
                         "New System Alert"
-                      )}
+                      ) : null}
                     </p>
                     <div className="flex justify-between items-center mt-2">
                       <span

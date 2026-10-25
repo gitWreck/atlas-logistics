@@ -3,10 +3,12 @@ import {
   initializeAuth,
   getAuth,
   getReactNativePersistence,
+  connectAuthEmulator,
 } from "firebase/auth";
-import { getFirestore } from "firebase/firestore";
+import { getFirestore, connectFirestoreEmulator } from "firebase/firestore";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { getStorage } from "firebase/storage";
+import { Platform } from "react-native";
 
 // Your Firebase config. Expo web may not inject EXPO_PUBLIC_* env vars at runtime,
 // so fall back to the expected values for local development.
@@ -54,5 +56,14 @@ try {
 // 3. Initialize Firestore
 const db = getFirestore(app);
 const storage = getStorage(app);
+
+if (process.env.EXPO_PUBLIC_USE_FIREBASE_EMULATOR === "true") {
+  if (!global.__firebase_emulator_connected) {
+    global.__firebase_emulator_connected = true;
+    const host = Platform.OS === "android" ? "10.0.2.2" : "localhost";
+    connectAuthEmulator(auth, `http://${host}:9099`, { disableWarnings: true });
+    connectFirestoreEmulator(db, host, 8080);
+  }
+}
 
 export { auth, db, app, storage };
